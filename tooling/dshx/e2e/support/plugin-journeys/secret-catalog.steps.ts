@@ -111,9 +111,18 @@ When('the scope filter is set to {string}', async ({ page }: { page: Page }, sco
   await catalog(page).getByRole('radio', { name: scope, exact: true }).click()
 })
 
+const evidenceSlug = (alias: string): string => alias.toLowerCase().replaceAll('_', '-')
+
+const openAddDialog = async (page: Page) => {
+  await catalog(page).getByRole('button', { name: 'More ways to add a secret', exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Add with details…', exact: true }).click()
+  return page.getByRole('dialog', { name: 'Add secret', exact: true })
+}
+
+const draftRow = (page: Page) => aliasRows(page).filter({ has: page.getByRole('textbox', { name: 'New secret name', exact: true }) })
+
 When('the alias {string} is added to the project with the value {string}', async ({ page }: { page: Page }, alias: string, value: string) => {
-  await catalog(page).getByRole('button', { name: '+ Add Secret', exact: true }).click()
-  const dialog = page.getByRole('dialog', { name: 'Add secret', exact: true })
+  const dialog = await openAddDialog(page)
   await dialog.getByRole('textbox', { name: 'Alias', exact: true }).fill(alias)
   await expect(dialog.getByRole('combobox', { name: 'Save to', exact: true })).toHaveText('This project')
   await expect(dialog.getByRole('textbox', { name: 'Environment', exact: true })).toHaveValue('prod')
@@ -124,6 +133,105 @@ When('the alias {string} is added to the project with the value {string}', async
   await dialog.getByRole('textbox', { name: 'Source URL', exact: true }).fill('https://api.example.test')
   await dialog.getByRole('button', { name: 'Add secret', exact: true }).click()
   await expect(dialog).toBeHidden()
+})
+
+When('{string} is typed into a new inline row with the value {string} and saved with Enter', async ({ page }: { page: Page }, name: string, value: string) => {
+  await catalog(page).getByRole('button', { name: 'Add secret', exact: true }).click()
+  const row = draftRow(page).last()
+  await row.getByRole('textbox', { name: 'New secret name', exact: true }).pressSequentially(name)
+  await row.getByRole('textbox', { name: 'New secret value', exact: true }).fill(value)
+  await row.getByRole('textbox', { name: 'New secret value', exact: true }).press('Enter')
+})
+
+When('an inline row named {string} is left by clicking elsewhere', async ({ page }: { page: Page }, name: string) => {
+  await catalog(page).getByRole('button', { name: 'Add secret', exact: true }).click()
+  await draftRow(page).last().getByRole('textbox', { name: 'New secret name', exact: true }).pressSequentially(name)
+  await catalog(page).getByRole('heading', { name: 'Secret Catalog', exact: true }).click()
+})
+
+When('the inline row is renamed {string}, set to Generate, and left by clicking elsewhere', async ({ page }: { page: Page }, name: string) => {
+  const row = draftRow(page).last()
+  await row.getByRole('textbox', { name: 'New secret name', exact: true }).fill(name)
+  await row.getByRole('button', { name: `Actions for ${name}`, exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Generate on this Host', exact: true }).click()
+  await expect(row.getByText('Generated on this Host when saved', { exact: true })).toBeVisible()
+  await catalog(page).getByRole('heading', { name: 'Secret Catalog', exact: true }).click()
+})
+
+When('a new inline row is deleted from its row menu', async ({ page }: { page: Page }) => {
+  await catalog(page).getByRole('button', { name: 'Add secret', exact: true }).click()
+  await draftRow(page).last().getByRole('button', { name: 'Actions for the new secret', exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Delete row', exact: true }).click()
+})
+
+When('the add dialog is opened from the Add secret menu', async ({ page }: { page: Page }) => {
+  await openAddDialog(page)
+})
+
+When('{string} is added to the global scope with a generated value', async ({ page }: { page: Page }, alias: string) => {
+  const dialog = page.getByRole('dialog', { name: 'Add secret', exact: true })
+  await dialog.getByRole('textbox', { name: 'Alias', exact: true }).fill(alias)
+  await dialog.getByRole('combobox', { name: 'Save to', exact: true }).click()
+  await page.getByRole('option', { name: 'Global (every project)', exact: true }).click()
+  await expect(dialog.getByRole('radio', { name: /^Generate on this Host/ })).toBeChecked()
+  await dialog.getByRole('button', { name: 'Add secret', exact: true }).click()
+  await expect(dialog).toBeHidden()
+})
+
+Then('the inline row says {string}', async ({ page }: { page: Page }, message: string) => {
+  await recordAssertion(page, 'secret-catalog-inline-row-explains-why-it-was-not-saved', async () => {
+    await expect(draftRow(page).last().getByText(message, { exact: true })).toBeVisible()
+  })
+})
+
+Then(
+  'the store holds {string} in the {string} scope with the value {string}',
+  async ({ page }: { page: Page }, alias: string, scope: string, value: string) => {
+    await recordAssertion(page, `secret-catalog-store-holds-${evidenceSlug(alias)}-in-${scope}`, async () => {
+      await expect(rowFor(page, alias, 'prod')).toBeVisible()
+      const store = await readStore(page)
+      const row = store.rows.find(candidate => candidate.alias === alias && candidate.environment === 'prod')
+      expect(row?.scope).toBe(scope)
+      expect(store.vault[row?.item ?? '']).toBe(value)
+      await expect(page.getByText(value)).toHaveCount(0)
+    })
+  },
+)
+
+Then(
+  'the store holds a generated value for {string} in the {string} scope that the page never showed',
+  async ({ page }: { page: Page }, alias: string, scope: string) => {
+    await recordAssertion(page, `secret-catalog-generated-${evidenceSlug(alias)}-stays-on-the-host`, async () => {
+      await expect(rowFor(page, alias, 'prod')).toBeVisible()
+      const store = await readStore(page)
+      const row = store.rows.find(candidate => candidate.alias === alias && candidate.environment === 'prod')
+      expect(row?.scope).toBe(scope)
+      const generated = store.vault[row?.item ?? ''] ?? ''
+      expect(generated).toMatch(/^generated-/)
+      await expect(page.getByText(generated)).toHaveCount(0)
+    })
+  },
+)
+
+Then('no inline row is left', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'secret-catalog-inline-rows-are-gone', () => expect(draftRow(page)).toHaveCount(0))
+  await finishJourneyAssertions(page)
+})
+
+Then('the dialog flags {string} as {string} and keeps Advanced folded', async ({ page }: { page: Page }, alias: string, message: string) => {
+  const dialog = page.getByRole('dialog', { name: 'Add secret', exact: true })
+  const aliasField = dialog.getByRole('textbox', { name: 'Alias', exact: true })
+  await aliasField.fill(alias)
+  await aliasField.blur()
+  await recordAssertion(page, `secret-catalog-dialog-flags-${evidenceSlug(alias)}`, async () => {
+    await expect(dialog.getByText(message, { exact: true })).toBeVisible()
+    await expect(aliasField).toHaveAttribute('aria-invalid', 'true')
+    await expect(dialog.getByRole('textbox', { name: 'Item name', exact: true })).toBeHidden()
+  })
+})
+
+Then('the dialog journey is complete', async ({ page }: { page: Page }) => {
+  await finishJourneyAssertions(page)
 })
 
 When('{string} gets the source {string} and the value {string}', async ({ page }: { page: Page }, alias: string, source: string, value: string) => {

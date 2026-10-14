@@ -1,5 +1,7 @@
 import { z } from 'zod'
 import { aliasSchema, createMetadataSchema, environmentSchema, updateMetadataSchema } from './secret-arguments.js'
+import type { SecretScopeFilter } from './secret-catalog-model.js'
+import type { SecretMetadata } from './secret-metadata.js'
 
 export type SecretMutationScope = 'global' | 'project' | 'local'
 export type SecretRemoveTarget = 'alias' | 'vault-item'
@@ -32,6 +34,39 @@ export const isSecretScope = (value: string): value is SecretMutationScope => va
 
 export const needsProjectFolder = (input: { readonly scope: SecretMutationScope; readonly hasProjectFolder: boolean }): boolean =>
   input.scope !== 'global' && !input.hasProjectFolder
+
+/** Where a new secret goes when the user has not said: the scope being viewed, or the selected project under All. */
+export const defaultCreateScope = (input: { readonly filter: SecretScopeFilter; readonly hasProjectFolder: boolean }): SecretMutationScope => {
+  if (input.filter !== 'all') return input.filter
+  return input.hasProjectFolder ? 'project' : 'global'
+}
+
+/** Env-var style, as typed into the quick-add row: upper case, separators become `_`, other characters are dropped. */
+export const toEnvVarName = (raw: string): string =>
+  raw
+    .toUpperCase()
+    .replace(/[\s.-]+/g, '_')
+    .replace(/[^A-Z0-9_]/g, '')
+
+export type QuickAddIssue = 'name-required' | 'name-invalid' | 'duplicate' | 'needs-folder' | 'value-required'
+
+/** The first reason a quick-add draft cannot be saved yet, or null when it can. */
+export const quickAddIssue = (input: {
+  readonly name: string
+  readonly value: string
+  readonly valueMode: 'generate' | 'manual'
+  readonly environment: string
+  readonly scope: SecretMutationScope
+  readonly hasProjectFolder: boolean
+  readonly rows: readonly SecretMetadata[]
+}): QuickAddIssue | null => {
+  if (input.name.length === 0) return 'name-required'
+  if (!aliasSchema.safeParse(input.name).success) return 'name-invalid'
+  if (input.rows.some(row => row.alias === input.name && row.environment === input.environment)) return 'duplicate'
+  if (needsProjectFolder({ scope: input.scope, hasProjectFolder: input.hasProjectFolder })) return 'needs-folder'
+  if (input.valueMode === 'manual' && input.value.length === 0) return 'value-required'
+  return null
+}
 
 const secretValueSchema = z.string().max(262_144, 'A secret value is at most 256 KiB.')
 

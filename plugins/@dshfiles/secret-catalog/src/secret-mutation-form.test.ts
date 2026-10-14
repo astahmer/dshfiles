@@ -1,13 +1,17 @@
 import { describe, expect, it } from 'vitest'
+import type { SecretMetadata } from './secret-metadata.js'
 import {
+  defaultCreateScope,
   defaultFieldForType,
   hasSecretUpdate,
   needsProjectFolder,
+  quickAddIssue,
   secretCreateFormDefaults,
   secretCreateFormSchema,
   secretUpdateFormDefaults,
   secretUpdateFormSchema,
   toSecretCreateInput,
+  toEnvVarName,
   toSecretUpdateInput,
 } from './secret-mutation-form.js'
 
@@ -122,5 +126,50 @@ describe('Secret Catalog edit form', () => {
 
   it('rejects metadata that starts with a dash', () => {
     expect(issuePaths(secretUpdateFormSchema.safeParse({ ...defaults, name: '-x' }))).toEqual(['name'])
+  })
+})
+
+describe('Secret Catalog quick add', () => {
+  const existing: SecretMetadata = {
+    id: 'existing',
+    alias: 'DB_PASSWORD',
+    scope: 'project',
+    environment: 'prod',
+    variableName: 'DB_PASSWORD',
+    item: '',
+    field: '',
+    service: '',
+    description: '',
+  }
+  const draft = {
+    name: 'STRIPE_KEY',
+    value: 'synthetic-value',
+    valueMode: 'manual',
+    environment: 'prod',
+    scope: 'project',
+    hasProjectFolder: true,
+    rows: [existing],
+  } as const
+
+  it('types names env-var style', () => {
+    expect(toEnvVarName('stripe api-key.v2')).toBe('STRIPE_API_KEY_V2')
+    expect(toEnvVarName('db_pässword!')).toBe('DB_PSSWORD')
+  })
+
+  it('adds to the viewed scope, or to the selected project under All', () => {
+    expect(defaultCreateScope({ filter: 'all', hasProjectFolder: true })).toBe('project')
+    expect(defaultCreateScope({ filter: 'all', hasProjectFolder: false })).toBe('global')
+    expect(defaultCreateScope({ filter: 'local', hasProjectFolder: true })).toBe('local')
+  })
+
+  it('names the first reason a draft cannot be saved', () => {
+    expect(quickAddIssue(draft)).toBeNull()
+    expect(quickAddIssue({ ...draft, name: '' })).toBe('name-required')
+    expect(quickAddIssue({ ...draft, name: '1PASSWORD' })).toBe('name-invalid')
+    expect(quickAddIssue({ ...draft, name: 'DB_PASSWORD' })).toBe('duplicate')
+    expect(quickAddIssue({ ...draft, name: 'DB_PASSWORD', environment: 'dev' })).toBeNull()
+    expect(quickAddIssue({ ...draft, hasProjectFolder: false })).toBe('needs-folder')
+    expect(quickAddIssue({ ...draft, value: '' })).toBe('value-required')
+    expect(quickAddIssue({ ...draft, value: '', valueMode: 'generate' })).toBeNull()
   })
 })

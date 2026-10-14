@@ -16,22 +16,31 @@ when it is registered, its workspace id.
 
 ## Value actions and mutations
 
-- Reveal calls the Host only after the exact row's Preview button is pressed.
-  The value control cycles through a masked preview, the full value, and
-  hidden. Long previews show four leading and trailing characters; short
-  values remain masked. The value stays in component state for at most 15
-  seconds and clears on window blur, document hiding, filter/scope/folder
-  change, refresh, and unmount.
+- Reveal calls the Host only when the exact row's masked value is clicked;
+  hovering it says "Click to reveal". The revealed value is focused and stays in
+  component state until the reveal timeout (15 seconds by default), Esc, a
+  second click, focus leaving it or the window (when hide-on-blur is on),
+  document hiding, a filter/scope/folder change, refresh, or unmount.
 - Copy calls `secret get <alias> --copy` only after the exact row's Copy button
-  is pressed. The Host discards both output streams.
-- Add supports global, project, and machine-local config scopes and an explicit
-  environment (default `prod`). It can ask
-  the CLI to generate a value on the Host or pass a user-entered value through
-  stdin. Values never appear in arguments or captured output. Global uses the
-  CLI's `--global`; project uses the selected working directory; local uses
-  the selected folder's `.secret.local.json` through the CLI's `--config`.
-  Add checks metadata for an existing alias in the selected environment and
-  refuses a duplicate before writing.
+  is pressed, without revealing. The Host discards both output streams.
+- **Add secret** under the list appends an editable row: an env-var style name
+  (typed text is upper-cased, separators become `_`) and a masked value. The
+  row menu offers Generate on this Host, Copy (the typed value) and Delete.
+  Enter, or focus leaving the row, saves it to the viewed scope (the selected
+  project under All, otherwise global) and the default environment. An empty
+  draft asks for a value or Generate instead of saving: the Host refuses empty
+  manual values and `secret set` documents no empty-value mode. The CLI has no
+  bulk import command, so there is no Import entry.
+- The arrow beside Add secret opens **Add with details…**: alias first, then
+  where it lives (the selected project by default), environment (default
+  `prod`), and where the value comes from. Generate asks the CLI to create the
+  value on the Host; a typed value goes once to the Host and reaches the CLI on
+  stdin. Item name, source, tags, type and field (`password`, or `notes` for a
+  Secure Note) sit behind Advanced. Values never appear in arguments or
+  captured output. Global uses the CLI's `--global`; project uses the selected
+  working directory; local uses the selected folder's `.secret.local.json`
+  through the CLI's `--config`. Both paths check metadata for an existing alias
+  in the selected environment and refuse a duplicate before writing.
 - Edit supports item name, source, tags, and a two-step masked value
   replacement. Value replacement is passed through stdin with an explicit
   overwrite flag after user confirmation. The CLI's `edit --field` also

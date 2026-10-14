@@ -2,24 +2,26 @@ import type { IWorkspaces } from '@deepseek-ai/dsh-api-workspace-controller/clie
 import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@dshfiles/plugin-ui/components/ui/input-group'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
 import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
 import { TooltipProvider } from '@dshfiles/plugin-ui/components/ui/tooltip'
-import { FolderOpenIcon, RefreshCwIcon, SearchIcon, XIcon } from '@dshfiles/plugin-ui/icons'
+import { ChevronDownIcon, FolderOpenIcon, PlusIcon, RefreshCwIcon, SearchIcon, SlidersHorizontalIcon, XIcon } from '@dshfiles/plugin-ui/icons'
 import { useApi, useSettings } from '@dshfiles/dshx/client'
 import type { KeyboardEvent } from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { ProjectFolderPicker, type DirectoryPickerPort, type ProjectFolderSelection, type RegisteredProject } from '@dshfiles/project-folder-picker'
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { SecretMutationDialog } from './secret-mutation-dialog.js'
-import type { SecretCreateForm, SecretMutationScope, SecretRemoveTarget, SecretUpdateForm } from './secret-mutation-form.js'
+import { defaultCreateScope, type SecretCreateForm, type SecretMutationScope, type SecretRemoveTarget, type SecretUpdateForm } from './secret-mutation-form.js'
 import { createSecretActionPolicy, filterSecretMetadata, nextRowIndex, type SecretScopeFilter } from './secret-catalog-model.js'
 import { secretCatalogSettings } from './settings.js'
 import { secretCatalogApi } from './api.js'
 import type { SecretCatalogTranslate } from './locales.js'
 import type { SecretMetadata } from './secret-metadata.js'
 import { SecretCatalogTable, type RevealedSecret } from './secret-catalog-table.js'
+import { SecretQuickAddRow } from './secret-quick-add-row.js'
 
 interface SecretCatalogPanelProps {
   readonly directoryPicker: DirectoryPickerPort
@@ -88,6 +90,8 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
   const [busyRow, setBusyRow] = useState<{ readonly id: string; readonly action: 'reveal' | 'copy' } | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [dialog, setDialog] = useState<ActiveDialog | null>(null)
+  const [draftIds, setDraftIds] = useState<readonly number[]>([])
+  const nextDraftId = useRef(0)
   const revealGeneration = useRef(0)
   const revealTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const queryClient = useQueryClient()
@@ -247,6 +251,23 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
   }
 
   const displayedMachineName = machineName ?? t('currentHost')
+  const createScope = defaultCreateScope({ filter: scope, hasProjectFolder: cwd !== null })
+
+  const addDraft = (): void => {
+    nextDraftId.current += 1
+    const id = nextDraftId.current
+    setDraftIds(current => [...current, id])
+  }
+  const removeDraft = (id: number): void => setDraftIds(current => current.filter(candidate => candidate !== id))
+  const createFromDraft = async (input: SecretCreateForm): Promise<void> => {
+    clearRevealed()
+    await api.create({ ...input, cwd })
+  }
+  const onDraftSaved = async (id: number, alias: string): Promise<void> => {
+    await queryClient.invalidateQueries({ queryKey: ['secret-catalog', 'list'] })
+    removeDraft(id)
+    setNotice(t('added', { alias }))
+  }
 
   const openDialog = (next: ActiveDialog): void => {
     clearRevealed()
@@ -285,9 +306,6 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
             >
               <RefreshCwIcon aria-hidden className={loading ? 'dshx:animate-spin' : undefined} />
               {t('refresh')}
-            </Button>
-            <Button onClick={() => openDialog({ mode: 'create' })} type="button">
-              {t('addSecret')}
             </Button>
           </div>
         </header>
@@ -408,10 +426,59 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
                 onEdit: row => openDialog({ mode: 'edit', row }),
                 onRemove: row => openDialog({ mode: 'remove', row }),
               }}
+              append={
+                draftIds.length === 0
+                  ? undefined
+                  : draftIds.map(id => (
+                      <SecretQuickAddRow
+                        create={createFromDraft}
+                        environment={defaultEnvironment}
+                        hasProjectFolder={cwd !== null}
+                        key={id}
+                        onDiscard={() => removeDraft(id)}
+                        onSaved={alias => onDraftSaved(id, alias)}
+                        rows={rows}
+                        scope={createScope}
+                        t={t}
+                      />
+                    ))
+              }
               hasAnyRows={rows.length > 0}
               loading={loading}
               rows={filteredRows}
             />
+            <div className="dshx:mt-3 dshx:inline-flex dshx:rounded-md dshx:shadow-xs">
+              <Button
+                className="dshx:rounded-r-none dshx:shadow-none"
+                disabled={loading && rows.length === 0}
+                onClick={addDraft}
+                size="sm"
+                type="button"
+                variant="outline"
+              >
+                <PlusIcon aria-hidden />
+                {t('addSecret')}
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    aria-label={t('moreWaysToAdd')}
+                    className="dshx:rounded-l-none dshx:border-l-0 dshx:shadow-none"
+                    size="icon-sm"
+                    type="button"
+                    variant="outline"
+                  >
+                    <ChevronDownIcon aria-hidden />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="dshx-root">
+                  <DropdownMenuItem onSelect={() => openDialog({ mode: 'create' })}>
+                    <SlidersHorizontalIcon aria-hidden />
+                    {t('addWithDetails')}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
         ) : null}
         {pickerOpen && (
@@ -433,7 +500,7 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
             error={mutationError}
             hasProjectFolder={cwd !== null}
             defaultEnvironment={defaultEnvironment}
-            initialCreateScope={scope === 'all' ? (cwd === null ? 'global' : 'project') : scope}
+            initialCreateScope={createScope}
             mode={dialog.mode}
             onClose={() => {
               setDialog(null)

@@ -137,20 +137,82 @@
       "reach": ["seed fake-secret-cli", "click button \"Secret Catalog\"", "hover button \"Reveal GITHUB_TOKEN\"", "expect text \"Click to reveal\""]
     },
     {
-      "id": "alias-mutations",
-      "title": "Create, edit, rename, and remove aliases safely",
-      "summary": "Create generated or manual values, edit metadata/value, rename aliases, remove one alias without deleting the vault item, or explicitly delete the vault entry.",
+      "id": "inline-quick-add",
+      "title": "Add a secret inline under the list",
+      "summary": "Add secret appends an editable row: an env-var style name and a masked value (or Generate on this Host from the row menu, which also offers Copy and Delete). Enter or leaving the row saves it to the viewed scope (the selected project under All) and the default environment; the split arrow opens the detailed dialog.",
       "reach": [
         "seed fake-secret-cli",
         "click button \"Secret Catalog\"",
-        "click button \"+ Add Secret\"",
+        "click button \"Add secret\"",
+        "fill textbox \"New secret name\" \"STRIPE_API_KEY\"",
+        "fill textbox \"New secret value\" \"scratch-fake-typed-value\"",
+        "click button \"Actions for STRIPE_API_KEY\"",
+        "expect menuitem \"Generate on this Host\""
+      ],
+      "surfaces": ["client", "host"],
+      "configuration": [
+        {
+          "key": "defaultEnvironment",
+          "defaultValue": "prod",
+          "constraints": "Must match ^[A-Za-z0-9_-]+$.",
+          "coveredBy": ["secret-catalog.quick-add"]
+        }
+      ],
+      "states": ["draft", "invalid", "saving", "saved", "failed", "discarded"],
+      "failureModes": [
+        "A draft with no value is not saved: the Host refuses empty manual values, so the row asks for a value or Generate.",
+        "A name that already exists in the environment is flagged before any write.",
+        "A failed save keeps the draft and its value in the row and says so."
+      ],
+      "externalDependencies": [
+        {
+          "id": "secret-cli",
+          "boundary": "secret set over stdin or with --generate through the managed secret executable.",
+          "deterministicFake": "Put the e2e fake secret CLI first on the Host PATH with a synthetic JSON store; never invoke a real vault."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "secret-catalog.quick-add",
+          "featureFile": "tooling/dshx/e2e/features/secret-catalog.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "secret-catalog.inline-quick-add-unit-env-var-name",
+          "file": "plugins/@dshfiles/secret-catalog/src/secret-mutation-form.test.ts",
+          "testName": "types names env-var style"
+        },
+        {
+          "kind": "unit-test",
+          "id": "secret-catalog.inline-quick-add-unit-default-scope",
+          "file": "plugins/@dshfiles/secret-catalog/src/secret-mutation-form.test.ts",
+          "testName": "adds to the viewed scope, or to the selected project under All"
+        },
+        {
+          "kind": "unit-test",
+          "id": "secret-catalog.inline-quick-add-unit-draft-issues",
+          "file": "plugins/@dshfiles/secret-catalog/src/secret-mutation-form.test.ts",
+          "testName": "names the first reason a draft cannot be saved"
+        }
+      ]
+    },
+    {
+      "id": "alias-mutations",
+      "title": "Create, edit, rename, and remove aliases safely",
+      "summary": "Add through a required-first dialog (alias, scope defaulting to the selected project, environment prod, generated or masked value, Advanced fold for item metadata), edit metadata/value, rename aliases, remove one alias without deleting the vault item, or explicitly delete the vault entry.",
+      "reach": [
+        "seed fake-secret-cli",
+        "click button \"Secret Catalog\"",
+        "click button \"More ways to add a secret\"",
+        "click menuitem \"Add with details…\"",
         "click radio \"Enter a value*\"",
         "click button \"Advanced*\"",
         "expect dialog \"Add secret\""
       ],
       "surfaces": ["client", "host", "settings"],
       "configuration": [],
-      "states": ["editing", "creating", "renaming", "removing-alias", "deleting-vault-item", "collision"],
+      "states": ["editing", "invalid", "creating", "renaming", "removing-alias", "deleting-vault-item", "collision"],
       "failureModes": [
         "Duplicate alias/environment collisions are blocked before writes.",
         "Manual values travel through stdin and are not echoed in process output."
@@ -163,6 +225,11 @@
         }
       ],
       "verification": [
+        {
+          "kind": "gherkin",
+          "id": "secret-catalog.add-dialog",
+          "featureFile": "tooling/dshx/e2e/features/secret-catalog.feature"
+        },
         {
           "kind": "gherkin",
           "id": "secret-catalog.add-edit",

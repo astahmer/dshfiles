@@ -189,18 +189,25 @@ const ActionsCell = (props: { readonly row: SecretMetadata }): JSX.Element => {
 const features = tableFeatures({ rowSortingFeature, sortedRowModel: createSortedRowModel(), sortFns: { alphanumeric: sortFn_alphanumeric } })
 const column = createColumnHelper<typeof features, SecretMetadata>()
 
-const columnClassNames: Readonly<Record<string, string | undefined>> = {
+const columnClassNames = {
   name: 'dshx:w-[38%] dshx:max-w-0',
   description: 'dshx:w-[28%] dshx:max-w-0 dshx:@max-pane-compact:hidden',
   value: 'dshx:max-w-0',
   actions: 'dshx:w-px dshx:text-right dshx:whitespace-nowrap',
-}
+} as const
+
+/** Width and visibility of a catalog column, so appended draft rows line up with saved ones. */
+export const secretColumnClassName = (columnId: keyof typeof columnClassNames): string => columnClassNames[columnId]
+
+const isColumnId = (columnId: string): columnId is keyof typeof columnClassNames => columnId in columnClassNames
 
 interface SecretCatalogTableProps {
   readonly rows: readonly SecretMetadata[]
   readonly loading: boolean
   readonly hasAnyRows: boolean
   readonly actions: SecretRowActions
+  /** Draft rows under the saved ones. */
+  readonly append?: ReactNode
 }
 
 const LoadingRows = (props: { readonly label: string }): JSX.Element => (
@@ -253,7 +260,8 @@ export const SecretCatalogTable = (props: SecretCatalogTableProps): JSX.Element 
   return (
     <SecretRowActionsContext.Provider value={props.actions}>
       <DataTable
-        cellClassName={columnId => columnClassNames[columnId]}
+        append={props.append}
+        cellClassName={columnId => (isColumnId(columnId) ? columnClassNames[columnId] : undefined)}
         className="dshx:overflow-visible dshx:[&_[data-slot=table-container]]:overflow-visible dshx:[&_thead]:sticky dshx:[&_thead]:top-0 dshx:[&_thead]:z-10 dshx:[&_thead]:bg-muted dshx:[&_thead_th:first-child]:rounded-tl-lg dshx:[&_thead_th:last-child]:rounded-tr-lg"
         empty={empty}
         table={table}

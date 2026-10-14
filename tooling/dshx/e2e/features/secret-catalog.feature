@@ -46,6 +46,32 @@ Feature: Secret Catalog
     When "API_KEY" gets the source "https://api.example.test/v2" and the value "api-e2e-edited-value"
     Then the store holds "API_KEY" with the value "api-e2e-edited-value" and the source "https://api.example.test/v2"
 
+  @scenario:secret-catalog.quick-add
+  Scenario: Add secrets inline under the list, typed or generated
+    Given the isolated plugin profile "@dshfiles/secret-catalog" is booted
+    When the Secret Catalog is opened
+    And the seeded project folder is chosen in the Secret Catalog
+    And "stripe key" is typed into a new inline row with the value "quick-e2e-typed-value" and saved with Enter
+    Then the store holds "STRIPE_KEY" in the "project" scope with the value "quick-e2e-typed-value"
+    When an inline row named "db password" is left by clicking elsewhere
+    Then the inline row says "DB_PASSWORD already exists in prod."
+    When the inline row is renamed "WEBHOOK_SECRET", set to Generate, and left by clicking elsewhere
+    Then the store holds a generated value for "WEBHOOK_SECRET" in the "project" scope that the page never showed
+    When a new inline row is deleted from its row menu
+    Then no inline row is left
+
+  @scenario:secret-catalog.add-dialog
+  Scenario: The add dialog validates inline and generates a global secret on the Host
+    Given the isolated plugin profile "@dshfiles/secret-catalog" is booted
+    When the Secret Catalog is opened
+    And the seeded project folder is chosen in the Secret Catalog
+    And the add dialog is opened from the Add secret menu
+    Then the dialog flags "1BAD" as "Start with a letter or _, then use letters, digits, _ or -." and keeps Advanced folded
+    And the dialog flags "DB_PASSWORD" as "DB_PASSWORD already exists in prod." and keeps Advanced folded
+    When "GLOBAL_TOKEN" is added to the global scope with a generated value
+    Then the store holds a generated value for "GLOBAL_TOKEN" in the "global" scope that the page never showed
+    And the dialog journey is complete
+
   @scenario:secret-catalog.rename-remove
   Scenario: Rename an alias, remove another, and delete a vault item
     Given the isolated plugin profile "@dshfiles/secret-catalog" is booted
