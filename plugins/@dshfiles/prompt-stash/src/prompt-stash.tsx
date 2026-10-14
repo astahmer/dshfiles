@@ -6,6 +6,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/com
 import { useMemo, useState } from 'react'
 import type {} from '@deepseek-ai/dsh-client-ui-chat/client'
 import type { ComposerActionProps } from '@dshfiles/dshx/client'
+import { useDraftAttachmentRetention, type DraftAttachmentKeeper } from './draft-attachment-retention.js'
 import {
   DRAFT_STORE_KEY,
   MAX_SENT_PROMPTS,
@@ -38,8 +39,11 @@ const readStore = (): DraftStore => {
 
 const previewText = (text: string): string => text.replace(/\s+/g, ' ').trim().slice(0, 180)
 
-export const PromptStashAction = (props: ComposerActionProps): JSX.Element => {
+export const PromptStashAction = (
+  props: ComposerActionProps & { readonly attachmentKeeper: DraftAttachmentKeeper<ComposerActionProps['sessionId']> },
+): JSX.Element => {
   const input = props.useInput(state => state)
+  useDraftAttachmentRetention({ keeper: props.attachmentKeeper, sessionId: props.sessionId, count: input.attachmentIds.length })
   const chatOrder = props.useChat(state => state.order)
   const chatNodes = props.useChat(state => state.nodes)
   const [store, setStore] = useState(readStore)

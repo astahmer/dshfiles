@@ -1,7 +1,8 @@
 Feature: Prompt stash
 
   These journeys use a fresh isolated browser profile and the real composer UI.
-  They do not submit a message or call a live model/provider API.
+  They never call a live model/provider API; the attachment journey sends two
+  messages only to create threads, and their turns fail for lack of a provider.
 
   @scenario:prompt-stash.prompt-library-management
   Scenario: Search, edit, and delete saved prompts
@@ -57,3 +58,13 @@ Feature: Prompt stash
     Then saving leaves the current composer text unchanged
     When the composer is cleared and the saved draft "Planning prompt" is restored
     Then the draft is restored without sending and can be removed
+
+  @scenario:prompt-stash.draft-attachments-survive-back
+  Scenario: Draft attachments survive leaving the thread and coming back
+    Given the isolated plugin composition of "@dshfiles/prompt-stash, @dshfiles/thread-sidebar" is booted
+    When a thread drafts "Draft with attachments" with an image and a file attached
+    And another thread is opened
+    And the sidebar goes back to the drafting thread
+    Then the draft still reads "Draft with attachments" with its image and file attached
+    When the attachments are removed from the draft
+    Then the drafting thread holds no attachments after another round trip

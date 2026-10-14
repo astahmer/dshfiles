@@ -1895,6 +1895,9 @@ importers:
       '@deepseek-ai/dsh':
         specifier: 0.2.0-rc.2
         version: 0.2.0-rc.2(6abed0b9bb080ea5a1f018a40b5b6850)
+      '@deepseek-ai/dsh-api-session-controller':
+        specifier: 0.2.0-rc.2
+        version: 0.2.0-rc.2(fbf77141fdbac807e5fc5bf811a103f5)
       '@deepseek-ai/dsh-client-ui-chat':
         specifier: 0.2.0-rc.2
         version: 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)

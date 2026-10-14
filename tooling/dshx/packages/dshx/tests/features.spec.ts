@@ -55,6 +55,10 @@ describe('plugin feature metadata', () => {
     expect(
       withReach(['click button "Choose workspace"', 'fill textbox "Search" "sample"', 'expect option "sample*"', 'press Enter', 'expect checkbox "workspace"']),
     ).toEqual([])
+    expect(withReach(['attach "tooling/dshx/e2e/fixtures/attachments/red.png"', 'expect button "Remove image red.png"'])).toEqual([])
+    for (const outside of ['attach "/etc/hosts"', 'attach "../secrets.txt"', 'attach "plugins/../../x"']) {
+      expect(withReach([outside, 'expect text "x"'])).toEqual(expect.arrayContaining([expect.stringContaining('reach steps are')]))
+    }
     expect(withReach(['open the queue panel'])).toEqual(expect.arrayContaining([expect.stringContaining('reach steps are')]))
     expect(withReach(['fill text "Queue" "x"', 'expect text "Queue"'])).toEqual(expect.arrayContaining([expect.stringContaining('reach steps are')]))
     expect(withReach(['click button "Queue"'])).toEqual(expect.arrayContaining([expect.stringContaining('must end with an expect step')]))

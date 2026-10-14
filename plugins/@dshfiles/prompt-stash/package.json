@@ -32,6 +32,7 @@
   "devDependencies": {
     "@deepseek-ai/cordis": "4.0.4",
     "@deepseek-ai/dsh": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-api-session-controller": "0.2.0-rc.2",
     "@deepseek-ai/dsh-client-ui-chat": "0.2.0-rc.2",
     "@deepseek-ai/dsh-client-ui-conversation": "0.2.0-rc.2",
     "@deepseek-ai/dsh-client-ui-renderer": "0.2.0-rc.2",
@@ -45,6 +46,7 @@
   "peerDependencies": {
     "@deepseek-ai/cordis": "~4.0.4",
     "@deepseek-ai/dsh": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-api-session-controller": ">=0.2.0-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-client-ui-chat": ">=0.2.0-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-client-ui-conversation": ">=0.2.0-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-client-ui-renderer": ">=0.2.0-rc.1 <0.3.0-0",
@@ -58,6 +60,7 @@
     "client": {
       "platform": "web",
       "inject": [
+        "@deepseek-ai/dsh-api-session-controller",
         "@deepseek-ai/dsh-client-ui-conversation",
         "@deepseek-ai/dsh-client-ui-chat",
         "@deepseek-ai/dsh-client-ui-renderer",

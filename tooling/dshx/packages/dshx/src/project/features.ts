@@ -41,11 +41,12 @@ export type ReachSeed = (typeof REACH_SEEDS)[number]
 /**
  * One user step toward a feature, run by `dshx dev open` from the app root:
  * `click|rightclick <role|text|label|title> "<name>"`, `fill <role|label> "<name>" "<value>"`,
- * `expect <role|text|label|title> "<name>"`, `press <key>` (Playwright key names, e.g. `Meta+K`) or `seed <seed>` (before
- * every other step). Names match exactly; a trailing `*` (`"sample*"`) matches a case-insensitive substring.
+ * `expect <role|text|label|title> "<name>"`, `press <key>` (Playwright key names, e.g. `Meta+K`), `attach "<file>"`, which
+ * hands a repository file (path from the repository root) to the page's file input as the composer's file picker does,
+ * or `seed <seed>` (before every other step). Names match exactly; a trailing `*` (`"sample*"`) matches a case-insensitive substring.
  */
 const reachStepPattern = new RegExp(
-  `^(?:(?:click|rightclick|expect) [a-z]+ "[^"]+"|fill [a-z]+ "[^"]+" "[^"]*"|press [A-Za-z0-9+]+|seed (?:${REACH_SEEDS.join('|')}))$`,
+  `^(?:(?:click|rightclick|expect) [a-z]+ "[^"]+"|fill [a-z]+ "[^"]+" "[^"]*"|press [A-Za-z0-9+]+|attach "(?!\\/)(?!.*\\.\\.)[^"]+"|seed (?:${REACH_SEEDS.join('|')}))$`,
 )
 
 export const parseReachStep = (
@@ -54,8 +55,11 @@ export const parseReachStep = (
   | { readonly action: 'click' | 'rightclick' | 'expect' | 'fill'; readonly by: string; readonly name: string; readonly value?: string }
   | { readonly action: 'press'; readonly key: string }
   | { readonly action: 'seed'; readonly seed: ReachSeed }
+  | { readonly action: 'attach'; readonly file: string }
   | undefined => {
   if (!reachStepPattern.test(step)) return undefined
+  const attach = /^attach "([^"]+)"$/.exec(step)
+  if (attach?.[1] !== undefined) return { action: 'attach', file: attach[1] }
   const press = /^press (\S+)$/.exec(step)
   if (press?.[1] !== undefined) return { action: 'press', key: press[1] }
   const seed = REACH_SEEDS.find(candidate => step === `seed ${candidate}`)
@@ -74,7 +78,7 @@ const reachSchema = z
       .string()
       .refine(
         step => parseReachStep(step) !== undefined,
-        `reach steps are click/rightclick/expect <role|text|label|title> "<name>", fill <role|label> "<name>" "<value>", press <key>, or seed <${REACH_SEEDS.join('|')}>`,
+        `reach steps are click/rightclick/expect <role|text|label|title> "<name>", fill <role|label> "<name>" "<value>", press <key>, attach "<repository file>", or seed <${REACH_SEEDS.join('|')}>`,
       ),
   )
   .min(1)

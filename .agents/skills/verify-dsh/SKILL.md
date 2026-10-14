@@ -48,7 +48,9 @@ Goes to the app root, dismisses Preview Notice and "Add an API key", then runs
 the feature's `reach` steps. A `seed` step first sets up state no short UI path
 creates, once per instance: `landable-thread` (a jj workspace thread with a
 described revision, for Land) and `pending-restart` (changes thread-sidebar's
-`dist/index.js`; `down` restores it). The browser keeps its page between commands, so
+`dist/index.js`; `down` restores it). `attach "<repo file>"` hands a fixture
+such as `tooling/dshx/e2e/fixtures/attachments/red.png` to the composer's file
+input. The browser keeps its page between commands, so
 `shot` captures where `open` stopped. A failing step exits 1 with a screenshot:
 decide drift vs regression with `maintain-verify-dsh`. To drive something
 ad hoc, add `reach` to its catalog entry rather than scripting Playwright.

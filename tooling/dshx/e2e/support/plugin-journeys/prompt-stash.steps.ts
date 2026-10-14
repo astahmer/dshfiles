@@ -1,4 +1,6 @@
 import { expect, type Page } from '@playwright/test'
+import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { Then, When } from '../bdd.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
 
@@ -246,5 +248,61 @@ Then('the draft is restored without sending and can be removed', async ({ page }
   await removeButton.hover()
   await removeButton.click()
   await recordAssertion(page, 'removed-draft-leaves-empty-draft-list', () => expect(page.getByText('No saved drafts yet.', { exact: true })).toBeVisible())
+  await finishJourneyAssertions(page)
+})
+
+const THREAD_COMPOSER_LABEL = 'Message or run a task, / commands, @ files or sessions'
+const ATTACHMENT_FIXTURES = fileURLToPath(new URL('../../fixtures/attachments/', import.meta.url))
+const threadComposer = ({ page }: { page: Page }) => page.getByRole('textbox', { name: THREAD_COMPOSER_LABEL, exact: true })
+const removeAttachment = ({ page, name }: { page: Page; name: string }) => page.getByRole('button', { name, exact: true })
+
+const startThread = async ({ page, text }: { page: Page; text: string }): Promise<void> => {
+  await page.getByRole('button', { name: 'New thread', exact: true }).first().click()
+  await composerInput({ page }).fill(text)
+  await composerInput({ page }).press('Enter')
+  await expect(threadComposer({ page })).toBeVisible()
+}
+
+When('a thread drafts {string} with an image and a file attached', async ({ page }: { page: Page }, text: string) => {
+  await startThread({ page, text: 'Attachment draft thread' })
+  await threadComposer({ page }).fill(text)
+  await page.locator('[data-composer-card] input[type="file"]').setInputFiles([join(ATTACHMENT_FIXTURES, 'red.png'), join(ATTACHMENT_FIXTURES, 'note.txt')])
+  await expect(removeAttachment({ page, name: 'Remove image red.png' })).toBeVisible()
+  await expect(removeAttachment({ page, name: 'Remove file note.txt' })).toBeVisible()
+})
+
+When('another thread is opened', async ({ page }: { page: Page }) => {
+  await startThread({ page, text: 'Other thread' })
+  await expect(removeAttachment({ page, name: 'Remove image red.png' })).toHaveCount(0)
+})
+
+When('the sidebar goes back to the drafting thread', async ({ page }: { page: Page }) => {
+  await page.getByRole('button', { name: 'Back', exact: true }).click()
+  await expect(
+    page.getByRole('heading', { name: 'Attachment draft thread' }).or(page.getByText('Attachment draft thread', { exact: true }).first()),
+  ).toBeVisible()
+})
+
+Then('the draft still reads {string} with its image and file attached', async ({ page }: { page: Page }, text: string) => {
+  await recordAssertion(page, 'prompt-stash-draft-attachments-survive-back', async () => {
+    await expect(threadComposer({ page })).toHaveText(text)
+    await expect(removeAttachment({ page, name: 'Remove image red.png' })).toBeVisible()
+    await expect(removeAttachment({ page, name: 'Remove file note.txt' })).toBeVisible()
+  })
+})
+
+When('the attachments are removed from the draft', async ({ page }: { page: Page }) => {
+  await removeAttachment({ page, name: 'Remove image red.png' }).click()
+  await removeAttachment({ page, name: 'Remove file note.txt' }).click()
+  await expect(removeAttachment({ page, name: 'Remove file note.txt' })).toHaveCount(0)
+})
+
+Then('the drafting thread holds no attachments after another round trip', async ({ page }: { page: Page }) => {
+  await page.getByRole('button', { name: 'Forward', exact: true }).click()
+  await page.getByRole('button', { name: 'Back', exact: true }).click()
+  await recordAssertion(page, 'prompt-stash-removed-attachments-stay-removed', async () => {
+    await expect(threadComposer({ page })).toBeVisible()
+    await expect(removeAttachment({ page, name: 'Remove image red.png' })).toHaveCount(0)
+  })
   await finishJourneyAssertions(page)
 })

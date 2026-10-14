@@ -1,5 +1,5 @@
 import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { join, relative, resolve } from 'node:path'
 import type { Browser, Page } from 'playwright'
 import { DshxFeatureCatalogSchema, parseReachStep } from '../project/features.js'
 import { DSHFILES_ROOT } from '../project/local-bundles.js'
@@ -68,6 +68,14 @@ const connect = async (state: ScratchState): Promise<{ readonly browser: Browser
     throw new ScratchError('browser-context', 'The scratch Chromium has no browser context.', 'Run "dshx dev down" then "dshx dev up".')
   const page = context.pages()[0] ?? (await context.newPage())
   return { browser, page }
+}
+
+/** A reach `attach` names a file under the repository root; anything that resolves outside it is refused. */
+const repositoryFile = (file: string): string => {
+  const path = resolve(DSHFILES_ROOT, file)
+  const inside = relative(DSHFILES_ROOT, path)
+  if (inside.startsWith('..') || inside === '') throw new Error(`attach "${file}" is outside the repository`)
+  return path
 }
 
 /** Names match exactly; a trailing `*` matches a case-insensitive substring (for names that carry a path or count). */
@@ -142,7 +150,9 @@ export const scratchOpen = async (state: ScratchState, reference: string, timeou
             await writeScratchState({ ...state, seeds: seeded })
           }
           if (feature.reach[index + 1]?.startsWith('seed ') !== true) await openAppRoot()
-        } else if (parsed.action === 'press') await (filled === undefined ? page.keyboard.press(parsed.key) : filled.press(parsed.key, { timeout: timeoutMs }))
+        } else if (parsed.action === 'attach')
+          await page.locator('input[type="file"]').first().setInputFiles(repositoryFile(parsed.file), { timeout: timeoutMs })
+        else if (parsed.action === 'press') await (filled === undefined ? page.keyboard.press(parsed.key) : filled.press(parsed.key, { timeout: timeoutMs }))
         else if (parsed.action === 'click') {
           filled = undefined
           await locate(page, parsed.by, parsed.name).click({ timeout: timeoutMs })

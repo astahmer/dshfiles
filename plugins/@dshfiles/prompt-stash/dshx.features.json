@@ -139,6 +139,60 @@
           "testName": "reads only bounded plain-text user messages"
         }
       ]
+    },
+    {
+      "id": "draft-attachment-retention",
+      "title": "Keep draft attachments across thread navigation",
+      "summary": "While a thread's composer holds draft attachments, keep that thread's session scope retained so leaving the thread and coming back (sidebar Back, another thread) keeps the files and images with the draft text.",
+      "reach": [
+        "click button \"New thread\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Attachment draft thread\"",
+        "press Enter",
+        "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"Draft with attachments\"",
+        "attach \"tooling/dshx/e2e/fixtures/attachments/red.png\"",
+        "attach \"tooling/dshx/e2e/fixtures/attachments/note.txt\"",
+        "expect button \"Remove file note.txt\"",
+        "click button \"New thread\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Other thread\"",
+        "press Enter",
+        "expect textbox \"Message or run a task, / commands, @ files or sessions\"",
+        "click button \"Back\"",
+        "expect button \"Remove image red.png\"",
+        "expect button \"Remove file note.txt\""
+      ],
+      "surfaces": ["client", "integration"],
+      "configuration": [],
+      "states": ["released", "retained"],
+      "failureModes": [
+        "A page reload still drops draft attachments: DSH persists only the draft text (see plans/dsh-host-gaps.md).",
+        "A session controller that refuses the retain leaves native behaviour unchanged."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "prompt-stash.draft-attachments-survive-back",
+          "featureFile": "tooling/dshx/e2e/features/prompt-stash.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "prompt-stash.draft-attachment-retention-unit-holds-after-unmount",
+          "file": "plugins/@dshfiles/prompt-stash/src/draft-attachment-retention.test.ts",
+          "testName": "holds a thread once its composer has attachments and keeps holding after the composer unmounts"
+        },
+        {
+          "kind": "unit-test",
+          "id": "prompt-stash.draft-attachment-retention-unit-release-on-send",
+          "file": "plugins/@dshfiles/prompt-stash/src/draft-attachment-retention.test.ts",
+          "testName": "lets the thread go once its attachments are sent or removed, and holds it again for new ones"
+        },
+        {
+          "kind": "unit-test",
+          "id": "prompt-stash.draft-attachment-retention-unit-dispose",
+          "file": "plugins/@dshfiles/prompt-stash/src/draft-attachment-retention.test.ts",
+          "testName": "releases every held thread when the plugin unloads"
+        }
+      ]
     }
   ],
   "kind": "bundle"

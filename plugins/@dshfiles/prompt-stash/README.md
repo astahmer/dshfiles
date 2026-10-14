@@ -15,3 +15,7 @@ The Drafts action can save up to 20 snapshots of the current plain-text composer
 Drafts also shows up to 50 text-only sent prompts from the loaded conversation; this history is not copied into local storage. Both actions capture the insertion position and reject insertion if the composer changed while the panel was open, preserving the current text and supported assets.
 
 Neither action syncs prompt data between browsers or devices.
+
+## Draft attachments
+
+DSH keeps a thread's composer text when you leave the thread, but its draft attachments live in the thread's session scope and are dropped once nothing holds that scope. While a composer holds attachments, Prompt Stash holds its session (reference source `composerDraftAttachments`), so leaving the thread and coming back, for example with the sidebar's Back, keeps the files and images with the text. Sending or removing them lets the session go. A page reload still loses them: DSH persists only the text ([Host gap](../../../plans/dsh-host-gaps.md)).
