@@ -50,7 +50,14 @@ and secret fields never show. Controls by type:
 | anything else                            | JSON, saved only when it parses                                                 |
 
 Edits save at once (switches, choices) or on Enter/blur (text, numbers) through the shared `ConfigForm`, the store
-native rows and `useSettings` read, so every surface stays in step. A refused value shows under its row.
+native rows and `useSettings` read, so every surface stays in step. A Host write takes seconds (it persists the profile
+and reloads the entry), so a row shows the requested value until the write settles; a refused value shows under its
+row.
+
+**Modified settings** carry a thin bar on their left, as in VS Code: the field is set in the user layer (an override
+equal to the default still counts, as natively). Hovering or focusing the row shows **Reset to default**, which unsets
+the override so the field re-inherits the composition default. A deep link to a field scrolls it into view and
+highlights it for two seconds.
 
 ### Open Settings from another plugin
 

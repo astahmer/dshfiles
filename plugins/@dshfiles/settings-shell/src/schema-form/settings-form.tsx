@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
 import { Textarea } from '@dshfiles/plugin-ui/components/ui/textarea'
 import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
-import { PlusIcon, XIcon } from '@dshfiles/plugin-ui/icons'
+import { PlusIcon, RotateCcwIcon, XIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { Fragment, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { z } from 'zod'
@@ -14,6 +14,7 @@ import type { ShellTranslate } from '../native/locales.js'
 import {
   blankValue,
   choiceDisplay,
+  hasValueAt,
   jsonValueSchema,
   parseJsonDraft,
   valueAt,
@@ -399,6 +400,20 @@ const JsonInput = (props: {
   )
 }
 
+type PendingEdit = { readonly kind: 'set'; readonly value: JsonValue } | { readonly kind: 'reset' }
+
+/** What a row shows: a pending edit first, else the resolved value, else (after a reset) the composition default. */
+const displayedValue = (input: {
+  readonly edit: PendingEdit | undefined
+  readonly field: SettingField
+  readonly values: JsonValue | undefined
+  readonly base: JsonValue | undefined
+}): JsonValue | undefined => {
+  if (input.edit?.kind === 'set') return input.edit.value
+  if (input.edit?.kind === 'reset') return valueAt(input.base, input.field.path) ?? input.field.defaultValue
+  return valueAt(input.values, input.field.path) ?? input.field.defaultValue
+}
+
 /** Wide controls sit under the description; single-value controls sit on the title row. */
 const isBlockControl = (control: SettingControl): boolean =>
   control.kind === 'list' || control.kind === 'record' || control.kind === 'json' || (control.kind === 'text' && control.multiline)
@@ -421,10 +436,16 @@ export const SettingControlInput = (props: {
   return <ScalarInput control={control} disabled={props.disabled} label={props.label} onChange={props.onChange} t={props.t} value={props.value} />
 }
 
+/** How long a deep-linked row stays highlighted after it scrolls into view. */
+const FLASH_MS = 2_000
+
 /** One setting: title, description and control, with the save outcome under it. */
 const SettingRow = (props: {
   readonly field: SettingField
   readonly value: JsonValue | undefined
+  /** The user layer sets this field: the row shows the modified bar and offers a reset. */
+  readonly modified: boolean
+  readonly reset: (field: SettingField) => Promise<boolean>
   readonly disabled: boolean
   readonly highlight: string | undefined
   readonly focused: boolean
@@ -434,12 +455,24 @@ const SettingRow = (props: {
   const { field } = props
   const [refused, setRefused] = useState(false)
   const row = useRef<HTMLDivElement>(null)
+  const [flashing, setFlashing] = useState(false)
   useEffect(() => {
-    if (props.focused) row.current?.scrollIntoView({ block: 'center' })
+    if (!props.focused) return
+    row.current?.scrollIntoView({ block: 'center' })
+    setFlashing(true)
+    const timeout = window.setTimeout(() => setFlashing(false), FLASH_MS)
+    return () => window.clearTimeout(timeout)
   }, [props.focused])
   const save = (value: JsonValue): void => {
     setRefused(false)
     void props.write(field, value).then(
+      accepted => setRefused(!accepted),
+      () => setRefused(true),
+    )
+  }
+  const reset = (): void => {
+    setRefused(false)
+    void props.reset(field).then(
       accepted => setRefused(!accepted),
       () => setRefused(true),
     )
@@ -449,16 +482,38 @@ const SettingRow = (props: {
   return (
     <div
       className={cn(
-        'dshx:flex dshx:flex-col dshx:gap-2 dshx:border-b-[0.5px] dshx:border-border dshx:py-3.5 dshx:last:border-b-0',
-        props.focused && 'dshx:animate-pulse dshx:rounded-md dshx:bg-accent/60 dshx:px-2',
+        'dshx:group dshx:relative dshx:flex dshx:flex-col dshx:gap-2 dshx:border-b-[0.5px] dshx:border-border dshx:py-3.5 dshx:last:border-b-0',
+        flashing && 'dshx:rounded-md dshx:bg-accent/70 dshx:px-2 dshx:transition-colors',
       )}
+      data-modified={props.modified ? '' : undefined}
       data-setting-path={field.path.join('.')}
       ref={row}
     >
+      {props.modified && (
+        <span
+          aria-hidden="true"
+          className="dshx:absolute dshx:inset-y-3 dshx:-left-3 dshx:w-0.5 dshx:rounded-full dshx:bg-info"
+          title={props.t('form.modified')}
+        />
+      )}
       <div className="dshx:flex dshx:items-start dshx:justify-between dshx:gap-6">
         <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-1">
-          <span className="dshx:text-[14px] dshx:leading-5 dshx:text-foreground">
+          <span className="dshx:flex dshx:min-h-5 dshx:items-center dshx:gap-2 dshx:text-[14px] dshx:leading-5 dshx:text-foreground">
             <Highlight query={props.highlight} text={field.title} />
+            {props.modified && <span className="dshx:sr-only">{props.t('form.modified')}</span>}
+            {props.modified && (
+              <Button
+                className="dshx:h-5 dshx:px-1.5 dshx:text-[11px] dshx:text-muted-foreground dshx:opacity-0 dshx:group-focus-within:opacity-100 dshx:group-hover:opacity-100 dshx:focus-visible:opacity-100"
+                disabled={props.disabled}
+                onClick={reset}
+                size="xs"
+                type="button"
+                variant="ghost"
+              >
+                <RotateCcwIcon />
+                {props.t('form.reset')}
+              </Button>
+            )}
           </span>
           {field.description !== '' && (
             <span className="dshx:text-[12px] dshx:leading-[18px] dshx:text-muted-foreground">
@@ -495,13 +550,33 @@ export const SettingsForm = (props: {
   const snapshot = useConfigFormSnapshot(props.form)
   const values = jsonValueSchema.safeParse(snapshot.value)
   const disabled = snapshot.status !== 'ready' || !snapshot.writable
-  const write = (field: SettingField, value: JsonValue): Promise<boolean> => props.form.mutate([{ op: 'set', path: [...field.path], value }], snapshot.revision)
+  // A Host write settles in seconds (it persists the profile and reloads the entry), so a row shows what was asked for
+  // until the write settles: `set` holds the new value, `reset` the cleared override.
+  const [pending, setPending] = useState<ReadonlyMap<string, PendingEdit>>(new Map())
+  const settle = (key: string, edit: PendingEdit, write: Promise<boolean>): Promise<boolean> => {
+    setPending(current => new Map(current).set(key, edit))
+    return write.finally(() =>
+      setPending(current => {
+        if (current.get(key) !== edit) return current
+        const next = new Map(current)
+        next.delete(key)
+        return next
+      }),
+    )
+  }
+  const write = (field: SettingField, value: JsonValue): Promise<boolean> =>
+    settle(field.path.join('.'), { kind: 'set', value }, props.form.mutate([{ op: 'set', path: [...field.path], value }], snapshot.revision))
+  const reset = (field: SettingField): Promise<boolean> =>
+    settle(field.path.join('.'), { kind: 'reset' }, props.form.mutate([{ op: 'unset', path: [...field.path] }], snapshot.revision))
+  const user = jsonValueSchema.safeParse(snapshot.user)
+  const base = jsonValueSchema.safeParse(snapshot.base)
   const focusKey = props.focusPath?.join('.')
   return (
     <div className="dshx:flex dshx:flex-col">
       {snapshot.status === 'unavailable' && <p className="dshx:py-2 dshx:text-sm dshx:text-muted-foreground">{props.t('form.unavailable')}</p>}
       {snapshot.status === 'ready' && !snapshot.writable && <p className="dshx:py-2 dshx:text-sm dshx:text-muted-foreground">{props.t('form.readOnly')}</p>}
       {props.fields.map((field, index) => {
+        const edit = pending.get(field.path.join('.'))
         const group = field.groups.join(' › ')
         const previous = props.fields[index - 1]?.groups.join(' › ')
         return (
@@ -514,8 +589,10 @@ export const SettingsForm = (props: {
               field={field}
               focused={focusKey === field.path.join('.')}
               highlight={props.highlight}
+              modified={edit === undefined ? user.success && hasValueAt(user.data, field.path) : edit.kind === 'set'}
+              reset={reset}
               t={props.t}
-              value={valueAt(values.success ? values.data : undefined, field.path) ?? field.defaultValue}
+              value={displayedValue({ edit, field, values: values.success ? values.data : undefined, base: base.success ? base.data : undefined })}
               write={write}
             />
           </Fragment>
