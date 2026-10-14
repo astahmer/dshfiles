@@ -76,15 +76,7 @@ import { z } from 'zod'
 import type { Mutation, ReadFailure, Revision } from './api.js'
 import { ChangedFiles, FileViewToggle, LineCounts } from './changed-files.js'
 import { FullDiffDialog } from './full-diff-dialog.js'
-import {
-  describeDraftChanged,
-  groupRevisionsByBranch,
-  layoutRevisionGraph,
-  matchesRevisionSearch,
-  type GraphLane,
-  type GraphTone,
-  type RevisionGraphRow,
-} from './graph.js'
+import { describeDraftChanged, layoutRevisionGraph, matchesRevisionSearch, type GraphLane, type RevisionGraphRow } from './graph.js'
 import { jujutsuApi } from './api.js'
 import { useAutoRefresh } from './auto-refresh.js'
 import { openInEditor } from './open-in-editor.js'
@@ -350,21 +342,27 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   const selectedBookmark = localBookmarkNames.includes(bookmark) ? bookmark : defaultBookmark
   const mainRevision = state?.revisions.find(revision => revision.localBookmarks.includes('main') || revision.bookmarks.includes('main'))
 
-  const graphOrder = useMemo(() => groupRevisionsByBranch(state?.revisions ?? []), [state])
-  const visibleRevisions = useMemo(() => {
-    if (state === undefined) return []
-    return graphOrder.filter(revision => {
-      if (mineOnly && !revision.mine && !revision.workingCopy) return false
-      if (hideImmutable && revision.immutable) return false
-      if (authorFilter && !revision.author.toLocaleLowerCase().includes(authorFilter.toLocaleLowerCase())) return false
-      const timestamp = Date.parse(revision.authorTime)
-      if (fromDate && Number.isFinite(timestamp) && timestamp < Date.parse(fromDate + 'T00:00:00')) return false
-      if (toDate && Number.isFinite(timestamp) && timestamp > Date.parse(toDate + 'T23:59:59')) return false
-      return matchesRevisionSearch(revision, textFilter)
-    })
-  }, [state, graphOrder, mineOnly, hideImmutable, authorFilter, textFilter, fromDate, toDate])
-
   const revisionsByCommitId = useMemo(() => new Map(state?.revisions.map(revision => [revision.commitId, revision]) ?? []), [state])
+  const graphRows = useMemo(() => {
+    if (state === undefined) return []
+    const graphRevisions = state.revisions.filter(revision => (!hideImmutable || !revision.immutable) && (!mineOnly || revision.mine || revision.workingCopy))
+    return layoutRevisionGraph(graphRevisions, revisionsByCommitId, hideImmutable)
+  }, [state, revisionsByCommitId, hideImmutable, mineOnly])
+  const visibleRevisions = useMemo(() => {
+    return graphRows
+      .flatMap(row => {
+        const revision = revisionsByCommitId.get(row.commitId)
+        return revision === undefined ? [] : [revision]
+      })
+      .filter(revision => {
+        if (authorFilter && !revision.author.toLocaleLowerCase().includes(authorFilter.toLocaleLowerCase())) return false
+        const timestamp = Date.parse(revision.authorTime)
+        if (fromDate && Number.isFinite(timestamp) && timestamp < Date.parse(fromDate + 'T00:00:00')) return false
+        if (toDate && Number.isFinite(timestamp) && timestamp > Date.parse(toDate + 'T23:59:59')) return false
+        return matchesRevisionSearch(revision, textFilter)
+      })
+  }, [graphRows, revisionsByCommitId, authorFilter, textFilter, fromDate, toDate])
+
   const dropDestination = dropPresentation === null ? undefined : revisionsByCommitId.get(dropPresentation.destinationId)
   /** The drop preview renders in its destination row, or above the list while a filter hides that row. */
   const dropPreviewAt = (destination: Revision): JSX.Element | null => {
@@ -383,11 +381,6 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
       />
     )
   }
-  const graphRows = useMemo(() => {
-    if (state === undefined) return []
-    const graphRevisions = graphOrder.filter(revision => (!hideImmutable || !revision.immutable) && (!mineOnly || revision.mine || revision.workingCopy))
-    return layoutRevisionGraph(graphRevisions, revisionsByCommitId, hideImmutable)
-  }, [state, graphOrder, revisionsByCommitId, hideImmutable, mineOnly])
   const graphRowsByCommitId = useMemo(() => new Map(graphRows.map(row => [row.commitId, row])), [graphRows])
   const graphMetrics = GRAPH_DENSITY[preferences.graphDensity]
   const rowHeight = graphMetrics.rowHeight + (sidePanel ? STACKED_ROW_EXTRA : 0)
@@ -403,8 +396,8 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   const previewBranch = useMemo(() => {
     if (dropPresentation?.kind !== 'rebase' || state === undefined) return []
     const branchIds = descendantCommitIds(state.revisions, dropPresentation.sourceId)
-    return graphOrder.filter(revision => branchIds.has(revision.commitId))
-  }, [dropPresentation, state, graphOrder])
+    return state.revisions.filter(revision => branchIds.has(revision.commitId))
+  }, [dropPresentation, state])
   const previewBranchIds = useMemo(() => new Set(previewBranch.map(revision => revision.commitId)), [previewBranch])
 
   const listItems = useMemo(() => flattenRevisionGroups({ groups, collapsedDays, layouts: graphRowsByCommitId }), [groups, collapsedDays, graphRowsByCommitId])
@@ -1548,21 +1541,27 @@ const STACKED_ROW_EXTRA = 14
 
 const LANE_WIDTH = 1.25
 
-const TONE_STROKE = {
-  trunk: 'dshx:stroke-info',
-  current: 'dshx:stroke-info',
-  workspace: 'dshx:stroke-teal',
-  divergent: 'dshx:stroke-violet',
-  branch: 'dshx:stroke-muted-foreground',
-} as const satisfies Record<GraphTone, string>
-
-const TONE_FILL = {
-  trunk: 'dshx:fill-info',
-  current: 'dshx:fill-info',
-  workspace: 'dshx:fill-teal',
-  divergent: 'dshx:fill-violet',
-  branch: 'dshx:fill-muted-foreground',
-} as const satisfies Record<GraphTone, string>
+/** Indexed by `RevisionGraphRow.color`: the trunk, then one hue per side branch (`GRAPH_BRANCH_COLORS`). */
+const GRAPH_STROKE = [
+  'dshx:stroke-info',
+  'dshx:stroke-graph-1',
+  'dshx:stroke-graph-2',
+  'dshx:stroke-graph-3',
+  'dshx:stroke-graph-4',
+  'dshx:stroke-graph-5',
+  'dshx:stroke-graph-6',
+] as const
+const GRAPH_FILL = [
+  'dshx:fill-info',
+  'dshx:fill-graph-1',
+  'dshx:fill-graph-2',
+  'dshx:fill-graph-3',
+  'dshx:fill-graph-4',
+  'dshx:fill-graph-5',
+  'dshx:fill-graph-6',
+] as const
+const graphStroke = (color: number): string => GRAPH_STROKE[color] ?? GRAPH_STROKE[0]
+const graphFill = (color: number): string => GRAPH_FILL[color] ?? GRAPH_FILL[0]
 
 const laneX = (metrics: GraphMetrics, lane: number): number => metrics.laneGap * 0.75 + lane * metrics.laneGap
 
@@ -1594,7 +1593,7 @@ const GraphLanes = (props: GraphLanesProps): JSX.Element => (
   <svg aria-hidden className="dshx:absolute dshx:inset-y-0 dshx:left-0 dshx:h-full" width={props.width}>
     {props.lanes.map(lane => (
       <line
-        className={TONE_STROKE[lane.tone]}
+        className={graphStroke(lane.color)}
         key={lane.lane}
         strokeLinecap="round"
         strokeWidth={LANE_WIDTH}
@@ -1623,7 +1622,6 @@ const RevisionGraphCell = (props: RevisionGraphCellProps): JSX.Element => {
   const turn = middle + (height - middle) / 2
   const x = (lane: number): number => laneX(props.metrics, lane)
   const commitX = x(layout.commitLane)
-  const tone = revision.divergent ? 'divergent' : layout.tone
   const node = (() => {
     if (revision.workingCopy) {
       return (
@@ -1644,7 +1642,7 @@ const RevisionGraphCell = (props: RevisionGraphCellProps): JSX.Element => {
     }
     return (
       <circle
-        className={cn(revision.empty ? 'dshx:fill-background' : TONE_FILL[tone], TONE_STROKE[tone])}
+        className={cn(revision.empty ? 'dshx:fill-background' : graphFill(layout.color), revision.divergent ? 'dshx:stroke-violet' : graphStroke(layout.color))}
         cx={commitX}
         cy={middle}
         r={3}
@@ -1663,14 +1661,14 @@ const RevisionGraphCell = (props: RevisionGraphCellProps): JSX.Element => {
       <g fill="none" strokeLinecap="round" strokeWidth={LANE_WIDTH}>
         {layout.passing.map(link => (
           <path
-            className={TONE_STROKE[link.tone]}
+            className={graphStroke(link.color)}
             d={lanePath({ fromX: x(link.fromLane), toX: x(link.toLane), top: 0, turn, bottom: height })}
             key={`pass-${link.fromLane}`}
           />
         ))}
         {layout.incoming.map(link => (
           <path
-            className={TONE_STROKE[link.tone]}
+            className={graphStroke(link.color)}
             d={lanePath({ fromX: x(link.fromLane), toX: commitX, top: 0, turn: middle / 2, bottom: middle })}
             key={`in-${link.fromLane}`}
           />
@@ -1678,7 +1676,7 @@ const RevisionGraphCell = (props: RevisionGraphCellProps): JSX.Element => {
         {layout.outgoing.map((link, index) =>
           link.terminal ? (
             <path
-              className={TONE_STROKE[link.tone]}
+              className={graphStroke(link.color)}
               d={`M ${commitX} ${middle} V ${middle + (height - middle) * 0.75}`}
               key={`stub-${index}`}
               strokeDasharray="1 3"
@@ -1686,7 +1684,7 @@ const RevisionGraphCell = (props: RevisionGraphCellProps): JSX.Element => {
             />
           ) : (
             <path
-              className={TONE_STROKE[link.tone]}
+              className={graphStroke(link.color)}
               d={lanePath({ fromX: commitX, toX: x(link.toLane), top: middle, turn, bottom: height })}
               key={`out-${link.toLane}-${index}`}
               strokeDasharray={link.dashed ? '2 3' : undefined}

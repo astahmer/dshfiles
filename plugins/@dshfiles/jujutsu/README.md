@@ -6,14 +6,19 @@ contracts.
 
 ## What it provides
 
-- A revision graph modelled on jj-view: rows follow `jj log`'s branch-grouped
-  order (each side branch sits right above the commit it forks from), the trunk
-  line (from @ when it is built on `main`/`master`/`trunk`, else that bookmark)
-  stays straight in lane 0, new heads take the leftmost free lane, and lanes
+- A revision graph laid out like VisualJJ: the trunk (`main`/`master`/`trunk`
+  and its first-parent ancestry) stays straight in lane 0; every other head
+  opens a branch whose revisions form one contiguous block down to its fork
+  point, placed directly above the trunk revision it forks from (newest head
+  first) or directly above the side branch it is nested on. Each branch joins
+  its parent with one turn, takes the leftmost lane whose run and turns cross
+  no other lane, and frees that lane when it ends; without a visible trunk
+  bookmark, branches simply stack by their newest head. Lanes
   bend with rounded corners in the lower half of the row, so every row keeps
-  one height (24 px Comfortable, 20 px Compact). One accent for the trunk and
-  @, teal for workspace heads, violet for divergent copies (`changeid/N`),
-  neutral for other branches. Nodes are small: filled for changes, hollow for
+  one height (24 px Comfortable, 20 px Compact). The trunk uses the accent
+  colour and each side branch one of six hues (`graph-1..6` in the kit),
+  never the same as the branch above it or its parent; divergent copies
+  (`changeid/N`) get a violet node. Nodes are small: filled for changes, hollow for
   empty ones, a filled ring for @, dim diamonds for immutable revisions (whose
   text is dimmed too), and conflicts get a warning glyph. Each row reads like
   VisualJJ: the change ID (unique prefix bold, rest dim), workspace (`name@`),

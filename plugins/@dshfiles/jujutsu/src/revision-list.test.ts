@@ -5,7 +5,7 @@ import { activeDayIndex, flattenRevisionGroups } from './revision-list.ts'
 const layout = (commitId: string, lane = 0): RevisionGraphRow => ({
   commitId,
   commitLane: lane,
-  tone: 'trunk',
+  color: 0,
   laneCount: 1,
   incoming: [],
   passing: [],
