@@ -56,7 +56,8 @@ thread whose model ran a 3 s `bash` call; needs `@dshfiles/ai-accounts`), and `f
 aliases; needs `up --fake-secret-cli`, which puts the e2e fake `secret` first on
 the Host's PATH so Secret Catalog never reaches a real vault). `attach "<repo file>"` hands a fixture
 such as `tooling/dshx/e2e/fixtures/attachments/red.png` to the composer's file
-input. The browser keeps its page between commands, so
+input. `hover <role> "<name>"` leaves the pointer on hover-only UI for the next
+`shot`. The browser keeps its page between commands, so
 `shot` captures where `open` stopped. A failing step exits 1 with a screenshot:
 decide drift vs regression with `maintain-verify-dsh`. To drive something
 ad hoc, add `reach` to its catalog entry rather than scripting Playwright.

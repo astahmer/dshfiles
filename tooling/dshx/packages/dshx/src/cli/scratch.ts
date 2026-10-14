@@ -71,6 +71,7 @@ qualified: "thread-destination", "jj-integration/thread-destination" or
 Notice and "Add an API key" dialogs, then runs the feature's "reach" steps:
   click <role|text|label|title> "<name>"       fill <role|label> "<name>" "<value>"
   rightclick <role|text|label|title> "<name>"  press <key>
+  hover <role|text|label|title> "<name>"       (leaves the pointer there, for hover-only UI)
   expect <role|text|label|title> "<name>"      seed <rebase-ready-thread|pending-restart|tool-call-thread|fake-secret-cli>
   attach "<file>"                              (a repository file, to the page's file input)
 Names match exactly; "name*" matches a case-insensitive substring. "text" without "*" is exact too.

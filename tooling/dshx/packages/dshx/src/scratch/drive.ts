@@ -160,6 +160,9 @@ export const scratchOpen = async (state: ScratchState, reference: string, timeou
         else if (parsed.action === 'click') {
           filled = undefined
           await locate(page, parsed.by, parsed.name).click({ timeout: timeoutMs })
+        } else if (parsed.action === 'hover') {
+          filled = undefined
+          await locate(page, parsed.by, parsed.name).hover({ timeout: timeoutMs })
         } else if (parsed.action === 'rightclick') {
           filled = undefined
           // A row that re-renders under the pointer (a new thread, a status change) closes its context menu at once.
