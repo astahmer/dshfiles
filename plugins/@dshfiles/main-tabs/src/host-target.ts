@@ -1,4 +1,4 @@
-import type { TabTarget } from './tabs-machine.js'
+import type { HostTarget } from './tabs-machine.js'
 
 interface SessionRow {
   readonly id: string
@@ -13,7 +13,7 @@ interface WorkspaceRow {
 }
 
 export interface HostView {
-  readonly target: TabTarget | null
+  readonly target: HostTarget | null
   readonly projectId: string | null
 }
 

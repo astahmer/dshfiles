@@ -7,14 +7,17 @@ import type { ShortcutBinding, ShortcutCommandId } from '@deepseek-ai/dsh-client
 import { resolveSlotLabel } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { defineClient, useSettings } from '@dshfiles/dshx/client'
+import { MessageSquareIcon, MessageSquarePlusIcon, PanelsTopLeftIcon, SettingsIcon } from '@dshfiles/plugin-ui/icons'
 import { createActor } from '@dshfiles/plugin-ui/machine'
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
 import { readHostView } from './host-target.js'
 import { MAIN_TABS_LOCALE_NAMESPACE, mainTabsLocale } from './locales.js'
 import { mainTabsSettings } from './settings.js'
+import { PanelIcon, StartPage, type StartSection } from './start-page.js'
+import { panelShortcut, recentThreads } from './start-suggestions.js'
 import { TabStrip, threadTabStatus, type TabView } from './tab-strip.js'
-import { DEFAULT_TAB_PREFERENCES, tabIdOf, tabsMachine, type TabPreferences, type TabsEvent, type TabTarget } from './tabs-machine.js'
+import { DEFAULT_TAB_PREFERENCES, START_TAB_ID, tabIdOf, tabsMachine, type HostTarget, type TabPreferences, type TabsEvent } from './tabs-machine.js'
 import { STRIP_MISPLACED_WARNING, STRIP_MISSING_WARNING, mountStripHost, stripSitsAbovePanel } from './strip-mount.js'
 import { saveTabs, storedTabs } from './tabs-storage.js'
 import './client.css'
@@ -28,6 +31,25 @@ const panelTitleFallback = (panelId: string): string => {
 }
 
 const STRIP_MISSING_AFTER_MS = 3_000
+
+/**
+ * Settings is a modal whose open action stays private to `ui-settings-general` (its shell store is not exported and
+ * the shortcut registry cannot run a command), so the new-tab page presses the sidebar's own Settings trigger.
+ */
+const SETTINGS_TRIGGER_SELECTOR = '[data-slot="settings.launcher"] button[aria-haspopup="dialog"]'
+
+/** While the new-tab page shows, the main panel under it stays mounted but hidden, keeping a thread's scroll and state. */
+const useHiddenMainPanel = (host: HTMLElement | null, hidden: boolean): void => {
+  useLayoutEffect(() => {
+    const outlet = host?.nextElementSibling
+    if (!hidden || !(outlet instanceof HTMLElement)) return
+    const display = outlet.style.display
+    outlet.style.display = 'none'
+    return () => {
+      outlet.style.display = display
+    }
+  })
+}
 
 /** The strip's host node before the `main` outlet, with the startup self-check warning when it cannot mount. */
 const useStripHost = (): HTMLElement | null => {
@@ -62,7 +84,7 @@ export default defineClient({
     // The slot ledger erases the brand; an id is a MainPanelId exactly when `main` registers it.
     const isMainPanelId = (id: string): id is MainPanelId => ctx.slots.entriesOfSlot('main').some(entry => entry.options.key === id)
 
-    const navigate = (target: TabTarget): boolean => {
+    const navigate = (target: HostTarget): boolean => {
       if (target.kind === 'panel') {
         if (!isMainPanelId(target.panelId)) return false
         ctx.layout.selectPanel(target.panelId)
@@ -116,6 +138,8 @@ export default defineClient({
       return () => disposers.forEach(dispose => dispose())
     }
     const panelsVersion = (): string => `${ctx.slots.getVersion('main')}:${ctx.slots.getVersion('sidebar.panellist')}:${ctx.locale.getLocale().revision}`
+    const subscribeCatalog = (listener: () => void): (() => void) => ctx.shortcuts.catalog.subscribe(listener)
+    const catalogSnapshot = () => ctx.shortcuts.catalog.getSnapshot()
 
     ctx.slots.inject('shell.overlay', () =>
       ctx.slots.register(
@@ -141,11 +165,13 @@ export default defineClient({
           const byId = props.useSessions(state => state.byId)
           const sessions = useMemo(() => new Map<string, SessionSummary>(Object.values(byId).map(session => [session.id, session])), [byId])
           const statuses = props.useSessionStatus(state => state)
+          const catalog = useSyncExternalStore(subscribeCatalog, catalogSnapshot)
           const host = useStripHost()
 
           const set = snapshot.context.sets[snapshot.context.scopeKey]
           const tabs = (set?.tabs ?? []).map((tab): TabView => {
             const base = { id: tab.id, active: tab.id === set?.activeTabId, pinned: tab.pinned, preview: tab.preview }
+            if (tab.target.kind === 'start') return { ...base, kind: 'start', title: translate('startTab'), available: true, status: null }
             if (tab.target.kind === 'panel') {
               const panelId = tab.target.panelId
               return {
@@ -167,10 +193,96 @@ export default defineClient({
             return { ...base, kind: 'thread', title, available: session !== undefined, status: tabStatus }
           })
 
-          const showStrip = host !== null && snapshot.matches('on') && tabs.length > 0
-          usePlacementCheck(host, showStrip)
+          const showStrip = host !== null && snapshot.matches('on')
+          const startShown = showStrip && set?.activeTabId === START_TAB_ID
+          usePlacementCheck(host, showStrip && !startShown)
+          useHiddenMainPanel(host, startShown)
           if (host === null || !showStrip) return null
-          return createPortal(<TabStrip tabs={tabs} send={event => actor.send(event)} t={props.t} />, host)
+
+          const shortcutOf = (commandId: string) => catalog.find(entry => entry.id === commandId)
+          const pick = (target: HostTarget | null): void => actor.send({ type: 'start.pick', target })
+          const startSections = (): readonly StartSection[] => {
+            const threads = recentThreads(
+              ctx.sessions.list.getSnapshot().ids.flatMap(id => sessions.get(id) ?? []),
+              session => statuses.get(session.id)?.running ?? session.running,
+            )
+            const panels = ctx.slots
+              .entriesOfSlot('sidebar.panellist')
+              .filter(entry => entry.options.id !== undefined && registeredPanels.has(entry.options.id))
+              .toSorted((left, right) => (left.options.order ?? 0) - (right.options.order ?? 0))
+            return [
+              {
+                id: 'new-thread',
+                suggestions: [
+                  {
+                    id: 'new-thread',
+                    title: translate('newThread'),
+                    icon: <MessageSquarePlusIcon aria-hidden size={22} strokeWidth={1.5} />,
+                    shortcut: shortcutOf('session.new'),
+                    pick: () => {
+                      pick(null)
+                      ctx.uiWorkspace.startSession()
+                    },
+                  },
+                ],
+              },
+              {
+                id: 'recent-threads',
+                label: translate('recentThreads'),
+                suggestions: threads.map(session => {
+                  const project = session.cwd?.split('/').filter(Boolean).at(-1)
+                  const running = statuses.get(session.id)?.running ?? session.running
+                  return {
+                    id: `thread:${session.id}`,
+                    title: session.title ?? session.displayTitle,
+                    description: [running ? translate('running') : undefined, project].filter(Boolean).join(' · ') || undefined,
+                    icon: <MessageSquareIcon aria-hidden size={22} strokeWidth={1.5} />,
+                    shortcut: undefined,
+                    pick: () => pick({ kind: 'thread', sessionId: session.id }),
+                  }
+                }),
+              },
+              {
+                id: 'panels',
+                label: translate('panels'),
+                suggestions: panels.flatMap(entry => {
+                  const panelId = entry.options.id
+                  if (panelId === undefined) return []
+                  const title = panelLabels.get(panelId) ?? panelTitleFallback(panelId)
+                  return {
+                    id: `panel:${panelId}`,
+                    title,
+                    icon: <PanelIcon glyph={entry.component} fallback={<PanelsTopLeftIcon aria-hidden size={22} strokeWidth={1.5} />} />,
+                    shortcut: panelShortcut(catalog, title),
+                    pick: () => pick({ kind: 'panel', panelId }),
+                  }
+                }),
+              },
+              {
+                id: 'settings',
+                suggestions: [
+                  {
+                    id: 'settings',
+                    title: translate('settings'),
+                    icon: <SettingsIcon aria-hidden size={22} strokeWidth={1.5} />,
+                    shortcut: shortcutOf('settings.open'),
+                    pick: () => {
+                      pick(null)
+                      document.querySelector<HTMLElement>(SETTINGS_TRIGGER_SELECTOR)?.click()
+                    },
+                  },
+                ],
+              },
+            ].filter(section => section.suggestions.length > 0)
+          }
+
+          return createPortal(
+            <>
+              <TabStrip tabs={tabs} send={event => actor.send(event)} t={props.t} newTabKeys={shortcutOf('mainTabs.newTab')?.keys.join('') ?? ''} />
+              {startShown ? <StartPage sections={startSections()} t={props.t} /> : null}
+            </>,
+            host,
+          )
         }),
       ),
     )
@@ -185,6 +297,13 @@ export default defineClient({
       readonly event: TabsEvent
     }
     const commands: readonly TabCommand[] = [
+      {
+        id: 'mainTabs.newTab',
+        label: () => translate('newTab'),
+        desktop: { code: 'KeyT', modifiers: ['primary'] },
+        web: { code: 'KeyT', modifiers: ['primary', 'alt'] },
+        event: { type: 'tab.new' },
+      },
       {
         id: 'mainTabs.next',
         label: () => translate('nextTab'),

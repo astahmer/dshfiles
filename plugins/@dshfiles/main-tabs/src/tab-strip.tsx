@@ -4,13 +4,14 @@ import { ChevronDownIcon, PinIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactElement } from 'react'
 import type { MainTabsTranslate } from './locales.js'
+import { CompassGlyph } from './start-page.js'
 import type { TabsEvent } from './tabs-machine.js'
 
 export type TabStatus = 'running' | 'needsYou' | 'unread'
 
 export interface TabView {
   readonly id: string
-  readonly kind: 'panel' | 'thread'
+  readonly kind: 'panel' | 'thread' | 'start'
   readonly title: string
   readonly active: boolean
   readonly pinned: boolean
@@ -23,6 +24,8 @@ interface TabStripProps {
   readonly tabs: readonly TabView[]
   readonly send: (event: TabsEvent) => void
   readonly t: MainTabsTranslate
+  /** The new-tab command's keys, shown in the "+" tooltip. */
+  readonly newTabKeys: string
 }
 
 /** One dot per thread tab, most urgent first: a question or approval waits, then work in progress, then an unseen finish. */
@@ -41,7 +44,7 @@ const statusDotClass = {
 
 const statusLabel = { running: 'running', needsYou: 'needsYou', unread: 'unread' } as const satisfies Record<TabStatus, string>
 
-/** DSH's dock-kit strip close glyph (`dsh-client-ui-dockkit`): a 1px cross on a 16px grid, drawn at 14px. */
+/** DSH's dock-kit strip glyphs (`dsh-client-ui-dockkit`): a 1px cross and plus on a 16px grid, drawn at 14px. */
 const CloseGlyph = (): ReactElement => (
   <svg aria-hidden width={14} height={14} viewBox="0 0 16 16" fill="none" strokeWidth={1}>
     <path d="M3.5 3.5L12.5 12.5" stroke="currentColor" />
@@ -49,18 +52,25 @@ const CloseGlyph = (): ReactElement => (
   </svg>
 )
 
+const PlusGlyph = (): ReactElement => (
+  <svg aria-hidden width={14} height={14} viewBox="0 0 16 16" fill="none" strokeWidth={1}>
+    <path d="M8 2V14" stroke="currentColor" />
+    <path d="M2 8H14" stroke="currentColor" />
+  </svg>
+)
 
 /** The 2px caret the dock-kit strip draws where a dragged tab will land. */
 const DROP_CARET =
   "dshx:before:absolute dshx:before:top-1 dshx:before:-left-1.5 dshx:before:h-5 dshx:before:w-0.5 dshx:before:bg-(--dsw-alias-brand-primary-new-colorprimary-new-color) dshx:before:content-['']"
 
-/** Square 28px strip buttons, as the dock-kit `iconButton`. */
+/** Square 28px strip buttons, as the dock-kit `addTab` and `iconButton`. */
 const STRIP_BUTTON =
   'dshx:flex dshx:size-7 dshx:flex-none dshx:cursor-pointer dshx:items-center dshx:justify-center dshx:rounded-(--dsw-radius-sm) dshx:text-muted-foreground dshx:outline-none dshx:hover:bg-accent dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring'
 
 /**
  * The tab row above the main view, styled after DSH's own dock-kit strip (the right panel's tabs): 28px pills on the
- * panel background, a hairline between inactive neighbours and the close cross over a faded title end. Rendering only: the tabs machine owns order, pins, preview and the active tab; this keeps DOM-only state
+ * panel background, a hairline between inactive neighbours, the close cross over a faded title end, and "+" after the
+ * last tab. Rendering only: the tabs machine owns order, pins, preview and the active tab; this keeps DOM-only state
  * (drop target, overflow measurement) and sends what the user did.
  */
 export const TabStrip = (props: TabStripProps): ReactElement => {
@@ -212,6 +222,7 @@ export const TabStrip = (props: TabStripProps): ReactElement => {
                       !tab.pinned && tab.active && 'dshx:[mask-image:linear-gradient(to_right,black_calc(100%-30px),transparent_calc(100%-14px))]',
                     )}
                   >
+                    {tab.kind === 'start' ? <CompassGlyph size={16} className="dshx:flex-none dshx:text-(--dsw-alias-label-tertiary)" /> : null}
                     {tab.status === null ? null : (
                       <span aria-hidden className={cn('dshx:size-1.5 dshx:flex-none dshx:rounded-full', statusDotClass[tab.status])} />
                     )}
@@ -240,9 +251,11 @@ export const TabStrip = (props: TabStripProps): ReactElement => {
                 </div>
               </ContextMenuTrigger>
               <ContextMenuContent className="dshx-root">
-                <ContextMenuItem onSelect={() => send({ type: 'tab.togglePin', tabId: tab.id })}>{t(tab.pinned ? 'unpin' : 'pin')}</ContextMenuItem>
+                {tab.kind === 'start' ? null : (
+                  <ContextMenuItem onSelect={() => send({ type: 'tab.togglePin', tabId: tab.id })}>{t(tab.pinned ? 'unpin' : 'pin')}</ContextMenuItem>
+                )}
                 {tab.preview ? <ContextMenuItem onSelect={() => send({ type: 'tab.keep', tabId: tab.id })}>{t('keepOpen')}</ContextMenuItem> : null}
-                <ContextMenuSeparator />
+                {tab.kind === 'start' && !tab.preview ? null : <ContextMenuSeparator />}
                 <ContextMenuItem onSelect={() => send({ type: 'tab.close', tabId: tab.id })}>{t('closeTab')}</ContextMenuItem>
                 <ContextMenuItem disabled={tabs.length < 2} onSelect={() => send({ type: 'tab.closeOthers', tabId: tab.id })}>
                   {t('closeOthers')}
@@ -255,9 +268,27 @@ export const TabStrip = (props: TabStripProps): ReactElement => {
           )
         })}
       </div>
+      <button
+        type="button"
+        aria-label={t('newTab')}
+        title={props.newTabKeys === '' ? t('newTab') : `${t('newTab')} (${props.newTabKeys})`}
+        className={cn(STRIP_BUTTON, 'dshx:relative', dropIndex === tabs.length && DROP_CARET)}
+        onClick={() => send({ type: 'tab.new' })}
+        onDragOver={event => {
+          if (dragged.current === null) return
+          event.preventDefault()
+          setDropIndex(tabs.length)
+        }}
+        onDrop={event => {
+          event.preventDefault()
+          dropAtEnd()
+        }}
+      >
+        <PlusGlyph />
+      </button>
       <div
         aria-hidden
-        className={cn('dshx:relative dshx:h-7 dshx:min-w-6 dshx:flex-1', dropIndex === tabs.length && DROP_CARET)}
+        className="dshx:h-7 dshx:min-w-6 dshx:flex-1"
         onDragOver={event => {
           if (dragged.current === null) return
           event.preventDefault()

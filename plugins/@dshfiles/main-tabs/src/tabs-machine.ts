@@ -1,6 +1,10 @@
 import { and, assign, raise, setup } from '@dshfiles/plugin-ui/machine'
 
-export type TabTarget = { readonly kind: 'panel'; readonly panelId: string } | { readonly kind: 'thread'; readonly sessionId: string }
+/** What the Host's main view can show. */
+export type HostTarget = { readonly kind: 'panel'; readonly panelId: string } | { readonly kind: 'thread'; readonly sessionId: string }
+
+/** A tab shows a Host target, or the new-tab page (suggestions of what to open), which only the strip renders. */
+export type TabTarget = HostTarget | { readonly kind: 'start' }
 
 export interface Tab {
   readonly id: string
@@ -27,19 +31,27 @@ export interface TabPreferences {
   readonly persistence: TabPersistence
 }
 
+/** A saved tab always shows a Host target: the new-tab page is a moment, not a place, and is never saved. */
+export interface PersistedTab extends Omit<Tab, 'target'> {
+  readonly target: HostTarget
+}
+
 export interface PersistedTabs {
   readonly lastProjectKey: string | null
-  readonly sets: Readonly<Record<string, TabSet>>
+  readonly sets: Readonly<Record<string, { readonly tabs: readonly PersistedTab[]; readonly activeTabId: string | null }>>
 }
 
 export interface TabsPorts {
   /** Show the target in the main view; false when the Host cannot (an unregistered panel). */
-  readonly navigate: (target: TabTarget) => boolean
+  readonly navigate: (target: HostTarget) => boolean
   readonly save: (tabs: PersistedTabs) => void
 }
 
 export type TabsEvent =
-  | { readonly type: 'host.navigated'; readonly target: TabTarget | null; readonly projectId: string | null }
+  | { readonly type: 'host.navigated'; readonly target: HostTarget | null; readonly projectId: string | null }
+  | { readonly type: 'tab.new' }
+  /** A suggestion picked on the new-tab page: its target takes the page's place; null closes it (New thread, Settings). */
+  | { readonly type: 'start.pick'; readonly target: HostTarget | null }
   | { readonly type: 'tab.select'; readonly tabId: string }
   | { readonly type: 'tab.close'; readonly tabId: string }
   | { readonly type: 'tab.closeOthers'; readonly tabId: string }
@@ -60,11 +72,11 @@ interface TabsContext {
   readonly scopeKey: string
   readonly clock: number
   /** What the Host shows now, kept while disabled or waiting for settings so enabling adopts it. */
-  readonly hostTarget: TabTarget | null
+  readonly hostTarget: HostTarget | null
   readonly hostProjectId: string | null
   readonly hostSeen: boolean
   /** A navigation this machine started; Host reports of anything else are in-between states until it lands. */
-  readonly pendingTarget: TabTarget | null
+  readonly pendingTarget: HostTarget | null
   /** The first Host report after load either restores the saved active tab or opens what the Host shows. */
   readonly restored: boolean
 }
@@ -82,9 +94,14 @@ const NO_PROJECT_KEY = 'project:none'
 const NAVIGATION_SETTLE_MS = 2_000
 const EMPTY_SET: TabSet = { tabs: [], activeTabId: null }
 
-export const tabIdOf = (target: TabTarget): string => (target.kind === 'panel' ? `panel:${target.panelId}` : `thread:${target.sessionId}`)
+export const START_TAB_ID = 'start'
 
-const sameTarget = (left: TabTarget | null, right: TabTarget | null): boolean =>
+export const tabIdOf = (target: TabTarget): string => {
+  if (target.kind === 'start') return START_TAB_ID
+  return target.kind === 'panel' ? `panel:${target.panelId}` : `thread:${target.sessionId}`
+}
+
+const sameTarget = (left: HostTarget | null, right: HostTarget | null): boolean =>
   left === null || right === null ? left === right : tabIdOf(left) === tabIdOf(right)
 
 const projectKeyOf = (projectId: string): string => `project:${projectId}`
@@ -144,6 +161,28 @@ const removeTabs = (set: TabSet, removed: (tab: Tab) => boolean): TabSet => {
   return { tabs, activeTabId: (right ?? left)?.id ?? null }
 }
 
+/**
+ * The new-tab page gives its place to what was opened from it, or from anywhere else while it was shown; a target that
+ * already has a tab is focused there instead.
+ */
+const replaceStart = (set: TabSet, target: HostTarget, usedAt: number): TabSet => {
+  const id = tabIdOf(target)
+  if (set.tabs.some(tab => tab.id === id)) {
+    return { tabs: set.tabs.flatMap(tab => (tab.id === START_TAB_ID ? [] : [tab.id === id ? { ...tab, usedAt } : tab])), activeTabId: id }
+  }
+  const opened: Tab = { id, target, pinned: false, preview: false, usedAt }
+  return { tabs: set.tabs.map(tab => (tab.id === START_TAB_ID ? opened : tab)), activeTabId: id }
+}
+
+/** Open the new-tab page at the end of the strip, or focus it when it is already open. */
+const openStart = (set: TabSet, usedAt: number, maxTabs: number): TabSet => {
+  if (set.tabs.some(tab => tab.id === START_TAB_ID)) {
+    return { tabs: set.tabs.map(tab => (tab.id === START_TAB_ID ? { ...tab, usedAt } : tab)), activeTabId: START_TAB_ID }
+  }
+  const opened: Tab = { id: START_TAB_ID, target: { kind: 'start' }, pinned: false, preview: false, usedAt }
+  return evictPastLimit({ tabs: [...set.tabs, opened], activeTabId: START_TAB_ID }, maxTabs)
+}
+
 const moveTab = (set: TabSet, tabId: string, toIndex: number): TabSet => {
   const tab = set.tabs.find(candidate => candidate.id === tabId)
   if (tab === undefined) return set
@@ -159,7 +198,18 @@ const withSet = (context: TabsContext, set: TabSet): Pick<TabsContext, 'sets'> =
 const activeTarget = (context: TabsContext): TabTarget | null =>
   currentSet(context).tabs.find(tab => tab.id === currentSet(context).activeTabId)?.target ?? null
 
-const persisted = (context: TabsContext): PersistedTabs => ({ lastProjectKey: context.lastProjectKey, sets: context.sets })
+const persisted = (context: TabsContext): PersistedTabs => ({
+  lastProjectKey: context.lastProjectKey,
+  sets: Object.fromEntries(
+    Object.entries(context.sets).map(([key, set]) => [
+      key,
+      {
+        tabs: set.tabs.flatMap(tab => (tab.target.kind === 'start' ? [] : [{ ...tab, target: tab.target }])),
+        activeTabId: set.activeTabId === START_TAB_ID ? null : set.activeTabId,
+      },
+    ]),
+  ),
+})
 
 /**
  * Owns the main-view tab strip: which tabs exist (per project or globally), their order, pins and preview flag, the
@@ -177,7 +227,7 @@ export const tabsMachine = setup({
     persist: ({ context }) => context.ports.save(persisted(context)),
     navigateToActive: assign(({ context }) => {
       const target = activeTarget(context)
-      if (target === null || sameTarget(target, context.hostTarget)) return { pendingTarget: null }
+      if (target === null || target.kind === 'start' || sameTarget(target, context.hostTarget)) return { pendingTarget: null }
       return { pendingTarget: context.ports.navigate(target) ? target : null }
     }),
     followHost: assign(({ context, event }) => {
@@ -196,12 +246,15 @@ export const tabsMachine = setup({
         restored: true,
       }
       const set = currentSet(scoped)
+      const startShown = set.activeTabId === START_TAB_ID
       if (event.target === null) {
         // Nothing is shown (the New thread screen): no tab is active, unless this is the first report and a tab waits.
-        return { ...scoped, ...withSet(scoped, { ...set, activeTabId: context.restored || projectChanged ? null : set.activeTabId }) }
+        const shown = startShown ? removeTabs(set, tab => tab.id === START_TAB_ID) : set
+        return { ...scoped, ...withSet(scoped, { ...shown, activeTabId: context.restored || projectChanged || startShown ? null : set.activeTabId }) }
       }
       const clock = context.clock + 1
-      return { ...scoped, clock, ...withSet(scoped, openTarget(set, event.target, context.preferences, clock)) }
+      const next = startShown ? replaceStart(set, event.target, clock) : openTarget(set, event.target, context.preferences, clock)
+      return { ...scoped, clock, ...withSet(scoped, next) }
     }),
     recordHost: assign(({ event }) => (event.type === 'host.navigated' ? { hostTarget: event.target, hostProjectId: event.projectId, hostSeen: true } : {})),
     applyPreferences: assign(({ context, event }) => {
@@ -288,6 +341,32 @@ export const tabsMachine = setup({
             'persist',
           ],
         },
+        'tab.new': {
+          actions: [
+            assign(({ context }) => {
+              const clock = context.clock + 1
+              return { clock, ...withSet(context, openStart(currentSet(context), clock, context.preferences.maxTabs)) }
+            }),
+            'persist',
+          ],
+        },
+        'start.pick': {
+          target: '.navigating',
+          actions: [
+            assign(({ context, event }) => {
+              const set = currentSet(context)
+              if (!set.tabs.some(tab => tab.id === START_TAB_ID)) return {}
+              const clock = context.clock + 1
+              if (event.target !== null) return { clock, ...withSet(context, replaceStart(set, event.target, clock)) }
+              // Closing the page reveals what the Host still shows underneath; its tab, if any, is active again.
+              const remaining = set.tabs.filter(tab => tab.id !== START_TAB_ID)
+              const hostTabId = context.hostTarget === null ? null : tabIdOf(context.hostTarget)
+              return withSet(context, { tabs: remaining, activeTabId: remaining.some(tab => tab.id === hostTabId) ? hostTabId : null })
+            }),
+            'navigateToActive',
+            'persist',
+          ],
+        },
         'tab.activateIndex': {
           guard: ({ context, event }) => currentSet(context).tabs.length > 0 && event.index < currentSet(context).tabs.length,
           actions: raise(({ context, event }) => {
@@ -347,7 +426,7 @@ export const tabsMachine = setup({
           actions: [
             assign(({ context, event }) => {
               const set = currentSet(context)
-              const tabs = set.tabs.map(tab => (tab.id === event.tabId ? { ...tab, pinned: !tab.pinned, preview: false } : tab))
+              const tabs = set.tabs.map(tab => (tab.id === event.tabId && tab.id !== START_TAB_ID ? { ...tab, pinned: !tab.pinned, preview: false } : tab))
               return withSet(context, { ...set, tabs: pinnedFirst(tabs) })
             }),
             'persist',

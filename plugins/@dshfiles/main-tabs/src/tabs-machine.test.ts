@@ -1,12 +1,12 @@
 import { createActor } from '@dshfiles/plugin-ui/machine'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { DEFAULT_TAB_PREFERENCES, tabsMachine, type PersistedTabs, type TabPreferences, type TabTarget } from './tabs-machine.js'
+import { DEFAULT_TAB_PREFERENCES, tabsMachine, type HostTarget, type PersistedTabs, type TabPreferences } from './tabs-machine.js'
 
-const thread = (sessionId: string): TabTarget => ({ kind: 'thread', sessionId })
-const panel = (panelId: string): TabTarget => ({ kind: 'panel', panelId })
+const thread = (sessionId: string): HostTarget => ({ kind: 'thread', sessionId })
+const panel = (panelId: string): HostTarget => ({ kind: 'panel', panelId })
 
 const start = (options: { readonly preferences?: Partial<TabPreferences>; readonly persisted?: PersistedTabs | null; readonly navigates?: boolean } = {}) => {
-  const navigated: TabTarget[] = []
+  const navigated: HostTarget[] = []
   const saved: PersistedTabs[] = []
   const actor = createActor(tabsMachine, {
     input: {
@@ -21,7 +21,7 @@ const start = (options: { readonly preferences?: Partial<TabPreferences>; readon
     },
   }).start()
   const preferences = { ...DEFAULT_TAB_PREFERENCES, ...options.preferences }
-  const host = (target: TabTarget | null, projectId: string | null = null): void => actor.send({ type: 'host.navigated', target, projectId })
+  const host = (target: HostTarget | null, projectId: string | null = null): void => actor.send({ type: 'host.navigated', target, projectId })
   const set = () => {
     const context = actor.getSnapshot().context
     return context.sets[context.scopeKey] ?? { tabs: [], activeTabId: null }
@@ -234,5 +234,84 @@ describe('tabsMachine', () => {
     tabs.host(null)
     expect(tabs.set()).toMatchObject({ activeTabId: null })
     expect(tabs.ids()).toEqual(['thread:a'])
+  })
+
+  it('opens the new-tab page at the end of the strip without navigating, and focuses it when opened again', () => {
+    const tabs = start({ preferences: { openMode: 'new' } })
+    tabs.enable()
+    tabs.host(thread('a'))
+    tabs.host(panel('jujutsu'))
+    tabs.actor.send({ type: 'tab.select', tabId: 'thread:a' })
+    tabs.host(thread('a'))
+    tabs.actor.send({ type: 'tab.new' })
+    expect(tabs.ids()).toEqual(['thread:a', 'panel:jujutsu', 'start'])
+    expect(tabs.set().activeTabId).toBe('start')
+    tabs.actor.send({ type: 'tab.select', tabId: 'panel:jujutsu' })
+    tabs.host(panel('jujutsu'))
+    tabs.actor.send({ type: 'tab.new' })
+    expect(tabs.ids()).toEqual(['thread:a', 'panel:jujutsu', 'start'])
+    expect(tabs.set().activeTabId).toBe('start')
+    expect(tabs.navigated).toEqual([thread('a'), panel('jujutsu')])
+  })
+
+  it('replaces the new-tab page with the picked suggestion and navigates there', () => {
+    const tabs = start({ preferences: { openMode: 'preview' } })
+    tabs.enable()
+    tabs.host(thread('a'))
+    tabs.actor.send({ type: 'tab.new' })
+    tabs.actor.send({ type: 'start.pick', target: panel('memory') })
+    expect(tabs.set().tabs.map(tab => [tab.id, tab.preview])).toEqual([
+      ['thread:a', true],
+      ['panel:memory', false],
+    ])
+    expect(tabs.set().activeTabId).toBe('panel:memory')
+    expect(tabs.navigated).toEqual([panel('memory')])
+  })
+
+  it('focuses the tab a picked suggestion already has and drops the new-tab page', () => {
+    const tabs = start({ preferences: { openMode: 'new' } })
+    tabs.enable()
+    tabs.host(thread('a'))
+    tabs.host(panel('usage'))
+    tabs.actor.send({ type: 'tab.new' })
+    tabs.actor.send({ type: 'start.pick', target: thread('a') })
+    expect(tabs.ids()).toEqual(['thread:a', 'panel:usage'])
+    expect(tabs.set().activeTabId).toBe('thread:a')
+    expect(tabs.navigated).toEqual([thread('a')])
+  })
+
+  it('closes the new-tab page for a suggestion that is not a tab, showing the tab of what the Host still shows', () => {
+    const tabs = start({ preferences: { openMode: 'new' } })
+    tabs.enable()
+    tabs.host(thread('a'))
+    tabs.actor.send({ type: 'tab.new' })
+    tabs.actor.send({ type: 'start.pick', target: null })
+    expect(tabs.ids()).toEqual(['thread:a'])
+    expect(tabs.set().activeTabId).toBe('thread:a')
+    expect(tabs.navigated).toEqual([])
+  })
+
+  it('lets whatever the Host opens while the new-tab page shows take its place', () => {
+    const tabs = start({ preferences: { openMode: 'new' } })
+    tabs.enable()
+    tabs.host(thread('a'))
+    tabs.actor.send({ type: 'tab.new' })
+    tabs.host(thread('b'))
+    expect(tabs.ids()).toEqual(['thread:a', 'thread:b'])
+    expect(tabs.set().activeTabId).toBe('thread:b')
+    tabs.actor.send({ type: 'tab.new' })
+    tabs.host(null)
+    expect(tabs.ids()).toEqual(['thread:a', 'thread:b'])
+    expect(tabs.set().activeTabId).toBeNull()
+  })
+
+  it('never saves or pins the new-tab page', () => {
+    const tabs = start({ preferences: { openMode: 'new' } })
+    tabs.enable()
+    tabs.host(thread('a'))
+    tabs.actor.send({ type: 'tab.new' })
+    tabs.actor.send({ type: 'tab.togglePin', tabId: 'start' })
+    expect(tabs.set().tabs.find(tab => tab.id === 'start')?.pinned).toBe(false)
+    expect(Object.values(tabs.saved.at(-1)?.sets ?? {})).toEqual([{ tabs: [expect.objectContaining({ id: 'thread:a' })], activeTabId: null }])
   })
 })

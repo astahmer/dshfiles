@@ -1,18 +1,19 @@
 # @dshfiles/main-tabs
 
-Browser-like tabs above DSH's main view. Every thread or global panel the main view shows (Plugins, Jujutsu, AI Accounts, Usage analytics, Memory, Thread workspaces, Workbench, …) opens or focuses a tab; picking a tab shows it again.
+Browser-like tabs above DSH's main view. Every thread or global panel the main view shows (Plugins, Jujutsu, AI Accounts, Usage analytics, Memory, Thread workspaces, Workbench, …) opens or focuses a tab; picking a tab shows it again. The strip looks like DSH's own right-panel tabs (`dsh-client-ui-dockkit`): same 28px pills, typography, hover and active colors, hairline separators and close cross, built from the same `--dsw-*` tokens.
 
 This is an owned DSH bundle built with dshx (no port: nothing upstream does this). Run `pnpm build`, `pnpm test` and `pnpm typecheck` from this package.
 
 ## Use
 
+- **New tab**: "+" after the last tab, or Mod+T (Web: Mod+Alt+T), opens a _Start_ tab modelled on the right panel's Start page: New thread, the five most recent threads (running ones first), every main panel with its shortcut when it has one, and Settings. Arrow keys, Home/End and Enter move through the list. A picked thread or panel takes the Start tab's place (or focuses its existing tab); New thread and Settings close it. The Start tab is not saved.
 - **Open**: anything shown in the main view gets a tab. By default it is a _preview_ tab (italic) that the next thing you open replaces, VS Code style; double-click it, pin it or drag it to keep it.
 - **Close**: × on the tab, a middle click, or Delete on a focused tab. Closing the active tab shows its right neighbour. The context menu adds _Close other tabs_ and _Close tabs to the right_; pinned tabs survive both.
 - **Pin**: from the context menu. Pinned tabs lead the strip and have no ×.
 - **Reorder**: drag a tab. Pinned and unpinned tabs stay in their own groups.
 - **Overflow**: the strip scrolls (mouse wheel works) and a ▾ button lists every tab once they do not fit.
 - **Thread indicators**: a dot for _needs your input_ (an approval or a question), _working_ (pulsing), and _finished, unread_.
-- **Keyboard**: Desktop Mod+1…8 / Mod+9 (last), Ctrl+Tab / Ctrl+Shift+Tab (Ctrl+Shift+] / [ on Linux). The browser keeps those keys, so the Web defaults are Mod+Alt+1…9 and Mod+Alt+] / [. All are listed and rebindable in Settings › Shortcuts. Arrow keys, Home/End, Enter and Delete work inside the focused strip.
+- **Keyboard**: Desktop Mod+1…8 / Mod+9 (last), Ctrl+Tab / Ctrl+Shift+Tab (Ctrl+Shift+] / [ on Linux). The browser keeps those keys, so the Web defaults are Mod+Alt+1…9 and Mod+Alt+] / [. Mod+T (Web: Mod+Alt+T) opens a new tab. All are listed and rebindable in Settings › Shortcuts. Arrow keys, Home/End, Enter and Delete work inside the focused strip.
 
 ## Settings (`dshfiles-main-tabs`)
 
@@ -27,7 +28,7 @@ Tabs, order, pins, the preview flag and the active tab are saved in `localStorag
 
 ## Design
 
-`tabs-machine.ts` (xstate) owns the tab sets, the active tab, order and persistence. The Host's main view stays the truth for what is shown: the client reports it (`host.navigated`, from `layout.panelInfo`, the Session list and Workspaces), and the machine opens or focuses a tab. Picking a tab asks the Host to navigate and ignores its in-between reports until it lands (two-second limit). Settings are only readable from components, so the machine waits in `gate` until the strip reads them.
+`tabs-machine.ts` (xstate) owns the tab sets, the active tab, order and persistence. The Host's main view stays the truth for what is shown: the client reports it (`host.navigated`, from `layout.panelInfo`, the Session list and Workspaces), and the machine opens or focuses a tab. Picking a tab asks the Host to navigate and ignores its in-between reports until it lands (two-second limit). The Start tab is the one tab with no Host target: while it is active the strip renders `start-page.tsx` below itself and hides the `main` outlet (still mounted, so a thread keeps its state); whatever the Host opens next, from the page or elsewhere, replaces it. Settings are only readable from components, so the machine waits in `gate` until the strip reads them.
 
 ## Host limits and workarounds
 
@@ -43,5 +44,7 @@ See [`plans/dsh-host-gaps.md`](../../../plans/dsh-host-gaps.md).
 
   Opening Settings from the gear, the palette or `Mod+,` keeps showing the native modal over the tabs.
 
-- A panel's own sidebar icon can only be rendered by the `sidebar.panellist` declarer, so tabs use a generic panel or thread icon with the panel's sidebar label.
+- A panel's own sidebar icon can only be rendered through the `sidebar.panellist` slot by its declarer. Tabs show only the label, as the right panel's tabs do; the Start page renders each entry's registered glyph component directly with the sidebar's owner props (`{ size, active }`), behind an error boundary that falls back to a generic panel icon.
+- **Settings has no open action for plugins.** Its shell store is private to `ui-settings-general` and the shortcut registry cannot run a command, so the Start page's Settings row presses the sidebar's own trigger (`[data-slot="settings.launcher"] button[aria-haspopup="dialog"]`).
+- **Panels have no shortcut field.** The Start page shows the bound shortcut command named after the panel (`Jujutsu` or `Open Jujutsu`), if any.
 - With no tab left, the main view keeps showing what it showed: DSH has no way to show "nothing" without creating a blank Session.

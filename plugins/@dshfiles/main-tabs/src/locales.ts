@@ -25,6 +25,13 @@ const en = {
   previousTab: 'Previous tab',
   goToTab: 'Go to tab {index}',
   goToLastTab: 'Go to the last tab',
+  newTab: 'New tab',
+  startTab: 'Start',
+  startLabel: 'Open in this tab',
+  newThread: 'New thread',
+  recentThreads: 'Recent threads',
+  panels: 'Panels',
+  settings: 'Settings',
 }
 
 const zh = {
@@ -49,6 +56,13 @@ const zh = {
   previousTab: '上一个标签页',
   goToTab: '转到标签页 {index}',
   goToLastTab: '转到最后一个标签页',
+  newTab: '新标签页',
+  startTab: '开始',
+  startLabel: '在此标签页中打开',
+  newThread: '新会话',
+  recentThreads: '最近的会话',
+  panels: '面板',
+  settings: '设置',
 } satisfies Record<keyof typeof en, string>
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
