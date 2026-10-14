@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process'
-import { mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
+import { chmod, copyFile, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { Page } from 'playwright'
@@ -236,6 +236,65 @@ const seedToolCallThread = async (state: ScratchState, page: Page, timeoutMs: nu
   return fake.process
 }
 
+const FAKE_SECRET_CLI = join(DSHFILES_ROOT, 'tooling', 'dshx', 'e2e', 'support', 'fake-secret-cli.mjs')
+
+/** Synthetic aliases for the scratch project: one global, a project alias in two environments, one machine-local. */
+const fakeSecretStore = (project: string): string => {
+  const row = (fields: {
+    readonly alias: string
+    readonly scope: string
+    readonly root: string | null
+    readonly environment: string
+    readonly item: string
+    readonly source: string
+  }) => ({
+    ...fields,
+    field: 'password',
+  })
+  return `${JSON.stringify(
+    {
+      rows: [
+        row({ alias: 'GITHUB_TOKEN', scope: 'global', root: null, environment: 'prod', item: 'item-github', source: 'github' }),
+        row({ alias: 'DB_PASSWORD', scope: 'project', root: project, environment: 'prod', item: 'item-db-prod', source: 'postgres' }),
+        row({ alias: 'DB_PASSWORD', scope: 'project', root: project, environment: 'dev', item: 'item-db-dev', source: 'postgres' }),
+        row({ alias: 'LOCAL_TOKEN', scope: 'local', root: project, environment: 'prod', item: 'item-local', source: 'laptop' }),
+      ],
+      vault: {
+        'item-github': 'scratch-fake-github-value',
+        'item-db-prod': 'scratch-fake-db-prod-value',
+        'item-db-dev': 'scratch-fake-db-dev-value',
+        'item-local': 'scratch-fake-local-value',
+      },
+    },
+    null,
+    2,
+  )}\n`
+}
+
+/**
+ * Install the e2e fake `secret` CLI in the scratch home with a synthetic store for `project`, so a Host started with
+ * the returned directory first on PATH never reaches a real vault. Returns that directory.
+ */
+export const installFakeSecretCli = async (input: { readonly home: string; readonly project: string }): Promise<string> => {
+  const bin = join(input.home, 'fake-secret-cli')
+  await mkdir(bin, { recursive: true })
+  await copyFile(FAKE_SECRET_CLI, join(bin, 'secret'))
+  await chmod(join(bin, 'secret'), 0o755)
+  await writeFile(join(bin, 'store.json'), fakeSecretStore(input.project), { mode: 0o600 })
+  return bin
+}
+
+const seedFakeSecretCli = async (state: ScratchState): Promise<void> => {
+  if (state.fakeSecretCli === undefined) {
+    throw new ScratchError(
+      'seed-needs-fake-secret-cli',
+      'Seed fake-secret-cli needs a Host started with the fake secret CLI on its PATH.',
+      'Run "dshx dev down" then "dshx dev up --fake-secret-cli --plugin @dshfiles/secret-catalog ...".',
+    )
+  }
+  await writeFile(join(state.fakeSecretCli, 'store.json'), fakeSecretStore(state.project.path), { mode: 0o600 })
+}
+
 /** Apply one seed: the checkout file it changed and the process it started, if any. */
 export const applySeed = async (input: {
   readonly state: ScratchState
@@ -244,6 +303,10 @@ export const applySeed = async (input: {
   readonly timeoutMs: number
 }): Promise<{ readonly changedFile?: string; readonly fakeProvider?: NonNullable<ScratchState['fakeProvider']> }> => {
   if (input.seed === 'pending-restart') return { changedFile: await seedPendingRestart(input.state) }
+  if (input.seed === 'fake-secret-cli') {
+    await seedFakeSecretCli(input.state)
+    return {}
+  }
   if (input.seed === 'tool-call-thread') return { fakeProvider: await seedToolCallThread(input.state, input.page, input.timeoutMs) }
   await seedRebaseReadyThread(input.state, input.page, input.timeoutMs)
   return {}

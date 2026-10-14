@@ -34,9 +34,10 @@ const externalDependencySchema = z
  * State a reach needs that one short UI path cannot create, set up once per scratch instance by `dshx dev open`:
  * `rebase-ready-thread` is a thread in its own jj workspace whose described revision is ready to rebase (the agent's edit
  * is stood in for by the jj CLI); `pending-restart` changes a loaded plugin's Host entry on disk, as a rebuild would;
- * `tool-call-thread` is a thread whose model (a loopback fake provider) ran a few-second `bash` tool call.
+ * `tool-call-thread` is a thread whose model (a loopback fake provider) ran a few-second `bash` tool call;
+ * `fake-secret-cli` resets the synthetic store of a Host started with `up --fake-secret-cli`.
  */
-export const REACH_SEEDS = ['rebase-ready-thread', 'pending-restart', 'tool-call-thread'] as const
+export const REACH_SEEDS = ['rebase-ready-thread', 'pending-restart', 'tool-call-thread', 'fake-secret-cli'] as const
 export type ReachSeed = (typeof REACH_SEEDS)[number]
 
 /**

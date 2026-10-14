@@ -52,7 +52,9 @@ creates, once per instance: `rebase-ready-thread` (a jj workspace thread with a
 described revision, for Rebase), `pending-restart` (changes thread-sidebar's
 `dist/index.js`; `down` restores it), and `tool-call-thread` (an AI Accounts
 Command Code account on a loopback fake provider, which `down` stops, and a
-thread whose model ran a 3 s `bash` call; needs `@dshfiles/ai-accounts`). `attach "<repo file>"` hands a fixture
+thread whose model ran a 3 s `bash` call; needs `@dshfiles/ai-accounts`), and `fake-secret-cli` (resets synthetic
+aliases; needs `up --fake-secret-cli`, which puts the e2e fake `secret` first on
+the Host's PATH so Secret Catalog never reaches a real vault). `attach "<repo file>"` hands a fixture
 such as `tooling/dshx/e2e/fixtures/attachments/red.png` to the composer's file
 input. The browser keeps its page between commands, so
 `shot` captures where `open` stopped. A failing step exits 1 with a screenshot:

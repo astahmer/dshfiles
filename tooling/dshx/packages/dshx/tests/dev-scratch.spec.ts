@@ -1,11 +1,12 @@
-import { spawn } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { once } from 'node:events'
-import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, realpath, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { PassThrough } from 'node:stream'
 import { afterEach, describe, expect, it } from 'vitest'
 import { runCli } from '../src/cli/run.js'
+import { installFakeSecretCli } from '../src/scratch/seed.js'
 import type { ScratchState } from '../src/scratch/state.js'
 
 const run = async (argv: readonly string[]): Promise<{ readonly code: number; readonly stdout: string; readonly stderr: string }> => {
@@ -219,5 +220,22 @@ describe('dshx dev scratch commands', () => {
     const down = await run(['dev', 'down', '--state-dir', stateDir, '--json'])
     expect(down.code).toBe(0)
     expect(alive(fakeProviderPid)).toBe(false)
+  })
+
+  it('installs a fake secret CLI that serves synthetic aliases scoped to the scratch project', async () => {
+    const home = await mkdtemp(join(tmpdir(), 'dshx-boot-profile-'))
+    cleanups.push(() => rm(home, { recursive: true, force: true }))
+    await mkdir(join(home, 'projects', 'sample'), { recursive: true })
+    const project = await realpath(join(home, 'projects', 'sample'))
+    const bin = await installFakeSecretCli({ home, project })
+    const secret = (args: readonly string[]): string => {
+      const result = spawnSync(join(bin, 'secret'), args, { cwd: project, env: { PATH: process.env.PATH ?? '', HOME: home }, encoding: 'utf8' })
+      expect(result.status).toBe(0)
+      return result.stdout
+    }
+    const aliases = (output: string): readonly string[] => [...output.matchAll(/"alias":"(\w+)","scope":"(\w+)"/g)].map(match => `${match[1]}/${match[2]}`)
+    expect(aliases(secret(['print', 'global', '--json']))).toEqual(['GITHUB_TOKEN/global'])
+    expect(aliases(secret(['print', '--all', '--json']))).toEqual(['GITHUB_TOKEN/global', 'DB_PASSWORD/project', 'DB_PASSWORD/project', 'LOCAL_TOKEN/local'])
+    expect(secret(['get', 'DB_PASSWORD', '--env', 'dev'])).toBe('scratch-fake-db-dev-value\n')
   })
 })

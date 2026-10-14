@@ -1,12 +1,12 @@
 import { randomUUID } from 'node:crypto'
 import { mkdir, readFile, realpath, rm, stat, writeFile } from 'node:fs/promises'
-import { basename, join, resolve } from 'node:path'
+import { basename, delimiter, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { prepareComposedBootProfile } from '../project/boot-profile.js'
 import { DSHFILES_ROOT, buildPlugin, findFreePort, listLocalBootBundles, resolveLocalBundles } from '../project/local-bundles.js'
 import { compositionFailures, readProfileComposition } from '../project/profile-composition.js'
 import { isolatedHostEnvironment } from '../project/scratch-profile.js'
-import { seedSampleProject } from './seed.js'
+import { installFakeSecretCli, seedSampleProject } from './seed.js'
 import {
   LIVE_DSH_HOME,
   LIVE_DSH_PORT,
@@ -27,6 +27,8 @@ export interface ScratchUpOptions {
   readonly project?: string
   readonly port?: number
   readonly skipBuild: boolean
+  /** Put the e2e fake `secret` CLI first on the Host's PATH, with synthetic aliases for the project. */
+  readonly fakeSecretCli: boolean
   readonly timeoutMs: number
   readonly onProgress: (message: string) => void
 }
@@ -148,6 +150,8 @@ export const scratchUp = async (options: ScratchUpOptions): Promise<ScratchState
     // DSH compares a Session's resolved cwd with the stored path, and macOS temp dirs live behind the /var -> /private/var link.
     const project = await realpath(options.project === undefined ? await seedSampleProject(home) : resolve(options.project))
     const workspaceId = await registerProject(home, project)
+    const fakeSecretCli = options.fakeSecretCli ? await installFakeSecretCli({ home, project }) : undefined
+    const hostSource = fakeSecretCli === undefined ? process.env : { ...process.env, PATH: `${fakeSecretCli}${delimiter}${process.env.PATH ?? ''}` }
 
     await mkdir(options.stateDir, { recursive: true, mode: 0o700 })
     const hostLog = join(options.stateDir, 'host.log')
@@ -160,7 +164,7 @@ export const scratchUp = async (options: ScratchUpOptions): Promise<ScratchState
     const port = options.port ?? (await findFreePort())
     options.onProgress(`starting dsh on 127.0.0.1:${port}`)
     const hostArgs = ['--profile', prepared.profile, '--port', String(port), '--no-open']
-    hostPid = spawnDetached('dsh', hostArgs, { cwd: DSHFILES_ROOT, env: isolatedHostEnvironment(home, prepared.profileRoot), log: hostLog })
+    hostPid = spawnDetached('dsh', hostArgs, { cwd: DSHFILES_ROOT, env: isolatedHostEnvironment(home, prepared.profileRoot, hostSource), log: hostLog })
     const launchUrl = await waitFor(
       async () => {
         if (ownedProcessStatus({ pid: hostPid ?? 0, signature: ['--port'] }) === 'gone')
@@ -214,6 +218,7 @@ export const scratchUp = async (options: ScratchUpOptions): Promise<ScratchState
       browserEvents,
       evidenceDir: join(options.stateDir, 'evidence'),
     }
+    if (fakeSecretCli !== undefined) state.fakeSecretCli = fakeSecretCli
     await writeScratchState(state)
     return state
   } catch (error) {
