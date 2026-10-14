@@ -25,7 +25,7 @@ const pinnedNode = async () => {
 /** Build the local artifacts before installing their linked bundles in the scratch profile. */
 const buildPlugin = plugin =>
   new Promise((resolveBuild, rejectBuild) => {
-    const child = spawn('pnpm', ['exec', 'dshx', 'build'], { cwd: plugin.dir, stdio: ['ignore', 'pipe', 'pipe'] })
+    const child = spawn('pnpm', ['exec', 'turbo', 'run', 'build', `--filter=${plugin.id}`], { cwd: workspace, stdio: ['ignore', 'pipe', 'pipe'] })
     let output = ''
     let settled = false
     const collect = chunk => {

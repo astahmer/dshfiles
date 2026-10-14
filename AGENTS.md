@@ -94,7 +94,7 @@ Work lands on `main`; never `jj git push` without asking.
   leaves those edits behind in the old revision.
 - After moving `main` by hand (`jj bookmark set main …`), bring the checkout
   DSH runs from along: `node tooling/dshx/packages/dshx/dist/cli/bin.js
-  checkout sync` (`--dry-run` to preview). It rebases the `default` workspace
+checkout sync` (`--dry-run` to preview). It rebases the `default` workspace
   keeping its local edits, rebuilds what changed and says whether DSH needs a
   restart; it never restarts DSH. Land does this itself.
 - Always pass `-m` to `jj describe` and `jj squash` (or
@@ -153,9 +153,8 @@ provenance in [`FORK.md`](tooling/dshx/FORK.md)). It has no upstream remote and
 must not install `@becomeopc/dshx` from a registry. Build it, then scaffold:
 
 ```sh
-pnpm --dir tooling/dshx install --frozen-lockfile
-pnpm --dir tooling/dshx --filter create-dshx build
-pnpm --dir tooling/dshx --filter @dshfiles/dshx build
+pnpm install --frozen-lockfile
+pnpm exec turbo run build --filter=@dshfiles/dshx
 node tooling/dshx/packages/dshx/dist/cli/bin.js create plugins/@dshfiles/my-plugin
 dshx inspect slots --root sidebar     # read the live composition instead of guessing
 ```
@@ -177,7 +176,7 @@ Docs: [authoring guide](tooling/dshx/docs/sdk/getting-started.md),
 - A plugin and dshx must resolve **one** `@deepseek-ai/cordis` (including
   `cordis-plugin-include` and `cordis-plugin-loader`). Two copies make
   `declare module` augmentations land on the wrong `Events`. The versions are
-  pinned in `plugins/pnpm-workspace.yaml` with `dedupePeerDependents: true`.
+  pinned in root `pnpm-workspace.yaml` with `dedupePeerDependents: true`.
 
 ### Plugin UI and state
 

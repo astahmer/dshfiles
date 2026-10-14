@@ -1,0 +1,109 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "cacheDir": ".turbo/cache",
+  "concurrency": "4",
+  "remoteCache": {
+    "enabled": false
+  },
+  "globalDependencies": [".node-version", "pnpm-workspace.yaml", "tooling/dshx/tsconfig.base.json"],
+  "globalEnv": ["NODE_ENV"],
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "!**/*.md",
+        "!tests/**",
+        "!**/*.{test,spec}.{ts,tsx,js,mjs}",
+        "!e2e/**",
+        "!bench/**",
+        "!dshx.features.json",
+        "!.cache/**",
+        "!.turbo/**",
+        "!dist/**",
+        "!node_modules/**",
+        "!.vite/**"
+      ],
+      "outputs": ["dist/**", ".cache/*.tsbuildinfo"]
+    },
+    "@dshfiles/plugin-ui#build": {
+      "dependsOn": ["^build"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/plugins/@dshfiles/**",
+        "!$TURBO_ROOT$/plugins/@dshfiles/**/node_modules/**",
+        "!$TURBO_ROOT$/plugins/@dshfiles/**/dist/**",
+        "!$TURBO_ROOT$/plugins/@dshfiles/**/.cache/**",
+        "!$TURBO_ROOT$/plugins/@dshfiles/**/.turbo/**",
+        "!$TURBO_ROOT$/plugins/@dshfiles/**/.vite/**",
+        "!$TURBO_ROOT$/plugins/@dshfiles/**/output/**",
+        "!$TURBO_ROOT$/plugins/@dshfiles/**/test-results/**",
+        "!$TURBO_ROOT$/plugins/@dshfiles/**/playwright-report/**",
+        "!$TURBO_ROOT$/plugins/@dshfiles/**/.features-gen/**",
+        "!$TURBO_ROOT$/plugins/@dshfiles/**/.test-dist/**",
+        "!.turbo/**",
+        "!dist/**",
+        "!.cache/**",
+        "!node_modules/**",
+        "!.vite/**"
+      ],
+      "outputs": []
+    },
+    "typecheck": {
+      "dependsOn": ["build", "^typecheck"],
+      "outputs": [],
+      "inputs": ["$TURBO_DEFAULT$", "!.turbo/**", "!dist/**", "!.cache/**", "!node_modules/**", "!.vite/**"]
+    },
+    "test": {
+      "dependsOn": ["build"],
+      "outputs": [],
+      "env": ["CI"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/tooling/dshx/e2e/support/**",
+        "$TURBO_ROOT$/tooling/dshx/scripts/**",
+        "$TURBO_ROOT$/tooling/dshx/scratch-pnpm-policy.yaml",
+        "$TURBO_ROOT$/profiles/web/**",
+        "!.turbo/**",
+        "!dist/**",
+        "!.cache/**",
+        "!node_modules/**",
+        "!.vite/**"
+      ]
+    },
+    "@dshfiles/dshx#test": {
+      "cache": false
+    },
+    "create-dshx#test": {
+      "cache": false
+    },
+    "//#typecheck:scripts": {
+      "inputs": ["scripts/**"],
+      "outputs": []
+    },
+    "//#test:web-profile-contract": {
+      "inputs": ["scripts/verify-web-profile-contract*", "profiles/web/**", "plugins/@dshfiles/*/package.json"],
+      "outputs": []
+    },
+    "//#test:selection": {
+      "inputs": ["scripts/test-selection*"],
+      "outputs": []
+    },
+    "@dshfiles/jj-integration#test": {
+      "cache": false,
+      "env": ["CI", "JJ_TEST_EXECUTABLE", "JJ_CONFIG"]
+    },
+    "@dshfiles/jujutsu#test": {
+      "cache": false,
+      "env": ["CI", "JJ_TEST_EXECUTABLE", "JJ_CONFIG"]
+    },
+    "//#test:tooling": {
+      "cache": false,
+      "inputs": ["tooling/dshx/e2e/support/**", "tooling/dshx/scripts/**"]
+    },
+    "//#test:scripts": {
+      "cache": false,
+      "inputs": ["scripts/**"]
+    }
+  }
+}

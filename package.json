@@ -2,14 +2,13 @@
   "name": "dshfiles",
   "private": true,
   "type": "module",
-  "packageManager": "pnpm@12.5.1",
   "scripts": {
     "install:all": "ELECTRON_SKIP_BINARY_DOWNLOAD=1 pnpm install --frozen-lockfile && pnpm run setup:browser",
     "setup:browser": "pnpm --dir tooling/dshx exec playwright install --only-shell chromium",
     "check:dshx": "pnpm --dir tooling/dshx run check && pnpm --dir tooling/dshx run deps:check",
     "check:plugins": "pnpm --dir plugins run check",
     "check": "pnpm run check:green && pnpm run lint && pnpm run fmt:check",
-    "check:green": "pnpm run typecheck:scripts && pnpm run test:web-profile-contract && pnpm run verify:web-profile-contract && pnpm run check:dshx && pnpm run check:plugins && pnpm run check:desktop",
+    "check:green": "pnpm run typecheck:scripts && pnpm run test:scripts && pnpm run verify:web-profile-contract && pnpm run check:dshx && pnpm run check:plugins && pnpm run check:desktop",
     "check:diff": "node scripts/check-diff.mjs",
     "lint": "node scripts/lint-ratchet.ts oxlint && node scripts/lint-ratchet.ts ast-grep",
     "sg": "ast-grep scan tooling/dshx/packages plugins scripts apps/desktop/src",
@@ -21,7 +20,15 @@
     "profile:boot": "node scripts/profile-boot.ts",
     "test:web-profile-contract": "node --test scripts/verify-web-profile-contract.test.mjs",
     "verify:web-profile-contract": "node scripts/verify-web-profile-contract.mjs",
-    "check:desktop": "pnpm --dir apps/desktop run typecheck"
+    "check:desktop": "pnpm --dir apps/desktop run typecheck",
+    "build": "turbo run build --filter=!dshfiles-plugins --filter=!dshx-workspace",
+    "typecheck": "turbo run typecheck typecheck:scripts --filter=!dshfiles-plugins --filter=!dshx-workspace",
+    "test": "turbo run test test:scripts test:tooling --filter=!dshfiles-plugins --filter=!dshx-workspace",
+    "test:selection": "node --test scripts/test-selection.test.mjs",
+    "test:changed": "node scripts/test-selection.mjs changed",
+    "test:related": "node scripts/test-selection.mjs related",
+    "test:tooling": "pnpm --dir tooling/dshx run test:evidence && pnpm --dir tooling/dshx run test:inventory && pnpm --dir tooling/dshx run test:feature-coverage",
+    "test:scripts": "node --test scripts/*.test.mjs scripts/dsh-lkg/*.test.mjs"
   },
   "devDependencies": {
     "@ast-grep/cli": "0.45.3",
@@ -30,7 +37,9 @@
     "@types/node": "^22.20.5",
     "oxfmt": "0.71.0",
     "oxlint": "1.86.0",
+    "turbo": "2.11.8",
     "typescript": "7.0.2",
     "zod": "^4.6.5"
-  }
+  },
+  "packageManager": "pnpm@12.5.1"
 }
