@@ -58,6 +58,21 @@ which row applies to each.
 - Editing a profile's `cordis.patch.yml` by hand is fine only **outside** the Nix-managed marked block
   (`~/.config/nixfiles/modules/dsh.nix` reconciles that block on apply).
 
+### Capabilities other plugins and the agent use
+
+One dshx API serves Clients, other Host plugins and (opt-in) the agent; see
+`tooling/dshx/docs/guides/api.md#one-registry-other-plugins-clients-and-the-agent`.
+
+- A contract another package imports sets `owner` and gives each method a `description`.
+- Agent tool that wraps API logic → `method({ ..., tool: { name, readOnly } })`, not a second `defineTool`
+  restating the parameters. Keep `readOnly` off for anything that writes.
+- Host code calls another plugin with `createHostApiClient(ctx, contract, packageId)`, never a Cordis
+  service grab or an HTTP fetch.
+- An absent owner is `isApiOwnerMissing(error)` (Host and Client): stop polling and hide the feature; never
+  match transport message text.
+- Verify: `dshxRegistryApi.list` (the Tools tab in Settings > Built-in plugins) shows the method, its
+  description and its agent tool.
+
 ## 4. Run it
 
 ```sh

@@ -80,8 +80,9 @@ pgrep -fl 'dshx-boot-profile|browser-host.js' || echo clean
 - Sessions created with `dshx sessions create --cwd` stay "Unassigned" (not in
   the project's workspace); seed threads through the composer, as `home-screen`
   does.
-- Without `@dshfiles/multi-host`, jj-integration's host chip polls the
-  multi-host API and logs repeated 404s; load multi-host or discount them.
+- Without `@dshfiles/multi-host`, each multi-host query logs one 404 per page
+  load (e.g. `/api/dshx-9ca8a5fa/list`): the chip and sidebar see an
+  owner-missing error and stop polling. Load multi-host or discount it.
 - No provider is configured, so turns end immediately; anything needing a model
   reply needs a credential (see Safety).
 
