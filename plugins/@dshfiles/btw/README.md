@@ -3,6 +3,20 @@
 `/btw <question>` asks about the current thread without touching it. The
 answer opens in a right-sidebar tab, where follow-ups continue.
 
+Three more ways open an **Ask a side question** dialog for a thread, which
+forks it exactly as `/btw` does and closes once the side panel opens:
+
+- the command palette action _Ask a side question (btw)_, for the open,
+  unarchived thread;
+- the `btw.askSideQuestion` shortcut, default `Mod+Alt+/` (Settings ›
+  Shortcuts rebinds it), for the thread in the main view. If another command
+  already owns the chord, it registers without a default instead of failing;
+- an icon-only button in the composer's right toolbar, before Prompts. It
+  sits in the composer rather than the thread header because the question is
+  typed where the user already writes, and the header already folds Pin into
+  its "…" menu when the title is crowded; with no label, it adds nothing to
+  the composer's collapse order. It hides on a blank draft.
+
 - **Fork:** `sessions.fork({ sessionId })` with no `atSeq`, so the Host cuts
   at the latest completed turn, the prefix the provider has already cached.
   A fork gets the default model, so the side chat then selects the source's

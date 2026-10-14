@@ -1,6 +1,6 @@
 import { waitFor } from '@dshfiles/plugin-ui/machine'
 import { describe, expect, it, vi } from 'vitest'
-import { sideChatTitle, startSideChat, type SideChatPorts } from './side-chat-machine.js'
+import { sideChatStarted, sideChatTitle, startSideChat, type SideChatPorts } from './side-chat-machine.js'
 
 const ports = (overrides: Partial<SideChatPorts> = {}) => {
   const calls: string[] = []
@@ -52,5 +52,22 @@ describe('side chat', () => {
 
   it('keeps titles to one bounded line', () => {
     expect(sideChatTitle('x'.repeat(200))).toHaveLength('btw · '.length + 80)
+  })
+})
+
+describe('side chat start', () => {
+  it('reports success once the fork is configured, before the answer arrives', async () => {
+    let answer: () => void = () => undefined
+    const { ports: sideChatPorts } = ports({ ask: () => new Promise<void>(resolve => (answer = resolve)) })
+    const actor = startSideChat({ ports: sideChatPorts, sourceId: 'source', question: 'q', route: null })
+    expect(await sideChatStarted(actor)).toEqual({ ok: true })
+    expect(actor.getSnapshot().matches('asking')).toBe(true)
+    answer()
+  })
+
+  it('reports why a refused fork started nothing', async () => {
+    const { ports: sideChatPorts } = ports({ fork: async () => Promise.reject(new Error('fork-unavailable')) })
+    const actor = startSideChat({ ports: sideChatPorts, sourceId: 'source', question: 'q', route: null })
+    expect(await sideChatStarted(actor)).toEqual({ ok: false, reason: 'fork-unavailable' })
   })
 })

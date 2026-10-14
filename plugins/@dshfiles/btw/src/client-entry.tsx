@@ -2,25 +2,35 @@ import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type { SessionReference } from '@deepseek-ai/dsh-api-session-controller/client'
 import type {} from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type {} from '@deepseek-ai/dsh-client-resources/client'
+import type { ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client'
+import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
+import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type { ConversationViewsProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { CommandClaim, InputTriggerSource } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type { PropsRenderFactories, PropsRenderSlots, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
+import { registerPaletteAction } from '@dshfiles/command-palette/api'
 import { defineClient } from '@dshfiles/dshx/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
-import { useSelector, waitFor } from '@dshfiles/plugin-ui/machine'
+import { MessageCircleQuestionIcon } from '@dshfiles/plugin-ui/icons'
+import { useSelector } from '@dshfiles/plugin-ui/machine'
+import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { useSyncExternalStore, type ReactNode } from 'react'
 import { z } from 'zod'
 import { BTW_LOCALE_NAMESPACE, btwLocale, type BtwKey } from './locales.js'
+import { mainViewThreadId } from './main-view-thread.js'
 import { PrefixCache } from './prefix-cache.js'
-import { startSideChat, type ModelRoute, type SideChatActor } from './side-chat-machine.js'
+import { sideChatStarted, startSideChat, type ModelRoute, type SideChatActor } from './side-chat-machine.js'
+import { SideQuestionDialog } from './side-question-dialog.js'
 import './client.css'
 
 const TAB_ID = '@dshfiles/btw'
 const TAB_KIND = 'btwchat'
 const ADDRESS_PREFIX = 'dsh-resource://btwchat/session/'
 const CONVERSATION_SLOT = 'dshfiles.btw.conversation'
+const ASK_SHORTCUT_ID = 'btw.askSideQuestion'
+const ASK_SHORTCUT = { code: 'Slash', modifiers: ['primary', 'alt'] } as const
 
 interface SideChatResource {
   readonly childId: SessionId
@@ -60,6 +70,7 @@ interface CloseHandlerHost {
 }
 // The concrete right-sidebar controller has it; the typed `ISidebarRight` face does not.
 const hasCloseHandlers = (value: unknown): value is CloseHandlerHost => closeHandlerSchema.safeParse(value).success
+const isShortcutCommandId = (value: string): value is ShortcutCommandId => /^[a-z][a-zA-Z0-9-]*(?:\.[a-zA-Z][a-zA-Z0-9-]*)+$/u.test(value)
 
 /** Live side chats of this page, by fork id: the tab's close and the panel header find their flow here. */
 const sideChats = new Map<string, SideChatActor>()
@@ -102,7 +113,7 @@ const SideChatStatus = (props: { readonly actor: SideChatActor; readonly t: Tran
 export default defineClient({
   name: '@dshfiles/btw',
   locales: [btwLocale],
-  inject: ['slots', 'sessions', 'workspaces', 'remote', 'remote.session', 'inputTriggers', 'resources', 'sidebarRight', 'sidebarRightTabs'],
+  inject: ['slots', 'sessions', 'workspaces', 'remote', 'remote.session', 'inputTriggers', 'resources', 'sidebarRight', 'sidebarRightTabs', 'shortcuts'],
   setup(ctx) {
     const t: Translate = (key, params) => ctx.locale.bind(BTW_LOCALE_NAMESPACE)(key, params)
 
@@ -165,12 +176,137 @@ export default defineClient({
       submit: async args => {
         const question = args.trim()
         if (question === '') return { kind: 'error', text: t('empty') }
-        // The composer waits for the fork, so a refusal shows as a notice; the answer itself streams into the tab.
-        const settled = await waitFor(startBtw(sessionId, question), snapshot => !snapshot.matches('forking') && !snapshot.matches('configuring'))
-        if (settled.matches('asking') || settled.matches('open')) return { kind: 'success' }
-        return { kind: 'error', text: t('failed', { reason: settled.context.error ?? 'unknown' }) }
+        const started = await sideChatStarted(startBtw(sessionId, question))
+        return started.ok ? { kind: 'success' } : { kind: 'error', text: t('failed', { reason: started.reason }) }
       },
     })
+
+    // The palette, the composer chip and the shortcut open one question dialog for a thread; the overlay draws it.
+    const askTarget = createSnapshotStore<SessionId | null>(null)
+    const listedThread = (threadId: string | undefined): SessionId | undefined => {
+      const snapshot = ctx.sessions.list.getSnapshot()
+      const sessionId = snapshot.ids.find(id => id === threadId)
+      return sessionId === undefined || snapshot.byId[sessionId]?.blank !== false ? undefined : sessionId
+    }
+    const askAbout = (threadId: string | undefined): boolean => {
+      const sessionId = listedThread(threadId)
+      if (sessionId === undefined) return false
+      askTarget.set(sessionId)
+      return true
+    }
+    const mainViewThread = (): SessionId | undefined => {
+      const snapshot = ctx.sessions.list.getSnapshot()
+      return mainViewThreadId(snapshot.ids.flatMap(id => snapshot.byId[id] ?? []))
+    }
+
+    ctx.effect(
+      () =>
+        ctx.slots.inject('shell.overlay', () =>
+          ctx.slots.register(
+            { name: 'shell.overlay', id: 'dshfiles-btw-ask', order: 110, locale: BTW_LOCALE_NAMESPACE },
+            (props: PropsRuntime<'shell.overlay'>) => {
+              const target = useSyncExternalStore(askTarget.subscribe, askTarget.getSnapshot)
+              const title = props.useSessions(state => (target === null ? '' : (state.byId[target]?.displayTitle ?? '')))
+              if (target === null) return null
+              return (
+                <PluginQueryProvider>
+                  <SideQuestionDialog
+                    key={target}
+                    threadTitle={title}
+                    t={t}
+                    onClose={() => askTarget.set(null)}
+                    ask={async question => {
+                      const started = await sideChatStarted(startBtw(target, question))
+                      if (!started.ok) throw new Error(t('failed', { reason: started.reason }))
+                    }}
+                  />
+                </PluginQueryProvider>
+              )
+            },
+          ),
+        ),
+      'dshfiles-btw: side question dialog',
+    )
+
+    ctx.effect(
+      () =>
+        registerPaletteAction({
+          id: '@dshfiles/btw/ask',
+          label: () => t('paletteAsk'),
+          aliases: ['btw', 'side question', 'side chat', 'ask about this thread', 'fork'],
+          icon: <MessageCircleQuestionIcon className="dshx:size-4" />,
+          group: 'action',
+          isAvailable: context => context.thread !== null && !context.thread.archived && listedThread(context.thread.id) !== undefined,
+          run: context => {
+            askAbout(context.thread?.id)
+          },
+        }),
+      'dshfiles-btw: command palette action',
+    )
+
+    if (isShortcutCommandId(ASK_SHORTCUT_ID))
+      ctx.effect(() => {
+        const register = (withDefaults: boolean): (() => void) =>
+          ctx.shortcuts.register({
+            id: ASK_SHORTCUT_ID,
+            label: () => t('paletteAsk'),
+            aliases: ['btw', 'side question', 'side chat'],
+            defaults: withDefaults
+              ? {
+                  'desktop:macos': ASK_SHORTCUT,
+                  'desktop:windows': ASK_SHORTCUT,
+                  'desktop:linux': ASK_SHORTCUT,
+                  'web:macos': ASK_SHORTCUT,
+                  'web:windows': ASK_SHORTCUT,
+                }
+              : {},
+            regions: ['page', 'editable'],
+            modals: [],
+            resolve: () => {
+              const sessionId = mainViewThread()
+              return sessionId === undefined ? { status: 'pass' } : { status: 'handled', run: () => askAbout(sessionId) }
+            },
+          })
+        // Another plugin may already own the default chord; keep the command listed and rebindable, unbound.
+        try {
+          return register(true)
+        } catch (error) {
+          console.warn(`dshfiles-btw: ${ASK_SHORTCUT_ID} keeps no default binding`, error)
+          try {
+            return register(false)
+          } catch {
+            return () => undefined
+          }
+        }
+      }, 'dshfiles-btw: side question shortcut')
+
+    const ComposerChip = (props: PropsRuntime<'conversation.input.right'>): ReactNode => {
+      const available = props.useSessions(state => state.byId[props.sessionId]?.blank === false)
+      if (!available) return null
+      const label = t('composerChip')
+      return (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          aria-label={label}
+          title={label}
+          className="dshx-root dshx:text-muted-foreground dshx:hover:text-foreground"
+          onMouseDown={event => event.preventDefault()}
+          onClick={() => askAbout(props.sessionId)}
+        >
+          <MessageCircleQuestionIcon aria-hidden />
+        </Button>
+      )
+    }
+    // Icon-only and before Prompts (60): it never carries a label, so it adds nothing to the composer's collapse order.
+    ctx.effect(
+      () =>
+        ctx.slots.inject('conversation.input.right', () =>
+          ctx.slots.register({ name: 'conversation.input.right', id: 'dshfiles-btw-ask', order: 55 }, ComposerChip),
+        ),
+      'dshfiles-btw: composer chip',
+    )
 
     const source: InputTriggerSource = {
       trigger: '/',

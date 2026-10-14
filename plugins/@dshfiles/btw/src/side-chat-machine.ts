@@ -1,4 +1,4 @@
-import { assign, createActor, fromPromise, setup, type ActorRefFrom } from '@dshfiles/plugin-ui/machine'
+import { assign, createActor, fromPromise, setup, waitFor, type ActorRefFrom } from '@dshfiles/plugin-ui/machine'
 
 export interface ModelRoute {
   readonly provider: string
@@ -115,3 +115,12 @@ const sideChatMachine = setup({
 export type SideChatActor = ActorRefFrom<typeof sideChatMachine>
 
 export const startSideChat = (input: SideChatInput): SideChatActor => createActor(sideChatMachine, { input }).start()
+
+export type SideChatStart = { readonly ok: true } | { readonly ok: false; readonly reason: string }
+
+/** Waits for the fork only: a refusal is reported to whoever asked, while the answer itself streams into the tab. */
+export const sideChatStarted = async (actor: SideChatActor): Promise<SideChatStart> => {
+  const settled = await waitFor(actor, snapshot => !snapshot.matches('forking') && !snapshot.matches('configuring'))
+  if (settled.matches('asking') || settled.matches('open')) return { ok: true }
+  return { ok: false, reason: settled.context.error ?? 'unknown' }
+}

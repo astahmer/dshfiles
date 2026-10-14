@@ -11,6 +11,15 @@ const en = {
   cacheWaiting: 'Waiting for the first answer…',
   failed: 'Side chat failed: {reason}',
   dismiss: 'Dismiss',
+  paletteAsk: 'Ask a side question (btw)',
+  askTitle: 'Ask a side question',
+  askDescription: 'About “{thread}”. The answer opens in a side panel; the thread stays untouched.',
+  askLabel: 'Side question',
+  askPlaceholder: 'What do you want to know about this thread?',
+  askSubmit: 'Ask',
+  forking: 'Forking…',
+  cancel: 'Cancel',
+  composerChip: 'Ask a side question (btw)',
 } as const
 
 const zh = {
@@ -22,6 +31,15 @@ const zh = {
   cacheWaiting: '等待首个回答…',
   failed: '旁支对话失败：{reason}',
   dismiss: '关闭',
+  paletteAsk: '提一个旁支问题（btw）',
+  askTitle: '提一个旁支问题',
+  askDescription: '关于“{thread}”。回答在侧边面板中打开，主对话保持不变。',
+  askLabel: '旁支问题',
+  askPlaceholder: '想了解这个对话的什么？',
+  askSubmit: '提问',
+  forking: '分叉中…',
+  cancel: '取消',
+  composerChip: '提一个旁支问题（btw）',
 } as const
 
 export type BtwKey = keyof typeof en
