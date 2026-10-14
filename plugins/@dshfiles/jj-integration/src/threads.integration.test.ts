@@ -38,7 +38,10 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
     jj(repo, 'bookmark', 'create', 'main', '-r', '@-')
   })
 
-  afterEach(() => rmSync(root, { recursive: true, force: true }))
+  afterEach(() => {
+    rmSync(defaultThreadsDirectory(repo), { recursive: true, force: true })
+    rmSync(root, { recursive: true, force: true })
+  })
 
   it('provisions a checked-out workspace on the bookmark and recognises it as a thread', async () => {
     const thread = await threads.provision(repo)
@@ -81,7 +84,9 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
     expect(bookmarkTarget(repo)).toBe('feat: add feature')
     expect(jj(repo, '--ignore-working-copy', 'log', '--no-graph', '-r', 'main-', '-T', 'description.first_line()')).toBe('other work')
     const [status] = await threads.list(repo)
-    expect(status).toMatchObject({ unlanded: [], behind: false })
+    expect(status).toMatchObject({ unlanded: [], behind: false, rebasedAt: expect.any(Number) })
+    const reloaded = createThreads({ executor, bookmark: () => 'main', threadsDirectory: defaultThreadsDirectory })
+    expect((await reloaded.list(repo))[0]?.rebasedAt).toBe(status?.rebasedAt)
   })
 
   it('brings the default checkout onto the rebased bookmark with dshx checkout sync, keeping its local edits', async () => {

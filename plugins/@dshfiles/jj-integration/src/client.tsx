@@ -1,6 +1,8 @@
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type { EmptyWorkspaceOwnerProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
+import { SessionId } from '@deepseek-ai/dsh-session/types'
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
@@ -9,8 +11,8 @@ import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import { createApiClient, defineClient, useApi, useSettings } from '@dshfiles/dshx/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { hostDestination, multiHostApi, multiHostQueries, REMOTE_THREAD_PANEL, RemoteComposer } from '@dshfiles/multi-host/destination'
-import { useQuery } from '@dshfiles/plugin-ui/query'
-import { PluginQueryProvider, pluginQueryClient } from '@dshfiles/plugin-ui/query'
+import { PluginQueryProvider, pluginQueryClient, useQuery } from '@dshfiles/plugin-ui/query'
+import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { createWorkspacePickerPorts } from '@dshfiles/project-folder-picker'
 import { startWorkspaceToggle, type DestinationBarServices } from './destination-bar.js'
 import { createComposerWorkspaceNavigation } from './composer-workspace-navigation.js'
@@ -179,6 +181,51 @@ export default defineClient({
         ),
     }
     const jjThreads = createApiClient(ctx, jjIntegrationApi)
+    const ThreadRebaseNotice = (props: { readonly sessionId: SessionSummary['id'] }): JSX.Element | null => {
+      const api = useApi(jjIntegrationApi)
+      const session = ctx.sessions.list.getSnapshot().byId[props.sessionId]
+      const path = session?.cwd
+      const status = useQuery({
+        queryKey: ['jj-integration', 'thread', path],
+        enabled: path !== undefined,
+        retry: false,
+        queryFn: ({ signal }) =>
+          path === undefined
+            ? Promise.resolve({ thread: null })
+            : runHostRequest({ signal, timeoutMs: 15_000, request: hostSignal => api.threadAt({ path }, { signal: hostSignal }) }).catch(() => ({
+                thread: null,
+              })),
+      })
+      const bookmark = useBookmark()
+      const rebasedAt = status.data?.thread?.rebasedAt
+      if (rebasedAt === undefined || rebasedAt === null) return null
+      return (
+        <div
+          data-testid="jj-thread-rebased-notice"
+          className="dshx-root dshx:mx-auto dshx:my-3 dshx:flex dshx:max-w-3xl dshx:items-center dshx:gap-2 dshx:rounded-md dshx:border dshx:bg-muted/40 dshx:px-3 dshx:py-2 dshx:text-sm dshx:text-muted-foreground"
+        >
+          <span className="dshx:min-w-0 dshx:flex-1">{translate('rebaseNotice', { bookmark })}</span>
+          <time className="dshx:shrink-0 dshx:text-xs dshx:tabular-nums" dateTime={new Date(rebasedAt).toISOString()}>
+            {new Date(rebasedAt).toLocaleString()}
+          </time>
+        </div>
+      )
+    }
+    ctx.slots.inject('conversation.chat.turnTail', () =>
+      ctx.slots.register(
+        {
+          name: 'conversation.chat.turnTail',
+          id: 'dshfiles-jj-integration-rebased-notice',
+          order: 1,
+          inject: sessionId => ({ sessionId: SessionId(sessionId) }),
+        },
+        decorate((props: { readonly sessionId: SessionSummary['id'] }) => (
+          <PluginQueryProvider>
+            <ThreadRebaseNotice sessionId={props.sessionId} />
+          </PluginQueryProvider>
+        )),
+      ),
+    )
     const workspaceToggle = startWorkspaceToggle({
       provision: (input, options) => jjThreads.provision(input, options),
       services: destinationServices,

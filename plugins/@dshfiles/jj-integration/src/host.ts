@@ -168,7 +168,7 @@ const threadView = (
   activity: ReadonlyMap<string, ThreadSessionActivity> | undefined,
 ): ThreadView => {
   const sessionIds = [...(workspace?.sessionIds ?? [])]
-  return {
+  const view: ThreadView = {
     name: status.name,
     path: status.path,
     workspaceId: workspace?.id ?? null,
@@ -179,6 +179,8 @@ const threadView = (
     behind: status.behind,
     unlanded: [...status.unlanded],
   }
+  if (status.rebasedAt === undefined) return view
+  return { ...view, rebasedAt: status.rebasedAt }
 }
 
 /** Every registered project that is the owning checkout of a jj repository, with its thread workspaces. */

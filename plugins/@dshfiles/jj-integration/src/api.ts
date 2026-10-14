@@ -14,6 +14,7 @@ const threadSchema = z
     canRebase: z.boolean().optional(),
     missing: z.boolean(),
     behind: z.boolean(),
+    rebasedAt: z.number().int().nonnegative().optional(),
     unlanded: z.array(revisionSchema),
   })
   .strict()

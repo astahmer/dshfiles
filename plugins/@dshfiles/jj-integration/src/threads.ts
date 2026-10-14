@@ -1,8 +1,9 @@
 import { randomBytes } from 'node:crypto'
 import { existsSync, readFileSync, statSync } from 'node:fs'
-import { mkdir, rm } from 'node:fs/promises'
+import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { basename, dirname, join, resolve } from 'node:path'
+import { z } from 'zod'
 
 export interface JjResult {
   readonly exitCode: number
@@ -45,6 +46,8 @@ export interface ThreadStatus {
   readonly unlanded: readonly ThreadRevision[]
   /** The target bookmark moved since this thread last rebased. */
   readonly behind: boolean
+  /** Timestamp of the latest successful land, persisted beside the thread workspaces. */
+  readonly rebasedAt?: number
 }
 
 export type LandOutcome =
@@ -59,6 +62,7 @@ const REVISION_TEMPLATE = 'change_id.short(12) ++ "\\t" ++ commit_id ++ "\\t" ++
 const PLACEHOLDER_DESCRIPTIONS = new Set(['', 'wip'])
 const MAX_CONFLICT_FILES = 50
 const LAND_ATTEMPTS = 3
+const rebaseTimestampSchema = z.record(z.string(), z.number().int().nonnegative().safe())
 
 const parseRevisions = (stdout: string): readonly ThreadRevision[] =>
   stdout
@@ -119,23 +123,47 @@ export const createThreads = (options: {
   }
 
   const unlandedRevset = (name: string): string => `(::${name}@ ~ ::${options.bookmark()}) ~ empty()`
+  const timestampFile = (repoRoot: string): string => join(options.threadsDirectory(repoRoot), '.dshfiles-rebase-timestamps.json')
+  const readRebaseTimestamps = async (repoRoot: string): Promise<Readonly<Record<string, number>>> => {
+    try {
+      const parsed = rebaseTimestampSchema.parse(JSON.parse(await readFile(timestampFile(repoRoot), 'utf8')))
+      return Object.fromEntries(Object.entries(parsed).filter(([name]) => name.startsWith('thread-')))
+    } catch {
+      return {}
+    }
+  }
+  const writeRebaseTimestamp = async (repoRoot: string, name: string): Promise<number> => {
+    const at = Date.now()
+    const directory = options.threadsDirectory(repoRoot)
+    await mkdir(directory, { recursive: true })
+    const path = timestampFile(repoRoot)
+    const temporaryPath = `${path}.${randomBytes(4).toString('hex')}.tmp`
+    const timestamps = { ...(await readRebaseTimestamps(repoRoot)), [name]: at }
+    await writeFile(temporaryPath, JSON.stringify(timestamps), 'utf8')
+    await rename(temporaryPath, path)
+    return at
+  }
 
   const list = async (repoRoot: string): Promise<readonly ThreadStatus[]> => {
     const directory = options.threadsDirectory(repoRoot)
     const names = (await jj(['--ignore-working-copy', 'workspace', 'list', '-T', 'name ++ "\\n"'], repoRoot)).split('\n').filter(name => name.length > 0)
+    const rebaseTimestamps = await readRebaseTimestamps(repoRoot)
     const threads: ThreadStatus[] = []
     for (const name of names) {
       const path = join(directory, name)
       const present = existsSync(join(path, '.jj'))
       if (!present && !name.startsWith('thread-')) continue
-      threads.push({
+      const status = {
         name,
         path,
         repoRoot,
         missing: !present,
         unlanded: await revisions(unlandedRevset(name), repoRoot, true),
         behind: (await revisions(`${name}@ ~ ${options.bookmark()}::`, repoRoot, true)).length > 0,
-      })
+      }
+      const rebasedAt = rebaseTimestamps[name]
+      if (rebasedAt === undefined) threads.push(status)
+      else threads.push({ ...status, rebasedAt })
     }
     return threads
   }
@@ -188,6 +216,7 @@ export const createThreads = (options: {
         if (moved.exitCode === 0) {
           if (!workingCopyEmpty) await jj(['new', bookmark], cwd, signal)
           const [head] = await revisions(bookmark, cwd)
+          await writeRebaseTimestamp(thread.repoRoot, thread.threadName).catch(() => undefined)
           return { status: 'landed', revisions: rebased, head }
         }
         if (attempt >= LAND_ATTEMPTS) throw new ThreadError('jj-failed', `Could not move ${bookmark}: ${moved.stderr.trim().slice(0, 400)}`)

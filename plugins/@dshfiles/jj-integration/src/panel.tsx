@@ -211,6 +211,11 @@ const ThreadRow = (props: {
         <Badge variant="secondary">{t('sessions', { count: thread.sessionIds.length })}</Badge>
         {thread.unlanded.length === 0 ? <Badge variant="outline">{t('upToDate')}</Badge> : <Badge>{t('toRebase', { count: thread.unlanded.length })}</Badge>}
         {thread.behind ? <Badge variant="outline">{t('behind', { bookmark: props.bookmark })}</Badge> : null}
+        {thread.rebasedAt === undefined ? null : (
+          <Badge variant="secondary" title={new Date(thread.rebasedAt).toLocaleString()}>
+            {t('rebasedTag')}
+          </Badge>
+        )}
         {conflicted ? <Badge variant="destructive">{t('conflict')}</Badge> : null}
         {thread.finished ? <Badge variant="outline">{t('finished')}</Badge> : null}
         {thread.missing ? <Badge variant="destructive">{t('missing')}</Badge> : null}
