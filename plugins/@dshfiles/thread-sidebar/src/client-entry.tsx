@@ -47,6 +47,37 @@ declare module '@deepseek-ai/dsh-api-session-controller/client' {
   }
 }
 
+// Slot entries expose the native browser's injected hooks as `unknown`, and the Shortcuts service's registry is not in its
+// public type; these guards establish the members this plugin calls.
+interface WorkspaceShortcutsStore {
+  readonly getSnapshot: () => { readonly searchRequest: number }
+  readonly subscribe: (listener: () => void) => () => void
+}
+
+const hasWorkspaceShortcuts = (hooks: unknown): hooks is { readonly workspaceShortcuts: WorkspaceShortcutsStore } =>
+  typeof hooks === 'object' &&
+  hooks !== null &&
+  'workspaceShortcuts' in hooks &&
+  typeof hooks.workspaceShortcuts === 'object' &&
+  hooks.workspaceShortcuts !== null &&
+  'getSnapshot' in hooks.workspaceShortcuts &&
+  typeof hooks.workspaceShortcuts.getSnapshot === 'function' &&
+  'subscribe' in hooks.workspaceShortcuts &&
+  typeof hooks.workspaceShortcuts.subscribe === 'function'
+
+interface ShortcutRegistry {
+  readonly invoke: (commandId: string, scope: { readonly region: 'page'; readonly modal: null; readonly target: Element | null }) => void
+}
+
+const hasShortcutRegistry = <Shortcuts,>(shortcuts: Shortcuts): shortcuts is Shortcuts & { readonly registry: ShortcutRegistry } =>
+  typeof shortcuts === 'object' &&
+  shortcuts !== null &&
+  'registry' in shortcuts &&
+  typeof shortcuts.registry === 'object' &&
+  shortcuts.registry !== null &&
+  'invoke' in shortcuts.registry &&
+  typeof shortcuts.registry.invoke === 'function'
+
 export default defineClient({
   name: '@dshfiles/thread-sidebar',
   locales: [threadSidebarLocale],
@@ -134,26 +165,15 @@ export default defineClient({
         for (const entry of ctx.slots.entries('sidebar.workspaces')) {
           if (entry.options.priority === -1000 || entry.inject === undefined) continue
           const hooks: unknown = entry.inject().hooks
-          const store: unknown = typeof hooks === 'object' && hooks !== null ? Reflect.get(hooks, 'workspaceShortcuts') : undefined
-          const searchRequest = (): unknown => {
-            const read: unknown = typeof store === 'object' && store !== null ? Reflect.get(store, 'getSnapshot') : undefined
-            const snapshot: unknown = typeof read === 'function' ? Reflect.apply(read, store, []) : undefined
-            return typeof snapshot === 'object' && snapshot !== null ? Reflect.get(snapshot, 'searchRequest') : undefined
-          }
-          const subscribe: unknown = typeof store === 'object' && store !== null ? Reflect.get(store, 'subscribe') : undefined
-          if (typeof subscribe !== 'function') continue
-          let handled = searchRequest()
-          const unsubscribe: unknown = Reflect.apply(subscribe, store, [
-            () => {
-              const next = searchRequest()
-              if (next === handled) return
-              handled = next
-              window.dispatchEvent(new CustomEvent(PALETTE_EVENT, { detail: { mode: 'threads' } }))
-            },
-          ])
-          release = () => {
-            if (typeof unsubscribe === 'function') Reflect.apply(unsubscribe, undefined, [])
-          }
+          if (!hasWorkspaceShortcuts(hooks)) continue
+          const store = hooks.workspaceShortcuts
+          let handled = store.getSnapshot().searchRequest
+          release = store.subscribe(() => {
+            const next = store.getSnapshot().searchRequest
+            if (next === handled) return
+            handled = next
+            window.dispatchEvent(new CustomEvent(PALETTE_EVENT, { detail: { mode: 'threads' } }))
+          })
           return
         }
       }
@@ -341,18 +361,16 @@ export default defineClient({
 
     // The public Shortcuts service lists commands but only runs them from a key press; its registry's `invoke` is what
     // the Desktop menu uses. Read it defensively so a Host without it simply leaves Host commands out of the palette.
-    const hostRegistry: unknown = Reflect.get(ctx.shortcuts, 'registry')
-    const hostInvoke: unknown = typeof hostRegistry === 'object' && hostRegistry !== null ? Reflect.get(hostRegistry, 'invoke') : undefined
-    const runCommand =
-      typeof hostInvoke === 'function'
-        ? (commandId: string): void => {
-            try {
-              Reflect.apply(hostInvoke, hostRegistry, [commandId, { region: 'page', modal: null, target: document.activeElement }])
-            } catch (error) {
-              console.warn(`thread-sidebar: the ${commandId} command failed`, error)
-            }
+    const shortcuts = ctx.shortcuts
+    const runCommand = hasShortcutRegistry(shortcuts)
+      ? (commandId: string): void => {
+          try {
+            shortcuts.registry.invoke(commandId, { region: 'page', modal: null, target: document.activeElement })
+          } catch (error) {
+            console.warn(`thread-sidebar: the ${commandId} command failed`, error)
           }
-        : null
+        }
+      : null
 
     const archivedView = createActor(archivedViewMachine, {
       input: {

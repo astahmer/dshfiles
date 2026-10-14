@@ -1,4 +1,4 @@
-import type { LoggerService } from '@deepseek-ai/cordis'
+import type { Logger, LoggerMethod, LoggerService, LoggerType } from '@deepseek-ai/cordis'
 
 export const redactText = (value: string, secrets: readonly string[]): string => {
   let result = value
@@ -43,30 +43,23 @@ const redactValue = (value: unknown, secrets: readonly string[], seen = new Weak
   return value
 }
 
-/** Preserve the Host logger API while redacting resolved credential values. */
+/**
+ * Preserve the Host logger API while redacting resolved credential values. The returned service and the named
+ * loggers it creates inherit everything from the originals and override only the call and the four log methods.
+ */
 export const redactingLogger = (logger: LoggerService, secrets: readonly string[]): LoggerService => {
-  const wrap = (target: Function): Function =>
-    new Proxy(target, {
-      apply(original, thisArg, args: unknown[]) {
-        const result = Reflect.apply(
-          original,
-          thisArg,
-          args.map(value => redactValue(value, secrets)),
-        )
-        return typeof result === 'function' ? wrap(result) : result
-      },
-      get(original, property, receiver) {
-        const value = Reflect.get(original, property, receiver) as unknown
-        if (typeof value !== 'function') return value
-        return (...args: unknown[]) => {
-          const result = Reflect.apply(
-            value,
-            original,
-            args.map(item => redactValue(item, secrets)),
-          )
-          return typeof result === 'function' ? wrap(result) : result
-        }
-      },
-    })
-  return wrap(logger) as LoggerService
+  const redactingMethods = (source: Record<LoggerType, LoggerMethod>) => {
+    const redact = (values: readonly unknown[]): unknown[] => values.map(value => redactValue(value, secrets))
+    return {
+      error: (format, ...params) => source.error(redactValue(format, secrets), ...redact(params)),
+      info: (format, ...params) => source.info(redactValue(format, secrets), ...redact(params)),
+      warn: (format, ...params) => source.warn(redactValue(format, secrets), ...redact(params)),
+      debug: (format, ...params) => source.debug(redactValue(format, secrets), ...redact(params)),
+    } satisfies Record<LoggerType, LoggerMethod>
+  }
+  const createNamedLogger = (name?: string): Logger => {
+    const named = logger(name)
+    return Object.assign(Object.create(named), redactingMethods(named))
+  }
+  return Object.setPrototypeOf(Object.assign(createNamedLogger, redactingMethods(logger)), logger)
 }

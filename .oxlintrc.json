@@ -28,7 +28,7 @@
     "antislop/no-broad-object-parameters": "error",
     "antislop/no-conditional-empty-object-spread": "warn",
     "antislop/no-known-value-widening": "warn",
-    "antislop/no-reflect-apply": "warn",
+    "antislop/no-reflect-apply": "error",
     "antislop/no-reflect-get": "warn",
     "antislop/no-passthrough-variable": "warn",
     "antislop/no-runtime-typeof": "warn",

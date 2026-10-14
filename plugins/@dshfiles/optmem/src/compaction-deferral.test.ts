@@ -1,5 +1,6 @@
-import type { CompactionTrigger } from '@deepseek-ai/dsh-compaction'
+import type { CompactionResult, CompactionTrigger } from '@deepseek-ai/dsh-compaction'
 import { BasicCompactionEngine } from '@deepseek-ai/dsh-compaction-basic'
+import type { EpochHeader } from '@deepseek-ai/dsh-session'
 import { afterEach, describe, expect, it } from 'vitest'
 import { deferPressureCompaction } from './compaction-deferral.ts'
 
@@ -7,9 +8,22 @@ import { deferPressureCompaction } from './compaction-deferral.ts'
  * compaction-basic's step listener calls `this.compactIfNeeded` on its own engine. The real method reads the session's
  * request header first, so a header read means DSH's compaction ran; a session with no header then ends it as a no-op.
  */
+interface ProbeAgent {
+  readonly session: {
+    readonly id: string
+    readonly header: { readonly origin?: 'user' | 'subagent' }
+    readonly requestHeader: () => EpochHeader | undefined
+  }
+  readonly options: Record<never, never>
+}
+
+// Method parameters compare bivariantly, so the engine accepts the slice of an Agent this probe supplies.
+const engine: { compactIfNeeded(agent: ProbeAgent, trigger: CompactionTrigger, signal: AbortSignal): Promise<CompactionResult | null> } =
+  BasicCompactionEngine.prototype
+
 const step = async (origin: 'user' | 'subagent', trigger: CompactionTrigger) => {
   let headerReads = 0
-  const agent = {
+  const agent: ProbeAgent = {
     session: {
       id: `session-${origin}`,
       header: { origin },
@@ -20,7 +34,7 @@ const step = async (origin: 'user' | 'subagent', trigger: CompactionTrigger) => 
     },
     options: {},
   }
-  const result: unknown = await Reflect.apply(BasicCompactionEngine.prototype.compactIfNeeded, {}, [agent, trigger, new AbortController().signal])
+  const result = await engine.compactIfNeeded(agent, trigger, new AbortController().signal)
   return { result, compacted: headerReads > 0 }
 }
 

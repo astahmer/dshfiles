@@ -234,6 +234,17 @@ describe('native-client log redaction', () => {
     expect(String(logged)).not.toContain(secret)
     expect(String(logged instanceof Error ? logged.cause : undefined)).not.toContain(secret)
   })
+  it('redacts through a named logger and keeps the rest of the Host logger reachable', () => {
+    const secret = 'token-123'
+    const warn = vi.fn()
+    const exporters = new Map()
+    const service = Object.assign((name?: string) => ({ name, warn }), { warn: vi.fn(), exporters })
+    const logger = redactingLogger(service as never, [secret])
+    logger('mcp').warn(`refused ${secret}`)
+    expect(warn).toHaveBeenCalledWith('refused [REDACTED]')
+    expect(logger('mcp').name).toBe('mcp')
+    expect(logger.exporters).toBe(exporters)
+  })
 })
 
 describe('managed local HTTP process', () => {

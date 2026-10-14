@@ -773,10 +773,13 @@ const multiHostHandlers = multiHostApi.host({
   },
 })
 
-const callable = (target: unknown, name: string): ((...args: unknown[]) => unknown) | undefined => {
-  if (typeof target !== 'object' || target === null) return undefined
-  const member: unknown = Reflect.get(target, name)
-  return typeof member === 'function' ? (...args: unknown[]): unknown => Reflect.apply(member, target, args) : undefined
+// The members of the Host Loader and Connection services this plugin calls; a Host without them publishes no launch URL.
+interface LoaderSurface {
+  readonly await?: () => Promise<void>
+}
+
+interface ConnectionSurface {
+  readonly authenticatedUrl?: (url: string) => string
 }
 
 export default defineHost({
@@ -791,9 +794,11 @@ export default defineHost({
       let disposed = false
       scoped.effect(() => {
         void (async () => {
-          await callable(scoped.get('loader'), 'await')?.()
+          const loader: LoaderSurface | undefined = scoped.get('loader')
+          await loader?.await?.()
           const webServer = webServerSchema.safeParse(scoped.get('webServer'))
-          const launchUrl = callable(scoped.get('connection'), 'authenticatedUrl')?.(`http://127.0.0.1:${webServer.success ? webServer.data.port : 0}`)
+          const connection: ConnectionSurface | undefined = scoped.get('connection')
+          const launchUrl = connection?.authenticatedUrl?.(`http://127.0.0.1:${webServer.success ? webServer.data.port : 0}`)
           if (disposed || !webServer.success || typeof launchUrl !== 'string') return
           launchPath = await writeLaunchFile({ dshHome: process.env.DSH_HOME ?? join(homedir(), '.dsh'), launchUrl })
           // DSH can exit on a signal without disposing plugins; a stale launch file would point managers at a dead port.
