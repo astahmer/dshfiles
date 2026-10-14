@@ -119,8 +119,8 @@ describe('memory store', () => {
     expect(store.markCited({ thread: 'session-reader', cited: ['t:3f2a9c1e'], sinceMs: 60_000 })).toBe(1)
     store.recordUse({ kind: 'thread', id: 'session-3f2a9c1e' }, 'session-reader')
     expect(store.usage().tools).toEqual([
-      { tool: 'memory_read', calls: 1, withResults: 1, used: 0 },
-      { tool: 'memory_search', calls: 1, withResults: 1, used: 1 },
+      { tool: 'memory_read', calls: 1, withResults: 1, empty: 0, used: 0 },
+      { tool: 'memory_search', calls: 1, withResults: 1, empty: 0, used: 1 },
     ])
     expect(store.thread('3f2a9c1e')?.uses).toBe(1)
     expect(store.usageByDay(7)).toEqual([{ day: '2025-10-09', searches: 1, reads: 1, notes: 0, cited: 1, citations: 1 }])
@@ -137,5 +137,31 @@ describe('memory store', () => {
     expect(store.search({ query: 'BRK-4471', projects: [], ownProject: '/p/own', limit: 1 }).map(hit => (hit.kind === 'thread' ? hit.id : ''))).toEqual([
       'session-ancient',
     ])
+  })
+
+  it("totals memory's own calls per day and how its start blocks and citations fare", () => {
+    const clock = { now: start }
+    const store = open(clock)
+    store.recordCost({ kind: 'digest', provider: 'opencode-go-pi', model: 'deepseek-v4.1-flash', input: 1_200, cacheRead: 300, output: 150 })
+    store.recordCost({ kind: 'digest', provider: 'opencode-go-pi', model: 'deepseek-v4.1-flash', input: 800, cacheRead: 0, output: 90 })
+    store.recordCost({ kind: 'jev', provider: 'typesafe', model: 'jev', input: 420, cacheRead: 0, output: 0 })
+    expect(store.costsByDay(7)).toEqual([
+      { day: '2025-10-09', kind: 'digest', provider: 'opencode-go-pi', model: 'deepseek-v4.1-flash', calls: 2, input: 2_000, cacheRead: 300, output: 240 },
+      { day: '2025-10-09', kind: 'jev', provider: 'typesafe', model: 'jev', calls: 1, input: 420, cacheRead: 0, output: 0 },
+    ])
+    store.freezeBlock('session-a', 'x'.repeat(900))
+    store.freezeBlock('session-b', 'x'.repeat(1_100))
+    store.freezeBlock('session-c', '')
+    store.bumpDaily('block.requests', 7)
+    store.putThread(digest('session-3f2a9c1e', '/p/x', 'Digest'))
+    store.recordUse({ kind: 'thread', id: 'session-3f2a9c1e' }, 'session-reader')
+    store.recordUse({ kind: 'thread', id: 'session-3f2a9c1e' }, 'session-other')
+    expect(store.flagCitations({ thread: 'session-reader', by: 'user', sinceMs: 60_000 })).toBe(1)
+    const [latest] = store.recentCitations(1)
+    expect(store.rateCitation({ id: latest?.id ?? 0, rating: 'down' })).toBe(true)
+    expect(store.effectiveness()).toEqual({
+      block: { threads: 2, meanBytes: 1_000, maxBytes: 1_100, requests: 7 },
+      citations: { total: 2, agentCorrected: 0, userCorrected: 1, up: 0, down: 1 },
+    })
   })
 })

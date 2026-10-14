@@ -101,7 +101,7 @@ export type SearchRequest = {
 }
 
 export type UsageCounts = {
-  readonly tools: readonly { readonly tool: string; readonly calls: number; readonly withResults: number; readonly used: number }[]
+  readonly tools: readonly { readonly tool: string; readonly calls: number; readonly withResults: number; readonly empty: number; readonly used: number }[]
   readonly counters: Readonly<Record<string, number>>
   readonly threads: number
   readonly notes: number
@@ -124,6 +124,8 @@ const noteCategories: readonly NoteCategory[] = ['user', 'feedback', 'project', 
 const toCategory = (value: SQLOutputValue | undefined): NoteCategory => noteCategories.find(category => category === value) ?? 'project'
 
 type Row = Record<string, SQLOutputValue>
+
+const citationRatings: readonly ('up' | 'down')[] = ['up', 'down']
 
 const hashOf = (text: string): string => createHash('sha256').update(text.trim().replace(/\s+/g, ' ').toLowerCase()).digest('hex').slice(0, 32)
 
@@ -229,7 +231,18 @@ create table if not exists embeddings (kind text not null, ref text not null, mo
 create table if not exists tool_calls (id integer primary key, at integer not null, thread text not null, tool text not null, results integer not null, used integer not null default 0, tokens text not null);
 create index if not exists tool_calls_thread on tool_calls (thread, at);
 create table if not exists counters (name text primary key, value integer not null);
-create table if not exists citations (at integer not null, thread text not null, ref text not null);
+create table if not exists citations (
+  id integer primary key,
+  at integer not null,
+  thread text not null,
+  ref text not null,
+  rating text,
+  agent_corrected integer not null default 0,
+  user_corrected integer not null default 0
+);
+create table if not exists costs (at integer not null, kind text not null, provider text not null, model text not null, input integer not null, cache_read integer not null, output integer not null);
+create index if not exists costs_at on costs (at);
+create table if not exists daily (day text not null, name text not null, value integer not null, primary key (day, name));
 create index if not exists citations_at on citations (at);
 `
 
@@ -690,6 +703,106 @@ export const openMemoryStore = (options: { readonly path: string; readonly now?:
     database.prepare('insert into citations (at, thread, ref) values (?, ?, ?)').run(now(), citingThread, `${item.kind === 'thread' ? 't' : 'n'}:${item.id}`)
   }
 
+  /** One model or classifier call memory made on its own behalf; priced later from the token counts. */
+  const recordCost = (input: {
+    readonly kind: 'digest' | 'jev'
+    readonly provider: string
+    readonly model: string
+    readonly input: number
+    readonly cacheRead: number
+    readonly output: number
+  }): void => {
+    database
+      .prepare('insert into costs (at, kind, provider, model, input, cache_read, output) values (?, ?, ?, ?, ?, ?, ?)')
+      .run(now(), input.kind, input.provider, input.model, input.input, input.cacheRead, input.output)
+  }
+
+  const bumpDaily = (name: string, by = 1): void => {
+    database
+      .prepare(
+        "insert into daily (day, name, value) values (date(? / 1000, 'unixepoch'), ?, ?) on conflict (day, name) do update set value = value + excluded.value",
+      )
+      .run(now(), name, by)
+  }
+
+  /** Token totals per UTC day, kind and route, newest first. */
+  const costsByDay = (days: number) =>
+    database
+      .prepare(
+        `select date(at / 1000, 'unixepoch') day, kind, provider, model, count(*) calls, sum(input) input, sum(cache_read) cache_read, sum(output) output
+         from costs where at >= ? group by day, kind, provider, model order by day desc`,
+      )
+      .all(now() - days * dayMs)
+      .map(row => ({
+        day: String(row['day']),
+        kind: row['kind'] === 'jev' ? ('jev' as const) : ('digest' as const),
+        provider: String(row['provider']),
+        model: String(row['model']),
+        calls: Number(row['calls']),
+        input: Number(row['input']),
+        cacheRead: Number(row['cache_read']),
+        output: Number(row['output']),
+      }))
+
+  /**
+   * Heuristic correctness signals on a thread's citations of the last `sinceMs`: the agent revised what it said from
+   * memory, or the user corrected the answer that cited it.
+   */
+  const flagCitations = (input: { readonly thread: string; readonly by: 'agent' | 'user'; readonly sinceMs: number }): number =>
+    Number(
+      database
+        .prepare(`update citations set ${input.by === 'agent' ? 'agent_corrected' : 'user_corrected'} = 1 where thread = ? and at >= ?`)
+        .run(input.thread, now() - input.sinceMs).changes,
+    )
+
+  const rateCitation = (input: { readonly id: number; readonly rating: 'up' | 'down' | null }): boolean =>
+    database.prepare('update citations set rating = ? where id = ?').run(input.rating, input.id).changes > 0
+
+  /** Recent citations with what they pointed at, for the panel's rating list. */
+  const recentCitations = (limit: number) =>
+    database
+      .prepare(
+        `select c.*, coalesce(t.title, n.text) target from citations c
+         left join threads t on c.ref = 't:' || t.id
+         left join notes n on c.ref = 'n:' || n.id
+         order by c.at desc limit ?`,
+      )
+      .all(limit)
+      .map(row => ({
+        id: Number(row['id']),
+        at: Number(row['at']),
+        thread: String(row['thread']),
+        ref: String(row['ref']),
+        target: row['target'] === null ? null : String(row['target']),
+        rating: citationRatings.find(rating => rating === row['rating']) ?? null,
+        agentCorrected: Number(row['agent_corrected']) === 1,
+        userCorrected: Number(row['user_corrected']) === 1,
+      }))
+
+  /** Whether the start block and cited memory hold up: totals for the panel. */
+  const effectiveness = () => {
+    const blocks = database.prepare("select count(*) n, avg(length(text)) mean, max(length(text)) max from thread_blocks where text != ''").get()
+    const citations = database
+      .prepare("select count(*) n, sum(agent_corrected) agent, sum(user_corrected) user, sum(rating = 'up') up, sum(rating = 'down') down from citations")
+      .get()
+    const daily = (name: string): number => Number(database.prepare('select sum(value) n from daily where name = ?').get(name)?.['n'] ?? 0)
+    return {
+      block: {
+        threads: Number(blocks?.['n'] ?? 0),
+        meanBytes: Math.round(Number(blocks?.['mean'] ?? 0)),
+        maxBytes: Number(blocks?.['max'] ?? 0),
+        requests: daily('block.requests'),
+      },
+      citations: {
+        total: Number(citations?.['n'] ?? 0),
+        agentCorrected: Number(citations?.['agent'] ?? 0),
+        userCorrected: Number(citations?.['user'] ?? 0),
+        up: Number(citations?.['up'] ?? 0),
+        down: Number(citations?.['down'] ?? 0),
+      },
+    }
+  }
+
   const frozenBlock = (threadId: string): string | undefined => {
     const row = database.prepare('select text from thread_blocks where thread = ?').get(threadId)
     return row === undefined ? undefined : String(row['text'])
@@ -825,7 +938,13 @@ export const openMemoryStore = (options: { readonly path: string; readonly now?:
     tools: database
       .prepare('select tool, count(*) calls, sum(results > 0) with_results, sum(used) used from tool_calls group by tool order by tool')
       .all()
-      .map(row => ({ tool: String(row['tool']), calls: Number(row['calls']), withResults: Number(row['with_results'] ?? 0), used: Number(row['used'] ?? 0) })),
+      .map(row => ({
+        tool: String(row['tool']),
+        calls: Number(row['calls']),
+        withResults: Number(row['with_results'] ?? 0),
+        empty: Number(row['calls']) - Number(row['with_results'] ?? 0),
+        used: Number(row['used'] ?? 0),
+      })),
     counters: Object.fromEntries(
       database
         .prepare('select name, value from counters')
@@ -856,6 +975,8 @@ export const openMemoryStore = (options: { readonly path: string; readonly now?:
       database.prepare('delete from messages where at < ?').run(cutoff)
       database.prepare('delete from thread_blocks where created_at < ?').run(cutoff)
       database.prepare('delete from tool_calls where at < ?').run(cutoff)
+      database.prepare('delete from costs where at < ?').run(cutoff)
+      database.prepare('delete from citations where at < ?').run(cutoff)
       for (const project of new Set(old.map(row => String(row['project'])))) changed(project)
       return { threads: old.length, messages: messages.length }
     })
@@ -876,6 +997,13 @@ export const openMemoryStore = (options: { readonly path: string; readonly now?:
     missingEmbeddings,
     search,
     recordUse,
+    recordCost,
+    bumpDaily,
+    costsByDay,
+    flagCitations,
+    rateCitation,
+    recentCitations,
+    effectiveness,
     listNotes,
     noteHistory,
     listThreads,

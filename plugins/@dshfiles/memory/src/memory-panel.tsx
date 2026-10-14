@@ -10,7 +10,7 @@ import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useState, type ReactNode } from 'react'
 
-import { memoryApi, type MemoryNoteType, type MemoryUsage, type PanelNote, type PanelThread } from './api.ts'
+import { memoryApi, type MemoryCitation, type MemoryNoteType, type MemoryUsage, type PanelNote, type PanelThread } from './api.ts'
 
 const noteTypes: readonly { readonly value: MemoryNoteType; readonly label: string; readonly hint: string }[] = [
   { value: 'feedback', label: 'Feedback', hint: 'Corrections and confirmed approaches' },
@@ -368,11 +368,92 @@ const Stat = (props: { readonly label: string; readonly value: number | string; 
   </div>
 )
 
-const UsageTab = (props: { readonly usage: MemoryUsage | undefined }): JSX.Element => {
+const usd = (value: number | null): string => (value === null ? 'unpriced' : `$${value.toFixed(value < 0.01 ? 4 : 2)}`)
+const count = (value: number): string => new Intl.NumberFormat().format(value)
+
+const Section = (props: { readonly title: string; readonly note?: string; readonly children: ReactNode }): JSX.Element => (
+  <section className="dshx:flex dshx:flex-col dshx:rounded-lg dshx:border dshx:border-border dshx:px-4 dshx:py-2">
+    <h3 className="dshx:pt-1 dshx:text-sm dshx:font-semibold">{props.title}</h3>
+    {props.note ? <p className="dshx:text-xs dshx:text-muted-foreground">{props.note}</p> : null}
+    <div className="dshx:flex dshx:flex-col dshx:divide-y dshx:divide-border">{props.children}</div>
+  </section>
+)
+
+const DayTable = (props: { readonly label: string; readonly headings: readonly string[]; readonly rows: readonly (readonly string[])[] }): JSX.Element => (
+  <table className="dshx:w-full dshx:text-sm" aria-label={props.label}>
+    <thead className="dshx:text-xs dshx:text-muted-foreground">
+      <tr>
+        {props.headings.map(heading => (
+          <th key={heading} className="dshx:py-1 dshx:text-left dshx:font-medium">
+            {heading}
+          </th>
+        ))}
+      </tr>
+    </thead>
+    <tbody className="dshx:font-mono dshx:tabular-nums">
+      {props.rows.map(row => (
+        <tr key={row[0]} className="dshx:border-t dshx:border-border">
+          {row.map((cell, index) => (
+            <td key={props.headings[index]} className="dshx:py-1">
+              {cell}
+            </td>
+          ))}
+        </tr>
+      ))}
+    </tbody>
+  </table>
+)
+
+const CitationRow = (props: { readonly citation: MemoryCitation; readonly openThread: OpenThread }): JSX.Element => {
+  const api = useApi(memoryApi)
+  const client = useQueryClient()
+  const citation = props.citation
+  const rate = useMutation({
+    mutationFn: (rating: 'up' | 'down' | null) => api.rateCitation({ id: citation.id, rating }),
+    onSuccess: () => void client.invalidateQueries({ queryKey: ['dshfiles-memory'] }),
+  })
+  const toggle = (rating: 'up' | 'down'): void => rate.mutate(citation.rating === rating ? null : rating)
+  return (
+    <li className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:py-1.5 dshx:text-xs">
+      <span className="dshx:font-mono">{citation.ref.replace(/^t:session-/, 't:').slice(0, 10)}</span>
+      <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{citation.target ?? 'no longer in memory'}</span>
+      <span className="dshx:text-muted-foreground">cited in</span>
+      <ThreadLink id={citation.thread} openThread={props.openThread} />
+      <span className="dshx:text-muted-foreground">{stamp(citation.at)}</span>
+      {citation.agentCorrected ? <Badge variant="secondary">agent revised (heuristic)</Badge> : null}
+      {citation.userCorrected ? <Badge variant="secondary">user corrected (heuristic)</Badge> : null}
+      <Button
+        size="xs"
+        variant={citation.rating === 'up' ? 'default' : 'ghost'}
+        aria-pressed={citation.rating === 'up'}
+        aria-label="Useful"
+        onClick={() => toggle('up')}
+      >
+        👍
+      </Button>
+      <Button
+        size="xs"
+        variant={citation.rating === 'down' ? 'default' : 'ghost'}
+        aria-pressed={citation.rating === 'down'}
+        aria-label="Not useful"
+        onClick={() => toggle('down')}
+      >
+        👎
+      </Button>
+    </li>
+  )
+}
+
+const UsageTab = (props: { readonly usage: MemoryUsage | undefined; readonly openThread: OpenThread }): JSX.Element => {
+  const api = useApi(memoryApi)
+  const citations = useQuery({ queryKey: ['dshfiles-memory', 'citations'], queryFn: ({ signal }) => api.citations(undefined, { signal }) })
   const usage = props.usage
   if (usage === undefined) return <Empty>Loading usage…</Empty>
-  const calls = usage.tools.reduce((total, tool) => total + tool.calls, 0)
-  const cited = usage.tools.reduce((total, tool) => total + tool.used, 0)
+  const tool = (name: string) => usage.tools.find(item => item.tool === name) ?? { calls: 0, withResults: 0, empty: 0, used: 0 }
+  const search = tool('memory_search')
+  const read = tool('memory_read')
+  const total = usage.costs.total
+  const effectiveness = usage.effectiveness
   return (
     <div className="dshx:flex dshx:flex-col dshx:gap-4">
       {usage.state !== 'ready' ? (
@@ -381,45 +462,69 @@ const UsageTab = (props: { readonly usage: MemoryUsage | undefined }): JSX.Eleme
           {usage.failure ? `: ${usage.failure}` : ''}.
         </p>
       ) : null}
-      <section className="dshx:flex dshx:flex-col dshx:divide-y dshx:divide-border dshx:rounded-lg dshx:border dshx:border-border dshx:px-4">
+      <Section
+        title="Cost"
+        note="Memory's own calls at list price (digests on the thread's cheap route, Jev at $0.042 per million input tokens). Last 30 days."
+      >
         <Stat
-          label="Thread digests"
-          value={usage.threads}
-          hint={`${usage.digests.trail} from the thread record, ${usage.digests.model} by a model, ${usage.digests.trivial} trivial threads skipped`}
+          label="Digest calls"
+          value={count(total.digest.calls)}
+          hint={`${count(total.digest.input)} input, ${count(total.digest.cacheRead)} cached, ${count(total.digest.output)} output tokens`}
         />
-        <Stat label="Notes" value={usage.notes} />
-        <Stat label="Indexed messages" value={usage.indexedMessages} hint="Index only; the text stays in DSH's session logs." />
-        <Stat label="Start blocks served" value={usage.blocksServed} />
-        <Stat label="Memory tool calls" value={calls} hint={`${cited} cited in a reply (memory: <id>)`} />
-        <Stat label="Citations" value={usage.citations} />
-        {usage.jev.calls + usage.jev.failures > 0 ? (
-          <Stat label="Jev calls" value={usage.jev.calls} hint={`${usage.jev.inputTokens} input tokens, ${usage.jev.failures} failures`} />
-        ) : null}
-      </section>
-      <table className="dshx:w-full dshx:text-sm" aria-label="Memory usage per day">
-        <thead className="dshx:text-xs dshx:text-muted-foreground">
-          <tr>
-            {['Day', 'Searches', 'Reads', 'Note writes', 'Cited calls', 'Citations'].map(heading => (
-              <th key={heading} className="dshx:py-1 dshx:text-left dshx:font-medium">
-                {heading}
-              </th>
+        <Stat label="Digest cost" value={usd(total.digest.usd)} />
+        <Stat label="Jev calls" value={count(total.jev.calls)} hint={`${count(total.jev.input)} input tokens · ${usd(total.jev.usd)}`} />
+        <DayTable
+          label="Memory cost per day"
+          headings={['Day', 'Digests', 'Digest $', 'Jev', 'Jev $']}
+          rows={usage.costs.days.map(day => [day.day, count(day.digest.calls), usd(day.digest.usd), count(day.jev.calls), usd(day.jev.usd)])}
+        />
+      </Section>
+      <Section title="Start block">
+        <Stat
+          label="Threads that started with a block"
+          value={count(effectiveness.block.threads)}
+          hint={`${count(usage.blocksServed)} blocks frozen in total, empty ones included`}
+        />
+        <Stat label="Block size" value={`${count(effectiveness.block.meanBytes)} B`} hint={`mean; largest ${count(effectiveness.block.maxBytes)} B`} />
+        <Stat label="Model requests that carried it" value={count(effectiveness.block.requests)} />
+      </Section>
+      <Section title="Recall" note="A call counts as used when a reply cites one of its ids (memory: <id>).">
+        <Stat
+          label="memory_search"
+          value={`${count(search.calls)} calls`}
+          hint={`${count(search.withResults)} with hits, ${count(search.empty)} empty, ${count(search.used)} cited`}
+        />
+        <Stat
+          label="memory_read"
+          value={`${count(read.calls)} calls`}
+          hint={`${count(read.withResults)} found, ${count(read.empty)} missing, ${count(read.used)} cited`}
+        />
+        <Stat label="Citations" value={count(usage.citations)} />
+      </Section>
+      <Section
+        title="Correctness"
+        note="Heuristics: a later reply in the same thread revises itself (agent), or the user's next message is a correction (user), within 30 minutes of a citation. Ratings are yours."
+      >
+        <Stat label="Cited memories" value={count(effectiveness.citations.total)} />
+        <Stat label="Revised by the agent (heuristic)" value={count(effectiveness.citations.agentCorrected)} />
+        <Stat label="Corrected by the user (heuristic)" value={count(effectiveness.citations.userCorrected)} />
+        <Stat label="Rated" value={`👍 ${count(effectiveness.citations.up)} · 👎 ${count(effectiveness.citations.down)}`} />
+        {(citations.data ?? []).length === 0 ? null : (
+          <ul className="dshx:flex dshx:flex-col dshx:divide-y dshx:divide-border" aria-label="Recent citations">
+            {(citations.data ?? []).map(citation => (
+              <CitationRow key={citation.id} citation={citation} openThread={props.openThread} />
             ))}
-          </tr>
-        </thead>
-        <tbody className="dshx:font-mono dshx:tabular-nums">
-          {usage.daily.map(day => (
-            <tr key={day.day} className="dshx:border-t dshx:border-border">
-              <td className="dshx:py-1">{day.day}</td>
-              <td>{day.searches}</td>
-              <td>{day.reads}</td>
-              <td>{day.notes}</td>
-              <td>{day.cited}</td>
-              <td>{day.citations}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      {usage.daily.length === 0 ? <Empty>No memory activity in the last 30 days.</Empty> : null}
+          </ul>
+        )}
+      </Section>
+      <Section title="Activity per day">
+        <DayTable
+          label="Memory usage per day"
+          headings={['Day', 'Searches', 'Reads', 'Note writes', 'Cited calls', 'Citations']}
+          rows={usage.daily.map(day => [day.day, count(day.searches), count(day.reads), count(day.notes), count(day.cited), count(day.citations)])}
+        />
+        {usage.daily.length === 0 ? <Empty>No memory activity in the last 30 days.</Empty> : null}
+      </Section>
     </div>
   )
 }
@@ -472,7 +577,7 @@ export const MemoryPanel = (props: { readonly openThread: OpenThread }): JSX.Ele
             <ThreadsTab project={selected} openThread={props.openThread} />
           </TabsContent>
           <TabsContent value="usage">
-            <UsageTab usage={usage.data} />
+            <UsageTab usage={usage.data} openThread={props.openThread} />
           </TabsContent>
         </div>
       </Tabs>

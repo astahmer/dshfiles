@@ -294,12 +294,15 @@
     },
     {
       "id": "usage-telemetry",
-      "title": "Count whether memory earns its keep",
-      "summary": "Locally record memory tool calls, start blocks served and citations; a call counts as used when the reply cites one of its ids. Usage per day appears in the Memory panel.",
+      "title": "Show what memory costs and whether it holds up",
+      "summary": "Locally record memory's own digest and Jev calls (tokens, list-price dollars from AI Accounts' pricing cache), start-block size and the requests that carried it, memory tool calls with hits, empty results and citations, and two labelled heuristics: the agent revising, or the user correcting, an answer that cited memory. Cited memories can be rated \ud83d\udc4d/\ud83d\udc4e. The Memory panel's Usage tab and the dshfiles-memory API (usage, citations, rateCitation) expose it.",
       "surfaces": ["client", "storage"],
       "configuration": [],
-      "states": ["no-activity", "counted"],
-      "failureModes": ["Counters never leave the machine; a failing write never fails the tool call it counts."],
+      "states": ["no-activity", "counted", "priced", "unpriced", "rated"],
+      "failureModes": [
+        "Counters never leave the machine; a failing write never fails the tool call it counts.",
+        "A route missing from the pricing cache shows as unpriced instead of $0."
+      ],
       "externalDependencies": [],
       "verification": [
         {
@@ -312,6 +315,18 @@
           "id": "memory.citation-counts",
           "file": "plugins/@dshfiles/memory/src/store.test.ts",
           "testName": "counts a citation as use of the tool call that returned the id and of the cited item"
+        },
+        {
+          "kind": "unit-test",
+          "id": "memory.cost-effectiveness",
+          "file": "plugins/@dshfiles/memory/src/store.test.ts",
+          "testName": "totals memory's own calls per day and how its start blocks and citations fare"
+        },
+        {
+          "kind": "unit-test",
+          "id": "memory.correction-heuristics",
+          "file": "plugins/@dshfiles/memory/src/runtime.test.ts",
+          "testName": "flags, as heuristics, a citation the user then corrects and one the agent later revises"
         }
       ],
       "reach": ["click button \"Memory\"", "click tab \"Usage\"", "expect table \"Memory usage per day\""]

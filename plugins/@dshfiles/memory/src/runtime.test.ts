@@ -219,4 +219,30 @@ describe('memory runtime', () => {
     expect(await hybrid.runtime.retrievalStatus()).toEqual({ requested: 'hybrid', active: 'hybrid', model: 'concepts-v1', reason: null })
     expect(await hybrid.runtime.search(hybrid.caller('session-reader'), { query })).toContain('t:44444444')
   })
+
+  it('flags, as heuristics, a citation the user then corrects and one the agent later revises', async () => {
+    const { logs, runtime, store } = setup()
+    const thread = halyardThread('session-11111111-0000-4000-8000-000000000000')
+    logs.set(thread.header.id, thread.log())
+    await runtime.digest(thread.header.id)
+    const reply = (session: string, seq: number, text: string) =>
+      runtime.onSessionEvent({ id: session }, { type: 'assistant/message', seq, time: seq, data: { message: { content: [{ type: 'text', text }] } } } as never)
+    const ask = (session: string, seq: number, text: string) =>
+      runtime.onSessionEvent({ id: session }, {
+        type: 'user/message',
+        seq,
+        time: seq,
+        data: { content: [{ type: 'text', text }], source: { kind: 'user' } },
+      } as never)
+
+    reply('session-user', 1, 'Northwind is on the Enterprise tier.\nmemory: t:11111111')
+    ask('session-user', 2, "No, that's wrong: they moved to the Scale tier last week.")
+    reply('session-agent', 1, 'The admin API listens on 9644.\nmemory: t:11111111')
+    reply('session-agent', 2, 'I was wrong: the admin API moved to 9654 in 4.2.0.')
+    reply('session-fine', 1, 'INC-20931 delayed delivery by 26 minutes.\nmemory: t:11111111')
+    reply('session-fine', 2, 'The incident note is drafted.')
+
+    const flags = Object.fromEntries(store.recentCitations(10).map(citation => [citation.thread, [citation.userCorrected, citation.agentCorrected]]))
+    expect(flags).toEqual({ 'session-user': [true, false], 'session-agent': [false, true], 'session-fine': [false, false] })
+  })
 })

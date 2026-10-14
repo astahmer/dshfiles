@@ -23,6 +23,7 @@
   },
   "dependencies": {
     "@deepseek-ai/schemastery": "^3.18.4",
+    "@dshfiles/ai-accounts": "workspace:*",
     "@dshfiles/optmem-core": "workspace:*",
     "@dshfiles/plugin-ui": "workspace:*",
     "@dshfiles/shared-runtime": "workspace:*",

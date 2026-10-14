@@ -63,7 +63,8 @@ Then('forgetting it with a reason removes it from the list', async ({ page }: { 
 Then('the Usage tab shows the memory counters and the usage per day', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'memory-panel-usage-counters', async () => {
     await page.getByRole('tab', { name: 'Usage', exact: true }).click()
-    await expect(page.getByText('Start blocks served', { exact: true })).toBeVisible()
+    await expect(page.getByText('Model requests that carried it', { exact: true })).toBeVisible()
+    await expect(page.getByRole('table', { name: 'Memory cost per day' })).toBeVisible()
     await expect(page.getByRole('table', { name: 'Memory usage per day' })).toBeVisible()
   })
   await finishJourneyAssertions(page)

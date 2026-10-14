@@ -1128,6 +1128,9 @@ importers:
       '@deepseek-ai/schemastery':
         specifier: ^3.18.4
         version: 3.18.4
+      '@dshfiles/ai-accounts':
+        specifier: workspace:*
+        version: link:../ai-accounts
       '@dshfiles/optmem-core':
         specifier: workspace:*
         version: link:../optmem-core

@@ -5,7 +5,7 @@ import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
 import { Utf8 } from '@dshfiles/optmem-core'
 
 import { renderStartBlock } from './block.ts'
-import { readThread, redact, shortId, type Signal, type ThreadHeader } from './digest.ts'
+import { flagSignal, readThread, redact, shortId, type Signal, type ThreadHeader } from './digest.ts'
 import { MemoryGuidance } from './guidance.ts'
 import type { MemoryEmbedder, RetrievalStatus } from './embedder.ts'
 import { JevClassifier } from './jev.ts'
@@ -18,7 +18,13 @@ export type MemoryServices = {
   readonly listSessions: () => Promise<readonly { readonly header: ThreadHeader & { readonly createdAt: number }; readonly live: boolean }[]>
   readonly readSession: (sessionId: string) => Promise<SessionLog>
   /** One cheap-model call on the thread's route (reasoning off by default); rejects when no route is offered. */
-  readonly summarize: (request: { readonly conversationId: string; readonly system: string; readonly input: string }) => Promise<{ readonly text: string }>
+  readonly summarize: (request: { readonly conversationId: string; readonly system: string; readonly input: string }) => Promise<{
+    readonly text: string
+    /** The route and provider-reported tokens, recorded as memory's own cost. */
+    readonly usage?:
+      | { readonly provider: string; readonly model: string; readonly input: number; readonly cacheRead: number; readonly output: number }
+      | undefined
+  }>
   readonly jevKey: () => string | undefined
   /** The configured embedding provider, loaded once per specifier; rejects when it cannot load. */
   readonly embedder: (specifier: string) => Promise<MemoryEmbedder>
@@ -36,6 +42,13 @@ const citedIds = (text: string): readonly string[] =>
 /** The user asking the agent to remember something, in English or French. */
 const rememberRequest =
   /\b(?:remember|keep in mind|don'?t forget|note (?:that|this|it)|save (?:that|this) (?:as a )?note|retiens|souviens-toi|n'oublie pas|note que)\b/i
+
+/** How long after a citation a correction still counts against it. */
+const correctionWindowMs = 30 * 60_000
+
+/** A reply revising an earlier statement; a heuristic, labelled as such in the panel. */
+const selfCorrection =
+  /\b(?:i was wrong|that was wrong|correction:|let me correct|actually,? (?:it|the|that)|turns out|is (?:outdated|stale|no longer (?:true|the case|accurate)))\b/i
 
 const day = (time: number): string => new Date(time).toISOString().slice(0, 10)
 
@@ -106,6 +119,7 @@ export const createMemoryRuntime = (options: {
         const verdict = await JevClassifier.ask({ question: 'signal', text, apiKey, fetch: services.fetch })
         store.bump('jev.calls')
         store.bump('jev.inputTokens', verdict.inputTokens)
+        store.recordCost({ kind: 'jev', provider: 'typesafe', model: 'jev', input: verdict.inputTokens, cacheRead: 0, output: 0 })
         logger.info('memory: jev call {"question":"signal","inputTokens":%d}', verdict.inputTokens)
         if (verdict.probability >= options.settings().jevThreshold)
           signals.push({ seq: event.seq, kind: 'flagged', text: Utf8.clip(redact(text).replace(/\s+/g, ' '), 260) })
@@ -185,10 +199,14 @@ export const createMemoryRuntime = (options: {
     let digest = material.digest
     if (material.needsModel) {
       try {
-        const answer = (
-          await services.summarize({ conversationId: sessionId, system: digestSystem, input: `Transcript:\n${JSON.stringify(material.transcript)}` })
-        ).text.trim()
+        const result = await services.summarize({
+          conversationId: sessionId,
+          system: digestSystem,
+          input: `Transcript:\n${JSON.stringify(material.transcript)}`,
+        })
+        const answer = result.text.trim()
         store.bump('digests.modelCalls')
+        if (result.usage !== undefined) store.recordCost({ kind: 'digest', ...result.usage })
         if (answer === 'NONE') return 'trivial'
         const text = Utf8.clip(redact(answer), 1_800)
         digest = {
@@ -244,13 +262,20 @@ export const createMemoryRuntime = (options: {
       return
     }
     if (event.type === 'user/message' && event.data.source.kind === 'user') {
-      lastUserMessage.set(session.id, { seq: event.seq, text: event.data.content.flatMap(block => (block.type === 'text' ? [block.text] : [])).join('\n') })
+      const text = event.data.content.flatMap(block => (block.type === 'text' ? [block.text] : [])).join('\n')
+      lastUserMessage.set(session.id, { seq: event.seq, text })
+      // Heuristic: the user corrects an answer that cited memory.
+      if (flagSignal(text) === 'correction') store.flagCitations({ thread: session.id, by: 'user', sinceMs: correctionWindowMs })
       return
     }
     if (event.type === 'assistant/message') {
       const text = event.data.message.content.flatMap(block => (block.type === 'text' ? [block.text] : [])).join('\n')
       const cited = citedIds(text)
-      if (cited.length === 0) return
+      // Heuristic: a later reply revises what an earlier reply took from memory.
+      if (cited.length === 0) {
+        if (selfCorrection.test(text)) store.flagCitations({ thread: session.id, by: 'agent', sinceMs: correctionWindowMs })
+        return
+      }
       try {
         store.markCited({ thread: session.id, cited, sinceMs: 3_600_000 })
         for (const id of new Set(cited)) {
@@ -274,6 +299,7 @@ export const createMemoryRuntime = (options: {
       const verdict = await JevClassifier.ask({ question: 'recall', text: firstUserText, apiKey, fetch: services.fetch })
       store.bump('jev.calls')
       store.bump('jev.inputTokens', verdict.inputTokens)
+      store.recordCost({ kind: 'jev', provider: 'typesafe', model: 'jev', input: verdict.inputTokens, cacheRead: 0, output: 0 })
       logger.info('memory: jev call {"question":"recall","inputTokens":%d}', verdict.inputTokens)
       return verdict.probability >= options.settings().jevThreshold
     } catch {
@@ -532,6 +558,11 @@ export const createMemoryRuntime = (options: {
     },
     pendingDigests: (): number => idleTimers.size + digesting.size,
     retrievalStatus: async (): Promise<RetrievalStatus> => (await retrieval()).status,
+    /** One model request that carried a non-empty start block. */
+    countBlockRequest: (bytes: number): void => {
+      store.bumpDaily('block.requests')
+      store.bumpDaily('block.bytes', bytes)
+    },
     embedMissing,
   }
 }

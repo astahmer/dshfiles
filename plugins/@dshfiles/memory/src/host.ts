@@ -14,7 +14,10 @@ import type { SettingsScope } from '@dshfiles/dshx/settings'
 import { z } from 'zod'
 
 import { EmbeddingProviders, type MemoryEmbedder, type RetrievalStatus } from './embedder.ts'
-import { memoryApi, type MemoryUsage, type PanelNote, type PanelThread } from './api.ts'
+import { costOfTokens } from '@dshfiles/ai-accounts/cost-estimate'
+import { createPricingCatalog, DEFAULT_PRICING_PATH, resolveRouteQuote } from '@dshfiles/ai-accounts/pricing-catalog'
+
+import { memoryApi, type MemoryCostLine, type MemoryCosts, type MemoryUsage, type PanelNote, type PanelThread } from './api.ts'
 import { createMemoryRuntime, type MemoryRuntime, type MemoryServices } from './runtime.ts'
 import { memorySettings, type MemorySettings } from './settings.ts'
 import { openMemoryStore, type MemoryStore, type NoteRecord, type StoredThread } from './store.ts'
@@ -128,7 +131,20 @@ const hostServices = (ctx: Context): MemoryServices => {
           .join('')
           .trim()
         if (text.length === 0) throw new Error(`the digest model returned no text (${finish.kind})`)
-        return { text }
+        const tokens = assembler.usage
+        return {
+          text,
+          usage:
+            tokens === undefined
+              ? undefined
+              : {
+                  provider: state.route.provider,
+                  model: state.route.model,
+                  input: tokens.inputTokens,
+                  cacheRead: tokens.cacheReadTokens ?? 0,
+                  output: tokens.outputTokens,
+                },
+        }
       }
       throw new Error('the digest route rejected every reasoning effort')
     },
@@ -148,6 +164,58 @@ const hostServices = (ctx: Context): MemoryServices => {
 
 const bm25Only: RetrievalStatus = { requested: 'bm25', active: 'bm25', model: null, reason: null }
 
+/** TypeSafe's list price for Jev input; its output is free. */
+const jevUsdPerMillionInput = 0.042
+
+const pricing = createPricingCatalog({ path: DEFAULT_PRICING_PATH })
+let pricingLoaded: Promise<void> | undefined
+
+/** List-price dollars of one digest route's tokens from AI Accounts' models.dev cache, or null when the route is unpriced. */
+const digestUsd = async (line: {
+  readonly provider: string
+  readonly model: string
+  readonly input: number
+  readonly cacheRead: number
+  readonly output: number
+}) => {
+  pricingLoaded ??= pricing.load().catch(() => undefined)
+  await pricingLoaded
+  const price = resolveRouteQuote({ route: { provider: line.provider, model: line.model }, cache: pricing.current(), overrides: {} }).price
+  if (price === null) return null
+  return costOfTokens({
+    tokens: { uncachedInputTokens: line.input, cacheReadTokens: line.cacheRead, outputTokens: line.output, cacheWriteTokens: 0 },
+    price,
+    band: 0,
+  }).total
+}
+
+const emptyCostLine = (): MemoryCostLine => ({ digest: { calls: 0, input: 0, cacheRead: 0, output: 0, usd: 0 }, jev: { calls: 0, input: 0, usd: 0 } })
+
+const addCost = (line: MemoryCostLine, row: ReturnType<MemoryStore['costsByDay']>[number], usd: number | null): MemoryCostLine =>
+  row.kind === 'jev'
+    ? { ...line, jev: { calls: line.jev.calls + row.calls, input: line.jev.input + row.input, usd: line.jev.usd + (row.input * jevUsdPerMillionInput) / 1e6 } }
+    : {
+        ...line,
+        digest: {
+          calls: line.digest.calls + row.calls,
+          input: line.digest.input + row.input,
+          cacheRead: line.digest.cacheRead + row.cacheRead,
+          output: line.digest.output + row.output,
+          usd: line.digest.usd === null || usd === null ? null : line.digest.usd + usd,
+        },
+      }
+
+const costs = async (opened: MemoryStore): Promise<MemoryCosts> => {
+  const days = new Map<string, MemoryCostLine>()
+  let total = emptyCostLine()
+  for (const row of opened.costsByDay(30)) {
+    const usd = row.kind === 'digest' ? await digestUsd(row) : 0
+    days.set(row.day, addCost(days.get(row.day) ?? emptyCostLine(), row, usd))
+    total = addCost(total, row, usd)
+  }
+  return { days: [...days].map(([day, line]) => ({ day, ...line })), total }
+}
+
 const usage = async (): Promise<MemoryUsage> => {
   const base = {
     state: currentSettings().enabled ? (failure === null ? 'ready' : 'failed') : 'off',
@@ -166,6 +234,11 @@ const usage = async (): Promise<MemoryUsage> => {
       digests: { trail: 0, model: 0, duplicate: 0, trivial: 0, modelFailures: 0 },
       jev: { calls: 0, inputTokens: 0, failures: 0 },
       tools: [],
+      costs: { days: [], total: emptyCostLine() },
+      effectiveness: {
+        block: { threads: 0, meanBytes: 0, maxBytes: 0, requests: 0 },
+        citations: { total: 0, agentCorrected: 0, userCorrected: 0, up: 0, down: 0 },
+      },
       daily: [],
     }
   const counts = store.usage()
@@ -186,6 +259,8 @@ const usage = async (): Promise<MemoryUsage> => {
     },
     jev: { calls: counter('jev.calls'), inputTokens: counter('jev.inputTokens'), failures: counter('jev.failures') },
     tools: counts.tools,
+    costs: await costs(store),
+    effectiveness: store.effectiveness(),
     daily: store.usageByDay(30),
   }
 }
@@ -286,6 +361,11 @@ const panelApi = memoryApi.host({
     const parsed = z.object({ id: noteId, reason }).parse(input)
     return { forgotten: requireStore().forgetNote({ id: parsed.id, reason: parsed.reason || 'removed in the Memory panel' }) }
   },
+  citations: () => requireStore().recentCitations(100),
+  rateCitation: ({ input }) => {
+    const parsed = z.object({ id: noteId, rating: z.enum(['up', 'down']).nullable() }).parse(input)
+    return { rated: requireStore().rateCitation(parsed) }
+  },
   threads: ({ input }) => {
     const project = anyWhenEmpty(4_096).parse(input.project)
     return requireStore().listThreads({ project, limit: 300 }).map(panelThread)
@@ -324,6 +404,7 @@ const setup = (ctx: Context): void => {
         return first?.type === 'user/message' ? textOf(first.data.content) : undefined
       })
       if (text.length === 0) return assembled
+      active.countBlockRequest(Buffer.byteLength(text))
       return { ...assembled, sections: [...assembled.sections, { name: 'dshfiles-memory:start-block', text, interpolate: false }] }
     } catch (error) {
       logger.warn('memory: no start block for %s: %s', agent.id, error instanceof Error ? error.message : String(error))
