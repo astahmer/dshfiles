@@ -26,6 +26,7 @@ const HOST_DEFINE_PATH = fileURLToPath(new URL('../../host/define.js', import.me
 const HOST_PROCESS_PATH = fileURLToPath(new URL('../../host/process.js', import.meta.url))
 const HOST_SDK_PATH = fileURLToPath(new URL('../../sdk/host.js', import.meta.url))
 const API_DEFINE_PATH = fileURLToPath(new URL('../../api/define.js', import.meta.url))
+const API_HOST_CLIENT_PATH = fileURLToPath(new URL('../../api/host-client.js', import.meta.url))
 const API_RUNTIME_PATH = fileURLToPath(new URL('../../api/runtime.js', import.meta.url))
 const SETTINGS_DEFINE_PATH = fileURLToPath(new URL('../../settings/define.js', import.meta.url))
 const COMMUNICATION_RUNTIME_PATH = fileURLToPath(new URL('../../communication/index.js', import.meta.url))
@@ -105,13 +106,14 @@ function hostEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, opti
           // only way to reach them is a private import the guard would refuse.
           `export { waitForManagedExit, terminateManagedProcess } from ${JSON.stringify(HOST_PROCESS_PATH)}`,
           "export { defineTool } from '@deepseek-ai/dsh-tools'",
+          `export { createHostApiClient, isApiServed, listApis } from ${JSON.stringify(API_HOST_CLIENT_PATH)}`,
           '',
         ].join('\n')
       }
       if (id === `${VIRTUAL_HOST_PUBLIC}-api`) {
         return [
-          `export { defineApi, method } from ${JSON.stringify(API_DEFINE_PATH)}`,
-          `export { isApiError, PluginApiError } from ${JSON.stringify(API_RUNTIME_PATH)}`,
+          `export { defineApi, DSHX_REGISTRY_OWNER, dshxRegistryApi, method } from ${JSON.stringify(API_DEFINE_PATH)}`,
+          `export { isApiError, isApiOwnerMissing, PluginApiError } from ${JSON.stringify(API_RUNTIME_PATH)}`,
           '',
         ].join('\n')
       }

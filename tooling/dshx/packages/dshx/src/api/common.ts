@@ -1,3 +1,4 @@
+import type { StandardSchemaV1 } from '@standard-schema/spec'
 import type { ApiError, ApiErrorKind } from './types.js'
 
 const MAX_JSON_BYTES = 1024 * 1024
@@ -107,6 +108,17 @@ export function jsonBytes(value: unknown): number {
   return bytes
 }
 
+/** The first few Standard Schema issues as `path: message`, so a caller (often the agent) can fix its input. */
+function describeIssues(issues: readonly StandardSchemaV1.Issue[]): string {
+  if (issues.length === 0) return ''
+  const described = issues.slice(0, 3).map(issue => {
+    const path = (issue.path ?? []).map(segment => String(segment instanceof Object ? segment.key : segment)).join('.')
+    const message = issue.message.slice(0, 200)
+    return path === '' ? message : `${path}: ${message}`
+  })
+  return `: ${described.join('; ')}${issues.length > 3 ? ` (+${issues.length - 3} more)` : ''}`
+}
+
 export async function validate(schema: unknown, value: unknown): Promise<unknown> {
   if (schema === undefined) return value
   const validator = (
@@ -121,8 +133,9 @@ export async function validate(schema: unknown, value: unknown): Promise<unknown
   if (result === undefined || typeof result !== 'object' || result === null) {
     throw new ContractViolation('API schema returned an invalid Standard Schema result.')
   }
-  if ((result as { readonly issues?: unknown }).issues !== undefined) {
-    throw new ContractViolation('API schema validation failed.')
+  const issues = (result as { readonly issues?: unknown }).issues
+  if (issues !== undefined) {
+    throw new ContractViolation(`API schema validation failed${describeIssues(Array.isArray(issues) ? issues : [])}.`)
   }
   if (!Object.hasOwn(result, 'value')) throw new ContractViolation('API schema success result is missing value.')
   return (result as { readonly value: unknown }).value
@@ -146,4 +159,19 @@ export function aborted(apiId: string, method: string, cause?: unknown): ApiErro
 
 export function throwIfAborted(signal: AbortSignal | undefined, apiId: string, method: string): void {
   if (signal?.aborted === true) throw aborted(apiId, method, signal.reason)
+}
+
+const OWNER_MISSING = 'owner-missing'
+
+/** The owner of an API is not loaded in this DSH process (or, from a Client, its routes do not exist). */
+export function ownerMissing(owner: string, apiId: string, method: string, cause?: unknown): ApiError {
+  return error('unavailable', `${owner} is not loaded, so ${apiId}.${method} is unavailable.`, apiId, method, true, cause, OWNER_MISSING)
+}
+
+/**
+ * Whether a call failed only because the plugin that owns the API is not
+ * loaded. Stop polling and hide the feature instead of reporting an error.
+ */
+export function isApiOwnerMissing(value: Error | null | undefined): boolean {
+  return isApiError(value) && value.kind === 'unavailable' && value.remoteCode === OWNER_MISSING
 }

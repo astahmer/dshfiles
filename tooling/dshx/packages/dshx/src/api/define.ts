@@ -8,6 +8,9 @@ import type {
   ApiMethodDefinition,
   ApiMethodOptions,
   ApiSchema,
+  ApiToolExposure,
+  RegistryListInput,
+  RegistryListing,
 } from './types.js'
 
 export interface ApiHostRegistrationParts {
@@ -19,25 +22,20 @@ const apiHostRegistrations = new WeakMap<object, ApiHostRegistrationParts>()
 
 type SchemaInput<Schema> = Schema extends StandardSchemaV1<infer Input, any> ? Input : never
 type SchemaOutput<Schema> = Schema extends StandardSchemaV1<any, infer Output> ? Output : never
-type InputSchemaOf<Options> = Options extends {
-  readonly input: infer Schema extends ApiSchema
-}
-  ? Schema
-  : undefined
-type OutputSchemaOf<Options> = Options extends {
-  readonly output: infer Schema extends ApiSchema
-}
-  ? Schema
-  : undefined
-type MethodFromOptions<Options extends ApiMethodOptions> = ApiMethodDefinition<
-  InputSchemaOf<Options> extends ApiSchema ? SchemaInput<InputSchemaOf<Options>> : void,
-  InputSchemaOf<Options> extends ApiSchema ? SchemaOutput<InputSchemaOf<Options>> : void,
-  OutputSchemaOf<Options> extends ApiSchema ? SchemaInput<OutputSchemaOf<Options>> : unknown,
-  OutputSchemaOf<Options> extends ApiSchema ? SchemaOutput<OutputSchemaOf<Options>> : unknown
+type MethodFromSchemas<InputSchema, OutputSchema> = ApiMethodDefinition<
+  InputSchema extends ApiSchema ? SchemaInput<InputSchema> : void,
+  InputSchema extends ApiSchema ? SchemaOutput<InputSchema> : void,
+  OutputSchema extends ApiSchema ? SchemaInput<OutputSchema> : unknown,
+  OutputSchema extends ApiSchema ? SchemaOutput<OutputSchema> : unknown
 >
 
 export function method<I = void, O = unknown>(): ApiMethodDefinition<I, I, O, O>
-export function method<const Options extends ApiMethodOptions>(options: Options): MethodFromOptions<Options>
+export function method<const InputSchema extends ApiSchema | undefined = undefined, const OutputSchema extends ApiSchema | undefined = undefined>(options: {
+  readonly input?: InputSchema
+  readonly output?: OutputSchema
+  readonly description?: string
+  readonly tool?: ApiToolExposure<OutputSchema extends ApiSchema ? SchemaOutput<OutputSchema> : unknown>
+}): MethodFromSchemas<InputSchema, OutputSchema>
 export function method(options: ApiMethodOptions = {}): AnyApiMethodDefinition {
   return { ...options }
 }
@@ -101,3 +99,19 @@ export function defineApi<const Methods extends Record<string, AnyApiMethodDefin
   }
   return contract
 }
+
+/** Package that serves the dshx registry listing on behalf of the first loaded API Host. */
+export const DSHX_REGISTRY_OWNER = '@dshfiles/dshx'
+
+/**
+ * Discovery of every dshx API served in this DSH process, plus the agent's
+ * tools and skills. The first loaded dshx Host plugin with an API serves it.
+ */
+export const dshxRegistryApi = defineApi({
+  id: 'registry',
+  version: 1,
+  owner: DSHX_REGISTRY_OWNER,
+  methods: {
+    list: method<RegistryListInput, RegistryListing>(),
+  },
+})

@@ -1,8 +1,22 @@
 import type { Context } from '@deepseek-ai/cordis'
-import type { ConnectionFetchRoute, ConnectionRpcHandler, HostConnectionHandle } from '@deepseek-ai/dsh-client-connection'
-import type { ApiHostRegistration } from './types.js'
-import { apiHostRegistrationParts } from './define.js'
+import type { ConnectionFetchRoute, HostConnectionHandle } from '@deepseek-ai/dsh-client-connection'
+import type { ToolDefinition, ToolRunContext, ToolRuntime } from '@deepseek-ai/dsh-tools'
+import type {
+  AnyApiMethodDefinition,
+  ApiCaller,
+  ApiContract,
+  ApiHostRegistration,
+  ApiSchema,
+  RegistryApiView,
+  RegistryMethodView,
+  RegistryToolSource,
+  RegistryListInput,
+  RegistryListing,
+} from './types.js'
+import { apiHostRegistrationParts, DSHX_REGISTRY_OWNER, dshxRegistryApi } from './define.js'
 import { apiChannel, ContractViolation, error, isApiError, isPluginApiError, jsonBytes, throwIfAborted, validate } from './common.js'
+import { apiKey, apiRegistry, type ApiDispatch, type ApiRegistry, type RegisteredApi, type RegistryMember } from './registry.js'
+import { publishedJsonSchema, toToolSchema } from './json-schema.js'
 
 // Node resolves the Connection package only where DSH itself has it installed
 // (the profile bundle tree), so load it lazily: a Host artifact built without a
@@ -32,6 +46,13 @@ function describeFailure(cause: unknown): string {
 
 interface LoggerLike {
   error(format: string, ...params: unknown[]): void
+  warn?(format: string, ...params: unknown[]): void
+}
+
+function warn(ctx: Context, message: string): void {
+  const logger = hostLogger(ctx)
+  if (logger.warn === undefined) console.warn(message)
+  else logger.warn(message)
 }
 
 function hostLogger(ctx: Context): LoggerLike {
@@ -46,37 +67,13 @@ function hostLogger(ctx: Context): LoggerLike {
   }
 }
 
-export async function registerApi(ctx: Context, packageId: string, registration: ApiHostRegistration): Promise<void> {
-  const registrationParts = apiHostRegistrationParts(registration)
-  const contract = registrationParts.contract
-  const connection = ctx.get('connection') as HostConnectionHandle | undefined
-  if (connection?.fetch?.register === undefined) {
-    console.warn(`API ${contract.id} is unavailable because the DSH Connection provider is not loaded.`)
-    return
-  }
-  if (contract.owner !== undefined && contract.owner !== packageId) {
-    throw new Error(`API ${contract.id} is owned by ${contract.owner} and cannot be served by ${packageId}.`)
-  }
-  const channel = apiChannel(packageId, contract.id)
-  const root = ctx.root ?? ctx
-  const owners = channelOwners.get(root) ?? new Map<string, string>()
-  const owner = `${packageId}:${contract.id}`
-  const previous = owners.get(channel)
-  if (previous !== undefined) {
-    throw new Error(`API channel collision at ${channel}: ${previous} and ${owner}.`)
-  }
-  const dispatch: ConnectionRpcHandler = async (endpoint, payload, signal, peer) => {
+function createDispatch(ctx: Context, packageId: string, registration: ApiHostRegistration): ApiDispatch {
+  const { contract, handlers } = apiHostRegistrationParts(registration)
+  return async (endpoint, payload, signal, caller, peer) => {
     const methodDefinition = contract.methods[endpoint]
-    const handler = registrationParts.handlers[endpoint]
+    const handler = handlers[endpoint]
     if (methodDefinition === undefined || typeof handler !== 'function') {
-      return {
-        ok: false,
-        error: {
-          code: 'bad-request',
-          message: `Unknown API method ${endpoint}.`,
-          details: {},
-        },
-      }
+      return { ok: false, error: { code: 'bad-request', message: `Unknown API method ${endpoint}.`, details: {} } }
     }
     try {
       throwIfAborted(signal, contract.id, endpoint)
@@ -88,41 +85,26 @@ export async function registerApi(ctx: Context, packageId: string, registration:
       jsonBytes(envelope.input)
       const input = await validate(methodDefinition.input, envelope.input)
       throwIfAborted(signal, contract.id, endpoint)
-      const output = await validate(methodDefinition.output, await handler({ input, ctx, signal, peer } as never))
+      const output = await validate(methodDefinition.output, await handler({ input, ctx, signal, peer, caller } as never))
       throwIfAborted(signal, contract.id, endpoint)
       jsonBytes(output)
       return { ok: true, value: { version: contract.version, output } }
     } catch (cause) {
-      if (isApiError(cause))
-        return {
-          ok: false,
-          error: {
-            code: cause.remoteCode ?? 'internal',
-            message: cause.message,
-            details: {},
-          },
-        }
-      if (cause instanceof ContractViolation)
-        return {
-          ok: false,
-          error: { code: 'contract', message: cause.message, details: {} },
-        }
-      if (isPluginApiError(cause))
-        return {
-          ok: false,
-          error: { code: cause.code, message: cause.message, details: {} },
-        }
+      if (isApiError(cause)) return { ok: false, error: { code: cause.remoteCode ?? 'internal', message: cause.message, details: {} } }
+      if (cause instanceof ContractViolation) return { ok: false, error: { code: 'contract', message: cause.message, details: {} } }
+      if (isPluginApiError(cause)) return { ok: false, error: { code: cause.code, message: cause.message, details: {} } }
       hostLogger(ctx).error(`API handler ${packageId} ${contract.id}.${endpoint} failed: ${describeFailure(cause)}`)
-      return {
-        ok: false,
-        error: {
-          code: 'internal',
-          message: 'API handler failed. See Host diagnostics.',
-          details: {},
-        },
-      }
+      return { ok: false, error: { code: 'internal', message: 'API handler failed. See Host diagnostics.', details: {} } }
     }
   }
+}
+
+async function registerRoutes(
+  connection: HostConnectionHandle,
+  channel: string,
+  contract: ApiContract,
+  dispatch: ApiDispatch,
+): Promise<Array<() => Promise<void>>> {
   const removeRoutes: Array<() => Promise<void>> = []
   try {
     for (const method of Object.keys(contract.methods)) {
@@ -161,7 +143,7 @@ export async function registerApi(ctx: Context, packageId: string, registration:
             })
             return Response.json(mismatch)
           }
-          const result = await dispatch(method, message.payload, request.signal, connection.operator)
+          const result = await dispatch(method, message.payload, request.signal, { kind: 'client' }, connection.operator)
           return Response.json(serverResponseSchema.parse({ type: 'server-response', rpcId: message.rpcId, result }))
         },
       }
@@ -171,17 +153,308 @@ export async function registerApi(ctx: Context, packageId: string, registration:
     await Promise.all(removeRoutes.map(remove => remove()))
     throw cause
   }
+  return removeRoutes
+}
+
+type ToolAgent = ToolRunContext['agent']
+
+const toolsOf = (ctx: Context): ToolRuntime | undefined => {
+  try {
+    return ctx.get('tools')
+  } catch {
+    return undefined
+  }
+}
+
+const agentCaller = (agent: ToolAgent): ApiCaller => {
+  if (agent === undefined) return { kind: 'agent' }
+  const cwd = agent.session.header.cwd
+  return cwd === undefined || cwd === '' ? { kind: 'agent', sessionId: agent.id } : { kind: 'agent', sessionId: agent.id, cwd }
+}
+
+/** A `z.void()`-style input has no JSON Schema; it is a no-argument tool when it accepts `undefined` synchronously. */
+const acceptsNoInput = (schema: ApiSchema): boolean => {
+  const result = schema['~standard'].validate(undefined)
+  return !(result instanceof Promise) && result.issues === undefined
+}
+
+/** Build the native tool for one exposed method; the call runs through the same dispatch as every other caller. */
+function apiTool(contract: ApiContract, method: string, definition: AnyApiMethodDefinition, dispatch: ApiDispatch): ToolDefinition {
+  const exposure = definition.tool
+  if (exposure === undefined) throw new Error(`API ${contract.id}.${method} is not exposed as a tool.`)
+  const inputSchema = publishedJsonSchema(definition.input, 'input')
+  if (definition.input !== undefined && inputSchema === undefined && !acceptsNoInput(definition.input)) {
+    throw new Error(
+      `API ${contract.id}.${method} cannot become tool ${exposure.name}: its input schema publishes no Standard JSON Schema (use zod 4.2+ or remove tool).`,
+    )
+  }
+  const parameters = toToolSchema(inputSchema)
+  const takesInput = parameters.type === 'object'
+  const description = exposure.description ?? definition.description
+  if (description === undefined) throw new Error(`API ${contract.id}.${method} needs a description before it can become tool ${exposure.name}.`)
+  const tool: ToolDefinition = {
+    name: exposure.name,
+    description,
+    parameters: takesInput ? { ...parameters } : { type: 'object', properties: {} },
+    output: {
+      schema: { description: `${contract.id}.${method} output` },
+      render: (_args, value) => [{ type: 'text', text: exposure.render === undefined ? JSON.stringify(value, null, 2) : exposure.render(value) }],
+    },
+    execute: async (args, execution) => {
+      const result = await dispatch(
+        method,
+        { version: contract.version, input: takesInput ? args : undefined },
+        execution.signal,
+        agentCaller(execution.agent),
+        undefined,
+      )
+      if (!result.ok) throw new Error(result.error.message)
+      return result.value.output ?? null
+    },
+  }
+  if (exposure.readOnly === true) tool.isConcurrencySafe = () => true
+  return tool
+}
+
+function describeMethod(name: string, definition: AnyApiMethodDefinition, schemas: boolean): RegistryMethodView {
+  const view = { name }
+  if (definition.description !== undefined) Object.assign(view, { description: definition.description })
+  if (definition.tool !== undefined) Object.assign(view, { tool: definition.tool.name })
+  if (!schemas) return view
+  const input = publishedJsonSchema(definition.input, 'input')
+  if (input !== undefined) Object.assign(view, { input })
+  const output = publishedJsonSchema(definition.output, 'output')
+  if (output !== undefined) Object.assign(view, { output })
+  return view
+}
+
+export function describeApis(registry: ApiRegistry, input: RegistryListInput): RegistryApiView[] {
+  return [...registry.apis.values()]
+    .filter(api => input.owner === undefined || api.owner === input.owner)
+    .sort((left, right) => left.owner.localeCompare(right.owner) || left.id.localeCompare(right.id))
+    .map(api => ({
+      owner: api.owner,
+      id: api.id,
+      version: api.version,
+      methods: Object.entries(api.methods).map(([name, definition]) => describeMethod(name, definition, input.schemas === true)),
+    }))
+}
+
+/** The slice of DSH's agent registry the listing reads; dshx does not depend on its package. */
+interface AgentsLike {
+  get(id: string): NonNullable<ToolAgent> | undefined
+  list(): readonly NonNullable<ToolAgent>[]
+}
+
+/** The slice of DSH's skill registry the listing reads. */
+interface SkillsLike {
+  list(options: {
+    readonly cwd?: string
+    readonly scope?: object
+  }): Promise<
+    ReadonlyArray<{ readonly name: string; readonly description: string; readonly provider: string; readonly invocation: { readonly modelInvocable: boolean } }>
+  >
+}
+
+/**
+ * Agent presets register most model-facing tools in an agent's own scope, so
+ * the global view misses them. Read the tools one live agent sees: the
+ * requested Session's, else the first live one.
+ */
+function viewingAgent(ctx: Context, sessionId: string | undefined): NonNullable<ToolAgent> | undefined {
+  try {
+    const agents: AgentsLike | undefined = ctx.get('agents')
+    return sessionId === undefined ? agents?.list()[0] : agents?.get(sessionId)
+  } catch {
+    return undefined
+  }
+}
+
+async function listSkills(ctx: Context, options: { readonly cwd?: string; readonly scope?: object }): Promise<RegistryListing['skills']> {
+  try {
+    const skills: SkillsLike | undefined = ctx.get('skills')
+    if (skills === undefined) return []
+    return (await skills.list(options)).map(skill => ({
+      name: skill.name,
+      description: skill.description,
+      provider: skill.provider,
+      modelInvocable: skill.invocation.modelInvocable,
+    }))
+  } catch (cause) {
+    warn(ctx, `dshx registry: skill listing failed: ${describeFailure(cause)}`)
+    return []
+  }
+}
+
+const toolSource = (name: string, owner: string | undefined): RegistryToolSource => {
+  if (owner !== undefined) return 'api'
+  return name.startsWith('mcp__') ? 'mcp' : 'tool'
+}
+
+async function describeRegistry(ctx: Context, registry: ApiRegistry, input: RegistryListInput): Promise<RegistryListing> {
+  const apiTools = new Map<string, string>()
+  for (const api of registry.apis.values()) {
+    for (const definition of Object.values(api.methods)) if (definition.tool !== undefined) apiTools.set(definition.tool.name, api.owner)
+  }
+  const agent = viewingAgent(ctx, input.sessionId)
+  const tools = (toolsOf(ctx)?.schemas(agent) ?? [])
+    .map(schema => {
+      const owner = apiTools.get(schema.name)
+      const view = { name: schema.name, description: schema.description, source: toolSource(schema.name, owner) }
+      if (owner !== undefined) Object.assign(view, { owner })
+      return view
+    })
+    .sort((left, right) => left.name.localeCompare(right.name))
+  const skillOptions = {}
+  const cwd = input.cwd ?? (agent?.session.header.cwd || undefined)
+  if (cwd !== undefined) Object.assign(skillOptions, { cwd })
+  if (agent !== undefined) Object.assign(skillOptions, { scope: agent })
+  const listing = {
+    apis: describeApis(registry, input),
+    tools,
+    skills: await listSkills(ctx, skillOptions),
+  }
+  if (agent !== undefined) Object.assign(listing, { toolScope: { sessionId: agent.id } })
+  // Published JSON Schemas may carry accessors; the transport accepts plain data only.
+  return structuredClone(listing)
+}
+
+const capabilitiesTool = (registry: ApiRegistry): ToolDefinition => ({
+  name: 'dshx_capabilities',
+  description:
+    'List the typed APIs DSH plugins serve in this process: owner package, methods, what each does, and which are callable by you as tools. Use it to find a plugin capability before asking the user for data a plugin already has. Read-only.',
+  parameters: {
+    type: 'object',
+    properties: {
+      owner: { type: 'string', description: 'Only this package, e.g. "@dshfiles/jj-integration".' },
+      schemas: { type: 'boolean', description: 'Include each method’s JSON Schema.' },
+    },
+  },
+  output: {
+    schema: { description: 'API listing' },
+    render: (_args, value) => [{ type: 'text', text: JSON.stringify(value, null, 2) }],
+  },
+  isConcurrencySafe: () => true,
+  execute: async args => {
+    const filter = {}
+    if (args instanceof Object && 'owner' in args) {
+      const owner = [...registry.apis.values()].find(api => api.owner === args.owner)?.owner
+      // An unknown owner lists nothing rather than everything.
+      Object.assign(filter, { owner: owner ?? '' })
+    }
+    if (args instanceof Object && 'schemas' in args && args.schemas === true) Object.assign(filter, { schemas: true })
+    return structuredClone({ apis: describeApis(registry, filter) })
+  },
+})
+
+async function lead(registry: ApiRegistry): Promise<void> {
+  const member = registry.members[0]
+  if (member === undefined || registry.leader !== undefined) return
+  registry.leader = member
+  const registration = dshxRegistryApi.host({ list: ({ input }) => describeRegistry(member.ctx, registry, input ?? {}) })
+  try {
+    const unmount = (await mountApi(member.ctx, DSHX_REGISTRY_OWNER, registration)).dispose
+    const tools = toolsOf(member.ctx)
+    const unregister = tools?.register(capabilitiesTool(registry))
+    member.stop = async () => {
+      try {
+        unregister?.()
+      } catch {
+        // The tools layer may already have released it with the Host fiber.
+      }
+      await unmount()
+    }
+  } catch (cause) {
+    warn(member.ctx, `dshx registry: ${member.packageId} could not serve the registry: ${describeFailure(cause)}`)
+  }
+}
+
+function joinRegistry(ctx: Context, packageId: string, registry: ApiRegistry): void {
+  if (registry.members.some(member => member.ctx === ctx)) return
+  const member: RegistryMember = { ctx, packageId }
+  registry.members.push(member)
+  void lead(registry)
+  ctx.effect(
+    () => async () => {
+      const index = registry.members.indexOf(member)
+      if (index >= 0) registry.members.splice(index, 1)
+      if (registry.leader !== member) return
+      await member.stop?.()
+      registry.leader = undefined
+      await lead(registry)
+    },
+    'dshx api registry membership',
+  )
+}
+
+/** Serve one API: Connection routes for Clients, the in-process registry for Host plugins, and opted-in agent tools. Returns its disposer. */
+async function mountApi(
+  ctx: Context,
+  packageId: string,
+  registration: ApiHostRegistration,
+): Promise<{ readonly dispose: () => Promise<void>; readonly servesClients: boolean }> {
+  const { contract } = apiHostRegistrationParts(registration)
+  if (contract.owner !== undefined && contract.owner !== packageId) {
+    throw new Error(`API ${contract.id} is owned by ${contract.owner} and cannot be served by ${packageId}.`)
+  }
+  const registry = apiRegistry(ctx)
+  const key = apiKey(packageId, contract.id)
+  if (registry.apis.has(key)) throw new Error(`API ${contract.id} of ${packageId} is already served in this process.`)
+  const channel = apiChannel(packageId, contract.id)
+  const root = ctx.root ?? ctx
+  const owners = channelOwners.get(root) ?? new Map<string, string>()
+  const owner = `${packageId}:${contract.id}`
+  const previous = owners.get(channel)
+  if (previous !== undefined) {
+    throw new Error(`API channel collision at ${channel}: ${previous} and ${owner}.`)
+  }
+  const dispatch = createDispatch(ctx, packageId, registration)
+  const connection = ctx.get('connection') as HostConnectionHandle | undefined
+  const servesClients = connection?.fetch?.register !== undefined
+  const removeRoutes = connection?.fetch?.register === undefined ? [] : await registerRoutes(connection, channel, contract, dispatch)
+  if (!servesClients) {
+    warn(ctx, `API ${contract.id} serves Host plugins only: the DSH Connection provider is not loaded.`)
+  }
+  const served: RegisteredApi = { owner: packageId, id: contract.id, version: contract.version, methods: contract.methods, dispatch }
   owners.set(channel, owner)
   channelOwners.set(root, owners)
+  registry.apis.set(key, served)
+  const unregisterTools: Array<() => void> = []
+  const exposed = Object.entries(contract.methods).filter(([, definition]) => definition.tool !== undefined)
+  if (exposed.length > 0) {
+    const tools = toolsOf(ctx)
+    if (tools === undefined) warn(ctx, `API ${contract.id} cannot expose agent tools: the tools service is not loaded.`)
+    for (const [method, definition] of tools === undefined ? [] : exposed) {
+      try {
+        unregisterTools.push(tools!.register(apiTool(contract, method, definition, dispatch)))
+      } catch (cause) {
+        warn(ctx, `API ${contract.id}.${method} is not exposed to the agent: ${describeFailure(cause)}`)
+      }
+    }
+  }
   const dispose = async (): Promise<void> => {
+    if (registry.apis.get(key) === served) registry.apis.delete(key)
     if (owners.get(channel) === owner) owners.delete(channel)
     if (owners.size === 0) channelOwners.delete(root)
+    for (const unregister of unregisterTools) {
+      try {
+        unregister()
+      } catch {
+        // Released with the Host fiber already.
+      }
+    }
     await Promise.all(removeRoutes.map(remove => remove()))
   }
+  return { dispose, servesClients }
+}
+
+export async function registerApi(ctx: Context, packageId: string, registration: ApiHostRegistration): Promise<void> {
+  const mounted = await mountApi(ctx, packageId, registration)
   try {
-    ctx.effect(() => dispose, `dshx api: ${contract.id}`)
+    ctx.effect(() => mounted.dispose, `dshx api: ${apiHostRegistrationParts(registration).contract.id}`)
   } catch (cause) {
-    await dispose()
+    await mounted.dispose()
     throw cause
   }
+  if (mounted.servesClients) joinRegistry(ctx, packageId, apiRegistry(ctx))
 }

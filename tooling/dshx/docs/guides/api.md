@@ -103,7 +103,7 @@ export default defineHost({
 });
 ```
 
-Each handler receives `{ input, ctx, signal }`. `.host()` requires exactly the contract's method keys: missing and extra handlers are type errors and are also rejected at runtime. `authority` defaults to `loopback`; pass `{ authority: 'trusted-host' }` only when the official Connection policy requires it.
+Each handler receives `{ input, ctx, signal, peer, caller }`; `caller` says whether a Client, another Host plugin or the agent made the call (see [One registry](#one-registry-other-plugins-clients-and-the-agent)). `.host()` requires exactly the contract's method keys: missing and extra handlers are type errors and are also rejected at runtime. `authority` defaults to `loopback`; pass `{ authority: 'trusted-host' }` only when the official Connection policy requires it.
 
 ## Host transport and authentication
 
@@ -219,6 +219,76 @@ Public fields are `name`, `message`, `kind`, `apiId`, `method`, `retryable`, and
 A handler that throws `new PluginApiError(message, { code })` (from `@dshfiles/dshx/api`) reaches the Client as an `ApiError` with `kind: 'remote'`, that `message` (up to 500 characters) and `remoteCode: code`. Codes match `[a-z][a-z0-9-]*`; a reserved code (`internal`, `contract`, `aborted`, `bad-request`) or a malformed one becomes `plugin`. Write the message for the person using the plugin; never put secrets or raw command output in it.
 
 Any other thrown value stays generic on the Client (`remoteCode: 'internal'`, "API handler failed. See Host diagnostics.") and is logged once on the Host through the `dshx:api` logger with the package, API id and method, the error's name, message and first stack frames, bounded to 2000 characters with common credential shapes redacted. The request input is never logged.
+
+## One registry: other plugins, Clients and the agent
+
+Every API a dshx Host serves joins one process-wide registry. The same contract, handler and schemas then serve three callers:
+
+| Caller | How it calls | Transport |
+| --- | --- | --- |
+| A browser Client (any plugin) | `useApi(contract)` / `useApiQuery(contract, ...)` | Connection RPC |
+| Another Host plugin | `createHostApiClient(ctx, contract, packageId)` | in process, through the owner's dispatch |
+| The agent | a native tool, only for methods with `tool` | `ctx.tools` pipeline (policy, guards, approval) |
+
+Set `owner` on a contract that other packages import, and give methods a `description` so they are discoverable:
+
+```ts
+export const threadsApi = defineApi({
+  id: 'threads',
+  version: 1,
+  owner: '@dshfiles/jj-integration',
+  methods: {
+    status: method({
+      input: z.object({ path: z.string().min(1).optional() }).strict(),
+      output: threadStatusSchema,
+      description: 'Revisions of a thread workspace not yet on the landing bookmark.',
+      tool: { name: 'jj_thread_status', readOnly: true, render: output => summarize(output) },
+    }),
+  },
+})
+```
+
+### From another Host plugin
+
+```ts
+import { createHostApiClient } from '@dshfiles/dshx/host'
+import { isApiOwnerMissing } from '@dshfiles/dshx/api'
+import { threadsApi } from '@dshfiles/jj-integration/api'
+
+const threads = createHostApiClient(ctx, threadsApi, '@dshfiles/my-plugin')
+const result = await threads.safe.status({ path })
+if (!result.ok && isApiOwnerMissing(result.error)) return undefined // jj-integration is not installed
+```
+
+The call runs the owner's input schema, handler and output schema, and both sides receive a detached JSON copy, exactly as over Connection. The handler sees `caller: { kind: 'plugin', packageId }`. `isApiServed(ctx, contract)` and `listApis(ctx)` read the registry without calling.
+
+### When the owner is not loaded
+
+A Host call fails with `ApiError { kind: 'unavailable', remoteCode: 'owner-missing' }` without touching the network. A Client call to routes nobody registered gets Connection's HTTP 404, which dshx reports as the same error. Test it with `isApiOwnerMissing(error)` and stop polling or hide the feature; do not match on transport messages.
+
+### Exposing a method to the agent
+
+`tool: { name, description?, readOnly?, render? }` registers a native tool when the Host loads (dshx adds `tools` to `inject`). Requirements and behavior:
+
+- The method needs a `description` (or `tool.description`) and, when it takes input, a schema that publishes Standard JSON Schema (zod 4.2+). The model sees that schema projected onto the DSH tool subset; unsupported keywords are dropped, and the contract schema still validates every call, so the projection only loosens.
+- Input must be an object (or absent). The handler gets `caller: { kind: 'agent', sessionId, cwd }`, so a method can default to the calling Session's working directory.
+- The call goes through `ctx.tools.execute`: `tools/pre-execute` policies, `ctx.tools.guard` guards and approval apply as to any tool. `readOnly: true` lets it run beside sibling calls; omit it for anything that writes.
+- A tool name collision or an unrepresentable schema logs a warning and leaves the method callable by plugins and Clients; it never fails the Host.
+
+Only opted-in methods become tools. Every other method stays callable by Clients and Host plugins.
+
+### Discovery
+
+The first loaded dshx Host with an API also serves `dshxRegistryApi` (owner `@dshfiles/dshx`, exported from `@dshfiles/dshx/api`) and the read-only agent tool `dshx_capabilities`. When that Host unloads, the next one takes over.
+
+```ts
+const registry = useApiQuery(dshxRegistryApi, 'list', { input: { schemas: false } })
+// registry.data: { apis: [{ owner, id, version, methods: [{ name, description, tool }] }], tools, skills }
+```
+
+`tools` lists every tool a top-level agent sees, tagged `api` (with its owner), `mcp` (`mcp__*`) or `tool`; `skills` lists the skill registry for `input.cwd`. This is the data source for a Tools page.
+
+Plugins built with an older dshx do not join the registry until they are rebuilt.
 
 ## Automatic Client wiring
 

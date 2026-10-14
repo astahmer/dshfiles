@@ -22,7 +22,7 @@ import type { DshCompatibility } from '../compat/types.js'
 import { loadRuntimePlugins } from './runtime-plugins.js'
 import { inspectBridgeEnabled, ownHostInspectBridge, startHostInspectBridge } from './inspect-bridge.js'
 import { registerApi } from '../api/host-runtime.js'
-import { isApiHostRegistration } from '../api/define.js'
+import { apiHostRegistrationParts, isApiHostRegistration } from '../api/define.js'
 import type { SettingsContract, SettingsContribution, SettingsHostContribution } from '../settings/types.js'
 import {
   isSettingsContract,
@@ -351,6 +351,8 @@ export function createHostPlugin(value: unknown, metadata: HostPluginMetadata): 
   if ((definition.settings?.length ?? 0) > 0 && !inject.includes('settings')) inject.push('settings')
   const apis = definition.apis ?? []
   if (apis.length > 0 && !inject.includes('connection')) inject.push('connection')
+  const exposesTools = apis.some(api => Object.values(apiHostRegistrationParts(api).contract.methods).some(method => method.tool !== undefined))
+  if (exposesTools && !inject.includes('tools')) inject.push('tools')
   const config =
     definition.Config ??
     (definition.settings?.length === 0 || definition.settings === undefined ? undefined : settingsContract(definition.settings[0]!).schema.volatile())

@@ -1,9 +1,9 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { ClientConnectionRpc } from '@deepseek-ai/dsh-client-connection/client'
 import type { AnyApiMethodDefinition, ApiCallOptions, ApiClient, ApiContract, ApiError } from './types.js'
-import { aborted, apiChannel, ContractViolation, error, isApiError, jsonBytes, throwIfAborted } from './common.js'
+import { aborted, apiChannel, ContractViolation, error, isApiError, jsonBytes, ownerMissing, throwIfAborted } from './common.js'
 
-export { apiChannel, isApiError, PluginApiError } from './common.js'
+export { apiChannel, isApiError, isApiOwnerMissing, PluginApiError } from './common.js'
 
 type RpcResult =
   | { readonly ok: true; readonly value: unknown }
@@ -31,7 +31,7 @@ interface ConnectionLifecycleLike {
 
 const clientConnections = new WeakMap<object, ConnectionLifecycleLike | undefined>()
 
-function errorFromRemote(result: Extract<RpcResult, { readonly ok: false }>, apiId: string, method: string): ApiError {
+export function errorFromRemote(result: Extract<RpcResult, { readonly ok: false }>, apiId: string, method: string): ApiError {
   const code = result.error?.code
   const message = result.error?.message ?? `API method ${method} failed.`
   if (code === 'DSHX6401' || code === 'contract' || code === 'bad-request') {
@@ -69,6 +69,8 @@ export function createApiClient<const Methods extends Record<string, AnyApiMetho
       if (isApiError(cause)) throw cause
       if (options?.signal?.aborted) throw aborted(contract.id, name, cause)
       if (cause instanceof ContractViolation) throw error('contract', cause.message, contract.id, name, false, cause)
+      // Connection answers a route nobody registered with HTTP 404: the owning plugin is not loaded.
+      if (cause instanceof Error && /\bHTTP 404$/.test(cause.message)) throw ownerMissing(contract.owner ?? packageId, contract.id, name, cause)
       throw error('transport', cause instanceof Error ? cause.message : String(cause), contract.id, name, true, cause)
     }
   }

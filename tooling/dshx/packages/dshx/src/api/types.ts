@@ -11,13 +11,33 @@ declare const apiClientOutputBrand: unique symbol
 
 export type ApiSchema<Input = unknown, Output = Input> = StandardSchemaV1<Input, Output>
 
-export interface ApiMethodOptions<InputSchema extends ApiSchema = ApiSchema, OutputSchema extends ApiSchema = ApiSchema> {
+/** Opt-in exposure of one API method to the agent as a native tool. */
+export interface ApiToolExposure<Output = unknown> {
+  /** Model-facing tool name; unique across every loaded tool. */
+  readonly name: string
+  /** Model-facing description; defaults to the method description. */
+  readonly description?: string
+  /** A read-only method may run beside sibling tool calls. */
+  readonly readOnly?: boolean
+  /** Model-facing text for a successful output; defaults to pretty-printed JSON. */
+  readonly render?: (output: Output) => string
+}
+
+/** Discovery metadata shared by the registry listing and agent-tool exposure. */
+export interface ApiMethodMetadata {
+  /** What the method does, written for another plugin author or the agent. */
+  readonly description?: string
+  /** Expose the method to the agent; requires input and output schemas that publish Standard JSON Schema. */
+  readonly tool?: ApiToolExposure
+}
+
+export interface ApiMethodOptions<InputSchema extends ApiSchema = ApiSchema, OutputSchema extends ApiSchema = ApiSchema> extends ApiMethodMetadata {
   readonly input?: InputSchema
   readonly output?: OutputSchema
 }
 
 /** Client input -> Host input -> Host output -> Client output. */
-export interface ApiMethodDefinition<ClientInput = void, HostInput = ClientInput, HostOutput = unknown, ClientOutput = HostOutput> {
+export interface ApiMethodDefinition<ClientInput = void, HostInput = ClientInput, HostOutput = unknown, ClientOutput = HostOutput> extends ApiMethodMetadata {
   readonly input?: ApiSchema<ClientInput, HostInput>
   readonly output?: ApiSchema<HostOutput, ClientOutput>
   readonly [apiClientInputBrand]?: ClientInput
@@ -47,12 +67,19 @@ export type ApiClientOutput<M> = M extends ApiMethodDefinition<any, any, any, in
 export type ApiInput<M> = ApiClientInput<M>
 export type ApiOutput<M> = ApiClientOutput<M>
 
+/** Who reached the handler: a browser Client over Connection, another Host plugin in process, or the agent through a tool. */
+export type ApiCaller =
+  | { readonly kind: 'client' }
+  | { readonly kind: 'plugin'; readonly packageId: string }
+  | { readonly kind: 'agent'; readonly sessionId?: string; readonly cwd?: string }
+
 export type ApiHandlerContext<I> = {
   readonly input: I
   readonly ctx: Context
   readonly signal: AbortSignal
-  /** Admitted native operator peer; transport authentication stays with Connection. */
-  readonly peer: Parameters<ConnectionRpcHandler>[3]
+  /** Admitted native operator peer for Client calls; undefined for in-process callers. */
+  readonly peer: Parameters<ConnectionRpcHandler>[3] | undefined
+  readonly caller: ApiCaller
 }
 
 export type ApiHandler<I, O> = (context: ApiHandlerContext<I>) => O | Promise<O>
@@ -144,3 +171,74 @@ export type ApiQueryBaseOptions = {
   readonly signal?: AbortSignal
 }
 export type ApiQueryOptions<M> = ApiClientInput<M> extends void ? ApiQueryBaseOptions : ApiQueryBaseOptions & { readonly input: ApiClientInput<M> }
+
+/** The JSON Schema keywords a method publishes (Standard JSON Schema) that discovery and agent tools read. */
+export type PublishedJsonSchema = {
+  readonly type?: string | readonly string[]
+  readonly description?: string
+  readonly title?: string
+  readonly anyOf?: readonly PublishedJsonSchema[]
+  readonly oneOf?: readonly PublishedJsonSchema[]
+  readonly enum?: readonly (string | number | boolean | null)[]
+  readonly const?: string | number | boolean | null
+  readonly items?: PublishedJsonSchema
+  readonly properties?: { readonly [key: string]: PublishedJsonSchema }
+  readonly required?: readonly string[]
+  readonly additionalProperties?: boolean | PublishedJsonSchema
+}
+
+/** One API method another plugin, a Client or (when exposed) the agent can call. */
+export interface RegistryMethodView {
+  readonly name: string
+  readonly description?: string
+  /** Agent tool name when the method is exposed to the agent. */
+  readonly tool?: string
+  /** Published Standard JSON Schema of the Client input, when requested and available. */
+  readonly input?: PublishedJsonSchema
+  readonly output?: PublishedJsonSchema
+}
+
+export interface RegistryApiView {
+  readonly owner: string
+  readonly id: string
+  readonly version: number
+  readonly methods: readonly RegistryMethodView[]
+}
+
+/** Where an agent tool comes from: a dshx API method, an MCP server, or a plugin's own `defineTool`. */
+export type RegistryToolSource = 'api' | 'mcp' | 'tool'
+
+export interface RegistryToolView {
+  readonly name: string
+  readonly description: string
+  readonly source: RegistryToolSource
+  /** Owning package for API tools. */
+  readonly owner?: string
+}
+
+export interface RegistrySkillView {
+  readonly name: string
+  readonly description: string
+  readonly provider: string
+  readonly modelInvocable: boolean
+}
+
+export interface RegistryListing {
+  readonly apis: readonly RegistryApiView[]
+  /** Every tool the viewing agent sees (global tools when no agent is live); empty without a tools service. */
+  readonly tools: readonly RegistryToolView[]
+  /** The live Session whose tool view `tools` shows; absent for the global view. */
+  readonly toolScope?: { readonly sessionId: string }
+  /** Every skill the skill registry resolves for `cwd`; empty when no skill registry is loaded. */
+  readonly skills: readonly RegistrySkillView[]
+}
+
+export interface RegistryListInput {
+  readonly owner?: string
+  /** Include published JSON Schemas of each method. */
+  readonly schemas?: boolean
+  /** Workspace whose project skills to include. */
+  readonly cwd?: string
+  /** Session whose agent tool view to list; defaults to the first live agent. */
+  readonly sessionId?: string
+}

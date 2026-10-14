@@ -98,7 +98,8 @@ describe('generic API runtime', () => {
       },
     })
     await registerApi(fixture.context as never, '@scope/plugin', registration)
-    expect(fixture.routes.size).toBe(2)
+    const statusChannel = apiChannel('@scope/plugin', 'status')
+    expect([...fixture.routes.keys()].filter(path => path.startsWith(`/api${statusChannel}/`))).toHaveLength(2)
     const endpoint = `${apiChannel('@scope/plugin', 'status').slice(1)}/get`
     await expect(fixture.call('/api', endpoint, { version: 1, input: undefined })).resolves.toEqual({
       ok: true,

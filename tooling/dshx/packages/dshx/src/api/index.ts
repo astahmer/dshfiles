@@ -1,7 +1,8 @@
-export { defineApi, method } from './define.js'
-export { isApiError, PluginApiError } from './runtime.js'
+export { defineApi, DSHX_REGISTRY_OWNER, dshxRegistryApi, method } from './define.js'
+export { isApiError, isApiOwnerMissing, PluginApiError } from './runtime.js'
 export type {
   AnyApiMethodDefinition,
+  ApiCaller,
   ApiCallOptions,
   ApiCallResult,
   ApiClient,
@@ -17,9 +18,19 @@ export type {
   ApiHostRegistration,
   ApiHostOutput,
   ApiMethodDefinition,
+  ApiMethodMetadata,
   ApiMethodOptions,
   ApiQueryOptions,
   ApiQueryResult,
   ApiQueryState,
   ApiSchema,
+  ApiToolExposure,
+  PublishedJsonSchema,
+  RegistryApiView,
+  RegistryListInput,
+  RegistryListing,
+  RegistryMethodView,
+  RegistrySkillView,
+  RegistryToolSource,
+  RegistryToolView,
 } from './types.js'
