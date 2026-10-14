@@ -223,6 +223,7 @@ export type ManagerPreferences = z.infer<typeof preferencesInputSchema>
 
 export const mcpServersApi = defineApi({
   id: 'mcp-servers',
+  owner: '@dshfiles/mcp-servers',
   version: 1,
   methods: {
     list: method({ input: z.void(), output: snapshotSchema }),
