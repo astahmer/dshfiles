@@ -336,6 +336,17 @@ export const createMemoryRuntime = (options: {
     return store.freezeBlock(caller.id, text)
   }
 
+  /** What a new thread in the folder would start with now: rendered fresh, frozen for no thread, and empty when memory is off. */
+  const previewStartBlock = async (cwd: string): Promise<{ readonly project: string; readonly text: string }> => {
+    const project = await projectOf({ id: 'preview', cwd })
+    if (!options.settings().enabled) return { project, text: '' }
+    const settings = options.settings()
+    return {
+      project,
+      text: renderStartBlock({ store, project, budgetBytes: settings.blockBytes, crossProject: settings.crossProject, staleDays: settings.blockStaleDays }),
+    }
+  }
+
   const hitId = (hit: SearchHit): string =>
     hit.kind === 'note' ? `n:${hit.id}` : hit.kind === 'thread' ? `t:${shortId(hit.id)}` : `t:${shortId(hit.thread)}#${hit.seq}`
 
@@ -545,6 +556,7 @@ export const createMemoryRuntime = (options: {
   return {
     onSessionEvent,
     startBlock,
+    previewStartBlock,
     digest,
     catchUp,
     search,

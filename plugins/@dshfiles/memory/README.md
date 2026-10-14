@@ -23,7 +23,8 @@ Cross-thread, cross-project memory for DSH that leaves the live context and the 
   `reference`, with `scope`, `confidence` and the source thread and message.
 - **One registry.** The tools are `dshfiles-memory` API methods (`search`, `read`, `note`) opted into dshx's agent
   registry, so the agent, other Host plugins and Clients call the same handlers; `usage` and `citations` serve memory's
-  statistics the same way.
+  statistics the same way, and `startBlock({ cwd })` previews the block a new thread in a folder would get (the Agent
+  toolkit page shows it). Other plugins import the contract from `@dshfiles/memory/api`.
 - **Citations as usage.** The block asks agents to cite memory they used as `memory: <id>`. A citation marks the tool
   call that returned the id as used and ranks the cited item higher in later blocks.
 - **Memory panel** (sidebar → Memory): notes by type with their source (project, thread, message, who wrote it,

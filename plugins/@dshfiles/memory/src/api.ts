@@ -169,6 +169,12 @@ export const memoryApi = defineApi({
       tool: { name: 'memory_note', render: output => output.summary },
     }),
     projects: method<void, readonly { readonly project: string; readonly threads: number; readonly notes: number }[]>(),
+    startBlock: method({
+      input: z.object({ cwd: z.string().min(1).max(4_096) }).strict(),
+      output: z.custom<{ readonly project: string; readonly text: string }>(),
+      description:
+        'The memory block a new thread started in this folder gets now, and the project it is filed under. Empty when memory is off or has nothing for the project.',
+    }),
     notes: method<NotesFilter, readonly PanelNote[]>(),
     noteHistory: method<{ readonly id: number }, readonly PanelNote[]>(),
     editNote: method<

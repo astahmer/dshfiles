@@ -125,6 +125,17 @@ describe('memory runtime', () => {
     expect(Buffer.byteLength(blockB)).toBeLessThanOrEqual(settings().blockBytes)
   })
 
+  it('previews the block a new thread of the project would get, without freezing one', async () => {
+    const { logs, runtime, caller } = setup()
+    const first = halyardThread('session-11111111-0000-4000-8000-000000000000')
+    logs.set(first.header.id, first.log())
+    await runtime.digest(first.header.id)
+    const preview = await runtime.previewStartBlock(root)
+    expect(preview.project).toBe(root)
+    expect(preview.text).toBe(await runtime.startBlock(caller('session-aaaaaaaa')))
+    expect((await setup({ enabled: false }).runtime.previewStartBlock(root)).text).toBe('')
+  })
+
   it('asks a cheap model only for a thread without a trail of its own', async () => {
     const { logs, runtime, store, summaries } = setup()
     const thread = createThread({ id: 'session-22222222', cwd: root })

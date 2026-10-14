@@ -337,6 +337,10 @@ const panelApi = memoryApi.host({
   note: ({ input, caller }) => withRuntime(active => active.note(callerOf(caller), input)),
   usage: () => usage(),
   projects: () => requireStore().projects(),
+  startBlock: ({ input }) => {
+    if (!runtime) throw new Error('Memory is not active in this DSH host (setting dshfiles-memory.enabled, or the plugin failed to start).')
+    return runtime.previewStartBlock(input.cwd)
+  },
   notes: ({ input }) => {
     const filter = notesFilter.parse(input)
     return requireStore()
