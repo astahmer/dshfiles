@@ -57,6 +57,29 @@ describe('E2E scratch profile provisioning', () => {
     }
   })
 
+  it('leaves out a URL dependency that an explicit bundle list never loads, and still refuses a requested one', async () => {
+    const sourceRoot = await mkdtemp(join(tmpdir(), 'dshx-source-profile-'))
+    let scratch: Awaited<ReturnType<typeof createScratchProfile>> | undefined
+    try {
+      await writeFile(
+        join(sourceRoot, 'package.json'),
+        JSON.stringify({
+          dependencies: { '@deepseek-ai/dsh-base': '0.2.0-rc.2', 'github-plugin': 'github:owner/github-plugin#abc123' },
+        }),
+      )
+      scratch = await createScratchProfile({ profileName: 'sample', sourceProfileRoot: sourceRoot, bundleIds: ['@deepseek-ai/dsh-base'] })
+      const manifest = await readFile(join(scratch.profileRoot, 'package.json'), 'utf8')
+      expect(manifest).toContain('"@deepseek-ai/dsh-base": "0.2.0-rc.2"')
+      expect(manifest).not.toContain('github-plugin')
+      await expect(createScratchProfile({ profileName: 'sample', sourceProfileRoot: sourceRoot, bundleIds: ['github-plugin'] })).rejects.toThrow(
+        'The github-plugin dependency uses a URL or unsupported protocol in the isolated profile.',
+      )
+    } finally {
+      await scratch?.cleanup()
+      await rm(sourceRoot, { recursive: true, force: true })
+    }
+  })
+
   it('gives the Host a scratch home without inheriting process credentials', () => {
     const environment = isolatedHostEnvironment('/scratch/home', '/scratch/profile', {
       PATH: '/repo/plugins/@dshfiles/sample/node_modules/.bin:/repo/node_modules/.bin:/toolchain/bin',

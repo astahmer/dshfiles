@@ -107,10 +107,14 @@ export const createScratchProfile = async (options: ScratchProfileOptions): Prom
     if (!parsedSource.success) throw new Error('The E2E source profile package.json has an invalid shape.')
 
     const excludedPrefixes = options.excludedDependencyPrefixes ?? []
+    const requestedBundles = options.bundleIds === undefined ? undefined : new Set(options.bundleIds)
     const dependencies = Object.fromEntries(
       await Promise.all(
         Object.entries(parsedSource.data.dependencies ?? {})
           .filter(([name]) => !excludedPrefixes.some(prefix => name.startsWith(prefix)))
+          // With an explicit bundle list, a source dependency fetched from a URL (e.g. a GitHub plugin) is never
+          // loaded, so it is left out rather than refusing the whole profile.
+          .filter(([name, specifier]) => requestedBundles === undefined || requestedBundles.has(name) || dependencySpecifierSchema.safeParse(specifier).success)
           .map(async ([name, specifier]) => [name, await resolvePathSpec(name, specifier, sourceRoot)]),
       ),
     )
