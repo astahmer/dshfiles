@@ -1,0 +1,3 @@
+- insert:
+    - id: dshfiles-main-tabs
+      name: '@dshfiles/main-tabs'

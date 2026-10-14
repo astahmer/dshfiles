@@ -1,0 +1,187 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "main-view-tabs",
+      "title": "Browser-like tabs above the main view",
+      "summary": "Every thread or global panel shown in the main view opens or focuses a tab above it. Tabs close with × or a middle click, reorder by drag, pin to the start, close others or to the right from their context menu, scroll or list in a dropdown when they overflow, and show working, needs-you and unread dots on thread tabs. Opening from outside the strip uses a VS Code-style preview tab by default.",
+      "reach": ["click button \"Workbench\"", "expect tab \"Workbench\""],
+      "surfaces": ["client", "integration", "storage", "settings"],
+      "configuration": [
+        {
+          "key": "enabled",
+          "defaultValue": "true",
+          "constraints": "Boolean; show the tab strip and follow the main view.",
+          "choices": ["true", "false"],
+          "coveredBy": ["main-tabs.machine-unit-enable-toggle"]
+        },
+        {
+          "key": "maxTabs",
+          "defaultValue": "12",
+          "constraints": "Integer 2–50; past it the least recently used unpinned tab closes.",
+          "coveredBy": ["main-tabs.machine-unit-tab-limit"]
+        },
+        {
+          "key": "openMode",
+          "defaultValue": "preview",
+          "constraints": "What opening from outside the strip does: preview tab, new tab, or replace the current tab.",
+          "choices": ["preview", "new", "replace"],
+          "coveredBy": ["main-tabs.panels-and-threads", "main-tabs.machine-unit-preview", "main-tabs.machine-unit-replace"]
+        }
+      ],
+      "states": ["following", "navigating", "off", "preview", "pinned", "overflowing"],
+      "failureModes": [
+        "A tab whose panel plugin is gone stays dimmed until the panel registers again; picking it does nothing.",
+        "A navigation the Host never finishes stops being awaited after two seconds.",
+        "Tabs of deleted threads are dropped."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "main-tabs.panels-and-threads",
+          "featureFile": "tooling/dshx/e2e/features/main-tabs.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.machine-unit-follow-host",
+          "file": "plugins/@dshfiles/main-tabs/src/tabs-machine.test.ts",
+          "testName": "opens a tab for whatever the main view shows, and focuses it when shown again"
+        },
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.machine-unit-preview",
+          "file": "plugins/@dshfiles/main-tabs/src/tabs-machine.test.ts",
+          "testName": "replaces the preview tab until it is kept, VS Code style"
+        },
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.machine-unit-replace",
+          "file": "plugins/@dshfiles/main-tabs/src/tabs-machine.test.ts",
+          "testName": "replaces the active tab in replace mode, but never a pinned one"
+        },
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.machine-unit-tab-limit",
+          "file": "plugins/@dshfiles/main-tabs/src/tabs-machine.test.ts",
+          "testName": "closes the least recently used unpinned tab past the limit"
+        },
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.machine-unit-in-between-views",
+          "file": "plugins/@dshfiles/main-tabs/src/tabs-machine.test.ts",
+          "testName": "navigates to a picked tab and ignores the Host passing through other views on the way"
+        },
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.machine-unit-close-neighbour",
+          "file": "plugins/@dshfiles/main-tabs/src/tabs-machine.test.ts",
+          "testName": "activates the right neighbour when the active tab closes, and navigates there"
+        },
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.machine-unit-close-menu",
+          "file": "plugins/@dshfiles/main-tabs/src/tabs-machine.test.ts",
+          "testName": "closes other tabs and tabs to the right, keeping pinned ones"
+        },
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.machine-unit-pinned-reorder",
+          "file": "plugins/@dshfiles/main-tabs/src/tabs-machine.test.ts",
+          "testName": "keeps pinned tabs a group at the start when reordering"
+        },
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.machine-unit-enable-toggle",
+          "file": "plugins/@dshfiles/main-tabs/src/tabs-machine.test.ts",
+          "testName": "ignores the Host while disabled and adopts its view when enabled again"
+        },
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.machine-unit-missing-threads",
+          "file": "plugins/@dshfiles/main-tabs/src/tabs-machine.test.ts",
+          "testName": "drops tabs of threads that no longer exist"
+        },
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.strip-unit-thread-status",
+          "file": "plugins/@dshfiles/main-tabs/src/tab-strip.test.ts",
+          "testName": "shows the most urgent thread state: needs you, then working, then unread"
+        }
+      ]
+    },
+    {
+      "id": "tab-keyboard",
+      "title": "Jump between tabs from the keyboard",
+      "summary": "Mod+1…8 jump to a tab and Mod+9 to the last one, Ctrl+Tab and Ctrl+Shift+Tab cycle (Desktop); the browser keeps those keys, so the Web defaults are Mod+Alt+1…9 and Mod+Alt+] / [. All are rebindable in Settings › Shortcuts. Arrow keys, Enter and Delete work inside the focused strip.",
+      "surfaces": ["client", "integration"],
+      "configuration": [],
+      "states": ["bound", "unbound-on-conflict"],
+      "failureModes": ["A default another command already owns leaves that tab command listed but unbound."],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "main-tabs.keyboard",
+          "featureFile": "tooling/dshx/e2e/features/main-tabs.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.machine-unit-jump-and-cycle",
+          "file": "plugins/@dshfiles/main-tabs/src/tabs-machine.test.ts",
+          "testName": "jumps to a tab by position and cycles with wrap-around"
+        }
+      ]
+    },
+    {
+      "id": "tab-persistence",
+      "title": "Keep tabs across reloads, per project or globally",
+      "summary": "The tab set, order, pins, preview flag and active tab survive a reload; each project keeps its own set unless the persistence setting shares one set across projects. A reload that lands on the New thread screen reopens the saved active tab.",
+      "surfaces": ["client", "storage", "settings"],
+      "configuration": [
+        {
+          "key": "persistence",
+          "defaultValue": "project",
+          "constraints": "project keeps a tab set per project (jj thread workspaces count as their project); global shares one.",
+          "choices": ["project", "global"],
+          "coveredBy": ["main-tabs.machine-unit-per-project", "main-tabs.machine-unit-global"]
+        }
+      ],
+      "states": ["restored", "per-project", "global"],
+      "failureModes": ["A malformed saved document is ignored and tabs start empty."],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "main-tabs.persistence",
+          "featureFile": "tooling/dshx/e2e/features/main-tabs.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.machine-unit-per-project",
+          "file": "plugins/@dshfiles/main-tabs/src/tabs-machine.test.ts",
+          "testName": "keeps one tab set per project and switches with the thread shown"
+        },
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.machine-unit-global",
+          "file": "plugins/@dshfiles/main-tabs/src/tabs-machine.test.ts",
+          "testName": "shares one tab set across projects in global mode"
+        },
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.machine-unit-restore",
+          "file": "plugins/@dshfiles/main-tabs/src/tabs-machine.test.ts",
+          "testName": "persists every change and restores the saved active tab when the Host opens on nothing"
+        },
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.host-view-unit-project",
+          "file": "plugins/@dshfiles/main-tabs/src/host-target.test.ts",
+          "testName": "files a jj thread workspace and a subagent under the project they belong to"
+        }
+      ]
+    }
+  ]
+}
