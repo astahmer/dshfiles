@@ -13,6 +13,7 @@ export const projectOf = (workspace: WorkspaceView, items: readonly WorkspaceVie
 export const brandStyle = (settings: HomeSettings): string =>
   [
     '[class$="_fishHitbox"]{width:auto}',
+    '[class$="_composerStack"]>[data-slot="conversation.input.dock"]{order:1}',
     settings.headline.trim() === '' ? '' : '[class$="_titleGroup"]>span:first-child{display:none}',
     settings.showPreviewBadge ? '' : '[class$="_previewBadge"]{display:none}',
     settings.showAgentPresetPicker ? '' : '[data-slot="conversation.hero.agentPreset"]{display:none!important}',

@@ -16,10 +16,11 @@ describe('home model', () => {
   it('hides only the native pieces the settings replace', () => {
     const defaults = homeSettings.schema({})
     expect(brandStyle(defaults)).toContain('_titleGroup')
+    expect(brandStyle(defaults)).toContain('_composerStack')
     expect(brandStyle(defaults)).toContain('_previewBadge')
     expect(brandStyle(defaults)).not.toContain('agentPreset')
     expect(brandStyle({ ...defaults, headline: '', showPreviewBadge: true, showAgentPresetPicker: false })).toBe(
-      '[class$="_fishHitbox"]{width:auto}[data-slot="conversation.hero.agentPreset"]{display:none!important}',
+      '[class$="_fishHitbox"]{width:auto}[class$="_composerStack"]>[data-slot="conversation.input.dock"]{order:1}[data-slot="conversation.hero.agentPreset"]{display:none!important}',
     )
   })
 })
