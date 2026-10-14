@@ -34,6 +34,7 @@ import type { AdapterRegistrationHandle, DirectoryRegistrationHandle, GenerateOp
 import { LlmError, resolveImageAttachmentAccess, type LlmFailure } from '@deepseek-ai/dsh-llm'
 import type { ResolvedPiAiProviderProfile } from '@deepseek-ai/dsh-llm-pi-ai'
 import { createAccountPool, creditServedAttempt } from './account-pool.js'
+import { explainSilentRejections } from './silent-rejection.js'
 import { createFailureRecovery, offloadResentImages, type RecoveryAction } from './failure-recovery.js'
 import { failoverAccountIds, selectRequestAccount } from './request-account-routing.js'
 // Types the `llm/retry` rows this plugin writes, so a fail-over shows in the turn like DSH's own retries.
@@ -555,8 +556,8 @@ export default definePlugin({
         ctx.on('llm/stream', (options: GenerateOptions, next: () => AsyncIterable<StreamChunk>) => {
           // Credited only after the upstream answers, so a failed attempt is never "used",
           // and to the account a fail-over put on the wire rather than the chosen route.
-          const accountId = routes.has(options.provider) ? accountForRequest(options) : undefined
-          return creditServedAttempt(next(), { pool, accountId })
+          if (!routes.has(options.provider)) return next()
+          return explainSilentRejections(creditServedAttempt(next(), { pool, accountId: accountForRequest(options) }), options)
         }),
       )
 
