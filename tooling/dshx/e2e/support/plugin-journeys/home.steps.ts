@@ -70,6 +70,15 @@ Then('the New thread screen offers to resume {string} and reports one thread wit
   )
 })
 
+Then('the Resume list appears below the chat composer', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'home-resume-list-follows-composer', async () => {
+    const resume = await page.getByText('Resume', { exact: true }).boundingBox()
+    const sendMessage = await page.getByRole('button', { name: 'Send message', exact: true }).boundingBox()
+    if (resume === null || sendMessage === null) throw new Error('Resume or composer control is not visible')
+    expect(resume.y).toBeGreaterThan(sendMessage.y + sendMessage.height)
+  })
+})
+
 Then('the work to land opens the Thread workspaces panel', async ({ page }: { page: Page }) => {
   await page.getByRole('button', { name: '1 thread has unlanded work', exact: true }).click()
   await recordAssertion(page, 'home-work-to-land-opens-thread-workspaces', async () => {

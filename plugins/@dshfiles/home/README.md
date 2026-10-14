@@ -1,7 +1,7 @@
 # Home
 
 Owns the New thread screen's top: the DeepSeek mark and headline are replaced,
-and a compact row above the composer lets you resume one of the project's
+and a compact row below the composer lets you resume one of the project's
 recent threads or jump to thread workspaces that still hold work to land.
 
 ## Settings (`dshfiles-home`)

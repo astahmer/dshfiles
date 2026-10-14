@@ -113,7 +113,7 @@ const HomeStrip = (props: {
   const toLand = unlanded.data ?? 0
   if (recent.length === 0 && toLand === 0) return null
   return (
-    <div className="dshx-root dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-1.5 dshx:pb-2 dshx:text-xs dshx:text-muted-foreground">
+    <div className="dshx-root dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-1.5 dshx:pb-2 dshx:text-xs dshx:text-muted-foreground" style={{ order: 1 }}>
       {recent.length > 0 ? <span>{props.t('resume')}</span> : null}
       {recent.map(id => (
         <Button key={id} size="sm" variant="ghost" className="dshx:h-7 dshx:max-w-56 dshx:px-2 dshx:text-xs" onClick={() => props.openSession(id)}>

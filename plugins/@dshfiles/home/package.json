@@ -2,7 +2,7 @@
   "name": "@dshfiles/home",
   "version": "0.1.0",
   "private": true,
-  "description": "Replaces the New thread logo and headline, and shows the project's recent threads and unlanded thread work above the composer.",
+  "description": "Replaces the New thread logo and headline, and shows the project's recent threads and unlanded thread work below the composer.",
   "files": [
     "dist",
     "cordis.patch.yml",
