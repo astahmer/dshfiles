@@ -120,7 +120,9 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
   })
   const rows = listQuery.data ?? []
   const loading = listQuery.isFetching
-  const error = actionError ?? (listQuery.isError && !listQuery.isFetching ? t('loadFailed') : null)
+  const listFailed = listQuery.isError && !listQuery.isFetching
+  const showCatalog = !(listFailed && rows.length === 0)
+  const error = actionError ?? (listFailed ? t('loadFailed') : null)
   const machineName = machineQuery.data?.name ?? null
 
   useEffect(() => {
@@ -269,7 +271,7 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
           <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-1">
             <div className="dshx:flex dshx:items-center dshx:gap-2">
               <h1 className="dshx:text-xl dshx:font-semibold">{t('title')}</h1>
-              <Badge variant="muted">{t('aliasCount', { count: rows.length })}</Badge>
+              {showCatalog ? <Badge variant="muted">{t('aliasCount', { count: rows.length })}</Badge> : null}
             </div>
             <p className="dshx:text-sm dshx:text-muted-foreground">{t('subtitle')}</p>
           </div>
@@ -379,23 +381,25 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
             </Alert>
           )}
         </div>
-        <div className="dshx:min-h-0 dshx:flex-1 dshx:overflow-auto dshx:px-6 dshx:pb-6" onKeyDown={focusRowFromKey}>
-          <SecretCatalogTable
-            actions={{
-              t,
-              revealed,
-              canActOnRow,
-              isRowBusy: row => busyRow === row.id,
-              onReveal: row => void onReveal(row),
-              onCopy: row => void onCopy(row),
-              onEdit: row => openDialog({ mode: 'edit', row }),
-              onRemove: row => openDialog({ mode: 'remove', row }),
-            }}
-            hasAnyRows={rows.length > 0}
-            loading={loading}
-            rows={filteredRows}
-          />
-        </div>
+        {showCatalog ? (
+          <div className="dshx:min-h-0 dshx:flex-1 dshx:overflow-auto dshx:px-6 dshx:pb-6" onKeyDown={focusRowFromKey}>
+            <SecretCatalogTable
+              actions={{
+                t,
+                revealed,
+                canActOnRow,
+                isRowBusy: row => busyRow === row.id,
+                onReveal: row => void onReveal(row),
+                onCopy: row => void onCopy(row),
+                onEdit: row => openDialog({ mode: 'edit', row }),
+                onRemove: row => openDialog({ mode: 'remove', row }),
+              }}
+              hasAnyRows={rows.length > 0}
+              loading={loading}
+              rows={filteredRows}
+            />
+          </div>
+        ) : null}
         {pickerOpen && (
           <ProjectFolderPicker
             directoryPicker={props.directoryPicker}

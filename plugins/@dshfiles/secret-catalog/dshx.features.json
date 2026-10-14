@@ -5,6 +5,7 @@
       "id": "scoped-alias-catalog",
       "title": "Browse aliases by scope and environment",
       "summary": "Search metadata-only aliases across all, project, global, and local scopes; choose projects through the shared picker and identify the current host-local scope.",
+      "reach": ["click button \"Secret Catalog\"", "expect heading \"Secret Catalog\""],
       "surfaces": ["client", "host", "settings", "integration"],
       "configuration": [
         {
@@ -24,7 +25,8 @@
       "states": ["all-scopes", "project-scope", "global-scope", "local-scope", "ambiguous-alias"],
       "failureModes": [
         "Duplicate alias and environment across scopes makes value operations unavailable.",
-        "A scope without a selected folder cannot claim project-specific results."
+        "A scope without a selected folder cannot claim project-specific results.",
+        "An unavailable or failing secret CLI shows only its load error, never an empty catalog."
       ],
       "externalDependencies": [
         {
@@ -42,6 +44,11 @@
         {
           "kind": "gherkin",
           "id": "secret-catalog.project-picker",
+          "featureFile": "tooling/dshx/e2e/features/secret-catalog.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "secret-catalog.load-failure",
           "featureFile": "tooling/dshx/e2e/features/secret-catalog.feature"
         },
         {

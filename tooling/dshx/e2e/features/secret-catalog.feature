@@ -21,6 +21,13 @@ Feature: Secret Catalog
     When the scope filter is set to "all"
     Then filtering by "LOCAL_TOKEN" keeps only the matching alias
 
+  @scenario:secret-catalog.load-failure
+  Scenario: A failing secret CLI shows its error without an empty catalog
+    Given the isolated plugin profile "@dshfiles/secret-catalog" is booted
+    When the fake secret CLI store is unreadable
+    And the Secret Catalog is opened
+    Then only the load error is shown, without an empty catalog
+
   @scenario:secret-catalog.reveal-expiry
   Scenario: Reveal one value briefly and copy it without showing it
     Given the isolated plugin profile "@dshfiles/secret-catalog" is booted

@@ -95,6 +95,10 @@ When('the seeded project folder is chosen in the Secret Catalog', async ({ page 
   await expect(catalog(page).getByRole('button', { name: new RegExp(`^secret-project · ${project}`) })).toBeVisible()
 })
 
+When('the fake secret CLI store is unreadable', async ({ page }: { page: Page }) => {
+  await writeFile(fixtureFor(page).storePath, 'not json\n')
+})
+
 When('the Secret Catalog reveals values for {int} seconds', async ({ page }: { page: Page }, seconds: number) => {
   await page.getByRole('navigation', { name: 'Global panels', exact: true }).getByRole('button', { name: 'Plugins', exact: true }).click()
   await page.getByRole('button', { name: 'View @dshfiles/secret-catalog', exact: true }).click()
@@ -168,6 +172,17 @@ Then('only global aliases are listed until a project folder is chosen', async ({
     await expect(aliasRows(page)).toHaveCount(1)
     await expect(rowFor(page, 'GITHUB_TOKEN', 'prod')).toBeVisible()
   })
+})
+
+Then('only the load error is shown, without an empty catalog', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'secret-catalog-load-error-replaces-the-empty-catalog', async () => {
+    await expect(catalog(page).getByText('Secret metadata could not be loaded. Check the secret CLI and refresh.', { exact: true })).toBeVisible({
+      timeout: 30_000,
+    })
+    await expect(catalog(page).getByText('No aliases found.', { exact: true })).toHaveCount(0)
+    await expect(catalog(page).getByText('0 aliases', { exact: true })).toHaveCount(0)
+  })
+  await finishJourneyAssertions(page)
 })
 
 Then('the {string} scope lists {int} aliases', async ({ page }: { page: Page }, scope: string, count: number) => {
