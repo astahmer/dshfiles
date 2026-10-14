@@ -1,0 +1,8 @@
+$ dshx build
+✓ Built @dshfiles/memory
+  Output: dist
+  Artifacts: 4
+    • dist/index.js
+    • dist/index.js.map
+    • dist/client.js
+    • dist/client.js.map

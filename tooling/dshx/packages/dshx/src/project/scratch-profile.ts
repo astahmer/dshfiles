@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 import { z } from 'zod'
 
 const dshxRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..')
-const workspacePolicyPath = join(dshxRoot, 'pnpm-workspace.yaml')
+const workspacePolicyPath = join(dshxRoot, 'scratch-pnpm-policy.yaml')
 const sourceManifestSchema = z.object({
   dependencies: z.record(z.string(), z.string()).optional(),
   dsh: z.object({ profile: z.object({ bundles: z.array(z.string()).optional() }).optional() }).optional(),

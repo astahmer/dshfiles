@@ -1,0 +1,7 @@
+$ dshx build
+✓ Built @dshfiles/request-messages
+  Output: dist
+  Artifacts: 3
+    • dist/index.js
+    • dist/index.js.map
+    • dist/index.d.ts

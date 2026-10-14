@@ -20,7 +20,7 @@
     "@dshfiles/plugin-ui": "workspace:*"
   },
   "devDependencies": {
-    "@dshfiles/dshx": "link:../../../tooling/dshx/packages/dshx",
+    "@dshfiles/dshx": "workspace:*",
     "@types/react": "~18.3.31",
     "typescript": "7.0.2",
     "vitest": "^4.1.10"

@@ -1,2 +1,75 @@
+packages:
+  - plugins
+  - plugins/@dshfiles/*
+  - tooling/dshx
+  - tooling/dshx/packages/*
+  - apps/desktop
+
+# Same guard as plugins/pnpm-workspace.yaml: a global virtual store puts every package under
+# ~/.local/share/pnpm/store/v11/links, where a package's own peer imports resolve to nothing. The E2E boot check
+# then refuses the profile because the plugin and this SDK no longer share one cordis identity, and
+# `declare module '@deepseek-ai/cordis'` augmentations stop merging. Keep the per-workspace virtual store.
+enableGlobalVirtualStore: false
+
+catalog:
+  '@types/node': 22.19.20
+  execa: 10.0.1
+  typescript: 7.0.2
+  vite: 8.3.2
+  vitest: 4.1.11
+  yaml: 2.9.0
+
+dedupePeerDependents: true
+publicHoistPattern:
+  - '@deepseek-ai/*'
+  - '@dshfiles/*'
+
 allowBuilds:
   '@ast-grep/cli': true
+  electron: false
+  '@deepseek-ai/dsh-subprocess-local': false
+  '@google/genai': false
+  esbuild: true
+  koffi: false
+  lightningcss: true
+  node-pty: false
+  protobufjs: false
+
+overrides:
+  # playwright-bdd requires an internal Playwright module the alpha build no
+  # longer exports, so the E2E suite runs against the stable release.
+  playwright: 1.56.1
+  '@esbuild-kit/core-utils>esbuild': 0.25.12
+  'postcss>nanoid': 3.3.18
+  '@deepseek-ai/cordis': 4.0.4
+  '@deepseek-ai/cordis-plugin-include': 1.0.9
+  '@deepseek-ai/cordis-plugin-loader': 1.0.5
+
+packageExtensions:
+  '@deepseek-ai/dsh-client-ui-renderer@0.2.0-rc.2':
+    dependencies:
+      '@deepseek-ai/dsh-client-ui-slots': 0.2.0-rc.2
+  '@deepseek-ai/dsh-client-ui-layout@0.2.0-rc.2':
+    dependencies:
+      '@deepseek-ai/dsh-client-ui-slots': 0.2.0-rc.2
+  '@deepseek-ai/dsh-client-ui-sidebar@0.2.0-rc.2':
+    dependencies:
+      '@deepseek-ai/dsh-client-ui-slots': 0.2.0-rc.2
+  '@deepseek-ai/dsh-client-ui-settings@0.2.0-rc.2':
+    dependencies:
+      '@deepseek-ai/dsh-client-ui-slots': 0.2.0-rc.2
+  '@deepseek-ai/dsh-client-ui-chat@0.2.0-rc.2':
+    dependencies:
+      '@deepseek-ai/dsh-client-ui-slots': 0.2.0-rc.2
+  '@deepseek-ai/dsh-client-ui-conversation@0.2.0-rc.2':
+    dependencies:
+      '@deepseek-ai/dsh-client-ui-slots': 0.2.0-rc.2
+  '@deepseek-ai/dsh-client-locale@0.2.0-rc.2':
+    dependencies:
+      '@deepseek-ai/dsh-client-ui-slots': 0.2.0-rc.2
+  '@dshfiles/dshx@0.1.4-preview.3':
+    # The browser boot check drives Playwright directly, so the optional peer the
+    # package declares has to be present for pnpm not to warn on every install.
+    dependencies:
+      playwright: 1.56.1
+

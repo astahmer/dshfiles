@@ -1,0 +1,13 @@
+$ dshx build
+DSHX4224 [warning] dsh.client.inject loads "@deepseek-ai/dsh-client-shortcuts", but peerDependencies does not declare it.
+  file: /Users/astahmer/dev/dshfiles-threads/thread-6e4156/plugins/@dshfiles/jujutsu/package.json
+  hint: Add "@deepseek-ai/dsh-client-shortcuts": ">=0.2.0-rc.1 <0.3.0-0" to peerDependencies so the plugin states every Host package it loads.
+✓ Built @dshfiles/jujutsu
+  Output: dist
+  Artifacts: 6
+    • dist/index.js
+    • dist/index.js.map
+    • dist/index.d.ts
+    • dist/client.js
+    • dist/client.js.map
+    • dist/client.d.ts

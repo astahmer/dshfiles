@@ -1,0 +1,10 @@
+$ dshx build
+✓ Built @dshfiles/command-palette
+  Output: dist
+  Artifacts: 6
+    • dist/index.js
+    • dist/index.js.map
+    • dist/index.d.ts
+    • dist/client.js
+    • dist/client.js.map
+    • dist/client.d.ts

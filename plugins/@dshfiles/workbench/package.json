@@ -27,7 +27,7 @@
   },
   "dependencies": {
     "@deepseek-ai/schemastery": "^3.18.4",
-    "@dshfiles/dshx": "link:../../../tooling/dshx/packages/dshx",
+    "@dshfiles/dshx": "workspace:*",
     "@dshfiles/plugin-ui": "workspace:*",
     "@dshfiles/shared-runtime": "workspace:*",
     "dockview-react": "8.4.1",

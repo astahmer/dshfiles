@@ -1,0 +1,11 @@
+$ vitest run
+
+ RUN  v4.1.11 /Users/astahmer/dev/dshfiles-threads/thread-6e4156/plugins/@dshfiles/shared-streams
+
+ ✓ src/host.test.ts (8 tests) 8ms
+
+ Test Files  1 passed (1)
+      Tests  8 passed (8)
+   Start at  17:53:08
+   Duration  512ms (transform 64ms, setup 0ms, import 91ms, tests 8ms, environment 0ms)
+

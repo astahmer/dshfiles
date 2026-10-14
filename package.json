@@ -4,7 +4,7 @@
   "type": "module",
   "packageManager": "pnpm@12.5.1",
   "scripts": {
-    "install:all": "pnpm install --frozen-lockfile && pnpm --dir tooling/dshx install --frozen-lockfile && pnpm --dir plugins install --frozen-lockfile && ELECTRON_SKIP_BINARY_DOWNLOAD=1 pnpm --dir apps/desktop install --frozen-lockfile --ignore-workspace && pnpm run setup:browser",
+    "install:all": "ELECTRON_SKIP_BINARY_DOWNLOAD=1 pnpm install --frozen-lockfile && pnpm run setup:browser",
     "setup:browser": "pnpm --dir tooling/dshx exec playwright install --only-shell chromium",
     "check:dshx": "pnpm --dir tooling/dshx run check && pnpm --dir tooling/dshx run deps:check",
     "check:plugins": "pnpm --dir plugins run check",

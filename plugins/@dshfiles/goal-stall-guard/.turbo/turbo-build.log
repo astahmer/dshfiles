@@ -1,0 +1,7 @@
+$ node ../../../tooling/dshx/packages/dshx/dist/cli/bin.js build
+✓ Built @dshfiles/goal-stall-guard
+  Output: dist
+  Artifacts: 3
+    • dist/index.js
+    • dist/index.js.map
+    • dist/index.d.ts

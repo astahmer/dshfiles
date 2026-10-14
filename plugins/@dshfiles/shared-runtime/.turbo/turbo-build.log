@@ -1,0 +1,9 @@
+$ dshx build
+✓ Built @dshfiles/shared-runtime
+  Output: dist
+  Artifacts: 5
+    • dist/index.js
+    • dist/index.d.ts
+    • dist/client.js
+    • dist/client.js.map
+    • dist/client.d.ts

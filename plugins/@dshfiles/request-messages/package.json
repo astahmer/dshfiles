@@ -30,7 +30,7 @@
     "@deepseek-ai/dsh-agent": "0.2.0-rc.2",
     "@deepseek-ai/dsh-llm": "0.2.0-rc.2",
     "@deepseek-ai/dsh-scope": "0.2.0-rc.2",
-    "@dshfiles/dshx": "link:../../../tooling/dshx/packages/dshx",
+    "@dshfiles/dshx": "workspace:*",
     "@types/node": "^22.19.0",
     "typescript": "7.0.2",
     "vitest": "^4.1.10"

@@ -97,7 +97,7 @@
   },
   "devDependencies": {
     "@deepseek-ai/dsh-client-ui-primitives": "0.2.0-rc.2",
-    "@dshfiles/dshx": "link:../../../tooling/dshx/packages/dshx",
+    "@dshfiles/dshx": "workspace:*",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/react": "^16.1.0",
     "@types/node": "^22.19.0",
