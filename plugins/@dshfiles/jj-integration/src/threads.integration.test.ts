@@ -1,9 +1,9 @@
 import { execFileSync, spawnSync } from 'node:child_process'
-import { existsSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { createThreads, defaultThreadsDirectory, type JjExecutor } from './threads.js'
+import { checkoutSyncArgv, createThreads, defaultThreadsDirectory, type JjExecutor } from './threads.js'
 
 const jjAvailable = spawnSync('jj', ['--version']).status === 0
 
@@ -72,6 +72,20 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
     expect(jj(repo, '--ignore-working-copy', 'log', '--no-graph', '-r', 'main-', '-T', 'description.first_line()')).toBe('other work')
     const [status] = await threads.list(repo)
     expect(status).toMatchObject({ unlanded: [], behind: false })
+  })
+
+  it('brings the default checkout onto the landed bookmark with dshx checkout sync, keeping its local edits', async () => {
+    writeFileSync(join(repo, '.secret.json'), 'local\n')
+    const thread = await threads.provision(repo)
+    writeFileSync(join(thread.path, 'feature.txt'), 'feature\n')
+    jj(thread.path, 'describe', '-m', 'feat: add feature')
+    expect(await threads.land(thread.path)).toMatchObject({ status: 'landed' })
+
+    const [command = '', ...args] = checkoutSyncArgv({ repoRoot: repo, workspace: 'default', bookmark: 'main' })
+    const synced = spawnSync(command, args, { encoding: 'utf8', env: { ...process.env, JJ_CONFIG: '' } })
+    expect(JSON.parse(synced.stdout)).toMatchObject({ ok: true, data: { status: 'synced', kept: [{ description: '' }], changedFiles: ['feature.txt'] } })
+    expect(readFileSync(join(repo, 'feature.txt'), 'utf8')).toBe('feature\n')
+    expect(readFileSync(join(repo, '.secret.json'), 'utf8')).toBe('local\n')
   })
 
   it('asks for a description instead of landing placeholder work', async () => {

@@ -32,6 +32,25 @@ const landResultSchema = z
   .strict()
 export type LandResult = z.infer<typeof landResultSchema>
 
+const workspaceSyncSchema = z
+  .object({
+    state: z.enum(['running', 'done', 'failed']),
+    workspace: z.string(),
+    bookmark: z.string(),
+    /** `dshx checkout sync`'s status once it finished; null while running or when it could not run. */
+    status: z.enum(['up-to-date', 'synced', 'would-sync', 'refused', 'conflicted', 'build-failed']).nullable(),
+    pluginsRebuilt: z.array(z.string()),
+    /** Rebuilt plugins whose only change was their client bundle, which DSH hot-reloads. */
+    hotPlugins: z.array(z.string()),
+    restartNeeded: z.boolean(),
+    conflicts: z.array(z.string()),
+    /** What to do when the sync stopped: the routine's hint or error. */
+    message: z.string().nullable(),
+    finishedAt: z.string().nullable(),
+  })
+  .strict()
+export type WorkspaceSyncView = z.infer<typeof workspaceSyncSchema>
+
 const destinationSchema = z
   .object({
     /** Whether the workspace is in a jj repository at all; bookmarks and isolation need one. */
@@ -64,6 +83,7 @@ export const jjIntegrationApi = defineApi({
     repositories: method({ input: z.object({}).strict(), output: z.object({ repositories: z.array(repositorySchema) }).strict() }),
     threadAt: method({ input: z.object({ path: z.string().min(1) }).strict(), output: z.object({ thread: threadSchema.nullable() }).strict() }),
     land: method({ input: z.object({ path: z.string().min(1), sessionId: z.string().optional() }).strict(), output: landResultSchema }),
+    workspaceSync: method({ input: z.object({}).strict(), output: z.object({ sync: workspaceSyncSchema.nullable() }).strict() }),
     discard: method({
       input: z.object({ path: z.string().min(1), force: z.boolean() }).strict(),
       output: z.object({ status: z.enum(['discarded', 'has-work']), revisions: z.array(revisionSchema) }).strict(),

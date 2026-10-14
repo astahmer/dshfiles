@@ -38,6 +38,15 @@ thread's own workspace, serialized per repository:
 4. `jj bookmark set main -r <tip>` (forward only; retried after a rebase if
    another writer moved `main`), then `jj new main` when `@` held work.
 
+5. When `syncWorkspaceAfterLand` names a workspace (`default`, the checkout
+   `dsh web` usually runs from), run `dshx checkout sync` for it in the
+   background: its working copy follows the bookmark with its local edits, and
+   dshx and the changed plugins are rebuilt. The panel shows the outcome, e.g.
+   `default updated · 3 plugins rebuilt · restart to apply`, with **Restart**
+   (the thread sidebar's restart) when a Host bundle changed; client-only
+   changes arrive over HMR. Conflicts or described work the bookmark lacks
+   leave that checkout untouched and are reported there instead.
+
 When Land stops on conflicts or descriptions, it queues a message asking the
 thread's agent to fix them and call `jj_thread_land` again
 (`askAgentToFixLanding`). Nothing is pushed.
@@ -57,14 +66,15 @@ panel's **Discard with work** deletes it on request.
 
 ## Settings (`jj-integration`)
 
-| Key                     | Default | Meaning                                                                             |
-| ----------------------- | ------- | ----------------------------------------------------------------------------------- |
-| `isolateByDefault`      | `false` | Initial state of the workspace toggle for new threads.                              |
-| `bookmark`              | `main`  | Bookmark threads start from and Land advances.                                      |
-| `threadsDirectory`      | empty   | Parent for thread workspaces; empty uses `<repository>-threads`.                    |
-| `setupCommand`          | empty   | Shell command run in a new thread workspace, e.g. `pnpm install --frozen-lockfile`. |
-| `askAgentToFixLanding`  | `true`  | Hand Land problems back to the thread's agent.                                      |
-| `removeFinishedThreads` | `true`  | Remove finished thread workspaces without unlanded work.                            |
+| Key                      | Default   | Meaning                                                                                   |
+| ------------------------ | --------- | ----------------------------------------------------------------------------------------- |
+| `isolateByDefault`       | `false`   | Initial state of the workspace toggle for new threads.                                    |
+| `bookmark`               | `main`    | Bookmark threads start from and Land advances.                                            |
+| `threadsDirectory`       | empty     | Parent for thread workspaces; empty uses `<repository>-threads`.                          |
+| `setupCommand`           | empty     | Shell command run in a new thread workspace, e.g. `pnpm install --frozen-lockfile`.       |
+| `askAgentToFixLanding`   | `true`    | Hand Land problems back to the thread's agent.                                            |
+| `syncWorkspaceAfterLand` | `default` | Workspace brought onto the bookmark after Land (`dshx checkout sync`); empty disables it. |
+| `removeFinishedThreads`  | `true`    | Remove finished thread workspaces without unlanded work.                                  |
 
 ## Limits
 

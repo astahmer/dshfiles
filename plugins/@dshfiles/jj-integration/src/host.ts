@@ -11,9 +11,10 @@ import type { InferValue, ToolRunContext, ValueSchemaSpec } from '@deepseek-ai/d
 import { WorkspaceId, type Workspace } from '@deepseek-ai/dsh-workspace'
 import { defineHost, defineTool } from '@dshfiles/dshx/host'
 import type { SettingsScope } from '@dshfiles/dshx/settings'
-import { jjIntegrationApi, type LandResult, type RepositoryView, type ThreadView } from './api.js'
+import { z } from 'zod'
+import { jjIntegrationApi, type LandResult, type RepositoryView, type ThreadView, type WorkspaceSyncView } from './api.js'
 import { jjIntegrationSettings, type JjIntegrationSettings } from './settings.js'
-import { createThreads, defaultThreadsDirectory, type JjExecutor, type ThreadStatus, type Threads } from './threads.js'
+import { checkoutSyncArgv, createThreads, defaultThreadsDirectory, type JjExecutor, type ThreadStatus, type Threads } from './threads.js'
 
 declare module '@deepseek-ai/cordis' {
   interface Events {
@@ -28,11 +29,16 @@ const SETUP_TIMEOUT_MS = 15 * 60_000
 /** A thread younger than this may still be waiting for its first Session to attach. */
 const SWEEP_GRACE_MS = 15 * 60_000
 const SWEEP_INTERVAL_MS = 10 * 60_000
+/** Installs and plugin rebuilds after a large landing take minutes. */
+const SYNC_TIMEOUT_MS = 30 * 60_000
 
 const defaultSettings: JjIntegrationSettings = jjIntegrationSettings.schema({})
 let settingsScope: SettingsScope<JjIntegrationSettings> | undefined
 let hostContext: Context | undefined
 let threads: Threads | undefined
+let workspaceSync: WorkspaceSyncView | null = null
+let workspaceSyncQueued = false
+let workspaceSyncQueue: Promise<void> = Promise.resolve()
 
 const readSettings = (): JjIntegrationSettings => {
   try {
@@ -209,6 +215,108 @@ const askAgent = async (path: string, sessionId: string | undefined, text: strin
   return true
 }
 
+const checkoutSyncOutputSchema = z.object({
+  ok: z.boolean(),
+  data: z
+    .object({
+      status: z.enum(['up-to-date', 'synced', 'would-sync', 'refused', 'conflicted', 'build-failed']),
+      rebuilt: z.object({ plugins: z.array(z.string()) }),
+      plugins: z.array(z.object({ name: z.string(), host: z.boolean(), client: z.boolean() })),
+      restart: z.object({ needed: z.boolean() }),
+      conflicts: z.array(z.string()),
+      hint: z.string().nullable(),
+    })
+    .optional(),
+  error: z.object({ message: z.string(), hint: z.string() }).optional(),
+})
+
+const describeWorkspaceSync = (view: WorkspaceSyncView): string => {
+  if (view.status === 'up-to-date') return `${view.workspace} already on ${view.bookmark}`
+  if (view.status !== 'synced') return `${view.workspace} not updated: ${view.message ?? view.status ?? 'unknown error'}`
+  const rebuilt = view.pluginsRebuilt.length
+  if (rebuilt === 0 && !view.restartNeeded) return `${view.workspace} updated · nothing to rebuild`
+  return `${view.workspace} updated · ${String(rebuilt)} plugin${rebuilt === 1 ? '' : 's'} rebuilt · ${view.restartNeeded ? 'restart to apply' : 'applied live'}`
+}
+
+interface WorkspaceSyncInput {
+  readonly repoRoot: string
+  readonly workspace: string
+  readonly bookmark: string
+}
+
+const workspaceSyncView = (input: WorkspaceSyncInput, state: WorkspaceSyncView['state'], message: string | null): WorkspaceSyncView => ({
+  workspace: input.workspace,
+  bookmark: input.bookmark,
+  state,
+  status: null,
+  pluginsRebuilt: [],
+  hotPlugins: [],
+  restartNeeded: false,
+  conflicts: [],
+  message,
+  finishedAt: state === 'running' ? null : new Date().toISOString(),
+})
+
+const runWorkspaceSync = async (input: WorkspaceSyncInput): Promise<WorkspaceSyncView> => {
+  const failed = (message: string): WorkspaceSyncView => workspaceSyncView(input, 'failed', message)
+  let argv: readonly string[]
+  try {
+    argv = checkoutSyncArgv(input)
+  } catch {
+    return failed('dshx is not installed beside jj-integration; run `pnpm --dir plugins install --frozen-lockfile` in the repository.')
+  }
+  const handle = requireContext().subprocess.spawn({
+    argv: [...argv],
+    cwd: input.repoRoot,
+    stdio: { stdin: 'ignore', stdout: { maxBytes: MAX_OUTPUT }, stderr: { maxBytes: MAX_STDERR } },
+    graceMs: 5_000,
+    signal: AbortSignal.timeout(SYNC_TIMEOUT_MS),
+  })
+  await handle.done
+  const stdout = handle.collected.stdout?.readFrom(0)?.text ?? ''
+  let decoded: unknown
+  try {
+    decoded = JSON.parse(stdout)
+  } catch {
+    return failed(`dshx checkout sync printed no result: ${(handle.collected.stderr?.readFrom(0)?.text ?? '').trim().slice(-400)}`)
+  }
+  const output = checkoutSyncOutputSchema.safeParse(decoded)
+  if (!output.success) return failed('dshx checkout sync printed a result this plugin cannot read; rebuild dshx.')
+  const data = output.data.data
+  if (data === undefined)
+    return failed(output.data.error === undefined ? 'dshx checkout sync failed.' : `${output.data.error.message} ${output.data.error.hint}`)
+  return {
+    ...workspaceSyncView(input, output.data.ok ? 'done' : 'failed', data.hint),
+    status: data.status,
+    pluginsRebuilt: data.rebuilt.plugins,
+    hotPlugins: data.plugins.filter(plugin => plugin.client && !plugin.host).map(plugin => plugin.name),
+    restartNeeded: data.restart.needed,
+    conflicts: data.conflicts,
+  }
+}
+
+/** Runs one sync at a time; Lands arriving while one waits share it. */
+const queueWorkspaceSync = (repoRoot: string): void => {
+  const settings = readSettings()
+  const workspace = settings.syncWorkspaceAfterLand.trim()
+  if (workspace === '' || workspaceSyncQueued) return
+  workspaceSyncQueued = true
+  const input = { repoRoot, workspace, bookmark: settings.bookmark }
+  workspaceSync = workspaceSyncView(input, 'running', null)
+  workspaceSyncQueue = workspaceSyncQueue.then(async () => {
+    workspaceSyncQueued = false
+    const view = await runWorkspaceSync(input).catch(error => workspaceSyncView(input, 'failed', error instanceof Error ? error.message : String(error)))
+    workspaceSync = view
+    emitActivity({
+      type: `workspace.sync_${view.state}`,
+      level: view.state === 'failed' || view.restartNeeded ? 'attention' : 'notable',
+      summary: describeWorkspaceSync(view),
+      detail: view.message ?? undefined,
+      path: repoRoot,
+    })
+  })
+}
+
 const landThread = async (input: { readonly path: string; readonly sessionId: string | undefined; readonly fromAgent: boolean }): Promise<LandResult> => {
   const bookmark = readSettings().bookmark
   const outcome = await requireThreads().land(input.path)
@@ -224,6 +332,7 @@ const landThread = async (input: { readonly path: string; readonly sessionId: st
     message !== undefined && !input.fromAgent && readSettings().askAgentToFixLanding
       ? await askAgent(input.path, input.sessionId, message).catch(() => false)
       : false
+  if (outcome.status === 'landed') queueWorkspaceSync((await requireThreads().locate(input.path)).repoRoot)
   emitActivity({
     type: `workspace.land_${outcome.status.replaceAll('-', '_')}`,
     level: outcome.status === 'landed' || outcome.status === 'nothing-to-land' ? 'notable' : 'attention',
@@ -380,6 +489,7 @@ const api = jjIntegrationApi.host({
     return { thread: (await findThread(location.workspaceRoot))?.thread ?? null }
   },
   land: ({ input }) => landThread({ path: input.path, sessionId: input.sessionId, fromAgent: false }),
+  workspaceSync: () => ({ sync: workspaceSync }),
   discard: ({ input }) => discardThread(input),
 })
 

@@ -19,6 +19,11 @@ export const jjIntegrationSettings = defineSettings({
     askAgentToFixLanding: Schema.boolean()
       .default(true)
       .description('When Land finds conflicts or undescribed revisions, queue a message asking the thread’s agent to fix them and land again.'),
+    syncWorkspaceAfterLand: Schema.string()
+      .default('default')
+      .description(
+        'After Land moves the bookmark, bring this jj workspace (the checkout running DSH) onto it in the background with `dshx checkout sync`, keeping its local edits and rebuilding what changed. Empty disables it.',
+      ),
     removeFinishedThreads: Schema.boolean()
       .default(true)
       .description('Remove a thread workspace once all its threads are archived and it holds no unlanded work. Work is never deleted.'),

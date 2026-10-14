@@ -846,6 +846,9 @@ importers:
 
   '@dshfiles/jj-integration':
     dependencies:
+      '@dshfiles/command-palette':
+        specifier: workspace:*
+        version: link:../command-palette
       '@dshfiles/multi-host':
         specifier: workspace:*
         version: link:../multi-host

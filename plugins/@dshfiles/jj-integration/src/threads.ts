@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto'
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import { mkdir, rm } from 'node:fs/promises'
+import { createRequire } from 'node:module'
 import { basename, dirname, join, resolve } from 'node:path'
 
 export interface JjResult {
@@ -230,3 +231,21 @@ export const createThreads = (options: {
 export type Threads = ReturnType<typeof createThreads>
 
 export const defaultThreadsDirectory = (repoRoot: string): string => `${repoRoot}-threads`
+
+/**
+ * `dshx checkout sync` from the dshx this plugin builds with: the one routine that brings the checkout running DSH
+ * onto the bookmark after Land, and that agents run after moving the bookmark by hand. Throws when dshx is missing.
+ */
+export const checkoutSyncArgv = (input: { readonly repoRoot: string; readonly workspace: string; readonly bookmark: string }): readonly string[] => [
+  process.execPath,
+  join(dirname(createRequire(import.meta.url).resolve('@dshfiles/dshx')), 'cli', 'bin.js'),
+  'checkout',
+  'sync',
+  '--workspace',
+  input.workspace,
+  '--bookmark',
+  input.bookmark,
+  '--cwd',
+  input.repoRoot,
+  '--json',
+]

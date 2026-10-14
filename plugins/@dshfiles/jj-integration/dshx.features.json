@@ -82,7 +82,7 @@
     {
       "id": "land",
       "title": "Land a thread onto the bookmark",
-      "summary": "Rebase a thread's described work onto the landing bookmark and move the bookmark forward; conflicts and undescribed revisions are handed back to the thread's agent.",
+      "summary": "Rebase a thread's described work onto the landing bookmark and move the bookmark forward; conflicts and undescribed revisions are handed back to the thread's agent. Afterwards the checkout running DSH follows the bookmark in the background through `dshx checkout sync`, with a panel line saying what was rebuilt and whether to restart.",
       "surfaces": ["host", "tool", "client", "integration"],
       "configuration": [
         {
@@ -90,10 +90,20 @@
           "defaultValue": "true",
           "constraints": "Queues a message to the thread's latest unarchived Session when Land stops.",
           "coveredBy": ["jj-integration.land-conflict"]
+        },
+        {
+          "key": "syncWorkspaceAfterLand",
+          "defaultValue": "default",
+          "constraints": "jj workspace synced onto the bookmark after a successful Land; empty disables it.",
+          "coveredBy": ["jj-integration.checkout-sync"]
         }
       ],
-      "states": ["landed", "nothing-to-land", "needs-description", "conflicted"],
-      "failureModes": ["A conflict leaves the bookmark where it was.", "Placeholder descriptions (empty or wip) are refused."],
+      "states": ["landed", "nothing-to-land", "needs-description", "conflicted", "checkout-synced"],
+      "failureModes": [
+        "A conflict leaves the bookmark where it was.",
+        "Placeholder descriptions (empty or wip) are refused.",
+        "The post-Land checkout sync refuses described work the bookmark lacks and undoes a conflicting rebase; the panel line names the files and the Land itself stands."
+      ],
       "externalDependencies": [
         {
           "id": "jj",
@@ -124,6 +134,12 @@
           "id": "jj-integration.land-conflict",
           "file": "plugins/@dshfiles/jj-integration/src/threads.integration.test.ts",
           "testName": "reports conflicting files and keeps the bookmark where it was"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.checkout-sync",
+          "file": "plugins/@dshfiles/jj-integration/src/threads.integration.test.ts",
+          "testName": "brings the default checkout onto the landed bookmark with dshx checkout sync, keeping its local edits"
         }
       ]
     }

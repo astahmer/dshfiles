@@ -1,3 +1,4 @@
+import { getPaletteActions, subscribePaletteActions, type PaletteActionContext } from '@dshfiles/command-palette/api'
 import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
@@ -7,13 +8,14 @@ import { RefreshCwIcon } from '@dshfiles/plugin-ui/icons'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useApi } from '@dshfiles/dshx/client'
-import { useState } from 'react'
-import { jjIntegrationApi, type LandResult, type ThreadView } from './api.js'
+import { useState, useSyncExternalStore } from 'react'
+import { jjIntegrationApi, type LandResult, type ThreadView, type WorkspaceSyncView } from './api.js'
 import type { JjIntegrationTranslate } from './locales.js'
 
 export const threadQueryKeys = {
   repositories: ['jj-integration', 'repositories'] as const,
   threadAt: (path: string) => ['jj-integration', 'thread', path] as const,
+  workspaceSync: ['jj-integration', 'workspace-sync'] as const,
 }
 
 export const describeLandResult = (t: JjIntegrationTranslate, result: LandResult): string => {
@@ -26,6 +28,52 @@ export const describeLandResult = (t: JjIntegrationTranslate, result: LandResult
           ? t('needsDescription', { revisions: result.revisions.map(revision => revision.changeId).join(', ') })
           : t('conflicted', { bookmark: result.bookmark, files: result.files.join(', ') })
   return result.agentAsked ? `${summary} ${t('agentAsked')}` : summary
+}
+
+/** The thread sidebar owns restarting DSH (with its confirmation dialog) and registers it as a palette action. */
+const RESTART_ACTION_ID = '@dshfiles/thread-sidebar/action/restart-dsh'
+const NO_PALETTE_CONTEXT: PaletteActionContext = { thread: null, workspace: null, workspaces: [], themePreference: 'system' }
+const findRestartAction = () => getPaletteActions().find(action => action.id === RESTART_ACTION_ID) ?? null
+const noRestartAction = (): null => null
+
+const describeWorkspaceSync = (t: JjIntegrationTranslate, view: WorkspaceSyncView): string => {
+  if (view.state === 'running') return t('workspaceSyncRunning', { workspace: view.workspace, bookmark: view.bookmark })
+  if (view.status === 'up-to-date') return t('workspaceSyncUpToDate', { workspace: view.workspace, bookmark: view.bookmark })
+  if (view.status === 'conflicted')
+    return `${t('workspaceSyncConflicted', { workspace: view.workspace, files: view.conflicts.join(', ') })} ${view.message ?? ''}`.trim()
+  if (view.status !== 'synced') return t('workspaceSyncFailed', { workspace: view.workspace, message: view.message ?? view.status ?? '' })
+  if (view.pluginsRebuilt.length === 0 && !view.restartNeeded) return t('workspaceSyncedQuiet', { workspace: view.workspace })
+  const effect = view.restartNeeded ? t('workspaceSyncRestart') : t('workspaceSyncLive')
+  return t('workspaceSynced', { workspace: view.workspace, count: view.pluginsRebuilt.length, effect })
+}
+
+/** What the background sync after the last Land did to the checkout running DSH, with the restart it may need. */
+const WorkspaceSyncLine = (props: { readonly t: JjIntegrationTranslate }): JSX.Element | null => {
+  const api = useApi(jjIntegrationApi)
+  const restart = useSyncExternalStore(subscribePaletteActions, findRestartAction, noRestartAction)
+  const sync = useQuery({
+    queryKey: threadQueryKeys.workspaceSync,
+    retry: false,
+    // A Host older than this client has no workspaceSync method: show nothing until DSH restarts.
+    queryFn: ({ signal }) =>
+      runHostRequest({ signal, timeoutMs: 15_000, request: hostSignal => api.workspaceSync({}, { signal: hostSignal }) }).catch(() => ({ sync: null })),
+    refetchInterval: query => (query.state.data?.sync?.state === 'running' ? 2_000 : false),
+  })
+  const view = sync.data?.sync
+  if (view === null || view === undefined) return null
+  return (
+    <Alert variant={view.state === 'failed' ? 'destructive' : 'default'}>
+      <AlertDescription className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
+        {view.state === 'running' ? <Spinner /> : null}
+        <span>{describeWorkspaceSync(props.t, view)}</span>
+        {view.restartNeeded && restart !== null ? (
+          <Button size="sm" variant="outline" onClick={() => void restart.run(NO_PALETTE_CONTEXT)}>
+            {props.t('restart')}
+          </Button>
+        ) : null}
+      </AlertDescription>
+    </Alert>
+  )
 }
 
 const ThreadRow = (props: {
@@ -111,6 +159,7 @@ export const ThreadWorkspacesPanel = (props: { readonly t: JjIntegrationTranslat
           {t('refresh')}
         </Button>
       </header>
+      <WorkspaceSyncLine t={t} />
       {notice === null ? null : (
         <Alert variant={notice.tone}>
           <AlertDescription>{notice.text}</AlertDescription>

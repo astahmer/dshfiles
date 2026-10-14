@@ -38,6 +38,15 @@ const en = {
   isolateHint: 'Work in a separate jj workspace, so other threads never see this one’s edits until it lands.',
   workspace: 'workspace',
   chooseProject: 'Choose a project',
+  workspaceSyncRunning: 'Updating {workspace} to {bookmark}…',
+  workspaceSyncUpToDate: '{workspace} is already on {bookmark}.',
+  workspaceSynced: '{workspace} updated · {count} plugin(s) rebuilt · {effect}',
+  workspaceSyncedQuiet: '{workspace} updated · nothing to rebuild',
+  workspaceSyncRestart: 'restart to apply',
+  workspaceSyncLive: 'applied live',
+  workspaceSyncConflicted: '{workspace} not updated: conflicts in {files}.',
+  workspaceSyncFailed: '{workspace} not updated: {message}',
+  restart: 'Restart',
 } as const
 
 const zh: Record<keyof typeof en, string> = {
@@ -75,6 +84,15 @@ const zh: Record<keyof typeof en, string> = {
   isolateHint: '在独立的 jj 工作区中工作，合入前其他会话看不到这里的修改。',
   workspace: '工作区',
   chooseProject: '选择项目',
+  workspaceSyncRunning: '正在将 {workspace} 更新到 {bookmark}…',
+  workspaceSyncUpToDate: '{workspace} 已经位于 {bookmark}。',
+  workspaceSynced: '{workspace} 已更新 · 重新构建了 {count} 个插件 · {effect}',
+  workspaceSyncedQuiet: '{workspace} 已更新 · 无需重新构建',
+  workspaceSyncRestart: '重启后生效',
+  workspaceSyncLive: '已实时生效',
+  workspaceSyncConflicted: '{workspace} 未更新：{files} 有冲突。',
+  workspaceSyncFailed: '{workspace} 未更新：{message}',
+  restart: '重启',
 }
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
