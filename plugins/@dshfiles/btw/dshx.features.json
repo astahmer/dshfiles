@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "btw-side-chat",
+      "title": "/btw side chat",
+      "summary": "/btw <question> forks the thread at its latest completed turn with the same model and route, asks the question there, and opens the fork in a right-sidebar tab where follow-ups continue. The fork is hidden from the thread sidebar and archived when its tab closes; the tab header shows how much of the first request the provider read from its prefix cache.",
+      "surfaces": ["client"],
+      "configuration": [],
+      "states": ["forking", "configuring", "asking", "open", "archiving", "failed", "closed"],
+      "failureModes": [
+        "A refused fork creates nothing; a failure after the fork archives it and shows why in the tab.",
+        "A side chat from before a reload has no flow left; closing its tab still archives it."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "btw.btw-side-chat",
+          "featureFile": "tooling/dshx/e2e/features/btw.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "btw.flow",
+          "file": "plugins/@dshfiles/btw/src/side-chat-machine.test.ts",
+          "testName": "forks, pins the source route, opens the panel, asks, and archives on close"
+        },
+        {
+          "kind": "unit-test",
+          "id": "btw.failure-archives",
+          "file": "plugins/@dshfiles/btw/src/side-chat-machine.test.ts",
+          "testName": "archives the fork when asking fails, and reports why"
+        },
+        {
+          "kind": "unit-test",
+          "id": "btw.cache-reading",
+          "file": "plugins/@dshfiles/btw/src/prefix-cache.test.ts",
+          "testName": "reads the first request after the fork seed, not the copied source requests"
+        }
+      ]
+    }
+  ]
+}

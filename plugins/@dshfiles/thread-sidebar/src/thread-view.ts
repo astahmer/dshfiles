@@ -31,6 +31,11 @@ export interface ThreadViewGroup<Thread> {
   readonly threads: readonly Thread[]
 }
 
+// @dshfiles/btw titles its forks with this prefix; they live in their right-sidebar tab, not in the thread list.
+const SIDE_CHAT_TITLE_PREFIX = 'btw · '
+
+export const isSideChat = (thread: Pick<SessionSummary, 'title'>): boolean => thread.title?.startsWith(SIDE_CHAT_TITLE_PREFIX) === true
+
 export const matchesThreadSourceFilter = (thread: Partial<Pick<SessionSummary, 'origin' | 'parentId'>>, sourceFilter: ThreadSourceFilter): boolean => {
   if (sourceFilter === 'all') return true
   const isSubagent = thread.origin === 'subagent' || thread.parentId !== undefined

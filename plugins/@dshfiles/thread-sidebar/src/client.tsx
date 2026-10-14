@@ -97,6 +97,7 @@ import { buildThreadUrl, clearThreadUrl, readThreadUrl } from './thread-url.js'
 import { workingThreadIds } from './working-threads.js'
 import {
   groupThreadEntries,
+  isSideChat,
   matchesThreadSourceFilter,
   matchesThreadStatusFilter,
   THREAD_GROUP_BY_OPTIONS,
@@ -1208,7 +1209,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
     const listed: SessionSummary[] = []
     for (const sessionId of sessionState.ids) {
       const session = sessionState.byId[sessionId]
-      if (session === undefined || session.blank) continue
+      if (session === undefined || session.blank || isSideChat(session)) continue
       const workspaceId = workspaceForLineage(session, sessionState.byId, workspaceBySession)
       if (preferences.workspaceFilter !== null && (workspaceId ?? '') !== preferences.workspaceFilter) continue
       listed.push(session)

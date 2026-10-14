@@ -1,6 +1,6 @@
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { describe, expect, it } from 'vitest'
-import { groupThreadEntries, matchesThreadSourceFilter, matchesThreadStatusFilter, threadDateGroup } from './thread-view.js'
+import { groupThreadEntries, isSideChat, matchesThreadSourceFilter, matchesThreadStatusFilter, threadDateGroup } from './thread-view.js'
 
 describe('thread view grouping', () => {
   it('groups repositories alphabetically and keeps newest threads first', () => {
@@ -69,6 +69,12 @@ describe('thread view grouping', () => {
 })
 
 describe('thread view filters', () => {
+  it('hides /btw side chats by their title marker only', () => {
+    expect(isSideChat({ title: 'btw · why is the build slow?' })).toBe(true)
+    expect(isSideChat({ title: 'btw: notes' })).toBe(false)
+    expect(isSideChat({})).toBe(false)
+  })
+
   it('filters supported activity states', () => {
     expect(matchesThreadStatusFilter({ filter: 'all', running: false, needsAttention: false, archived: false, muted: false })).toBe(true)
     expect(matchesThreadStatusFilter({ filter: 'working', running: true, needsAttention: false, archived: false, muted: false })).toBe(true)
