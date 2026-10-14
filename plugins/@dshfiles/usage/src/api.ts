@@ -6,8 +6,8 @@ export const purposeSchema = z.enum(REQUEST_PURPOSES)
 export const statusSchema = z.enum(REQUEST_STATUSES)
 
 const rangeShape = {
-  from: z.number().int().min(0),
-  to: z.number().int().min(0),
+  from: z.number().int().min(0).describe('Range start, Unix milliseconds.'),
+  to: z.number().int().min(0).describe('Range end, Unix milliseconds.'),
   purposes: z.array(purposeSchema).max(REQUEST_PURPOSES.length).optional(),
 }
 
@@ -146,10 +146,26 @@ export const indexStatusSchema = z.object({
 export const usageApi = defineApi({
   id: 'dshfiles-usage',
   version: 1,
+  owner: '@dshfiles/usage',
   methods: {
-    requests: method({ input: requestQuerySchema, output: requestPageSchema }),
-    charts: method({ input: chartQuerySchema, output: chartViewSchema }),
-    status: method({ input: z.object({}).strict(), output: indexStatusSchema }),
+    requests: method({
+      input: requestQuerySchema,
+      output: requestPageSchema,
+      description: 'Page through recorded LLM requests between two Unix-ms timestamps: model, provider, tokens, cache, latency and list-price cost. Read-only.',
+      tool: { name: 'usage_requests', readOnly: true, render: output => JSON.stringify(output) },
+    }),
+    charts: method({
+      input: chartQuerySchema,
+      output: chartViewSchema,
+      description:
+        'Cost, token, cache and latency totals between two Unix-ms timestamps, bucketed by hour or day, with breakdowns by model, provider and project and the costliest sessions. Costs are list-price estimates. Read-only.',
+      tool: { name: 'usage_report', readOnly: true, render: output => JSON.stringify(output) },
+    }),
+    status: method({
+      input: z.object({}).strict(),
+      output: indexStatusSchema,
+      description: 'How far the request index has read the session logs, and when prices were fetched.',
+    }),
     /** Index whatever the session logs gained since the last pass, then report. */
     refresh: method({ input: z.object({}).strict(), output: indexStatusSchema }),
   },

@@ -1,6 +1,4 @@
-import { readFile, stat } from 'node:fs/promises'
-import { dshHomePath } from '@deepseek-ai/dsh-home-paths'
-import { z } from 'zod'
+import { stat } from 'node:fs/promises'
 import { costOfTokens, routeKey } from '@dshfiles/ai-accounts/cost-estimate'
 import { createPricingCatalog, DEFAULT_PRICING_PATH, resolveRouteQuote, type PricingCache } from '@dshfiles/ai-accounts/pricing-catalog'
 import type { Rates, RouteBand, UsageStore } from './store.js'
@@ -25,18 +23,6 @@ export const ratesAt = (input: { readonly price: Parameters<typeof costOfTokens>
   return { input: unit('uncachedInputTokens'), output: unit('outputTokens'), cacheRead: unit('cacheReadTokens'), cacheWrite: unit('cacheWriteTokens') }
 }
 
-const accountsFileSchema = z.object({ accounts: z.array(z.object({ kind: z.string(), instanceId: z.string() })).catch([]) })
-
-/** AI Accounts may be absent or another version: an unreadable file just means "kind unknown". */
-const readAccountKinds = async (): Promise<ReadonlyMap<string, string>> => {
-  try {
-    const parsed = accountsFileSchema.safeParse(JSON.parse(await readFile(dshHomePath('plugins', 'ai-accounts', 'accounts.json'), 'utf8')))
-    return new Map(parsed.success ? parsed.data.accounts.map(account => [account.instanceId, account.kind] as const) : [])
-  } catch {
-    return new Map()
-  }
-}
-
 const ratesFor = (input: {
   readonly cache: PricingCache
   readonly routes: readonly RouteBand[]
@@ -57,7 +43,11 @@ const ratesFor = (input: {
   return rates
 }
 
-export const createRatePricer = (options: { readonly store: UsageStore; readonly pricingPath?: string }) => {
+/** Account instance id → kind, so subscription routes resolve their quote; empty when AI Accounts is absent. */
+export type AccountKinds = () => Promise<ReadonlyMap<string, string>>
+
+export const createRatePricer = (options: { readonly store: UsageStore; readonly pricingPath?: string; readonly accountKinds?: AccountKinds }) => {
+  const accountKinds = options.accountKinds ?? (async () => new Map<string, string>())
   const pricingPath = options.pricingPath ?? DEFAULT_PRICING_PATH
   const catalog = createPricingCatalog({ path: pricingPath })
   let loadedMtime = -1
@@ -75,7 +65,7 @@ export const createRatePricer = (options: { readonly store: UsageStore; readonly
     const replace = catalogChanged || options.store.getMeta('pricingFetchedAt') !== String(cache.fetchedAt)
     const routes = replace ? options.store.routeBands() : options.store.unratedRouteBands()
     if (routes.length === 0 && !replace) return
-    options.store.writeRates({ rates: ratesFor({ cache, routes, kinds: await readAccountKinds() }), replace })
+    options.store.writeRates({ rates: ratesFor({ cache, routes, kinds: await accountKinds() }), replace })
     options.store.setMeta('pricingFetchedAt', String(cache.fetchedAt))
   }
 

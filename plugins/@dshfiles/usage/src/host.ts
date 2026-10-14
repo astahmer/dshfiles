@@ -1,7 +1,8 @@
 import type { Context, Effect } from '@deepseek-ai/cordis'
 import { dshHomePath } from '@deepseek-ai/dsh-home-paths'
 import type {} from '@deepseek-ai/dsh-llm'
-import { defineHost } from '@dshfiles/dshx/host'
+import { aiAccountsApi } from '@dshfiles/ai-accounts/api'
+import { createHostApiClient, defineHost } from '@dshfiles/dshx/host'
 import { z } from 'zod'
 import { usageApi } from './api.js'
 import { indexSessionLogs } from './indexer.js'
@@ -79,7 +80,19 @@ const api = usageApi.host({
 
 const setupHost = (context: Context): Effect<void> => {
   const store = openUsageStore(dshHomePath('plugins', 'usage', 'usage.db'))
-  const active: UsageRuntime = { store, pricer: createRatePricer({ store }), root: sessionsRoot(context), pass: null, lastIndexedAt: null, lastError: null }
+  const accounts = createHostApiClient(context, aiAccountsApi, '@dshfiles/usage')
+  const accountKinds = async (): Promise<ReadonlyMap<string, string>> => {
+    const file = await accounts.safe.read()
+    return new Map(file.ok ? file.value.accounts.map(account => [account.instanceId, account.kind] as const) : [])
+  }
+  const active: UsageRuntime = {
+    store,
+    pricer: createRatePricer({ store, accountKinds }),
+    root: sessionsRoot(context),
+    pass: null,
+    lastIndexedAt: null,
+    lastError: null,
+  }
   runtime = active
   context.on(
     'llm/stream',
