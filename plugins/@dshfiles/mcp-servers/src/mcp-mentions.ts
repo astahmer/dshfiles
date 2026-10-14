@@ -1,6 +1,7 @@
 import type { ClientSessionContext, InputTriggerCandidate, InputTriggerSource } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
 import type { rankByName } from '@deepseek-ai/dsh-client-ui-primitives'
 import { z } from 'zod'
+import { jsonTextSchema } from './json-text.js'
 
 const registryListingSchema = z.object({ tools: z.array(z.unknown()).max(2_000) })
 const registryToolIdentitySchema = z.object({
@@ -56,15 +57,11 @@ const CATALOG_TTL_MS = 1_000
 const MAX_SERVER_CANDIDATES = 40
 const MAX_TOOL_CANDIDATES = 80
 
+const mentionValueTextSchema = jsonTextSchema('An MCP mention value is JSON text.').pipe(mentionValueSchema)
+
 const decodeMentionValue = (value: unknown): MentionValue | null => {
-  const stringValue = z.string().safeParse(value)
-  if (!stringValue.success) return null
-  try {
-    const parsed = mentionValueSchema.safeParse(JSON.parse(stringValue.data))
-    return parsed.success ? parsed.data : null
-  } catch {
-    return null
-  }
+  const parsed = mentionValueTextSchema.safeParse(value)
+  return parsed.success ? parsed.data : null
 }
 
 const mentionClipboardText = (value: MentionValue): string => (value.kind === 'server' ? `MCP server: ${value.serverName}` : `MCP tool: ${value.name}`)

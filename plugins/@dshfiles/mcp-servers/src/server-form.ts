@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { serverDraftSchema, type ServerDraft, type ServerView } from './api.js'
 import { hasUnexpandedTilde, parseCommandLine, UNEXPANDED_TILDE_MESSAGE } from './command-line.js'
+import { jsonTextSchema } from './json-text.js'
 
 export const serverTransports = ['streamable-http', 'stdio'] as const
 
@@ -32,22 +33,11 @@ interface ServerFormIssue {
 
 type ParsedServerForm = { readonly success: true; readonly draft: ServerDraft } | { readonly success: false; readonly issues: readonly ServerFormIssue[] }
 
-const referenceTextSchema = z
-  .string()
-  .transform((text, context) => {
-    try {
-      const parsed: unknown = JSON.parse(text)
-      return parsed
-    } catch {
-      context.addIssue({ code: 'custom', message: 'Enter a JSON object of names to credential references.' })
-      return z.NEVER
-    }
-  })
-  .pipe(
-    z.record(z.string(), z.string({ error: 'Every credential reference must be a string.' }), {
-      error: 'Enter a JSON object of names to credential references.',
-    }),
-  )
+const referenceTextSchema = jsonTextSchema('Enter a JSON object of names to credential references.').pipe(
+  z.record(z.string(), z.string({ error: 'Every credential reference must be a string.' }), {
+    error: 'Enter a JSON object of names to credential references.',
+  }),
+)
 
 const startCommandFields = { commandLine: 'startCommandLine', cwd: 'startCwd', envRefs: 'startEnvRefs' } as const satisfies Record<string, ServerFormField>
 const draftFields = new Set<PropertyKey>(['name', 'serverName', 'url', 'headerRefs', 'commandLine', 'cwd', 'envRefs'])
