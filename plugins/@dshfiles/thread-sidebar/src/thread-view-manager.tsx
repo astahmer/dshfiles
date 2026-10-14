@@ -36,6 +36,7 @@ const statusLabelKeys = {
   all: 'threadSidebarAllThreads',
   working: 'threadSidebarWorking',
   attention: 'threadSidebarFilterAttention',
+  muted: 'threadSidebarFilterMuted',
   archived: 'threadSidebarArchived',
 } as const
 

@@ -1,5 +1,6 @@
 import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { FinishedSubagentsMode } from './thread-children.js'
+import type { ThreadMutes } from './thread-mute.js'
 
 export type SidebarSection = 'pinned' | 'active' | 'parked' | 'inactive' | 'archived'
 
@@ -28,6 +29,8 @@ export interface SidebarPreferences {
   autoArchiveSessionIds: string[]
   autoArchiveDisabledSessionIds: string[]
   parkedSessionIds: string[]
+  /** Muted or snoozed threads by session id; Host-synced so every browser stays quiet. */
+  mutedThreads: ThreadMutes
   collapsedSections: SidebarSection[]
   workspaceFilter: string | null
   headerMode: 'compact' | 'expanded'
@@ -79,6 +82,7 @@ export const DEFAULT_PREFERENCES: SidebarPreferences = {
   autoArchiveSessionIds: [],
   autoArchiveDisabledSessionIds: [],
   parkedSessionIds: [],
+  mutedThreads: {},
   // Keep every working section open; archived threads stay folded until requested.
   collapsedSections: ['archived'],
   workspaceFilter: null,

@@ -305,6 +305,55 @@ Then('the thread stays pinned after reload', async ({ page }: { page: Page }) =>
   await finishJourneyAssertions(page)
 })
 
+let mutedThreadId: string | null = null
+
+When('a thread is snoozed until tomorrow morning from its sidebar row', async ({ page }: { page: Page }) => {
+  if (currentThreadId(page) === null) await startBlankThread(page)
+  const composer = page.getByRole('textbox').first()
+  await composer.fill('thread sidebar mute e2e target')
+  await composer.press('Enter')
+  mutedThreadId = currentThreadId(page)
+  if (mutedThreadId === null) throw new Error('The Host did not keep the selected thread after its first message.')
+  const targetRow = threadRow(page, mutedThreadId)
+  await expect(targetRow).toHaveCount(1)
+  await targetRow.hover()
+  await targetRow.getByRole('button', { name: 'Mute thread', exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Until tomorrow morning', exact: true }).click()
+  const marker = targetRow.getByRole('img', { name: 'Muted', exact: true })
+  await expect(marker).toBeVisible()
+  await marker.hover()
+  await expect(page.getByRole('tooltip').filter({ hasText: /Muted · wakes in \d+ [hd] / }).first()).toBeVisible()
+})
+
+Then('it stays snoozed after reload and the Muted filter lists it', async ({ page }: { page: Page }) => {
+  if (mutedThreadId === null) throw new Error('No thread was muted.')
+  const targetRow = threadRow(page, mutedThreadId)
+  await page.reload()
+  await expect(threadSidebar(page)).toBeVisible()
+  await recordAssertion(page, 'thread-sidebar-mute-survives-reload', async () => {
+    await expect(targetRow.getByRole('img', { name: 'Muted', exact: true })).toBeVisible()
+  })
+  await selectThreadViewValue(page, 'Filter: None', 'Muted')
+  await recordAssertion(page, 'thread-sidebar-muted-filter-lists-muted-thread', async () => {
+    await expect(targetRow).toHaveCount(1)
+  })
+})
+
+Then('unmuting it from the session header clears the marker', async ({ page }: { page: Page }) => {
+  if (mutedThreadId === null) throw new Error('No thread was muted.')
+  const threadActions = page.getByRole('group', { name: 'Thread actions', exact: true })
+  await threadActions.getByRole('button', { name: 'More thread actions', exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Muted', exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Unmute', exact: true }).click()
+  await recordAssertion(page, 'thread-sidebar-unmute-clears-marker', async () => {
+    await expect(threadSidebar(page).getByTestId('thread-sidebar-muted-marker')).toHaveCount(0)
+    await expect(threadRow(page, mutedThreadId ?? '')).toHaveCount(0)
+  })
+  await selectThreadViewValue(page, 'Filter: Muted', 'All threads')
+  await expect(threadRow(page, mutedThreadId)).toHaveCount(1)
+  await finishJourneyAssertions(page)
+})
+
 When('the Active section is folded and reopened', async ({ page }: { page: Page }) => {
   const activeSection = threadSidebar(page).getByRole('button', { name: 'Active (0)', exact: true })
   await expect(activeSection).toHaveAttribute('aria-expanded', 'true')

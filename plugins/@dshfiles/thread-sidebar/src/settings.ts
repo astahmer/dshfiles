@@ -105,6 +105,9 @@ export const threadSidebarSettings = defineSettings({
     autoArchiveSessionIds: ids(),
     autoArchiveDisabledSessionIds: ids(),
     parkedSessionIds: ids(),
+    mutedThreads: Schema.dict(Schema.object({ until: Schema.union([Schema.const(null), Schema.natural()]), activityAt: Schema.natural() }))
+      .default({})
+      .hidden(),
     collapsedSections: Schema.array(Schema.union(['pinned', 'active', 'parked', 'inactive', 'archived'] as const))
       .default(DEFAULT_PREFERENCES.collapsedSections)
       .hidden(),

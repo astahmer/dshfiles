@@ -70,11 +70,13 @@ describe('thread view grouping', () => {
 
 describe('thread view filters', () => {
   it('filters supported activity states', () => {
-    expect(matchesThreadStatusFilter({ filter: 'all', running: false, needsAttention: false, archived: false })).toBe(true)
-    expect(matchesThreadStatusFilter({ filter: 'working', running: true, needsAttention: false, archived: false })).toBe(true)
-    expect(matchesThreadStatusFilter({ filter: 'working', running: false, needsAttention: false, archived: false })).toBe(false)
-    expect(matchesThreadStatusFilter({ filter: 'attention', running: false, needsAttention: true, archived: false })).toBe(true)
-    expect(matchesThreadStatusFilter({ filter: 'archived', running: false, needsAttention: false, archived: true })).toBe(true)
+    expect(matchesThreadStatusFilter({ filter: 'all', running: false, needsAttention: false, archived: false, muted: false })).toBe(true)
+    expect(matchesThreadStatusFilter({ filter: 'working', running: true, needsAttention: false, archived: false, muted: false })).toBe(true)
+    expect(matchesThreadStatusFilter({ filter: 'working', running: false, needsAttention: false, archived: false, muted: false })).toBe(false)
+    expect(matchesThreadStatusFilter({ filter: 'attention', running: false, needsAttention: true, archived: false, muted: false })).toBe(true)
+    expect(matchesThreadStatusFilter({ filter: 'archived', running: false, needsAttention: false, archived: true, muted: false })).toBe(true)
+    expect(matchesThreadStatusFilter({ filter: 'muted', running: true, needsAttention: false, archived: false, muted: true })).toBe(true)
+    expect(matchesThreadStatusFilter({ filter: 'muted', running: true, needsAttention: false, archived: false, muted: false })).toBe(false)
   })
 
   it('filters main and subagent sources using Host lineage metadata', () => {

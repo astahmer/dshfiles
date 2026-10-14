@@ -4,6 +4,7 @@ import { z } from 'zod'
 export interface ThreadNotificationPreferences {
   readonly enabled: boolean
   readonly needsYouAt: Readonly<Record<string, number>>
+  /** Browser-only mutes from before they moved to Host settings; read once to migrate, then emptied. */
   readonly mutedUntil: Readonly<Record<string, number | null>>
   readonly manuallyUnreadSessionIds: string[]
 }
@@ -24,20 +25,12 @@ export const threadNotificationPreferences = createStoredValue({
     .object({
       enabled: z.boolean(),
       needsYouAt: timestampMap,
-      mutedUntil: muteMap,
+      mutedUntil: muteMap.default({}),
       manuallyUnreadSessionIds: z.array(z.string().min(1).max(256)).max(5000).default([]),
     })
     .strict(),
   fallback: DEFAULT_THREAD_NOTIFICATION_PREFERENCES,
 })
-
-export const snoozeDurations = [
-  { label: 'threadSidebarSnooze15Minutes', milliseconds: 15 * 60_000 },
-  { label: 'threadSidebarSnooze1Hour', milliseconds: 60 * 60_000 },
-  { label: 'threadSidebarSnooze3Hours', milliseconds: 3 * 60 * 60_000 },
-  { label: 'threadSidebarSnooze8Hours', milliseconds: 8 * 60 * 60_000 },
-  { label: 'threadSidebarSnooze24Hours', milliseconds: 24 * 60 * 60_000 },
-] as const
 
 export interface ThreadAttentionStatus {
   readonly pendingInteractionKey: string | undefined
@@ -71,22 +64,6 @@ export const threadAttentionTransitions = <SessionIdentifier extends string>(
   return { approvalNeeded, inputNeeded, turnFinished }
 }
 
-export const isThreadMuted = (preferences: ThreadNotificationPreferences, sessionId: string, now: number): boolean => {
-  const mutedUntil = preferences.mutedUntil[sessionId]
-  return mutedUntil === null || (mutedUntil !== undefined && mutedUntil > now)
-}
-
-export const setThreadMute = (preferences: ThreadNotificationPreferences, sessionId: string, mutedUntil: number | null): ThreadNotificationPreferences => ({
-  ...preferences,
-  mutedUntil: { ...preferences.mutedUntil, [sessionId]: mutedUntil },
-})
-
-export const clearThreadMute = (preferences: ThreadNotificationPreferences, sessionId: string): ThreadNotificationPreferences => {
-  const mutedUntil = { ...preferences.mutedUntil }
-  delete mutedUntil[sessionId]
-  return { ...preferences, mutedUntil }
-}
-
 export const isThreadUnread = (preferences: ThreadNotificationPreferences, sessionId: string): boolean =>
   preferences.manuallyUnreadSessionIds.includes(sessionId)
 
@@ -104,8 +81,3 @@ export const markThreadSeen = (preferences: ThreadNotificationPreferences, sessi
     manuallyUnreadSessionIds: preferences.manuallyUnreadSessionIds.filter(id => id !== sessionId),
   }
 }
-
-export const clearExpiredThreadMutes = (preferences: ThreadNotificationPreferences, now: number): ThreadNotificationPreferences => ({
-  ...preferences,
-  mutedUntil: Object.fromEntries(Object.entries(preferences.mutedUntil).filter(([, until]) => until === null || until > now)),
-})

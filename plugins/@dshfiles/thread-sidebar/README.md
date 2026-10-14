@@ -111,17 +111,31 @@ no such seat, so an occupant keeps a footer-action fallback and registers throug
 generated text field cannot capture.
 
 Every thread row also exposes **Copy thread ID**, **Copy thread link**, **Mark
-unread**, per-thread auto-settle behavior, and a **Thread notifications** menu.
+unread**, per-thread auto-settle behavior, and a **Mute thread** menu.
 Opening a thread marks Host attention read and clears its manual unread marker;
 new Host attention can mark it unread again. Manual unread markers are saved in
 this browser, separate from lifecycle and attention state. Auto-settle can
 inherit the global auto-archive setting, explicitly enable auto-archive for one
 thread, or exclude that thread; the global idle threshold and safety exclusions
-still apply. Notifications can be snoozed for 15 minutes, 1, 3, 8, or 24 hours,
-muted until manually re-enabled, or unmuted. Snoozes and mutes affect alerts
-only; they do not hide attention rows. Desktop notifications are opt-in in
-Sidebar settings and show the thread title. Mute, snooze, and unseen-completion
-state are saved in this browser. The sidebar separates **Approval needed**,
+still apply. **Mute thread** (row bell, context menu, and the
+session header's More menu) silences a thread for 1, 8 or 24 hours, until
+tomorrow morning (09:00 local), for a week, or until it is unmuted, like a
+Discord channel. A muted thread raises no desktop alert, attention group,
+attention label or unread dot, and keeps the activity time it had when muted,
+so new activity does not lift it to the top or out of Inactive. A bell-off
+marker before its title gives the time left in its tooltip; a snooze wakes on
+its own, and **Unmute** is always in the same menu. The **Muted** filter lists
+muted threads. Mutes follow child-thread action preferences and live in the
+Host-synced `mutedThreads` setting, so every browser stays quiet; mutes saved
+in this browser by older versions are copied there once. Desktop notifications
+are opt-in in Sidebar settings and show the thread title. Unseen-completion
+state is saved in this browser.
+
+**Park vs mute.** Park files a finished thread away: it moves to the Parked
+section, is skipped by auto-archive, and stays parked until unparked, but its
+alerts still fire. Mute keeps the thread where it is and only silences it, for
+a while or for good. They answer different questions ("not now" vs "not
+noisy"), so they stay separate and combine freely. The sidebar separates **Approval needed**,
 **Input needed**, and **Turn finished**.
 Permission approvals and plan-review decisions use **Approval needed**;
 structured user-question requests use **Input needed**. Both use the Client's

@@ -52,6 +52,13 @@ Feature: Thread sidebar journeys
     When auto-archive is enabled with a new idle threshold and scan interval
     Then the policy settings survive a browser reload
 
+  @scenario:thread-sidebar.thread-mute
+  Scenario: Snooze a thread until tomorrow morning, find it under Muted, and unmute it
+    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
+    When a thread is snoozed until tomorrow morning from its sidebar row
+    Then it stays snoozed after reload and the Muted filter lists it
+    And unmuting it from the session header clears the marker
+
   @scenario:thread-sidebar.manual-unread
   Scenario: Manual unread stays per-thread and clears on reopen
     Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted

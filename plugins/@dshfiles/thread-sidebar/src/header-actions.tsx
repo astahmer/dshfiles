@@ -18,14 +18,7 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { ArchiveIcon, ArchiveRestoreIcon, BellIcon, BellOffIcon, EllipsisIcon, PauseIcon, PinIcon, PinOffIcon } from '@dshfiles/plugin-ui/icons'
 import { useLayoutEffect, useState } from 'react'
-import {
-  isThreadMuted,
-  setThreadMute,
-  clearThreadMute,
-  snoozeDurations,
-  threadNotificationPreferences,
-  DEFAULT_THREAD_NOTIFICATION_PREFERENCES,
-} from './thread-notifications.js'
+import { isSessionMuted, muteOptionLabelKeys, muteSessions, muteUntil, THREAD_MUTE_OPTIONS, unmuteSessions, type ThreadMuteOption } from './thread-mute.js'
 import { threadActionTargetIds } from './thread-children.js'
 import { usePreferences } from './sidebar-state.js'
 import { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
@@ -40,6 +33,9 @@ interface HeaderThreadActionsInjected {
 type HeaderThreadActionsProps = PropsRuntime<'conversation.session.header.utilities'> &
   PropsLocale<typeof THREAD_SIDEBAR_LOCALE_NAMESPACE> &
   HeaderThreadActionsInjected
+
+// Read at the click, outside render.
+const muteUntilNow = (option: ThreadMuteOption): number | null => muteUntil(option, Date.now())
 
 // Room the native title cluster keeps for the breadcrumb before Pin folds into the menu.
 const TITLE_MIN_WIDTH = 160
@@ -90,7 +86,6 @@ export const HeaderThreadActions = ({
   const session = sessionState.byId[sessionId]
   const workspaceState = useWorkspaces(state => state)
   const { preferences, updatePreferences } = usePreferences()
-  const notificationPreferences = threadNotificationPreferences.useValue() ?? DEFAULT_THREAD_NOTIFICATION_PREFERENCES
   const [actionFailed, setActionFailed] = useState(false)
   const [bar, setBar] = useState<HTMLElement | null>(null)
   const crowded = useCrowdedHeader(bar)
@@ -99,7 +94,7 @@ export const HeaderThreadActions = ({
   const archived = workspaceState.archivedSessionIds.includes(sessionId)
   const pinned = workspaceState.pinnedSessionIds.includes(sessionId)
   const parked = preferences.parkedSessionIds.includes(sessionId)
-  const muted = isThreadMuted(notificationPreferences, sessionId, Date.now())
+  const muted = isSessionMuted(preferences.mutedThreads, sessionId, Date.now())
   const actionThreads = Object.values(sessionState.byId).filter(candidate => !candidate.blank)
   const targetIds = threadActionTargetIds({
     threadId: sessionId,
@@ -132,8 +127,14 @@ export const HeaderThreadActions = ({
       setActionFailed(true)
     }
   }
-  const updateMute = (until: number | null): void => {
-    threadNotificationPreferences.set(setThreadMute(notificationPreferences, sessionId, until))
+  const mute = (option: ThreadMuteOption): void => {
+    updatePreferences({
+      mutedThreads: muteSessions({
+        mutes: preferences.mutedThreads,
+        sessions: actionThreads.filter(thread => targetIds.includes(thread.id)),
+        until: muteUntilNow(option),
+      }),
+    })
   }
   const togglePinned = (): void => void updateThreadOperation(pinned ? 'unpin' : 'pin')
   const pinLabel = t(pinned ? 'threadSidebarUnpin' : 'threadSidebarPin')
@@ -182,20 +183,18 @@ export const HeaderThreadActions = ({
                 <DropdownMenuSub>
                   <DropdownMenuSubTrigger>
                     {muted ? <BellOffIcon aria-hidden="true" /> : <BellIcon aria-hidden="true" />}
-                    {t(muted ? 'threadSidebarNotificationsMuted' : 'threadSidebarNotifications')}
+                    {t(muted ? 'threadSidebarMuted' : 'threadSidebarMute')}
                   </DropdownMenuSubTrigger>
-                  <DropdownMenuSubContent className="dshx-root dshx:min-w-44" aria-label={t('threadSidebarNotifications')}>
-                    {snoozeDurations.map(duration => (
-                      <DropdownMenuItem key={duration.milliseconds} onSelect={() => updateMute(Date.now() + duration.milliseconds)}>
-                        {t('threadSidebarSnoozeFor')} {t(duration.label)}
+                  <DropdownMenuSubContent className="dshx-root dshx:min-w-44" aria-label={t('threadSidebarMute')}>
+                    {THREAD_MUTE_OPTIONS.map(option => (
+                      <DropdownMenuItem key={option} onSelect={() => mute(option)}>
+                        {t(muteOptionLabelKeys[option])}
                       </DropdownMenuItem>
                     ))}
-                    <DropdownMenuItem onSelect={() => updateMute(null)}>{t('threadSidebarMuteUntilEnabled')}</DropdownMenuItem>
+                    <DropdownMenuSeparator />
                     <DropdownMenuItem
                       disabled={!muted}
-                      onSelect={() => {
-                        threadNotificationPreferences.set(clearThreadMute(notificationPreferences, sessionId))
-                      }}
+                      onSelect={() => updatePreferences({ mutedThreads: unmuteSessions(preferences.mutedThreads, targetIds) })}
                     >
                       {t('threadSidebarUnmute')}
                     </DropdownMenuItem>

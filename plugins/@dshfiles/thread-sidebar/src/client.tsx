@@ -120,19 +120,29 @@ import {
 import { ThreadViewManager, threadViewPresetLabel } from './thread-view-manager.js'
 import { captureThreadMentionInsertion, requestThreadMentionInsertion } from './thread-mention.js'
 import {
-  clearExpiredThreadMutes,
-  clearThreadMute,
   DEFAULT_THREAD_NOTIFICATION_PREFERENCES,
-  isThreadMuted,
   isThreadUnread,
   markThreadSeen,
   markThreadUnread,
-  setThreadMute,
-  snoozeDurations,
   threadAttentionTransitions,
   threadNotificationPreferences,
   type ThreadAttentionStatus,
 } from './thread-notifications.js'
+import {
+  effectiveActivityAt,
+  isMuteActive,
+  legacyMutesToMigrate,
+  muteRemaining,
+  muteOptionLabelKeys,
+  muteSessions,
+  muteUntil,
+  nextMuteExpiry,
+  THREAD_MUTE_OPTIONS,
+  unmuteSessions,
+  withoutExpiredMutes,
+  type ThreadMute,
+  type ThreadMuteOption,
+} from './thread-mute.js'
 
 type InjectedActions = {
   archiveSession: (sessionId: SessionSummary['id']) => Promise<void>
@@ -155,6 +165,7 @@ const emptyThreadsMessage = {
   all: 'threadSidebarEmpty',
   working: 'threadSidebarNoWorkingThreads',
   attention: 'threadSidebarNoAttentionThreads',
+  muted: 'threadSidebarNoMutedThreads',
   archived: 'threadSidebarNoArchivedThreads',
 } as const satisfies Record<ThreadStatusFilter, string>
 type AttentionDisplayPreferenceKey = 'approvalNeededDisplay' | 'inputNeededDisplay' | 'turnFinishedDisplay'
@@ -191,6 +202,7 @@ const threadStatusFilterLabelKeys = {
   all: 'threadSidebarAllThreads',
   working: 'threadSidebarWorking',
   attention: 'threadSidebarFilterAttention',
+  muted: 'threadSidebarFilterMuted',
   archived: 'threadSidebarArchived',
 } satisfies Record<ThreadStatusFilter, Parameters<ThreadSidebarTranslate>[0]>
 
@@ -278,8 +290,8 @@ interface RowActions {
   readonly copy: (value: string, successMessage: string) => Promise<void>
   readonly toggleChildren: (sessionId: SessionSummary['id']) => void
   readonly toggleAllChildren: (sessionId: SessionSummary['id']) => void
-  readonly setNotificationMute: (sessionId: SessionSummary['id'], mutedUntil: number | null) => void
-  readonly clearNotificationMute: (sessionId: SessionSummary['id']) => void
+  readonly mute: (sessionId: SessionSummary['id'], option: ThreadMuteOption) => void
+  readonly unmute: (sessionId: SessionSummary['id']) => void
   readonly markUnread: (sessionId: SessionSummary['id']) => void
   readonly setAutoArchiveOverride: (sessionId: SessionSummary['id'], override: AutoArchiveOverride) => void
   readonly translate: ThreadSidebarTranslate
@@ -312,7 +324,8 @@ interface ThreadRowProps {
   readonly workspaceTitle: string | undefined
   readonly machine: string | undefined
   readonly age: string
-  readonly muted: boolean
+  /** Set only while the thread is muted or snoozed. */
+  readonly mute: ThreadMute | undefined
   readonly attentionLabel: ThreadAttentionLabel | undefined
   readonly childAttentionLabels: ReadonlyMap<SessionSummary['id'], ThreadAttentionLabel>
   readonly rowStyle: RowStyle
@@ -340,6 +353,26 @@ const withTooltip = (label: string, anchor: ReactElement): JSX.Element => (
       <span className="dshx:inline-flex">{anchor}</span>
     </TooltipTrigger>
     <TooltipContent side="top">{label}</TooltipContent>
+  </Tooltip>
+)
+
+const muteStatusLabel = (t: ThreadSidebarTranslate, mute: ThreadMute): string => {
+  const remaining = muteRemaining(mute, Date.now())
+  if (remaining.kind === 'forever') return t('threadSidebarMutedForever')
+  if (remaining.kind === 'minutes') return t('threadSidebarMutedMinutes', { minutes: remaining.minutes })
+  if (remaining.kind === 'hours') return t('threadSidebarMutedHours', { hours: remaining.hours, minutes: remaining.minutes })
+  return t('threadSidebarMutedDays', { days: remaining.days, hours: remaining.hours })
+}
+
+/** Read when the tooltip opens, so the remaining time is current without re-rendering the row every minute. */
+const MutedMarker = (props: { readonly mute: ThreadMute; readonly t: ThreadSidebarTranslate }): JSX.Element => (
+  <Tooltip>
+    <TooltipTrigger asChild>
+      <span className="dshx:inline-flex dshx:shrink-0" role="img" aria-label={props.t('threadSidebarMuted')} data-testid="thread-sidebar-muted-marker">
+        <BellOffIcon className="dshx:size-3 dshx:text-muted-foreground" aria-hidden="true" />
+      </span>
+    </TooltipTrigger>
+    <TooltipContent side="right">{muteStatusLabel(props.t, props.mute)}</TooltipContent>
   </Tooltip>
 )
 
@@ -498,6 +531,7 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                       attentionColors={rowStyle.attentionColors}
                     />
                   ) : null}
+                  {props.mute === undefined ? null : <MutedMarker mute={props.mute} t={t} />}
                   <span
                     className={cn(
                       'dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-foreground',
@@ -507,9 +541,6 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                   >
                     {rowStyle.title ? session.displayTitle : null}
                   </span>
-                  {props.muted ? (
-                    <BellOffIcon className="dshx:size-3 dshx:shrink-0 dshx:text-muted-foreground" aria-label={t('threadSidebarNotificationsMuted')} />
-                  ) : null}
                   {props.attentionLabel === undefined ? null : (
                     <span className={cn('dshx:shrink-0 dshx:text-xs dshx:font-medium', attentionLabelClass(props.attentionLabel, rowStyle.attentionColors))}>
                       {t(props.attentionLabel)}
@@ -627,27 +658,21 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                     </Button>,
                   )}
                   {withTooltip(
-                    t(props.muted ? 'threadSidebarNotificationsMuted' : 'threadSidebarNotifications'),
+                    props.mute === undefined ? t('threadSidebarMute') : muteStatusLabel(t, props.mute),
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon-xs" aria-label={t(props.muted ? 'threadSidebarNotificationsMuted' : 'threadSidebarNotifications')}>
-                          {props.muted ? <BellOffIcon className="dshx:size-3.5" /> : <BellIcon className="dshx:size-3.5" />}
+                        <Button variant="ghost" size="icon-xs" aria-label={t(props.mute === undefined ? 'threadSidebarMute' : 'threadSidebarMuted')}>
+                          {props.mute === undefined ? <BellIcon className="dshx:size-3.5" /> : <BellOffIcon className="dshx:size-3.5" />}
                         </Button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="dshx-root dshx:min-w-44" aria-label={t('threadSidebarNotifications')}>
-                        {snoozeDurations.map(duration => (
-                          <DropdownMenuItem
-                            key={duration.milliseconds}
-                            onSelect={() => props.actions.setNotificationMute(session.id, Date.now() + duration.milliseconds)}
-                          >
-                            {t('threadSidebarSnoozeFor')} {t(duration.label)}
+                      <DropdownMenuContent align="end" className="dshx-root dshx:min-w-44" aria-label={t('threadSidebarMute')}>
+                        {THREAD_MUTE_OPTIONS.map(option => (
+                          <DropdownMenuItem key={option} onSelect={() => props.actions.mute(session.id, option)}>
+                            {t(muteOptionLabelKeys[option])}
                           </DropdownMenuItem>
                         ))}
-                        <DropdownMenuItem onSelect={() => props.actions.setNotificationMute(session.id, null)}>
-                          {t('threadSidebarMuteUntilEnabled')}
-                        </DropdownMenuItem>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem disabled={!props.muted} onSelect={() => props.actions.clearNotificationMute(session.id)}>
+                        <DropdownMenuItem disabled={props.mute === undefined} onSelect={() => props.actions.unmute(session.id)}>
                           {t('threadSidebarUnmute')}
                         </DropdownMenuItem>
                       </DropdownMenuContent>
@@ -745,16 +770,15 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
         </ContextMenuSub>
         <ContextMenuSeparator />
         <ContextMenuSub>
-          <ContextMenuSubTrigger>{t('threadSidebarNotifications')}</ContextMenuSubTrigger>
+          <ContextMenuSubTrigger>{t(props.mute === undefined ? 'threadSidebarMute' : 'threadSidebarMuted')}</ContextMenuSubTrigger>
           <ContextMenuSubContent className="dshx-root dshx:min-w-44">
-            {snoozeDurations.map(duration => (
-              <ContextMenuItem key={duration.milliseconds} onSelect={() => props.actions.setNotificationMute(session.id, Date.now() + duration.milliseconds)}>
-                {t('threadSidebarSnoozeFor')} {t(duration.label)}
+            {THREAD_MUTE_OPTIONS.map(option => (
+              <ContextMenuItem key={option} onSelect={() => props.actions.mute(session.id, option)}>
+                {t(muteOptionLabelKeys[option])}
               </ContextMenuItem>
             ))}
-            <ContextMenuItem onSelect={() => props.actions.setNotificationMute(session.id, null)}>{t('threadSidebarMuteUntilEnabled')}</ContextMenuItem>
             <ContextMenuSeparator />
-            <ContextMenuItem disabled={!props.muted} onSelect={() => props.actions.clearNotificationMute(session.id)}>
+            <ContextMenuItem disabled={props.mute === undefined} onSelect={() => props.actions.unmute(session.id)}>
               {t('threadSidebarUnmute')}
             </ContextMenuItem>
           </ContextMenuSubContent>
@@ -831,14 +855,20 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
   )
   const sessions = useMemo(() => sessionsForAutoArchive(sessionState.ids, sessionState.byId), [sessionState.byId, sessionState.ids])
   const parkedSessionIds = useMemo(() => setIncludes(preferences.parkedSessionIds), [preferences.parkedSessionIds])
+  const mutedThreads = preferences.mutedThreads
+  const mutedSessionIds = useMemo(
+    () => new Set(Object.entries(mutedThreads).flatMap(([sessionId, mute]) => (isMuteActive(mute, now) ? [sessionId] : []))),
+    [mutedThreads, now],
+  )
   const selectedSession = useMemo(() => sessions.find(session => (session.retainedBy.mainView ?? 0) > 0), [sessions])
   const attentionSessions = useMemo(
     () => sessions.filter(session => isAttentionSessionIncluded(session, preferences.includeSubagentAttention)),
     [preferences.includeSubagentAttention, sessions],
   )
   const unreadSessionIds = useMemo(
-    () => new Set(sessions.filter(session => isThreadUnread(notificationPreferences, session.id)).map(session => session.id)),
-    [notificationPreferences, sessions],
+    () =>
+      new Set(sessions.filter(session => !mutedSessionIds.has(session.id) && isThreadUnread(notificationPreferences, session.id)).map(session => session.id)),
+    [mutedSessionIds, notificationPreferences, sessions],
   )
 
   useEffect(() => setSelectedThreadId(selectedSession?.id ?? null), [selectedSession?.id, setSelectedThreadId])
@@ -1193,12 +1223,12 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
         workspaceId: workspaceForLineage(session, sessionState.byId, workspaceBySession),
         activity: {
           id: session.id,
-          updatedAt: session.updatedAt,
+          updatedAt: effectiveActivityAt(mutedThreads, session, now),
           // A parent waiting on a running subagent is still active work.
           running: session.running || (threadTree.childrenByRoot.get(session.id) ?? NO_CHILDREN).some(child => child.running),
         },
       })),
-    [sessionState.byId, threadTree, workspaceBySession],
+    [mutedThreads, now, sessionState.byId, threadTree, workspaceBySession],
   )
   const childThreadEntries = useMemo(
     () =>
@@ -1206,10 +1236,10 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
         children.map(session => ({
           session,
           workspaceId: workspaceForLineage(session, sessionState.byId, workspaceBySession),
-          activity: { id: session.id, updatedAt: session.updatedAt, running: session.running },
+          activity: { id: session.id, updatedAt: effectiveActivityAt(mutedThreads, session, now), running: session.running },
         })),
       ),
-    [sessionState.byId, threadTree, workspaceBySession],
+    [mutedThreads, now, sessionState.byId, threadTree, workspaceBySession],
   )
   const sourceFilteredThreadEntries = useMemo(() => {
     if (threadView.sourceFilter === 'subagents') {
@@ -1230,13 +1260,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
     }),
     [childThreadEntries, sectionEntries],
   )
-  const nextMuteExpiry = useMemo(
-    () =>
-      Object.values(notificationPreferences.mutedUntil)
-        .flatMap(until => (until !== null && until > now ? [until] : []))
-        .sort((left, right) => left - right)[0] ?? null,
-    [notificationPreferences.mutedUntil, now],
-  )
+  const nextMuteWake = useMemo(() => nextMuteExpiry(mutedThreads, now), [mutedThreads, now])
   const nextIdleAt = useMemo(
     () =>
       nextIdleTransitionAt(
@@ -1248,11 +1272,30 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
   )
 
   useEffect(() => {
-    const nextBoundary = [nextIdleAt, nextMuteExpiry].filter((value): value is number => value !== null).sort((left, right) => left - right)[0]
+    const nextBoundary = [nextIdleAt, nextMuteWake].filter((value): value is number => value !== null).sort((left, right) => left - right)[0]
     if (nextBoundary === undefined) return
     const timer = window.setTimeout(() => setNow(Date.now()), Math.max(0, nextBoundary - Date.now() + 1))
     return () => window.clearTimeout(timer)
-  }, [nextIdleAt, nextMuteExpiry])
+  }, [nextIdleAt, nextMuteWake])
+
+  // A snooze that ran out wakes the thread at once (through `now`); dropping its entry keeps the settings small.
+  const mutesAwake = useMemo(() => withoutExpiredMutes(mutedThreads, now), [mutedThreads, now])
+  useEffect(() => {
+    if (Object.keys(mutesAwake).length !== Object.keys(mutedThreads).length) updatePreferences({ mutedThreads: mutesAwake })
+  }, [mutedThreads, mutesAwake, updatePreferences])
+
+  useEffect(() => {
+    const legacy = notificationPreferences.mutedUntil
+    if (Object.keys(legacy).length === 0 || sessionState.phase !== 'ready') return
+    const migrated = legacyMutesToMigrate({
+      legacy,
+      hostMutes: mutedThreads,
+      updatedAt: sessionId => sessions.find(session => session.id === sessionId)?.updatedAt,
+      now: Date.now(),
+    })
+    if (Object.keys(migrated).length > 0) updatePreferences({ mutedThreads: { ...mutedThreads, ...migrated } })
+    threadNotificationPreferences.set({ ...notificationPreferences, mutedUntil: {} })
+  }, [mutedThreads, notificationPreferences, sessionState.phase, sessions, updatePreferences])
 
   const needsInputRows = useMemo(
     () =>
@@ -1263,13 +1306,23 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
             !session.blank &&
             session.id !== selectedSession?.id &&
             kind === 'question' &&
+            !mutedSessionIds.has(session.id) &&
             !archivedSessionIds.has(session.id) &&
             (preferences.workspaceFilter === null ||
               (workspaceForLineage(session, sessionState.byId, workspaceBySession) ?? '') === preferences.workspaceFilter)
           )
         })
         .sort((left, right) => right.updatedAt - left.updatedAt),
-    [archivedSessionIds, attentionSessions, preferences.workspaceFilter, selectedSession?.id, sessionState.byId, sessionStatus, workspaceBySession],
+    [
+      archivedSessionIds,
+      attentionSessions,
+      mutedSessionIds,
+      preferences.workspaceFilter,
+      selectedSession?.id,
+      sessionState.byId,
+      sessionStatus,
+      workspaceBySession,
+    ],
   )
   const needsInputIds = useMemo(() => new Set(needsInputRows.map(session => session.id)), [needsInputRows])
   const approvalNeededRows = useMemo(
@@ -1281,13 +1334,23 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
             !session.blank &&
             session.id !== selectedSession?.id &&
             (kind === 'approval' || kind === 'plan-review') &&
+            !mutedSessionIds.has(session.id) &&
             !archivedSessionIds.has(session.id) &&
             (preferences.workspaceFilter === null ||
               (workspaceForLineage(session, sessionState.byId, workspaceBySession) ?? '') === preferences.workspaceFilter)
           )
         })
         .sort((left, right) => right.updatedAt - left.updatedAt),
-    [archivedSessionIds, attentionSessions, preferences.workspaceFilter, selectedSession?.id, sessionState.byId, sessionStatus, workspaceBySession],
+    [
+      archivedSessionIds,
+      attentionSessions,
+      mutedSessionIds,
+      preferences.workspaceFilter,
+      selectedSession?.id,
+      sessionState.byId,
+      sessionStatus,
+      workspaceBySession,
+    ],
   )
   const approvalNeededIds = useMemo(() => new Set(approvalNeededRows.map(session => session.id)), [approvalNeededRows])
   const turnFinishedRows = useMemo(
@@ -1301,6 +1364,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
             !needsInputIds.has(session.id) &&
             !approvalNeededIds.has(session.id) &&
             notificationPreferences.needsYouAt[session.id] !== undefined &&
+            !mutedSessionIds.has(session.id) &&
             !archivedSessionIds.has(session.id) &&
             (preferences.workspaceFilter === null ||
               (workspaceForLineage(session, sessionState.byId, workspaceBySession) ?? '') === preferences.workspaceFilter),
@@ -1310,6 +1374,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
       approvalNeededIds,
       archivedSessionIds,
       attentionSessions,
+      mutedSessionIds,
       needsInputIds,
       notificationPreferences.needsYouAt,
       preferences.workspaceFilter,
@@ -1338,6 +1403,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
           running: threadView.sourceFilter === 'subagents' ? entry.activity.running : currentWorkingThreadIds.has(entry.session.id),
           needsAttention: threadView.sourceFilter === 'subagents' ? attentionSessionIds.has(entry.session.id) : attentionRootIds.has(entry.session.id),
           archived: archivedSessionIds.has(entry.session.id),
+          muted: mutedSessionIds.has(entry.session.id),
         }),
       ),
     [
@@ -1345,6 +1411,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
       attentionRootIds,
       attentionSessionIds,
       currentWorkingThreadIds,
+      mutedSessionIds,
       sourceFilteredThreadEntries,
       threadView.sourceFilter,
       threadView.statusFilter,
@@ -1361,6 +1428,8 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
             running: threadView.sourceFilter === 'subagents' ? session.running : currentWorkingThreadIds.has(session.id),
             needsAttention: true,
             archived: archivedSessionIds.has(session.id),
+            // Attention rows already leave muted threads out.
+            muted: false,
           }),
       )
     }
@@ -1412,6 +1481,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
 
   const rowsBySection = useMemo(() => {
     const rows = new Map<SidebarSection, SessionSummary[]>(sections.map(section => [section, []]))
+    const activityAt = new Map(visibleThreadEntries.map(entry => [entry.session.id, entry.activity.updatedAt]))
     for (const { session, activity } of visibleThreadEntries) {
       if (threadView.groupBy === 'status' && attentionIds.has(session.id)) continue
       const section = sectionForSession({
@@ -1424,7 +1494,8 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
       })
       rows.get(section)?.push(session)
     }
-    for (const entries of rows.values()) entries.sort((left, right) => right.updatedAt - left.updatedAt)
+    for (const entries of rows.values())
+      entries.sort((left, right) => (activityAt.get(right.id) ?? right.updatedAt) - (activityAt.get(left.id) ?? left.updatedAt))
     rows.set(
       'pinned',
       rows.get('pinned')?.sort((left, right) => workspaceState.pinnedSessionIds.indexOf(left.id) - workspaceState.pinnedSessionIds.indexOf(right.id)) ?? [],
@@ -1445,7 +1516,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
     if (threadView.groupBy === 'status') return []
     return groupThreadEntries({
       groupBy: threadView.groupBy,
-      entries: visibleThreadEntries.map(entry => ({ thread: entry.session, workspaceId: entry.workspaceId })),
+      entries: visibleThreadEntries.map(entry => ({ thread: entry.session, workspaceId: entry.workspaceId, activityAt: entry.activity.updatedAt })),
       workspaceTitles: new Map(displayWorkspaces.map(workspace => [workspace.id, workspace.title])),
       unassignedTitle: props.tSidebar('threadSidebarUnassigned'),
       dateTitles: {
@@ -1637,13 +1708,26 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
       copy: (value, successMessage) => latestRowActions.current.copyContextValue(value, successMessage),
       toggleChildren: sessionId => setClosedParents(current => toggleSetMember(current, sessionId)),
       toggleAllChildren: sessionId => setExpandedParents(current => toggleSetMember(current, sessionId)),
-      setNotificationMute: (sessionId, mutedUntil) => {
-        const current = threadNotificationPreferences.get() ?? DEFAULT_THREAD_NOTIFICATION_PREFERENCES
-        threadNotificationPreferences.set(setThreadMute(current, sessionId, mutedUntil))
+      mute: (sessionId, option) => {
+        const current = latestRowActions.current
+        const threads = Object.values(current.sessionsById).filter(session => !session.blank)
+        const targetIds = threadActionTargetIds({ threadId: sessionId, threads, cascadeToChildren: current.preferences.applyActionsToChildThreads })
+        current.changePreferences({
+          mutedThreads: muteSessions({
+            mutes: current.preferences.mutedThreads,
+            sessions: threads.filter(session => targetIds.includes(session.id)),
+            until: muteUntil(option, Date.now()),
+          }),
+        })
       },
-      clearNotificationMute: sessionId => {
-        const current = threadNotificationPreferences.get() ?? DEFAULT_THREAD_NOTIFICATION_PREFERENCES
-        threadNotificationPreferences.set(clearThreadMute(current, sessionId))
+      unmute: sessionId => {
+        const current = latestRowActions.current
+        const targetIds = threadActionTargetIds({
+          threadId: sessionId,
+          threads: Object.values(current.sessionsById).filter(session => !session.blank),
+          cascadeToChildren: current.preferences.applyActionsToChildThreads,
+        })
+        current.changePreferences({ mutedThreads: unmuteSessions(current.preferences.mutedThreads, targetIds) })
       },
       markUnread: sessionId => {
         const current = threadNotificationPreferences.get() ?? DEFAULT_THREAD_NOTIFICATION_PREFERENCES
@@ -1675,6 +1759,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
                 running: child.running,
                 needsAttention: attentionSessionIds.has(child.id),
                 archived: archivedSessionIds.has(child.id),
+                muted: mutedSessionIds.has(child.id),
               }),
           )
     const selectedChildId = listedChildThreads.some(child => child.id === selectedSession?.id) ? selectedSession?.id : undefined
@@ -1701,7 +1786,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
         workspaceTitle={displayWorkspaces.find(workspace => workspace.id === workspaceId)?.title}
         machine={machine}
         age={formatAge(session.updatedAt)}
-        muted={isThreadMuted(notificationPreferences, session.id, now)}
+        mute={mutedSessionIds.has(session.id) ? mutedThreads[session.id] : undefined}
         attentionLabel={rowAttentionLabel}
         childAttentionLabels={inlineAttentionLabels}
         rowStyle={rowStyle}
@@ -1734,14 +1819,15 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
     const transitions = threadAttentionTransitions(previousStatus.current, currentStatusEntries)
     previousStatus.current = currentStatus
     const now = Date.now()
-    const stored = threadNotificationPreferences.get() ?? DEFAULT_THREAD_NOTIFICATION_PREFERENCES
-    const current = clearExpiredThreadMutes(stored, now)
+    const current = threadNotificationPreferences.get() ?? DEFAULT_THREAD_NOTIFICATION_PREFERENCES
+    const mutes = latestRowActions.current.preferences.mutedThreads
     const needsYouAt = { ...current.needsYouAt }
-    let changed = Object.keys(current.mutedUntil).length !== Object.keys(stored.mutedUntil).length
+    let changed = false
     for (const { sessionId, status } of currentStatusEntries) {
       const session = sessionState.byId[sessionId]
       if (
         !status.completionUnread ||
+        isMuteActive(mutes[sessionId], now) ||
         needsYouAt[sessionId] !== undefined ||
         session === undefined ||
         !isAttentionSessionIncluded(session, preferences.includeSubagentAttention)
@@ -1752,7 +1838,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
       changed = true
     }
     const notifyThread = (sessionId: SessionSummary['id'], title: string, fallbackBody: string): void => {
-      if (!current.enabled || isThreadMuted(current, sessionId, now) || !('Notification' in window) || window.Notification.permission !== 'granted') return
+      if (!current.enabled || isMuteActive(mutes[sessionId], now) || !('Notification' in window) || window.Notification.permission !== 'granted') return
       const session = sessionState.byId[sessionId]
       if (session === undefined || !isAttentionSessionIncluded(session, preferences.includeSubagentAttention)) return
       try {

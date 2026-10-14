@@ -1,14 +1,10 @@
 import assert from 'node:assert/strict'
 import { test } from 'vitest'
 import {
-  clearExpiredThreadMutes,
-  clearThreadMute,
   DEFAULT_THREAD_NOTIFICATION_PREFERENCES,
-  isThreadMuted,
   isThreadUnread,
   markThreadSeen,
   markThreadUnread,
-  setThreadMute,
   threadAttentionTransitions,
 } from './thread-notifications.js'
 test('structured question and completed turn have distinct transitions', () => {
@@ -64,15 +60,6 @@ test('initial status does not replay desktop attention alerts', () => {
     { approvalNeeded: [], inputNeeded: [], turnFinished: [] },
   )
 })
-test('timed snooze expires, while permanent mute lasts until cleared', () => {
-  const timed = setThreadMute(DEFAULT_THREAD_NOTIFICATION_PREFERENCES, 'timed', 100)
-  const muted = setThreadMute(timed, 'forever', null)
-  assert.equal(isThreadMuted(muted, 'timed', 99), true)
-  assert.equal(isThreadMuted(muted, 'timed', 100), false)
-  assert.equal(isThreadMuted(muted, 'forever', 1_000_000), true)
-  assert.deepEqual(clearExpiredThreadMutes(muted, 100).mutedUntil, { forever: null })
-  assert.deepEqual(clearThreadMute(muted, 'forever').mutedUntil, { timed: 100 })
-})
 test('manual unread clears when the thread is opened', () => {
   const markedUnread = markThreadUnread(DEFAULT_THREAD_NOTIFICATION_PREFERENCES, 'thread')
   assert.equal(isThreadUnread(markedUnread, 'thread'), true)
@@ -81,9 +68,8 @@ test('manual unread clears when the thread is opened', () => {
   assert.deepEqual(markThreadUnread(markedUnread, 'thread').manuallyUnreadSessionIds, ['thread'])
 })
 
-test('opening a thread clears its needs-you and manual unread markers while keeping mute settings', () => {
-  const muted = setThreadMute({ ...DEFAULT_THREAD_NOTIFICATION_PREFERENCES, needsYouAt: { thread: 123 } }, 'thread', null)
-  const markedUnread = markThreadUnread(muted, 'thread')
+test('opening a thread clears its needs-you and manual unread markers', () => {
+  const markedUnread = markThreadUnread({ ...DEFAULT_THREAD_NOTIFICATION_PREFERENCES, needsYouAt: { thread: 123 } }, 'thread')
   assert.deepEqual(markThreadSeen(markedUnread, 'thread'), {
     ...markedUnread,
     needsYouAt: {},

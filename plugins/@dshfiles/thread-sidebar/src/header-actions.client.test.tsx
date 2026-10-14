@@ -3,7 +3,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { HeaderThreadActions } from './header-actions.js'
 import { storedPreferences, PREFERENCES_STORAGE_KEY } from './preferences.js'
-import { threadNotificationPreferences, DEFAULT_THREAD_NOTIFICATION_PREFERENCES } from './thread-notifications.js'
 import { SidebarStateProvider } from './sidebar-state.js'
 
 const labels: Readonly<Record<string, string>> = {
@@ -13,16 +12,15 @@ const labels: Readonly<Record<string, string>> = {
   threadSidebarUnpark: 'Unpark',
   threadSidebarArchive: 'Archive',
   threadSidebarRestore: 'Restore',
-  threadSidebarNotifications: 'Thread notifications',
-  threadSidebarNotificationsMuted: 'Notifications muted',
-  threadSidebarSnoozeFor: 'Snooze for',
-  threadSidebarSnooze15Minutes: '15 minutes',
-  threadSidebarSnooze1Hour: '1 hour',
-  threadSidebarSnooze3Hours: '3 hours',
-  threadSidebarSnooze8Hours: '8 hours',
-  threadSidebarSnooze24Hours: '24 hours',
-  threadSidebarMuteUntilEnabled: 'Mute until enabled',
-  threadSidebarUnmute: 'Turn notifications back on',
+  threadSidebarMute: 'Mute thread',
+  threadSidebarMuted: 'Muted',
+  threadSidebarMuteFor1Hour: 'For 1 hour',
+  threadSidebarMuteFor8Hours: 'For 8 hours',
+  threadSidebarMuteFor24Hours: 'For 24 hours',
+  threadSidebarMuteUntilTomorrow: 'Until tomorrow morning',
+  threadSidebarMuteFor1Week: 'For 1 week',
+  threadSidebarMuteForever: 'Until I unmute it',
+  threadSidebarUnmute: 'Unmute',
   threadSidebarActionFailure: 'Could not update thread',
   threadSidebarThreadActions: 'Thread actions',
   threadSidebarMoreThreadActions: 'More thread actions',
@@ -101,7 +99,6 @@ const openMoreMenu = (): void => {
 beforeEach(() => {
   localStorage.clear()
   storedPreferences.remove()
-  threadNotificationPreferences.set(DEFAULT_THREAD_NOTIFICATION_PREFERENCES)
   resizeCallbacks.length = 0
   vi.stubGlobal('ResizeObserver', RecordingResizeObserver)
 })
@@ -137,12 +134,20 @@ describe('HeaderThreadActions', () => {
     expect(screen.getByRole('button', { name: 'Pin' })).toBeTruthy()
   })
 
-  it('opens the notification submenu and snoozes the current thread', () => {
+  it('snoozes the current thread until tomorrow morning, then offers Unmute', () => {
     mount()
     openMoreMenu()
-    fireEvent.keyDown(screen.getByRole('menuitem', { name: 'Thread notifications' }), { key: 'ArrowRight' })
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Snooze for 15 minutes' }))
-    expect(threadNotificationPreferences.get()?.mutedUntil.s1).toBeGreaterThan(Date.now())
+    fireEvent.keyDown(screen.getByRole('menuitem', { name: 'Mute thread' }), { key: 'ArrowRight' })
+    expect(screen.getByRole('menuitem', { name: 'Unmute' }).getAttribute('aria-disabled')).toBe('true')
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Until tomorrow morning' }))
+    const wake = new Date(storedPreferences.get()?.mutedThreads.s1?.until ?? 0)
+    expect(wake.getHours()).toBe(9)
+    expect(wake.getTime()).toBeGreaterThan(Date.now())
+    expect(storedPreferences.get()?.mutedThreads.s1?.activityAt).toBe(1)
+    openMoreMenu()
+    fireEvent.keyDown(screen.getByRole('menuitem', { name: 'Muted' }), { key: 'ArrowRight' })
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Unmute' }))
+    expect(storedPreferences.get()?.mutedThreads).toEqual({})
   })
 
   it('offers only restore for archived threads and omits controls for blank ones', () => {

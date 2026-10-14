@@ -3,7 +3,7 @@ import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/cli
 export const THREAD_GROUP_BY_OPTIONS = ['project', 'date', 'status', 'none'] as const
 export type ThreadGroupBy = (typeof THREAD_GROUP_BY_OPTIONS)[number]
 
-export const THREAD_STATUS_FILTER_OPTIONS = ['all', 'working', 'attention', 'archived'] as const
+export const THREAD_STATUS_FILTER_OPTIONS = ['all', 'working', 'attention', 'muted', 'archived'] as const
 export type ThreadStatusFilter = (typeof THREAD_STATUS_FILTER_OPTIONS)[number]
 
 export const THREAD_SOURCE_FILTER_OPTIONS = ['all', 'main', 'subagents'] as const
@@ -20,6 +20,8 @@ export interface ThreadViewPreferences {
 export interface ThreadViewEntry<Thread extends Pick<SessionSummary, 'updatedAt'>> {
   readonly thread: Thread
   readonly workspaceId: string | undefined
+  /** What the thread sorts and dates by; a muted thread keeps the time it had when muted. Defaults to `updatedAt`. */
+  readonly activityAt?: number
 }
 
 export interface ThreadViewGroup<Thread> {
@@ -40,8 +42,10 @@ export const matchesThreadStatusFilter = (options: {
   readonly running: boolean
   readonly needsAttention: boolean
   readonly archived: boolean
+  readonly muted: boolean
 }): boolean => {
   if (options.filter === 'all') return true
+  if (options.filter === 'muted') return options.muted
   if (options.filter === 'working') return options.running
   if (options.filter === 'attention') return options.needsAttention
   return options.archived
@@ -69,7 +73,7 @@ export const groupThreadEntries = <Thread extends Pick<SessionSummary, 'updatedA
   readonly dateTitles: Readonly<Record<ThreadDateGroup, string>>
   readonly now: number
 }): readonly ThreadViewGroup<Thread>[] => {
-  const groups = new Map<string, { label: string; showHeader: boolean; entries: Thread[] }>()
+  const groups = new Map<string, { label: string; showHeader: boolean; entries: { thread: Thread; activityAt: number }[] }>()
   for (const entry of options.entries) {
     let key = 'none'
     let label = ''
@@ -80,13 +84,13 @@ export const groupThreadEntries = <Thread extends Pick<SessionSummary, 'updatedA
       showHeader = true
     }
     if (options.groupBy === 'date') {
-      const dateGroup = threadDateGroup(entry.thread.updatedAt, options.now)
+      const dateGroup = threadDateGroup(entry.activityAt ?? entry.thread.updatedAt, options.now)
       key = `date:${dateGroup}`
       label = options.dateTitles[dateGroup]
       showHeader = true
     }
     const group = groups.get(key) ?? { label, showHeader, entries: [] }
-    group.entries.push(entry.thread)
+    group.entries.push({ thread: entry.thread, activityAt: entry.activityAt ?? entry.thread.updatedAt })
     groups.set(key, group)
   }
 
@@ -101,6 +105,6 @@ export const groupThreadEntries = <Thread extends Pick<SessionSummary, 'updatedA
     key,
     label: group.label,
     showHeader: group.showHeader,
-    threads: group.entries.sort((left, right) => right.updatedAt - left.updatedAt),
+    threads: group.entries.sort((left, right) => right.activityAt - left.activityAt).map(entry => entry.thread),
   }))
 }

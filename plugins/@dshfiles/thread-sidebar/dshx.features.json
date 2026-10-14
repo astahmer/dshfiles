@@ -502,6 +502,69 @@
       ]
     },
     {
+      "id": "thread-mute",
+      "title": "Mute or snooze a thread",
+      "summary": "Mute a thread for 1 h, 8 h, 24 h, until tomorrow morning (09:00), a week, or until unmuted, from its row, its context menu or the session header. A muted thread raises no desktop alert, attention group, label or unread dot and keeps its place instead of rising on new activity; a bell-off marker's tooltip gives the time left, and it wakes on its own. Mutes are Host-synced sidebar settings; the Muted filter lists them.",
+      "reach": [
+        "click button \"All threads\"",
+        "click button \"New thread\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Mute target\"",
+        "click button \"Send message\"",
+        "expect text \"This turn failed*\"",
+        "rightclick text \"Mute target\"",
+        "click menuitem \"Mute thread\"",
+        "click menuitem \"Until tomorrow morning\"",
+        "expect img \"Muted\""
+      ],
+      "surfaces": ["client", "settings", "storage"],
+      "configuration": [
+        {
+          "key": "mutedThreads",
+          "defaultValue": "{}",
+          "constraints": "Hidden; session id → { until: epoch ms or null for until unmuted, activityAt: the activity time the row keeps while muted }. Expired entries are dropped when they wake.",
+          "coveredBy": ["thread-sidebar.thread-mute"]
+        }
+      ],
+      "states": ["unmuted", "snoozed", "muted", "woken"],
+      "failureModes": [
+        "Muting silences this sidebar only: the Host still records attention, and the thread's composer still shows a pending request.",
+        "Mutes made before they were Host-synced lived in this browser; they are copied into settings once and cleared locally.",
+        "A muted thread that keeps running still shows as working; only its ordering and attention are frozen."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "thread-sidebar.thread-mute",
+          "featureFile": "tooling/dshx/e2e/features/thread-sidebar.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.thread-mute-unit-options",
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-mute.test.ts",
+          "testName": "each mute option wakes at its own time, and forever never does"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.thread-mute-unit-wake",
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-mute.test.ts",
+          "testName": "a snooze wakes on its own while a mute lasts until unmuted"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.thread-mute-unit-frozen-order",
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-mute.test.ts",
+          "testName": "a muted thread keeps the activity time it had when muted, and gets it back on waking"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.thread-mute-unit-migration",
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-mute.test.ts",
+          "testName": "browser-only mutes migrate once, skipping expired ones and threads the Host already mutes"
+        }
+      ]
+    },
+    {
       "id": "manual-unread",
       "title": "Keep selected threads manually unread",
       "summary": "Mark a thread unread from the sidebar and clear that marker when the thread is opened.",
@@ -537,7 +600,7 @@
           "kind": "unit-test",
           "id": "thread-sidebar.manual-unread-unit-seen-clears-local-marker",
           "file": "plugins/@dshfiles/thread-sidebar/src/thread-notifications.test.ts",
-          "testName": "opening a thread clears its needs-you and manual unread markers while keeping mute settings"
+          "testName": "opening a thread clears its needs-you and manual unread markers"
         }
       ]
     },
@@ -848,7 +911,7 @@
     {
       "id": "session-header-actions",
       "title": "Manage threads from the session header",
-      "summary": "Keep Pin as an icon button in the conversation header and put park, snooze, archive, and restore in a More menu; Pin folds into the menu when the header is too narrow. Child-thread action preferences apply.",
+      "summary": "Keep Pin as an icon button in the conversation header and put park, mute or snooze, archive, and restore in a More menu; Pin folds into the menu when the header is too narrow. Child-thread action preferences apply.",
       "reach": [
         "click button \"New thread\"",
         "click button \"Choose workspace\"",
@@ -893,7 +956,7 @@
           "kind": "unit-test",
           "id": "thread-sidebar.session-header-actions-unit-snooze",
           "file": "plugins/@dshfiles/thread-sidebar/src/header-actions.client.test.tsx",
-          "testName": "opens the notification submenu and snoozes the current thread"
+          "testName": "snoozes the current thread until tomorrow morning, then offers Unmute"
         },
         {
           "kind": "unit-test",
