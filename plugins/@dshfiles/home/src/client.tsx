@@ -92,8 +92,8 @@ const HomeStrip = (props: {
       .slice(0, RECENT_THREADS)
       .join(',')
   })
-  const unlanded = useQuery({
-    queryKey: ['home', 'unlanded', project?.path ?? ''],
+  const rebaseWork = useQuery({
+    queryKey: ['home', 'rebase-work', project?.path ?? '']
     enabled: blank && settings.showUnlandedWork && project !== undefined,
     // Reading every thread workspace is the costliest jj call on this screen; each New thread remounts it, and a
     // fresh read per mount competed with creating the thread's own workspace.
@@ -110,8 +110,8 @@ const HomeStrip = (props: {
   const recent = sessions.ids
     .filter(id => recentIds.has(id))
     .sort((left, right) => (sessions.byId[right]?.updatedAt ?? 0) - (sessions.byId[left]?.updatedAt ?? 0))
-  const toLand = unlanded.data ?? 0
-  if (recent.length === 0 && toLand === 0) return null
+  const threadsToRebase = rebaseWork.data ?? 0
+  if (recent.length === 0 && threadsToRebase === 0) return null
   return (
     <div className="dshx-root dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-1.5 dshx:pb-2 dshx:text-xs dshx:text-muted-foreground" style={{ order: 1 }}>
       {recent.length > 0 ? <span>{props.t('resume')}</span> : null}
@@ -120,7 +120,7 @@ const HomeStrip = (props: {
           <span className="dshx:truncate">{sessions.byId[id]?.displayTitle}</span>
         </Button>
       ))}
-      {toLand > 0 ? (
+      {threadsToRebase > 0 ? (
         <Button
           size="sm"
           variant="link"
@@ -128,7 +128,7 @@ const HomeStrip = (props: {
           title={props.t('openThreadWorkspaces')}
           onClick={props.openThreadWorkspaces}
         >
-          {props.t(toLand === 1 ? 'unlandedOne' : 'unlandedOther', { count: toLand })}
+          {props.t(threadsToRebase === 1 ? 'rebaseWorkOne' : 'rebaseWorkOther', { count: threadsToRebase })}
           <ArrowRightIcon aria-hidden />
         </Button>
       ) : null}
