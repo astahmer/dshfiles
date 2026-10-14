@@ -18,6 +18,7 @@ import { Fragment, useEffect, useRef, useState } from 'react'
 import { CatalogBrowser, SignInNotice, type CustomServerRequest } from './catalog-browser.js'
 import type { ServerDraft, ServerView } from './api.js'
 import type { McpServersTranslate } from './locales.js'
+import { PreferencesForm } from './preferences-form.js'
 import { ServerEditor, ServerEditorDialog } from './server-editor.js'
 import { blankServerForm, serverFormFromView, type ServerFormValues } from './server-form.js'
 import { useServerActions, useServerSnapshot } from './server-queries.js'
@@ -130,6 +131,8 @@ export const ManagerView = ({ t }: { readonly t: McpServersTranslate }): JSX.Ele
             )}
           </div>
         </section>
+
+        {snapshot.data === undefined ? null : <PreferencesForm preferences={snapshot.data.preferences} t={t} />}
       </div>
 
       <CatalogBrowser

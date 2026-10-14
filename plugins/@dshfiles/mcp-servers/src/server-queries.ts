@@ -1,7 +1,7 @@
 import { useApi } from '@dshfiles/dshx/client'
 import { useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useState } from 'react'
-import { decodeSnapshot, mcpServersApi, type ManagerSnapshot, type ServerDraft, type ServerView } from './api.js'
+import { decodeSnapshot, mcpServersApi, type ManagerPreferences, type ManagerSnapshot, type ServerDraft, type ServerView } from './api.js'
 import { isClientActive } from './server-status.js'
 
 const snapshotQueryKey = ['mcp-servers', 'snapshot'] as const
@@ -114,6 +114,18 @@ export const useServerActions = () => {
       remove.mutate(input.server, { onSettled: input.onSettled })
     },
   }
+}
+
+/** Saves the manager preferences; the answer is the full snapshot, like every other mutation. */
+export const useSavePreferences = () => {
+  const api = useApi(mcpServersApi)
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (preferences: ManagerPreferences) => api.setPreferences({ preferences }),
+    onSuccess: (snapshot: ManagerSnapshot) => {
+      queryClient.setQueryData(snapshotQueryKey, snapshot)
+    },
+  })
 }
 
 export const useRegistrySearch = (query: string, enabled: boolean) => {

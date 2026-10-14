@@ -167,11 +167,28 @@ export const registryEntrySchema = z.object({
   docsUrl: z.string().url().nullable(),
 })
 
+/** The four manager preferences, stored beside the server list in the Loader row; each field falls back on its own. */
+export const preferencesSchema = z.object({
+  connectOnStartup: z.boolean().catch(true),
+  toolCallTimeoutSeconds: z.number().int().min(5).max(600).catch(30),
+  registrySearch: z.boolean().catch(true),
+  oauthClientName: z.string().trim().min(1).max(120).catch('DSH MCP servers'),
+})
+
+/** What a save must satisfy: unlike stored values, an invalid field is refused instead of reset. */
+export const preferencesInputSchema = z.object({
+  connectOnStartup: z.boolean(),
+  toolCallTimeoutSeconds: z.number().int().min(5).max(600),
+  registrySearch: z.boolean(),
+  oauthClientName: z.string().trim().min(1).max(120),
+})
+
 export const snapshotSchema = z.object({
   servers: z.array(serverViewSchema),
   providers: z.array(providerSchema),
   connectionHealth: z.literal('not-reported'),
   registrySearch: z.boolean(),
+  preferences: preferencesInputSchema,
 })
 
 /**
@@ -184,6 +201,7 @@ const compatibleSnapshotSchema = z.object({
   providers: z.array(providerSchema).catch(() => [...PROVIDERS]),
   connectionHealth: z.literal('not-reported').catch('not-reported'),
   registrySearch: z.boolean().catch(true),
+  preferences: preferencesSchema.catch(() => preferencesSchema.parse({})),
 })
 
 export const decodeSnapshot = (raw: unknown): ManagerSnapshot => compatibleSnapshotSchema.parse(raw ?? {})
@@ -193,6 +211,7 @@ export type ServerDraft = z.infer<typeof serverDraftSchema>
 export type ServerView = z.infer<typeof serverViewSchema>
 export type RegistryEntry = z.infer<typeof registryEntrySchema>
 export type ManagerSnapshot = z.infer<typeof snapshotSchema>
+export type ManagerPreferences = z.infer<typeof preferencesInputSchema>
 
 export const mcpServersApi = defineApi({
   id: 'mcp-servers',
@@ -209,6 +228,7 @@ export const mcpServersApi = defineApi({
       output: z.object({ authorizationUrl: z.string().url() }),
     }),
     signOut: method({ input: z.object({ id: z.string().min(1).max(80) }), output: snapshotSchema }),
+    setPreferences: method({ input: z.object({ preferences: preferencesInputSchema }), output: snapshotSchema }),
     searchRegistry: method({ input: z.object({ query: z.string().trim().min(1).max(80) }), output: z.array(registryEntrySchema).max(20) }),
   },
 })

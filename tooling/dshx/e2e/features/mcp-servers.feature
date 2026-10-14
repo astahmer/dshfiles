@@ -23,3 +23,11 @@ Feature: MCP servers
     When the Echo server is "Disable"
     Then the Echo server reads "Disabled in configuration"
     And removing the Echo server after confirmation empties the list
+
+  @scenario:mcp-servers.preferences
+  Scenario: Manager preferences are saved and applied
+    Given the isolated plugin profile "@dshfiles/mcp-servers" is booted
+    When the MCP servers page is opened
+    And public Registry search is turned off and the tool call timeout set to 45 seconds
+    Then the preferences survive a reload
+    And the catalog no longer searches the public Registry

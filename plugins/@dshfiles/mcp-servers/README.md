@@ -92,9 +92,12 @@ The composer **+** menu (and `/mcp-servers`) opens the quick panel through
 `ctx.commandUi.register()`; **Manage** selects this sidebar page through
 `ctx.layout.selectPanel`.
 
-The Host `Config` is a Schemastery object whose `servers` list stays hidden and
-whose live fields render on the DSH Settings page: connect on startup, tool
-call timeout, public Registry search, and the OAuth client name.
+**Preferences** at the foot of the page set connect on startup, the tool call
+timeout, public Registry search and the OAuth client name. They are stored in
+this bundle's Loader row beside `servers` and read on every use, so a save
+applies without a restart (a changed timeout reconnects the clients; connect on
+startup applies at the next start). They are not on the DSH Settings page:
+dshx refuses a Host entry with both a native `Config` and a Settings namespace.
 
 ## Adoption audit
 

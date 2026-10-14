@@ -48,26 +48,26 @@
           "defaultValue": "true",
           "constraints": "Declared preference is currently not user-writable; Host uses the hard-coded parsed default.",
           "choices": ["true", "false"],
-          "coveredBy": ["mcp-servers.settings-boundary"]
+          "coveredBy": ["mcp-servers.preferences"]
         },
         {
           "key": "toolCallTimeoutSeconds",
           "defaultValue": "30",
           "constraints": "Declared integer preference 5 to 600 seconds; currently not user-writable.",
-          "coveredBy": ["mcp-servers.settings-boundary"]
+          "coveredBy": ["mcp-servers.preferences"]
         },
         {
           "key": "registrySearch",
           "defaultValue": "true",
           "constraints": "Declared boolean preference currently not user-writable.",
           "choices": ["true", "false"],
-          "coveredBy": ["mcp-servers.settings-boundary"]
+          "coveredBy": ["mcp-servers.preferences"]
         },
         {
           "key": "oauthClientName",
           "defaultValue": "DSH MCP servers",
           "constraints": "Declared trimmed text from 1 to 120 characters; currently not user-writable.",
-          "coveredBy": ["mcp-servers.settings-boundary"]
+          "coveredBy": ["mcp-servers.preferences"]
         }
       ],
       "states": ["configured", "enabled", "connected", "disconnected", "failed", "health-unreported"],
@@ -94,9 +94,9 @@
           "featureFile": "tooling/dshx/e2e/features/mcp-servers.feature"
         },
         {
-          "kind": "not-applicable",
-          "id": "mcp-servers.settings-boundary",
-          "reason": "connectOnStartup, toolCallTimeoutSeconds, registrySearch and oauthClientName cannot be set from any surface yet: host.ts settingsFor() returns the schema defaults because dshx refuses a Host with both a native Config and a Settings namespace, so no journey can change them until the Host entry is split."
+          "kind": "gherkin",
+          "id": "mcp-servers.preferences",
+          "featureFile": "tooling/dshx/e2e/features/mcp-servers.feature"
         }
       ]
     },

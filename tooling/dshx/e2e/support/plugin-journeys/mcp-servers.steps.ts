@@ -67,3 +67,33 @@ Then('removing the Echo server after confirmation empties the list', async ({ pa
   await recordAssertion(page, 'mcp-servers-remove-drops-the-server', () => expect(servers(page).getByText('No MCP servers configured yet.', { exact: true })).toBeVisible())
   await finishJourneyAssertions(page)
 })
+
+const preferences = (page: Page) => page.getByRole('region', { name: 'Preferences', exact: true })
+
+When('public Registry search is turned off and the tool call timeout set to 45 seconds', async ({ page }: { page: Page }) => {
+  const registrySearch = preferences(page).getByRole('switch', { name: 'Search the public MCP Registry', exact: true })
+  await expect(registrySearch).toBeChecked()
+  await registrySearch.click()
+  await preferences(page).getByRole('spinbutton', { name: 'Tool call timeout (seconds)' }).fill('45')
+  await preferences(page).getByRole('button', { name: 'Save preferences', exact: true }).click()
+  await expect(preferences(page).getByRole('status').filter({ hasText: 'Preferences saved.' })).toBeVisible()
+})
+
+Then('the preferences survive a reload', async ({ page }: { page: Page }) => {
+  await page.reload()
+  await page.getByRole('navigation', { name: 'Global panels', exact: true }).getByRole('button', { name: 'MCP servers', exact: true }).click()
+  await recordAssertion(page, 'mcp-servers-preferences-persist-in-the-profile', async () => {
+    await expect(preferences(page).getByRole('switch', { name: 'Search the public MCP Registry', exact: true })).not.toBeChecked()
+    await expect(preferences(page).getByRole('spinbutton', { name: 'Tool call timeout (seconds)' })).toHaveValue('45')
+    await expect(preferences(page).getByRole('switch', { name: 'Connect servers when DSH starts', exact: true })).toBeChecked()
+  })
+})
+
+Then('the catalog no longer searches the public Registry', async ({ page }: { page: Page }) => {
+  await page.getByRole('button', { name: 'Browse MCPs', exact: true }).click()
+  await page.getByRole('textbox', { name: 'Search providers and Registry…', exact: true }).fill('postgres')
+  await recordAssertion(page, 'mcp-servers-registry-search-follows-the-preference', () =>
+    expect(page.getByText('Public Registry search is turned off in Preferences.', { exact: true })).toBeVisible(),
+  )
+  await finishJourneyAssertions(page)
+})
