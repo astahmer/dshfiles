@@ -51,7 +51,18 @@ export default defineClient({
   // so the compiler cannot infer them. Declaring only slots lets the plugin
   // activate and then throw inside the slot, which blanks the sidebar instead of
   // failing the boot.
-  inject: ['slots', 'shortcuts', 'layout', 'uiWorkspace', 'workspaces', 'sessions', 'conversation', 'remote', 'remote.sessionReferenceResolver'],
+  inject: [
+    'slots',
+    'shortcuts',
+    'layout',
+    'uiWorkspace',
+    'workspaces',
+    'sessions',
+    'conversation',
+    'remote',
+    'remote.workspace',
+    'remote.sessionReferenceResolver',
+  ],
   // Every registered component reads Settings, so each one goes through decorate.
   setup(ctx, decorate) {
     const panels = createSnapshotStore<readonly SidebarPanelMetadata[]>([])

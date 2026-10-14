@@ -104,6 +104,11 @@
         },
         {
           "kind": "gherkin",
+          "id": "thread-sidebar.row-pin",
+          "featureFile": "tooling/dshx/e2e/features/thread-sidebar.feature"
+        },
+        {
+          "kind": "gherkin",
           "id": "thread-sidebar.park-context-menu",
           "featureFile": "tooling/dshx/e2e/features/thread-sidebar.feature"
         },

@@ -272,6 +272,23 @@ When('a nonblank Host thread is pinned from its session header', async ({ page }
   await expect(page.getByRole('alert').filter({ hasText: 'could not update' })).toHaveCount(0)
 })
 
+When('a nonblank Host thread is pinned from its sidebar row', async ({ page }: { page: Page }) => {
+  if (currentThreadId(page) === null) await startBlankThread(page)
+  const composer = page.getByRole('textbox').first()
+  await composer.fill('thread sidebar row pin e2e target')
+  await composer.press('Enter')
+  const threadId = currentThreadId(page)
+  if (threadId === null) throw new Error('The Host did not keep the selected thread after its first message.')
+  pinnedThreadId = threadId
+  const targetRow = threadRow(page, threadId)
+  await expect(targetRow).toHaveCount(1)
+  await targetRow.hover()
+  await targetRow.getByRole('button', { name: 'Pin', exact: true }).click()
+  await expect(threadSidebar(page).getByRole('button', { name: 'Pinned (1)', exact: true })).toBeVisible()
+  await expect(targetRow.getByRole('button', { name: 'Unpin', exact: true })).toHaveCount(1)
+  await expect(threadSidebar(page).getByText('could not update', { exact: false })).toHaveCount(0)
+})
+
 Then('the thread stays pinned after reload', async ({ page }: { page: Page }) => {
   if (pinnedThreadId === null) throw new Error('No thread was pinned.')
   const targetRow = threadRow(page, pinnedThreadId)

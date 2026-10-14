@@ -34,6 +34,12 @@ Feature: Thread sidebar journeys
     When a nonblank Host thread is pinned from its session header
     Then the thread stays pinned after reload
 
+  @scenario:thread-sidebar.row-pin
+  Scenario: Pin a thread from its sidebar row
+    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
+    When a nonblank Host thread is pinned from its sidebar row
+    Then the thread stays pinned after reload
+
   @scenario:thread-sidebar.view-controls
   Scenario: Thread grouping and filters affect rows and survive reload
     Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
