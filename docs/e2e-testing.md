@@ -116,11 +116,15 @@ builds every bundle once, then runs the journeys headless on one worker
 (`DSHX_E2E_PREBUILT=1` stops each scenario from rebuilding the bundles it boots)
 and ends with a summary: totals, wall time, one line per failure and the
 slowest feature files. A filter is a feature-file name such as `thread-sidebar`.
-`pnpm check` does not run journeys; landing a plugin change needs
-`pnpm check:e2e <plugin>` green. A fresh clone gets the pinned
+`pnpm check` ends with `pnpm check:e2e:smoke`: the same command filtered to
+scenarios tagged `@smoke`, about ten journeys spanning boot, the shared
+stylesheet and the most used plugins, so the harness and its shared steps cannot
+rot unnoticed. Keep the subset under four minutes; tag a scenario `@smoke` only
+when it covers a surface no other smoke scenario does. Smoke is a tripwire, not
+coverage: landing a plugin change still needs `pnpm check:e2e <plugin>` green. A fresh clone gets the pinned
 Chromium from `pnpm install:all` (`setup:browser`).
 
-In CI, `check.yml` runs `pnpm check`, which includes `features:check` and the
-web-profile boot. `plugin-e2e-coverage.yml` runs the inventory and catalog
-tests, the report and `bddgen` listing; it does not execute the journeys yet
-(see [plans/plugin-e2e-coverage.md](../plans/plugin-e2e-coverage.md)).
+In CI, `check.yml` runs `pnpm check`, which includes `features:check`, the
+web-profile boot and the `@smoke` journeys. `plugin-e2e-coverage.yml` runs the
+inventory and catalog tests, the report and `bddgen` listing; it does not
+execute the full journeys yet (see [plans/plugin-e2e-coverage.md](../plans/plugin-e2e-coverage.md)).

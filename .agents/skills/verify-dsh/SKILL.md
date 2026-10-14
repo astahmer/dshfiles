@@ -82,8 +82,9 @@ pgrep -fl 'dshx-boot-profile|browser-host.js' || echo clean
 
 ## Journeys
 
-`dshx dev` walks one feature; the Gherkin journeys walk them all. Landing a
-plugin change needs its journeys green:
+`dshx dev` walks one feature; the Gherkin journeys walk them all. `pnpm check`
+runs only the `@smoke` subset (`pnpm check:e2e:smoke`); landing a plugin change
+needs its full journeys green:
 
 ```sh
 pnpm check:e2e <plugin>   # its feature files, headless, serial; no filter = whole suite

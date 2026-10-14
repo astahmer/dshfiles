@@ -234,8 +234,9 @@ rule exceeding its cap in `scripts/lint-ratchet.json`, fails; lower a cap when
 you fix sites, never raise it.
 `pnpm run check:diff` lints and format-checks only the paths your revision
 touches, and `pnpm run check:green` runs everything except lint/format.
-`pnpm check` runs no browser journey: before landing a plugin change, run
-`pnpm check:e2e <plugin>` (its feature files, headless, serial) green.
+`pnpm check` ends with `check:e2e:smoke`, the `@smoke` journeys only; before
+landing a plugin change, also run `pnpm check:e2e <plugin>` (its feature files,
+headless, serial) green.
 
 ### Rebuilt plugins reach the browser over HMR
 

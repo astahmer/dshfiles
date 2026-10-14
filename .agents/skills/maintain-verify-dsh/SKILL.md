@@ -47,7 +47,9 @@ If none applies, stop: **Clean**.
    ```
    A `reach` not walked green in this session stays unverified; say so.
    Then `pnpm check:e2e <plugin>` for each touched plugin: its journeys must be
-   green before landing (`pnpm check` runs none).
+   green before landing (`pnpm check` runs only the `@smoke` subset). A shared
+   step (`steps.ts`, a boot or navigation helper) can break plugins it does not
+   name: also run `pnpm check:e2e:smoke`.
 5. **Triage each failure** (look at the failure screenshot, `shot` summary or
    the journey's `test-results/*/error-context.md`):
    - **Doc drift** (a name or step changed, the feature works by hand): fix
