@@ -14,19 +14,20 @@ import { ArrangeableAccount, useUsageLayout } from './usage-arrangement.js'
 import { useAccountsUsage } from './use-accounts-usage.js'
 import { usePreferences, type MeterLabel, type UsageWindowLayout } from './use-preferences.js'
 import { UsageOverview, useNow } from './usage-overview.js'
-import { formatResetShort, isExhausted, meterLines, mostCritical, stripItems, type QuotaSummaryItem } from './usage-overview-model.js'
+import { formatResetShort, isExhausted, meterLines, mostCritical, stripItems, stripShortName, type QuotaSummaryItem } from './usage-overview-model.js'
 
 const RESET_UNIT = { now: 'now', minutes: 'min', hours: 'h', days: 'd', months: 'mo', years: 'y' } as const
 
-/** Each account's picker tag from the accounts file; an account without one keeps its initials. */
+/** Each account's strip short name: its override in settings, then its picker tag, then its initials. */
 const useShortNames = (): ((item: QuotaSummaryItem) => QuotaSummaryItem) => {
   const accounts = useApi(aiAccountsApi)
+  const { usageShortNameOverrides } = usePreferences()
   const file = useQuery({ ...aiAccountsQueries.file(accounts), retry: false })
-  const tags = new Map((file.data?.accounts ?? []).map(account => [account.instanceId, account.badge.trim()]))
-  return item => {
-    const tag = tags.get(item.instanceId) ?? ''
-    return tag === '' ? item : { ...item, shortName: tag }
-  }
+  const tags = new Map((file.data?.accounts ?? []).map(account => [account.instanceId, account.badge]))
+  return item => ({
+    ...item,
+    shortName: stripShortName({ displayName: item.displayName, tag: tags.get(item.instanceId) ?? '', override: usageShortNameOverrides[item.instanceId] }),
+  })
 }
 
 /** Name, every quota window and the soonest reset of one strip account. */
@@ -74,6 +75,7 @@ const SummaryItem = (props: {
   readonly now: number
   readonly label: MeterLabel
   readonly windowLayout?: UsageWindowLayout
+  readonly showShortName: boolean
 }): JSX.Element => {
   const lines = meterLines(props.item, props.now, props.label)
   const tone = props.item.exhausted ? 'critical' : quotaTone(props.item.percentRemaining)
@@ -88,7 +90,7 @@ const SummaryItem = (props: {
       )}
     >
       <ProviderGlyph className="dshx:size-3.5" kind={props.item.kind} />
-      {props.item.exhausted && windowLayout === 'binding' ? null : (
+      {!props.showShortName || (props.item.exhausted && windowLayout === 'binding') ? null : (
         <span className="dshx:text-[10px] dshx:font-semibold dshx:tracking-wide dshx:text-foreground">{props.item.shortName}</span>
       )}
       {windowLayout === 'binding' ? (
@@ -174,7 +176,7 @@ const UsagePopoverContent = (props: {
  * actions above Settings, so there it renders in place.
  */
 export const QuotaStrip = (props: { readonly onOpenUsageHistory: () => void }): JSX.Element | null => {
-  const { footerButton, meterLabel, usageWindowLayout } = usePreferences()
+  const { footerButton, meterLabel, usageWindowLayout, usageShortNames } = usePreferences()
   const arrangement = useUsageLayout()
   const [open, setOpen] = useState(false)
   const { usage } = useAccountsUsage({ enabled: footerButton })
@@ -206,6 +208,7 @@ export const QuotaStrip = (props: { readonly onOpenUsageHistory: () => void }): 
               items.map(item => (
                 <ArrangeableAccount
                   arrangement={arrangement}
+                  shortNames={usageShortNames}
                   direction="row"
                   id={item.instanceId}
                   key={item.instanceId}
@@ -225,7 +228,7 @@ export const QuotaStrip = (props: { readonly onOpenUsageHistory: () => void }): 
                         onClick={() => setOpen(current => !current)}
                         type="button"
                       >
-                        <SummaryItem item={item} label={meterLabel} now={now} windowLayout={usageWindowLayout} />
+                        <SummaryItem item={item} label={meterLabel} now={now} showShortName={usageShortNames} windowLayout={usageWindowLayout} />
                       </button>
                     </TooltipTrigger>
                     {open ? null : (
@@ -247,7 +250,7 @@ export const QuotaStrip = (props: { readonly onOpenUsageHistory: () => void }): 
 
 /** Collapsed rail: one button with the most critical account, opening the usage popover. */
 const QuotaRailButton = (props: { readonly onOpenUsageHistory: () => void }): JSX.Element => {
-  const { meterLabel } = usePreferences()
+  const { meterLabel, usageShortNames } = usePreferences()
   const arrangement = useUsageLayout()
   const [open, setOpen] = useState(false)
   const { usage } = useAccountsUsage()
@@ -265,7 +268,11 @@ const QuotaRailButton = (props: { readonly onOpenUsageHistory: () => void }): JS
           title={items.map(item => describeItem(item, now)).join('\n') || label}
           type="button"
         >
-          {critical === undefined ? <ChartColumnIcon className="dshx:size-4 dshx:shrink-0" /> : <SummaryItem item={critical} label={meterLabel} now={now} />}
+          {critical === undefined ? (
+            <ChartColumnIcon className="dshx:size-4 dshx:shrink-0" />
+          ) : (
+            <SummaryItem item={critical} label={meterLabel} now={now} showShortName={usageShortNames} />
+          )}
         </button>
       </PopoverTrigger>
       <UsagePopoverContent close={() => setOpen(false)} onOpenUsageHistory={props.onOpenUsageHistory} />

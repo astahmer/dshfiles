@@ -93,7 +93,11 @@ accounts grow. By default, each shows the account's governing window; Settings
 vertically. The collapsed rail always shows one button with the most critical
 account. A spent limit draws as a red "Limit reached" pill. Settings › AI
 Accounts › Meter shows picks percent left, time to reset, or both (the default)
-for the strip and the rail button. Clicking a meter
+for the strip and the rail button. Each strip meter carries the account's
+short name: the one set beside the account in Settings › AI Accounts (up to six
+characters), else its picker tag, else its initials. Settings › AI Accounts ›
+Short names in the strip, or the strip's right-click menu (Hide/Show short
+names), turns them off. Clicking a meter
 opens the popover, which filters by provider and lists one card per enabled
 account with quota, each showing its machine, session, weekly and monthly bars,
 reset times and snapshot age; accounts with a spent window carry a "Limit

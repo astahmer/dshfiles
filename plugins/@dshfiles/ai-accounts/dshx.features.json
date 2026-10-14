@@ -199,6 +199,50 @@
       ]
     },
     {
+      "id": "strip-short-names",
+      "title": "Short names in the sidebar usage strip",
+      "summary": "Show or hide the tag beside each meter in the wide usage strip (Settings switch or the strip's context menu), and set each account's strip short name in AI Accounts settings; an account without one uses its picker tag, then its initials.",
+      "reach": ["click button \"Settings\"", "click text \"AI Accounts\"", "expect switch \"Short names in the strip\""],
+      "surfaces": ["client", "settings"],
+      "configuration": [
+        {
+          "key": "usageShortNames",
+          "defaultValue": "true",
+          "constraints": "Boolean; show each account's short name in the wide strip.",
+          "choices": ["true", "false"],
+          "coveredBy": ["ai-accounts.strip-short-names"]
+        },
+        {
+          "key": "usageShortNameOverrides",
+          "defaultValue": "{}",
+          "constraints": "Account id → strip short name, at most 6 characters; empty falls back to the picker tag, then the initials.",
+          "coveredBy": ["ai-accounts.strip-short-names"]
+        }
+      ],
+      "states": ["shown", "hidden", "overridden", "fallback-tag", "fallback-initials"],
+      "failureModes": ["A spent account's binding meter still names the account in its 'limit reached' text when short names are hidden."],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "ai-accounts.strip-short-names",
+          "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.strip-short-names-unit-fallback",
+          "file": "plugins/@dshfiles/ai-accounts/src/usage-overview-model.test.ts",
+          "testName": "prefers the strip override, then the picker tag, then the initials"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.strip-short-names-unit-length",
+          "file": "plugins/@dshfiles/ai-accounts/src/usage-overview-model.test.ts",
+          "testName": "cuts an override to six characters so one account cannot widen the strip"
+        }
+      ]
+    },
+    {
       "id": "usage-history-and-pricing",
       "title": "Review usage history and cost forecasts",
       "summary": "Store bounded successful usage snapshots, chart historical and forecast usage, and apply explicit price overrides without persisting provider response payloads.",

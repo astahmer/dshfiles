@@ -65,6 +65,13 @@ Feature: AI Accounts
     When a second Command Code account whose billing read fails is added
     Then the failed account reports the provider error instead of a quota
 
+  @scenario:ai-accounts.strip-short-names
+  Scenario: Rename an account's short name in the usage strip and hide short names
+    Given the isolated plugin profile "@dshfiles/ai-accounts" is booted
+    When a Command Code account backed by a local fake provider is added
+    Then the usage strip shows its short name, renamed from AI Accounts settings
+    And the strip's context menu hides and shows short names
+
   @scenario:ai-accounts.pool-failover
   Scenario: A rate-limited account hands the turn to a healthy one
     Given the isolated plugin profile "@dshfiles/ai-accounts" is booted

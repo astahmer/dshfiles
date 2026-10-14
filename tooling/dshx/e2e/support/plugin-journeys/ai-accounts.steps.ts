@@ -250,6 +250,31 @@ Then('the failed account reports the provider error instead of a quota', async (
   await finishJourneyAssertions(page)
 })
 
+const stripMeter = (page: Page) =>
+  page.getByRole('group', { name: /^AI accounts usage/ }).getByRole('button', { name: /^Command Code 1: Weekly limit/ })
+
+Then('the usage strip shows its short name, renamed from AI Accounts settings', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'ai-accounts-strip-shows-initials-by-default', () => expect(stripMeter(page)).toContainText('CC'))
+  await page.getByRole('button', { name: 'Settings', exact: true }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'AI Accounts', exact: true }).click()
+  await expect(page.getByRole('switch', { name: 'Short names in the strip', exact: true })).toBeChecked()
+  const shortName = page.getByRole('textbox', { name: 'Short name for Command Code 1', exact: true })
+  await shortName.fill('WRK')
+  await shortName.press('Enter')
+  await page.keyboard.press('Escape')
+  await recordAssertion(page, 'ai-accounts-strip-uses-the-configured-short-name', () => expect(stripMeter(page)).toContainText('WRK'))
+})
+
+Then("the strip's context menu hides and shows short names", async ({ page }: { page: Page }) => {
+  await stripMeter(page).click({ button: 'right' })
+  await page.getByRole('menuitem', { name: 'Hide short names', exact: true }).click()
+  await recordAssertion(page, 'ai-accounts-strip-hides-short-names', () => expect(stripMeter(page)).not.toContainText('WRK'))
+  await stripMeter(page).click({ button: 'right' })
+  await page.getByRole('menuitem', { name: 'Show short names', exact: true }).click()
+  await recordAssertion(page, 'ai-accounts-strip-shows-short-names-again', () => expect(stripMeter(page)).toContainText('WRK'))
+  await finishJourneyAssertions(page)
+})
+
 When('a rate-limited and a healthy Command Code account share a local fake provider', async ({ page }: { page: Page }) => {
   await startFakeCommandCode(page)
   await openAccountsPanel(page)

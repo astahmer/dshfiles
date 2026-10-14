@@ -43,6 +43,10 @@ export const aiAccountsSettings = defineSettings({
     usageOrder: Schema.array(Schema.string()).default([]),
     /** Account ids the usage strip and popover leave out. */
     hiddenUsageAccounts: Schema.array(Schema.string()).default([]),
+    /** Show each account's short name beside its meter in the sidebar usage strip. */
+    usageShortNames: Schema.boolean().default(true),
+    /** Account id → short name for the usage strip; an account without one uses its picker tag, then its initials. */
+    usageShortNameOverrides: Schema.dict(Schema.string()).default({}),
     /** The draggable usage tab pinned to a window edge. */
     edgeWidget: Schema.boolean().default(true),
     /** Show the accounts block on Settings › Models. */

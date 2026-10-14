@@ -101,6 +101,12 @@ export interface QuotaSummaryItem {
   readonly windows?: readonly UsageWindow[]
 }
 
+export const SHORT_NAME_MAX_LENGTH = 6
+
+/** The name the usage strip shows beside an account's meter: its strip override, then its picker tag, then its initials. */
+export const stripShortName = (input: { readonly displayName: string; readonly tag: string; readonly override: string | undefined }): string =>
+  (input.override ?? '').trim().slice(0, SHORT_NAME_MAX_LENGTH) || input.tag.trim() || badgeFromName(input.displayName)
+
 const resetOrder = (resetsAt: number | null): number => resetsAt ?? Number.POSITIVE_INFINITY
 
 /**

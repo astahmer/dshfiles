@@ -13,6 +13,7 @@ import {
   overviewProviders,
   overviewSections,
   stripItems,
+  stripShortName,
 } from './usage-overview-model.js'
 
 const usage: AccountsUsage = {
@@ -231,5 +232,17 @@ describe('usage cache', () => {
     expect(await cache.get()).toBe(3)
     cache.invalidate()
     expect(await cache.get()).toBe(4)
+  })
+})
+
+describe('strip short names', () => {
+  it('prefers the strip override, then the picker tag, then the initials', () => {
+    expect(stripShortName({ displayName: 'Claude Max', tag: 'CM', override: ' work ' })).toBe('work')
+    expect(stripShortName({ displayName: 'Claude Max', tag: 'CM', override: '  ' })).toBe('CM')
+    expect(stripShortName({ displayName: 'Claude Max', tag: '', override: undefined })).toBe('CM')
+  })
+
+  it('cuts an override to six characters so one account cannot widen the strip', () => {
+    expect(stripShortName({ displayName: 'Codex', tag: '', override: 'personal-account' })).toBe('person')
   })
 })

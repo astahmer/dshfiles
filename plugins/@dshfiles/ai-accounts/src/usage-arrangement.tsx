@@ -1,5 +1,5 @@
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from '@dshfiles/plugin-ui/components/ui/context-menu'
-import { ArrowDownIcon, ArrowLeftIcon, ArrowRightIcon, ArrowUpIcon, EyeIcon, EyeOffIcon } from '@dshfiles/plugin-ui/icons'
+import { ArrowDownIcon, ArrowLeftIcon, ArrowRightIcon, ArrowUpIcon, EyeIcon, EyeOffIcon, TagIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useState, type ReactNode } from 'react'
 import { usePreferences } from './use-preferences.js'
@@ -17,6 +17,7 @@ export const useUsageLayout = () => {
     hide: (id: string): void => saveHidden([...hiddenUsageAccounts.filter(hidden => hidden !== id), id]),
     show: (id: string): void => saveHidden(hiddenUsageAccounts.filter(hidden => hidden !== id)),
     showAll: (): void => saveHidden([]),
+    setShortNamesShown: (shown: boolean): void => void settings.set('usageShortNames', shown).catch(() => false),
     move: (input: { readonly shownIds: readonly string[]; readonly id: string; readonly toIndex: number }): void =>
       void settings.set('usageOrder', moveAccount({ order: usageOrder, ...input })).catch(() => false),
   }
@@ -35,6 +36,8 @@ export const ArrangeableAccount = (props: {
   readonly id: string
   readonly name: string
   readonly direction: 'row' | 'column'
+  /** Set on the strip, where short names show: offers hiding or showing them. */
+  readonly shortNames?: boolean
   /** Give the wrapper a tab stop when its child is not focusable itself. */
   readonly focusable?: boolean
   readonly className?: string
@@ -99,6 +102,15 @@ export const ArrangeableAccount = (props: {
           <EyeIcon />
           {hiddenCount === 0 ? 'Show all hidden' : `Show all hidden (${String(hiddenCount)})`}
         </ContextMenuItem>
+        {props.shortNames === undefined ? null : (
+          <>
+            <ContextMenuSeparator />
+            <ContextMenuItem onSelect={() => props.arrangement.setShortNamesShown(props.shortNames !== true)}>
+              <TagIcon />
+              {props.shortNames ? 'Hide short names' : 'Show short names'}
+            </ContextMenuItem>
+          </>
+        )}
       </ContextMenuContent>
     </ContextMenu>
   )

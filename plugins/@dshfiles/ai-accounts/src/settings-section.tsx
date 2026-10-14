@@ -2,6 +2,7 @@ import { useApi } from '@dshfiles/dshx/client'
 import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Checkbox } from '@dshfiles/plugin-ui/components/ui/checkbox'
+import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Label } from '@dshfiles/plugin-ui/components/ui/label'
 import { RadioGroup, RadioGroupItem } from '@dshfiles/plugin-ui/components/ui/radio-group'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
@@ -17,6 +18,7 @@ import { aiAccountsApi, type AccountsFile, type UsageHistoryMeta } from './api.j
 import { FAILURE_KINDS, type FailureKind, type KindPolicy } from './failure-policy.js'
 import { pricingStatusLine } from './pricing-status.js'
 import { usePreferences } from './use-preferences.js'
+import { SHORT_NAME_MAX_LENGTH, stripShortName } from './usage-overview-model.js'
 
 const DELAYS = [400, 800, 1_500, 3_000] as const
 const REFRESH_SECONDS = [15, 30, 60, 120, 300, 900] as const
@@ -361,12 +363,29 @@ export const AiAccountsSettingsSection = (props: { readonly close: () => void; r
             </Select>
           )}
         </Row>
+        <Row hint="The tag beside each meter in the wide strip; set one per account below." label="Short names in the strip">
+          {id => (
+            <Switch
+              checked={preferences.usageShortNames}
+              disabled={readOnly || !preferences.footerButton}
+              id={id}
+              onCheckedChange={value => write(settings.set('usageShortNames', value))}
+            />
+          )}
+        </Row>
         {file === null ? null : (
           <UsageAccountsPicker
             accounts={file.accounts.filter(account => account.enabled)}
             disabled={readOnly}
             hidden={preferences.hiddenUsageAccounts}
             onChange={ids => write(settings.set('hiddenUsageAccounts', ids))}
+            shortNames={preferences.usageShortNames ? preferences.usageShortNameOverrides : null}
+            onShortNameChange={(instanceId, shortName) => {
+              const next = { ...preferences.usageShortNameOverrides }
+              if (shortName === '') delete next[instanceId]
+              else next[instanceId] = shortName
+              write(settings.set('usageShortNameOverrides', next))
+            }}
           />
         )}
         <Row hint="Draggable tab pinned to a window edge." label="Edge overlay">
@@ -434,6 +453,9 @@ const UsageAccountsPicker = (props: {
   readonly hidden: readonly string[]
   readonly disabled: boolean
   readonly onChange: (ids: string[]) => void
+  /** Strip short-name overrides by account id; null while short names are hidden. */
+  readonly shortNames: Readonly<Record<string, string>> | null
+  readonly onShortNameChange: (instanceId: string, shortName: string) => void
 }): JSX.Element | null => {
   if (props.accounts.length === 0) return null
   const hidden = new Set(props.hidden)
@@ -452,10 +474,50 @@ const UsageAccountsPicker = (props: {
               onCheckedChange={value => toggle(account.instanceId, value === true)}
             />
             {account.displayName}
+            {props.shortNames === null ? null : (
+              <ShortNameInput
+                disabled={props.disabled || hidden.has(account.instanceId)}
+                name={account.displayName}
+                placeholder={stripShortName({ displayName: account.displayName, tag: account.badge, override: undefined })}
+                saved={props.shortNames[account.instanceId] ?? ''}
+                onSave={shortName => props.onShortNameChange(account.instanceId, shortName)}
+              />
+            )}
           </Label>
         ))}
       </div>
     </fieldset>
+  )
+}
+
+/** One account's strip short name; saved on blur or Enter, empty falls back to the placeholder (picker tag or initials). */
+const ShortNameInput = (props: {
+  readonly name: string
+  readonly placeholder: string
+  readonly saved: string
+  readonly disabled: boolean
+  readonly onSave: (shortName: string) => void
+}): JSX.Element => {
+  const [draft, setDraft] = useState<string | null>(null)
+  const save = (): void => {
+    if (draft === null) return
+    setDraft(null)
+    if (draft.trim() !== props.saved) props.onSave(draft.trim())
+  }
+  return (
+    <Input
+      aria-label={`Short name for ${props.name}`}
+      className="dshx:h-6 dshx:w-16 dshx:px-1.5 dshx:font-mono! dshx:text-xs"
+      disabled={props.disabled}
+      maxLength={SHORT_NAME_MAX_LENGTH}
+      onBlur={save}
+      onChange={event => setDraft(event.target.value)}
+      onKeyDown={event => {
+        if (event.key === 'Enter') save()
+      }}
+      placeholder={props.placeholder}
+      value={draft ?? props.saved}
+    />
   )
 }
 

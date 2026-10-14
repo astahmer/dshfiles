@@ -23,6 +23,8 @@ export const usePreferences = () => {
     usageWindowLayout: usageWindowLayoutSchema.parse(value?.usageWindowLayout),
     usageOrder: Array.isArray(value?.usageOrder) ? value.usageOrder.filter(id => typeof id === 'string') : [],
     hiddenUsageAccounts: Array.isArray(value?.hiddenUsageAccounts) ? value.hiddenUsageAccounts.filter(id => typeof id === 'string') : [],
+    usageShortNames: value?.usageShortNames ?? true,
+    usageShortNameOverrides: value?.usageShortNameOverrides ?? {},
     edgeWidget: value?.edgeWidget ?? DEFAULT_CLIENT_SETTINGS.edgeWidget,
     codexLunaReserve: value?.codexLunaReserve ?? true,
     autoRetryQuotaDefault: value?.autoRetryQuotaDefault ?? false,
