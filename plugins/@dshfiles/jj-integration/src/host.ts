@@ -9,7 +9,7 @@ import type {} from '@deepseek-ai/dsh-subprocess'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import { WorkspaceId, type Workspace } from '@deepseek-ai/dsh-workspace'
 import { PluginApiError, type ApiCaller } from '@dshfiles/dshx/api'
-import { defineHost } from '@dshfiles/dshx/host'
+import { defineCommand, defineHost, type CommandInvocation, type CommandResult } from '@dshfiles/dshx/host'
 import type { SettingsScope } from '@dshfiles/dshx/settings'
 import { z } from 'zod'
 import { jjIntegrationApi, type DestinationView, type LandResult, type RepositoryView, type ThreadView, type WorkspaceSyncView } from './api.js'
@@ -348,7 +348,12 @@ const queueWorkspaceSync = (repoRoot: string): void => {
   })
 }
 
-const landThread = async (input: { readonly path: string; readonly sessionId: string | undefined; readonly fromAgent: boolean }): Promise<LandResult> => {
+const landThread = async (input: {
+  readonly path: string
+  readonly sessionId: string | undefined
+  readonly fromAgent: boolean
+  readonly signal?: AbortSignal
+}): Promise<LandResult> => {
   const bookmark = readSettings().bookmark
   const location = await requireThreads().locate(input.path)
   if (location.threadName !== undefined) {
@@ -360,7 +365,7 @@ const landThread = async (input: { readonly path: string; readonly sessionId: st
       throw new PluginApiError('Finish all work and answer pending questions before rebasing this thread.', { code: 'thread-active' })
     }
   }
-  const outcome = await requireThreads().land(input.path)
+  const outcome = await requireThreads().land(input.path, input.signal)
   const result: LandResult = {
     status: outcome.status,
     revisions: outcome.status === 'nothing-to-land' ? [] : [...outcome.revisions],
@@ -533,6 +538,43 @@ const api = jjIntegrationApi.host({
   discard: ({ input }) => discardThread(input),
 })
 
+const rebaseCommand = defineCommand({
+  name: 'rebase',
+  description: 'Rebase this thread workspace onto the configured bookmark.',
+  handler: async (invocation: CommandInvocation): Promise<CommandResult> => {
+    if (invocation.rawInput.trim().length > 0) return { kind: 'error', text: 'Usage: /rebase' }
+    if (hostContext === undefined) return { kind: 'error', text: 'jj-integration is not active.' }
+    const controller = hostContext.get('sessionController')
+    if (controller === undefined) return { kind: 'error', text: 'The Session controller is unavailable.' }
+    const sessions = await controller.list({}, invocation.signal)
+    const path = sessions.items.find(session => session.sessionId === invocation.agent.id)?.cwd
+    if (path === undefined || path.length === 0) return { kind: 'error', text: 'This Session has no working directory; there is nothing to rebase.' }
+    const location = await requireThreads().locate(path)
+    if (location.threadName === undefined) {
+      return { kind: 'error', text: 'This Session is not in a managed thread workspace. Use an isolated thread workspace to run /rebase.' }
+    }
+    const result = await landThread({
+      path: location.workspaceRoot,
+      sessionId: invocation.agent.id,
+      fromAgent: false,
+      signal: invocation.signal,
+    })
+    if (result.status === 'landed') return { kind: 'success', text: `Rebased ${String(result.revisions.length)} revision(s) onto ${result.bookmark}.` }
+    if (result.status === 'nothing-to-land') return { kind: 'success', text: `Nothing to rebase; the workspace now sits on ${result.bookmark}.` }
+    if (result.status === 'needs-description') {
+      return {
+        kind: 'error',
+        text: `Rebase refused: ${String(result.revisions.length)} revision(s) need real descriptions. Describe them and run /rebase again.`,
+      }
+    }
+    const agentAsked = result.agentAsked ? " The thread's agent was asked to fix them and rebase again." : ''
+    return {
+      kind: 'error',
+      text: `Rebase onto ${result.bookmark} stopped with conflicts in ${String(result.files.length)} file(s). Resolve them in the thread workspace and run /rebase again.${agentAsked}`,
+    }
+  },
+})
+
 const ownedSettings = jjIntegrationSettings.host({
   setup: scope => {
     settingsScope = scope
@@ -568,7 +610,8 @@ const setupHost = (context: Context): Effect<void> => {
 
 export default defineHost({
   name: 'jj-integration',
-  inject: ['subprocess'],
+  inject: ['subprocess', 'sessionController'],
+  commands: [rebaseCommand],
   settings: [ownedSettings],
   apis: [api],
   setup: setupHost,

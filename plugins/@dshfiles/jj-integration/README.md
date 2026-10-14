@@ -45,10 +45,13 @@ show the linked conversation titles. Choose a title to open that conversation;
 
 ## Rebasing
 
-**Rebase** (thread header, the panel, or the `jj_thread_rebase` tool) runs in the
-thread's own workspace, serialized per repository. It is available only after
-every Session in the thread has stopped running and no question is waiting for
-an answer:
+**Rebase** (thread header, the panel, `/rebase` in the thread composer, or the
+`jj_thread_rebase` tool) runs in the thread's own workspace, serialized per
+repository. The command accepts no arguments and refuses from any workspace
+that is not a managed thread workspace (including a shared checkout), where
+there is no safe per-thread target to rebase. Rebase is available only
+after every Session in the thread has stopped running and no question is waiting
+for an answer:
 
 1. Abandon empty leftovers between `main` and `@`.
 2. Refuse revisions described as nothing or `wip`.
@@ -67,8 +70,8 @@ an answer:
    leave that checkout untouched and are reported there instead.
 
 When Rebase stops on conflicts or descriptions, it queues a message asking the
-thread's agent to fix them and call `jj_thread_rebase` again
-(`askAgentToFixLanding`). Nothing is pushed.
+thread's agent to fix them and rebase again with `/rebase` or the
+`jj_thread_rebase` tool (`askAgentToFixLanding`). Nothing is pushed.
 
 ## Cleanup
 

@@ -76,6 +76,26 @@ Feature: jj thread workspaces
     When the thread's work is rebased outside the UI
     Then Rebase reflects the external rebase without reloading
 
+  @scenario:jj-integration.rebase-command-browser-journey
+  Scenario: Rebase a thread from its composer command
+    Given the isolated plugin composition of "@dshfiles/jj-integration, @dshfiles/workspace-folder-picker, @dshfiles/multi-host" is booted
+    When a disposable jj repository is chosen as the New thread project
+    And the New thread workspace toggle is turned on
+    And a message is sent in the thread workspace
+    And the thread workspace gains a revision described "Rebase from command"
+    When the rebase command is submitted in the thread composer
+    Then the rebase command advances main and reports success
+
+  @scenario:jj-integration.rebase-command-shared-checkout-browser-journey
+  Scenario: The rebase command refuses a shared checkout
+    Given the isolated plugin composition of "@dshfiles/jj-integration, @dshfiles/workspace-folder-picker, @dshfiles/multi-host" is booted
+    When a disposable jj repository is chosen as the New thread project
+    And the New thread workspace is kept in the shared checkout
+    And a message is sent in the shared checkout
+    Then the thread header has no Rebase button
+    When the rebase command is submitted in the thread composer
+    Then the rebase command refuses the shared checkout without moving main
+
   @scenario:jj-integration.thread-workspace-rebase-browser-journey
   Scenario: Thread workspaces update as soon as a rebase succeeds
     Given the isolated plugin composition of "@dshfiles/jj-integration, @dshfiles/workspace-folder-picker, @dshfiles/multi-host" is booted

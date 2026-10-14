@@ -19,6 +19,8 @@ const repositories = new WeakMap<Page, ThreadRepository>()
 /** The thread workspace the New thread screen last provisioned; a started thread's header no longer names it. */
 const provisionedThreads = new WeakMap<Page, string>()
 const newThreadComposerName = 'Describe what you want to build, / commands, @ files or sessions'
+const threadComposerName = 'Message or run a task, / commands, @ files or sessions'
+const threadComposer = (page: Page) => page.getByRole('textbox', { name: threadComposerName, exact: true })
 const attachmentFixtures = fileURLToPath(new URL('../../fixtures/attachments/', import.meta.url))
 const newThreadComposer = (page: Page) => page.getByRole('textbox', { name: newThreadComposerName, exact: true })
 const removeComposerAttachment = (page: Page, name: string) => page.getByRole('button', { name, exact: true })
@@ -186,6 +188,12 @@ When('the New thread workspace toggle is turned off', async ({ page }: { page: P
   await expect(projectButton(page)).toHaveText('repo')
 })
 
+When('the New thread workspace is kept in the shared checkout', async ({ page }: { page: Page }) => {
+  const toggle = workspaceToggle(page)
+  if (await toggle.isChecked()) await toggle.click()
+  await expect(toggle).not.toBeChecked()
+})
+
 When('the {string} bookmark is picked in the destination bar', async ({ page }: { page: Page }, bookmark: string) => {
   await page.getByRole('button', { name: 'main', exact: true }).click()
   await page.getByPlaceholder('Search bookmarks…').fill(bookmark)
@@ -217,6 +225,13 @@ Then('the current thread header identifies its jj workspace', async ({ page }: {
   await indicator.click()
   await expect(page.getByRole('heading', { name: 'Thread workspaces', exact: true }).last()).toBeVisible()
   await expect(indicator).toBeVisible()
+})
+
+When('a message is sent in the shared checkout', async ({ page }: { page: Page }) => {
+  const composer = newThreadComposer(page)
+  await composer.fill('jj integration shared checkout rebase e2e')
+  await composer.press('Enter')
+  await expect(page.getByRole('navigation', { name: 'Session hierarchy', exact: true })).toContainText('jj integration shared checkout rebase')
 })
 
 When('{string} is typed in the New thread composer', async ({ page }: { page: Page }, text: string) => {
@@ -376,6 +391,38 @@ Then('the destination bar offers neither a bookmark nor a workspace toggle', asy
     await expect(page.getByLabel('New thread destination', { exact: true }).getByText('Local', { exact: true })).toBeVisible()
     await expect(workspaceToggle(page)).toHaveCount(0)
     await expect(page.getByRole('button', { name: 'main', exact: true })).toHaveCount(0)
+  })
+  await finishJourneyAssertions(page)
+})
+
+When('the rebase command is submitted in the thread composer', async ({ page }: { page: Page }) => {
+  const composer = threadComposer(page)
+  await expect(composer).toBeVisible()
+  await composer.fill('/rebase')
+  await composer.press('Enter')
+})
+
+Then('the thread header has no Rebase button', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'jj-integration-shared-checkout-has-no-rebase-button', () => expect(rebaseButton(page)).toHaveCount(0))
+})
+
+Then('the rebase command advances main and reports success', async ({ page }: { page: Page }) => {
+  const repository = repositoryFor(page)
+  await recordAssertion(page, 'jj-integration-rebase-command-advances-main', async () => {
+    await expect(page.getByText('Rebased 1 revision(s) onto main.', { exact: true })).toBeVisible()
+    await expect.poll(() => descriptionOf(repository, 'main')).toBe('Rebase from command')
+    expect(commitIdOf(repository, 'main-')).toBe(repository.baseCommitId)
+  })
+  await finishJourneyAssertions(page)
+})
+
+Then('the rebase command refuses the shared checkout without moving main', async ({ page }: { page: Page }) => {
+  const repository = repositoryFor(page)
+  await recordAssertion(page, 'jj-integration-rebase-command-refuses-shared-checkout', async () => {
+    await expect(
+      page.getByText('This Session is not in a managed thread workspace. Use an isolated thread workspace to run /rebase.', { exact: true }),
+    ).toBeVisible()
+    expect(commitIdOf(repository, 'main')).toBe(repository.baseCommitId)
   })
   await finishJourneyAssertions(page)
 })
