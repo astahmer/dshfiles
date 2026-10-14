@@ -6,6 +6,7 @@
       "id": "activity-feed",
       "title": "Unified agent activity feed",
       "summary": "Normalizes session, communication, and jj integration events into one durable chronological feed with deduplication, bounded retention, cursor pagination, filtering, search, and provenance.",
+      "reach": ["click button \"Activity\"", "expect textbox \"Search activity\""],
       "surfaces": ["host", "tool", "storage", "client", "integration"],
       "configuration": [],
       "states": ["empty", "live", "paged", "filtered", "searched", "reconnected", "attention"],

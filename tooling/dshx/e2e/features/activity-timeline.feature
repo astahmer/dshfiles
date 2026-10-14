@@ -16,4 +16,5 @@ Feature: Activity timeline
     Given the isolated plugin profile "@dshfiles/activity-timeline" is booted
     When a thread runs a turn that fails for want of credentials
     And the Activity panel is opened
-    Then routine events stay condensed while the error stays visible on its own
+    Then only the error carries the failure badge
+    And routine events stay condensed while the error stays visible on its own

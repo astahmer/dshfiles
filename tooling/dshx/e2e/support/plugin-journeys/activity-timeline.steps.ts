@@ -51,6 +51,14 @@ Then('search and the source filter narrow the feed, and it survives a reload', a
   await finishJourneyAssertions(page)
 })
 
+Then('only the error carries the failure badge', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'activity-timeline-only-failures-use-the-destructive-badge', async () => {
+    const failureRows = feedRows(page).filter({ has: page.locator('[data-slot="badge"][data-variant="destructive"]') })
+    await expect(failureRows).toHaveCount(1)
+    await expect(failureRows).toContainText('Agent reported an error')
+  })
+})
+
 Then('routine events stay condensed while the error stays visible on its own', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'activity-timeline-condensed-feed-hides-routine-state-changes', async () => {
     const titles = await rowTitles(page)

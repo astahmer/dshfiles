@@ -17,11 +17,10 @@ import type { ActivityTimelineTranslate } from './locales.js'
 const feedKey = ['activity-timeline', 'feed'] as const
 const statsKey = ['activity-timeline', 'stats'] as const
 
-const sourceVariant = (source: ActivitySource): 'default' | 'secondary' | 'outline' | 'destructive' => {
-  if (source === 'integration') return 'default'
-  if (source === 'workspace') return 'destructive'
-  if (source === 'communication') return 'secondary'
-  if (source === 'session') return 'outline'
+const badgeVariant = (item: CondensedItem): 'default' | 'secondary' | 'outline' | 'destructive' => {
+  if (item.level === 'attention') return 'destructive'
+  if (item.source === 'integration') return 'default'
+  if (item.source === 'communication') return 'secondary'
   return 'outline'
 }
 
@@ -57,7 +56,7 @@ const ActivityRow = (props: {
     <span className={`dshx:mt-1.5 dshx:h-2 dshx:w-2 dshx:shrink-0 dshx:rounded-full ${levelMarker(props.item.level)}`} aria-hidden />
     <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-0.5">
       <span className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
-        <Badge variant={sourceVariant(props.item.source)}>{props.t(props.item.source)}</Badge>
+        <Badge variant={badgeVariant(props.item)}>{props.t(props.item.source)}</Badge>
         <span className="dshx:break-words dshx:text-sm">{props.item.summary}</span>
         {props.item.count > 1 ? <Badge variant="outline">{props.item.count}×</Badge> : null}
       </span>
@@ -219,7 +218,10 @@ export const ActivityTimelinePanel = (props: { readonly t: ActivityTimelineTrans
       </header>
       <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
         <div className="dshx:relative dshx:min-w-56 dshx:flex-1">
-          <SearchIcon aria-hidden />
+          <SearchIcon
+            aria-hidden
+            className="dshx:pointer-events-none dshx:absolute dshx:left-2.5 dshx:top-1/2 dshx:size-4 dshx:-translate-y-1/2 dshx:text-muted-foreground"
+          />
           <Input
             aria-label={t('search')}
             placeholder={t('searchPlaceholder')}
