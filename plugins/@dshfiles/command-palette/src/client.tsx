@@ -280,19 +280,29 @@ export default defineClient({
     ctx.effect(() => registerPaletteAction(newThreadAction), 'command-palette: new thread action')
     const newThreadShortcutId = 'commandPalette.newThread'
     if (isShortcutCommandId(newThreadShortcutId))
-      ctx.effect(
-        () =>
+      ctx.effect(() => {
+        const register = (withDefaults: boolean) =>
           ctx.shortcuts.register({
             id: newThreadShortcutId,
             label: () => translate('commandPaletteNewThread'),
             aliases: ['new thread', 'new chat', 'new session'],
-            defaults: newThreadShortcutDefaults,
+            defaults: withDefaults ? newThreadShortcutDefaults : {},
             regions: ['page', 'editable'],
             modals: [],
             resolve: () => ({ status: 'handled', run: startNewThread }),
-          }),
-        'command-palette: new thread shortcut',
-      )
+          })
+        // Another plugin (main-tabs' new tab) may already own the default key; keep the command, unbound.
+        try {
+          return register(true)
+        } catch (error) {
+          console.warn(`command-palette: ${newThreadShortcutId} keeps no default binding`, error)
+          try {
+            return register(false)
+          } catch {
+            return () => undefined
+          }
+        }
+      }, 'command-palette: new thread shortcut')
     const themeActions: readonly PaletteAction[] = [
       {
         id: '@dshfiles/command-palette/theme/light',
