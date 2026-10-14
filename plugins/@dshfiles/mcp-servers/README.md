@@ -78,6 +78,11 @@ refreshed token reconnects the client. **Sign out** and removing the server
 delete the record. Providers without dynamic client registration (GitHub) need
 a token stored as a DSH credential and referenced as a header.
 
+A Streamable HTTP endpoint must be HTTPS without embedded credentials; plain
+HTTP is accepted only on a loopback host (`127.0.0.1`, `localhost`, `[::1]`), the
+same rule the OAuth endpoints follow, so a local server or a local helper's
+endpoint can be registered. Catalog and Registry entries stay HTTPS-only.
+
 ## Catalog, composer panel, and settings
 
 **Browse MCPs** (page header, or **Add MCP** in the composer panel) lists the

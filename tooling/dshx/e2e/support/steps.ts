@@ -132,6 +132,15 @@ Before(async ({ page, $testInfo }) => {
   )
 })
 
+/** Admit one loopback fake (an OAuth provider page) through the browser network boundary for this scenario. */
+export const allowLoopbackBrowserOrigin = (page: Page, origin: string): void => {
+  const url = new URL(origin)
+  if (url.hostname !== '127.0.0.1' && url.hostname !== 'localhost') throw new Error('Only a loopback fake may pass the E2E network boundary.')
+  const allowedOrigins = allowedBrowserOrigins.get(page)
+  if (allowedOrigins === undefined) throw new Error('the browser network boundary was not initialized')
+  allowedOrigins.add(browserOriginKey(url))
+}
+
 /** The scratch profile a scenario booted, for journeys that configure it the way an operator edits its patch file. */
 export const profileFor = (page: Page): BootedProfile => {
   const profile = profiles.get(page)

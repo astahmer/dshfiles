@@ -1,8 +1,9 @@
 import { expect, type Page } from '@playwright/test'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { Then, When } from '../bdd.js'
-import { finishJourneyAssertions, recordAssertion } from '../steps.js'
+import { After, Then, When } from '../bdd.js'
+import { fakeOAuthMcpFor, startFakeOAuthMcp, stopFakeOAuthMcp } from '../fake-oauth-mcp.js'
+import { allowLoopbackBrowserOrigin, finishJourneyAssertions, recordAssertion } from '../steps.js'
 
 const fakeServer = join(dirname(fileURLToPath(import.meta.url)), '..', 'fake-mcp-server.mjs')
 const addForm = (page: Page) => page.getByRole('form', { name: 'Add MCP server', exact: true })
@@ -96,4 +97,59 @@ Then('the catalog no longer searches the public Registry', async ({ page }: { pa
     expect(page.getByText('Public Registry search is turned off in Preferences.', { exact: true })).toBeVisible(),
   )
   await finishJourneyAssertions(page)
+})
+
+const oauthRow = (page: Page) => serverRow(page, 'Fake OAuth')
+
+When('a loopback OAuth-protected MCP server is added with OAuth sign-in', async ({ page }: { page: Page }) => {
+  const fake = await startFakeOAuthMcp(page)
+  allowLoopbackBrowserOrigin(page, fake.origin)
+  await addForm(page).getByRole('textbox', { name: 'Display name', exact: true }).fill('Fake OAuth')
+  await addForm(page).getByRole('textbox', { name: 'HTTPS endpoint', exact: true }).fill(fake.endpoint)
+  await addForm(page).getByRole('checkbox', { name: 'Sign in with OAuth (discovery, dynamic client registration, PKCE)', exact: true }).click()
+  await addForm(page).getByRole('button', { name: 'Add server', exact: true }).click()
+  await expect(oauthRow(page)).toBeVisible()
+})
+
+Then('the server asks for sign-in and registers no tools', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'mcp-servers-oauth-server-waits-for-sign-in', async () => {
+    await expect(oauthRow(page)).toContainText('Sign-in required', { timeout: 30_000 })
+    await expect(oauthRow(page).getByRole('button', { name: 'Sign in', exact: true })).toBeVisible()
+    expect(fakeOAuthMcpFor(page).acceptedTokens.size).toBe(0)
+  })
+})
+
+When('the server is signed in through the provider page', async ({ page }: { page: Page }) => {
+  const providerPage = page.context().waitForEvent('page')
+  await oauthRow(page).getByRole('button', { name: 'Sign in', exact: true }).click()
+  const popup = await providerPage
+  await expect(popup.getByText('Signed in. The MCP server is reconnecting.', { exact: true })).toBeVisible({ timeout: 30_000 })
+  await popup.close()
+  // Returning to the tab refetches on focus in a real browser; a headless page gets no focus event, so refresh by hand.
+  await page.getByRole('button', { name: 'Refresh status', exact: true }).click()
+})
+
+Then("the server loads with the provider's tool and reads {string}", async ({ page }: { page: Page }, status: string) => {
+  await recordAssertion(page, 'mcp-servers-oauth-sign-in-loads-the-server', async () => {
+    await expect(oauthRow(page)).toContainText(status, { timeout: 30_000 })
+    await expect(oauthRow(page)).toContainText('1 Host tools registered', { timeout: 30_000 })
+    expect(fakeOAuthMcpFor(page).acceptedTokens.size).toBe(1)
+    expect(fakeOAuthMcpFor(page).registeredClientNames).toEqual(['DSH MCP servers'])
+  })
+})
+
+When('the server is signed out', async ({ page }: { page: Page }) => {
+  await oauthRow(page).getByRole('button', { name: 'Sign out', exact: true }).click()
+})
+
+Then('the server asks for sign-in again', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'mcp-servers-oauth-sign-out-drops-the-grant', async () => {
+    await expect(oauthRow(page)).toContainText('Sign-in required', { timeout: 30_000 })
+    await expect(oauthRow(page)).not.toContainText('1 Host tools registered')
+  })
+  await finishJourneyAssertions(page)
+})
+
+After(async ({ page }: { page: Page }) => {
+  await stopFakeOAuthMcp(page)
 })

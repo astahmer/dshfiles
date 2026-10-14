@@ -31,3 +31,18 @@ Feature: MCP servers
     And public Registry search is turned off and the tool call timeout set to 45 seconds
     Then the preferences survive a reload
     And the catalog no longer searches the public Registry
+
+  @scenario:mcp-servers.oauth-lifecycle
+  Scenario: Sign in to an OAuth-protected server and sign out again
+    A loopback fake is both the MCP server and its authorization server: it
+    answers 401 until DSH signs in through discovery, dynamic registration and
+    PKCE, then serves one tool to the token it issued.
+
+    Given the isolated plugin profile "@dshfiles/mcp-servers" is booted
+    When the MCP servers page is opened
+    And a loopback OAuth-protected MCP server is added with OAuth sign-in
+    Then the server asks for sign-in and registers no tools
+    When the server is signed in through the provider page
+    Then the server loads with the provider's tool and reads "Signed in with OAuth"
+    When the server is signed out
+    Then the server asks for sign-in again

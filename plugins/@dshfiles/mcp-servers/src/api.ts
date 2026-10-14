@@ -41,18 +41,26 @@ const localStartDraftSchema = z
   })
   .strict()
 
-const endpointSchema = z
-  .string()
-  .url()
-  .max(2048)
-  .refine(value => {
-    try {
-      const url = new URL(value)
-      return url.protocol === 'https:' && url.username === '' && url.password === '' && url.search === '' && url.hash === ''
-    } catch {
-      return false
-    }
-  }, 'Use an HTTPS endpoint without embedded credentials.')
+const endpointWith = (allowLoopbackHttp: boolean) =>
+  z
+    .string()
+    .url()
+    .max(2048)
+    .refine(value => {
+      try {
+        const url = new URL(value)
+        const loopback = url.hostname === '127.0.0.1' || url.hostname === 'localhost' || url.hostname === '[::1]'
+        const secure = url.protocol === 'https:' || (allowLoopbackHttp && url.protocol === 'http:' && loopback)
+        return secure && url.username === '' && url.password === '' && url.search === '' && url.hash === ''
+      } catch {
+        return false
+      }
+    }, 'Use an HTTPS endpoint without embedded credentials.')
+
+/** A catalog or Registry entry: always HTTPS. */
+const endpointSchema = endpointWith(false)
+/** A server the user registers may also be plain HTTP on this machine: a local MCP server or the helper an entry starts. */
+const serverEndpointSchema = endpointWith(true)
 
 const authSchema = z.enum(['none', 'oauth'])
 
@@ -78,7 +86,7 @@ export const storedServerSchema = z.discriminatedUnion('transport', [
     .object({
       ...baseDraft,
       transport: z.literal('streamable-http'),
-      url: endpointSchema,
+      url: serverEndpointSchema,
       headerRefs: refsSchema(headerNameSchema),
       auth: authSchema.optional(),
       startCommand: localStartSchema.optional(),
@@ -102,7 +110,7 @@ export const serverDraftSchema = z.discriminatedUnion('transport', [
       ...baseDraft,
       id: z.string().max(80),
       transport: z.literal('streamable-http'),
-      url: endpointSchema,
+      url: serverEndpointSchema,
       headerRefs: refsSchema(headerNameSchema),
       auth: authSchema.optional(),
       startCommand: localStartDraftSchema.nullable().optional(),

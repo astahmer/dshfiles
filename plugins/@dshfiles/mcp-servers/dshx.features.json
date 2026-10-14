@@ -143,9 +143,9 @@
       ],
       "verification": [
         {
-          "kind": "not-applicable",
+          "kind": "gherkin",
           "id": "mcp-servers.oauth-lifecycle",
-          "reason": "A sign-in round trip needs an OAuth authorization server the browser is redirected to; the e2e network boundary admits only the scratch Host origin and no loopback authorization server fake exists yet, so discovery, PKCE, refresh and sign-out are verified by the oauth.test.ts cases listed here."
+          "featureFile": "tooling/dshx/e2e/features/mcp-servers.feature"
         },
         {
           "kind": "unit-test",

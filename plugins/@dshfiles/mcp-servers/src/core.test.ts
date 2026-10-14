@@ -103,6 +103,15 @@ describe('MCP manager state', () => {
       ).toBe(false)
     }
   })
+
+  it('accepts plain HTTP only on a loopback host, like the OAuth endpoints', () => {
+    const draft = (url: string) =>
+      serverDraftSchema.safeParse({ id: '', name: 'Local', serverName: 'local', enabled: true, transport: 'streamable-http', url, headerRefs: {} }).success
+    expect(draft('http://127.0.0.1:4100/mcp')).toBe(true)
+    expect(draft('http://localhost:4100/mcp')).toBe(true)
+    expect(draft('http://example.com/mcp')).toBe(false)
+    expect(draft('http://127.0.0.1.example.com/mcp')).toBe(false)
+  })
 })
 
 describe('catalog search', () => {
