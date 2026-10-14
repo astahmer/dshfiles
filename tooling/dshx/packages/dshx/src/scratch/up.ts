@@ -24,6 +24,8 @@ export interface ScratchUpOptions {
   readonly name: string
   readonly stateDir: string
   readonly plugins: readonly string[]
+  /** Registry bundles from the web profile's dependencies, loaded beside the owned ones (a model provider, say). */
+  readonly bundles: readonly string[]
   readonly project?: string
   readonly port?: number
   readonly skipBuild: boolean
@@ -127,7 +129,7 @@ export const scratchUp = async (options: ScratchUpOptions): Promise<ScratchState
     }
   }
   options.onProgress('installing the scratch profile')
-  const prepared = await prepareComposedBootProfile([firstBundle, ...otherBundles])
+  const prepared = await prepareComposedBootProfile([firstBundle, ...otherBundles], { additionalBundleIds: options.bundles })
   const home = prepared.homeRoot
   let hostPid: number | undefined
   let browserPid: number | undefined

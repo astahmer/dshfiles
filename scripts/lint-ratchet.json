@@ -8,7 +8,7 @@
     "antislop(no-reflect-apply)": 10,
     "antislop(no-reflect-get)": 28,
     "antislop(no-runtime-typeof)": 353,
-    "antislop(no-unknown-parameters)": 200,
+    "antislop(no-unknown-parameters)": 199,
     "antislop(no-unknown-returns)": 118,
     "antislop(no-unsafe-dictionary-type)": 236,
     "antislop(require-safety-comment-for-type-assertion)": 415,

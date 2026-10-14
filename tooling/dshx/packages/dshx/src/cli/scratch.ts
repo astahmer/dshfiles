@@ -46,6 +46,7 @@ Chromium, and records pids, origin and paths in <state-dir>/state.json (mode 600
 
 Options:
   --plugin <id>        Owned bundle to load, repeatable (default: every bundle under plugins/@dshfiles).
+  --bundle <id>        Also load a registry bundle the web profile installs (e.g. dsh-our-free-model), repeatable.
   --project <dir>      Register this folder instead of seeding a sample jj project; down keeps it.
   --port <port>        Host port (default: a free one; 3080 is refused).
   --skip-build         Use each plugin's existing dist/.
@@ -127,7 +128,7 @@ export const runScratchCli = async (argv: readonly string[], io: { readonly stdo
     else write(io.stderr, `error: ${error.message}\n  fix: ${error.hint}\n`)
     return error.code === 'usage' ? 2 : 1
   }
-  const succeed = (data: unknown, human: string, ok = true): number => {
+  const succeed = <Data>(data: Data, human: string, ok = true): number => {
     write(io.stdout, json ? `${JSON.stringify({ schemaVersion: 1, command, ok, data }, null, 2)}\n` : human)
     return ok ? 0 : 1
   }
@@ -145,6 +146,7 @@ export const runScratchCli = async (argv: readonly string[], io: { readonly stdo
         json: { type: 'boolean' },
         help: { type: 'boolean', short: 'h' },
         plugin: { type: 'string', multiple: true },
+        bundle: { type: 'string', multiple: true },
         project: { type: 'string' },
         port: { type: 'string' },
         'skip-build': { type: 'boolean' },
@@ -163,7 +165,7 @@ export const runScratchCli = async (argv: readonly string[], io: { readonly stdo
     return 0
   }
   const allowed: Readonly<Record<string, readonly string[]>> = {
-    up: ['plugin', 'project', 'port', 'skip-build', 'fake-secret-cli', 'timeout'],
+    up: ['plugin', 'bundle', 'project', 'port', 'skip-build', 'fake-secret-cli', 'timeout'],
     doctor: [],
     open: ['timeout'],
     shot: ['label', 'out'],
@@ -205,6 +207,7 @@ export const runScratchCli = async (argv: readonly string[], io: { readonly stdo
         name: name.data,
         stateDir,
         plugins: Array.isArray(values.plugin) ? values.plugin : [],
+        bundles: Array.isArray(values.bundle) ? values.bundle : [],
         ...(typeof values.project === 'string' ? { project: values.project } : {}),
         ...(port === undefined ? {} : { port }),
         skipBuild: values['skip-build'] === true,

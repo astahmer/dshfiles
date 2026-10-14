@@ -102,8 +102,11 @@ pgrep -fl 'dshx-boot-profile|browser-host.js' || echo clean
 - Without `@dshfiles/multi-host`, each multi-host query logs one 404 per page
   load (e.g. `/api/dshx-9ca8a5fa/list`): the chip and sidebar see an
   owner-missing error and stop polling. Load multi-host or discount it.
-- No provider is configured, so turns end immediately; anything needing a model
-  reply needs a credential (see Safety) or the `tool-call-thread` seed's fake provider.
+- No provider is configured, so turns end immediately. `up --bundle
+  dsh-our-free-model` loads the web profile's keyless free-model bundle (its
+  "Kilo Auto Free" route answers; the OpenCode Zen routes refuse outside
+  OpenCode); otherwise use a credential (see Safety) or the `tool-call-thread`
+  seed's fake provider.
 - Several workspaces run `dshx dev` at once and the state dir is keyed by name only:
   pass `--name <topic>` to every command.
 
