@@ -29,9 +29,9 @@ Feature: Thread sidebar journeys
     Then the sidebar keeps the blank session out of classified thread rows
 
   @scenario:thread-sidebar.session-header-actions
-  Scenario: Pin a thread from the native session header overflow
+  Scenario: Pin a thread from the session header
     Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
-    When a nonblank Host thread is pinned from its session header overflow
+    When a nonblank Host thread is pinned from its session header
     Then the thread stays pinned after reload
 
   @scenario:thread-sidebar.view-controls

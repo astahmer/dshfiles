@@ -754,14 +754,27 @@
     {
       "id": "session-header-actions",
       "title": "Manage threads from the session header",
-      "summary": "Expose pin, park, snooze, archive, and restore actions beside the conversation header and honor child-thread action preferences.",
+      "summary": "Keep Pin as an icon button in the conversation header and put park, snooze, archive, and restore in a More menu; Pin folds into the menu when the header is too narrow. Child-thread action preferences apply.",
+      "reach": [
+        "click button \"New thread\"",
+        "click button \"Choose workspace\"",
+        "fill textbox \"Search projects or enter a folder path\" \"sample\"",
+        "expect option \"sample*\"",
+        "press Enter",
+        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Header actions target\"",
+        "press Enter",
+        "expect group \"Thread actions\"",
+        "click button \"More thread actions\"",
+        "expect menuitem \"Archive\""
+      ],
       "surfaces": ["client", "host", "storage", "integration"],
       "configuration": [],
-      "states": ["active", "pinned", "parked", "snoozed", "archived"],
+      "states": ["active", "pinned", "parked", "snoozed", "archived", "crowded"],
       "failureModes": [
         "Blank sessions have no header actions.",
         "Running sessions cannot be parked or archived.",
-        "Failed Host mutations are reported beside the action."
+        "Failed Host mutations are reported beside the action.",
+        "A narrow header folds Pin into the More menu instead of overlapping the title."
       ],
       "externalDependencies": [],
       "verification": [
@@ -774,19 +787,25 @@
           "kind": "unit-test",
           "id": "thread-sidebar.session-header-actions-unit-pin-and-park",
           "file": "plugins/@dshfiles/thread-sidebar/src/header-actions.client.test.tsx",
-          "testName": "renders pin and park as direct overflow actions without an inner ellipsis"
+          "testName": "keeps Pin as an icon button and moves Park into the More menu"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.session-header-actions-unit-narrow-overflow",
+          "file": "plugins/@dshfiles/thread-sidebar/src/header-actions.client.test.tsx",
+          "testName": "folds Pin into the More menu when the native title has no room, and restores it once there is"
         },
         {
           "kind": "unit-test",
           "id": "thread-sidebar.session-header-actions-unit-snooze",
           "file": "plugins/@dshfiles/thread-sidebar/src/header-actions.client.test.tsx",
-          "testName": "opens the notification action and snoozes the current thread"
+          "testName": "opens the notification submenu and snoozes the current thread"
         },
         {
           "kind": "unit-test",
           "id": "thread-sidebar.session-header-actions-unit-restore-and-blank",
           "file": "plugins/@dshfiles/thread-sidebar/src/header-actions.client.test.tsx",
-          "testName": "offers restore for archived threads and omits controls for blank ones"
+          "testName": "offers only restore for archived threads and omits controls for blank ones"
         },
         {
           "kind": "unit-test",

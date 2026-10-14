@@ -15,7 +15,7 @@ import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
 import { useEffect, useRef } from 'react'
 import { SidebarRoot, type FooterSnapshot, type SidebarShellBaseProps } from './sidebar-shell.js'
 import { ThreadSidebar } from './client.js'
-import { HeaderThreadActions, type HeaderThreadActionKind } from './header-actions.js'
+import { HeaderThreadActions } from './header-actions.js'
 import { sidebarChildren } from './sidebar-contract.js'
 import { THREAD_SIDEBAR_LOCALE_NAMESPACE, threadSidebarLocale } from './locales.js'
 import { archiveWithoutStopping } from './organization.js'
@@ -341,25 +341,19 @@ export default defineClient({
       const result = await ctx.remote.workspace.unpinSession({ sessionId })
       if (!result.ok) throw new Error(result.error.code)
     }
-    const registerHeaderAction = (action: HeaderThreadActionKind, order: number, label: () => string): void => {
-      ctx.slots.inject('conversation.session.header.utilities', () =>
-        ctx.slots.register(
-          {
-            name: 'conversation.session.header.utilities',
-            id: `thread-sidebar-${action}`,
-            order,
-            label,
-            locale: THREAD_SIDEBAR_LOCALE_NAMESPACE,
-            inject: () => ({ action, archiveSession, unarchiveSession, pinSession, unpinSession }),
-          },
-          decorate(HeaderThreadActions),
-        ),
-      )
-    }
-    registerHeaderAction('pin', 100, () => ctx.locale.bind(THREAD_SIDEBAR_LOCALE_NAMESPACE)('threadSidebarPin'))
-    registerHeaderAction('park', 101, () => ctx.locale.bind(THREAD_SIDEBAR_LOCALE_NAMESPACE)('threadSidebarPark'))
-    registerHeaderAction('notifications', 102, () => ctx.locale.bind(THREAD_SIDEBAR_LOCALE_NAMESPACE)('threadSidebarNotifications'))
-    registerHeaderAction('archive', 103, () => ctx.locale.bind(THREAD_SIDEBAR_LOCALE_NAMESPACE)('threadSidebarArchive'))
+    ctx.slots.inject('conversation.session.header.utilities', () =>
+      ctx.slots.register(
+        {
+          name: 'conversation.session.header.utilities',
+          id: 'thread-sidebar-thread-actions',
+          order: 100,
+          label: () => ctx.locale.bind(THREAD_SIDEBAR_LOCALE_NAMESPACE)('threadSidebarThreadActions'),
+          locale: THREAD_SIDEBAR_LOCALE_NAMESPACE,
+          inject: () => ({ archiveSession, unarchiveSession, pinSession, unpinSession }),
+        },
+        decorate(HeaderThreadActions),
+      ),
+    )
 
     ctx.slots.inject('sidebar', () =>
       ctx.slots.register(
