@@ -39,6 +39,12 @@ When('recent threads are turned off in the New thread settings', async ({ page }
   await closeSettings(page)
 })
 
+// The work-to-rebase count is cached for a minute per project (each New thread remounts the strip), so the revision
+// described a moment ago shows only on a fresh read; a reload stands in for the agent's next turn.
+When('the page is reloaded so the home screen reads the thread workspaces afresh', async ({ page }: { page: Page }) => {
+  await page.reload()
+})
+
 When('a new thread is started from the sidebar', async ({ page }: { page: Page }) => {
   await page.getByRole('button', { name: 'New session', exact: true }).first().click()
   await expect(page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })).toBeVisible()
