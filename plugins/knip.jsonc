@@ -1,0 +1,15 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "include": ["files", "dependencies", "unlisted", "binaries", "unresolved", "catalog", "catalogReferences"],
+  "ignoreBinaries": ["dsh", "dshx", "jj", "knip"],
+  "workspaces": {
+    ".": {
+      "entry": ["scripts/*.ts"],
+    },
+    "@dshfiles/*": {
+      "entry": ["dshx.config.ts", "src/{host,client,client-entry,index}.{ts,tsx}"],
+      // dshx.config.ts names shared-runtime as a string (`client.shared`); dsh is the runtime the bundles load into.
+      "ignoreDependencies": ["@dshfiles/shared-runtime", "@deepseek-ai/dsh"],
+    },
+  },
+}

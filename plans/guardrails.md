@@ -102,7 +102,12 @@ rule to `error` once those land.
   `types.ts`).
 - [x] 4. `refactor(plugin-ui)`: named `machine` exports (`export *` cap 1). `docs`: shared skills in
       `AGENTS.md`, link `actor-state-ownership` from `plugin-state`.
-- [ ] 5. `chore(knip)`: `plugins/knip.jsonc`, report-only.
+- [x] 5. `chore(knip)`: `plugins/knip.jsonc`, report-only. `pnpm --dir plugins run knip`
+      runs dshx's pinned knip 6.32.2 (no new lockfile entry); not in `check`.
+      Findings at landing: 37 (22 unused files, 4 unused dependencies, 6
+      unused devDependencies, 5 unlisted dependencies). Some unused files are
+      false positives (optmem bench and scripts run by hand, plugin-marketplace
+      `tests/`); step 8 adds those entries.
 - [ ] 6. `chore(deps)`: single root, redone from `main`.
 - [ ] 7. `chore(deps)`: `save-exact`, catalog, pins taken from the lockfile, contract check.
 - [ ] 8. `chore(knip)`: root config, added to `check`.
