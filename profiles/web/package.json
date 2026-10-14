@@ -13,6 +13,7 @@
     "@dshfiles/home": "link:../../../dev/dshfiles/plugins/@dshfiles/home",
     "@dshfiles/jj-integration": "link:../../../dev/dshfiles/plugins/@dshfiles/jj-integration",
     "@dshfiles/jujutsu": "link:../../../dev/dshfiles/plugins/@dshfiles/jujutsu",
+    "@dshfiles/main-tabs": "link:../../../dev/dshfiles/plugins/@dshfiles/main-tabs",
     "@dshfiles/mcp-servers": "link:../../../dev/dshfiles/plugins/@dshfiles/mcp-servers",
     "@dshfiles/memory": "link:../../../dev/dshfiles/plugins/@dshfiles/memory",
     "@dshfiles/model-effort-picker": "link:../../../dev/dshfiles/plugins/@dshfiles/model-effort-picker",
@@ -65,6 +66,7 @@
         "@dshfiles/model-effort-picker",
         "@dshfiles/editor",
         "@dshfiles/workbench",
+        "@dshfiles/main-tabs",
         "@dshfiles/workspace-folder-picker",
         "@dshfiles/memory",
         "@dshfiles/home"
