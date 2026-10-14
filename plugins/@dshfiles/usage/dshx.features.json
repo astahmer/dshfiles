@@ -61,6 +61,12 @@
         },
         {
           "kind": "unit-test",
+          "id": "usage.live-memory-purpose",
+          "file": "plugins/@dshfiles/usage/src/live-calls.test.ts",
+          "testName": "tags OptMem summaries and memory digests as memory summaries, other compactions as compaction"
+        },
+        {
+          "kind": "unit-test",
           "id": "usage.fold-retry",
           "file": "plugins/@dshfiles/usage/src/fold.test.ts",
           "testName": "fails an attempt the loop retried with the retry failure code, then records the settled retry"
