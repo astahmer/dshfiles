@@ -471,7 +471,12 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
-        <article className="dshx:group/row dshx:relative dshx:min-w-0" data-selected={props.selected} onContextMenu={captureThreadMentionInsertion}>
+        <article
+          className="dshx:group/row dshx:relative dshx:min-w-0"
+          data-thread-id={session.id}
+          data-selected={props.selected}
+          onContextMenu={captureThreadMentionInsertion}
+        >
           <div className="dshx:relative dshx:rounded-md dshx:hover:bg-accent/60 dshx:focus-within:bg-accent/60 dshx:group-data-[selected=true]/row:bg-accent">
             <button
               type="button"

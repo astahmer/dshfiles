@@ -24,6 +24,8 @@ const sidebarSettings = (page: Page) => page.getByRole('region', { name: 'Sideba
 const paletteDialog = (page: Page) => page.getByRole('dialog', { name: 'Command palette' })
 const paletteInput = (page: Page) => paletteDialog(page).getByRole('combobox')
 const currentThreadId = (page: Page): string | null => new URL(page.url()).searchParams.get('thread')
+// The Host shortens display titles to their first words, so rows are found by thread id, not by the prompt.
+const threadRow = (page: Page, threadId: string) => threadSidebar(page).locator(`article[data-thread-id="${threadId}"]`)
 
 const startBlankThread = async (page: Page): Promise<string> => {
   const createResponsePromise = page.waitForResponse(
@@ -247,14 +249,18 @@ Then('the Host thread stays parked after reload without an attention error', asy
   await finishJourneyAssertions(page)
 })
 
+let pinnedThreadId: string | null = null
+
 When('a nonblank Host thread is pinned from its session header', async ({ page }: { page: Page }) => {
   const prompt = 'thread sidebar header pin e2e target'
   if (currentThreadId(page) === null) await startBlankThread(page)
   const composer = page.getByRole('textbox').first()
   await composer.fill(prompt)
   await composer.press('Enter')
-  const targetRow = threadSidebar(page).locator('article').filter({ hasText: prompt })
-  await expect(targetRow).toHaveCount(1)
+  const threadId = currentThreadId(page)
+  if (threadId === null) throw new Error('The Host did not keep the selected thread after its first message.')
+  pinnedThreadId = threadId
+  await expect(threadRow(page, threadId)).toHaveCount(1)
   const threadActions = page.getByRole('group', { name: 'Thread actions', exact: true })
   await expect(threadActions).toHaveCount(1)
   await threadActions.getByRole('button', { name: 'More thread actions', exact: true }).click()
@@ -262,10 +268,13 @@ When('a nonblank Host thread is pinned from its session header', async ({ page }
   await page.keyboard.press('Escape')
   await threadActions.getByRole('button', { name: 'Pin', exact: true }).click()
   await expect(threadSidebar(page).getByRole('button', { name: 'Pinned (1)', exact: true })).toBeVisible()
+  await expect(threadActions.getByRole('button', { name: 'Unpin', exact: true })).toBeVisible()
+  await expect(page.getByRole('alert').filter({ hasText: 'could not update' })).toHaveCount(0)
 })
 
 Then('the thread stays pinned after reload', async ({ page }: { page: Page }) => {
-  const targetRow = threadSidebar(page).locator('article').filter({ hasText: 'thread sidebar header pin e2e target' })
+  if (pinnedThreadId === null) throw new Error('No thread was pinned.')
+  const targetRow = threadRow(page, pinnedThreadId)
   await recordAssertion(page, 'thread-sidebar-session-header-pin-succeeds', async () => {
     await expect(threadSidebar(page).getByRole('button', { name: 'Pinned (1)', exact: true })).toBeVisible()
     await expect(targetRow).toHaveCount(1)
