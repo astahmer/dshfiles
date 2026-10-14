@@ -1,0 +1,9 @@
+# The native Settings shell is replaced, not wrapped: its sections are child slots
+# only the declaring `sidebar.settings` entry may render, so this bundle ports the
+# whole shell (see README "Port") and switches the native client row off.
+- id: ui-settings-general
+  disabled: true
+# Loader ids share one namespace per profile; the settings namespace is this id.
+- insert:
+    - id: dshfiles-settings-shell
+      name: '@dshfiles/settings-shell'

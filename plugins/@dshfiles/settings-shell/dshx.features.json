@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "settings-shell-port",
+      "title": "Native Settings shell, ported",
+      "summary": "The sidebar Settings trigger, connection recovery pill, Desktop update indicator, General section, onboarding coordinator and Mod+, shortcut of the native Settings shell, served by this bundle with the native row switched off.",
+      "reach": ["click button \"Settings\"", "expect dialog \"Settings\""],
+      "surfaces": ["client", "settings", "integration"],
+      "configuration": [],
+      "states": ["closed", "open", "onboarding", "disconnected", "update-available"],
+      "failureModes": [
+        "When the running DSH ships another version of the native Settings package, the Host warns at boot and General shows it, so the port is refreshed instead of drifting silently.",
+        "The native welcome notice stores its acknowledgement in the switched-off row's namespace; the step is skipped while that namespace is unserved."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "settings-shell.upstream-version",
+          "file": "plugins/@dshfiles/settings-shell/src/upstream-version.test.ts",
+          "testName": "matches the native Settings package this workspace builds against"
+        }
+      ]
+    }
+  ]
+}
