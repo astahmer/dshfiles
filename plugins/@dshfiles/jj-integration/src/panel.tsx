@@ -9,25 +9,14 @@ import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useApi } from '@dshfiles/dshx/client'
 import { useState, useSyncExternalStore } from 'react'
-import { jjIntegrationApi, type LandResult, type ThreadView, type WorkspaceSyncView } from './api.js'
+import { jjIntegrationApi, type ThreadView, type WorkspaceSyncView } from './api.js'
+import { announceRepositoryChange, describeLandResult, useLandToast } from './land-feedback.js'
 import type { JjIntegrationTranslate } from './locales.js'
 
 export const threadQueryKeys = {
   repositories: ['jj-integration', 'repositories'] as const,
   threadAt: (path: string) => ['jj-integration', 'thread', path] as const,
   workspaceSync: ['jj-integration', 'workspace-sync'] as const,
-}
-
-export const describeLandResult = (t: JjIntegrationTranslate, result: LandResult): string => {
-  const summary =
-    result.status === 'landed'
-      ? t('landed', { count: result.revisions.length, bookmark: result.bookmark })
-      : result.status === 'nothing-to-land'
-        ? t('nothingToLand', { bookmark: result.bookmark })
-        : result.status === 'needs-description'
-          ? t('needsDescription', { revisions: result.revisions.map(revision => revision.changeId).join(', ') })
-          : t('conflicted', { bookmark: result.bookmark, files: result.files.join(', ') })
-  return result.agentAsked ? `${summary} ${t('agentAsked')}` : summary
 }
 
 /** The thread sidebar owns restarting DSH (with its confirmation dialog) and registers it as a palette action. */
@@ -127,25 +116,37 @@ export const ThreadWorkspacesPanel = (props: { readonly t: JjIntegrationTranslat
   const { t } = props
   const api = useApi(jjIntegrationApi)
   const queryClient = useQueryClient()
+  const toast = useLandToast()
   const [notice, setNotice] = useState<{ readonly tone: 'default' | 'destructive'; readonly text: string } | null>(null)
   const repositories = useQuery({
     queryKey: threadQueryKeys.repositories,
     queryFn: ({ signal }) => runHostRequest({ signal, timeoutMs: 60_000, request: hostSignal => api.repositories({}, { signal: hostSignal }) }),
   })
-  const action = useMutation({
-    mutationFn: (request: ({ readonly kind: 'land' } | { readonly kind: 'discard'; readonly force: boolean }) & { readonly path: string }) =>
-      request.kind === 'land'
-        ? runHostRequest({ timeoutMs: 300_000, request: signal => api.land({ path: request.path }, { signal }) }).then(result => ({
-            tone: result.status === 'landed' || result.status === 'nothing-to-land' ? ('default' as const) : ('destructive' as const),
-            text: describeLandResult(t, result),
-          }))
-        : runHostRequest({ timeoutMs: 120_000, request: signal => api.discard({ path: request.path, force: request.force }, { signal }) }).then(result =>
-            result.status === 'has-work' ? { tone: 'destructive' as const, text: t('hasWork') } : null,
-          ),
-    onSuccess: next => setNotice(next),
+  const refreshAfterChange = (): void => {
+    void queryClient.invalidateQueries({ queryKey: ['jj-integration'] })
+    announceRepositoryChange()
+  }
+  const land = useMutation({
+    mutationFn: (path: string) => runHostRequest({ timeoutMs: 300_000, request: signal => api.land({ path }, { signal }) }),
+    onSuccess: result => {
+      if (result.status === 'landed') {
+        setNotice(null)
+        toast.show({ text: describeLandResult(t, result), success: true })
+        return
+      }
+      setNotice({ tone: result.status === 'nothing-to-land' ? 'default' : 'destructive', text: describeLandResult(t, result) })
+    },
     onError: error => setNotice({ tone: 'destructive', text: errorMessage(error, t('loadFailed')) }),
-    onSettled: () => void queryClient.invalidateQueries({ queryKey: ['jj-integration'] }),
+    onSettled: refreshAfterChange,
   })
+  const discard = useMutation({
+    mutationFn: (request: { readonly path: string; readonly force: boolean }) =>
+      runHostRequest({ timeoutMs: 120_000, request: signal => api.discard(request, { signal }) }),
+    onSuccess: result => setNotice(result.status === 'has-work' ? { tone: 'destructive', text: t('hasWork') } : null),
+    onError: error => setNotice({ tone: 'destructive', text: errorMessage(error, t('loadFailed')) }),
+    onSettled: refreshAfterChange,
+  })
+  const busyPath = land.isPending ? land.variables : discard.isPending ? discard.variables.path : undefined
 
   return (
     <div className="dshx-root dshx:flex dshx:h-full dshx:flex-col dshx:gap-4 dshx:overflow-auto dshx:p-6">
@@ -159,6 +160,7 @@ export const ThreadWorkspacesPanel = (props: { readonly t: JjIntegrationTranslat
           {t('refresh')}
         </Button>
       </header>
+      {toast.element}
       <WorkspaceSyncLine t={t} />
       {notice === null ? null : (
         <Alert variant={notice.tone}>
@@ -188,9 +190,9 @@ export const ThreadWorkspacesPanel = (props: { readonly t: JjIntegrationTranslat
                     thread={thread}
                     t={t}
                     bookmark={props.bookmark}
-                    busy={action.isPending && action.variables?.path === thread.path}
-                    onLand={() => action.mutate({ kind: 'land', path: thread.path })}
-                    onDiscard={force => action.mutate({ kind: 'discard', force, path: thread.path })}
+                    busy={busyPath === thread.path}
+                    onLand={() => land.mutate(thread.path)}
+                    onDiscard={force => discard.mutate({ force, path: thread.path })}
                   />
                 ))}
               </ul>

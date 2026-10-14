@@ -73,7 +73,11 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
     jj(repo, 'bookmark', 'set', 'main', '-r', '@-')
 
     const outcome = await threads.land(thread.path)
-    expect(outcome).toMatchObject({ status: 'landed', revisions: [{ description: 'feat: add feature', conflict: false }] })
+    expect(outcome).toMatchObject({
+      status: 'landed',
+      revisions: [{ description: 'feat: add feature', conflict: false }],
+      head: { description: 'feat: add feature' },
+    })
     expect(bookmarkTarget(repo)).toBe('feat: add feature')
     expect(jj(repo, '--ignore-working-copy', 'log', '--no-graph', '-r', 'main-', '-T', 'description.first_line()')).toBe('other work')
     const [status] = await threads.list(repo)

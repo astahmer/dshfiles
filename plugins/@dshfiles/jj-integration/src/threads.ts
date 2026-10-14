@@ -48,7 +48,7 @@ export interface ThreadStatus {
 }
 
 export type LandOutcome =
-  | { readonly status: 'landed'; readonly revisions: readonly ThreadRevision[] }
+  | { readonly status: 'landed'; readonly revisions: readonly ThreadRevision[]; readonly head: ThreadRevision | undefined }
   | { readonly status: 'nothing-to-land' }
   | { readonly status: 'needs-description'; readonly revisions: readonly ThreadRevision[] }
   | { readonly status: 'conflicted'; readonly revisions: readonly ThreadRevision[]; readonly files: readonly string[] }
@@ -187,7 +187,8 @@ export const createThreads = (options: {
         const moved = await options.executor({ args: ['bookmark', 'set', bookmark, '-r', target], cwd })
         if (moved.exitCode === 0) {
           if (!workingCopyEmpty) await jj(['new', bookmark], cwd, signal)
-          return { status: 'landed', revisions: rebased }
+          const [head] = await revisions(bookmark, cwd)
+          return { status: 'landed', revisions: rebased, head }
         }
         if (attempt >= LAND_ATTEMPTS) throw new ThreadError('jj-failed', `Could not move ${bookmark}: ${moved.stderr.trim().slice(0, 400)}`)
       }

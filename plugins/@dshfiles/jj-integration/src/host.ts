@@ -325,6 +325,7 @@ const landThread = async (input: { readonly path: string; readonly sessionId: st
     revisions: outcome.status === 'nothing-to-land' ? [] : [...outcome.revisions],
     files: outcome.status === 'conflicted' ? [...outcome.files] : [],
     bookmark,
+    ...(outcome.status === 'landed' && outcome.head !== undefined ? { head: outcome.head } : {}),
     agentAsked: false,
   }
   const message = landingMessage(result)

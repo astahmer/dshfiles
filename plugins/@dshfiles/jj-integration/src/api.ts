@@ -27,6 +27,8 @@ const landResultSchema = z
     revisions: z.array(revisionSchema),
     files: z.array(z.string()),
     bookmark: z.string(),
+    /** Where the bookmark points after a Land; absent from a Host older than this field. */
+    head: revisionSchema.optional(),
     agentAsked: z.boolean(),
   })
   .strict()

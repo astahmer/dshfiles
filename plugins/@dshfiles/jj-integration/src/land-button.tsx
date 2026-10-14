@@ -5,10 +5,11 @@ import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useApi } from '@dshfiles/dshx/client'
-import { useCallback, useState, useSyncExternalStore } from 'react'
+import { useCallback, useSyncExternalStore } from 'react'
 import { jjIntegrationApi } from './api.js'
 import type { JjIntegrationTranslate } from './locales.js'
-import { describeLandResult, threadQueryKeys } from './panel.js'
+import { announceRepositoryChange, describeLandResult, useLandToast } from './land-feedback.js'
+import { threadQueryKeys } from './panel.js'
 
 export interface LandButtonProps {
   readonly sessionId: SessionSummary['id']
@@ -26,7 +27,7 @@ export const LandButton = (props: LandButtonProps): JSX.Element | null => {
   const subscribe = useCallback((listener: () => void) => props.sessions.list.subscribe(listener), [props.sessions])
   const read = useCallback(() => props.sessions.list.getSnapshot().byId[props.sessionId]?.cwd ?? null, [props.sessions, props.sessionId])
   const cwd = useSyncExternalStore(subscribe, read, noCwd)
-  const [message, setMessage] = useState<string | null>(null)
+  const toast = useLandToast()
   const thread = useQuery({
     queryKey: threadQueryKeys.threadAt(cwd ?? ''),
     enabled: cwd !== null && cwd.length > 0,
@@ -34,27 +35,33 @@ export const LandButton = (props: LandButtonProps): JSX.Element | null => {
   })
   const land = useMutation({
     mutationFn: (path: string) => runHostRequest({ timeoutMs: 300_000, request: signal => api.land({ path, sessionId: props.sessionId }, { signal }) }),
-    onSuccess: result => setMessage(describeLandResult(props.t, result)),
-    onError: error => setMessage(errorMessage(error, props.t('loadFailed'))),
-    onSettled: () => void queryClient.invalidateQueries({ queryKey: ['jj-integration'] }),
+    onSuccess: result => toast.show({ text: describeLandResult(props.t, result), success: result.status === 'landed' }),
+    onError: error => toast.show({ text: errorMessage(error, props.t('loadFailed')), success: false }),
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ['jj-integration'] })
+      announceRepositoryChange()
+    },
   })
   const current = thread.data?.thread
-  if (current === null || current === undefined) return null
+  if (current === null || current === undefined) return toast.element
   const label = props.t('landThread', { bookmark: props.bookmark })
   return (
-    <Button
-      className="dshx-root"
-      disabled={land.isPending || current.unlanded.length === 0}
-      onClick={() => land.mutate(current.path)}
-      size="sm"
-      title={message ?? `${label} (${props.t('unlanded', { count: current.unlanded.length })})`}
-      type="button"
-      variant="ghost"
-      aria-label={label}
-    >
-      {land.isPending ? <Spinner /> : null}
-      {props.t('land')}
-      {current.unlanded.length > 0 ? ` · ${String(current.unlanded.length)}` : ''}
-    </Button>
+    <>
+      <Button
+        className="dshx-root"
+        disabled={land.isPending || current.unlanded.length === 0}
+        onClick={() => land.mutate(current.path)}
+        size="sm"
+        title={`${label} (${props.t('unlanded', { count: current.unlanded.length })})`}
+        type="button"
+        variant="ghost"
+        aria-label={label}
+      >
+        {land.isPending ? <Spinner /> : null}
+        {props.t('land')}
+        {current.unlanded.length > 0 ? ` · ${String(current.unlanded.length)}` : ''}
+      </Button>
+      {toast.element}
+    </>
   )
 }

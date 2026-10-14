@@ -218,7 +218,7 @@ Then('Land refuses the placeholder description and leaves main in place', async 
   await expect(landButton(page)).toHaveText('Land · 1')
   await landButton(page).click()
   await recordAssertion(page, 'jj-integration-land-asks-for-a-description', async () => {
-    await expect(landButton(page)).toHaveAttribute('title', /^Describe these revisions before landing: \w+\./)
+    await expect(page.getByRole('alert').filter({ hasText: /^Describe these revisions before landing: \w+\./ })).toBeVisible()
     expect(commitIdOf(repository, 'main')).toBe(repository.baseCommitId)
   })
 })
@@ -228,9 +228,12 @@ Then('Land moves main onto the work described {string}', async ({ page }: { page
   await expect(landButton(page)).toHaveText('Land · 1')
   await landButton(page).click()
   await recordAssertion(page, 'jj-integration-land-moves-the-bookmark', async () => {
-    await expect(landButton(page)).toHaveAttribute('title', 'Landed 1 revision(s) onto main.')
+    const landedToast = page.getByRole('alert').filter({ hasText: 'Landed 1 revision(s) onto main:' })
+    await expect(landedToast).toContainText(description)
     await expect(landButton(page)).toBeDisabled()
     expect(descriptionOf(repository, 'main')).toBe(description)
+    await expect(landedToast).toContainText('main is now at')
+    await expect(landedToast).toContainText(`(${commitIdOf(repository, 'main').slice(0, 8)})`)
     expect(commitIdOf(repository, 'main-')).toBe(repository.baseCommitId)
   })
   await finishJourneyAssertions(page)
