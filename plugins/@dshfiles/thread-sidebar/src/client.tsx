@@ -165,6 +165,7 @@ type ThreadSidebarTranslate = ThreadSidebarProps['tSidebar']
 const emptyThreadsMessage = {
   all: 'threadSidebarEmpty',
   working: 'threadSidebarNoWorkingThreads',
+  'not-working': 'threadSidebarNoNotWorkingThreads',
   attention: 'threadSidebarNoAttentionThreads',
   muted: 'threadSidebarNoMutedThreads',
   archived: 'threadSidebarNoArchivedThreads',
@@ -202,6 +203,7 @@ const threadGroupLabelKeys = {
 const threadStatusFilterLabelKeys = {
   all: 'threadSidebarAllThreads',
   working: 'threadSidebarWorking',
+  'not-working': 'threadSidebarFilterNotWorking',
   attention: 'threadSidebarFilterAttention',
   muted: 'threadSidebarFilterMuted',
   archived: 'threadSidebarArchived',

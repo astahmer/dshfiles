@@ -221,8 +221,14 @@
     {
       "id": "thread-list-views",
       "title": "Configure saved thread views",
-      "summary": "Group and filter thread rows, create named tabs with saved presets, reorder or disable views, and hide quick controls.",
-      "reach": ["expect group \"Thread list view\"", "click button \"All threads\"", "expect button \"All threads\""],
+      "summary": "Group and filter thread rows by activity, attention, muted, or archived status; create named tabs with saved presets, reorder or disable views, and hide quick controls.",
+      "reach": [
+        "expect group \"Thread list view\"",
+        "click button \"All threads\"",
+        "expect button \"All threads\"",
+        "click button \"Filter: None\"",
+        "expect menuitemradio \"Not working\""
+      ],
       "surfaces": ["client", "storage"],
       "configuration": [
         {
@@ -235,8 +241,8 @@
         {
           "key": "statusFilter",
           "defaultValue": "all",
-          "constraints": "Browser-local view preference: all, working, attention, or archived.",
-          "choices": ["all", "working", "attention", "archived"],
+          "constraints": "Browser-local view preference: all, working, not working, attention, muted, or archived.",
+          "choices": ["all", "working", "not-working", "attention", "muted", "archived"],
           "coveredBy": ["thread-sidebar.view-controls"]
         },
         {
@@ -286,7 +292,9 @@
         "none",
         "all",
         "working",
+        "not-working",
         "attention",
+        "muted",
         "archived",
         "main",
         "subagents",
@@ -297,7 +305,7 @@
         "hidden"
       ],
       "failureModes": [
-        "Status and source filters are limited to running, attention, archived, parentId, and origin data exposed by SessionSummary.",
+        "Working and not-working status matching uses session activity plus attention, archive, and mute state; source filters use parentId and origin.",
         "Saved view IDs and names must be unique; at least one of 1–12 presets must remain enabled."
       ],
       "externalDependencies": [],
@@ -329,6 +337,12 @@
           "id": "thread-sidebar.view-controls-unit-status-filters",
           "file": "plugins/@dshfiles/thread-sidebar/src/thread-view.test.ts",
           "testName": "filters supported activity states"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.view-controls-unit-not-working-filter",
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-view.test.ts",
+          "testName": "filters completed and attention-needed threads but excludes archived and muted threads"
         },
         {
           "kind": "unit-test",

@@ -43,6 +43,11 @@ describe('thread view preferences', () => {
       statusFilter: 'all',
       sourceFilter: 'all',
     })
+    expect(decodeThreadViewPreferences({ statusFilter: 'not-working' })).toEqual({
+      groupBy: 'status',
+      statusFilter: 'not-working',
+      sourceFilter: 'all',
+    })
     expect(decodeThreadViewPreferences({ groupBy: 'model' })).toBeNull()
     expect(decodeThreadViewPreferences({ groupBy: 'date', unexpected: true })).toBeNull()
   })

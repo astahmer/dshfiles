@@ -3,7 +3,7 @@ import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/cli
 export const THREAD_GROUP_BY_OPTIONS = ['project', 'date', 'status', 'none'] as const
 export type ThreadGroupBy = (typeof THREAD_GROUP_BY_OPTIONS)[number]
 
-export const THREAD_STATUS_FILTER_OPTIONS = ['all', 'working', 'attention', 'muted', 'archived'] as const
+export const THREAD_STATUS_FILTER_OPTIONS = ['all', 'working', 'not-working', 'attention', 'muted', 'archived'] as const
 export type ThreadStatusFilter = (typeof THREAD_STATUS_FILTER_OPTIONS)[number]
 
 export const THREAD_SOURCE_FILTER_OPTIONS = ['all', 'main', 'subagents'] as const
@@ -52,8 +52,10 @@ export const matchesThreadStatusFilter = (options: {
   if (options.filter === 'all') return true
   if (options.filter === 'muted') return options.muted
   if (options.filter === 'working') return options.running
+  if (options.filter === 'not-working') return !options.archived && !options.muted && (!options.running || options.needsAttention)
   if (options.filter === 'attention') return options.needsAttention
-  return options.archived
+  if (options.filter === 'archived') return options.archived
+  return false
 }
 
 export const threadDateGroup = (updatedAt: number, now: number): ThreadDateGroup => {

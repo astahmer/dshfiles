@@ -85,6 +85,14 @@ describe('thread view filters', () => {
     expect(matchesThreadStatusFilter({ filter: 'muted', running: true, needsAttention: false, archived: false, muted: false })).toBe(false)
   })
 
+  it('filters completed and attention-needed threads but excludes archived and muted threads', () => {
+    expect(matchesThreadStatusFilter({ filter: 'not-working', running: false, needsAttention: false, archived: false, muted: false })).toBe(true)
+    expect(matchesThreadStatusFilter({ filter: 'not-working', running: true, needsAttention: true, archived: false, muted: false })).toBe(true)
+    expect(matchesThreadStatusFilter({ filter: 'not-working', running: true, needsAttention: false, archived: false, muted: false })).toBe(false)
+    expect(matchesThreadStatusFilter({ filter: 'not-working', running: false, needsAttention: false, archived: true, muted: false })).toBe(false)
+    expect(matchesThreadStatusFilter({ filter: 'not-working', running: false, needsAttention: false, archived: false, muted: true })).toBe(false)
+  })
+
   it('filters main and subagent sources using Host lineage metadata', () => {
     expect(matchesThreadSourceFilter({}, 'main')).toBe(true)
     expect(matchesThreadSourceFilter({ origin: 'subagent' }, 'main')).toBe(false)

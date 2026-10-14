@@ -35,6 +35,7 @@ const groupLabelKeys = {
 const statusLabelKeys = {
   all: 'threadSidebarAllThreads',
   working: 'threadSidebarWorking',
+  'not-working': 'threadSidebarFilterNotWorking',
   attention: 'threadSidebarFilterAttention',
   muted: 'threadSidebarFilterMuted',
   archived: 'threadSidebarArchived',

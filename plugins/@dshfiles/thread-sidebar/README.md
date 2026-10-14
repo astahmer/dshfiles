@@ -54,7 +54,9 @@ and the grouping/status/source filters it applies. Stored v1 view preferences
 migrate into that preset list once. **Customize views** opens
 `src/thread-view-manager.tsx`, where presets are saved, renamed, reordered,
 selected, and removed; the row's quick controls apply the selected preset
-without opening the manager. For how working, attention, read state, groups,
+without opening the manager. **Not working** includes non-running threads even
+after their completion was seen, and threads waiting for attention; muted and
+archived threads are omitted. For how working, attention, read state, groups,
 and filters fit together, see [Thread sidebar states](sidebar-state.md).
 
 **Archive undo notice.** Archiving reports itself as a compact overlay anchored
