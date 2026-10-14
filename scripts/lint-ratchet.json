@@ -3,7 +3,7 @@
     "antislop(no-broad-object-parameters)": 8,
     "antislop(no-chained-type-assertions)": 42,
     "antislop(no-conditional-empty-object-spread)": 492,
-    "antislop(no-known-value-widening)": 167,
+    "antislop(no-known-value-widening)": 166,
     "antislop(no-passthrough-variable)": 37,
     "antislop(no-reflect-apply)": 10,
     "antislop(no-reflect-get)": 28,
@@ -11,7 +11,7 @@
     "antislop(no-unknown-parameters)": 211,
     "antislop(no-unknown-returns)": 120,
     "antislop(no-unsafe-dictionary-type)": 256,
-    "antislop(require-safety-comment-for-type-assertion)": 419,
+    "antislop(require-safety-comment-for-type-assertion)": 418,
     "react-hooks(exhaustive-deps)": 26,
     "react(purity)": 15
   },

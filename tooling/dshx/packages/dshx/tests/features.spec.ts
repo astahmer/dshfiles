@@ -51,7 +51,7 @@ describe('plugin feature metadata', () => {
   })
 
   it('accepts reach steps a scratch DSH can run and rejects ones it cannot', () => {
-    const withReach = (reach: unknown) => featureCatalogIssues({ schemaVersion: 1, kind: 'bundle', features: [{ ...feature, reach }] })
+    const withReach = (reach: readonly string[]) => featureCatalogIssues({ schemaVersion: 1, kind: 'bundle', features: [{ ...feature, reach }] })
     expect(
       withReach(['click button "Choose workspace"', 'fill textbox "Search" "sample"', 'expect option "sample*"', 'press Enter', 'expect checkbox "workspace"']),
     ).toEqual([])
