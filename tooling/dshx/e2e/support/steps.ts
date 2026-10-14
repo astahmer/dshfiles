@@ -238,6 +238,19 @@ Given('the isolated plugin composition of {string} is booted with the autocomple
   await visitIsolatedPluginProfile(page, profile)
 })
 
+// The web profile seed enables the in-memory session-content index through its patch layer; no bundle composes it.
+const sessionContentIndexPatch = `- id: session-query-sqlite
+  name: '@deepseek-ai/dsh-session-query-sqlite'
+  config:
+    path: ':memory:'
+    openAt: first-search
+`
+
+Given('the isolated plugin profile {string} is booted with the session-content index', async ({ page }: { page: Page }, packageId: string) => {
+  const profile = await bootComposedPluginProfile({ packageIds: [packageId], profileLabel: packageId, cordisPatch: sessionContentIndexPatch })
+  await visitIsolatedPluginProfile(page, profile)
+})
+
 Given('the isolated plugin composition {string} and {string} is booted', async ({ page }: { page: Page }, packageId: string, companionPackageId: string) => {
   const profile = await bootComposedPluginProfile({
     packageIds: [packageId, companionPackageId],
@@ -378,7 +391,8 @@ Then('exactly one shared plugin stylesheet is injected', async ({ page }: { page
   await page.locator('[data-plugin-css="@dshfiles/thread-sidebar/client.css"]').waitFor({ state: 'attached', timeout: OUTCOME_TIMEOUT_MS })
   const sheets = await page.evaluate(() =>
     [...document.querySelectorAll<HTMLStyleElement>('style[data-plugin^="@dshfiles/"], style[data-plugin="dshx:shared-css"]')]
-      .filter(style => (style.textContent ?? '').length > 0)
+      // The budget guards copies of the Tailwind sheet; a plugin's small hand-written CSS (agent-questions, mentions) is not one.
+      .filter(style => (style.textContent ?? '').includes('tailwindcss'))
       .map(style => style.dataset.plugin ?? ''),
   )
   await recordAssertion(page, 'one-shared-plugin-stylesheet', () => expect(sheets).toEqual(['dshx:shared-css']))

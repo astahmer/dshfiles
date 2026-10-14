@@ -144,6 +144,8 @@ interface PrepareBootProfilesOptions {
   readonly additionalBundleIds?: readonly string[]
   readonly sourceProfileRoot?: string
   readonly includeSourceProfileBundles?: boolean
+  /** The profile's own `cordis.patch.yml`, for Loader rows no bundle composes (e.g. the session-content index). */
+  readonly cordisPatch?: string
 }
 
 const prepareBootProfiles = async (
@@ -201,6 +203,7 @@ const prepareBootProfiles = async (
     }
     await writeFile(join(profileRoot, 'package.json'), `${JSON.stringify(manifest, null, 2)}\n`)
     await writeFile(join(profileRoot, 'pnpm-workspace.yaml'), pnpmWorkspace)
+    if (options.cordisPatch !== undefined) await writeFile(join(profileRoot, 'cordis.patch.yml'), options.cordisPatch)
     await installProfile(profileRoot, homeRoot, workspaceManifest.packageManager)
     return {
       homeRoot,

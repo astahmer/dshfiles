@@ -140,16 +140,18 @@ export const bootComposedPluginProfile = async ({
   timeoutMs = 90_000,
   additionalBundleIds = [],
   seedHome,
+  cordisPatch,
 }: {
   readonly packageIds: readonly [string, ...string[]]
   readonly profileLabel: string
   readonly timeoutMs?: number
   readonly additionalBundleIds?: readonly string[]
   readonly seedHome?: (homeRoot: string) => Promise<void>
+  readonly cordisPatch?: string
 }): Promise<BootedProfile> => {
   const bundles = resolveLocalBundles(packageIds, await listLocalBootBundles())
   for (const bundle of bundles) await buildBundleOnce(bundle)
-  const prepared = await prepareComposedBootProfile(bundles, { additionalBundleIds })
+  const prepared = await prepareComposedBootProfile(bundles, cordisPatch === undefined ? { additionalBundleIds } : { additionalBundleIds, cordisPatch })
   const expectedClientEntries = bundles.filter(bundle => bundle.hasClient).map(bundle => bundle.packageId)
   try {
     await seedHome?.(prepared.homeRoot)

@@ -12,8 +12,7 @@ Feature: Command palette
 
   @scenario:command-palette.content-search
   Scenario: Content search finds a real user message and opens its thread
-    Given the isolated plugin composition "@dshfiles/command-palette" and "@dshfiles/dsh-core-runtime" is booted
-    Then the Web UI mounts without a plugin failure card
+    Given the isolated plugin profile "@dshfiles/command-palette" is booted with the session-content index
     When a searchable user message is sent to a new thread
     When the command palette is opened
     When the palette query is "#dshx-content-search-e2e-marker"
