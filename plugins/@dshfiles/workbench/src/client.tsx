@@ -9,7 +9,7 @@ import { defineClient, useSettings } from '@dshfiles/dshx/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { LayoutGridIcon } from '@dshfiles/plugin-ui/icons'
 import dockviewSheet from 'virtual:dshfiles-workbench/dockview-css'
-import { useLayoutEffect } from 'react'
+import { useEffect, useLayoutEffect } from 'react'
 import { demoPanels } from './demo-panels.js'
 import { createLayoutStore } from './layout-store.js'
 import { WORKBENCH_LOCALE_NAMESPACE, workbenchLocale } from './locales.js'
@@ -51,7 +51,28 @@ export default defineClient({
     // The slot ledger erases the brand; an id is a MainPanelId exactly when `main` registers it.
     const isMainPanelId = (id: string): id is MainPanelId => ctx.slots.entriesOfSlot('main').some(entry => entry.options.key === id)
 
-    for (const panel of demoPanels(translate)) ctx.effect(() => registry.register(panel), `workbench: ${panel.id}`)
+    // Settings are only readable from components, so the views that show panels hold the developer fixtures while the flag is on.
+    const demos = demoPanels(translate)
+    let demoHolders = 0
+    let releaseDemos: (() => void) | undefined
+    const useDemoPanels = (): void => {
+      const enabled = useSettings(workbenchSettings).value?.demoPanels === true
+      useEffect(() => {
+        if (!enabled) return
+        demoHolders += 1
+        if (demoHolders === 1) {
+          const disposers = demos.map(panel => registry.register(panel))
+          releaseDemos = () => disposers.forEach(dispose => dispose())
+        }
+        return () => {
+          demoHolders -= 1
+          if (demoHolders > 0) return
+          releaseDemos?.()
+          releaseDemos = undefined
+        }
+      }, [enabled])
+    }
+    ctx.effect(() => () => releaseDemos?.(), 'workbench: developer panels')
     ctx.effect(() => () => document.querySelector(SHEET_SELECTOR)?.remove(), 'workbench: dockview sheet')
     ctx.effect(
       () =>
@@ -73,6 +94,7 @@ export default defineClient({
         { name: 'main', key: PANEL_ID, locale: WORKBENCH_LOCALE_NAMESPACE },
         decorate(props => {
           useDockviewSheet()
+          useDemoPanels()
           return <WorkbenchView registry={registry} store={store} t={props.t} />
         }),
       ),
@@ -102,6 +124,7 @@ export default defineClient({
         { name: 'sidebar.right.pane.tab', key: RIGHT_PANE_ID, locale: WORKBENCH_LOCALE_NAMESPACE },
         decorate(props => {
           useDockviewSheet()
+          useDemoPanels()
           return <WorkbenchView registry={registry} store={sideStore} t={props.t} />
         }),
       ),

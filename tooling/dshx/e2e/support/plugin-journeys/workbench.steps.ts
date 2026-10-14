@@ -29,9 +29,9 @@ When('the Workbench is opened', async ({ page }: { page: Page }) => {
   await openWorkbench(page)
 })
 
-When('the Ticker panel is closed and the page is reloaded', async ({ page }: { page: Page }) => {
-  await page.getByRole('button', { name: 'Close Ticker', exact: true }).click()
-  await expect(page.getByRole('region', { name: 'Ticker', exact: true })).toHaveCount(0)
+When('the Editor panel is closed and the page is reloaded', async ({ page }: { page: Page }) => {
+  await page.getByRole('button', { name: 'Close Editor', exact: true }).click()
+  await expect(page.getByRole('region', { name: 'Editor', exact: true })).toHaveCount(0)
   await page.reload()
   await openWorkbench(page)
 })
@@ -54,35 +54,36 @@ When('the editor plugin is enabled again', async ({ page }: { page: Page }) => {
   await openWorkbench(page)
 })
 
-When('a thread opens the Workbench side panel and closes its Ticker', async ({ page }: { page: Page }) => {
+When('a thread opens the Workbench side panel and closes its Editor', async ({ page }: { page: Page }) => {
   await page.getByRole('button', { name: 'New session', exact: true }).first().click()
   await sendMessage(page, 'workbench side panel thread')
   await page.getByRole('button', { name: 'Toggle the workbench side panel', exact: true }).click()
   await expect(page.getByRole('tab', { name: 'Workbench Close', exact: true })).toBeVisible()
-  await expect(page.getByRole('region', { name: 'Ticker', exact: true })).toBeVisible()
-  await page.getByRole('button', { name: 'Close Ticker', exact: true }).click()
-  await expect(page.getByRole('region', { name: 'Ticker', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('region', { name: 'Editor', exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Close Editor', exact: true }).click()
+  await expect(page.getByRole('region', { name: 'Editor', exact: true })).toHaveCount(0)
 })
 
-Then('the default layout shows the first two panels side by side', async ({ page }: { page: Page }) => {
-  await recordAssertion(page, 'workbench-default-layout-splits-the-first-two-panels', async () => {
-    await expect.poll(() => regionNames(page)).toEqual(['Scratchpad', 'Ticker'])
-    await expect(page.getByRole('region', { name: 'Scratchpad', exact: true }).getByRole('tab')).toHaveText(['Scratchpad', 'Editor', 'Explorer'])
+Then('the default layout shows the Editor alone', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'workbench-default-layout-opens-the-editor-alone', async () => {
+    await expect.poll(() => regionNames(page)).toEqual(['Editor'])
+    await expect(page.getByRole('region', { name: 'Editor', exact: true }).getByRole('tab')).toHaveText(['Editor'])
+    await expect(page.getByRole('region', { name: 'Scratchpad', exact: true })).toHaveCount(0)
   })
 })
 
 Then('the closed panel stays closed and can be added back', async ({ page }: { page: Page }) => {
-  await recordAssertion(page, 'workbench-layout-survives-reload', () => expect.poll(() => regionNames(page)).toEqual(['Scratchpad']))
+  await recordAssertion(page, 'workbench-layout-survives-reload', () => expect.poll(() => regionNames(page)).toEqual([]))
   await page.getByRole('button', { name: 'Add panel', exact: true }).click()
-  await page.getByRole('menuitem', { name: 'Ticker', exact: true }).click()
-  await recordAssertion(page, 'workbench-add-panel-restores-the-closed-panel', () => expect(page.getByRole('region', { name: 'Ticker', exact: true })).toBeVisible())
-  await page.getByRole('button', { name: 'Close Ticker', exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Editor', exact: true }).click()
+  await recordAssertion(page, 'workbench-add-panel-restores-the-closed-panel', () => expect(page.getByRole('region', { name: 'Editor', exact: true })).toBeVisible())
+  await page.getByRole('button', { name: 'Close Editor', exact: true }).click()
   await page.getByRole('button', { name: 'Reset layout', exact: true }).click()
-  await recordAssertion(page, 'workbench-reset-restores-the-default-layout', () => expect.poll(() => regionNames(page)).toEqual(['Scratchpad', 'Ticker']))
+  await recordAssertion(page, 'workbench-reset-restores-the-default-layout', () => expect.poll(() => regionNames(page)).toEqual(['Editor']))
 })
 
 Then('the Workbench falls back to its default layout', async ({ page }: { page: Page }) => {
-  await recordAssertion(page, 'workbench-malformed-layout-falls-back-to-default', () => expect.poll(() => regionNames(page)).toEqual(['Scratchpad', 'Ticker']))
+  await recordAssertion(page, 'workbench-malformed-layout-falls-back-to-default', () => expect.poll(() => regionNames(page)).toEqual(['Editor']))
   await finishJourneyAssertions(page)
 })
 
@@ -106,11 +107,10 @@ Then('the Editor tab shows the editor again', async ({ page }: { page: Page }) =
 Then('the main Workbench keeps its own layout', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'workbench-side-panel-layout-is-stored-apart', async () => {
     const [main, side] = await page.evaluate(keys => keys.map(key => localStorage.getItem(key) ?? ''), [MAIN_LAYOUT_KEY, SIDE_LAYOUT_KEY])
-    expect(side).toContain('"dshfiles-workbench.scratchpad"')
-    expect(side).not.toContain('"dshfiles-workbench.ticker"')
-    expect(main ?? '').not.toContain('"dshfiles-workbench.ticker"')
+    expect(side).not.toContain('"dshfiles-editor.main"')
+    expect(main ?? '').not.toContain('"dshfiles-editor.main"')
   })
   await openWorkbench(page)
-  await recordAssertion(page, 'workbench-main-layout-unaffected-by-side-panel', () => expect.poll(() => regionNames(page)).toEqual(['Scratchpad', 'Ticker']))
+  await recordAssertion(page, 'workbench-main-layout-unaffected-by-side-panel', () => expect.poll(() => regionNames(page)).toEqual(['Editor']))
   await finishJourneyAssertions(page)
 })

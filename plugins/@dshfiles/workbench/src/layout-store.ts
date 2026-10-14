@@ -35,9 +35,17 @@ export const openPanel = (api: DockviewApi, definition: Pick<WorkbenchPanelDefin
   api.addPanel({ id: definition.id, component: WORKBENCH_COMPONENT, title: definition.title })
 }
 
-/** The first two panels side by side, the rest as tabs of the first group. */
+/** The Editor's panel id: the workbench exists to host it, so it opens alone when it is registered. */
+const EDITOR_PANEL_ID = 'dshfiles-editor.main'
+
+/** The Editor alone when registered; otherwise the first two panels side by side and the rest as tabs of the first group. */
 export const applyDefaultLayout = (api: DockviewApi, panels: readonly WorkbenchPanelDefinition[]): void => {
   api.clear()
+  const editor = panels.find(panel => panel.id === EDITOR_PANEL_ID)
+  if (editor !== undefined) {
+    api.addPanel({ id: editor.id, component: WORKBENCH_COMPONENT, title: editor.title }).api.setActive()
+    return
+  }
   const [first, second, ...rest] = panels
   if (first === undefined) return
   const firstPanel = api.addPanel({ id: first.id, component: WORKBENCH_COMPONENT, title: first.title })

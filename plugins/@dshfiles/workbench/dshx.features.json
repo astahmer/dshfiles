@@ -4,8 +4,9 @@
     {
       "id": "dockable-panel-layouts",
       "title": "Arrange plugin panels in independent layouts",
-      "summary": "Add panels and arrange tab, split, float, move, close, and reset operations independently in the main workbench and right-side pane.",
-      "surfaces": ["client", "integration", "storage"],
+      "summary": "Opens on the Editor alone, then adds panels and arranges tab, split, float, move, close, and reset operations independently in the main workbench and right-side pane. The Scratchpad and Ticker docking fixtures appear only behind a developer setting.",
+      "reach": ["click button \"Workbench\"", "expect heading \"Workbench\"", "expect region \"Editor\""],
+      "surfaces": ["client", "integration", "storage", "settings"],
       "configuration": [
         {
           "key": "headerToggle",
@@ -13,6 +14,13 @@
           "constraints": "Boolean; show the workbench header toggle.",
           "choices": ["true", "false"],
           "coveredBy": ["workbench.surface-layouts"]
+        },
+        {
+          "key": "demoPanels",
+          "defaultValue": "false",
+          "constraints": "Boolean; offer the Scratchpad and Ticker developer fixtures in Add panel.",
+          "choices": ["true", "false"],
+          "coveredBy": ["workbench.default-layout"]
         }
       ],
       "states": ["tabbed", "split", "floating", "closed", "reset"],
@@ -41,6 +49,12 @@
           "kind": "gherkin",
           "id": "workbench.surface-layouts",
           "featureFile": "tooling/dshx/e2e/features/workbench.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workbench.dockable-panel-layouts-unit-editor-default-layout",
+          "file": "plugins/@dshfiles/workbench/src/workbench-view.test.tsx",
+          "testName": "opens the Editor alone by default and leaves the other panels to Add panel"
         },
         {
           "kind": "unit-test",

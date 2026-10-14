@@ -69,6 +69,12 @@ describe('WorkbenchView', () => {
     expect(api.getPanel('c')?.group).toBe(api.getPanel('a')?.group)
   })
 
+  it('opens the Editor alone by default and leaves the other panels to Add panel', () => {
+    const { api } = renderWorkbench(registryWith('dshfiles-editor.explorer', 'dshfiles-editor.main', 'other'))
+    expect(api.panels.map(panel => panel.id)).toEqual(['dshfiles-editor.main'])
+    expect(api.getPanel('dshfiles-editor.main')?.api.isActive).toBe(true)
+  })
+
   it('keeps a panel mounted with its draft while it is tabbed, split, floated and moved back', () => {
     mounts.clear()
     const { api } = renderWorkbench(registryWith('a', 'b'))

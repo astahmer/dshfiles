@@ -8,8 +8,8 @@ Feature: Workbench layouts
   Scenario: The default layout persists, resets and survives a corrupt save
     Given the isolated plugin composition of "@dshfiles/workbench, @dshfiles/editor" is booted
     When the Workbench is opened
-    Then the default layout shows the first two panels side by side
-    When the Ticker panel is closed and the page is reloaded
+    Then the default layout shows the Editor alone
+    When the Editor panel is closed and the page is reloaded
     Then the closed panel stays closed and can be added back
     When the saved Workbench layout is corrupted and the page is reloaded
     Then the Workbench falls back to its default layout
@@ -26,7 +26,7 @@ Feature: Workbench layouts
   @scenario:workbench.surface-layouts
   Scenario: The side panel keeps a layout apart from the main Workbench
     Given the isolated plugin composition of "@dshfiles/workbench, @dshfiles/editor" is booted
-    When a thread opens the Workbench side panel and closes its Ticker
+    When a thread opens the Workbench side panel and closes its Editor
     Then the main Workbench keeps its own layout
 
   @scenario:workbench.early-open
