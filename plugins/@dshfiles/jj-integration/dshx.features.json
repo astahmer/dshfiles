@@ -246,7 +246,7 @@
     {
       "id": "thread-workspaces-panel",
       "title": "Thread workspaces page",
-      "summary": "Available from the left panel and conversation side panel beside Jujutsu. Rows show conversation titles with open links and lazy message previews; Rebase is disabled until every thread session is stopped and no user question is pending. Removal confirms folder and registry effects and any revisions to abandon.",
+      "summary": "Available from the left panel and conversation side panel beside Jujutsu. Rows show conversation titles with open links and lazy message previews; Rebase is disabled until every thread session is stopped and no user question is pending. A successful rebase immediately marks its row up to date while the refreshed repository data arrives. Removal confirms folder and registry effects and any revisions to abandon.",
       "reach": [
         "seed rebase-ready-thread",
         "expect button \"Open thread workspaces in side panel\"",
@@ -286,6 +286,11 @@
         }
       ],
       "verification": [
+        {
+          "kind": "gherkin",
+          "id": "jj-integration.thread-workspace-rebase-browser-journey",
+          "featureFile": "tooling/dshx/e2e/features/jj-integration.feature"
+        },
         {
           "kind": "gherkin",
           "id": "jj-integration.discard-browser-journey",

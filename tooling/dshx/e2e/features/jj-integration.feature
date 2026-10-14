@@ -63,6 +63,18 @@ Feature: jj thread workspaces
     When the thread's work is rebased outside the UI
     Then Rebase reflects the external rebase without reloading
 
+  @scenario:jj-integration.thread-workspace-rebase-browser-journey
+  Scenario: Thread workspaces update as soon as a rebase succeeds
+    Given the isolated plugin composition of "@dshfiles/jj-integration, @dshfiles/workspace-folder-picker, @dshfiles/multi-host" is booted
+    When a disposable jj repository is chosen as the New thread project
+    And the New thread workspace toggle is turned on
+    And a message is sent in the thread workspace
+    And the thread workspace gains a revision described "Panel rebase"
+    And the Thread workspaces panel is opened
+    Then the thread row offers Rebase for its 1 revision to rebase
+    When Rebase is clicked in the thread workspace row
+    Then the thread workspace row immediately shows that it is up to date
+
   @scenario:jj-integration.discard-browser-journey
   Scenario: Remove a thread workspace and explicitly abandon its work
     Given the isolated plugin composition of "@dshfiles/jj-integration, @dshfiles/workspace-folder-picker, @dshfiles/multi-host" is booted

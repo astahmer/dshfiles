@@ -393,6 +393,16 @@ Then('the thread row offers Rebase for its 1 revision to rebase', async ({ page 
   })
 })
 
+When('Rebase is clicked in the thread workspace row', async ({ page }: { page: Page }) => {
+  await threadRow(page).getByRole('button', { name: 'Rebase', exact: true }).click()
+})
+
+Then('the thread workspace row immediately shows that it is up to date', async ({ page }: { page: Page }) => {
+  const row = threadRow(page)
+  await expect(row.getByText('Nothing to rebase', { exact: true })).toBeVisible()
+  await expect(row.getByRole('button', { name: 'Rebase', exact: true })).toHaveCount(0)
+})
+
 When('the conversation is opened from its workspace row', async ({ page }: { page: Page }) => {
   await threadRow(page)
     .getByRole('button', { name: /^Open thread:/ })

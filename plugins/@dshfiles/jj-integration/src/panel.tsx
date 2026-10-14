@@ -358,8 +358,18 @@ export const ThreadWorkspacesPanel = (props: {
   }
   const rebase = useMutation({
     mutationFn: (path: string) => runHostRequest({ timeoutMs: 300_000, request: signal => api.land({ path }, { signal }) }),
-    onSuccess: result => {
+    onSuccess: async (result, path) => {
       if (result.status === 'landed') {
+        await queryClient.cancelQueries({ queryKey: threadQueryKeys.repositories })
+        queryClient.setQueryData<Awaited<ReturnType<typeof api.repositories>>>(threadQueryKeys.repositories, previous => {
+          if (previous === undefined) return previous
+          return {
+            repositories: previous.repositories.map(repository => ({
+              ...repository,
+              threads: repository.threads.map(thread => (thread.path === path ? { ...thread, unlanded: [], behind: false } : thread)),
+            })),
+          }
+        })
         setNotice(null)
         toast.show({ text: describeLandResult(t, result), success: true })
         return
@@ -424,7 +434,7 @@ export const ThreadWorkspacesPanel = (props: {
                   openSession={props.openSession}
                   t={t}
                   bookmark={props.bookmark}
-                  busy={rebase.isPending && rebase.variables === thread.path}
+                  busy={rebase.isPending}
                   onRebase={() => rebase.mutate(thread.path)}
                   onDiscard={() => discard.request({ path: thread.path, name: thread.name, unlandedCount: thread.unlanded.length })}
                 />
