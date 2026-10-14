@@ -275,8 +275,6 @@ When('the thread workspace gains a revision described {string}', async ({ page }
   const threadPath = join(repository.threadsPath, provisionedThreadName(page))
   await writeFile(join(threadPath, 'feature.txt'), `${description}\n`)
   jjAt(threadPath, repository.temporaryRoot, ['describe', '--message', description])
-  // The Host activity snapshot is read once per mount; a reload stands in for the agent's next turn.
-  await page.reload()
 })
 
 Then('the destination bar offers the main bookmark in the shared checkout', async ({ page }: { page: Page }) => {
@@ -334,7 +332,7 @@ Then('Rebase is disabled before there are revisions to rebase', async ({ page }:
 
 Then('Rebase refuses the placeholder description and leaves main in place', async ({ page }: { page: Page }) => {
   const repository = repositoryFor(page)
-  await expect(rebaseButton(page)).toHaveText('Rebase · 1')
+  await expect(rebaseButton(page)).toHaveText('Rebase · 1', { timeout: 10_000 })
   await rebaseButton(page).click()
   await recordAssertion(page, 'jj-integration-rebase-asks-for-a-description', async () => {
     await expect(page.getByRole('alert').filter({ hasText: /^Describe these revisions before rebasing: \w+\./ })).toBeVisible()
@@ -356,6 +354,30 @@ Then('Rebase moves main onto the work described {string}', async ({ page }: { pa
     expect(commitIdOf(repository, 'main-')).toBe(repository.baseCommitId)
   })
   await finishJourneyAssertions(page)
+})
+
+Then('Rebase detects the follow-up revision without reloading', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'jj-integration-rebase-refreshes-new-work-without-reload', async () => {
+    await expect(rebaseButton(page)).toHaveText('Rebase · 1', { timeout: 10_000 })
+    await expect(rebaseButton(page)).toBeEnabled()
+  })
+})
+
+When("the thread's work is rebased outside the UI", async ({ page }: { page: Page }) => {
+  const repository = repositoryFor(page)
+  const threadPath = join(repository.threadsPath, provisionedThreadName(page))
+  jjAt(threadPath, repository.temporaryRoot, ['rebase', '-b', '@', '-d', 'main'])
+  jjAt(threadPath, repository.temporaryRoot, ['bookmark', 'set', 'main', '-r', '@'])
+  jjAt(threadPath, repository.temporaryRoot, ['new', 'main'])
+})
+
+Then('Rebase reflects the external rebase without reloading', async ({ page }: { page: Page }) => {
+  const repository = repositoryFor(page)
+  await recordAssertion(page, 'jj-integration-rebase-refreshes-external-rebase-without-reload', async () => {
+    await expect(rebaseButton(page)).toBeDisabled({ timeout: 10_000 })
+    await expect(rebaseButton(page)).toHaveAttribute('title', 'Rebase this thread onto main (0 to rebase)')
+    expect(descriptionOf(repository, 'main')).toBe('Follow-up after a steer')
+  })
 })
 
 When('the Thread workspaces panel is opened', async ({ page }: { page: Page }) => {

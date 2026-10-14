@@ -58,6 +58,10 @@ Feature: jj thread workspaces
     Then Rebase refuses the placeholder description and leaves main in place
     When the thread workspace gains a revision described "Add the feature"
     Then Rebase moves main onto the work described "Add the feature"
+    When the thread workspace gains a revision described "Follow-up after a steer"
+    Then Rebase detects the follow-up revision without reloading
+    When the thread's work is rebased outside the UI
+    Then Rebase reflects the external rebase without reloading
 
   @scenario:jj-integration.discard-browser-journey
   Scenario: Remove a thread workspace and explicitly abandon its work

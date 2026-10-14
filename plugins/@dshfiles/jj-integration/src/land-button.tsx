@@ -33,14 +33,15 @@ export const LandButton = (props: LandButtonProps): JSX.Element | null => {
     queryKey: threadQueryKeys.threadAt(cwd ?? ''),
     enabled: cwd !== null && cwd.length > 0,
     queryFn: ({ signal }) => runHostRequest({ signal, timeoutMs: 30_000, request: hostSignal => api.threadAt({ path: cwd ?? '' }, { signal: hostSignal }) }),
+    refetchInterval: query => (query.state.data?.thread === null ? false : 5_000),
   })
   const rebase = useMutation({
     mutationFn: (path: string) => runHostRequest({ timeoutMs: 300_000, request: signal => api.land({ path, sessionId: props.sessionId }, { signal }) }),
     onSuccess: result => toast.show({ text: describeLandResult(props.t, result), success: result.status === 'landed' }),
     onError: error => toast.show({ text: errorMessage(error, props.t('loadFailed')), success: false }),
     onSettled: () => {
-      void queryClient.invalidateQueries({ queryKey: ['jj-integration'] })
       announceRepositoryChange()
+      return queryClient.invalidateQueries({ queryKey: ['jj-integration'] })
     },
   })
   const current = thread.data?.thread
@@ -78,7 +79,7 @@ export const LandButton = (props: LandButtonProps): JSX.Element | null => {
     <>
       <Button
         className="dshx-root"
-        disabled={rebase.isPending || current.unlanded.length === 0 || !canRebase}
+        disabled={rebase.isPending || thread.isFetching || current.unlanded.length === 0 || !canRebase}
         onClick={() => rebase.mutate(current.path)}
         size="sm"
         title={canRebase ? `${label} (${props.t('toRebase', { count: current.unlanded.length })})` : `${label} — ${props.t('rebaseBlocked')}`}
