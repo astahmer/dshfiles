@@ -26,6 +26,7 @@ import { SHELL_LOCALE_NAMESPACE, shellLocale, type ShellTranslate } from './nati
 import { ShellRoot, type OnboardingStep, type ShellRootDeps } from './native/shell-root.js'
 import { SHELL_CHILDREN, type ShellRenderSlot } from './native/slots.js'
 import { useObservable } from './native/use-observable.js'
+import { WELCOME_LOCALE_NAMESPACE, WELCOME_STEP_ID, WelcomeNotice, WelcomeNoticeStore, welcomeLocale, type WelcomeTranslate } from './native/welcome-notice.js'
 import { settingsShellApi } from './shell-api.js'
 import { OPEN_SETTINGS_EVENT, openSettingsRequestSchema, type OpenSettingsRequest } from './open-settings.js'
 import { PluginSettingsPageView } from './plugin-settings-page.js'
@@ -38,9 +39,6 @@ import { shellMachine, type FieldTarget, type ShellSurface } from './shell-machi
 import { PORTED_FROM } from './upstream.js'
 import './client.css'
 
-/** The settings namespace whose acknowledgement the native welcome step stores; it is served by the native row only. */
-const WELCOME_NOTICE_NAMESPACE = 'ui-settings-general'
-const WELCOME_NOTICE_STEP = 'welcome-notice'
 /** The main panel Settings fills when it opens as a tab; main-tabs names the tab "Settings" from this id. */
 const SETTINGS_PANEL_ID = 'dshfiles-settings'
 const SETTINGS_NAMESPACE = 'dshfiles-settings-shell'
@@ -98,7 +96,7 @@ const CurrentVersion = (props: { readonly t: ShellTranslate }): JSX.Element => {
 
 export default defineClient({
   name: '@dshfiles/settings-shell',
-  locales: [shellLocale],
+  locales: [shellLocale, welcomeLocale],
   inject: ['slots', 'connection', 'remote', 'remote.settings', 'remote.session', 'configForms', 'shortcuts', 'sessions', 'layout'],
   setup(ctx, decorate, metadata) {
     const t = ctx.locale.bind(SHELL_LOCALE_NAMESPACE)
@@ -278,8 +276,9 @@ export default defineClient({
     )
     const onboardingSteps = ledgerProjection<readonly OnboardingStep[]>(
       () =>
+        // Winners only: this plugin shadows the native welcome step under the same id.
         ctx.slots
-          .entries('settings.onboarding')
+          .entriesOfSlot('settings.onboarding')
           .map(entry => ({ id: entry.options.id ?? '', order: entry.options.order ?? 0 }))
           .sort((left, right) => left.order - right.order),
       () => String(ctx.slots.getVersion('settings.onboarding')),
@@ -292,15 +291,6 @@ export default defineClient({
         return state.phase === 'ready' && (main === undefined || main.blank)
       },
       subscribe: listener => ctx.sessions.list.subscribe(listener),
-    }
-    // The welcome step stores its acknowledgement in the native row's namespace, which is switched off with that row; an
-    // unserved namespace would only show the notice with a save error on every empty Hero, so it is skipped instead.
-    const welcomeForm = ctx.configForms.get<unknown>(WELCOME_NOTICE_NAMESPACE)
-    const noSkips: ReadonlySet<string> = new Set()
-    const welcomeSkipped: ReadonlySet<string> = new Set([WELCOME_NOTICE_STEP])
-    const skippedOnboarding: ObservableSnapshot<ReadonlySet<string>> = {
-      getSnapshot: () => (welcomeForm.getSnapshot().status === 'unavailable' ? welcomeSkipped : noSkips),
-      subscribe: listener => welcomeForm.subscribe(listener),
     }
 
     const fieldTarget: ObservableSnapshot<FieldTarget | undefined> = { getSnapshot: () => actor.getSnapshot().context.field, subscribe: subscribeActor }
@@ -327,7 +317,6 @@ export default defineClient({
       shortcuts: ctx.shortcuts.catalog,
       onboardingSteps,
       onboardingActive,
-      skippedOnboarding,
       settingsOpen,
       openSettings: () => openSettings(),
       closeSettings: () => actor.send({ type: 'close' }),
@@ -516,6 +505,20 @@ export default defineClient({
     ctx.slots.inject('settings.close', () =>
       ctx.slots.register({ name: 'settings.close', locale: SHELL_LOCALE_NAMESPACE }, (props: { readonly t: ShellTranslate }) => <CloseLabel t={props.t} />),
     )
+
+    // The Desktop shell shows its own first-run flow, as natively; the browser gets the preview notice.
+    if (!('dshDesktop' in globalThis)) {
+      const welcome = new WelcomeNoticeStore(preferences)
+      ctx.effect(() => () => welcome.dispose(), 'settings-shell: welcome notice')
+      ctx.slots.inject('settings.onboarding', () =>
+        ctx.slots.register(
+          { name: 'settings.onboarding', id: WELCOME_STEP_ID, order: -100, priority: -1, locale: WELCOME_LOCALE_NAMESPACE },
+          (props: { readonly complete: () => void; readonly t: WelcomeTranslate }) => (
+            <WelcomeNotice complete={props.complete} controller={welcome} t={props.t} />
+          ),
+        ),
+      )
+    }
 
     // Native policy: only a loopback page gets the privileged document actions (and the path they reveal).
     if (ctx.remote.$host.isLoopback) {

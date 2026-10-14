@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { humanizeKey, namespaceText, settingFields, type JsonValue, type LocalizedTextReader, type SettingField } from './schema-form/schema-model.js'
 
 /** One settings namespace, as `settings.describe` reports it. */
-export interface NamespaceDescription {
+interface NamespaceDescription {
   readonly ns: string
   readonly schema: JsonValue
   readonly secrets?: readonly { readonly path: readonly string[] }[]
@@ -29,10 +29,6 @@ export interface PluginSettingsPage {
 const PAGE_PREFIX = 'plugin:'
 
 export const pluginPageId = (ns: string): string => `${PAGE_PREFIX}${ns}`
-
-/** The namespace a nav id opens, or undefined for a `settings.section` id. */
-export const namespaceOfPage = (pageId: string | undefined): string | undefined =>
-  pageId?.startsWith(PAGE_PREFIX) === true ? pageId.slice(PAGE_PREFIX.length) : undefined
 
 /**
  * One page per namespace with at least one visible setting: titled by its bundle's manifest, else its schema, else

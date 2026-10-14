@@ -105,7 +105,8 @@ name and owner prop, so native and plugin sections register exactly as before.
 `src/native/` holds the ported code, one file per upstream module, each naming its source. `src/upstream.ts` records
 the version it was taken from:
 
-- `src/upstream-version.test.ts` fails when the workspace's DSH packages move past that version;
+- `src/upstream-version.test.ts` fails when the workspace's DSH packages move past that version (or past the welcome
+  notice's, below);
 - the Host logs `settings-shell: ported from … but DSH ships …` at boot when the running DSH resolves another version,
   and the General section's version row shows the running one.
 
@@ -116,9 +117,11 @@ Deliberate differences from upstream:
 
 - Styles are `dshx:` utilities instead of CSS modules (one shared plugin stylesheet).
 - Dictionaries live under `dshfiles.settings-shell`; dshx reserves the native `settings` namespace.
-- The native welcome notice keeps its acknowledgement in the `ui-settings-general` namespace, which only the native
-  row serves. With that row off the namespace is unserved, so the shell skips the `welcome-notice` onboarding step
-  instead of showing it with a save error on every empty Hero. A DSH release that bumps the notice will not show it.
+- The native welcome notice (`@deepseek-ai/dsh-client-ui-settings-models` 0.2.0-rc.2) keeps its acknowledgement in
+  the `ui-settings-general` namespace, which only the switched-off native row serves, and a Loader patch cannot give
+  this row that id. So the step is ported too (`src/native/welcome-notice.tsx`): it shadows the `welcome-notice`
+  onboarding entry and stores `welcomeNoticeVersion` in `dshfiles-settings-shell`. Someone who acknowledged the native
+  notice sees it once more after switching. Its version is checked like the shell's.
 
 ## Settings (`dshfiles-settings-shell`)
 

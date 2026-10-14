@@ -1,6 +1,6 @@
 import Schema from '@deepseek-ai/schemastery'
 import { describe, expect, it } from 'vitest'
-import { localizedTextReader, namespaceOfPage, pluginPageId, pluginSettingsPages } from './plugin-settings.js'
+import { localizedTextReader, pluginSettingsPages } from './plugin-settings.js'
 import { jsonValueSchema } from './schema-form/schema-model.js'
 
 const wire = (schema: Schema) => jsonValueSchema.parse(schema.toJSON())
@@ -23,11 +23,6 @@ describe('pluginSettingsPages', () => {
       ['Ui theme', 'more', 1],
     ])
     expect(pages[1]?.description).toBe('Group threads.')
-  })
-
-  it('round-trips page ids and leaves section ids alone', () => {
-    expect(namespaceOfPage(pluginPageId('thread-sidebar'))).toBe('thread-sidebar')
-    expect(namespaceOfPage('general')).toBeUndefined()
   })
 })
 

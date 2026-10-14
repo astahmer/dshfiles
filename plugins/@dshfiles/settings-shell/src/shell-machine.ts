@@ -3,7 +3,7 @@ import { assign, setup } from '@dshfiles/plugin-ui/machine'
 /** Where Settings shows: a dialog over the current view, that dialog filling the window, or the main view (a tab). */
 export type ShellSurface = 'modal' | 'tab'
 
-export interface ShellPorts {
+interface ShellPorts {
   /** Show the Settings main panel; main-tabs, when loaded, gives it a tab. */
   readonly showPanel: () => void
   /** Leave the Settings main panel for whatever the main view showed before. */
@@ -16,7 +16,7 @@ export interface FieldTarget {
   readonly fieldPath: readonly string[]
 }
 
-export type ShellEvent =
+type ShellEvent =
   | { readonly type: 'open'; readonly surface: ShellSurface; readonly sectionId?: string; readonly field?: FieldTarget; readonly query?: string }
   | { readonly type: 'search'; readonly query: string }
   | { readonly type: 'close' }

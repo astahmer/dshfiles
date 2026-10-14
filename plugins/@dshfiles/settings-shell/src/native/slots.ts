@@ -12,6 +12,6 @@ export const SHELL_CHILDREN = {
   'settings.onboarding': { kind: 'list', scope: 'root' },
 } as const
 
-export type ShellChildKey = keyof typeof SHELL_CHILDREN
+type ShellChildKey = keyof typeof SHELL_CHILDREN
 
 export type ShellRenderSlot = PropsRenderSlots<ShellChildKey>['renderSlot']

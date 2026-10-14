@@ -7,7 +7,7 @@ import { z } from 'zod'
  * the control its type calls for, grouped by the nested objects that contain it.
  */
 
-export type JsonPrimitive = string | number | boolean | null
+type JsonPrimitive = string | number | boolean | null
 
 /** Settings values cross the wire as JSON; everything here reads them through this one type. */
 export const jsonValueSchema = z.json()
@@ -219,7 +219,7 @@ export const settingFields = (input: {
   return root === undefined ? [] : collect(walk, root, [], [], 0)
 }
 
-export interface NamespaceText {
+interface NamespaceText {
   readonly title: string
   readonly description: string
 }

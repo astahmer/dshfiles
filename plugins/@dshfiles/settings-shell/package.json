@@ -108,7 +108,8 @@
       ],
       "immediately": false,
       "locales": [
-        "dshfiles.settings-shell"
+        "dshfiles.settings-shell",
+        "dshfiles.settings-shell.welcome"
       ]
     }
   },

@@ -11,6 +11,7 @@ export const settingsShellSettings = defineSettings({
     ])
       .default('auto')
       .description('Where the gear, the palette and Mod+, open Settings.'),
+    welcomeNoticeVersion: Schema.string().default('').hidden().description('The welcome notice version last acknowledged.'),
   }),
   applies: 'live',
 })

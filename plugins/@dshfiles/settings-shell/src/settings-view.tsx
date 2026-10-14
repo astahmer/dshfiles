@@ -29,7 +29,7 @@ export interface SectionRow {
 }
 
 /** How the view is framed: the centered dialog, that dialog filling the window, or the main view. */
-export type ViewVariant = 'modal' | 'expanded' | 'tab'
+type ViewVariant = 'modal' | 'expanded' | 'tab'
 
 /** Nav glyph by section id, as the native shell draws it; unknown ids fall back to the settings gear. */
 const navIcon = (id: string): JSX.Element => {
@@ -50,7 +50,7 @@ const navCellActive = 'dshx:bg-[var(--dsw-specific-sidebar-nav-item-active)]'
 const navGroup =
   'dshx:mt-3 dshx:flex dshx:items-center dshx:gap-1 dshx:px-3 dshx:pb-1 dshx:text-[12px] dshx:font-medium dshx:text-[var(--dsw-alias-label-secondary)]'
 
-export interface SettingsViewProps {
+interface SettingsViewProps {
   readonly variant: ViewVariant
   readonly rows: readonly SectionRow[]
   /** Pages the shell draws itself from each plugin's settings schema. */

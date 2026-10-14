@@ -45,8 +45,6 @@ export interface ShellRootDeps {
   readonly onboardingSteps: ObservableSnapshot<readonly OnboardingStep[]>
   /** Whether the main view shows no thread (or a blank one), the empty-Hero fact onboarding waits for. */
   readonly onboardingActive: ObservableSnapshot<boolean>
-  /** Steps whose durable facts are not served by this composition and would only show an error. */
-  readonly skippedOnboarding: ObservableSnapshot<ReadonlySet<string>>
   readonly settingsOpen: ObservableSnapshot<boolean>
   readonly openSettings: () => void
   readonly closeSettings: () => void
@@ -68,7 +66,6 @@ export const ShellRoot = (props: {
   const connectionState = useObservable(deps.connectionState)
   const onboardingSteps = useObservable(deps.onboardingSteps)
   const onboardingActive = useObservable(deps.onboardingActive)
-  const skippedOnboarding = useObservable(deps.skippedOnboarding)
   const [requestedOnboarding, setRequestedOnboarding] = useState<string | undefined>()
   const [completedOnboarding, setCompletedOnboarding] = useState<ReadonlySet<string>>(() => new Set())
   const [showRecovery, setShowRecovery] = useState(false)
@@ -76,7 +73,7 @@ export const ShellRoot = (props: {
   const connectingShownAt = useRef<number | undefined>(undefined)
   const previousConnectionState = useRef(connectionState)
 
-  const pendingStep = onboardingActive ? onboardingSteps.find(step => !completedOnboarding.has(step.id) && !skippedOnboarding.has(step.id)) : undefined
+  const pendingStep = onboardingActive ? onboardingSteps.find(step => !completedOnboarding.has(step.id)) : undefined
   const onboardingStep = requestedOnboarding === undefined ? pendingStep : onboardingSteps.find(step => step.id === requestedOnboarding)
 
   useEffect(() => {

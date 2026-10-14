@@ -4,22 +4,24 @@ import { defineHost } from '@dshfiles/dshx/host'
 import { z } from 'zod'
 import { settingsShellApi } from './shell-api.js'
 import { settingsShellSettings } from './settings.js'
-import { PORTED_FROM } from './upstream.js'
+import { PORTED_FROM, WELCOME_PORTED_FROM } from './upstream.js'
 
 const packageVersionSchema = z.object({ version: z.string() })
 const settingsProviderSchema = z.object({ documentPath: z.string() })
 
-/** The native Settings package the running `dsh` resolves, read from beside its entry script; null when unreadable. */
-const installedUpstreamVersion = (): string | null => {
+/** A native package's version as the running `dsh` resolves it, read from beside its entry script; null when unreadable. */
+const installedVersion = (packageName: string): string | null => {
   const entry = process.argv[1]
   if (entry === undefined) return null
   try {
     const require = createRequire(realpathSync(entry))
-    return packageVersionSchema.parse(require(`${PORTED_FROM.packageName}/package.json`)).version
+    return packageVersionSchema.parse(require(`${packageName}/package.json`)).version
   } catch {
     return null
   }
 }
+
+const installedUpstreamVersion = (): string | null => installedVersion(PORTED_FROM.packageName)
 
 export default defineHost({
   name: '@dshfiles/settings-shell',
@@ -41,14 +43,15 @@ export default defineHost({
     }),
   ],
   setup(ctx) {
-    const installed = installedUpstreamVersion()
-    if (installed !== null && installed !== PORTED_FROM.version) {
+    for (const ported of [PORTED_FROM, WELCOME_PORTED_FROM]) {
+      const installed = installedVersion(ported.packageName)
+      if (installed === null || installed === ported.version) continue
       ctx
         .logger('dshfiles-settings-shell')
         .warn(
           'settings-shell: ported from %s@%s but DSH ships %s; refresh plugins/@dshfiles/settings-shell/src/native from the new package',
-          PORTED_FROM.packageName,
-          PORTED_FROM.version,
+          ported.packageName,
+          ported.version,
           installed,
         )
     }

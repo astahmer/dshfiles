@@ -3,7 +3,7 @@ import type { SettingField } from './schema-form/schema-model.js'
 import type { SectionRow } from './settings-view.js'
 
 /** One page's matching settings, in schema order. */
-export interface PageHits {
+interface PageHits {
   readonly page: PluginSettingsPage
   readonly fields: readonly SettingField[]
 }

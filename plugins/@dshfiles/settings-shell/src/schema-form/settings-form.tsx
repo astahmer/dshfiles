@@ -53,7 +53,7 @@ export const Highlight = (props: { readonly text: string; readonly query: string
   return parts
 }
 
-export const useConfigFormSnapshot = (form: ConfigForm<unknown>): ConfigFormSnapshot<unknown> =>
+const useConfigFormSnapshot = (form: ConfigForm<unknown>): ConfigFormSnapshot<unknown> =>
   useSyncExternalStore(
     listener => form.subscribe(listener),
     () => form.getSnapshot(),
@@ -418,7 +418,7 @@ const displayedValue = (input: {
 const isBlockControl = (control: SettingControl): boolean =>
   control.kind === 'list' || control.kind === 'record' || control.kind === 'json' || (control.kind === 'text' && control.multiline)
 
-export const SettingControlInput = (props: {
+const SettingControlInput = (props: {
   readonly label: string
   readonly control: SettingControl
   readonly value: JsonValue | undefined

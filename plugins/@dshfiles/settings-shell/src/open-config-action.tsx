@@ -25,7 +25,7 @@ export interface ConfigFileOpeners {
   readonly openInEditor: ((path: string) => boolean) | undefined
 }
 
-export interface DocumentLocation {
+interface DocumentLocation {
   readonly path: string
   /** False until the native action first creates the document; only the path can be copied then. */
   readonly exists: boolean
