@@ -3,6 +3,7 @@ import { realpathSync } from 'node:fs'
 import { defineHost } from '@dshfiles/dshx/host'
 import { z } from 'zod'
 import { settingsShellApi } from './shell-api.js'
+import { settingsShellSettings } from './settings.js'
 import { PORTED_FROM } from './upstream.js'
 
 const packageVersionSchema = z.object({ version: z.string() })
@@ -22,6 +23,7 @@ const installedUpstreamVersion = (): string | null => {
 
 export default defineHost({
   name: '@dshfiles/settings-shell',
+  settings: [settingsShellSettings],
   apis: [
     settingsShellApi.host({
       documentPath: async ({ ctx }) => {

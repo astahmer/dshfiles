@@ -7,6 +7,23 @@ import { defineLocale } from '@dshfiles/dshx/client'
  */
 export const SHELL_LOCALE_NAMESPACE = 'dshfiles.settings-shell'
 
+// Keys this plugin adds on top of the port.
+const shellEn = {
+  'view.expand': 'Expand to the full window',
+  'view.restore': 'Restore the dialog size',
+  'view.openInTab': 'Open in a tab',
+  'palette.open': 'Open Settings',
+  'palette.section': 'Settings: {section}',
+}
+
+const shellZh = {
+  'view.expand': '展开到整个窗口',
+  'view.restore': '恢复对话框大小',
+  'view.openInTab': '在标签页中打开',
+  'palette.open': '打开设置',
+  'palette.section': '设置：{section}',
+} satisfies Record<keyof typeof shellEn, string>
+
 // Ported verbatim from @deepseek-ai/dsh-client-ui-settings-general@0.2.0-rc.2 (MIT), lib/client.js `zh` and `en`.
 const zh = {
   trigger: '设置',
@@ -43,6 +60,7 @@ const zh = {
   'connection.connected': '连接成功',
   'connection.reconnect': '连接异常，点击立即重连',
   'connection.restart': '连接中断，正在重试，点击立即重连',
+  ...shellZh,
 }
 
 const en = {
@@ -80,6 +98,7 @@ const en = {
   'connection.connected': 'Connected',
   'connection.reconnect': 'Disconnected, reconnect now',
   'connection.restart': 'Reconnecting, reconnect now',
+  ...shellEn,
 } satisfies Record<keyof typeof zh, string>
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
