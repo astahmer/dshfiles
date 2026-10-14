@@ -133,18 +133,22 @@ const readFailureSchema = z.object({ failure: z.object({ message: z.string().max
 export const jujutsuApi = defineApi({
   id: 'jujutsu',
   version: 1,
+  owner: '@dshfiles/jujutsu',
   methods: {
     registerRepository: method({
       input: z.object({ path: repoPathSchema }),
       output: z.object({ repoId: repoIdSchema, root: z.string().max(2048) }),
+      description: 'Resolve a folder to its jj repository and return the repoId the other jujutsu methods take.',
     }),
     load: method({
       input: z.object({ repoId: repoIdSchema, limit: z.number().int().min(20).max(500).default(300) }),
       output: z.union([stateSchema, readFailureSchema]),
+      description: 'Repository status: the revision graph, working-copy revision, bookmarks and conflicts, or a read failure.',
     }),
     details: method({
       input: z.object({ repoId: repoIdSchema, commitId: commitIdSchema }),
       output: z.union([detailsSchema, readFailureSchema]),
+      description: 'One revision’s description, files, patch and evolution log.',
     }),
     revisionFiles: method({
       input: z.object({ repoId: repoIdSchema, commitIds: z.array(commitIdSchema).min(1).max(40) }),
@@ -156,6 +160,7 @@ export const jujutsuApi = defineApi({
     workingDiff: method({
       input: z.object({ repoId: repoIdSchema }),
       output: z.object({ patch: z.string().max(1_200_000), truncated: z.boolean() }),
+      description: 'The working-copy revision’s patch.',
     }),
     prepare: method({
       input: z.object({ repoId: repoIdSchema, action: mutationSchema }),
