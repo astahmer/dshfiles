@@ -178,3 +178,104 @@ Then('the strip starts over from what the main view shows', async ({ page }: { p
   await recordAssertion(page, 'main-tabs-malformed-storage-starts-over', () => expect.poll(() => tabSummary(page)).toEqual(['Workbench* (preview)']))
   await finishJourneyAssertions(page)
 })
+
+/** What a tab looks like, compared between the main strip and DSH's dock-kit strip in the right panel. */
+const tabLook = (page: Page, selector: string) =>
+  page
+    .locator(selector)
+    .first()
+    .evaluate(node => {
+      const style = getComputedStyle(node)
+      const box = node.getBoundingClientRect()
+      return {
+        height: box.height,
+        top: box.top,
+        fontSize: style.fontSize,
+        lineHeight: style.lineHeight,
+        fontFamily: style.fontFamily,
+        padding: `${style.paddingLeft} ${style.paddingRight}`,
+        radius: style.borderRadius,
+        color: style.color,
+        background: style.backgroundColor,
+      }
+    })
+
+const MAIN_TAB = '[role="tablist"][aria-label="Open views"] [role="tab"]'
+const DOCK_TAB = '[data-dockkit-tab]'
+
+When('a thread is started and the right panel is opened beside it', async ({ page }: { page: Page }) => {
+  await globalPanel(page, 'Workbench').click()
+  await tab(page, 'Workbench').dblclick()
+  await page.getByRole('button', { name: 'New session', exact: true }).first().click()
+  await sendMessage(page, 'look thread')
+  await page.getByRole('button', { name: 'Open right sidebar', exact: true }).click()
+  await page.locator('[data-sidebar-right-guide-entry]').filter({ hasText: 'Workbench' }).click()
+  await page.locator('[data-dockkit-add-tab]').click()
+  await expect(page.locator(`${DOCK_TAB}[aria-selected="true"]`)).toBeVisible()
+  await page.mouse.move(0, 0)
+})
+
+Then("the active and inactive main tabs share the right panel tabs' metrics and colors", async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'main-tabs-native-tab-look', async () => {
+    expect(await tabLook(page, `${MAIN_TAB}[aria-selected="true"]`)).toEqual(await tabLook(page, `${DOCK_TAB}[aria-selected="true"]`))
+    expect(await tabLook(page, `${MAIN_TAB}[aria-selected="false"]`)).toEqual(await tabLook(page, `${DOCK_TAB}[aria-selected="false"]`))
+  })
+  await finishJourneyAssertions(page)
+})
+
+const newTabButton = (page: Page) => strip(page).locator('xpath=..').getByRole('button', { name: 'New tab', exact: true })
+const startPage = (page: Page) => page.getByRole('listbox', { name: 'Open in this tab', exact: true })
+const suggestion = (page: Page, name: string) => startPage(page).getByRole('option', { name, exact: true })
+const suggestionNames = (page: Page): Promise<readonly string[]> =>
+  startPage(page)
+    .getByRole('option')
+    .evaluateAll(nodes => nodes.map(node => node.getAttribute('aria-label') ?? ''))
+
+When('the Workbench is kept as a tab and "+" is pressed', async ({ page }: { page: Page }) => {
+  await openKept(page, 'Workbench')
+  await newTabButton(page).click()
+})
+
+Then('a Start tab follows the Workbench and suggests a new thread, the panels and Settings', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'main-tabs-plus-opens-start-page', async () => {
+    await expect.poll(() => tabSummary(page)).toEqual(['Workbench', 'Start*'])
+    await expect(page.getByRole('heading', { name: 'Workbench', exact: true })).toBeHidden()
+    const names = await suggestionNames(page)
+    expect(names[0]).toBe('New thread')
+    expect(names).toEqual(expect.arrayContaining(['Plugins', 'Jujutsu', 'Workbench']))
+    expect(names.at(-1)).toBe('Settings')
+    await expect(suggestion(page, 'New thread')).toHaveAttribute('aria-keyshortcuts', /.+/)
+    await expect(suggestion(page, 'Settings')).toHaveAttribute('aria-keyshortcuts', /.+/)
+    await expect(suggestion(page, 'New thread')).toBeFocused()
+  })
+})
+
+When('the arrow keys move to Jujutsu and Enter picks it', async ({ page }: { page: Page }) => {
+  const names = await suggestionNames(page)
+  for (let step = 0; step < names.indexOf('Jujutsu'); step++) await page.keyboard.press('ArrowDown')
+  await expect(suggestion(page, 'Jujutsu')).toBeFocused()
+  await page.keyboard.press('Enter')
+})
+
+Then('Jujutsu replaced the Start tab', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'main-tabs-start-page-pick-replaces-tab', async () => {
+    await expect.poll(() => tabSummary(page)).toEqual(['Workbench', 'Jujutsu*'])
+    await expect(page.getByRole('heading', { name: 'Jujutsu', exact: true })).toBeVisible()
+  })
+})
+
+When('a new tab is opened from the keyboard and Settings is picked', async ({ page }: { page: Page }) => {
+  await page.keyboard.press(`${primary()}+Alt+KeyT`)
+  await expect(tab(page, 'Start')).toHaveAttribute('aria-selected', 'true')
+  await page.keyboard.press('End')
+  await expect(suggestion(page, 'Settings')).toBeFocused()
+  await page.keyboard.press('Enter')
+})
+
+Then('Settings opens and the Start tab is gone', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'main-tabs-start-page-opens-settings', async () => {
+    await expect(page.getByRole('dialog').getByText('Keyboard shortcuts', { exact: true })).toBeVisible()
+    await expect.poll(() => tabSummary(page)).toEqual(['Workbench', 'Jujutsu*'])
+  })
+  await finishJourneyAssertions(page)
+})

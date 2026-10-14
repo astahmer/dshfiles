@@ -38,3 +38,19 @@ Feature: Main view tabs
     Then the tabs come back with the pin and the Jujutsu tab is active again
     When the saved tabs are corrupted and the page is reloaded
     Then the strip starts over from what the main view shows
+
+  @scenario:main-tabs.native-look
+  Scenario: The strip's tabs look like DSH's own right-panel tabs
+    Given the isolated plugin composition of "@dshfiles/main-tabs, @dshfiles/workbench, @dshfiles/jujutsu" is booted
+    When a thread is started and the right panel is opened beside it
+    Then the active and inactive main tabs share the right panel tabs' metrics and colors
+
+  @scenario:main-tabs.new-tab-page
+  Scenario: "+" opens a Start page whose suggestions take its place
+    Given the isolated plugin composition of "@dshfiles/main-tabs, @dshfiles/workbench, @dshfiles/jujutsu" is booted
+    When the Workbench is kept as a tab and "+" is pressed
+    Then a Start tab follows the Workbench and suggests a new thread, the panels and Settings
+    When the arrow keys move to Jujutsu and Enter picks it
+    Then Jujutsu replaced the Start tab
+    When a new tab is opened from the keyboard and Settings is picked
+    Then Settings opens and the Start tab is gone

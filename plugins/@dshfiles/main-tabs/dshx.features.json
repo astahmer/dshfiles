@@ -5,7 +5,7 @@
     {
       "id": "main-view-tabs",
       "title": "Browser-like tabs above the main view",
-      "summary": "Every thread or global panel shown in the main view opens or focuses a tab above it. Tabs close with × or a middle click, reorder by drag, pin to the start, close others or to the right from their context menu, scroll or list in a dropdown when they overflow, and show working, needs-you and unread dots on thread tabs. Opening from outside the strip uses a VS Code-style preview tab by default.",
+      "summary": "Every thread or global panel shown in the main view opens or focuses a tab above it. The strip looks like DSH's own right-panel tabs (28px pills, hairline separators, a close cross over a faded title end). Tabs close with × or a middle click, reorder by drag, pin to the start, close others or to the right from their context menu, scroll or list in a dropdown when they overflow, and show working, needs-you and unread dots on thread tabs. Opening from outside the strip uses a VS Code-style preview tab by default.",
       "reach": ["click button \"Workbench\"", "expect tab \"Workbench\""],
       "surfaces": ["client", "integration", "storage", "settings"],
       "configuration": [
@@ -47,6 +47,11 @@
         {
           "kind": "gherkin",
           "id": "main-tabs.strip-mount",
+          "featureFile": "tooling/dshx/e2e/features/main-tabs.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "main-tabs.native-look",
           "featureFile": "tooling/dshx/e2e/features/main-tabs.feature"
         },
         {
@@ -136,9 +141,80 @@
       ]
     },
     {
+      "id": "new-tab-page",
+      "title": "Open a new tab with suggestions of what to show",
+      "summary": "\"+\" at the end of the strip (or Mod+T on Desktop, Mod+Alt+T on the Web) opens a Start tab modelled on DSH's right-panel Start page: a compass over large rows for New thread, the five most recent threads (running ones first), every main panel with its shortcut when it has one, and Settings. Arrow keys, Home/End and Enter work in the list; the picked thread or panel takes the Start tab's place, while New thread and Settings close it.",
+      "reach": ["click button \"Workbench\"", "press ControlOrMeta+Alt+KeyT", "expect tab \"Start\"", "expect option \"New thread\""],
+      "surfaces": ["client", "integration"],
+      "configuration": [],
+      "states": ["start-shown", "start-replaced", "start-closed"],
+      "failureModes": [
+        "The Start page is never saved: a reload drops it.",
+        "A panel glyph that throws outside the sidebar falls back to a generic panel icon.",
+        "Settings opens by pressing the sidebar's own Settings trigger; without that trigger the Settings suggestion only closes the Start tab.",
+        "Opening, from the sidebar, the very view the Host already shows under the Start page leaves the Start page in front: the Host reports no change."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "main-tabs.new-tab-page",
+          "featureFile": "tooling/dshx/e2e/features/main-tabs.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.machine-unit-start-open",
+          "file": "plugins/@dshfiles/main-tabs/src/tabs-machine.test.ts",
+          "testName": "opens the new-tab page at the end of the strip without navigating, and focuses it when opened again"
+        },
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.machine-unit-start-pick",
+          "file": "plugins/@dshfiles/main-tabs/src/tabs-machine.test.ts",
+          "testName": "replaces the new-tab page with the picked suggestion and navigates there"
+        },
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.machine-unit-start-pick-existing",
+          "file": "plugins/@dshfiles/main-tabs/src/tabs-machine.test.ts",
+          "testName": "focuses the tab a picked suggestion already has and drops the new-tab page"
+        },
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.machine-unit-start-close",
+          "file": "plugins/@dshfiles/main-tabs/src/tabs-machine.test.ts",
+          "testName": "closes the new-tab page for a suggestion that is not a tab, showing the tab of what the Host still shows"
+        },
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.machine-unit-start-host",
+          "file": "plugins/@dshfiles/main-tabs/src/tabs-machine.test.ts",
+          "testName": "lets whatever the Host opens while the new-tab page shows take its place"
+        },
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.machine-unit-start-unsaved",
+          "file": "plugins/@dshfiles/main-tabs/src/tabs-machine.test.ts",
+          "testName": "never saves or pins the new-tab page"
+        },
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.start-unit-recent-threads",
+          "file": "plugins/@dshfiles/main-tabs/src/start-suggestions.test.ts",
+          "testName": "suggests running threads first, then the most recent, skipping blank threads and subagents, five at most"
+        },
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.start-unit-panel-shortcut",
+          "file": "plugins/@dshfiles/main-tabs/src/start-suggestions.test.ts",
+          "testName": "shows the bound command named after the panel, and nothing when it has none"
+        }
+      ]
+    },
+    {
       "id": "tab-keyboard",
       "title": "Jump between tabs from the keyboard",
-      "summary": "Mod+1…8 jump to a tab and Mod+9 to the last one, Ctrl+Tab and Ctrl+Shift+Tab cycle (Desktop); the browser keeps those keys, so the Web defaults are Mod+Alt+1…9 and Mod+Alt+] / [. All are rebindable in Settings › Shortcuts. Arrow keys, Enter and Delete work inside the focused strip.",
+      "summary": "Mod+1…8 jump to a tab and Mod+9 to the last one, Ctrl+Tab and Ctrl+Shift+Tab cycle (Desktop); the browser keeps those keys, so the Web defaults are Mod+Alt+1…9 and Mod+Alt+] / [. All are rebindable in Settings › Shortcuts. Arrow keys, Enter and Delete work inside the focused strip. Mod+T (Web: Mod+Alt+T) opens a new tab.",
       "surfaces": ["client", "integration"],
       "configuration": [],
       "states": ["bound", "unbound-on-conflict"],
