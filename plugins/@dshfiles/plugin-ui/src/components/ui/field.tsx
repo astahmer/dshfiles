@@ -44,7 +44,7 @@ function FieldGroup({ className, ...props }: React.ComponentProps<'div'>) {
 const fieldVariants = cva('dshx:group/field dshx:flex dshx:w-full dshx:gap-3 dshx:data-[invalid=true]:text-destructive', {
   variants: {
     orientation: {
-      vertical: ['flex-col [&>*]:w-full [&>.sr-only]:w-auto'],
+      vertical: ['dshx:flex-col dshx:[&>*]:w-full dshx:[&>.sr-only]:w-auto'],
       horizontal: [
         'dshx:flex-row dshx:items-center',
         'dshx:[&>[data-slot=field-label]]:flex-auto',
