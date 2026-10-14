@@ -20,7 +20,10 @@
   "scripts": {
     "build": "dshx build",
     "test": "vitest run",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test:boot": "node ../../../tooling/dshx/scripts/boot-check-web.mjs --plugin",
+    "test:e2e": "node ../../../tooling/dshx/scripts/run-e2e.mjs",
+    "test:e2e:smoke": "node ../../../tooling/dshx/scripts/run-e2e.mjs --smoke"
   },
   "dependencies": {
     "@deepseek-ai/schemastery": "catalog:",

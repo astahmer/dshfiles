@@ -9,7 +9,10 @@
     "test": "pnpm --dir .. exec turbo run test --filter='./plugins/@dshfiles/*' -- --testTimeout=30000",
     "build": "pnpm --dir .. exec turbo run build --filter='./plugins/@dshfiles/*'",
     "check": "pnpm run contract && pnpm run build && pnpm run typecheck && pnpm run test",
-    "knip": "pnpm --dir .. run knip --workspace plugins --workspace 'plugins/@dshfiles/*'"
+    "knip": "pnpm --dir .. run knip --workspace plugins --workspace 'plugins/@dshfiles/*'",
+    "test:boot": "node ../tooling/dshx/scripts/boot-check-web.mjs --composed",
+    "test:e2e": "node ../tooling/dshx/scripts/run-e2e.mjs",
+    "test:e2e:smoke": "node ../tooling/dshx/scripts/run-e2e.mjs --smoke"
   },
   "devDependencies": {
     "@types/node": "22.20.5",

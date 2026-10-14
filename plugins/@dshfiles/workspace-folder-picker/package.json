@@ -29,7 +29,9 @@
     "fmt:check": "oxfmt --check .",
     "test": "vitest run --passWithNoTests",
     "build": "dshx build",
-    "dev": "dshx dev --open"
+    "dev": "dshx dev --open",
+    "test:boot": "node ../../../tooling/dshx/scripts/boot-check-web.mjs --plugin",
+    "test:e2e": "node ../../../tooling/dshx/scripts/run-e2e.mjs"
   },
   "dependencies": {
     "@dshfiles/plugin-ui": "workspace:*",

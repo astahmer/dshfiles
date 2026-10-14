@@ -29,7 +29,9 @@
     "fmt:check": "oxfmt --check .",
     "lint": "oxlint src tests dshx.config.ts",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test:boot": "node ../../../tooling/dshx/scripts/boot-check-web.mjs --plugin",
+    "test:e2e": "node ../../../tooling/dshx/scripts/run-e2e.mjs"
   },
   "dependencies": {
     "@dshfiles/plugin-ui": "workspace:*",

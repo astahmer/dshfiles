@@ -97,6 +97,11 @@
       "cache": false,
       "env": ["CI", "JJ_TEST_EXECUTABLE", "JJ_CONFIG"]
     },
+    "dshx-workspace#test:evidence": {
+      "inputs": ["e2e/support/evidence*.ts", "package.json", "$TURBO_ROOT$/pnpm-lock.yaml"],
+      "outputs": [],
+      "passThroughEnv": ["HOME", "TMPDIR", "PLAYWRIGHT_BROWSERS_PATH"]
+    },
     "//#test:tooling": {
       "cache": false,
       "inputs": ["tooling/dshx/e2e/support/**", "tooling/dshx/scripts/**"]

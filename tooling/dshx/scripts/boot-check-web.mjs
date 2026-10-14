@@ -1,6 +1,13 @@
 #!/usr/bin/env node
 
-/** Boot each owned plugin alone in a composed scratch profile and a real browser. */
+/**
+ * Boot each owned plugin alone in a composed scratch profile and a real browser, then the full web profile.
+ *
+ * Root `pnpm check:plugin-boot` builds once and runs the cached Turbo tasks instead: `--plugin` boots the bundle in
+ * the current directory alone, `--composed` boots the shared-runtime pair and the full profile, and
+ * `--validate-ignores` checks boot-ignore.json, whose expiry dates no cache key can see. Registry dependencies come
+ * from the checked-in `profiles/web` seed, not the live profile, so a cached pass depends only on the repository.
+ */
 
 import { readFile } from 'node:fs/promises'
 import { spawn } from 'node:child_process'
@@ -11,7 +18,7 @@ import { listPluginBundles, pluginsToBoot, readBootIgnores, validateBootIgnores 
 const workspace = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
 const pluginsRoot = resolve(workspace, 'plugins/@dshfiles')
 const dshxDist = resolve(workspace, 'tooling/dshx/packages/dshx/dist')
-const { prepareBootProfile, prepareComposedBootProfile } = await import(resolve(dshxDist, 'project/boot-profile.js'))
+const { prepareComposedBootProfile } = await import(resolve(dshxDist, 'project/boot-profile.js'))
 const { checkClientBoot } = await import(resolve(dshxDist, 'project/client-boot-check.js'))
 const sourceProfileRoot = resolve(workspace, 'profiles/web')
 
@@ -57,7 +64,7 @@ const buildPlugin = plugin =>
   })
 
 const bootAlone = async plugin => {
-  const profile = await prepareBootProfile(plugin.dir, plugin.id)
+  const profile = await prepareComposedBootProfile([{ projectRoot: plugin.dir, packageId: plugin.id }], { sourceProfileRoot })
   try {
     return await checkClientBoot({
       projectRoot: workspace,
@@ -120,12 +127,39 @@ const describe = (result, ignoredIds = new Set()) => {
 
 const errorSummary = error => (error instanceof Error ? error.message : String(error)).split('\n').filter(Boolean).slice(0, 5).join(' | ')
 
+const bootOnePlugin = async (plugins, ignoredIds) => {
+  const { name } = JSON.parse(await readFile(resolve(process.cwd(), 'package.json'), 'utf8'))
+  const plugin = plugins.find(candidate => candidate.id === name)
+  if (plugin === undefined) throw new Error(`${name} is not a DSH bundle under plugins/@dshfiles.`)
+  if (ignoredIds.has(plugin.id)) {
+    console.log(`  skip ${plugin.id}: listed in boot-ignore.json`)
+    return
+  }
+  const result = await bootAlone(plugin).catch(error => ({ browserError: error instanceof Error ? error.message : String(error) }))
+  const problem = describe(result)
+  if (problem === undefined) {
+    console.log(`  ok  ${plugin.id}`)
+    return
+  }
+  console.error(`  - ${plugin.id}: ${problem}`)
+  process.exitCode = 1
+}
+
 const main = async () => {
   await pinnedNode()
   const plugins = await listPluginBundles(pluginsRoot)
   if (plugins.length === 0) throw new Error('No DSH bundles found to boot.')
   const ignores = await readBootIgnores(resolve(workspace, 'tooling/dshx/scripts/boot-ignore.json'))
   const ignoredIds = validateBootIgnores(ignores, plugins)
+  if (process.argv.includes('--validate-ignores')) {
+    console.log(`boot-ignore.json: ${String(ignores.length)} documented, unexpired entries.`)
+    return
+  }
+  if (process.argv.includes('--plugin')) {
+    await bootOnePlugin(plugins, ignoredIds)
+    return
+  }
+  const composedOnly = process.argv.includes('--composed')
   const runnable = pluginsToBoot(plugins, ignoredIds)
   const profileManifest = JSON.parse(await readFile(resolve(sourceProfileRoot, 'package.json'), 'utf8'))
   const profilePluginIds = profileManifest.dsh.profile.bundles.filter(packageId => packageId.startsWith('@dshfiles/'))
@@ -150,7 +184,7 @@ const main = async () => {
   const failures = []
   const buildFailures = new Set()
   const builtPluginIds = new Set()
-  for (const plugin of providerPair) {
+  for (const plugin of composedOnly ? [] : providerPair) {
     try {
       await buildPlugin(plugin)
       builtPluginIds.add(plugin.id)
@@ -183,7 +217,7 @@ const main = async () => {
     console.log('\nShared-runtime consumer smoke passed.')
     return
   }
-  for (const plugin of plugins) {
+  for (const plugin of composedOnly ? [] : plugins) {
     if (builtPluginIds.has(plugin.id)) continue
     try {
       await buildPlugin(plugin)
@@ -194,7 +228,7 @@ const main = async () => {
     }
   }
 
-  for (const plugin of runnable) {
+  for (const plugin of composedOnly ? [] : runnable) {
     if (buildFailures.has(plugin.id)) continue
     const result = await bootAlone(plugin).catch(error => ({
       ok: false,
@@ -220,6 +254,10 @@ const main = async () => {
     else failures.push(`full web profile: ${problem}`)
   } else {
     failures.push('full web profile: composition smoke skipped because one or more bundles failed to build')
+  }
+  if (failures.length === 0 && composedOnly) {
+    console.log('\nShared-runtime consumer composition and full web profile composition booted clean.')
+    return
   }
   if (failures.length === 0) {
     console.log(
