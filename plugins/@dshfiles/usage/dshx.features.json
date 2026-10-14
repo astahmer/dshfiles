@@ -1,0 +1,142 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "usage-index",
+      "title": "Incremental request index from session logs",
+      "summary": "Folds every session log into a SQLite ledger of model requests (agent, subagent, compaction, title, OptMem and other side calls) with route, tokens, cache reads, stop reason, duration and TTFT, reading only the Zstandard frames each log gained since the last pass. Costs join per-route, per-context-band list prices from the AI Accounts models.dev catalog at query time.",
+      "surfaces": ["host", "storage", "integration"],
+      "configuration": [],
+      "states": ["empty", "first-index", "incremental", "torn-frame", "unpriced-route", "catalog-refreshed"],
+      "failureModes": [
+        "A log the writer is still appending to keeps its torn final frame for the next pass instead of failing.",
+        "A stored fold state that no longer decodes restarts that log from its first byte; rows upsert by event sequence, so nothing doubles.",
+        "Without the AI Accounts price cache every cost reads as unknown (\u2013) and the request still counts.",
+        "Title generation keeps no usage in the log: its tokens come only from the live llm/stream observer, so titles generated while the plugin was not loaded show \u2013.",
+        "OptMem summaries are not in session logs at all; only those made while the plugin is loaded are counted."
+      ],
+      "externalDependencies": [
+        {
+          "id": "@dshfiles/ai-accounts",
+          "boundary": "Reads the models.dev price cache AI Accounts writes ($DSH_HOME/plugins/ai-accounts/pricing.json) and its accounts.json for account kinds; never refreshes the catalog itself.",
+          "deterministicFake": "src/cost.test.ts writes a pricing file in the cache format to a temp directory."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "usage.index-browser-journey",
+          "featureFile": "tooling/dshx/e2e/features/usage.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "usage.index-real-logs",
+          "file": "plugins/@dshfiles/usage/src/indexer.test.ts",
+          "testName": "turns real session logs into requests with purpose, status, tokens and timings"
+        },
+        {
+          "kind": "unit-test",
+          "id": "usage.index-incremental",
+          "file": "plugins/@dshfiles/usage/src/indexer.test.ts",
+          "testName": "resumes from the stored offset, reads only what the log gained, and leaves a torn frame for later"
+        },
+        {
+          "kind": "unit-test",
+          "id": "usage.index-generations",
+          "file": "plugins/@dshfiles/usage/src/indexer.test.ts",
+          "testName": "reads only the newest generation of a session"
+        },
+        {
+          "kind": "unit-test",
+          "id": "usage.live-title-merge",
+          "file": "plugins/@dshfiles/usage/src/indexer.test.ts",
+          "testName": "gives a title row the usage the log never kept, and counts the call once"
+        },
+        {
+          "kind": "unit-test",
+          "id": "usage.live-memory",
+          "file": "plugins/@dshfiles/usage/src/indexer.test.ts",
+          "testName": "counts an OptMem summary on its own, since no log records it"
+        },
+        {
+          "kind": "unit-test",
+          "id": "usage.fold-retry",
+          "file": "plugins/@dshfiles/usage/src/fold.test.ts",
+          "testName": "fails an attempt the loop retried with the retry failure code, then records the settled retry"
+        },
+        {
+          "kind": "unit-test",
+          "id": "usage.fold-aborted",
+          "file": "plugins/@dshfiles/usage/src/fold.test.ts",
+          "testName": "records a step the user interrupted before any answer as an aborted request"
+        },
+        {
+          "kind": "unit-test",
+          "id": "usage.cost-bands",
+          "file": "plugins/@dshfiles/usage/src/cost.test.ts",
+          "testName": "prices each request at its route and band list price, and reports unpriced routes"
+        },
+        {
+          "kind": "unit-test",
+          "id": "usage.cost-catalog",
+          "file": "plugins/@dshfiles/usage/src/cost.test.ts",
+          "testName": "prices routes from the AI Accounts catalog file and re-prices when the catalog changes"
+        }
+      ]
+    },
+    {
+      "id": "usage-request-log",
+      "title": "Request log",
+      "summary": "A Usage analytics main panel with a sortable table of model requests (model and provider, when, project, input, cache read, output, cost, duration, TTFT, status with stop reason), status chips with counts, search by model, provider, project or thread title, a purpose filter and a date range. Each row opens the thread that made the request.",
+      "reach": [
+        "click button \"New Session*\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Seed a usage request\"",
+        "press Enter",
+        "click button \"Usage analytics\"",
+        "click button \"Re-index session logs\"",
+        "click tab \"Request log\"",
+        "expect heading \"Request log\""
+      ],
+      "surfaces": ["client"],
+      "configuration": [],
+      "states": ["empty", "loading", "filtered", "searched", "sorted", "thread-missing"],
+      "failureModes": [
+        "DSH exposes no API to scroll a thread to one turn, so a row opens its thread but cannot jump to the step (see plans/dsh-host-gaps.md).",
+        "A subagent session absent from the thread list opens its parent thread instead; an archived or deleted thread shows a notice."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "usage.request-log-browser-journey",
+          "featureFile": "tooling/dshx/e2e/features/usage.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "usage.request-search",
+          "file": "plugins/@dshfiles/usage/src/indexer.test.ts",
+          "testName": "searches by model, provider or project and counts every status for the chips"
+        }
+      ]
+    },
+    {
+      "id": "usage-charts",
+      "title": "Usage charts",
+      "summary": "Headline tiles with a previous-period comparison, cost over time stacked by model, provider or project, cost per model, provider and project (selecting one filters the request log), tokens split into input, cache read, cache write and output, cache hit ratio, requests and failures, TTFT and duration percentiles, and the top threads by cost, grouped hourly or daily.",
+      "reach": ["click button \"Usage analytics\"", "click tab \"Charts\"", "expect text \"Cost over time\""],
+      "surfaces": ["client"],
+      "configuration": [],
+      "states": ["empty", "hourly", "daily", "custom-range", "grouped"],
+      "failureModes": ["Series beyond the five most expensive fold into Other so the legend stays readable."],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "usage.charts-browser-journey",
+          "featureFile": "tooling/dshx/e2e/features/usage.feature"
+        }
+      ]
+    }
+  ]
+}
