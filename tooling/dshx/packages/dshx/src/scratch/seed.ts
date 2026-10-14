@@ -247,5 +247,4 @@ export const applySeed = async (input: {
   if (input.seed === 'tool-call-thread') return { fakeProvider: await seedToolCallThread(input.state, input.page, input.timeoutMs) }
   await seedRebaseReadyThread(input.state, input.page, input.timeoutMs)
   return {}
-
 }
