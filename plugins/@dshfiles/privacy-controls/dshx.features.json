@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "feedback-privacy-settings",
+      "title": "Control feedback and session-data sharing",
+      "summary": "Independently control answer feedback, session feedback capture, OpenTelemetry session-log export, and official DeepSeek API session-log upload; keep local log downloads separate. The answer-feedback UI requires the sessionFeedback Host Remote.",
+      "reach": ["click button \"Settings\"", "click button \"Feedback & privacy\"", "expect switch \"Answer feedback UI\""],
+      "surfaces": ["client", "host", "settings"],
+      "configuration": [],
+      "states": ["default-off", "enabled", "dependency-blocked", "download-preserved", "unavailable"],
+      "failureModes": [
+        "Answer feedback UI cannot start without the sessionFeedback Remote; the UI requires session feedback capture first.",
+        "The master action changes only four feedback/upload rows and never changes session-log download.",
+        "Malformed profile patches are rejected without overwriting user-owned content."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "privacy-controls.individual-switches",
+          "featureFile": "tooling/dshx/e2e/features/privacy-controls.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "privacy-controls.profile-patch-preservation",
+          "file": "plugins/@dshfiles/privacy-controls/tests/profile-patch.spec.ts",
+          "testName": "appends only marked row-state overrides and preserves unrelated YAML"
+        },
+        {
+          "kind": "unit-test",
+          "id": "privacy-controls.feedback-dependency",
+          "file": "plugins/@dshfiles/privacy-controls/tests/host.spec.ts",
+          "testName": "enforces the feedback Remote dependency without changing the patch on rejection"
+        }
+      ]
+    }
+  ]
+}

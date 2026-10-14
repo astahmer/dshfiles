@@ -1,0 +1,3 @@
+- insert:
+    - id: dshfiles-privacy-controls
+      name: '@dshfiles/privacy-controls'

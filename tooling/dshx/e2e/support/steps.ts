@@ -213,6 +213,31 @@ Given('the isolated plugin profile {string} is booted', async ({ page }: { page:
   await visitIsolatedPluginProfile(page, await bootPluginProfile(packageId))
 })
 
+const privacyControlsDefaults = `- id: command-feedback
+  disabled: true
+- id: message-feedback
+  disabled: true
+- id: ui-message-feedback
+  disabled: true
+- id: session-telemetry-otel
+  disabled: true
+- id: session-log-deepseek
+  disabled: true
+- id: ui-settings-session-log
+  disabled: true
+- id: session-log-download
+  disabled: false
+`
+
+Given('the privacy-controls profile is booted with feedback and uploads off', async ({ page }: { page: Page }) => {
+  const profile = await bootComposedPluginProfile({
+    packageIds: ['@dshfiles/privacy-controls', '@dshfiles/settings-shell'],
+    profileLabel: 'privacy-controls',
+    cordisPatch: privacyControlsDefaults,
+  })
+  await visitIsolatedPluginProfile(page, profile)
+})
+
 const seedAutocompleteSkill = async (homeRoot: string): Promise<void> => {
   const skillDirectory = join(homeRoot, 'skills', 'e2e-skill-mentions')
   await mkdir(skillDirectory, { recursive: true })

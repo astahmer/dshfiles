@@ -1,0 +1,87 @@
+{
+  "name": "@dshfiles/privacy-controls",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Per-feature controls for feedback surfaces, session data uploads, and session-log downloads in DSH Web.",
+  "files": [
+    "dist",
+    "cordis.patch.yml"
+  ],
+  "type": "module",
+  "main": "./dist/index.js",
+  "exports": {
+    ".": "./dist/index.js",
+    "./package.json": "./package.json",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./client": "./dist/client.js"
+  },
+  "scripts": {
+    "check": "dshx check && pnpm lint && pnpm fmt:check",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "oxlint src tests dshx.config.ts",
+    "fmt": "oxfmt .",
+    "fmt:check": "oxfmt --check .",
+    "test": "vitest run",
+    "build": "dshx build",
+    "dev": "dshx dev --open",
+    "prepack": "npm run check && npm run build",
+    "test:boot": "node ../../../tooling/dshx/scripts/boot-check-web.mjs --plugin",
+    "test:e2e": "node ../../../tooling/dshx/scripts/run-e2e.mjs"
+  },
+  "dependencies": {
+    "@dshfiles/plugin-ui": "workspace:*",
+    "yaml": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "catalog:",
+    "@deepseek-ai/cordis-plugin-include": "catalog:",
+    "@deepseek-ai/cordis-plugin-loader": "catalog:",
+    "@deepseek-ai/dsh": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-client-connection": "catalog:",
+    "@deepseek-ai/dsh-client-ui-settings": "catalog:",
+    "@deepseek-ai/dsh-client-ui-slots": "catalog:",
+    "@deepseek-ai/dsh-cordis-host-runner": "catalog:",
+    "@deepseek-ai/dsh-tools": "catalog:",
+    "@dshfiles/dshx": "workspace:*",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "oxfmt": "catalog:",
+    "oxlint": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "~4.0.4",
+    "@deepseek-ai/dsh": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-client-connection": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-client-ui-renderer": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-client-ui-settings": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-client-ui-slots": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-tools": ">=0.2.0-rc.1 <0.3.0-0",
+    "react": ">=18.2.0 <19",
+    "react-dom": ">=18.2.0 <19"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-connection",
+        "@deepseek-ai/dsh-client-ui-settings",
+        "@deepseek-ai/dsh-client-ui-slots",
+        "@deepseek-ai/dsh-client-ui-renderer"
+      ],
+      "external": [],
+      "immediately": false
+    }
+  },
+  "dshx": {
+    "features": "./dshx.features.json"
+  }
+}
