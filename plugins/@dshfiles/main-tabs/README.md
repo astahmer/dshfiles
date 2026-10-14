@@ -33,7 +33,15 @@ Tabs, order, pins, the preview flag and the active tab are saved in `localStorag
 
 See [`plans/dsh-host-gaps.md`](../../../plans/dsh-host-gaps.md).
 
-- The layout has no seat above the main panel. The strip renders from a `shell.overlay` entry through a portal into a node prepended to the centre column (found next to `[data-rightbar-col]`). If the frame markup changes, the strip disappears rather than breaking the panel.
-- Settings is a modal dialog, not a main panel, so it cannot be a tab.
+- **No seat above the main panel.** The strip renders from a `shell.overlay` entry through a portal into a node placed right before the `main` slot outlet. The slot renderer wraps every outlet in `<div data-slot="<key>" style="display:contents">`, and only the frame (the `root` occupant) may render `main`, so `[data-slot="main"]` is unique and independent of the frame's own markup (`src/strip-mount.ts`). The node is re-attached when the frame replaces the outlet or its column.
+  - _Why not a real seat:_ the frame's `AppFrame` is not exported (`@deepseek-ai/dsh-client-ui-layout` exports `apply`, `inject` and `LayoutController` only), a lower-priority shadow of `root` cannot re-declare `main` (declaring a declared child throws), and a keyed shadow of a `main` entry cannot render the entry it shadows (each entry's props are composed privately by the renderer). Disabling `ui-layout` in `cordis.patch.yml` drops its module from the boot graph, so a wrapper could not reuse its `apply` either; the only plugin-side seat would be a fork of the frame.
+  - _Detection:_ if no `[data-slot="main"]` outlet appears within 3 s, the console warns once (`main-tabs: the tab strip cannot mount …`) and the strip stays hidden while tabs keep following the main view. If the strip renders anywhere but directly above the main panel, the console warns too. The e2e journey `main-tabs.strip-mount` fails on either.
+- **Settings is not a tab.** Settings is the `ui-settings-general` modal, not a `main` panel, and nothing plugin-side can render its content elsewhere:
+  - its pages are `settings.section` entries, a child slot the `sidebar.settings` entry declares; the renderer lets only the declaring entry `renderSlot` a child, so another plugin cannot render them;
+  - a shadow `sidebar.settings` registration cannot re-declare those children, and the shell component (`SettingsRoot`) is not exported (the package exports `apply`, `inject` and `SettingsDocumentStore`);
+  - disabling `ui-settings-general` in `cordis.patch.yml` removes its client module, so a wrapper cannot call its `apply`; replacing it would mean porting its whole shell (General section, onboarding, desktop update, document action, dictionaries, shortcut), a fork of a core package under a plugin name.
+
+  Opening Settings from the gear, the palette or `Mod+,` keeps showing the native modal over the tabs.
+
 - A panel's own sidebar icon can only be rendered by the `sidebar.panellist` declarer, so tabs use a generic panel or thread icon with the panel's sidebar label.
 - With no tab left, the main view keeps showing what it showed: DSH has no way to show "nothing" without creating a blank Session.
