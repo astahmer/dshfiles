@@ -286,6 +286,7 @@ export type SecretCatalogKeys = z.infer<typeof secretCatalogKeysSchema>
 export const aiAccountsApi = defineApi({
   id: 'ai-accounts',
   version: 1,
+  owner: '@dshfiles/ai-accounts',
   methods: {
     /** Read the whole file: distribution plus every account. */
     read: method({ input: z.void(), output: accountsFileSchema }),
@@ -405,7 +406,13 @@ export const aiAccountsApi = defineApi({
      * credential and a short timeout, so one unreachable provider degrades one
      * card rather than the panel. Concurrent surfaces share one cached sweep.
      */
-    usage: method({ input: z.void(), output: accountsUsageSchema }),
+    usage: method({
+      input: z.void(),
+      output: accountsUsageSchema,
+      description:
+        'Live subscription quota of every configured AI account (Codex, Copilot, OpenCode Go…): used and remaining windows and when each resets. Read-only; cached for a short while.',
+      tool: { name: 'ai_accounts_quota', readOnly: true },
+    }),
     /** Native DSH provider rows (DeepSeek, Command Code, …) and whether each is switched on. */
     nativeProviders: method({ input: z.void(), output: nativeProvidersSchema }),
     /**

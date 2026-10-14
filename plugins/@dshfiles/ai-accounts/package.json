@@ -24,6 +24,10 @@
     "./cost-estimate": {
       "types": "./src/cost-estimate.ts",
       "default": "./src/cost-estimate.ts"
+    },
+    "./api": {
+      "types": "./src/api.ts",
+      "default": "./src/api.ts"
     }
   },
   "scripts": {
