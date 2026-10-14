@@ -6,6 +6,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { createApiClient, defineClient, useSettings } from '@dshfiles/dshx/client'
 import { jjIntegrationApi, type RepositoryView } from '@dshfiles/jj-integration/api'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { ArrowRightIcon } from '@dshfiles/plugin-ui/icons'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { PluginQueryProvider, useQuery } from '@dshfiles/plugin-ui/query'
 import { useCallback, useSyncExternalStore } from 'react'
@@ -119,12 +120,13 @@ const HomeStrip = (props: {
       {toLand > 0 ? (
         <Button
           size="sm"
-          variant="outline"
-          className="dshx:ml-auto dshx:h-7 dshx:px-2 dshx:text-xs"
+          variant="link"
+          className="dshx:h-7 dshx:gap-1 dshx:px-1 dshx:text-xs"
           title={props.t('openThreadWorkspaces')}
           onClick={props.openThreadWorkspaces}
         >
-          {props.t('unlanded', { count: toLand })}
+          {props.t(toLand === 1 ? 'unlandedOne' : 'unlandedOther', { count: toLand })}
+          <ArrowRightIcon aria-hidden />
         </Button>
       ) : null}
     </div>

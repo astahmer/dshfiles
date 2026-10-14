@@ -5,14 +5,16 @@ export const HOME_LOCALE_NAMESPACE = 'dshfiles.home'
 
 const en = {
   resume: 'Resume',
-  unlanded: '{count} thread(s) with work to land',
+  unlandedOne: '{count} thread has unlanded work',
+  unlandedOther: '{count} threads have unlanded work',
   openThreadWorkspaces: 'Open thread workspaces',
   noProject: 'No folder',
 } as const
 
 const zh: Record<keyof typeof en, string> = {
   resume: '继续',
-  unlanded: '{count} 个会话有待合入的修改',
+  unlandedOne: '{count} 个会话有未合入的修改',
+  unlandedOther: '{count} 个会话有未合入的修改',
   openThreadWorkspaces: '打开会话工作区',
   noProject: '无文件夹',
 }

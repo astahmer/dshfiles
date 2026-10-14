@@ -66,12 +66,12 @@ Then('the New thread screen offers to resume {string} and reports one thread wit
     await expect(page.getByRole('button', { name: title, exact: true })).toBeVisible()
   })
   await recordAssertion(page, 'home-strip-counts-thread-workspaces-with-work-to-land', () =>
-    expect(page.getByRole('button', { name: '1 thread(s) with work to land', exact: true })).toBeVisible(),
+    expect(page.getByRole('button', { name: '1 thread has unlanded work', exact: true })).toBeVisible(),
   )
 })
 
 Then('the work to land opens the Thread workspaces panel', async ({ page }: { page: Page }) => {
-  await page.getByRole('button', { name: '1 thread(s) with work to land', exact: true }).click()
+  await page.getByRole('button', { name: '1 thread has unlanded work', exact: true }).click()
   await recordAssertion(page, 'home-work-to-land-opens-thread-workspaces', async () => {
     await expect(page.getByRole('heading', { name: 'Thread workspaces', exact: true })).toBeVisible()
     await expect(page.getByText('1 unlanded', { exact: true })).toBeVisible()
@@ -81,7 +81,7 @@ Then('the work to land opens the Thread workspaces panel', async ({ page }: { pa
 
 Then('the New thread screen no longer offers to resume {string}', async ({ page }: { page: Page }, title: string) => {
   await recordAssertion(page, 'home-recent-threads-setting-hides-the-resume-list', async () => {
-    await expect(page.getByRole('button', { name: '1 thread(s) with work to land', exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: '1 thread has unlanded work', exact: true })).toBeVisible()
     await expect(page.getByText('Resume', { exact: true })).toHaveCount(0)
     await expect(page.getByRole('button', { name: title, exact: true })).toHaveCount(0)
   })
