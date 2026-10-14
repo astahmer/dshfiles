@@ -119,12 +119,20 @@ const projectButton = (page: Page) => page.getByRole('button', { name: 'Choose w
 const workspaceToggle = (page: Page) => page.getByRole('checkbox', { name: 'workspace', exact: true })
 const rebaseButton = (page: Page) => page.getByRole('button', { name: 'Rebase this thread onto main', exact: true })
 
-/** The Host names a thread workspace `<repository> · <thread>`; the thread name is its directory under `repo-threads`. */
+/**
+ * The Host names a thread workspace `<repository> · <thread>`; the thread name is its directory under `repo-threads`.
+ * Under load the picker re-renders through its empty "Choose workspace" label while the provisioned workspace
+ * registers, so the label is read once it settles on a thread workspace.
+ */
 const currentThreadName = async (page: Page): Promise<string> => {
-  const label = (await projectButton(page).textContent()) ?? ''
-  const match = /^repo · (thread-[\w-]+)$/.exec(label.trim())
-  if (match?.[1] === undefined) throw new Error(`The New thread project is not a thread workspace: ${label}`)
-  return match[1]
+  let threadName: string | undefined
+  await expect(async () => {
+    const label = ((await projectButton(page).textContent()) ?? '').trim()
+    threadName = /^repo · (thread-[\w-]+)$/.exec(label)?.[1]
+    expect(threadName, `The New thread project is not a thread workspace: ${label}`).toBeDefined()
+  }).toPass({ timeout: 15_000 })
+  if (threadName === undefined) throw new Error('The New thread project never settled on a thread workspace.')
+  return threadName
 }
 
 const chooseProjectPath = async (page: Page, path: string): Promise<void> => {
