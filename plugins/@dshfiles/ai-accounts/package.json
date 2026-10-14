@@ -16,7 +16,15 @@
     "./package.json": "./package.json",
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./client": "./dist/client.js",
-    "./locale/en.json": "./locale/en.json"
+    "./locale/en.json": "./locale/en.json",
+    "./pricing-catalog": {
+      "types": "./src/pricing-catalog.ts",
+      "default": "./src/pricing-catalog.ts"
+    },
+    "./cost-estimate": {
+      "types": "./src/cost-estimate.ts",
+      "default": "./src/cost-estimate.ts"
+    }
   },
   "scripts": {
     "build": "dshx build",
