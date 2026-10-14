@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "tool-call-timing",
+      "title": "Start time and duration on every tool call",
+      "summary": "Each tool card in the chat transcript, native or plugin-owned, root or nested, shows how long the call took and when it started (\"1.2 s · 14:02:11\"). While a call runs the duration counts up live. The start time reads as clock time or relative time, and the whole line can be hidden.",
+      "reach": ["seed tool-call-thread", "click text \"Completed in*\"", "click text \"Ran commands\"", "expect note \"Took*\""],
+      "surfaces": ["client", "settings"],
+      "configuration": [
+        {
+          "key": "enabled",
+          "defaultValue": "true",
+          "constraints": "Boolean; show the timing line on tool cards.",
+          "choices": ["true", "false"],
+          "coveredBy": ["tool-meta.settings"]
+        },
+        {
+          "key": "timeFormat",
+          "defaultValue": "absolute",
+          "constraints": "How the start time reads: clock time (with the day when not today) or relative to now.",
+          "choices": ["absolute", "relative"],
+          "coveredBy": ["tool-meta.settings", "tool-meta.timing-unit-relative"]
+        }
+      ],
+      "states": ["preparing", "running", "finished", "start-out-of-window", "hidden"],
+      "failureModes": [
+        "No call time is shown while the model is still writing the arguments.",
+        "A result whose call fell outside the loaded history shows only when it ended.",
+        "If DSH stops rendering tool cards through the keyed tool-call renderer and its renderSlot dispatch, the line disappears and the browser console logs one @dshfiles/tool-meta warning; the cards themselves are untouched."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "tool-meta.live-and-final",
+          "featureFile": "tooling/dshx/e2e/features/tool-meta.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "tool-meta.settings",
+          "featureFile": "tooling/dshx/e2e/features/tool-meta.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "tool-meta.timing-unit-phases",
+          "file": "plugins/@dshfiles/tool-meta/src/timing.test.ts",
+          "testName": "reads a running call from its dispatch time and a settled one from its call and result times"
+        },
+        {
+          "kind": "unit-test",
+          "id": "tool-meta.timing-unit-relative",
+          "file": "plugins/@dshfiles/tool-meta/src/timing.test.ts",
+          "testName": "counts back from now in the relative format"
+        },
+        {
+          "kind": "unit-test",
+          "id": "tool-meta.tree-unit-every-card",
+          "file": "plugins/@dshfiles/tool-meta/src/tool-call-tree.test.tsx",
+          "testName": "adds a meta line under every dispatched tool card, nested calls included"
+        },
+        {
+          "kind": "unit-test",
+          "id": "tool-meta.tree-unit-drift-warning",
+          "file": "plugins/@dshfiles/tool-meta/src/tool-call-tree.test.tsx",
+          "testName": "warns once when the renderer stops dispatching through renderSlot"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,3 @@
+- insert:
+    - id: dshfiles-tool-meta
+      name: '@dshfiles/tool-meta'
