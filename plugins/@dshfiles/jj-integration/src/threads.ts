@@ -41,9 +41,9 @@ export interface ThreadStatus {
   readonly path: string
   readonly repoRoot: string
   readonly missing: boolean
-  /** Non-empty revisions in the thread that the landing bookmark does not contain yet. */
+  /** Non-empty revisions in the thread that the target bookmark does not contain yet. */
   readonly unlanded: readonly ThreadRevision[]
-  /** The landing bookmark moved since this thread last rebased. */
+  /** The target bookmark moved since this thread last rebased. */
   readonly behind: boolean
 }
 
@@ -84,7 +84,7 @@ export const createThreads = (options: {
   readonly threadsDirectory: (repoRoot: string) => string
 }) => {
   const locks = new Map<string, Promise<unknown>>()
-  /** Every mutation of one store runs in order, so two lands never race to move the same bookmark. */
+  /** Every mutation of one store runs in order, so two rebases never race to move the same bookmark. */
   const serialized = <Value>(repoRoot: string, operation: () => Promise<Value>): Promise<Value> => {
     const next = (locks.get(repoRoot) ?? Promise.resolve()).then(operation, operation)
     locks.set(
@@ -235,7 +235,7 @@ export const defaultThreadsDirectory = (repoRoot: string): string => `${repoRoot
 
 /**
  * `dshx checkout sync` from the dshx this plugin builds with: the one routine that brings the checkout running DSH
- * onto the bookmark after Land, and that agents run after moving the bookmark by hand. Throws when dshx is missing.
+ * onto the bookmark after rebasing, and that agents run after moving the bookmark by hand. Throws when dshx is missing.
  */
 export const checkoutSyncArgv = (input: { readonly repoRoot: string; readonly workspace: string; readonly bookmark: string }): readonly string[] => [
   process.execPath,

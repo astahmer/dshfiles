@@ -1,7 +1,7 @@
 # Thread workspaces (jj-integration)
 
 Lets many agents work on one jj repository at once: a thread can run in its own
-jj workspace beside the repository, and **Land** puts its finished work on
+jj workspace beside the repository, and **Rebase** moves its finished work onto
 `main`. Works on stock DSH 0.2.0-rc.2; no core patch.
 
 ## Starting a thread
@@ -30,7 +30,7 @@ project picker open the composer at once in the project (or current) checkout,
 and the destination bar then moves the blank thread to where new threads start
 by default: with `isolateByDefault` on, its own workspace (the spare when there
 is one, else a new one named by the client and created in the background);
-with it off, the project checkout when the thread landed in another thread's
+with it off, the project checkout when the thread started in another thread's
 workspace. The chip shows the workspace name with a spinner and Send waits
 until it is ready; typing does not. Each new thread is moved at most once, so a
 manual toggle sticks. The thread sidebar shows a thread workspace's sessions
@@ -43,10 +43,12 @@ the conversation's right side panel, beside Jujutsu and other tools. Its rows
 show the linked conversation titles. Choose a title to open that conversation;
 **Preview** loads the latest three user/assistant text messages on demand.
 
-## Landing
+## Rebasing
 
-**Land** (thread header, the panel, or the `jj_thread_land` tool) runs in the
-thread's own workspace, serialized per repository:
+**Rebase** (thread header, the panel, or the `jj_thread_rebase` tool) runs in the
+thread's own workspace, serialized per repository. It is available only after
+every Session in the thread has stopped running and no question is waiting for
+an answer:
 
 1. Abandon empty leftovers between `main` and `@`.
 2. Refuse revisions described as nothing or `wip`.
@@ -64,19 +66,19 @@ thread's own workspace, serialized per repository:
    changes arrive over HMR. Conflicts or described work the bookmark lacks
    leave that checkout untouched and are reported there instead.
 
-When Land stops on conflicts or descriptions, it queues a message asking the
-thread's agent to fix them and call `jj_thread_land` again
+When Rebase stops on conflicts or descriptions, it queues a message asking the
+thread's agent to fix them and call `jj_thread_rebase` again
 (`askAgentToFixLanding`). Nothing is pushed.
 
 ## Cleanup
 
 Every 10 minutes, a thread workspace whose threads are all archived and that
-holds no unlanded work is removed: `jj workspace forget`, its own empty
+holds no revisions to rebase is removed: `jj workspace forget`, its own empty
 revisions abandoned (no stray heads), its directory deleted, its registry entry
 dropped. The conversation sessions stay in DSH and remain archived. A workspace
-with unlanded work is never removed automatically; the row's More menu offers
-**Remove workspace and work…** behind a confirmation that names how many
-revisions will be abandoned.
+with revisions to rebase is never removed automatically; its row's More menu
+offers **Remove workspace and work to rebase…** behind a confirmation that names
+how many revisions will be abandoned.
 
 Manual removal forgets the jj workspace, removes its DSH workspace registration,
 and permanently deletes its folder. It does **not** archive or delete the
@@ -85,20 +87,24 @@ The confirmation dialog explains these effects before removal.
 
 ## Agent tools
 
-- `jj_thread_status`: this thread's unlanded revisions and whether `main` moved.
-- `jj_thread_land`: land this thread's work.
+- `jj_thread_status`: this thread's revisions not yet on the target bookmark and whether it moved.
+- `jj_thread_rebase`: rebase this thread's work onto the target bookmark.
 
 ## Settings (`jj-integration`)
 
-| Key                      | Default   | Meaning                                                                                   |
-| ------------------------ | --------- | ----------------------------------------------------------------------------------------- |
-| `isolateByDefault`       | `false`   | Initial state of the workspace toggle for new threads.                                    |
-| `bookmark`               | `main`    | Bookmark threads start from and Land advances.                                            |
-| `threadsDirectory`       | empty     | Parent for thread workspaces; empty uses `<repository>-threads`.                          |
-| `setupCommand`           | empty     | Shell command run in a new thread workspace, e.g. `pnpm install --frozen-lockfile`.       |
-| `askAgentToFixLanding`   | `true`    | Hand Land problems back to the thread's agent.                                            |
-| `syncWorkspaceAfterLand` | `default` | Workspace brought onto the bookmark after Land (`dshx checkout sync`); empty disables it. |
-| `removeFinishedThreads`  | `true`    | Remove finished thread workspaces without unlanded work.                                  |
+| Key                      | Default   | Meaning                                                                                     |
+| ------------------------ | --------- | ------------------------------------------------------------------------------------------- |
+| `isolateByDefault`       | `false`   | Initial state of the workspace toggle for new threads.                                      |
+| `bookmark`               | `main`    | Bookmark threads start from and Rebase advances.                                            |
+| `threadsDirectory`       | empty     | Parent for thread workspaces; empty uses `<repository>-threads`.                            |
+| `setupCommand`           | empty     | Shell command run in a new thread workspace, e.g. `pnpm install --frozen-lockfile`.         |
+| `askAgentToFixLanding`   | `true`    | Hand Rebase problems back to the thread's agent.                                            |
+| `syncWorkspaceAfterLand` | `default` | Workspace brought onto the bookmark after Rebase (`dshx checkout sync`); empty disables it. |
+| `removeFinishedThreads`  | `true`    | Remove finished thread workspaces without revisions to rebase.                              |
+
+The settings keys `askAgentToFixLanding` and `syncWorkspaceAfterLand` retain
+their names for saved-settings compatibility; their descriptions and UI copy
+use **Rebase**.
 
 ## Limits
 

@@ -54,14 +54,14 @@
         {
           "key": "removeFinishedThreads",
           "defaultValue": "true",
-          "constraints": "Removes a thread workspace only when every thread in it is archived and it has no unlanded work.",
+          "constraints": "Removes a thread workspace only when every thread in it is archived and it has no revisions to rebase.",
           "coveredBy": ["jj-integration.discard"]
         }
       ],
       "states": ["shared-checkout", "isolated", "finished", "missing"],
       "failureModes": [
         "A folder outside a jj repository offers no bookmark or isolation.",
-        "A thread workspace with unlanded work is never removed by the sweep."
+        "A thread workspace with revisions to rebase is never removed by the sweep."
       ],
       "externalDependencies": [
         {
@@ -97,7 +97,7 @@
           "kind": "unit-test",
           "id": "jj-integration.discard",
           "file": "plugins/@dshfiles/jj-integration/src/threads.integration.test.ts",
-          "testName": "discards an empty thread completely and refuses one with unlanded work"
+          "testName": "discards an empty thread completely and refuses one with revisions to rebase"
         }
       ]
     },
@@ -154,30 +154,36 @@
       ]
     },
     {
-      "id": "land",
-      "title": "Land a thread onto the bookmark",
-      "summary": "Rebase a thread's described work onto the landing bookmark and move the bookmark forward; conflicts and undescribed revisions are handed back to the thread's agent. Afterwards the checkout running DSH follows the bookmark in the background through `dshx checkout sync`, with a panel line saying what was rebuilt and whether to restart.",
-      "reach": ["seed landable-thread", "click button \"Seeded thread to land*\"", "expect button \"Land this thread onto main\"", "expect text \"Land · 1\""],
+      "id": "rebase",
+      "title": "Rebase a thread onto the bookmark",
+      "summary": "Rebase a thread's described work onto the target bookmark and advance it; conflicts and undescribed revisions are handed back to the thread's agent. Rebase is disabled while any thread session is working or waiting for input. Afterwards the checkout running DSH follows the bookmark in the background through `dshx checkout sync`, with a panel line saying what was rebuilt and whether to restart.",
+      "reach": [
+        "seed rebase-ready-thread",
+        "click button \"Seeded thread to rebase*\"",
+        "expect button \"Rebase this thread onto main\"",
+        "expect text \"Rebase · 1\""
+      ],
       "surfaces": ["host", "tool", "client", "integration"],
       "configuration": [
         {
           "key": "askAgentToFixLanding",
           "defaultValue": "true",
-          "constraints": "Queues a message to the thread's latest unarchived Session when Land stops.",
-          "coveredBy": ["jj-integration.land-conflict"]
+          "constraints": "Queues a message to the thread's latest unarchived Session when Rebase stops.",
+          "coveredBy": ["jj-integration.rebase-conflict"]
         },
         {
           "key": "syncWorkspaceAfterLand",
           "defaultValue": "default",
-          "constraints": "jj workspace synced onto the bookmark after a successful Land; empty disables it.",
+          "constraints": "jj workspace synced onto the bookmark after a successful rebase; empty disables it.",
           "coveredBy": ["jj-integration.checkout-sync"]
         }
       ],
-      "states": ["landed", "nothing-to-land", "needs-description", "conflicted", "checkout-synced"],
+      "states": ["rebased", "nothing-to-rebase", "rebase-blocked", "needs-description", "conflicted", "checkout-synced"],
       "failureModes": [
         "A conflict leaves the bookmark where it was.",
         "Placeholder descriptions (empty or wip) are refused.",
-        "The post-Land checkout sync refuses described work the bookmark lacks and undoes a conflicting rebase; the panel line names the files and the Land itself stands."
+        "Rebase is refused while any thread session is running or waiting for input.",
+        "The post-rebase checkout sync refuses described work the bookmark lacks and undoes a conflicting rebase; the panel line names the files and the rebase itself stands."
       ],
       "externalDependencies": [
         {
@@ -189,24 +195,48 @@
       "verification": [
         {
           "kind": "gherkin",
-          "id": "jj-integration.land-browser-journey",
+          "id": "jj-integration.rebase-browser-journey",
           "featureFile": "tooling/dshx/e2e/features/jj-integration.feature"
         },
         {
           "kind": "unit-test",
-          "id": "jj-integration.land",
-          "file": "plugins/@dshfiles/jj-integration/src/threads.integration.test.ts",
-          "testName": "lands described work onto the bookmark and leaves a fresh working copy"
+          "id": "jj-integration.rebase-working-session",
+          "file": "plugins/@dshfiles/jj-integration/src/thread-rebase-eligibility.test.ts",
+          "testName": "blocks rebasing while any session is working"
         },
         {
           "kind": "unit-test",
-          "id": "jj-integration.land-description",
-          "file": "plugins/@dshfiles/jj-integration/src/threads.integration.test.ts",
-          "testName": "asks for a description instead of landing placeholder work"
+          "id": "jj-integration.rebase-waiting-question",
+          "file": "plugins/@dshfiles/jj-integration/src/thread-rebase-eligibility.test.ts",
+          "testName": "blocks rebasing while a user question waits after the Agent turn stopped"
         },
         {
           "kind": "unit-test",
-          "id": "jj-integration.land-conflict",
+          "id": "jj-integration.rebase-unknown-question-state",
+          "file": "plugins/@dshfiles/jj-integration/src/thread-rebase-eligibility.test.ts",
+          "testName": "fails closed when pending-question state is unknown"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.rebase-question-projection",
+          "file": "plugins/@dshfiles/jj-integration/src/thread-rebase-eligibility.test.ts",
+          "testName": "reads unanswered questions from the user-question projection"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.rebase",
+          "file": "plugins/@dshfiles/jj-integration/src/threads.integration.test.ts",
+          "testName": "rebases described work onto the bookmark and leaves a fresh working copy"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.rebase-description",
+          "file": "plugins/@dshfiles/jj-integration/src/threads.integration.test.ts",
+          "testName": "requires a description before rebasing placeholder work"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.rebase-conflict",
           "file": "plugins/@dshfiles/jj-integration/src/threads.integration.test.ts",
           "testName": "reports conflicting files and keeps the bookmark where it was"
         },
@@ -214,23 +244,20 @@
           "kind": "unit-test",
           "id": "jj-integration.checkout-sync",
           "file": "plugins/@dshfiles/jj-integration/src/threads.integration.test.ts",
-          "testName": "brings the default checkout onto the landed bookmark with dshx checkout sync, keeping its local edits"
+          "testName": "brings the default checkout onto the rebased bookmark with dshx checkout sync, keeping its local edits"
         }
       ]
     },
     {
       "id": "thread-workspaces-panel",
       "title": "Thread workspaces page",
-      "summary": "Available as a main page and a conversation side-panel tab beside Jujutsu. Rows show conversation titles with open links and lazy recent-message previews; workspace removal explains jj/DSH registration deletion, folder removal, conversation retention, and abandoned revisions in a confirmation dialog.",
+      "summary": "Available from the left panel and conversation side panel beside Jujutsu. Rows show conversation titles with open links and lazy message previews; Rebase is disabled until every thread session is stopped and no user question is pending. Removal confirms folder and registry effects and any revisions to abandon.",
       "reach": [
-        "click button \"New thread\"",
-        "click checkbox \"workspace\"",
-        "expect status \"thread-*\"",
-        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Thread workspace panel reach\"",
-        "press Enter",
+        "seed rebase-ready-thread",
         "expect button \"Open thread workspaces in side panel\"",
         "click button \"Open thread workspaces in side panel\"",
         "expect heading \"Thread workspaces\"",
+        "expect button \"Rebase\"",
         "click button \"Preview\"",
         "expect text \"You\""
       ],
@@ -243,15 +270,18 @@
         "side-panel",
         "thread-titles",
         "message-preview",
-        "unlanded",
+        "to-rebase",
         "up-to-date",
         "removal-confirming",
-        "removal-failed"
+        "removal-failed",
+        "discard-confirming",
+        "discard-failed"
       ],
       "failureModes": [
         "Work that appears after the removal dialog opened is refused by the Host and never deleted unseen; the dialog asks for a refresh.",
         "A Host error while removing stays in the dialog with a retry.",
-        "Removal deletes the jj workspace and folder but retains conversation sessions in DSH without changing their archive state."
+        "Removal deletes the jj workspace and folder but retains conversation sessions in DSH without changing their archive state.",
+        "Rebase stays disabled while any thread session is running or has a pending user question, and the Host rejects direct calls under the same conditions."
       ],
       "externalDependencies": [
         {

@@ -118,7 +118,7 @@ describe('dshx dev scratch commands', () => {
       browserLog: join(stateDir, 'browser.log'),
       browserEvents: join(stateDir, 'browser-events.jsonl'),
       evidenceDir: join(stateDir, 'evidence'),
-      seeds: [{ seed: 'pending-restart', changedFile: hostEntry }, { seed: 'landable-thread' }],
+      seeds: [{ seed: 'pending-restart', changedFile: hostEntry }, { seed: 'rebase-ready-thread' }],
     }
     await writeFile(join(stateDir, 'state.json'), JSON.stringify(state), { mode: 0o600 })
 

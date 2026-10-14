@@ -13,7 +13,7 @@ recent threads or jump to thread workspaces with work to rebase.
 | `showPreviewBadge`      | `false`     | Keep the DeepSeek "Preview" badge.                                                          |
 | `showAgentPresetPicker` | `true`      | Show the agent preset picker; hidden, new threads use the native "New task default" preset. |
 | `showRecentThreads`     | `true`      | Up to three unarchived threads of the selected project.                                     |
-| `showUnlandedWork`      | `true`      | Count of the project's thread workspaces with work to rebase (needs jj-integration).          |
+| `showUnlandedWork`      | `true`      | Count of the project's thread workspaces with work to rebase (needs jj-integration).        |
 
 ## Limits
 

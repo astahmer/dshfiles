@@ -23,7 +23,7 @@ export const homeSettings = defineSettings({
         'Show the agent preset (Standard mode, …) picker on the New thread screen. Hidden, new threads use the preset marked “New task default” in Settings › Agent presets.',
       ),
     showRecentThreads: Schema.boolean().default(true).description('List the project’s most recent threads above the composer to resume one.'),
-    showUnlandedWork: Schema.boolean().default(true).description('Show how many of the project’s thread workspaces hold work not yet landed.'),
+    showUnlandedWork: Schema.boolean().default(true).description('Show how many of the project’s thread workspaces have work to rebase.'),
   }),
 })
 

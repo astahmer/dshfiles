@@ -20,7 +20,7 @@ const threads = defineApi({
     land: method({
       input: z.object({ path: z.string().min(1) }).strict(),
       output: z.object({ landed: z.boolean() }),
-      description: 'Land a thread onto main.',
+      description: 'Rebase a thread onto main.',
       tool: { name: 'test_thread_land' },
     }),
     internal: method({ input: z.void(), output: z.string() }),

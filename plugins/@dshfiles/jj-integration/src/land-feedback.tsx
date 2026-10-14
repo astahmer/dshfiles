@@ -16,21 +16,21 @@ export const describeLandResult = (t: JjIntegrationTranslate, result: LandResult
     const listed = result.revisions.slice(0, LISTED_REVISIONS).map(revisionLabel)
     const hidden = result.revisions.length - listed.length
     const revisions = hidden > 0 ? `${listed.join(', ')} ${t('andMore', { count: hidden })}` : listed.join(', ')
-    const landed = t('landed', { count: result.revisions.length, bookmark: result.bookmark, revisions })
+    const rebased = t('rebased', { count: result.revisions.length, bookmark: result.bookmark, revisions })
     return result.head === undefined
-      ? landed
-      : `${landed} ${t('bookmarkNowAt', { bookmark: result.bookmark, changeId: result.head.changeId.slice(0, 8), commitId: result.head.commitId.slice(0, 8) })}`
+      ? rebased
+      : `${rebased} ${t('bookmarkNowAt', { bookmark: result.bookmark, changeId: result.head.changeId.slice(0, 8), commitId: result.head.commitId.slice(0, 8) })}`
   }
   const summary =
     result.status === 'nothing-to-land'
-      ? t('nothingToLand', { bookmark: result.bookmark })
+      ? t('nothingToRebase', { bookmark: result.bookmark })
       : result.status === 'needs-description'
         ? t('needsDescription', { revisions: result.revisions.map(revision => revision.changeId).join(', ') })
-        : t('conflicted', { bookmark: result.bookmark, files: result.files.join(', ') })
-  return result.agentAsked ? `${summary} ${t('agentAsked')}` : summary
+        : t('rebaseConflicted', { bookmark: result.bookmark, files: result.files.join(', ') })
+  return result.agentAsked ? `${summary} ${t('agentAskedToRebase')}` : summary
 }
 
-/** Land rewrote the repository: the jujutsu plugin's changes card and chips listen for this to refetch. */
+/** Rebase rewrote the repository: the jujutsu plugin's changes card and chips listen for this to refetch. */
 export const announceRepositoryChange = (): void => {
   window.dispatchEvent(new CustomEvent('dshfiles:jj-changed'))
 }

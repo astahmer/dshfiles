@@ -93,7 +93,7 @@ const HomeStrip = (props: {
       .join(',')
   })
   const rebaseWork = useQuery({
-    queryKey: ['home', 'rebase-work', project?.path ?? '']
+    queryKey: ['home', 'rebase-work', project?.path ?? ''],
     enabled: blank && settings.showUnlandedWork && project !== undefined,
     // Reading every thread workspace is the costliest jj call on this screen; each New thread remounts it, and a
     // fresh read per mount competed with creating the thread's own workspace.

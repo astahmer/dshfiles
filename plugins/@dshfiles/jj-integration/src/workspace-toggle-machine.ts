@@ -84,7 +84,7 @@ type ToggleEvent =
 /**
  * Where a blank New-thread Session should start, given its current destination: its own thread workspace when
  * isolation is on by default (unless it already sits alone in one), the project checkout when it is off and the
- * Session landed in another thread's workspace. Null keeps it where it is.
+ * Session started in another thread's workspace. Null keeps it where it is.
  */
 export const defaultDestinationMove = (input: {
   readonly destination: DestinationView

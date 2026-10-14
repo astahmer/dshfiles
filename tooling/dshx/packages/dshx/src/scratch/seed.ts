@@ -14,7 +14,7 @@ const FAKE_PROVIDER_ACCOUNT = 'Command Code 1'
 const FAKE_PROVIDER_MODEL = 'commandcode_work/gpt-6-luna'
 /** A call that runs long enough to watch a live tool-call counter, then settles. */
 const TOOL_CALL_DIRECTIVE = `[[call bash ${JSON.stringify({ command: 'sleep 3 && echo tool-call-thread', description: 'Wait three seconds' })}]]`
-const LANDABLE_THREAD_MESSAGE = 'Seeded thread to land'
+const REBASE_READY_THREAD_MESSAGE = 'Seeded thread to rebase'
 const PENDING_RESTART_MARKER = '\n// dshx dev seed: pending restart\n'
 /** thread-sidebar reports pending Host updates, so its own Host entry is the one a seeded rebuild changes. */
 const PENDING_RESTART_PLUGIN = '@dshfiles/thread-sidebar'
@@ -59,13 +59,13 @@ export const seedSampleProject = async (home: string): Promise<string> => {
 
 /**
  * Start a thread in its own jj workspace through the New thread screen, then stand in for the agent's edit with a
- * described revision in that workspace, so Land has work to land.
+ * described revision in that workspace, so the Rebase action is available.
  */
-const seedLandableThread = async (state: ScratchState, page: Page, timeoutMs: number): Promise<void> => {
+const seedRebaseReadyThread = async (state: ScratchState, page: Page, timeoutMs: number): Promise<void> => {
   if (!state.bundles.includes('@dshfiles/jj-integration')) {
     throw new ScratchError(
       'seed-needs-plugin',
-      'Seed landable-thread needs @dshfiles/jj-integration.',
+      'Seed rebase-ready-thread needs @dshfiles/jj-integration.',
       'Run "dshx dev down" then "dshx dev up --plugin @dshfiles/jj-integration ...".',
     )
   }
@@ -96,11 +96,11 @@ const seedLandableThread = async (state: ScratchState, page: Page, timeoutMs: nu
       'Run "dshx dev open jj-integration/thread-destination".',
     )
   }
-  await composer.fill(LANDABLE_THREAD_MESSAGE)
+  await composer.fill(REBASE_READY_THREAD_MESSAGE)
   await composer.press('Enter')
   await page
     .getByRole('navigation', { name: 'Session hierarchy', exact: true })
-    .filter({ hasText: LANDABLE_THREAD_MESSAGE })
+    .filter({ hasText: REBASE_READY_THREAD_MESSAGE })
     .waitFor({ state: 'visible', timeout: timeoutMs })
   const threadPath = join(dirname(state.project.path), `${projectName}-threads`, threadName)
   if (
@@ -111,8 +111,8 @@ const seedLandableThread = async (state: ScratchState, page: Page, timeoutMs: nu
   ) {
     throw new ScratchError('seed-failed', `The thread workspace ${threadPath} does not exist.`, 'Check jj-integration threadsDirectory in the scratch profile.')
   }
-  await writeFile(join(threadPath, 'seeded-work.md'), 'Work a scratch thread is ready to land.\n')
-  runJj({ cwd: threadPath, home: state.home, args: ['describe', '--message', 'Seeded work to land'], purpose: 'describing the seeded thread work' })
+  await writeFile(join(threadPath, 'seeded-work.md'), 'Work a scratch thread is ready to rebase.\n')
+  runJj({ cwd: threadPath, home: state.home, args: ['describe', '--message', 'Seeded work to rebase'], purpose: 'describing the seeded thread work' })
 }
 
 /** The scratch profile links owned bundles, so this changes the checkout's build output until `down` restores it. */
@@ -245,6 +245,7 @@ export const applySeed = async (input: {
 }): Promise<{ readonly changedFile?: string; readonly fakeProvider?: NonNullable<ScratchState['fakeProvider']> }> => {
   if (input.seed === 'pending-restart') return { changedFile: await seedPendingRestart(input.state) }
   if (input.seed === 'tool-call-thread') return { fakeProvider: await seedToolCallThread(input.state, input.page, input.timeoutMs) }
-  await seedLandableThread(input.state, input.page, input.timeoutMs)
+  await seedRebaseReadyThread(input.state, input.page, input.timeoutMs)
   return {}
+
 }

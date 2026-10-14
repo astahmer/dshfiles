@@ -41,14 +41,16 @@ entry active and every bundle under test loaded, no error lines in the host log.
 
 ```sh
 dshx dev open jj-integration/thread-destination
+dshx dev open jj-integration/rebase
+dshx dev open jj-integration/thread-workspaces-panel
 dshx dev open home-screen
 ```
 
 Goes to the app root, dismisses Preview Notice and "Add an API key", then runs
 the feature's `reach` steps. A `seed` step first sets up state no short UI path
-creates, once per instance: `landable-thread` (a jj workspace thread with a
-described revision, for Land) and `pending-restart` (changes thread-sidebar's
-`dist/index.js`; `down` restores it) and `tool-call-thread` (an AI Accounts
+creates, once per instance: `rebase-ready-thread` (a jj workspace thread with a
+described revision, for Rebase), `pending-restart` (changes thread-sidebar's
+`dist/index.js`; `down` restores it), and `tool-call-thread` (an AI Accounts
 Command Code account on a loopback fake provider, which `down` stops, and a
 thread whose model ran a 3 s `bash` call; needs `@dshfiles/ai-accounts`). `attach "<repo file>"` hands a fixture
 such as `tooling/dshx/e2e/fixtures/attachments/red.png` to the composer's file
@@ -82,8 +84,10 @@ pgrep -fl 'dshx-boot-profile|browser-host.js' || echo clean
 - The root reopens the last thread, so a reach that needs the New thread screen
   starts with `click button "New thread"`; that button and the thread rows come
   from `@dshfiles/thread-sidebar`, so load it for any thread reach.
-- Reaches share one browser: a reach that changes a sidebar view leaves it for
-  the next one; row-driven reaches start with `click button "All threads"`.
+- Reaches share one browser and project selection persists. A reach that needs
+  the project picker should run before another selects `sample` or use a separate
+  `--name` instance. A reach that changes a sidebar view leaves it for the next
+  one; row-driven reaches start with `click button "All threads"`.
 - The project picker filters asynchronously: wait for the row
   (`expect option "sample*"`) before `press Enter`.
 - Register projects by their realpath. macOS temp dirs sit behind

@@ -77,7 +77,7 @@ Work lands on `main`; never `jj git push` without asking.
 - Do parallel work in your own workspace, never in someone else's checkout:
   `jj workspace add ../dshfiles-<topic> --name <topic> -r main`, or a thread
   workspace created by `@dshfiles/jj-integration` (see its
-  [README](plugins/@dshfiles/jj-integration/README.md); **Land** rebases it
+  [README](plugins/@dshfiles/jj-integration/README.md); **Rebase** moves it
   onto `main`).
 - One described revision per logical change: Conventional Commit title, a body
   that says why, and the `Co-Authored-By` trailer. `jj describe -m …`, then
@@ -96,7 +96,7 @@ Work lands on `main`; never `jj git push` without asking.
   DSH runs from along: `node tooling/dshx/packages/dshx/dist/cli/bin.js
 checkout sync` (`--dry-run` to preview). It rebases the `default` workspace
   keeping its local edits, rebuilds what changed and says whether DSH needs a
-  restart; it never restarts DSH. Land does this itself.
+  restart; it never restarts DSH. Rebase does this itself.
 - Always pass `-m` to `jj describe` and `jj squash` (or
   `--use-destination-message`); a bare command opens an editor and hangs.
 - Check `jj log -r 'conflicts()'` after a rebase.

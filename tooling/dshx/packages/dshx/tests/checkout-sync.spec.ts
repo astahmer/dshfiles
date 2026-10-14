@@ -27,7 +27,7 @@ describe.skipIf(!jjAvailable)('dshx checkout sync against real jj', () => {
   let checkout: string
   let lander: string
   const sync = (dryRun = false) => syncCheckout({ cwd: lander, workspace: 'default', bookmark: 'main', dryRun })
-  /** Another workspace lands work on main, the way jj-integration's Land or an agent does. */
+  /** Another workspace lands work on main, the way jj-integration's Rebase action or an agent does. */
   const land = (file: string, content: string, message: string): void => {
     jj(lander, 'new', 'main')
     writeFile(join(lander, file), content)
@@ -101,7 +101,7 @@ describe.skipIf(!jjAvailable)('dshx checkout sync against real jj', () => {
 
     const result = await sync()
     expect(result).toMatchObject({ status: 'refused', unlanded: [{ description: 'feat: not landed' }] })
-    expect(result.hint).toContain('Land it onto main')
+    expect(result.hint).toContain('Rebase it onto main')
     expect(commitOf(checkout, 'default@')).toBe(before)
     expect(describeRevision(checkout, 'default@-')).toBe('feat: not landed')
   })

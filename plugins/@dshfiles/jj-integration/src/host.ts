@@ -14,6 +14,7 @@ import type { SettingsScope } from '@dshfiles/dshx/settings'
 import { z } from 'zod'
 import { jjIntegrationApi, type DestinationView, type LandResult, type RepositoryView, type ThreadView, type WorkspaceSyncView } from './api.js'
 import { jjIntegrationSettings, type JjIntegrationSettings } from './settings.js'
+import { canRebaseThread, hasPendingUserQuestion, type ThreadSessionActivity } from './thread-rebase-eligibility.js'
 import { checkoutSyncArgv, createThreads, defaultThreadsDirectory, type JjExecutor, type ThreadStatus, type Threads } from './threads.js'
 
 declare module '@deepseek-ai/cordis' {
@@ -29,7 +30,7 @@ const SETUP_TIMEOUT_MS = 15 * 60_000
 /** A thread younger than this may still be waiting for its first Session to attach. */
 const SWEEP_GRACE_MS = 15 * 60_000
 const SWEEP_INTERVAL_MS = 10 * 60_000
-/** Installs and plugin rebuilds after a large landing take minutes. */
+/** Installs and plugin rebuilds after a large rebase take minutes. */
 const SYNC_TIMEOUT_MS = 30 * 60_000
 
 const defaultSettings: JjIntegrationSettings = jjIntegrationSettings.schema({})
@@ -139,16 +140,46 @@ const runSetupCommand = async (context: Context, command: string, cwd: string): 
 const isFinished = (workspace: Workspace | undefined, archived: ReadonlySet<string>): boolean =>
   workspace === undefined || workspace.sessionIds.every(sessionId => archived.has(sessionId))
 
-const threadView = (status: ThreadStatus, workspace: Workspace | undefined, archived: ReadonlySet<string>): ThreadView => ({
-  name: status.name,
-  path: status.path,
-  workspaceId: workspace?.id ?? null,
-  sessionIds: [...(workspace?.sessionIds ?? [])],
-  finished: isFinished(workspace, archived),
-  missing: status.missing,
-  behind: status.behind,
-  unlanded: [...status.unlanded],
-})
+const readSessionActivity = async (): Promise<ReadonlyMap<string, ThreadSessionActivity> | undefined> => {
+  const controller = requireContext().get('sessionController')
+  if (controller === undefined) return undefined
+  try {
+    const result = await controller.list({}, AbortSignal.timeout(15_000))
+    const activity = new Map<string, ThreadSessionActivity>()
+    for (const item of result.items) {
+      activity.set(item.sessionId, {
+        running: item.running,
+        pendingUserQuestion: hasPendingUserQuestion(item.projections?.values),
+      })
+    }
+    return activity
+  } catch {
+    return undefined
+  }
+}
+
+const canRebaseWorkspace = (sessionIds: readonly string[], activity: ReadonlyMap<string, ThreadSessionActivity> | undefined): boolean =>
+  canRebaseThread(sessionIds, sessionId => activity?.get(sessionId))
+
+const threadView = (
+  status: ThreadStatus,
+  workspace: Workspace | undefined,
+  archived: ReadonlySet<string>,
+  activity: ReadonlyMap<string, ThreadSessionActivity> | undefined,
+): ThreadView => {
+  const sessionIds = [...(workspace?.sessionIds ?? [])]
+  return {
+    name: status.name,
+    path: status.path,
+    workspaceId: workspace?.id ?? null,
+    sessionIds,
+    finished: isFinished(workspace, archived),
+    canRebase: canRebaseWorkspace(sessionIds, activity),
+    missing: status.missing,
+    behind: status.behind,
+    unlanded: [...status.unlanded],
+  }
+}
 
 /** Every registered project that is the owning checkout of a jj repository, with its thread workspaces. */
 const listRepositories = async (): Promise<readonly RepositoryView[]> => {
@@ -157,6 +188,7 @@ const listRepositories = async (): Promise<readonly RepositoryView[]> => {
   const workspaces = registry.list()
   const byPath = new Map(workspaces.map(workspace => [workspace.path, workspace]))
   const archived = new Set<string>(registry.archivedSessionIds)
+  const activity = await readSessionActivity()
   const repositories = new Map<string, RepositoryView>()
   for (const workspace of workspaces) {
     if (!existsSync(workspace.path)) continue
@@ -168,7 +200,7 @@ const listRepositories = async (): Promise<readonly RepositoryView[]> => {
       repoRoot: location.repoRoot,
       title: owner?.title ?? basename(location.repoRoot),
       workspaceId: owner?.id ?? null,
-      threads: statuses.map(status => threadView(status, byPath.get(status.path), archived)),
+      threads: statuses.map(status => threadView(status, byPath.get(status.path), archived, activity)),
     })
   }
   return [...repositories.values()]
@@ -186,16 +218,16 @@ const landingMessage = (outcome: LandResult): string | undefined => {
   const bookmark = outcome.bookmark
   if (outcome.status === 'conflicted') {
     return [
-      `Landing this thread onto \`${bookmark}\` stopped: rebasing onto the latest \`${bookmark}\` left conflicts in:`,
+      `Rebasing this thread onto \`${bookmark}\` stopped with conflicts in:`,
       ...outcome.files.map(file => `- ${file}`),
-      'Resolve them in this workspace (edit the files so no conflict markers remain; the conflicted revisions are already rebased), keep every revision described, then call the `jj_thread_land` tool again.',
+      'Resolve them in this workspace (edit the files so no conflict markers remain; the conflicted revisions are already rebased), keep every revision described, then call the `jj_thread_rebase` tool again.',
     ].join('\n')
   }
   if (outcome.status === 'needs-description') {
     return [
-      `Landing this thread onto \`${bookmark}\` stopped: these revisions have no real description:`,
+      `Rebasing this thread onto \`${bookmark}\` stopped because these revisions have no real description:`,
       ...outcome.revisions.map(revision => `- ${revision.changeId}`),
-      'Describe each one with `jj describe -r <change-id> -m "<conventional commit message>"` (split unrelated changes with `jj split` first), then call the `jj_thread_land` tool again.',
+      'Describe each one with `jj describe -r <change-id> -m "<conventional commit message>"` (split unrelated changes with `jj split` first), then call the `jj_thread_rebase` tool again.',
     ].join('\n')
   }
   return undefined
@@ -295,7 +327,7 @@ const runWorkspaceSync = async (input: WorkspaceSyncInput): Promise<WorkspaceSyn
   }
 }
 
-/** Runs one sync at a time; Lands arriving while one waits share it. */
+/** Runs one sync at a time; rebases arriving while one waits share it. */
 const queueWorkspaceSync = (repoRoot: string): void => {
   const settings = readSettings()
   const workspace = settings.syncWorkspaceAfterLand.trim()
@@ -319,6 +351,16 @@ const queueWorkspaceSync = (repoRoot: string): void => {
 
 const landThread = async (input: { readonly path: string; readonly sessionId: string | undefined; readonly fromAgent: boolean }): Promise<LandResult> => {
   const bookmark = readSettings().bookmark
+  const location = await requireThreads().locate(input.path)
+  if (location.threadName !== undefined) {
+    const registry = registryOf()
+    const workspace = await registry.resolveByPath(location.workspaceRoot)
+    if (workspace === undefined) throw new PluginApiError('Could not verify thread activity before rebasing.', { code: 'thread-activity-unknown' })
+    const activity = await readSessionActivity()
+    if (!canRebaseWorkspace(workspace.sessionIds, activity)) {
+      throw new PluginApiError('Finish all work and answer pending questions before rebasing this thread.', { code: 'thread-active' })
+    }
+  }
   const outcome = await requireThreads().land(input.path)
   const result: LandResult = {
     status: outcome.status,
@@ -335,12 +377,12 @@ const landThread = async (input: { readonly path: string; readonly sessionId: st
       : false
   if (outcome.status === 'landed') queueWorkspaceSync((await requireThreads().locate(input.path)).repoRoot)
   emitActivity({
-    type: `workspace.land_${outcome.status.replaceAll('-', '_')}`,
+    type: `workspace.rebase_${outcome.status.replaceAll('-', '_')}`,
     level: outcome.status === 'landed' || outcome.status === 'nothing-to-land' ? 'notable' : 'attention',
     summary:
       outcome.status === 'landed'
-        ? `Landed ${String(outcome.revisions.length)} revision(s) from ${basename(input.path)} onto ${bookmark}`
-        : `Land ${outcome.status} in ${basename(input.path)}`,
+        ? `Rebased ${String(outcome.revisions.length)} revision(s) from ${basename(input.path)} onto ${bookmark}`
+        : `Rebase ${outcome.status} in ${basename(input.path)}`,
     path: input.path,
   })
   return { ...result, agentAsked }
@@ -468,7 +510,7 @@ const api = jjIntegrationApi.host({
   },
   landThread: async ({ input, caller }) => {
     const location = await requireThreads().locate(threadPath(input, caller))
-    if (location.threadName === undefined) return { summary: 'This Session does not run in a thread workspace; nothing to land.', result: null }
+    if (location.threadName === undefined) return { summary: 'This Session does not run in a thread workspace; nothing to rebase.', result: null }
     const result = await landThread({
       path: location.workspaceRoot,
       sessionId: caller.kind === 'agent' ? caller.sessionId : undefined,

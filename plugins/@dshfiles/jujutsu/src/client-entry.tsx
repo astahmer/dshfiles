@@ -71,7 +71,7 @@ export default defineClient({
         }),
       'dshfiles-jujutsu: right pane tab type',
     )
-    // Another plugin that rewrote the repository (jj-integration's Land) announces it, so the changes card and chips do not wait for the next poll.
+    // Another plugin that rewrote the repository (jj-integration's rebase) announces it, so the changes card and chips do not wait for the next poll.
     ctx.effect(() => {
       const refresh = (): void => void pluginQueryClient().invalidateQueries({ queryKey: ['jujutsu'] })
       window.addEventListener('dshfiles:jj-changed', refresh)

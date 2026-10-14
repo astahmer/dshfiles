@@ -241,7 +241,7 @@ export const threadsApi = defineApi({
     status: method({
       input: z.object({ path: z.string().min(1).optional() }).strict(),
       output: threadStatusSchema,
-      description: 'Revisions of a thread workspace not yet on the landing bookmark.',
+      description: 'Revisions of a thread workspace not yet on its target bookmark.',
       tool: { name: 'jj_thread_status', readOnly: true, render: output => summarize(output) },
     }),
   },

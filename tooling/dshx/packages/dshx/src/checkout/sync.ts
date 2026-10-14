@@ -87,7 +87,7 @@ const updateIfStale = async (jj: ReturnType<typeof jjAt>): Promise<boolean> => {
 }
 
 /**
- * Brings the checkout of one jj workspace (the one running `dsh web`, `default` by default) onto the landing bookmark,
+ * Brings the checkout of one jj workspace (the one running `dsh web`, `default` by default) onto the target bookmark,
  * keeping its local edits, then reinstalls and rebuilds what the move changed.
  *
  * Only undescribed (`wip`) revisions and described revisions main already holds move; described work main lacks is
@@ -170,7 +170,7 @@ export const syncCheckout = async (options: {
         from,
         updatedStale,
         status: 'refused',
-        hint: `Rebasing ${workspace}'s revisions would rewrite the working copy of ${others.join(', ')}, which builds on them. Land or move that work first, then sync again.`,
+        hint: `Rebasing ${workspace}'s revisions would rewrite the working copy of ${others.join(', ')}, which builds on them. Rebase or move that work first, then sync again.`,
       }
   }
 
@@ -183,7 +183,7 @@ export const syncCheckout = async (options: {
   const after = await jj.revisions(`::@ ~ ::${bookmark}`)
 
   // Restore exactly when nothing else wrote since the rebase; otherwise revert only the rebase, so a concurrent
-  // Land or agent operation is not undone with it.
+  // Rebase or agent operation is not undone with it.
   const undo = async (): Promise<void> => {
     const head = await jj.operation()
     await jj.read(head === rebaseOperation ? [...quiet, 'op', 'restore', preOperation] : [...quiet, 'op', 'revert', rebaseOperation])
@@ -208,7 +208,7 @@ export const syncCheckout = async (options: {
       updatedStale,
       status: 'refused',
       unlanded,
-      hint: `${workspace}@ carries described work ${bookmark} does not have yet. Land it onto ${bookmark} (or describe it "wip" if it is local-only), then sync again.`,
+      hint: `${workspace}@ carries described work ${bookmark} does not have yet. Rebase it onto ${bookmark} (or describe it "wip" if it is local-only), then sync again.`,
     }
   }
   const conflicted = after.filter(revision => revision.conflict)

@@ -21,8 +21,8 @@ Every bundle directory under `plugins/@dshfiles/` is listed here; shared librari
 | [`diff-viewed`](plugins/@dshfiles/diff-viewed/README.md) | Track changed files reviewed per turn. |
 | [`editor`](plugins/@dshfiles/editor/README.md) | Monaco file tree, tabs, open-from-anywhere, and confined saves. |
 | [`goal-stall-guard`](plugins/@dshfiles/goal-stall-guard/README.md) | Pause goals whose rounds stop making progress. |
-| [`home`](plugins/@dshfiles/home/README.md) | New thread screen: own mark and headline, resume and land shortcuts, and a Settings › New thread page. |
-| [`jj-integration`](plugins/@dshfiles/jj-integration/README.md) | One jj workspace per thread, chosen before the first message, and a Land button that rebases its work onto `main`. |
+| [`home`](plugins/@dshfiles/home/README.md) | New thread screen: own mark and headline, recent threads and work to rebase, and a Settings › New thread page. |
+| [`jj-integration`](plugins/@dshfiles/jj-integration/README.md) | One jj workspace per thread, chosen before the first message, and a Rebase button that moves its work onto `main`. |
 | [`jujutsu`](plugins/@dshfiles/jujutsu/README.md) | Browse revision graph and run confirmed Source Control actions. |
 | [`mcp-servers`](plugins/@dshfiles/mcp-servers/README.md) | Configure profile-wide MCP servers through native DSH clients. |
 | [`model-effort-picker`](plugins/@dshfiles/model-effort-picker/README.md) | Search provider-grouped model catalogs and tune reasoning effort in the composer. |

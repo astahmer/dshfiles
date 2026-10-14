@@ -52,8 +52,8 @@ export const NewThreadSettings = () => {
       <Row title="Recent threads" description="Offer the project’s three most recent threads above the composer.">
         {toggle('showRecentThreads', 'Recent threads')}
       </Row>
-      <Row title="Work to land" description="Show how many of the project’s thread workspaces hold work not landed yet.">
-        {toggle('showUnlandedWork', 'Work to land')}
+      <Row title="Work to rebase" description="Show how many of the project’s thread workspaces have work to rebase.">
+        {toggle('showUnlandedWork', 'Work to rebase')}
       </Row>
       <Row title="Headline" description="`{project}` is the selected project; empty keeps the DeepSeek headline.">
         <Input

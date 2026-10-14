@@ -5,14 +5,13 @@
     {
       "id": "home-screen",
       "title": "New thread screen branding and shortcuts",
-      "summary": "Replaces the DeepSeek mark and headline on the New thread screen, lists recent threads below the composer, and links to thread workspaces with work to land.",
+      "summary": "Replaces the DeepSeek mark and headline on the New thread screen, lists recent threads below the composer, and links to thread workspaces with work to rebase.",
       "reach": [
+        "seed rebase-ready-thread",
         "click button \"New thread\"",
-        "click button \"Choose workspace\"",
-        "fill textbox \"Search projects or enter a folder path\" \"sample\"",
-        "expect option \"sample*\"",
-        "press Enter",
-        "expect textbox \"Describe what you want to build, / commands, @ files or sessions\""
+        "expect text \"Resume\"",
+        "expect text \"1 thread has work to rebase\"",
+        "expect button \"1 thread has work to rebase\""
       ],
       "surfaces": ["client"],
       "configuration": [
@@ -43,7 +42,7 @@
       ],
       "states": ["blank-thread", "project-selected", "no-folder"],
       "failureModes": [
-        "Without jj-integration the unlanded count stays hidden.",
+        "Without jj-integration the work-to-rebase count stays hidden.",
         "The headline hides native elements by CSS class suffix, which a DSH update can rename."
       ],
       "externalDependencies": [],

@@ -1,7 +1,7 @@
 Feature: jj thread workspaces
 
   These journeys register a disposable jj repository as a project through the
-  real New thread picker. The Host provisions, discards and lands thread
+  real New thread picker. The Host provisions, discards and rebases thread
   workspaces in that repository; the agent's edits are stood in for by the jj CLI.
 
   @scenario:jj-integration.destination-browser-journey
@@ -47,17 +47,17 @@ Feature: jj thread workspaces
     And New thread is clicked in the sidebar
     Then the New thread composer is empty and no consumed draft remains stored
 
-  @scenario:jj-integration.land-browser-journey
-  Scenario: Land a thread's described work onto main
+  @scenario:jj-integration.rebase-browser-journey
+  Scenario: Rebase a thread's described work onto main
     Given the isolated plugin composition of "@dshfiles/jj-integration, @dshfiles/workspace-folder-picker, @dshfiles/multi-host" is booted
     When a disposable jj repository is chosen as the New thread project
     And the New thread workspace toggle is turned on
     And a message is sent in the thread workspace
-    Then Land waits for work in the thread
+    Then Rebase is disabled before there are revisions to rebase
     When the thread workspace gains a revision described "wip"
-    Then Land refuses the placeholder description and leaves main in place
-    When the thread workspace gains a revision described "Add the landed feature"
-    Then Land moves main onto the work described "Add the landed feature"
+    Then Rebase refuses the placeholder description and leaves main in place
+    When the thread workspace gains a revision described "Add the feature"
+    Then Rebase moves main onto the work described "Add the feature"
 
   @scenario:jj-integration.discard-browser-journey
   Scenario: Remove a thread workspace and explicitly abandon its work
@@ -67,11 +67,11 @@ Feature: jj thread workspaces
     And a message is sent in the thread workspace
     And the thread workspace gains a revision described "Work nobody wants"
     And the Thread workspaces panel is opened
-    Then the thread row offers Land for its 1 unlanded revision
+    Then the thread row offers Rebase for its 1 revision to rebase
     When the conversation is opened from its workspace row
     And the Thread workspaces side panel is opened
     Then its Preview shows the latest message
-    When "Remove workspace and unlanded work…" is chosen from the thread row's More menu
-    Then the confirmation names the thread and its 1 unlanded revision
+    When "Remove workspace and work to rebase…" is chosen from the thread row's More menu
+    Then the confirmation names the thread and its 1 revision to rebase
     When the removal is confirmed
     Then the thread workspace is gone from jj and from the panel

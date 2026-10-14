@@ -70,10 +70,10 @@ qualified: "thread-destination", "jj-integration/thread-destination" or
 Notice and "Add an API key" dialogs, then runs the feature's "reach" steps:
   click <role|text|label|title> "<name>"       fill <role|label> "<name>" "<value>"
   rightclick <role|text|label|title> "<name>"  press <key>
-  expect <role|text|label|title> "<name>"      seed <landable-thread|pending-restart|tool-call-thread>
+  expect <role|text|label|title> "<name>"      seed <rebase-ready-thread|pending-restart|tool-call-thread>
   attach "<file>"                              (a repository file, to the page's file input)
 Names match exactly; "name*" matches a case-insensitive substring. "text" without "*" is exact too.
-Seed steps come first and run once per instance: landable-thread starts a thread in its own jj
+Seed steps come first and run once per instance: rebase-ready-thread starts a thread in its own jj
 workspace through the New thread screen and describes a revision there; pending-restart changes
 thread-sidebar's Host entry on disk, as a rebuild would ("down" restores it); tool-call-thread
 points an AI Accounts Command Code account at a loopback fake provider ("down" stops it) and runs a

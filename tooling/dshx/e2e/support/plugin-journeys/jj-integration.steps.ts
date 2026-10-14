@@ -117,7 +117,7 @@ const repositoryFor = (page: Page): ThreadRepository => {
 
 const projectButton = (page: Page) => page.getByRole('button', { name: 'Choose workspace', exact: true })
 const workspaceToggle = (page: Page) => page.getByRole('checkbox', { name: 'workspace', exact: true })
-const landButton = (page: Page) => page.getByRole('button', { name: 'Land this thread onto main', exact: true })
+const rebaseButton = (page: Page) => page.getByRole('button', { name: 'Rebase this thread onto main', exact: true })
 
 /** The Host names a thread workspace `<repository> · <thread>`; the thread name is its directory under `repo-threads`. */
 const currentThreadName = async (page: Page): Promise<string> => {
@@ -195,9 +195,9 @@ When('No folder is chosen as the New thread project', async ({ page }: { page: P
 
 When('a message is sent in the thread workspace', async ({ page }: { page: Page }) => {
   const composer = page.getByRole('textbox', { name: newThreadComposerName, exact: true })
-  await composer.fill('jj integration land e2e thread')
+  await composer.fill('jj integration rebase e2e thread')
   await composer.press('Enter')
-  await expect(page.getByRole('navigation', { name: 'Session hierarchy', exact: true })).toContainText('jj integration land e2e thread')
+  await expect(page.getByRole('navigation', { name: 'Session hierarchy', exact: true })).toContainText('jj integration rebase e2e thread')
 })
 
 When('{string} is typed in the New thread composer', async ({ page }: { page: Page }, text: string) => {
@@ -275,7 +275,7 @@ When('the thread workspace gains a revision described {string}', async ({ page }
   const threadPath = join(repository.threadsPath, provisionedThreadName(page))
   await writeFile(join(threadPath, 'feature.txt'), `${description}\n`)
   jjAt(threadPath, repository.temporaryRoot, ['describe', '--message', description])
-  // The Land button reads the thread status once per mount; a reload stands in for the agent's next turn.
+  // The Host activity snapshot is read once per mount; a reload stands in for the agent's next turn.
   await page.reload()
 })
 
@@ -325,34 +325,34 @@ Then('the destination bar offers neither a bookmark nor a workspace toggle', asy
   await finishJourneyAssertions(page)
 })
 
-Then('Land waits for work in the thread', async ({ page }: { page: Page }) => {
-  await recordAssertion(page, 'jj-integration-land-is-disabled-without-unlanded-work', async () => {
-    await expect(landButton(page)).toBeDisabled()
-    await expect(landButton(page)).toHaveAttribute('title', 'Land this thread onto main (0 unlanded)')
+Then('Rebase is disabled before there are revisions to rebase', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'jj-integration-rebase-is-disabled-without-work', async () => {
+    await expect(rebaseButton(page)).toBeDisabled()
+    await expect(rebaseButton(page)).toHaveAttribute('title', 'Rebase this thread onto main (0 to rebase)')
   })
 })
 
-Then('Land refuses the placeholder description and leaves main in place', async ({ page }: { page: Page }) => {
+Then('Rebase refuses the placeholder description and leaves main in place', async ({ page }: { page: Page }) => {
   const repository = repositoryFor(page)
-  await expect(landButton(page)).toHaveText('Land · 1')
-  await landButton(page).click()
-  await recordAssertion(page, 'jj-integration-land-asks-for-a-description', async () => {
-    await expect(page.getByRole('alert').filter({ hasText: /^Describe these revisions before landing: \w+\./ })).toBeVisible()
+  await expect(rebaseButton(page)).toHaveText('Rebase · 1')
+  await rebaseButton(page).click()
+  await recordAssertion(page, 'jj-integration-rebase-asks-for-a-description', async () => {
+    await expect(page.getByRole('alert').filter({ hasText: /^Describe these revisions before rebasing: \w+\./ })).toBeVisible()
     expect(commitIdOf(repository, 'main')).toBe(repository.baseCommitId)
   })
 })
 
-Then('Land moves main onto the work described {string}', async ({ page }: { page: Page }, description: string) => {
+Then('Rebase moves main onto the work described {string}', async ({ page }: { page: Page }, description: string) => {
   const repository = repositoryFor(page)
-  await expect(landButton(page)).toHaveText('Land · 1')
-  await landButton(page).click()
-  await recordAssertion(page, 'jj-integration-land-moves-the-bookmark', async () => {
-    const landedToast = page.getByRole('alert').filter({ hasText: 'Landed 1 revision(s) onto main:' })
-    await expect(landedToast).toContainText(description)
-    await expect(landButton(page)).toBeDisabled()
+  await expect(rebaseButton(page)).toHaveText('Rebase · 1')
+  await rebaseButton(page).click()
+  await recordAssertion(page, 'jj-integration-rebase-moves-the-bookmark', async () => {
+    const rebasedToast = page.getByRole('alert').filter({ hasText: 'Rebased 1 revision(s) onto main:' })
+    await expect(rebasedToast).toContainText(description)
+    await expect(rebaseButton(page)).toBeDisabled()
     expect(descriptionOf(repository, 'main')).toBe(description)
-    await expect(landedToast).toContainText('main is now at')
-    await expect(landedToast).toContainText(`(${commitIdOf(repository, 'main').slice(0, 8)})`)
+    await expect(rebasedToast).toContainText('main is now at')
+    await expect(rebasedToast).toContainText(`(${commitIdOf(repository, 'main').slice(0, 8)})`)
     expect(commitIdOf(repository, 'main-')).toBe(repository.baseCommitId)
   })
   await finishJourneyAssertions(page)
@@ -363,10 +363,10 @@ When('the Thread workspaces panel is opened', async ({ page }: { page: Page }) =
   await expect(page.getByRole('heading', { name: 'Thread workspaces', exact: true })).toBeVisible()
 })
 
-Then('the thread row offers Land for its 1 unlanded revision', async ({ page }: { page: Page }) => {
-  await recordAssertion(page, 'jj-integration-panel-offers-land-only-with-work', async () => {
-    await expect(threadRow(page).getByText('1 unlanded', { exact: true })).toBeVisible()
-    await expect(threadRow(page).getByRole('button', { name: 'Land', exact: true })).toBeVisible()
+Then('the thread row offers Rebase for its 1 revision to rebase', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'jj-integration-panel-offers-rebase-only-with-work', async () => {
+    await expect(threadRow(page).getByText('1 to rebase', { exact: true })).toBeVisible()
+    await expect(threadRow(page).getByRole('button', { name: 'Rebase', exact: true })).toBeVisible()
     await expect(threadRow(page).getByRole('button', { name: 'Discard', exact: true })).toHaveCount(0)
   })
 })
@@ -376,7 +376,7 @@ When('the conversation is opened from its workspace row', async ({ page }: { pag
     .getByRole('button', { name: /^Open thread:/ })
     .first()
     .click()
-  await expect(page.getByRole('navigation', { name: 'Session hierarchy', exact: true })).toContainText('jj integration land e2e thread')
+  await expect(page.getByRole('navigation', { name: 'Session hierarchy', exact: true })).toContainText('jj integration rebase e2e thread')
 })
 
 When('the Thread workspaces side panel is opened', async ({ page }: { page: Page }) => {
@@ -387,7 +387,7 @@ When('the Thread workspaces side panel is opened', async ({ page }: { page: Page
 Then('its Preview shows the latest message', async ({ page }: { page: Page }) => {
   const row = threadRow(page)
   await row.getByRole('button', { name: 'Preview', exact: true }).first().click()
-  await expect(row).toContainText('jj integration land e2e thread')
+  await expect(row).toContainText('jj integration rebase e2e thread')
 })
 
 When("{string} is chosen from the thread row's More menu", async ({ page }: { page: Page }, item: string) => {
@@ -397,10 +397,10 @@ When("{string} is chosen from the thread row's More menu", async ({ page }: { pa
   await page.getByRole('menuitem', { name: item, exact: true }).click()
 })
 
-Then('the confirmation names the thread and its 1 unlanded revision', async ({ page }: { page: Page }) => {
+Then('the confirmation names the thread and its 1 revision to rebase', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'jj-integration-removal-confirmation', async () => {
     const dialog = page.getByRole('alertdialog')
-    await expect(dialog.getByRole('heading')).toHaveText(`Remove ${provisionedThreadName(page)} and abandon 1 unlanded revision(s)?`)
+    await expect(dialog.getByRole('heading')).toHaveText(`Remove ${provisionedThreadName(page)} and abandon 1 revision(s) to rebase?`)
     await expect(dialog).toContainText('deletes its folder')
     await expect(dialog).toContainText('conversations remain in DSH and are not archived')
   })
@@ -417,7 +417,7 @@ Then('the thread workspace is gone from jj and from the panel', async ({ page }:
     await expect.poll(() => workspaceNames(repository)).toEqual(['default'])
     await expect(threadRow(page)).toHaveCount(0)
     await expect(page.getByText(repository.repositoryPath, { exact: true })).toHaveCount(0)
-    await expect(page.getByRole('navigation', { name: 'Session hierarchy', exact: true })).toContainText('jj integration land e2e thread')
+    await expect(page.getByRole('navigation', { name: 'Session hierarchy', exact: true })).toContainText('jj integration rebase e2e thread')
   })
   await finishJourneyAssertions(page)
 })

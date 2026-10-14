@@ -1,3 +1,5 @@
+import type { ISessions, SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
+import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { getPaletteActions, subscribePaletteActions, type PaletteActionContext } from '@dshfiles/command-palette/api'
 import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
 import {
@@ -20,13 +22,13 @@ import { EllipsisIcon, RefreshCwIcon } from '@dshfiles/plugin-ui/icons'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useApi } from '@dshfiles/dshx/client'
-import type { ISessions, SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
-import { useCallback, useId, useMemo, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useId, useMemo, useState, useSyncExternalStore } from 'react'
 import { jjIntegrationApi, type ThreadView, type WorkspaceSyncView } from './api.js'
 import { sessionPreviewMessages } from './session-preview.js'
 import { useDiscardConfirmation } from './discard-machine.js'
 import { announceRepositoryChange, describeLandResult, useLandToast } from './land-feedback.js'
 import type { JjIntegrationTranslate } from './locales.js'
+import { canRebaseThread, hasPendingUserQuestion } from './thread-rebase-eligibility.js'
 
 export const threadQueryKeys = {
   repositories: ['jj-integration', 'repositories'] as const,
@@ -51,7 +53,7 @@ const describeWorkspaceSync = (t: JjIntegrationTranslate, view: WorkspaceSyncVie
   return t('workspaceSynced', { workspace: view.workspace, count: view.pluginsRebuilt.length, effect })
 }
 
-/** What the background sync after the last Land did to the checkout running DSH, with the restart it may need. */
+/** What the background sync after the last rebase did to the checkout running DSH, with the restart it may need. */
 const WorkspaceSyncLine = (props: { readonly t: JjIntegrationTranslate }): JSX.Element | null => {
   const api = useApi(jjIntegrationApi)
   const restart = useSyncExternalStore(subscribePaletteActions, findRestartAction, noRestartAction)
@@ -169,26 +171,54 @@ const ThreadRow = (props: {
   readonly t: JjIntegrationTranslate
   readonly bookmark: string
   readonly busy: boolean
-  readonly onLand: () => void
+  readonly onRebase: () => void
   readonly onDiscard: () => void
 }): JSX.Element => {
   const { thread, t } = props
+  const queryClient = useQueryClient()
+  const subscribe = useCallback((listener: () => void) => props.sessions.list.subscribe(listener), [props.sessions])
+  const readSessionRunning = useCallback(
+    () => Object.values(props.sessions.list.getSnapshot().byId).some(session => session.cwd === thread.path && session.running),
+    [props.sessions, thread.path],
+  )
+  const readClientCanRebase = useCallback(() => {
+    const sessions = props.sessions.list.getSnapshot().byId
+    return canRebaseThread(thread.sessionIds, sessionId => {
+      const session = sessions[SessionId(sessionId)]
+      return session === undefined ? undefined : { running: session.running, pendingUserQuestion: hasPendingUserQuestion(session.projectionValues) }
+    })
+  }, [props.sessions, thread.sessionIds])
+  const readClientQuestionPending = useCallback(() => {
+    const sessions = props.sessions.list.getSnapshot().byId
+    return (
+      thread.sessionIds.some(sessionId => hasPendingUserQuestion(sessions[SessionId(sessionId)]?.projectionValues) === true) ||
+      Object.values(sessions).some(session => session.cwd === thread.path && hasPendingUserQuestion(session.projectionValues) === true)
+    )
+  }, [props.sessions, thread.path, thread.sessionIds])
+  const sessionRunning = useSyncExternalStore(subscribe, readSessionRunning, () => true)
+  const clientCanRebase = useSyncExternalStore(subscribe, readClientCanRebase, () => false)
+  const sessionWaitingForInput = useSyncExternalStore(subscribe, readClientQuestionPending, () => true)
+  const canRebase = thread.canRebase === true && !sessionRunning && !sessionWaitingForInput
+  useEffect(() => {
+    if (thread.canRebase !== false || !clientCanRebase) return
+    void queryClient.invalidateQueries({ queryKey: threadQueryKeys.repositories })
+  }, [clientCanRebase, queryClient, thread.canRebase])
   const conflicted = thread.unlanded.some(revision => revision.conflict)
   return (
     <li className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-2 dshx:rounded-md dshx:border dshx:p-3">
       <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
         <span className="dshx:font-mono dshx:text-sm">{thread.name}</span>
         <Badge variant="secondary">{t('sessions', { count: thread.sessionIds.length })}</Badge>
-        {thread.unlanded.length === 0 ? <Badge variant="outline">{t('upToDate')}</Badge> : <Badge>{t('unlanded', { count: thread.unlanded.length })}</Badge>}
+        {thread.unlanded.length === 0 ? <Badge variant="outline">{t('upToDate')}</Badge> : <Badge>{t('toRebase', { count: thread.unlanded.length })}</Badge>}
         {thread.behind ? <Badge variant="outline">{t('behind', { bookmark: props.bookmark })}</Badge> : null}
         {conflicted ? <Badge variant="destructive">{t('conflict')}</Badge> : null}
         {thread.finished ? <Badge variant="outline">{t('finished')}</Badge> : null}
         {thread.missing ? <Badge variant="destructive">{t('missing')}</Badge> : null}
         <span className="dshx:ml-auto dshx:flex dshx:items-center dshx:gap-2">
           {thread.unlanded.length > 0 ? (
-            <Button size="sm" disabled={props.busy || thread.missing} onClick={props.onLand}>
+            <Button size="sm" disabled={props.busy || thread.missing || !canRebase} onClick={props.onRebase} title={canRebase ? undefined : t('rebaseBlocked')}>
               {props.busy ? <Spinner /> : null}
-              {props.busy ? t('landing') : t('land')}
+              {props.busy ? t('rebasing') : t('rebase')}
             </Button>
           ) : null}
           <DropdownMenu>
@@ -326,7 +356,7 @@ export const ThreadWorkspacesPanel = (props: {
     void queryClient.invalidateQueries({ queryKey: ['jj-integration'] })
     announceRepositoryChange()
   }
-  const land = useMutation({
+  const rebase = useMutation({
     mutationFn: (path: string) => runHostRequest({ timeoutMs: 300_000, request: signal => api.land({ path }, { signal }) }),
     onSuccess: result => {
       if (result.status === 'landed') {
@@ -394,8 +424,8 @@ export const ThreadWorkspacesPanel = (props: {
                   openSession={props.openSession}
                   t={t}
                   bookmark={props.bookmark}
-                  busy={land.isPending && land.variables === thread.path}
-                  onLand={() => land.mutate(thread.path)}
+                  busy={rebase.isPending && rebase.variables === thread.path}
+                  onRebase={() => rebase.mutate(thread.path)}
                   onDiscard={() => discard.request({ path: thread.path, name: thread.name, unlandedCount: thread.unlanded.length })}
                 />
               ))}

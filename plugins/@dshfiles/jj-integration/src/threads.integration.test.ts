@@ -64,7 +64,7 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
     expect((await threads.bookmarks(thread.path)).current).toBe('feature')
   })
 
-  it('lands described work onto the bookmark and leaves a fresh working copy', async () => {
+  it('rebases described work onto the bookmark and leaves a fresh working copy', async () => {
     const thread = await threads.provision(repo)
     writeFileSync(join(thread.path, 'feature.txt'), 'feature\n')
     jj(thread.path, 'describe', '-m', 'feat: add feature')
@@ -84,7 +84,7 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
     expect(status).toMatchObject({ unlanded: [], behind: false })
   })
 
-  it('brings the default checkout onto the landed bookmark with dshx checkout sync, keeping its local edits', async () => {
+  it('brings the default checkout onto the rebased bookmark with dshx checkout sync, keeping its local edits', async () => {
     writeFileSync(join(repo, '.secret.json'), 'local\n')
     const thread = await threads.provision(repo)
     writeFileSync(join(thread.path, 'feature.txt'), 'feature\n')
@@ -98,7 +98,7 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
     expect(readFileSync(join(repo, '.secret.json'), 'utf8')).toBe('local\n')
   })
 
-  it('asks for a description instead of landing placeholder work', async () => {
+  it('requires a description before rebasing placeholder work', async () => {
     const thread = await threads.provision(repo)
     writeFileSync(join(thread.path, 'feature.txt'), 'feature\n')
     jj(thread.path, 'describe', '-m', 'wip')
@@ -118,7 +118,7 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
     expect(bookmarkTarget(repo)).toBe('main edit')
   })
 
-  it('discards an empty thread completely and refuses one with unlanded work', async () => {
+  it('discards an empty thread completely and refuses one with revisions to rebase', async () => {
     const empty = await threads.provision(repo)
     const busy = await threads.provision(repo)
     writeFileSync(join(busy.path, 'draft.txt'), 'draft\n')
