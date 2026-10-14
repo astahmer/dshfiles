@@ -16,3 +16,5 @@ and current workarounds are documented in each owning plugin's README.
 | "Unify branches" prefilled thread | jujutsu | No API to start a session with a prefilled prompt | Session create option `initialPrompt` |
 | Edit a queued message that has attachments | queue-reorder | `QueueAction.edit` is text-only and `updateQueue` replaces the whole content | Host edit that keeps existing attachment refs and replaces only text blocks |
 | ⌘, / ⌘N shortcuts | shortcuts | No service to open Settings / start a session from a plugin | Expose those actions as commands |
+| Open a thread at the turn and step a request produced | usage | `uiWorkspace.openSession` only selects a thread; the chat's `scrollToTurn` is private to its viewport | `openSession(target, { turn, step })` or a chat navigation service |
+| Usage of title generation and plugin side calls in history | usage | The session log keeps no usage for `session-title` calls and no record of plugin `llm.stream` calls (OptMem summaries); only a live `llm/stream` observer sees them | Persist a `llm/side-call` event with route, usage and finish in the session log |
