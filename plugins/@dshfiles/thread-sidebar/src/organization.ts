@@ -1,4 +1,5 @@
 import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
+import type { FinishedSubagentsMode } from './thread-children.js'
 
 export type SidebarSection = 'pinned' | 'active' | 'parked' | 'inactive' | 'archived'
 
@@ -62,6 +63,7 @@ export interface SidebarPreferences {
   applyActionsToChildThreads: boolean
   /** Child threads listed under a parent before the "N more…" line. */
   maxChildren: number
+  finishedSubagents: FinishedSubagentsMode
 }
 
 export type ThreadRowDensity = 'compact' | 'comfortable'
@@ -111,6 +113,7 @@ export const DEFAULT_PREFERENCES: SidebarPreferences = {
   includeSubagentAttention: false,
   applyActionsToChildThreads: true,
   maxChildren: 3,
+  finishedSubagents: 'collapse',
 }
 
 export interface OrderedSidebarEntry {

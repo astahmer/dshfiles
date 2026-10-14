@@ -152,6 +152,11 @@ is not limited to parent/child pairs; a child link carries
 the workspace found on the nearest ancestor when the child has no direct
 workspace membership.
 
+Finished subagents (not running and not waiting on approval or input) fold
+into one “N finished” line by default so live ones stay on top; the
+`finishedSubagents` setting can also list them or hide them. The open child is
+always listed.
+
 Thread links use the root/index URL with `thread` and optional `workspace`
 query parameters, for example `http://127.0.0.1:3080/?workspace=ws_…&thread=thr_…`.
 This matches the installed frontend-static contract: it serves the app index

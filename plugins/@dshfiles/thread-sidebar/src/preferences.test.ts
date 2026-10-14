@@ -105,3 +105,10 @@ test('a Host namespace from before the brand-logo setting keeps the logo shown',
   assert.equal(decodePreferences(older)?.hideBrandLogo, false)
   assert.equal(decodePreferences({ ...older, hideBrandLogo: true })?.hideBrandLogo, true)
 })
+
+test('settings saved before the finished-subagents choice collapse them and reject unknown modes', () => {
+  const { finishedSubagents, ...older } = DEFAULT_PREFERENCES
+  assert.equal(decodePreferences(older)?.finishedSubagents, finishedSubagents)
+  assert.equal(finishedSubagents, 'collapse')
+  assert.equal(decodePreferences({ ...DEFAULT_PREFERENCES, finishedSubagents: 'archive' }), null)
+})

@@ -682,7 +682,8 @@
     {
       "id": "thread-children-and-links",
       "title": "Browse child sessions and share thread URLs",
-      "summary": "Expand recursive child sessions with inherited workspace context and copy credential-free thread URLs.",
+      "summary": "Expand recursive child sessions with inherited workspace context, fold or hide finished subagents, and copy credential-free thread URLs.",
+      "reach": ["click button \"Sidebar settings\"", "click button \"Finished subagents: Fold into “N finished”\"", "expect menuitemradio \"Hide them\""],
       "surfaces": ["client", "host", "settings", "integration"],
       "configuration": [
         {
@@ -690,9 +691,20 @@
           "defaultValue": "3",
           "constraints": "Integer from 1 to 50 children per level.",
           "coveredBy": ["thread-sidebar.children-links"]
+        },
+        {
+          "key": "finishedSubagents",
+          "defaultValue": "collapse",
+          "constraints": "show lists finished subagents, collapse folds them into one \"N finished\" line, hide omits them; the open child always stays listed.",
+          "choices": ["show", "collapse", "hide"],
+          "coveredBy": [
+            "thread-sidebar.thread-children-and-links-unit-finished-collapse",
+            "thread-sidebar.thread-children-and-links-unit-finished-hide-show",
+            "thread-sidebar.thread-children-and-links-unit-finished-default"
+          ]
         }
       ],
-      "states": ["collapsed", "expanded", "nested", "copied"],
+      "states": ["collapsed", "expanded", "nested", "copied", "finished-folded"],
       "failureModes": ["Child chains preserve inherited workspace identity.", "Copied links omit credentials and unsupported path-based routes."],
       "externalDependencies": [],
       "verification": [
@@ -736,6 +748,24 @@
           "id": "thread-sidebar.thread-children-and-links-unit-child-limit-open-thread",
           "file": "plugins/@dshfiles/thread-sidebar/src/thread-children.test.ts",
           "testName": "the open child stays visible even past the limit"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.thread-children-and-links-unit-finished-collapse",
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-children.test.ts",
+          "testName": "collapse keeps live and open subagents listed and folds the finished ones in order"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.thread-children-and-links-unit-finished-hide-show",
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-children.test.ts",
+          "testName": "hide drops finished subagents except the open one, and show leaves every child listed"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.thread-children-and-links-unit-finished-default",
+          "file": "plugins/@dshfiles/thread-sidebar/src/preferences.test.ts",
+          "testName": "settings saved before the finished-subagents choice collapse them and reject unknown modes"
         },
         {
           "kind": "unit-test",

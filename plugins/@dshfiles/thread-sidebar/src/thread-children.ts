@@ -92,3 +92,31 @@ export const visibleChildren = <Thread extends { readonly id: string }>(options:
   const shown = options.children.filter((child, index) => index < options.limit || child.id === options.selectedId)
   return { shown, hiddenCount: options.children.length - shown.length }
 }
+
+export type FinishedSubagentsMode = 'show' | 'collapse' | 'hide'
+
+interface FinishedPartition<Thread> {
+  readonly live: readonly Thread[]
+  readonly finished: readonly Thread[]
+}
+
+/**
+ * Split a parent's children into the rows listed normally and the finished ones
+ * folded behind an "N finished" toggle. `hide` drops the finished ones, `show`
+ * keeps everything live, and the open child always stays live.
+ */
+export const partitionFinishedChildren = <Thread extends { readonly id: string }>(options: {
+  readonly children: readonly Thread[]
+  readonly mode: FinishedSubagentsMode
+  readonly isFinished: (thread: Thread) => boolean
+  readonly selectedId: string | undefined
+}): FinishedPartition<Thread> => {
+  if (options.mode === 'show') return { live: options.children, finished: [] }
+  const live: Thread[] = []
+  const finished: Thread[] = []
+  for (const child of options.children) {
+    if (child.id !== options.selectedId && options.isFinished(child)) finished.push(child)
+    else live.push(child)
+  }
+  return { live, finished: options.mode === 'hide' ? [] : finished }
+}

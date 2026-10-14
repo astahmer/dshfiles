@@ -90,7 +90,7 @@ import { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
 import { projectTextTone } from './project-tone.js'
 import { scheduleSuccessNoticeDismissal, SidebarNoticeMessage, type SidebarNotice } from './sidebar-notice.js'
 import { threadSidebarMachineApi } from './machine-api.js'
-import { groupThreadChildren, threadActionTargetIds, visibleChildren } from './thread-children.js'
+import { groupThreadChildren, partitionFinishedChildren, threadActionTargetIds, visibleChildren } from './thread-children.js'
 import { buildThreadUrl, clearThreadUrl, readThreadUrl } from './thread-url.js'
 import { workingThreadIds } from './working-threads.js'
 import {
@@ -313,6 +313,8 @@ interface ThreadRowProps {
   readonly childAttentionLabels: ReadonlyMap<SessionSummary['id'], ThreadAttentionLabel>
   readonly rowStyle: RowStyle
   readonly childThreads: readonly SessionSummary[]
+  /** Finished subagents folded behind the "N finished" line; empty unless the setting collapses them. */
+  readonly finishedChildThreads: readonly SessionSummary[]
   readonly childrenOpen: boolean
   readonly allChildrenShown: boolean
   /** Set only when the open thread is one of this row's children, so other rows skip re-rendering. */
@@ -321,6 +323,12 @@ interface ThreadRowProps {
 }
 
 const NO_CHILDREN: readonly SessionSummary[] = []
+
+const finishedSubagentsLabels = {
+  show: 'threadSidebarFinishedSubagentsShow',
+  collapse: 'threadSidebarFinishedSubagentsCollapse',
+  hide: 'threadSidebarFinishedSubagentsHide',
+} as const
 
 const withTooltip = (label: string, anchor: ReactElement): JSX.Element => (
   <Tooltip>
@@ -358,6 +366,7 @@ const StatusDot = (props: {
 const ChildThreadList = (props: {
   readonly parentId: SessionSummary['id']
   readonly childThreads: readonly SessionSummary[]
+  readonly finishedChildThreads: readonly SessionSummary[]
   readonly unreadSessionIds: ReadonlySet<SessionSummary['id']>
   readonly allShown: boolean
   readonly selectedChildId: SessionSummary['id'] | undefined
@@ -366,6 +375,7 @@ const ChildThreadList = (props: {
   readonly actions: RowActions
 }): JSX.Element => {
   const t = props.actions.translate
+  const [finishedShown, setFinishedShown] = useState(false)
   const { shown, hiddenCount } = visibleChildren({
     children: props.childThreads,
     limit: props.rowStyle.maxChildren,
@@ -377,41 +387,42 @@ const ChildThreadList = (props: {
     'dshx:flex dshx:w-full dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-2 dshx:text-left dshx:outline-none dshx:hover:bg-accent/60 dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50',
     compact ? 'dshx:h-6 dshx:text-xs' : 'dshx:h-7 dshx:text-sm',
   )
+  const renderChild = (child: SessionSummary): JSX.Element => {
+    const attentionLabel = props.attentionLabels.get(child.id)
+    return (
+      <li key={child.id}>
+        <button
+          type="button"
+          className={cn(lineClass, 'dshx:data-[selected=true]:bg-accent')}
+          data-selected={child.id === props.selectedChildId}
+          title={new Date(child.updatedAt).toLocaleString()}
+          onClick={() => props.actions.open(child.id)}
+        >
+          <StatusDot
+            session={child}
+            unread={props.unreadSessionIds.has(child.id)}
+            unreadLabel={t('threadSidebarUnread')}
+            attentionLabel={attentionLabel}
+            attentionColors={props.rowStyle.attentionColors}
+          />
+          <span className={cn('dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-foreground', props.unreadSessionIds.has(child.id) && 'dshx:font-semibold')}>
+            {child.displayTitle}
+          </span>
+          {attentionLabel === undefined ? null : (
+            <span className={cn('dshx:shrink-0 dshx:text-[10px] dshx:font-medium', attentionLabelClass(attentionLabel, props.rowStyle.attentionColors))}>
+              {t(attentionLabel)}
+            </span>
+          )}
+          {props.rowStyle.time ? (
+            <span className="dshx:shrink-0 dshx:text-xs dshx:tabular-nums dshx:text-muted-foreground">{formatAge(child.updatedAt)}</span>
+          ) : null}
+        </button>
+      </li>
+    )
+  }
   return (
     <ul className="dshx:mb-1 dshx:ml-3.5 dshx:flex dshx:flex-col dshx:border-l dshx:pl-1.5" aria-label={t('threadSidebarChildThreads')}>
-      {shown.map(child => {
-        const attentionLabel = props.attentionLabels.get(child.id)
-        return (
-          <li key={child.id}>
-            <button
-              type="button"
-              className={cn(lineClass, 'dshx:data-[selected=true]:bg-accent')}
-              data-selected={child.id === props.selectedChildId}
-              title={new Date(child.updatedAt).toLocaleString()}
-              onClick={() => props.actions.open(child.id)}
-            >
-              <StatusDot
-                session={child}
-                unread={props.unreadSessionIds.has(child.id)}
-                unreadLabel={t('threadSidebarUnread')}
-                attentionLabel={attentionLabel}
-                attentionColors={props.rowStyle.attentionColors}
-              />
-              <span className={cn('dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-foreground', props.unreadSessionIds.has(child.id) && 'dshx:font-semibold')}>
-                {child.displayTitle}
-              </span>
-              {attentionLabel === undefined ? null : (
-                <span className={cn('dshx:shrink-0 dshx:text-[10px] dshx:font-medium', attentionLabelClass(attentionLabel, props.rowStyle.attentionColors))}>
-                  {t(attentionLabel)}
-                </span>
-              )}
-              {props.rowStyle.time ? (
-                <span className="dshx:shrink-0 dshx:text-xs dshx:tabular-nums dshx:text-muted-foreground">{formatAge(child.updatedAt)}</span>
-              ) : null}
-            </button>
-          </li>
-        )
-      })}
+      {shown.map(renderChild)}
       {hiddenCount > 0 || props.allShown ? (
         <li>
           <button
@@ -424,6 +435,19 @@ const ChildThreadList = (props: {
           </button>
         </li>
       ) : null}
+      {props.finishedChildThreads.length > 0 ? (
+        <li>
+          <button
+            type="button"
+            className={cn(lineClass, 'dshx:text-muted-foreground dshx:hover:text-foreground')}
+            aria-expanded={finishedShown}
+            onClick={() => setFinishedShown(current => !current)}
+          >
+            {finishedShown ? t('threadSidebarHideFinishedChildren') : `${props.finishedChildThreads.length} ${t('threadSidebarFinishedChildren')}`}
+          </button>
+        </li>
+      ) : null}
+      {finishedShown ? props.finishedChildThreads.map(renderChild) : null}
     </ul>
   )
 }
@@ -434,7 +458,7 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
   const t = props.actions.translate
   const unread = props.unread
   const compact = rowStyle.density === 'compact'
-  const childCount = props.childThreads.length
+  const childCount = props.childThreads.length + props.finishedChildThreads.length
   const showProject = rowStyle.project || props.parentTitle !== undefined
   const showMachine = rowStyle.machine && props.machine !== undefined
   const showPath = rowStyle.path && session.cwd !== undefined && session.cwd.length > 0
@@ -652,6 +676,7 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
             <ChildThreadList
               parentId={session.id}
               childThreads={props.childThreads}
+              finishedChildThreads={props.finishedChildThreads}
               unreadSessionIds={props.unreadSessionIds}
               allShown={props.allChildrenShown}
               selectedChildId={props.selectedChildId}
@@ -1259,6 +1284,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
       workspaceBySession,
     ],
   )
+  const waitingSessionIds = useMemo(() => new Set([...approvalNeededRows, ...needsInputRows].map(session => session.id)), [approvalNeededRows, needsInputRows])
   const attentionSessionIds = useMemo(
     () => new Set([...approvalNeededRows, ...needsInputRows, ...turnFinishedRows].map(session => session.id)),
     [approvalNeededRows, needsInputRows, turnFinishedRows],
@@ -1604,7 +1630,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
   const renderThreadRow = (session: SessionSummary, attentionLabel: ThreadRowProps['attentionLabel']): JSX.Element => {
     const lineage = sessionLineage(session, sessionState.byId)
     const workspaceId = workspaceForLineage(session, sessionState.byId, workspaceBySession)
-    const childThreads =
+    const listedChildThreads =
       threadView.sourceFilter === 'main'
         ? NO_CHILDREN
         : (threadTree.childrenByRoot.get(session.id) ?? NO_CHILDREN).filter(
@@ -1617,7 +1643,13 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
                 archived: archivedSessionIds.has(child.id),
               }),
           )
-    const selectedChildId = childThreads.some(child => child.id === selectedSession?.id) ? selectedSession?.id : undefined
+    const selectedChildId = listedChildThreads.some(child => child.id === selectedSession?.id) ? selectedSession?.id : undefined
+    const { live: childThreads, finished: finishedChildThreads } = partitionFinishedChildren({
+      children: listedChildThreads,
+      mode: preferences.finishedSubagents,
+      isFinished: child => child.origin === 'subagent' && !child.running && !waitingSessionIds.has(child.id),
+      selectedId: selectedChildId,
+    })
     const rowAttentionLabel = attentionLabel ?? inlineAttentionLabels.get(session.id)
     return (
       <ThreadRow
@@ -1640,6 +1672,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
         childAttentionLabels={inlineAttentionLabels}
         rowStyle={rowStyle}
         childThreads={childThreads}
+        finishedChildThreads={finishedChildThreads}
         childrenOpen={!closedParents.has(session.id)}
         allChildrenShown={expandedParents.has(session.id)}
         selectedChildId={selectedChildId}
@@ -1924,6 +1957,33 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
               {props.tSidebar('threadSidebarApplyActionsToChildren')}
             </Label>
             <p className="dshx:text-xs dshx:text-muted-foreground">{props.tSidebar('threadSidebarApplyActionsToChildrenHint')}</p>
+            <div className="dshx:grid dshx:min-w-0 dshx:gap-1">
+              <span className="dshx:text-xs">{props.tSidebar('threadSidebarFinishedSubagents')}</span>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="dshx:min-w-0 dshx:justify-start"
+                    aria-label={`${props.tSidebar('threadSidebarFinishedSubagents')}: ${props.tSidebar(finishedSubagentsLabels[preferences.finishedSubagents])}`}
+                  >
+                    {props.tSidebar(finishedSubagentsLabels[preferences.finishedSubagents])}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start">
+                  <DropdownMenuRadioGroup
+                    value={preferences.finishedSubagents}
+                    onValueChange={value => {
+                      if (value === 'show' || value === 'collapse' || value === 'hide') changePreferences({ finishedSubagents: value })
+                    }}
+                  >
+                    <DropdownMenuRadioItem value="collapse">{props.tSidebar('threadSidebarFinishedSubagentsCollapse')}</DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="hide">{props.tSidebar('threadSidebarFinishedSubagentsHide')}</DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="show">{props.tSidebar('threadSidebarFinishedSubagentsShow')}</DropdownMenuRadioItem>
+                  </DropdownMenuRadioGroup>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
             <Label className="dshx:font-normal dshx:leading-snug">
               <Checkbox checked={preferences.archiveUndoEnabled} onCheckedChange={checked => changePreferences({ archiveUndoEnabled: checked === true })} />
               {props.tSidebar('threadSidebarArchiveUndoEnabled')}

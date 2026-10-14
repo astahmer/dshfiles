@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'vitest'
-import { groupThreadChildren, threadActionTargetIds, visibleChildren, type ThreadNode } from './thread-children.js'
+import { groupThreadChildren, partitionFinishedChildren, threadActionTargetIds, visibleChildren, type ThreadNode } from './thread-children.js'
 
 const thread = (id: string, updatedAt: number, parentId?: string): ThreadNode => (parentId === undefined ? { id, updatedAt } : { id, updatedAt, parentId })
 const ids = (threads: readonly ThreadNode[] | undefined): string[] => (threads ?? []).map(item => item.id)
@@ -68,4 +68,24 @@ test('the open child stays visible even past the limit', () => {
     ['a', 'b', 'e'],
   )
   assert.equal(result.hiddenCount, 2)
+})
+
+const subagents = [
+  { id: 'live', running: true },
+  { id: 'done-a', running: false },
+  { id: 'open-done', running: false },
+  { id: 'done-b', running: false },
+]
+const partition = (mode: 'show' | 'collapse' | 'hide') => {
+  const result = partitionFinishedChildren({ children: subagents, mode, isFinished: child => !child.running, selectedId: 'open-done' })
+  return { live: result.live.map(child => child.id), finished: result.finished.map(child => child.id) }
+}
+
+test('collapse keeps live and open subagents listed and folds the finished ones in order', () => {
+  assert.deepEqual(partition('collapse'), { live: ['live', 'open-done'], finished: ['done-a', 'done-b'] })
+})
+
+test('hide drops finished subagents except the open one, and show leaves every child listed', () => {
+  assert.deepEqual(partition('hide'), { live: ['live', 'open-done'], finished: [] })
+  assert.deepEqual(partition('show'), { live: ['live', 'done-a', 'open-done', 'done-b'], finished: [] })
 })

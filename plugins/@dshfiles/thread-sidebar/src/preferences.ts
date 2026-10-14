@@ -58,6 +58,7 @@ const preferencesSchema = z
     includeSubagentAttention: z.boolean().default(DEFAULT_PREFERENCES.includeSubagentAttention),
     applyActionsToChildThreads: z.boolean().default(DEFAULT_PREFERENCES.applyActionsToChildThreads),
     maxChildren: z.number().int().min(1).max(50).default(DEFAULT_PREFERENCES.maxChildren),
+    finishedSubagents: z.enum(['show', 'collapse', 'hide']).default(DEFAULT_PREFERENCES.finishedSubagents),
   })
   .strict()
 

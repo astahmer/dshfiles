@@ -63,6 +63,9 @@ export const threadSidebarSettings = defineSettings({
       .max(50)
       .default(DEFAULT_PREFERENCES.maxChildren)
       .description('Child threads listed under a parent before the expandable "more" line.'),
+    finishedSubagents: Schema.union(['show', 'collapse', 'hide'] as const)
+      .default(DEFAULT_PREFERENCES.finishedSubagents)
+      .description('Finished subagents under a parent: list them, fold them into one "N finished" line, or hide them.'),
     archiveUndoEnabled: Schema.boolean()
       .default(DEFAULT_PREFERENCES.archiveUndoEnabled)
       .description('Show a temporary undo notice after manually archiving threads.'),
