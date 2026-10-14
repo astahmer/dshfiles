@@ -12,7 +12,6 @@ const layout = (commitId: string, lane = 0): RevisionGraphRow => ({
   outgoing: [],
   topLanes: [],
   bottomLanes: [],
-  bends: false,
 })
 const layouts = new Map(['a', 'b', 'c'].map(id => [id, layout(id)]))
 

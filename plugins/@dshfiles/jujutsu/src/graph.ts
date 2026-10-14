@@ -23,7 +23,7 @@ export interface GraphLane {
 
 /**
  * One row of the revision graph. Lines enter at the top edge, the node sits in the middle, and every
- * lane change happens in a link band below the node, so a row whose links bend gets extra height.
+ * lane change happens in the lower half of the row, so all rows keep one height.
  */
 export interface RevisionGraphRow {
   readonly commitId: string
@@ -32,13 +32,12 @@ export interface RevisionGraphRow {
   readonly laneCount: number
   /** Lanes that end at this node (usually only its own lane). */
   readonly incoming: readonly GraphLink[]
-  /** Lanes of other revisions crossing this row, possibly moving left in the link band. */
+  /** Lanes of other revisions crossing this row, possibly moving left below the node. */
   readonly passing: readonly GraphLink[]
   /** Links from this node to its parents. */
   readonly outgoing: readonly GraphLink[]
   readonly topLanes: readonly GraphLane[]
   readonly bottomLanes: readonly GraphLane[]
-  readonly bends: boolean
 }
 
 export interface GraphParentLink {
@@ -288,7 +287,6 @@ export const layoutRevisionGraph = (
           'toLane',
         ),
       ],
-      bends: passing.some(link => link.fromLane !== link.toLane) || outgoing.some(link => link.toLane !== link.fromLane),
     })
     lanes.splice(0, lanes.length, ...next)
   }

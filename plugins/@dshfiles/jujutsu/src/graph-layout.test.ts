@@ -80,7 +80,7 @@ describe('revision graph lanes', () => {
   test('a long linear trunk is a single straight lane', () => {
     const rows = layout(linearTrunk('commit', 200, index => ({ workingCopy: index === 0, immutable: index > 20 })))
 
-    expect(rows.every(row => row.commitLane === 0 && row.laneCount === 1 && !row.bends)).toBe(true)
+    expect(rows.every(row => row.commitLane === 0 && row.laneCount === 1)).toBe(true)
     expect(rows.at(-1)?.outgoing).toEqual([])
   })
 
@@ -116,7 +116,6 @@ describe('revision graph lanes', () => {
     const rows = layout([revision('merge', ['trunk0', 'side'], { workingCopy: true }), revision('side', ['trunk2']), ...linearTrunk('trunk', 4)])
 
     expect(rowOf(rows, 'merge').outgoing.map(link => link.toLane)).toEqual([0, 1])
-    expect(rowOf(rows, 'merge').bends).toBe(true)
     expect(rowOf(rows, 'side').commitLane).toBe(1)
     expect(crossings(rows)).toBe(0)
   })

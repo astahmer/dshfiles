@@ -10,16 +10,22 @@ contracts.
   order (each side branch sits right above the commit it forks from), the trunk
   line (from @ when it is built on `main`/`master`/`trunk`, else that bookmark)
   stays straight in lane 0, new heads take the leftmost free lane, and lanes
-  bend with rounded corners in a spaced band under the row. One accent for the
-  trunk and @, teal for workspace heads, violet for divergent copies
-  (`changeid/N`), neutral for other branches; immutable revisions are small dim
-  diamonds and conflicts a warning glyph. Each row reads Editing / workspace
-  pills → bookmark and tag chips → description (or a muted Describe chip), with
-  relative time and the change ID on the right. Collapsible day groups,
-  author-name, text, mine, immutable and date filters, and a Comfortable /
-  Compact density setting. The ideas (straight first-parent lanes, turns in a
-  band between rows, rounded corners, node styles) come from studying the
-  jj-view VS Code extension (Apache-2.0); no code is copied from it.
+  bend with rounded corners in the lower half of the row, so every row keeps
+  one height (24 px Comfortable, 20 px Compact). One accent for the trunk and
+  @, teal for workspace heads, violet for divergent copies (`changeid/N`),
+  neutral for other branches. Nodes are small: filled for changes, hollow for
+  empty ones, a filled ring for @, dim diamonds for immutable revisions (whose
+  text is dimmed too), and conflicts get a warning glyph. Each row reads like
+  VisualJJ: the change ID (unique prefix bold, rest dim), workspace (`name@`),
+  bookmark and tag names as coloured text, then the description or a muted
+  italic `(empty)` / `(no description)`, and the relative time as a dim
+  trailing column. Describe appears on hover for undescribed revisions, and
+  the expand chevron on hover. In the side panel the change ID and labels move
+  under the description and the time column is dropped. Collapsible day
+  groups, author-name, text, mine, immutable and date filters, and a
+  Comfortable / Compact density setting. The ideas (straight first-parent
+  lanes, rounded corners, node styles) come from studying the jj-view VS Code
+  extension (Apache-2.0); no code is copied from it.
 - Expanded revisions show the description, Describe / Full diff / Edit This
   Change / Squash into parent, and changed files as a Flat or Tree list with
   M/A/D status, +/- counts, folder counts, and per-file review marks.

@@ -51,20 +51,15 @@ import { Toggle } from '@dshfiles/plugin-ui/components/ui/toggle'
 import { TooltipProvider } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import {
   ArrowDownIcon,
-  BookmarkIcon,
   CalendarIcon,
   ChevronDownIcon,
   ChevronRightIcon,
   EllipsisVerticalIcon,
   FolderGit2Icon,
-  GripVerticalIcon,
-  LayersIcon,
   LocateFixedIcon,
-  PencilIcon,
   RefreshCwIcon,
   SearchIcon,
   Settings2Icon,
-  TagIcon,
   TriangleAlertIcon,
   UserIcon,
 } from '@dshfiles/plugin-ui/icons'
@@ -395,6 +390,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   }, [state, graphOrder, revisionsByCommitId, hideImmutable, mineOnly])
   const graphRowsByCommitId = useMemo(() => new Map(graphRows.map(row => [row.commitId, row])), [graphRows])
   const graphMetrics = GRAPH_DENSITY[preferences.graphDensity]
+  const rowHeight = graphMetrics.rowHeight + (sidePanel ? STACKED_ROW_EXTRA : 0)
   const graphWidth = graphWidthFor(
     graphMetrics,
     graphRows.reduce((maximum, row) => Math.max(maximum, row.laneCount), 1),
@@ -424,7 +420,6 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     estimateSize: index => {
       const item = listItems[index]
       if (item === undefined || item.kind === 'day') return 18
-      const rowHeight = rowHeightFor(graphMetrics, item.layout)
       return item.key === selectedRevision?.commitId ? rowHeight + 320 : rowHeight
     },
     overscan: 12,
@@ -1014,6 +1009,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
                   ) : (
                     <RevisionRow
                       bookmarkMenu={bookmarkMenu}
+                      density={sidePanel ? 'stacked' : 'inline'}
                       dimmed={movingBranch?.has(item.revision.commitId) === true || previewBranchIds.has(item.revision.commitId)}
                       dropTarget={dropTarget === item.revision.commitId || rowDropPresentation !== null}
                       expanded={selectedRevision?.commitId === item.revision.commitId || rowDropPresentation !== null}
@@ -1028,6 +1024,11 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
                       onDragStart={origin => sendAction({ type: 'drag.start', origin })}
                       onDrop={event => dropOn(event, item.revision)}
                       onToggle={() => activateRevisionRow(item.revision)}
+                      onDescribe={() => {
+                        setSelection({ commitId: item.revision.commitId, changeId: item.revision.changeId })
+                        setEditingDescription(item.revision.commitId)
+                      }}
+                      rowHeight={rowHeight}
                       revision={item.revision}
                       metrics={graphMetrics}
                     >
@@ -1534,14 +1535,18 @@ const PreferencesMenu = (): JSX.Element => {
 
 interface GraphMetrics {
   readonly rowHeight: number
-  readonly bendGap: number
   readonly laneGap: number
 }
 
 const GRAPH_DENSITY = {
-  comfortable: { rowHeight: 28, bendGap: 12, laneGap: 14 },
-  compact: { rowHeight: 22, bendGap: 8, laneGap: 11 },
+  comfortable: { rowHeight: 24, laneGap: 12 },
+  compact: { rowHeight: 20, laneGap: 10 },
 } as const satisfies Record<GraphDensity, GraphMetrics>
+
+/** The side panel stacks the change ID under the description, so its rows carry a second text line. */
+const STACKED_ROW_EXTRA = 14
+
+const LANE_WIDTH = 1.25
 
 const TONE_STROKE = {
   trunk: 'dshx:stroke-info',
@@ -1562,8 +1567,6 @@ const TONE_FILL = {
 const laneX = (metrics: GraphMetrics, lane: number): number => metrics.laneGap * 0.75 + lane * metrics.laneGap
 
 const graphWidthFor = (metrics: GraphMetrics, laneCount: number): number => laneX(metrics, Math.max(laneCount, 1) - 1) + metrics.laneGap * 0.75
-
-const rowHeightFor = (metrics: GraphMetrics, layout: RevisionGraphRow): number => metrics.rowHeight + (layout.bends ? metrics.bendGap : 0)
 
 /** A lane that runs straight down, or turns once with rounded corners at `turn`. */
 const lanePath = (input: { readonly fromX: number; readonly toX: number; readonly top: number; readonly turn: number; readonly bottom: number }): string => {
@@ -1594,7 +1597,7 @@ const GraphLanes = (props: GraphLanesProps): JSX.Element => (
         className={TONE_STROKE[lane.tone]}
         key={lane.lane}
         strokeLinecap="round"
-        strokeWidth={1.5}
+        strokeWidth={LANE_WIDTH}
         x1={laneX(props.metrics, lane.lane)}
         x2={laneX(props.metrics, lane.lane)}
         y1="0"
@@ -1608,15 +1611,16 @@ interface RevisionGraphCellProps {
   readonly revision: Revision
   readonly layout: RevisionGraphRow
   readonly metrics: GraphMetrics
+  readonly height: number
   readonly width: number
 }
 
 const RevisionGraphCell = (props: RevisionGraphCellProps): JSX.Element => {
   const revision = props.revision
   const layout = props.layout
-  const height = rowHeightFor(props.metrics, layout)
-  const middle = props.metrics.rowHeight / 2
-  const turn = props.metrics.rowHeight + props.metrics.bendGap / 2
+  const height = props.height
+  const middle = height / 2
+  const turn = middle + (height - middle) / 2
   const x = (lane: number): number => laneX(props.metrics, lane)
   const commitX = x(layout.commitLane)
   const tone = revision.divergent ? 'divergent' : layout.tone
@@ -1624,31 +1628,27 @@ const RevisionGraphCell = (props: RevisionGraphCellProps): JSX.Element => {
     if (revision.workingCopy) {
       return (
         <>
-          <circle className="dshx:fill-info/25" cx={commitX} cy={middle} r={7.5} />
-          <circle className="dshx:fill-info dshx:stroke-background" cx={commitX} cy={middle} r={4.5} strokeWidth={1.5} />
+          <circle className="dshx:fill-background dshx:stroke-info" cx={commitX} cy={middle} r={4.5} strokeWidth={1.5} />
+          <circle className="dshx:fill-info" cx={commitX} cy={middle} r={2.25} />
         </>
       )
     }
     if (revision.immutable) {
       return (
         <path
-          className="dshx:fill-muted-foreground dshx:stroke-background"
-          d={`M ${commitX} ${middle - 3.5} L ${commitX + 3.5} ${middle} L ${commitX} ${middle + 3.5} L ${commitX - 3.5} ${middle} Z`}
-          fillOpacity={0.6}
-          strokeWidth={1}
+          className="dshx:fill-muted-foreground"
+          d={`M ${commitX} ${middle - 3} L ${commitX + 3} ${middle} L ${commitX} ${middle + 3} L ${commitX - 3} ${middle} Z`}
+          fillOpacity={0.55}
         />
       )
     }
-    if (revision.workspaces.length > 0 && !revision.divergent) {
-      return <circle className="dshx:fill-background dshx:stroke-teal" cx={commitX} cy={middle} r={4.25} strokeWidth={2} />
-    }
     return (
       <circle
-        className={cn(revision.empty ? 'dshx:fill-background' : TONE_FILL[tone], TONE_STROKE[tone], !revision.empty && 'dshx:stroke-background')}
+        className={cn(revision.empty ? 'dshx:fill-background' : TONE_FILL[tone], TONE_STROKE[tone])}
         cx={commitX}
         cy={middle}
-        r={revision.empty ? 3.5 : 4}
-        strokeWidth={revision.empty ? 1.5 : 1}
+        r={3}
+        strokeWidth={revision.empty ? LANE_WIDTH : 0}
       />
     )
   })()
@@ -1660,7 +1660,7 @@ const RevisionGraphCell = (props: RevisionGraphCellProps): JSX.Element => {
       viewBox={`0 0 ${props.width} ${height}`}
       width={props.width}
     >
-      <g fill="none" strokeLinecap="round" strokeWidth={1.5}>
+      <g fill="none" strokeLinecap="round" strokeWidth={LANE_WIDTH}>
         {layout.passing.map(link => (
           <path
             className={TONE_STROKE[link.tone]}
@@ -1699,8 +1699,6 @@ const RevisionGraphCell = (props: RevisionGraphCellProps): JSX.Element => {
     </svg>
   )
 }
-
-const CHIP = 'dshx:inline-flex dshx:h-[18px] dshx:flex-none dshx:items-center dshx:gap-1 dshx:rounded-sm dshx:px-1.5 dshx:text-[11px] dshx:leading-none'
 
 /** jj prints change IDs in "reverse hex" (0-f → z-k); the API carries the normal hex form. */
 const reverseHexChangeId = (changeId: string, length: number): string =>
@@ -1761,15 +1759,19 @@ const InlineDropPreview = (props: InlineDropPreviewProps): JSX.Element => (
 
 interface RevisionRowProps {
   readonly revision: Revision
+  /** `stacked` puts the change ID and labels under the description and drops the time column, for narrow panels. */
+  readonly density: 'inline' | 'stacked'
   readonly expanded: boolean
   readonly dimmed: boolean
   readonly dropTarget: boolean
   readonly graphLayout: RevisionGraphRow
   readonly graphWidth: number
   readonly metrics: GraphMetrics
+  readonly rowHeight: number
   readonly menu: ReactNode
   readonly bookmarkMenu: (name: string, local: boolean) => ReactNode
   readonly onToggle: () => void
+  readonly onDescribe: () => void
   readonly onDragStart: (origin: DragOrigin) => void
   readonly onDragEnter: (event: DragEvent) => void
   readonly onDragLeave: () => void
@@ -1779,10 +1781,101 @@ interface RevisionRowProps {
 
 const RevisionRow = (props: RevisionRowProps): JSX.Element => {
   const revision = props.revision
+  const stacked = props.density === 'stacked'
   const draggable = !revision.immutable
   const described = revision.description.trim().length > 0
   const changeId = reverseHexChangeId(revision.changeId, Math.max(8, revision.shortestChangeId.length))
-  const otherWorkspaces = revision.workingCopy && revision.workspaces.length === 1 ? [] : revision.workspaces
+  const workspaceLabels = revision.workingCopy && revision.workspaces.length === 0 ? [''] : revision.workspaces
+  const changeIdLabel = (
+    // The row button is named by its description; the full change ID stays in the title, the details and the menu.
+    <span
+      aria-hidden
+      className="dshx:flex-none dshx:font-mono dshx:text-[11px]"
+      title={revision.changeId + (revision.evolved ? ' · rewritten from an earlier commit' : '')}
+    >
+      <span className={revision.immutable ? 'dshx:font-semibold dshx:text-muted-foreground' : 'dshx:font-semibold dshx:text-foreground/85'}>
+        {changeId.slice(0, revision.shortestChangeId.length)}
+      </span>
+      <span className="dshx:text-muted-foreground/55">{changeId.slice(revision.shortestChangeId.length)}</span>
+      {revision.divergent && <span className="dshx:text-violet">/{revision.changeOffset}</span>}
+    </span>
+  )
+  const labels = (
+    <>
+      {workspaceLabels.map(workspace => (
+        <span
+          className={cn(
+            'dshx:max-w-40 dshx:flex-none dshx:truncate dshx:font-mono dshx:text-[11px]',
+            revision.workingCopy ? 'dshx:font-semibold dshx:text-info' : 'dshx:text-teal',
+          )}
+          key={workspace}
+          title={revision.workingCopy ? `Working copy of workspace ${workspace || 'default'}` : `Workspace ${workspace}`}
+        >
+          {workspace}@
+        </span>
+      ))}
+      {revision.bookmarks.map(name => {
+        const local = revision.localBookmarks.includes(name)
+        return (
+          <ContextMenu key={name}>
+            <ContextMenuTrigger asChild>
+              <span
+                className={cn(
+                  'dshx:max-w-40 dshx:flex-none dshx:truncate dshx:font-mono dshx:text-[11px] dshx:font-medium',
+                  local ? 'dshx:cursor-grab dshx:text-violet' : 'dshx:text-muted-foreground',
+                )}
+                draggable={local}
+                onContextMenu={event => event.stopPropagation()}
+                onDragStart={event => {
+                  event.stopPropagation()
+                  event.dataTransfer.setData(BOOKMARK_MIME, name)
+                  event.dataTransfer.setData(BOOKMARK_SOURCE_MIME, revision.commitId)
+                  event.dataTransfer.effectAllowed = 'move'
+                  props.onDragStart({ kind: 'bookmark', sourceId: revision.commitId, bookmark: name })
+                }}
+                title={local ? `Bookmark ${name} · drag onto a revision to move · right-click for actions` : `Remote bookmark ${name}`}
+              >
+                {name}
+              </span>
+            </ContextMenuTrigger>
+            {props.bookmarkMenu(name, local)}
+          </ContextMenu>
+        )
+      })}
+      {revision.tags.map(name => (
+        <span className="dshx:max-w-32 dshx:flex-none dshx:truncate dshx:font-mono dshx:text-[11px] dshx:text-warning" key={name} title={`Tag ${name}`}>
+          {name}
+        </span>
+      ))}
+      {revision.divergent && (
+        <span className="dshx:flex-none dshx:text-[11px] dshx:text-violet" title="Divergent: several visible commits share this change ID">
+          divergent
+        </span>
+      )}
+    </>
+  )
+  const chevron = (
+    <ChevronRightIcon
+      aria-hidden
+      className={cn(
+        'dshx:size-3 dshx:flex-none dshx:text-muted-foreground dshx:transition-transform',
+        props.expanded ? 'dshx:rotate-90' : 'dshx:opacity-0 dshx:group-hover/row:opacity-100 dshx:group-focus-visible/button:opacity-100',
+      )}
+    />
+  )
+  const descriptionText = (
+    <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:gap-1.5 dshx:text-[13px]">
+      {revision.conflict && <TriangleAlertIcon aria-label="Conflict" className="dshx:size-3.5 dshx:flex-none dshx:text-warning" role="img" />}
+      {revision.empty && <span className="dshx:flex-none dshx:text-muted-foreground dshx:italic">(empty)</span>}
+      {described ? (
+        <span className={cn('dshx:min-w-0 dshx:truncate', revision.workingCopy && 'dshx:font-medium', revision.immutable && 'dshx:text-muted-foreground')}>
+          {firstLine(revision.description)}
+        </span>
+      ) : (
+        <span className="dshx:min-w-0 dshx:truncate dshx:text-muted-foreground dshx:italic">(no description)</span>
+      )}
+    </span>
+  )
   return (
     <article
       className={cn('dshx:group/row dshx:relative', props.expanded && 'dshx:bg-muted-foreground/[0.07]', props.dimmed && 'dshx:opacity-40')}
@@ -1802,7 +1895,7 @@ const RevisionRow = (props: RevisionRowProps): JSX.Element => {
         <ContextMenuTrigger asChild>
           <div
             className={cn(
-              'dshx:flex dshx:items-start dshx:pr-3 dshx:hover:bg-accent',
+              'dshx:flex dshx:items-start dshx:pr-2 dshx:hover:bg-accent',
               props.dropTarget && 'dshx:bg-primary/10 dshx:ring-1 dshx:ring-primary dshx:ring-inset',
             )}
             draggable={draggable}
@@ -1811,131 +1904,58 @@ const RevisionRow = (props: RevisionRowProps): JSX.Element => {
               event.dataTransfer.effectAllowed = 'move'
               props.onDragStart({ kind: 'revision', sourceId: revision.commitId })
             }}
-            style={{ height: rowHeightFor(props.metrics, props.graphLayout) }}
+            style={{ height: props.rowHeight }}
             title={draggable ? 'Drag onto another revision to rebase · right-click for actions' : 'Right-click for actions'}
           >
-            <RevisionGraphCell layout={props.graphLayout} metrics={props.metrics} revision={revision} width={props.graphWidth} />
-            <div className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:gap-1.5" style={{ height: props.metrics.rowHeight }}>
+            <RevisionGraphCell height={props.rowHeight} layout={props.graphLayout} metrics={props.metrics} revision={revision} width={props.graphWidth} />
+            <div className="dshx:flex dshx:h-full dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:gap-1.5">
               <button
                 aria-expanded={props.expanded}
-                className="dshx:flex dshx:h-full dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:gap-1.5 dshx:overflow-hidden dshx:text-left dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50"
+                className={cn(
+                  'dshx:group/button dshx:flex dshx:h-full dshx:min-w-0 dshx:flex-1 dshx:overflow-hidden dshx:text-left dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50',
+                  stacked ? 'dshx:flex-col dshx:justify-center dshx:gap-0.5' : 'dshx:items-center dshx:gap-1.5',
+                )}
                 data-row-focus=""
                 onClick={props.onToggle}
                 type="button"
               >
-                <ChevronRightIcon
-                  className={cn(
-                    'dshx:size-3 dshx:flex-none dshx:text-muted-foreground/60 dshx:transition-transform dshx:group-hover/row:text-muted-foreground',
-                    props.expanded && 'dshx:rotate-90',
-                  )}
-                />
-                {revision.workingCopy && (
-                  <span
-                    className={cn(CHIP, 'dshx:rounded-full dshx:bg-info/15 dshx:font-semibold dshx:text-info')}
-                    title={revision.workspaces.length === 1 ? `Working copy of workspace ${revision.workspaces[0]}` : 'Working copy'}
-                  >
-                    <PencilIcon className="dshx:size-3" />
-                    Editing
-                  </span>
-                )}
-                {otherWorkspaces.map(workspace => (
-                  <span
-                    className={cn(CHIP, 'dshx:max-w-[45%] dshx:rounded-full dshx:bg-teal/15 dshx:font-medium dshx:text-teal')}
-                    key={workspace}
-                    title={`Workspace ${workspace}`}
-                  >
-                    <LayersIcon className="dshx:size-3 dshx:flex-none" />
-                    <span className="dshx:truncate">{workspace}</span>
-                  </span>
-                ))}
-                {revision.bookmarks.map(name => {
-                  const local = revision.localBookmarks.includes(name)
-                  return (
-                    <ContextMenu key={name}>
-                      <ContextMenuTrigger asChild>
-                        <span
-                          className={cn(
-                            CHIP,
-                            'dshx:max-w-[35%] dshx:border dshx:border-border dshx:bg-muted dshx:font-mono dshx:text-[10.5px]',
-                            local ? 'dshx:cursor-grab dshx:text-foreground' : 'dshx:text-muted-foreground',
-                          )}
-                          draggable={local}
-                          onContextMenu={event => event.stopPropagation()}
-                          onDragStart={event => {
-                            event.stopPropagation()
-                            event.dataTransfer.setData(BOOKMARK_MIME, name)
-                            event.dataTransfer.setData(BOOKMARK_SOURCE_MIME, revision.commitId)
-                            event.dataTransfer.effectAllowed = 'move'
-                            props.onDragStart({ kind: 'bookmark', sourceId: revision.commitId, bookmark: name })
-                          }}
-                          title={local ? `Bookmark ${name} · drag onto a revision to move · right-click for actions` : `Remote bookmark ${name}`}
-                        >
-                          <BookmarkIcon className="dshx:size-2.5 dshx:flex-none" />
-                          <span className="dshx:truncate">{name}</span>
-                        </span>
-                      </ContextMenuTrigger>
-                      {props.bookmarkMenu(name, local)}
-                    </ContextMenu>
-                  )
-                })}
-                {revision.tags.map(name => (
-                  <span
-                    className={cn(CHIP, 'dshx:max-w-[30%] dshx:border dshx:border-border dshx:font-mono dshx:text-[10.5px] dshx:text-muted-foreground')}
-                    key={name}
-                    title={`Tag ${name}`}
-                  >
-                    <TagIcon className="dshx:size-2.5 dshx:flex-none" />
-                    <span className="dshx:truncate">{name}</span>
-                  </span>
-                ))}
-                {revision.conflict && <TriangleAlertIcon aria-label="Conflict" className="dshx:size-3.5 dshx:flex-none dshx:text-warning" role="img" />}
-                {described ? (
-                  <span
-                    className={cn(
-                      'dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-sm',
-                      revision.workingCopy ? 'dshx:font-semibold' : 'dshx:font-medium',
-                      revision.immutable && 'dshx:font-normal dshx:text-muted-foreground',
-                    )}
-                  >
-                    {firstLine(revision.description)}
-                  </span>
+                {stacked ? (
+                  <>
+                    <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1">
+                      {chevron}
+                      {descriptionText}
+                    </span>
+                    <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5 dshx:overflow-hidden dshx:pl-4 dshx:leading-none">
+                      {changeIdLabel}
+                      {labels}
+                    </span>
+                  </>
                 ) : (
                   <>
-                    <span className={cn(CHIP, 'dshx:border dshx:border-dashed dshx:border-border dshx:text-muted-foreground')} title="No description">
-                      Describe
-                    </span>
-                    <span className="dshx:flex-1" />
+                    {chevron}
+                    {changeIdLabel}
+                    {labels}
+                    {descriptionText}
                   </>
                 )}
               </button>
-              {revision.divergent && (
-                <span
-                  className={cn(CHIP, 'dshx:bg-violet/10 dshx:text-[10px] dshx:text-violet')}
-                  title="Divergent: several visible commits share this change ID"
+              {!described && !revision.immutable && (
+                <button
+                  className="dshx:flex-none dshx:rounded-sm dshx:px-1 dshx:text-[11px] dshx:text-muted-foreground dshx:opacity-0 dshx:outline-none dshx:group-hover/row:opacity-100 dshx:hover:text-foreground dshx:focus-visible:opacity-100 dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50"
+                  onClick={props.onDescribe}
+                  type="button"
                 >
-                  divergent
-                </span>
+                  Describe
+                </button>
               )}
-              <time className="dshx:flex-none dshx:font-mono dshx:text-[11px] dshx:text-muted-foreground" dateTime={revision.authorTime}>
-                {formatAge(revision.authorTime)}
-              </time>
-              <span
-                className="dshx:flex-none dshx:font-mono dshx:text-[11px]"
-                title={revision.changeId + (revision.evolved ? ' · rewritten from an earlier commit' : '')}
-              >
-                <span className={revision.immutable ? 'dshx:text-muted-foreground' : 'dshx:text-foreground/80'}>
-                  {changeId.slice(0, revision.shortestChangeId.length)}
-                </span>
-                <span className="dshx:text-muted-foreground/50">{changeId.slice(revision.shortestChangeId.length)}</span>
-                {revision.divergent && <span className="dshx:text-violet">/{revision.changeOffset}</span>}
-              </span>
-              <GripVerticalIcon
-                aria-hidden
-                className={cn(
-                  'dshx:size-3.5 dshx:flex-none dshx:text-muted-foreground dshx:opacity-0',
-                  draggable ? 'dshx:cursor-grab dshx:group-hover/row:opacity-100' : 'dshx:invisible',
-                )}
-              />
+              {!stacked && (
+                <time
+                  className="dshx:w-8 dshx:flex-none dshx:text-right dshx:text-[11px] dshx:text-muted-foreground/70 dshx:tabular-nums"
+                  dateTime={revision.authorTime}
+                >
+                  {formatAge(revision.authorTime)}
+                </time>
+              )}
             </div>
           </div>
         </ContextMenuTrigger>
