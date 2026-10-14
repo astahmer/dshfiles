@@ -16,6 +16,7 @@ import { jjIntegrationApi, type DestinationView, type LandResult, type Repositor
 import { JsonText } from './json-text.js'
 import { jjIntegrationSettings, type JjIntegrationSettings } from './settings.js'
 import { canRebaseThread, hasPendingUserQuestion, type ThreadSessionActivity } from './thread-rebase-eligibility.js'
+import { workspaceHasOtherSession } from './thread-session-ownership.js'
 import { checkoutSyncArgv, createThreads, defaultThreadsDirectory, type JjExecutor, type ThreadStatus, type Threads } from './threads.js'
 
 declare module '@deepseek-ai/cordis' {
@@ -464,14 +465,26 @@ const api = jjIntegrationApi.host({
   destination: async ({ input }) => {
     const registry = registryOf()
     const source = registry.get(WorkspaceId(input.workspaceId))
+    const ownedByAnotherSession =
+      input.sessionId === undefined ? undefined : workspaceHasOtherSession({ sessionId: input.sessionId, workspaceSessionIds: source?.sessionIds })
     const location =
       source === undefined
         ? undefined
         : await requireThreads()
             .locate(source.path)
             .catch(() => undefined)
-    if (location === undefined) return noDestination(readSettings().isolateByDefault)
-    return destinationAt(location.workspaceRoot, location.threadName !== undefined, (await registry.resolveByPath(location.repoRoot))?.id ?? null)
+    if (location === undefined) {
+      const destination = noDestination(readSettings().isolateByDefault)
+      if (ownedByAnotherSession === undefined) return destination
+      return { ...destination, ownedByAnotherSession }
+    }
+    const destination = await destinationAt(
+      location.workspaceRoot,
+      location.threadName !== undefined,
+      (await registry.resolveByPath(location.repoRoot))?.id ?? null,
+    )
+    if (ownedByAnotherSession === undefined) return destination
+    return { ...destination, ownedByAnotherSession }
   },
   projects: async () => {
     const workspaces = [...registryOf().list()].sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt))

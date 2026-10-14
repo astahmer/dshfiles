@@ -129,6 +129,12 @@
         },
         {
           "kind": "unit-test",
+          "id": "jj-integration.new-thread-background-ownership",
+          "file": "plugins/@dshfiles/jj-integration/src/thread-session-ownership.test.ts",
+          "testName": "treats any different workspace session as another owner before its details load"
+        },
+        {
+          "kind": "unit-test",
           "id": "jj-integration.new-thread-background-unit-preparing",
           "file": "plugins/@dshfiles/jj-integration/src/workspace-toggle-machine.test.ts",
           "testName": "holds Send for a new thread while its destination loads, then moves it to its own workspace in the background"

@@ -23,7 +23,7 @@ export interface WorkspaceToggleClient {
   /** Resolves once the Workspace list carries the id; the client refuses to open an id it has not seen. */
   readonly listed: (workspaceId: string) => Promise<void>
   readonly open: (workspaceId: string, signal: AbortSignal) => Promise<void>
-  /** A thread workspace this project left unused for this bookmark, still listed and holding only blank Sessions. */
+  /** A thread workspace this project left unused for this bookmark, with no other Session assigned to it. */
   readonly findSpare: (key: string) => SpareWorkspace | undefined
   readonly keepSpare: (key: string, spare: SpareWorkspace) => void
   /** Blocks the current composer until the returned release runs, so nothing is sent to the old destination. */
@@ -89,7 +89,7 @@ type ToggleEvent =
 export const defaultDestinationMove = (input: {
   readonly destination: DestinationView
   readonly workspaceId: string
-  /** The workspace already holds another thread's non-blank Session. */
+  /** The workspace already holds another thread Session. */
   readonly occupied: boolean
 }): ToggleRequest | null => {
   const { destination } = input

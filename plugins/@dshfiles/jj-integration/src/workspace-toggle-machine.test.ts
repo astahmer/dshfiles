@@ -107,6 +107,25 @@ describe('workspaceToggleMachine', () => {
     expect(toggle.calls.filter(call => call.startsWith('block'))).toHaveLength(2)
   })
 
+  it('waits for Host ownership before accepting a thread workspace that appears exclusive', async () => {
+    const toggle = startToggle()
+    toggle.actor.send({ type: 'arrive', visitId: 's1', workspaceId: 'ws-shared', isolateByDefault: true })
+    expect(toggle.actor.getSnapshot().matches('preparing')).toBe(true)
+    expect(eagerDestinationMove({ workspaceId: 'ws-shared', inThreadWorkspace: true, occupied: false, bookmark: 'main' })).toBeNull()
+    expect(toggle.calls).toEqual(['block Preparing thread-abc123'])
+
+    const request = defaultDestinationMove({
+      destination: { vcs: 'jj', isolated: true, projectWorkspaceId: 'project', bookmark: 'main', bookmarks: ['main'], isolateByDefault: true },
+      workspaceId: 'ws-shared',
+      occupied: true,
+    })
+    expect(request).not.toBeNull()
+    toggle.actor.send({ type: 'resolved', visitId: 's1', request })
+    toggle.release()
+    await waitFor(toggle.actor, snapshot => snapshot.matches('idle'))
+    expect(toggle.switched).toEqual(['ws-thread-abc123'])
+  })
+
   it('reuses the spare workspace for a new thread instead of provisioning one', async () => {
     const toggle = startToggle()
     toggle.spares.set(spareKey('project', 'main'), { workspaceId: 'ws-spare', name: 'thread-5pa4e0' })

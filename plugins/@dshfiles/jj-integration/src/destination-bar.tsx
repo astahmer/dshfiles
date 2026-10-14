@@ -17,6 +17,7 @@ import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 
 import { z } from 'zod'
 import { jjIntegrationApi, threadWorkspaceName } from './api.js'
 import type { JjIntegrationTranslate } from './locales.js'
+import { workspaceHasOtherSession } from './thread-session-ownership.js'
 import { jjIntegrationSettings } from './settings.js'
 import {
   defaultDestinationMove,
@@ -106,8 +107,9 @@ export const startWorkspaceToggle = (input: {
       if (spare === undefined) return undefined
       const workspace = services.workspaces.list.getSnapshot().items.find(item => item.workspaceId === spare.workspaceId)
       const sessions = services.sessions.list.getSnapshot().byId
-      const blank = workspace?.sessionIds.every(sessionId => sessions[sessionId]?.blank === true) ?? false
-      return blank ? spare : undefined
+      const blankAndExclusive =
+        workspace !== undefined && workspace.sessionIds.length === 1 && workspace.sessionIds.every(sessionId => sessions[sessionId]?.blank === true)
+      return blankAndExclusive ? spare : undefined
     },
     keepSpare: (key, spare) => void storedSpares.set({ ...storedSpares.get(), [key]: spare }),
     blockComposer: reason => {
@@ -121,10 +123,8 @@ export const startWorkspaceToggle = (input: {
     preparingReason: name => (name === null ? t('switchingDestination') : t('preparingWorkspace', { name })),
   }
   const actor = createActor(workspaceToggleMachine, { input: { client } })
-  // Seeding the new destination spares the next mount a Host round trip before it can decide anything.
   actor.on('switched', event => {
-    if (event.destination !== undefined) queryClient.setQueryData(['jj-integration', 'destination', event.workspaceId], event.destination)
-    else void queryClient.invalidateQueries({ queryKey: ['jj-integration', 'destination', event.workspaceId] })
+    void queryClient.invalidateQueries({ queryKey: ['jj-integration', 'destination', event.workspaceId] })
     void queryClient.invalidateQueries({ queryKey: ['jj-integration', 'repositories'] })
   })
   return actor.start()
@@ -161,7 +161,7 @@ const useNewThread = (services: DestinationBarServices, workspaceId: string | nu
   const session = sessionId === undefined ? undefined : sessions.byId[sessionId]
   if (session === undefined || !session.blank || workspaceId === null) return null
   const workspace = workspaces.items.find(item => item.workspaceId === workspaceId)
-  const occupied = (workspace?.sessionIds ?? []).some(id => id !== session.id && sessions.byId[id]?.blank === false)
+  const occupied = workspaceHasOtherSession({ sessionId: session.id, workspaceSessionIds: workspace?.sessionIds })
   return { sessionId: session.id, occupied, path: workspace?.path }
 }
 
@@ -181,21 +181,33 @@ export const DestinationBar = (props: {
   const [branchOpen, setBranchOpen] = useState(false)
   const workspaceId = props.workspaceId ?? null
   const toggle = useWorkspaceToggle(props.toggle)
+  const newThread = useNewThread(services, workspaceId)
   const destination = useQuery({
-    queryKey: ['jj-integration', 'destination', workspaceId ?? ''],
+    queryKey: ['jj-integration', 'destination', workspaceId ?? '', newThread?.sessionId ?? ''],
     // While a new thread is moving, the destination it leaves does not matter; asking would only slow jj down.
     enabled: workspaceId !== null && !toggle.busy,
-    queryFn: ({ signal }) =>
-      runHostRequest({ signal, timeoutMs: 30_000, request: hostSignal => api.destination({ workspaceId: workspaceId ?? '' }, { signal: hostSignal }) }),
+    queryFn: async ({ signal }) => {
+      const input = { workspaceId: workspaceId ?? '', sessionId: newThread?.sessionId }
+      try {
+        return await runHostRequest({ signal, timeoutMs: 30_000, request: hostSignal => api.destination(input, { signal: hostSignal }) })
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        if (newThread === null || !/sessionId|unrecognized|unknown key/iu.test(message)) throw error
+        return runHostRequest({
+          signal,
+          timeoutMs: 30_000,
+          request: hostSignal => api.destination({ workspaceId: workspaceId ?? '' }, { signal: hostSignal }),
+        })
+      }
+    },
   })
   const settings = useSettings(jjIntegrationSettings).value
   const isolateByDefault = settings?.isolateByDefault ?? false
   const bookmark = settings?.bookmark ?? 'main'
-  const newThread = useNewThread(services, workspaceId)
   // One visit per showing of the New-thread screen: DSH hands the same blank Session to the next New thread.
   const [mountId] = useState(() => crypto.randomUUID())
   const newThreadId = newThread === null ? null : `${mountId}:${newThread.sessionId}`
-  const occupied = newThread?.occupied ?? false
+  const occupied = destination.data?.ownedByAnotherSession ?? newThread?.occupied ?? true
   const inThreadWorkspace = newThread?.path === undefined ? null : threadNameOf(newThread.path) !== null
 
   // A New thread opens its composer at once wherever it was started; the machine then moves it, in the background,
@@ -205,8 +217,9 @@ export const DestinationBar = (props: {
     if (newThreadId === null || workspaceId === null) return
     arrive({ visitId: newThreadId, workspaceId, isolateByDefault })
     if (!isolateByDefault || inThreadWorkspace === null) return
-    // Isolation on: decide from the workspace path at once instead of waiting for the Host's destination.
-    resolved(newThreadId, eagerDestinationMove({ workspaceId, inThreadWorkspace, occupied, bookmark }))
+    // A shared workspace can move immediately; a seemingly exclusive one still waits for the Host's ownership check.
+    const request = eagerDestinationMove({ workspaceId, inThreadWorkspace, occupied, bookmark })
+    if (request !== null) resolved(newThreadId, request)
   }, [arrive, bookmark, inThreadWorkspace, isolateByDefault, newThreadId, occupied, resolved, workspaceId])
   useEffect(() => {
     if (newThreadId === null || workspaceId === null || destination.data === undefined) return

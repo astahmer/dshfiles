@@ -65,6 +65,7 @@ const destinationSchema = z
     bookmark: z.string().nullable(),
     bookmarks: z.array(z.string()),
     isolateByDefault: z.boolean(),
+    ownedByAnotherSession: z.boolean().optional(),
   })
   .strict()
 export type DestinationView = z.infer<typeof destinationSchema>
@@ -93,7 +94,10 @@ export const jjIntegrationApi = defineApi({
       // A Host from before the destination field omits it; the client then reads the destination itself.
       output: z.object({ workspaceId: z.string(), isolated: z.boolean(), destination: destinationSchema.optional() }).strict(),
     }),
-    destination: method({ input: z.object({ workspaceId: z.string().min(1) }).strict(), output: destinationSchema }),
+    destination: method({
+      input: z.object({ workspaceId: z.string().min(1), sessionId: z.string().min(1).optional() }).strict(),
+      output: destinationSchema,
+    }),
     projects: method({
       input: z.object({}).strict(),
       output: z.object({ projects: z.array(z.object({ workspaceId: z.string(), title: z.string(), path: z.string() }).strict()) }).strict(),
