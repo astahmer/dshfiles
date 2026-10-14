@@ -12,7 +12,7 @@
     "antislop(no-unknown-returns)": 118,
     "antislop(no-unsafe-dictionary-type)": 236,
     "antislop(require-safety-comment-for-type-assertion)": 415,
-    "react-hooks(exhaustive-deps)": 25,
+    "react-hooks(exhaustive-deps)": 24,
     "react(purity)": 15
   },
   "ast-grep": {
