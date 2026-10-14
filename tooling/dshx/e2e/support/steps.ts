@@ -1,5 +1,5 @@
 import { expect, type Page } from '@playwright/test'
-import { readdir, readFile } from 'node:fs/promises'
+import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { After, Before, Given, Then, readBootOutcome } from './bdd.js'
 import { bootComposedPluginProfile, bootPluginProfile, bootProfile, type BootedProfile } from './boot.js'
@@ -211,6 +211,25 @@ Given('the web profile is booted', async ({ page }: { page: Page }) => {
 
 Given('the isolated plugin profile {string} is booted', async ({ page }: { page: Page }, packageId: string) => {
   await visitIsolatedPluginProfile(page, await bootPluginProfile(packageId))
+})
+
+Given('the isolated plugin profile {string} is booted with the autocomplete skill fixture', async (
+  { page }: { page: Page },
+  packageId: string,
+) => {
+  const profile = await bootComposedPluginProfile({
+    packageIds: [packageId],
+    profileLabel: `${packageId}-skill-mentions`,
+    seedHome: async homeRoot => {
+      const skillDirectory = join(homeRoot, 'skills', 'e2e-skill-mentions')
+      await mkdir(skillDirectory, { recursive: true })
+      await writeFile(
+        join(skillDirectory, 'SKILL.md'),
+        `---\nname: e2e-skill-mentions\ndescription: Deterministic fixture for @ skill autocomplete.\nuser-invocable: true\ndisable-model-invocation: true\n---\nUsed only by the autocomplete browser journey.\n`,
+      )
+    },
+  })
+  await visitIsolatedPluginProfile(page, profile)
 })
 
 Given('the isolated plugin composition {string} and {string} is booted', async (

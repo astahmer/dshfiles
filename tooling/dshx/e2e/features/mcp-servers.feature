@@ -46,3 +46,12 @@ Feature: MCP servers
     Then the server loads with the provider's tool and reads "Signed in with OAuth"
     When the server is signed out
     Then the server asks for sign-in again
+
+  @scenario:mcp-servers.autocomplete
+  Scenario: Find MCP server names and tools through @ autocomplete
+    Given the isolated plugin composition of "@dshfiles/mcp-servers, @dshfiles/thread-sidebar" is booted
+    When the MCP servers page is opened
+    And the local echo MCP server is added as a stdio command
+    Then the Echo server reads "Native client loaded · 1 Host tools registered"
+    When the composer searches MCP @ autocomplete for "echo"
+    Then the Echo server and its tool appear as @ suggestions

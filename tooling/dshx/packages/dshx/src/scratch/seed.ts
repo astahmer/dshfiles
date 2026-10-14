@@ -46,6 +46,12 @@ export const seedSampleProject = async (home: string): Promise<string> => {
   const project = join(home, 'projects', 'sample')
   await mkdir(project, { recursive: true })
   await writeFile(join(project, 'README.md'), '# Sample\n\nScratch project created by dshx dev up.\n')
+  const skillDirectory = join(home, 'skills', 'e2e-skill-mentions')
+  await mkdir(skillDirectory, { recursive: true })
+  await writeFile(
+    join(skillDirectory, 'SKILL.md'),
+    `---\nname: e2e-skill-mentions\ndescription: Deterministic fixture for @ skill autocomplete.\nuser-invocable: true\ndisable-model-invocation: true\n---\nUsed only by the autocomplete scratch journey.\n`,
+  )
   for (const args of [
     ['git', 'init', '--no-colocate'],
     ['describe', '--message', 'Sample project'],

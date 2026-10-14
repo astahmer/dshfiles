@@ -112,3 +112,9 @@ Feature: Thread sidebar journeys
     Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
     When the thread-sidebar command palette is searched for restart
     Then no restart action or confirmation appears without pending Host changes
+
+  @scenario:thread-sidebar.skill-mentions
+  Scenario: Find a user-invocable skill through @ autocomplete
+    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted with the autocomplete skill fixture
+    When the composer searches @ autocomplete for skill "e2e-skill-mentions"
+    Then the skill "e2e-skill-mentions" appears as an @ suggestion

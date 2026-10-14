@@ -1,14 +1,18 @@
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type {} from '@deepseek-ai/dsh-client-ui-input-trigger/client'
 import type {} from '@deepseek-ai/dsh-client-ui-commands/client'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
-import type { IconProps } from '@deepseek-ai/dsh-client-ui-primitives'
+import { rankByName, type IconProps } from '@deepseek-ai/dsh-client-ui-primitives'
 import { PlugIcon } from '@dshfiles/plugin-ui/icons'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
+import { dshxRegistryApi } from '@dshfiles/dshx/api'
 import { defineClientPlugin } from '@dshfiles/dshx/client'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { MCP_LOCALE_NAMESPACE, mcpServersLocale, type McpServersTranslate } from './locales.js'
+import { mcpServersApi } from './api.js'
 import { ManagerView } from './manager-view.js'
+import { createMcpMentionSource, decodeMcpMentionTools } from './mcp-mentions.js'
 import { McpQuickPanel } from './mcp-quick-panel.js'
 import { createQuickPanelContribution, SessionQuickPanels, type QuickPanelState } from './quick-panel.js'
 import './client.css'
@@ -37,13 +41,43 @@ const icon = (size = 18): JSX.Element => (
 export default defineClientPlugin({
   id: 'dshfiles-mcp-servers',
   name: 'MCP servers',
-  uses: ['ui'],
-  inject: ['commandUi', 'layout'],
+  uses: ['ui', 'rpc'],
+  inject: ['commandUi', 'layout', 'inputTriggers'],
   locales: [mcpServersLocale],
   setup(api) {
     const ctx = api.raw.ctx
     const translate = ctx.locale.bind(MCP_LOCALE_NAMESPACE) as McpServersTranslate
     const panels = new SessionQuickPanels()
+    const mcpApi = api.rpc.use(mcpServersApi)
+    const registryApi = api.rpc.use(dshxRegistryApi)
+    const mentions = createMcpMentionSource({
+      rank: rankByName,
+      list: async (sessionId, signal) => {
+        const [serversResult, registryResult] = await Promise.allSettled([mcpApi.list(undefined, { signal }), registryApi.list({ sessionId }, { signal })])
+        const servers =
+          serversResult.status === 'fulfilled'
+            ? serversResult.value.servers.filter(server => server.enabled).map(server => ({ name: server.name, serverName: server.serverName }))
+            : []
+        return {
+          servers,
+          tools: registryResult.status === 'fulfilled' ? decodeMcpMentionTools(registryResult.value) : [],
+        }
+      },
+      serverSection: translate('mentionServersSection'),
+      toolSection: translate('mentionToolsSection'),
+      serverInstruction: translate('mentionServerInstruction'),
+      toolInstruction: translate('mentionToolInstruction'),
+      useWhenRelevant: translate('mentionUseWhenRelevant'),
+    })
+    ctx.on('connection/reset', mentions.clear)
+    ctx.effect(() => {
+      const unregister = ctx.inputTriggers.registerSource(mentions.source)
+      return () => {
+        unregister()
+        mentions.clear()
+      }
+    }, 'MCP servers: @ suggestions')
+
     const RootPanel = (): JSX.Element => (
       <PluginQueryProvider>
         <ManagerView t={translate} />

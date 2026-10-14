@@ -121,6 +121,11 @@ const en = {
   manageShort: 'Manage',
   advancedIdentity: 'Advanced: tool namespace',
   namePlaceholder: 'Name',
+  mentionServersSection: 'MCP servers',
+  mentionToolsSection: 'MCP tools',
+  mentionServerInstruction: 'The user explicitly referenced MCP server',
+  mentionToolInstruction: 'The user explicitly referenced MCP tool',
+  mentionUseWhenRelevant: 'Use its tools only when relevant to the request.',
   tokenHint: 'This provider needs a token header. Store it as a DSH credential, then reference it here.',
 }
 
@@ -242,6 +247,11 @@ const zh = {
   manageShort: '管理',
   advancedIdentity: '高级：工具命名空间',
   namePlaceholder: '名称',
+  mentionServersSection: 'MCP 服务器',
+  mentionToolsSection: 'MCP 工具',
+  mentionServerInstruction: '用户明确引用了 MCP 服务器',
+  mentionToolInstruction: '用户明确引用了 MCP 工具',
+  mentionUseWhenRelevant: '仅在与请求相关时使用其工具。',
   tokenHint: '此服务商需要令牌请求头。请先将其保存为 DSH 凭据，再在此处引用。',
 }
 

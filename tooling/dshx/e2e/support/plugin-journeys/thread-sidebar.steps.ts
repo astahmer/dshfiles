@@ -708,3 +708,15 @@ Then('no restart action or confirmation appears without pending Host changes', a
   })
   await finishJourneyAssertions(page)
 })
+
+When('the composer searches @ autocomplete for skill {string}', async ({ page }: { page: Page }, skillName: string) => {
+  await startBlankThread(page)
+  await page.getByRole('textbox').first().fill(`@${skillName}`)
+})
+
+Then('the skill {string} appears as an @ suggestion', async ({ page }: { page: Page }, skillName: string) => {
+  await recordAssertion(page, 'thread-sidebar-skill-mentions-offer', async () => {
+    await expect(page.getByRole('option').filter({ hasText: skillName })).toBeVisible()
+  })
+  await finishJourneyAssertions(page)
+})

@@ -1,5 +1,6 @@
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
+import type {} from '@deepseek-ai/dsh-client-ui-input-trigger/client'
 import type { InputActions } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { WorkspaceView } from '@deepseek-ai/dsh-api-workspace-controller/client'
@@ -7,6 +8,7 @@ import type { ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import type { SidebarPanelMetadata, SidebarRootInjected } from '@deepseek-ai/dsh-client-ui-sidebar/client'
+import { rankByName } from '@deepseek-ai/dsh-client-ui-primitives'
 import { resolveSlotLabel, type TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
@@ -25,6 +27,7 @@ import { archiveWithoutStopping } from './organization.js'
 import { NAVIGATION_EVENT } from './navigation-history.js'
 import { PALETTE_EVENT } from '@dshfiles/command-palette/api'
 import { SettingsTab } from './settings-tab.js'
+import { createSkillMentionSource } from './skill-mention.js'
 import {
   buildThreadReferenceInsert,
   classifyThreadMentionFailure,
@@ -40,6 +43,7 @@ import './client.css'
 declare module '@deepseek-ai/dsh-api-session-controller/client' {
   interface SessionReferenceSourceMap {
     threadSidebarArchivedView: unknown
+    threadSidebarSkillAutocomplete: unknown
   }
 }
 
@@ -61,6 +65,8 @@ export default defineClient({
     'remote',
     'remote.workspace',
     'remote.sessionReferenceResolver',
+    'remote.skills',
+    'inputTriggers',
   ],
   // Every registered component reads Settings, so each one goes through decorate.
   setup(ctx, decorate) {
@@ -162,6 +168,28 @@ export default defineClient({
 
     const isShortcutCommandId = (value: string): value is ShortcutCommandId => /^[a-z][a-zA-Z0-9-]*(?:\.[a-zA-Z][a-zA-Z0-9-]*)+$/u.test(value)
     const translate = ctx.locale.bind(THREAD_SIDEBAR_LOCALE_NAMESPACE)
+    const skillMentions = createSkillMentionSource({
+      isSubagent: sessionId => ctx.sessions.subagentAddress(sessionId) !== undefined,
+      rank: rankByName,
+      list: async (sessionId, signal) => {
+        const result = await ctx.remote.skills.list({ sessionId }, signal)
+        signal.throwIfAborted()
+        if (!result.ok) throw new Error('Skill catalog is unavailable.')
+        return result.value.skills
+      },
+      section: translate('threadSidebarSkillSource'),
+      userOnlyLabel: translate('threadSidebarSkillUserOnly'),
+    })
+    ctx.remote.$on('agent-preset/selected', skillMentions.invalidate)
+    ctx.on('connection/reset', skillMentions.clear)
+    ctx.effect(() => {
+      const unregister = ctx.inputTriggers.registerSource(skillMentions.source)
+      return () => {
+        unregister()
+        skillMentions.clear()
+      }
+    }, 'thread-sidebar: @ skill source')
+
     const ThreadMentionInput = (props: { readonly inputActions: InputActions; readonly sessionId: SessionSummary['id'] }): null => {
       const insertion = useRef<ReturnType<InputActions['captureInsertion']> | null>(null)
       const pending = useRef(new Set<AbortController>())

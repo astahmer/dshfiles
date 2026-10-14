@@ -102,6 +102,61 @@
       ]
     },
     {
+      "id": "mcp-mentions",
+      "title": "Reference configured MCP servers and tools in the composer",
+      "summary": "Search enabled MCP server namespaces and the current Session's registered MCP tools from @ autocomplete; selection inserts a structured prompt reference without directly executing tools.",
+      "reach": [
+        "click button \"MCP servers\"",
+        "click combobox \"Transport\"",
+        "click option \"Local command (stdio)\"",
+        "fill textbox \"Display name\" \"Echo server\"",
+        "fill textbox \"Command and arguments\" \"node tooling/dshx/e2e/support/fake-mcp-server.mjs\"",
+        "click button \"Add server\"",
+        "expect text \"Native client loaded · 1 Host tools registered\"",
+        "click button \"New thread\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"MCP autocomplete tool context\"",
+        "click button \"Send message\"",
+        "expect text \"This turn failed*\"",
+        "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"@echo\"",
+        "expect option \"Echo server*\"",
+        "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"@e2e\"",
+        "expect option \"e2e_echo*\""
+      ],
+      "surfaces": ["client", "host", "tool", "integration"],
+      "configuration": [],
+      "states": ["unconfigured", "server-suggested", "tool-suggested", "referenced"],
+      "failureModes": [
+        "MCP tool suggestions are limited to tools visible to the current Session in the dshx registry.",
+        "Selecting a suggestion adds a prompt reference; it does not directly invoke the MCP tool."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "mcp-servers.autocomplete",
+          "featureFile": "tooling/dshx/e2e/features/mcp-servers.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "mcp-servers.mentions-unit-registry-boundary",
+          "file": "plugins/@dshfiles/mcp-servers/src/mcp-mentions.test.ts",
+          "testName": "decodes MCP tools without letting unrelated long descriptions hide them"
+        },
+        {
+          "kind": "unit-test",
+          "id": "mcp-servers.mentions-unit-candidate-sections",
+          "file": "plugins/@dshfiles/mcp-servers/src/mcp-mentions.test.ts",
+          "testName": "maps ranked MCP servers and tools into distinct @ sections"
+        },
+        {
+          "kind": "unit-test",
+          "id": "mcp-servers.mentions-unit-reference-serialization",
+          "file": "plugins/@dshfiles/mcp-servers/src/mcp-mentions.test.ts",
+          "testName": "serializes selected MCP entities as explicit, non-path prompt references"
+        }
+      ]
+    },
+    {
       "id": "registry-catalog",
       "title": "Search curated providers and the MCP Registry",
       "summary": "Browse curated provider documentation and search the official Registry while handling unavailable or malformed catalog responses safely.",

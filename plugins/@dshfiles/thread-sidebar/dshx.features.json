@@ -1082,6 +1082,49 @@
           "testName": "thread mention classifies Remote preflight errors without logging their messages"
         }
       ]
+    },
+    {
+      "id": "skill-mentions",
+      "title": "Find human-invocable skills from @ autocomplete",
+      "summary": "List the current Session's user-invocable skills in the @ menu and route selection through the existing /skill invocation.",
+      "reach": [
+        "click button \"All threads\"",
+        "click button \"New thread\"",
+        "press Escape",
+        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"@e2e-skill-mentions\"",
+        "click textbox \"Describe what you want to build, / commands, @ files or sessions\"",
+        "press End",
+        "press x",
+        "press Backspace",
+        "expect option \"e2e-skill-mentions*\""
+      ],
+      "surfaces": ["client", "host", "integration"],
+      "configuration": [],
+      "states": ["loading", "suggested", "selected", "unavailable"],
+      "failureModes": [
+        "Subagent Sessions do not receive human-invocable skill suggestions.",
+        "A selected skill uses the existing slash invocation rather than a new skill execution path."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "thread-sidebar.skill-mentions",
+          "featureFile": "tooling/dshx/e2e/features/thread-sidebar.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.skill-mentions-unit-candidate-mapping",
+          "file": "plugins/@dshfiles/thread-sidebar/src/skill-mention.test.ts",
+          "testName": "maps user-invocable skills to the @ group and marks user-only skills"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.skill-mentions-unit-slash-invocation",
+          "file": "plugins/@dshfiles/thread-sidebar/src/skill-mention.test.ts",
+          "testName": "routes a selected skill through the existing slash invocation"
+        }
+      ]
     }
   ],
   "kind": "bundle"

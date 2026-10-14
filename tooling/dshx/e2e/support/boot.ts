@@ -129,17 +129,20 @@ export const bootComposedPluginProfile = async ({
   profileLabel,
   timeoutMs = 90_000,
   additionalBundleIds = [],
+  seedHome,
 }: {
   readonly packageIds: readonly [string, ...string[]]
   readonly profileLabel: string
   readonly timeoutMs?: number
   readonly additionalBundleIds?: readonly string[]
+  readonly seedHome?: (homeRoot: string) => Promise<void>
 }): Promise<BootedProfile> => {
   const bundles = resolveLocalBundles(packageIds, await listLocalBootBundles())
   for (const bundle of bundles) await buildPlugin(bundle.projectRoot, bundle.packageId)
   const prepared = await prepareComposedBootProfile(bundles, { additionalBundleIds })
   const expectedClientEntries = bundles.filter(bundle => bundle.hasClient).map(bundle => bundle.packageId)
   try {
+    await seedHome?.(prepared.homeRoot)
     return await startScratchProfile(prepared, profileLabel, expectedClientEntries, timeoutMs)
   } catch (error) {
     await prepared.dispose()
