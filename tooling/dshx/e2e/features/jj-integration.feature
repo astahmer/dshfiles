@@ -29,3 +29,17 @@ Feature: jj thread workspaces
     Then Land refuses the placeholder description and leaves main in place
     When the thread workspace gains a revision described "Add the landed feature"
     Then Land moves main onto the work described "Add the landed feature"
+
+  @scenario:jj-integration.discard-browser-journey
+  Scenario: Discard a thread workspace and its work from the Thread workspaces panel
+    Given the isolated plugin composition "@dshfiles/jj-integration" and "@dshfiles/workspace-folder-picker" is booted
+    When a disposable jj repository is chosen as the New thread project
+    And the New thread workspace toggle is turned on
+    And a message is sent in the thread workspace
+    And the thread workspace gains a revision described "Work nobody wants"
+    And the Thread workspaces panel is opened
+    Then the thread row offers Land for its 1 unlanded revision
+    When "Discard with work" is chosen from the thread row's More menu
+    Then the confirmation names the thread and its 1 unlanded revision
+    When the discard is confirmed
+    Then the thread workspace is gone from jj and from the panel

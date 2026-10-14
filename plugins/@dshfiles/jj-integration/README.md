@@ -57,7 +57,8 @@ Every 10 minutes, a thread workspace whose threads are all archived and that
 holds no unlanded work is removed: `jj workspace forget`, its own empty
 revisions abandoned (no stray heads), its directory deleted, its registry entry
 dropped. A workspace with unlanded work is never removed automatically; the
-panel's **Discard with work** deletes it on request.
+**Discard with work** in its row's More menu deletes it after a confirmation
+that names how many revisions go with it.
 
 ## Agent tools
 

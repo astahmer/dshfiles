@@ -54,6 +54,14 @@ const workspaceNames = (repository: ThreadRepository): readonly string[] =>
     .map(line => line.slice(0, line.indexOf(':')))
     .sort()
 
+const provisionedThreadName = (page: Page): string => {
+  const threadName = provisionedThreads.get(page)
+  if (threadName === undefined) throw new Error('No thread workspace was provisioned from the New thread screen.')
+  return threadName
+}
+
+const threadRow = (page: Page) => page.getByRole('listitem').filter({ has: page.getByText(provisionedThreadName(page), { exact: true }) })
+
 const createRepository = async (page: Page): Promise<ThreadRepository> => {
   const temporaryRoot = await realpath(await mkdtemp(join(tmpdir(), 'dshx-jj-integration-e2e-')))
   const repositoryPath = join(temporaryRoot, 'repo')
@@ -153,9 +161,7 @@ When('a message is sent in the thread workspace', async ({ page }: { page: Page 
 
 When('the thread workspace gains a revision described {string}', async ({ page }: { page: Page }, description: string) => {
   const repository = repositoryFor(page)
-  const threadName = provisionedThreads.get(page)
-  if (threadName === undefined) throw new Error('No thread workspace was provisioned from the New thread screen.')
-  const threadPath = join(repository.threadsPath, threadName)
+  const threadPath = join(repository.threadsPath, provisionedThreadName(page))
   await writeFile(join(threadPath, 'feature.txt'), `${description}\n`)
   jjAt(threadPath, repository.temporaryRoot, ['describe', '--message', description])
   // The Land button reads the thread status once per mount; a reload stands in for the agent's next turn.
@@ -235,6 +241,47 @@ Then('Land moves main onto the work described {string}', async ({ page }: { page
     await expect(landedToast).toContainText('main is now at')
     await expect(landedToast).toContainText(`(${commitIdOf(repository, 'main').slice(0, 8)})`)
     expect(commitIdOf(repository, 'main-')).toBe(repository.baseCommitId)
+  })
+  await finishJourneyAssertions(page)
+})
+
+When('the Thread workspaces panel is opened', async ({ page }: { page: Page }) => {
+  await page.getByRole('button', { name: 'Thread workspaces', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Thread workspaces', exact: true })).toBeVisible()
+})
+
+Then('the thread row offers Land for its 1 unlanded revision', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'jj-integration-panel-offers-land-only-with-work', async () => {
+    await expect(threadRow(page).getByText('1 unlanded', { exact: true })).toBeVisible()
+    await expect(threadRow(page).getByRole('button', { name: 'Land', exact: true })).toBeVisible()
+    await expect(threadRow(page).getByRole('button', { name: 'Discard', exact: true })).toHaveCount(0)
+  })
+})
+
+When('{string} is chosen from the thread row\'s More menu', async ({ page }: { page: Page }, item: string) => {
+  await threadRow(page)
+    .getByRole('button', { name: `More actions for ${provisionedThreadName(page)}`, exact: true })
+    .click()
+  await page.getByRole('menuitem', { name: item, exact: true }).click()
+})
+
+Then('the confirmation names the thread and its 1 unlanded revision', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'jj-integration-discard-confirmation-names-the-revision-count', () =>
+    expect(page.getByRole('alertdialog').getByRole('heading')).toHaveText(`Discard ${provisionedThreadName(page)} and its 1 unlanded revision(s)?`),
+  )
+})
+
+When('the discard is confirmed', async ({ page }: { page: Page }) => {
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Discard with work', exact: true }).click()
+})
+
+Then('the thread workspace is gone from jj and from the panel', async ({ page }: { page: Page }) => {
+  const repository = repositoryFor(page)
+  await recordAssertion(page, 'jj-integration-discard-removes-the-thread-and-its-empty-card', async () => {
+    await expect(page.getByRole('alertdialog')).toHaveCount(0)
+    await expect.poll(() => workspaceNames(repository)).toEqual(['default'])
+    await expect(page.getByText(provisionedThreadName(page), { exact: true })).toHaveCount(0)
+    await expect(page.getByText(repository.repositoryPath, { exact: true })).toHaveCount(0)
   })
   await finishJourneyAssertions(page)
 })

@@ -145,6 +145,45 @@
           "testName": "brings the default checkout onto the landed bookmark with dshx checkout sync, keeping its local edits"
         }
       ]
+    },
+    {
+      "id": "thread-workspaces-panel",
+      "title": "Thread workspaces page",
+      "summary": "Sidebar page listing every project's thread workspaces with their unlanded revisions; Land shows only when a thread has work, and Discard sits in each row's More menu behind a confirmation that names the revision count.",
+      "reach": ["click button \"Thread workspaces\"", "expect heading \"Thread workspaces\""],
+      "configuration": [],
+      "surfaces": ["client", "host", "integration"],
+      "states": ["loading", "no-repositories", "no-threads", "unlanded", "up-to-date", "discard-confirming", "discard-failed"],
+      "failureModes": [
+        "Work that appears after the discard dialog opened is refused by the Host and never deleted unseen; the dialog asks for a refresh.",
+        "A Host error while discarding stays in the dialog with a retry."
+      ],
+      "externalDependencies": [
+        {
+          "id": "jj",
+          "boundary": "Fixed-argv jj CLI through the DSH subprocess service with a timeout.",
+          "deterministicFake": "Real temporary jj repositories in the browser journey; the discard confirmation flow is unit-tested against a fake client."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "jj-integration.discard-browser-journey",
+          "featureFile": "tooling/dshx/e2e/features/jj-integration.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.discard-confirmation",
+          "file": "plugins/@dshfiles/jj-integration/src/discard-machine.test.ts",
+          "testName": "forces the discard only when the dialog named unlanded revisions"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.discard-raced-work",
+          "file": "plugins/@dshfiles/jj-integration/src/discard-machine.test.ts",
+          "testName": "never retries once the Host reports work that appeared after the dialog opened"
+        }
+      ]
     }
   ]
 }

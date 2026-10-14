@@ -1,15 +1,28 @@
 import { getPaletteActions, subscribePaletteActions, type PaletteActionContext } from '@dshfiles/command-palette/api'
 import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@dshfiles/plugin-ui/components/ui/alert-dialog'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@dshfiles/plugin-ui/components/ui/card'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
+import { Skeleton } from '@dshfiles/plugin-ui/components/ui/skeleton'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
-import { RefreshCwIcon } from '@dshfiles/plugin-ui/icons'
+import { EllipsisIcon, RefreshCwIcon } from '@dshfiles/plugin-ui/icons'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useApi } from '@dshfiles/dshx/client'
 import { useState, useSyncExternalStore } from 'react'
 import { jjIntegrationApi, type ThreadView, type WorkspaceSyncView } from './api.js'
+import { useDiscardConfirmation } from './discard-machine.js'
 import { announceRepositoryChange, describeLandResult, useLandToast } from './land-feedback.js'
 import type { JjIntegrationTranslate } from './locales.js'
 
@@ -71,7 +84,7 @@ const ThreadRow = (props: {
   readonly bookmark: string
   readonly busy: boolean
   readonly onLand: () => void
-  readonly onDiscard: (force: boolean) => void
+  readonly onDiscard: () => void
 }): JSX.Element => {
   const { thread, t } = props
   const conflicted = thread.unlanded.some(revision => revision.conflict)
@@ -85,18 +98,25 @@ const ThreadRow = (props: {
         {conflicted ? <Badge variant="destructive">{t('conflict')}</Badge> : null}
         {thread.finished ? <Badge variant="outline">{t('finished')}</Badge> : null}
         {thread.missing ? <Badge variant="destructive">{t('missing')}</Badge> : null}
-        <span className="dshx:ml-auto dshx:flex dshx:gap-2">
-          <Button size="sm" disabled={props.busy || thread.missing} onClick={props.onLand}>
-            {props.busy ? t('landing') : t('land')}
-          </Button>
-          <Button size="sm" variant="outline" disabled={props.busy} onClick={() => props.onDiscard(false)}>
-            {t('discard')}
-          </Button>
+        <span className="dshx:ml-auto dshx:flex dshx:items-center dshx:gap-2">
           {thread.unlanded.length > 0 ? (
-            <Button size="sm" variant="destructive" disabled={props.busy} onClick={() => props.onDiscard(true)}>
-              {t('discardWork')}
+            <Button size="sm" disabled={props.busy || thread.missing} onClick={props.onLand}>
+              {props.busy ? <Spinner /> : null}
+              {props.busy ? t('landing') : t('land')}
             </Button>
           ) : null}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="icon-sm" variant="ghost" disabled={props.busy} aria-label={t('moreActions', { name: thread.name })}>
+                <EllipsisIcon />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem variant="destructive" onSelect={props.onDiscard}>
+                {thread.unlanded.length > 0 ? t('discardWork') : t('discard')}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </span>
       </div>
       {thread.unlanded.length > 0 ? (
@@ -111,6 +131,71 @@ const ThreadRow = (props: {
     </li>
   )
 }
+
+const DiscardDialog = (props: { readonly t: JjIntegrationTranslate; readonly confirmation: ReturnType<typeof useDiscardConfirmation> }): JSX.Element => {
+  const { t, confirmation } = props
+  const target = confirmation.target
+  const failure = confirmation.failure
+  return (
+    <AlertDialog
+      open={target !== null}
+      onOpenChange={open => {
+        if (!open && !confirmation.busy) confirmation.cancel()
+      }}
+    >
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>
+            {target === null
+              ? null
+              : target.unlandedCount > 0
+                ? t('discardWithWorkTitle', { name: target.name, count: target.unlandedCount })
+                : t('discardTitle', { name: target.name })}
+          </AlertDialogTitle>
+          <AlertDialogDescription>
+            {target !== null && target.unlandedCount > 0 ? t('discardWithWorkDescription', { count: target.unlandedCount }) : t('discardDescription')}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        {failure === null ? null : (
+          <Alert variant="destructive">
+            <AlertDescription>{failure.kind === 'has-work' ? t('hasWork') : (failure.message ?? t('discardFailed'))}</AlertDescription>
+          </Alert>
+        )}
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={confirmation.busy} onClick={confirmation.cancel}>
+            {t('cancel')}
+          </AlertDialogCancel>
+          {failure?.kind === 'has-work' ? null : (
+            <AlertDialogAction
+              disabled={confirmation.busy}
+              variant="destructive"
+              onClick={event => {
+                event.preventDefault()
+                confirmation.confirm()
+              }}
+            >
+              {confirmation.busy ? <Spinner /> : null}
+              {target !== null && target.unlandedCount > 0 ? t('discardWork') : t('discard')}
+            </AlertDialogAction>
+          )}
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  )
+}
+
+const PanelSkeleton = (): JSX.Element => (
+  <Card aria-hidden>
+    <CardHeader>
+      <Skeleton className="dshx:h-5 dshx:w-40" />
+      <Skeleton className="dshx:h-4 dshx:w-72" />
+    </CardHeader>
+    <CardContent className="dshx:flex dshx:flex-col dshx:gap-2">
+      <Skeleton className="dshx:h-12 dshx:w-full" />
+      <Skeleton className="dshx:h-12 dshx:w-full" />
+    </CardContent>
+  </Card>
+)
 
 export const ThreadWorkspacesPanel = (props: { readonly t: JjIntegrationTranslate; readonly bookmark: string }): JSX.Element => {
   const { t } = props
@@ -139,14 +224,14 @@ export const ThreadWorkspacesPanel = (props: { readonly t: JjIntegrationTranslat
     onError: error => setNotice({ tone: 'destructive', text: errorMessage(error, t('loadFailed')) }),
     onSettled: refreshAfterChange,
   })
-  const discard = useMutation({
-    mutationFn: (request: { readonly path: string; readonly force: boolean }) =>
-      runHostRequest({ timeoutMs: 120_000, request: signal => api.discard(request, { signal }) }),
-    onSuccess: result => setNotice(result.status === 'has-work' ? { tone: 'destructive', text: t('hasWork') } : null),
-    onError: error => setNotice({ tone: 'destructive', text: errorMessage(error, t('loadFailed')) }),
+  const discard = useDiscardConfirmation({
+    client: {
+      discard: (input, options) =>
+        runHostRequest({ signal: options.signal, timeoutMs: 120_000, request: hostSignal => api.discard(input, { signal: hostSignal }) }),
+    },
     onSettled: refreshAfterChange,
   })
-  const busyPath = land.isPending ? land.variables : discard.isPending ? discard.variables.path : undefined
+  const repositoriesWithThreads = repositories.data?.repositories.filter(repository => repository.threads.length > 0)
 
   return (
     <div className="dshx-root dshx:flex dshx:h-full dshx:flex-col dshx:gap-4 dshx:overflow-auto dshx:p-6">
@@ -172,34 +257,35 @@ export const ThreadWorkspacesPanel = (props: { readonly t: JjIntegrationTranslat
           <AlertDescription>{errorMessage(repositories.error, t('loadFailed'))}</AlertDescription>
         </Alert>
       ) : null}
+      {repositories.isPending ? <PanelSkeleton /> : null}
       {repositories.data?.repositories.length === 0 ? <p className="dshx:text-sm dshx:text-muted-foreground">{t('noRepositories')}</p> : null}
-      {repositories.data?.repositories.map(repository => (
+      {repositories.data !== undefined && repositories.data.repositories.length > 0 && repositoriesWithThreads?.length === 0 ? (
+        <p className="dshx:text-sm dshx:text-muted-foreground">{t('noThreads')}</p>
+      ) : null}
+      {repositoriesWithThreads?.map(repository => (
         <Card key={repository.repoRoot}>
           <CardHeader>
             <CardTitle>{repository.title}</CardTitle>
             <CardDescription className="dshx:font-mono">{repository.repoRoot}</CardDescription>
           </CardHeader>
           <CardContent>
-            {repository.threads.length === 0 ? (
-              <p className="dshx:text-sm dshx:text-muted-foreground">{t('noThreads')}</p>
-            ) : (
-              <ul className="dshx:flex dshx:flex-col dshx:gap-2">
-                {repository.threads.map(thread => (
-                  <ThreadRow
-                    key={thread.path}
-                    thread={thread}
-                    t={t}
-                    bookmark={props.bookmark}
-                    busy={busyPath === thread.path}
-                    onLand={() => land.mutate(thread.path)}
-                    onDiscard={force => discard.mutate({ force, path: thread.path })}
-                  />
-                ))}
-              </ul>
-            )}
+            <ul className="dshx:flex dshx:flex-col dshx:gap-2">
+              {repository.threads.map(thread => (
+                <ThreadRow
+                  key={thread.path}
+                  thread={thread}
+                  t={t}
+                  bookmark={props.bookmark}
+                  busy={land.isPending && land.variables === thread.path}
+                  onLand={() => land.mutate(thread.path)}
+                  onDiscard={() => discard.request({ path: thread.path, name: thread.name, unlandedCount: thread.unlanded.length })}
+                />
+              ))}
+            </ul>
           </CardContent>
         </Card>
       ))}
+      <DiscardDialog t={t} confirmation={discard} />
     </div>
   )
 }
