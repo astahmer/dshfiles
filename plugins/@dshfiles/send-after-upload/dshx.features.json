@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "send-after-upload",
+      "title": "Send when the attachment upload finishes",
+      "summary": "Enter, or a press on the disabled Send button, while a file attachment is still uploading queues the send behind a 'Sending when upload finishes\u2026' banner with Cancel. Editing the text or the attachments, Escape or Cancel drops it; it sends on its own once every upload is ready.",
+      "surfaces": ["client"],
+      "configuration": [],
+      "states": ["idle", "waiting", "sending", "failed"],
+      "failureModes": [
+        "A failed upload, or one still running after five minutes, leaves the message unsent with a notice instead of sending without the file.",
+        "A deferred send queues behind a running turn; it never steers."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "send-after-upload.queued-send",
+          "featureFile": "tooling/dshx/e2e/features/send-after-upload.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "send-after-upload.sends-when-ready",
+          "file": "plugins/@dshfiles/send-after-upload/src/pending-send-machine.test.ts",
+          "testName": "sends once the uploads finish"
+        },
+        {
+          "kind": "unit-test",
+          "id": "send-after-upload.edit-cancels",
+          "file": "plugins/@dshfiles/send-after-upload/src/pending-send-machine.test.ts",
+          "testName": "cancels when the text or the attachments change, and a later upload does not send"
+        },
+        {
+          "kind": "unit-test",
+          "id": "send-after-upload.cancel",
+          "file": "plugins/@dshfiles/send-after-upload/src/pending-send-machine.test.ts",
+          "testName": "cancels on Cancel or Escape"
+        },
+        {
+          "kind": "unit-test",
+          "id": "send-after-upload.failed-upload",
+          "file": "plugins/@dshfiles/send-after-upload/src/pending-send-machine.test.ts",
+          "testName": "reports a failed upload instead of sending, and can be dismissed"
+        }
+      ]
+    }
+  ]
+}

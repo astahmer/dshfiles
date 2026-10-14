@@ -1,0 +1,3 @@
+- insert:
+    - id: dshfiles-send-after-upload
+      name: '@dshfiles/send-after-upload'
