@@ -35,6 +35,15 @@ Out of scope: promoting facts into AGENTS.md or skills, reading `~/.agents`, mid
 
 `@dshfiles/memory` and `@dshfiles/optmem` both register `memory_search`; load one of them per profile.
 
+## Per-project roll-up (designed, not built)
+
+A roll-up would rewrite one short summary per project at most once a day, out of band, from what changed since the
+last run: the previous summary plus the digests and notes added since its watermark, in one cheap call (reasoning
+`off`), stored as a searchable item and never placed in the start block. It is not built because search does not need
+it yet: on the recall set in [`docs/benchmark.md`](docs/benchmark.md), BM25 alone finds every exact identifier and
+24 of 25 natural recall questions among 5,000 items. Its misses are paraphrases with no shared word, which a summary
+does not fix either; local embeddings recover some of them (see the retrieval experiment).
+
 ## Settings (`dshfiles-memory`)
 
 `enabled`, `crossProject` (true), `blockBytes` (1,600), `blockStaleDays` (90: never-cited threads older than this
