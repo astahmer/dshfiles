@@ -204,12 +204,32 @@
     {
       "id": "memory-tools",
       "title": "Search, read and note memory from any agent",
-      "summary": "memory_search ranks digests, valid notes and indexed messages (porter words plus trigram identifiers, BM25 fused by reciprocal rank, recency decay, project and note-type boosts); memory_read opens a digest, a note or a bounded raw excerpt; memory_note adds, supersedes (with a reason) or forgets (with a reason) notes typed user, feedback, project or reference. A `memory: <id>` citation in a reply counts as use.",
+      "summary": "memory_search ranks (BM25, or hybrid with a configured local embedding provider) digests, valid notes and indexed messages (porter words plus trigram identifiers, BM25 fused by reciprocal rank, recency decay, project and note-type boosts); memory_read opens a digest, a note or a bounded raw excerpt; memory_note adds, supersedes (with a reason) or forgets (with a reason) notes typed user, feedback, project or reference. A `memory: <id>` citation in a reply counts as use.",
       "surfaces": ["host", "tool", "storage"],
-      "configuration": [],
-      "states": ["no-hits", "hits", "excerpt", "note-added", "note-superseded", "note-forgotten", "cited"],
+      "configuration": [
+        {
+          "key": "retrieval",
+          "defaultValue": "bm25",
+          "constraints": "bm25 or hybrid; hybrid serves only while embeddingProvider loads, otherwise BM25 serves and the panel says why.",
+          "choices": ["bm25", "hybrid"],
+          "coveredBy": ["memory.retrieval-mode"]
+        },
+        {
+          "key": "embeddingProvider",
+          "defaultValue": "",
+          "constraints": "ES module path or package name whose default export createEmbedder() returns { model, embed(texts, kind) }; memory ships none.",
+          "coveredBy": ["memory.retrieval-mode"]
+        }
+      ],
+      "states": ["no-hits", "hits", "excerpt", "note-added", "note-superseded", "note-forgotten", "cited", "hybrid"],
       "failureModes": ["Tools report a clear error when memory is off or failed to start.", "An excerpt omits tool output that names a credential file."],
-      "externalDependencies": [],
+      "externalDependencies": [
+        {
+          "id": "embedding-provider",
+          "boundary": "Optional local embedding model loaded from the embeddingProvider module.",
+          "deterministicFake": "Tests pass a concept embedder that maps synonyms to the same direction; no model is downloaded."
+        }
+      ],
       "verification": [
         {
           "kind": "not-applicable",
@@ -245,6 +265,12 @@
           "id": "memory.note-tool",
           "file": "plugins/@dshfiles/memory/src/runtime.test.ts",
           "testName": "adds, supersedes and forgets notes through memory_note"
+        },
+        {
+          "kind": "unit-test",
+          "id": "memory.retrieval-mode",
+          "file": "plugins/@dshfiles/memory/src/runtime.test.ts",
+          "testName": "ranks with BM25 unless hybrid is asked for and an embedding provider loads"
         }
       ]
     },

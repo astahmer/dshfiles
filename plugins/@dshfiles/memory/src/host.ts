@@ -13,6 +13,7 @@ import type { SettingsScope } from '@dshfiles/dshx/settings'
 
 import { z } from 'zod'
 
+import { EmbeddingProviders, type MemoryEmbedder, type RetrievalStatus } from './embedder.ts'
 import { memoryApi, type MemoryUsage, type PanelNote, type PanelThread } from './api.ts'
 import { createMemoryRuntime, type MemoryRuntime, type MemoryServices } from './runtime.ts'
 import { memorySettings, type MemorySettings } from './settings.ts'
@@ -48,6 +49,8 @@ const effortOf = (effort: string): SummaryEffort | undefined =>
 
 const textOf = (blocks: readonly { readonly type: string; readonly text?: string }[]): string =>
   blocks.flatMap(block => (block.type === 'text' && block.text !== undefined ? [block.text] : [])).join('\n')
+
+const embedders = new Map<string, Promise<MemoryEmbedder>>()
 
 const hostServices = (ctx: Context): MemoryServices => {
   const sessionQuery = () => {
@@ -129,6 +132,13 @@ const hostServices = (ctx: Context): MemoryServices => {
       }
       throw new Error('the digest route rejected every reasoning effort')
     },
+    embedder: specifier => {
+      const loaded = embedders.get(specifier) ?? EmbeddingProviders.load(specifier)
+      embedders.set(specifier, loaded)
+      // A provider that failed to load is retried on the next search instead of staying broken until restart.
+      loaded.catch(() => embedders.delete(specifier))
+      return loaded
+    },
     jevKey: () => {
       const key = process.env['TYPESAFE_API_KEY']
       return key === undefined || key.length === 0 ? undefined : key
@@ -136,8 +146,14 @@ const hostServices = (ctx: Context): MemoryServices => {
   }
 }
 
-const usage = (): MemoryUsage => {
-  const base = { state: currentSettings().enabled ? (failure === null ? 'ready' : 'failed') : 'off', failure } as const
+const bm25Only: RetrievalStatus = { requested: 'bm25', active: 'bm25', model: null, reason: null }
+
+const usage = async (): Promise<MemoryUsage> => {
+  const base = {
+    state: currentSettings().enabled ? (failure === null ? 'ready' : 'failed') : 'off',
+    failure,
+    retrieval: runtime === undefined ? bm25Only : await runtime.retrievalStatus(),
+  } as const
   if (!store)
     return {
       ...base,

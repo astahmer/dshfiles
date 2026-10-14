@@ -57,6 +57,17 @@ export const memorySettings = defineSettings({
         "Ask TypeSafe's Jev classifier which user messages carry a durable signal and whether a new thread likely needs memory. Needs TYPESAFE_API_KEY in the Host environment; any failure falls back to the heuristics.",
       ),
     jevThreshold: Schema.number().min(0).max(1).step(0.05).default(0.5).description('Jev probability above which a message counts as a signal.'),
+    retrieval: Schema.union([
+      Schema.const('bm25').description('BM25: full-text (word stems and identifier substrings)'),
+      Schema.const('hybrid').description('Hybrid: BM25 fused with a local embedding model (needs embeddingProvider)'),
+    ])
+      .default('bm25')
+      .description('How memory_search ranks. Hybrid only runs when embeddingProvider loads; otherwise BM25 serves and the Memory panel says why.'),
+    embeddingProvider: Schema.string()
+      .default('')
+      .description(
+        'ES module (absolute path or package name) whose default export createEmbedder() returns { model, embed(texts, kind) }. Memory ships no model; see the README.',
+      ),
     retentionDays: Schema.natural()
       .min(0)
       .max(3_650)

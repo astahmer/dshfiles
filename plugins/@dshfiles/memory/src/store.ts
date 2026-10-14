@@ -550,6 +550,26 @@ export const openMemoryStore = (options: { readonly path: string; readonly now?:
       .run(input.kind, input.ref, input.model, input.project, now(), new Uint8Array(input.vector.buffer, input.vector.byteOffset, input.vector.byteLength))
   }
 
+  /** Digests and valid notes that have no vector for `model` yet, oldest first. */
+  const missingEmbeddings = (input: { readonly model: string; readonly limit: number }) => [
+    ...database
+      .prepare(
+        `select t.id ref, t.project, t.title || char(10) || t.digest text from threads t
+         left join embeddings e on e.kind = 'thread' and e.ref = t.id and e.model = ?
+         where t.duplicate_of is null and e.ref is null order by t.updated_at limit ?`,
+      )
+      .all(input.model, input.limit)
+      .map(row => ({ kind: 'thread' as const, ref: String(row['ref']), project: String(row['project']), text: String(row['text']) })),
+    ...database
+      .prepare(
+        `select n.id ref, n.project, n.text from notes n
+         left join embeddings e on e.kind = 'note' and e.ref = cast(n.id as text) and e.model = ?
+         where n.valid = 1 and e.ref is null order by n.created_at limit ?`,
+      )
+      .all(input.model, input.limit)
+      .map(row => ({ kind: 'note' as const, ref: String(row['ref']), project: String(row['project']), text: String(row['text']) })),
+  ]
+
   const search = (request: SearchRequest): readonly SearchHit[] => {
     const ranker = request.ranker ?? 'bm25'
     const projectFilter = request.projects.length === 0 ? undefined : new Set(request.projects)
@@ -853,6 +873,7 @@ export const openMemoryStore = (options: { readonly path: string; readonly now?:
     indexMessages,
     indexedThrough,
     putEmbedding,
+    missingEmbeddings,
     search,
     recordUse,
     listNotes,

@@ -7,6 +7,7 @@ import { Utf8 } from '@dshfiles/optmem-core'
 import { renderStartBlock } from './block.ts'
 import { readThread, redact, shortId, type Signal, type ThreadHeader } from './digest.ts'
 import { MemoryGuidance } from './guidance.ts'
+import type { MemoryEmbedder, RetrievalStatus } from './embedder.ts'
 import { JevClassifier } from './jev.ts'
 import type { MemorySettings } from './settings.ts'
 import type { MemoryStore, NoteCategory, SearchHit } from './store.ts'
@@ -19,6 +20,8 @@ export type MemoryServices = {
   /** One cheap-model call on the thread's route (reasoning off by default); rejects when no route is offered. */
   readonly summarize: (request: { readonly conversationId: string; readonly system: string; readonly input: string }) => Promise<{ readonly text: string }>
   readonly jevKey: () => string | undefined
+  /** The configured embedding provider, loaded once per specifier; rejects when it cannot load. */
+  readonly embedder: (specifier: string) => Promise<MemoryEmbedder>
   readonly fetch?: typeof fetch | undefined
 }
 
@@ -115,6 +118,54 @@ export const createMemoryRuntime = (options: {
     return signals
   }
 
+  /** Which ranker serves now: hybrid only when it was asked for and the embedding provider loads. */
+  const retrieval = async (): Promise<{ readonly embedder: MemoryEmbedder | undefined; readonly status: RetrievalStatus }> => {
+    const settings = options.settings()
+    const specifier = settings.embeddingProvider.trim()
+    if (settings.retrieval === 'bm25') return { embedder: undefined, status: { requested: 'bm25', active: 'bm25', model: null, reason: null } }
+    if (specifier === '')
+      return { embedder: undefined, status: { requested: 'hybrid', active: 'bm25', model: null, reason: 'no embeddingProvider is configured' } }
+    try {
+      const embedder = await services.embedder(specifier)
+      return { embedder, status: { requested: 'hybrid', active: 'hybrid', model: embedder.model, reason: null } }
+    } catch (error) {
+      return {
+        embedder: undefined,
+        status: { requested: 'hybrid', active: 'bm25', model: null, reason: error instanceof Error ? error.message : String(error) },
+      }
+    }
+  }
+
+  let embedding: Promise<number> | undefined
+  /** Embeds a bounded batch of digests and notes that have no vector for the active model yet. */
+  const embedMissing = (limit = 64): Promise<number> => {
+    embedding ??= (async () => {
+      const { embedder } = await retrieval()
+      if (embedder === undefined) return 0
+      const documents = store.missingEmbeddings({ model: embedder.model, limit })
+      for (let index = 0; index < documents.length; index += 16) {
+        const batch = documents.slice(index, index + 16)
+        const vectors = await embedder.embed(
+          batch.map(document => document.text),
+          'document',
+        )
+        batch.forEach((document, row) => {
+          const vector = vectors[row]
+          if (vector !== undefined) store.putEmbedding({ kind: document.kind, ref: document.ref, project: document.project, model: embedder.model, vector })
+        })
+      }
+      return documents.length
+    })()
+      .catch((error: unknown) => {
+        logger.warn('memory: embedding memory failed, BM25 still serves: %s', error instanceof Error ? error.message : String(error))
+        return 0
+      })
+      .finally(() => {
+        embedding = undefined
+      })
+    return embedding
+  }
+
   /** Builds or refreshes one thread's digest and message index. Never runs while the thread has a turn in flight. */
   const digestThread = async (sessionId: string): Promise<string> => {
     const log = await services.readSession(sessionId)
@@ -151,7 +202,9 @@ export const createMemoryRuntime = (options: {
         logger.warn('memory: no model digest for %s, keeping the deterministic one: %s', sessionId, error instanceof Error ? error.message : String(error))
       }
     }
-    return store.putThread(digest).stored
+    const stored = store.putThread(digest).stored
+    void embedMissing()
+    return stored
   }
 
   const scheduleDigest = (sessionId: string): void => {
@@ -286,7 +339,24 @@ export const createMemoryRuntime = (options: {
     const projectsFilter =
       wanted !== undefined && wanted.length > 0 && wanted !== 'all' ? [wanted === 'current' ? own : wanted] : options.settings().crossProject ? [] : [own]
     const limit = Math.max(1, Math.min(args.limit ?? 6, 20))
-    const hits = store.search({ query: args.query, projects: projectsFilter, ownProject: own, limit })
+    const { embedder } = await retrieval()
+    const queryVector =
+      embedder === undefined
+        ? undefined
+        : await embedder
+            .embed([args.query], 'query')
+            .then(vectors => vectors[0])
+            .catch(() => undefined)
+    if (embedder !== undefined) void embedMissing()
+    const hits = store.search({
+      query: args.query,
+      projects: projectsFilter,
+      ownProject: own,
+      limit,
+      ranker: queryVector === undefined ? 'bm25' : 'hybrid',
+      queryVector,
+      embeddingModel: embedder?.model,
+    })
     const lines: string[] = []
     for (const hit of hits) {
       const where = hit.project === own ? '' : `, ${basename(hit.project)}`
@@ -411,6 +481,7 @@ export const createMemoryRuntime = (options: {
         confidence: args.confidence ?? 'stated',
         ...provenance,
       })
+      void embedMissing()
       return saved.duplicate ? `Already noted as n:${saved.note.id}.` : `Saved n:${saved.note.id}. It appears in the start block of later threads.`
     }
     const id = Number(String(args.id ?? '').replace(/^n:/i, ''))
@@ -427,6 +498,7 @@ export const createMemoryRuntime = (options: {
       scope: args.scope,
       confidence: args.confidence,
     })
+    void embedMissing()
     return replacement === undefined ? `No valid note n:${id}.` : `n:${id} is superseded by n:${replacement.id}.`
   }
 
@@ -459,6 +531,8 @@ export const createMemoryRuntime = (options: {
       idleTimers.clear()
     },
     pendingDigests: (): number => idleTimers.size + digesting.size,
+    retrievalStatus: async (): Promise<RetrievalStatus> => (await retrieval()).status,
+    embedMissing,
   }
 }
 

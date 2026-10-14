@@ -35,6 +35,39 @@ Out of scope: promoting facts into AGENTS.md or skills, reading `~/.agents`, mid
 
 `@dshfiles/memory` and `@dshfiles/optmem` both register `memory_search`; load one of them per profile.
 
+## Retrieval: BM25 by default, hybrid with your own embedder
+
+`retrieval: 'bm25'` (default) ranks with FTS5 only. `retrieval: 'hybrid'` fuses BM25 with vector similarity by
+reciprocal rank, but only when `embeddingProvider` loads; otherwise BM25 serves and the Memory panel's header says why.
+Memory ships no model and no embedding dependency. A provider is any ES module whose default export returns
+`{ model, embed(texts, kind) }` (`src/embedder.ts`): one unit-length `Float32Array` per text; `kind` is `query` or
+`document`. Digests and notes are embedded in bounded batches after each digest, note and search; vectors are stored per
+model, so switching models re-embeds. For example, with `@huggingface/transformers` installed where the module can
+resolve it:
+
+```js
+// ~/.dsh/memory-embedder.mjs → embeddingProvider: "/Users/me/.dsh/memory-embedder.mjs"
+import { pipeline } from '@huggingface/transformers'
+
+export default async function createEmbedder() {
+  const extract = await pipeline('feature-extraction', 'Xenova/bge-small-en-v1.5', { dtype: 'q8' })
+  const prefix = { query: 'Represent this sentence for searching relevant passages: ', document: '' }
+  return {
+    model: 'bge-small-en-v1.5-q8',
+    embed: async (texts, kind) => {
+      const output = await extract(
+        texts.map(text => prefix[kind] + text),
+        { pooling: 'cls', normalize: true },
+      )
+      const size = output.dims.at(-1)
+      return texts.map((_, row) => output.data.slice(row * size, (row + 1) * size))
+    },
+  }
+}
+```
+
+The [benchmark](docs/benchmark.md#retrieval-bm25-vs-local-embeddings-vs-hybrid) is why BM25 is the default.
+
 ## Per-project roll-up (designed, not built)
 
 A roll-up would rewrite one short summary per project at most once a day, out of band, from what changed since the
@@ -48,7 +81,8 @@ does not fix either; local embeddings recover some of them (see the retrieval ex
 
 `enabled`, `crossProject` (true), `blockBytes` (1,600), `blockStaleDays` (90: never-cited threads older than this
 leave the block), `idleMs` (60,000), `summarizerProvider` / `summarizerModel` / `summarizerEffort` (`off`),
-`cheapModels`, `jevEnabled` (false), `jevThreshold` (0.5), `retentionDays` (365; notes stay until forgotten).
+`cheapModels`, `jevEnabled` (false), `jevThreshold` (0.5), `retrieval` (`bm25`; or `hybrid`), `embeddingProvider` (empty),
+`retentionDays` (365; notes stay until forgotten).
 
 ## Develop
 

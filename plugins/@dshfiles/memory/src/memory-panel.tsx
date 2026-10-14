@@ -440,6 +440,15 @@ export const MemoryPanel = (props: { readonly openThread: OpenThread }): JSX.Ele
       <Tabs defaultValue="notes" className="dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col">
         <header className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-3 dshx:border-b dshx:border-border dshx:px-4 dshx:py-3">
           <h2 className="dshx:text-base dshx:font-semibold">Memory</h2>
+          {usage.data === undefined ? null : (
+            <Badge variant="outline" title={usage.data.retrieval.reason ?? undefined}>
+              {usage.data.retrieval.active === 'hybrid'
+                ? `Retrieval: hybrid (${usage.data.retrieval.model ?? 'embeddings'})`
+                : usage.data.retrieval.requested === 'hybrid'
+                  ? 'Retrieval: BM25 (hybrid unavailable)'
+                  : 'Retrieval: BM25'}
+            </Badge>
+          )}
           <select aria-label="Memory project" className={selectClass} value={project} onChange={event => setProject(event.currentTarget.value)}>
             <option value="">All projects</option>
             {(projects.data ?? []).map(item => (

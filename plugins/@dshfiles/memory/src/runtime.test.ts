@@ -6,6 +6,7 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { createMemoryRuntime, type Caller, type SessionLog } from './runtime.ts'
+import type { MemoryEmbedder } from './embedder.ts'
 import { memorySettings, type MemorySettings } from './settings.ts'
 import { openMemoryStore } from './store.ts'
 import { createThread } from './testing/session-fixture.ts'
@@ -21,7 +22,19 @@ afterEach(() => {
 
 const settings = (overrides: Partial<MemorySettings> = {}): MemorySettings => ({ ...memorySettings.schema({}), idleMs: 1_000, ...overrides })
 
-const setup = (overrides: Partial<MemorySettings> = {}) => {
+/** Stand-in for a local embedding model: texts naming the same concept, in any wording, get the same direction. */
+const conceptEmbedder: MemoryEmbedder = {
+  model: 'concepts-v1',
+  embed: async texts =>
+    texts.map(text => {
+      const concepts = [/rebalanc|reshuffl/i, /consumer|reader/i, /coordinator|leader/i]
+      const vector = Float32Array.from(concepts.map(pattern => (pattern.test(text) ? 1 : 0)))
+      const norm = Math.hypot(...vector) || 1
+      return vector.map(value => value / norm)
+    }),
+}
+
+const setup = (overrides: Partial<MemorySettings> = {}, embedder?: MemoryEmbedder) => {
   const logs = new Map<string, SessionLog>()
   const summaries: string[] = []
   const store = openMemoryStore({ path: join(root, 'memory.db') })
@@ -43,6 +56,10 @@ const setup = (overrides: Partial<MemorySettings> = {}) => {
         }
       },
       jevKey: () => undefined,
+      embedder: async specifier => {
+        if (embedder === undefined) throw new Error(`cannot load ${specifier}`)
+        return embedder
+      },
     },
   })
   const caller = (id: string, cwd = root, origin?: 'subagent'): Caller => ({
@@ -177,5 +194,29 @@ describe('memory runtime', () => {
     expect(store.thread('session-hello')).toBeUndefined()
     expect(store.thread('session-33333333')).toBeDefined()
     expect(await runtime.catchUp(10)).toBe(0)
+  })
+
+  it('ranks with BM25 unless hybrid is asked for and an embedding provider loads', async () => {
+    const thread = createThread({ id: 'session-44444444', cwd: root })
+    thread.exchange(
+      'Why did the consumer group rebalance storm happen after the coordinator restart?',
+      'Every config push restarted the coordinators, so consumers kept rebalancing; pushes now reload in place.',
+    )
+    thread.exchange('Ship the fix to staging first.', 'Deployed to staging; the rebalance storm no longer happens on a config push.')
+    const query = 'readers were reshuffling whenever the leader bounced'
+
+    const plain = setup({ retrieval: 'hybrid' })
+    plain.logs.set(thread.header.id, thread.log())
+    await plain.runtime.digest(thread.header.id)
+    expect(await plain.runtime.retrievalStatus()).toEqual({ requested: 'hybrid', active: 'bm25', model: null, reason: 'no embeddingProvider is configured' })
+    expect(await plain.runtime.search(plain.caller('session-reader'), { query })).toContain('No memory matches')
+    plain.store.close()
+
+    const hybrid = setup({ retrieval: 'hybrid', embeddingProvider: '/opt/embedders/concepts.mjs' }, conceptEmbedder)
+    hybrid.logs.set(thread.header.id, thread.log())
+    await hybrid.runtime.digest(thread.header.id)
+    await hybrid.runtime.embedMissing()
+    expect(await hybrid.runtime.retrievalStatus()).toEqual({ requested: 'hybrid', active: 'hybrid', model: 'concepts-v1', reason: null })
+    expect(await hybrid.runtime.search(hybrid.caller('session-reader'), { query })).toContain('t:44444444')
   })
 })

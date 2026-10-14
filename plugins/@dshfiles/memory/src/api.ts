@@ -1,9 +1,13 @@
 import { defineApi, method } from '@dshfiles/dshx/api'
 
+import type { RetrievalStatus } from './embedder.ts'
+
 /** What the panel shows about whether memory earns its keep. Counters are local and never leave the machine. */
 export type MemoryUsage = {
   readonly state: 'off' | 'ready' | 'failed'
   readonly failure: string | null
+  /** Which ranker memory_search uses now, and why hybrid fell back to BM25 when it did. */
+  readonly retrieval: RetrievalStatus
   readonly threads: number
   readonly notes: number
   readonly indexedMessages: number
