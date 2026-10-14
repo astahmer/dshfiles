@@ -3,6 +3,7 @@ import { spawnSync } from 'node:child_process'
 import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { After, Then, When } from '../bdd.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
 
@@ -18,6 +19,14 @@ const repositories = new WeakMap<Page, ThreadRepository>()
 /** The thread workspace the New thread screen last provisioned; a started thread's header no longer names it. */
 const provisionedThreads = new WeakMap<Page, string>()
 const newThreadComposerName = 'Describe what you want to build, / commands, @ files or sessions'
+const attachmentFixtures = fileURLToPath(new URL('../../fixtures/attachments/', import.meta.url))
+const newThreadComposer = (page: Page) => page.getByRole('textbox', { name: newThreadComposerName, exact: true })
+const removeComposerAttachment = (page: Page, name: string) => page.getByRole('button', { name, exact: true })
+const expectDraftAndAttachments = async (page: Page, text: string): Promise<void> => {
+  await expect(newThreadComposer(page)).toHaveText(text)
+  await expect(removeComposerAttachment(page, 'Remove image red.png')).toBeVisible()
+  await expect(removeComposerAttachment(page, 'Remove file note.txt')).toBeVisible()
+}
 
 const jjAt = (cwd: string, home: string, args: readonly string[]): string => {
   const result = spawnSync(process.env.JJ_TEST_EXECUTABLE ?? 'jj', ['--color=never', '--no-pager', ...args], {
@@ -132,6 +141,29 @@ When('a disposable jj repository is chosen as the New thread project', async ({ 
   const repository = await createRepository(page)
   await chooseProjectPath(page, repository.repositoryPath)
   await expect(projectButton(page)).toHaveText('repo')
+})
+
+When('the New thread composer has a draft {string} with an image and a file attached', async ({ page }: { page: Page }, text: string) => {
+  await newThreadComposer(page).fill(text)
+  await page.locator('[data-composer-card] input[type="file"]').setInputFiles([join(attachmentFixtures, 'red.png'), join(attachmentFixtures, 'note.txt')])
+  await expect(removeComposerAttachment(page, 'Remove image red.png')).toBeVisible()
+  await expect(removeComposerAttachment(page, 'Remove file note.txt')).toBeVisible()
+})
+
+Then('the composer keeps draft {string} with its image and file in the isolated workspace', async ({ page }: { page: Page }, text: string) => {
+  await recordAssertion(page, 'jj-integration-isolated-draft-keeps-attachments', () => expectDraftAndAttachments(page, text))
+})
+
+Then('the composer keeps draft {string} with its image and file in the shared checkout', async ({ page }: { page: Page }, text: string) => {
+  await recordAssertion(page, 'jj-integration-shared-draft-keeps-attachments', () => expectDraftAndAttachments(page, text))
+})
+
+When('the New thread composer draft is cleared', async ({ page }: { page: Page }) => {
+  await newThreadComposer(page).fill('')
+  await removeComposerAttachment(page, 'Remove image red.png').click()
+  await removeComposerAttachment(page, 'Remove file note.txt').click()
+  await expect(removeComposerAttachment(page, 'Remove image red.png')).toHaveCount(0)
+  await expect(removeComposerAttachment(page, 'Remove file note.txt')).toHaveCount(0)
 })
 
 When('the New thread workspace toggle is turned on', async ({ page }: { page: Page }) => {
@@ -263,20 +295,22 @@ Then('the destination bar offers the main bookmark in the shared checkout', asyn
 Then('the New thread runs in its own jj workspace on {string}', async ({ page }: { page: Page }, bookmark: string) => {
   const repository = repositoryFor(page)
   const threadName = await currentThreadName(page)
+  const expectedWorkspaceNames = [...new Set(['default', provisionedThreadName(page), threadName])].sort()
   const expectedParent = bookmark === 'release' ? repository.releaseCommitId : repository.baseCommitId
   await recordAssertion(page, `jj-integration-isolated-thread-starts-on-${bookmark}`, async () => {
     await expect(workspaceToggle(page)).toBeChecked()
     await expect(page.getByRole('button', { name: bookmark, exact: true })).toBeVisible()
-    await expect.poll(() => workspaceNames(repository)).toEqual(['default', threadName])
+    await expect.poll(() => workspaceNames(repository)).toEqual(expectedWorkspaceNames)
     expect(commitIdOf(repository, `${threadName}@-`)).toBe(expectedParent)
   })
 })
 
-Then('the blank thread returns to the shared checkout and its workspace is discarded', async ({ page }: { page: Page }) => {
+Then('the blank thread returns to the shared checkout and its workspace is kept as a spare', async ({ page }: { page: Page }) => {
   const repository = repositoryFor(page)
-  await recordAssertion(page, 'jj-integration-leaving-an-isolated-blank-thread-discards-it', async () => {
+  const threadName = provisionedThreadName(page)
+  await recordAssertion(page, 'jj-integration-spare-kept-on-toggle', async () => {
     await expect(workspaceToggle(page)).not.toBeChecked()
-    await expect.poll(() => workspaceNames(repository)).toEqual(['default'])
+    await expect.poll(() => workspaceNames(repository)).toEqual(['default', threadName])
   })
 })
 

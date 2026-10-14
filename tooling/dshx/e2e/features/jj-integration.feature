@@ -6,13 +6,17 @@ Feature: jj thread workspaces
 
   @scenario:jj-integration.destination-browser-journey
   Scenario: Choose where a new thread runs from the destination bar
-    Given the isolated plugin composition "@dshfiles/jj-integration" and "@dshfiles/workspace-folder-picker" is booted
+    Given the isolated plugin composition of "@dshfiles/jj-integration, @dshfiles/workspace-folder-picker, @dshfiles/multi-host" is booted
     When a disposable jj repository is chosen as the New thread project
     Then the destination bar offers the main bookmark in the shared checkout
-    When the New thread workspace toggle is turned on
+    When the New thread composer has a draft "Keep this draft" with an image and a file attached
+    And the New thread workspace toggle is turned on
     Then the New thread runs in its own jj workspace on "main"
+    And the composer keeps draft "Keep this draft" with its image and file in the isolated workspace
     When the New thread workspace toggle is turned off
-    Then the blank thread returns to the shared checkout and its workspace is discarded
+    Then the blank thread returns to the shared checkout and its workspace is kept as a spare
+    And the composer keeps draft "Keep this draft" with its image and file in the shared checkout
+    When the New thread composer draft is cleared
     When the "release" bookmark is picked in the destination bar
     Then the New thread runs in its own jj workspace on "release"
     When No folder is chosen as the New thread project
@@ -20,7 +24,7 @@ Feature: jj thread workspaces
 
   @scenario:jj-integration.new-thread-background-browser-journey
   Scenario: New thread opens its composer at once and gets its own workspace in the background
-    Given the isolated plugin composition of "@dshfiles/jj-integration, @dshfiles/workspace-folder-picker, @dshfiles/home, @dshfiles/thread-sidebar" is booted
+    Given the isolated plugin composition of "@dshfiles/jj-integration, @dshfiles/workspace-folder-picker, @dshfiles/home, @dshfiles/thread-sidebar, @dshfiles/multi-host" is booted
     When a disposable jj repository is chosen as the New thread project
     And a first message is sent from the shared checkout
     And new threads start in their own jj workspace by default
@@ -30,7 +34,7 @@ Feature: jj thread workspaces
 
   @scenario:jj-integration.draft-handoff-browser-journey
   Scenario: Switching the thread destination carries the draft without leaving a stale copy
-    Given the isolated plugin composition of "@dshfiles/jj-integration, @dshfiles/workspace-folder-picker, @dshfiles/home, @dshfiles/thread-sidebar" is booted
+    Given the isolated plugin composition of "@dshfiles/jj-integration, @dshfiles/workspace-folder-picker, @dshfiles/home, @dshfiles/thread-sidebar, @dshfiles/multi-host" is booted
     When a disposable jj repository is chosen as the New thread project
     And "Draft handoff regression" is typed in the New thread composer
     And the New thread workspace toggle is turned on
@@ -45,7 +49,7 @@ Feature: jj thread workspaces
 
   @scenario:jj-integration.land-browser-journey
   Scenario: Land a thread's described work onto main
-    Given the isolated plugin composition "@dshfiles/jj-integration" and "@dshfiles/workspace-folder-picker" is booted
+    Given the isolated plugin composition of "@dshfiles/jj-integration, @dshfiles/workspace-folder-picker, @dshfiles/multi-host" is booted
     When a disposable jj repository is chosen as the New thread project
     And the New thread workspace toggle is turned on
     And a message is sent in the thread workspace
@@ -57,7 +61,7 @@ Feature: jj thread workspaces
 
   @scenario:jj-integration.discard-browser-journey
   Scenario: Discard a thread workspace and its work from the Thread workspaces panel
-    Given the isolated plugin composition "@dshfiles/jj-integration" and "@dshfiles/workspace-folder-picker" is booted
+    Given the isolated plugin composition of "@dshfiles/jj-integration, @dshfiles/workspace-folder-picker, @dshfiles/multi-host" is booted
     When a disposable jj repository is chosen as the New thread project
     And the New thread workspace toggle is turned on
     And a message is sent in the thread workspace
