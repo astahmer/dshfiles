@@ -1,6 +1,6 @@
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from '@dshfiles/plugin-ui/components/ui/context-menu'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
-import { ChevronDownIcon, MessageSquareIcon, PanelsTopLeftIcon, PinIcon, XIcon } from '@dshfiles/plugin-ui/icons'
+import { ChevronDownIcon, PinIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactElement } from 'react'
 import type { MainTabsTranslate } from './locales.js'
@@ -41,16 +41,27 @@ const statusDotClass = {
 
 const statusLabel = { running: 'running', needsYou: 'needsYou', unread: 'unread' } as const satisfies Record<TabStatus, string>
 
-const TabIcon = (props: { readonly kind: TabView['kind'] }): ReactElement =>
-  props.kind === 'thread' ? (
-    <MessageSquareIcon aria-hidden size={14} className="dshx:shrink-0" />
-  ) : (
-    <PanelsTopLeftIcon aria-hidden size={14} className="dshx:shrink-0" />
-  )
+/** DSH's dock-kit strip close glyph (`dsh-client-ui-dockkit`): a 1px cross on a 16px grid, drawn at 14px. */
+const CloseGlyph = (): ReactElement => (
+  <svg aria-hidden width={14} height={14} viewBox="0 0 16 16" fill="none" strokeWidth={1}>
+    <path d="M3.5 3.5L12.5 12.5" stroke="currentColor" />
+    <path d="M12.5 3.5L3.5 12.5" stroke="currentColor" />
+  </svg>
+)
+
+
+/** The 2px caret the dock-kit strip draws where a dragged tab will land. */
+const DROP_CARET =
+  "dshx:before:absolute dshx:before:top-1 dshx:before:-left-1.5 dshx:before:h-5 dshx:before:w-0.5 dshx:before:bg-(--dsw-alias-brand-primary-new-colorprimary-new-color) dshx:before:content-['']"
+
+/** Square 28px strip buttons, as the dock-kit `iconButton`. */
+const STRIP_BUTTON =
+  'dshx:flex dshx:size-7 dshx:flex-none dshx:cursor-pointer dshx:items-center dshx:justify-center dshx:rounded-(--dsw-radius-sm) dshx:text-muted-foreground dshx:outline-none dshx:hover:bg-accent dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring'
 
 /**
- * The tab row above the main view. Rendering only: the tabs machine owns order, pins, preview and the active tab;
- * this keeps DOM-only state (drop target, overflow measurement) and sends what the user did.
+ * The tab row above the main view, styled after DSH's own dock-kit strip (the right panel's tabs): 28px pills on the
+ * panel background, a hairline between inactive neighbours and the close cross over a faded title end. Rendering only: the tabs machine owns order, pins, preview and the active tab; this keeps DOM-only state
+ * (drop target, overflow measurement) and sends what the user did.
  */
 export const TabStrip = (props: TabStripProps): ReactElement => {
   const { tabs, send, t } = props
@@ -100,18 +111,24 @@ export const TabStrip = (props: TabStripProps): ReactElement => {
     }
   }
 
+  const dropAtEnd = (): void => {
+    const tabId = dragged.current
+    if (tabId !== null) send({ type: 'tab.move', tabId, toIndex: tabs.length - 1 })
+    setDropIndex(null)
+  }
+
   return (
     <div
-      className="dshx-root dshx:flex dshx:h-9 dshx:shrink-0 dshx:items-stretch dshx:border-b dshx:border-border dshx:bg-muted/50 dshx:text-sm"
+      className="dshx-root dshx:flex dshx:h-[38px] dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:bg-background dshx:pt-2.5 dshx:pr-1.5 dshx:text-[length:var(--dsh-content-font-size-secondary,13px)]"
       data-window-drag=""
-      style={{ paddingInlineStart: 'var(--dsh-frame-leading-clearance, 0px)' }}
+      style={{ paddingInlineStart: 'calc(var(--dsh-frame-leading-clearance, 0px) + 10px)' }}
     >
       <div
         ref={scroller}
         role="tablist"
         aria-label={t('stripLabel')}
         aria-orientation="horizontal"
-        className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:items-stretch dshx:overflow-x-auto dshx:overflow-y-hidden dshx:[scrollbar-width:none] dshx:[&::-webkit-scrollbar]:hidden"
+        className="dshx:flex dshx:min-w-0 dshx:flex-[0_1_auto] dshx:items-center dshx:overflow-x-auto dshx:overflow-y-hidden dshx:[scrollbar-width:none] dshx:[&::-webkit-scrollbar]:hidden"
         onWheel={event => {
           if (event.deltaY === 0 || scroller.current === null) return
           scroller.current.scrollLeft += event.deltaY
@@ -122,8 +139,18 @@ export const TabStrip = (props: TabStripProps): ReactElement => {
       >
         {tabs.map((tab, index) => {
           const label = tab.status === null ? tab.title : `${tab.title}, ${t(statusLabel[tab.status])}`
+          const previous = tabs[index - 1]
           return (
             <ContextMenu key={tab.id}>
+              {previous === undefined ? null : (
+                <span
+                  aria-hidden
+                  className={cn(
+                    'dshx:flex dshx:h-7 dshx:w-2.5 dshx:flex-none dshx:items-center dshx:justify-center dshx:before:h-3.5 dshx:before:w-[0.5px] dshx:before:content-[""]',
+                    previous.active || tab.active ? 'dshx:before:bg-transparent' : 'dshx:before:bg-(--dsw-alias-border-l4)',
+                  )}
+                />
+              )}
               <ContextMenuTrigger asChild>
                 <div
                   role="tab"
@@ -136,12 +163,11 @@ export const TabStrip = (props: TabStripProps): ReactElement => {
                   tabIndex={tab.active || (activeId === undefined && index === 0) ? 0 : -1}
                   draggable
                   className={cn(
-                    'dshx:group dshx:relative dshx:flex dshx:min-w-[6.5rem] dshx:cursor-default dshx:items-center dshx:gap-1.5 dshx:border-r dshx:border-t-2 dshx:border-r-border dshx:border-t-transparent dshx:pr-1 dshx:pl-2.5 dshx:text-muted-foreground dshx:outline-none dshx:select-none dshx:hover:bg-background/60 dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:focus-visible:ring-inset',
-                    tab.pinned ? 'dshx:max-w-40 dshx:flex-none' : 'dshx:flex-[0_1_12rem]',
-                    tab.active && 'dshx:border-t-primary dshx:bg-background dshx:text-foreground',
+                    'dshx:group dshx:relative dshx:flex dshx:h-7 dshx:max-w-[190px] dshx:flex-[0_1_auto] dshx:cursor-pointer dshx:items-center dshx:rounded-(--dsw-radius-sm) dshx:px-2.5 dshx:leading-none dshx:whitespace-nowrap dshx:text-muted-foreground dshx:outline-none dshx:select-none dshx:hover:bg-accent dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:focus-visible:ring-inset',
+                    tab.pinned ? 'dshx:min-w-0' : 'dshx:min-w-[100px]',
+                    tab.active && 'dshx:bg-(--dsw-alias-markdown-tag) dshx:text-foreground dshx:hover:bg-(--dsw-alias-markdown-tag)',
                     !tab.available && 'dshx:opacity-50',
-                    dropIndex === index &&
-                      "dshx:before:absolute dshx:before:inset-y-1 dshx:before:left-0 dshx:before:w-0.5 dshx:before:bg-primary dshx:before:content-['']",
+                    dropIndex === index && DROP_CARET,
                   )}
                   onClick={() => send({ type: 'tab.select', tabId: tab.id })}
                   onDoubleClick={() => send({ type: 'tab.keep', tabId: tab.id })}
@@ -178,26 +204,37 @@ export const TabStrip = (props: TabStripProps): ReactElement => {
                     setDropIndex(null)
                   }}
                 >
-                  <TabIcon kind={tab.kind} />
-                  <span className={cn('dshx:min-w-0 dshx:flex-1 dshx:truncate', tab.preview && 'dshx:italic')}>{tab.title}</span>
-                  {tab.status === null ? null : <span aria-hidden className={cn('dshx:size-2 dshx:shrink-0 dshx:rounded-full', statusDotClass[tab.status])} />}
-                  {tab.pinned ? (
-                    <PinIcon aria-label={t('pinned')} size={12} className="dshx:shrink-0 dshx:text-muted-foreground" />
-                  ) : (
+                  <span
+                    className={cn(
+                      'dshx:flex dshx:min-w-0 dshx:flex-auto dshx:items-center dshx:gap-[5px] dshx:overflow-hidden dshx:leading-[1.4]',
+                      !tab.pinned &&
+                        'dshx:group-hover:[mask-image:linear-gradient(to_right,black_calc(100%-30px),transparent_calc(100%-14px))] dshx:group-focus-within:[mask-image:linear-gradient(to_right,black_calc(100%-30px),transparent_calc(100%-14px))]',
+                      !tab.pinned && tab.active && 'dshx:[mask-image:linear-gradient(to_right,black_calc(100%-30px),transparent_calc(100%-14px))]',
+                    )}
+                  >
+                    {tab.status === null ? null : (
+                      <span aria-hidden className={cn('dshx:size-1.5 dshx:flex-none dshx:rounded-full', statusDotClass[tab.status])} />
+                    )}
+                    <span className={cn('dshx:truncate', tab.preview && 'dshx:italic')}>{tab.title}</span>
+                    {tab.pinned ? <PinIcon aria-label={t('pinned')} size={12} className="dshx:flex-none dshx:text-(--dsw-alias-label-tertiary)" /> : null}
+                  </span>
+                  {tab.pinned ? null : (
                     <button
                       type="button"
                       tabIndex={-1}
                       aria-label={t('close', { title: tab.title })}
                       className={cn(
-                        'dshx:flex dshx:size-5 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-sm dshx:text-muted-foreground dshx:hover:bg-accent dshx:hover:text-foreground',
-                        tab.active ? 'dshx:opacity-100' : 'dshx:opacity-0 dshx:group-hover:opacity-100 dshx:group-focus-visible:opacity-100',
+                        'dshx:absolute dshx:top-1 dshx:right-1 dshx:flex dshx:size-5 dshx:cursor-pointer dshx:items-center dshx:justify-center dshx:rounded-(--dsw-radius-sm) dshx:text-(--dsw-alias-label-tertiary) dshx:hover:bg-accent dshx:hover:text-foreground',
+                        tab.active
+                          ? 'dshx:opacity-100'
+                          : 'dshx:pointer-events-none dshx:opacity-0 dshx:group-focus-within:pointer-events-auto dshx:group-focus-within:opacity-100 dshx:group-hover:pointer-events-auto dshx:group-hover:opacity-100',
                       )}
                       onClick={event => {
                         event.stopPropagation()
                         send({ type: 'tab.close', tabId: tab.id })
                       }}
                     >
-                      <XIcon aria-hidden size={12} />
+                      <CloseGlyph />
                     </button>
                   )}
                 </div>
@@ -217,39 +254,28 @@ export const TabStrip = (props: TabStripProps): ReactElement => {
             </ContextMenu>
           )
         })}
-        <div
-          aria-hidden
-          className={cn(
-            'dshx:relative dshx:min-w-6 dshx:flex-1',
-            dropIndex === tabs.length &&
-              "dshx:before:absolute dshx:before:inset-y-1 dshx:before:left-0 dshx:before:w-0.5 dshx:before:bg-primary dshx:before:content-['']",
-          )}
-          onDragOver={event => {
-            if (dragged.current === null) return
-            event.preventDefault()
-            setDropIndex(tabs.length)
-          }}
-          onDrop={event => {
-            event.preventDefault()
-            const tabId = dragged.current
-            if (tabId !== null) send({ type: 'tab.move', tabId, toIndex: tabs.length - 1 })
-            setDropIndex(null)
-          }}
-        />
       </div>
+      <div
+        aria-hidden
+        className={cn('dshx:relative dshx:h-7 dshx:min-w-6 dshx:flex-1', dropIndex === tabs.length && DROP_CARET)}
+        onDragOver={event => {
+          if (dragged.current === null) return
+          event.preventDefault()
+          setDropIndex(tabs.length)
+        }}
+        onDrop={event => {
+          event.preventDefault()
+          dropAtEnd()
+        }}
+      />
       {overflowing ? (
         <DropdownMenu>
-          <DropdownMenuTrigger
-            aria-label={t('allTabs')}
-            title={t('allTabs')}
-            className="dshx:flex dshx:w-8 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:border-l dshx:border-border dshx:text-muted-foreground dshx:hover:bg-background/60 dshx:hover:text-foreground"
-          >
-            <ChevronDownIcon aria-hidden size={14} />
+          <DropdownMenuTrigger aria-label={t('allTabs')} title={t('allTabs')} className={STRIP_BUTTON}>
+            <ChevronDownIcon aria-hidden size={15} />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="dshx-root dshx:max-h-96 dshx:max-w-80">
             {tabs.map(tab => (
               <DropdownMenuItem key={tab.id} onSelect={() => send({ type: 'tab.select', tabId: tab.id })} className={cn(tab.active && 'dshx:font-semibold')}>
-                <TabIcon kind={tab.kind} />
                 <span className="dshx:truncate">{tab.title}</span>
                 {tab.status === null ? null : (
                   <span aria-hidden className={cn('dshx:ml-auto dshx:size-2 dshx:shrink-0 dshx:rounded-full', statusDotClass[tab.status])} />
