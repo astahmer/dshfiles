@@ -243,9 +243,10 @@ export default defineClient({
               .entriesOfSlot('sidebar.panellist')
               .filter(entry => entry.options.id !== undefined && registeredPanels.has(entry.options.id))
               .toSorted((left, right) => (left.options.order ?? 0) - (right.options.order ?? 0))
-            return [
+            const sections: readonly StartSection[] = [
               {
                 id: 'new-thread',
+                column: 'threads',
                 suggestions: [
                   {
                     id: 'new-thread',
@@ -261,6 +262,7 @@ export default defineClient({
               },
               {
                 id: 'recent-threads',
+                column: 'threads',
                 label: translate('recentThreads'),
                 suggestions: threads.map(session => {
                   const project = session.cwd?.split('/').filter(Boolean).at(-1)
@@ -277,6 +279,7 @@ export default defineClient({
               },
               {
                 id: 'panels',
+                column: 'panels',
                 label: translate('panels'),
                 suggestions: panels.flatMap(entry => {
                   const panelId = entry.options.id
@@ -293,6 +296,7 @@ export default defineClient({
               },
               {
                 id: 'settings',
+                column: 'panels',
                 suggestions: [
                   {
                     id: 'settings',
@@ -306,7 +310,8 @@ export default defineClient({
                   },
                 ],
               },
-            ].filter(section => section.suggestions.length > 0)
+            ]
+            return sections.filter(section => section.suggestions.length > 0)
           }
 
           return createPortal(

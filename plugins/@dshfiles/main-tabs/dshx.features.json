@@ -148,7 +148,7 @@
     {
       "id": "new-tab-page",
       "title": "Open a new tab with suggestions of what to show",
-      "summary": "\"+\" at the end of the strip (or Mod+T on Desktop, Mod+Alt+T on the Web) opens a Start tab modelled on DSH's right-panel Start page: a compass over large rows for New thread, the five most recent threads (running ones first), every main panel with its shortcut when it has one, and Settings. Arrow keys, Home/End and Enter work in the list; the picked thread or panel takes the Start tab's place, while New thread and Settings close it.",
+      "summary": "\"+\" at the end of the strip (or Mod+T on Desktop, Mod+Alt+T on the Web) opens a compact Start tab: New thread and the five most recent threads (running ones first) sit beside the main panels and Settings when the pane is wide, and stack in one column when narrow. Arrow keys, Home/End and Enter work in the list; the picked thread or panel takes the Start tab's place, while New thread and Settings close it.",
       "reach": ["click button \"Workbench\"", "press ControlOrMeta+Alt+KeyT", "expect tab \"Start\"", "expect option \"New thread\""],
       "surfaces": ["client", "integration"],
       "configuration": [],

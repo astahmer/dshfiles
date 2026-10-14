@@ -13,8 +13,13 @@ export interface StartSuggestion {
   readonly pick: () => void
 }
 
+type StartColumn = 'threads' | 'panels'
+
+const START_COLUMNS: readonly StartColumn[] = ['threads', 'panels']
+
 export interface StartSection {
   readonly id: string
+  readonly column: StartColumn
   readonly label?: string | undefined
   readonly suggestions: readonly StartSuggestion[]
 }
@@ -92,57 +97,65 @@ export const StartPage = (props: StartPageProps): ReactElement => {
   }
 
   return (
-    <div className="dshx-root dshx:min-h-0 dshx:flex-1 dshx:overflow-auto dshx:bg-background" data-main-tabs-start="">
-      <div className="dshx:flex dshx:min-h-full dshx:flex-col dshx:items-center dshx:justify-center dshx:gap-3.5 dshx:px-6 dshx:py-8 dshx:after:flex-[0_10%] dshx:after:content-['']">
-        <span aria-hidden className="dshx:mb-4 dshx:flex dshx:text-(--dsw-static-neutral-200) dshx:dark:text-(--dsw-static-neutral-700)">
-          <CompassGlyph size={56} />
+    <div className="dshx-root dshx:@container dshx:min-h-0 dshx:flex-1 dshx:overflow-auto dshx:bg-background" data-main-tabs-start="">
+      <div className="dshx:flex dshx:min-h-full dshx:flex-col dshx:items-center dshx:justify-start dshx:gap-2 dshx:px-6 dshx:py-4 dshx:@max-pane-narrow:px-3 dshx:@max-pane-narrow:py-3">
+        <span aria-hidden className="dshx:flex dshx:text-(--dsw-static-neutral-200) dshx:dark:text-(--dsw-static-neutral-700)">
+          <CompassGlyph size={40} />
         </span>
         <div
           ref={list}
           role="listbox"
           aria-label={props.t('startLabel')}
-          className="dshx:flex dshx:w-[380px] dshx:max-w-full dshx:flex-col dshx:gap-4"
+          className="dshx:grid dshx:w-full dshx:max-w-[900px] dshx:grid-cols-2 dshx:items-start dshx:gap-x-6 dshx:gap-y-3 dshx:@max-pane-compact:grid-cols-1"
           onKeyDown={onKeyDown}
         >
-          {props.sections.map(section => (
-            <div key={section.id} role="group" aria-label={section.label} className="dshx:flex dshx:flex-col dshx:gap-1.5">
-              {section.label === undefined ? null : (
-                <div aria-hidden className="dshx:px-1 dshx:text-xs dshx:text-(--dsw-alias-label-tertiary)">
-                  {section.label}
-                </div>
-              )}
-              {section.suggestions.map(suggestion => (
-                <div
-                  key={suggestion.id}
-                  role="option"
-                  aria-selected={false}
-                  aria-label={suggestion.description === undefined ? suggestion.title : `${suggestion.title}, ${suggestion.description}`}
-                  aria-keyshortcuts={suggestion.shortcut?.aria}
-                  tabIndex={-1}
-                  data-start-suggestion={suggestion.id}
-                  className={cn(
-                    'dshx:flex dshx:min-h-12 dshx:w-full dshx:cursor-pointer dshx:items-center dshx:gap-3.5 dshx:rounded-(--dsw-radius-xl) dshx:border-[0.5px] dshx:border-input dshx:bg-card dshx:px-5 dshx:py-2 dshx:text-left dshx:text-foreground dshx:outline-none dshx:select-none',
-                    'dshx:hover:bg-accent dshx:focus-visible:bg-accent dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring',
-                  )}
-                  onClick={suggestion.pick}
-                  onKeyDown={event => {
-                    if (event.key !== 'Enter' && event.key !== ' ') return
-                    event.preventDefault()
-                    suggestion.pick()
-                  }}
-                >
-                  <span className="dshx:flex dshx:size-[26px] dshx:flex-none dshx:items-center dshx:justify-center dshx:text-muted-foreground">
-                    {suggestion.icon}
-                  </span>
-                  <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-[3px]">
-                    <span className="dshx:truncate dshx:text-sm dshx:leading-[1.4]">{suggestion.title}</span>
-                    {suggestion.description === undefined ? null : (
-                      <span className="dshx:truncate dshx:text-[11px] dshx:leading-[1.4] dshx:text-(--dsw-alias-label-tertiary)">{suggestion.description}</span>
+          {START_COLUMNS.map(column => (
+            <div key={column} className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-3" data-start-column={column}>
+              {props.sections
+                .filter(section => section.column === column)
+                .map(section => (
+                  <div key={section.id} role="group" aria-label={section.label} className="dshx:flex dshx:flex-col dshx:gap-1">
+                    {section.label === undefined ? null : (
+                      <div aria-hidden className="dshx:px-1 dshx:text-xs dshx:text-(--dsw-alias-label-tertiary)">
+                        {section.label}
+                      </div>
                     )}
-                  </span>
-                  {suggestion.shortcut === undefined || suggestion.shortcut.keys.length === 0 ? null : <ShortcutKeys keys={suggestion.shortcut.keys} />}
-                </div>
-              ))}
+                    {section.suggestions.map(suggestion => (
+                      <div
+                        key={suggestion.id}
+                        role="option"
+                        aria-selected={false}
+                        aria-label={suggestion.description === undefined ? suggestion.title : `${suggestion.title}, ${suggestion.description}`}
+                        aria-keyshortcuts={suggestion.shortcut?.aria}
+                        tabIndex={-1}
+                        data-start-suggestion={suggestion.id}
+                        className={cn(
+                          'dshx:flex dshx:min-h-9 dshx:w-full dshx:cursor-pointer dshx:items-center dshx:gap-2.5 dshx:rounded-(--dsw-radius-xl) dshx:border-[0.5px] dshx:border-input dshx:bg-card dshx:px-3 dshx:py-1 dshx:text-left dshx:text-foreground dshx:outline-none dshx:select-none',
+                          'dshx:hover:bg-accent dshx:focus-visible:bg-accent dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring',
+                        )}
+                        onClick={suggestion.pick}
+                        onKeyDown={event => {
+                          if (event.key !== 'Enter' && event.key !== ' ') return
+                          event.preventDefault()
+                          suggestion.pick()
+                        }}
+                      >
+                        <span className="dshx:flex dshx:size-[26px] dshx:flex-none dshx:items-center dshx:justify-center dshx:text-muted-foreground">
+                          {suggestion.icon}
+                        </span>
+                        <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-[3px]">
+                          <span className="dshx:truncate dshx:text-sm dshx:leading-[1.4]">{suggestion.title}</span>
+                          {suggestion.description === undefined ? null : (
+                            <span className="dshx:truncate dshx:text-[11px] dshx:leading-[1.4] dshx:text-(--dsw-alias-label-tertiary)">
+                              {suggestion.description}
+                            </span>
+                          )}
+                        </span>
+                        {suggestion.shortcut === undefined || suggestion.shortcut.keys.length === 0 ? null : <ShortcutKeys keys={suggestion.shortcut.keys} />}
+                      </div>
+                    ))}
+                  </div>
+                ))}
             </div>
           ))}
         </div>

@@ -279,6 +279,7 @@ Then("the active and inactive main tabs share the right panel tabs' metrics and 
 
 const newTabButton = (page: Page) => strip(page).locator('xpath=..').getByRole('button', { name: 'New tab', exact: true })
 const startPage = (page: Page) => page.getByRole('listbox', { name: 'Open in this tab', exact: true })
+const startPageColumnCount = (page: Page) => startPage(page).evaluate(element => getComputedStyle(element).gridTemplateColumns.trim().split(/\s+/u).length)
 const suggestion = (page: Page, name: string) => startPage(page).getByRole('option', { name, exact: true })
 const suggestionNames = (page: Page): Promise<readonly string[]> =>
   startPage(page)
@@ -301,6 +302,14 @@ Then('a Start tab follows the Workbench and suggests a new thread, the panels an
     await expect(suggestion(page, 'New thread')).toHaveAttribute('aria-keyshortcuts', /.+/)
     await expect(suggestion(page, 'Settings')).toHaveAttribute('aria-keyshortcuts', /.+/)
     await expect(suggestion(page, 'New thread')).toBeFocused()
+
+    const originalViewport = page.viewportSize()
+    if (originalViewport === null) throw new Error('Expected a fixed browser viewport')
+    await page.setViewportSize({ width: 1280, height: originalViewport.height })
+    await expect.poll(() => startPageColumnCount(page)).toBe(2)
+    await page.setViewportSize({ width: 480, height: originalViewport.height })
+    await expect.poll(() => startPageColumnCount(page)).toBe(1)
+    await page.setViewportSize(originalViewport)
   })
 })
 
