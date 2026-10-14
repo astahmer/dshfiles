@@ -1,18 +1,20 @@
 import type {} from '@deepseek-ai/dsh-api-settings-controller/remote'
+import type {} from '@deepseek-ai/dsh-plugin-manager/remote'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
-import type { ObservableSnapshot } from '@deepseek-ai/dsh-client-store'
+import { createSnapshotStore, type ObservableSnapshot } from '@deepseek-ai/dsh-client-store'
 import { closeTopModal } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client'
 import { resolveSlotLabel, type PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
-import { defineClient, useApiQuery } from '@dshfiles/dshx/client'
+import { defineClient, provideSettingsPageRenderer, useApiQuery, type SettingsPageRendererProps } from '@dshfiles/dshx/client'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import { registerPaletteAction } from '@dshfiles/command-palette/api'
 import { createActor } from '@dshfiles/plugin-ui/machine'
 import { useEffect, useState } from 'react'
 import { z } from 'zod'
+import type { SettingsSectionOwnerProps } from '@deepseek-ai/dsh-client-ui-settings/client'
 
 import { DesktopUpdateBadge, DesktopUpdateSource, desktopUpdateBridge } from './native/desktop-update.js'
 import { SettingsDocumentAction, SettingsDocumentStore } from './native/document-action.js'
@@ -22,10 +24,13 @@ import { ShellRoot, type OnboardingStep, type ShellRootDeps } from './native/she
 import { SHELL_CHILDREN, type ShellRenderSlot } from './native/slots.js'
 import { useObservable } from './native/use-observable.js'
 import { settingsShellApi } from './shell-api.js'
-import { OPEN_SETTINGS_EVENT, openSettingsRequestSchema } from './open-settings.js'
+import { OPEN_SETTINGS_EVENT, openSettingsRequestSchema, type OpenSettingsRequest } from './open-settings.js'
+import { PluginSettingsPageView } from './plugin-settings-page.js'
+import { SettingsForm } from './schema-form/settings-form.js'
+import { localizedTextReader, pluginPageId, pluginSettingsPages, type NamespaceLabel, type PluginSettingsPage } from './plugin-settings.js'
 import { preferredSurface } from './settings-preference.js'
 import { SettingsDialog, SettingsTab, type SectionRow } from './settings-view.js'
-import { shellMachine, type ShellSurface } from './shell-machine.js'
+import { shellMachine, type FieldTarget, type ShellSurface } from './shell-machine.js'
 import { PORTED_FROM } from './upstream.js'
 import './client.css'
 
@@ -127,6 +132,83 @@ export default defineClient({
     const openSettings = (sectionId?: string): void =>
       actor.send(sectionId === undefined ? { type: 'open', surface: surface() } : { type: 'open', surface: surface(), sectionId })
 
+    // Bundle manifests title each namespace ("Thread Sidebar" for `thread-sidebar`); read once Settings first opens.
+    const labels = createSnapshotStore<ReadonlyMap<string, NamespaceLabel>>(new Map())
+    let labelsRequested = false
+    ctx.inject(['remote.pluginManager'], scoped => {
+      const load = (): void => {
+        void scoped.remote.pluginManager.listBundles().then(result => {
+          if (!result.ok) return
+          const next = new Map<string, NamespaceLabel>()
+          for (const bundle of result.value) {
+            for (const row of bundle.rows) {
+              // A package name is no title; without manifest text the page falls back to the schema or the id.
+              const title = row.meta?.title ?? bundle.meta?.title
+              const description = row.meta?.description ?? bundle.meta?.description
+              const resolvedTitle = title === undefined ? '' : ctx.locale.resolveText(title)
+              next.set(row.rowId, {
+                title: resolvedTitle === bundle.name || resolvedTitle === row.moduleName ? '' : resolvedTitle,
+                description: description === undefined ? (bundle.description ?? '') : ctx.locale.resolveText(description),
+              })
+            }
+          }
+          labels.set(next)
+        })
+      }
+      const dispose = subscribeActor(() => {
+        if (labelsRequested || !settingsOpen.getSnapshot()) return
+        labelsRequested = true
+        load()
+      })
+      scoped.effect(() => dispose, 'settings-shell: bundle labels')
+    })
+
+    const describe = ctx.configForms.describe()
+    // Snapshot identities change exactly when the data does; counting them keys the page projection.
+    const identityVersion = <T,>(read: () => T): (() => number) => {
+      let last: T | undefined
+      let version = 0
+      return () => {
+        const current = read()
+        if (current !== last) {
+          last = current
+          version += 1
+        }
+        return version
+      }
+    }
+    const describeVersion = identityVersion(() => describe.getSnapshot())
+    const labelsVersion = identityVersion(() => labels.getSnapshot())
+    const pluginPages = ledgerProjection<readonly PluginSettingsPage[]>(
+      () =>
+        pluginSettingsPages({
+          namespaces: describe.getSnapshot().view?.namespaces ?? [],
+          labels: labels.getSnapshot(),
+          text: localizedTextReader(ctx.locale.getSnapshot().active),
+        }),
+      () => `${String(describe.getSnapshot().view?.namespaces.length)}:${ctx.locale.getSnapshot().revision}:${labelsVersion()}:${describeVersion()}`,
+      listener => {
+        const offDescribe = describe.subscribe(listener)
+        const offLabels = labels.subscribe(listener)
+        const offLocale = ctx.locale.subscribe(listener)
+        return () => {
+          offDescribe()
+          offLabels()
+          offLocale()
+        }
+      },
+    )
+
+    /** Opens the page that edits one settings field; false when no served namespace has it. */
+    const openSettingsTarget = (target: { readonly entryId: string; readonly fieldPath: readonly string[] }, requested?: ShellSurface): boolean => {
+      void describe.ensure()
+      const page = pluginPages.getSnapshot().find(candidate => candidate.ns === target.entryId)
+      if (page === undefined) return false
+      const field: FieldTarget = { sectionId: pluginPageId(page.ns), fieldPath: target.fieldPath }
+      actor.send({ type: 'open', surface: requested ?? surface(), field })
+      return true
+    }
+
     let panelHost: HTMLElement | null = null
     const hostListeners = new Set<() => void>()
     const mainPanelHost: ObservableSnapshot<HTMLElement | null> = {
@@ -187,6 +269,17 @@ export default defineClient({
       subscribe: listener => welcomeForm.subscribe(listener),
     }
 
+    const fieldTarget: ObservableSnapshot<FieldTarget | undefined> = { getSnapshot: () => actor.getSnapshot().context.field, subscribe: subscribeActor }
+    // Sections get the native `close` plus the navigation the dshx Settings-target contract describes.
+    const sectionOwner: SettingsSectionOwnerProps & {
+      readonly openSection: (sectionId: string) => void
+      readonly openSettingsTarget: (target: { readonly entryId: string; readonly fieldPath: readonly string[] }) => boolean
+    } = {
+      close: () => actor.send({ type: 'close' }),
+      openSection: sectionId => openSettings(sectionId),
+      openSettingsTarget: target => openSettingsTarget(target),
+    }
+
     const mainTabsLoaded: ObservableSnapshot<boolean> = {
       getSnapshot: () => ctx.slots.entriesOfSlot('shell.overlay').some(entry => entry.options.id === MAIN_TABS_OVERLAY_ID),
       subscribe: listener => ctx.slots.subscribe('shell.overlay', listener),
@@ -211,13 +304,28 @@ export default defineClient({
       const activeId = useObservable(activeSection)
       const variant = useObservable(surfaceState)
       const host = useObservable(mainPanelHost)
+      const pages = useObservable(pluginPages)
+      const field = useObservable(fieldTarget)
+      useEffect(() => {
+        void describe.ensure()
+      }, [])
       const tabsLoaded = useObservable(mainTabsLoaded)
       if (variant === 'closed') return null
       const view = {
         rows,
         activeId,
         renderSlot: props.renderSlot,
-        sectionOwner: { close: deps.closeSettings },
+        pluginPages: pages,
+        renderPluginPage: (page: PluginSettingsPage) => (
+          <PluginSettingsPageView
+            form={ctx.configForms.get<unknown>(page.ns)}
+            key={page.ns}
+            page={page}
+            t={props.t}
+            {...(field?.sectionId === page.pageId ? { focusPath: field.fieldPath } : {})}
+          />
+        ),
+        sectionOwner,
         t: props.t,
         onSelect: (sectionId: string) => actor.send({ type: 'select', sectionId }),
         onExpand: () => actor.send({ type: 'expand' }),
@@ -268,6 +376,32 @@ export default defineClient({
       }
     })
 
+    // Every dshx plugin's own Plugins page draws its settings with the same controls as Settings.
+    const PluginsPageSettings = (props: SettingsPageRendererProps): JSX.Element | null => {
+      const pages = useObservable(pluginPages).filter(page => props.namespaces.includes(page.ns))
+      useEffect(() => {
+        void describe.ensure()
+      }, [])
+      if (pages.length === 0) return null
+      return (
+        <div className="dshx-root dshx:flex dshx:flex-col dshx:gap-4" data-settings-shell-plugin-page={props.packageId}>
+          {pages.map(page => (
+            <section aria-label={page.title} className="dshx:flex dshx:flex-col" key={page.ns}>
+              {pages.length > 1 && <h4 className="dshx:m-0 dshx:text-[13px] dshx:font-semibold dshx:text-muted-foreground">{page.title}</h4>}
+              <SettingsForm fields={page.fields} form={ctx.configForms.get<unknown>(page.ns)} t={t} />
+            </section>
+          ))}
+        </div>
+      )
+    }
+    ctx.effect(() => provideSettingsPageRenderer(PluginsPageSettings), 'settings-shell: Plugins page settings')
+
+    const openRequest = (request: OpenSettingsRequest): void => {
+      const requested = request.surface ?? surface()
+      if (request.setting !== undefined && openSettingsTarget(request.setting, requested)) return
+      actor.send(request.section === undefined ? { type: 'open', surface: requested } : { type: 'open', surface: requested, sectionId: request.section })
+    }
+
     const PanelHost = (): JSX.Element => {
       const [element, setElement] = useState<HTMLDivElement | null>(null)
       useEffect(() => {
@@ -284,10 +418,7 @@ export default defineClient({
         const request = openSettingsRequestSchema.safeParse(event.detail ?? {})
         if (!request.success) return
         event.preventDefault()
-        const requested = request.data.surface ?? surface()
-        actor.send(
-          request.data.section === undefined ? { type: 'open', surface: requested } : { type: 'open', surface: requested, sectionId: request.data.section },
-        )
+        openRequest(request.data)
       }
       window.addEventListener(OPEN_SETTINGS_EVENT, onOpenSettings)
       return () => window.removeEventListener(OPEN_SETTINGS_EVENT, onOpenSettings)

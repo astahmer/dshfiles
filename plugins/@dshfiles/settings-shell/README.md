@@ -13,6 +13,31 @@ DSH's Settings, rebuilt as a plugin so it can grow VS Code-style behaviour the n
 - Picking the Settings tab, or a reload that lands on it, reopens Settings there; leaving the panel closes it. With no
   other tab left, main-tabs keeps showing Settings (it cannot show an empty main view).
 
+### Plugin settings
+
+Every settings namespace with a visible field gets a page under **Plugins** in the Settings navigation (namespaces
+whose plugin draws its own native page sit under **More settings**), titled by its bundle's manifest, then its schema,
+then its id. The same renderer draws each dshx plugin's settings on its **Plugins** page detail, through dshx's
+settings page renderer seat (`provideSettingsPageRenderer`); without this plugin the built-in dshx form shows.
+
+Fields come from the serialized schemastery schema (`src/schema-form/schema-model.ts`): the title is the field's label
+or its humanized key, the description its `.description()` (localized descriptions follow the active language). Hidden
+and secret fields never show. Controls by type:
+
+| Schema                                   | Control                                                                         |
+| ---------------------------------------- | ------------------------------------------------------------------------------- |
+| `boolean`                                | switch                                                                          |
+| union of constants                       | segmented buttons (≤ 4 short labels) or a select; `"Label: explanation"` splits |
+| `number`, `natural`, `percent`           | number input with bounds and a unit read from the key (`…Ms`, `…Minutes`, …, %) |
+| `string` (`role('textarea')`: multiline) | text input                                                                      |
+| array of scalars                         | list editor (add, edit, remove rows)                                            |
+| dict of scalars                          | key/value editor                                                                |
+| nested object                            | its fields, under a group heading                                               |
+| anything else                            | JSON, saved only when it parses                                                 |
+
+Edits save at once (switches, choices) or on Enter/blur (text, numbers) through the shared `ConfigForm`, the store
+native rows and `useSettings` read, so every surface stays in step. A refused value shows under its row.
+
 ### Open Settings from another plugin
 
 ```ts

@@ -10,8 +10,14 @@ export interface ShellPorts {
   readonly leavePanel: () => void
 }
 
+/** A settings field to scroll to and flash once its page shows. */
+export interface FieldTarget {
+  readonly sectionId: string
+  readonly fieldPath: readonly string[]
+}
+
 export type ShellEvent =
-  | { readonly type: 'open'; readonly surface: ShellSurface; readonly sectionId?: string }
+  | { readonly type: 'open'; readonly surface: ShellSurface; readonly sectionId?: string; readonly field?: FieldTarget }
   | { readonly type: 'close' }
   | { readonly type: 'select'; readonly sectionId: string }
   | { readonly type: 'expand' }
@@ -24,10 +30,13 @@ interface ShellContext {
   readonly ports: ShellPorts
   /** The selected nav section; undefined shows the first one. */
   readonly sectionId: string | undefined
+  readonly field: FieldTarget | undefined
 }
 
-const selectRequested = assign<ShellContext, ShellEvent, undefined, ShellEvent, never>({
-  sectionId: ({ context, event }) => (event.type === 'open' && event.sectionId !== undefined ? event.sectionId : context.sectionId),
+const selectRequested = assign<ShellContext, ShellEvent, undefined, ShellEvent, never>(({ context, event }) => {
+  if (event.type !== 'open') return {}
+  if (event.field !== undefined) return { sectionId: event.field.sectionId, field: event.field }
+  return { sectionId: event.sectionId ?? context.sectionId, field: undefined }
 })
 
 /**
@@ -42,17 +51,17 @@ export const shellMachine = setup({
     showPanel: ({ context }) => context.ports.showPanel(),
     leavePanel: ({ context }) => context.ports.leavePanel(),
     selectRequested,
-    forgetSection: assign({ sectionId: undefined }),
+    forgetSection: assign({ sectionId: undefined, field: undefined }),
   },
   guards: {
     wantsTab: ({ event }) => event.type === 'open' && event.surface === 'tab',
   },
 }).createMachine({
   id: 'settings-shell',
-  context: ({ input }) => ({ ports: input.ports, sectionId: undefined }),
+  context: ({ input }) => ({ ports: input.ports, sectionId: undefined, field: undefined }),
   initial: 'closed',
   on: {
-    select: { actions: assign({ sectionId: ({ event }) => event.sectionId }) },
+    select: { actions: assign({ sectionId: ({ event }) => event.sectionId, field: undefined }) },
   },
   states: {
     closed: {

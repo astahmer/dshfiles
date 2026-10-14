@@ -44,6 +44,14 @@ describe('settings shell machine', () => {
     expect(calls).toEqual(['leave'])
   })
 
+  it('opens on a field and forgets it once the user picks another section', () => {
+    const { actor } = start()
+    actor.send({ type: 'open', surface: 'modal', field: { sectionId: 'plugin:thread-sidebar', fieldPath: ['maxChildren'] } })
+    expect(actor.getSnapshot().context).toMatchObject({ sectionId: 'plugin:thread-sidebar', field: { fieldPath: ['maxChildren'] } })
+    actor.send({ type: 'select', sectionId: 'general' })
+    expect(actor.getSnapshot().context.field).toBeUndefined()
+  })
+
   it('moves an open dialog into a tab, keeping its section', () => {
     const { actor, calls } = start()
     actor.send({ type: 'open', surface: 'modal', sectionId: 'plugins' })

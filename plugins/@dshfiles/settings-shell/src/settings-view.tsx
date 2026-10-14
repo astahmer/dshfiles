@@ -10,12 +10,13 @@ import {
   Tooltip,
   useModalLayer,
 } from '@deepseek-ai/dsh-client-ui-primitives'
-import { AppWindowIcon, Maximize2Icon, Minimize2Icon } from '@dshfiles/plugin-ui/icons'
+import { AppWindowIcon, ChevronDownIcon, ChevronRightIcon, Maximize2Icon, Minimize2Icon, PuzzleIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { useId, useRef, type ReactNode, type SyntheticEvent } from 'react'
+import { useId, useRef, useState, type ReactNode, type SyntheticEvent } from 'react'
 import { createPortal } from 'react-dom'
 import type { ShellTranslate } from './native/locales.js'
 import type { ShellRenderSlot } from './native/slots.js'
+import type { PluginSettingsPage } from './plugin-settings.js'
 
 export interface SectionRow {
   readonly id: string
@@ -43,6 +44,9 @@ const headerButton =
 export interface SettingsViewProps {
   readonly variant: ViewVariant
   readonly rows: readonly SectionRow[]
+  /** Pages the shell draws itself from each plugin's settings schema. */
+  readonly pluginPages: readonly PluginSettingsPage[]
+  readonly renderPluginPage: (page: PluginSettingsPage) => ReactNode
   readonly activeId: string | undefined
   readonly renderSlot: ShellRenderSlot
   readonly sectionOwner: SettingsSectionOwnerProps
@@ -56,11 +60,35 @@ export interface SettingsViewProps {
 }
 
 /** Section navigation, header actions and the active section; the frame around it decides dialog or tab. */
+const navCell =
+  'dshx:box-border dshx:flex dshx:h-10 dshx:shrink-0 dshx:cursor-pointer dshx:items-center dshx:gap-2 dshx:rounded-[var(--dsw-radius-md)] dshx:border-none dshx:bg-transparent dshx:py-[9px] dshx:pr-4 dshx:pl-3 dshx:text-left dshx:text-[14px] dshx:leading-[22px] dshx:font-normal dshx:text-[var(--dsw-alias-label-primary)] dshx:hover:bg-[var(--dsw-specific-sidebar-nav-item-hover)]'
+const navCellActive = 'dshx:bg-[var(--dsw-specific-sidebar-nav-item-active)]'
+const navGroup =
+  'dshx:mt-3 dshx:flex dshx:items-center dshx:gap-1 dshx:px-3 dshx:pb-1 dshx:text-[12px] dshx:font-medium dshx:text-[var(--dsw-alias-label-secondary)]'
+
+const PageCell = (props: { readonly page: PluginSettingsPage; readonly active: boolean; readonly onSelect: (pageId: string) => void }): JSX.Element => (
+  <button
+    aria-current={props.active ? 'true' : undefined}
+    className={cn(navCell, 'dshx:h-8 dshx:text-[13px]', props.active && navCellActive)}
+    data-modal-autofocus={props.active ? '' : undefined}
+    onClick={() => props.onSelect(props.page.pageId)}
+    title={props.page.ns}
+    type="button"
+  >
+    <PuzzleIcon className="dshx:size-3.5 dshx:flex-none dshx:text-[var(--dsw-alias-label-secondary)]" />
+    <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{props.page.title}</span>
+  </button>
+)
+
 const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): JSX.Element => {
-  const active = props.rows.find(row => row.id === props.activeId)?.id ?? props.rows[0]?.id
+  const activePage = props.pluginPages.find(page => page.pageId === props.activeId)
+  const active = activePage?.pageId ?? props.rows.find(row => row.id === props.activeId)?.id ?? props.rows[0]?.id
+  const plugins = props.pluginPages.filter(page => page.group === 'plugins')
+  const more = props.pluginPages.filter(page => page.group === 'more')
+  const [moreOpen, setMoreOpen] = useState(activePage?.group === 'more')
   return (
     <>
-      <nav className="dshx:box-border dshx:flex dshx:w-[188px] dshx:flex-none dshx:flex-col dshx:gap-[18px] dshx:px-3 dshx:pt-[22px]">
+      <nav className="dshx:box-border dshx:flex dshx:min-h-0 dshx:w-[200px] dshx:flex-none dshx:flex-col dshx:gap-[18px] dshx:px-3 dshx:pt-[22px]">
         <div
           className="dshx:px-3 dshx:text-[16px] dshx:leading-6 dshx:font-medium dshx:text-[var(--dsw-alias-label-primary)]"
           data-modal-autofocus={active === undefined ? '' : undefined}
@@ -69,14 +97,11 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
         >
           {props.renderSlot('settings.header', {})}
         </div>
-        <div className="dshx:flex dshx:flex-col dshx:gap-1 dshx:overflow-y-auto">
+        <div className="dshx:flex dshx:min-h-0 dshx:flex-col dshx:gap-1 dshx:overflow-y-auto dshx:pb-4">
           {props.rows.map(row => (
             <button
               aria-current={row.id === active ? 'true' : undefined}
-              className={cn(
-                'dshx:box-border dshx:flex dshx:h-10 dshx:cursor-pointer dshx:items-center dshx:gap-2 dshx:rounded-[var(--dsw-radius-md)] dshx:border-none dshx:bg-transparent dshx:py-[9px] dshx:pr-4 dshx:pl-3 dshx:text-left dshx:text-[14px] dshx:leading-[22px] dshx:font-normal dshx:text-[var(--dsw-alias-label-primary)] dshx:hover:bg-[var(--dsw-specific-sidebar-nav-item-hover)]',
-                row.id === active && 'dshx:bg-[var(--dsw-specific-sidebar-nav-item-active)]',
-              )}
+              className={cn(navCell, row.id === active && navCellActive)}
               data-modal-autofocus={row.id === active ? '' : undefined}
               key={row.id}
               onClick={() => props.onSelect(row.id)}
@@ -86,6 +111,28 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
               <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{row.label}</span>
             </button>
           ))}
+          {plugins.length > 0 && (
+            <div aria-label={props.t('nav.plugins')} className="dshx:flex dshx:flex-col dshx:gap-0.5" role="group">
+              <span className={navGroup}>{props.t('nav.plugins')}</span>
+              {plugins.map(page => (
+                <PageCell active={page.pageId === active} key={page.pageId} onSelect={props.onSelect} page={page} />
+              ))}
+            </div>
+          )}
+          {more.length > 0 && (
+            <div aria-label={props.t('nav.more')} className="dshx:flex dshx:flex-col dshx:gap-0.5" role="group">
+              <button
+                aria-expanded={moreOpen}
+                className={cn(navGroup, 'dshx:cursor-pointer dshx:border-none dshx:bg-transparent')}
+                onClick={() => setMoreOpen(open => !open)}
+                type="button"
+              >
+                {moreOpen ? <ChevronDownIcon className="dshx:size-3" /> : <ChevronRightIcon className="dshx:size-3" />}
+                {props.t('nav.more')}
+              </button>
+              {moreOpen && more.map(page => <PageCell active={page.pageId === active} key={page.pageId} onSelect={props.onSelect} page={page} />)}
+            </div>
+          )}
         </div>
       </nav>
       <div className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col">
@@ -120,7 +167,9 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
           )}
         </div>
         <div className="dshx:min-h-0 dshx:flex-1 dshx:overflow-y-auto dshx:px-6 dshx:pb-6">
-          {active !== undefined && props.renderSlot('settings.section', props.sectionOwner, { only: active })}
+          {activePage !== undefined
+            ? props.renderPluginPage(activePage)
+            : active !== undefined && props.renderSlot('settings.section', props.sectionOwner, { only: active })}
         </div>
       </div>
     </>
