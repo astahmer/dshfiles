@@ -21,6 +21,9 @@ Cross-thread, cross-project memory for DSH that leaves the live context and the 
   bounded raw excerpt read back from the session log), `memory_note` (add, update with a reason — the old row stays as
   superseded history — or forget with a reason). Note types follow Claude Code: `user`, `feedback`, `project`,
   `reference`, with `scope`, `confidence` and the source thread and message.
+- **One registry.** The tools are `dshfiles-memory` API methods (`search`, `read`, `note`) opted into dshx's agent
+  registry, so the agent, other Host plugins and Clients call the same handlers; `usage` and `citations` serve memory's
+  statistics the same way.
 - **Citations as usage.** The block asks agents to cite memory they used as `memory: <id>`. A citation marks the tool
   call that returned the id as used and ranks the cited item higher in later blocks.
 - **Memory panel** (sidebar → Memory): notes by type with their source (project, thread, message, who wrote it,

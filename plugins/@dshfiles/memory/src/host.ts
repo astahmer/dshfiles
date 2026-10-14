@@ -8,6 +8,7 @@ import { SessionId } from '@deepseek-ai/dsh-session/types'
 import type {} from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-tools'
 import { createRouteResolver, type SummaryEffort } from '@dshfiles/optmem-core/summary-routes'
+import type { ApiCaller } from '@dshfiles/dshx/api'
 import { defineHost } from '@dshfiles/dshx/host'
 import type { SettingsScope } from '@dshfiles/dshx/settings'
 
@@ -18,10 +19,9 @@ import { costOfTokens } from '@dshfiles/ai-accounts/cost-estimate'
 import { createPricingCatalog, DEFAULT_PRICING_PATH, resolveRouteQuote } from '@dshfiles/ai-accounts/pricing-catalog'
 
 import { memoryApi, type MemoryCostLine, type MemoryCosts, type MemoryUsage, type PanelNote, type PanelThread } from './api.ts'
-import { createMemoryRuntime, type MemoryRuntime, type MemoryServices } from './runtime.ts'
+import { createMemoryRuntime, type Caller, type MemoryRuntime, type MemoryServices } from './runtime.ts'
 import { memorySettings, type MemorySettings } from './settings.ts'
 import { openMemoryStore, type MemoryStore, type NoteRecord, type StoredThread } from './store.ts'
-import { createMemoryTools } from './tools.ts'
 
 let runtime: MemoryRuntime | undefined
 let store: MemoryStore | undefined
@@ -319,7 +319,22 @@ const notesFilter = z.object({
 const noteId = z.number().int().positive()
 const reason = z.string().trim().max(500).optional()
 
+/** The calling thread for memory's agent tools; a Client or plugin caller searches as no particular thread. */
+const callerOf = (caller: ApiCaller): Caller => {
+  if (caller.kind === 'agent' && caller.sessionId !== undefined) return { id: caller.sessionId, session: { header: { id: caller.sessionId, cwd: caller.cwd } } }
+  const id = caller.kind === 'plugin' ? `api:${caller.packageId}` : 'api:client'
+  return { id, session: { header: { id } } }
+}
+
+const withRuntime = async (body: (active: MemoryRuntime) => Promise<string>): Promise<{ readonly summary: string }> => {
+  if (!runtime) throw new Error('Memory is not active in this DSH host (setting dshfiles-memory.enabled, or the plugin failed to start).')
+  return { summary: await body(runtime) }
+}
+
 const panelApi = memoryApi.host({
+  search: ({ input, caller }) => withRuntime(active => active.search(callerOf(caller), input)),
+  read: ({ input, caller }) => withRuntime(active => active.read(callerOf(caller), input)),
+  note: ({ input, caller }) => withRuntime(active => active.note(callerOf(caller), input)),
   usage: () => usage(),
   projects: () => requireStore().projects(),
   notes: ({ input }) => {
@@ -441,7 +456,6 @@ const setup = (ctx: Context): void => {
 
 export default defineHost({
   name: '@dshfiles/memory',
-  tools: createMemoryTools(() => runtime),
   settings: [ownedSettings],
   apis: [panelApi],
   setup,

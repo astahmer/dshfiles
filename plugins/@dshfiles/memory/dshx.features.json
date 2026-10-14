@@ -204,8 +204,8 @@
     {
       "id": "memory-tools",
       "title": "Search, read and note memory from any agent",
-      "summary": "memory_search ranks (BM25, or hybrid with a configured local embedding provider) digests, valid notes and indexed messages (porter words plus trigram identifiers, BM25 fused by reciprocal rank, recency decay, project and note-type boosts); memory_read opens a digest, a note or a bounded raw excerpt; memory_note adds, supersedes (with a reason) or forgets (with a reason) notes typed user, feedback, project or reference. A `memory: <id>` citation in a reply counts as use.",
-      "surfaces": ["host", "tool", "storage"],
+      "summary": "memory_search ranks (BM25, or hybrid with a configured local embedding provider) digests, valid notes and indexed messages (porter words plus trigram identifiers, BM25 fused by reciprocal rank, recency decay, project and note-type boosts); memory_read opens a digest, a note or a bounded raw excerpt; memory_note adds, supersedes (with a reason) or forgets (with a reason) notes typed user, feedback, project or reference. A `memory: <id>` citation in a reply counts as use. The three tools are dshx API methods (dshfiles-memory search, read, note) opted into the agent registry, so other plugins and Clients call the same code.",
+      "surfaces": ["host", "tool", "storage", "api"],
       "configuration": [
         {
           "key": "retrieval",

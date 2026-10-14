@@ -1,6 +1,8 @@
 import { defineApi, method } from '@dshfiles/dshx/api'
+import { z } from 'zod'
 
 import type { RetrievalStatus } from './embedder.ts'
+import { MemoryGuidance } from './guidance.ts'
 
 /** What the panel shows about whether memory earns its keep. Counters are local and never leave the machine. */
 export type MemoryUsage = {
@@ -104,12 +106,68 @@ export type NotesFilter = {
   readonly includeInvalid: boolean
 }
 
+const toolOutput = z.object({ summary: z.string() }).strict()
+
+const searchInput = z
+  .object({
+    query: z.string().min(1).max(512).describe('A few words or an exact identifier.'),
+    project: z.string().max(4_096).optional().describe('Restrict to one project: "current", a project path, or "all" (default: current first, then others).'),
+    limit: z.number().int().min(1).max(20).optional().describe('Hits to return, 1 to 20; default 6.'),
+  })
+  .strict()
+
+const readInput = z
+  .object({
+    id: z.string().min(1).max(200).describe('t:<thread id> or n:<note id>.'),
+    range: z.string().max(40).optional().describe('For a thread: "<from>-<to>" event sequence numbers (at most 60 events, 8 KB).'),
+  })
+  .strict()
+
+const noteInput = z
+  .object({
+    action: z.enum(['add', 'update', 'forget']).optional().describe('Default add.'),
+    text: z.string().max(2_000).optional().describe('The note (add, update): one or two sentences.'),
+    category: z
+      .enum(['user', 'feedback', 'project', 'reference'])
+      .optional()
+      .describe(
+        'user: who the user is, their role, expertise, preferences. feedback: a correction or a confirmed approach, with the why. project: a decision, constraint or context not derivable from code or git. reference: a pointer to an external resource. Default project.',
+      ),
+    scope: z.string().max(256).optional().describe('repo (default), global, or path:<subpath>. Do not widen a one-off request into a global rule.'),
+    confidence: z.enum(['stated', 'inferred']).optional().describe('stated: the user said it; inferred: you concluded it. Default stated.'),
+    id: z.string().max(40).optional().describe('Note id (n:<id>) for update and forget.'),
+    reason: z.string().max(500).optional().describe('Why the note is updated or forgotten (required for both).'),
+  })
+  .strict()
+
 export const memoryApi = defineApi({
   id: 'dshfiles-memory',
   owner: '@dshfiles/memory',
   version: 1,
   methods: {
-    usage: method<void, MemoryUsage>(),
+    usage: method({
+      output: z.custom<MemoryUsage>(),
+      description:
+        "Memory's state and whether it earns its keep: stored digests, notes and indexed messages; its own digest and Jev cost per day; start-block size and the requests that carried it; memory tool calls, hits and citations; heuristic correction counts and ratings.",
+    }),
+    search: method({
+      input: searchInput,
+      output: toolOutput,
+      description: MemoryGuidance.searchDescription,
+      tool: { name: 'memory_search', readOnly: true, render: output => output.summary },
+    }),
+    read: method({
+      input: readInput,
+      output: toolOutput,
+      description: MemoryGuidance.readDescription,
+      tool: { name: 'memory_read', readOnly: true, render: output => output.summary },
+    }),
+    note: method({
+      input: noteInput,
+      output: toolOutput,
+      description: MemoryGuidance.noteDescription,
+      tool: { name: 'memory_note', render: output => output.summary },
+    }),
     projects: method<void, readonly { readonly project: string; readonly threads: number; readonly notes: number }[]>(),
     notes: method<NotesFilter, readonly PanelNote[]>(),
     noteHistory: method<{ readonly id: number }, readonly PanelNote[]>(),
@@ -126,7 +184,10 @@ export const memoryApi = defineApi({
     >(),
     forgetNote: method<{ readonly id: number; readonly reason: string }, { readonly forgotten: boolean }>(),
     threads: method<{ readonly project: string }, readonly PanelThread[]>(),
-    citations: method<void, readonly MemoryCitation[]>(),
+    citations: method({
+      output: z.custom<readonly MemoryCitation[]>(),
+      description: 'The 100 most recent citations of memory (`memory: <id>` in a reply), with heuristic correction flags and ratings.',
+    }),
     /** 👍/👎 on one cited memory; null clears the rating. */
     rateCitation: method<{ readonly id: number; readonly rating: 'up' | 'down' | null }, { readonly rated: boolean }>(),
   },
