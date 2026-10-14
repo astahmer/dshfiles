@@ -8,17 +8,16 @@ import { resolveSlotLabel } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { defineClient, useSettings } from '@dshfiles/dshx/client'
 import { createActor } from '@dshfiles/plugin-ui/machine'
-import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
 import { readHostView } from './host-target.js'
 import { MAIN_TABS_LOCALE_NAMESPACE, mainTabsLocale } from './locales.js'
 import { mainTabsSettings } from './settings.js'
 import { TabStrip, threadTabStatus, type TabView } from './tab-strip.js'
 import { DEFAULT_TAB_PREFERENCES, tabIdOf, tabsMachine, type TabPreferences, type TabsEvent, type TabTarget } from './tabs-machine.js'
+import { STRIP_MISPLACED_WARNING, STRIP_MISSING_WARNING, mountStripHost, stripSitsAbovePanel } from './strip-mount.js'
 import { saveTabs, storedTabs } from './tabs-storage.js'
 import './client.css'
-
-const HOST_ATTRIBUTE = 'data-dshfiles-main-tabs'
 
 const isShortcutCommandId = (value: string): value is ShortcutCommandId => /^[a-z][a-zA-Z0-9-]*(?:\.[a-zA-Z][a-zA-Z0-9-]*)+$/u.test(value)
 
@@ -28,40 +27,29 @@ const panelTitleFallback = (panelId: string): string => {
   return words.charAt(0).toUpperCase() + words.slice(1)
 }
 
-/**
- * The frame has no seat above the main panel, so the strip lives in a node we prepend to the centre column (a flex
- * column) and fills with a portal. React only ever appends its own panel after it, so the node survives panel changes.
- */
-const useMainColumnHost = (): HTMLElement | null => {
+const STRIP_MISSING_AFTER_MS = 3_000
+
+/** The strip's host node before the `main` outlet, with the startup self-check warning when it cannot mount. */
+const useStripHost = (): HTMLElement | null => {
   const [host, setHost] = useState<HTMLElement | null>(null)
-  useEffect(() => {
-    let created: HTMLElement | null = null
-    const attach = (): boolean => {
-      const column = document.querySelector('[data-rightbar-col]')?.previousElementSibling
-      if (!(column instanceof HTMLElement)) return false
-      const existing = column.querySelector(`:scope > [${HOST_ATTRIBUTE}]`)
-      if (existing instanceof HTMLElement) {
-        setHost(existing)
-        return true
-      }
-      created = document.createElement('div')
-      created.setAttribute(HOST_ATTRIBUTE, '')
-      created.style.display = 'contents'
-      column.prepend(created)
-      setHost(created)
-      return true
-    }
-    if (attach()) return () => created?.remove()
-    const observer = new MutationObserver(() => {
-      if (attach()) observer.disconnect()
-    })
-    observer.observe(document.body, { childList: true, subtree: true })
-    return () => {
-      observer.disconnect()
-      created?.remove()
-    }
-  }, [])
+  useEffect(
+    () => mountStripHost({ document, onHost: setHost, onMissing: () => console.warn(STRIP_MISSING_WARNING), missingAfterMs: STRIP_MISSING_AFTER_MS }),
+    [],
+  )
   return host
+}
+
+/** Warn once per host when the rendered strip does not sit on top of the main panel. */
+const usePlacementCheck = (host: HTMLElement | null, rendered: boolean): void => {
+  const checked = useRef<HTMLElement | null>(null)
+  useEffect(() => {
+    if (host === null || !rendered || checked.current === host) return
+    const frame = requestAnimationFrame(() => {
+      checked.current = host
+      if (!stripSitsAbovePanel(host)) console.warn(STRIP_MISPLACED_WARNING)
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [host, rendered])
 }
 
 export default defineClient({
@@ -153,7 +141,7 @@ export default defineClient({
           const byId = props.useSessions(state => state.byId)
           const sessions = useMemo(() => new Map<string, SessionSummary>(Object.values(byId).map(session => [session.id, session])), [byId])
           const statuses = props.useSessionStatus(state => state)
-          const host = useMainColumnHost()
+          const host = useStripHost()
 
           const set = snapshot.context.sets[snapshot.context.scopeKey]
           const tabs = (set?.tabs ?? []).map((tab): TabView => {
@@ -179,7 +167,9 @@ export default defineClient({
             return { ...base, kind: 'thread', title, available: session !== undefined, status: tabStatus }
           })
 
-          if (host === null || !snapshot.matches('on') || tabs.length === 0) return null
+          const showStrip = host !== null && snapshot.matches('on') && tabs.length > 0
+          usePlacementCheck(host, showStrip)
+          if (host === null || !showStrip) return null
           return createPortal(<TabStrip tabs={tabs} send={event => actor.send(event)} t={props.t} />, host)
         }),
       ),
