@@ -2,7 +2,7 @@
 
 Owns the New thread screen's top: the DeepSeek mark and headline are replaced,
 and a compact row below the composer lets you resume one of the project's
-recent threads or jump to thread workspaces that still hold work to land.
+recent threads or jump to thread workspaces with work to rebase.
 
 ## Settings (`dshfiles-home`)
 
@@ -13,7 +13,7 @@ recent threads or jump to thread workspaces that still hold work to land.
 | `showPreviewBadge`      | `false`     | Keep the DeepSeek "Preview" badge.                                                          |
 | `showAgentPresetPicker` | `true`      | Show the agent preset picker; hidden, new threads use the native "New task default" preset. |
 | `showRecentThreads`     | `true`      | Up to three unarchived threads of the selected project.                                     |
-| `showUnlandedWork`      | `true`      | Count of the project's thread workspaces with work to land (needs jj-integration).          |
+| `showUnlandedWork`      | `true`      | Count of the project's thread workspaces with work to rebase (needs jj-integration).          |
 
 ## Limits
 

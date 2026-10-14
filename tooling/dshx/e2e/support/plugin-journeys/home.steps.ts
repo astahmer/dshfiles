@@ -60,17 +60,17 @@ Then('the New thread screen shows the mark {string} and the headline {string}', 
   await recordAssertion(page, 'home-brand-settings-survive-reload', () => expect(heroHeadline(page).getByText(headline, { exact: true })).toBeVisible())
 })
 
-Then('the New thread screen offers to resume {string} and reports one thread with work to land', async ({ page }: { page: Page }, title: string) => {
+Then('the New thread screen offers to resume {string} and reports one thread with work to rebase', async ({ page }: { page: Page }, title: string) => {
   await recordAssertion(page, 'home-strip-lists-the-project-recent-thread', async () => {
     await expect(page.getByText('Resume', { exact: true })).toBeVisible()
     await expect(page.getByRole('button', { name: title, exact: true })).toBeVisible()
   })
-  await recordAssertion(page, 'home-strip-counts-thread-workspaces-with-work-to-land', () =>
-    expect(page.getByRole('button', { name: '1 thread has unlanded work', exact: true })).toBeVisible(),
+  await recordAssertion(page, 'home-strip-counts-thread-workspaces-with-work-to-rebase', () =>
+    expect(page.getByRole('button', { name: '1 thread has work to rebase', exact: true })).toBeVisible(),
   )
 })
 
-Then('the Resume list appears below the chat composer', async ({ page }: { page: Page }) => {
+Then('the resume list appears below the chat composer', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'home-resume-list-follows-composer', async () => {
     const resume = await page.getByText('Resume', { exact: true }).boundingBox()
     const sendMessage = await page.getByRole('button', { name: 'Send message', exact: true }).boundingBox()
@@ -79,18 +79,18 @@ Then('the Resume list appears below the chat composer', async ({ page }: { page:
   })
 })
 
-Then('the work to land opens the Thread workspaces panel', async ({ page }: { page: Page }) => {
-  await page.getByRole('button', { name: '1 thread has unlanded work', exact: true }).click()
-  await recordAssertion(page, 'home-work-to-land-opens-thread-workspaces', async () => {
+Then('the work to rebase opens the Thread workspaces panel', async ({ page }: { page: Page }) => {
+  await page.getByRole('button', { name: '1 thread has work to rebase', exact: true }).click()
+  await recordAssertion(page, 'home-work-to-rebase-opens-thread-workspaces', async () => {
     await expect(page.getByRole('heading', { name: 'Thread workspaces', exact: true })).toBeVisible()
-    await expect(page.getByText('1 unlanded', { exact: true })).toBeVisible()
+    await expect(page.getByText('1 to rebase', { exact: true })).toBeVisible()
   })
   await finishJourneyAssertions(page)
 })
 
 Then('the New thread screen no longer offers to resume {string}', async ({ page }: { page: Page }, title: string) => {
   await recordAssertion(page, 'home-recent-threads-setting-hides-the-resume-list', async () => {
-    await expect(page.getByRole('button', { name: '1 thread has unlanded work', exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: '1 thread has work to rebase', exact: true })).toBeVisible()
     await expect(page.getByText('Resume', { exact: true })).toHaveCount(0)
     await expect(page.getByRole('button', { name: title, exact: true })).toHaveCount(0)
   })
