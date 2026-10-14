@@ -11,6 +11,7 @@ import type { PropsLocale, PropsRuntime, TranslateNS } from '@deepseek-ai/dsh-cl
 import type { WorkspaceBrowserProps } from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { defineClient } from '@dshfiles/dshx/client'
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
+import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
 import { FolderOpenIcon, MoonIcon, SunIcon, SunMoonIcon } from '@dshfiles/plugin-ui/icons'
 import { COMMAND_PALETTE_LOCALE_NAMESPACE, commandPaletteLocale } from './locales.js'
 import { newThreadShortcutDefaults } from './new-thread-shortcut.js'
@@ -106,15 +107,17 @@ const PaletteOverlay = (props: PaletteOverlayProps): JSX.Element | null => {
   )
   const workspaceActions = useMemo<readonly PaletteAction[]>(
     () =>
-      workspaceState.items.map(workspace => ({
-        id: `@dshfiles/command-palette/workspace/${workspace.workspaceId}`,
-        label: workspace.title,
-        aliases: ['workspace', 'project', workspace.title],
-        icon: <FolderOpenIcon className="dshx:size-4" />,
-        group: 'destination',
-        isSelected: current => current.workspace?.id === workspace.workspaceId,
-        run: () => props.openWorkspace(workspace.workspaceId),
-      })),
+      workspaceState.items
+        .filter(workspace => !EntityLabels.isThreadWorkspace(workspace.path))
+        .map(workspace => ({
+          id: `@dshfiles/command-palette/workspace/${workspace.workspaceId}`,
+          label: workspace.title,
+          aliases: ['workspace', 'project', workspace.title],
+          icon: <FolderOpenIcon className="dshx:size-4" />,
+          group: 'destination',
+          isSelected: current => current.workspace?.id === workspace.workspaceId,
+          run: () => props.openWorkspace(workspace.workspaceId),
+        })),
     [props.openWorkspace, workspaceState.items],
   )
   useEffect(

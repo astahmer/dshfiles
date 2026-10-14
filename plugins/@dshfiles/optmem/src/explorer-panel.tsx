@@ -5,6 +5,7 @@ import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { ArrowDownIcon, ChevronDownIcon, ChevronRightIcon, SearchIcon } from '@dshfiles/plugin-ui/icons'
 import { errorMessage, useQuery } from '@dshfiles/plugin-ui/query'
 import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
+import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { z } from 'zod'
@@ -56,14 +57,27 @@ export const ExplorerPanel = (props: ExplorerPanelProps): JSX.Element => {
     staleTime: 30_000,
     retry: false,
   })
-  const resolvedCurrentProjectId = currentProject.data ?? null
+  // A thread workspace opens on its repository's memory: that is where the project's history accumulates.
+  const currentProjectPath = projectList.find(project => project.projectId === currentProject.data)?.path ?? null
+  const resolvedCurrentProjectId =
+    currentProjectPath !== null && EntityLabels.isThreadWorkspace(currentProjectPath)
+      ? (projectList.find(project => project.path === EntityLabels.repositoryPath(currentProjectPath))?.projectId ?? currentProject.data ?? null)
+      : (currentProject.data ?? null)
+  const projectGroups = EntityLabels.groupByRepository(projectList)
+  const unregisteredProjects = projectList.filter(project => project.path === null)
+  const projectOption = (project: (typeof projectList)[number], label: string): JSX.Element => (
+    <option key={project.projectId} value={project.projectId}>
+      {label}
+      {project.path !== null && project.path === props.currentPath ? ' · current' : ''}
+    </option>
+  )
   const availableSelection = projectList.some(project => project.projectId === projectId)
     ? projectId
     : props.currentPath !== null
       ? projectList.some(project => project.projectId === resolvedCurrentProjectId)
         ? resolvedCurrentProjectId
         : null
-      : (projectList[0]?.projectId ?? null)
+      : (projectList.find(project => !EntityLabels.isThreadWorkspace(project.path))?.projectId ?? projectList[0]?.projectId ?? null)
   const selectedProject = projectList.find(project => project.projectId === availableSelection)
 
   const view = useQuery({
@@ -146,18 +160,28 @@ export const ExplorerPanel = (props: ExplorerPanelProps): JSX.Element => {
           <span className="dshx:text-xs dshx:text-muted-foreground">Project memory</span>
           <select
             aria-label="Memory project"
-            className="dshx:h-8 dshx:max-w-96 dshx:truncate dshx:rounded-md dshx:border dshx:border-input dshx:bg-background dshx:px-2 dshx:text-sm dshx:text-foreground dshx:font-mono!"
+            className="dshx:h-8 dshx:max-w-96 dshx:truncate dshx:rounded-md dshx:border dshx:border-input dshx:bg-background dshx:px-2 dshx:text-sm dshx:text-foreground"
             value={availableSelection ?? ''}
             onChange={event => changeProject(event.currentTarget.value)}
           >
             {projectList.length === 0 ? <option value="">No projects found</option> : null}
-            {projectList.map(project => (
-              <option key={project.projectId} value={project.projectId}>
-                {project.title}
-                {project.path === props.currentPath ? ' · current' : ''}
-                {!project.registered ? ' · unregistered' : ''}
-              </option>
-            ))}
+            {projectGroups.map(group =>
+              group.threads.length === 0 && group.project !== null ? (
+                projectOption(group.project, group.project.title)
+              ) : (
+                <optgroup key={group.repositoryPath} label={group.project?.title ?? group.repositoryPath.split('/').at(-1) ?? group.repositoryPath}>
+                  {group.project === null ? null : projectOption(group.project, group.project.title)}
+                  {group.threads.map(thread => projectOption(thread, `↳ ${thread.path?.split('/').at(-1) ?? thread.title}`))}
+                </optgroup>
+              ),
+            )}
+            {unregisteredProjects.length === 0 ? null : (
+              <optgroup label="Unregistered">
+                {unregisteredProjects.map(project =>
+                  projectOption(project, `Unregistered project · ${EntityLabels.shortId(project.projectId.replace(/^workspace:/u, ''))}`),
+                )}
+              </optgroup>
+            )}
           </select>
         </div>
         {selectedProject ? (

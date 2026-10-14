@@ -6,6 +6,8 @@ import { InputGroup, InputGroupAddon, InputGroupInput } from '@dshfiles/plugin-u
 import { Separator } from '@dshfiles/plugin-ui/components/ui/separator'
 import { RefreshCwIcon, SearchIcon } from '@dshfiles/plugin-ui/icons'
 import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
+import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
+import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
 import { errorMessage, useMutation, useQuery } from '@dshfiles/plugin-ui/query'
 import { useApi } from '@dshfiles/dshx/client'
 import type { ActivityEvent, ActivityLevel, ActivitySource, CondensedItem } from './types.js'
@@ -46,6 +48,7 @@ const ActivityRow = (props: {
   readonly item: CondensedItem
   readonly selected: boolean
   readonly t: ActivityTimelineTranslate
+  readonly sessionLabel: (sessionId: string) => string
   readonly onSelect: (item: CondensedItem) => void
 }): JSX.Element => (
   <button
@@ -62,15 +65,16 @@ const ActivityRow = (props: {
       </span>
       <span className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:text-[11px] dshx:text-muted-foreground">
         <span title={formatExact(props.item.at)}>{formatTime(props.item.at)}</span>
-        {props.item.sessionId === null ? null : <span>session {props.item.sessionId.slice(0, 8)}</span>}
+        {props.item.sessionId === null ? null : <span className="dshx:truncate">{props.sessionLabel(props.item.sessionId)}</span>}
         {props.item.correlationId === null ? null : <span>correlation {props.item.correlationId}</span>}
       </span>
     </span>
   </button>
 )
 
-export const ActivityTimelinePanel = (props: { readonly t: ActivityTimelineTranslate }): JSX.Element => {
+export const ActivityTimelinePanel = (props: { readonly sessions: ISessions; readonly t: ActivityTimelineTranslate }): JSX.Element => {
   const api = useApi(activityTimelineApi)
+  const sessionLabel = EntityLabels.useSessionLabel(props.sessions)
   const t = props.t
   const [search, setSearch] = useState('')
   const [sources, setSources] = useState<readonly ActivitySource[]>([])
@@ -293,7 +297,7 @@ export const ActivityTimelinePanel = (props: { readonly t: ActivityTimelineTrans
                   </p>
                 ) : null}
                 {items.map(item => (
-                  <ActivityRow key={item.id} item={item} selected={selected?.id === item.id} t={t} onSelect={setSelected} />
+                  <ActivityRow key={item.id} item={item} selected={selected?.id === item.id} t={t} sessionLabel={sessionLabel} onSelect={setSelected} />
                 ))}
               </div>
             </CardContent>
@@ -331,7 +335,7 @@ export const ActivityTimelinePanel = (props: { readonly t: ActivityTimelineTrans
                   <div className="dshx:flex dshx:flex-wrap dshx:gap-1">
                     {selectedEvent.references.map(reference => (
                       <Badge key={`${reference.kind}:${reference.id}`} variant="outline">
-                        {reference.kind}: {reference.id.slice(0, 12)}
+                        {reference.kind}: {reference.kind === 'session' ? sessionLabel(reference.id) : reference.id.slice(0, 12)}
                       </Badge>
                     ))}
                     {selectedEvent.references.length === 0 ? <span className="dshx:text-xs dshx:text-muted-foreground">—</span> : null}

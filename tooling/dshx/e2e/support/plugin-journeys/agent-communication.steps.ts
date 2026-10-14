@@ -43,15 +43,15 @@ Then('a human post is browsable and remains passive', async ({ page }: { page: P
   await finishJourneyAssertions(page)
 })
 
-Then('an offline direct message remains unread until its recipient reads it', async ({ page }: { page: Page }) => {
-  await page.getByRole('textbox', { name: 'Agent ID', exact: true }).fill('offline-agent-demo')
-  await page.getByRole('button', { name: 'Open conversation', exact: true }).click()
+Then('a direct message remains unread until its recipient reads it', async ({ page }: { page: Page }) => {
+  await page.getByRole('combobox', { name: 'Message a thread…', exact: true }).click()
+  await page.getByRole('option').first().click()
   await page.getByRole('textbox', { name: 'Write a message…', exact: true }).fill('A delayed message stays passive.')
   await page.getByRole('button', { name: 'Send message', exact: true }).click()
 
   await recordAssertion(page, 'communication-offline-direct-message', async () => {
     await expect(page.getByText('Message stored · 1 recipient(s)', { exact: true })).toBeVisible()
-    await expect(page.getByText('Not currently live · completion unknown', { exact: true })).toBeVisible()
+    await expect(page.getByRole('img', { name: 'Idle · completion unknown', exact: true }).first()).toBeVisible()
     await expect(page.getByText('A delayed message stays passive.', { exact: true })).toBeVisible()
     await expect(page.getByText('Local browser user', { exact: true })).toBeVisible()
   })
@@ -64,12 +64,12 @@ Then('an offline direct message remains unread until its recipient reads it', as
   await finishJourneyAssertions(page)
 })
 
-Then('workspace diagnostics show the active Agent\'s workspace subscription', async ({ page }: { page: Page }) => {
+Then("workspace diagnostics show the active Agent's workspace subscription", async ({ page }: { page: Page }) => {
   await page.getByRole('tab', { name: 'Diagnostics', exact: true }).click()
   await recordAssertion(page, 'communication-workspace-subscription-health', async () => {
     await expect(page.getByText('Idle · completion unknown', { exact: true })).toBeVisible()
     await expect(page.getByText('Subscribed', { exact: true })).toBeVisible()
-    await expect(page.getByText(/^workspace\/[a-f0-9]{24}$/).first()).toBeVisible()
+    await expect(page.getByTitle(/^workspace\/[a-f0-9]{24}$/).first()).toBeVisible()
     await expect(page.getByText(/missing a workspace subscription/)).toHaveCount(0)
     await expect(page.getByRole('button', { name: 'Unsubscribe', exact: true })).toBeVisible()
     await expect(page.getByText('Completed', { exact: true })).toHaveCount(0)

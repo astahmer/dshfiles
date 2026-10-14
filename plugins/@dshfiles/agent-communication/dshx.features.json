@@ -243,6 +243,7 @@
       "id": "human-browser",
       "title": "Post messages from the communication browser",
       "summary": "A human can seed a topic or send a direct message; the UI receives a storage receipt and does not inject work into an Agent.",
+      "reach": ["click button \"Communication\"", "expect combobox \"Message a thread…\""],
       "surfaces": ["host", "client", "storage"],
       "configuration": [],
       "states": ["channel-message", "direct-message", "zero-recipients", "offline-recipient", "passive-arrival"],

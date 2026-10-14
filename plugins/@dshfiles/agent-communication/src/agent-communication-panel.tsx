@@ -13,17 +13,22 @@ import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@dshfiles/plugin-ui/components/ui/card'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
 import { Separator } from '@dshfiles/plugin-ui/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@dshfiles/plugin-ui/components/ui/tabs'
 import { Textarea } from '@dshfiles/plugin-ui/components/ui/textarea'
 import { HashIcon, MessageSquareIcon, RefreshCwIcon, SearchIcon, SendIcon } from '@dshfiles/plugin-ui/icons'
 import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
+import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
+import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
+import type { IWorkspaces } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import { errorMessage, useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useApi } from '@dshfiles/dshx/client'
 import type { CommunicationDiagnosticAgent, CommunicationDiagnostics, CommunicationMessage } from '@dshfiles/dshx/communication'
 import { useState } from 'react'
 import { agentCommunicationApi, type AgentCommunicationPostInput } from './api.js'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
+import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import type { AgentCommunicationTranslate } from './locales.js'
 
 const diagnosticsKey = ['agent-communication', 'diagnostics'] as const
@@ -48,14 +53,21 @@ interface SendVariables {
 }
 
 interface AgentCommunicationPanelProps {
+  readonly sessions: ISessions
+  readonly workspaces: IWorkspaces
   readonly t: AgentCommunicationTranslate
 }
 
+/** Agents are Sessions and workspace channels are hashed folders: both render as thread titles and project names. */
+interface Labels {
+  readonly agent: (agentId: string) => string
+  readonly topic: (topic: string) => string
+}
+
 const formatTime = (timestamp: number): string => new Date(timestamp).toLocaleString()
-const agentLabel = (agentId: string): string => `Agent session · ${agentId}`
-const principalLabel = (principal: CommunicationMessage['sender'], t: AgentCommunicationTranslate): string =>
+const principalLabel = (principal: CommunicationMessage['sender'], labels: Labels, t: AgentCommunicationTranslate): string =>
   principal.kind === 'agent'
-    ? agentLabel(principal.id)
+    ? labels.agent(principal.id)
     : principal.id === 'communication-browser'
       ? t('browserUser')
       : t('externalPrincipal', { id: principal.id })
@@ -65,9 +77,6 @@ const selectionKey = (selection: ConversationSelection): readonly string[] => {
   if (selection.kind === 'direct') return [...browseKey, 'direct', selection.agentId]
   return [...browseKey, 'all']
 }
-
-const topicLabel = (topic: string, t: AgentCommunicationTranslate): string =>
-  topic.startsWith('workspace/') ? `${t('workspace')} · ${topic.slice('workspace/'.length, 'workspace/'.length + 8)}` : topic
 
 const ActivityList = (props: {
   readonly events: readonly {
@@ -81,6 +90,7 @@ const ActivityList = (props: {
     readonly rootCallId: string | null
     readonly errorCode: string | null
   }[]
+  readonly labels: Labels
   readonly t: AgentCommunicationTranslate
 }): JSX.Element => (
   <div className="dshx:flex dshx:flex-col">
@@ -95,7 +105,7 @@ const ActivityList = (props: {
         </time>
         <div className="dshx:min-w-0">
           <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
-            <span className="dshx:break-all dshx:font-medium">{agentLabel(event.principal.id)}</span>
+            <span className="dshx:break-words dshx:font-medium">{props.labels.agent(event.principal.id)}</span>
             <code className="dshx:text-xs dshx:text-muted-foreground">{event.operation.replace('dshx_comm_', '')}</code>
             <Badge variant={event.outcome === 'failure' ? 'destructive' : 'secondary'}>{props.t(event.outcome)}</Badge>
           </div>
@@ -113,6 +123,7 @@ const ActivityList = (props: {
 const MessageRow = (props: {
   readonly message: CommunicationMessage
   readonly selected: boolean
+  readonly labels: Labels
   readonly t: AgentCommunicationTranslate
   readonly onSelect: (messageId: string) => void
   readonly onOpenDirect: (agentId: string) => void
@@ -124,7 +135,7 @@ const MessageRow = (props: {
   >
     <div className="dshx:flex dshx:flex-wrap dshx:items-start dshx:justify-between dshx:gap-2">
       <div className="dshx:min-w-0">
-        <p className="dshx:break-all dshx:text-sm dshx:font-semibold">{principalLabel(props.message.sender, props.t)}</p>
+        <p className="dshx:break-all dshx:text-sm dshx:font-semibold">{principalLabel(props.message.sender, props.labels, props.t)}</p>
         <time className="dshx:text-xs dshx:text-muted-foreground" dateTime={new Date(props.message.createdAt).toISOString()}>
           {formatTime(props.message.createdAt)}
         </time>
@@ -165,6 +176,7 @@ const AgentStatus = (props: { readonly agent: CommunicationDiagnosticAgent; read
 
 const DiagnosticPanel = (props: {
   readonly data: CommunicationDiagnostics
+  readonly labels: Labels
   readonly t: AgentCommunicationTranslate
   readonly onAction: (action: ManagementAction) => void
   readonly busy: boolean
@@ -208,7 +220,9 @@ const DiagnosticPanel = (props: {
                 key={topic.topic}
                 className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-3 dshx:border-t dshx:border-border dshx:px-4 dshx:py-3"
               >
-                <code className="dshx:break-all dshx:text-sm">{topic.topic}</code>
+                <span className="dshx:min-w-0 dshx:truncate dshx:text-sm" title={topic.topic}>
+                  {props.labels.topic(topic.topic)}
+                </span>
                 <Badge variant="secondary">{topicMap.get(topic.topic) ?? 0}</Badge>
               </div>
             ))}
@@ -227,10 +241,16 @@ const DiagnosticPanel = (props: {
                 className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-3 dshx:border-t dshx:border-border dshx:p-4"
               >
                 <div className="dshx:min-w-0">
-                  <p className="dshx:break-all dshx:font-medium">{agentLabel(agent.id)}</p>
+                  <p className="dshx:break-words dshx:font-medium" title={agent.id}>
+                    {props.labels.agent(agent.id)}
+                  </p>
                   <div className="dshx:mt-1 dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
                     <AgentStatus agent={agent} t={t} />
-                    {agent.workspaceTopic === null ? null : <code className="dshx:text-xs dshx:text-muted-foreground">{agent.workspaceTopic}</code>}
+                    {agent.workspaceTopic === null ? null : (
+                      <span className="dshx:text-xs dshx:text-muted-foreground" title={agent.workspaceTopic}>
+                        {props.labels.topic(agent.workspaceTopic)}
+                      </span>
+                    )}
                     {agent.workspaceOptedOut ? <Badge variant="outline">{t('optedOut')}</Badge> : null}
                     {agent.workspaceSubscribed === true ? <Badge variant="secondary">{t('subscribed')}</Badge> : null}
                     {agent.workspaceTopic !== null && agent.workspaceSubscribed === undefined && !agent.workspaceOptedOut ? (
@@ -274,7 +294,7 @@ const DiagnosticPanel = (props: {
           </CardDescription>
         </CardHeader>
         <CardContent className="dshx:p-0">
-          <ActivityList events={diagnostics.activity.events} t={t} />
+          <ActivityList events={diagnostics.activity.events} labels={props.labels} t={t} />
         </CardContent>
       </Card>
     </div>
@@ -289,7 +309,6 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
   const [draft, setDraft] = useState('')
   const [draftIntent, setDraftIntent] = useState<'notice' | 'request'>('notice')
   const [newTopic, setNewTopic] = useState('')
-  const [directTarget, setDirectTarget] = useState('')
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null)
   const [action, setAction] = useState<ManagementAction | null>(null)
   const [receiptCount, setReceiptCount] = useState<number | null>(null)
@@ -301,6 +320,21 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
     retry: 1,
   })
   const diagnostics = diagnosticsQuery.data
+  const sessionLabel = EntityLabels.useSessionLabel(props.sessions)
+  const sessionCwd = EntityLabels.useSessionCwd(props.sessions)
+  const projectLabel = EntityLabels.useWorkspaceLabel(props.workspaces)
+  const labels: Labels = {
+    agent: sessionLabel,
+    // A workspace topic hashes its folder on the Host; any agent subscribed to it knows the folder through its Session.
+    topic: topic => {
+      if (!topic.startsWith('workspace/')) return topic
+      const member = diagnostics?.agents.find(agent => agent.workspaceTopic === topic)
+      const cwd = member === undefined ? null : sessionCwd(member.id)
+      if (cwd === null) return `${props.t('workspace')} · ${topic.slice('workspace/'.length, 'workspace/'.length + 8)}`
+      const project = projectLabel({ path: cwd })
+      return EntityLabels.isThreadWorkspace(cwd) ? `${project} · ${cwd.replace(/\/+$/u, '').split('/').at(-1) ?? ''}` : project
+    },
+  }
   const navigationQuery = useQuery({
     queryKey: [...browseKey, 'navigation'],
     enabled: diagnostics !== undefined,
@@ -325,7 +359,8 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
         )
     }
   }
-  const directThreads = [...threadAgents.entries()].sort(([left], [right]) => left.localeCompare(right))
+  const directThreads = [...threadAgents.entries()].sort(([left], [right]) => sessionLabel(left).localeCompare(sessionLabel(right)))
+  const pickableAgents = [...(diagnostics?.agents ?? [])].sort((left, right) => sessionLabel(left.id).localeCompare(sessionLabel(right.id)))
   const topics = new Map<string, number>((diagnostics?.topics ?? []).map(topic => [topic.topic, topic.subscribers]))
   for (const agent of diagnostics?.agents ?? []) {
     if (agent.workspaceTopic !== null && agent.workspaceTopic !== undefined && !topics.has(agent.workspaceTopic)) topics.set(agent.workspaceTopic, 0)
@@ -334,7 +369,8 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
     if (message.topic !== null && !topics.has(message.topic)) topics.set(message.topic, 0)
   }
   if (selection.kind === 'topic' && !topics.has(selection.topic)) topics.set(selection.topic, 0)
-  const topicEntries = [...topics.entries()].sort(([left], [right]) => left.localeCompare(right))
+  // Sorted by label so a project's channel sits next to its thread workspaces' channels.
+  const topicEntries = [...topics.entries()].sort(([left], [right]) => labels.topic(left).localeCompare(labels.topic(right)))
   const conversationKey = selectionKey(selection)
   const messagesQuery = useInfiniteQuery({
     queryKey: [...conversationKey, debouncedSearch],
@@ -405,8 +441,8 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
     currentTopic === null
       ? currentDirectAgent === null
         ? t('allConversations')
-        : t('directThread', { agent: currentDirectAgent })
-      : topicLabel(currentTopic, t)
+        : t('directThread', { agent: sessionLabel(currentDirectAgent) })
+      : labels.topic(currentTopic)
   const legacyHost =
     diagnostics?.unnotifiedRecipientCount !== undefined || diagnostics?.subscriptions.some(subscription => subscription.delivery !== 'passive') === true
   const missingWorkspaceCount =
@@ -415,8 +451,8 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
     action === null
       ? ''
       : action.kind === 'rejoin'
-        ? t('confirmRejoin', { agent: action.agentId, topic: action.topic })
-        : t('confirmUnsubscribe', { agent: action.agentId, topic: action.topic })
+        ? t('confirmRejoin', { agent: sessionLabel(action.agentId), topic: labels.topic(action.topic) })
+        : t('confirmUnsubscribe', { agent: sessionLabel(action.agentId), topic: labels.topic(action.topic) })
   const submitMessage = (): void => {
     if (draft.trim().length === 0 || sendMutation.isPending) return
     let input: AgentCommunicationPostInput
@@ -436,7 +472,6 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
     setDraft('')
     setDraftIntent('notice')
     setNewTopic('')
-    setDirectTarget('')
     setReceiptCount(null)
     sendMutation.reset()
   }
@@ -505,7 +540,9 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
                           onClick={() => changeSelection({ kind: 'topic', topic })}
                         >
                           <HashIcon aria-hidden />
-                          <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-left">{topicLabel(topic, t)}</span>
+                          <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-left" title={topic}>
+                            {labels.topic(topic)}
+                          </span>
                           <span className="dshx:text-xs dshx:text-muted-foreground">{subscribers}</span>
                         </Button>
                       ))}
@@ -515,27 +552,22 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
                       <p className="dshx:px-2 dshx:text-xs dshx:font-semibold dshx:uppercase dshx:tracking-wide dshx:text-muted-foreground">
                         {t('directMessages')}
                       </p>
-                      <form
-                        className="dshx:flex dshx:flex-col dshx:gap-2 dshx:px-1"
-                        onSubmit={event => {
-                          event.preventDefault()
-                          const agentId = directTarget.trim()
-                          if (agentId.length === 0 || sendMutation.isPending) return
-                          changeSelection({ kind: 'direct', agentId })
-                        }}
+                      <Select
+                        disabled={pickableAgents.length === 0 || sendMutation.isPending}
+                        onValueChange={agentId => changeSelection({ kind: 'direct', agentId })}
+                        value={selection.kind === 'direct' ? selection.agentId : ''}
                       >
-                        <Input
-                          aria-label={t('agentId')}
-                          placeholder={t('agentId')}
-                          value={directTarget}
-                          maxLength={256}
-                          disabled={sendMutation.isPending}
-                          onChange={event => setDirectTarget(event.currentTarget.value)}
-                        />
-                        <Button type="submit" variant="outline" size="sm" disabled={directTarget.trim().length === 0 || sendMutation.isPending}>
-                          {t('openThread')}
-                        </Button>
-                      </form>
+                        <SelectTrigger aria-label={t('chooseAgent')} className="dshx:mx-1 dshx:w-[calc(100%-0.5rem)]" size="sm">
+                          <SelectValue placeholder={t('chooseAgent')} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {pickableAgents.map(agent => (
+                            <SelectItem key={agent.id} value={agent.id}>
+                              {sessionLabel(agent.id)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       {directThreads.length === 0 ? (
                         <p className="dshx:px-2 dshx:py-1 dshx:text-xs dshx:text-muted-foreground">{t('noDirectThreads')}</p>
                       ) : null}
@@ -548,8 +580,23 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
                           onClick={() => changeSelection({ kind: 'direct', agentId })}
                         >
                           <MessageSquareIcon aria-hidden />
-                          <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-left">{agentId}</span>
-                          {agent === undefined ? <Badge variant="outline">{t('offlineUnknown')}</Badge> : <AgentStatus agent={agent} t={t} />}
+                          <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-left" title={agentId}>
+                            {sessionLabel(agentId)}
+                          </span>
+                          {/* A dot, not a badge: the 15rem column needs its width for the thread title. */}
+                          <span
+                            aria-label={agent === undefined ? t('offlineUnknown') : agent.status === 'running' ? t('running') : t('idle')}
+                            className={cn(
+                              'dshx:size-2 dshx:shrink-0 dshx:rounded-full',
+                              agent === undefined
+                                ? 'dshx:border dshx:border-muted-foreground'
+                                : agent.status === 'running'
+                                  ? 'dshx:bg-success'
+                                  : 'dshx:bg-muted-foreground/50',
+                            )}
+                            role="img"
+                            title={agent === undefined ? t('offlineUnknown') : agent.status === 'running' ? t('running') : t('idle')}
+                          />
                         </Button>
                       ))}
                     </div>
@@ -591,6 +638,7 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
                           key={message.id}
                           message={message}
                           selected={selectedMessageId === message.id}
+                          labels={labels}
                           t={t}
                           onSelect={messageId => setSelectedMessageId(current => (current === messageId ? null : messageId))}
                           onOpenDirect={agentId => changeSelection({ kind: 'direct', agentId })}
@@ -659,9 +707,9 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
                       <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-2">
                         <p className="dshx:text-xs dshx:text-muted-foreground">
                           {selection.kind === 'topic'
-                            ? t('sendToTopic', { topic: topicLabel(selection.topic, t) })
+                            ? t('sendToTopic', { topic: labels.topic(selection.topic) })
                             : selection.kind === 'direct'
-                              ? t('sendToAgent', { agent: selection.agentId })
+                              ? t('sendToAgent', { agent: sessionLabel(selection.agentId) })
                               : t('newChannel')}
                         </p>
                         <Button
@@ -700,7 +748,7 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
                       <>
                         <div>
                           <p className="dshx:text-xs dshx:text-muted-foreground">{t('sender')}</p>
-                          <p className="dshx:break-all dshx:text-sm dshx:font-medium">{principalLabel(selectedMessage.sender, t)}</p>
+                          <p className="dshx:break-all dshx:text-sm dshx:font-medium">{principalLabel(selectedMessage.sender, labels, t)}</p>
                         </div>
                         <div>
                           <p className="dshx:text-xs dshx:text-muted-foreground">{t('topic')}</p>
@@ -732,7 +780,7 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
                             className="dshx:flex dshx:flex-col dshx:gap-1 dshx:border-t dshx:border-border dshx:pt-2"
                           >
                             <span className="dshx:break-all dshx:text-sm">
-                              {recipient.principal.kind === 'agent' ? agentLabel(recipient.principal.id) : recipient.principal.id}
+                              {recipient.principal.kind === 'agent' ? sessionLabel(recipient.principal.id) : recipient.principal.id}
                             </span>
                             <span className="dshx:text-xs dshx:text-muted-foreground">
                               {recipient.readAt === null ? t('notRead') : t('readAt', { time: formatTime(recipient.readAt) })}
@@ -772,6 +820,7 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
                 ) : null}
                 <DiagnosticPanel
                   data={diagnostics}
+                  labels={labels}
                   t={t}
                   busy={managementMutation.isPending}
                   onAction={nextAction => {

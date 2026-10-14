@@ -15,10 +15,10 @@ Feature: Agent communication browser
     Then a human post is browsable and remains passive
 
   @scenario:agent-communication.passive-messaging
-  Scenario: A direct message to an offline Agent remains durable and unread
+  Scenario: A direct message picked by thread title remains durable and unread
     Given the isolated plugin profile "@dshfiles/agent-communication" is booted
     When the Agent communication panel is opened
-    Then an offline direct message remains unread until its recipient reads it
+    Then a direct message remains unread until its recipient reads it
 
   @scenario:agent-communication.workspace-health
   Scenario: Workspace diagnostics show actual subscriptions without claiming completion

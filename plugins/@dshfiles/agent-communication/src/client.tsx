@@ -1,4 +1,6 @@
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
+import type {} from '@deepseek-ai/dsh-api-session-controller/client'
+import type {} from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
@@ -20,7 +22,7 @@ const PanelGlyph = (props: { readonly size?: number }): JSX.Element => (
 export default defineClient({
   name: '@dshfiles/agent-communication',
   locales: [agentCommunicationLocale],
-  inject: ['slots'],
+  inject: ['slots', 'sessions', 'workspaces'],
   setup(ctx, decorate) {
     const translate = ctx.locale.bind(AGENT_COMMUNICATION_LOCALE_NAMESPACE)
     const label = (): string => translate('title')
@@ -32,7 +34,7 @@ export default defineClient({
         { name: 'main', key: PANEL_ID, locale: AGENT_COMMUNICATION_LOCALE_NAMESPACE },
         decorate(props => (
           <PluginQueryProvider>
-            <AgentCommunicationPanel t={props.t} />
+            <AgentCommunicationPanel sessions={ctx.sessions} t={props.t} workspaces={ctx.workspaces} />
           </PluginQueryProvider>
         )),
       ),

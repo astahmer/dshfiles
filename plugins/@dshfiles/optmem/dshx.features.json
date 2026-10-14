@@ -444,6 +444,7 @@
       "id": "workbench-explorer",
       "title": "Explore one project's memory and pipeline",
       "summary": "The dedicated OptMem page offers project-scoped tree browsing, paginated search and source navigation, simulated context preview, and read-only persisted pipeline diagnostics.",
+      "reach": ["click button \"OptMem\"", "expect combobox \"Memory project\""],
       "surfaces": ["client", "host", "storage"],
       "configuration": [],
       "states": ["loading", "project-selected", "searching", "node-selected", "previewing", "pipeline"],
