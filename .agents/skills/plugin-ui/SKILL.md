@@ -36,6 +36,29 @@ import { cn } from '@dshfiles/plugin-ui/lib/utils'
 - Prefer Host utilities from `@deepseek-ai/dsh-client-ui-primitives` over local copies: `relativeTime`,
   `writeClipboard`, `rankByName`.
 
+## Small views: container queries, not viewport breakpoints
+
+Plugin surfaces render in 360–480 px panes, split layouts and the composer, so size them by their own width:
+
+```tsx
+<main className="dshx-root dshx:@container dshx:flex dshx:flex-col dshx:gap-4 dshx:p-5 dshx:@max-pane-narrow:p-3">
+  <div className="dshx:flex dshx:flex-wrap dshx:gap-2 dshx:@max-pane-narrow:flex-nowrap dshx:@max-pane-narrow:overflow-x-auto">…</div>
+</main>
+```
+
+- `dshx:@container` on the surface root (page, panel, card); children query it with `dshx:@max-pane-narrow:` (< 28rem,
+  phones and 360–480 px panes) and `dshx:@max-pane-compact:` (< 42rem, split layouts). The tiers live in `styles.css`.
+- Never `sm:`/`md:`/`xl:` inside a panel: those follow the viewport, not the pane.
+- Declare a collapse order per surface and keep it in this order: labels become icons (`sr-only` keeps the accessible
+  name), secondary chips hide, then the primary text truncates (`min-w-0 truncate`), and only then does a row wrap.
+- `min-w-0` on every flex child that holds text, and `shrink` on a `Button` (its base class is `shrink-0`).
+- A container's inline size cannot come from its content: give it a width (`w-80 max-w-full`) or let a parent size it.
+- The composer row is a native container: composer slots query it directly. Order there: Drafts and Prompts lose their
+  labels (`@max-pane-compact`), the jj dock chips collapse to the working-copy chip, the model name truncates
+  (`100cqw`), and the row's own `data-model-compact` hides the name only when even that does not fit; the effort
+  never truncates.
+- Check 360, 480, 768 and 1024 px plus a split layout (see `verify-dsh`).
+
 ## Rebuild every UI plugin after any class change
 
 Each plugin injects its own copy of the Tailwind sheet. dshx dedupes them by **content hash**

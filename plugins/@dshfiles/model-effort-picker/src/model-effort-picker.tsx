@@ -65,7 +65,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select }
       <PopoverTrigger asChild>
         <Button
           aria-label={`${triggerLabel}, reasoning ${effortLabel}`}
-          className="dshx-root dshx:h-8 dshx:max-w-72 dshx:min-w-0 dshx:justify-start dshx:gap-1.5 dshx:px-2 dshx:text-left"
+          className="dshx-root dshx:h-8 dshx:max-w-72 dshx:min-w-0 dshx:justify-start dshx:gap-1.5 dshx:px-2 dshx:text-left dshx:@max-pane-narrow:gap-1 dshx:@max-pane-narrow:has-[>svg]:px-1.5"
           disabled={locked}
           size="sm"
           variant="ghost"
@@ -76,14 +76,16 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select }
             <SparklesIcon aria-hidden="true" className="dshx:size-4 dshx:shrink-0 dshx:text-muted-foreground" />
           )}
           <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:gap-1.5 dshx:leading-none">
+            {/* The name truncates with the composer row (a native container) before the effort does; the row's own
+                compact flag hides it only when even the truncated name cannot share the line. */}
             <span
-              className="dshx:min-w-0 dshx:truncate dshx:text-xs dshx:font-medium"
+              className="dshx:max-w-[clamp(3rem,calc(100cqw-21rem),12rem)] dshx:min-w-0 dshx:truncate dshx:text-xs dshx:font-medium"
               data-model-picker-text
               style={{ display: 'var(--dsh-composer-model-text-display, inline)' }}
             >
               {triggerLabel}
             </span>
-            <span aria-hidden="true" className="dshx:text-[10px] dshx:text-muted-foreground">
+            <span aria-hidden="true" className="dshx:text-[10px] dshx:text-muted-foreground dshx:@max-pane-narrow:hidden">
               ·
             </span>
             <span

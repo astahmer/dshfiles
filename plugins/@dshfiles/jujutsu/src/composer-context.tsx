@@ -175,7 +175,7 @@ export const ComposerChangesBar = (props: ComposerSlotProps): JSX.Element | null
       <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:px-1 dshx:py-0.5">
         <Button
           aria-expanded={expanded}
-          className="dshx:min-w-0 dshx:justify-start dshx:text-muted-foreground"
+          className="dshx:min-w-0 dshx:shrink dshx:justify-start dshx:overflow-hidden dshx:text-muted-foreground"
           disabled={fileCount === 0}
           onClick={() => setExpanded(open => !open)}
           size="xs"
@@ -278,9 +278,12 @@ export const ComposerChangesBar = (props: ComposerSlotProps): JSX.Element | null
   )
 }
 
-const Chip = (props: { readonly title: string; readonly onClick: () => void; readonly children: ReactNode }) => (
+const Chip = (props: { readonly title: string; readonly onClick: () => void; readonly className?: string; readonly children: ReactNode }) => (
   <button
-    className="dshx:flex dshx:min-w-0 dshx:cursor-pointer dshx:items-center dshx:gap-1 dshx:whitespace-nowrap dshx:rounded-md dshx:px-1.5 dshx:py-0.5 dshx:hover:bg-accent dshx:hover:text-foreground dshx:[&_svg]:size-3 dshx:[&_svg]:flex-none"
+    className={cn(
+      'dshx:flex dshx:min-w-0 dshx:cursor-pointer dshx:items-center dshx:gap-1 dshx:whitespace-nowrap dshx:rounded-md dshx:px-1.5 dshx:py-0.5 dshx:hover:bg-accent dshx:hover:text-foreground dshx:[&_svg]:size-3 dshx:[&_svg]:flex-none',
+      props.className,
+    )}
     onClick={props.onClick}
     title={props.title}
     type="button"
@@ -299,13 +302,18 @@ export const ComposerChips = (props: ComposerSlotProps): JSX.Element | null => {
   const ownBookmark = repository.bookmarks[0]
   const nearestBookmark = repository.nearestBookmarks[0]
   return (
-    <div className="dshx-root dshx:flex dshx:max-w-full dshx:min-w-0 dshx:items-center dshx:gap-0.5 dshx:text-xs dshx:text-muted-foreground" ref={context.ref}>
-      <Chip onClick={toggle} title={'Toggle Jujutsu on ' + repository.root}>
+    // A 20rem container that shrinks with the dock: once squeezed the folder chip goes, then the workspace chip,
+    // leaving only the working-copy chip, so the chips never spill over the context meter.
+    <div
+      className="dshx-root dshx:@container dshx:flex dshx:w-80 dshx:max-w-full dshx:min-w-0 dshx:shrink dshx:items-center dshx:justify-center dshx:gap-0.5 dshx:overflow-hidden dshx:text-xs dshx:text-muted-foreground"
+      ref={context.ref}
+    >
+      <Chip className="dshx:shrink-[3] dshx:@max-xs:hidden" onClick={toggle} title={'Toggle Jujutsu on ' + repository.root}>
         <FolderIcon />
         <span className="dshx:max-w-40 dshx:truncate">{basename(repository.root)}</span>
       </Chip>
       {repository.workspace !== null && (
-        <Chip onClick={toggle} title={'JJ workspace ' + repository.workspace}>
+        <Chip className="dshx:shrink-[2] dshx:@max-3xs:hidden" onClick={toggle} title={'JJ workspace ' + repository.workspace}>
           <LayersIcon />
           <span className="dshx:max-w-32 dshx:truncate">{repository.workspace}</span>
         </Chip>
@@ -315,12 +323,12 @@ export const ComposerChips = (props: ComposerSlotProps): JSX.Element | null => {
         title={'@ ' + repository.changeId + ' (' + repository.commitId + ')' + (repository.description.length > 0 ? ' — ' + repository.description : '')}
       >
         {ownBookmark !== undefined || nearestBookmark !== undefined ? <GitBranchIcon /> : <GitCommitHorizontalIcon />}
-        <span className="dshx:font-mono!">@ {repository.changeId}</span>
+        <span className="dshx:min-w-0 dshx:truncate dshx:font-mono!">@ {repository.changeId}</span>
         {repository.conflict && <span className="dshx:text-destructive">conflict</span>}
         {ownBookmark !== undefined ? (
-          <span className="dshx:max-w-48 dshx:truncate dshx:text-foreground">· {ownBookmark}</span>
+          <span className="dshx:max-w-48 dshx:min-w-0 dshx:shrink-[3] dshx:truncate dshx:text-foreground">· {ownBookmark}</span>
         ) : nearestBookmark !== undefined ? (
-          <span className="dshx:max-w-48 dshx:truncate" title={'Nearest ancestor bookmark: ' + nearestBookmark}>
+          <span className="dshx:max-w-48 dshx:min-w-0 dshx:shrink-[3] dshx:truncate" title={'Nearest ancestor bookmark: ' + nearestBookmark}>
             · {nearestBookmark}+
           </span>
         ) : (

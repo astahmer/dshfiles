@@ -64,6 +64,16 @@
   --radius-xl: 12px;
 }
 
+/*
+ * Container tiers for plugin surfaces, queried with `dshx:@max-pane-narrow:` / `dshx:@max-pane-compact:`
+ * against the nearest `dshx:@container` (or a native container such as the composer row). Panels live in
+ * split layouts and side panes, so they follow their own width, never the viewport (skill plugin-ui).
+ */
+@theme {
+  --container-pane-narrow: 28rem;
+  --container-pane-compact: 42rem;
+}
+
 @layer base {
   :root {
     --dshx-kit-teal: oklch(0.58 0.1 185);

@@ -158,7 +158,7 @@ export const PromptStashAction = (
           }}
         >
           <NotebookPenIcon />
-          Drafts
+          <span className="dshx:@max-pane-compact:sr-only">Drafts</span>
         </Button>
       </PopoverTrigger>
       <PopoverContent

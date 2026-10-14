@@ -40,6 +40,7 @@ import { cn } from '@dshfiles/plugin-ui/lib/utils'
 - Put `dshx-root` on each surface root you render. Prefix every utility (`dshx:hover:bg-accent`), write complete static class strings, merge with `cn`.
 - Components: `src/components/ui/` (button, input, textarea, label, select, checkbox, switch, tabs, badge, card, table, dialog, alert-dialog, dropdown-menu, context-menu, popover, tooltip, command, separator, skeleton, toggle, toggle-group, collapsible, alert, kbd, spinner, empty, field, input-group, item, progress, scroll-area). Wrap tooltips in `TooltipProvider`.
 - Icons: `import { RefreshCwIcon } from '@dshfiles/plugin-ui/icons'` (lucide-react re-exported, so plugins need no extra dependency); Host `Icon*` from `@deepseek-ai/dsh-client-ui-primitives` where a DSH-native glyph matters.
+- Small views: `dshx:@container` on a surface root, then `dshx:@max-pane-narrow:` (< 28rem) and `dshx:@max-pane-compact:` (< 42rem) on its children. Panels follow their own width, not the viewport; the collapse-order rules are in the `plugin-ui` skill.
 
 ### Adding a registry component
 

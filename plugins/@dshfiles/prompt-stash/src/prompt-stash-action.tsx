@@ -377,7 +377,7 @@ const PromptStashAction = (props: ComposerActionProps): JSX.Element => {
           onMouseDown={event => event.preventDefault()}
         >
           <BookmarkIcon />
-          Prompts
+          <span className="dshx:@max-pane-compact:sr-only">Prompts</span>
         </Button>
       </PopoverTrigger>
       <PopoverContent
