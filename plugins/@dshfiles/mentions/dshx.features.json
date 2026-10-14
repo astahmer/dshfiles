@@ -53,6 +53,61 @@
           "testName": "caps the menu and ranks 500 entries in well under a frame"
         }
       ]
+    },
+    {
+      "id": "session-mention-links",
+      "title": "Referenced threads open on click",
+      "summary": "A thread chip in the composer, the thread chip in a sent message and its \"Referenced session \u00b7 \u2026\" line open that thread. With @dshfiles/main-tabs the thread opens per the tabs openMode setting, and Cmd/Ctrl-click always opens a new tab.",
+      "reach": [
+        "click button \"New thread\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Seed a mention target\"",
+        "press Enter",
+        "click button \"New thread\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"@t:\"",
+        "expect text \"Threads \u00b7 @f: files\"",
+        "press Enter",
+        "press Enter",
+        "expect link \"Referenced session*\""
+      ],
+      "surfaces": ["client"],
+      "configuration": [],
+      "states": ["composer-chip", "sent-chip", "reference-line", "new-tab"],
+      "failureModes": [
+        "A reference line naming a thread that is no longer listed stays inert.",
+        "Without @dshfiles/main-tabs, or with its tabs off, Cmd/Ctrl-click opens the thread like a plain click."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "mentions.session-mention-links",
+          "featureFile": "tooling/dshx/e2e/features/mentions.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "mentions.session-id-from-mention",
+          "file": "plugins/@dshfiles/mentions/src/session-links.test.ts",
+          "testName": "reads the session id out of a canonical mention and ignores anything else"
+        },
+        {
+          "kind": "unit-test",
+          "id": "mentions.referenced-sessions",
+          "file": "plugins/@dshfiles/mentions/src/session-links.test.ts",
+          "testName": "maps labels to the sessions a thread referenced, the latest reference winning"
+        },
+        {
+          "kind": "unit-test",
+          "id": "mentions.reference-line-label",
+          "file": "plugins/@dshfiles/mentions/src/session-links.test.ts",
+          "testName": "finds the clicked label in a \"Referenced session\" line"
+        },
+        {
+          "kind": "unit-test",
+          "id": "mentions.main-tabs-new-tab",
+          "file": "plugins/@dshfiles/main-tabs/src/tabs-machine.test.ts",
+          "testName": "opens a Mod-clicked thread in a new tab even in preview mode, and navigates to it"
+        }
+      ]
     }
   ]
 }

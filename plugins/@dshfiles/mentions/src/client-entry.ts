@@ -3,6 +3,7 @@ import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import type { InputTriggerCandidate, InputTriggerCrumb, InputTriggerSource } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
+import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { relativeTime } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { FileReferenceCandidate } from '@deepseek-ai/dsh-file-reference/types'
 import type { SessionReferenceMentionCandidate } from '@deepseek-ai/dsh-session-reference'
@@ -10,6 +11,8 @@ import { defineClient } from '@dshfiles/dshx/client'
 import { FileMentions } from './file-mentions.js'
 import { MENTIONS_LOCALE_NAMESPACE, mentionsLocale } from './locales.js'
 import { MentionRanking, type FileEntry, type MentionQuery, type ThreadEntry } from './mention-ranking.js'
+import { SessionLinks } from './session-links.js'
+import './client.css'
 
 // The native chip codec, copy/paste and send-time serialization are keyed by this source name.
 const SOURCE_NAME = 'reference'
@@ -21,6 +24,11 @@ declare module '@deepseek-ai/dsh-api-session-controller/client' {
   }
 }
 const TIMING_MEASURE = 'dshfiles-mentions:candidates'
+// @dshfiles/main-tabs takes this cancelable window event to open a thread in a tab.
+const OPEN_THREAD_EVENT = 'dshfiles:open-thread'
+// A sent message's in-text session chip (ui-primitives `projectUserText`) and its "Referenced session · …" line (ui-chat).
+const SESSION_CHIP = '[data-ref-chip="session"]'
+const SESSION_LINK = `${SESSION_CHIP}, [class*="_referenceSummary"]`
 
 type PickValue =
   | { readonly kind: 'file'; readonly fileKind: 'file' | 'directory'; readonly label: string; readonly mention: string; readonly drillText: string }
@@ -39,7 +47,7 @@ const drillTextFor = (query: MentionQuery, mention: string): string =>
 export default defineClient({
   name: '@dshfiles/mentions',
   locales: [mentionsLocale],
-  inject: ['inputTriggers', 'sessions', 'remote', 'remote.fileReferences', 'remote.sessionReferenceResolver', 'sidebarRight'],
+  inject: ['inputTriggers', 'sessions', 'remote', 'remote.fileReferences', 'remote.sessionReferenceResolver', 'sidebarRight', 'uiWorkspace'],
   setup(ctx) {
     const t = ctx.locale.bind(MENTIONS_LOCALE_NAMESPACE)
     const pickValues = new Map<string, PickValue>()
@@ -70,6 +78,89 @@ export default defineClient({
       }
       return crumbs
     }
+
+    // The composer hands `openReference` no event, so a Mod-click is read from the pointer that just went down.
+    let modifiedPointerAt = Number.NEGATIVE_INFINITY
+    const MODIFIER_WINDOW_MS = 1000
+    const wantsNewTab = (): boolean => performance.now() - modifiedPointerAt < MODIFIER_WINDOW_MS
+
+    /** Open a referenced thread; Mod-click asks @dshfiles/main-tabs for a new tab, a plain click follows its openMode. */
+    const openThread = (sessionId: string, newTab: boolean): boolean => {
+      const listed = sessions.list.getSnapshot().ids.find(id => id === sessionId)
+      if (listed === undefined) return false
+      if (newTab && !window.dispatchEvent(new CustomEvent(OPEN_THREAD_EVENT, { detail: { sessionId: listed, newTab: true }, cancelable: true }))) return true
+      ctx.uiWorkspace.openSession(listed)
+      return true
+    }
+
+    /** The session a sent message's chip or "Referenced session · …" line names, read from that thread's own recall events. */
+    const referencedSessionAt = (element: Element, point: { readonly x: number; readonly y: number }): string | undefined => {
+      const fromMention = SessionLinks.idFromMention(element.getAttribute('title') ?? '')
+      if (fromMention !== undefined) return fromMention
+      const threadId = element.closest('[data-conversation-session]')?.getAttribute('data-conversation-session') ?? ''
+      const thread = sessions.list.getSnapshot().ids.find(id => id === threadId)
+      const events = thread === undefined ? [] : (sessions.binding(thread)?.eventSource.getSnapshot().entries ?? []).map(entry => entry.event)
+      const byLabel = SessionLinks.referencedSessions(events)
+      if (element.matches(SESSION_CHIP)) return byLabel.get((element.getAttribute('title') ?? '').replace(/^@/u, ''))
+      const caret = document.caretPositionFromPoint?.(point.x, point.y)
+      const label = SessionLinks.labelAt({
+        text: element.textContent ?? '',
+        offset: caret?.offsetNode.parentElement === element ? caret.offset : undefined,
+        labels: byLabel.keys(),
+      })
+      return label === undefined ? undefined : byLabel.get(label)
+    }
+
+    const sessionLinkOf = (target: EventTarget | null): Element | null =>
+      target instanceof Element && target.closest('[data-composer-card]') === null ? target.closest(SESSION_LINK) : null
+
+    const onPointerDown = (event: PointerEvent): void => {
+      if (event.metaKey || event.ctrlKey) modifiedPointerAt = performance.now()
+    }
+    const onClick = (event: MouseEvent): void => {
+      const link = sessionLinkOf(event.target)
+      if (link === null || event.button !== 0 || document.getSelection()?.isCollapsed === false) return
+      const sessionId = referencedSessionAt(link, { x: event.clientX, y: event.clientY })
+      if (sessionId !== undefined && openThread(sessionId, event.metaKey || event.ctrlKey)) event.preventDefault()
+    }
+    const onKeyDown = (event: KeyboardEvent): void => {
+      const link = event.key === 'Enter' ? sessionLinkOf(event.target) : null
+      if (link === null) return
+      const box = link.getBoundingClientRect()
+      const sessionId = referencedSessionAt(link, { x: box.left + 1, y: box.top + box.height / 2 })
+      if (sessionId !== undefined && openThread(sessionId, event.metaKey || event.ctrlKey)) event.preventDefault()
+    }
+    // Native renders these as inert text; marking them keeps React's own nodes and only adds link semantics.
+    const markLinks = (): void => {
+      for (const element of document.querySelectorAll(`${SESSION_LINK}:not([data-dshfiles-session-link])`)) {
+        if (element.closest('[data-composer-card]') !== null) continue
+        element.setAttribute('data-dshfiles-session-link', '')
+        element.setAttribute('role', 'link')
+        element.setAttribute('tabindex', '0')
+      }
+    }
+    ctx.effect(() => {
+      let frame = 0
+      const observer = new MutationObserver(() => {
+        if (frame === 0)
+          frame = requestAnimationFrame(() => {
+            frame = 0
+            markLinks()
+          })
+      })
+      observer.observe(document.body, { childList: true, subtree: true })
+      markLinks()
+      window.addEventListener('pointerdown', onPointerDown, true)
+      window.addEventListener('click', onClick)
+      window.addEventListener('keydown', onKeyDown)
+      return () => {
+        observer.disconnect()
+        cancelAnimationFrame(frame)
+        window.removeEventListener('pointerdown', onPointerDown, true)
+        window.removeEventListener('click', onClick)
+        window.removeEventListener('keydown', onKeyDown)
+      }
+    }, 'dshfiles-mentions: referenced sessions open their thread')
 
     const source: InputTriggerSource = {
       trigger: '@',
@@ -180,6 +271,10 @@ export default defineClient({
         }
       },
       openReference(session, reference) {
+        if (reference.appearance === 'session') {
+          const sessionId = SessionLinks.idFromMention(reference.ref)
+          return sessionId !== undefined && openThread(sessionId, wantsNewTab())
+        }
         if (reference.appearance !== 'file') return false
         const path = reference.ref.startsWith('@"') ? reference.ref.slice(2, -1) : reference.ref.slice(1)
         const cwd = sessions.list.getSnapshot().byId[session.sessionId]?.cwd

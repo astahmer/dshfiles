@@ -1,0 +1,13 @@
+[data-dshfiles-session-link] {
+  cursor: pointer;
+}
+
+[data-dshfiles-session-link]:hover,
+[data-dshfiles-session-link]:focus-visible {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+[data-composer-chip='reference'] {
+  cursor: pointer;
+}

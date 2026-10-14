@@ -15,6 +15,8 @@ This is an owned DSH bundle built with dshx (no port: nothing upstream does this
 - **Thread indicators**: a dot for _needs your input_ (an approval or a question), _working_ (pulsing), and _finished, unread_.
 - **Keyboard**: Desktop Mod+1…8 / Mod+9 (last), Ctrl+Tab / Ctrl+Shift+Tab (Ctrl+Shift+] / [ on Linux). The browser keeps those keys, so the Web defaults are Mod+Alt+1…9 and Mod+Alt+] / [. Mod+T (Web: Mod+Alt+T) opens a new tab. All are listed and rebindable in Settings › Shortcuts. Arrow keys, Home/End, Enter and Delete work inside the focused strip.
 
+- **From other plugins**: a cancelable `dshfiles:open-thread` window event with `{ sessionId, newTab }` opens a thread in a tab; `newTab: true` keeps every tab whatever `openMode` says (Cmd/Ctrl-click on a thread reference in `@dshfiles/mentions`). The dispatch comes back cancelled when a tab took it; otherwise the caller opens the thread itself.
+
 ## Settings (`dshfiles-main-tabs`)
 
 | Key           | Default   | Meaning                                                                                                                                      |

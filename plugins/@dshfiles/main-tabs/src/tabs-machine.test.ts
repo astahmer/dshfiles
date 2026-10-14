@@ -65,6 +65,20 @@ describe('tabsMachine', () => {
     expect(tabs.ids()).toEqual(['thread:b', 'thread:c'])
   })
 
+  it('opens a Mod-clicked thread in a new tab even in preview mode, and navigates to it', () => {
+    const tabs = start({ preferences: { openMode: 'preview' } })
+    tabs.enable()
+    tabs.host(thread('a'))
+    tabs.actor.send({ type: 'tab.open', target: thread('b'), newTab: true })
+    tabs.actor.send({ type: 'tab.open', target: thread('c'), newTab: true })
+    expect(tabs.ids()).toEqual(['thread:a', 'thread:b', 'thread:c'])
+    expect(tabs.set().activeTabId).toBe('thread:c')
+    expect(tabs.navigated.at(-1)).toEqual(thread('c'))
+    tabs.actor.send({ type: 'tab.open', target: thread('d'), newTab: false })
+    // A plain open follows openMode: it takes the preview tab's place.
+    expect(tabs.ids()).toEqual(['thread:d', 'thread:b', 'thread:c'])
+  })
+
   it('replaces the active tab in replace mode, but never a pinned one', () => {
     const tabs = start({ preferences: { openMode: 'replace' } })
     tabs.enable()

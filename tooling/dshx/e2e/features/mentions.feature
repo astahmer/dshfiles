@@ -1,4 +1,4 @@
-Feature: Ranked @ mentions
+Feature: Ranked @ mentions and thread links
 
   The @ menu is @dshfiles/mentions' own source over the native file and
   thread lookups. Turns fail for lack of a provider; the threads exist only
@@ -16,3 +16,14 @@ Feature: Ranked @ mentions
     Then no thread row is listed under the heading "Files · @t: threads"
     When the highlighted mention row is picked with the keyboard
     Then the composer holds a native reference chip
+
+  @scenario:mentions.session-mention-links
+  Scenario: Referenced threads open from the sent message, in a new tab on Cmd-click
+    Given the isolated plugin composition of "@dshfiles/mentions, @dshfiles/main-tabs" is booted
+    When threads named "Mention target" and "Second thread" are started
+    And a new thread mentions "Mention target" and is sent
+    Then the sent message links to "Mention target"
+    When the "Referenced session" link is clicked
+    Then the thread "Mention target" is shown
+    When the sending thread is shown again and its thread chip is Cmd-clicked
+    Then the thread "Mention target" is shown in a tab of its own

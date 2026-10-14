@@ -53,6 +53,8 @@ export type TabsEvent =
   /** A suggestion picked on the new-tab page: its target takes the page's place; null closes it (New thread, Settings). */
   | { readonly type: 'start.pick'; readonly target: HostTarget | null }
   | { readonly type: 'tab.select'; readonly tabId: string }
+  /** Open a target from outside the main view; `newTab` keeps every existing tab, whatever `openMode` says (Mod-click). */
+  | { readonly type: 'tab.open'; readonly target: TabTarget; readonly newTab: boolean }
   | { readonly type: 'tab.close'; readonly tabId: string }
   | { readonly type: 'tab.closeOthers'; readonly tabId: string }
   | { readonly type: 'tab.closeToRight'; readonly tabId: string }
@@ -362,6 +364,18 @@ export const tabsMachine = setup({
               const remaining = set.tabs.filter(tab => tab.id !== START_TAB_ID)
               const hostTabId = context.hostTarget === null ? null : tabIdOf(context.hostTarget)
               return withSet(context, { tabs: remaining, activeTabId: remaining.some(tab => tab.id === hostTabId) ? hostTabId : null })
+            }),
+            'navigateToActive',
+            'persist',
+          ],
+        },
+        'tab.open': {
+          target: '.navigating',
+          actions: [
+            assign(({ context, event }) => {
+              const clock = context.clock + 1
+              const preferences: TabPreferences = event.newTab ? { ...context.preferences, openMode: 'new' } : context.preferences
+              return { clock, ...withSet(context, openTarget(currentSet(context), event.target, preferences, clock)) }
             }),
             'navigateToActive',
             'persist',

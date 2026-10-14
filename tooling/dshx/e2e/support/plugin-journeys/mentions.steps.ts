@@ -7,6 +7,7 @@ const THREAD_COMPOSER = 'Message or run a task, / commands, @ files or sessions'
 
 const newThreadComposer = (page: Page) => page.getByRole('textbox', { name: NEW_THREAD_COMPOSER, exact: true })
 const mentionRows = (page: Page) => page.getByRole('listbox').getByRole('option')
+const threadHeader = (page: Page, title: string) => page.locator('[data-conversation-session]:visible').getByText(title, { exact: true }).first()
 
 // A click while the previous turn settles can be dropped, so the New-thread screen is awaited and the click retried.
 const openNewThread = async (page: Page): Promise<void> => {
@@ -75,6 +76,47 @@ When('the highlighted mention row is picked with the keyboard', async ({ page }:
 Then('the composer holds a native reference chip', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'mentions-native-chip', async () => {
     await expect(page.locator('[data-composer-card] [data-composer-chip="reference"]')).toHaveCount(1)
+  })
+  await finishJourneyAssertions(page)
+})
+
+When('a new thread mentions {string} and is sent', async ({ page }: { page: Page }, title: string) => {
+  await typeInNewThread(page, `@t:${title.split(' ')[0] ?? ''}`)
+  await mentionRows(page).filter({ hasText: title }).first().click()
+  await newThreadComposer(page).pressSequentially(' what changed there?')
+  await newThreadComposer(page).press('Enter')
+  await expect(page.getByRole('textbox', { name: THREAD_COMPOSER, exact: true })).toBeVisible()
+})
+
+Then('the sent message links to {string}', async ({ page }: { page: Page }, title: string) => {
+  await recordAssertion(page, 'mentions-sent-reference-is-a-link', async () => {
+    await expect(page.getByRole('link', { name: `Referenced session · ${title}` })).toBeVisible()
+    await expect(page.locator('[data-ref-chip="session"][role="link"]:visible')).toHaveCount(1)
+  })
+})
+
+When('the {string} link is clicked', async ({ page }: { page: Page }, name: string) => {
+  await page.getByRole('link', { name: new RegExp(`^${name}`) }).click({ position: { x: 150, y: 8 } })
+})
+
+Then('the thread {string} is shown', async ({ page }: { page: Page }, title: string) => {
+  await recordAssertion(page, 'mentions-link-opens-thread', async () => {
+    await expect(threadHeader(page, title)).toBeVisible()
+  })
+})
+
+When('the sending thread is shown again and its thread chip is Cmd-clicked', async ({ page }: { page: Page }) => {
+  await page.getByText('Mention target what changed there?', { exact: false }).first().click()
+  const chip = page.locator('[data-ref-chip="session"][role="link"]:visible')
+  await expect(chip).toHaveCount(1)
+  await chip.click({ modifiers: ['ControlOrMeta'] })
+})
+
+Then('the thread {string} is shown in a tab of its own', async ({ page }: { page: Page }, title: string) => {
+  await recordAssertion(page, 'mentions-mod-click-new-tab', async () => {
+    await expect(threadHeader(page, title)).toBeVisible()
+    await expect(page.getByRole('tab').filter({ hasText: new RegExp(`^${title}$`) })).toHaveCount(1)
+    await expect(page.getByRole('tab').filter({ hasText: 'what changed' })).toHaveCount(1)
   })
   await finishJourneyAssertions(page)
 })

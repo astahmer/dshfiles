@@ -10,6 +10,7 @@ import { defineClient, useSettings } from '@dshfiles/dshx/client'
 import { MessageSquareIcon, MessageSquarePlusIcon, PanelsTopLeftIcon, SettingsIcon } from '@dshfiles/plugin-ui/icons'
 import { createActor } from '@dshfiles/plugin-ui/machine'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { z } from 'zod'
 import { createPortal } from 'react-dom'
 import { readHostView } from './host-target.js'
 import { MAIN_TABS_LOCALE_NAMESPACE, mainTabsLocale } from './locales.js'
@@ -74,6 +75,13 @@ const usePlacementCheck = (host: HTMLElement | null, rendered: boolean): void =>
   }, [host, rendered])
 }
 
+/**
+ * Another plugin asks for a thread through this cancelable window event; a cancelled dispatch means a tab took it, so
+ * the caller falls back to `uiWorkspace.openSession` only when this plugin is absent or switched off.
+ */
+const OPEN_THREAD_EVENT = 'dshfiles:open-thread'
+const openThreadRequestSchema = z.object({ sessionId: z.string().min(1), newTab: z.boolean() })
+
 export default defineClient({
   name: '@dshfiles/main-tabs',
   locales: [mainTabsLocale],
@@ -101,6 +109,17 @@ export default defineClient({
       actor.start()
       return () => actor.stop()
     }, 'main-tabs: tabs machine')
+
+    ctx.effect(() => {
+      const onOpenThread = (event: Event): void => {
+        const request = event instanceof CustomEvent ? openThreadRequestSchema.safeParse(event.detail) : undefined
+        if (request?.success !== true || !actor.getSnapshot().matches('on')) return
+        event.preventDefault()
+        actor.send({ type: 'tab.open', target: { kind: 'thread', sessionId: request.data.sessionId }, newTab: request.data.newTab })
+      }
+      window.addEventListener(OPEN_THREAD_EVENT, onOpenThread)
+      return () => window.removeEventListener(OPEN_THREAD_EVENT, onOpenThread)
+    }, 'main-tabs: open a thread for another plugin')
 
     ctx.effect(() => {
       let reported = ''
