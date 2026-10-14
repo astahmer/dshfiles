@@ -36,6 +36,13 @@ until it is ready; typing does not. Each new thread is moved at most once, so a
 manual toggle sticks. The thread sidebar shows a thread workspace's sessions
 under its project.
 
+## Finding a thread workspace
+
+The **Thread workspaces** page is available from the left panel and as a tab in
+the conversation's right side panel, beside Jujutsu and other tools. Its rows
+show the linked conversation titles. Choose a title to open that conversation;
+**Preview** loads the latest three user/assistant text messages on demand.
+
 ## Landing
 
 **Land** (thread header, the panel, or the `jj_thread_land` tool) runs in the
@@ -66,9 +73,15 @@ thread's agent to fix them and call `jj_thread_land` again
 Every 10 minutes, a thread workspace whose threads are all archived and that
 holds no unlanded work is removed: `jj workspace forget`, its own empty
 revisions abandoned (no stray heads), its directory deleted, its registry entry
-dropped. A workspace with unlanded work is never removed automatically; the
-**Discard with work** in its row's More menu deletes it after a confirmation
-that names how many revisions go with it.
+dropped. The conversation sessions stay in DSH and remain archived. A workspace
+with unlanded work is never removed automatically; the row's More menu offers
+**Remove workspace and work…** behind a confirmation that names how many
+revisions will be abandoned.
+
+Manual removal forgets the jj workspace, removes its DSH workspace registration,
+and permanently deletes its folder. It does **not** archive or delete the
+conversation sessions; they remain in DSH with their original archive state.
+The confirmation dialog explains these effects before removal.
 
 ## Agent tools
 

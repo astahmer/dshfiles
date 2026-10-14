@@ -77,7 +77,8 @@ const provisionedThreadName = (page: Page): string => {
   return threadName
 }
 
-const threadRow = (page: Page) => page.getByRole('listitem').filter({ has: page.getByText(provisionedThreadName(page), { exact: true }) })
+const threadRow = (page: Page) =>
+  page.getByRole('listitem').filter({ has: page.getByRole('button', { name: `More actions for ${provisionedThreadName(page)}`, exact: true }) })
 
 const createRepository = async (page: Page): Promise<ThreadRepository> => {
   const temporaryRoot = await realpath(await mkdtemp(join(tmpdir(), 'dshx-jj-integration-e2e-')))
@@ -370,6 +371,25 @@ Then('the thread row offers Land for its 1 unlanded revision', async ({ page }: 
   })
 })
 
+When('the conversation is opened from its workspace row', async ({ page }: { page: Page }) => {
+  await threadRow(page)
+    .getByRole('button', { name: /^Open thread:/ })
+    .first()
+    .click()
+  await expect(page.getByRole('navigation', { name: 'Session hierarchy', exact: true })).toContainText('jj integration land e2e thread')
+})
+
+When('the Thread workspaces side panel is opened', async ({ page }: { page: Page }) => {
+  await page.getByRole('button', { name: 'Open thread workspaces in side panel', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Thread workspaces', exact: true }).last()).toBeVisible()
+})
+
+Then('its Preview shows the latest message', async ({ page }: { page: Page }) => {
+  const row = threadRow(page)
+  await row.getByRole('button', { name: 'Preview', exact: true }).first().click()
+  await expect(row).toContainText('jj integration land e2e thread')
+})
+
 When("{string} is chosen from the thread row's More menu", async ({ page }: { page: Page }, item: string) => {
   await threadRow(page)
     .getByRole('button', { name: `More actions for ${provisionedThreadName(page)}`, exact: true })
@@ -378,22 +398,26 @@ When("{string} is chosen from the thread row's More menu", async ({ page }: { pa
 })
 
 Then('the confirmation names the thread and its 1 unlanded revision', async ({ page }: { page: Page }) => {
-  await recordAssertion(page, 'jj-integration-discard-confirmation-names-the-revision-count', () =>
-    expect(page.getByRole('alertdialog').getByRole('heading')).toHaveText(`Discard ${provisionedThreadName(page)} and its 1 unlanded revision(s)?`),
-  )
+  await recordAssertion(page, 'jj-integration-removal-confirmation', async () => {
+    const dialog = page.getByRole('alertdialog')
+    await expect(dialog.getByRole('heading')).toHaveText(`Remove ${provisionedThreadName(page)} and abandon 1 unlanded revision(s)?`)
+    await expect(dialog).toContainText('deletes its folder')
+    await expect(dialog).toContainText('conversations remain in DSH and are not archived')
+  })
 })
 
-When('the discard is confirmed', async ({ page }: { page: Page }) => {
-  await page.getByRole('alertdialog').getByRole('button', { name: 'Discard with work', exact: true }).click()
+When('the removal is confirmed', async ({ page }: { page: Page }) => {
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Abandon work and remove workspace', exact: true }).click()
 })
 
 Then('the thread workspace is gone from jj and from the panel', async ({ page }: { page: Page }) => {
   const repository = repositoryFor(page)
-  await recordAssertion(page, 'jj-integration-discard-removes-the-thread-and-its-empty-card', async () => {
+  await recordAssertion(page, 'jj-integration-remove-preserves-session', async () => {
     await expect(page.getByRole('alertdialog')).toHaveCount(0)
     await expect.poll(() => workspaceNames(repository)).toEqual(['default'])
-    await expect(page.getByText(provisionedThreadName(page), { exact: true })).toHaveCount(0)
+    await expect(threadRow(page)).toHaveCount(0)
     await expect(page.getByText(repository.repositoryPath, { exact: true })).toHaveCount(0)
+    await expect(page.getByRole('navigation', { name: 'Session hierarchy', exact: true })).toContainText('jj integration land e2e thread')
   })
   await finishJourneyAssertions(page)
 })

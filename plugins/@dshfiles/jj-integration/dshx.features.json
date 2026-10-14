@@ -221,14 +221,37 @@
     {
       "id": "thread-workspaces-panel",
       "title": "Thread workspaces page",
-      "summary": "Sidebar page listing every project's thread workspaces with their unlanded revisions; Land shows only when a thread has work, and Discard sits in each row's More menu behind a confirmation that names the revision count.",
-      "reach": ["click button \"Thread workspaces\"", "expect heading \"Thread workspaces\""],
+      "summary": "Available as a main page and a conversation side-panel tab beside Jujutsu. Rows show conversation titles with open links and lazy recent-message previews; workspace removal explains jj/DSH registration deletion, folder removal, conversation retention, and abandoned revisions in a confirmation dialog.",
+      "reach": [
+        "click button \"New thread\"",
+        "click checkbox \"workspace\"",
+        "expect status \"thread-*\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Thread workspace panel reach\"",
+        "press Enter",
+        "expect button \"Open thread workspaces in side panel\"",
+        "click button \"Open thread workspaces in side panel\"",
+        "expect heading \"Thread workspaces\"",
+        "click button \"Preview\"",
+        "expect text \"You\""
+      ],
       "configuration": [],
       "surfaces": ["client", "host", "integration"],
-      "states": ["loading", "no-repositories", "no-threads", "unlanded", "up-to-date", "discard-confirming", "discard-failed"],
+      "states": [
+        "loading",
+        "no-repositories",
+        "no-threads",
+        "side-panel",
+        "thread-titles",
+        "message-preview",
+        "unlanded",
+        "up-to-date",
+        "removal-confirming",
+        "removal-failed"
+      ],
       "failureModes": [
-        "Work that appears after the discard dialog opened is refused by the Host and never deleted unseen; the dialog asks for a refresh.",
-        "A Host error while discarding stays in the dialog with a retry."
+        "Work that appears after the removal dialog opened is refused by the Host and never deleted unseen; the dialog asks for a refresh.",
+        "A Host error while removing stays in the dialog with a retry.",
+        "Removal deletes the jj workspace and folder but retains conversation sessions in DSH without changing their archive state."
       ],
       "externalDependencies": [
         {

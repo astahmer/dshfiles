@@ -4,8 +4,10 @@ import type { EmptyWorkspaceOwnerProps } from '@deepseek-ai/dsh-client-ui-conver
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
+import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import { createApiClient, defineClient, useApi, useSettings } from '@dshfiles/dshx/client'
+import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { hostDestination, multiHostApi, multiHostQueries, REMOTE_THREAD_PANEL, RemoteComposer } from '@dshfiles/multi-host/destination'
 import { useQuery } from '@dshfiles/plugin-ui/query'
 import { PluginQueryProvider, pluginQueryClient } from '@dshfiles/plugin-ui/query'
@@ -22,6 +24,8 @@ import { jjIntegrationSettings } from './settings.js'
 import './client.css'
 
 const PANEL_ID = 'jj-integration'
+const RIGHT_PANE_ID = '@dshfiles/jj-integration/thread-workspaces'
+const RIGHT_PANE_KIND = 'dshfiles-jj-integration-thread-workspaces'
 
 const PanelGlyph = (props: { readonly size?: number }): JSX.Element => (
   <svg aria-hidden width={props.size ?? 18} height={props.size ?? 18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
@@ -36,7 +40,19 @@ const useBookmark = (): string => useSettings(jjIntegrationSettings).value?.book
 export default defineClient({
   name: '@dshfiles/jj-integration',
   locales: [jjIntegrationLocale],
-  inject: ['slots', 'layout', 'sessions', 'workspaces', 'uiWorkspace', 'conversation', 'remote', 'remote.directoryPicker', 'remote.workspace'],
+  inject: [
+    'slots',
+    'layout',
+    'sessions',
+    'workspaces',
+    'uiWorkspace',
+    'sidebarRight',
+    'sidebarRightTabs',
+    'conversation',
+    'remote',
+    'remote.directoryPicker',
+    'remote.workspace',
+  ],
   setup(ctx, decorate) {
     const translate = ctx.locale.bind(JJ_INTEGRATION_LOCALE_NAMESPACE)
     ctx.slots.inject('sidebar.panellist', () =>
@@ -50,11 +66,68 @@ export default defineClient({
         { name: 'main', key: PANEL_ID, locale: JJ_INTEGRATION_LOCALE_NAMESPACE },
         decorate(props => (
           <PluginQueryProvider>
-            <ThreadWorkspacesPanel t={props.t} bookmark={useBookmark()} />
+            <ThreadWorkspacesPanel
+              t={props.t}
+              bookmark={useBookmark()}
+              sessions={ctx.sessions}
+              openSession={sessionId => ctx.uiWorkspace.openSession(sessionId)}
+            />
           </PluginQueryProvider>
         )),
       ),
     )
+    ctx.effect(
+      () =>
+        ctx.sidebarRightTabs.register({
+          id: RIGHT_PANE_ID,
+          kind: RIGHT_PANE_KIND,
+          title: () => translate('title'),
+          guide: [
+            {
+              id: 'thread-workspaces',
+              order: 47,
+              title: () => translate('title'),
+              description: () => translate('sidePanelGuide'),
+              icon: PanelGlyph,
+            },
+          ],
+        }),
+      'jj-integration: right pane tab type',
+    )
+    ctx.slots.inject('sidebar.right.pane.tab', () =>
+      ctx.slots.register(
+        { name: 'sidebar.right.pane.tab', key: RIGHT_PANE_ID, locale: JJ_INTEGRATION_LOCALE_NAMESPACE },
+        decorate(props => (
+          <PluginQueryProvider>
+            <ThreadWorkspacesPanel
+              t={props.t}
+              bookmark={useBookmark()}
+              sessions={ctx.sessions}
+              openSession={sessionId => ctx.uiWorkspace.openSession(sessionId)}
+            />
+          </PluginQueryProvider>
+        )),
+      ),
+    )
+    ctx.slots.inject('conversation.session.header.utilities', () =>
+      ctx.slots.register(
+        { name: 'conversation.session.header.utilities', id: 'dshfiles-jj-integration-thread-workspaces', order: 38 },
+        decorate(() => (
+          <span className="dshx-root dshx:inline-flex">
+            <Button
+              size="icon-sm"
+              variant="ghost"
+              aria-label={translate('openSidePanel')}
+              title={translate('openSidePanel')}
+              onClick={() => ctx.sidebarRight.openTab(RIGHT_PANE_KIND, { revealIfOpened: true })}
+            >
+              <PanelGlyph size={16} />
+            </Button>
+          </span>
+        )),
+      ),
+    )
+    // SAFETY: The multi-host panel id is registered by @dshfiles/multi-host.
     const openRemoteThreadPanel = (): void => ctx.layout.selectPanel(REMOTE_THREAD_PANEL as MainPanelId)
     const RemoteComposerBar = (): JSX.Element | null => {
       const multiHost = useApi(multiHostApi)

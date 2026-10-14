@@ -20,8 +20,10 @@ import { EllipsisIcon, RefreshCwIcon } from '@dshfiles/plugin-ui/icons'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useApi } from '@dshfiles/dshx/client'
-import { useState, useSyncExternalStore } from 'react'
+import type { ISessions, SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
+import { useCallback, useId, useMemo, useState, useSyncExternalStore } from 'react'
 import { jjIntegrationApi, type ThreadView, type WorkspaceSyncView } from './api.js'
+import { sessionPreviewMessages } from './session-preview.js'
 import { useDiscardConfirmation } from './discard-machine.js'
 import { announceRepositoryChange, describeLandResult, useLandToast } from './land-feedback.js'
 import type { JjIntegrationTranslate } from './locales.js'
@@ -78,8 +80,92 @@ const WorkspaceSyncLine = (props: { readonly t: JjIntegrationTranslate }): JSX.E
   )
 }
 
+const SessionConversationPreview = (props: {
+  readonly id: string
+  readonly session: SessionSummary
+  readonly sessions: ISessions
+  readonly t: JjIntegrationTranslate
+}): JSX.Element => {
+  const messages = useQuery({
+    queryKey: ['jj-integration', 'session-preview', props.session.id],
+    queryFn: ({ signal }) =>
+      props.sessions.using(props.session.id, { source: 'controllerOperation', signal }, async reference => {
+        const binding = await reference.ready
+        return sessionPreviewMessages(binding.eventSource.getSnapshot().entries)
+      }),
+  })
+
+  return (
+    <div
+      id={props.id}
+      role="region"
+      aria-label={props.t('previewFor', { title: props.session.displayTitle })}
+      className="dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-md dshx:bg-muted/50 dshx:p-2"
+    >
+      {messages.isPending ? (
+        <p className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-xs dshx:text-muted-foreground">
+          <Spinner /> {props.t('previewLoading')}
+        </p>
+      ) : null}
+      {messages.isError ? (
+        <Alert variant="destructive">
+          <AlertDescription>{errorMessage(messages.error, props.t('previewFailed'))}</AlertDescription>
+        </Alert>
+      ) : null}
+      {messages.data?.length === 0 ? <p className="dshx:text-xs dshx:text-muted-foreground">{props.t('previewNoMessages')}</p> : null}
+      {messages.data?.map(message => (
+        <div key={message.seq} className="dshx:min-w-0 dshx:text-xs">
+          <span className="dshx:font-medium">{props.t(message.role === 'user' ? 'you' : 'assistant')}</span>
+          <p className="dshx:break-words dshx:whitespace-pre-wrap dshx:text-muted-foreground">{message.text}</p>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+const ThreadSessionRow = (props: {
+  readonly session: SessionSummary
+  readonly sessions: ISessions
+  readonly t: JjIntegrationTranslate
+  readonly openSession: (sessionId: SessionSummary['id']) => void
+}): JSX.Element => {
+  const [previewOpen, setPreviewOpen] = useState(false)
+  const previewId = useId()
+
+  return (
+    <li className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-1">
+      <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1">
+        <Button
+          size="sm"
+          variant="ghost"
+          className="dshx:min-w-0 dshx:grow dshx:justify-start dshx:truncate dshx:px-2"
+          title={props.session.displayTitle}
+          aria-label={props.t('openThread', { title: props.session.displayTitle })}
+          onClick={() => props.openSession(props.session.id)}
+        >
+          {props.session.displayTitle}
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          className="dshx:shrink-0"
+          aria-expanded={previewOpen}
+          aria-controls={previewId}
+          onClick={() => setPreviewOpen(open => !open)}
+        >
+          {props.t(previewOpen ? 'hidePreview' : 'preview')}
+        </Button>
+      </div>
+      {previewOpen ? <SessionConversationPreview id={previewId} session={props.session} sessions={props.sessions} t={props.t} /> : null}
+    </li>
+  )
+}
+
 const ThreadRow = (props: {
   readonly thread: ThreadView
+  readonly sessionById: ReadonlyMap<string, SessionSummary>
+  readonly sessions: ISessions
+  readonly openSession: (sessionId: SessionSummary['id']) => void
   readonly t: JjIntegrationTranslate
   readonly bookmark: string
   readonly busy: boolean
@@ -89,7 +175,7 @@ const ThreadRow = (props: {
   const { thread, t } = props
   const conflicted = thread.unlanded.some(revision => revision.conflict)
   return (
-    <li className="dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-md dshx:border dshx:p-3">
+    <li className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-2 dshx:rounded-md dshx:border dshx:p-3">
       <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
         <span className="dshx:font-mono dshx:text-sm">{thread.name}</span>
         <Badge variant="secondary">{t('sessions', { count: thread.sessionIds.length })}</Badge>
@@ -113,12 +199,26 @@ const ThreadRow = (props: {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem variant="destructive" onSelect={props.onDiscard}>
-                {thread.unlanded.length > 0 ? t('discardWork') : t('discard')}
+                {thread.unlanded.length > 0 ? t('removeWorkspaceWorkMenu') : t('removeWorkspaceMenu')}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </span>
       </div>
+      {thread.sessionIds.length > 0 ? (
+        <ul className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-1 dshx:border-l dshx:pl-2">
+          {thread.sessionIds.map(sessionId => {
+            const session = props.sessionById.get(sessionId)
+            if (session === undefined)
+              return (
+                <li key={sessionId} className="dshx:truncate dshx:px-2 dshx:text-xs dshx:text-muted-foreground">
+                  {sessionId}
+                </li>
+              )
+            return <ThreadSessionRow key={session.id} session={session} sessions={props.sessions} t={t} openSession={props.openSession} />
+          })}
+        </ul>
+      ) : null}
       {thread.unlanded.length > 0 ? (
         <ul className="dshx:flex dshx:flex-col dshx:gap-0.5 dshx:text-xs dshx:text-muted-foreground">
           {thread.unlanded.map(revision => (
@@ -149,11 +249,13 @@ const DiscardDialog = (props: { readonly t: JjIntegrationTranslate; readonly con
             {target === null
               ? null
               : target.unlandedCount > 0
-                ? t('discardWithWorkTitle', { name: target.name, count: target.unlandedCount })
-                : t('discardTitle', { name: target.name })}
+                ? t('removeWorkspaceWithWorkTitle', { name: target.name, count: target.unlandedCount })
+                : t('removeWorkspaceTitle', { name: target.name })}
           </AlertDialogTitle>
           <AlertDialogDescription>
-            {target !== null && target.unlandedCount > 0 ? t('discardWithWorkDescription', { count: target.unlandedCount }) : t('discardDescription')}
+            {target !== null && target.unlandedCount > 0
+              ? t('removeWorkspaceWithWorkDescription', { count: target.unlandedCount })
+              : t('removeWorkspaceDescription')}
           </AlertDialogDescription>
         </AlertDialogHeader>
         {failure === null ? null : (
@@ -175,7 +277,7 @@ const DiscardDialog = (props: { readonly t: JjIntegrationTranslate; readonly con
               }}
             >
               {confirmation.busy ? <Spinner /> : null}
-              {target !== null && target.unlandedCount > 0 ? t('discardWork') : t('discard')}
+              {target !== null && target.unlandedCount > 0 ? t('removeWorkspaceWorkConfirm') : t('removeWorkspaceConfirm')}
             </AlertDialogAction>
           )}
         </AlertDialogFooter>
@@ -197,8 +299,21 @@ const PanelSkeleton = (): JSX.Element => (
   </Card>
 )
 
-export const ThreadWorkspacesPanel = (props: { readonly t: JjIntegrationTranslate; readonly bookmark: string }): JSX.Element => {
+const useSessionDirectory = (sessions: ISessions): ReadonlyMap<string, SessionSummary> => {
+  const subscribe = useCallback((listener: () => void) => sessions.list.subscribe(listener), [sessions])
+  const readSnapshot = useCallback(() => sessions.list.getSnapshot(), [sessions])
+  const snapshot = useSyncExternalStore(subscribe, readSnapshot, readSnapshot)
+  return useMemo(() => new Map<string, SessionSummary>(Object.values(snapshot.byId).map(session => [session.id, session])), [snapshot.byId])
+}
+
+export const ThreadWorkspacesPanel = (props: {
+  readonly t: JjIntegrationTranslate
+  readonly bookmark: string
+  readonly sessions: ISessions
+  readonly openSession: (sessionId: SessionSummary['id']) => void
+}): JSX.Element => {
   const { t } = props
+  const sessionById = useSessionDirectory(props.sessions)
   const api = useApi(jjIntegrationApi)
   const queryClient = useQueryClient()
   const toast = useLandToast()
@@ -235,7 +350,7 @@ export const ThreadWorkspacesPanel = (props: { readonly t: JjIntegrationTranslat
 
   return (
     <div className="dshx-root dshx:flex dshx:h-full dshx:flex-col dshx:gap-4 dshx:overflow-auto dshx:p-6">
-      <header className="dshx:flex dshx:items-start dshx:gap-3">
+      <header className="dshx:flex dshx:flex-wrap dshx:items-start dshx:gap-3">
         <div className="dshx:flex dshx:flex-col dshx:gap-1">
           <h1 className="dshx:text-xl dshx:font-semibold">{t('title')}</h1>
           <p className="dshx:text-sm dshx:text-muted-foreground">{t('subtitle', { bookmark: props.bookmark })}</p>
@@ -266,7 +381,7 @@ export const ThreadWorkspacesPanel = (props: { readonly t: JjIntegrationTranslat
         <Card key={repository.repoRoot}>
           <CardHeader>
             <CardTitle>{repository.title}</CardTitle>
-            <CardDescription className="dshx:font-mono">{repository.repoRoot}</CardDescription>
+            <CardDescription className="dshx:break-all dshx:font-mono">{repository.repoRoot}</CardDescription>
           </CardHeader>
           <CardContent>
             <ul className="dshx:flex dshx:flex-col dshx:gap-2">
@@ -274,6 +389,9 @@ export const ThreadWorkspacesPanel = (props: { readonly t: JjIntegrationTranslat
                 <ThreadRow
                   key={thread.path}
                   thread={thread}
+                  sessionById={sessionById}
+                  sessions={props.sessions}
+                  openSession={props.openSession}
                   t={t}
                   bookmark={props.bookmark}
                   busy={land.isPending && land.variables === thread.path}
