@@ -239,3 +239,31 @@ Then('{string} ran {string} with its image and file', async ({ page }: { page: P
   })
   await finishJourneyAssertions(page)
 })
+
+Then('{string} shows a thumbnail of {string} and a chip for {string}', async ({ page }: { page: Page }, text: string, image: string, file: string) => {
+  const row = queuedRows(page).filter({ hasText: text })
+  await recordAssertion(page, 'queue-reorder-attachment-previews-show-images-and-files', async () => {
+    await expect(row.getByRole('group', { name: '2 attachments', exact: true })).toBeVisible()
+    await expect(row.getByRole('img', { name: image, exact: true })).toBeVisible()
+    await expect(row.locator('[data-queue-attachment="file"]')).toHaveText(file)
+    await expect(row.locator('span[title]').first()).toHaveText(text)
+  })
+})
+
+When('queued attachment previews are turned off', async ({ page }: { page: Page }) => {
+  await page.getByRole('navigation', { name: 'Global panels', exact: true }).getByRole('button', { name: 'Plugins', exact: true }).click()
+  await page.getByRole('button', { name: 'View Queue Reorder', exact: true }).click()
+  const previews = page.getByRole('switch', { name: 'Attachment previews', exact: true })
+  await previews.click()
+  await expect(previews).not.toBeChecked()
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
+})
+
+Then('the queued messages show no attachment previews', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'queue-reorder-attachment-previews-setting-hides-them', async () => {
+    await expect(queuedRows(page)).toHaveCount(2)
+    await expect(queueDock(page).locator('[data-queue-attachment]')).toHaveCount(0)
+  })
+  await finishJourneyAssertions(page)
+})

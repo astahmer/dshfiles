@@ -275,6 +275,12 @@ export const sessionQueueEditor = (ctx: Context, sessionId: SessionFace['session
   return editor
 }
 
+/** Reads one queued image of a session, for the dock's thumbnails. */
+export const sessionImageReader = (ctx: Context, sessionId: SessionFace['sessionId']): ((attachment: QueuedImageAttachment) => Promise<Blob>) | undefined => {
+  const binding = ctx.sessions.binding(sessionId)
+  return binding === undefined ? undefined : sessionQueueIo({ sessionId, session: binding.session }).readImage
+}
+
 const transfers = new Map<string, { readonly session: SessionFace; readonly actor: QueueTransferActor }>()
 
 /** Main view retention a just-opened thread takes before this plugin lets go of its own reference. */

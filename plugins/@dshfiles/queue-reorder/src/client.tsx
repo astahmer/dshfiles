@@ -11,7 +11,8 @@ import { useMutation } from '@dshfiles/plugin-ui/query'
 import { useEffect, useId, useMemo, useRef, useState, useSyncExternalStore, type ReactNode, type CSSProperties } from 'react'
 import type { ComposedProps } from '@deepseek-ai/dsh-client-ui-slots'
 import { queueApi } from './api.js'
-import { messagePreview } from './message-preview.js'
+import { attachmentPreviews, messagePreview } from './message-preview.js'
+import { QueuedAttachments, type ReadQueuedImage } from './queued-attachments.js'
 import { decodeQueuedRows, restoredIndex, type QueueEditor, type QueueEditView, type QueuedRow } from './queue-edit.js'
 import { useQueueClientForEditing } from './session-queue-editor.js'
 import { QueueTransferDialog } from './queue-transfer-dialog.js'
@@ -103,6 +104,8 @@ export interface QueueDockInjected {
   readonly updateQueue: (itemId: MessageId, action: QueueAction) => Promise<unknown>
   /** Absent when this DSH build exposes no composer input or draft attachments to plugins. */
   readonly queueEditor: QueueEditor | undefined
+  /** Image bytes for thumbnails; absent when this DSH build cannot read queued attachments. */
+  readonly readImage: ReadQueuedImage | undefined
   /** "Move to thread…"; absent for the same reason as `queueEditor`. */
   readonly queueTransfer: QueueTransferActor | undefined
   /** The session catalog the thread picker lists. */
@@ -138,6 +141,7 @@ export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
   const preferences = useSettings(queueReorderSettings)
   const expandByDefault = preferences.value?.expandByDefault ?? true
   const previewLength = preferences.value?.previewLength ?? 200
+  const showAttachments = preferences.value?.attachmentPreviews ?? true
   const rows = useMemo(() => decodeQueuedRows(inbox), [inbox])
   const rowCount = rows.length
 
@@ -245,6 +249,7 @@ export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
     const rowId = MessageId(row.id)
     const isBusy = busy === rowId
     const preview = messagePreview(row.content, previewLength)
+    const previews = attachmentPreviews(row.blocks)
     return (
       <li
         className={cn(
@@ -292,8 +297,9 @@ export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
           <GripVerticalIcon className="dshx:size-3.5" />
         </span>
         <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-sm" title={preview || undefined}>
-          {preview || files || '—'}
+          {preview || (showAttachments && previews.length > 0 ? '' : (files ?? '—'))}
         </span>
+        {showAttachments ? <QueuedAttachments sessionId={props.sessionId} previews={previews} readImage={props.readImage} /> : null}
         {queueMutable ? (
           <span className="dshx:flex dshx:flex-none dshx:items-center dshx:gap-0.5 dshx:opacity-60 dshx:transition-opacity dshx:group-hover/row:opacity-100 dshx:focus-within:opacity-100">
             <RowAction

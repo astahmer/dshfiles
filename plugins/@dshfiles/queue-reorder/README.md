@@ -6,4 +6,6 @@ The separate queued-message editor is a client workflow: it removes the item, hy
 
 **Move to thread…** sends one queued message, with its images and files, to another thread picked from a thread list. A busy target gets it at the end of its queue; an idle target gets it in its composer, appended to any draft there, and that thread opens, so nothing runs that the person did not send. The message leaves this queue before it is delivered, so a finishing turn cannot run it here mid-move; if delivery fails it goes back to the end of this queue, and if even that fails the dock shows its text. Like editing, it re-uploads the attachments into the target thread rather than moving them by reference.
 
+Each queued row previews its attachments: a small thumbnail per image, read from the session that holds it, and a chip with the name per other file. The `attachmentPreviews` setting (default on) turns them off.
+
 This is an owned DSH bundle. Run `pnpm build`, `pnpm test`, and `pnpm typecheck` from this package.

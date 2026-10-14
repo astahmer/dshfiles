@@ -263,6 +263,38 @@
           "testName": "lists other top-level threads, newest first, without blank drafts or subagents"
         }
       ]
+    },
+    {
+      "id": "queued-attachment-previews",
+      "title": "Preview queued attachments",
+      "summary": "Each queued message shows a small thumbnail for every image and a chip with the name for every other file, read from the session that holds them; a setting turns the previews off.",
+      "reach": ["click text \"Queue source\"", "expect group \"2 attachments\"", "expect img \"red.png\"", "expect text \"note.txt\""],
+      "surfaces": ["client", "settings"],
+      "configuration": [
+        {
+          "key": "attachmentPreviews",
+          "defaultValue": "true",
+          "constraints": "Boolean; show thumbnails and file chips in queued rows.",
+          "choices": ["true", "false"],
+          "coveredBy": ["queue-reorder.attachment-previews"]
+        }
+      ],
+      "states": ["loading-thumbnail", "thumbnail", "file-chip", "unreadable-image", "disabled"],
+      "failureModes": ["An image that cannot be read keeps a placeholder icon instead of a thumbnail.", "Attachment bytes are never rendered as message text."],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "queue-reorder.attachment-previews",
+          "featureFile": "tooling/dshx/e2e/features/queue-reorder.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "queue-reorder.queued-attachment-previews-unit-order",
+          "file": "plugins/@dshfiles/queue-reorder/src/message-preview.test.ts",
+          "testName": "previews each image and file in message order and skips text"
+        }
+      ]
     }
   ],
   "kind": "bundle"

@@ -53,3 +53,14 @@ Feature: Queued message dock
     Then "Idle target" opens with "stay here" and its image in the composer
     When the held turn finishes
     Then "Busy target" ran "carry this" with its image and file
+
+  @scenario:queue-reorder.attachment-previews
+  Scenario: Queued messages preview their images and files until the setting turns previews off
+    Given the isolated plugin composition of "@dshfiles/queue-reorder, @dshfiles/ai-accounts" is booted
+    When a Command Code account backed by a local fake provider is added
+    And a thread on the fake model is kept busy by a held turn
+    And "carry this" is queued with an image and a file, then "stay here" with an image
+    Then "carry this" shows a thumbnail of "red.png" and a chip for "note.txt"
+    When queued attachment previews are turned off
+    And the thread "Fake thread title" is opened again
+    Then the queued messages show no attachment previews
