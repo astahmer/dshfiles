@@ -12,7 +12,12 @@ const servers = (page: Page) => page.getByRole('region', { name: 'Registered ser
 const serverRow = (page: Page, name: string) => servers(page).getByRole('listitem').filter({ hasText: name })
 
 When('the MCP servers page is opened', async ({ page }: { page: Page }) => {
-  await page.getByRole('navigation', { name: 'Sidebar navigation', exact: true }).getByRole('button', { name: 'MCP servers', exact: true }).click()
+  await page
+    .getByRole('navigation', { name: 'Sidebar navigation', exact: true })
+    .or(page.getByRole('navigation', { name: 'Global panels', exact: true }))
+    .getByRole('button', { name: 'MCP servers', exact: true })
+    .first()
+    .click()
   await expect(page.getByRole('heading', { name: 'Global MCP servers', exact: true })).toBeVisible()
 })
 
