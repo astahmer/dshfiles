@@ -109,11 +109,21 @@ export const startScratchProfile = async (
   }
 }
 
+// A bundle's sources do not change during a run, so each worker builds it once instead of once per scenario; `pnpm
+// check:e2e` builds every bundle up front and sets DSHX_E2E_PREBUILT=1 to skip even that.
+const builtBundles = new Set<string>()
+
+const buildBundleOnce = async (bundle: { readonly projectRoot: string; readonly packageId: string }): Promise<void> => {
+  if (process.env.DSHX_E2E_PREBUILT === '1' || builtBundles.has(bundle.packageId)) return
+  await buildPlugin(bundle.projectRoot, bundle.packageId)
+  builtBundles.add(bundle.packageId)
+}
+
 /** Boot a scratch composition of all owned bundles without touching the user's `web` profile. */
 export const bootProfile = async (profileLabel: string, timeoutMs = 90_000): Promise<BootedProfile> => {
   const bundles = await listLocalBootBundles()
   if (bundles.length === 0) throw new Error('No owned plugin bundles were found for the composed scratch profile.')
-  for (const bundle of bundles) await buildPlugin(bundle.projectRoot, bundle.packageId)
+  for (const bundle of bundles) await buildBundleOnce(bundle)
   const prepared = await prepareComposedBootProfile(bundles)
   const expectedClientEntries = bundles.filter(bundle => bundle.hasClient).map(bundle => bundle.packageId)
   try {
@@ -138,7 +148,7 @@ export const bootComposedPluginProfile = async ({
   readonly seedHome?: (homeRoot: string) => Promise<void>
 }): Promise<BootedProfile> => {
   const bundles = resolveLocalBundles(packageIds, await listLocalBootBundles())
-  for (const bundle of bundles) await buildPlugin(bundle.projectRoot, bundle.packageId)
+  for (const bundle of bundles) await buildBundleOnce(bundle)
   const prepared = await prepareComposedBootProfile(bundles, { additionalBundleIds })
   const expectedClientEntries = bundles.filter(bundle => bundle.hasClient).map(bundle => bundle.packageId)
   try {

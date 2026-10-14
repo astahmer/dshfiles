@@ -27,8 +27,8 @@ export default defineConfig({
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI
-    ? [['github'], ['html', { open: 'never' }], ['./e2e/support/evidence-reporter.ts']]
-    : [['list'], ['./e2e/support/evidence-reporter.ts']],
+    ? [['github'], ['html', { open: 'never' }], ['./e2e/support/evidence-reporter.ts'], ['./e2e/support/summary-reporter.ts']]
+    : [['list'], ['./e2e/support/evidence-reporter.ts'], ['./e2e/support/summary-reporter.ts']],
   use: {
     serviceWorkers: 'block',
     trace: 'off',

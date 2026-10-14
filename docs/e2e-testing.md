@@ -111,7 +111,13 @@ pnpm run test:e2e           # build, generate with bddgen, run every journey
 pnpm run test:e2e:gen && pnpm exec playwright test --config=playwright.e2e.config.ts -g "<scenario>"
 ```
 
-Root `pnpm check:plugin-boot` runs `test:boot`. A fresh clone gets the pinned
+Root `pnpm check:plugin-boot` runs `test:boot`. Root `pnpm check:e2e [filter]`
+builds every bundle once, then runs the journeys headless on one worker
+(`DSHX_E2E_PREBUILT=1` stops each scenario from rebuilding the bundles it boots)
+and ends with a summary: totals, wall time, one line per failure and the
+slowest feature files. A filter is a feature-file name such as `thread-sidebar`.
+`pnpm check` does not run journeys; landing a plugin change needs
+`pnpm check:e2e <plugin>` green. A fresh clone gets the pinned
 Chromium from `pnpm install:all` (`setup:browser`).
 
 In CI, `check.yml` runs `pnpm check`, which includes `features:check` and the

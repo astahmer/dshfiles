@@ -15,6 +15,7 @@
     "fmt": "oxfmt tooling/dshx/packages plugins scripts apps/desktop/src --config .oxfmtrc.json",
     "fmt:check": "oxfmt --check tooling/dshx/packages plugins scripts apps/desktop/src --config .oxfmtrc.json",
     "check:plugin-boot": "pnpm --dir tooling/dshx run test:boot",
+    "check:e2e": "pnpm --dir plugins run build && DSHX_E2E_PREBUILT=1 pnpm --dir tooling/dshx run test:e2e --workers=1",
     "typecheck:scripts": "tsc -p scripts/tsconfig.json",
     "profile:sync": "node scripts/profile-sync.ts",
     "profile:boot": "node scripts/profile-boot.ts",
