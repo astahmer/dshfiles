@@ -1,7 +1,7 @@
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { homedir, tmpdir } from 'node:os'
-import { dirname, join, resolve, sep } from 'node:path'
+import { dirname, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { z } from 'zod'
 import { parse } from 'yaml'
@@ -87,18 +87,37 @@ const runPnpm = async (profileRoot: string, homeRoot: string, args: readonly str
 
 const pnpmPeerIdentity = (resolvedPath: string): string => resolvedPath.split(`${sep}.pnpm${sep}`)[1] ?? resolvedPath
 
+/** A virtual store inside the repository but outside its root is a per-folder install from before the unified workspace. */
+const staleNestedInstallRoot = (resolvedPath: string): string | undefined => {
+  const storeIndex = resolvedPath.indexOf(`${sep}node_modules${sep}.pnpm${sep}`)
+  if (storeIndex === -1) return undefined
+  const installRoot = resolvedPath.slice(0, storeIndex)
+  const fromWorkspace = relative(WORKSPACE_ROOT, installRoot)
+  const insideWorkspace = fromWorkspace !== '' && !fromWorkspace.startsWith('..') && !fromWorkspace.startsWith(sep)
+  return insideWorkspace ? installRoot : undefined
+}
+
 const assertSharedCordisIdentity = (projectRoot: string): void => {
   const projectRequire = createRequire(join(projectRoot, 'package.json'))
   const sdkRequire = createRequire(join(WORKSPACE_ROOT, 'tooling/dshx/packages/dshx/package.json'))
   for (const packageName of SHARED_CORDIS_PACKAGES) {
-    let projectIdentity: string
-    let sdkIdentity: string
+    let projectPath: string
+    let sdkPath: string
     try {
-      projectIdentity = pnpmPeerIdentity(projectRequire.resolve(packageName))
-      sdkIdentity = pnpmPeerIdentity(sdkRequire.resolve(packageName))
+      projectPath = projectRequire.resolve(packageName)
+      sdkPath = sdkRequire.resolve(packageName)
     } catch (error) {
       throw new Error(`Boot checks cannot verify shared ${packageName} identity: ${error instanceof Error ? error.message : String(error)}.`)
     }
+    const staleRoots = [...new Set([projectPath, sdkPath].flatMap(path => staleNestedInstallRoot(path) ?? []))]
+    if (staleRoots.length > 0) {
+      const folders = staleRoots.map(root => join(relative(WORKSPACE_ROOT, root), 'node_modules')).join(', ')
+      throw new Error(
+        `Boot checks resolved ${packageName} from a stale nested install (${folders}) left from before the unified workspace, which gives Cordis a second identity. Remove ${folders} and run "pnpm install" at the repository root.`,
+      )
+    }
+    const projectIdentity = pnpmPeerIdentity(projectPath)
+    const sdkIdentity = pnpmPeerIdentity(sdkPath)
     if (projectIdentity !== sdkIdentity) {
       throw new Error(
         `Boot checks found different ${packageName} peer identities for the plugin and DSHX SDK. Align cordis, cordis-plugin-include, and cordis-plugin-loader with the repository workspace overrides before booting.`,
