@@ -65,6 +65,7 @@ Wrap each slot root once (inside dshx `decorate(...)`). Prefix every key with th
 ```tsx
 import { DataTable, createColumnHelper, tableFeatures, useTable } from '@dshfiles/plugin-ui/table'
 ;<DataTable table={table} empty="No rows" /> // shadcn Table in a bordered card, uppercase headers, aria-sort
+;<DataTable table={table} append={<TableRow>…</TableRow>} /> // extra rows (e.g. drafts) after the row model; empty is skipped
 ```
 
 ## Form (TanStack Form)

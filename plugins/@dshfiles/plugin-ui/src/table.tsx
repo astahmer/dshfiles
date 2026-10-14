@@ -20,8 +20,10 @@ const ariaSort = (direction: false | SortDirection): 'ascending' | 'descending' 
 export interface DataTableProps<TFeatures extends TableFeatures, TData extends RowData> {
   readonly table: ReactTable<TFeatures, TData, unknown>
   readonly caption?: ReactNode
-  /** Rendered in one full-width row when the row model is empty. */
+  /** Rendered in one full-width row when the row model is empty and nothing is appended. */
   readonly empty?: ReactNode
+  /** `TableRow`s rendered after the row model, such as editable draft rows; they keep the table's column widths. */
+  readonly append?: ReactNode
   readonly className?: string
   readonly rowClassName?: (row: TData) => string | undefined
   readonly cellClassName?: (columnId: string) => string | undefined
@@ -87,7 +89,8 @@ export const DataTable = <TFeatures extends TableFeatures, TData extends RowData
               ))}
             </TableRow>
           ))}
-          {rows.length === 0 && props.empty !== undefined && (
+          {props.append}
+          {rows.length === 0 && props.empty !== undefined && props.append === undefined && (
             <TableRow className="dshx:hover:bg-transparent">
               <TableCell className="dshx:py-8 dshx:text-center dshx:text-muted-foreground" colSpan={columnCount}>
                 {props.empty}
