@@ -15,6 +15,7 @@ Feature: Thread sidebar journeys
     When archive undo settings are changed and threads are archived
     Then archive undo settings control the temporary notice
 
+  @smoke
   @scenario:thread-sidebar.park-context-menu
   Scenario: Park a thread from its context menu and keep it parked
     Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
@@ -34,6 +35,7 @@ Feature: Thread sidebar journeys
     When a nonblank Host thread is pinned from its session header
     Then the thread stays pinned after reload
 
+  @smoke
   @scenario:thread-sidebar.row-pin
   Scenario: Pin a thread from its sidebar row
     Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted

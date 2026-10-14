@@ -71,6 +71,7 @@ Feature: Command palette
     When the palette query is "session:https://dsh.example.invalid/?thread=session-e2e-missing&workspace=workspace-e2e&token=fake-value"
     Then the palette reports that session "session-e2e-missing" was not found
 
+  @smoke
   @scenario:command-palette.new-thread-action
   Scenario: New thread is searchable in the command palette
     Given the isolated plugin profile "@dshfiles/command-palette" is booted

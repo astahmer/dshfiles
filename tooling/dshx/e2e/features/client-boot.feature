@@ -9,6 +9,7 @@ Feature: Client plugin boot integrity
   Background:
     Given the web profile is booted
 
+  @smoke
   Scenario: The shipped Web UI mounts every client plugin
     Then the Web UI mounts without a plugin failure card
 

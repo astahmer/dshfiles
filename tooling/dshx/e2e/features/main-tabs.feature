@@ -39,6 +39,7 @@ Feature: Main view tabs
     When the saved tabs are corrupted and the page is reloaded
     Then the strip starts over from what the main view shows
 
+  @smoke
   @scenario:main-tabs.native-look
   Scenario: The strip's tabs look like DSH's own right-panel tabs
     Given the isolated plugin composition of "@dshfiles/main-tabs, @dshfiles/workbench, @dshfiles/jujutsu" is booted

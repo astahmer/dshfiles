@@ -4,6 +4,7 @@ Feature: jj thread workspaces
   real New thread picker. The Host provisions, discards and rebases thread
   workspaces in that repository; the agent's edits are stood in for by the jj CLI.
 
+  @smoke
   @scenario:jj-integration.destination-browser-journey
   Scenario: Choose where a new thread runs from the destination bar
     Given the isolated plugin composition of "@dshfiles/jj-integration, @dshfiles/workspace-folder-picker, @dshfiles/multi-host" is booted

@@ -14,6 +14,7 @@ Feature: Settings shell
     Then the native sections and General rows show in the Settings dialog
     And the Settings shortcut closes and reopens the dialog
 
+  @smoke
   @scenario:settings-shell.tab
   Scenario: Settings opens as a tab when main-tabs is loaded
     Given the isolated plugin composition of "@dshfiles/settings-shell, @dshfiles/main-tabs" is booted

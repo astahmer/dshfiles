@@ -3,6 +3,7 @@ Feature: Workbench layouts
   The Workbench docks registered panels in the main area and in the side
   panel, each with its own saved layout.
 
+  @smoke
   @scenario:workbench.default-layout
   @scenario:workbench.persisted-layout
   Scenario: The default layout persists, resets and survives a corrupt save

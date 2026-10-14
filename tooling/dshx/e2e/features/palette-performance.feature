@@ -8,6 +8,7 @@ Feature: Palette and stylesheet performance budget
   Background:
     Given the web profile is booted
 
+  @smoke
   Scenario: The @dshfiles plugins share one stylesheet
     Then exactly one shared plugin stylesheet is injected
 

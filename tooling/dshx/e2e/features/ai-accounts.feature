@@ -2,6 +2,7 @@ Feature: AI Accounts
 
   AI Accounts policy settings are available in the real Settings UI.
 
+  @smoke
   @scenario:ai-accounts.account-draft
   @scenario:ai-accounts.save-policy
   Scenario: Keep and save an account draft in manual mode
