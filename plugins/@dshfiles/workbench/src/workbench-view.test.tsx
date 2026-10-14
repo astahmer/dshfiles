@@ -70,7 +70,7 @@ describe('WorkbenchView', () => {
   })
 
   it('opens the Editor alone by default and leaves the other panels to Add panel', () => {
-    const { api } = renderWorkbench(registryWith('dshfiles-editor.explorer', 'dshfiles-editor.main', 'other'))
+    const { api } = renderWorkbench(registryWith('other-plugin.panel', 'dshfiles-editor.main', 'other'))
     expect(api.panels.map(panel => panel.id)).toEqual(['dshfiles-editor.main'])
     expect(api.getPanel('dshfiles-editor.main')?.api.isActive).toBe(true)
   })

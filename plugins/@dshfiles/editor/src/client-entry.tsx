@@ -17,7 +17,6 @@ import { EditorOpenFileLinksSetting } from './editor-open-file-links-setting.js'
 import { editorSettingsLocale, EDITOR_SETTINGS_LOCALE_NAMESPACE } from './editor-settings-locales.js'
 import { EDITOR_OPEN_FILE_LINKS_OWNER_ID } from './editor-settings-row.js'
 import { EditorPanel } from './editor-panel.js'
-import { FileTree } from './file-tree.js'
 import {
   editorClaimsFileAddress,
   fileLinkParamsSchema,
@@ -35,7 +34,6 @@ import { createWorkspaceFileIndex, WORKSPACE_FILES_EVENT, workspaceFilesRequestS
 const RIGHT_PANE_ID = '@dshfiles/editor/files'
 const RIGHT_PANE_KIND = 'dshfiles-editor-files'
 const WORKBENCH_PANEL_ID = 'dshfiles-editor.main'
-const EXPLORER_PANEL_ID = 'dshfiles-editor.explorer'
 const FILE_LINK_ID = '@dshfiles/editor/file-link'
 const FILE_LINK_KIND = 'dshfiles-editor-file-link'
 const MONACO_STYLE_SELECTOR = 'style[data-dshfiles-monaco]'
@@ -149,36 +147,6 @@ export default defineClient({
       if (placement.get() === 'workbench' && workbenchInstalled()) workbench.open(WORKBENCH_PANEL_ID)
       else ctx.sidebarRight.openTab(RIGHT_PANE_KIND, { revealIfOpened: true })
     }
-
-    // P2.2 minimal explorer: the editor's lazy tree as its own dockable panel; a click opens the file in the editor.
-    const ExplorerTree = (): JSX.Element => {
-      const sessionId = useSyncExternalStore(subscribeSession, currentSession, noSession)
-      const state = useSyncExternalStore(store.subscribe, store.getSnapshot)
-      if (sessionId === undefined) {
-        return <p className="dshx-root dshx:p-3 dshx:text-xs dshx:text-muted-foreground">Open a session to browse its files.</p>
-      }
-      const activeId = state.activeBySession[sessionId]
-      const activePath = state.documents.find(document => document.id === activeId)?.path ?? null
-      return (
-        <div className="dshx-root dshx:h-full dshx:overflow-auto dshx:bg-background dshx:text-foreground">
-          <FileTree
-            activePath={activePath}
-            onOpen={path => {
-              store.open(sessionId, { path })
-              showEditor()
-            }}
-            remote={ctx.remote}
-            sessionId={sessionId}
-          />
-        </div>
-      )
-    }
-    const Explorer = decorate(() => (
-      <PluginQueryProvider>
-        <ExplorerTree />
-      </PluginQueryProvider>
-    ))
-    ctx.effect(() => workbench.register({ id: EXPLORER_PANEL_ID, title: 'Explorer', component: Explorer }), 'dshfiles-editor: explorer panel')
 
     ctx.effect(
       () =>

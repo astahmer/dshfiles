@@ -138,6 +138,10 @@ Then('{string} opens in the {string} editor with its disk content', async ({ pag
     if (placement === 'workbench') {
       await expect(page.getByRole('heading', { name: 'Workbench', exact: true })).toBeVisible()
       await expect(workbenchEditor.getByRole('tab', { name: 'Editor' })).toHaveAttribute('aria-selected', 'true')
+      // The Editor's own tree is the file browser; the workbench offers no second Explorer panel.
+      await page.getByRole('button', { name: 'Add panel' }).click()
+      await expect(page.getByRole('menuitem', { name: 'Explorer', exact: true })).toHaveCount(0)
+      await page.keyboard.press('Escape')
       return
     }
     await expect(page.getByRole('navigation', { name: 'Session hierarchy', exact: true })).toContainText('editor e2e thread')
