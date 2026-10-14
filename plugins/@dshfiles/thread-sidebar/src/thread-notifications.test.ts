@@ -5,6 +5,7 @@ import {
   isThreadUnread,
   markThreadSeen,
   markThreadUnread,
+  reconcileFinishedThreadNotifications,
   threadAttentionTransitions,
 } from './thread-notifications.js'
 test('structured question and completed turn have distinct transitions', () => {
@@ -74,7 +75,43 @@ test('opening a thread clears its needs-you and manual unread markers', () => {
     ...markedUnread,
     needsYouAt: {},
     manuallyUnreadSessionIds: [],
+    seenCompletionSessionIds: ['thread'],
   })
+})
+
+test('opening a finished thread stays seen while the Host still reports completion unread', () => {
+  const preferences = markThreadSeen({ ...DEFAULT_THREAD_NOTIFICATION_PREFERENCES, needsYouAt: { thread: 123 } }, 'thread', true)
+  assert.deepEqual(preferences.needsYouAt, {})
+  assert.deepEqual(preferences.seenCompletionSessionIds, ['thread'])
+
+  const stillUnread = reconcileFinishedThreadNotifications({
+    preferences,
+    statuses: [{ sessionId: 'thread', completionUnread: true }],
+    eligibleSessionIds: new Set(['thread']),
+    newlyFinishedSessionIds: [],
+    now: 456,
+  })
+  assert.equal(stillUnread.changed, false)
+  assert.deepEqual(stillUnread.preferences, preferences)
+
+  const read = reconcileFinishedThreadNotifications({
+    preferences: stillUnread.preferences,
+    statuses: [{ sessionId: 'thread', completionUnread: false }],
+    eligibleSessionIds: new Set(),
+    newlyFinishedSessionIds: [],
+    now: 789,
+  })
+  assert.deepEqual(read.preferences.seenCompletionSessionIds, [])
+
+  const nextTurn = reconcileFinishedThreadNotifications({
+    preferences: read.preferences,
+    statuses: [{ sessionId: 'thread', completionUnread: true }],
+    eligibleSessionIds: new Set(['thread']),
+    newlyFinishedSessionIds: ['thread'],
+    now: 1000,
+  })
+  assert.deepEqual(nextTurn.preferences.needsYouAt, { thread: 1000 })
+  assert.deepEqual(nextTurn.preferences.seenCompletionSessionIds, [])
 })
 
 test('opening one thread preserves another thread unread marker', () => {

@@ -125,6 +125,7 @@ import {
   isThreadUnread,
   markThreadSeen,
   markThreadUnread,
+  reconcileFinishedThreadNotifications,
   threadAttentionTransitions,
   threadNotificationPreferences,
   type ThreadAttentionStatus,
@@ -862,6 +863,8 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
     [mutedThreads, now],
   )
   const selectedSession = useMemo(() => sessions.find(session => (session.retainedBy.mainView ?? 0) > 0), [sessions])
+  const selectedSessionId = selectedSession?.id
+  const selectedSessionCompletionUnread = selectedSessionId === undefined ? false : sessionStatus.get(selectedSessionId)?.completionUnread === true
   const attentionSessions = useMemo(
     () => sessions.filter(session => isAttentionSessionIncluded(session, preferences.includeSubagentAttention)),
     [preferences.includeSubagentAttention, sessions],
@@ -874,10 +877,10 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
 
   useEffect(() => setSelectedThreadId(selectedSession?.id ?? null), [selectedSession?.id, setSelectedThreadId])
   useEffect(() => {
-    if (selectedSession === undefined) return
+    if (selectedSessionId === undefined) return
     const current = threadNotificationPreferences.get() ?? DEFAULT_THREAD_NOTIFICATION_PREFERENCES
-    threadNotificationPreferences.set(markThreadSeen(current, selectedSession.id))
-  }, [selectedSession?.id])
+    threadNotificationPreferences.set(markThreadSeen(current, selectedSessionId, selectedSessionCompletionUnread))
+  }, [selectedSessionId, selectedSessionCompletionUnread])
   threadTitle.current = sessionId => sessionState.byId[sessionId]?.displayTitle
 
   useEffect(() => {
@@ -1082,10 +1085,8 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
   }, [archivedView, reopenThread, tSidebar, unarchiveSession])
 
   const openThread = (sessionId: SessionSummary['id']): void => {
-    if (selectedSession?.id === sessionId) {
-      const current = threadNotificationPreferences.get() ?? DEFAULT_THREAD_NOTIFICATION_PREFERENCES
-      threadNotificationPreferences.set(markThreadSeen(current, sessionId))
-    }
+    const current = threadNotificationPreferences.get() ?? DEFAULT_THREAD_NOTIFICATION_PREFERENCES
+    threadNotificationPreferences.set(markThreadSeen(current, sessionId, sessionStatus.get(sessionId)?.completionUnread === true))
     setRouteRequest(null)
     openedRouteId.current = sessionId
     suppressUrlForSession.current = null
@@ -1822,22 +1823,24 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
     const now = Date.now()
     const current = threadNotificationPreferences.get() ?? DEFAULT_THREAD_NOTIFICATION_PREFERENCES
     const mutes = latestRowActions.current.preferences.mutedThreads
-    const needsYouAt = { ...current.needsYouAt }
-    let changed = false
-    for (const { sessionId, status } of currentStatusEntries) {
-      const session = sessionState.byId[sessionId]
-      if (
-        !status.completionUnread ||
-        isMuteActive(mutes[sessionId], now) ||
-        needsYouAt[sessionId] !== undefined ||
-        session === undefined ||
-        !isAttentionSessionIncluded(session, preferences.includeSubagentAttention)
-      ) {
-        continue
-      }
-      needsYouAt[sessionId] = now
-      changed = true
-    }
+    const eligibleSessionIds = new Set(
+      currentStatusEntries.flatMap(({ sessionId, status }) => {
+        const session = sessionState.byId[sessionId]
+        return status.completionUnread &&
+          !isMuteActive(mutes[sessionId], now) &&
+          session !== undefined &&
+          isAttentionSessionIncluded(session, preferences.includeSubagentAttention)
+          ? [sessionId]
+          : []
+      }),
+    )
+    const completionReconciliation = reconcileFinishedThreadNotifications({
+      preferences: current,
+      statuses: currentStatusEntries.map(({ sessionId }) => ({ sessionId, completionUnread: sessionStatus.get(sessionId)?.completionUnread })),
+      eligibleSessionIds,
+      newlyFinishedSessionIds: transitions.turnFinished,
+      now,
+    })
     const notifyThread = (sessionId: SessionSummary['id'], title: string, fallbackBody: string): void => {
       if (!current.enabled || isMuteActive(mutes[sessionId], now) || !('Notification' in window) || window.Notification.permission !== 'granted') return
       const session = sessionState.byId[sessionId]
@@ -1865,7 +1868,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
       if (selectedSession?.id === sessionId) continue
       notifyThread(sessionId, props.tSidebar('threadSidebarNotificationTitle'), props.tSidebar('threadSidebarNotificationDone'))
     }
-    if (changed) threadNotificationPreferences.set({ ...current, needsYouAt })
+    if (completionReconciliation.changed) threadNotificationPreferences.set(completionReconciliation.preferences)
   }, [
     notificationPreferences.enabled,
     openThread,

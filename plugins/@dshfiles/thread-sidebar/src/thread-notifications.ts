@@ -7,6 +7,7 @@ export interface ThreadNotificationPreferences {
   /** Browser-only mutes from before they moved to Host settings; read once to migrate, then emptied. */
   readonly mutedUntil: Readonly<Record<string, number | null>>
   readonly manuallyUnreadSessionIds: string[]
+  readonly seenCompletionSessionIds: string[]
 }
 
 export const DEFAULT_THREAD_NOTIFICATION_PREFERENCES: ThreadNotificationPreferences = {
@@ -14,6 +15,7 @@ export const DEFAULT_THREAD_NOTIFICATION_PREFERENCES: ThreadNotificationPreferen
   needsYouAt: {},
   mutedUntil: {},
   manuallyUnreadSessionIds: [],
+  seenCompletionSessionIds: [],
 }
 
 const timestampMap = z.record(z.string().min(1).max(256), z.number().int().nonnegative()).refine(value => Object.keys(value).length <= 5000)
@@ -27,6 +29,7 @@ export const threadNotificationPreferences = createStoredValue({
       needsYouAt: timestampMap,
       mutedUntil: muteMap.default({}),
       manuallyUnreadSessionIds: z.array(z.string().min(1).max(256)).max(5000).default([]),
+      seenCompletionSessionIds: z.array(z.string().min(1).max(256)).max(5000).default([]),
     })
     .strict(),
   fallback: DEFAULT_THREAD_NOTIFICATION_PREFERENCES,
@@ -42,6 +45,16 @@ export interface ThreadAttentionTransitions<SessionIdentifier extends string = s
   readonly approvalNeeded: SessionIdentifier[]
   readonly inputNeeded: SessionIdentifier[]
   readonly turnFinished: SessionIdentifier[]
+}
+
+export interface ThreadCompletionSnapshot<SessionIdentifier extends string = string> {
+  readonly sessionId: SessionIdentifier
+  readonly completionUnread: boolean | undefined
+}
+
+export interface ThreadCompletionReconciliation {
+  readonly preferences: ThreadNotificationPreferences
+  readonly changed: boolean
 }
 
 export const threadAttentionTransitions = <SessionIdentifier extends string>(
@@ -64,6 +77,49 @@ export const threadAttentionTransitions = <SessionIdentifier extends string>(
   return { approvalNeeded, inputNeeded, turnFinished }
 }
 
+export const reconcileFinishedThreadNotifications = ({
+  preferences,
+  statuses,
+  eligibleSessionIds,
+  newlyFinishedSessionIds,
+  now,
+}: {
+  readonly preferences: ThreadNotificationPreferences
+  readonly statuses: readonly ThreadCompletionSnapshot[]
+  readonly eligibleSessionIds: ReadonlySet<string>
+  readonly newlyFinishedSessionIds: readonly string[]
+  readonly now: number
+}): ThreadCompletionReconciliation => {
+  const needsYouAt = { ...preferences.needsYouAt }
+  const seenCompletionSessionIds = new Set(preferences.seenCompletionSessionIds)
+  let changed = false
+
+  for (const sessionId of newlyFinishedSessionIds) {
+    if (seenCompletionSessionIds.delete(sessionId)) changed = true
+  }
+
+  for (const { sessionId, completionUnread } of statuses) {
+    if (completionUnread === false) {
+      if (seenCompletionSessionIds.delete(sessionId)) changed = true
+      if (needsYouAt[sessionId] !== undefined) {
+        delete needsYouAt[sessionId]
+        changed = true
+      }
+      continue
+    }
+    if (completionUnread !== true || !eligibleSessionIds.has(sessionId) || seenCompletionSessionIds.has(sessionId) || needsYouAt[sessionId] !== undefined) {
+      continue
+    }
+    needsYouAt[sessionId] = now
+    changed = true
+  }
+
+  return {
+    changed,
+    preferences: changed ? { ...preferences, needsYouAt, seenCompletionSessionIds: [...seenCompletionSessionIds] } : preferences,
+  }
+}
+
 export const isThreadUnread = (preferences: ThreadNotificationPreferences, sessionId: string): boolean =>
   preferences.manuallyUnreadSessionIds.includes(sessionId)
 
@@ -72,12 +128,17 @@ export const markThreadUnread = (preferences: ThreadNotificationPreferences, ses
   manuallyUnreadSessionIds: [...new Set([...preferences.manuallyUnreadSessionIds, sessionId])],
 })
 
-export const markThreadSeen = (preferences: ThreadNotificationPreferences, sessionId: string): ThreadNotificationPreferences => {
+export const markThreadSeen = (preferences: ThreadNotificationPreferences, sessionId: string, completionUnread = false): ThreadNotificationPreferences => {
   const needsYouAt = { ...preferences.needsYouAt }
+  const wasCompletionUnread = completionUnread || needsYouAt[sessionId] !== undefined
   delete needsYouAt[sessionId]
+  const seenCompletionSessionIds = wasCompletionUnread
+    ? [...new Set([...preferences.seenCompletionSessionIds, sessionId])].slice(-5000)
+    : preferences.seenCompletionSessionIds
   return {
     ...preferences,
     needsYouAt,
     manuallyUnreadSessionIds: preferences.manuallyUnreadSessionIds.filter(id => id !== sessionId),
+    seenCompletionSessionIds,
   }
 }
