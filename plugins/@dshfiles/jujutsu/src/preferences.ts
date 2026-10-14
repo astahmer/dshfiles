@@ -13,7 +13,7 @@ const preferencesSchema = z.object({
   diffLayout: z.enum(['auto', 'unified', 'split']).catch('auto'),
   hideImmutable: z.boolean().catch(false),
   mineOnly: z.boolean().catch(false),
-  dateHeadings: z.boolean().catch(true),
+  dateHeadings: z.boolean().catch(false),
   graphDensity: z.enum(['comfortable', 'compact']).catch('comfortable'),
   revisionLimit: z.number().int().min(50).max(500).catch(300),
   refreshMode: z.enum(['interval', 'manual']).catch('interval'),

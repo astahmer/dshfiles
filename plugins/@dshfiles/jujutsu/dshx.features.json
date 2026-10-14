@@ -45,7 +45,7 @@
         },
         {
           "key": "dateHeadings",
-          "defaultValue": "true",
+          "defaultValue": "false",
           "constraints": "Boolean; group graph rows under date headings.",
           "choices": ["true", "false"],
           "coveredBy": ["jujutsu.graph-filters"]

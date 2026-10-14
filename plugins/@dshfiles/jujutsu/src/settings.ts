@@ -21,7 +21,7 @@ export const jujutsuSettings = defineSettings({
       .description('Layout of rendered diffs.'),
     hideImmutable: Schema.boolean().default(false).description('Hide immutable revisions in the graph.'),
     mineOnly: Schema.boolean().default(false).description('Show only your own revisions (and the working copy) in the graph.'),
-    dateHeadings: Schema.boolean().default(true).description('Group graph revisions under day headings.'),
+    dateHeadings: Schema.boolean().default(false).description('Group graph revisions under day headings.'),
     graphDensity: Schema.union([Schema.const('comfortable').description('Comfortable'), Schema.const('compact').description('Compact')])
       .default('comfortable')
       .description('Row height and lane spacing of the revision graph.'),
