@@ -38,6 +38,18 @@ const shellEn = {
   'search.sections': 'Sections',
   'search.openSection': 'Open {section}',
   'search.matches': '{count} matching settings',
+  'config.more': 'More ways to open the configuration file',
+  'config.openWith': 'Open with',
+  'config.default': 'default',
+  'config.editor': 'Editor (in DSH)',
+  'config.copyPath': 'Copy path',
+  'config.copied': 'Path copied',
+  'config.reveal': 'Reveal in Finder',
+  'config.showInFolder': 'Show in folder',
+  'config.loadingApps': 'Looking for apps…',
+  'config.noApps': 'No other app opens this file',
+  'config.failed': 'Could not open the configuration file',
+  'config.editorNeedsThread': 'Open a thread first: the Editor opens files in a thread’s panel',
 }
 
 const shellZh = {
@@ -70,6 +82,18 @@ const shellZh = {
   'search.sections': '设置分区',
   'search.openSection': '打开{section}',
   'search.matches': '{count} 项匹配的设置',
+  'config.more': '打开配置文件的更多方式',
+  'config.openWith': '打开方式',
+  'config.default': '默认',
+  'config.editor': '编辑器（DSH 内）',
+  'config.copyPath': '复制路径',
+  'config.copied': '已复制路径',
+  'config.reveal': '在访达中显示',
+  'config.showInFolder': '在文件夹中显示',
+  'config.loadingApps': '正在查找应用…',
+  'config.noApps': '没有其他应用可以打开此文件',
+  'config.failed': '无法打开配置文件',
+  'config.editorNeedsThread': '请先打开一个会话：编辑器在会话面板中打开文件',
 } satisfies Record<keyof typeof shellEn, string>
 
 // Ported verbatim from @deepseek-ai/dsh-client-ui-settings-general@0.2.0-rc.2 (MIT), lib/client.js `zh` and `en`.

@@ -1,5 +1,5 @@
 import { createRequire } from 'node:module'
-import { realpathSync } from 'node:fs'
+import { existsSync, realpathSync } from 'node:fs'
 import { defineHost } from '@dshfiles/dshx/host'
 import { z } from 'zod'
 import { settingsShellApi } from './shell-api.js'
@@ -28,7 +28,11 @@ export default defineHost({
     settingsShellApi.host({
       documentPath: async ({ ctx }) => {
         const provider = settingsProviderSchema.safeParse(ctx.get('settings'))
-        return { path: provider.success ? provider.data.documentPath : null }
+        if (!provider.success) return { path: null, exists: false }
+        const path = provider.data.documentPath
+        // The desktop opener verifies paths against their real location (macOS temp homes sit behind /var → /private/var).
+        if (!existsSync(path)) return { path, exists: false }
+        return { path: realpathSync(path), exists: true }
       },
       upstream: async () => {
         const installed = installedUpstreamVersion()

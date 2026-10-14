@@ -1,14 +1,16 @@
 import type {} from '@deepseek-ai/dsh-api-settings-controller/remote'
+import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import type {} from '@deepseek-ai/dsh-plugin-manager/remote'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
+import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import { createSnapshotStore, type ObservableSnapshot } from '@deepseek-ai/dsh-client-store'
 import { closeTopModal } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client'
 import { resolveSlotLabel, type PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
-import { defineClient, provideSettingsPageRenderer, useApiQuery, type SettingsPageRendererProps } from '@dshfiles/dshx/client'
+import { createApiClient, defineClient, provideSettingsPageRenderer, useApiQuery, type SettingsPageRendererProps } from '@dshfiles/dshx/client'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import { registerPaletteAction } from '@dshfiles/command-palette/api'
 import { createActor } from '@dshfiles/plugin-ui/machine'
@@ -17,7 +19,8 @@ import { z } from 'zod'
 import type { SettingsSectionOwnerProps } from '@deepseek-ai/dsh-client-ui-settings/client'
 
 import { DesktopUpdateBadge, DesktopUpdateSource, desktopUpdateBridge } from './native/desktop-update.js'
-import { SettingsDocumentAction, SettingsDocumentStore } from './native/document-action.js'
+import { SettingsDocumentStore } from './native/document-action.js'
+import { OpenConfigAction, type ConfigFileOpeners } from './open-config-action.js'
 import { CloseLabel, CurrentVersionRow, DeveloperToolsRow, GeneralSection, HeaderContent, TriggerContent } from './native/general-section.js'
 import { SHELL_LOCALE_NAMESPACE, shellLocale, type ShellTranslate } from './native/locales.js'
 import { ShellRoot, type OnboardingStep, type ShellRootDeps } from './native/shell-root.js'
@@ -42,6 +45,9 @@ const WELCOME_NOTICE_STEP = 'welcome-notice'
 const SETTINGS_PANEL_ID = 'dshfiles-settings'
 const SETTINGS_NAMESPACE = 'dshfiles-settings-shell'
 const MAIN_TABS_OVERLAY_ID = 'dshfiles-main-tabs'
+/** The Editor plugin's right-pane tab and its cross-plugin open request (`@dshfiles/editor` README). */
+const EDITOR_PANE_ID = '@dshfiles/editor/files'
+const OPEN_FILE_EVENT = 'dshfiles:open-file'
 const OPEN_SETTINGS_COMMAND = 'settings.open'
 
 const isShortcutCommandId = (value: string): value is ShortcutCommandId => /^[a-z][a-zA-Z0-9-]*(?:\.[a-zA-Z][a-zA-Z0-9-]*)+$/u.test(value)
@@ -84,8 +90,8 @@ const CurrentVersion = (props: { readonly t: ShellTranslate }): JSX.Element => {
 export default defineClient({
   name: '@dshfiles/settings-shell',
   locales: [shellLocale],
-  inject: ['slots', 'connection', 'remote', 'remote.settings', 'configForms', 'shortcuts', 'sessions', 'layout'],
-  setup(ctx, decorate) {
+  inject: ['slots', 'connection', 'remote', 'remote.settings', 'remote.session', 'configForms', 'shortcuts', 'sessions', 'layout'],
+  setup(ctx, decorate, metadata) {
     const t = ctx.locale.bind(SHELL_LOCALE_NAMESPACE)
     const connection = clientConnectionSchema.parse(ctx.get('connection'))
     const openSettingsCommand = shortcutCommandId(OPEN_SETTINGS_COMMAND)
@@ -482,13 +488,38 @@ export default defineClient({
       ctx.slots.register({ name: 'settings.close', locale: SHELL_LOCALE_NAMESPACE }, (props: { readonly t: ShellTranslate }) => <CloseLabel t={props.t} />),
     )
 
+    // Native policy: only a loopback page gets the privileged document actions (and the path they reveal).
     if (ctx.remote.$host.isLoopback) {
       const documentController = new SettingsDocumentStore(ctx.configForms.describe(), () => ctx.remote.settings.openSettingsDocument())
       ctx.effect(() => () => documentController.dispose(), 'settings-shell: document action')
+      const api = createApiClient(ctx, settingsShellApi, metadata?.packageId)
+      const editorLoaded = (): boolean => ctx.slots.entries('sidebar.right.pane.tab').some(entry => entry.options.key === EDITOR_PANE_ID)
+      const openers: ConfigFileOpeners = {
+        documentPath: async () => {
+          const result = await api.safe.documentPath(undefined)
+          return result.ok && result.value.path !== null ? { path: result.value.path, exists: result.value.exists } : null
+        },
+        canOpenPaths: async () => {
+          const result = await ctx.remote.session.canOpenWorkspacePath()
+          return result.ok && result.value
+        },
+        applications: async path => {
+          const result = await ctx.remote.session.workspacePathApplications({ path })
+          return result.ok ? result.value : null
+        },
+        openWith: async (path, application) => (await ctx.remote.session.openWorkspacePath({ path, application })).ok,
+        reveal: async path => (await ctx.remote.session.openWorkspacePath({ path, action: 'reveal' })).ok,
+        openInEditor: path => {
+          if (!editorLoaded()) return false
+          const handled = !window.dispatchEvent(new CustomEvent(OPEN_FILE_EVENT, { detail: { path }, cancelable: true }))
+          if (handled && actor.getSnapshot().matches('modal')) actor.send({ type: 'close' })
+          return handled
+        },
+      }
       ctx.slots.inject('settings.action', () =>
         ctx.slots.register(
           { name: 'settings.action', id: 'open-document', order: 0, locale: SHELL_LOCALE_NAMESPACE },
-          (props: { readonly t: ShellTranslate }) => <SettingsDocumentAction controller={documentController} t={props.t} />,
+          (props: { readonly t: ShellTranslate }) => <OpenConfigAction controller={documentController} openers={openers} t={props.t} />,
         ),
       )
     }

@@ -5,8 +5,11 @@ export const settingsShellApi = defineApi({
   id: 'settings-shell',
   version: 1,
   methods: {
-    /** The profile document `Open configuration file` opens, so the Client can copy, reveal or open it elsewhere. */
-    documentPath: method({ input: z.void(), output: z.object({ path: z.string().nullable() }) }),
+    /**
+     * The profile document `Open configuration file` opens, so the Client can copy, reveal or open it elsewhere. It may
+     * not exist yet: the native action creates it on first open.
+     */
+    documentPath: method({ input: z.void(), output: z.object({ path: z.string().nullable(), exists: z.boolean() }) }),
     /** The native Settings package version the running DSH ships, against the version this shell was ported from. */
     upstream: method({
       input: z.void(),

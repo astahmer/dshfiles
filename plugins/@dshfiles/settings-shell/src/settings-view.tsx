@@ -308,9 +308,11 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
           )}
         </nav>
         <div className="dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:overflow-y-auto dshx:px-6 dshx:pt-5 dshx:pb-6" ref={content}>
-          {searching && <SearchResults {...props} result={result} />}
-          {!searching && activePage !== undefined && props.renderPluginPage(activePage)}
-          {!searching && activePage === undefined && active !== undefined && props.renderSlot('settings.section', props.sectionOwner, { only: active })}
+          <div className="dshx:max-w-[880px]">
+            {searching && <SearchResults {...props} result={result} />}
+            {!searching && activePage !== undefined && props.renderPluginPage(activePage)}
+            {!searching && activePage === undefined && active !== undefined && props.renderSlot('settings.section', props.sectionOwner, { only: active })}
+          </div>
         </div>
       </div>
     </div>

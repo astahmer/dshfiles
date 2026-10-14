@@ -59,6 +59,21 @@ equal to the default still counts, as natively). Hovering or focusing the row sh
 the override so the field re-inherits the composition default. A deep link to a field scrolls it into view and
 highlights it for two seconds.
 
+### Configuration file
+
+On a loopback browser whose Host keeps a settings document (the profile's `cordis.patch.yml`), the header shows
+**Open configuration file** as a split button, like the thread header's open-in control. The button keeps the native
+action: the Host opens the document in its text editor, creating it if absent. **▾** offers:
+
+- **Open with** each app the desktop associates with the file (icons and the default from the Session Remote's path
+  opener, the service behind the native open-in controls; their component is not exported, so the menu is drawn here);
+- **Editor (in DSH)** when `@dshfiles/editor` is loaded, through its `dshfiles:open-file` request (it needs a thread
+  to open files in);
+- **Copy path**, and **Reveal in Finder** (_Show in folder_ elsewhere).
+
+The path comes from this plugin's Host (`settings-shell.documentPath`, the settings provider's `documentPath`,
+canonicalized). Until the document exists only the path can be copied. Remote browsers get neither action nor path.
+
 ### Open Settings from another plugin
 
 ```ts

@@ -1,13 +1,10 @@
 /**
- * Ported from @deepseek-ai/dsh-client-ui-settings-general@0.2.0-rc.2 (MIT): `SettingsDocumentAction.js` and
- * `settings-document-store.js`. Opens the provider-owned local settings document on a loopback browser.
+ * Ported from @deepseek-ai/dsh-client-ui-settings-general@0.2.0-rc.2 (MIT): `settings-document-store.js`. Whether the
+ * provider owns a local settings document, and its pathless native open. The action that renders it is
+ * `open-config-action.tsx`, a split button in place of the native single button.
  */
 import type { SettingsDescribeFace } from '@deepseek-ai/dsh-client-ui-settings/client'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
-import { Button } from '@deepseek-ai/dsh-client-ui-primitives'
-import { useEffect } from 'react'
-import type { ShellTranslate } from './locales.js'
-import { useObservable } from './use-observable.js'
 
 /** Mutable: the snapshot store hands updates an immer draft. */
 interface DocumentState {
@@ -85,25 +82,4 @@ export class SettingsDocumentStore {
       state.error = null
     })
   }
-}
-
-/** The open-document action, rendered only after Host metadata confirms the document exists. */
-export const SettingsDocumentAction = (props: { readonly controller: SettingsDocumentStore; readonly t: ShellTranslate }): JSX.Element | null => {
-  const state = useObservable(props.controller.store)
-  useEffect(() => {
-    void props.controller.load()
-  }, [props.controller])
-  if (state.status !== 'ready') return null
-  return (
-    <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
-      {state.error !== null && (
-        <span className="dshx:max-w-[180px] dshx:truncate dshx:text-[12px] dshx:leading-[18px] dshx:text-[var(--dsw-alias-state-error-primary)]" role="alert">
-          {props.t('openDocument.error')}
-        </span>
-      )}
-      <Button disabled={state.opening} onClick={() => void props.controller.open()} size="sm" variant="outline">
-        {props.t('openDocument')}
-      </Button>
-    </div>
-  )
 }
