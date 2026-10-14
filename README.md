@@ -100,8 +100,12 @@ pnpm profile:sync --profile probe
 fnm exec --using="$(cat .node-version)" pnpm profile:boot --profile probe
 ```
 
-`profile:sync` links owned bundles into a profile (exactly the seed's, for a
-profile seeded under `profiles/`). `profile:boot` checks that
+`profile:sync` links owned bundles into a profile (reconciled from the seed,
+for a profile seeded under `profiles/`). The live `web` profile follows its seed
+on its own: the `dsh web` supervisor runs the same sync before every start and
+restart, so seed and plugin changes need a restart, not `nixapply` (one last
+`nixapply` installs that supervisor; see
+[profile installs](docs/profile-installs.md#migrating-from-the-nix-copy)). `profile:boot` checks that
 all composed entries activate. Try changes in the isolated `probe` profile
 before promoting them to `web`; never restart the live web profile from a
 validation run. See [`AGENTS.md`](AGENTS.md) for the full workflow and runtime

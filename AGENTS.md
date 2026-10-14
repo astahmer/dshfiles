@@ -127,9 +127,14 @@ Profiles live in `~/.dsh/profiles/<name>/`. Registry packages go through
 local bundle. Read [`docs/profile-installs.md`](docs/profile-installs.md)
 before touching a profile manifest.
 
-The checked-in seed is `profiles/web/`. Home Manager seeds missing files into
-the writable `~/.dsh/profiles/web/` and reconciles the plugin dependencies and
-the marked Cordis region on apply; edits outside that region stay local.
+The checked-in seed is `profiles/web/`. `scripts/profile-sync.ts` is the only
+reconciler: it seeds missing files into the writable `~/.dsh/profiles/web/`,
+applies the seed's plugin dependencies and the marked Cordis region, and keeps
+user-added entries and edits outside that region. The nixfiles `dsh web`
+supervisor runs it before every start and restart, `dshx checkout sync` runs it
+when the seed changed, so a seed change reaches the live profile on the next
+restart without `nixapply`. See
+[`docs/profile-installs.md`](docs/profile-installs.md#the-web-profile-reconciles-itself).
 
 Experiment in `probe` (or a disposable profile), never in `web`. `probe` is not
 Nix-managed, has its own `node_modules`, and gets its own port:
@@ -138,7 +143,7 @@ Nix-managed, has its own `node_modules`, and gets its own port:
 pnpm profile:sync --profile probe
 fnm exec --using="$(cat .node-version)" pnpm profile:boot --profile probe
 pnpm --dir plugins/@dshfiles/<name> test
-pnpm profile:sync --profile web --bundle @dshfiles/<name>   # only once it earns its place
+# once it earns its place: add it to profiles/web/package.json; the next restart links it
 ```
 
 When `probe` has unrelated activation failures, isolate the target with the

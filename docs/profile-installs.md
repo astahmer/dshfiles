@@ -4,9 +4,8 @@ Profiles live in `~/.dsh/profiles/<name>/`. Edit `cordis.patch.yml` for config,
 never `cordis.yml`. `pnpm profile:sync --profile <name>` links owned bundles
 into a profile the supported way (below), so reach for it before editing a
 profile manifest by hand. A profile with a seed in this repository
-(`profiles/<name>/package.json`) gets exactly the seed's `@dshfiles/*` bundles,
-its relative `link:` paths resolved against the seed folder; any other profile
-gets every owned bundle. `--bundle <name>` adds or refreshes one bundle and
+(`profiles/<name>/package.json`) is reconciled from that seed (below); any
+other profile gets every owned bundle. `--bundle <name>` adds or refreshes one bundle and
 leaves the rest alone.
 
 ```sh
@@ -14,10 +13,52 @@ dsh --profile web --dump-config          # full composed tree
 dsh --profile web --dump-config-schema   # JSON Schema for entries and patches
 ```
 
+## The web profile reconciles itself
+
 The `web` profile seed lives in this repo: `profiles/web/package.json` and
-`profiles/web/cordis.patch.yml`. nixfiles `modules/dsh.nix` reads them on apply and
-reconciles only its marked block, so promoting a bundle means editing that seed
-(then `pnpm profile:sync --profile web`); no nixfiles change is needed.
+`profiles/web/cordis.patch.yml`. `scripts/profile-sync.ts` is the one
+reconciler for it, and three callers run it:
+
+- the nixfiles `dsh web` supervisor, before every start and every restart
+  (the thread sidebar's Restart included), from `$DSHFILES_DIR`;
+- `dshx checkout sync` (by hand or after Rebase), when the moved range touched
+  `profiles/`; it then reports "restart to apply". It skips when
+  `DSHFILES_DIR` names another checkout, so the profile never flips between two;
+- the nixfiles Home Manager activation, on `nixapply`.
+
+Promoting or dropping a bundle means editing the seed; the next restart applies
+it. No nixfiles change and no `nixapply` is needed. A run:
+
+- copies missing seed files (`package.json`, `cordis.patch.yml`,
+  `pnpm-workspace.yaml`, and `ai-accounts.json` to
+  `$DSH_HOME/plugins/ai-accounts/accounts.json`); existing files are not replaced;
+- applies the seed's dependencies with relative `link:` paths resolved to the
+  checkout running it, and its bundle list, keeping the profile's bundle order;
+- removes entries a previous run managed and the seed dropped, unless the user
+  changed them since, and any `@dshfiles/*` row the seed lacks; every other
+  entry (a registry plugin added with `dsh plugin add`) stays;
+- restores the region between `# BEGIN NIX-MANAGED DSH PLUGINS` and
+  `# END NIX-MANAGED DSH PLUGINS` in `cordis.patch.yml`; the rest stays local;
+- runs `pnpm install --prefer-offline` (bounded to 180 s) only when the
+  manifest differs from the last one it installed or `node_modules` is missing.
+  An unchanged profile costs a few milliseconds.
+
+It writes under DSH's own `package.json.lock` and replaces files atomically. Its
+record of managed entries is `.dshfiles-profile-sync.json` in the profile; it
+reads the older `.nixfiles-managed-plugins.json` once and removes it. When a
+run fails (a seed bundle missing, pnpm failing), the supervisor logs a warning
+and starts DSH with the previous profile.
+
+Preview a run against any home with `--dry-run`, and test against a scratch
+home and seed with `--home <dir> --seed <dir>`.
+
+### Migrating from the Nix copy
+
+Until nixfiles carried this change, its activation ran its own copy of the
+reconciler, so seed changes needed `nixapply`. Run `nixapply` once after
+updating nixfiles: it installs the supervisor that syncs before each start,
+and `dsh-web` with `DSHFILES_DIR` defaulting to the `dsh.dshfilesCheckout`
+option. Restart DSH once afterwards; from then on Restart is enough.
 
 ## `pnpm add <path>` is blocked; `pnpm install` is not
 
