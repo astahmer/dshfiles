@@ -12,7 +12,7 @@ import type { WorkspaceBrowserProps } from '@deepseek-ai/dsh-client-ui-workspace
 import { defineClient } from '@dshfiles/dshx/client'
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
-import { FolderOpenIcon, MoonIcon, SunIcon, SunMoonIcon } from '@dshfiles/plugin-ui/icons'
+import { CirclePlusIcon, FolderOpenIcon, MoonIcon, SunIcon, SunMoonIcon } from '@dshfiles/plugin-ui/icons'
 import { COMMAND_PALETTE_LOCALE_NAMESPACE, commandPaletteLocale } from './locales.js'
 import { newThreadShortcutDefaults } from './new-thread-shortcut.js'
 import {
@@ -71,7 +71,8 @@ const PaletteOverlay = (props: PaletteOverlayProps): JSX.Element | null => {
     () => new Map(workspaceState.items.flatMap(workspace => workspace.sessionIds.map(id => [id, workspace.workspaceId] as const))),
     [workspaceState.items],
   )
-  const selectedSession = sessions.find(session => (session.retainedBy.mainView ?? 0) > 0)
+  // The New-thread screen holds a blank Session in the main view; it is not a thread, so it gets no thread actions.
+  const selectedSession = sessions.find(session => (session.retainedBy.mainView ?? 0) > 0 && !session.blank)
   const selectedWorkspaceId = workspaceForSession(selectedSession, sessionState.byId, workspaceBySession)
   const workspaces = useMemo(() => workspaceState.items.map(workspace => ({ id: workspace.workspaceId, title: workspace.title })), [workspaceState.items])
   const context = useMemo<PaletteActionContext>(() => {
@@ -272,6 +273,7 @@ export default defineClient({
       id: '@dshfiles/command-palette/new-thread',
       label: () => translate('commandPaletteNewThread'),
       aliases: ['new thread', 'new chat', 'new session'],
+      icon: <CirclePlusIcon className="dshx:size-4" />,
       group: 'action',
       run: startNewThread,
     }

@@ -199,6 +199,9 @@ const useWorkspaceFiles = (enabled: boolean): FilesState => {
   return state
 }
 
+/** Host shortcut commands that do what a differently labelled palette entry already does. */
+const SAME_COMMAND_AS = new Map([['@dshfiles/thread-sidebar/command/session.new', 'new thread']])
+
 export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
   const [mode, setMode] = useState(props.mode)
   const [query, setQuery] = useState('')
@@ -220,13 +223,24 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
   const boosts = useMemo(() => frecencyBoosts(frecency, Date.now()), [frecency])
   const [registeredActions, setRegisteredActions] = useState(getPaletteActions)
   useEffect(() => subscribePaletteActions(() => setRegisteredActions(getPaletteActions())), [])
-  const actionOptions = useMemo<PaletteActionOption[]>(
-    () =>
-      [...registeredActions, ...props.additionalActions].flatMap(action =>
-        action.isAvailable?.(props.context) === false ? [] : [{ ...action, label: typeof action.label === 'function' ? action.label() : action.label }],
-      ),
-    [props.additionalActions, props.context, registeredActions],
-  )
+  const actionOptions = useMemo<PaletteActionOption[]>(() => {
+    // Several bundles register the same command ("New thread" comes from this palette, the sidebar header and the
+    // Host shortcut catalog); list it once, keeping an action or destination over its bare shortcut-command twin.
+    const registeredLabels = new Set<string>()
+    const byKind = [...registeredActions.filter(action => action.group !== 'command'), ...registeredActions.filter(action => action.group === 'command')]
+    const registered = byKind.flatMap(action => {
+      if (action.isAvailable?.(props.context) === false) return []
+      const label = typeof action.label === 'function' ? action.label() : action.label
+      const key = SAME_COMMAND_AS.get(action.id) ?? label.trim().toLowerCase()
+      if (registeredLabels.has(key)) return []
+      registeredLabels.add(key)
+      return [{ ...action, label }]
+    })
+    const additional = props.additionalActions.flatMap(action =>
+      action.isAvailable?.(props.context) === false ? [] : [{ ...action, label: typeof action.label === 'function' ? action.label() : action.label }],
+    )
+    return [...registered, ...additional]
+  }, [props.additionalActions, props.context, registeredActions])
 
   const workspaceFiles = useWorkspaceFiles(mode === 'files')
   const fileIndex = useMemo(() => indexFiles(workspaceFiles.files), [workspaceFiles.files])
@@ -326,6 +340,8 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
     [commandRows, contentRows, destinationRows, fileRows, helpRows, line, threadRows],
   )
   const numbered = rows.slice(0, 9)
+  // Until the pointer or arrows pick a row, the first match is active, so Enter runs it right after typing.
+  const activeValue = rows.some(row => rowValue(row) === selected) ? selected : rows[0] === undefined ? '' : rowValue(rows[0])
 
   const remember = (id: string): void => {
     paletteFrecency.set(recordUse(paletteFrecency.get(), id, Date.now()))
@@ -480,7 +496,7 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
       >
         <DialogTitle className="dshx:sr-only">{props.copy.title}</DialogTitle>
         <DialogDescription className="dshx:sr-only">{placeholder}</DialogDescription>
-        <Command shouldFilter={false} value={selected} onValueChange={setSelected} onKeyDown={onKeyDown} loop className="dshx:rounded-none">
+        <Command shouldFilter={false} value={activeValue} onValueChange={setSelected} onKeyDown={onKeyDown} loop className="dshx:rounded-none">
           <CommandInput
             autoFocus
             className="dshx:h-11"

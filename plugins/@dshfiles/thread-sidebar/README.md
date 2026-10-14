@@ -84,7 +84,8 @@ started before this plugin version report nothing. Keyboard entry
 points:
 
 - Capture-phase chords claimed before the browser: ⌘K / Ctrl+K palette,
-  ⌘P / Ctrl+P thread search. Rebind or disable them in Settings › Plugins ›
+  ⌘P / Ctrl+P file search (thread search has no chord by default; it stays on
+  ⌥⌘K and in ⌘K). Rebind or disable them in Settings › Plugins ›
   Thread sidebar shortcuts. A chord the Host shortcut catalog already binds is left to
   the Host (so desktop ⌘K stays native Search sessions).
 - Host shortcut `threadSidebar.commandPalette` (⇧⌘P by default), editable in

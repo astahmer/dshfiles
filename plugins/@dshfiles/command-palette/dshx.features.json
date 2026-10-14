@@ -60,6 +60,7 @@
       "id": "action-registry",
       "title": "Register and invoke typed palette actions",
       "summary": "Expose namespaced, validated actions to the shared palette, notify subscribers on changes, and dispose registrations cleanly.",
+      "reach": ["click button \"New thread\"", "click button \"Open command palette\"", "expect option \"New thread*\"", "expect option \"Use dark theme*\""],
       "surfaces": ["client", "api"],
       "configuration": [],
       "states": ["registered", "available", "selected", "disposed"],

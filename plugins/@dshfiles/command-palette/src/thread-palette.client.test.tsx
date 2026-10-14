@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import type { PaletteActionContext } from './palette-api.js'
+import { registerPaletteAction, type PaletteActionContext } from './palette-api.js'
 import { ThreadPalette, type ThreadPaletteCopy } from './thread-palette.js'
 
 const copy: ThreadPaletteCopy = {
@@ -79,6 +79,8 @@ const mount = () => {
 
 beforeEach(() => {
   localStorage.clear()
+  // jsdom has no layout; cmdk scrolls the active row into view.
+  Element.prototype.scrollIntoView = vi.fn()
   vi.stubGlobal(
     'ResizeObserver',
     class {
@@ -134,5 +136,32 @@ describe('ThreadPalette navigation', () => {
     expect(screen.getByRole('tab', { name: 'Everything' }).getAttribute('aria-selected')).toBe('true')
     expect(document.activeElement).toBe(input)
     expect(onClose).not.toHaveBeenCalled()
+  })
+})
+
+describe('ThreadPalette actions', () => {
+  it('lists New thread once although four entries register it', () => {
+    const disposers = [
+      registerPaletteAction({ id: '@dshfiles/command-palette/new-thread', label: 'New thread', group: 'action', run: vi.fn() }),
+      registerPaletteAction({ id: '@dshfiles/thread-sidebar/header/new-thread', label: () => 'New thread', group: 'destination', run: vi.fn() }),
+      registerPaletteAction({ id: '@dshfiles/thread-sidebar/command/commandPalette.newThread', label: 'New thread', group: 'command', run: vi.fn() }),
+      registerPaletteAction({ id: '@dshfiles/thread-sidebar/command/session.new', label: 'New Session', group: 'command', run: vi.fn() }),
+    ]
+    mount()
+    expect(screen.getAllByRole('option', { name: /New (thread|Session)/ })).toHaveLength(1)
+    disposers.forEach(dispose => dispose())
+  })
+
+  it('selects the first match while typing so Enter runs it', async () => {
+    const run = vi.fn()
+    const dispose = registerPaletteAction({ id: '@dshfiles/test/zebra', label: 'Zebra mode', group: 'action', run })
+    mount()
+    const input = screen.getByRole<HTMLInputElement>('combobox')
+    input.focus()
+    fireEvent.change(input, { target: { value: 'zebra' } })
+    await waitFor(() => expect(screen.getByRole('option', { name: /Zebra mode/ }).getAttribute('aria-selected')).toBe('true'))
+    fireEvent.keyDown(input, { key: 'Enter', code: 'Enter' })
+    await waitFor(() => expect(run).toHaveBeenCalledTimes(1))
+    dispose()
   })
 })
