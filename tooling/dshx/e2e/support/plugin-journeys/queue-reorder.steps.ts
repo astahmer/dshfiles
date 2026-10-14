@@ -1,4 +1,6 @@
 import { expect, type Page } from '@playwright/test'
+import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { Then, When } from '../bdd.js'
 import { fakeCommandCodeFor, type FakeChatRequest } from '../fake-command-code.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
@@ -147,6 +149,93 @@ Then('the queue starts collapsed and previews at most 40 characters', async ({ p
   await recordAssertion(page, 'queue-reorder-preview-length-applies', async () => {
     const text = (await queuedRows(page).filter({ hasText: 'third queued' }).locator('span[title]').textContent()) ?? ''
     expect([...text].length).toBeLessThanOrEqual(41)
+  })
+  await finishJourneyAssertions(page)
+})
+
+const ATTACHMENT_FIXTURES = fileURLToPath(new URL('../../fixtures/attachments/', import.meta.url))
+
+const queueWithAttachments = async (page: Page, text: string, files: readonly string[]): Promise<void> => {
+  await composerInput(page).fill(text)
+  await page.locator('[data-composer-card] input[type="file"]').setInputFiles(files.map(name => join(ATTACHMENT_FIXTURES, name)))
+  for (const name of files) {
+    await expect(page.getByRole('button', { name: new RegExp(`^Remove (image|file) ${name.replace('.', '\\.')}$`) })).toBeVisible()
+  }
+  // Enter is refused until the file upload finishes, so it is pressed again until the composer empties.
+  await expect(async () => {
+    await composerInput(page).press('Enter')
+    await expect(composerInput(page)).toHaveText('', { timeout: 1_000 })
+  }).toPass({ timeout: 20_000 })
+}
+
+const openThread = async (page: Page, title: string): Promise<void> => {
+  await page.getByText(title, { exact: true }).first().click()
+  // The sidebar row and the open thread's header both name it.
+  await expect(page.getByText(title, { exact: true }).nth(1)).toBeVisible()
+  await expect(composerInput(page)).toBeVisible()
+}
+
+When('an idle thread {string} and a busy thread {string} exist', async ({ page }: { page: Page }, idle: string, busy: string) => {
+  for (const [title, directive] of [
+    [idle, ''],
+    [busy, ' [[hold]]'],
+  ] as const) {
+    await startThreadWithModel(page, { project: 'Default workspace', model: 'commandcode_work/gpt-6-luna' })
+    const composer = page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })
+    await composer.fill(`${title} [[title ${title}]]${directive}`)
+    await composer.press('Enter')
+    await expect(page.getByText(title, { exact: true }).first()).toBeVisible({ timeout: 30_000 })
+  }
+})
+
+When('the thread {string} is opened again', async ({ page }: { page: Page }, title: string) => {
+  await openThread(page, title)
+  await expect(queueDock(page)).toBeVisible()
+})
+
+When('{string} is queued with an image and a file, then {string} with an image', async ({ page }: { page: Page }, first: string, second: string) => {
+  await queueWithAttachments(page, first, ['red.png', 'note.txt'])
+  await queueWithAttachments(page, second, ['blue.png'])
+  await expect(queuedRows(page)).toHaveCount(2)
+})
+
+When('the queued message {string} is moved to {string}', async ({ page }: { page: Page }, text: string, title: string) => {
+  await queuedRows(page).filter({ hasText: text }).getByRole('button', { name: 'Move queued message to another thread', exact: true }).click()
+  const picker = page.getByRole('dialog', { name: 'Move to thread', exact: true })
+  await expect(picker).toBeVisible()
+  await picker.getByRole('option', { name: title }).click()
+})
+
+Then('the dock says it moved to the queue of {string} and keeps only {string}', async ({ page }: { page: Page }, title: string, remaining: string) => {
+  await recordAssertion(page, 'queue-reorder-move-to-busy-thread-queues-it-there', async () => {
+    await expect(page.locator('[data-queue-transfer-outcome]')).toHaveText(new RegExp(`Moved to the queue of ${title}\\.`))
+    await expect(queuedRows(page)).toHaveCount(1)
+    await expect(queuedRows(page).first()).toContainText(remaining)
+  })
+})
+
+Then('{string} opens with {string} and its image in the composer', async ({ page }: { page: Page }, title: string, text: string) => {
+  await recordAssertion(page, 'queue-reorder-move-to-idle-thread-fills-its-composer', async () => {
+    await expect(composerInput(page)).toHaveText(text)
+    await expect(page.getByRole('button', { name: 'Remove image blue.png', exact: true })).toBeVisible()
+    await expect(page.getByText(title, { exact: true }).nth(1)).toBeVisible()
+  })
+})
+
+Then('{string} ran {string} with its image and file', async ({ page }: { page: Page }, title: string, text: string) => {
+  await openThread(page, title)
+  await recordAssertion(page, 'queue-reorder-moved-message-keeps-its-attachments', async () => {
+    await expect
+      .poll(
+        () =>
+          fakeCommandCodeFor(page)
+            .requests.filter(request => request.kind === 'turn')
+            .map(latestUserText),
+        { timeout: 60_000 },
+      )
+      .toContainEqual(expect.stringContaining(text))
+    await expect(page.getByText('note.txt', { exact: true })).toBeVisible()
+    await expect(page.getByText(text, { exact: true })).toBeVisible()
   })
   await finishJourneyAssertions(page)
 })

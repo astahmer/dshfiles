@@ -1,12 +1,25 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { SessionFace } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { PromptContentPart } from '@deepseek-ai/dsh-api-session-controller/types'
+import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type { ComposerAttachment, DraftAttachmentId, DraftFileUploads, SessionInput, SubmitAttachment } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { MessageId } from '@deepseek-ai/dsh-llm/brand'
 import type { ApiClient } from '@dshfiles/dshx/api'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import type { queueApi } from './api.js'
-import { createQueueEditor, decodeQueuedRows, queueEditRecordsSchema, type QueueEditor, type QueueEditRecord, type QueuedRow } from './queue-edit.js'
+import {
+  createQueueEditor,
+  decodeQueuedRows,
+  promptPartsFor,
+  queueEditRecordsSchema,
+  type PromptPart,
+  type QueuedFileAttachment,
+  type QueuedImageAttachment,
+  type QueueEditor,
+  type QueueEditRecord,
+  type QueuedRow,
+} from './queue-edit.js'
+import { startQueueTransfer, type QueueTransferActor } from './queue-transfer.js'
 
 /**
  * Binds the queue editor to one live DSH session: its inbox projection, its pending submissions, its composer
@@ -114,6 +127,54 @@ const toPromptPart = (part: { readonly type: 'text'; readonly text: string } | S
   return { type: 'file', receiptId: part.receiptId }
 }
 
+/** Reads a session's queued attachments back as files, and queues or removes its messages. */
+const sessionQueueIo = (input: { readonly sessionId: SessionFace['sessionId']; readonly session: SessionFace }) => ({
+  readImage: async (attachment: QueuedImageAttachment): Promise<File> => {
+    if (!isAttachmentId(attachment.attachmentId)) throw new Error('image has no id')
+    const result = await input.session.readAttachment(attachment.attachmentId)
+    if (!result.ok) throw new Error(result.error.message)
+    const name = attachment.name ?? result.value.attachment.name ?? 'image'
+    return new File([new Uint8Array(result.value.data)], name, { type: result.value.attachment.mediaType })
+  },
+  readFile: async (attachment: QueuedFileAttachment): Promise<File> => {
+    const file = await requireQueueClient().readFile({ sessionId: input.sessionId, attachment })
+    return new File([bytesFromBase64(file.data)], file.name)
+  },
+  remove: async (itemId: string): Promise<void> => {
+    const result = await input.session.updateQueue(MessageId(itemId), { kind: 'remove' })
+    if (!result.ok) throw new Error(result.error.message)
+  },
+  enqueue: async (parts: readonly PromptPart<SubmitAttachment>[]): Promise<string> => {
+    const text = parts.flatMap(part => (part.type === 'text' ? [part.text] : [])).join('')
+    const handle = input.session.beginSubmission({ mode: 'queue', text, attachments: [] })
+    let content: PromptContentPart[]
+    try {
+      content = parts.map(toPromptPart)
+    } catch (error) {
+      handle.abandon()
+      throw error
+    }
+    const result = await input.session.prompt(content, 'queue', undefined, handle.requestId)
+    if (!result.ok) throw new Error(result.error.message)
+    return handle.requestId
+  },
+})
+
+/** Upload `files` as draft attachments of one session and answer with their wire payloads, releasing the drafts. */
+const serializeFiles = async (
+  drafts: DraftAttachmentApi,
+  sessionId: SessionFace['sessionId'],
+  files: readonly File[],
+): Promise<readonly SubmitAttachment[]> => {
+  const ids = drafts.createDrafts(sessionId, files).map(draft => draft.id)
+  try {
+    await waitForUploads(drafts, ids)
+    return (await drafts.serializeDraftAttachments(ids)).attachments
+  } finally {
+    for (const id of ids) drafts.releaseDraftAttachment(id)
+  }
+}
+
 const createEditor = (input: {
   readonly sessionId: SessionFace['sessionId']
   readonly session: SessionFace
@@ -122,6 +183,7 @@ const createEditor = (input: {
 }): QueueEditor => {
   const inbox = input.session.projections.faceOf('inbox')
   const key: string = input.sessionId
+  const io = sessionQueueIo(input)
   const records = {
     load: (): QueueEditRecord | null => storedEdits.get()[key] ?? null,
     save: (record: QueueEditRecord | null): void => {
@@ -164,35 +226,10 @@ const createEditor = (input: {
       },
     },
     host: {
-      readImage: async attachment => {
-        if (!isAttachmentId(attachment.attachmentId)) throw new Error('image has no id')
-        const result = await input.session.readAttachment(attachment.attachmentId)
-        if (!result.ok) throw new Error(result.error.message)
-        const name = attachment.name ?? result.value.attachment.name ?? 'image'
-        return new File([new Uint8Array(result.value.data)], name, { type: result.value.attachment.mediaType })
-      },
-      readFile: async attachment => {
-        const file = await requireQueueClient().readFile({ sessionId: input.sessionId, attachment })
-        return new File([bytesFromBase64(file.data)], file.name)
-      },
-      remove: async itemId => {
-        const result = await input.session.updateQueue(MessageId(itemId), { kind: 'remove' })
-        if (!result.ok) throw new Error(result.error.message)
-      },
-      enqueue: async parts => {
-        const text = parts.flatMap(part => (part.type === 'text' ? [part.text] : [])).join('')
-        const handle = input.session.beginSubmission({ mode: 'queue', text, attachments: [] })
-        let content: PromptContentPart[]
-        try {
-          content = parts.map(toPromptPart)
-        } catch (error) {
-          handle.abandon()
-          throw error
-        }
-        const result = await input.session.prompt(content, 'queue', undefined, handle.requestId)
-        if (!result.ok) throw new Error(result.error.message)
-        return handle.requestId
-      },
+      readImage: io.readImage,
+      readFile: io.readFile,
+      remove: io.remove,
+      enqueue: io.enqueue,
       move: async (itemId, direction) => (await requireQueueClient().move({ sessionId: input.sessionId, itemId, direction })).index,
     },
     records,
@@ -236,6 +273,90 @@ export const sessionQueueEditor = (ctx: Context, sessionId: SessionFace['session
     },
   })
   return editor
+}
+
+const transfers = new Map<string, { readonly session: SessionFace; readonly actor: QueueTransferActor }>()
+
+/** Main view retention a just-opened thread takes before this plugin lets go of its own reference. */
+const OPEN_TIMEOUT_MS = 5_000
+
+const openedInMainView = (ctx: Context, sessionId: SessionFace['sessionId']): Promise<void> =>
+  new Promise(resolve => {
+    const info = ctx.sessions.retainInfo(sessionId)
+    const opened = (): boolean => (info.getSnapshot().retainedBy.mainView ?? 0) > 0
+    if (opened()) return resolve()
+    const timer = setTimeout(() => {
+      unsubscribe()
+      resolve()
+    }, OPEN_TIMEOUT_MS)
+    const unsubscribe = info.subscribe(() => {
+      if (!opened()) return
+      clearTimeout(timer)
+      unsubscribe()
+      resolve()
+    })
+  })
+
+const conversationOf = (ctx: Context, sessionId: SessionFace['sessionId']) => {
+  const scoped = ctx.sessions.scope(sessionId)
+  const conversation = scoped?.get('conversation')
+  if (scoped === undefined || !hasDraftAttachmentApi(conversation) || !hasSessionInput(conversation)) return undefined
+  return { drafts: conversation, composer: conversation.input.for(scoped) }
+}
+
+/**
+ * The "Move to thread" flow for one session's queue, kept for the page's lifetime like the editor: opening the
+ * target thread unmounts this dock, and the move must still finish.
+ */
+export const sessionQueueTransfer = (ctx: Context, sessionId: SessionFace['sessionId']): QueueTransferActor | undefined => {
+  const binding = ctx.sessions.binding(sessionId)
+  const source = conversationOf(ctx, sessionId)
+  if (binding === undefined || source === undefined) return undefined
+  const existing = transfers.get(sessionId)
+  if (existing?.session === binding.session) return existing.actor
+  const io = sessionQueueIo({ sessionId, session: binding.session })
+  const actor = startQueueTransfer({
+    load: async blocks =>
+      Promise.all(
+        blocks.flatMap(block => (block.type === 'image' ? [io.readImage(block.attachment)] : block.type === 'file' ? [io.readFile(block.attachment)] : [])),
+      ),
+    remove: io.remove,
+    restore: async input => {
+      await io.enqueue(promptPartsFor(input.blocks, await serializeFiles(source.drafts, sessionId, input.files)))
+    },
+    deliver: async input => {
+      const targetId = ctx.sessions.list.getSnapshot().ids.find(id => id === input.target.id)
+      if (targetId === undefined) throw new Error(`${input.target.title} is no longer listed`)
+      const reference = ctx.sessions.retain(targetId, { source: 'controllerOperation' })
+      try {
+        const target = await reference.ready
+        const conversation = conversationOf(ctx, targetId)
+        if (conversation === undefined) throw new Error('that thread has no composer')
+        if (target.session.getSnapshot().running) {
+          await sessionQueueIo({ sessionId: targetId, session: target.session }).enqueue(
+            promptPartsFor(input.blocks, await serializeFiles(conversation.drafts, targetId, input.files)),
+          )
+          return 'queue'
+        }
+        const text = input.blocks.flatMap(block => (block.type === 'text' ? [block.text] : [])).join('')
+        const draft = conversation.composer.state.getSnapshot().draft
+        const ids = conversation.drafts.createDrafts(targetId, input.files).map(created => created.id)
+        if (ids.length > 0 && !conversation.composer.addAttachments(ids)) {
+          for (const id of ids) conversation.drafts.releaseDraftAttachment(id)
+          throw new Error(`${input.target.title}'s composer is busy`)
+        }
+        conversation.composer.setDraft(draft.trim().length === 0 ? text : `${draft}\n\n${text}`)
+        ctx.uiWorkspace.openSession(targetId)
+        await openedInMainView(ctx, targetId)
+        return 'composer'
+      } finally {
+        reference.release()
+      }
+    },
+  })
+  existing?.actor.stop()
+  transfers.set(sessionId, { session: binding.session, actor })
+  return actor
 }
 
 export type { QueuedRow }

@@ -10,7 +10,7 @@ import { z } from 'zod'
  * every other key reports a 75%-left session window and a 10%-left weekly window. A turn answers `Answered by <key
  * suffix>` unless its latest message carries a directive: `[[call TOOL {json}]]` calls any tool (several in one turn when repeated), `[[read PATH]]` calls the read tool and
  * `[[memory_search QUERY]]` or `[[memory_search QUERY in SCOPE]]` calls the memory search tool, `[[empty]]` settles with reasoning and no answer (a stalled round), and `[[hold]]`
- * keeps the turn running until `releaseHeldTurns`; the turn after a tool
+ * keeps the turn running until `releaseHeldTurns`; `[[title NAME]]` names the thread NAME; the turn after a tool
  * result answers `Tool finished.`. OptMem summary calls answer, fail or hang as `summaries` says.
  */
 
@@ -105,7 +105,10 @@ export const startFakeCommandCode = async (page: Page): Promise<FakeCommandCode>
         }
         return streamAnswer(response, { content: 'Memory note written by the fake summarizer.' })
       }
-      if (kind === 'title') return streamAnswer(response, { content: 'Fake thread title' })
+      if (kind === 'title') {
+        const named = /\[\[title ([^\]]+)\]\]/.exec(messages.map(message => message.text).join('\n'))
+        return streamAnswer(response, { content: named?.[1] ?? 'Fake thread title' })
+      }
       if (key.endsWith('-LIMITED')) return json(429, { error: { message: 'Rate limit reached', type: 'rate_limit_error' } })
       // DSH appends its runtime-context snapshot after the user's message.
       const last = messages.filter(message => !message.text.startsWith(RUNTIME_CONTEXT)).at(-1)

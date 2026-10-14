@@ -2,7 +2,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { QueueAction } from '@deepseek-ai/dsh-api-session-controller/types'
 import { MessageId } from '@deepseek-ai/dsh-llm/brand'
-import { ChevronDownIcon, ChevronUpIcon, GripVerticalIcon, ListOrderedIcon, PencilIcon, SendIcon, Trash2Icon } from '@dshfiles/plugin-ui/icons'
+import { ChevronDownIcon, ChevronUpIcon, ForwardIcon, GripVerticalIcon, ListOrderedIcon, PencilIcon, SendIcon, Trash2Icon } from '@dshfiles/plugin-ui/icons'
 import { useApi, useSettings } from '@dshfiles/dshx/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
@@ -14,6 +14,8 @@ import { queueApi } from './api.js'
 import { messagePreview } from './message-preview.js'
 import { decodeQueuedRows, restoredIndex, type QueueEditor, type QueueEditView, type QueuedRow } from './queue-edit.js'
 import { useQueueClientForEditing } from './session-queue-editor.js'
+import { QueueTransferDialog } from './queue-transfer-dialog.js'
+import { transferTargets, useQueueTransfer, type QueueTransferActor, type TransferOutcome } from './queue-transfer.js'
 import { queueReorderSettings } from './settings.js'
 
 const editStatusLabel = { editing: 'Editing', submitting: 'Saving', restoring: 'Restoring', failed: 'Not restored' } as const
@@ -101,6 +103,25 @@ export interface QueueDockInjected {
   readonly updateQueue: (itemId: MessageId, action: QueueAction) => Promise<unknown>
   /** Absent when this DSH build exposes no composer input or draft attachments to plugins. */
   readonly queueEditor: QueueEditor | undefined
+  /** "Move to thread…"; absent for the same reason as `queueEditor`. */
+  readonly queueTransfer: QueueTransferActor | undefined
+  /** The session catalog the thread picker lists. */
+  readonly threads: {
+    getSnapshot(): {
+      readonly ids: readonly string[]
+      readonly byId: Readonly<
+        Record<string, { readonly displayTitle: string; readonly blank: boolean; readonly origin?: string; readonly updatedAt: number } | undefined>
+      >
+    }
+    subscribe(listener: () => void): () => void
+  }
+}
+
+const transferOutcomeText = (outcome: TransferOutcome): string => {
+  if (outcome.kind !== 'moved') return outcome.message
+  return outcome.destination === 'queue'
+    ? `Moved to the queue of ${outcome.target.title}.`
+    : `Moved into the composer of ${outcome.target.title}, which was idle; it is open now.`
 }
 
 /**
@@ -126,7 +147,13 @@ export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
   const editor = props.queueEditor
   const edit = useSyncExternalStore(editor?.subscribe ?? noSubscription, editor?.getSnapshot ?? idleEditView)
   const record = edit.record
-  const queueEditActive = record !== null || edit.loading
+  const transfer = useQueueTransfer(props.queueTransfer)
+  const threadList = useSyncExternalStore(props.threads.subscribe, props.threads.getSnapshot)
+  const targets = useMemo(
+    () => (transfer.picking ? transferTargets({ ids: threadList.ids, rows: threadList.byId, currentId: props.sessionId }) : []),
+    [transfer.picking, threadList, props.sessionId],
+  )
+  const queueEditActive = record !== null || edit.loading || transfer.busy
   const [dragId, setDragId] = useState<string | null>(null)
   const [dropIndex, setDropIndex] = useState<number | null>(null)
   // Open by default (the `expandByDefault` setting): the list is the point of the
@@ -179,7 +206,7 @@ export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
     for (let step = 0; step < steps; step += 1) await move(sourceId, direction)
   }
 
-  if (rowCount === 0 && record === null && edit.notice === null) return null
+  if (rowCount === 0 && record === null && edit.notice === null && transfer.outcome === null && !transfer.busy) return null
 
   const interactionActive = queueEditActive || (queueMutable && busy !== null)
   const expanded = !collapsed || interactionActive
@@ -300,6 +327,20 @@ export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
               <PencilIcon />
             </RowAction>
             <RowAction
+              label="Move queued message to another thread"
+              tooltip={
+                !transfer.available
+                  ? 'This DSH version cannot hand queued messages to another thread'
+                  : row.editable
+                    ? 'Move to thread…'
+                    : 'This message holds content that cannot be moved'
+              }
+              disabled={!transfer.available || !row.editable || busy !== null || queueEditActive}
+              onClick={() => transfer.open(row)}
+            >
+              <ForwardIcon />
+            </RowAction>
+            <RowAction
               label="Remove queued message"
               tooltip="Remove"
               disabled={busy !== null || queueEditActive || isBusy}
@@ -380,6 +421,31 @@ export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
               )}
             </div>
           ) : null}
+          {transfer.busy ? (
+            <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:border-t dshx:px-3 dshx:py-1 dshx:text-xs dshx:text-muted-foreground" role="status">
+              Moving the queued message to {transfer.target?.title}…
+            </div>
+          ) : null}
+          {transfer.outcome !== null ? (
+            <div
+              className={cn(
+                'dshx:flex dshx:items-center dshx:gap-2 dshx:border-t dshx:px-3 dshx:py-1 dshx:text-xs',
+                transfer.outcome.kind === 'moved' ? 'dshx:text-muted-foreground' : 'dshx:text-destructive',
+              )}
+              role={transfer.outcome.kind === 'moved' ? 'status' : 'alert'}
+              data-queue-transfer-outcome=""
+            >
+              <span className="dshx:min-w-0 dshx:flex-1">
+                {transferOutcomeText(transfer.outcome)}
+                {transfer.outcome.kind === 'lost' ? (
+                  <span className="dshx:mt-1 dshx:block dshx:select-text dshx:font-mono">{transfer.outcome.text}</span>
+                ) : null}
+              </span>
+              <Button type="button" size="xs" variant="ghost" onClick={transfer.dismiss}>
+                Dismiss
+              </Button>
+            </div>
+          ) : null}
           {edit.notice !== null ? (
             <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:px-3 dshx:pb-1 dshx:text-xs dshx:text-destructive" role="alert">
               <span className="dshx:min-w-0 dshx:flex-1">{edit.notice}</span>
@@ -390,6 +456,7 @@ export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
           ) : null}
         </div>
       </div>
+      <QueueTransferDialog open={transfer.picking} targets={targets} onChoose={transfer.choose} onCancel={transfer.cancel} />
     </TooltipProvider>
   )
 }

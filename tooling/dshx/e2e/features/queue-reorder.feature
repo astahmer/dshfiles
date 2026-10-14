@@ -38,3 +38,18 @@ Feature: Queued message dock
     And a thread on the fake model is kept busy by a held turn
     And the messages "first queued", "second queued" and a long third one are queued
     Then the queue starts collapsed and previews at most 40 characters
+
+  @scenario:queue-reorder.move-to-thread
+  Scenario: Move queued messages with their attachments to a busy thread's queue and an idle thread's composer
+    Given the isolated plugin composition of "@dshfiles/queue-reorder, @dshfiles/ai-accounts" is booted
+    When a Command Code account backed by a local fake provider is added
+    And a thread on the fake model is kept busy by a held turn
+    And "carry this" is queued with an image and a file, then "stay here" with an image
+    And an idle thread "Idle target" and a busy thread "Busy target" exist
+    And the thread "Fake thread title" is opened again
+    When the queued message "carry this" is moved to "Busy target"
+    Then the dock says it moved to the queue of "Busy target" and keeps only "stay here"
+    When the queued message "stay here" is moved to "Idle target"
+    Then "Idle target" opens with "stay here" and its image in the composer
+    When the held turn finishes
+    Then "Busy target" ran "carry this" with its image and file

@@ -178,6 +178,91 @@
           "testName": "clips by Unicode code point and appends one ellipsis"
         }
       ]
+    },
+    {
+      "id": "queue-message-transfer",
+      "title": "Move a queued message to another thread",
+      "summary": "Move to thread\u2026 opens a thread picker; the queued message, with its images and files, leaves this queue and lands in the chosen thread's queue when that thread is busy, or in its composer (and the thread opens) when it is idle.",
+      "reach": [
+        "click text \"Queue source\"",
+        "click button \"Move queued message to another thread\"",
+        "expect dialog \"Move to thread\"",
+        "click option \"Busy target*\"",
+        "expect text \"Moved to the queue of Busy target.\"",
+        "click button \"Dismiss\"",
+        "click button \"Move queued message to another thread\"",
+        "click option \"Idle target*\"",
+        "expect button \"Remove image red.png\"",
+        "expect button \"Remove image blue.png\"",
+        "click text \"Busy target\"",
+        "expect text \"first queued, with an image and a file\""
+      ],
+      "surfaces": ["client", "host", "integration"],
+      "configuration": [],
+      "states": ["idle", "picking", "loading", "removing", "delivering", "restoring", "settled"],
+      "failureModes": [
+        "An attachment cannot be read back, so the message stays queued here.",
+        "The message already left the queue, so nothing moves.",
+        "The target refuses the message (gone, busy composer, upload failure), so it goes back to the end of this queue.",
+        "Neither the move nor the restore goes through; the dock shows the message text so it is not lost silently.",
+        "A target that becomes idle between the check and the send runs the message at once."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "queue-reorder.move-to-thread",
+          "featureFile": "tooling/dshx/e2e/features/queue-reorder.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "queue-reorder.queue-message-transfer-unit-moves-attachments",
+          "file": "plugins/@dshfiles/queue-reorder/src/queue-transfer.test.ts",
+          "testName": "moves the text and every attachment to the chosen thread and takes it out of this queue"
+        },
+        {
+          "kind": "unit-test",
+          "id": "queue-reorder.queue-message-transfer-unit-idle-composer",
+          "file": "plugins/@dshfiles/queue-reorder/src/queue-transfer.test.ts",
+          "testName": "reports an idle target as receiving the message in its composer"
+        },
+        {
+          "kind": "unit-test",
+          "id": "queue-reorder.queue-message-transfer-unit-unreadable",
+          "file": "plugins/@dshfiles/queue-reorder/src/queue-transfer.test.ts",
+          "testName": "leaves the message queued here when its attachments cannot be read"
+        },
+        {
+          "kind": "unit-test",
+          "id": "queue-reorder.queue-message-transfer-unit-already-left",
+          "file": "plugins/@dshfiles/queue-reorder/src/queue-transfer.test.ts",
+          "testName": "changes nothing when the message already left the queue"
+        },
+        {
+          "kind": "unit-test",
+          "id": "queue-reorder.queue-message-transfer-unit-restore",
+          "file": "plugins/@dshfiles/queue-reorder/src/queue-transfer.test.ts",
+          "testName": "puts the message back in this queue, attachments included, when the target refuses it"
+        },
+        {
+          "kind": "unit-test",
+          "id": "queue-reorder.queue-message-transfer-unit-lost",
+          "file": "plugins/@dshfiles/queue-reorder/src/queue-transfer.test.ts",
+          "testName": "shows the text when neither the move nor the restore went through"
+        },
+        {
+          "kind": "unit-test",
+          "id": "queue-reorder.queue-message-transfer-unit-in-flight",
+          "file": "plugins/@dshfiles/queue-reorder/src/queue-transfer.test.ts",
+          "testName": "ignores a second move while one is in flight and can be dismissed afterwards"
+        },
+        {
+          "kind": "unit-test",
+          "id": "queue-reorder.queue-message-transfer-unit-targets",
+          "file": "plugins/@dshfiles/queue-reorder/src/queue-transfer.test.ts",
+          "testName": "lists other top-level threads, newest first, without blank drafts or subagents"
+        }
+      ]
     }
   ],
   "kind": "bundle"

@@ -5,7 +5,7 @@ import { MessageId } from '@deepseek-ai/dsh-llm/brand'
 import { defineClient } from '@dshfiles/dshx/client'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { type DockProps, DraggableQueueDock } from './client.js'
-import { sessionQueueEditor } from './session-queue-editor.js'
+import { sessionQueueEditor, sessionQueueTransfer } from './session-queue-editor.js'
 import { QUEUE_REORDER_LOCALE_NAMESPACE, queueReorderLocale } from './locales.js'
 import './client.css'
 
@@ -43,7 +43,7 @@ export default defineClient({
   locales: [queueReorderLocale],
   // setup(ctx) reads ctx.slots and ctx.sessions; declaring them here is what
   // activates those services. Without this the plugin loads but never mounts.
-  inject: ['slots', 'sessions'],
+  inject: ['slots', 'sessions', 'uiWorkspace'],
   setup(ctx, decorate) {
     ctx.slots.inject('conversation.input.dock', () =>
       ctx.slots.register(
@@ -68,6 +68,8 @@ export default defineClient({
             return {
               updateQueue: (itemId: MessageId, action: QueueAction): Promise<void> => conversation.updateQueue(itemId, action),
               queueEditor: sessionQueueEditor(ctx, sessionId),
+              queueTransfer: sessionQueueTransfer(ctx, sessionId),
+              threads: ctx.sessions.list,
             }
           },
         },

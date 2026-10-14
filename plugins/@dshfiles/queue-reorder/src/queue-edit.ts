@@ -178,6 +178,19 @@ export const restoredIndex = (input: { readonly rows: readonly QueuedRow[]; read
   return input.rows.filter(row => row.id !== input.itemId && ahead.has(row.id)).length
 }
 
+/** The message's parts in block order, each attachment block replaced by its serialized upload. */
+export const promptPartsFor = <Attachment>(blocks: readonly QueuedBlock[], attachments: readonly Attachment[]): PromptPart<Attachment>[] => {
+  let attachmentIndex = 0
+  const parts = blocks.flatMap((block): PromptPart<Attachment>[] => {
+    if (block.type === 'text') return [{ type: 'text', text: block.text }]
+    const attachment = attachments[attachmentIndex]
+    attachmentIndex += 1
+    return attachment === undefined ? [] : [attachment]
+  })
+  if (attachmentIndex !== attachments.length || parts.length !== blocks.length) throw new Error('attachments did not serialize')
+  return parts
+}
+
 const textOf = (blocks: readonly QueuedBlock[]): string => blocks.flatMap(block => (block.type === 'text' ? [block.text] : [])).join('')
 
 const messageOf = (error: unknown): string => (error instanceof Error && error.message.length > 0 ? error.message : 'unknown error')
@@ -406,16 +419,7 @@ export const createQueueEditor = <DraftId extends string, Attachment>(ports: Que
     let requestId: string
     try {
       draftIds = ports.drafts.create(await loadFiles(record.blocks))
-      const attachments = await ports.drafts.serialize(draftIds)
-      let attachmentIndex = 0
-      const parts = record.blocks.flatMap((block): PromptPart<Attachment>[] => {
-        if (block.type === 'text') return [{ type: 'text', text: block.text }]
-        const attachment = attachments[attachmentIndex]
-        attachmentIndex += 1
-        return attachment === undefined ? [] : [attachment]
-      })
-      if (attachmentIndex !== attachments.length || parts.length !== record.blocks.length) throw new Error('attachments did not serialize')
-      requestId = await ports.host.enqueue(parts)
+      requestId = await ports.host.enqueue(promptPartsFor(record.blocks, await ports.drafts.serialize(draftIds)))
     } catch (error) {
       return saveRecord({ ...next, status: 'failed', error: `Could not put the original message back (${messageOf(error)}). Retry or discard it.` })
     } finally {
