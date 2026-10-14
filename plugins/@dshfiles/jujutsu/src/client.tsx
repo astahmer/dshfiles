@@ -1,7 +1,6 @@
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
-import type { ISessions, SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
 import { relativeTime, writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
 import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
 import {
@@ -101,10 +100,9 @@ import { repositoryLoadingState } from './repository-loading.js'
 import { JUJUTSU_QUERY_GC_TIME, JUJUTSU_QUERY_STALE_TIME, jujutsuQueryKeys } from './repository-query-cache.js'
 import { ANCESTOR_COUNT_OPTIONS, REVISION_LIMIT_OPTIONS, usePreferences, type GraphDensity } from './preferences.js'
 import { isFileReviewed, readReviewStore, reviewProgress, toggleFileReview, type ReviewFile, type ReviewStore } from './review-progress.js'
-import { SessionForkPanel } from './session-fork-panel.js'
 import { descendantCommitIds, emptyAncestorCandidates } from './source-control.js'
 import { SourceControlView } from './source-control-view.js'
-import { WorkspaceProvisioner } from './workspace-provisioner.js'
+import { WorkspaceProvisionerDialog } from './workspace-provisioner.js'
 import { containsPath, sidePanelRepository } from './side-panel-repository.js'
 
 type View = 'graph' | 'source'
@@ -122,11 +120,9 @@ interface FullDiffTarget {
 
 interface JujutsuPanelProps {
   readonly surface?: 'main' | 'side-panel'
-  readonly sessions: ISessions
   readonly projects: readonly RegisteredProject[]
   readonly directoryPicker: DirectoryPickerPort
   readonly registerWorkspace: (canonicalPath: string) => Promise<RegisteredProject>
-  readonly openSession: (sessionId: SessionSummary['id']) => void
   readonly launchSession: (cwd: string) => Promise<void>
 }
 
@@ -227,6 +223,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   const [remote, setRemote] = useState('')
   const [bookmark, setBookmark] = useState('')
   const [provisionedPath, setProvisionedPath] = useState<string | null>(null)
+  const [workspaceBase, setWorkspaceBase] = useState<Revision | null>(null)
   const [fullDiff, setFullDiff] = useState<FullDiffTarget | null>(null)
   const [bookmarkDraft, setBookmarkDraft] = useState<{ readonly commitId: string; readonly name: string } | null>(null)
   const [moveSource, setMoveSource] = useState<Revision | null>(null)
@@ -255,6 +252,8 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     }
   }, [actionActor, queryClient])
 
+  const launchMutation = useMutation({ mutationFn: (cwd: string) => props.launchSession(cwd) })
+
   const registerMutation = useMutation({
     mutationFn: (repositoryPath: string) => api.registerRepository({ path: repositoryPath }),
     onSuccess: registered => {
@@ -266,6 +265,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
       }
       sendAction({ type: 'reset' })
       setProvisionedPath(null)
+      setWorkspaceBase(null)
       setRepoId(registered.repoId)
       setPath(registered.root)
       setSelection(null)
@@ -488,6 +488,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     stateQuery.error && errorMessage(stateQuery.error, 'Could not load this repository.'),
     registerMutation.error && errorMessage(registerMutation.error, 'Could not register this repository.'),
     actionSnapshot.context.error,
+    launchMutation.error && errorMessage(launchMutation.error, 'Workspace Session could not be opened.'),
   ].filter((message): message is string => Boolean(message))
 
   const askForConfirmation = (action: Mutation, presentation: DropPresentation | null = null): void => {
@@ -621,6 +622,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
           <ContextMenuItem onSelect={() => askForConfirmation({ kind: 'edit', commitId: revision.commitId })}>Edit this change</ContextMenuItem>
         )}
         <ContextMenuItem onSelect={() => askForConfirmation({ kind: 'new', commitId: revision.commitId })}>New change here</ContextMenuItem>
+        <ContextMenuItem onSelect={() => setWorkspaceBase(revision)}>New workspace here…</ContextMenuItem>
         <ContextMenuSeparator />
         {!revision.immutable && parent !== undefined && !parent.immutable && (
           <ContextMenuItem onSelect={() => askForConfirmation({ kind: 'squash', sourceId: revision.commitId, destinationId: parent.commitId })}>
@@ -1243,13 +1245,31 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
             </div>
           </header>
 
-          {(errorMessages.length > 0 || copyNotice !== null || (confirmResult !== null && confirmResult.output.length > 0)) && (
+          {(errorMessages.length > 0 || copyNotice !== null || provisionedPath !== null || (confirmResult !== null && confirmResult.output.length > 0)) && (
             <div className="dshx:flex dshx:max-h-48 dshx:flex-none dshx:flex-col dshx:gap-1.5 dshx:overflow-auto dshx:border-b dshx:px-3 dshx:py-2">
               {errorMessages.map(message => (
                 <Alert className="dshx:px-3 dshx:py-2" key={message} variant="destructive">
                   <AlertDescription className="dshx:text-xs">{message}</AlertDescription>
                 </Alert>
               ))}
+              {provisionedPath !== null && (
+                <Alert className="dshx:px-3 dshx:py-2" variant="success">
+                  <AlertDescription className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-xs">
+                    <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:font-mono dshx:text-foreground" title={provisionedPath}>
+                      Created: {provisionedPath}
+                    </span>
+                    <Button
+                      disabled={launchMutation.isPending}
+                      onClick={() => launchMutation.mutate(provisionedPath)}
+                      size="xs"
+                      type="button"
+                      variant="outline"
+                    >
+                      {launchMutation.isPending ? 'Opening…' : 'Open a DSH Session here'}
+                    </Button>
+                  </AlertDescription>
+                </Alert>
+              )}
               {copyNotice !== null && (
                 <Alert className="dshx:px-3 dshx:py-2" role={copyNotice.copied ? 'status' : 'alert'} variant={copyNotice.copied ? 'default' : 'destructive'}>
                   <AlertDescription className="dshx:text-xs">
@@ -1269,29 +1289,18 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
             </div>
           )}
 
-          {sidePanel ? (
-            tabsContent
-          ) : (
-            <div className="dshx:grid dshx:min-h-0 dshx:flex-1 dshx:overflow-auto dshx:lg:grid-cols-[minmax(0,1fr)_22rem] dshx:lg:overflow-hidden">
-              <div className="dshx:flex dshx:min-h-[24rem] dshx:min-w-0 dshx:flex-col dshx:lg:min-h-0">{tabsContent}</div>
-              <aside className="dshx:flex dshx:flex-col dshx:gap-3 dshx:border-t dshx:bg-muted/30 dshx:p-3 dshx:lg:overflow-auto dshx:lg:border-t-0 dshx:lg:border-l">
-                <SessionForkPanel sessions={props.sessions} openSession={props.openSession} />
-                {state !== undefined && (
-                  <WorkspaceProvisioner
-                    revisions={state.revisions}
-                    selectedCommitId={selectedRevision?.commitId ?? null}
-                    provisionedPath={provisionedPath}
-                    onPreview={askForConfirmation}
-                    directoryPicker={props.directoryPicker}
-                    registerWorkspace={props.registerWorkspace}
-                    launchSession={props.launchSession}
-                  />
-                )}
-              </aside>
-            </div>
-          )}
+          {tabsContent}
         </Tabs>
 
+        {workspaceBase !== null && (
+          <WorkspaceProvisionerDialog
+            directoryPicker={props.directoryPicker}
+            onClose={() => setWorkspaceBase(null)}
+            onPreview={askForConfirmation}
+            registerWorkspace={props.registerWorkspace}
+            revision={workspaceBase}
+          />
+        )}
         {pickerOpen && (
           <ProjectFolderPicker
             directoryPicker={props.directoryPicker}

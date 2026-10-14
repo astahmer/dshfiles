@@ -4,7 +4,7 @@
     "antislop(no-chained-type-assertions)": 42,
     "antislop(no-conditional-empty-object-spread)": 492,
     "antislop(no-known-value-widening)": 168,
-    "antislop(no-passthrough-variable)": 38,
+    "antislop(no-passthrough-variable)": 37,
     "antislop(no-reflect-apply)": 10,
     "antislop(no-reflect-get)": 28,
     "antislop(no-runtime-typeof)": 362,

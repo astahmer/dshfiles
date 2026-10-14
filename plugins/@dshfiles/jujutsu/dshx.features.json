@@ -205,9 +205,9 @@
       ]
     },
     {
-      "id": "workspace-and-session-history",
-      "title": "Create workspaces and navigate session history",
-      "summary": "Create isolated JJ workspaces at a selected revision, launch a session only after explicit confirmation, and browse/load/fork at exact durable event boundaries.",
+      "id": "workspace-at-revision",
+      "title": "Create a workspace at a revision",
+      "summary": "Right-click a revision and choose New workspace here… to add an isolated JJ workspace checked out at it, then launch a session there only after explicit confirmation. Forking a session moved to the native Branch action.",
       "surfaces": ["client", "host", "integration"],
       "configuration": [
         {
@@ -218,27 +218,22 @@
           "coveredBy": ["jujutsu.workspace-session"]
         }
       ],
-      "states": ["workspace-created", "session-not-launched", "session-launched", "history-loaded", "forked"],
+      "states": ["workspace-created", "session-not-launched", "session-launched"],
       "failureModes": [
         "Existing workspace, ancestor, or symlink target is rejected.",
-        "History operations preserve exact sequence boundaries and do not rewrite previous events."
+        "A failed session launch stays in the panel as an error and leaves the workspace in place."
       ],
       "externalDependencies": [
         {
           "id": "jj-workspace",
-          "boundary": "Local workspace creation and session event history.",
-          "deterministicFake": "Use a temporary JJ repository and synthetic session event stream; no user workspace or remote."
+          "boundary": "Local jj workspace creation.",
+          "deterministicFake": "Use a temporary JJ repository; no user workspace or remote."
         }
       ],
       "verification": [
         {
           "kind": "gherkin",
           "id": "jujutsu.workspace-session",
-          "featureFile": "tooling/dshx/e2e/features/jujutsu.feature"
-        },
-        {
-          "kind": "gherkin",
-          "id": "jujutsu.history-boundaries",
           "featureFile": "tooling/dshx/e2e/features/jujutsu.feature"
         }
       ]

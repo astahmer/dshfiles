@@ -1,85 +1,38 @@
-import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@dshfiles/plugin-ui/components/ui/card'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@dshfiles/plugin-ui/components/ui/dialog'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Label } from '@dshfiles/plugin-ui/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
 import { ProjectFolderPicker, type DirectoryPickerPort, type RegisteredProject } from '@dshfiles/project-folder-picker'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { workspaceNameSchema, type Mutation, type Revision } from './api.js'
 
-interface WorkspaceProvisionerProps {
-  readonly revisions: readonly Revision[]
-  readonly selectedCommitId: string | null
-  readonly provisionedPath: string | null
+interface WorkspaceProvisionerDialogProps {
+  readonly revision: Revision
+  readonly onClose: () => void
   readonly onPreview: (action: Mutation) => void
   /** The same Host picker the repository chooser uses, so a browse-only Host can choose a parent too. */
   readonly directoryPicker: DirectoryPickerPort
   readonly registerWorkspace: (canonicalPath: string) => Promise<RegisteredProject>
-  readonly launchSession: (cwd: string) => Promise<void>
 }
 
-export const WorkspaceProvisioner = (props: WorkspaceProvisionerProps): JSX.Element => {
+/** `jj workspace add` at one revision, opened from that revision's context menu. */
+export const WorkspaceProvisionerDialog = (props: WorkspaceProvisionerDialogProps): JSX.Element => {
   const [parentPath, setParentPath] = useState('')
   const [name, setName] = useState('')
-  const [baseCommitId, setBaseCommitId] = useState('')
-  const [launching, setLaunching] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const [pickerOpen, setPickerOpen] = useState(false)
-
-  useEffect(() => {
-    if (props.revisions.length === 0) {
-      setBaseCommitId('')
-      return
-    }
-    setBaseCommitId(current => {
-      if (props.revisions.some(revision => revision.commitId === current)) return current
-      return props.selectedCommitId ?? props.revisions.find(revision => revision.workingCopy)?.commitId ?? props.revisions[0]?.commitId ?? ''
-    })
-  }, [props.revisions, props.selectedCommitId])
-
-  const createSession = async (): Promise<void> => {
-    if (props.provisionedPath === null) return
-    setLaunching(true)
-    setError(null)
-    try {
-      await props.launchSession(props.provisionedPath)
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Workspace Session could not be opened.')
-    } finally {
-      setLaunching(false)
-    }
-  }
-
   const validName = workspaceNameSchema.safeParse(name).success
-  const canPreview = parentPath.length > 0 && validName && baseCommitId.length > 0
+  const description = props.revision.description.split('\n')[0] || '(no description)'
 
   return (
-    <Card aria-labelledby="jj-workspace-provision-title" className="dshx:gap-3" role="region">
-      <CardHeader>
-        <CardTitle className="dshx:text-sm" id="jj-workspace-provision-title">
-          Provision an isolated workspace
-        </CardTitle>
-        <CardDescription className="dshx:text-xs">
-          JJ adds a sibling workspace at the chosen revision. This repository’s current working files stay in place.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="dshx:flex dshx:flex-col dshx:gap-2.5">
-        <div className="dshx:flex dshx:flex-col dshx:gap-1.5">
-          <Label className="dshx:text-xs dshx:text-muted-foreground">Base revision</Label>
-          <Select onValueChange={setBaseCommitId} value={baseCommitId}>
-            <SelectTrigger aria-label="Workspace base revision" className="dshx:w-full dshx:text-xs" size="sm">
-              <SelectValue placeholder="No revisions" />
-            </SelectTrigger>
-            <SelectContent>
-              {props.revisions.map(revision => (
-                <SelectItem key={revision.commitId} value={revision.commitId}>
-                  <span className="dshx:font-mono dshx:text-info">{revision.shortestChangeId}</span> {revision.description.split('\n')[0] || '(no description)'}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+    <Dialog onOpenChange={open => !open && props.onClose()} open>
+      <DialogContent className="dshx-root dshx:sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>New workspace</DialogTitle>
+          <DialogDescription className="dshx:text-xs">
+            A sibling jj workspace checked out at <code className="dshx:font-mono! dshx:text-foreground">{props.revision.shortestChangeId}</code> ·{' '}
+            {description}. This repository’s working files stay as they are.
+          </DialogDescription>
+        </DialogHeader>
         <div className="dshx:flex dshx:flex-col dshx:gap-1.5">
           <Label className="dshx:text-xs dshx:text-muted-foreground" htmlFor="jj-workspace-name">
             Workspace name
@@ -87,6 +40,7 @@ export const WorkspaceProvisioner = (props: WorkspaceProvisionerProps): JSX.Elem
           <Input
             aria-invalid={name.length > 0 && !validName}
             aria-label="Workspace name"
+            autoFocus
             className="dshx:h-7 dshx:font-mono! dshx:text-xs dshx:md:text-xs"
             id="jj-workspace-name"
             onChange={event => setName(event.target.value)}
@@ -95,62 +49,44 @@ export const WorkspaceProvisioner = (props: WorkspaceProvisionerProps): JSX.Elem
           />
         </div>
         <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5">
-          <Button
-            onClick={() => {
-              setError(null)
-              setPickerOpen(true)
-            }}
-            size="sm"
-            type="button"
-            variant="outline"
-          >
+          <Button onClick={() => setPickerOpen(true)} size="sm" type="button" variant="outline">
             Choose parent directory
           </Button>
           <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:font-mono dshx:text-xs dshx:text-muted-foreground" title={parentPath || undefined}>
             {parentPath || 'No parent directory selected'}
           </span>
         </div>
-        <Button
-          className="dshx:self-start"
-          disabled={!canPreview || props.revisions.length === 0}
-          onClick={() => props.onPreview({ kind: 'workspace-add', parentPath, name, commitId: baseCommitId })}
-          size="sm"
-          type="button"
-        >
-          Preview workspace setup
-        </Button>
-        {props.provisionedPath !== null && (
-          <Alert className="dshx:px-3 dshx:py-2" variant="success">
-            <AlertDescription className="dshx:flex dshx:flex-col dshx:gap-1.5 dshx:text-xs">
-              <span className="dshx:w-full dshx:truncate dshx:font-mono dshx:text-foreground" title={props.provisionedPath}>
-                Created: {props.provisionedPath}
-              </span>
-              <Button disabled={launching} onClick={() => void createSession()} size="xs" type="button" variant="outline">
-                {launching ? 'Opening…' : 'Open a DSH Session here'}
-              </Button>
-            </AlertDescription>
-          </Alert>
+        <DialogFooter>
+          <Button onClick={props.onClose} size="sm" type="button" variant="outline">
+            Cancel
+          </Button>
+          <Button
+            disabled={parentPath.length === 0 || !validName}
+            onClick={() => {
+              props.onPreview({ kind: 'workspace-add', parentPath, name, commitId: props.revision.commitId })
+              props.onClose()
+            }}
+            size="sm"
+            type="button"
+          >
+            Preview workspace setup
+          </Button>
+        </DialogFooter>
+        {pickerOpen && (
+          <ProjectFolderPicker
+            directoryPicker={props.directoryPicker}
+            mode="directories"
+            onClose={() => setPickerOpen(false)}
+            onRegisterWorkspace={props.registerWorkspace}
+            onSelect={selected => {
+              setPickerOpen(false)
+              setParentPath(selected.canonicalPath)
+            }}
+            projects={[]}
+            title="Choose the parent directory"
+          />
         )}
-        {error !== null && (
-          <Alert className="dshx:px-3 dshx:py-2" role="alert" variant="destructive">
-            <AlertDescription className="dshx:text-xs">{error}</AlertDescription>
-          </Alert>
-        )}
-      </CardContent>
-      {pickerOpen && (
-        <ProjectFolderPicker
-          directoryPicker={props.directoryPicker}
-          mode="directories"
-          onClose={() => setPickerOpen(false)}
-          onRegisterWorkspace={props.registerWorkspace}
-          onSelect={selected => {
-            setPickerOpen(false)
-            setParentPath(selected.canonicalPath)
-          }}
-          projects={[]}
-          title="Choose the parent directory"
-        />
-      )}
-    </Card>
+      </DialogContent>
+    </Dialog>
   )
 }

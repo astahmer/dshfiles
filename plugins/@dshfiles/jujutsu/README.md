@@ -26,8 +26,8 @@ contracts.
 - Full diff opens every file of a revision with numbered rows and collapsed
   "N unmodified lines" separators, rendered from `jj diff --git`.
 - Right-click a revision for full diff, describe, edit, new change, squash,
-  duplicate, revert onto @, rebase onto main, set or move a bookmark, copy IDs, and
-  abandon; right-click a local bookmark to push or delete it.
+  duplicate, revert onto @, rebase onto main, set or move a bookmark, create a
+  workspace there, copy IDs, and abandon; right-click a local bookmark to push or delete it.
 - A Source Control view modelled on jj-view: a message box that describes or
   commits @, then Working Copy and `@-1 … @-N` groups with per-file open diff,
   discard (`jj restore`), move to parent/child (`jj squash` with literal
@@ -45,12 +45,10 @@ contracts.
 - View settings (default tab, ancestor groups, file layout, raw patch expanded,
   day grouping, graph density, hide immutable, mine only, revisions loaded) are saved in this
   browser and shared live by the main page and side panel.
-- Create an isolated JJ workspace at a listed revision, then explicitly open a
-  DSH Session in that directory.
-- Browse durable event sequence boundaries for a listed Session, load older
-  history, and fork/open a child at the selected boundary through the native
-  Session Controller. This history control does not display message contents
-  or transient stream chunks.
+- Right-click a revision → New workspace here… to create an isolated JJ
+  workspace checked out at it, then explicitly open a DSH Session in that
+  directory. Forking a Session is left to DSH's native Branch action, and
+  thread workspaces to `@dshfiles/jj-integration`.
 
 ## Host and command boundary
 

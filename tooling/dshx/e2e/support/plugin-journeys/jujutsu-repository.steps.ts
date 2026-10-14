@@ -87,9 +87,9 @@ When('the squash preview is confirmed', async ({ page }: { page: Page }) => {
 
 When('a workspace {string} is provisioned at the Feature revision under the fixture root', async ({ page }: { page: Page }, name: string) => {
   const repository = repositoryFor(page)
-  const provision = page.getByRole('region', { name: 'Provision an isolated workspace', exact: true })
-  await provision.getByRole('combobox', { name: 'Workspace base revision', exact: true }).click()
-  await page.getByRole('option', { name: /Feature work by Ada/ }).click()
+  await revisionRow(page, 'Feature work by Ada').getByRole('button').first().click({ button: 'right' })
+  await page.getByRole('menuitem', { name: 'New workspace here…', exact: true }).click()
+  const provision = page.getByRole('dialog', { name: 'New workspace', exact: true })
   await provision.getByRole('textbox', { name: 'Workspace name', exact: true }).fill(name)
   await provision.getByRole('button', { name: 'Choose parent directory', exact: true }).click()
   const picker = page.getByRole('dialog', { name: 'Choose the parent directory', exact: true })
@@ -103,11 +103,6 @@ When('a workspace {string} is provisioned at the Feature revision under the fixt
   await expect(provision.getByText(repository.root, { exact: true })).toBeVisible()
   await provision.getByRole('button', { name: 'Preview workspace setup', exact: true }).click()
   await page.getByRole('alertdialog').getByRole('button', { name: 'Confirm and run', exact: true }).click()
-})
-
-When('a thread {string} runs in the Default workspace', async ({ page }: { page: Page }, message: string) => {
-  await page.getByRole('button', { name: 'New session', exact: true }).first().click()
-  await sendMessage(page, message)
 })
 
 Then('searching, filtering by author and hiding immutable revisions narrow the graph', async ({ page }: { page: Page }) => {
@@ -204,7 +199,7 @@ Then('the Feature revision is squashed into Base', async ({ page }: { page: Page
 
 Then('the workspace {string} exists and a session opens in it only when asked', async ({ page }: { page: Page }, name: string) => {
   const repository = repositoryFor(page)
-  const provision = page.getByRole('region', { name: 'Provision an isolated workspace', exact: true })
+  const provision = page.getByRole('alert').filter({ hasText: 'Created:' })
   await recordAssertion(page, 'jujutsu-workspace-is-created-at-the-revision', async () => {
     await expect(provision.getByText(`Created: ${join(repository.root, name)}`, { exact: true })).toBeVisible()
     expect(jj(repository, ['--ignore-working-copy', 'workspace', 'list'])).toContain(`${name}:`)
@@ -217,30 +212,6 @@ Then('the workspace {string} exists and a session opens in it only when asked', 
     await expect(page.getByRole('button', { name: 'Choose workspace', exact: true })).toHaveText(name)
     await expect(page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })).toBeEditable()
   })
-  await finishJourneyAssertions(page)
-})
-
-Then('forking that thread at its first boundary opens a new thread', async ({ page }: { page: Page }) => {
-  await page.getByRole('button', { name: 'Jujutsu', exact: true }).first().click()
-  const fork = page.getByRole('region', { name: 'Fork a Session at a history boundary', exact: true })
-  await fork.getByRole('combobox', { name: 'Session to fork', exact: true }).click()
-  await page.getByRole('option').first().click()
-  const boundary = fork.getByRole('combobox', { name: 'Fork boundary sequence', exact: true })
-  await expect(boundary).toBeEnabled()
-  await boundary.click()
-  const options = page.getByRole('option')
-  await recordAssertion(page, 'jujutsu-history-lists-durable-boundaries', () => expect(options.first()).toBeVisible())
-  // Cutting right after the user's message keeps the message and leaves out the failed answer that followed it.
-  await page.getByRole('option', { name: /· user\/message$/ }).last().click()
-  await fork.getByRole('button', { name: 'Fork and open', exact: true }).click()
-  const sessions = page.getByRole('tree', { name: 'Sessions', exact: true })
-  await recordAssertion(page, 'jujutsu-fork-opens-a-new-session-at-the-boundary', async () => {
-    await expect(sessions.getByRole('treeitem', { name: /^Untitled/ })).toHaveAttribute('aria-selected', 'true')
-    await expect(page.getByText('history boundary source thread', { exact: true }).first()).toBeVisible()
-    await expect(page.getByText('This turn failed')).toHaveCount(0)
-  })
-  await sessions.getByRole('treeitem', { name: /^history boundary source thread/ }).click()
-  await recordAssertion(page, 'jujutsu-fork-leaves-the-source-history-intact', () => expect(page.getByText('This turn failed').first()).toBeVisible())
   await finishJourneyAssertions(page)
 })
 

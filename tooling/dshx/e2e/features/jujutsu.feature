@@ -64,10 +64,3 @@ Feature: Jujutsu revision interactions
     When a disposable Jujutsu repository with two authors is opened in the Jujutsu panel
     And a workspace "review-ws" is provisioned at the Feature revision under the fixture root
     Then the workspace "review-ws" exists and a session opens in it only when asked
-
-  @scenario:jujutsu.history-boundaries
-  Scenario: Fork a thread at a durable history boundary
-    Given the isolated plugin profile "@dshfiles/jujutsu" is booted
-    When a disposable Jujutsu repository with two authors is opened in the Jujutsu panel
-    And a thread "history boundary source thread" runs in the Default workspace
-    Then forking that thread at its first boundary opens a new thread

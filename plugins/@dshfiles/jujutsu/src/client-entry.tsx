@@ -43,8 +43,6 @@ export default defineClient({
             surface={surface}
             directoryPicker={directoryPicker}
             registerWorkspace={registerWorkspace}
-            sessions={ctx.sessions}
-            openSession={sessionId => ctx.uiWorkspace.openSession(sessionId)}
             // A Session whose folder is not a registered workspace lands in "Ungrouped" with its composer locked, so
             // the new JJ workspace is registered and opened the way the native folder picker opens one.
             launchSession={async cwd => {
