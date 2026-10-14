@@ -95,6 +95,11 @@ export const visibleChildren = <Thread extends { readonly id: string }>(options:
 
 export type FinishedSubagentsMode = 'show' | 'collapse' | 'hide'
 
+export const shouldOpenChildThreadList = (options: {
+  readonly children: readonly { readonly origin?: string; readonly running: boolean }[]
+  readonly override: boolean | undefined
+}): boolean => options.override ?? options.children.some(child => child.origin === 'subagent' && child.running)
+
 interface FinishedPartition<Thread> {
   readonly live: readonly Thread[]
   readonly finished: readonly Thread[]

@@ -92,7 +92,7 @@ import { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
 import { projectTextTone } from './project-tone.js'
 import { scheduleSuccessNoticeDismissal, SidebarNoticeMessage, type SidebarNotice } from './sidebar-notice.js'
 import { threadSidebarMachineApi } from './machine-api.js'
-import { groupThreadChildren, partitionFinishedChildren, threadActionTargetIds, visibleChildren } from './thread-children.js'
+import { groupThreadChildren, partitionFinishedChildren, shouldOpenChildThreadList, threadActionTargetIds, visibleChildren } from './thread-children.js'
 import { buildThreadUrl, clearThreadUrl, readThreadUrl } from './thread-url.js'
 import { workingThreadIds } from './working-threads.js'
 import {
@@ -288,7 +288,7 @@ interface RowActions {
   readonly mutate: (sessionId: SessionSummary['id'], operation: RowOperation) => Promise<void>
   readonly toggleParked: (sessionId: SessionSummary['id']) => void
   readonly copy: (value: string, successMessage: string) => Promise<void>
-  readonly toggleChildren: (sessionId: SessionSummary['id']) => void
+  readonly toggleChildren: (sessionId: SessionSummary['id'], currentlyOpen: boolean) => void
   readonly toggleAllChildren: (sessionId: SessionSummary['id']) => void
   readonly mute: (sessionId: SessionSummary['id'], option: ThreadMuteOption) => void
   readonly unmute: (sessionId: SessionSummary['id']) => void
@@ -602,7 +602,7 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                 className="dshx:absolute dshx:right-1.5 dshx:bottom-1 dshx:flex dshx:h-5 dshx:items-center dshx:gap-1 dshx:rounded-full dshx:px-1.5 dshx:text-xs dshx:text-muted-foreground dshx:outline-none dshx:hover:bg-accent dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50"
                 aria-expanded={props.childrenOpen}
                 aria-label={`${t(props.childrenOpen ? 'threadSidebarHideChildren' : 'threadSidebarShowChildren')} (${childCount})`}
-                onClick={() => props.actions.toggleChildren(session.id)}
+                onClick={() => props.actions.toggleChildren(session.id, props.childrenOpen)}
               >
                 <span className="dshx:flex dshx:-space-x-0.5" aria-hidden="true">
                   {props.childThreads.slice(0, 3).map(child => {
@@ -811,7 +811,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
   const { preferences, updatePreferences, storageWarning, setSelectedThreadId, threadTitle } = useSidebarState()
   const notificationPreferences = threadNotificationPreferences.useValue() ?? DEFAULT_THREAD_NOTIFICATION_PREFERENCES
   const machine = useApiQuery(threadSidebarMachineApi, 'name', { enabled: preferences.threadRowMachine }).data?.name
-  const [closedParents, setClosedParents] = useState<ReadonlySet<string>>(() => new Set())
+  const [childrenOpenOverrides, setChildrenOpenOverrides] = useState<ReadonlyMap<string, boolean>>(() => new Map())
   const [expandedParents, setExpandedParents] = useState<ReadonlySet<string>>(() => new Set())
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [viewsManagerOpen, setViewsManagerOpen] = useState(false)
@@ -1706,7 +1706,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
       mutate: (sessionId, operation) => latestRowActions.current.mutateSession(sessionId, operation),
       toggleParked: sessionId => latestRowActions.current.toggleParked(sessionId),
       copy: (value, successMessage) => latestRowActions.current.copyContextValue(value, successMessage),
-      toggleChildren: sessionId => setClosedParents(current => toggleSetMember(current, sessionId)),
+      toggleChildren: (sessionId, currentlyOpen) => setChildrenOpenOverrides(current => new Map(current).set(sessionId, !currentlyOpen)),
       toggleAllChildren: sessionId => setExpandedParents(current => toggleSetMember(current, sessionId)),
       mute: (sessionId, option) => {
         const current = latestRowActions.current
@@ -1792,7 +1792,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
         rowStyle={rowStyle}
         childThreads={childThreads}
         finishedChildThreads={finishedChildThreads}
-        childrenOpen={!closedParents.has(session.id)}
+        childrenOpen={shouldOpenChildThreadList({ children: listedChildThreads, override: childrenOpenOverrides.get(session.id) })}
         allChildrenShown={expandedParents.has(session.id)}
         selectedChildId={selectedChildId}
         actions={rowActions}

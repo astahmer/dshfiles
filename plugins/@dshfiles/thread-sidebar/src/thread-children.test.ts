@@ -1,6 +1,13 @@
 import assert from 'node:assert/strict'
 import { test } from 'vitest'
-import { groupThreadChildren, partitionFinishedChildren, threadActionTargetIds, visibleChildren, type ThreadNode } from './thread-children.js'
+import {
+  groupThreadChildren,
+  partitionFinishedChildren,
+  shouldOpenChildThreadList,
+  threadActionTargetIds,
+  visibleChildren,
+  type ThreadNode,
+} from './thread-children.js'
 
 const thread = (id: string, updatedAt: number, parentId?: string): ThreadNode => (parentId === undefined ? { id, updatedAt } : { id, updatedAt, parentId })
 const ids = (threads: readonly ThreadNode[] | undefined): string[] => (threads ?? []).map(item => item.id)
@@ -88,4 +95,13 @@ test('collapse keeps live and open subagents listed and folds the finished ones 
 test('hide drops finished subagents except the open one, and show leaves every child listed', () => {
   assert.deepEqual(partition('hide'), { live: ['live', 'open-done'], finished: [] })
   assert.deepEqual(partition('show'), { live: ['live', 'done-a', 'open-done', 'done-b'], finished: [] })
+})
+
+test('parent groups expand by default only while a subagent is working and respect manual overrides', () => {
+  assert.equal(shouldOpenChildThreadList({ children: [{ origin: 'subagent', running: true }], override: undefined }), true)
+  assert.equal(shouldOpenChildThreadList({ children: [{ origin: 'subagent', running: false }], override: undefined }), false)
+  assert.equal(shouldOpenChildThreadList({ children: [{ origin: 'user', running: true }], override: undefined }), false)
+  assert.equal(shouldOpenChildThreadList({ children: [], override: undefined }), false)
+  assert.equal(shouldOpenChildThreadList({ children: [{ origin: 'subagent', running: true }], override: false }), false)
+  assert.equal(shouldOpenChildThreadList({ children: [{ origin: 'subagent', running: false }], override: true }), true)
 })

@@ -809,7 +809,7 @@
     {
       "id": "thread-children-and-links",
       "title": "Browse child sessions and share thread URLs",
-      "summary": "Expand recursive child sessions with inherited workspace context, fold or hide finished subagents, and copy credential-free thread URLs.",
+      "summary": "Default child lists to open only while a subagent is working, preserve manual toggles, expand recursive child sessions with inherited workspace context, fold or hide finished subagents, and copy credential-free thread URLs.",
       "reach": ["click button \"Sidebar settings\"", "click button \"Finished subagents: Fold into “N finished”\"", "expect menuitemradio \"Hide them\""],
       "surfaces": ["client", "host", "settings", "integration"],
       "configuration": [
@@ -887,6 +887,12 @@
           "id": "thread-sidebar.thread-children-and-links-unit-finished-hide-show",
           "file": "plugins/@dshfiles/thread-sidebar/src/thread-children.test.ts",
           "testName": "hide drops finished subagents except the open one, and show leaves every child listed"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.thread-children-and-links-unit-default-expansion",
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-children.test.ts",
+          "testName": "parent groups expand by default only while a subagent is working and respect manual overrides"
         },
         {
           "kind": "unit-test",
