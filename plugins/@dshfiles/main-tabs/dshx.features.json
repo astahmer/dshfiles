@@ -30,11 +30,12 @@
           "coveredBy": ["main-tabs.panels-and-threads", "main-tabs.machine-unit-preview", "main-tabs.machine-unit-replace"]
         }
       ],
-      "states": ["following", "navigating", "off", "preview", "pinned", "overflowing"],
+      "states": ["following", "navigating", "off", "preview", "pinned", "overflowing", "strip-unmounted"],
       "failureModes": [
         "A tab whose panel plugin is gone stays dimmed until the panel registers again; picking it does nothing.",
         "A navigation the Host never finishes stops being awaited after two seconds.",
-        "Tabs of deleted threads are dropped."
+        "Tabs of deleted threads are dropped.",
+        "If DSH stops rendering the main slot outlet (`[data-slot=\"main\"]`) the strip stays hidden, tabs keep following the main view, and the console warns once at startup; if the strip lands anywhere but directly above the main panel, the console warns too."
       ],
       "externalDependencies": [],
       "verification": [
@@ -42,6 +43,29 @@
           "kind": "gherkin",
           "id": "main-tabs.panels-and-threads",
           "featureFile": "tooling/dshx/e2e/features/main-tabs.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "main-tabs.strip-mount",
+          "featureFile": "tooling/dshx/e2e/features/main-tabs.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.mount-unit-anchor",
+          "file": "plugins/@dshfiles/main-tabs/src/strip-mount.test.ts",
+          "testName": "puts the strip host right before the main outlet and removes it on dispose"
+        },
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.mount-unit-remount",
+          "file": "plugins/@dshfiles/main-tabs/src/strip-mount.test.ts",
+          "testName": "follows the outlet when the frame replaces the main column"
+        },
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.mount-unit-self-check",
+          "file": "plugins/@dshfiles/main-tabs/src/strip-mount.test.ts",
+          "testName": "warns once when no main outlet shows up, and still mounts when one appears later"
         },
         {
           "kind": "unit-test",
@@ -132,6 +156,15 @@
           "file": "plugins/@dshfiles/main-tabs/src/tabs-machine.test.ts",
           "testName": "jumps to a tab by position and cycles with wrap-around"
         }
+      ],
+      "reach": [
+        "click button \"Workbench\"",
+        "rightclick tab \"Workbench\"",
+        "click menuitem \"Keep open\"",
+        "click button \"Jujutsu\"",
+        "expect heading \"Jujutsu\"",
+        "press ControlOrMeta+Alt+Digit1",
+        "expect heading \"Workbench\""
       ]
     },
     {

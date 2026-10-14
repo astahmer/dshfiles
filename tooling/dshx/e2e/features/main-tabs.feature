@@ -16,6 +16,14 @@ Feature: Main view tabs
     When the Jujutsu tab is closed with a middle click and other tabs are closed from the thread tab
     Then only the pinned Workbench and the thread remain
 
+  @scenario:main-tabs.strip-mount
+  Scenario: The strip mounts right above whatever the main view shows
+    Given the isolated plugin composition of "@dshfiles/main-tabs, @dshfiles/workbench, @dshfiles/jujutsu" is booted
+    When the Workbench is opened as a tab
+    Then the tab strip sits directly above the main panel, anchored before the main slot outlet
+    When a thread is started beside the Workbench tab
+    Then the tab strip still sits directly above the main panel
+
   @scenario:main-tabs.keyboard
   Scenario: Keyboard shortcuts jump between tabs
     Given the isolated plugin composition of "@dshfiles/main-tabs, @dshfiles/workbench, @dshfiles/jujutsu" is booted
