@@ -16,6 +16,17 @@ Load the matching skill from `.agents/skills/` before the work it covers:
 - `dsh-sessions` — review, watch or debug another DSH thread (digest, tail, export) from a shell.
 - `complete-plan` — when a plan's last task is done and verified: move its durable content into docs and delete it.
 
+Shared skills (`~/.agents/skills/`) for the same kinds of work:
+
+- `actor-state-ownership` — who owns which state when a component grows machines, effects or refs.
+- `antislop` — fixing lint findings and promoting antislop rules.
+- `runtime-boundary-audit`, `library-architecture` — Host/client boundaries and the dshx public surface.
+- `safe-transformations` — codemods: version pins, namespace classes, renames across plugins.
+- `focused-validation` — the narrowest check that proves a change.
+- `memory-curation` — the memory plugin's stored memories.
+- `jj-merge-workspaces` — landing several workspaces onto `main`.
+- `disk-space-cleanup` — stale workspaces, `node_modules` and build output.
+
 ## Adopt, port, or build
 
 - **Adopt** a plugin from [dshmarket.com](https://dshmarket.com) whenever one

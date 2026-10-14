@@ -64,7 +64,8 @@ the form store when the draft re-syncs from another source (it becomes a second 
 
 ## Machine
 
-Only for flows like select → prepare → confirm → receipt. Machines own **flow** state; data stays in Query. Host
+Only for flows like select → prepare → confirm → receipt. Machines own **flow** state; data stays in Query.
+Split ownership between React, the machine, its actors and the URL with the shared `actor-state-ownership` skill. Host
 calls go through `fromPromise` actors with the `signal` forwarded, so leaving a state aborts the call. Pilot:
 `jujutsu/src/workspace-restore-machine.ts`.
 
