@@ -1,5 +1,8 @@
 # @dshfiles/memory
 
+Read [docs/findings.md](docs/findings.md) first: why memory exists, its design, and how it compares with native DSH
+and OptMem.
+
 Cross-thread, cross-project memory for DSH that leaves the live context and the provider's KV cache alone.
 
 - **No capture store.** DSH's own session logs are the source of truth. When a thread has been idle for `idleMs`
@@ -22,7 +25,9 @@ Cross-thread, cross-project memory for DSH that leaves the live context and the 
   call that returned the id as used and ranks the cited item higher in later blocks.
 - **Memory panel** (sidebar → Memory): notes by type with their source (project, thread, message, who wrote it,
   created and updated), inline edit and forget, superseded history, markdown preview through DSH's own
-  `MarkdownText`; thread digests by project; usage per day.
+  `MarkdownText`; thread digests by project; usage: cost per day, start-block size and the requests that carried
+  it, recall hits and citations, correction heuristics and 👍/👎 per cited memory (also through the
+  `dshfiles-memory` API).
 
 Message text is indexed with contentless FTS5 tables (the index only; the text stays in the session log). Credential
 shapes, bearer tokens, `key=value` secrets and tokenized URLs are redacted before anything is indexed, digested,
