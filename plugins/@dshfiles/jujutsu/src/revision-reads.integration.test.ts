@@ -98,3 +98,37 @@ test('a stale preview reaches the Client as a PluginApiError while unexpected er
   const raw = new Error("ENOENT: no such file or directory, stat '/Users/someone/repo'")
   assert.equal(RevisionReads.publicError(raw), raw)
 })
+
+test('changed-file stats and revision details mark the files a rebase left conflicted', async () => {
+  const { repo, jj, run } = await scratchRepo()
+  const changeId = (): string => jj(['--ignore-working-copy', 'log', '--no-graph', '--revisions', '@', '--template', 'change_id']).trim()
+  await writeFile(join(repo, 'shared.txt'), 'base\n')
+  jj(['describe', '--message', 'base'])
+  const base = changeId()
+  jj(['new', '--message', 'left'])
+  await writeFile(join(repo, 'shared.txt'), 'left\n')
+  jj(['status'])
+  const left = changeId()
+  jj(['new', base, '--message', 'right'])
+  await writeFile(join(repo, 'shared.txt'), 'right\n')
+  await writeFile(join(repo, 'clean.txt'), 'clean\n')
+  jj(['status'])
+  jj(['rebase', '--revisions', '@', '--destination', left])
+
+  const stats = await RevisionReads.fileStats(run, [workingCopyCommitId(jj)])
+  assert.deepEqual(
+    stats.revisions[0]?.files.map(file => [file.path, file.conflict]),
+    [
+      ['clean.txt', false],
+      ['shared.txt', true],
+    ],
+  )
+  const details = await RevisionReads.details(run, workingCopyCommitId(jj))
+  assert.deepEqual(
+    details.files.map(file => [file.path, file.conflict]),
+    [
+      ['clean.txt', false],
+      ['shared.txt', true],
+    ],
+  )
+})

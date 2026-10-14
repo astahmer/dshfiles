@@ -17,10 +17,11 @@ contracts.
   bend with rounded corners in the lower half of the row, so every row keeps
   one height (28 px Comfortable, 22 px Compact). The trunk uses the accent
   colour and each side branch one of six hues (`graph-1..6` in the kit),
-  different from the branch above it and from its parent. Lanes are 2 px;
-  nodes are filled circles, hollow rings for empty revisions, a ring with a
-  dot for @, dimmed for immutable revisions (whose text is dimmed too); a
-  divergent copy gets a violet outline and conflicts a warning glyph. Every
+  different from the branch above it and from its parent. Lanes are 2 px.
+  Nodes follow VisualJJ: workspace heads are filled, @ is filled with a halo,
+  every other revision is a hollow ring (dimmed when immutable, whose text is
+  dimmed too), a divergent copy gets a violet outline, and a conflicted
+  revision is a red ✗. Every
   row is one line at any width: workspace pills (teal, blue for this
   checkout's @) and boxed bookmark and tag labels on the branch's head row,
   then the description or a muted italic `(empty)` / `(no description)`
@@ -35,7 +36,7 @@ contracts.
   extension (Apache-2.0); no code is copied from it.
 - Expanded revisions show the description, Describe / Full diff / Edit This
   Change / Squash into parent, and changed files as a Flat or Tree list with
-  M/A/D status, +/- counts, folder counts, and per-file review marks.
+  M/A/D status (a conflicted file gets a red ✗ and red name), +/- counts, folder counts, and per-file review marks.
 - Full diff opens every file of a revision with numbered rows and collapsed
   "N unmodified lines" separators, rendered from `jj diff --git`.
 - Right-click a revision for full diff, describe, edit, new change, squash,

@@ -23,6 +23,7 @@ const fileStatsRowSchema = z.object({
       }),
     )
     .max(20_000),
+  conflicts: z.array(z.string().max(2048)).max(20_000).default([]),
 })
 
 const SAFE_FAILURE_MESSAGE =
@@ -56,11 +57,16 @@ export class RevisionReads {
     let truncated = result.truncated
     const revisions = rows.map(row => {
       if (row.files.length > 2000) truncated = true
+      const conflicts = new Set(row.conflicts)
       return {
         commitId: row.commitId,
-        files: row.files
-          .slice(0, 2000)
-          .map(file => ({ path: file.path, status: fileStatusLetter(file.status), additions: file.additions, deletions: file.deletions })),
+        files: row.files.slice(0, 2000).map(file => ({
+          path: file.path,
+          status: fileStatusLetter(file.status),
+          additions: file.additions,
+          deletions: file.deletions,
+          conflict: conflicts.has(file.path),
+        })),
       }
     })
     return { revisions, truncated }
@@ -80,10 +86,11 @@ export class RevisionReads {
     const patch = await run([RevisionReads.ignoreWorkingCopy, 'diff', '--revisions', commitId, '--git'])
     const evolution = await run([RevisionReads.ignoreWorkingCopy, 'evolog', '--no-graph', '--revisions', commitId, '--limit', '30'], { outputLimit: 118_000 })
     const stats = await RevisionReads.fileStats(run, [commitId])
-    const statusByPath = new Map(stats.revisions[0]?.files.map(file => [file.path, file.status]) ?? [])
+    const statByPath = new Map(stats.revisions[0]?.files.map(file => [file.path, file]) ?? [])
     const files = parsePatchStats(patch.stdout, paths, patch.truncated).map(file => ({
       ...file,
-      status: statusByPath.get(file.path) ?? fileStatusLetter('modified'),
+      status: statByPath.get(file.path)?.status ?? fileStatusLetter('modified'),
+      conflict: statByPath.get(file.path)?.conflict ?? false,
     }))
     return {
       files,

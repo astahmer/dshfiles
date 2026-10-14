@@ -97,6 +97,8 @@ export const fileStatSchema = z.object({
   status: fileStatusSchema,
   additions: z.number().int().min(0),
   deletions: z.number().int().min(0),
+  /** Set by changed-file reads; an older Host omits it. */
+  conflict: z.boolean().optional(),
 })
 
 export const fileChangeSchema = fileStatSchema.extend({

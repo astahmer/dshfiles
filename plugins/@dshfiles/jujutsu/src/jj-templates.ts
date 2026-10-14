@@ -35,4 +35,5 @@ export const FILE_STATS_TEMPLATE =
   '\'{"path":\' ++ f.path().display().escape_json() ++ ' +
   '\',"status":\' ++ f.status().escape_json() ++ ' +
   '\',"additions":\' ++ f.lines_added() ++ ' +
-  '\',"deletions":\' ++ f.lines_removed() ++ \'}\').join(",") ++ \']}\' ++ "\\n"'
+  '\',"deletions":\' ++ f.lines_removed() ++ \'}\').join(",") ++ ' +
+  '\'],"conflicts":[\' ++ self.diff().files().filter(|e| e.target().conflict()).map(|e| e.path().display().escape_json()).join(",") ++ \']}\' ++ "\\n"'

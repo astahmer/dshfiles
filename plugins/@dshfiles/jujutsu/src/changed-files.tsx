@@ -1,7 +1,7 @@
 import { Checkbox } from '@dshfiles/plugin-ui/components/ui/checkbox'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuLabel, ContextMenuTrigger } from '@dshfiles/plugin-ui/components/ui/context-menu'
 import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
-import { ChevronRightIcon } from '@dshfiles/plugin-ui/icons'
+import { ChevronRightIcon, CircleXIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useMemo, useState, type ReactNode } from 'react'
 import type { FileStat, FileStatus } from './api.js'
@@ -117,8 +117,18 @@ export const ChangedFiles = (props: ChangedFilesProps): JSX.Element => {
           title={openInEditor === undefined ? `${file.path} · open diff` : `${file.path} · open diff (⌘/Ctrl-click: open in editor)`}
           type="button"
         >
-          {props.statusAtEnd !== true && <FileStatusLetter status={file.status} />}
-          <span className={cn('dshx:flex-none dshx:truncate dshx:text-xs dshx:font-medium', file.status === 'D' && 'dshx:line-through dshx:opacity-70')}>
+          {file.conflict === true ? (
+            <CircleXIcon aria-label="Conflicted" className="dshx:size-3 dshx:flex-none dshx:text-destructive" role="img" />
+          ) : (
+            props.statusAtEnd !== true && <FileStatusLetter status={file.status} />
+          )}
+          <span
+            className={cn(
+              'dshx:flex-none dshx:truncate dshx:text-xs dshx:font-medium',
+              file.status === 'D' && 'dshx:line-through dshx:opacity-70',
+              file.conflict === true && 'dshx:text-destructive',
+            )}
+          >
             {parts.name}
           </span>
           {props.view === 'flat' && parts.directory.length > 0 && (

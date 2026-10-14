@@ -61,7 +61,6 @@ import {
   RefreshCwIcon,
   SearchIcon,
   Settings2Icon,
-  TriangleAlertIcon,
   UserIcon,
 } from '@dshfiles/plugin-ui/icons'
 import { PatchView, type PatchLayout } from '@dshfiles/plugin-ui/diff'
@@ -1621,26 +1620,41 @@ const RevisionGraphCell = (props: RevisionGraphCellProps): JSX.Element => {
   const commitX = x(layout.commitLane)
   const radius = props.metrics.laneGap * 0.36
   const stroke = revision.divergent ? 'dshx:stroke-violet' : graphStroke(layout.color)
+  // Like VisualJJ: workspace heads are filled, every other revision is a hollow ring, and a conflict is a red ✗.
   const node = (() => {
-    if (revision.workingCopy) {
+    if (revision.conflict) {
+      const arm = radius * 0.5
       return (
         <>
-          <circle className={cn('dshx:fill-background', stroke)} cx={commitX} cy={middle} r={radius + 0.5} strokeWidth={2} />
-          <circle className={graphFill(layout.color)} cx={commitX} cy={middle} r={radius * 0.45} />
+          <circle className="dshx:fill-background dshx:stroke-destructive" cx={commitX} cy={middle} r={radius + 0.5} strokeWidth={2} />
+          <path
+            className="dshx:stroke-destructive"
+            d={`M ${commitX - arm} ${middle - arm} L ${commitX + arm} ${middle + arm} M ${commitX + arm} ${middle - arm} L ${commitX - arm} ${middle + arm}`}
+            strokeLinecap="round"
+            strokeWidth={1.75}
+          />
         </>
       )
     }
-    if (revision.empty) {
-      return <circle className={cn('dshx:fill-background', stroke)} cx={commitX} cy={middle} r={radius - 0.5} strokeWidth={2} />
+    if (revision.workingCopy) {
+      return (
+        <>
+          <circle className={cn('dshx:fill-none', stroke)} cx={commitX} cy={middle} r={radius + 2.5} strokeWidth={1.5} />
+          <circle className={graphFill(layout.color)} cx={commitX} cy={middle} r={radius} />
+        </>
+      )
+    }
+    if (revision.workspaces.length > 0) {
+      return <circle className={cn(graphFill(layout.color), 'dshx:stroke-background')} cx={commitX} cy={middle} r={radius + 0.5} strokeWidth={1.5} />
     }
     return (
       <circle
-        className={cn(graphFill(layout.color), 'dshx:stroke-background')}
+        className={cn('dshx:fill-background', stroke)}
         cx={commitX}
         cy={middle}
-        fillOpacity={revision.immutable ? 0.6 : 1}
-        r={radius}
-        strokeWidth={1.5}
+        r={radius - 0.5}
+        strokeOpacity={revision.immutable ? 0.6 : 1}
+        strokeWidth={2}
       />
     )
   })()
@@ -1886,7 +1900,7 @@ const RevisionRow = (props: RevisionRowProps): JSX.Element => {
                 onClick={props.onToggle}
                 type="button"
               >
-                {revision.conflict && <TriangleAlertIcon aria-label="Conflict" className="dshx:size-3.5 dshx:flex-none dshx:text-warning" role="img" />}
+                {revision.conflict && <span className="dshx:sr-only">Conflict:</span>}
                 {revision.empty && <span className="dshx:flex-none dshx:text-muted-foreground dshx:italic">(empty)</span>}
                 {described ? (
                   <span
