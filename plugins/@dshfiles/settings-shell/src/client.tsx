@@ -16,7 +16,7 @@ import { registerPaletteAction } from '@dshfiles/command-palette/api'
 import { createActor } from '@dshfiles/plugin-ui/machine'
 import { useEffect, useState } from 'react'
 import { z } from 'zod'
-import type { SettingsSectionOwnerProps } from '@deepseek-ai/dsh-client-ui-settings/client'
+import type { ConfigForm, SettingsSectionOwnerProps } from '@deepseek-ai/dsh-client-ui-settings/client'
 
 import { DesktopUpdateBadge, DesktopUpdateSource, desktopUpdateBridge } from './native/desktop-update.js'
 import { SettingsDocumentStore } from './native/document-action.js'
@@ -84,7 +84,16 @@ const ledgerProjection = <T,>(read: () => T, versionOf: () => string, subscribe:
 
 const CurrentVersion = (props: { readonly t: ShellTranslate }): JSX.Element => {
   const upstream = useApiQuery(settingsShellApi, 'upstream', {})
-  return <CurrentVersionRow t={props.t} version={upstream.data?.installed ?? PORTED_FROM.version} />
+  return (
+    <>
+      <CurrentVersionRow t={props.t} version={upstream.data?.installed ?? PORTED_FROM.version} />
+      {upstream.data?.stale === true && (
+        <p className="dshx:m-0 dshx:pb-4 dshx:text-[12px] dshx:text-warning" role="note">
+          {props.t('port.stale', { ported: upstream.data.portedFrom, installed: upstream.data.installed ?? '' })}
+        </p>
+      )}
+    </>
+  )
 }
 
 export default defineClient({
@@ -131,9 +140,27 @@ export default defineClient({
     }, 'settings-shell: follow the main view')
 
     const preferences = ctx.configForms.get<unknown>(SETTINGS_NAMESPACE)
+    // A Host write lands seconds later; the next gear click should already follow the `openIn` just picked.
+    let requestedOpenIn: unknown
+    const ownForm: ConfigForm<unknown> = {
+      getSnapshot: () => preferences.getSnapshot(),
+      subscribe: listener => preferences.subscribe(listener),
+      set: (field, value) => preferences.set(field, value),
+      unset: field => preferences.unset(field),
+      mutate: (ops, expectedRevision) => {
+        const edit = ops.find(op => op.path.length === 1 && op.path[0] === 'openIn')
+        if (edit === undefined) return preferences.mutate(ops, expectedRevision)
+        const requested = edit.op === 'set' ? edit.value : undefined
+        requestedOpenIn = requested
+        return preferences.mutate(ops, expectedRevision).finally(() => {
+          if (requestedOpenIn === requested) requestedOpenIn = undefined
+        })
+      },
+    }
+    const formFor = (ns: string): ConfigForm<unknown> => (ns === SETTINGS_NAMESPACE ? ownForm : ctx.configForms.get<unknown>(ns))
     const surface = (): ShellSurface =>
       preferredSurface({
-        settings: preferences.getSnapshot().value,
+        settings: requestedOpenIn === undefined ? preferences.getSnapshot().value : { openIn: requestedOpenIn },
         tabsLoaded: ctx.slots.entriesOfSlot('shell.overlay').some(entry => entry.options.id === MAIN_TABS_OVERLAY_ID),
       })
     const openSettings = (sectionId?: string): void =>
@@ -327,7 +354,7 @@ export default defineClient({
         pluginPages: pages,
         renderPluginPage: (page: PluginSettingsPage) => (
           <PluginSettingsPageView
-            form={ctx.configForms.get<unknown>(page.ns)}
+            form={formFor(page.ns)}
             key={page.ns}
             page={page}
             t={props.t}
@@ -340,7 +367,7 @@ export default defineClient({
         query,
         onSearch: (next: string) => actor.send({ type: 'search', query: next }),
         renderMatches: (page: PluginSettingsPage, fields: readonly SettingField[], highlight: string) => (
-          <SettingsForm fields={fields} form={ctx.configForms.get<unknown>(page.ns)} highlight={highlight} key={page.ns} t={props.t} />
+          <SettingsForm fields={fields} form={formFor(page.ns)} highlight={highlight} key={page.ns} t={props.t} />
         ),
         onExpand: () => actor.send({ type: 'expand' }),
         onRestore: () => actor.send({ type: 'restore' }),
@@ -402,7 +429,7 @@ export default defineClient({
           {pages.map(page => (
             <section aria-label={page.title} className="dshx:flex dshx:flex-col" key={page.ns}>
               {pages.length > 1 && <h4 className="dshx:m-0 dshx:text-[13px] dshx:font-semibold dshx:text-muted-foreground">{page.title}</h4>}
-              <SettingsForm fields={page.fields} form={ctx.configForms.get<unknown>(page.ns)} t={t} />
+              <SettingsForm fields={page.fields} form={formFor(page.ns)} t={t} />
             </section>
           ))}
         </div>
@@ -451,7 +478,7 @@ export default defineClient({
             group: 'command',
             run: () => openSettings(),
           }),
-          ...sections.getSnapshot().map(row =>
+          ...[...sections.getSnapshot(), ...pluginPages.getSnapshot().map(page => ({ id: page.pageId, label: page.title }))].map(row =>
             registerPaletteAction({
               id: `@dshfiles/settings-shell/section/${row.id}`,
               label: () => t('palette.section', { section: row.label }),
@@ -462,10 +489,12 @@ export default defineClient({
           ),
         ]
       }
-      const dispose = sections.subscribe(register)
+      const disposers = [sections.subscribe(register), pluginPages.subscribe(register)]
       register()
+      // Plugin pages come from the settings mirror, which otherwise loads on the first Settings open.
+      void describe.ensure()
       return () => {
-        dispose()
+        disposers.forEach(dispose => dispose())
         registered.forEach(release => release())
       }
     }, 'settings-shell: palette actions')

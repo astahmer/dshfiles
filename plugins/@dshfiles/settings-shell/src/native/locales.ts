@@ -50,6 +50,7 @@ const shellEn = {
   'config.noApps': 'No other app opens this file',
   'config.failed': 'Could not open the configuration file',
   'config.editorNeedsThread': 'Open a thread first: the Editor opens files in a thread’s panel',
+  'port.stale': 'This Settings shell was ported from DSH {ported}; DSH {installed} may have changed it. Refresh @dshfiles/settings-shell.',
 }
 
 const shellZh = {
@@ -94,6 +95,7 @@ const shellZh = {
   'config.noApps': '没有其他应用可以打开此文件',
   'config.failed': '无法打开配置文件',
   'config.editorNeedsThread': '请先打开一个会话：编辑器在会话面板中打开文件',
+  'port.stale': '此设置界面移植自 DSH {ported}；DSH {installed} 可能已更改它。请更新 @dshfiles/settings-shell。',
 } satisfies Record<keyof typeof shellEn, string>
 
 // Ported verbatim from @deepseek-ai/dsh-client-ui-settings-general@0.2.0-rc.2 (MIT), lib/client.js `zh` and `en`.
