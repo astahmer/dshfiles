@@ -39,7 +39,7 @@ Vitest only follows static imports, including literal `import('./module')`. File
 
 ## Validation
 
-Dependency migration replaced 34 SDK link specifications; one root install discovers 42 projects. The plugin workspace contract and shared Cordis module identity were verified. Selection regression tests cover owner/dependent selection, manifests/configs/fixtures/deletions, shared profile inputs, source-only libraries, dynamic-input fallbacks, CLI rejection and documentation-only skips.
+Dependency migration replaced 35 SDK link specifications, including the tool-meta package added on main while this work was in progress; one root install discovers 43 projects. The plugin workspace contract and shared Cordis module identity were verified. Selection regression tests cover owner/dependent selection, manifests/configs/fixtures/deletions, shared profile inputs, source-only libraries, dynamic-input fallbacks, CLI rejection and documentation-only skips.
 
 - `pnpm run test:scripts`: 15 passing Node tests.
 - `pnpm run test:tooling`: 15 passing evidence/inventory/feature-coverage tests, including real browser evidence collection.
