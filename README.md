@@ -100,7 +100,8 @@ pnpm profile:sync --profile probe
 fnm exec --using="$(cat .node-version)" pnpm profile:boot --profile probe
 ```
 
-`profile:sync` links owned bundles into a profile. `profile:boot` checks that
+`profile:sync` links owned bundles into a profile (exactly the seed's, for a
+profile seeded under `profiles/`). `profile:boot` checks that
 all composed entries activate. Try changes in the isolated `probe` profile
 before promoting them to `web`; never restart the live web profile from a
 validation run. See [`AGENTS.md`](AGENTS.md) for the full workflow and runtime

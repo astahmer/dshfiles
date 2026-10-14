@@ -1,9 +1,13 @@
 # Installing into a DSH profile
 
 Profiles live in `~/.dsh/profiles/<name>/`. Edit `cordis.patch.yml` for config,
-never `cordis.yml`. `pnpm profile:sync --profile <name>` links every owned
-bundle into a profile the supported way (below), so reach for it before editing
-a profile manifest by hand.
+never `cordis.yml`. `pnpm profile:sync --profile <name>` links owned bundles
+into a profile the supported way (below), so reach for it before editing a
+profile manifest by hand. A profile with a seed in this repository
+(`profiles/<name>/package.json`) gets exactly the seed's `@dshfiles/*` bundles,
+its relative `link:` paths resolved against the seed folder; any other profile
+gets every owned bundle. `--bundle <name>` adds or refreshes one bundle and
+leaves the rest alone.
 
 ```sh
 dsh --profile web --dump-config          # full composed tree
@@ -13,7 +17,7 @@ dsh --profile web --dump-config-schema   # JSON Schema for entries and patches
 The `web` profile seed lives in this repo: `profiles/web/package.json` and
 `profiles/web/cordis.patch.yml`. nixfiles `modules/dsh.nix` reads them on apply and
 reconciles only its marked block, so promoting a bundle means editing that seed
-(then `pnpm profile:sync --profile web --bundle <name>`); no nixfiles change is needed.
+(then `pnpm profile:sync --profile web`); no nixfiles change is needed.
 
 ## `pnpm add <path>` is blocked; `pnpm install` is not
 
