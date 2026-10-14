@@ -1,0 +1,138 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "agent-toolkit-page",
+      "title": "Agent toolkit page",
+      "summary": "A main panel (sidebar → Agent toolkit; main-tabs opens it as a tab) showing what the agent can use in one thread: its tools with source (native, plugin, MCP, memory), owner, read-only marker and whether the preset restricts them; the API methods plugins serve each other, with the agent tool each is exposed as; the loaded plugins with versions, state and a link to their settings; MCP servers with status and tools; skills from the project and the user's .agents/skills with who can invoke them; and memory's start block and note counts for the project, with a link to the Memory panel. Search and a source filter narrow every section. It replaces the Tools tab of Settings › Built-in plugins.",
+      "reach": [
+        "click button \"Agent toolkit\"",
+        "expect heading \"Agent toolkit\"",
+        "expect region \"Tools (*\"",
+        "click radio \"Plugins\"",
+        "expect region \"Plugins (*\""
+      ],
+      "surfaces": ["client", "host", "api"],
+      "configuration": [],
+      "states": ["loading", "populated", "filtered", "no-thread", "catalog-unavailable", "owner-missing"],
+      "failureModes": [
+        "Without a dshx Host serving the registry, the page says the catalog is unavailable instead of listing nothing.",
+        "Without MCP servers or memory loaded, their section says so; the rest still renders.",
+        "A registry served by an older dshx lacks read-only, restriction and invocation fields; the page omits those badges and treats skills as user-invocable."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "agent-toolkit.page",
+          "featureFile": "tooling/dshx/e2e/features/agent-toolkit.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agent-toolkit.panel-sections",
+          "file": "plugins/@dshfiles/agent-toolkit/src/toolkit-panel.test.tsx",
+          "testName": "shows the thread’s tools, plugin APIs, plugins, MCP servers, skills and memory"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agent-toolkit.panel-filter",
+          "file": "plugins/@dshfiles/agent-toolkit/src/toolkit-panel.test.tsx",
+          "testName": "narrows to one source and its section"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agent-toolkit.panel-unavailable",
+          "file": "plugins/@dshfiles/agent-toolkit/src/toolkit-panel.test.tsx",
+          "testName": "says the catalog is unavailable when no dshx Host serves it"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agent-toolkit.sources",
+          "file": "plugins/@dshfiles/agent-toolkit/src/toolkit-model.test.ts",
+          "testName": "files each tool under native, plugin, MCP or memory and filters by source and text"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agent-toolkit.api-methods",
+          "file": "plugins/@dshfiles/agent-toolkit/src/toolkit-model.test.ts",
+          "testName": "lists the API methods plugins serve each other with their agent tool, by owner under the memory filter"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agent-toolkit.old-registry",
+          "file": "plugins/@dshfiles/agent-toolkit/src/toolkit-model.test.ts",
+          "testName": "reads a listing from an older registry with every tool enabled and read-only unknown"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agent-toolkit.skill-scope",
+          "file": "plugins/@dshfiles/agent-toolkit/src/toolkit-model.test.ts",
+          "testName": "tells project skills from the user’s own and says who can invoke them"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agent-toolkit.mcp-tools",
+          "file": "plugins/@dshfiles/agent-toolkit/src/toolkit-model.test.ts",
+          "testName": "groups MCP tools under their server"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agent-toolkit.note-counts",
+          "file": "plugins/@dshfiles/agent-toolkit/src/toolkit-model.test.ts",
+          "testName": "counts memory notes by type, largest first"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agent-toolkit.plugins",
+          "file": "plugins/@dshfiles/agent-toolkit/src/toolkit-model.test.ts",
+          "testName": "lists our plugins first with their versions, skips Loader internals, and filters native from the rest"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agent-toolkit.sections",
+          "file": "plugins/@dshfiles/agent-toolkit/src/toolkit-model.test.ts",
+          "testName": "shows only the sections a filter is about"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agent-toolkit.versions",
+          "file": "plugins/@dshfiles/agent-toolkit/src/package-versions.test.ts",
+          "testName": "reads the version of a package and of a subpath entry, searching each base in order"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agent-toolkit.package-name",
+          "file": "plugins/@dshfiles/agent-toolkit/src/package-versions.test.ts",
+          "testName": "names the package of a module specifier"
+        }
+      ]
+    },
+    {
+      "id": "agent-toolkit-palette",
+      "title": "Open the agent toolkit from the command palette",
+      "summary": "The command palette's “Open the agent toolkit” opens the page about the thread the palette was opened from.",
+      "reach": [
+        "click button \"New thread\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Toolkit thread\"",
+        "press Enter",
+        "click button \"Open command palette\"",
+        "click option \"Open the agent toolkit*\"",
+        "expect heading \"Agent toolkit\"",
+        "expect combobox \"Thread\""
+      ],
+      "surfaces": ["client"],
+      "configuration": [],
+      "states": ["opened"],
+      "failureModes": ["Without a thread the page falls back to global tools."],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "agent-toolkit.palette",
+          "featureFile": "tooling/dshx/e2e/features/agent-toolkit.feature"
+        }
+      ]
+    }
+  ]
+}

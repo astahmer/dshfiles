@@ -1,0 +1,3 @@
+- insert:
+    - id: dshfiles-agent-toolkit
+      name: '@dshfiles/agent-toolkit'

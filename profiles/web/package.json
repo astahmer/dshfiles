@@ -5,6 +5,7 @@
     "@dshfiles/activity-timeline": "link:../../plugins/@dshfiles/activity-timeline",
     "@dshfiles/agent-communication": "link:../../plugins/@dshfiles/agent-communication",
     "@dshfiles/agent-questions": "link:../../plugins/@dshfiles/agent-questions",
+    "@dshfiles/agent-toolkit": "link:../../plugins/@dshfiles/agent-toolkit",
     "@dshfiles/ai-accounts": "link:../../plugins/@dshfiles/ai-accounts",
     "@dshfiles/command-palette": "link:../../plugins/@dshfiles/command-palette",
     "@dshfiles/diff-viewed": "link:../../plugins/@dshfiles/diff-viewed",
@@ -77,6 +78,7 @@
         "@dshfiles/tool-meta",
         "@dshfiles/workspace-folder-picker",
         "@dshfiles/memory",
+        "@dshfiles/agent-toolkit",
         "@dshfiles/home"
       ]
     }
