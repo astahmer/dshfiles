@@ -12,7 +12,9 @@ interface SortableColumn {
   readonly getToggleSortingHandler: () => ((event: unknown) => void) | undefined
 }
 
-const isSortable = (column: object): column is SortableColumn => 'getCanSort' in column && 'getToggleSortingHandler' in column
+const isSortable = <TFeatures extends TableFeatures, TData extends RowData>(
+  column: Column<TFeatures, TData, unknown>,
+): column is Column<TFeatures, TData, unknown> & SortableColumn => 'getCanSort' in column && 'getToggleSortingHandler' in column
 
 const ariaSort = (direction: false | SortDirection): 'ascending' | 'descending' | undefined =>
   direction === 'asc' ? 'ascending' : direction === 'desc' ? 'descending' : undefined

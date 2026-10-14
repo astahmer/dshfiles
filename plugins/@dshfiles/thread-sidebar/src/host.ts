@@ -48,9 +48,11 @@ const pluginUpdatesApi = threadSidebarPluginUpdatesApi.host({
   pending: async () => ({ plugins: (await pluginUpdates?.pending()) ?? [] }),
 })
 
-const callable = (target: object, name: string) => {
-  const member: unknown = Reflect.get(target, name)
-  return typeof member === 'function' ? (...args: unknown[]): unknown => Reflect.apply(member, target, args) : undefined
+// The slice of `@deepseek-ai/dsh-client-modules`' ClientModuleRegistry this plugin reads; older Hosts lack members.
+interface ClientModuleRegistrySurface {
+  readonly graph?: () => { readonly entries: ReadonlyArray<{ readonly id: string }> }
+  readonly clientPath?: (id: string) => string | undefined
+  readonly onGraphChanged?: (listener: () => void) => () => void
 }
 
 export default defineHost({
@@ -62,29 +64,22 @@ export default defineHost({
   // (desktop shells, older builds) simply report no pending updates.
   setup: ctx => {
     ctx.inject(['clientModules'], scoped => {
-      const registry: unknown = scoped.get('clientModules')
-      if (typeof registry !== 'object' || registry === null) return
-      const graph = callable(registry, 'graph')
-      const clientPath = callable(registry, 'clientPath')
-      const onGraphChanged = callable(registry, 'onGraphChanged')
-      if (graph === undefined || clientPath === undefined) return
+      const registry: ClientModuleRegistrySurface | undefined = scoped.get('clientModules')
+      if (registry?.graph === undefined || registry.clientPath === undefined) return
       const watch = createPluginUpdateWatch({
         ids: () =>
           graphIdsSchema
             .catch({ entries: [] })
-            .parse(graph())
+            .parse(registry.graph?.())
             .entries.map(entry => entry.id),
-        clientPath: id => {
-          const path = clientPath(id)
-          return typeof path === 'string' ? path : undefined
-        },
+        clientPath: id => registry.clientPath?.(id),
       })
       watch.remember()
       scoped.effect(() => {
         pluginUpdates = watch
-        const stopWatching = onGraphChanged?.(() => watch.remember())
+        const stopWatching = registry.onGraphChanged?.(() => watch.remember())
         return () => {
-          if (typeof stopWatching === 'function') Reflect.apply(stopWatching, undefined, [])
+          stopWatching?.()
           if (pluginUpdates === watch) pluginUpdates = undefined
         }
       }, 'thread-sidebar: plugin update watch')

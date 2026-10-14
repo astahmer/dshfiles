@@ -94,13 +94,16 @@ export function createApiClient<const Methods extends Record<string, AnyApiMetho
 }
 
 /** Internal lifecycle seam used by the React query adapter. */
-export function subscribeApiConnection(client: object, listener: () => void): () => void {
+export function subscribeApiConnection<const Methods extends Record<string, AnyApiMethodDefinition>>(
+  client: ApiClient<Methods>,
+  listener: () => void,
+): () => void {
   const source = clientConnections.get(client)?.hostDescription
   return typeof source?.subscribe === 'function' ? source.subscribe(listener) : () => undefined
 }
 
 /** Internal snapshot helper; unavailable while the Host generation is down. */
-export function apiConnectionAvailable(client: object): boolean {
+export function apiConnectionAvailable<const Methods extends Record<string, AnyApiMethodDefinition>>(client: ApiClient<Methods>): boolean {
   const source = clientConnections.get(client)?.hostDescription
   return typeof source?.getSnapshot !== 'function' || source.getSnapshot() !== undefined
 }

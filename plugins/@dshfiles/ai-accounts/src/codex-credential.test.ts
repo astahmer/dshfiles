@@ -4,7 +4,12 @@ import { join } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
 import { persistCodexOAuthCredential, readCodexOAuthCredential } from './codex-credential.js'
 
-const jwt = (claims: object): string => {
+interface CodexAccessClaims {
+  readonly exp?: number
+  readonly 'https://api.openai.com/auth'?: { readonly chatgpt_account_id: string }
+}
+
+const jwt = (claims: CodexAccessClaims): string => {
   const header = Buffer.from(JSON.stringify({ alg: 'none' })).toString('base64url')
   const payload = Buffer.from(JSON.stringify(claims)).toString('base64url')
   return `${header}.${payload}.`

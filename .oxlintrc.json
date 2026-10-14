@@ -25,7 +25,7 @@
     "react/exhaustive-deps": "warn",
     "react/purity": "warn",
     "antislop/no-chained-type-assertions": "warn",
-    "antislop/no-broad-object-parameters": "warn",
+    "antislop/no-broad-object-parameters": "error",
     "antislop/no-conditional-empty-object-spread": "warn",
     "antislop/no-known-value-widening": "warn",
     "antislop/no-reflect-apply": "warn",

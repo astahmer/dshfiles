@@ -67,7 +67,7 @@ function safeMessage(error: unknown): {
   }
 }
 
-function emitResult(args: CliArgs, io: PlatformCliIO, data: JsonValue | object, message: string): void {
+function emitResult<Result extends JsonValue | object>(args: CliArgs, io: PlatformCliIO, data: Result, message: string): void {
   if (args.json) {
     write(io.stdout, `${JSON.stringify({ schemaVersion: 1, command: commandName(args), ok: true, data }, null, 2)}\n`)
     return
@@ -667,7 +667,7 @@ async function runPlatformAction(args: CliArgs, runtime: PlatformCliRuntime): Pr
     }
   }
 
-  const emitSessionResult = (data: JsonValue | object, message: string): void => {
+  const emitSessionResult = <Result extends JsonValue | object>(data: Result, message: string): void => {
     if (selectedPlacement === undefined) {
       emitResult(args, runtime.io, data, message)
       return

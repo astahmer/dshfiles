@@ -10,7 +10,7 @@ import type {
   LocaleDictionaries,
   SlotContribution,
 } from './types.js'
-import { isSlotContribution, slotContributionParts } from './define.js'
+import { isSlotContribution, slotContributionParts, type SlotRegistrationOptions } from './define.js'
 import { isLocaleDefinition, localeDefinitionParts } from './locale.js'
 import { getConversationContributionParts, isConversationContribution } from '../conversation/define.js'
 import { createApiClientRuntime, provideApiContext } from '../api/client.js'
@@ -288,10 +288,9 @@ function validateDefinition(value: unknown, metadata: ClientPluginMetadata): Cli
 
 type ComponentDecorator = ClientComponentDecorator
 
-function normalizedSlotOptions(options: object): object {
-  const locale = (options as Record<string, unknown>).locale
-  if (!isLocaleDefinition(locale)) return options
-  return { ...options, locale: localeDefinitionParts(locale).namespace }
+function normalizedSlotOptions(options: SlotRegistrationOptions): SlotRegistrationOptions {
+  if (!isLocaleDefinition(options.locale)) return options
+  return { ...options, locale: localeDefinitionParts(options.locale).namespace }
 }
 
 function registerLocales(client: ClientRuntimeContext, definition: ClientDefinition): void {

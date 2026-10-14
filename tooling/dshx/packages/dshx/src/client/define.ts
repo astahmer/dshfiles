@@ -12,9 +12,13 @@ import type {
 } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ClientDefinition, LocaleDefinition, PropsLocaleOf, SlotContribution } from './types.js'
 
+export interface SlotRegistrationOptions {
+  readonly locale?: unknown
+}
+
 export interface SlotContributionParts {
   readonly name: keyof SlotMap & string
-  readonly options: object
+  readonly options: SlotRegistrationOptions
   readonly component: unknown
 }
 
