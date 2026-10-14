@@ -58,6 +58,16 @@ answerable, and a late answer is steered in as a `user-question-reply` message.
 (card, pending result, late answer, cancel, restart) has not been accepted in a
 browser yet; see [plans/async-agent-questions.md](../../../plans/async-agent-questions.md).
 
+The Client half only restyles that native card (`src/client.ts`): a tabular,
+fixed-width countdown so it stops jittering, a header that stacks below 480 px
+of card width, and the question clamped to three lines that expands on hover or
+keyboard focus in the header. The card's classes are CSS-module hashes, so the
+rules key on `data-question-key`, element structure and class-name suffixes; a
+DSH update that reshapes the card drops them silently. A real "Show more"
+button needs DOM the card does not expose. The Client has its own
+`tsconfig.client.json` because the Client `ISessions` face would win the
+`Context.sessions` declaration merge over the Host store the tools use.
+
 ## Design decisions
 
 - **Reuse `ask_user_question` for root async, never a second root tool.** Two

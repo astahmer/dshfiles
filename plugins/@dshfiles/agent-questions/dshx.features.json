@@ -165,6 +165,26 @@
           "testName": "accepts batches of 20 and rejects larger batches before resolving any item"
         }
       ]
+    },
+    {
+      "id": "question-card-layout",
+      "title": "Steady countdown and compact native question card",
+      "summary": "Restyles the native async question card: a tabular, fixed-width countdown, a header that stacks under 480px, and a question clamped to three lines that expands on hover or focus.",
+      "surfaces": ["client"],
+      "configuration": [],
+      "states": ["counting-down", "paused", "narrow-pane", "long-question"],
+      "failureModes": [
+        "The rules key on the native card's data-question-key attribute, element structure and CSS-module class suffixes, so a DSH update that reshapes the card drops them silently.",
+        "Without DOM access there is no \"Show more\" button; the clamped question expands only on hover or keyboard focus inside the header."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "not-applicable",
+          "id": "agent-questions.question-card-layout-needs-model-turn",
+          "reason": "The card only renders while a model turn calls ask_user_question, which dshx dev reach steps cannot trigger; check it on a live question at 800px and 420px pane widths."
+        }
+      ]
     }
   ],
   "kind": "bundle"

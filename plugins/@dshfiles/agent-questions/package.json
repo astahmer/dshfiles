@@ -13,13 +13,14 @@
   "exports": {
     ".": "./dist/index.js",
     "./package.json": "./package.json",
-    "./cordis.patch.yml": "./cordis.patch.yml"
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./client": "./dist/client.js"
   },
   "scripts": {
     "build": "dshx build",
     "test": "vitest run",
     "verify:scratch": "node scripts/verify-scratch.mjs",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.client.json --noEmit"
   },
   "dependencies": {
     "zod": "^4.4.3"
@@ -54,6 +55,11 @@
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [],
+      "locales": []
     }
   },
   "dshx": {
