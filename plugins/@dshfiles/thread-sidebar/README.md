@@ -54,7 +54,8 @@ and the grouping/status/source filters it applies. Stored v1 view preferences
 migrate into that preset list once. **Customize views** opens
 `src/thread-view-manager.tsx`, where presets are saved, renamed, reordered,
 selected, and removed; the row's quick controls apply the selected preset
-without opening the manager.
+without opening the manager. For how working, attention, read state, groups,
+and filters fit together, see [Thread sidebar states](sidebar-state.md).
 
 **Archive undo notice.** Archiving reports itself as a compact overlay anchored
 to the sidebar (`data-testid="thread-sidebar-transient-notice"`), so the thread
@@ -113,12 +114,15 @@ generated text field cannot capture.
 
 Every thread row also exposes **Copy thread ID**, **Copy thread link**, **Mark
 unread**, per-thread auto-settle behavior, and a **Mute thread** menu.
-Opening a thread marks Host attention read and clears its manual unread marker;
-new Host attention can mark it unread again. Manual unread markers are saved in
-this browser, separate from lifecycle and attention state. Auto-settle can
-inherit the global auto-archive setting, explicitly enable auto-archive for one
-thread, or exclude that thread; the global idle threshold and safety exclusions
-still apply. **Mute thread** (row bell, context menu, and the
+Opening or selecting a thread clears its manual unread marker. For a finished
+turn, the sidebar also records that completion as seen locally. If the Host
+still reports the same completion unread, it stays dismissed until that status
+clears or the Host reports a fresh unread completion. Manual unread and
+seen-completion markers are saved in this browser, separate from Host running
+and pending-interaction state.
+Auto-settle can inherit the global auto-archive setting, explicitly enable it
+for one thread, or exclude that thread; the global idle threshold and safety
+exclusions still apply. **Mute thread** (row bell, context menu, and the
 session header's More menu) silences a thread for 1, 8 or 24 hours, until
 tomorrow morning (09:00 local), for a week, or until it is unmuted, like a
 Discord channel. A muted thread raises no desktop alert, attention group,
@@ -129,8 +133,7 @@ its own, and **Unmute** is always in the same menu. The **Muted** filter lists
 muted threads. Mutes follow child-thread action preferences and live in the
 Host-synced `mutedThreads` setting, so every browser stays quiet; mutes saved
 in this browser by older versions are copied there once. Desktop notifications
-are opt-in in Sidebar settings and show the thread title. Unseen-completion
-state is saved in this browser.
+are opt-in in Sidebar settings and show the thread title.
 
 **Park vs mute.** Park files a finished thread away: it moves to the Parked
 section, is skipped by auto-archive, and stays parked until unparked, but its
@@ -142,8 +145,11 @@ Permission approvals and plan-review decisions use **Approval needed**;
 structured user-question requests use **Input needed**. Both use the Client's
 explicit Session pending-interaction status. Unknown interaction kinds and
 generic unstructured questions remain unclassified. **Turn finished**
-marks a completed turn not yet opened from the sidebar. Each category can be
-configured independently as a separate group or an inline thread-row label.
+marks an eligible completed turn with a local attention marker; selecting that
+thread from any route acknowledges it. The sidebar keeps the same completion
+dismissed while its seen marker is active, even if Host still reports it unread.
+Each category can be configured independently as a separate group or an inline
+thread-row label.
 Approval and Input default to groups; Turn finished defaults to an inline
 label. Each status has an independently configurable semantic color in Sidebar
 settings (Muted, Primary, Info, Success, Warning, or Danger); the default colors
@@ -153,8 +159,9 @@ Subagent attention is
 excluded from groups, labels, and desktop alerts by default; enable **Include
 subagent threads** in Sidebar settings to opt in. An unresolved request stays
 available in its conversation composer and returns to its configured attention
-display when that thread is no longer selected. Opening a finished thread clears
-its local completion marker. Completion alerts are observable only while the
+display when that thread is no longer selected. The seen marker clears when Host
+reports completion unread as false or reports a fresh completion unread, so a
+later turn can surface normally. Completion alerts are observable only while the
 DSH page is connected, so offline completion notifications are not replayed
 after reconnect. A failed latest turn shows a destructive dot and **Failed · time**
 in its row, using its durable turn-end timestamp. The row exposes failure time,
