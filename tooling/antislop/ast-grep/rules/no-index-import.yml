@@ -1,0 +1,9 @@
+id: no-index-import
+language: TypeScript
+message: Import the named implementation or explicit public export file, never an index.ts module.
+severity: error
+rule:
+  kind: import_statement
+  has:
+    field: source
+    regex: "index\\.ts"

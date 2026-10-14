@@ -1,0 +1,9 @@
+id: no-internal-export-boundary-import
+language: TypeScript
+message: Internal modules must import named implementation files, not a package mod.ts barrel.
+severity: error
+rule:
+  kind: import_statement
+  has:
+    field: source
+    regex: "mod\\.ts"

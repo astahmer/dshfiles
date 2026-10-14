@@ -79,7 +79,11 @@ wait for the `memory` and `usage` plugins to land.
 - [ ] 2. `refactor`: fix the 126 low-count antislop sites (broad-object 8,
       reflect-apply 10, reflect-get 28, passthrough 38, chained assertions 42),
       one revision per rule, then promote each to `error`.
-- [ ] 3. `chore(lint)`: vendor emilint ast-grep rules, `sgconfig.yml`, `pnpm sg`.
+- [x] 3. `chore(lint)`: vendor emilint ast-grep rules, `sgconfig.yml`, `pnpm sg`.
+      Rules in `tooling/antislop/ast-grep/rules/`, `@ast-grep/cli 0.45.3`,
+      ratcheted by `pnpm lint`. Caps at landing: `JSON.parse` 177 (+1 tsx),
+      `export … from` 172, nested ternary 27 + 26 tsx, `export *` 3, raw
+      `response.json()` cast 1; every other rule is an error.
 - [ ] 4. `refactor(plugin-ui)`: named `machine` exports. `docs`: shared skills in
       `AGENTS.md`, link `actor-state-ownership` from `plugin-state`.
 - [ ] 5. `chore(knip)`: `plugins/knip.jsonc`, report-only.

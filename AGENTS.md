@@ -208,8 +208,9 @@ A plugin that installs is not a plugin that works.
 From `plugins/`: `pnpm run contract`, `pnpm run build`, `pnpm run typecheck`,
 `pnpm run test` (the order `check:plugins` uses). The root `pnpm run check`
 adds dshx, desktop, scripts, web-profile contract, `lint` and `fmt:check`.
-`lint` is a ratchet: any error, or a rule exceeding its warning cap in
-`scripts/lint-ratchet.json`, fails; lower a cap when you fix sites, never raise it.
+`lint` ratchets Oxlint and the ast-grep rules (`pnpm sg`): any error, or a
+rule exceeding its cap in `scripts/lint-ratchet.json`, fails; lower a cap when
+you fix sites, never raise it.
 `pnpm run check:diff` lints and format-checks only the paths your revision
 touches, and `pnpm run check:green` runs everything except lint/format.
 

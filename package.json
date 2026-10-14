@@ -11,7 +11,8 @@
     "check": "pnpm run check:green && pnpm run lint && pnpm run fmt:check",
     "check:green": "pnpm run typecheck:scripts && pnpm run test:web-profile-contract && pnpm run verify:web-profile-contract && pnpm run check:dshx && pnpm run check:plugins && pnpm run check:desktop",
     "check:diff": "node scripts/check-diff.mjs",
-    "lint": "node scripts/lint-ratchet.ts",
+    "lint": "node scripts/lint-ratchet.ts oxlint && node scripts/lint-ratchet.ts ast-grep",
+    "sg": "ast-grep scan tooling/dshx/packages plugins scripts apps/desktop/src",
     "fmt": "oxfmt tooling/dshx/packages plugins scripts apps/desktop/src --config .oxfmtrc.json",
     "fmt:check": "oxfmt --check tooling/dshx/packages plugins scripts apps/desktop/src --config .oxfmtrc.json",
     "check:plugin-boot": "pnpm --dir tooling/dshx run test:boot",
@@ -23,6 +24,7 @@
     "check:desktop": "pnpm --dir apps/desktop run typecheck"
   },
   "devDependencies": {
+    "@ast-grep/cli": "0.45.3",
     "@deepseek-ai/cordis": "4.0.4",
     "@deepseek-ai/dsh-typert-generator": "0.2.0-rc.2",
     "@types/node": "^22.20.5",

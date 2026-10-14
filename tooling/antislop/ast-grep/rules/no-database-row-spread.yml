@@ -1,0 +1,6 @@
+id: no-database-row-spread
+language: TypeScript
+message: Do not spread a database row or caller-controlled record into an output object; enumerate the fields that cross the boundary.
+severity: error
+rule:
+  pattern: return { ...$ROW, $$$PROPERTIES };

@@ -1,0 +1,6 @@
+id: no-wildcard-export
+language: TypeScript
+message: Implementation modules must not use wildcard forwarding; configure explicit public boundary files as the only exceptions.
+severity: error
+rule:
+  pattern: export * from '$SOURCE'

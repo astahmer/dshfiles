@@ -1,0 +1,13 @@
+id: no-raw-response-json-assertion
+language: TypeScript
+message: Decode response JSON with a runtime schema or validated parser instead of asserting its raw type.
+severity: error
+rule:
+  pattern: (await $RESPONSE.json()) as $TYPE
+---
+id: no-raw-response-json-assertion-tsx
+language: Tsx
+message: Decode response JSON with a runtime schema or validated parser instead of asserting its raw type.
+severity: error
+rule:
+  pattern: (await $RESPONSE.json()) as $TYPE

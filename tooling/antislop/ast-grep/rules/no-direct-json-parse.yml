@@ -1,0 +1,13 @@
+id: no-direct-json-parse
+language: TypeScript
+message: Decode untrusted or transport JSON through the repository's validated parser instead of calling JSON.parse directly.
+severity: error
+rule:
+  pattern: JSON.parse($INPUT)
+---
+id: no-direct-json-parse-tsx
+language: Tsx
+message: Decode untrusted or transport JSON through the repository's validated parser instead of calling JSON.parse directly.
+severity: error
+rule:
+  pattern: JSON.parse($INPUT)

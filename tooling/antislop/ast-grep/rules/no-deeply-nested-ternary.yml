@@ -1,0 +1,13 @@
+id: no-deeply-nested-ternary
+language: TypeScript
+message: Replace three-or-more-level cascading ternaries with a Record, switch, or explicit state branches.
+severity: error
+rule:
+  pattern: "$A ? $B : $C ? $D : $E ? $F : $G"
+---
+id: no-deeply-nested-ternary-tsx
+language: Tsx
+message: Replace three-or-more-level cascading ternaries with a Record, switch, or explicit state branches.
+severity: error
+rule:
+  pattern: "$A ? $B : $C ? $D : $E ? $F : $G"

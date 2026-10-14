@@ -1,0 +1,9 @@
+id: no-export-from
+language: TypeScript
+message: Implementation modules must not forward exports; configure explicit public boundary files as the only exceptions.
+severity: error
+rule:
+  kind: export_statement
+  has:
+    field: source
+    kind: string
