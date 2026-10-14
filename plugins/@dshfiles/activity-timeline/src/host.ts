@@ -1,6 +1,5 @@
 import type { Context, Effect } from '@deepseek-ai/cordis'
-import type { InferValue, ValueSchemaSpec } from '@deepseek-ai/dsh-tools'
-import { defineHost, defineTool } from '@dshfiles/dshx/host'
+import { defineHost } from '@dshfiles/dshx/host'
 import { z } from 'zod'
 import { communicationActivity, communicationMessage, integrationActivity, sessionActivity, workspaceActivity } from './adapters.js'
 import { activityTimelineApi } from './api.js'
@@ -13,80 +12,12 @@ declare module '@deepseek-ai/cordis' {
   }
 }
 
-const summaryOutputSchema = {
-  type: 'object',
-  additionalProperties: false,
-  properties: { summary: { type: 'string', required: true } },
-} satisfies ValueSchemaSpec
-
-const summaryOutput = {
-  schema: summaryOutputSchema,
-  render(_args: {}, value: InferValue<typeof summaryOutputSchema>) {
-    return [{ type: 'text' as const, text: value.summary }]
-  },
-}
-
 let service: ActivityTimelineService | undefined
 
 const requireService = (): ActivityTimelineService => {
   if (service === undefined) throw new Error('Activity timeline Host is not active.')
   return service
 }
-
-const pageTool = defineTool({
-  name: 'activity_timeline_page',
-  description:
-    'Read one condensed page of the unified agent activity timeline (session, communication, and jj integration events), oldest-to-newest within the page. Read-only; it never activates or messages an Agent. Continue older pages with next_cursor.',
-  parameters: {
-    cursor: { type: 'string', description: 'Opaque cursor from a previous page; omit for the newest page.' },
-    limit: { type: 'integer', description: 'Maximum condensed items, 1 to 200; defaults to 60.' },
-    search: { type: 'string', description: 'Case-insensitive literal search over event type, summary, and detail.' },
-    sessionId: { type: 'string', description: 'Only events for one Session id.' },
-    correlationId: { type: 'string', description: 'Only events sharing one correlation id.' },
-    detailed: { type: 'string', enum: ['true', 'false'], description: 'When true, return every retained event without condensation.' },
-  },
-  output: summaryOutput,
-  execute: async args => ({
-    summary: JSON.stringify(
-      await requireService().page({
-        ...(args.cursor === undefined ? {} : { cursor: args.cursor }),
-        ...(args.limit === undefined ? {} : { limit: args.limit }),
-        ...(args.search === undefined ? {} : { search: args.search }),
-        ...(args.sessionId === undefined ? {} : { sessionId: args.sessionId }),
-        ...(args.correlationId === undefined ? {} : { correlationId: args.correlationId }),
-        ...(args.detailed === undefined ? {} : { detailed: args.detailed === 'true' }),
-      }),
-    ),
-  }),
-})
-
-const attentionTool = defineTool({
-  name: 'activity_timeline_attention',
-  description:
-    'List retained events that need human attention (agent errors, blocked or failed integrations, missing workspaces, failed communication tool calls). Read-only.',
-  parameters: { limit: { type: 'integer', description: 'Maximum events, 1 to 100; defaults to 20.' } },
-  output: summaryOutput,
-  execute: async args => ({ summary: JSON.stringify({ events: await requireService().attention(args.limit ?? 20) }) }),
-})
-
-const statsTool = defineTool({
-  name: 'activity_timeline_stats',
-  description: 'Report retained activity counts by source plus duplicate and attention counts. Read-only.',
-  parameters: {},
-  output: summaryOutput,
-  execute: async () => ({ summary: JSON.stringify(await requireService().stats()) }),
-})
-
-const relatedTool = defineTool({
-  name: 'activity_timeline_related',
-  description: 'List retained events correlated with one activity event id. Read-only.',
-  parameters: {
-    eventId: { type: 'string', required: true },
-    limit: { type: 'integer', description: 'Maximum events, 1 to 100; defaults to 50.' },
-  },
-  output: summaryOutput,
-  execute: async args => ({ summary: JSON.stringify({ events: await requireService().related(args.eventId, args.limit ?? 50) }) }),
-})
 
 const api = activityTimelineApi.host({
   page: ({ input }) => requireService().page(input),
@@ -173,7 +104,6 @@ const host = defineHost({
   name: 'activity-timeline',
   inject: ['agents'],
   apis: [api],
-  tools: [pageTool, attentionTool, statsTool, relatedTool],
   setup: setupHost,
 })
 
