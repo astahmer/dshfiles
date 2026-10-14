@@ -244,8 +244,7 @@ export async function inspectProjectComposition(project: ResolvedDshxConfig, tar
       ...(profileLink === undefined ? {} : { profileLink }),
     }
   try {
-    const method =
-      target === 'slots' ? provider.listSlots : target === 'tools' ? provider.listTools : target === 'services' ? provider.listServices : provider.listEvents
+    const method = { slots: provider.listSlots, tools: provider.listTools, services: provider.listServices, events: provider.listEvents }[target]
     if (typeof method !== 'function')
       return {
         profile: project.profile,
@@ -276,14 +275,7 @@ export async function inspectProjectComposition(project: ResolvedDshxConfig, tar
     }
     let items: readonly SlotSummary[] | readonly ToolSummary[] | readonly ServiceSummary[] | readonly EventSummary[]
     try {
-      items =
-        target === 'slots'
-          ? normalizeSlots(raw)
-          : target === 'tools'
-            ? normalizeTools(raw)
-            : target === 'services'
-              ? normalizeServices(raw)
-              : normalizeEvents(raw)
+      items = { slots: normalizeSlots, tools: normalizeTools, services: normalizeServices, events: normalizeEvents }[target](raw)
     } catch (error) {
       return {
         profile: project.profile,

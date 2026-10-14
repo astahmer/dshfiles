@@ -132,17 +132,12 @@ function clientEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, op
         source === DSHX_SETTINGS_PUBLIC ||
         source === DSHX_CONVERSATION_PUBLIC
       ) {
-        return source === VIRTUAL_CLIENT_API_HOOKS || source === VIRTUAL_CLIENT_SETTINGS_HOOK
-          ? source
-          : source === DSHX_CLIENT_PUBLIC
-            ? VIRTUAL_CLIENT_PUBLIC
-            : source === DSHX_API_PUBLIC
-              ? `${VIRTUAL_CLIENT_PUBLIC}-api`
-              : source === DSHX_SETTINGS_PUBLIC
-                ? `${VIRTUAL_CLIENT_PUBLIC}-settings`
-                : source === DSHX_CONVERSATION_PUBLIC
-                  ? `${VIRTUAL_CLIENT_PUBLIC}-conversation`
-                  : VIRTUAL_CLIENT_ENTRY
+        if (source === VIRTUAL_CLIENT_API_HOOKS || source === VIRTUAL_CLIENT_SETTINGS_HOOK) return source
+        if (source === DSHX_CLIENT_PUBLIC) return VIRTUAL_CLIENT_PUBLIC
+        if (source === DSHX_API_PUBLIC) return `${VIRTUAL_CLIENT_PUBLIC}-api`
+        if (source === DSHX_SETTINGS_PUBLIC) return `${VIRTUAL_CLIENT_PUBLIC}-settings`
+        if (source === DSHX_CONVERSATION_PUBLIC) return `${VIRTUAL_CLIENT_PUBLIC}-conversation`
+        return VIRTUAL_CLIENT_ENTRY
       }
       return null
     },

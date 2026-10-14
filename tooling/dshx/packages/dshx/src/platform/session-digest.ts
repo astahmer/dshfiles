@@ -400,14 +400,9 @@ export const digestSession = (input: {
       const args = parseArguments(call.data.arguments)
       const result = results.get(call.data.callId)
       const exit = result === undefined || result.isError ? undefined : shellFailure(result.text)
-      const failure =
-        result === undefined
-          ? undefined
-          : result.isError
-            ? oneLine(stripRoot(resultHeadline(result.text, 'tool-error')), 160)
-            : exit === undefined
-              ? undefined
-              : oneLine(`${exit}: ${stripRoot(resultHeadline(result.text, 'shell-failure'))}`, 160)
+      let failure: string | undefined
+      if (result?.isError) failure = oneLine(stripRoot(resultHeadline(result.text, 'tool-error')), 160)
+      else if (result !== undefined && exit !== undefined) failure = oneLine(`${exit}: ${stripRoot(resultHeadline(result.text, 'shell-failure'))}`, 160)
       const status = result === undefined ? 'pending' : failure === undefined ? 'ok' : 'error'
       actions.push({
         ...at(event),

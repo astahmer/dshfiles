@@ -16,6 +16,12 @@ import { decodeQueuedRows, restoredIndex, type QueueEditor, type QueueEditView, 
 import { useQueueClientForEditing } from './session-queue-editor.js'
 import { queueReorderSettings } from './settings.js'
 
+const editStatusLabel = { editing: 'Editing', submitting: 'Saving', restoring: 'Restoring', failed: 'Not restored' } as const
+const editProgressText = {
+  restoring: 'Putting the original back in the queue…',
+  submitting: 'Saving the edited message to its place in the queue…',
+} as const
+
 // Inline instead of client.css so this plugin's sheet stays byte-identical to the shared plugin-ui sheet.
 const QUEUE_DOCK_STYLE: CSSProperties = {
   boxSizing: 'border-box',
@@ -200,9 +206,7 @@ export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
         data-queue-edit-placeholder=""
       >
         <PencilIcon className="dshx:size-3.5 dshx:flex-none dshx:text-muted-foreground" aria-hidden />
-        <span className="dshx:flex-none dshx:text-xs dshx:font-medium dshx:text-muted-foreground">
-          {record.status === 'restoring' ? 'Restoring' : record.status === 'submitting' ? 'Saving' : record.status === 'failed' ? 'Not restored' : 'Editing'}
-        </span>
+        <span className="dshx:flex-none dshx:text-xs dshx:font-medium dshx:text-muted-foreground">{editStatusLabel[record.status]}</span>
         <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-sm dshx:text-muted-foreground" title={placeholderPreview || undefined}>
           {placeholderPreview || attachmentsOf(record.blocks) || '—'}
         </span>
@@ -349,13 +353,11 @@ export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
           {record !== null && editor !== undefined ? (
             <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:border-t dshx:px-3 dshx:py-1" role="status" data-queue-edit-bar="">
               <span className="dshx:min-w-0 dshx:flex-1 dshx:text-xs dshx:text-muted-foreground">
-                {record.status === 'failed'
-                  ? record.error
-                  : record.status === 'restoring'
-                    ? 'Putting the original back in the queue…'
-                    : record.status === 'submitting'
-                      ? 'Saving the edited message to its place in the queue…'
-                      : (record.error ?? 'Editing a queued message in the composer. Submit puts it back in place; Esc cancels.')}
+                {record.status === 'restoring' || record.status === 'submitting'
+                  ? editProgressText[record.status]
+                  : record.status === 'failed'
+                    ? record.error
+                    : (record.error ?? 'Editing a queued message in the composer. Submit puts it back in place; Esc cancels.')}
               </span>
               {record.status === 'failed' ? (
                 <>

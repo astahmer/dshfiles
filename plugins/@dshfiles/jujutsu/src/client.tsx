@@ -471,17 +471,12 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     const current = pendingFocusIndex.current ?? Number(event.target.closest('[data-index]')?.getAttribute('data-index'))
     if (!Number.isInteger(current)) return
     const last = listItems.length - 1
-    const next =
-      event.key === 'ArrowDown'
-        ? Math.min(current + 1, last)
-        : event.key === 'ArrowUp'
-          ? Math.max(current - 1, 0)
-          : event.key === 'Home'
-            ? 0
-            : event.key === 'End'
-              ? last
-              : null
-    if (next === null) return
+    let next: number | undefined
+    if (event.key === 'ArrowDown') next = Math.min(current + 1, last)
+    else if (event.key === 'ArrowUp') next = Math.max(current - 1, 0)
+    else if (event.key === 'Home') next = 0
+    else if (event.key === 'End') next = last
+    if (next === undefined) return
     event.preventDefault()
     pendingFocusIndex.current = next
     listVirtualizer.scrollToIndex(next, { align: 'auto' })
@@ -600,14 +595,9 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     }
   }
 
-  const lastPushLabel =
-    state === undefined
-      ? ''
-      : state.lastPushAt
-        ? formatAge(state.lastPushAt) + (state.lastPushHistoryTruncated ? ' · scan limited' : '')
-        : state.lastPushHistoryTruncated
-          ? 'not found before the operation-history limit'
-          : 'not found in the latest 1,000 operations'
+  const missingPushLabel = state?.lastPushHistoryTruncated ? 'not found before the operation-history limit' : 'not found in the latest 1,000 operations'
+  const foundPushLabel = state?.lastPushAt ? formatAge(state.lastPushAt) + (state.lastPushHistoryTruncated ? ' · scan limited' : '') : missingPushLabel
+  const lastPushLabel = state === undefined ? '' : foundPushLabel
 
   const revisionMenu = (revision: Revision): ReactNode => {
     const parent = revisionsByCommitId.get(revision.parents[0] ?? '')

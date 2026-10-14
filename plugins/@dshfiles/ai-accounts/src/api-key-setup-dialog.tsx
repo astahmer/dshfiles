@@ -164,9 +164,10 @@ export const ApiKeySetupDialog = (props: {
             <p className="dshx:break-all dshx:text-xs dshx:text-muted-foreground">
               {cwd === null ? 'Showing global entries.' : `Showing entries for ${cwd}; project and local entries require the selected folder.`}
             </p>
-            {!validCredentialRef ? null : catalogQuery.isFetching ? (
+            {validCredentialRef && catalogQuery.isFetching ? (
               <p className="dshx:text-sm dshx:text-muted-foreground">Loading value-free Secret Catalog metadata…</p>
-            ) : catalogAvailable ? (
+            ) : null}
+            {!validCredentialRef || catalogQuery.isFetching ? null : catalogAvailable ? (
               catalogKeys.length > 0 ? (
                 <>
                   <label className="dshx:text-sm" htmlFor="ai-account-secret-catalog-entry">

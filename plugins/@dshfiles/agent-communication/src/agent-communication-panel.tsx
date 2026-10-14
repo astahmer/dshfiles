@@ -238,7 +238,7 @@ const DiagnosticPanel = (props: {
                     ) : null}
                   </div>
                 </div>
-                {agent.workspaceTopic === null ? null : agent.workspaceOptedOut || agent.workspaceSubscribed === false ? (
+                {agent.workspaceTopic !== null && (agent.workspaceOptedOut || agent.workspaceSubscribed === false) ? (
                   <Button
                     size="sm"
                     variant="outline"
@@ -247,7 +247,8 @@ const DiagnosticPanel = (props: {
                   >
                     {t('rejoin')}
                   </Button>
-                ) : agent.workspaceSubscribed === true ? (
+                ) : null}
+                {agent.workspaceTopic !== null && !agent.workspaceOptedOut && agent.workspaceSubscribed === true ? (
                   <Button
                     size="sm"
                     variant="outline"

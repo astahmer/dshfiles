@@ -80,21 +80,22 @@ export const RuntimePathsSection = (props: {
     accountKind: draft.kind,
   })
   const configureLabel = credentialInfo?.configured === true ? 'Replace or import key…' : 'Set up key…'
-  const credentialStatus = !isKeyEnvName(credentialRef)
-    ? 'Choose a name ending in _API_KEY, then use Set up key to add a value or import it from Secret Catalog. The secret value never goes in account JSON.'
-    : props.state.credentialInfoLoading
-      ? 'Checking credential status…'
-      : credentialInfo?.configured === true
-        ? credentialInfo.source === 'env'
-          ? 'Using the Host environment. To change this key, update that environment value and restart DSH; environment values take precedence over saved credentials.'
-          : `Key is available from ${credentialInfo.source ?? 'a DSH credential source'}. You can replace or import it below; changes apply to the next request.`
-        : credentialInfo?.configured === false && !credentialInfo.writable
-          ? 'This key comes from a read-only source. Change the source itself; saved-key setup is unavailable for this reference.'
-          : credentialInfo?.configured === false
-            ? 'No key is saved yet. Use Set up key to enter one or import it from Secret Catalog.'
-            : props.state.credentialInfoUnavailable
-              ? 'Credential status is unavailable. Check that DSH credential management is enabled; setup actions stay disabled until the source can be verified.'
-              : 'Credential status is not available yet.'
+  let credentialStatus = 'Credential status is not available yet.'
+  if (!isKeyEnvName(credentialRef))
+    credentialStatus =
+      'Choose a name ending in _API_KEY, then use Set up key to add a value or import it from Secret Catalog. The secret value never goes in account JSON.'
+  else if (props.state.credentialInfoLoading) credentialStatus = 'Checking credential status…'
+  else if (credentialInfo?.configured === true)
+    credentialStatus =
+      credentialInfo.source === 'env'
+        ? 'Using the Host environment. To change this key, update that environment value and restart DSH; environment values take precedence over saved credentials.'
+        : `Key is available from ${credentialInfo.source ?? 'a DSH credential source'}. You can replace or import it below; changes apply to the next request.`
+  else if (credentialInfo?.configured === false && !credentialInfo.writable)
+    credentialStatus = 'This key comes from a read-only source. Change the source itself; saved-key setup is unavailable for this reference.'
+  else if (credentialInfo?.configured === false) credentialStatus = 'No key is saved yet. Use Set up key to enter one or import it from Secret Catalog.'
+  else if (props.state.credentialInfoUnavailable)
+    credentialStatus =
+      'Credential status is unavailable. Check that DSH credential management is enabled; setup actions stay disabled until the source can be verified.'
   return (
     <NumberedSection
       actions={

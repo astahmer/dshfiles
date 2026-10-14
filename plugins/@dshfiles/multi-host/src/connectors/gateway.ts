@@ -210,14 +210,8 @@ const followOnce = async ({
       resetTimeout()
     })
     socket.on('message', data => {
-      const text =
-        typeof data === 'string'
-          ? data
-          : Buffer.isBuffer(data)
-            ? data.toString('utf8')
-            : Array.isArray(data)
-              ? Buffer.concat(data).toString('utf8')
-              : Buffer.from(data).toString('utf8')
+      const chunk = Array.isArray(data) ? Buffer.concat(data) : data
+      const text = typeof chunk === 'string' ? chunk : Buffer.isBuffer(chunk) ? chunk.toString('utf8') : Buffer.from(chunk).toString('utf8')
       let raw: unknown
       try {
         raw = JSON.parse(text)

@@ -126,6 +126,12 @@ const layoutFor = (profile: AccountDraft, file: AccountStoreFile) => codexLayout
 const defaultName = (draft: AccountDraft): string =>
   draft.displayName.trim().length > 0 ? draft.displayName.trim() : `${KIND_LABEL[draft.kind]} (${draft.instanceId})`
 
+const profileState = (facts: { readonly enabled: boolean; readonly cooling: boolean; readonly signedIn: boolean }): AccountProfile['state'] => {
+  if (!facts.enabled) return 'disabled'
+  if (facts.cooling) return 'cooling'
+  return facts.signedIn ? 'healthy' : 'unconfigured'
+}
+
 const observed = (
   draft: AccountDraft,
   facts: Pick<AccountProfile, 'signedIn' | 'identity' | 'plan' | 'loginHint' | 'detail'> & { readonly cooling: boolean },
@@ -136,7 +142,7 @@ const observed = (
   signedIn: facts.signedIn,
   identity: facts.identity,
   plan: facts.plan,
-  state: !draft.enabled ? 'disabled' : facts.cooling ? 'cooling' : facts.signedIn ? 'healthy' : 'unconfigured',
+  state: profileState({ enabled: draft.enabled, cooling: facts.cooling, signedIn: facts.signedIn }),
   loginHint: facts.loginHint,
   detail: facts.detail,
 })
@@ -244,7 +250,7 @@ const observe = async (
     signedIn: auth.signedIn,
     identity: auth.identity ?? null,
     plan: auth.plan ?? null,
-    state: !draft.enabled ? 'disabled' : cooling ? 'cooling' : auth.signedIn ? 'healthy' : 'unconfigured',
+    state: profileState({ enabled: draft.enabled, cooling, signedIn: auth.signedIn }),
     loginHint: `CODEX_HOME="${layout.effectiveHomePath}" codex login`,
     detail: auth.error ?? null,
   }

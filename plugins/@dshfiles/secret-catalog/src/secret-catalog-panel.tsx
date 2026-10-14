@@ -231,15 +231,10 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
       afterMutation(input.target === 'alias' ? t('removedAlias', { alias: input.row.alias }) : t('deletedItem', { alias: input.row.alias })),
   })
   const mutationPending = createMutation.isPending || updateMutation.isPending || removeMutation.isPending
-  const mutationError = createMutation.isError
-    ? t('addFailed')
-    : updateMutation.isError
-      ? t('updateFailed')
-      : removeMutation.isError
-        ? removeMutation.variables.target === 'alias'
-          ? t('removeAliasFailed')
-          : t('deleteItemFailed')
-        : null
+  let mutationError: string | null = null
+  if (createMutation.isError) mutationError = t('addFailed')
+  else if (updateMutation.isError) mutationError = t('updateFailed')
+  else if (removeMutation.isError) mutationError = removeMutation.variables.target === 'alias' ? t('removeAliasFailed') : t('deleteItemFailed')
   const resetMutations = (): void => {
     createMutation.reset()
     updateMutation.reset()

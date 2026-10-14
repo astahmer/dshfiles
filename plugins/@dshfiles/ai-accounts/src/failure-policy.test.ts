@@ -23,15 +23,10 @@ const climb = (input: {
     progress = decision.progress
     const step = decision.step
     if (step.kind === 'failover') targets.shift()
-    steps.push(
-      step.kind === 'retry' || step.kind === 'wait'
-        ? `${step.kind}:${String(step.delayMs)}`
-        : step.kind === 'failover'
-          ? `failover:${step.to}`
-          : step.kind === 'give-up'
-            ? `give-up:${step.then}`
-            : step.kind,
-    )
+    if (step.kind === 'retry' || step.kind === 'wait') steps.push(`${step.kind}:${String(step.delayMs)}`)
+    else if (step.kind === 'failover') steps.push(`failover:${step.to}`)
+    else if (step.kind === 'give-up') steps.push(`give-up:${step.then}`)
+    else steps.push(step.kind)
     if (step.kind === 'give-up') return steps
   }
   throw new Error('policy never gave up')

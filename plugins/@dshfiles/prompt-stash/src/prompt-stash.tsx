@@ -15,10 +15,18 @@ import {
   removeDraft,
   saveDraft,
   sentPromptFromNode,
+  type DraftSaveBlock,
   type DraftStore,
   type SavedDraft,
   type SentPrompt,
 } from './draft-store.js'
+
+const draftBlockMessage = {
+  'rich-content': 'Remove reference chips and attachments before saving a text-only draft.',
+  'too-long': 'This draft is too long to save.',
+  busy: 'Wait for the current composer action to finish.',
+  empty: 'Enter text before saving a draft.',
+} as const satisfies Record<DraftSaveBlock, string>
 
 const readStore = (): DraftStore => {
   try {
@@ -79,15 +87,7 @@ export const PromptStashAction = (props: ComposerActionProps): JSX.Element => {
 
   const saveCurrent = (): void => {
     if (block !== null) {
-      setMessage(
-        block === 'rich-content'
-          ? 'Remove reference chips and attachments before saving a text-only draft.'
-          : block === 'too-long'
-            ? 'This draft is too long to save.'
-            : block === 'busy'
-              ? 'Wait for the current composer action to finish.'
-              : 'Enter text before saving a draft.',
-      )
+      setMessage(draftBlockMessage[block])
       return
     }
     const result = saveDraft(store, {

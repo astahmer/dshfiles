@@ -458,26 +458,14 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
     )
   }
 
-  const contentStatus =
-    view !== 'content'
-      ? null
-      : props.searchContent === null || content.status === 'failed'
-        ? props.copy.contentUnavailable
-        : content.status === 'searching'
-          ? props.copy.contentSearching
-          : null
-  const filesStatus =
-    view !== 'files'
-      ? null
-      : workspaceFiles.status === 'unavailable'
-        ? props.copy.filesUnavailable
-        : workspaceFiles.status === 'no-session'
-          ? props.copy.filesNoSession
-          : workspaceFiles.status === 'loading' || workspaceFiles.status === 'indexing'
-            ? props.copy.filesIndexing
-            : workspaceFiles.truncated
-              ? props.copy.filesTruncated
-              : null
+  let contentStatus: string | null = null
+  if (view === 'content' && (props.searchContent === null || content.status === 'failed')) contentStatus = props.copy.contentUnavailable
+  else if (view === 'content' && content.status === 'searching') contentStatus = props.copy.contentSearching
+  let filesStatus: string | null = null
+  if (view === 'files' && workspaceFiles.status === 'unavailable') filesStatus = props.copy.filesUnavailable
+  else if (view === 'files' && workspaceFiles.status === 'no-session') filesStatus = props.copy.filesNoSession
+  else if (view === 'files' && (workspaceFiles.status === 'loading' || workspaceFiles.status === 'indexing')) filesStatus = props.copy.filesIndexing
+  else if (view === 'files' && workspaceFiles.truncated) filesStatus = props.copy.filesTruncated
 
   return (
     <Dialog open onOpenChange={(open: boolean) => (open ? undefined : props.onClose())}>

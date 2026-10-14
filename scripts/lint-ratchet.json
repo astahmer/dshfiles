@@ -11,17 +11,16 @@
     "antislop(no-unknown-parameters)": 211,
     "antislop(no-unknown-returns)": 120,
     "antislop(no-unsafe-dictionary-type)": 255,
-    "antislop(require-safety-comment-for-type-assertion)": 419,
+    "antislop(require-safety-comment-for-type-assertion)": 418,
     "react-hooks(exhaustive-deps)": 26,
     "react(purity)": 10
   },
   "ast-grep": {
-    "no-deeply-nested-ternary": 27,
-    "no-deeply-nested-ternary-tsx": 26,
+    "no-deeply-nested-ternary": 12,
+    "no-deeply-nested-ternary-tsx": 3,
     "no-direct-json-parse": 177,
     "no-direct-json-parse-tsx": 1,
     "no-export-from": 172,
-    "no-raw-response-json-assertion": 1,
     "no-wildcard-export": 3
   }
 }

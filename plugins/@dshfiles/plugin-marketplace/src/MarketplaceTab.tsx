@@ -294,7 +294,8 @@ const PluginCard = ({
   readonly t: Translate
   readonly onDownload: () => void
 }): ReactNode => {
-  const label = plugin.installed ? t('installed') : installing ? t('downloading') : failed ? t('retry') : t('download')
+  const downloadLabel = failed ? t('retry') : t('download')
+  const label = plugin.installed ? t('installed') : installing ? t('downloading') : downloadLabel
   const accessibleLabel = plugin.installed ? `${plugin.name}: ${label}` : interpolate(t(failed ? 'retryPlugin' : 'downloadPlugin'), { name: plugin.name })
 
   return (

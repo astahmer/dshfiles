@@ -49,15 +49,14 @@ const QuotaRetryMessageContent = (props: { readonly sessionId: string }): JSX.El
   if (!showChoice) return null
 
   const knownReset = continuation !== undefined && continuation.resetAt !== null
-  const status = continuationsQuery.isError
-    ? 'Quota exhausted. Retry when your provider limit resets.'
-    : continuation === undefined
-      ? continuationsQuery.isFetching
-        ? 'Quota exhausted. Recovery details are loading.'
-        : 'Quota exhausted. Reset details are unavailable; retry manually.'
-      : knownReset
-        ? `Your current account's usage limit is exhausted. It resets ${resetLabel(continuation.resetAt ?? 0)}.`
-        : "Your current account's usage limit is exhausted. Reset time is unknown; automatic retry is unavailable."
+  const exhaustedStatus = knownReset
+    ? `Your current account's usage limit is exhausted. It resets ${resetLabel(continuation.resetAt ?? 0)}.`
+    : "Your current account's usage limit is exhausted. Reset time is unknown; automatic retry is unavailable."
+  const pendingStatus = continuationsQuery.isFetching
+    ? 'Quota exhausted. Recovery details are loading.'
+    : 'Quota exhausted. Reset details are unavailable; retry manually.'
+  const recoveryStatus = continuation === undefined ? pendingStatus : exhaustedStatus
+  const status = continuationsQuery.isError ? 'Quota exhausted. Retry when your provider limit resets.' : recoveryStatus
 
   return (
     <div className="dshx-root dshx:mt-2 dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-md dshx:border dshx:border-warning/40 dshx:bg-warning/10 dshx:px-3 dshx:py-2.5">

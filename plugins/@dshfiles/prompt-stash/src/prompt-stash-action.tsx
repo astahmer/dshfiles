@@ -22,7 +22,14 @@ import {
   type PromptLibraryRead,
   type SavedPrompt,
 } from './library.js'
-import { draftSaveBlock } from './draft-store.js'
+import { draftSaveBlock, type DraftSaveBlock } from './draft-store.js'
+
+const draftBlockNotice = {
+  busy: 'Wait for the current composer action to finish.',
+  empty: 'Enter text before saving a prompt.',
+  'rich-content': 'Saved prompts are text-only. Remove attachments and references first.',
+  'too-long': 'The composer text is too long to save as a prompt.',
+} as const satisfies Record<DraftSaveBlock, string>
 
 type LibraryState = 'loading' | 'ready' | 'invalid' | 'unavailable'
 
@@ -223,15 +230,7 @@ const PromptStashAction = (props: ComposerActionProps): JSX.Element => {
 
   const saveCurrentPrompt = (): void => {
     if (currentDraftBlock !== null) {
-      setNotice(
-        currentDraftBlock === 'busy'
-          ? 'Wait for the current composer action to finish.'
-          : currentDraftBlock === 'empty'
-            ? 'Enter text before saving a prompt.'
-            : currentDraftBlock === 'rich-content'
-              ? 'Saved prompts are text-only. Remove attachments and references first.'
-              : 'The composer text is too long to save as a prompt.',
-      )
+      setNotice(draftBlockNotice[currentDraftBlock])
       return
     }
     if (input.draft.length > MAX_PROMPT_TEXT_LENGTH) {

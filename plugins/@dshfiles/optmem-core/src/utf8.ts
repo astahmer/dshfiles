@@ -1,5 +1,10 @@
 const isHighSurrogate = (code: number): boolean => code >= 0xd800 && code <= 0xdbff
 const isLowSurrogate = (code: number): boolean => code >= 0xdc00 && code <= 0xdfff
+const encodedSize = (code: number, pair: boolean): number => {
+  if (code < 0x80) return 1
+  if (code < 0x800) return 2
+  return pair ? 4 : 3
+}
 
 /** UTF-8 byte arithmetic on JS strings without TextEncoder, so the core stays runtime-agnostic. */
 export class Utf8 {
@@ -26,7 +31,7 @@ export class Utf8 {
     while (index < text.length) {
       const code = text.charCodeAt(index)
       const pair = isHighSurrogate(code) && isLowSurrogate(text.charCodeAt(index + 1))
-      const size = code < 0x80 ? 1 : code < 0x800 ? 2 : pair ? 4 : 3
+      const size = encodedSize(code, pair)
       if (bytes + size > maxBytes) break
       bytes += size
       index += pair ? 2 : 1
@@ -41,7 +46,7 @@ export class Utf8 {
     while (index > 0) {
       const code = text.charCodeAt(index - 1)
       const pair = isLowSurrogate(code) && index > 1 && isHighSurrogate(text.charCodeAt(index - 2))
-      const size = code < 0x80 ? 1 : code < 0x800 ? 2 : pair ? 4 : 3
+      const size = encodedSize(code, pair)
       if (bytes + size > maxBytes) break
       bytes += size
       index -= pair ? 2 : 1

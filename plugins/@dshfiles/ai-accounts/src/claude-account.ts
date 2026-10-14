@@ -119,13 +119,9 @@ export const describeClaudeAuth = async (input: {
   const hasKey = named.length > 0
   const credential = login.kind === 'signed-in' ? login.credential : undefined
   const expired = credential?.expiresAt !== undefined && credential.expiresAt <= input.now
-  const detail = hasKey
-    ? undefined
-    : expired
-      ? 'The Claude Code login has expired. Run Claude Code once on this account to refresh it.'
-      : login.kind === 'signed-out'
-        ? signedOutMessage(input.configDir)
-        : undefined
+  const signedOutDetail = login.kind === 'signed-out' ? signedOutMessage(input.configDir) : undefined
+  const loginDetail = expired ? 'The Claude Code login has expired. Run Claude Code once on this account to refresh it.' : signedOutDetail
+  const detail = hasKey ? undefined : loginDetail
   return { signedIn: hasKey || (credential !== undefined && !expired), identity, plan: credential?.plan, detail }
 }
 

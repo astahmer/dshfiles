@@ -120,15 +120,11 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
     mutationFn: (variables: { readonly parent: string; readonly name: string }) => props.directoryPicker.createDirectory(variables.parent, variables.name),
   })
   const busy = props.disabled === true || listingQuery.isFetching || pickMutation.isPending || registerMutation.isPending || createMutation.isPending
-  const error = pickMutation.isError
-    ? 'The folder picker is unavailable on this Host.'
-    : registerMutation.isError
-      ? 'This folder could not be registered as a project.'
-      : createMutation.isError
-        ? 'This folder could not be created.'
-        : listingQuery.isError
-          ? 'This folder could not be opened.'
-          : null
+  let error: string | null = null
+  if (pickMutation.isError) error = 'The folder picker is unavailable on this Host.'
+  else if (registerMutation.isError) error = 'This folder could not be registered as a project.'
+  else if (createMutation.isError) error = 'This folder could not be created.'
+  else if (listingQuery.isError) error = 'This folder could not be opened.'
 
   useEffect(() => () => pickRequest.current?.abort(), [])
 

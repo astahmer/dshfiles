@@ -215,24 +215,26 @@ export default definePlugin({
           ] as const,
       )
 
+      const upstreamFor = (id: string, route: Route) => {
+        if (route.kind === CODEX_KIND) {
+          return withLunaReserve({
+            upstream: codexUpstream,
+            onReserve: () =>
+              readLunaReserveRouting() &&
+              (lunaReserveHeld(id, Date.now()) ||
+                shouldUseLunaReserve(runtime.usageCache?.latest()?.cards.find(card => card.instanceId === id)?.usage, Date.now())),
+          })
+        }
+        if (route.kind === CLAUDE_KIND) return claudeUpstream
+        if (route.kind === GITHUB_COPILOT_KIND) return githubCopilotUpstream
+        return keyedUpstream(route)
+      }
+
       return new Map<string, ResolvedPiAiProviderProfile>(
         enabled.map(([id, route]) => [
           id,
           buildProfile({
-            upstream:
-              route.kind === CODEX_KIND
-                ? withLunaReserve({
-                    upstream: codexUpstream,
-                    onReserve: () =>
-                      readLunaReserveRouting() &&
-                      (lunaReserveHeld(id, Date.now()) ||
-                        shouldUseLunaReserve(runtime.usageCache?.latest()?.cards.find(card => card.instanceId === id)?.usage, Date.now())),
-                  })
-                : route.kind === CLAUDE_KIND
-                  ? claudeUpstream
-                  : route.kind === GITHUB_COPILOT_KIND
-                    ? githubCopilotUpstream
-                    : keyedUpstream(route),
+            upstream: upstreamFor(id, route),
             provider: id,
             displayName: route.displayName,
             reasoningDefaults: reasoningPins.find(([instanceId]) => instanceId === id)?.[1],
@@ -724,14 +726,10 @@ const retryNotice = (
   const from = context.label(action.account)
   const cause = context.failure.message.slice(0, NOTICE_MESSAGE_CHARS)
   const step = action.step
-  const failure: LlmFailure =
-    step.kind === 'failover'
-      ? { message: `Switched from ${from} to ${context.label(step.to)} after: ${cause}`, code: 'ACCOUNT_FAILOVER' }
-      : step.kind === 'luna-reserve'
-        ? { message: `Continuing ${from} on Luna Reserve after: ${cause}`, code: 'LUNA_RESERVE' }
-        : step.kind === 'shrink'
-          ? { message: `Retrying ${from} with earlier images as file placeholders after: ${cause}`, code: 'REQUEST_SHRUNK' }
-          : { ...context.failure, message: `${from}: ${cause}` }
+  let failure: LlmFailure = { ...context.failure, message: `${from}: ${cause}` }
+  if (step.kind === 'failover') failure = { message: `Switched from ${from} to ${context.label(step.to)} after: ${cause}`, code: 'ACCOUNT_FAILOVER' }
+  if (step.kind === 'luna-reserve') failure = { message: `Continuing ${from} on Luna Reserve after: ${cause}`, code: 'LUNA_RESERVE' }
+  if (step.kind === 'shrink') failure = { message: `Retrying ${from} with earlier images as file placeholders after: ${cause}`, code: 'REQUEST_SHRUNK' }
   return {
     retryId: context.retryId,
     turn: context.turn,

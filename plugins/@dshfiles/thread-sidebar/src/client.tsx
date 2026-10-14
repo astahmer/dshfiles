@@ -147,6 +147,12 @@ type ThreadSidebarProps = Pick<WorkspaceBrowserProps, 'open' | 'useSessions' | '
   }
 
 type ThreadSidebarTranslate = ThreadSidebarProps['tSidebar']
+const emptyThreadsMessage = {
+  all: 'threadSidebarEmpty',
+  working: 'threadSidebarNoWorkingThreads',
+  attention: 'threadSidebarNoAttentionThreads',
+  archived: 'threadSidebarNoArchivedThreads',
+} as const satisfies Record<ThreadStatusFilter, string>
 type AttentionDisplayPreferenceKey = 'approvalNeededDisplay' | 'inputNeededDisplay' | 'turnFinishedDisplay'
 
 const attentionPreferenceRows: readonly {
@@ -2154,15 +2160,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
             : groupedThreadEntries.every(group => group.threads.length === 0)) ? (
             <Empty className="dshx:gap-2 dshx:p-6 dshx:md:p-6">
               <EmptyTitle className="dshx:text-sm dshx:font-normal dshx:text-muted-foreground">
-                {props.tSidebar(
-                  threadView.statusFilter === 'working'
-                    ? 'threadSidebarNoWorkingThreads'
-                    : threadView.statusFilter === 'attention'
-                      ? 'threadSidebarNoAttentionThreads'
-                      : threadView.statusFilter === 'archived'
-                        ? 'threadSidebarNoArchivedThreads'
-                        : 'threadSidebarEmpty',
-                )}
+                {props.tSidebar(emptyThreadsMessage[threadView.statusFilter])}
               </EmptyTitle>
             </Empty>
           ) : null}

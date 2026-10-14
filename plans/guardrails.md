@@ -84,6 +84,22 @@ wait for the `memory` and `usage` plugins to land.
       ratcheted by `pnpm lint`. Caps at landing: `JSON.parse` 177 (+1 tsx),
       `export … from` 172, nested ternary 27 + 26 tsx, `export *` 3, raw
       `response.json()` cast 1; every other rule is an error.
+      Fixed outside in-progress areas: the raw `response.json()` cast (rule now
+      an error) and 38 nested ternaries.
+
+## Deferred sites
+
+Files other workspaces are changing; fix them, lower the cap, and promote the
+rule to `error` once those land.
+
+- **Nested ternary** (caps 12 + 3 tsx):
+  - `plugins/@dshfiles/optmem/src/host.ts` (7: lines 223–229, 412–416)
+  - `tooling/dshx/packages/dshx/src/compiler/host/build.ts` (5: lines 80–88)
+  - `plugins/@dshfiles/editor/src/editor-panel.tsx:333`, `file-tree.tsx:52`
+  - `plugins/@dshfiles/jj-integration/src/panel.tsx:21`
+- **`export *`**: `plugins/@dshfiles/optmem-core/src/index.ts`
+  (`export type * from './types.ts'`; optmem workspaces are changing
+  `types.ts`).
 - [ ] 4. `refactor(plugin-ui)`: named `machine` exports. `docs`: shared skills in
       `AGENTS.md`, link `actor-state-ownership` from `plugin-state`.
 - [ ] 5. `chore(knip)`: `plugins/knip.jsonc`, report-only.

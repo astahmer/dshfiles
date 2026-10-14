@@ -1,6 +1,7 @@
 import type { StandardSchemaV1 } from '@standard-schema/spec'
 import type { ConnectionFetchRoute } from '@deepseek-ai/dsh-client-connection'
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
+import { z } from 'zod'
 import { createApiClientRuntime, startApiQueryEffect } from '../src/api/client.js'
 import { defineApi, method } from '../src/api/define.js'
 import * as publicApi from '../src/api/index.js'
@@ -18,6 +19,13 @@ const api = defineApi({
     get: method<void, { value: string }>(),
     refresh: method<{ force?: boolean }, { value: string }>(),
   },
+})
+
+const routeResponseSchema = z.object({
+  result: z.discriminatedUnion('ok', [
+    z.object({ ok: z.literal(true), value: z.unknown() }),
+    z.object({ ok: z.literal(false), error: z.object({ code: z.string(), message: z.string(), details: z.looseObject({}) }) }),
+  ]),
 })
 
 function connectionFixture() {
@@ -38,13 +46,7 @@ function connectionFixture() {
     })
     const response = await route.fetch(request)
     if (!response.ok) throw new Error(`HTTP ${response.status}`)
-    return (
-      (await response.json()) as {
-        readonly result:
-          | { readonly ok: true; readonly value: unknown }
-          | { readonly ok: false; readonly error: { readonly code: string; readonly message: string; readonly details: object } }
-      }
-    ).result
+    return routeResponseSchema.parse(await response.json()).result
   })
   const context = {
     get(name: string) {
