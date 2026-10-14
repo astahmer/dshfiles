@@ -131,36 +131,6 @@
           "testName": "rejects a zero exit when the bundle was not activated"
         }
       ]
-    },
-    {
-      "id": "agent-tools-catalog",
-      "title": "See every agent tool and plugin capability",
-      "summary": "A Tools tab in Settings > Plugins lists the tools the agent sees (tagged plugin API, MCP or tool), the API methods plugins can call on each other with their agent exposure, and the loaded skills, read from the dshx registry.",
-      "reach": ["click button \"Settings\"", "click button \"Built-in plugins\"", "click tab \"Tools\"", "expect text \"Agent tools and plugin capabilities\""],
-      "surfaces": ["client", "integration"],
-      "configuration": [],
-      "states": ["loading", "populated", "filtered", "catalog-unavailable"],
-      "failureModes": ["Without a loaded dshx Host that serves the registry, the tab says the catalog is unavailable instead of showing an empty list."],
-      "externalDependencies": [],
-      "verification": [
-        {
-          "kind": "gherkin",
-          "id": "plugin-marketplace.agent-tools-catalog",
-          "featureFile": "tooling/dshx/e2e/features/plugin-marketplace.feature"
-        },
-        {
-          "kind": "unit-test",
-          "id": "plugin-marketplace.agent-tools-catalog-unit-list",
-          "file": "plugins/@dshfiles/plugin-marketplace/tests/ToolsTab.test.tsx",
-          "testName": "lists agent tools by source, plugin API methods with their agent exposure, and skills"
-        },
-        {
-          "kind": "unit-test",
-          "id": "plugin-marketplace.agent-tools-catalog-unit-unavailable",
-          "file": "plugins/@dshfiles/plugin-marketplace/tests/ToolsTab.test.tsx",
-          "testName": "says the catalog is unavailable when no dshx Host serves it"
-        }
-      ]
     }
   ],
   "kind": "bundle"

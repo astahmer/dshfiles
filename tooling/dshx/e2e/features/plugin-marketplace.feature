@@ -37,9 +37,3 @@ Feature: Framework Hub marketplace
     When the Hub "detail" recovers
     And the failed install is retried through both confirmations again
     Then the bundle is installed into the Profile with a restart notice
-
-  @scenario:plugin-marketplace.agent-tools-catalog
-  Scenario: The Tools tab lists agent tools and plugin capabilities
-    Given the isolated plugin profile "@dshfiles/plugin-marketplace" is booted
-    When the Tools tab is opened in Settings
-    Then the Tools tab lists the registry tool and the marketplace API

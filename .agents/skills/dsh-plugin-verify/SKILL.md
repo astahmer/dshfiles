@@ -70,7 +70,7 @@ One dshx API serves Clients, other Host plugins and (opt-in) the agent; see
   service grab or an HTTP fetch.
 - An absent owner is `isApiOwnerMissing(error)` (Host and Client): stop polling and hide the feature; never
   match transport message text.
-- Verify: `dshxRegistryApi.list` (the Tools tab in Settings > Built-in plugins) shows the method, its
+- Verify: `dshxRegistryApi.list` (the Agent toolkit page, `@dshfiles/agent-toolkit`) shows the method, its
   description and its agent tool.
 
 ## 4. Run it

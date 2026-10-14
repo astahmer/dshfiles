@@ -133,23 +133,6 @@ When('the Framework Hub tab is opened in Settings', async ({ page }: { page: Pag
   await expect(settingsDialog(page).getByText('Framework Hub plugins', { exact: true })).toBeVisible()
 })
 
-When('the Tools tab is opened in Settings', async ({ page }: { page: Page }) => {
-  await page.getByRole('button', { name: 'Settings', exact: true }).click()
-  await settingsDialog(page).getByRole('button', { name: 'Built-in plugins', exact: true }).click()
-  await settingsDialog(page).getByRole('tab', { name: 'Tools', exact: true }).click()
-  await expect(settingsDialog(page).getByText('Agent tools and plugin capabilities', { exact: true })).toBeVisible()
-})
-
-Then('the Tools tab lists the registry tool and the marketplace API', async ({ page }: { page: Page }) => {
-  const tab = settingsDialog(page).getByTestId('tools-tab')
-  await recordAssertion(page, 'plugin-marketplace-tools-tab-lists-capabilities', async () => {
-    await expect(tab.getByText('dshx_capabilities', { exact: true })).toBeVisible()
-    await expect(tab.getByText('@dshfiles/plugin-marketplace', { exact: true }).first()).toBeVisible()
-  })
-  await tab.getByRole('searchbox', { name: 'Search tools', exact: true }).fill('dshx_capabilities')
-  await expect(tab.getByText('Plugin API methods (0)', { exact: true })).toBeVisible()
-})
-
 When('{string} is downloaded through both confirmations', async ({ page }: { page: Page }, name: string) => {
   await settingsDialog(page)
     .getByRole('button', { name: new RegExp(`^(Download|Retry download) ${name}$`) })
