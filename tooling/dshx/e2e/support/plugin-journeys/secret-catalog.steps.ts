@@ -190,7 +190,8 @@ Then('only the load error is shown, without an empty catalog', async ({ page }: 
     await expect(catalog(page).getByText('Secret metadata could not be loaded. Check the secret CLI and refresh.', { exact: true })).toBeVisible({
       timeout: 30_000,
     })
-    await expect(catalog(page).getByText('No aliases found.', { exact: true })).toHaveCount(0)
+    await expect(catalog(page).getByRole('button', { name: 'Retry', exact: true })).toBeVisible()
+    await expect(catalog(page).getByText('No secrets yet', { exact: true })).toHaveCount(0)
     await expect(catalog(page).getByText('0 aliases', { exact: true })).toHaveCount(0)
   })
   await finishJourneyAssertions(page)
@@ -212,17 +213,27 @@ Then('filtering by {string} keeps only the matching alias', async ({ page }: { p
   await finishJourneyAssertions(page)
 })
 
-Then('the dev DB_PASSWORD previews masked, reveals in full, then hides itself', async ({ page }: { page: Page }) => {
+Then('the dev DB_PASSWORD reveals on click, hides on timeout and blur, and copies without revealing', async ({ page }: { page: Page }) => {
   const row = rowFor(page, 'DB_PASSWORD', 'dev')
-  await row.getByRole('button', { name: 'Preview DB_PASSWORD', exact: true }).click()
-  await recordAssertion(page, 'secret-catalog-preview-masks-the-middle', async () => {
-    await expect(row.getByRole('status')).toHaveText('db-e…alue')
+  const reveal = row.getByRole('button', { name: 'Reveal DB_PASSWORD', exact: true })
+  const revealed = row.getByRole('status', { name: 'Value of DB_PASSWORD', exact: true })
+  await reveal.hover()
+  await recordAssertion(page, 'secret-catalog-hover-offers-click-to-reveal', async () => {
+    await expect(row.getByText('Click to reveal', { exact: true })).toHaveCSS('opacity', '1')
+    await expect(page.getByText('db-e2e-dev-value')).toHaveCount(0)
   })
-  await row.getByRole('button', { name: 'Reveal full DB_PASSWORD', exact: true }).click()
-  await recordAssertion(page, 'secret-catalog-full-reveal-shows-the-exact-value', () => expect(row.getByRole('status')).toHaveText('db-e2e-dev-value'))
+  await reveal.click()
+  await recordAssertion(page, 'secret-catalog-click-reveals-the-exact-value', () => expect(revealed).toHaveText('db-e2e-dev-value'))
   await recordAssertion(page, 'secret-catalog-revealed-value-expires', async () => {
-    await expect(row.getByRole('status')).toHaveCount(0, { timeout: 10_000 })
-    await expect(row.getByLabel('Hidden secret value', { exact: true })).toBeVisible()
+    await expect(revealed).toHaveCount(0, { timeout: 10_000 })
+    await expect(reveal).toBeVisible()
+  })
+  await reveal.click()
+  await expect(revealed).toHaveText('db-e2e-dev-value')
+  await catalog(page).getByRole('heading', { name: 'Secret Catalog', exact: true }).click()
+  await recordAssertion(page, 'secret-catalog-revealed-value-hides-on-blur', async () => {
+    await expect(revealed).toHaveCount(0)
+    await expect(page.getByText('db-e2e-dev-value')).toHaveCount(0)
   })
   await row.getByRole('button', { name: 'Copy DB_PASSWORD', exact: true }).click()
   await recordAssertion(page, 'secret-catalog-copy-reads-the-exact-alias', async () => {

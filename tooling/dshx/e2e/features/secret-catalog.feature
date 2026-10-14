@@ -29,12 +29,12 @@ Feature: Secret Catalog
     Then only the load error is shown, without an empty catalog
 
   @scenario:secret-catalog.reveal-expiry
-  Scenario: Reveal one value briefly and copy it without showing it
+  Scenario: Reveal one value on click, briefly, and copy it without showing it
     Given the isolated plugin profile "@dshfiles/secret-catalog" is booted
     When the Secret Catalog reveals values for 3 seconds
     And the Secret Catalog is opened
     And the seeded project folder is chosen in the Secret Catalog
-    Then the dev DB_PASSWORD previews masked, reveals in full, then hides itself
+    Then the dev DB_PASSWORD reveals on click, hides on timeout and blur, and copies without revealing
 
   @scenario:secret-catalog.add-edit
   Scenario: Add a project alias with a typed value, then edit its source and value

@@ -1,17 +1,18 @@
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@dshfiles/plugin-ui/components/ui/empty'
+import { Skeleton } from '@dshfiles/plugin-ui/components/ui/skeleton'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
-import { CopyIcon, EyeIcon, EyeOffIcon, PencilIcon, Trash2Icon } from '@dshfiles/plugin-ui/icons'
+import { CopyIcon, EyeIcon, KeyRoundIcon, PencilIcon, SearchXIcon, Trash2Icon } from '@dshfiles/plugin-ui/icons'
+import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { DataTable, createColumnHelper, createSortedRowModel, rowSortingFeature, sortFn_alphanumeric, tableFeatures, useTable } from '@dshfiles/plugin-ui/table'
-import { createContext, useContext, useMemo, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useMemo, useRef, type ReactNode } from 'react'
 import type { SecretCatalogTranslate } from './locales.js'
 import type { SecretMetadata } from './secret-metadata.js'
-import { previewSecretValue, type SecretRevealStage } from './secret-reveal-model.js'
 
 export interface RevealedSecret {
   readonly id: string
   readonly value: string
-  readonly stage: SecretRevealStage
 }
 
 export interface SecretRowActions {
@@ -19,7 +20,11 @@ export interface SecretRowActions {
   readonly revealed: RevealedSecret | null
   readonly canActOnRow: (row: SecretMetadata) => boolean
   readonly isRowBusy: (row: SecretMetadata) => boolean
+  readonly isRevealing: (row: SecretMetadata) => boolean
   readonly onReveal: (row: SecretMetadata) => void
+  /** The revealed value lost focus; hide it when the user set hide-on-blur. */
+  readonly onRevealedBlur: () => void
+  readonly onHide: () => void
   readonly onCopy: (row: SecretMetadata) => void
   readonly onEdit: (row: SecretMetadata) => void
   readonly onRemove: (row: SecretMetadata) => void
@@ -33,9 +38,11 @@ const useSecretRowActions = (): SecretRowActions => {
   return actions
 }
 
-const VariableCell = (props: { readonly row: SecretMetadata }): JSX.Element => (
+const NameCell = (props: { readonly row: SecretMetadata }): JSX.Element => (
   <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-0.5">
-    <span className="dshx:truncate dshx:font-mono dshx:text-[13px] dshx:font-semibold">{props.row.variableName}</span>
+    <span className="dshx:truncate dshx:font-mono dshx:text-[13px] dshx:font-semibold" title={props.row.variableName}>
+      {props.row.variableName}
+    </span>
     <span className="dshx:truncate dshx:text-xs dshx:text-muted-foreground">
       {props.row.alias} · {props.row.scope} · {props.row.environment}
       {props.row.field.length > 0 ? ` · ${props.row.field}` : ''}
@@ -53,19 +60,79 @@ const DescriptionCell = (props: { readonly row: SecretMetadata }): JSX.Element =
   </div>
 )
 
+const MASK = '••••••••••••'
+
+const RevealedValue = (props: { readonly row: SecretMetadata; readonly value: string }): JSX.Element => {
+  const actions = useSecretRowActions()
+  const outputRef = useRef<HTMLOutputElement>(null)
+  useEffect(() => outputRef.current?.focus(), [])
+  return (
+    <output
+      aria-label={actions.t('revealedValue', { alias: props.row.alias })}
+      className="dshx:block dshx:rounded-sm dshx:bg-muted dshx:px-2 dshx:py-1 dshx:font-mono dshx:text-xs dshx:break-all dshx:select-all dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50"
+      onBlur={actions.onRevealedBlur}
+      onKeyDown={event => {
+        if (event.key === 'Escape') actions.onHide()
+      }}
+      ref={outputRef}
+      tabIndex={0}
+      title={actions.t('hideRevealedHint')}
+    >
+      {props.value}
+    </output>
+  )
+}
+
 const ValueCell = (props: { readonly row: SecretMetadata }): JSX.Element => {
   const actions = useSecretRowActions()
-  const revealed = actions.revealed
-  if (revealed?.id === props.row.id) {
-    const preview = revealed.stage === 'preview' ? previewSecretValue(revealed.value) : null
-    const value =
-      preview === null ? revealed.value : preview.kind === 'excerpt' ? preview.text : actions.t('previewMasked', { mask: preview.mask, count: preview.length })
-    return <output className="dshx:font-mono dshx:text-xs dshx:break-all dshx:select-all">{value}</output>
+  const t = actions.t
+  const row = props.row
+  if (actions.revealed?.id === row.id) return <RevealedValue row={row} value={actions.revealed.value} />
+  if (actions.isRevealing(row)) {
+    return (
+      <span className="dshx:inline-flex dshx:items-center dshx:gap-2 dshx:px-2 dshx:py-1 dshx:text-xs dshx:text-muted-foreground" role="status">
+        <Spinner />
+        {t('revealing')}
+      </span>
+    )
+  }
+  if (!actions.canActOnRow(row)) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span
+            aria-label={t('hiddenValue')}
+            className="dshx:inline-block dshx:px-2 dshx:py-1 dshx:font-mono dshx:text-xs dshx:tracking-[0.2em] dshx:text-muted-foreground/60"
+            tabIndex={0}
+          >
+            {MASK}
+          </span>
+        </TooltipTrigger>
+        <TooltipContent>{t('actionBlockedHint')}</TooltipContent>
+      </Tooltip>
+    )
   }
   return (
-    <span aria-label={actions.t('hiddenValue')} className="dshx:font-mono dshx:text-xs dshx:tracking-[0.2em] dshx:text-muted-foreground">
-      ••••••••••••
-    </span>
+    <button
+      aria-label={t('revealAlias', { alias: row.alias })}
+      className="dshx:group dshx:relative dshx:inline-flex dshx:min-w-32 dshx:items-center dshx:rounded-sm dshx:px-2 dshx:py-1 dshx:text-left dshx:outline-none dshx:hover:bg-muted dshx:focus-visible:bg-muted dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50"
+      onClick={() => actions.onReveal(row)}
+      type="button"
+    >
+      <span
+        aria-hidden
+        className="dshx:font-mono dshx:text-xs dshx:tracking-[0.2em] dshx:text-muted-foreground dshx:transition-opacity dshx:group-hover:opacity-0 dshx:group-focus-visible:opacity-0"
+      >
+        {MASK}
+      </span>
+      <span
+        aria-hidden
+        className="dshx:absolute dshx:inset-0 dshx:flex dshx:items-center dshx:gap-1.5 dshx:px-2 dshx:text-xs dshx:font-medium dshx:opacity-0 dshx:transition-opacity dshx:group-hover:opacity-100 dshx:group-focus-visible:opacity-100"
+      >
+        <EyeIcon className="dshx:size-3.5" />
+        {t('clickToReveal')}
+      </span>
+    </button>
   )
 }
 
@@ -97,43 +164,22 @@ const RowActionButton = (props: {
   </Tooltip>
 )
 
-const RevealCopyCell = (props: { readonly row: SecretMetadata }): JSX.Element => {
-  const actions = useSecretRowActions()
-  const row = props.row
-  const t = actions.t
-  const allowed = actions.canActOnRow(row)
-  const busy = actions.isRowBusy(row)
-  const hint = allowed ? undefined : t('actionBlockedHint')
-  const isRevealed = actions.revealed?.id === row.id
-  const revealAction = !isRevealed ? t('preview') : actions.revealed?.stage === 'preview' ? t('revealFull') : t('hide')
-  return (
-    <div className="dshx:flex dshx:items-center dshx:gap-1">
-      <RowActionButton
-        disabled={!allowed || busy}
-        hint={hint}
-        label={t('revealActionLabel', { action: revealAction, alias: row.alias })}
-        onClick={() => actions.onReveal(row)}
-      >
-        {busy ? <Spinner /> : isRevealed && actions.revealed?.stage === 'full' ? <EyeOffIcon aria-hidden /> : <EyeIcon aria-hidden />}
-      </RowActionButton>
-      <RowActionButton disabled={!allowed || busy} hint={hint} label={t('copyAlias', { alias: row.alias })} onClick={() => actions.onCopy(row)}>
-        <CopyIcon aria-hidden />
-      </RowActionButton>
-    </div>
-  )
-}
-
 const ActionsCell = (props: { readonly row: SecretMetadata }): JSX.Element => {
   const actions = useSecretRowActions()
   const row = props.row
   const t = actions.t
-  const disabled = !actions.canActOnRow(row) || actions.isRowBusy(row)
+  const allowed = actions.canActOnRow(row)
+  const disabled = !allowed || actions.isRowBusy(row)
+  const hint = allowed ? undefined : t('actionBlockedHint')
   return (
-    <div className="dshx:flex dshx:items-center dshx:justify-end dshx:gap-1">
-      <RowActionButton disabled={disabled} hint={undefined} label={t('editAlias', { alias: row.alias })} onClick={() => actions.onEdit(row)}>
+    <div className="dshx:flex dshx:items-center dshx:justify-end dshx:gap-0.5">
+      <RowActionButton disabled={disabled} hint={hint ?? t('copyHint')} label={t('copyAlias', { alias: row.alias })} onClick={() => actions.onCopy(row)}>
+        <CopyIcon aria-hidden />
+      </RowActionButton>
+      <RowActionButton disabled={disabled} hint={hint} label={t('editAlias', { alias: row.alias })} onClick={() => actions.onEdit(row)}>
         <PencilIcon aria-hidden />
       </RowActionButton>
-      <RowActionButton destructive disabled={disabled} hint={undefined} label={t('removeAlias', { alias: row.alias })} onClick={() => actions.onRemove(row)}>
+      <RowActionButton destructive disabled={disabled} hint={hint} label={t('removeAlias', { alias: row.alias })} onClick={() => actions.onRemove(row)}>
         <Trash2Icon aria-hidden />
       </RowActionButton>
     </div>
@@ -144,11 +190,10 @@ const features = tableFeatures({ rowSortingFeature, sortedRowModel: createSorted
 const column = createColumnHelper<typeof features, SecretMetadata>()
 
 const columnClassNames: Readonly<Record<string, string | undefined>> = {
-  variable: 'dshx:w-[34%] dshx:max-w-0',
-  description: 'dshx:w-[30%] dshx:max-w-0 dshx:@max-pane-compact:hidden',
-  value: 'dshx:w-[16%]',
-  reveal: 'dshx:w-px',
-  actions: 'dshx:w-px dshx:text-right',
+  name: 'dshx:w-[38%] dshx:max-w-0',
+  description: 'dshx:w-[28%] dshx:max-w-0 dshx:@max-pane-compact:hidden',
+  value: 'dshx:max-w-0',
+  actions: 'dshx:w-px dshx:text-right dshx:whitespace-nowrap',
 }
 
 interface SecretCatalogTableProps {
@@ -158,6 +203,18 @@ interface SecretCatalogTableProps {
   readonly actions: SecretRowActions
 }
 
+const LoadingRows = (props: { readonly label: string }): JSX.Element => (
+  <div aria-busy className="dshx:flex dshx:flex-col dshx:gap-3 dshx:py-1 dshx:text-left" role="status">
+    <span className="dshx:sr-only">{props.label}</span>
+    {['dshx:w-3/5', 'dshx:w-2/5', 'dshx:w-1/2'].map(width => (
+      <div className="dshx:flex dshx:items-center dshx:gap-4" key={width}>
+        <Skeleton className={cn('dshx:h-4', width)} />
+        <Skeleton className="dshx:ml-auto dshx:h-4 dshx:w-24" />
+      </div>
+    ))}
+  </div>
+)
+
 export const SecretCatalogTable = (props: SecretCatalogTableProps): JSX.Element => {
   const t = props.actions.t
   const data = useMemo(() => [...props.rows], [props.rows])
@@ -165,29 +222,34 @@ export const SecretCatalogTable = (props: SecretCatalogTableProps): JSX.Element 
     () =>
       column.columns([
         column.accessor('variableName', {
-          id: 'variable',
-          header: t('columnVariable'),
+          id: 'name',
+          header: t('columnName'),
           sortFn: 'alphanumeric',
-          cell: context => <VariableCell row={context.row.original} />,
+          cell: context => <NameCell row={context.row.original} />,
         }),
         column.display({ id: 'description', header: t('columnDescription'), cell: context => <DescriptionCell row={context.row.original} /> }),
         column.display({ id: 'value', header: t('columnValue'), cell: context => <ValueCell row={context.row.original} /> }),
-        column.display({ id: 'reveal', header: '', cell: context => <RevealCopyCell row={context.row.original} /> }),
-        column.display({ id: 'actions', header: t('columnActions'), cell: context => <ActionsCell row={context.row.original} /> }),
+        column.display({
+          id: 'actions',
+          header: () => <span className="dshx:sr-only">{t('columnActions')}</span>,
+          cell: context => <ActionsCell row={context.row.original} />,
+        }),
       ]),
     [t],
   )
   const table = useTable({ features, columns, data })
-  const empty = props.loading ? (
-    <span className="dshx:inline-flex dshx:items-center dshx:gap-2">
-      <Spinner />
-      {t('loadingMetadata')}
-    </span>
-  ) : props.hasAnyRows ? (
-    t('noMatchingAliases')
-  ) : (
-    t('noAliases')
-  )
+  const empty =
+    props.loading && !props.hasAnyRows ? (
+      <LoadingRows label={t('loadingMetadata')} />
+    ) : (
+      <Empty className="dshx:gap-3 dshx:p-4 dshx:md:p-6">
+        <EmptyHeader>
+          <EmptyMedia variant="icon">{props.hasAnyRows ? <SearchXIcon /> : <KeyRoundIcon />}</EmptyMedia>
+          <EmptyTitle className="dshx:text-base">{props.hasAnyRows ? t('noMatchingAliases') : t('noAliases')}</EmptyTitle>
+          <EmptyDescription>{props.hasAnyRows ? t('noMatchingAliasesHint') : t('noAliasesHint')}</EmptyDescription>
+        </EmptyHeader>
+      </Empty>
+    )
   return (
     <SecretRowActionsContext.Provider value={props.actions}>
       <DataTable

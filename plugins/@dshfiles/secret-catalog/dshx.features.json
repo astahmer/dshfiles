@@ -79,8 +79,8 @@
     },
     {
       "id": "bounded-secret-reveal",
-      "title": "Reveal and copy an exact secret value",
-      "summary": "Reveal one exact alias and environment only on demand, permit a bounded preview/full/hidden cycle, and clear plaintext on timeout, blur, scope change, refresh, or unmount.",
+      "title": "Reveal on click and copy without revealing",
+      "summary": "Hovering a masked value offers \"Click to reveal\"; a click reveals that one alias and environment through the Host, and it masks again after the configured timeout, on blur, Esc, scope change, refresh, or unmount. Copy goes through the Host CLI without revealing.",
       "surfaces": ["client", "host", "settings"],
       "configuration": [
         {
@@ -103,7 +103,7 @@
           "coveredBy": ["secret-catalog.reveal-expiry"]
         }
       ],
-      "states": ["hidden", "preview", "full", "expired", "cleared"],
+      "states": ["masked", "revealing", "revealed", "expired", "cleared"],
       "failureModes": [
         "Secret values are never included in catalog metadata, argv, or notices.",
         "Blur or navigation clears client plaintext before another reveal."
@@ -129,23 +129,12 @@
         },
         {
           "kind": "unit-test",
-          "id": "secret-catalog.bounded-secret-reveal-unit-reveal-state-cycle",
-          "file": "plugins/@dshfiles/secret-catalog/src/secret-reveal-model.test.ts",
-          "testName": "cycles from preview to full to hidden"
-        },
-        {
-          "kind": "unit-test",
-          "id": "secret-catalog.bounded-secret-reveal-unit-masked-preview",
-          "file": "plugins/@dshfiles/secret-catalog/src/secret-reveal-model.test.ts",
-          "testName": "previews long values at both ends and keeps short values masked"
-        },
-        {
-          "kind": "unit-test",
           "id": "secret-catalog.bounded-secret-reveal-unit-secret-cli-output-redaction",
           "file": "plugins/@dshfiles/secret-catalog/src/secret-cli-runner.test.ts",
           "testName": "does not expose CLI stdout for copy and mutation commands"
         }
-      ]
+      ],
+      "reach": ["seed fake-secret-cli", "click button \"Secret Catalog\"", "hover button \"Reveal GITHUB_TOKEN\"", "expect text \"Click to reveal\""]
     },
     {
       "id": "alias-mutations",

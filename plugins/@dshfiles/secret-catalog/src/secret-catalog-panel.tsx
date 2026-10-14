@@ -16,11 +16,10 @@ import { SecretMutationDialog } from './secret-mutation-dialog.js'
 import type { SecretCreateForm, SecretMutationScope, SecretRemoveTarget, SecretUpdateForm } from './secret-mutation-form.js'
 import { createSecretActionPolicy, filterSecretMetadata, nextRowIndex, type SecretScopeFilter } from './secret-catalog-model.js'
 import { secretCatalogSettings } from './settings.js'
-import { nextSecretRevealStage, type SecretRevealStage } from './secret-reveal-model.js'
 import { secretCatalogApi } from './api.js'
 import type { SecretCatalogTranslate } from './locales.js'
 import type { SecretMetadata } from './secret-metadata.js'
-import { SecretCatalogTable } from './secret-catalog-table.js'
+import { SecretCatalogTable, type RevealedSecret } from './secret-catalog-table.js'
 
 interface SecretCatalogPanelProps {
   readonly directoryPicker: DirectoryPickerPort
@@ -44,7 +43,7 @@ const scopeLabelKeys = {
 } satisfies Record<SecretScopeFilter, Parameters<SecretCatalogTranslate>[0]>
 
 const focusRowFromKey = (event: KeyboardEvent<HTMLDivElement>): void => {
-  if (!(event.target instanceof HTMLElement)) return
+  if (!(event.target instanceof HTMLElement) || event.target.closest('input, textarea') !== null) return
   const row = event.target.closest('tbody tr')
   const rows = [...event.currentTarget.querySelectorAll('tbody tr')]
   if (row === null) return
@@ -85,8 +84,8 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
   const [scope, setScope] = useState<SecretScopeFilter>('all')
   const [search, setSearch] = useState('')
   const [actionError, setActionError] = useState<string | null>(null)
-  const [revealed, setRevealed] = useState<{ readonly id: string; readonly value: string; readonly stage: SecretRevealStage } | null>(null)
-  const [busyRow, setBusyRow] = useState<string | null>(null)
+  const [revealed, setRevealed] = useState<RevealedSecret | null>(null)
+  const [busyRow, setBusyRow] = useState<{ readonly id: string; readonly action: 'reveal' | 'copy' } | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [dialog, setDialog] = useState<ActiveDialog | null>(null)
   const revealGeneration = useRef(0)
@@ -170,19 +169,17 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
     const rowScope = mutationScopeFor(row)
     if (rowScope === null) return
     if (revealed?.id === row.id) {
-      const nextStage = nextSecretRevealStage(revealed.stage)
-      if (nextStage === null) clearRevealed()
-      else setRevealed({ ...revealed, stage: nextStage })
+      clearRevealed()
       return
     }
     clearRevealed()
     const generation = ++revealGeneration.current
-    setBusyRow(row.id)
+    setBusyRow({ id: row.id, action: 'reveal' })
     setActionError(null)
     try {
       const value = await api.reveal({ alias: row.alias, cwd, scope: rowScope, environment: row.environment })
       if (generation !== revealGeneration.current || (hideOnBlur && document.visibilityState === 'hidden')) return
-      setRevealed({ id: row.id, value, stage: 'preview' })
+      setRevealed({ id: row.id, value })
       revealTimer.current = setTimeout(clearRevealed, revealMs)
     } catch {
       if (generation === revealGeneration.current) setActionError(t('revealFailed'))
@@ -195,7 +192,7 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
     if (!canActOnRow(row)) return
     const rowScope = mutationScopeFor(row)
     if (rowScope === null) return
-    setBusyRow(row.id)
+    setBusyRow({ id: row.id, action: 'copy' })
     setNotice(null)
     setActionError(null)
     try {
@@ -361,8 +358,20 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
             />
           </InputGroup>
           {error !== null && (
-            <Alert variant="destructive">
+            <Alert className="dshx:pr-24" variant="destructive">
               <AlertDescription>{error}</AlertDescription>
+              {listFailed && actionError === null && (
+                <Button
+                  className="dshx:absolute dshx:top-1/2 dshx:right-2 dshx:-translate-y-1/2"
+                  disabled={loading}
+                  onClick={() => void listQuery.refetch()}
+                  size="xs"
+                  type="button"
+                  variant="outline"
+                >
+                  {t('retry')}
+                </Button>
+              )}
             </Alert>
           )}
           {notice !== null && (
@@ -388,8 +397,13 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
                 t,
                 revealed,
                 canActOnRow,
-                isRowBusy: row => busyRow === row.id,
+                isRowBusy: row => busyRow?.id === row.id,
+                isRevealing: row => busyRow?.id === row.id && busyRow.action === 'reveal',
                 onReveal: row => void onReveal(row),
+                onRevealedBlur: () => {
+                  if (hideOnBlur) clearRevealed()
+                },
+                onHide: clearRevealed,
                 onCopy: row => void onCopy(row),
                 onEdit: row => openDialog({ mode: 'edit', row }),
                 onRemove: row => openDialog({ mode: 'remove', row }),
