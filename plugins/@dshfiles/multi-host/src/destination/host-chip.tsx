@@ -6,7 +6,8 @@ import { useQueries, useQuery } from '@dshfiles/plugin-ui/query'
 import { useState } from 'react'
 import type { RuntimeSummary } from '../api.js'
 import { hostState, HostsDialog, StatusDot } from './hosts-dialog.js'
-import { isMultiHostMissing, multiHostQueries, type MultiHostClient } from './queries.js'
+import { isApiOwnerMissing } from '@dshfiles/dshx/api'
+import { multiHostQueries, type MultiHostClient } from './queries.js'
 import { hostDestination, setHostDestination } from './state.js'
 
 const chipClassName = 'dshx:h-7 dshx:gap-1.5 dshx:px-2 dshx:text-sm dshx:font-medium'
@@ -42,7 +43,7 @@ export const HostChip = (props: { readonly api: MultiHostClient; readonly unavai
   const selectedHost = directory.data?.hosts.find(host => host.id === selected?.hostId)
   const label = destination.kind === 'local' ? 'Local' : (selectedHost?.name ?? selected?.name ?? 'Unknown host')
   const state = destination.kind === 'runtime' ? liveState(selected) : undefined
-  if (isMultiHostMissing(directory.error)) return null
+  if (isApiOwnerMissing(directory.error)) return null
 
   return (
     <>

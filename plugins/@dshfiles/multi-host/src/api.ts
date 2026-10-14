@@ -154,10 +154,13 @@ export const multiHostApi = defineApi({
   version: 1,
   owner: '@dshfiles/multi-host',
   methods: {
-    identity: method({ input: z.void(), output: runtimeIdentitySchema }),
+    identity: method({ input: z.void(), output: runtimeIdentitySchema, description: 'Identity of this DSH runtime as other hosts see it.' }),
     list: method({
       input: z.void(),
       output: z.object({ hosts: z.array(hostSummarySchema), runtimes: z.array(runtimeSummarySchema) }),
+      description:
+        'List the machines (hosts) this DSH can run threads on and their DSH runtimes: connector, remote home, whether a connection is open, and the last error. Read-only.',
+      tool: { name: 'multi_host_list', readOnly: true },
     }),
     hostUpsert: method({
       input: z.object({ id: idSchema, name: z.string().min(1).max(120), connector: hostConnectorSchema }).strict(),
