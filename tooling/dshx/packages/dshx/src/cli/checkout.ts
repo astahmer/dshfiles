@@ -11,7 +11,9 @@ directory (jj rebase -r @, or -b @ when it has ancestors off main), keeping loca
 dropping described revisions main already holds. It refuses described work main lacks, undoes a
 conflicting rebase, then runs pnpm install where a lockfile changed and rebuilds dshx and the plugins
 whose sources changed (plus their dependants). It reports which plugins changed and whether DSH needs a
-restart (Host bundle, manifest or profile changes) or picks the change up over HMR (client bundles).
+restart (Host bundle or manifest changes) or picks the change up over HMR (client bundles).
+When the profile seed changed it reconciles the live web profile with scripts/profile-sync.ts (skipped when
+DSHFILES_DIR names another checkout); a restart applies it.
 It never restarts DSH.
 
 Options:

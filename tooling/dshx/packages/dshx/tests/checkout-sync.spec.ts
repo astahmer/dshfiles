@@ -143,6 +143,29 @@ describe.skipIf(!jjAvailable)('dshx checkout sync against real jj', () => {
     expect(() => readFileSync(join(checkout, 'feature.txt'))).toThrow()
   })
 
+  it('reconciles the web profile with the checkout reconciler when the seed changed, unless DSH runs another checkout', async () => {
+    land(
+      'scripts/profile-sync.ts',
+      "process.getBuiltinModule('node:fs').appendFileSync('profile-sync.log', `${process.argv.slice(2).join(' ')}\\n`)\n",
+      'feat: reconciler',
+    )
+    land('profiles/web/package.json', '{}\n', 'feat: seed')
+    const running = process.env.DSHFILES_DIR
+    try {
+      process.env.DSHFILES_DIR = lander
+      expect((await sync()).restart.reasons).toEqual([`the profile seed changed here, but DSH runs from ${lander}; its next start syncs from there`])
+      expect(() => readFileSync(join(checkout, 'profile-sync.log'))).toThrow()
+
+      land('profiles/web/package.json', '{"changed":true}\n', 'feat: seed again')
+      process.env.DSHFILES_DIR = checkout
+      expect((await sync()).restart).toEqual({ needed: true, reasons: ['the web profile was synced from the changed seed: restart to apply'] })
+      expect(readFileSync(join(checkout, 'profile-sync.log'), 'utf8')).toBe('--profile web\n')
+    } finally {
+      if (running === undefined) delete process.env.DSHFILES_DIR
+      else process.env.DSHFILES_DIR = running
+    }
+  })
+
   it('prints a JSON envelope and a usage error from the CLI', async () => {
     land('feature.txt', 'feature\n', 'feat: landed elsewhere')
     const run = async (argv: readonly string[]) => {

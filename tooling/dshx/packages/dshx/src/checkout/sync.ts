@@ -1,3 +1,5 @@
+import { existsSync, realpathSync } from 'node:fs'
+import { join } from 'node:path'
 import { CheckoutSyncError, planRebuild, runCommand, runRebuild, type PluginEffect } from './rebuild.js'
 
 export interface SyncRevision {
@@ -84,6 +86,32 @@ const updateIfStale = async (jj: ReturnType<typeof jjAt>): Promise<boolean> => {
     )
   await jj.read(['workspace', 'update-stale'])
   return true
+}
+
+const realPath = (path: string): string => (existsSync(path) ? realpathSync(path) : path)
+
+/**
+ * Reconciles the live web profile from the checkout's seed with the checkout's own `scripts/profile-sync.ts`, the
+ * reconciler the `dsh web` supervisor also runs before each start. It skips when `DSHFILES_DIR` names another checkout,
+ * so the profile never flips between two checkouts.
+ */
+const syncWebProfile = async (input: {
+  readonly root: string
+  readonly onProgress?: ((message: string) => void) | undefined
+  readonly onOutput?: ((chunk: string) => void) | undefined
+}): Promise<string> => {
+  const running = process.env.DSHFILES_DIR?.trim()
+  if (running !== undefined && running.length > 0 && realPath(running) !== realPath(input.root))
+    return `the profile seed changed here, but DSH runs from ${running}; its next start syncs from there`
+  input.onProgress?.('sync the web profile: node scripts/profile-sync.ts --profile web')
+  const result = await runCommand({
+    argv: [process.execPath, join(input.root, 'scripts/profile-sync.ts'), '--profile', 'web'],
+    cwd: input.root,
+    onOutput: input.onOutput,
+  })
+  if (result.exitCode === 0) return 'the web profile was synced from the changed seed: restart to apply'
+  const reason = result.output.trim().split('\n').at(-1) ?? `exit ${String(result.exitCode)}`
+  return `the profile seed changed but syncing the web profile failed (${reason}); the next "dsh web" start retries it`
 }
 
 /**
@@ -237,13 +265,16 @@ export const syncCheckout = async (options: {
     .filter(line => line.length > 0)
   const plan = planRebuild({ root: path, changedFiles })
   const synced = { ...base, from, updatedStale, kept, absorbed, changedFiles: changedFiles.slice(0, MAX_LISTED_FILES) }
-  const restartReasons = (plugins: readonly PluginEffect[]): readonly string[] => [
+  const restartReasons = (plugins: readonly PluginEffect[], profileReason: string | null): readonly string[] => [
     ...plugins.filter(plugin => plugin.host).map(plugin => `${plugin.name} Host bundle changed`),
-    ...(plan.profileChanged ? ['the profile seed changed: run "pnpm profile:sync --profile web" before restarting'] : []),
+    ...(profileReason === null ? [] : [profileReason]),
   ]
   if (dryRun) {
     await undo()
-    const reasons = restartReasons(plan.plugins)
+    const reasons = restartReasons(
+      plan.plugins,
+      plan.profileChanged ? 'the profile seed changed: the sync would reconcile the web profile; restart to apply' : null,
+    )
     return {
       ...synced,
       status: 'would-sync',
@@ -262,7 +293,12 @@ export const syncCheckout = async (options: {
     onProgress: options.onProgress,
     onOutput: options.onOutput,
   })
-  const reasons = restartReasons(outcome.plugins)
+  const profileReason = !plan.profileChanged
+    ? null
+    : outcome.failure === null
+      ? await syncWebProfile({ root: path, onProgress: options.onProgress, onOutput: options.onOutput })
+      : 'the profile seed changed: the next "dsh web" start syncs it'
+  const reasons = restartReasons(outcome.plugins, profileReason)
   return {
     ...synced,
     status: outcome.failure === null ? 'synced' : 'build-failed',
