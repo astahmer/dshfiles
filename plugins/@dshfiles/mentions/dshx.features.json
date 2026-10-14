@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "ranked-mentions",
+      "title": "Ranked @ mentions for files and threads",
+      "summary": "One @ menu that interleaves files and threads by match quality (exact title or basename, prefix, substring or fuzzy), then recency, then workspace or project, hides blank threads, and narrows with @thread: / @t: or @file: / @f:. Picks insert the native reference chips.",
+      "reach": [
+        "click button \"New thread\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Seed a mention target\"",
+        "press Enter",
+        "click button \"New thread\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"@t:\"",
+        "expect text \"Threads \u00b7 @f: files\""
+      ],
+      "surfaces": ["client"],
+      "configuration": [],
+      "states": ["all", "thread-scope", "file-scope", "drilled-directory", "empty"],
+      "failureModes": [
+        "A failed Host lookup drops that kind of candidate and keeps the other one.",
+        "A quoted path cannot keep its scope prefix through a drill, so it continues as a plain @ mention."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "mentions.ranked-mentions",
+          "featureFile": "tooling/dshx/e2e/features/mentions.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "mentions.scope-prefixes",
+          "file": "plugins/@dshfiles/mentions/src/mention-ranking.test.ts",
+          "testName": "reads the long and short scope prefixes and keeps what was typed"
+        },
+        {
+          "kind": "unit-test",
+          "id": "mentions.exact-title-wins",
+          "file": "plugins/@dshfiles/mentions/src/mention-ranking.test.ts",
+          "testName": "puts an exact thread title above a fuzzy file match"
+        },
+        {
+          "kind": "unit-test",
+          "id": "mentions.interleaved",
+          "file": "plugins/@dshfiles/mentions/src/mention-ranking.test.ts",
+          "testName": "interleaves files and threads of the same tier instead of listing one kind first"
+        },
+        {
+          "kind": "unit-test",
+          "id": "mentions.rank-budget",
+          "file": "plugins/@dshfiles/mentions/src/mention-ranking.test.ts",
+          "testName": "caps the menu and ranks 500 entries in well under a frame"
+        }
+      ]
+    }
+  ]
+}
