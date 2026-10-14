@@ -57,6 +57,23 @@ export const dismissProviderSetupDuringStartup = async (page: Page, timeoutMs = 
   return appeared
 }
 
+/**
+ * A reload is a fresh page, so "Add an API key" opens again a moment after the app renders. The registered handler
+ * dismisses it only once it blocks an action, and that dismissal also closes any menu the action had opened, so the
+ * reload waits it out before the next interaction.
+ */
+export const reloadPastProviderSetup = async (page: Page, timeoutMs = 5_000): Promise<void> => {
+  await page.reload()
+  if (!(await appears(page, PROVIDER_SETUP_DIALOG, timeoutMs))) return
+  const providerSetup = page.getByRole('dialog', { name: PROVIDER_SETUP_DIALOG, exact: true })
+  // The registered handler may dismiss it first, leaving this click no button; either way it must end hidden.
+  await providerSetup
+    .getByRole('button', { name: 'Configure later', exact: true })
+    .click({ timeout: timeoutMs })
+    .catch(() => undefined)
+  await providerSetup.waitFor({ state: 'hidden', timeout: timeoutMs })
+}
+
 /** Isolated profiles without the web profile's settings show DSH's "Preview Notice" once per browser profile. */
 export const dismissPreviewNotice = async (page: Page, timeoutMs = 5_000): Promise<boolean> => {
   if (!(await appears(page, PREVIEW_NOTICE_DIALOG, timeoutMs))) return false
