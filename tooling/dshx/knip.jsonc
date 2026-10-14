@@ -9,10 +9,9 @@
     "catalog",
     "catalogReferences",
   ],
-  "ignoreBinaries": ["dsh", "dshx", "jj"],
-  "ignore": ["scripts/smoke-multi-host*.mjs"],
+  "ignoreBinaries": ["jj"],
   "workspaces": {
-    ".": {
+    "tooling/dshx": {
       "entry": [
         "e2e/support/steps.ts",
         "e2e/support/plugin-journeys/**/*.ts",
@@ -23,7 +22,7 @@
         "scripts/smoke-multi-host-ssh.mjs"
       ],
     },
-    "packages/dshx": {
+    "tooling/dshx/packages/dshx": {
       "entry": [
         "src/index.ts",
         "src/config/index.ts",
@@ -42,7 +41,7 @@
         "src/compiler/host/index.ts",
         "scripts-mh-workspace-probe.mjs",
       ],
-      "ignoreDependencies": ["@deepseek-ai/dsh"],
     },
+    "tooling/dshx/packages/create-dshx": {},
   },
 }

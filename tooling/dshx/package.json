@@ -7,7 +7,7 @@
     "build": "pnpm --dir ../.. exec turbo run build --filter=@dshfiles/dshx",
     "lint": "pnpm --dir ../.. run lint",
     "format:check": "pnpm --dir ../.. run fmt:check",
-    "deps:check": "knip",
+    "deps:check": "knip --directory ../.. --config \"$PWD/knip.jsonc\" --workspace tooling/dshx --workspace tooling/dshx/packages/dshx --workspace tooling/dshx/packages/create-dshx",
     "typecheck": "pnpm --dir ../.. exec turbo run typecheck --filter=@dshfiles/dshx",
     "test": "pnpm run test:evidence && pnpm run test:inventory && pnpm run test:feature-coverage && pnpm --dir ../.. exec turbo run test --filter=@dshfiles/dshx",
     "test:evidence": "node --experimental-strip-types --test e2e/support/evidence.test.ts e2e/support/evidence-reporter.integration.test.ts",
