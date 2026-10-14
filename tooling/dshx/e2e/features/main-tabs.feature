@@ -54,3 +54,9 @@ Feature: Main view tabs
     Then Jujutsu replaced the Start tab
     When a new tab is opened from the keyboard and Settings is picked
     Then Settings opens and the Start tab is gone
+
+  @scenario:main-tabs.sidebar-thread-double-click
+  Scenario: Double-clicking a sidebar thread keeps its preview tab
+    Given the isolated plugin composition of "@dshfiles/main-tabs, @dshfiles/thread-sidebar" is booted
+    When a thread is double-clicked in the sidebar before another is opened
+    Then its tab stays open beside the next preview tab

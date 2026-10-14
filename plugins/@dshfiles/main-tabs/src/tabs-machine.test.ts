@@ -53,6 +53,15 @@ describe('tabsMachine', () => {
     expect(tabs.ids()).toEqual(['panel:workbench'])
   })
 
+  it('keeps a sidebar double-click during settings load when adopting the current thread', () => {
+    const tabs = start()
+    tabs.host(thread('a'))
+    tabs.actor.send({ type: 'thread.keep', sessionId: 'a' })
+    tabs.enable()
+    expect(tabs.ids()).toEqual(['thread:a'])
+    expect(tabs.set().tabs[0]?.preview).toBe(false)
+  })
+
   it('replaces the preview tab until it is kept, VS Code style', () => {
     const tabs = start({ preferences: { openMode: 'preview' } })
     tabs.enable()
@@ -79,6 +88,28 @@ describe('tabsMachine', () => {
     expect(tabs.ids()).toEqual(['thread:d', 'thread:b', 'thread:c'])
   })
 
+  it('keeps an already-open thread when the sidebar double-click intent arrives after navigation', () => {
+    const tabs = start({ preferences: { openMode: 'preview' } })
+    tabs.enable()
+    tabs.host(thread('a'))
+    tabs.actor.send({ type: 'thread.keep', sessionId: 'a' })
+    tabs.host(thread('b'))
+    expect(tabs.ids()).toEqual(['thread:a', 'thread:b'])
+    expect(tabs.set().tabs[0]?.preview).toBe(false)
+    expect(tabs.set().tabs[1]?.preview).toBe(true)
+  })
+
+  it('keeps a thread tab when the sidebar double-click intent arrives before navigation', () => {
+    const tabs = start({ preferences: { openMode: 'preview' } })
+    tabs.enable()
+    tabs.host(thread('a'))
+    tabs.actor.send({ type: 'thread.keep', sessionId: 'b' })
+    tabs.host(thread('b'))
+    tabs.host(thread('c'))
+    expect(tabs.ids()).toEqual(['thread:b', 'thread:c'])
+    expect(tabs.set().tabs[0]?.preview).toBe(false)
+    expect(tabs.set().tabs[1]?.preview).toBe(true)
+  })
   it('replaces the active tab in replace mode, but never a pinned one', () => {
     const tabs = start({ preferences: { openMode: 'replace' } })
     tabs.enable()

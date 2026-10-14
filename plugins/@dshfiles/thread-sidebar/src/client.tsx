@@ -277,6 +277,10 @@ const projectWorkspaces = (workspaces: readonly WorkspaceView[]): readonly Works
 
 const RELATIVE_TIME_SUFFIX = { now: '', minutes: 'm', hours: 'h', days: 'd', months: 'mo', years: 'y' } as const
 
+const keepThreadTab = (sessionId: string): void => {
+  window.dispatchEvent(new CustomEvent('dshfiles:main-tabs:keep-thread', { detail: { sessionId } }))
+}
+
 /** Row age ("22h") read off updatedAt; Host buckets keep it in step with other session surfaces. */
 const formatAge = (updatedAt: number): string => {
   const age = relativeTime(updatedAt, Date.now())
@@ -436,6 +440,7 @@ const ChildThreadList = (props: {
           data-selected={child.id === props.selectedChildId}
           title={new Date(child.updatedAt).toLocaleString()}
           onClick={() => props.actions.open(child.id)}
+          onDoubleClick={() => keepThreadTab(child.id)}
         >
           <StatusDot
             session={child}
@@ -521,6 +526,7 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
               )}
               title={new Date(session.updatedAt).toLocaleString()}
               onClick={() => props.actions.open(session.id)}
+              onDoubleClick={() => keepThreadTab(session.id)}
             >
               {headLine ? (
                 <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">

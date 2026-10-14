@@ -60,6 +60,7 @@ export type TabsEvent =
   | { readonly type: 'tab.closeToRight'; readonly tabId: string }
   | { readonly type: 'tab.togglePin'; readonly tabId: string }
   | { readonly type: 'tab.keep'; readonly tabId: string }
+  | { readonly type: 'thread.keep'; readonly sessionId: string }
   | { readonly type: 'tab.move'; readonly tabId: string; readonly toIndex: number }
   | { readonly type: 'tab.activateIndex'; readonly index: number }
   | { readonly type: 'tab.cycle'; readonly direction: 1 | -1 }
@@ -77,6 +78,7 @@ interface TabsContext {
   readonly hostTarget: HostTarget | null
   readonly hostProjectId: string | null
   readonly hostSeen: boolean
+  readonly pendingKeptSessionId: string | null
   /** A navigation this machine started; Host reports of anything else are in-between states until it lands. */
   readonly pendingTarget: HostTarget | null
   /** The first Host report after load either restores the saved active tab or opens what the Host shows. */
@@ -125,6 +127,11 @@ const evictPastLimit = (set: TabSet, maxTabs: number): TabSet => {
     tabs = tabs.filter(tab => tab.id !== oldest.id)
   }
   return { ...set, tabs }
+}
+
+const keepThreadTab = (set: TabSet, sessionId: string): TabSet => {
+  const id = tabIdOf({ kind: 'thread', sessionId })
+  return { ...set, tabs: set.tabs.map(tab => (tab.id === id ? { ...tab, preview: false } : tab)) }
 }
 
 const openTarget = (set: TabSet, target: TabTarget, preferences: TabPreferences, usedAt: number): TabSet => {
@@ -255,15 +262,26 @@ export const tabsMachine = setup({
         return { ...scoped, ...withSet(scoped, { ...shown, activeTabId: context.restored || projectChanged || startShown ? null : set.activeTabId }) }
       }
       const clock = context.clock + 1
-      const next = startShown ? replaceStart(set, event.target, clock) : openTarget(set, event.target, context.preferences, clock)
-      return { ...scoped, clock, ...withSet(scoped, next) }
+      const opened = startShown ? replaceStart(set, event.target, clock) : openTarget(set, event.target, context.preferences, clock)
+      const keptSessionId = event.target.kind === 'thread' && context.pendingKeptSessionId === event.target.sessionId ? event.target.sessionId : null
+      return {
+        ...scoped,
+        pendingKeptSessionId: keptSessionId === null ? context.pendingKeptSessionId : null,
+        clock,
+        ...withSet(scoped, keptSessionId === null ? opened : keepThreadTab(opened, keptSessionId)),
+      }
     }),
     recordHost: assign(({ event }) => (event.type === 'host.navigated' ? { hostTarget: event.target, hostProjectId: event.projectId, hostSeen: true } : {})),
     applyPreferences: assign(({ context, event }) => {
       if (event.type !== 'preferences.changed') return {}
       const scopeKey = scopeKeyFor(event.preferences, context.lastProjectKey)
       const scoped = { ...context, preferences: event.preferences, scopeKey }
-      return { preferences: event.preferences, scopeKey, ...withSet(scoped, evictPastLimit(currentSet(scoped), event.preferences.maxTabs)) }
+      return {
+        preferences: event.preferences,
+        scopeKey,
+        pendingKeptSessionId: event.preferences.enabled ? context.pendingKeptSessionId : null,
+        ...withSet(scoped, evictPastLimit(currentSet(scoped), event.preferences.maxTabs)),
+      }
     }),
     // Adopt what the Host shows right now, as if it had just navigated there.
     adoptHost: raise(({ context }) => ({ type: 'host.navigated' as const, target: context.hostTarget, projectId: context.hostProjectId })),
@@ -293,6 +311,7 @@ export const tabsMachine = setup({
       hostTarget: null,
       hostProjectId: null,
       hostSeen: false,
+      pendingKeptSessionId: null,
       pendingTarget: null,
       restored: false,
     }
@@ -303,6 +322,7 @@ export const tabsMachine = setup({
     gate: {
       on: {
         'host.navigated': { actions: 'recordHost' },
+        'thread.keep': { actions: assign(({ event }) => ({ pendingKeptSessionId: event.sessionId })) },
         'preferences.changed': [
           { guard: and(['enabled', 'hostSeen']), target: 'on', actions: ['applyPreferences', 'adoptHost'] },
           { guard: 'enabled', target: 'on', actions: 'applyPreferences' },
@@ -324,7 +344,11 @@ export const tabsMachine = setup({
       initial: 'following',
       on: {
         'preferences.changed': [
-          { guard: 'disabled', target: 'off', actions: assign(({ event }) => ({ preferences: event.preferences, pendingTarget: null })) },
+          {
+            guard: 'disabled',
+            target: 'off',
+            actions: assign(({ event }) => ({ preferences: event.preferences, pendingTarget: null, pendingKeptSessionId: null })),
+          },
           { actions: ['applyPreferences', 'persist'] },
         ],
         'tab.select': {
@@ -455,6 +479,17 @@ export const tabsMachine = setup({
             'persist',
           ],
         },
+        'thread.keep': {
+          actions: [
+            assign(({ context, event }) => {
+              const set = currentSet(context)
+              const threadId = tabIdOf({ kind: 'thread', sessionId: event.sessionId })
+              if (!set.tabs.some(tab => tab.id === threadId)) return { pendingKeptSessionId: event.sessionId }
+              return { pendingKeptSessionId: null, ...withSet(context, keepThreadTab(set, event.sessionId)) }
+            }),
+            'persist',
+          ],
+        },
         'tab.move': {
           actions: [assign(({ context, event }) => withSet(context, moveTab(currentSet(context), event.tabId, event.toIndex))), 'persist'],
         },
@@ -464,7 +499,10 @@ export const tabsMachine = setup({
               const missing = new Set(event.sessionIds)
               const gone = (tab: Tab): boolean => tab.target.kind === 'thread' && missing.has(tab.target.sessionId)
               const sets = Object.fromEntries(Object.entries(context.sets).map(([key, set]) => [key, removeTabs(set, gone)]))
-              return { sets }
+              return {
+                sets,
+                pendingKeptSessionId: context.pendingKeptSessionId !== null && missing.has(context.pendingKeptSessionId) ? null : context.pendingKeptSessionId,
+              }
             }),
             'persist',
           ],

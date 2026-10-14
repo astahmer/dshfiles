@@ -1,7 +1,16 @@
 import { expect, type Page } from '@playwright/test'
+import { z } from 'zod'
 import { Then, When } from '../bdd.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
+import { dismissProviderSetupIfShown } from '../../../packages/dshx/src/project/startup-dialogs.js'
 import { sendMessage } from '../threads.js'
+
+const createdSessionResponseSchema = z.object({
+  result: z.object({
+    ok: z.literal(true),
+    value: z.object({ sessionId: z.string().min(1) }),
+  }),
+})
 
 const STORAGE_KEY = 'dshfiles.main-tabs.v1'
 
@@ -58,6 +67,30 @@ const stripPlacement = (page: Page) =>
 const expectedPlacement = { hosts: 1, anchoredBeforeMainOutlet: true, aboveMainPanel: true, sameColumn: true }
 
 const primary = (): string => (process.platform === 'darwin' ? 'Meta' : 'Control')
+const threadSidebar = (page: Page) => page.getByRole('region', { name: 'Threads', exact: true })
+const sidebarThreadRow = (page: Page, sessionId: string) => threadSidebar(page).locator(`article[data-thread-id="${sessionId}"]`)
+const threadTab = (page: Page, sessionId: string) => strip(page).locator(`[data-tab-id="thread:${sessionId}"]`)
+
+const startSidebarThread = async (page: Page, prompt: string): Promise<string> => {
+  const createResponsePromise = page.waitForResponse(
+    response => {
+      const request = response.request()
+      return request.method() === 'POST' && request.postData()?.includes('session/create') === true
+    },
+    { timeout: 15_000 },
+  )
+  await page.getByRole('button', { name: 'New thread', exact: true }).click()
+  const createResponse = await createResponsePromise
+  const parsedResponse = createdSessionResponseSchema.safeParse(await createResponse.json())
+  if (!parsedResponse.success) throw new Error('The Host returned an invalid session ID after New thread was clicked.')
+  const sessionId = parsedResponse.data.result.value.sessionId
+  await expect.poll(() => new URL(page.url()).searchParams.get('thread')).toBe(sessionId)
+  await expect(page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })).toBeVisible()
+  await dismissProviderSetupIfShown(page)
+  await sendMessage(page, prompt)
+  await expect(sidebarThreadRow(page, sessionId)).toBeVisible()
+  return sessionId
+}
 
 When('the Workbench and then Jujutsu are opened from the sidebar', async ({ page }: { page: Page }) => {
   await globalPanel(page, 'Workbench').click()
@@ -159,6 +192,27 @@ When('the Workbench tab is pinned and the page is reloaded', async ({ page }: { 
   await page.getByRole('menuitem', { name: 'Pin tab', exact: true }).click()
   await expect(tab(page, 'Workbench')).toHaveAttribute('data-pinned', 'true')
   await page.reload()
+})
+
+When('a thread is double-clicked in the sidebar before another is opened', async ({ page }: { page: Page }) => {
+  const firstThreadId = await startSidebarThread(page, 'sidebar double click first thread')
+  const secondThreadId = await startSidebarThread(page, 'sidebar double click second thread')
+  const firstThreadButton = sidebarThreadRow(page, firstThreadId).getByRole('button').first()
+  await firstThreadButton.click()
+  await expect(threadTab(page, firstThreadId)).toHaveAttribute('data-preview', 'true')
+  await firstThreadButton.dblclick()
+  await expect(threadTab(page, firstThreadId)).not.toHaveAttribute('data-preview')
+  await sidebarThreadRow(page, secondThreadId).getByRole('button').first().click()
+  await expect(threadTab(page, secondThreadId)).toHaveAttribute('data-preview', 'true')
+})
+
+Then('its tab stays open beside the next preview tab', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'main-tabs-sidebar-double-click-keeps-thread', async () => {
+    await expect.poll(() => tabSummary(page)).toHaveLength(2)
+    await expect(page.locator('[data-tab-id^="thread:"]')).toHaveCount(2)
+    await expect(page.locator('[data-tab-id][data-preview="true"]')).toHaveCount(1)
+  })
+  await finishJourneyAssertions(page)
 })
 
 Then('the tabs come back with the pin and the Jujutsu tab is active again', async ({ page }: { page: Page }) => {

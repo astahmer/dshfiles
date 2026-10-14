@@ -5,7 +5,7 @@
     {
       "id": "main-view-tabs",
       "title": "Browser-like tabs above the main view",
-      "summary": "Every thread or global panel shown in the main view opens or focuses a tab above it. The strip looks like DSH's own right-panel tabs (28px pills, hairline separators, a close cross over a faded title end). Tabs close with × or a middle click, reorder by drag, pin to the start, close others or to the right from their context menu, scroll or list in a dropdown when they overflow, and show working, needs-you and unread dots on thread tabs. Opening from outside the strip uses a VS Code-style preview tab by default.",
+      "summary": "Every thread or global panel shown in the main view opens or focuses a tab above it. The strip looks like DSH's own right-panel tabs (28px pills, hairline separators, a close cross over a faded title end). Tabs close with × or a middle click, reorder by drag, pin to the start, close others or to the right from their context menu, scroll or list in a dropdown when they overflow, and show working, needs-you and unread dots on thread tabs. Opening from outside the strip uses a VS Code-style preview tab by default; double-clicking a sidebar thread keeps its tab open.",
       "reach": ["click button \"Workbench\"", "expect tab \"Workbench\""],
       "surfaces": ["client", "integration", "storage", "settings"],
       "configuration": [
@@ -42,6 +42,11 @@
         {
           "kind": "gherkin",
           "id": "main-tabs.panels-and-threads",
+          "featureFile": "tooling/dshx/e2e/features/main-tabs.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "main-tabs.sidebar-thread-double-click",
           "featureFile": "tooling/dshx/e2e/features/main-tabs.feature"
         },
         {

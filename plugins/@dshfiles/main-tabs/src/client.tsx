@@ -23,6 +23,9 @@ import { STRIP_MISPLACED_WARNING, STRIP_MISSING_WARNING, mountStripHost, stripSi
 import { saveTabs, storedTabs } from './tabs-storage.js'
 import './client.css'
 
+const THREAD_TAB_KEEP_EVENT = 'dshfiles:main-tabs:keep-thread'
+const threadTabKeepRequestSchema = z.object({ sessionId: z.string().min(1) }).strict()
+
 const isShortcutCommandId = (value: string): value is ShortcutCommandId => /^[a-z][a-zA-Z0-9-]*(?:\.[a-zA-Z][a-zA-Z0-9-]*)+$/u.test(value)
 
 /** "dshfiles-multi-host-thread" → "Multi host thread", for a main panel without a sidebar entry to name it. */
@@ -120,6 +123,17 @@ export default defineClient({
       window.addEventListener(OPEN_THREAD_EVENT, onOpenThread)
       return () => window.removeEventListener(OPEN_THREAD_EVENT, onOpenThread)
     }, 'main-tabs: open a thread for another plugin')
+
+    ctx.effect(() => {
+      const keepThreadTab = (event: Event): void => {
+        if (!(event instanceof CustomEvent)) return
+        const request = threadTabKeepRequestSchema.safeParse(event.detail)
+        if (!request.success) return
+        actor.send({ type: 'thread.keep', sessionId: request.data.sessionId })
+      }
+      window.addEventListener(THREAD_TAB_KEEP_EVENT, keepThreadTab)
+      return () => window.removeEventListener(THREAD_TAB_KEEP_EVENT, keepThreadTab)
+    }, 'main-tabs: keep double-clicked sidebar threads')
 
     ctx.effect(() => {
       let reported = ''
