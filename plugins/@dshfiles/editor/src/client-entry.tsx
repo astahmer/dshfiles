@@ -8,7 +8,7 @@ import { defineClient } from '@dshfiles/dshx/client'
 import type { SettingsValue } from '@dshfiles/dshx/settings'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
-import { workbenchPanels } from '@dshfiles/workbench/registry'
+import { WORKBENCH_MAIN_PANEL_ID, workbenchPanels } from '@dshfiles/workbench/registry'
 import { useEffect, useSyncExternalStore } from 'react'
 import { z } from 'zod'
 import './client.css'
@@ -143,7 +143,8 @@ export default defineClient({
     // The workbench keeps moved panels mounted, so the Monaco instance and its view state survive docking changes.
     const workbench = workbenchPanels()
     ctx.effect(() => workbench.register({ id: WORKBENCH_PANEL_ID, title: 'Editor', component: Panel }), 'dshfiles-editor: workbench panel')
-    const workbenchInstalled = (): boolean => workbench.list().some(panel => !panel.id.startsWith('dshfiles-editor.'))
+    // Its panel registry is page-global and may exist without it; the workbench is loaded when its own main panel is.
+    const workbenchInstalled = (): boolean => ctx.slots.entriesOfSlot('main').some(entry => entry.options.key === WORKBENCH_MAIN_PANEL_ID)
     const showEditor = (): void => {
       if (placement.get() === 'workbench' && workbenchInstalled()) workbench.open(WORKBENCH_PANEL_ID)
       else ctx.sidebarRight.openTab(RIGHT_PANE_KIND, { revealIfOpened: true })

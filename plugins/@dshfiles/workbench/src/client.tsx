@@ -13,12 +13,13 @@ import { useEffect, useLayoutEffect } from 'react'
 import { demoPanels } from './demo-panels.js'
 import { createLayoutStore } from './layout-store.js'
 import { WORKBENCH_LOCALE_NAMESPACE, workbenchLocale } from './locales.js'
-import { workbenchPanels } from './registry.js'
+import { workbenchPanels, type WORKBENCH_MAIN_PANEL_ID } from './registry.js'
 import { workbenchSettings } from './settings.js'
 import { WorkbenchView } from './workbench-view.js'
 import './client.css'
 
-const PANEL_ID = 'dshfiles-workbench'
+// A literal so dshx's slot-occupancy check can read the id; `satisfies` keeps it equal to the exported contract.
+const PANEL_ID = 'dshfiles-workbench' satisfies typeof WORKBENCH_MAIN_PANEL_ID
 const RIGHT_PANE_ID = '@dshfiles/workbench/side-panel'
 const RIGHT_PANE_KIND = 'dshfiles-workbench-side-panel'
 const TOGGLE_COMMAND_ID = 'workbench.toggleSidePanel'

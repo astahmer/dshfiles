@@ -56,7 +56,12 @@ When('a disposable workspace with source, dependency and version-control files h
 
   await registerWorkspaceFolder(page, workspace)
   const composer = page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })
-  await composer.fill('editor e2e thread')
+  // The New thread composer resets a draft typed while it switches to the just-registered project, so type until it sticks.
+  await expect(async () => {
+    await composer.fill('editor e2e thread')
+    await page.waitForTimeout(400)
+    await expect(composer).toHaveText('editor e2e thread', { timeout: 500 })
+  }).toPass({ timeout: 15_000 })
   await composer.press('Enter')
   await expect(page.getByRole('navigation', { name: 'Session hierarchy', exact: true })).toContainText('editor e2e thread', { timeout: 45_000 })
 })

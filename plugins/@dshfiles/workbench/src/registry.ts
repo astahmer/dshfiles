@@ -1,5 +1,8 @@
 import type { ComponentType } from 'react'
 
+/** The workbench's own `main` panel key; a contributor checks the slot ledger for it to know the workbench is loaded. */
+export const WORKBENCH_MAIN_PANEL_ID = 'dshfiles-workbench'
+
 export interface WorkbenchPanelProps {
   readonly panelId: string
 }
