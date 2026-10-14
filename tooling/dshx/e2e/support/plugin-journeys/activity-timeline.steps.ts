@@ -31,7 +31,7 @@ Then('the feed lists the session events in order with their provenance', async (
   await page.getByRole('button', { name: /Agent reported an error/ }).click()
   await recordAssertion(page, 'activity-timeline-detail-shows-references-and-provenance', async () => {
     await expect(page.getByText('session.error', { exact: false }).first()).toBeVisible()
-    await expect(page.getByText(/^session: session-/).first()).toBeVisible()
+    await expect(page.getByText('session: activity timeline journey turn', { exact: true }).first()).toBeVisible()
     await expect(page.getByText('Provenance: Observed', { exact: true })).toBeVisible()
   })
 })

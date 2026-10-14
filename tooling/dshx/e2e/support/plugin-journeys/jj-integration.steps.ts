@@ -242,7 +242,8 @@ When('a first message is sent from the shared checkout', async ({ page }: { page
   const composer = page.getByRole('textbox', { name: newThreadComposerName, exact: true })
   await composer.fill('background new thread e2e')
   await composer.press('Enter')
-  await expect(page.getByRole('navigation', { name: 'Session hierarchy', exact: true })).toContainText('background new thread e2e')
+  // The first send also creates the session and its workspace; on a loaded machine that outlasts the 15s default.
+  await expect(page.getByRole('navigation', { name: 'Session hierarchy', exact: true })).toContainText('background new thread e2e', { timeout: 45_000 })
 })
 
 When('New thread is clicked in the sidebar', async ({ page }: { page: Page }) => {

@@ -25,7 +25,8 @@ Then('Explore, Context Preview and Pipeline remain separate read-only tabs', asy
     const search = page.getByRole('textbox', { name: 'Search project memories' })
     await search.fill(marker)
     const result = page.getByRole('button').filter({ hasText: marker })
-    await expect(result).toBeVisible({ timeout: 30_000 })
+    // The message is indexed in the background; under a full serial run that took longer than 30s.
+    await expect(result).toBeVisible({ timeout: 60_000 })
     await result.click()
     await expect(page.getByText(marker, { exact: true }).last()).toBeVisible()
     await page.getByRole('tab', { name: 'Context preview', exact: true }).click()

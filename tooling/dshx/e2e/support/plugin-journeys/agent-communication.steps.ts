@@ -66,6 +66,12 @@ Then('a direct message remains unread until its recipient reads it', async ({ pa
 
 Then("workspace diagnostics show the active Agent's workspace subscription", async ({ page }: { page: Page }) => {
   await page.getByRole('tab', { name: 'Diagnostics', exact: true }).click()
+  // The Agent joins its workspace channel asynchronously and the panel polls every 30s, so a loaded Host can show the
+  // first snapshot without the subscription; Refresh reads it again.
+  await expect(async () => {
+    await page.getByRole('button', { name: 'Refresh', exact: true }).click()
+    await expect(page.getByText('Subscribed', { exact: true })).toBeVisible({ timeout: 2_000 })
+  }).toPass({ timeout: 45_000 })
   await recordAssertion(page, 'communication-workspace-subscription-health', async () => {
     await expect(page.getByText('Idle · completion unknown', { exact: true })).toBeVisible()
     await expect(page.getByText('Subscribed', { exact: true })).toBeVisible()

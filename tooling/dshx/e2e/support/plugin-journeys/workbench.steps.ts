@@ -43,6 +43,11 @@ When('the saved Workbench layout is corrupted and the page is reloaded', async (
 })
 
 When('the Editor tab is selected and the editor plugin is disabled', async ({ page }: { page: Page }) => {
+  // Only a saved layout keeps placeholders; the untouched default (the Editor alone) is rebuilt from what registers.
+  // Closing the Editor and adding it back is the smallest change that saves the layout.
+  await page.getByRole('button', { name: 'Close Editor', exact: true }).click()
+  await page.getByRole('button', { name: 'Add panel', exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Editor', exact: true }).click()
   await page.getByRole('tab', { name: 'Editor', exact: true }).click()
   await expect(page.getByRole('region', { name: 'Editor', exact: true })).toBeVisible()
   await setPluginEnabled(page, '@dshfiles/editor', false)
