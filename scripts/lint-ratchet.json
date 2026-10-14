@@ -21,6 +21,6 @@
     "no-direct-json-parse": 177,
     "no-direct-json-parse-tsx": 1,
     "no-export-from": 172,
-    "no-wildcard-export": 3
+    "no-wildcard-export": 1
   }
 }

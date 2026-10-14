@@ -80,6 +80,7 @@ Field components: `TextField`, `TextAreaField`, `SelectField` (shadcn Select), `
 import { assign, fromPromise, setup, useMachine } from '@dshfiles/plugin-ui/machine'
 ```
 
+The subpath names each xstate export a plugin uses; add a name there when a plugin needs another.
 Only for tangled flows with three or more states (select → prepare → confirm → receipt). Machines own flow state; server data stays in Query. Call the Host through `fromPromise` actors and forward their `signal` — leaving a state stops the actor and aborts the call.
 
 ## Chart

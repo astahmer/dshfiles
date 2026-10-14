@@ -100,7 +100,7 @@ rule to `error` once those land.
 - **`export *`**: `plugins/@dshfiles/optmem-core/src/index.ts`
   (`export type * from './types.ts'`; optmem workspaces are changing
   `types.ts`).
-- [ ] 4. `refactor(plugin-ui)`: named `machine` exports. `docs`: shared skills in
+- [ ] 4. ~~`refactor(plugin-ui)`: named `machine` exports~~ (done; `export *` cap 1). `docs`: shared skills in
       `AGENTS.md`, link `actor-state-ownership` from `plugin-state`.
 - [ ] 5. `chore(knip)`: `plugins/knip.jsonc`, report-only.
 - [ ] 6. `chore(deps)`: single root, redone from `main`.
