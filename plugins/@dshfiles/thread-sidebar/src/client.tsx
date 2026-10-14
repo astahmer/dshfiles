@@ -4,6 +4,8 @@ import type { WorkspaceView } from '@deepseek-ai/dsh-api-workspace-controller/cl
 import type { WorkspaceBrowserProps } from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import { RemoteThreadsSection } from './remote-threads-section.js'
+import type { ActorRefFrom } from '@dshfiles/plugin-ui/machine'
+import type { archivedViewMachine } from './archived-view-machine.js'
 import { useApiQuery } from '@dshfiles/dshx/client'
 import {
   IconArchiveOutlineRegular,
@@ -139,6 +141,8 @@ type InjectedActions = {
   unpinSession: (sessionId: SessionSummary['id']) => Promise<void>
   /** Show the remote thread view; set when the layout service is available. */
   openRemoteThreads?: () => void
+  /** Reports archived threads that failed to open or keep being closed by DSH. */
+  archivedView?: ActorRefFrom<typeof archivedViewMachine>
 }
 
 type ThreadSidebarProps = Pick<WorkspaceBrowserProps, 'open' | 'useSessions' | 'useSessionStatus' | 'useWorkspaces'> &
@@ -1016,6 +1020,31 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
     setNotice(failed ? { tone: 'danger', message: props.tSidebar('threadSidebarActionFailure') } : null)
   }
 
+  const archivedView = props.archivedView
+  const unarchiveSession = props.unarchiveSession
+  const reopenThread = props.open
+  const tSidebar = props.tSidebar
+  useEffect(() => {
+    if (archivedView === undefined) return
+    const subscription = archivedView.on('failed', event => {
+      const sessionId = event.sessionId
+      if (sessionId === null) return
+      setNotice({
+        tone: 'danger',
+        message: tSidebar(event.failure === 'keeps-closing' ? 'threadSidebarArchivedKeepsClosing' : 'threadSidebarArchivedLoadFailed'),
+        actionLabel: tSidebar('threadSidebarRestoreAndOpen'),
+        onAction: () => {
+          setNotice(null)
+          void unarchiveSession(sessionId).then(
+            () => reopenThread(sessionId),
+            () => setNotice({ tone: 'danger', message: tSidebar('threadSidebarActionFailure') }),
+          )
+        },
+      })
+    })
+    return () => subscription.unsubscribe()
+  }, [archivedView, reopenThread, tSidebar, unarchiveSession])
+
   const openThread = (sessionId: SessionSummary['id']): void => {
     if (selectedSession?.id === sessionId) {
       const current = threadNotificationPreferences.get() ?? DEFAULT_THREAD_NOTIFICATION_PREFERENCES
@@ -1771,7 +1800,9 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
       >
         <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
           {isTransientNotice ? (
-            <span className="dshx:min-w-0 dshx:truncate dshx:text-card-foreground">{notice.message}</span>
+            <span className="dshx:min-w-0 dshx:truncate dshx:text-card-foreground" title={notice.message}>
+              {notice.message}
+            </span>
           ) : (
             <SidebarNoticeMessage message={notice.message} />
           )}

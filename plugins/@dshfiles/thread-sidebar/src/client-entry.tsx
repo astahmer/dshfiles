@@ -11,8 +11,12 @@ import { resolveSlotLabel, type TranslateNS } from '@deepseek-ai/dsh-client-ui-s
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { createApiClient, defineClient } from '@dshfiles/dshx/client'
+import { createActor } from '@dshfiles/plugin-ui/machine'
+import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
 import { useEffect, useRef } from 'react'
+import { ArchivedThreadDock } from './archived-thread-dock.js'
+import { archivedViewMachine } from './archived-view-machine.js'
 import { SidebarRoot, type FooterSnapshot, type SidebarShellBaseProps } from './sidebar-shell.js'
 import { ThreadSidebar } from './client.js'
 import { HeaderThreadActions } from './header-actions.js'
@@ -33,6 +37,12 @@ import {
   type ThreadMentionFailureDiagnosticInput,
 } from './thread-mention.js'
 import './client.css'
+
+declare module '@deepseek-ai/dsh-api-session-controller/client' {
+  interface SessionReferenceSourceMap {
+    threadSidebarArchivedView: unknown
+  }
+}
 
 export default defineClient({
   name: '@dshfiles/thread-sidebar',
@@ -310,12 +320,51 @@ export default defineClient({
           }
         : null
 
+    const archivedView = createActor(archivedViewMachine, {
+      input: {
+        client: {
+          open: sessionId => ctx.uiWorkspace.openSession(sessionId),
+          ready: async (sessionId, signal) => {
+            const reference = ctx.sessions.retain(sessionId, { source: 'threadSidebarArchivedView' })
+            const aborted = new Promise<never>((_resolve, reject) => signal.addEventListener('abort', () => reject(signal.reason), { once: true }))
+            try {
+              await Promise.race([reference.ready, aborted])
+            } finally {
+              reference.release()
+            }
+          },
+          now: () => Date.now(),
+        },
+      },
+    })
+    ctx.effect(() => {
+      archivedView.start()
+      let selected: string | null = null
+      const followSelection = (): void => {
+        const sessions = ctx.sessions.list.getSnapshot()
+        const next = sessions.ids.find(id => (sessions.byId[id]?.retainedBy.mainView ?? 0) > 0) ?? null
+        if (next === selected) return
+        selected = next
+        archivedView.send({ type: 'selection.changed', sessionId: next })
+      }
+      const unsubscribe = ctx.sessions.list.subscribe(followSelection)
+      return () => {
+        unsubscribe()
+        archivedView.stop()
+      }
+    }, 'thread-sidebar: archived thread view')
+    const openThread = (sessionId: SessionSummary['id']): void => {
+      const archived = ctx.workspaces.list.getSnapshot().archivedSessionIds.includes(sessionId)
+      archivedView.send({ type: 'open', sessionId, archived })
+      if (!archived) ctx.uiWorkspace.openSession(sessionId)
+    }
+
     const SidebarRootAdapter = (props: SidebarShellBaseProps): JSX.Element => (
       <SidebarRoot
         {...props}
         readFooterSnapshot={readFooterSnapshot}
         subscribeFooterSnapshot={subscribeFooterSnapshot}
-        openSession={sessionId => ctx.uiWorkspace.openSession(sessionId)}
+        openSession={openThread}
         runCommand={runCommand}
       />
     )
@@ -327,6 +376,16 @@ export default defineClient({
           id: 'thread-sidebar-mention-input',
         },
         decorate(ThreadMentionInput),
+      ),
+    )
+    ctx.slots.inject('conversation.input.dock', () =>
+      ctx.slots.register(
+        { name: 'conversation.input.dock', id: 'thread-sidebar-archived-banner', order: 5, inject: sessionId => ({ sessionId }) },
+        decorate((props: { readonly sessionId: SessionSummary['id'] }) => (
+          <PluginQueryProvider>
+            <ArchivedThreadDock sessionId={props.sessionId} workspaces={ctx.workspaces} blocks={ctx.conversation.blocks} t={translate} />
+          </PluginQueryProvider>
+        )),
       ),
     )
 
@@ -389,7 +448,8 @@ export default defineClient({
               const result = await ctx.remote.workspace.unpinSession({ sessionId })
               if (!result.ok) throw new Error(result.error.code)
             },
-            open: (sessionId: SessionSummary['id']) => ctx.uiWorkspace.openSession(sessionId),
+            open: openThread,
+            archivedView,
             openRemoteThreads: () => ctx.layout.selectPanel('dshfiles-multi-host-thread' as MainPanelId),
           }),
         },

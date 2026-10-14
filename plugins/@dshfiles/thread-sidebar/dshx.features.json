@@ -153,7 +153,22 @@
     {
       "id": "manual-archive-undo",
       "title": "Undo a manual thread archive",
-      "summary": "Configure a temporary notice after manual archive, restore exactly the threads archived by that action when Undo is selected, or open an archived thread without restoring it.",
+      "summary": "Configure a temporary notice after manual archive, restore exactly the threads archived by that action when Undo is selected, or open an archived thread read-only (composer blocked, \"Restore to reply\" banner); when DSH closes or cannot load it, the sidebar names the failure and offers Restore and open.",
+      "reach": [
+        "click button \"New thread\"",
+        "click button \"Choose workspace\"",
+        "fill textbox \"Search projects or enter a folder path\" \"sample\"",
+        "expect option \"sample*\"",
+        "press Enter",
+        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Archive me later\"",
+        "press Enter",
+        "expect text \"Archive me later\"",
+        "click button \"More thread actions\"",
+        "click menuitem \"Archive\"",
+        "click button \"Archived*\"",
+        "click text \"Archive me later\"",
+        "expect button \"Restore and open\""
+      ],
       "surfaces": ["client", "host", "settings", "integration"],
       "configuration": [
         {
@@ -170,12 +185,13 @@
           "coveredBy": ["thread-sidebar.archive-undo-preferences"]
         }
       ],
-      "states": ["archived", "undo-available", "archived-open", "restored", "restore-failed"],
+      "states": ["archived", "undo-available", "archived-open", "restored", "restore-failed", "archived-open-failed"],
       "failureModes": [
         "Undo is offered only for thread IDs successfully archived by the initiating action.",
         "A partial restore reports failure without hiding the remaining archive state.",
         "Disabling the undo notice does not prevent archival.",
-        "Opening an archived thread leaves it archived."
+        "Opening an archived thread leaves it archived.",
+        "DSH clears an archived main Session whenever its lists change; the sidebar reopens it at most 3 times in 10 s, then shows the failure with Restore and open instead of a blank composer."
       ],
       "externalDependencies": [],
       "verification": [
@@ -188,6 +204,12 @@
           "kind": "gherkin",
           "id": "thread-sidebar.archive-undo-preferences",
           "featureFile": "tooling/dshx/e2e/features/thread-sidebar.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.archived-view",
+          "file": "plugins/@dshfiles/thread-sidebar/src/archived-view-machine.test.ts",
+          "testName": "stops reopening and reports the thread when DSH keeps closing it"
         }
       ]
     },
