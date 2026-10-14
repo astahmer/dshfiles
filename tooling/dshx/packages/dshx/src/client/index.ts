@@ -1,3 +1,5 @@
+import { provideSettingsPageRenderer, type SettingsPageRenderer, type SettingsPageRendererProps } from '../settings/page-renderer.js'
+
 export { defineClient, defineSlot } from './define.js'
 export { declareLocaleNamespace, defineLocale } from './locale.js'
 export { CLIENT_SLOT_REFERENCES, findClientSlot, slotOwnerImports, type ClientSlotReference } from './slot-reference.js'
@@ -34,3 +36,6 @@ export type {
   PanelProps,
   PanelIconProps,
 } from '../sdk/client.js'
+
+export { provideSettingsPageRenderer }
+export type { SettingsPageRenderer, SettingsPageRendererProps }

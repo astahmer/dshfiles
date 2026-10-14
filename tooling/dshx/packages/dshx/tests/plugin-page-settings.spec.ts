@@ -2,6 +2,7 @@ import Schema from '@deepseek-ai/schemastery'
 import { createElement } from 'react'
 import { createRequire } from 'node:module'
 import { afterEach, describe, expect, it } from 'vitest'
+import { provideSettingsPageRenderer } from '../src/settings/page-renderer.js'
 import { registerPluginPageSettings } from '../src/settings/plugin-page.js'
 
 interface CapturedSpec {
@@ -105,6 +106,18 @@ const provideModules = (): void => {
   nodeRequire.cache[primitivesPath] = { id: primitivesPath, filename: primitivesPath, loaded: true, exports: primitives } as never
 }
 
+type PageFixture = ReturnType<typeof pageContext>
+
+/** Server-render one registered page the way the Plugins page renders it: its injected face, the page view, the mirror. */
+const renderPage = (page: PageFixture, registration: PageFixture['registrations'][number]): string =>
+  renderToStaticMarkup(
+    createElement(registration.component as never, {
+      ...(registration.options.inject as () => Record<string, unknown>)(),
+      view: 'page',
+      useDescribe: (selector: (snapshot: unknown) => unknown) => selector(page.describeSnapshot),
+    }),
+  )
+
 describe('Plugins page settings', () => {
   it('registers the bundle form under the package name only once a namespace is served', () => {
     provideModules()
@@ -120,15 +133,7 @@ describe('Plugins page settings', () => {
     const page = pageContext()
     registerPluginPageSettings(page.ctx, { packageId: '@dshfiles/jujutsu', namespaces: ['dshfiles-jujutsu'] })
     page.serve()
-    const registration = page.registrations[0]!
-    const face = (registration.options.inject as () => Record<string, unknown>)()
-    const markup = renderToStaticMarkup(
-      createElement(registration.component as never, {
-        ...face,
-        view: 'page',
-        useDescribe: (selector: (snapshot: unknown) => unknown) => selector(page.describeSnapshot),
-      }),
-    )
+    const markup = renderPage(page, page.registrations[0]!)
     expect(markup).toContain('<segmented-control data-label="Default view">')
     expect(markup).toContain('<value-field data-label="Ancestor count" data-hint="Ancestor groups shown.">')
     expect(markup).toMatch(/<select id="dshx-plugin-settings-dshfiles-jujutsu-diffLayout"[^>]*aria-label="Diff layout"/)
@@ -143,14 +148,7 @@ describe('Plugins page settings', () => {
     const page = pageContext()
     registerPluginPageSettings(page.ctx, { packageId: '@dshfiles/jujutsu', namespaces: ['dshfiles-jujutsu'] })
     page.serve()
-    const registration = page.registrations[0]!
-    renderToStaticMarkup(
-      createElement(registration.component as never, {
-        ...(registration.options.inject as () => Record<string, unknown>)(),
-        view: 'page',
-        useDescribe: (selector: (snapshot: unknown) => unknown) => selector(page.describeSnapshot),
-      }),
-    )
+    renderPage(page, page.registrations[0]!)
     const spec = (field: string): CapturedSpec => specs.find(item => item.field === field)!
     expect(spec('ancestorCount').parse('3')).toEqual({ kind: 'set', value: 3 })
     expect(spec('ancestorCount').parse('50')).toBeUndefined()
@@ -159,6 +157,21 @@ describe('Plugins page settings', () => {
     expect(spec('defaultView').parse('"tree"')).toBeUndefined()
     expect(spec('defaultView').format('graph')).toBe('"graph"')
     expect(spec('diffExpanded').parse('false')).toEqual({ kind: 'set', value: false })
+  })
+
+  it('hands the page to a provided renderer, and falls back to the built-in form once it leaves', () => {
+    provideModules()
+    const page = pageContext()
+    registerPluginPageSettings(page.ctx, { packageId: '@dshfiles/jujutsu', namespaces: ['dshfiles-jujutsu', 'unserved'] })
+    page.serve()
+    const registration = page.registrations[0]!
+    const render = (): string => renderPage(page, registration)
+    const release = provideSettingsPageRenderer(props =>
+      createElement('rich-page', { 'data-package': props.packageId, 'data-namespaces': props.namespaces.join(',') }),
+    )
+    expect(render()).toBe('<rich-page data-package="@dshfiles/jujutsu" data-namespaces="dshfiles-jujutsu"></rich-page>')
+    release()
+    expect(render()).toContain('<segmented-control data-label="Default view">')
   })
 
   it('stays silent on a Host without optional injection or served-namespace tracking', () => {

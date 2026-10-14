@@ -48,6 +48,7 @@ const API_DEFINE_PATH = fileURLToPath(new URL('../../api/define.js', import.meta
 const API_RUNTIME_PATH = fileURLToPath(new URL('../../api/runtime.js', import.meta.url))
 const SETTINGS_DEFINE_PATH = fileURLToPath(new URL('../../settings/define.js', import.meta.url))
 const SETTINGS_CLIENT_PATH = fileURLToPath(new URL('../../settings/client.js', import.meta.url))
+const SETTINGS_PAGE_RENDERER_PATH = fileURLToPath(new URL('../../settings/page-renderer.js', import.meta.url))
 const CONVERSATION_DEFINE_PATH = fileURLToPath(new URL('../../conversation/define.js', import.meta.url))
 
 /** Options for producing one DSH-compatible lazy-CJS client bundle. */
@@ -150,6 +151,7 @@ function clientEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, op
           `export { useApi, useApiQuery } from ${JSON.stringify(VIRTUAL_CLIENT_API_HOOKS)}`,
           `export { createApiClient } from ${JSON.stringify(API_RUNTIME_PATH)}`,
           `export { useSettings } from ${JSON.stringify(VIRTUAL_CLIENT_SETTINGS_HOOK)}`,
+          `export { provideSettingsPageRenderer } from ${JSON.stringify(SETTINGS_PAGE_RENDERER_PATH)}`,
           '',
         ].join('\n')
       if (id === VIRTUAL_CLIENT_API_HOOKS) {

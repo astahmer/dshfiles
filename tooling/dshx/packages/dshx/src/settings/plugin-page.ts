@@ -11,6 +11,7 @@
  * schema service, or the primitives module simply shows nothing.
  */
 import type { ReactNode } from 'react'
+import { settingsPageRenderer, subscribeSettingsPageRenderer } from './page-renderer.js'
 
 type ReactRuntime = typeof import('react')
 declare const require: ((name: string) => unknown) | undefined
@@ -133,6 +134,7 @@ interface PageField {
 
 interface PageProps {
   readonly view?: 'summary' | 'page'
+  readonly packageId: string
   readonly useDescribe: <S>(selector: (snapshot: DescribeSnapshot) => S) => S
   readonly forms: ConfigFormsService
   readonly schemaService: SchemaService
@@ -382,6 +384,7 @@ const createPluginPage = (react: ReactRuntime, primitives: Primitives): ((props:
 
   return (props: PageProps): ReactNode => {
     const views = props.useDescribe(snapshot => snapshot.view?.namespaces)
+    const renderer = react.useSyncExternalStore(subscribeSettingsPageRenderer, settingsPageRenderer, settingsPageRenderer)
     react.useEffect(() => {
       void props.forms.describe().ensure?.()
     }, [props.forms])
@@ -390,6 +393,7 @@ const createPluginPage = (react: ReactRuntime, primitives: Primitives): ((props:
       const view = views?.find(item => item.ns === ns)
       return view === undefined ? [] : [view]
     })
+    if (renderer !== undefined) return h(renderer, { packageId: props.packageId, namespaces: served.map(view => view.ns) })
     return h(
       react.Fragment,
       null,
@@ -421,6 +425,7 @@ export const registerPluginPageSettings = (ctx: unknown, options: { readonly pac
     if (react === undefined || typeof primitives?.SettingsFormModel !== 'function' || typeof primitives.SettingsForm !== 'function') return
     const component = createPluginPage(react, primitives)
     const face = {
+      packageId: options.packageId,
       hooks: { describe: page.configForms.describe() },
       forms: page.configForms,
       schemaService: page.settingsSchema,
