@@ -7,7 +7,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import { defineClient } from '@dshfiles/dshx/client'
-import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
+import { PluginQueryProvider, pluginQueryClient } from '@dshfiles/plugin-ui/query'
 import type { DirectoryPickerPort, RegisteredProject } from '@dshfiles/project-folder-picker'
 import { useCallback, useMemo, useSyncExternalStore } from 'react'
 import { JujutsuPanel } from './client.js'
@@ -73,6 +73,12 @@ export default defineClient({
         }),
       'dshfiles-jujutsu: right pane tab type',
     )
+    // Another plugin that rewrote the repository (jj-integration's Land) announces it, so the changes card and chips do not wait for the next poll.
+    ctx.effect(() => {
+      const refresh = (): void => void pluginQueryClient().invalidateQueries({ queryKey: ['jujutsu'] })
+      window.addEventListener('dshfiles:jj-changed', refresh)
+      return () => window.removeEventListener('dshfiles:jj-changed', refresh)
+    }, 'dshfiles-jujutsu: refresh after another plugin changes the repository')
     // Older Hosts lack active()/isExpanded(); without them the toggle only ever opens.
     const toggleJujutsu = (path: string | null): void => {
       const sidebar = ctx.sidebarRight
