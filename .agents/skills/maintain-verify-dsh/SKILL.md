@@ -46,9 +46,12 @@ If none applies, stop: **Clean**.
    dshx dev down && pgrep -fl 'dshx-boot-profile|browser-host.js' || echo clean
    ```
    A `reach` not walked green in this session stays unverified; say so.
-5. **Triage each failure** (look at the failure screenshot and `shot` summary):
+   Then `pnpm check:e2e <plugin>` for each touched plugin: its journeys must be
+   green before landing (`pnpm check` runs none).
+5. **Triage each failure** (look at the failure screenshot, `shot` summary or
+   the journey's `test-results/*/error-context.md`):
    - **Doc drift** (a name or step changed, the feature works by hand): fix
-     `reach` or the skill.
+     `reach`, the journey's step file, or the skill.
    - **Harness gap** (`dshx dev` cannot seed, wait for or capture something):
      fix `dshx dev`, add a spec in `packages/dshx/tests/dev-scratch.spec.ts`.
    - **Product regression** (the feature is broken for a user): do not edit

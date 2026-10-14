@@ -80,6 +80,17 @@ dshx dev down
 pgrep -fl 'dshx-boot-profile|browser-host.js' || echo clean
 ```
 
+## Journeys
+
+`dshx dev` walks one feature; the Gherkin journeys walk them all. Landing a
+plugin change needs its journeys green:
+
+```sh
+pnpm check:e2e <plugin>   # its feature files, headless, serial; no filter = whole suite
+```
+
+A red journey is drift or a regression: triage it with `maintain-verify-dsh`.
+
 ## Gotchas
 
 - `reach` starts from the app root of the default `up` seed: the project is
