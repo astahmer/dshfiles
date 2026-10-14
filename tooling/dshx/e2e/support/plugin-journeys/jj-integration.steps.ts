@@ -45,7 +45,15 @@ const commitIdAt = (repositoryPath: string, home: string, revset: string): strin
 const commitIdOf = (repository: ThreadRepository, revset: string): string => commitIdAt(repository.repositoryPath, repository.temporaryRoot, revset)
 
 const descriptionOf = (repository: ThreadRepository, revset: string): string =>
-  jjAt(repository.repositoryPath, repository.temporaryRoot, ['--ignore-working-copy', 'log', '--no-graph', '-r', revset, '-T', 'description.first_line()']).trim()
+  jjAt(repository.repositoryPath, repository.temporaryRoot, [
+    '--ignore-working-copy',
+    'log',
+    '--no-graph',
+    '-r',
+    revset,
+    '-T',
+    'description.first_line()',
+  ]).trim()
 
 const workspaceNames = (repository: ThreadRepository): readonly string[] =>
   jjAt(repository.repositoryPath, repository.temporaryRoot, ['--ignore-working-copy', 'workspace', 'list'])
@@ -157,6 +165,35 @@ When('a message is sent in the thread workspace', async ({ page }: { page: Page 
   await composer.fill('jj integration land e2e thread')
   await composer.press('Enter')
   await expect(page.getByRole('navigation', { name: 'Session hierarchy', exact: true })).toContainText('jj integration land e2e thread')
+})
+
+When('{string} is typed in the New thread composer', async ({ page }: { page: Page }, text: string) => {
+  await page.getByRole('textbox', { name: newThreadComposerName, exact: true }).fill(text)
+})
+
+Then('the New thread composer contains {string}', async ({ page }: { page: Page }, text: string) => {
+  await expect(workspaceToggle(page)).toBeEnabled()
+  await expect(page.getByRole('textbox', { name: newThreadComposerName, exact: true })).toHaveText(text)
+})
+
+When('the carried draft is sent', async ({ page }: { page: Page }) => {
+  await page.getByRole('button', { name: 'Send message', exact: true }).click()
+  await expect(page.getByRole('navigation', { name: 'Session hierarchy', exact: true })).toContainText('Draft handoff regression')
+})
+
+Then('the New thread composer is empty and no consumed draft remains stored', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'jj-integration-consumed-draft-does-not-return', async () => {
+    await expect(workspaceToggle(page)).toBeEnabled()
+    await expect(page.getByRole('textbox', { name: newThreadComposerName, exact: true })).toHaveText('')
+    expect(
+      await page.evaluate(() =>
+        Object.keys(localStorage)
+          .filter(key => key.startsWith('dsh.conversation.'))
+          .some(key => localStorage.getItem(key)?.includes('Draft handoff regression')),
+      ),
+    ).toBe(false)
+  })
+  await finishJourneyAssertions(page)
 })
 
 When('new threads start in their own jj workspace by default', async ({ page }: { page: Page }) => {
@@ -299,7 +336,7 @@ Then('the thread row offers Land for its 1 unlanded revision', async ({ page }: 
   })
 })
 
-When('{string} is chosen from the thread row\'s More menu', async ({ page }: { page: Page }, item: string) => {
+When("{string} is chosen from the thread row's More menu", async ({ page }: { page: Page }, item: string) => {
   await threadRow(page)
     .getByRole('button', { name: `More actions for ${provisionedThreadName(page)}`, exact: true })
     .click()

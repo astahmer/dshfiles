@@ -64,6 +64,11 @@
           "featureFile": "tooling/dshx/e2e/features/jj-integration.feature"
         },
         {
+          "kind": "gherkin",
+          "id": "jj-integration.draft-handoff-browser-journey",
+          "featureFile": "tooling/dshx/e2e/features/jj-integration.feature"
+        },
+        {
           "kind": "unit-test",
           "id": "jj-integration.provision",
           "file": "plugins/@dshfiles/jj-integration/src/threads.integration.test.ts",
@@ -99,7 +104,7 @@
       "configuration": [],
       "states": ["opening", "preparing", "switching", "settled"],
       "failureModes": [
-        "The native composer cannot carry a typed draft to another Session, so it stays blocked (typing included) until the thread workspace is open.",
+        "Send stays blocked until the destination Session opens; navigation goes through the native composer picker so draft text and attachments move and the old blank Session is cleared.",
         "Each New-thread screen is moved at most once; a manual toggle afterwards is never undone."
       ],
       "externalDependencies": [],

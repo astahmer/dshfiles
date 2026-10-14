@@ -28,6 +28,21 @@ Feature: jj thread workspaces
     Then the New thread composer opens before its workspace exists
     And the New thread moves to its own jj workspace on "main" in the background
 
+  @scenario:jj-integration.draft-handoff-browser-journey
+  Scenario: Switching the thread destination carries the draft without leaving a stale copy
+    Given the isolated plugin composition of "@dshfiles/jj-integration, @dshfiles/workspace-folder-picker, @dshfiles/home, @dshfiles/thread-sidebar" is booted
+    When a disposable jj repository is chosen as the New thread project
+    And "Draft handoff regression" is typed in the New thread composer
+    And the New thread workspace toggle is turned on
+    Then the New thread composer contains "Draft handoff regression"
+    When the New thread workspace toggle is turned off
+    Then the New thread composer contains "Draft handoff regression"
+    When the New thread workspace toggle is turned on
+    Then the New thread composer contains "Draft handoff regression"
+    When the carried draft is sent
+    And New thread is clicked in the sidebar
+    Then the New thread composer is empty and no consumed draft remains stored
+
   @scenario:jj-integration.land-browser-journey
   Scenario: Land a thread's described work onto main
     Given the isolated plugin composition "@dshfiles/jj-integration" and "@dshfiles/workspace-folder-picker" is booted

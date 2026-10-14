@@ -22,7 +22,7 @@ export interface WorkspaceToggleClient {
   readonly provision: (input: ProvisionInput, signal: AbortSignal) => Promise<ProvisionedDestination>
   /** Resolves once the Workspace list carries the id; the client refuses to open an id it has not seen. */
   readonly listed: (workspaceId: string) => Promise<void>
-  readonly open: (workspaceId: string) => Promise<void>
+  readonly open: (workspaceId: string, signal: AbortSignal) => Promise<void>
   /** A thread workspace this project left unused for this bookmark, still listed and holding only blank Sessions. */
   readonly findSpare: (key: string) => SpareWorkspace | undefined
   readonly keepSpare: (key: string, spare: SpareWorkspace) => void
@@ -177,7 +177,7 @@ export const workspaceToggleMachine = setup({
               )
         await client.listed(target.workspaceId)
         signal.throwIfAborted()
-        await client.open(target.workspaceId)
+        await client.open(target.workspaceId, signal)
         return target
       } finally {
         release()

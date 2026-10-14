@@ -4,7 +4,7 @@ import { useQuery } from '@dshfiles/plugin-ui/query'
 import { ProjectFolderPicker, type ProjectFolderSelection, type RegisteredProject, type WorkspacePickerPorts } from '@dshfiles/project-folder-picker'
 import { useApi } from '@dshfiles/dshx/client'
 import { hostDestination, multiHostApi, multiHostQueries } from '@dshfiles/multi-host/destination'
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useState } from 'react'
 import { jjIntegrationApi } from './api.js'
 import { DestinationBar, HostChipSlot, type DestinationBarServices, type WorkspaceToggleActor, workspaceListed } from './destination-bar.js'
 import type { JjIntegrationTranslate } from './locales.js'
@@ -25,6 +25,15 @@ export const HeroWorkspacePicker = (
     readonly t: JjIntegrationTranslate
   },
 ) => {
+  const { services, onPick } = props
+  useLayoutEffect(
+    () =>
+      services.bindWorkspacePicker(workspaceId => {
+        // SAFETY: the destination was returned by the Host's workspace registry.
+        onPick(workspaceId as Parameters<EmptyWorkspaceOwnerProps['onPick']>[0])
+      }),
+    [services, onPick],
+  )
   const api = useApi(jjIntegrationApi)
   const multiHost = useApi(multiHostApi)
   const destination = hostDestination.useValue()

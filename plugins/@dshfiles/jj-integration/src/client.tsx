@@ -1,5 +1,4 @@
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
-import type { WorkspaceView } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type { EmptyWorkspaceOwnerProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
@@ -12,6 +11,7 @@ import { useQuery } from '@dshfiles/plugin-ui/query'
 import { PluginQueryProvider, pluginQueryClient } from '@dshfiles/plugin-ui/query'
 import { createWorkspacePickerPorts } from '@dshfiles/project-folder-picker'
 import { startWorkspaceToggle, type DestinationBarServices } from './destination-bar.js'
+import { createComposerWorkspaceNavigation } from './composer-workspace-navigation.js'
 import { jjIntegrationApi } from './api.js'
 import { HeroWorkspacePicker } from './hero-workspace-picker.js'
 import { LandButton } from './land-button.js'
@@ -73,12 +73,27 @@ export default defineClient({
         />
       )
     }
+    const composerNavigation = createComposerWorkspaceNavigation({
+      selectedWorkspace: () => {
+        const sessions = ctx.sessions.list.getSnapshot()
+        const current = sessions.ids.find(id => (sessions.byId[id]?.retainedBy.mainView ?? 0) > 0)
+        return ctx.workspaces.list.getSnapshot().items.find(workspace => current !== undefined && workspace.sessionIds.includes(current))?.workspaceId
+      },
+      subscribe: listener => {
+        const unsubscribeSessions = ctx.sessions.list.subscribe(listener)
+        const unsubscribeWorkspaces = ctx.workspaces.list.subscribe(listener)
+        return () => {
+          unsubscribeSessions()
+          unsubscribeWorkspaces()
+        }
+      },
+    })
     const destinationServices: DestinationBarServices = {
       workspaces: ctx.workspaces,
       sessions: ctx.sessions,
       blocks: ctx.conversation.blocks,
-      // SAFETY: every id passed here came back from the Host's workspace registry.
-      openWorkspace: workspaceId => ctx.uiWorkspace.openWorkspace(workspaceId as WorkspaceView['workspaceId']),
+      openWorkspace: composerNavigation.open,
+      bindWorkspacePicker: composerNavigation.bind,
       // A blank thread's composer would create a Session on this machine; while a remote host is chosen it sends there.
       takeOverComposer: () =>
         ctx.slots.register(

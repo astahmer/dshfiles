@@ -35,7 +35,8 @@ export interface DestinationBarServices {
   readonly workspaces: IWorkspaces
   readonly sessions: ISessions
   readonly blocks: ComposerBlocks
-  readonly openWorkspace: (workspaceId: string) => Promise<void>
+  readonly openWorkspace: (workspaceId: string, signal: AbortSignal) => Promise<void>
+  readonly bindWorkspacePicker: (pick: (workspaceId: string) => void) => () => void
   /** Replace the blank thread's composer with the remote one; returns the undo. */
   readonly takeOverComposer: () => () => void
 }
@@ -99,7 +100,7 @@ export const startWorkspaceToggle = (input: {
   const client: WorkspaceToggleClient = {
     provision: (provisionInput, signal) => input.provision(provisionInput, { signal }),
     listed: workspaceId => workspaceListed(services.workspaces, workspaceId),
-    open: workspaceId => services.openWorkspace(workspaceId),
+    open: (workspaceId, signal) => services.openWorkspace(workspaceId, signal),
     findSpare: key => {
       const spare = storedSpares.get()[key]
       if (spare === undefined) return undefined
