@@ -1,4 +1,5 @@
 import { type ChildProcess } from 'node:child_process'
+import { join } from 'node:path'
 import { prepareComposedBootProfile, type PreparedBootProfile } from '../../packages/dshx/src/project/boot-profile.js'
 import { DSHFILES_ROOT, buildPlugin, findFreePort, listLocalBootBundles, resolveLocalBundles } from '../../packages/dshx/src/project/local-bundles.js'
 import { compositionFailures, readProfileComposition } from '../../packages/dshx/src/project/profile-composition.js'
@@ -6,6 +7,9 @@ import { spawnOwnedProcess, stopOwnedProcess } from '../../packages/dshx/src/pro
 import { isolatedHostEnvironment, redactHostOutput } from './scratch-profile.js'
 
 const workspaceRoot = DSHFILES_ROOT
+// Registry dependencies come from the checked-in seed, not the live ~/.dsh profile, so a journey (and its cached
+// Turbo result) depends only on the repository.
+const sourceProfileRoot = join(workspaceRoot, 'profiles/web')
 const URL_PATTERN = /http:\/\/127\.0\.0\.1:\d+\/\S*/
 
 export interface BootedProfile {
@@ -124,7 +128,7 @@ export const bootProfile = async (profileLabel: string, timeoutMs = 90_000): Pro
   const bundles = await listLocalBootBundles()
   if (bundles.length === 0) throw new Error('No owned plugin bundles were found for the composed scratch profile.')
   for (const bundle of bundles) await buildBundleOnce(bundle)
-  const prepared = await prepareComposedBootProfile(bundles)
+  const prepared = await prepareComposedBootProfile(bundles, { sourceProfileRoot })
   const expectedClientEntries = bundles.filter(bundle => bundle.hasClient).map(bundle => bundle.packageId)
   try {
     return await startScratchProfile(prepared, profileLabel, expectedClientEntries, timeoutMs)
@@ -151,7 +155,10 @@ export const bootComposedPluginProfile = async ({
 }): Promise<BootedProfile> => {
   const bundles = resolveLocalBundles(packageIds, await listLocalBootBundles())
   for (const bundle of bundles) await buildBundleOnce(bundle)
-  const prepared = await prepareComposedBootProfile(bundles, cordisPatch === undefined ? { additionalBundleIds } : { additionalBundleIds, cordisPatch })
+  const prepared = await prepareComposedBootProfile(
+    bundles,
+    cordisPatch === undefined ? { additionalBundleIds, sourceProfileRoot } : { additionalBundleIds, sourceProfileRoot, cordisPatch },
+  )
   const expectedClientEntries = bundles.filter(bundle => bundle.hasClient).map(bundle => bundle.packageId)
   try {
     await seedHome?.(prepared.homeRoot)
