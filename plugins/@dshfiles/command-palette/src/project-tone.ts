@@ -16,6 +16,11 @@ const toneIndex = (project: string): number => {
   return Math.abs(hash) % glyphTones.length
 }
 
-export const projectGlyphTone = (project: string): string => glyphTones[toneIndex(project)] ?? glyphTones[0]
+const projectGlyphTone = (project: string): string => glyphTones[toneIndex(project)] ?? glyphTones[0]
 
-export const projectTextTone = (project: string): string => textTones[toneIndex(project)] ?? textTones[0]
+const projectTextTone = (project: string): string => textTones[toneIndex(project)] ?? textTones[0]
+
+export class ProjectTone {
+  static readonly glyph = projectGlyphTone
+  static readonly text = projectTextTone
+}

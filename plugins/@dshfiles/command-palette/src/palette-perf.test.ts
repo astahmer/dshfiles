@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'vitest'
-import { frecencyBoosts, recordUse, type FrecencyEntries } from './frecency.js'
+import { PaletteFrecency, type FrecencyEntries } from './frecency.js'
 import { PaletteRules, type ThreadCandidate } from './palette.js'
 
 const WORDS = ['sidebar', 'footer', 'palette', 'jujutsu', 'migration', 'review', 'refactor', 'billing', 'nix', 'theme']
@@ -52,7 +52,7 @@ test('ranking 2,000 threads per keystroke stays within one frame budget', () => 
 
 test('ranking 20,000 file paths per keystroke stays within one frame budget', () => {
   const index = PaletteRules.indexFiles(syntheticPaths(20_000))
-  const boosts = frecencyBoosts(
+  const boosts = PaletteFrecency.boosts(
     Array.from({ length: 200 }, (_, order) => ({ id: `file:/repo:${syntheticPaths(200)[order] ?? ''}`, count: 3, lastUsedAt: Date.now() })),
     Date.now(),
   )
@@ -71,14 +71,14 @@ test('opening the palette prepares 2,000 threads, 20,000 files and 200 frecency 
   const threads = syntheticThreads(2000)
   const paths = syntheticPaths(20_000)
   let frecency: FrecencyEntries = []
-  for (let use = 0; use < 200; use++) frecency = recordUse(frecency, `command:${use}`, Date.now())
+  for (let use = 0; use < 200; use++) frecency = PaletteFrecency.recordUse(frecency, `command:${use}`, Date.now())
   let fastest = Infinity
   for (let run = 0; run < RUNS_PER_KEYSTROKE; run++) {
     const started = performance.now()
     const threadIndex = PaletteRules.indexThreads(threads)
     PaletteRules.rankThreads({ index: threadIndex, query: '', limit: 20 })
     const fileIndex = PaletteRules.indexFiles(paths)
-    const boosts = frecencyBoosts(frecency, Date.now())
+    const boosts = PaletteFrecency.boosts(frecency, Date.now())
     PaletteRules.rankFiles({ index: fileIndex, query: '', limit: 50, boost: path => boosts.get(path) ?? 0 })
     fastest = Math.min(fastest, performance.now() - started)
   }

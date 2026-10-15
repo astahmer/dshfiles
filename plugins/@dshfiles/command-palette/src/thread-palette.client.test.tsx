@@ -137,6 +137,16 @@ describe('ThreadPalette navigation', () => {
     expect(document.activeElement).toBe(input)
     expect(onClose).not.toHaveBeenCalled()
   })
+
+  it('closes the palette when Escape backs out at the root', async () => {
+    const onClose = mount()
+    const input = screen.getByRole<HTMLInputElement>('combobox')
+    input.focus()
+
+    fireEvent.keyDown(input, { key: 'Escape', code: 'Escape' })
+
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1))
+  })
 })
 
 describe('ThreadPalette actions', () => {

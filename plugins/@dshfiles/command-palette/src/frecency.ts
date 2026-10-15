@@ -29,12 +29,17 @@ const recencyWeight = (ageMs: number): number => {
 const score = (entry: FrecencyEntries[number], now: number): number => entry.count * recencyWeight(now - entry.lastUsedAt)
 
 /** Ranking bonus per id, capped so a habit lifts an entry without beating a clearly better text match. */
-export const frecencyBoosts = (entries: FrecencyEntries, now: number): ReadonlyMap<string, number> =>
+const frecencyBoosts = (entries: FrecencyEntries, now: number): ReadonlyMap<string, number> =>
   new Map(entries.map(entry => [entry.id, Math.min(score(entry, now), 40) * 20]))
 
 /** Count one use, then keep the highest-scoring entries so storage stays bounded. */
-export const recordUse = (entries: FrecencyEntries, id: string, now: number): FrecencyEntries => {
+const recordUse = (entries: FrecencyEntries, id: string, now: number): FrecencyEntries => {
   const previous = entries.find(entry => entry.id === id)
   const used = { id, count: Math.min((previous?.count ?? 0) + 1, 100_000), lastUsedAt: now }
   return [used, ...entries.filter(entry => entry.id !== id)].sort((left, right) => score(right, now) - score(left, now)).slice(0, MAX_ENTRIES)
+}
+
+export class PaletteFrecency {
+  static readonly boosts = frecencyBoosts
+  static readonly recordUse = recordUse
 }

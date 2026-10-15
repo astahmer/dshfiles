@@ -4,15 +4,16 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@dshfiles/plugin-ui/components/ui/dialog'
 import { Tabs, TabsList, TabsTrigger } from '@dshfiles/plugin-ui/components/ui/tabs'
 import { Kbd, KbdGroup } from '@dshfiles/plugin-ui/components/ui/kbd'
-import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
 import { ArrowLeftIcon, CheckIcon, CommandIcon, FileIcon, FileSearchIcon, HashIcon, ListOrderedIcon, MessageSquareIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useMachine } from '@dshfiles/plugin-ui/machine'
-import { useDeferredValue, useEffect, useMemo, useRef, useState, useSyncExternalStore, type KeyboardEvent } from 'react'
-import { z } from 'zod'
-import { frecencyBoosts, paletteFrecency, recordUse } from './frecency.js'
-import { projectGlyphTone } from './project-tone.js'
-import { PaletteRules, type ContentHit, type PalettePrefix, type ThreadCandidate } from './palette.js'
+import { useDeferredValue, useEffect, useMemo, useRef, useSyncExternalStore, type KeyboardEvent } from 'react'
+import { useContentSearch, type ContentSearch } from './content-search-machine.js'
+import { PaletteFrecency, paletteFrecency } from './frecency.js'
+import { paletteNavigationMachine } from './palette-navigation-machine.js'
+import { useWorkspaceFiles } from './workspace-files-machine.js'
+import { ProjectTone } from './project-tone.js'
+import { PaletteRules, type PalettePrefix, type ThreadCandidate } from './palette.js'
 import { PaletteApi, type PaletteAction, type PaletteActionContext, type PaletteMode } from './palette-api.js'
 import { paletteActionMachine } from './palette-action-machine.js'
 
@@ -63,7 +64,6 @@ export interface ThreadPaletteCopy {
   readonly actionFailed: string
 }
 
-type ContentSearch = (query: string, signal: AbortSignal) => Promise<readonly ContentHit[]>
 type PaletteActionOption = Omit<PaletteAction, 'label'> & { readonly label: string }
 
 interface ThreadPaletteProps {
@@ -93,7 +93,7 @@ const FRECENT_COMMANDS_ON_EMPTY = 5
 const GO_TO_FILE_ID = 'action:go-to-file'
 
 const rememberPaletteUse = (id: string): void => {
-  paletteFrecency.set(recordUse(paletteFrecency.get(), id, Date.now()))
+  paletteFrecency.set(PaletteFrecency.recordUse(paletteFrecency.get(), id, Date.now()))
 }
 
 const rowValue = (row: PaletteRow): string => {
@@ -107,11 +107,6 @@ const rowValue = (row: PaletteRow): string => {
 
 type PaletteView = PaletteMode | 'commands' | 'content' | 'line' | 'help'
 
-interface PaletteLocation {
-  readonly mode: PaletteMode
-  readonly query: string
-}
-
 const VIEW_BY_PREFIX = {
   '>': 'commands',
   '#': 'content',
@@ -121,96 +116,18 @@ const VIEW_BY_PREFIX = {
   'session:': 'threads',
 } satisfies Readonly<Record<PalettePrefix, PaletteView>>
 
-interface ContentState {
-  readonly status: 'idle' | 'searching' | 'done' | 'failed'
-  readonly hits: readonly ContentHit[]
-}
-
-const NO_CONTENT: ContentState = { status: 'idle', hits: [] }
-
-/** Host message-content search, debounced and cancelled when the query changes. */
-const useContentSearch = (query: string, search: ContentSearch | null): ContentState => {
-  const debounced = useDebouncedValue({ value: query.trim(), delayMs: 200 })
-  const [state, setState] = useState<ContentState>(NO_CONTENT)
-  useEffect(() => {
-    if (search === null || debounced.length === 0) {
-      setState(NO_CONTENT)
-      return
-    }
-    const controller = new AbortController()
-    setState(current => ({ ...current, status: 'searching' }))
-    search(debounced, controller.signal).then(
-      hits => {
-        if (!controller.signal.aborted) setState({ status: 'done', hits })
-      },
-      () => {
-        if (!controller.signal.aborted) setState({ status: 'failed', hits: [] })
-      },
-    )
-    return () => controller.abort()
-  }, [debounced, search])
-  return state
-}
-
-const filesReplySchema = z.union([
-  z.object({ status: z.literal('no-session') }),
-  z.object({
-    status: z.enum(['indexing', 'ready']),
-    sessionId: z.string().min(1).max(256),
-    files: z.array(z.string().min(1).max(4096)).max(50_000),
-    truncated: z.boolean(),
-  }),
-])
-
-interface FilesState {
-  readonly status: 'loading' | 'indexing' | 'ready' | 'no-session' | 'unavailable'
-  readonly sessionId: string | null
-  readonly files: readonly string[]
-  readonly truncated: boolean
-}
-
-const NO_FILES: FilesState = { status: 'loading', sessionId: null, files: [], truncated: false }
-
-/** Asks @dshfiles/editor for the file list of the thread on screen; replies stream in while it walks the workspace. */
-const useWorkspaceFiles = (enabled: boolean): FilesState => {
-  const [state, setState] = useState<FilesState>(NO_FILES)
-  useEffect(() => {
-    if (!enabled) return
-    const controller = new AbortController()
-    const respond = (reply: unknown): void => {
-      const decoded = filesReplySchema.safeParse(reply)
-      if (!decoded.success || controller.signal.aborted) return
-      if (decoded.data.status === 'no-session') setState({ ...NO_FILES, status: 'no-session' })
-      else setState(decoded.data)
-    }
-    const handled = !window.dispatchEvent(
-      new CustomEvent(PaletteRules.WORKSPACE_FILES_EVENT, { detail: { respond, signal: controller.signal }, cancelable: true }),
-    )
-    if (!handled) setState({ ...NO_FILES, status: 'unavailable' })
-    return () => controller.abort()
-  }, [enabled])
-  return state
-}
-
 /** Host shortcut commands that do what a differently labelled palette entry already does. */
 const SAME_COMMAND_AS = new Map([['@dshfiles/thread-sidebar/command/session.new', 'new thread']])
 
 export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
-  const [mode, setMode] = useState(props.mode)
-  const [query, setQuery] = useState('')
-  const [backStack, setBackStack] = useState<readonly PaletteLocation[]>([])
+  const [navigationSnapshot, sendNavigation] = useMachine(paletteNavigationMachine, { input: { mode: props.mode } })
+  const { mode, query, backStack, notice, selected, closeRequested } = navigationSnapshot.context
   const parsed = PaletteRules.parsePaletteQuery(query)
   const view: PaletteView = parsed.prefix === null ? mode : VIEW_BY_PREFIX[parsed.prefix]
   const deferredQuery = useDeferredValue(parsed.text)
   const subview = backStack.length > 0 || parsed.prefix !== null
-  useEffect(() => {
-    setMode(props.mode)
-    setQuery('')
-    setBackStack([])
-  }, [props.mode])
+  useEffect(() => sendNavigation({ type: 'mode.sync', mode: props.mode }), [props.mode, sendNavigation])
   const emptyQuery = deferredQuery.trim().length === 0
-  const [notice, setNotice] = useState<string | null>(null)
-  const [selected, setSelected] = useState('')
   const [actionSnapshot, sendAction, actionActor] = useMachine(paletteActionMachine)
   const latestOnClose = useRef(props.onClose)
   latestOnClose.current = props.onClose
@@ -218,9 +135,14 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
     const subscription = actionActor.on('completed', () => latestOnClose.current())
     return () => subscription.unsubscribe()
   }, [actionActor])
+  useEffect(() => {
+    if (!closeRequested) return
+    latestOnClose.current()
+    sendNavigation({ type: 'close.handled' })
+  }, [closeRequested, sendNavigation])
   const runningAction = actionSnapshot.matches('running')
   const frecency = paletteFrecency.useValue()
-  const boosts = useMemo(() => frecencyBoosts(frecency, Date.now()), [frecency])
+  const boosts = useMemo(() => PaletteFrecency.boosts(frecency, Date.now()), [frecency])
   const registeredActions = useSyncExternalStore(PaletteApi.subscribe, PaletteApi.getSnapshot, PaletteApi.getSnapshot).actions
   const actionOptions = useMemo<PaletteActionOption[]>(() => {
     // Several bundles register the same command ("New thread" comes from this palette, the sidebar header and the
@@ -345,22 +267,18 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
 
   const activate = (row: PaletteRow): void => {
     if (row.kind === 'help') {
-      setQuery(row.prefix)
-      setSelected('')
+      sendNavigation({ type: 'query.change', query: row.prefix })
       return
     }
     if (row.kind === 'line') {
       const handled = !window.dispatchEvent(new CustomEvent(PaletteRules.GO_TO_LINE_EVENT, { detail: { line: row.line }, cancelable: true }))
       if (handled) props.onClose()
-      else setNotice(props.copy.noEditorFile)
+      else sendNavigation({ type: 'notice.show', message: props.copy.noEditorFile })
       return
     }
     if (row.kind === 'destination' && row.destination.id === GO_TO_FILE_ID) {
       rememberPaletteUse(GO_TO_FILE_ID)
-      setBackStack(stack => [...stack, { mode, query }])
-      setMode('files')
-      setQuery('')
-      setSelected('')
+      sendNavigation({ type: 'files.navigate' })
       return
     }
     if (row.kind === 'thread' || row.kind === 'content') {
@@ -379,33 +297,13 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
   }
 
   const clearNotice = (): void => {
-    setNotice(null)
+    sendNavigation({ type: 'notice.clear' })
     if (actionSnapshot.matches('failed')) sendAction({ type: 'reset' })
   }
 
   const goBack = (): void => {
-    if (parsed.prefix !== null) {
-      setQuery(parsed.text)
-      setSelected('')
-      clearNotice()
-      return
-    }
-    const previous = backStack.at(-1)
-    if (previous !== undefined) {
-      setBackStack(stack => stack.slice(0, -1))
-      setMode(previous.mode)
-      setQuery(previous.query)
-      setSelected('')
-      clearNotice()
-      return
-    }
-    if (query.length > 0) {
-      setQuery('')
-      setSelected('')
-      clearNotice()
-      return
-    }
-    props.onClose()
+    sendNavigation({ type: 'back' })
+    if (actionSnapshot.matches('failed')) sendAction({ type: 'reset' })
   }
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
@@ -489,14 +387,20 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
       >
         <DialogTitle className="dshx:sr-only">{props.copy.title}</DialogTitle>
         <DialogDescription className="dshx:sr-only">{placeholder}</DialogDescription>
-        <Command shouldFilter={false} value={activeValue} onValueChange={setSelected} onKeyDown={onKeyDown} loop className="dshx:rounded-none">
+        <Command
+          shouldFilter={false}
+          value={activeValue}
+          onValueChange={value => sendNavigation({ type: 'selection.change', value })}
+          onKeyDown={onKeyDown}
+          loop
+          className="dshx:rounded-none"
+        >
           <CommandInput
             autoFocus
             className="dshx:h-11"
             value={query}
             onValueChange={next => {
-              setQuery(next)
-              setSelected('')
+              sendNavigation({ type: 'query.change', query: next })
               clearNotice()
             }}
             placeholder={placeholder}
@@ -521,8 +425,7 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
                 value={mode}
                 onValueChange={(value: string) => {
                   if (value !== 'all' && value !== 'threads' && value !== 'files') return
-                  setMode(value)
-                  setSelected('')
+                  sendNavigation({ type: 'mode.change', mode: value })
                 }}
               >
                 <TabsList aria-label={props.copy.searchIn}>
@@ -619,7 +522,7 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
                       <span
                         className={cn(
                           'dshx:flex dshx:size-7 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-md dshx:text-[11px] dshx:font-semibold',
-                          thread.project.length > 0 ? projectGlyphTone(project) : 'dshx:bg-muted dshx:text-muted-foreground',
+                          thread.project.length > 0 ? ProjectTone.glyph(project) : 'dshx:bg-muted dshx:text-muted-foreground',
                         )}
                         aria-hidden="true"
                       >
