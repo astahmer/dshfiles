@@ -446,8 +446,7 @@ const setup = (ctx: Context): void => {
           result.notes,
           result.messages,
         )
-      if (result.conflicts > 0)
-        logger.warn('memory: left %d JJ workspace path(s) separate due to duplicate note or digest hashes', result.conflicts)
+      if (result.conflicts > 0) logger.warn('memory: left %d JJ workspace path(s) separate due to duplicate note or digest hashes', result.conflicts)
     })
     .catch(() => logger.warn('memory: JJ workspace memory backfill failed; remaining entries stay separate'))
   projectNormalization = normalization

@@ -115,11 +115,13 @@ describe('memory store', () => {
     store.addNote(note(first, 'Duplicate history across workspaces.'))
     store.addNote(note(second, 'Duplicate history across workspaces.'))
 
-    const result = store.rekeyProjects({ mappings: [
-      { from: unique, to },
-      { from: first, to },
-      { from: second, to },
-    ] })
+    const result = store.rekeyProjects({
+      mappings: [
+        { from: unique, to },
+        { from: first, to },
+        { from: second, to },
+      ],
+    })
 
     expect(result.projects).toBe(0)
     expect(result.conflicts).toEqual([{ kind: 'note', target: to, collisions: 1 }])
