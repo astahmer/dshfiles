@@ -1,6 +1,6 @@
 import { createActor, type ActorRefFrom } from '@dshfiles/plugin-ui/machine'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { secretRevealMachine, type SecretRevealClient, type SecretRevealRequest } from './secret-reveal-machine.js'
+import { createSecretRevealActor, secretRevealMachine, type SecretRevealClient, type SecretRevealRequest } from './secret-reveal-machine.js'
 
 type PendingCall = {
   readonly signal: AbortSignal | undefined
@@ -35,7 +35,8 @@ const harness = () => {
       return pending.promise
     },
   }
-  const actor = createActor(secretRevealMachine, { input: { client } }).start()
+  const machine = secretRevealMachine.provide({ actors: { revealSecret: createSecretRevealActor(client) } })
+  const actor = createActor(machine).start()
   return { actor, calls }
 }
 

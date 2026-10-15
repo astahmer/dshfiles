@@ -1,4 +1,8 @@
 import { useMachine } from '@dshfiles/plugin-ui/machine'
-import { secretRevealMachine, type SecretRevealClient } from './secret-reveal-machine.js'
+import { useMemo } from 'react'
+import { createSecretRevealActor, secretRevealMachine, type SecretRevealClient } from './secret-reveal-machine.js'
 
-export const useSecretReveal = (client: SecretRevealClient) => useMachine(secretRevealMachine, { input: { client } })
+export const useSecretReveal = (client: SecretRevealClient) => {
+  const machine = useMemo(() => secretRevealMachine.provide({ actors: { revealSecret: createSecretRevealActor(client) } }), [client])
+  return useMachine(machine)
+}

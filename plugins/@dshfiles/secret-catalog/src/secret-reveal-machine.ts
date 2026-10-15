@@ -5,17 +5,12 @@ import { secretCatalogApi } from './api.js'
 export type SecretRevealClient = Pick<ApiClient<typeof secretCatalogApi.methods>, 'reveal'>
 export type SecretRevealRequest = ApiClientInput<typeof secretCatalogApi.methods.reveal>
 
-interface SecretRevealMachineInput {
-  readonly client: SecretRevealClient
-}
-
 interface SecretRevealRequestState {
   readonly rowId: string
   readonly payload: SecretRevealRequest
 }
 
 interface SecretRevealContext {
-  readonly client: SecretRevealClient
   readonly operationId: number
   readonly request: SecretRevealRequestState | null
   readonly revealMs: number
@@ -40,26 +35,29 @@ type SecretRevealResult =
   | { readonly operationId: number; readonly status: 'failed' }
 
 interface SecretRevealActorInput {
-  readonly client: SecretRevealClient
   readonly operationId: number
   readonly request: SecretRevealRequestState
 }
+
+export const createSecretRevealActor = (client: SecretRevealClient) =>
+  fromPromise<SecretRevealResult, SecretRevealActorInput>(async ({ input, signal }) => {
+    try {
+      const value = await client.reveal(input.request.payload, { signal })
+      return { operationId: input.operationId, status: 'revealed', rowId: input.request.rowId, value }
+    } catch {
+      return { operationId: input.operationId, status: 'failed' }
+    }
+  })
 
 // SAFETY: XState uses these empty carriers for inference; nothing reads their values.
 export const secretRevealMachine = setup({
   types: {
     context: {} as SecretRevealContext,
     events: {} as SecretRevealMachineEvent,
-    input: {} as SecretRevealMachineInput,
   },
   actors: {
-    revealSecret: fromPromise<SecretRevealResult, SecretRevealActorInput>(async ({ input, signal }) => {
-      try {
-        const value = await input.client.reveal(input.request.payload, { signal })
-        return { operationId: input.operationId, status: 'revealed', rowId: input.request.rowId, value }
-      } catch {
-        return { operationId: input.operationId, status: 'failed' }
-      }
+    revealSecret: fromPromise<SecretRevealResult, SecretRevealActorInput>(() => {
+      throw new Error('Secret reveal machine requires an injected actor.')
     }),
   },
   delays: {
@@ -86,7 +84,7 @@ export const secretRevealMachine = setup({
 }).createMachine({
   id: 'secretReveal',
   initial: 'idle',
-  context: ({ input }) => ({ client: input.client, operationId: 0, request: null, revealMs: 0, revealed: null }),
+  context: { operationId: 0, request: null, revealMs: 0, revealed: null },
   states: {
     idle: {
       on: { toggle: { target: 'loading', actions: 'beginReveal' } },
@@ -96,7 +94,7 @@ export const secretRevealMachine = setup({
         src: 'revealSecret',
         input: ({ context }) => {
           if (context.request === null) throw new Error('Secret reveal request is missing.')
-          return { client: context.client, operationId: context.operationId, request: context.request }
+          return { operationId: context.operationId, request: context.request }
         },
         onDone: [
           {
