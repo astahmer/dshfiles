@@ -178,7 +178,7 @@ export const DestinationBar = (props: {
     // While a new thread is moving, the destination it leaves does not matter; asking would only slow jj down.
     enabled: workspaceId !== null && !toggle.busy,
     queryFn: async ({ signal }) => {
-      const input = { workspaceId: workspaceId ?? '', sessionId: newThread?.sessionId }
+      const input = newThread === null ? { workspaceId: workspaceId ?? '' } : { workspaceId: workspaceId ?? '', sessionId: newThread.sessionId }
       try {
         return await runHostRequest({ signal, timeoutMs: 30_000, request: hostSignal => api.destination(input, { signal: hostSignal }) })
       } catch (error) {
@@ -221,7 +221,7 @@ export const DestinationBar = (props: {
   const projectId = current?.projectWorkspaceId ?? workspaceId ?? ''
   const isJj = current?.vcs === 'jj'
   const isolated = toggle.pending?.isolate ?? current?.isolated === true
-  const move = (request: { readonly isolate: boolean; readonly base?: string | undefined }): void => {
+  const move = (request: { readonly isolate: boolean; readonly base?: string }): void => {
     const leavingPath =
       current?.isolated === true ? services.workspaces.list.getSnapshot().items.find(item => item.workspaceId === workspaceId)?.path : undefined
     const leavingName = threadNameOf(leavingPath)
@@ -290,7 +290,14 @@ export const DestinationBar = (props: {
             <Checkbox
               checked={isolated}
               disabled={toggle.busy}
-              onCheckedChange={checked => move({ isolate: checked === true, base: current?.bookmark ?? undefined })}
+              onCheckedChange={checked => {
+                const isolate = checked === true
+                if (current === undefined || current.bookmark === null) {
+                  move({ isolate })
+                  return
+                }
+                move({ isolate, base: current.bookmark })
+              }}
             />
             {t('workspace')}
           </label>

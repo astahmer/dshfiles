@@ -76,6 +76,25 @@ describe('workspaceToggleMachine', () => {
     expect(toggle.switched).toEqual(['ws-thread-abc123'])
   })
 
+  it('omits a missing bookmark from the workspace API payload', async () => {
+    const payloads: unknown[] = []
+    const toggle = startToggle({
+      provision: async input => {
+        payloads.push(input)
+        return { workspaceId: 'ws-thread-abc123' }
+      },
+    })
+    const request = defaultDestinationMove({
+      destination: { vcs: 'jj', isolated: false, projectWorkspaceId: 'project', bookmark: null, bookmarks: [], isolateByDefault: true },
+      workspaceId: 'project',
+      occupied: false,
+    })
+    if (request === null) throw new Error('Expected the new thread to move into an isolated workspace.')
+    toggle.actor.send({ type: 'toggle', request })
+    await waitFor(toggle.actor, snapshot => snapshot.matches('idle'))
+    expect(payloads).toStrictEqual([{ workspaceId: 'project', isolate: true, name: 'thread-abc123' }])
+  })
+
   it('keeps the left thread workspace as a spare and reuses it instead of creating another one', async () => {
     const toggle = startToggle()
     toggle.release()
@@ -89,18 +108,24 @@ describe('workspaceToggleMachine', () => {
     expect(toggle.switched).toEqual(['project', 'ws-thread-abc123'])
   })
 
-  it('retries without the name on a Host that does not know it yet', async () => {
-    const names: (string | undefined)[] = []
+  it('retries without unsupported fields on a Host that does not know the name yet', async () => {
+    const payloads: unknown[] = []
     const toggle = startToggle({
       provision: async input => {
-        names.push(input.name)
+        payloads.push(input)
         if (input.name !== undefined) throw new Error('Unrecognized key: "name"')
         return { workspaceId: 'ws-host-named' }
       },
     })
-    toggle.actor.send({ type: 'toggle', request: { isolate: true, projectWorkspaceId: 'project', leaving: null, leavingBase: null } })
+    toggle.actor.send({
+      type: 'toggle',
+      request: { isolate: true, base: 'main', projectWorkspaceId: 'project', leaving: null, leavingBase: null },
+    })
     await waitFor(toggle.actor, snapshot => snapshot.matches('idle'))
-    expect(names).toEqual(['thread-abc123', undefined])
+    expect(payloads).toStrictEqual([
+      { workspaceId: 'project', isolate: true, base: 'main', name: 'thread-abc123' },
+      { workspaceId: 'project', isolate: true, base: 'main' },
+    ])
     expect(toggle.switched).toEqual(['ws-host-named'])
   })
 

@@ -9,8 +9,8 @@ export interface ProvisionedDestination {
 export interface ProvisionInput {
   readonly workspaceId: string
   readonly isolate: boolean
-  readonly base: string | undefined
-  readonly name: string | undefined
+  readonly base?: string
+  readonly name?: string
 }
 
 export interface SpareWorkspace {
@@ -32,7 +32,7 @@ export interface WorkspaceToggleClient {
 
 export interface ToggleRequest {
   readonly isolate: boolean
-  readonly base?: string | undefined
+  readonly base?: string
   readonly projectWorkspaceId: string
   /** The isolated thread workspace the blank thread sits in now, kept as a spare instead of being thrown away. */
   readonly leaving: SpareWorkspace | null
@@ -94,7 +94,10 @@ export const defaultDestinationMove = (input: {
   if (destination.vcs !== 'jj') return null
   const projectWorkspaceId = destination.projectWorkspaceId ?? input.workspaceId
   const move = { projectWorkspaceId, leaving: null, leavingBase: null }
-  if (destination.isolateByDefault && (!destination.isolated || input.occupied)) return { ...move, isolate: true, base: destination.bookmark ?? undefined }
+  if (destination.isolateByDefault && (!destination.isolated || input.occupied)) {
+    if (destination.bookmark === null) return { ...move, isolate: true }
+    return { ...move, isolate: true, base: destination.bookmark }
+  }
   if (!destination.isolateByDefault && destination.isolated && input.occupied) return { ...move, isolate: false }
   return null
 }
@@ -123,13 +126,21 @@ export const spareKey = (projectWorkspaceId: string, base: string | undefined | 
 
 const errorText = (error: unknown): string => (error instanceof Error && error.message.length > 0 ? error.message : String(error))
 
+const provisionInputFor = (input: { readonly workspaceId: string; readonly base: string | undefined; readonly name: string | null }): ProvisionInput => {
+  let provisionInput: ProvisionInput = { workspaceId: input.workspaceId, isolate: true }
+  if (input.base !== undefined) provisionInput = { ...provisionInput, base: input.base }
+  if (input.name !== null) provisionInput = { ...provisionInput, name: input.name }
+  return provisionInput
+}
+
 // A Host from before the client-chosen name rejects the unknown field; retry without it and show what it created.
 const provisionTolerant = async (client: WorkspaceToggleClient, input: ProvisionInput, signal: AbortSignal): Promise<ProvisionedDestination> => {
   try {
     return await client.provision(input, signal)
   } catch (error) {
-    if (input.name === undefined || signal.aborted || !/name|unrecognized|invalid/iu.test(errorText(error))) throw error
-    return client.provision({ ...input, name: undefined }, signal)
+    const { name, ...inputWithoutName } = input
+    if (name === undefined || signal.aborted || !/name|unrecognized|invalid/iu.test(errorText(error))) throw error
+    return client.provision(inputWithoutName, signal)
   }
 }
 
@@ -163,11 +174,7 @@ export const workspaceToggleMachine = setup({
         ? { workspaceId: request.projectWorkspaceId }
         : pending.spare !== null
           ? { workspaceId: pending.spare.workspaceId }
-          : await provisionTolerant(
-              client,
-              { workspaceId: request.projectWorkspaceId, isolate: true, base: request.base, name: pending.name ?? undefined },
-              signal,
-            )
+          : await provisionTolerant(client, provisionInputFor({ workspaceId: request.projectWorkspaceId, base: request.base, name: pending.name }), signal)
       await client.listed(target.workspaceId)
       signal.throwIfAborted()
       await client.open(target.workspaceId, signal)
