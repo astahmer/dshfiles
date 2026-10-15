@@ -1,7 +1,7 @@
 import { expect, type Page } from '@playwright/test'
 import { spawnSync } from 'node:child_process'
 import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises'
-import { createServer, type Server } from 'node:http'
+import { card, startFakeHub, type FakeHub } from '../fake-hub.js'
 import { join } from 'node:path'
 import { After, Then, When } from '../bdd.js'
 import { finishJourneyAssertions, profileFor, recordAssertion } from '../steps.js'
@@ -11,15 +11,6 @@ import { createScratchDirectory } from '../threads.js'
  * A loopback Framework Hub: the plugin-marketplace Host accepts loopback HTTP and an absolute local .tgz target from
  * one, so a journey can browse a catalog and install a freshly packed bundle without the network.
  */
-interface FakeHub {
-  readonly root: string
-  readonly server: Server
-  readonly baseUrl: string
-  readonly queries: URLSearchParams[]
-  failList: boolean
-  failDetail: boolean
-}
-
 const TARGET_PACKAGE = '@dshx-e2e/marketplace-target'
 const hubs = new WeakMap<Page, FakeHub>()
 
@@ -28,20 +19,6 @@ const hubFor = (page: Page): FakeHub => {
   if (hub === undefined) throw new Error('The local Framework Hub was not started for this scenario.')
   return hub
 }
-
-const card = (input: { readonly slug: string; readonly name: string; readonly scope: string; readonly compat: string; readonly stars: number }) => ({
-  slug: input.slug,
-  name: input.name,
-  scope: input.scope,
-  description: `${input.name} served by the e2e Framework Hub.`,
-  version: '1.0.0',
-  compat: input.compat,
-  category: 'tools',
-  badge: 'community',
-  glyph: input.name.slice(0, 1),
-  iconUrl: null,
-  stars: input.stars,
-})
 
 const packTarget = async (root: string): Promise<string> => {
   const target = join(root, 'target')
@@ -76,35 +53,7 @@ When('a local Framework Hub lists three plugins and serves a packed target bundl
     card({ slug: 'starred-helper', name: 'Starred helper', scope: '@dshx-e2e/starred-helper', compat: '>=0.2.0-rc.1 <0.3.0-0', stars: 40 }),
     card({ slug: 'future-only', name: 'Future only', scope: '@dshx-e2e/future-only', compat: '>=9.0.0', stars: 1 }),
   ]
-  const queries: URLSearchParams[] = []
-  const server = createServer((request, response) => {
-    const url = new URL(request.url ?? '/', 'http://hub.invalid')
-    response.setHeader('content-type', 'application/json')
-    const send = (status: number, body: unknown): void => {
-      response.statusCode = status
-      response.end(JSON.stringify(body))
-    }
-    if (url.pathname === '/api/marketplace/plugins/marketplace-e2e-target') {
-      if (hub.failDetail) return send(503, { error: 'detail unavailable' })
-      return send(200, {
-        plugin: items[0],
-        installTargets: [{ kind: 'npm', spec: tarball, package_name: TARGET_PACKAGE, version: '1.0.0', integrity: null, is_primary: 1, status: 'active' }],
-      })
-    }
-    if (url.pathname === '/api/marketplace/plugins') {
-      queries.push(url.searchParams)
-      if (hub.failList) return send(503, { error: 'catalog unavailable' })
-      const query = url.searchParams.get('q')?.toLocaleLowerCase()
-      const matching = items.filter(item => query === undefined || item.name.toLocaleLowerCase().includes(query))
-      const sorted = url.searchParams.get('sort') === 'stars' ? [...matching].sort((left, right) => right.stars - left.stars) : matching
-      return send(200, { categories: [{ slug: 'tools', name: 'Tools' }], items: sorted, nextCursor: null, total: sorted.length })
-    }
-    return send(404, {})
-  })
-  await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
-  const address = server.address()
-  if (address === null || typeof address === 'string') throw new Error('The local Framework Hub has no port.')
-  const hub: FakeHub = { root, server, baseUrl: `http://127.0.0.1:${String(address.port)}`, queries, failList: false, failDetail: false }
+  const hub = await startFakeHub({ root, tarball, items })
   hubs.set(page, hub)
   await page.getByRole('navigation', { name: 'Global panels', exact: true }).getByRole('button', { name: 'Plugins', exact: true }).click()
   await page.getByRole('button', { name: 'View @dshfiles/plugin-marketplace', exact: true }).click()
@@ -223,7 +172,6 @@ After(async ({ page }: { page: Page }) => {
   const hub = hubs.get(page)
   if (hub === undefined) return
   hubs.delete(page)
-  hub.server.closeAllConnections()
-  await new Promise<void>(resolve => hub.server.close(() => resolve()))
+  await hub.close()
   await rm(hub.root, { recursive: true, force: true })
 })

@@ -1,6 +1,8 @@
 import type { Page } from '@playwright/test'
 import { createHash, randomUUID } from 'node:crypto'
-import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
+import { createAdaptorServer } from '@hono/node-server'
+import type { AddressInfo } from 'node:net'
+import { Hono } from 'hono'
 import { z } from 'zod'
 
 /**
@@ -20,6 +22,14 @@ export interface FakeOAuthMcp {
   close(): Promise<void>
 }
 
+interface FakeOAuthMcpState {
+  readonly codes: Map<string, { readonly challenge: string; readonly redirectUri: string; readonly clientId: string }>
+  readonly issuedTokens: Set<string>
+  readonly clients: Map<string, readonly string[]>
+  readonly registeredClientNames: string[]
+  readonly acceptedTokens: Set<string>
+}
+
 const registrationSchema = z.object({ client_name: z.string(), redirect_uris: z.array(z.string().url()).min(1) })
 const jsonRpcSchema = z.object({
   jsonrpc: z.literal('2.0'),
@@ -31,140 +41,161 @@ const initializeParamsSchema = z.object({ protocolVersion: z.string() })
 
 const fakes = new WeakMap<Page, FakeOAuthMcp>()
 
-const readBody = (request: IncomingMessage): Promise<string> =>
-  new Promise(resolve => {
-    let body = ''
-    request.setEncoding('utf8')
-    request.on('data', chunk => {
-      body += chunk
-    })
-    request.on('end', () => resolve(body))
-  })
-
-const json = (response: ServerResponse, status: number, value: unknown, headers: Record<string, string> = {}): void => {
-  response.writeHead(status, { 'content-type': 'application/json', 'cache-control': 'no-store', ...headers })
-  response.end(JSON.stringify(value))
+const jsonBody = async (request: Request): Promise<unknown> => {
+  try {
+    return await request.json()
+  } catch {
+    return {}
+  }
 }
 
 const s256 = (verifier: string): string => createHash('sha256').update(verifier).digest('base64url')
 
-export const startFakeOAuthMcp = async (page: Page): Promise<FakeOAuthMcp> => {
-  const codes = new Map<string, { readonly challenge: string; readonly redirectUri: string; readonly clientId: string }>()
-  const issuedTokens = new Set<string>()
-  const clients = new Map<string, readonly string[]>()
-  const registeredClientNames: string[] = []
-  const acceptedTokens = new Set<string>()
-  let origin = ''
+export const createFakeOAuthMcpApp = (state: FakeOAuthMcpState): Hono => {
+  const app = new Hono()
 
-  const server = createServer((request, response) => {
-    void (async () => {
-      const url = new URL(request.url ?? '/', origin)
-      const body = await readBody(request)
-      if (url.pathname === '/.well-known/oauth-protected-resource' || url.pathname === '/.well-known/oauth-protected-resource/mcp') {
-        return json(response, 200, { resource: `${origin}/mcp`, authorization_servers: [origin], bearer_methods_supported: ['header'] })
-      }
-      if (url.pathname === '/.well-known/oauth-authorization-server') {
-        return json(response, 200, {
-          issuer: origin,
-          authorization_endpoint: `${origin}/authorize`,
-          token_endpoint: `${origin}/token`,
-          registration_endpoint: `${origin}/register`,
-          response_types_supported: ['code'],
-          grant_types_supported: ['authorization_code', 'refresh_token'],
-          token_endpoint_auth_methods_supported: ['none'],
-          code_challenge_methods_supported: ['S256'],
-          authorization_response_iss_parameter_supported: true,
-        })
-      }
-      if (url.pathname === '/register' && request.method === 'POST') {
-        const registration = registrationSchema.safeParse(JSON.parse(body || '{}'))
-        if (!registration.success) return json(response, 400, { error: 'invalid_client_metadata' })
-        const clientId = `fake-client-${randomUUID()}`
-        clients.set(clientId, registration.data.redirect_uris)
-        registeredClientNames.push(registration.data.client_name)
-        return json(response, 201, {
-          client_id: clientId,
-          client_name: registration.data.client_name,
-          redirect_uris: registration.data.redirect_uris,
-          token_endpoint_auth_method: 'none',
-        })
-      }
-      if (url.pathname === '/authorize') {
-        const clientId = url.searchParams.get('client_id') ?? ''
-        const redirectUri = url.searchParams.get('redirect_uri') ?? ''
-        const challenge = url.searchParams.get('code_challenge') ?? ''
-        if (clients.get(clientId)?.includes(redirectUri) !== true || url.searchParams.get('code_challenge_method') !== 'S256' || challenge === '') {
-          return json(response, 400, { error: 'invalid_request' })
-        }
-        const code = randomUUID()
-        codes.set(code, { challenge, redirectUri, clientId })
-        const back = new URL(redirectUri)
-        back.searchParams.set('code', code)
-        back.searchParams.set('state', url.searchParams.get('state') ?? '')
-        back.searchParams.set('iss', origin)
-        response.writeHead(302, { location: back.href })
-        return response.end()
-      }
-      if (url.pathname === '/token' && request.method === 'POST') {
-        const form = new URLSearchParams(body)
-        const grant = codes.get(form.get('code') ?? '')
-        if (
-          form.get('grant_type') !== 'authorization_code' ||
-          grant === undefined ||
-          grant.clientId !== form.get('client_id') ||
-          grant.redirectUri !== form.get('redirect_uri') ||
-          s256(form.get('code_verifier') ?? '') !== grant.challenge
-        ) {
-          return json(response, 400, { error: 'invalid_grant' })
-        }
-        codes.delete(form.get('code') ?? '')
-        const accessToken = `fake-access-${randomUUID()}`
-        issuedTokens.add(accessToken)
-        return json(response, 200, { access_token: accessToken, token_type: 'Bearer', expires_in: 3600, refresh_token: `fake-refresh-${randomUUID()}` })
-      }
-      if (url.pathname === '/mcp') {
-        const token = (request.headers.authorization ?? '').replace(/^Bearer /, '')
-        if (!issuedTokens.has(token)) {
-          response.writeHead(401, { 'www-authenticate': `Bearer resource_metadata="${origin}/.well-known/oauth-protected-resource/mcp"` })
-          return response.end()
-        }
-        acceptedTokens.add(token)
-        if (request.method !== 'POST') {
-          response.writeHead(request.method === 'DELETE' ? 200 : 405)
-          return response.end()
-        }
-        const message = jsonRpcSchema.safeParse(JSON.parse(body || '{}'))
-        if (!message.success) return json(response, 400, { error: 'invalid JSON-RPC message' })
-        if (message.data.id === undefined) {
-          response.writeHead(202)
-          return response.end()
-        }
-        const reply = (result: unknown): void => json(response, 200, { jsonrpc: '2.0', id: message.data.id, result }, { 'mcp-session-id': 'fake-session' })
-        if (message.data.method === 'initialize') {
-          const params = initializeParamsSchema.safeParse(message.data.params)
-          return reply({
-            protocolVersion: params.success ? params.data.protocolVersion : '2025-06-18',
-            capabilities: { tools: {} },
-            serverInfo: { name: 'fake-oauth-mcp', version: '1.0.0' },
-          })
-        }
-        if (message.data.method === 'tools/list') {
-          return reply({ tools: [{ name: 'whoami', description: 'Names the signed-in fake account.', inputSchema: { type: 'object', properties: {} } }] })
-        }
-        return json(response, 200, { jsonrpc: '2.0', id: message.data.id, error: { code: -32601, message: 'Method not found' } })
-      }
-      return json(response, 404, { error: 'not found' })
-    })()
+  app.use('*', async (context, next) => {
+    await next()
+    context.header('cache-control', 'no-store')
   })
-  await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
+
+  app.get('/.well-known/oauth-protected-resource', context => {
+    const origin = new URL(context.req.url).origin
+    return context.json({ resource: `${origin}/mcp`, authorization_servers: [origin], bearer_methods_supported: ['header'] })
+  })
+  app.get('/.well-known/oauth-protected-resource/mcp', context => {
+    const origin = new URL(context.req.url).origin
+    return context.json({ resource: `${origin}/mcp`, authorization_servers: [origin], bearer_methods_supported: ['header'] })
+  })
+  app.get('/.well-known/oauth-authorization-server', context => {
+    const origin = new URL(context.req.url).origin
+    return context.json({
+      issuer: origin,
+      authorization_endpoint: `${origin}/authorize`,
+      token_endpoint: `${origin}/token`,
+      registration_endpoint: `${origin}/register`,
+      response_types_supported: ['code'],
+      grant_types_supported: ['authorization_code', 'refresh_token'],
+      token_endpoint_auth_methods_supported: ['none'],
+      code_challenge_methods_supported: ['S256'],
+      authorization_response_iss_parameter_supported: true,
+    })
+  })
+  app.post('/register', async context => {
+    const registration = registrationSchema.safeParse(await jsonBody(context.req.raw))
+    if (!registration.success) return context.json({ error: 'invalid_client_metadata' }, 400)
+    const clientId = `fake-client-${randomUUID()}`
+    state.clients.set(clientId, registration.data.redirect_uris)
+    state.registeredClientNames.push(registration.data.client_name)
+    return context.json(
+      {
+        client_id: clientId,
+        client_name: registration.data.client_name,
+        redirect_uris: registration.data.redirect_uris,
+        token_endpoint_auth_method: 'none',
+      },
+      201,
+    )
+  })
+  app.get('/authorize', context => {
+    const clientId = context.req.query('client_id') ?? ''
+    const redirectUri = context.req.query('redirect_uri') ?? ''
+    const challenge = context.req.query('code_challenge') ?? ''
+    if (state.clients.get(clientId)?.includes(redirectUri) !== true || context.req.query('code_challenge_method') !== 'S256' || challenge === '') {
+      return context.json({ error: 'invalid_request' }, 400)
+    }
+    const code = randomUUID()
+    const origin = new URL(context.req.url).origin
+    state.codes.set(code, { challenge, redirectUri, clientId })
+    const back = new URL(redirectUri)
+    back.searchParams.set('code', code)
+    back.searchParams.set('state', context.req.query('state') ?? '')
+    back.searchParams.set('iss', origin)
+    return context.redirect(back.href, 302)
+  })
+  app.post('/token', async context => {
+    const form = new URLSearchParams(await context.req.text())
+    const code = form.get('code') ?? ''
+    const grant = state.codes.get(code)
+    if (
+      form.get('grant_type') !== 'authorization_code' ||
+      grant === undefined ||
+      grant.clientId !== form.get('client_id') ||
+      grant.redirectUri !== form.get('redirect_uri') ||
+      s256(form.get('code_verifier') ?? '') !== grant.challenge
+    ) {
+      return context.json({ error: 'invalid_grant' }, 400)
+    }
+    state.codes.delete(code)
+    const accessToken = `fake-access-${randomUUID()}`
+    state.issuedTokens.add(accessToken)
+    return context.json({ access_token: accessToken, token_type: 'Bearer', expires_in: 3600, refresh_token: `fake-refresh-${randomUUID()}` })
+  })
+  app.all('/mcp', async context => {
+    const origin = new URL(context.req.url).origin
+    const token = (context.req.header('authorization') ?? '').replace(/^Bearer /, '')
+    if (!state.issuedTokens.has(token)) {
+      return context.body(null, 401, { 'www-authenticate': `Bearer resource_metadata="${origin}/.well-known/oauth-protected-resource/mcp"` })
+    }
+    state.acceptedTokens.add(token)
+    if (context.req.method === 'DELETE') return context.body(null, 200)
+    if (context.req.method !== 'POST') return context.body(null, 405)
+    const message = jsonRpcSchema.safeParse(await jsonBody(context.req.raw))
+    if (!message.success) return context.json({ error: 'invalid JSON-RPC message' }, 400)
+    if (message.data.id === undefined) return context.body(null, 202)
+    const reply = (result: unknown) => context.json({ jsonrpc: '2.0', id: message.data.id, result }, 200, { 'mcp-session-id': 'fake-session' })
+    if (message.data.method === 'initialize') {
+      const params = initializeParamsSchema.safeParse(message.data.params)
+      return reply({
+        protocolVersion: params.success ? params.data.protocolVersion : '2025-06-18',
+        capabilities: { tools: {} },
+        serverInfo: { name: 'fake-oauth-mcp', version: '1.0.0' },
+      })
+    }
+    if (message.data.method === 'tools/list') {
+      return reply({ tools: [{ name: 'whoami', description: 'Names the signed-in fake account.', inputSchema: { type: 'object', properties: {} } }] })
+    }
+    return context.json({ jsonrpc: '2.0', id: message.data.id, error: { code: -32601, message: 'Method not found' } }, 200)
+  })
+  app.notFound(context => context.json({ error: 'not found' }, 404))
+  return app
+}
+
+type ListenableServer = {
+  once(event: 'error', listener: (error: Error) => void): unknown
+  off(event: 'error', listener: (error: Error) => void): unknown
+  listen(port: number, host: string, listener: () => void): unknown
+  address(): AddressInfo | string | null
+  close(listener: () => void): unknown
+}
+
+const listen = (server: ListenableServer): Promise<void> =>
+  new Promise((resolve, reject) => {
+    server.once('error', reject)
+    server.listen(0, '127.0.0.1', () => {
+      server.off('error', reject)
+      resolve()
+    })
+  })
+
+export const startFakeOAuthMcp = async (page: Page): Promise<FakeOAuthMcp> => {
+  const state: FakeOAuthMcpState = {
+    codes: new Map(),
+    issuedTokens: new Set(),
+    clients: new Map(),
+    registeredClientNames: [],
+    acceptedTokens: new Set(),
+  }
+  const server = createAdaptorServer({ fetch: createFakeOAuthMcpApp(state).fetch })
+  await listen(server)
   const address = server.address()
   if (address === null || typeof address === 'string') throw new Error('The fake OAuth MCP server has no port.')
-  origin = `http://127.0.0.1:${String(address.port)}`
+  const origin = `http://127.0.0.1:${String(address.port)}`
   const fake: FakeOAuthMcp = {
     origin,
     endpoint: `${origin}/mcp`,
-    registeredClientNames,
-    acceptedTokens,
+    registeredClientNames: state.registeredClientNames,
+    acceptedTokens: state.acceptedTokens,
     close: async () => {
       server.closeAllConnections()
       await new Promise<void>(resolve => server.close(() => resolve()))
