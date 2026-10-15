@@ -37,6 +37,12 @@ Shared skills (`~/.agents/skills/`) for the same kinds of work:
   spec; reimplement against the DSH API.
 - **Build with dshx** when a port would carry more debt than the feature is
   worth.
+- **Replace native UI through an owned plugin** when we want DSH core's
+  behavior as the baseline but need product-specific UX. Disable the stock
+  Loader row in profile composition, fill its supported slots from the owned
+  plugin, and keep the upstream license, source/version provenance, and an
+  explicit update policy. This is not a blanket fork of core; see
+  [native plugin overrides](docs/native-plugin-overrides.md).
 
 Say which option you chose and why. Two rules keep the choice honest:
 
@@ -160,9 +166,12 @@ must not install `@becomeopc/dshx` from a registry. Build it, then scaffold:
 ```sh
 pnpm install --frozen-lockfile
 pnpm exec turbo run build --filter=@dshfiles/dshx
-node tooling/dshx/packages/dshx/dist/cli/bin.js create plugins/@dshfiles/my-plugin
+node tooling/dshx/packages/dshx/dist/cli/bin.js create my-plugin --cwd plugins/@dshfiles --template ui --style css-modules
 dshx inspect slots --root sidebar     # read the live composition instead of guessing
 ```
+
+`dshx create` accepts only an unscoped project slug; set both the package
+manifest and `dshx.config.ts` name to `@dshfiles/my-plugin` before building.
 
 Docs: [authoring guide](tooling/dshx/docs/sdk/getting-started.md),
 [compatibility](tooling/dshx/docs/compatibility.md) (check before assuming a

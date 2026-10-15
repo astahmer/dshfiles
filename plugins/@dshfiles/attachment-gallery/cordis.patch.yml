@@ -1,0 +1,5 @@
+- id: ui-attachment
+  disabled: true
+- insert:
+    - id: dshfiles-attachment-gallery
+      name: '@dshfiles/attachment-gallery'

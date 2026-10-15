@@ -1,0 +1,120 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1050;
+  display: grid;
+  place-items: center;
+  padding: 40px;
+}
+
+/* Shared dimming mask below the preview and its controls. */
+.mask {
+  position: absolute;
+  inset: 0;
+  background: var(--dsw-alias-bg-mask-1);
+  backdrop-filter: var(--dsw-mask-blur);
+}
+
+.loading {
+  position: relative;
+  color: var(--dsw-alias-label-primary);
+}
+
+.image {
+  position: relative;
+  max-width: min(100%, 1600px);
+  max-height: calc(100vh - 120px);
+  object-fit: contain;
+  border-radius: var(--dsw-radius-lg);
+  background: var(--dsw-specific-input-major);
+  border: 0;
+  box-shadow: var(--dsw-elevation-prominent);
+}
+
+.navigation {
+  position: fixed;
+  top: 50%;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 0.5px solid var(--dsw-alias-border-l2-darkmode-thin);
+  border-radius: 999px;
+  background: var(--dsw-specific-input-major);
+  color: var(--dsw-alias-label-primary);
+  cursor: pointer;
+  transform: translateY(-50%);
+}
+
+.previous {
+  left: 24px;
+}
+.next {
+  right: 24px;
+}
+
+.navigation:focus-visible,
+.thumbnail:focus-visible {
+  outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
+  outline-offset: 3px;
+}
+
+.thumbnails {
+  position: fixed;
+  bottom: 20px;
+  z-index: 1;
+  display: flex;
+  max-width: min(80vw, 720px);
+  gap: 8px;
+  overflow-x: auto;
+  padding: 6px;
+  border: 0.5px solid var(--dsw-alias-border-l2-darkmode-thin);
+  border-radius: var(--dsw-radius-lg);
+  background: var(--dsw-specific-input-major);
+}
+
+.thumbnail {
+  flex: 0 0 64px;
+  width: 64px;
+  height: 56px;
+  overflow: hidden;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: var(--dsw-radius-sm);
+  background: transparent;
+  opacity: 0.6;
+  cursor: pointer;
+}
+
+.thumbnail[aria-current='true'] {
+  border-color: var(--dsw-alias-state-business-primary);
+  opacity: 1;
+}
+.thumbnail img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.close {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 0.5px solid var(--dsw-alias-border-l2-darkmode-thin);
+  border-radius: 999px;
+  corner-shape: round;
+  background: var(--dsw-specific-input-major);
+  color: var(--dsw-alias-label-primary);
+  cursor: pointer;
+}
+
+.close:focus-visible {
+  outline: var(--dsw-focus-ring-width) solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
+  outline-offset: 3px;
+}

@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "features": [
+    {
+      "id": "image-gallery-navigation",
+      "title": "Navigate image previews",
+      "summary": "Open a draft image and move among all attached images with left/right keyboard controls or the thumbnail strip.",
+      "reach": [
+        "click button \"New session\"",
+        "attach \"tooling/dshx/e2e/fixtures/attachments/red.png\"",
+        "attach \"tooling/dshx/e2e/fixtures/attachments/blue.png\"",
+        "click button \"red.png, click to view original\"",
+        "expect dialog \"Image preview\"",
+        "expect img \"red.png\"",
+        "press ArrowRight",
+        "expect img \"blue.png\"",
+        "expect button \"Image 2 of 2\"",
+        "click button \"Image 1 of 2\"",
+        "expect img \"red.png\""
+      ],
+      "surfaces": ["client"],
+      "configuration": [],
+      "states": ["draft", "preview", "loading", "navigating"],
+      "failureModes": [
+        "An image URL cannot be loaded, so the thumbnail offers retry instead of opening an empty image.",
+        "The stock attachment Loader row stays active, so its single-slot registration conflicts with the replacement."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "attachment-gallery.gallery-navigation",
+          "featureFile": "tooling/dshx/e2e/features/attachment-gallery.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "attachment-gallery.image-gallery-navigation-unit-keyboard-controls-and-thumbnails",
+          "file": "plugins/@dshfiles/attachment-gallery/tests/image-lightbox.client.spec.tsx",
+          "testName": "navigates images with arrow keys, side controls, and thumbnails"
+        }
+      ]
+    }
+  ],
+  "kind": "bundle"
+}
