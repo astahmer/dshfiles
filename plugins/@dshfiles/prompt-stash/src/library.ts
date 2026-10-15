@@ -39,7 +39,7 @@ const legacyDraftsSchema = z.object({ schemaVersion: z.literal(1), drafts: z.arr
 
 export type SavedPrompt = z.infer<typeof promptSchema>
 
-export const defaultPromptTitle = (text: string): string => {
+const defaultPromptTitle = (text: string): string => {
   const firstLine = text.split(/\r?\n/, 1)[0]?.trim() ?? ''
   const title = firstLine.length === 0 ? 'Saved prompt' : firstLine
   return title.length > MAX_PROMPT_TITLE_LENGTH ? `${title.slice(0, MAX_PROMPT_TITLE_LENGTH - 1)}…` : title
@@ -51,7 +51,7 @@ export type PromptMutation =
   | { readonly kind: 'applied'; readonly prompts: readonly SavedPrompt[] }
   | { readonly kind: 'conflict'; readonly prompts: readonly SavedPrompt[] }
 
-export const readPromptLibrary = (serialized: string | null): PromptLibraryRead => {
+const readPromptLibrary = (serialized: string | null): PromptLibraryRead => {
   if (serialized === null) return { ok: true, prompts: [] }
 
   let value: unknown
@@ -67,13 +67,13 @@ export const readPromptLibrary = (serialized: string | null): PromptLibraryRead 
   return { ok: true, prompts: parsed.data.prompts }
 }
 
-export const serializePromptLibrary = (prompts: readonly SavedPrompt[]): string | null => {
+const serializePromptLibrary = (prompts: readonly SavedPrompt[]): string | null => {
   const parsed = librarySchema.safeParse({ version: 1, prompts })
   if (!parsed.success) return null
   return JSON.stringify(parsed.data)
 }
 
-export const writePromptIfCurrent = (prompts: readonly SavedPrompt[], next: SavedPrompt, expectedRevision: string | null): PromptMutation => {
+const writePromptIfCurrent = (prompts: readonly SavedPrompt[], next: SavedPrompt, expectedRevision: string | null): PromptMutation => {
   const current = prompts.find(prompt => prompt.id === next.id)
   if (expectedRevision === null ? current !== undefined : current?.revision !== expectedRevision) {
     return { kind: 'conflict', prompts }
@@ -85,7 +85,7 @@ export const writePromptIfCurrent = (prompts: readonly SavedPrompt[], next: Save
   }
 }
 
-export const removePromptIfCurrent = (prompts: readonly SavedPrompt[], id: string, expectedRevision: string): PromptMutation => {
+const removePromptIfCurrent = (prompts: readonly SavedPrompt[], id: string, expectedRevision: string): PromptMutation => {
   const current = prompts.find(prompt => prompt.id === id)
   if (current === undefined || current.revision !== expectedRevision) return { kind: 'conflict', prompts }
 
@@ -93,4 +93,15 @@ export const removePromptIfCurrent = (prompts: readonly SavedPrompt[], id: strin
     kind: 'applied',
     prompts: prompts.filter(prompt => prompt.id !== id),
   }
+}
+
+export class PromptLibrary {
+  static readonly maxPrompts = MAX_PROMPTS
+  static readonly maxPromptTitleLength = MAX_PROMPT_TITLE_LENGTH
+  static readonly maxPromptTextLength = MAX_PROMPT_TEXT_LENGTH
+  static readonly defaultTitle = defaultPromptTitle
+  static readonly read = readPromptLibrary
+  static readonly serialize = serializePromptLibrary
+  static readonly writeIfCurrent = writePromptIfCurrent
+  static readonly removeIfCurrent = removePromptIfCurrent
 }

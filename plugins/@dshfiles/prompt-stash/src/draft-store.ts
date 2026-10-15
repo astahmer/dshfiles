@@ -64,7 +64,7 @@ export type SaveDraftResult =
 
 const emptyDraftStore = (): DraftStore => ({ schemaVersion: 1, drafts: [] })
 
-export const draftSaveBlock = (input: {
+const draftSaveBlock = (input: {
   readonly phase: string
   readonly text: string
   readonly attachmentCount: number
@@ -77,7 +77,7 @@ export const draftSaveBlock = (input: {
   return null
 }
 
-export const readDraftStore = (source: string | null): DraftStore => {
+const readDraftStore = (source: string | null): DraftStore => {
   if (source === null || new TextEncoder().encode(source).byteLength > MAX_DRAFT_STORE_BYTES) return emptyDraftStore()
   try {
     const decoded: unknown = JSON.parse(source)
@@ -92,7 +92,7 @@ export const readDraftStore = (source: string | null): DraftStore => {
  * Reads the drafts key. Drafts left under the key they once shared with the prompt library move to their own key
  * on first read, so a later library save cannot overwrite them.
  */
-export const readStoredDrafts = (storage: { getItem(key: string): string | null; setItem(key: string, value: string): void }): DraftStore => {
+const readStoredDrafts = (storage: { getItem(key: string): string | null; setItem(key: string, value: string): void }): DraftStore => {
   const current = storage.getItem(DRAFT_STORE_KEY)
   if (current !== null) return readDraftStore(current)
   const legacy = readDraftStore(storage.getItem(LEGACY_DRAFT_STORE_KEY))
@@ -100,13 +100,13 @@ export const readStoredDrafts = (storage: { getItem(key: string): string | null;
   return legacy
 }
 
-export const defaultDraftTitle = (text: string): string => {
+const defaultDraftTitle = (text: string): string => {
   const firstLine = text.split(/\r?\n/, 1)[0]?.trim() ?? ''
   const title = firstLine.length === 0 ? 'Saved draft' : firstLine
   return title.length > MAX_DRAFT_TITLE_CHARS ? `${title.slice(0, MAX_DRAFT_TITLE_CHARS - 1)}…` : title
 }
 
-export const saveDraft = (
+const saveDraft = (
   current: DraftStore,
   draft: { readonly id: string; readonly title: string; readonly text: string; readonly now: string },
 ): SaveDraftResult => {
@@ -125,17 +125,27 @@ export const saveDraft = (
   return { ok: true, store, serialized }
 }
 
-export const removeDraft = (current: DraftStore, draftId: string): DraftStore =>
+const removeDraft = (current: DraftStore, draftId: string): DraftStore =>
   draftStoreSchema.parse({
     schemaVersion: 1,
     drafts: current.drafts.filter(draft => draft.id !== draftId),
   })
 
-export const sentPromptFromNode = (source: unknown): SentPrompt | null => {
+const sentPromptFromNode = (source: unknown): SentPrompt | null => {
   const result = sentPromptNodeSchema.safeParse(source)
   if (!result.success || result.data.content.length === 0) return null
   if (result.data.content.some(block => block.type !== 'text' || block.text === undefined)) return null
   const text = result.data.content.map(block => block.text ?? '').join('')
   if (text.trim().length === 0 || text.length > MAX_SENT_PROMPT_TEXT_CHARS) return null
   return { id: result.data.seq, text }
+}
+
+export class PromptDrafts {
+  static readonly saveBlock = draftSaveBlock
+  static readonly read = readDraftStore
+  static readonly readStored = readStoredDrafts
+  static readonly defaultTitle = defaultDraftTitle
+  static readonly save = saveDraft
+  static readonly remove = removeDraft
+  static readonly sentPromptFromNode = sentPromptFromNode
 }
