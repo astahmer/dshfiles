@@ -17,6 +17,7 @@ Feature: Command palette
     When the command palette is opened
     When the palette query is "#dshx-content-search-e2e-marker"
     Then thread content search finds the message and opens its thread
+    Then the content-search index exists under the isolated DSH home
 
   @scenario:command-palette.file-search
   Scenario: File search explains that the Editor integration is unavailable

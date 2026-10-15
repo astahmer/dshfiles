@@ -1,5 +1,5 @@
 import { expect, type Page } from '@playwright/test'
-import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises'
+import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { After, Before, Given, Then, readBootOutcome } from './bdd.js'
 import { bootComposedPluginProfile, bootPluginProfile, bootProfile, type BootedProfile } from './boot.js'
@@ -238,11 +238,11 @@ Given('the isolated plugin composition of {string} is booted with the autocomple
   await visitIsolatedPluginProfile(page, profile)
 })
 
-// The web profile seed enables the in-memory session-content index through its patch layer; no bundle composes it.
+// The web profile seed enables the file-backed session-content index through its patch layer; no bundle composes it.
 const sessionContentIndexPatch = `- id: session-query-sqlite
   name: '@deepseek-ai/dsh-session-query-sqlite'
   config:
-    path: ':memory:'
+    path: !!js (process.env.DSH_HOME || process.env.HOME + '/.dsh') + '/plugins/session-query-sqlite/index.sqlite'
     openAt: first-search
 `
 
