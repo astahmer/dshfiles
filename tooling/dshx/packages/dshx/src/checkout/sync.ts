@@ -90,6 +90,11 @@ const updateIfStale = async (jj: ReturnType<typeof jjAt>): Promise<boolean> => {
 
 const realPath = (path: string): string => (existsSync(path) ? realpathSync(path) : path)
 
+const restartReasons = (plugins: readonly PluginEffect[], profileReason: string | null): readonly string[] => [
+  ...plugins.filter(plugin => plugin.host).map(plugin => `${plugin.name} Host bundle changed`),
+  ...(profileReason === null ? [] : [profileReason]),
+]
+
 /**
  * Reconciles the live web profile from the checkout's seed with the checkout's own `scripts/profile-sync.ts`, the
  * reconciler the `dsh web` supervisor also runs before each start. It skips when `DSHFILES_DIR` names another checkout,
@@ -173,7 +178,38 @@ export const syncCheckout = async (options: {
   }
   // Dry runs leave the files alone; the real run snapshots the local edits first so they ride the rebase.
   const updatedStale = dryRun ? false : await updateIfStale(jj)
-  if ((await jj.revisions(`${bookmark} & ::@`)).length > 0) return { ...base, updatedStale, status: 'up-to-date' }
+  const alreadyOnBookmark = (await jj.revisions(`${bookmark} & ::@`)).length > 0
+  if (alreadyOnBookmark) {
+    const plan = planRebuild({ root: path, changedFiles: [] })
+    if (!plan.dshx && plan.plugins.length === 0) return { ...base, updatedStale, status: 'up-to-date' }
+    const synced = { ...base, updatedStale }
+    if (dryRun) {
+      const reasons = restartReasons(plan.plugins, null)
+      return {
+        ...synced,
+        status: 'would-sync',
+        installs: plan.installRoots,
+        rebuilt: { dshx: plan.dshx, plugins: plan.plugins.map(plugin => plugin.name) },
+        plugins: plan.plugins,
+        restart: { needed: reasons.length > 0, reasons },
+      }
+    }
+    const outcome = await runRebuild({ root: path, plan, changedFiles: [], onProgress: options.onProgress, onOutput: options.onOutput })
+    const reasons = restartReasons(outcome.plugins, null)
+    return {
+      ...synced,
+      status: outcome.failure === null ? 'synced' : 'build-failed',
+      installs: outcome.installed,
+      rebuilt: { dshx: outcome.dshx, plugins: outcome.plugins.map(plugin => plugin.name) },
+      plugins: outcome.plugins,
+      restart: { needed: reasons.length > 0, reasons },
+      hint:
+        outcome.failure === null
+          ? null
+          : `${workspace} is already on ${bookmark}, but "${outcome.failure.step}" failed. Fix it and rerun ${outcome.failure.command}.`,
+      failure: outcome.failure,
+    }
+  }
 
   const from = (await jj.revisions(`latest(heads(::@ & ::${bookmark}))`))[0]?.commitId ?? null
   const stack = await jj.revisions(`::@ ~ ::${bookmark}`)
@@ -265,10 +301,6 @@ export const syncCheckout = async (options: {
     .filter(line => line.length > 0)
   const plan = planRebuild({ root: path, changedFiles })
   const synced = { ...base, from, updatedStale, kept, absorbed, changedFiles: changedFiles.slice(0, MAX_LISTED_FILES) }
-  const restartReasons = (plugins: readonly PluginEffect[], profileReason: string | null): readonly string[] => [
-    ...plugins.filter(plugin => plugin.host).map(plugin => `${plugin.name} Host bundle changed`),
-    ...(profileReason === null ? [] : [profileReason]),
-  ]
   if (dryRun) {
     await undo()
     const reasons = restartReasons(

@@ -67,6 +67,46 @@ describe.skipIf(!jjAvailable)('dshx checkout sync against real jj', () => {
     expect(await sync()).toMatchObject({ status: 'up-to-date' })
   })
 
+  it('repairs missing plugin bundles when the checkout is already on main', async () => {
+    const directory = join(checkout, 'plugins/@dshfiles/attachment-gallery')
+    writeFile(join(checkout, 'plugins/package.json'), JSON.stringify({ name: 'dshfiles-plugins', private: true }))
+    writeFile(join(checkout, 'plugins/pnpm-workspace.yaml'), "packages:\n  - '@dshfiles/*'\n")
+    writeFile(
+      join(directory, 'package.json'),
+      JSON.stringify({ name: '@dshfiles/attachment-gallery', scripts: { build: 'node build.mjs' }, dsh: { client: { platform: 'web' } } }),
+    )
+    writeFile(
+      join(directory, 'build.mjs'),
+      [
+        "import { mkdirSync, writeFileSync } from 'node:fs'",
+        "mkdirSync('dist', { recursive: true })",
+        "writeFileSync('dist/index.js', 'export {}\\n')",
+        "writeFileSync('dist/client.js', 'export {}\\n')",
+      ].join('\n'),
+    )
+
+    const preview = await sync(true)
+    expect(preview).toMatchObject({
+      status: 'would-sync',
+      changedFiles: [],
+      rebuilt: { dshx: false, plugins: ['@dshfiles/attachment-gallery'] },
+      plugins: [{ name: '@dshfiles/attachment-gallery', host: true, client: true }],
+      restart: { needed: true, reasons: ['@dshfiles/attachment-gallery Host bundle changed'] },
+    })
+    expect(() => readFileSync(join(directory, 'dist/index.js'))).toThrow()
+
+    const result = await sync()
+    expect(result).toMatchObject({
+      status: 'synced',
+      changedFiles: [],
+      rebuilt: { dshx: false, plugins: ['@dshfiles/attachment-gallery'] },
+      plugins: [{ name: '@dshfiles/attachment-gallery', host: true, client: true }],
+      restart: { needed: true, reasons: ['@dshfiles/attachment-gallery Host bundle changed'] },
+    })
+    expect(readFileSync(join(directory, 'dist/index.js'), 'utf8')).toBe('export {}\n')
+    expect(readFileSync(join(directory, 'dist/client.js'), 'utf8')).toBe('export {}\n')
+  })
+
   it('absorbs described revisions main already holds and keeps the local edits above them', async () => {
     writeFile(join(checkout, 'feature.txt'), 'feature\n')
     jj(checkout, 'commit', '-m', 'feat: drafted here')
@@ -194,7 +234,18 @@ describe('checkout rebuild selection', () => {
     maps: { readonly index?: readonly string[]; readonly client?: readonly string[] } = {},
   ): void => {
     const directory = join(root, 'plugins/@dshfiles', name)
-    writeFile(join(directory, 'package.json'), JSON.stringify({ name: `@dshfiles/${name}`, scripts: { build: 'dshx build' }, dependencies }))
+    const hasClientBundle = maps.client !== undefined
+    writeFile(
+      join(directory, 'package.json'),
+      JSON.stringify({
+        name: `@dshfiles/${name}`,
+        scripts: { build: 'dshx build' },
+        dependencies,
+        dsh: hasClientBundle ? { client: { platform: 'web' } } : undefined,
+      }),
+    )
+    writeFile(join(directory, 'dist', 'index.js'), 'export {}\n')
+    if (hasClientBundle) writeFile(join(directory, 'dist', 'client.js'), 'export {}\n')
     for (const [bundle, sources] of Object.entries(maps)) writeFile(join(directory, 'dist', `${bundle}.js.map`), JSON.stringify({ version: 3, sources }))
   }
 
@@ -208,6 +259,12 @@ describe('checkout rebuild selection', () => {
   })
 
   afterEach(() => rmSync(root, { recursive: true, force: true }))
+
+  it('selects missing bundle outputs without rebuilding dependants', () => {
+    rmSync(join(root, 'plugins/@dshfiles/panel/dist/client.js'))
+    const plan = planRebuild({ root, changedFiles: [] })
+    expect(plan.plugins).toEqual([{ name: '@dshfiles/panel', host: false, client: true }])
+  })
 
   it('picks changed plugins, their dependants and plugins bundling changed dshx runtime code', () => {
     const plan = planRebuild({

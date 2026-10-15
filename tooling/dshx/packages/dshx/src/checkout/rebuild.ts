@@ -42,6 +42,7 @@ const manifestSchema = z.object({
   scripts: z.record(z.string(), z.string()).optional(),
   dependencies: z.record(z.string(), z.string()).optional(),
   devDependencies: z.record(z.string(), z.string()).optional(),
+  dsh: z.object({ client: z.unknown().optional() }).optional(),
 })
 const sourceMapSchema = z.object({ sources: z.array(z.string()) })
 
@@ -51,6 +52,8 @@ interface PluginPackage {
   readonly workspaceDependencies: readonly string[]
   readonly hostSources: ReadonlySet<string>
   readonly clientSources: ReadonlySet<string>
+  readonly missingHostBundle: boolean
+  readonly missingClientBundle: boolean
 }
 
 /** Tests, docs and catalogs never reach a build's output. */
@@ -77,6 +80,8 @@ const readPluginPackages = (root: string): readonly PluginPackage[] => {
       if (!entry.isDirectory() || !existsSync(manifestPath)) continue
       const manifest = manifestSchema.safeParse(JSON.parse(readFileSync(manifestPath, 'utf8')))
       if (!manifest.success || manifest.data.scripts?.build === undefined) continue
+      const distDirectory = join(root, directory, 'dist')
+      const hasClientBundle = manifest.data.dsh?.client !== undefined
       packages.push({
         name: manifest.data.name,
         directory,
@@ -85,6 +90,8 @@ const readPluginPackages = (root: string): readonly PluginPackage[] => {
           .map(([name]) => name),
         hostSources: bundledSources(root, directory, 'index'),
         clientSources: bundledSources(root, directory, 'client'),
+        missingHostBundle: !existsSync(join(distDirectory, 'index.js')),
+        missingClientBundle: hasClientBundle && !existsSync(join(distDirectory, 'client.js')),
       })
     }
   }
@@ -100,7 +107,8 @@ const dshxDistributionOf = (path: string): string | undefined => {
 /**
  * What a checkout needs after its base moved from one main to the next: installs where a lockfile changed, a dshx
  * rebuild when dshx changed, and the plugins whose sources changed plus every plugin that depends on them (a plugin-ui
- * class change only dedupes once every dependant is rebuilt) or bundles a changed dshx runtime file.
+ * class change only dedupes once every dependant is rebuilt) or bundles a changed dshx runtime file. Missing plugin bundle
+ * outputs are selected independently so an up-to-date checkout can repair its generated artifacts without rebuilding dependants.
  */
 export const planRebuild = (input: { readonly root: string; readonly changedFiles: readonly string[] }): RebuildPlan => {
   const changed = input.changedFiles.filter(isBuildInput)
@@ -108,7 +116,7 @@ export const planRebuild = (input: { readonly root: string; readonly changedFile
   const owns = (pluginPackage: PluginPackage, path: string): boolean => path.startsWith(`${pluginPackage.directory}/`)
   const dshxOutputs = new Set(changed.flatMap(path => dshxDistributionOf(path) ?? []))
 
-  const selected = new Set(
+  const changedPackages = new Set(
     packages
       .filter(
         pluginPackage =>
@@ -117,14 +125,19 @@ export const planRebuild = (input: { readonly root: string; readonly changedFile
       )
       .map(pluginPackage => pluginPackage.name),
   )
+  const dependencyAffected = new Set(changedPackages)
   for (let grew = true; grew;) {
     grew = false
     for (const pluginPackage of packages) {
-      if (selected.has(pluginPackage.name) || !pluginPackage.workspaceDependencies.some(name => selected.has(name))) continue
-      selected.add(pluginPackage.name)
+      if (dependencyAffected.has(pluginPackage.name) || !pluginPackage.workspaceDependencies.some(name => dependencyAffected.has(name))) continue
+      dependencyAffected.add(pluginPackage.name)
       grew = true
     }
   }
+  const selected = new Set([
+    ...dependencyAffected,
+    ...packages.filter(pluginPackage => pluginPackage.missingHostBundle || pluginPackage.missingClientBundle).map(pluginPackage => pluginPackage.name),
+  ])
 
   const changedSet = new Set(changed)
   const plugins = packages
@@ -135,8 +148,8 @@ export const planRebuild = (input: { readonly root: string; readonly changedFile
       const unmapped = own.some(path => /\.[cm]?[jt]sx?$/.test(path) && !pluginPackage.hostSources.has(path) && !pluginPackage.clientSources.has(path))
       const hits = (sources: ReadonlySet<string>): boolean => [...sources].some(source => changedSet.has(source) || dshxOutputs.has(source))
       // A source the last build never saw could land in either bundle; assume the Host so a restart is not missed.
-      const host = manifestChanged || unmapped || hits(pluginPackage.hostSources)
-      return { name: pluginPackage.name, host, client: !host || hits(pluginPackage.clientSources) }
+      const host = pluginPackage.missingHostBundle || manifestChanged || unmapped || hits(pluginPackage.hostSources)
+      return { name: pluginPackage.name, host, client: pluginPackage.missingClientBundle || !host || hits(pluginPackage.clientSources) }
     })
 
   const installRoots = [...new Set(input.changedFiles.filter(path => /(^|\/)pnpm-lock\.yaml$/.test(path)).map(path => dirname(path)))].sort((left, right) =>
