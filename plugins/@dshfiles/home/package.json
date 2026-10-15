@@ -24,8 +24,7 @@
   "dependencies": {
     "@dshfiles/jj-integration": "workspace:*",
     "@dshfiles/plugin-ui": "workspace:*",
-    "@dshfiles/shared-runtime": "workspace:*",
-    "zod": "catalog:"
+    "@dshfiles/shared-runtime": "workspace:*"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "catalog:",

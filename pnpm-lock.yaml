@@ -467,9 +467,6 @@ importers:
       '@dshfiles/shared-runtime':
         specifier: workspace:*
         version: link:../shared-runtime
-      write-file-atomic:
-        specifier: 'catalog:'
-        version: 7.0.0
       zod:
         specifier: 'catalog:'
         version: 4.6.5
@@ -847,6 +844,9 @@ importers:
       '@deepseek-ai/dsh-llm-pi-ai':
         specifier: 0.2.0-rc.2
         version: 0.2.0-rc.2(70780588991207c59b8cc95f4a7a83ba)
+      '@deepseek-ai/dsh-llm-retry':
+        specifier: 0.2.0-rc.2
+        version: 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-agent@0.2.0-rc.2(fee0e653b72a3883e0f0da2d9a46bb50))(@deepseek-ai/dsh-brand@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-llm@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))(@deepseek-ai/dsh-session-projection@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-session@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)))))(@deepseek-ai/dsh-session@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))))(@deepseek-ai/dsh-timeout@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4))
       '@deepseek-ai/dsh-schedule':
         specifier: 0.2.0-rc.2
         version: 0.2.0-rc.2(d26e781c4835252ed4e31e5f574fb76e)
@@ -1029,9 +1029,6 @@ importers:
       '@deepseek-ai/dsh-client-ui-primitives':
         specifier: 'catalog:'
         version: 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
-      '@deepseek-ai/dsh-client-ui-session':
-        specifier: 'catalog:'
-        version: 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
       '@deepseek-ai/dsh-client-ui-settings':
         specifier: 'catalog:'
         version: 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
@@ -1065,6 +1062,9 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 18.3.31
+      jsdom:
+        specifier: 'catalog:'
+        version: 26.1.0
       react:
         specifier: 'catalog:'
         version: 18.3.1
@@ -1245,9 +1245,6 @@ importers:
       '@dshfiles/shared-runtime':
         specifier: workspace:*
         version: link:../shared-runtime
-      zod:
-        specifier: 'catalog:'
-        version: 4.6.5
     devDependencies:
       '@deepseek-ai/cordis':
         specifier: 4.0.4
@@ -1558,9 +1555,6 @@ importers:
       '@deepseek-ai/dsh-client-ui-workspace':
         specifier: 'catalog:'
         version: 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
-      '@testing-library/react':
-        specifier: 'catalog:'
-        version: 16.3.3(@testing-library/dom@10.4.2)(@types/react-dom@18.3.7(@types/react@18.3.31))(@types/react@18.3.31)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@types/node':
         specifier: 22.20.5
         version: 22.20.5
@@ -2802,9 +2796,6 @@ importers:
       '@deepseek-ai/dsh-plugin-manager':
         specifier: 0.2.0-rc.2
         version: 0.2.0-rc.2(bfdc2f8c3f35c0e5915b546a4b15b3ab)
-      '@testing-library/react':
-        specifier: 'catalog:'
-        version: 16.3.3(@testing-library/dom@10.4.2)(@types/react-dom@18.3.7(@types/react@18.3.31))(@types/react@18.3.31)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@types/node':
         specifier: 22.20.5
         version: 22.20.5
@@ -3241,9 +3232,15 @@ importers:
       '@types/react':
         specifier: 'catalog:'
         version: 18.3.31
+      jsdom:
+        specifier: 'catalog:'
+        version: 26.1.0
       react:
         specifier: 'catalog:'
         version: 18.3.1
+      react-dom:
+        specifier: 'catalog:'
+        version: 18.3.1(react@18.3.1)
       typescript:
         specifier: 'catalog:'
         version: 7.0.2

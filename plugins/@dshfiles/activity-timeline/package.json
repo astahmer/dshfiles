@@ -23,7 +23,6 @@
   "dependencies": {
     "@dshfiles/plugin-ui": "workspace:*",
     "@dshfiles/shared-runtime": "workspace:*",
-    "write-file-atomic": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {

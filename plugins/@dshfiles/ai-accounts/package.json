@@ -67,6 +67,7 @@
     "@deepseek-ai/dsh-credentials": "catalog:",
     "@deepseek-ai/dsh-llm": "catalog:",
     "@deepseek-ai/dsh-llm-pi-ai": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-llm-retry": "0.2.0-rc.2",
     "@deepseek-ai/dsh-schedule": "0.2.0-rc.2",
     "@deepseek-ai/dsh-session": "catalog:",
     "@deepseek-ai/dsh-storage": "catalog:",
