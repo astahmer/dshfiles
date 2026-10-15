@@ -155,7 +155,7 @@ rule to `error` once those land.
       multi-host sources). Fixed by widening our own input types to
       `?: T | undefined` where callers forward optional values, and by not
       passing `undefined` to library props (Radix, Monaco, oauth4webapi, Toast).
-- [ ] 10. `test(e2e)`: Hono fake Command Code, then the hub fake.
+- [ ] 10. `test(e2e)`: Hono fake Command Code, then the hub fake. Detailed in [guardrails-refactors.md](guardrails-refactors.md).
 - [ ] 11. emilint `feat(antislop)`: `no-export-bag`; re-vendor as warn.
 - [ ] 12. `refactor(<plugin>)`: XState and namespace classes per plugin
       (jujutsu → thread-sidebar → ai-accounts → rest). Each slice lowers the ratchet.
