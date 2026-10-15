@@ -4,7 +4,7 @@ The child question flow, deferred files and revisioned Markdown feedback
 shipped in [`@dshfiles/agent-questions`](../plugins/@dshfiles/agent-questions/README.md),
 which also records the design decisions. Root timed questions are DSH's own
 `tool-ask-user` in `mode: timed` (300 s), already set in
-`profiles/web/cordis.patch.yml`. What is left is acceptance, not design.
+`profiles/web/cordis.patch.yml`. Browser acceptance remains open; cross-thread orchestration needs a Host-owned contract, tracked in [DSH Host gaps](dsh-host-gaps.md).
 
 ## Remaining
 
@@ -14,6 +14,14 @@ which also records the design decisions. Root timed questions are DSH's own
       as `user-question-reply`, cancellation, and the question surviving a Host
       restart. No e2e journey covers `ask_user_question` today; write one with
       the fake Command Code provider (`tooling/dshx/e2e/support/fake-command-code.ts`).
+- [ ] **Cross-thread question inbox for orchestration.** List native pending
+      question batches across all Sessions or filter one Session, plus durable
+      parent/child questions within the authorized direct-parent scope. Expose
+      options/recommendations, blocking versus timed mode, exact countdown/deadline,
+      and answerability/queued/expired state; submit complete structured answers
+      only within an authorized scope. Use SessionQuery projections and the
+      parent-question store, not arbitrary transcript scans; open forms need a
+      race/cancel-safe answerer broker. See the Host gap above.
 - [ ] **Child flow on a real provider.** Cold-resume across a Host restart is
       proven only with the synthetic LLM adapter (`pnpm verify:scratch`).
 - [ ] **Element anchors** for feedback, once a browser/evidence provider is

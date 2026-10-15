@@ -17,7 +17,7 @@ Checkboxes and receipts in a plan are history, not fresh verification.
 |---|---|
 | [Agent session history](agent-session-history.md) | Bounded, permission-scoped Session search and read tools for Agents; [tracker](agent-session-history/README.md). Not started on stock DSH: its route went through a core fork, and `dshx_comm_history` covers live descendants only. |
 | [Agent session observability](agent-session-observability/README.md) | Wider history access, JJ change associations, orchestration writes, a scratch check. |
-| [Async Agent questions](async-agent-questions.md) | Browser acceptance of root timed questions, a real-provider child run, element anchors. |
+| [Async Agent questions](async-agent-questions.md) | Cross-thread inbox Host gap, root timed acceptance, real-provider child run, element anchors. |
 | [Multi-host](multi-host/README.md) | Durable supervision and upgrades of a remote host; a browser journey. |
 | [Desktop shell](desktop-shell/README.md) | Relaunch on Host exit, lifecycle test, signing, updates. |
 | [OptMem remaining validation](optmem/README.md) | Quiet 100k-event benchmark and full acceptance gates. To be superseded by the new memory plugin. |
