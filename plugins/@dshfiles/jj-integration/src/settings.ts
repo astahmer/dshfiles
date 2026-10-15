@@ -13,9 +13,6 @@ export const jjIntegrationSettings = defineSettings({
     threadsDirectory: Schema.string()
       .default('')
       .description('Parent directory for thread workspaces. Empty uses `<repository>-threads` beside the repository.'),
-    setupCommand: Schema.string()
-      .default('')
-      .description('Shell command run in a new thread workspace right after it is created, e.g. `pnpm install --frozen-lockfile`. Empty runs nothing.'),
     askAgentToFixLanding: Schema.boolean()
       .default(true)
       .description('When Rebase finds conflicts or undescribed revisions, queue a message asking the thread’s agent to fix them and rebase again.'),

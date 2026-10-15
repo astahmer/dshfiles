@@ -1,5 +1,4 @@
-import { realpath } from 'node:fs/promises'
-import { basename, resolve } from 'node:path'
+import { basename } from 'node:path'
 
 import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
 import { Utf8 } from '@dshfiles/optmem-core'
@@ -15,6 +14,7 @@ import type { MemoryStore, NoteCategory, SearchHit } from './store.ts'
 export type SessionLog = { readonly header: ThreadHeader; readonly inheritedEventCount: number; readonly events: readonly SessionEvent[] }
 
 export type MemoryServices = {
+  readonly projectPath: (cwd: string) => Promise<string>
   readonly listSessions: () => Promise<readonly { readonly header: ThreadHeader & { readonly createdAt: number }; readonly live: boolean }[]>
   readonly readSession: (sessionId: string) => Promise<SessionLog>
   /** One cheap-model call on the thread's route (reasoning off by default); rejects when no route is offered. */
@@ -90,7 +90,7 @@ export const createMemoryRuntime = (options: {
     if (cwd === undefined || cwd.length === 0) return Promise.resolve('unknown')
     const known = projects.get(cwd)
     if (known) return known
-    const pending = realpath(cwd).catch(() => resolve(cwd))
+    const pending = services.projectPath(cwd)
     projects.set(cwd, pending)
     return pending
   }

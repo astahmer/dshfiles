@@ -66,7 +66,7 @@
       "externalDependencies": [
         {
           "id": "jj",
-          "boundary": "Fixed-argv jj CLI through the DSH subprocess service with a timeout; the only shell is the operator-configured setup command.",
+          "boundary": "Fixed-argv jj CLI through the DSH subprocess service with a timeout; workspace provisioning runs no setup commands.",
           "deterministicFake": "Real temporary jj repositories in src/threads.integration.test.ts; no jj mock is used."
         }
       ],
@@ -202,7 +202,7 @@
       "externalDependencies": [
         {
           "id": "jj",
-          "boundary": "Fixed-argv jj CLI through the DSH subprocess service with a timeout; the only shell is the operator-configured setup command.",
+          "boundary": "Fixed-argv jj CLI through the DSH subprocess service with a timeout; workspace provisioning runs no setup commands.",
           "deterministicFake": "Real temporary jj repositories in src/threads.integration.test.ts; no jj mock is used."
         }
       ],

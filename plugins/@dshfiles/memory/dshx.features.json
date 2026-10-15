@@ -148,7 +148,7 @@
     {
       "id": "start-block",
       "title": "Start every thread with one frozen memory block",
-      "summary": "At the first prompt assembly of each agent (subagents included), append a byte-bounded block to the end of the system prompt: a fixed instruction, notes, and thread pointers grouped by project and ranked by citations then recency. The block is frozen per thread and identical across a project's threads until memory changes, so it stays in the cached prefix and is never re-emitted.",
+      "summary": "At the first prompt assembly of each agent (subagents included), append a byte-bounded block to the end of the system prompt: a fixed instruction, notes, and thread pointers grouped by project and ranked by citations then recency. Jujutsu workspace paths resolve to their shared store's owning checkout, so isolated threads in one repository share project memory. The block is frozen per thread and identical across a project's threads until memory changes, so it stays in the cached prefix and is never re-emitted. Existing memory rows keep their prior project paths; normalization does not migrate them.",
       "surfaces": ["host", "integration", "settings"],
       "configuration": [
         {
@@ -192,6 +192,12 @@
           "id": "memory.block-frozen",
           "file": "plugins/@dshfiles/memory/src/runtime.test.ts",
           "testName": "gives every thread and subagent of a project the same frozen block until memory changes"
+        },
+        {
+          "kind": "unit-test",
+          "id": "memory.block-jj-workspaces",
+          "file": "plugins/@dshfiles/memory/src/runtime.test.ts",
+          "testName": "shares project notes between a jj checkout and its thread workspace"
         },
         {
           "kind": "unit-test",

@@ -19,6 +19,7 @@ import { costOfTokens } from '@dshfiles/ai-accounts/cost-estimate'
 import { createPricingCatalog, DEFAULT_PRICING_PATH, resolveRouteQuote } from '@dshfiles/ai-accounts/pricing-catalog'
 
 import { memoryApi, type MemoryCostLine, type MemoryCosts, type MemoryUsage, type PanelNote, type PanelThread } from './api.ts'
+import { projectPathFor } from './project-path.ts'
 import { createMemoryRuntime, type Caller, type MemoryRuntime, type MemoryServices } from './runtime.ts'
 import { memorySettings, type MemorySettings } from './settings.ts'
 import { openMemoryStore, type MemoryStore, type NoteRecord, type StoredThread } from './store.ts'
@@ -94,6 +95,7 @@ const hostServices = (ctx: Context): MemoryServices => {
     }),
   })
   return {
+    projectPath: projectPathFor,
     listSessions: async () => (await sessionQuery().listSessions()).map(record => ({ header: record.header, live: record.live })),
     readSession: async sessionId => {
       const log = await sessionQuery().readSession(SessionId(sessionId))

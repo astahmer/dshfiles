@@ -1,10 +1,11 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { realpathSync } from 'node:fs'
+import { execFileSync, spawnSync } from 'node:child_process'
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { projectPathFor } from './project-path.ts'
 import { createMemoryRuntime, type Caller, type SessionLog } from './runtime.ts'
 import type { MemoryEmbedder } from './embedder.ts'
 import { memorySettings, type MemorySettings } from './settings.ts'
@@ -19,6 +20,15 @@ afterEach(() => {
   vi.useRealTimers()
   rmSync(root, { recursive: true, force: true })
 })
+
+const jjAvailable = spawnSync('jj', ['--version']).status === 0
+const jj = (cwd: string, ...args: string[]): string =>
+  execFileSync('jj', ['--color=never', '--no-pager', ...args], {
+    cwd,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+    env: { ...process.env, JJ_CONFIG: '' },
+  })
 
 const settings = (overrides: Partial<MemorySettings> = {}): MemorySettings => ({ ...memorySettings.schema({}), idleMs: 1_000, ...overrides })
 
@@ -43,6 +53,7 @@ const setup = (overrides: Partial<MemorySettings> = {}, embedder?: MemoryEmbedde
     settings: () => settings(overrides),
     logger: { info: () => {}, warn: () => {} },
     services: {
+      projectPath: projectPathFor,
       listSessions: async () => [...logs.values()].map(log => ({ header: { ...log.header, createdAt: Date.now() }, live: false })),
       readSession: async id => {
         const log = logs.get(id)
@@ -169,6 +180,29 @@ describe('memory runtime', () => {
     } as never)
     expect(store.usage().tools.find(tool => tool.tool === 'memory_search')?.used).toBe(1)
     expect(store.thread('11111111')?.uses).toBe(1)
+  })
+
+  it.skipIf(!jjAvailable)('shares project notes between a jj checkout and its thread workspace', async () => {
+    const repository = join(root, 'repo')
+    execFileSync('jj', ['git', 'init', repository], { stdio: 'ignore', env: { ...process.env, JJ_CONFIG: '' } })
+    jj(repository, 'config', 'set', '--repo', 'user.name', 'Test')
+    jj(repository, 'config', 'set', '--repo', 'user.email', 'test@example.com')
+    writeFileSync(join(repository, 'base.txt'), 'base\n')
+    jj(repository, 'commit', '-m', 'base')
+    jj(repository, 'bookmark', 'create', 'main', '-r', '@-')
+
+    const threadWorkspace = join(`${repository}-threads`, 'thread-c0ffee')
+    mkdirSync(dirname(threadWorkspace), { recursive: true })
+    jj(repository, 'workspace', 'add', threadWorkspace, '--name', 'thread-c0ffee', '-r', 'main')
+
+    const { runtime, caller } = setup()
+    const note = 'Thread workspace preparation: install dependencies only for code changes.'
+    await runtime.note(caller('session-writer', repository), { text: note, category: 'project' })
+    expect(await runtime.startBlock(caller('session-thread', threadWorkspace))).toContain(note)
+
+    const otherProject = join(root, 'other-project')
+    mkdirSync(otherProject)
+    expect(await runtime.startBlock(caller('session-other-project', otherProject))).not.toContain(note)
   })
 
   it('adds, supersedes and forgets notes through memory_note', async () => {

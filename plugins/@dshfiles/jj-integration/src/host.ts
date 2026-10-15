@@ -28,7 +28,6 @@ declare module '@deepseek-ai/cordis' {
 const MAX_OUTPUT = 512 * 1024
 const MAX_STDERR = 64 * 1024
 const JJ_TIMEOUT_MS = 120_000
-const SETUP_TIMEOUT_MS = 15 * 60_000
 /** A thread younger than this may still be waiting for its first Session to attach. */
 const SWEEP_GRACE_MS = 15 * 60_000
 const SWEEP_INTERVAL_MS = 10 * 60_000
@@ -118,27 +117,6 @@ const createExecutor =
       stderr: handle.collected.stderr?.readFrom(0)?.text ?? '',
     }
   }
-
-/** Operator-configured setup (dependency install and the like); it never blocks the thread from opening. */
-const runSetupCommand = async (context: Context, command: string, cwd: string): Promise<void> => {
-  const argv = process.platform === 'win32' ? ['cmd.exe', '/c', command] : ['/bin/sh', '-c', command]
-  const handle = context.subprocess.spawn({
-    argv,
-    cwd,
-    stdio: { stdin: 'ignore', stdout: { maxBytes: MAX_STDERR }, stderr: { maxBytes: MAX_STDERR } },
-    graceMs: 5_000,
-    signal: AbortSignal.timeout(SETUP_TIMEOUT_MS),
-  })
-  const outcome = await handle.done
-  const failed = outcome.exitCode !== 0
-  emitActivity({
-    type: failed ? 'workspace.setup_failed' : 'workspace.setup_done',
-    level: failed ? 'attention' : 'routine',
-    summary: failed ? `Thread setup failed in ${basename(cwd)}` : `Thread setup finished in ${basename(cwd)}`,
-    detail: (handle.collected.stderr?.readFrom(0)?.text ?? '').slice(-2_000),
-    path: cwd,
-  })
-}
 
 const isolatedSessionIdsAt = (path: string): readonly string[] =>
   [...isolatedSessionWorkspaces].flatMap(([sessionId, workspace]) => (workspace.path === path ? [sessionId] : []))
@@ -466,8 +444,6 @@ const isolateSession = async (caller: ApiCaller) => {
 
   isolatedSessionWorkspaces.set(caller.sessionId, thread)
   emitActivity({ type: 'workspace.provisioned', summary: `New thread workspace ${thread.name}`, path: thread.path })
-  const command = readSettings().setupCommand.trim()
-  if (command !== '') void runSetupCommand(requireContext(), command, thread.path).catch(() => undefined)
   return { ...thread, created: true }
 }
 
@@ -510,8 +486,6 @@ const api = jjIntegrationApi.host({
     const thread = await requireThreads().provision(location.repoRoot, input.base, input.name)
     const workspace = await registry.create(thread.path, `${project?.title ?? basename(location.repoRoot)} · ${thread.name}`)
     emitActivity({ type: 'workspace.provisioned', summary: `New thread workspace ${thread.name}`, path: thread.path })
-    const command = settings.setupCommand.trim()
-    if (command !== '') void runSetupCommand(requireContext(), command, thread.path).catch(() => undefined)
     return { workspaceId: workspace.id, isolated: true, destination: await destinationAt(thread.path, true, project?.id ?? null) }
   },
   isolate: ({ caller }) => isolateSession(caller),

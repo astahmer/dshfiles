@@ -15,7 +15,9 @@ Cross-thread, cross-project memory for DSH that leaves the live context and the 
   (`blockBytes`, 1,600) is appended to the end of the system prompt: a fixed instruction, notes, and thread pointers
   grouped by project and ranked by citations, then recency. It is frozen per thread (persisted, so a Host restart does
   not change it) and identical for every thread of a project until memory changes, so it sits in the cached prefix and
-  is never re-emitted mid-thread.
+  is never re-emitted mid-thread. Jujutsu workspaces resolve to their shared store's owning checkout, so isolated
+  threads in one repository keep the same project memory. Existing memory rows keep their prior project path; they are
+  not migrated automatically.
 - **Tools.** `memory_search` (digests, valid notes and indexed messages; FTS5 porter words plus trigram identifiers,
   BM25 fused by reciprocal rank, recency decay, project and note-type boosts), `memory_read` (a digest, a note, or a
   bounded raw excerpt read back from the session log), `memory_note` (add, update with a reason — the old row stays as

@@ -36,6 +36,13 @@ until it is ready; typing does not. Each new thread is moved at most once, so a
 manual toggle sticks. The thread sidebar shows a thread workspace's sessions
 under its project.
 
+Creating a thread workspace never runs dependency setup; any previously saved
+`setupCommand` is ignored. After the thread starts, check the project's single
+`jj workspace preparation` memory note,
+verify its command against current project instructions, and prepare only when
+its explicit conditions match; no note or unmet conditions means no setup. This
+keeps workspace allocation fast for docs-only and other non-code work.
+
 ## Finding a thread workspace
 
 The **Thread workspaces** page is available from the left panel and as a tab in
@@ -101,7 +108,6 @@ The confirmation dialog explains these effects before removal.
 | `isolateByDefault`       | `false`   | Initial state of the workspace toggle for new threads.                                      |
 | `bookmark`               | `main`    | Bookmark threads start from and Rebase advances.                                            |
 | `threadsDirectory`       | empty     | Parent for thread workspaces; empty uses `<repository>-threads`.                            |
-| `setupCommand`           | empty     | Shell command run in a new thread workspace, e.g. `pnpm install --frozen-lockfile`.         |
 | `askAgentToFixLanding`   | `true`    | Hand Rebase problems back to the thread's agent.                                            |
 | `syncWorkspaceAfterLand` | `default` | Workspace brought onto the bookmark after Rebase (`dshx checkout sync`); empty disables it. |
 | `removeFinishedThreads`  | `true`    | Remove finished thread workspaces without revisions to rebase.                              |
@@ -113,7 +119,9 @@ use **Rebase**.
 ## Limits
 
 - jj repositories only; git worktrees are not handled yet.
-- A thread workspace starts without `node_modules`; use `setupCommand`.
+- A thread workspace starts without `node_modules`; run project-specific
+  preparation only after the thread starts and only when its memory-note
+  conditions match.
 - Isolation is a working directory, not a sandbox: a shell command can still
   write anywhere.
 - With a custom `threadsDirectory`, the thread sidebar cannot group thread
