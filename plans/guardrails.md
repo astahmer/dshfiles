@@ -115,8 +115,17 @@ rule to `error` once those land.
       unused devDependencies, 5 unlisted dependencies). Some unused files are
       false positives (optmem bench and scripts run by hand, plugin-marketplace
       `tests/`); step 8 adds those entries.
-- [ ] 6. `chore(deps)`: single root, redone from `main`.
-- [ ] 7. `chore(deps)`: `save-exact`, catalog, pins taken from the lockfile, contract check.
+- [x] 6. `chore(deps)`: single root, redone from `main`. (Landed: one root
+      `pnpm-workspace.yaml` and lockfile for root, plugins, dshx and desktop.)
+- [x] 7. `chore(deps)`: `save-exact`, catalog, pins taken from the lockfile, contract check.
+      `saveExact: true` in `pnpm-workspace.yaml` (pnpm 12 reads only auth and
+      registry keys from `.npmrc`, which keeps `save-exact` for npm tools).
+      246 ranges pinned (lockfile diff: specifiers only), 703 specifiers moved
+      into a 79-entry catalog, `check-workspace-contract.ts` rejects non-peer
+      ranges. Open: dshx's `zod ^4.6.5` is an allowed exception because pinning
+      it re-resolves 57 dsh peer variants (the lockfile fails `pnpm dedupe
+      --check` on `main`); `@types/node` drifts (catalog 22.19.20, 40 manifests
+      22.20.5), plus ai-accounts' `typescript 5.9.3` and `yaml 2.9.1`.
 - [ ] 8. `chore(knip)`: root config, added to `check`.
 - [ ] 9. `chore(tsconfig)`: shared plugin base.
 - [ ] 10. `test(e2e)`: Hono fake Command Code, then the hub fake.

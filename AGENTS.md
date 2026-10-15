@@ -172,6 +172,9 @@ Docs: [authoring guide](tooling/dshx/docs/sdk/getting-started.md),
   (`plugins/scripts/check-workspace-contract.ts`): `build`, `test` and
   `typecheck` scripts, `strict` and `noUncheckedIndexedAccess`. Every plugin
   also needs at least one end-to-end journey in the running client.
+- Workspace manifests name exact versions outside `peerDependencies`; a version
+  two manifests share goes in the `catalog:` of `pnpm-workspace.yaml`. The same
+  contract script rejects ranges.
 - Owned plugins are Cordis bundles: `cordis.patch.yml` inserts the package row,
   `dist/index.js` is the Host half, `dist/client.js` the browser half.
 - Loader row ids share one namespace per profile: keep the scope in the id
