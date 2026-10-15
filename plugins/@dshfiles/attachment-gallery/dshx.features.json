@@ -33,6 +33,11 @@
           "featureFile": "tooling/dshx/e2e/features/attachment-gallery.feature"
         },
         {
+          "kind": "gherkin",
+          "id": "attachment-gallery.intake-flows",
+          "featureFile": "tooling/dshx/e2e/features/attachment-gallery.feature"
+        },
+        {
           "kind": "unit-test",
           "id": "attachment-gallery.image-gallery-navigation-unit-keyboard-controls-and-thumbnails",
           "file": "plugins/@dshfiles/attachment-gallery/tests/image-lightbox.client.spec.tsx",
