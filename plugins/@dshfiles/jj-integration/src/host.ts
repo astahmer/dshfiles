@@ -24,6 +24,7 @@ import {
   isSecondaryWorkspace,
   ThreadError,
   type JjExecutor,
+  type ThreadLocation,
   type ThreadStatus,
   type Threads,
 } from './threads.js'
@@ -200,12 +201,19 @@ const listRepositories = async (): Promise<readonly RepositoryView[]> => {
   return [...repositories.values()]
 }
 
-const findThread = async (path: string): Promise<{ readonly repository: RepositoryView; readonly thread: ThreadView } | undefined> => {
-  for (const repository of await listRepositories()) {
-    const thread = repository.threads.find(candidate => candidate.path === path)
-    if (thread !== undefined) return { repository, thread }
+const findThread = async (location: ThreadLocation): Promise<{ readonly repoRoot: string; readonly thread: ThreadView } | undefined> => {
+  if (location.threadName === undefined) return undefined
+  const active = requireThreads()
+  const registry = registryOf()
+  const workspace = await registry.resolveByPath(location.workspaceRoot)
+  const [threadStatus, activity] = await Promise.all([
+    active.status(location.repoRoot, location.threadName),
+    workspace !== undefined && workspace.sessionIds.length > 0 ? readSessionActivity() : Promise.resolve(undefined),
+  ])
+  return {
+    repoRoot: location.repoRoot,
+    thread: threadView(threadStatus, workspace, new Set(registry.archivedSessionIds), activity),
   }
-  return undefined
 }
 
 const landingMessage = (outcome: LandResult): string | undefined => {
@@ -383,9 +391,12 @@ const landThread = async (input: {
 }
 
 const discardThread = async (input: { readonly path: string; readonly force: boolean }) => {
-  const found = await findThread(input.path)
+  const location = await requireThreads()
+    .locate(input.path)
+    .catch(() => undefined)
+  const found = location === undefined ? undefined : await findThread(location)
   if (found === undefined) throw new Error(`${input.path} is not a thread workspace.`)
-  const outcome = await requireThreads().discard({ repoRoot: found.repository.repoRoot, name: found.thread.name, force: input.force })
+  const outcome = await requireThreads().discard({ repoRoot: found.repoRoot, name: found.thread.name, force: input.force })
   if (outcome.status === 'discarded') {
     if (found.thread.workspaceId !== null) await registryOf().delete(WorkspaceId(found.thread.workspaceId))
     for (const [sessionId, workspace] of isolatedSessionWorkspaces) {
@@ -559,12 +570,13 @@ const api = jjIntegrationApi.host({
     const location = await requireThreads()
       .locate(input.path)
       .catch(() => undefined)
-    if (location?.threadName === undefined) return { thread: null }
-    return { thread: (await findThread(location.workspaceRoot))?.thread ?? null }
+    const found = location === undefined ? undefined : await findThread(location)
+    return { thread: found?.thread ?? null }
   },
   land: ({ input }) => landThread({ path: input.path, sessionId: input.sessionId, fromAgent: false }),
   threadStatus: async ({ input, caller }) => {
-    const found = await findThread((await requireThreads().locate(threadPath(input, caller))).workspaceRoot)
+    const location = await requireThreads().locate(threadPath(input, caller))
+    const found = await findThread(location)
     return { bookmark: readSettings().bookmark, thread: found?.thread ?? null }
   },
   landThread: async ({ input, caller }) => {

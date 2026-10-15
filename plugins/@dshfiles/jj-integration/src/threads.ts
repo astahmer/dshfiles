@@ -178,6 +178,20 @@ export const createThreads = (options: {
     return threads
   }
 
+  const status = async (repoRoot: string, name: string): Promise<ThreadStatus> => {
+    const path = join(options.threadsDirectory(repoRoot), name)
+    const bookmark = options.bookmark()
+    const [unlanded, behind, rebaseTimestamps] = await Promise.all([
+      revisions(`(::@ ~ ::${bookmark}) ~ empty()`, path, true),
+      revisions(`@ ~ ${bookmark}::`, path, true),
+      readRebaseTimestamps(repoRoot),
+    ])
+    const threadStatus = { name, path, repoRoot, missing: !existsSync(join(path, '.jj')), unlanded, behind: behind.length > 0 }
+    const rebasedAt = rebaseTimestamps[name]
+    if (rebasedAt === undefined) return threadStatus
+    return { ...threadStatus, rebasedAt }
+  }
+
   const provision = (repoRoot: string, base?: string, requestedName?: string): Promise<{ readonly name: string; readonly path: string }> =>
     serialized(repoRoot, async () => {
       const name = requestedName ?? `thread-${randomBytes(3).toString('hex')}`
@@ -265,7 +279,7 @@ export const createThreads = (options: {
     return { current: candidates.includes(preferred) ? preferred : (candidates[0] ?? null), names: [...new Set(names)] }
   }
 
-  return { locate, list, provision, land, discard, bookmarks, workingCopyCommitId }
+  return { locate, list, status, provision, land, discard, bookmarks, workingCopyCommitId }
 }
 
 export type Threads = ReturnType<typeof createThreads>

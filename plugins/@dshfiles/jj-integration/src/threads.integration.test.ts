@@ -80,6 +80,29 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
     expect((await threads.locate(thread.path)).threadName).toBe(thread.name)
   })
 
+  it('reads one thread status from its workspace without listing siblings', async () => {
+    const target = await threads.provision(repo)
+    await threads.provision(repo)
+    writeFileSync(join(target.path, 'feature.txt'), 'feature\n')
+    jj(target.path, 'describe', '-m', 'feat: target only')
+    const invocations: { readonly cwd: string; readonly command: string }[] = []
+    const focusedThreads = createThreads({
+      executor: async input => {
+        invocations.push({ cwd: input.cwd, command: input.args[1] ?? '' })
+        return executor(input)
+      },
+      bookmark: () => 'main',
+      threadsDirectory: defaultThreadsDirectory,
+    })
+
+    const status = await focusedThreads.status(repo, target.name)
+
+    expect(status).toMatchObject({ name: target.name, path: target.path, unlanded: [{ description: 'feat: target only' }] })
+    expect(status).toEqual((await threads.list(repo)).find(thread => thread.name === target.name))
+    expect(invocations).toHaveLength(2)
+    expect(invocations.every(invocation => invocation.cwd === target.path && invocation.command === 'log')).toBe(true)
+  })
+
   it('lists local bookmarks and starts a thread from the chosen one', async () => {
     jj(repo, 'bookmark', 'create', 'feature', '-r', '@')
     jj(repo, 'describe', '-m', 'feature base')
