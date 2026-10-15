@@ -40,6 +40,7 @@
       "inputs": [
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__command-palette.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__dshx.sha256",
+        "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__jj-integration.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__jujutsu.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__main-tabs.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__multi-host.sha256",
@@ -50,6 +51,8 @@
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__workbench.sha256",
         "$TURBO_ROOT$/plugins/@dshfiles/command-palette/cordis.patch.yml",
         "$TURBO_ROOT$/plugins/@dshfiles/command-palette/package.json",
+        "$TURBO_ROOT$/plugins/@dshfiles/jj-integration/cordis.patch.yml",
+        "$TURBO_ROOT$/plugins/@dshfiles/jj-integration/package.json",
         "$TURBO_ROOT$/plugins/@dshfiles/jujutsu/cordis.patch.yml",
         "$TURBO_ROOT$/plugins/@dshfiles/jujutsu/package.json",
         "$TURBO_ROOT$/plugins/@dshfiles/main-tabs/cordis.patch.yml",
@@ -89,6 +92,7 @@
       "inputs": [
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__command-palette.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__dshx.sha256",
+        "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__jj-integration.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__jujutsu.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__main-tabs.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__multi-host.sha256",
@@ -99,6 +103,8 @@
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__workbench.sha256",
         "$TURBO_ROOT$/plugins/@dshfiles/command-palette/cordis.patch.yml",
         "$TURBO_ROOT$/plugins/@dshfiles/command-palette/package.json",
+        "$TURBO_ROOT$/plugins/@dshfiles/jj-integration/cordis.patch.yml",
+        "$TURBO_ROOT$/plugins/@dshfiles/jj-integration/package.json",
         "$TURBO_ROOT$/plugins/@dshfiles/jujutsu/cordis.patch.yml",
         "$TURBO_ROOT$/plugins/@dshfiles/jujutsu/package.json",
         "$TURBO_ROOT$/plugins/@dshfiles/main-tabs/cordis.patch.yml",

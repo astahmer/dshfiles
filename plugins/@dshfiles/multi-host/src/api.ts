@@ -113,7 +113,7 @@ const remoteThreadSchema = z.object({
   connected: z.boolean(),
 })
 /** jj-integration methods a manager may call on a remote runtime; the folder and bookmark pickers need these. */
-const remotePluginMethodSchema = z.enum(['projects', 'destination', 'provision', 'noFolder'])
+const remotePluginMethodSchema = z.enum(['projects', 'classifyWorkspaces', 'destination', 'provision', 'noFolder'])
 
 export const nativeRpcSchema = nativeRpcRequestSchema
 

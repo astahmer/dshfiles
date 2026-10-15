@@ -1415,6 +1415,9 @@ importers:
       '@deepseek-ai/schemastery':
         specifier: 'catalog:'
         version: 3.18.4
+      '@dshfiles/jj-integration':
+        specifier: workspace:*
+        version: link:../jj-integration
       '@dshfiles/plugin-ui':
         specifier: workspace:*
         version: link:../plugin-ui
@@ -2586,6 +2589,9 @@ importers:
       '@deepseek-ai/schemastery':
         specifier: ^3.18.4
         version: 3.18.4
+      '@dshfiles/jj-integration':
+        specifier: workspace:*
+        version: link:../jj-integration
       '@dshfiles/plugin-ui':
         specifier: workspace:*
         version: link:../plugin-ui

@@ -27,6 +27,7 @@
     "test:e2e": "node ../../../tooling/dshx/scripts/run-e2e.mjs"
   },
   "dependencies": {
+    "@dshfiles/jj-integration": "workspace:*",
     "@dshfiles/plugin-ui": "workspace:*",
     "@dshfiles/project-folder-picker": "workspace:*",
     "@dshfiles/shared-runtime": "workspace:*",

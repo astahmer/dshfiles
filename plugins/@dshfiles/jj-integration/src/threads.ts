@@ -38,6 +38,8 @@ export interface ThreadLocation {
   readonly threadName: string | undefined
 }
 
+export const isSecondaryWorkspace = (location: ThreadLocation): boolean => location.workspaceRoot !== location.repoRoot
+
 export interface ThreadStatus {
   readonly name: string
   readonly path: string

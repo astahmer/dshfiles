@@ -102,6 +102,11 @@ export const jjIntegrationApi = defineApi({
       input: z.object({ workspaceId: z.string().min(1), sessionId: z.string().min(1).optional() }).strict(),
       output: destinationSchema,
     }),
+    classifyWorkspaces: method({
+      input: z.object({ workspaceIds: z.array(z.string().min(1).max(256)).max(256) }).strict(),
+      output: z.object({ jjWorkspaceIds: z.array(z.string().min(1).max(256)).max(256) }).strict(),
+      description: 'Return registered workspace IDs that are confirmed secondary workspaces in an owning JJ repository.',
+    }),
     projects: method({
       input: z.object({}).strict(),
       output: z.object({ projects: z.array(z.object({ workspaceId: z.string(), title: z.string(), path: z.string() }).strict()) }).strict(),

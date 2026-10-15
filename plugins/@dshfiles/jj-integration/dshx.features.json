@@ -98,6 +98,12 @@
           "id": "jj-integration.discard",
           "file": "plugins/@dshfiles/jj-integration/src/threads.integration.test.ts",
           "testName": "discards an empty thread completely and refuses one with revisions to rebase"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.secondary-workspace-identity",
+          "file": "plugins/@dshfiles/jj-integration/src/threads.integration.test.ts",
+          "testName": "identifies non-thread secondary workspaces by their owning JJ checkout"
         }
       ]
     },

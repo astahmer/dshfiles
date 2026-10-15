@@ -3,7 +3,7 @@ import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileS
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { checkoutSyncArgv, createThreads, defaultThreadsDirectory, type JjExecutor } from './threads.js'
+import { checkoutSyncArgv, createThreads, defaultThreadsDirectory, isSecondaryWorkspace, type JjExecutor } from './threads.js'
 
 const jjAvailable = spawnSync('jj', ['--version']).status === 0
 
@@ -50,6 +50,18 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
     expect((await threads.locate(thread.path)).threadName).toBe(thread.name)
     expect((await threads.locate(repo)).threadName).toBeUndefined()
     expect((await threads.list(repo)).map(entry => entry.name)).toEqual([thread.name])
+  })
+
+  it('identifies non-thread secondary workspaces by their owning JJ checkout', async () => {
+    const secondaryPath = join(root, 'secondary')
+    jj(repo, 'workspace', 'add', secondaryPath, '--name', 'secondary')
+
+    const rootLocation = await threads.locate(repo)
+    const secondaryLocation = await threads.locate(secondaryPath)
+
+    expect(isSecondaryWorkspace(rootLocation)).toBe(false)
+    expect(isSecondaryWorkspace(secondaryLocation)).toBe(true)
+    expect(secondaryLocation).toMatchObject({ repoRoot: repo, workspaceRoot: secondaryPath, threadName: undefined })
   })
 
   it('creates the thread workspace under the name the client already shows', async () => {

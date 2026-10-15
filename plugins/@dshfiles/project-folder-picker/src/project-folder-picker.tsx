@@ -21,6 +21,7 @@ export interface RegisteredProject {
   readonly workspaceId: string
   readonly title: string
   readonly canonicalPath: string
+  readonly isJjWorkspace?: boolean
 }
 
 export interface DirectoryListing {
@@ -414,7 +415,10 @@ const PickerEntryRow = (props: PickerEntryRowProps): JSX.Element => {
           </span>
         )}
         <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col">
-          <span className="dshx:truncate dshx:text-sm dshx:font-medium">{title}</span>
+          <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
+            <span className="dshx:min-w-0 dshx:truncate dshx:text-sm dshx:font-medium">{title}</span>
+            {props.entry.kind === 'project' && props.entry.project.isJjWorkspace === true ? <Badge variant="muted">JJ workspace</Badge> : null}
+          </span>
           <span className="dshx:truncate dshx:text-xs dshx:text-muted-foreground">
             {props.machineName === undefined ? null : `${props.machineName} · `}
             <span className="dshx:font-mono">{path}</span>

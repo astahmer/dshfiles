@@ -6,8 +6,9 @@ import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
-import { defineClient } from '@dshfiles/dshx/client'
-import { PluginQueryProvider, pluginQueryClient } from '@dshfiles/plugin-ui/query'
+import { defineClient, useApi } from '@dshfiles/dshx/client'
+import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
+import { PluginQueryProvider, pluginQueryClient, useQuery } from '@dshfiles/plugin-ui/query'
 import type { DirectoryPickerPort, RegisteredProject } from '@dshfiles/project-folder-picker'
 import { useCallback, useMemo, useSyncExternalStore } from 'react'
 import { JujutsuPanel } from './client.js'
@@ -160,13 +161,35 @@ const noProjects = (): null => null
 
 /** Follow the Host workspace registry so the repository picker lists every registered project. */
 const useRegisteredProjects = (workspaces: IWorkspaces | undefined): readonly RegisteredProject[] => {
+  const api = useApi(jjIntegrationApi)
   const source = workspaces?.list
   const subscribe = useCallback((listener: () => void) => source?.subscribe(listener) ?? (() => undefined), [source])
   const getSnapshot = useCallback(() => source?.getSnapshot() ?? null, [source])
   const snapshot = useSyncExternalStore(subscribe, getSnapshot, noProjects)
+  const workspaceIds = useMemo(() => snapshot?.items.map(workspace => workspace.workspaceId).sort() ?? [], [snapshot])
+  const classification = useQuery({
+    queryKey: ['jujutsu', 'jj-workspace-classification', workspaceIds],
+    enabled: workspaceIds.length > 0,
+    retry: false,
+    staleTime: Number.POSITIVE_INFINITY,
+    queryFn: async ({ signal }) => {
+      try {
+        return (await api.classifyWorkspaces({ workspaceIds }, { signal })).jjWorkspaceIds
+      } catch (error) {
+        if (signal.aborted) throw error
+        return []
+      }
+    },
+  })
   return useMemo(
-    () => snapshot?.items.map(workspace => ({ workspaceId: workspace.workspaceId, title: workspace.title, canonicalPath: workspace.path })) ?? [],
-    [snapshot],
+    () =>
+      snapshot?.items.map(workspace => ({
+        workspaceId: workspace.workspaceId,
+        title: workspace.title,
+        canonicalPath: workspace.path,
+        isJjWorkspace: classification.data?.includes(workspace.workspaceId) === true,
+      })) ?? [],
+    [snapshot, classification.data],
   )
 }
 

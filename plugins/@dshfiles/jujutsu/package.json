@@ -25,6 +25,7 @@
   },
   "dependencies": {
     "@deepseek-ai/schemastery": "catalog:",
+    "@dshfiles/jj-integration": "workspace:*",
     "@dshfiles/plugin-ui": "workspace:*",
     "@dshfiles/project-folder-picker": "workspace:*",
     "@dshfiles/shared-runtime": "workspace:*",

@@ -17,7 +17,16 @@ import { JsonText } from './json-text.js'
 import { jjIntegrationSettings, type JjIntegrationSettings } from './settings.js'
 import { canRebaseThread, hasPendingUserQuestion, type ThreadSessionActivity } from './thread-rebase-eligibility.js'
 import { workspaceHasOtherSession } from './thread-session-ownership.js'
-import { checkoutSyncArgv, createThreads, defaultThreadsDirectory, ThreadError, type JjExecutor, type ThreadStatus, type Threads } from './threads.js'
+import {
+  checkoutSyncArgv,
+  createThreads,
+  defaultThreadsDirectory,
+  isSecondaryWorkspace,
+  ThreadError,
+  type JjExecutor,
+  type ThreadStatus,
+  type Threads,
+} from './threads.js'
 
 declare module '@deepseek-ai/cordis' {
   interface Events {
@@ -513,6 +522,18 @@ const api = jjIntegrationApi.host({
     if (ownedByAnotherSession === undefined) return destination
     return { ...destination, ownedByAnotherSession }
   },
+  classifyWorkspaces: async ({ input }) => {
+    const registry = registryOf()
+    const active = requireThreads()
+    const jjWorkspaceIds: string[] = []
+    for (const workspaceId of new Set(input.workspaceIds)) {
+      const workspace = registry.get(WorkspaceId(workspaceId))
+      if (workspace === undefined || !existsSync(workspace.path)) continue
+      const location = await active.locate(workspace.path).catch(() => undefined)
+      if (location !== undefined && isSecondaryWorkspace(location)) jjWorkspaceIds.push(workspaceId)
+    }
+    return { jjWorkspaceIds }
+  },
   projects: async () => {
     const workspaces = [...registryOf().list()].sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt))
     const projects = []
@@ -522,7 +543,7 @@ const api = jjIntegrationApi.host({
             .locate(workspace.path)
             .catch(() => undefined)
         : undefined
-      if (location?.threadName === undefined) projects.push({ workspaceId: workspace.id, title: workspace.title, path: workspace.path })
+      if (location === undefined || !isSecondaryWorkspace(location)) projects.push({ workspaceId: workspace.id, title: workspace.title, path: workspace.path })
     }
     return { projects }
   },

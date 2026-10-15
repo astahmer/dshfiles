@@ -22,6 +22,7 @@ import type { JjIntegrationTranslate } from './locales.js'
 type RuntimeDestination = Extract<HostDestination, { kind: 'runtime' }>
 
 const remoteProjectsSchema = z.object({ projects: z.array(z.object({ workspaceId: z.string(), title: z.string(), path: z.string() })) })
+const remoteWorkspaceClassificationSchema = z.object({ jjWorkspaceIds: z.array(z.string()) }).strict()
 const remoteDestinationSchema = z.object({
   vcs: z.enum(['jj', 'none']),
   bookmark: z.string().nullable(),
@@ -77,13 +78,43 @@ export const RemoteDestinationChips = (props: {
       return result.ok ? remoteProjectsSchema.safeParse(result.value).data?.projects : undefined
     },
   })
+  const remoteWorkspaceIds = (status.data?.ok === true ? status.data.workspaces : []).map(workspace => workspace.workspaceId).sort()
+  const remoteWorkspaceClassification = useQuery({
+    queryKey: ['jj-integration', 'remote-workspace-classification', destination.runtimeId, remoteWorkspaceIds],
+    enabled: props.pickerOpen && remoteWorkspaceIds.length > 0 && (remoteProjects.data === undefined || remoteProjects.data.length === 0),
+    retry: false,
+    staleTime: Number.POSITIVE_INFINITY,
+    queryFn: async ({ signal }) => {
+      try {
+        const result = await api.runtimePluginCall(
+          { runtimeId: destination.runtimeId, method: 'classifyWorkspaces', input: { workspaceIds: remoteWorkspaceIds } },
+          { signal },
+        )
+        if (!result.ok) {
+          signal.throwIfAborted()
+          return []
+        }
+        const parsed = remoteWorkspaceClassificationSchema.safeParse(result.value)
+        return parsed.success ? parsed.data.jjWorkspaceIds : []
+      } catch (error) {
+        if (signal.aborted) throw error
+        return []
+      }
+    },
+  })
   const threads = useQuery({ queryKey: multiHostKeys.threads, enabled: props.pickerOpen, queryFn: ({ signal }) => api.threadList(undefined, { signal }) })
   // The host's jj-integration knows its projects; without it, the host's registered workspaces stand in.
+  const classifiedWorkspaceIds = new Set(remoteWorkspaceClassification.data ?? [])
   const projects: RegisteredProject[] =
     remoteProjects.data !== undefined && remoteProjects.data.length > 0
       ? remoteProjects.data.map(project => ({ workspaceId: project.workspaceId, title: project.title, canonicalPath: project.path }))
       : status.data?.ok === true
-        ? status.data.workspaces.map(workspace => ({ workspaceId: workspace.workspaceId, title: workspace.title, canonicalPath: workspace.path }))
+        ? status.data.workspaces.map(workspace => ({
+            workspaceId: workspace.workspaceId,
+            title: workspace.title,
+            canonicalPath: workspace.path,
+            isJjWorkspace: classifiedWorkspaceIds.has(workspace.workspaceId),
+          }))
         : []
   const recentFolders = [
     ...new Set(

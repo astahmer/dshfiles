@@ -9,6 +9,7 @@ import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/
 import { TooltipProvider } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { ChevronDownIcon, FolderOpenIcon, PlusIcon, RefreshCwIcon, SearchIcon, SlidersHorizontalIcon, XIcon } from '@dshfiles/plugin-ui/icons'
 import { useApi, useSettings } from '@dshfiles/dshx/client'
+import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
 import type { KeyboardEvent } from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { ProjectFolderPicker, type DirectoryPickerPort, type ProjectFolderSelection, type RegisteredProject } from '@dshfiles/project-folder-picker'
@@ -65,6 +66,7 @@ type ActiveDialog = { readonly mode: 'create' } | { readonly mode: 'edit' | 'rem
 
 export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element => {
   const api = useApi(secretCatalogApi)
+  const jjApi = useApi(jjIntegrationApi)
   const t = props.t
   const settings = useSettings(secretCatalogSettings)
   const revealMs = (settings.value?.revealSeconds ?? 15) * 1000
@@ -95,12 +97,31 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
   const revealGeneration = useRef(0)
   const revealTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const queryClient = useQueryClient()
+  const workspaceIds = useMemo(() => workspaceSnapshot.items.map(workspace => workspace.workspaceId).sort(), [workspaceSnapshot])
+  const workspaceClassification = useQuery({
+    queryKey: ['secret-catalog', 'jj-workspace-classification', workspaceIds],
+    enabled: pickerOpen && workspaceIds.length > 0,
+    retry: false,
+    staleTime: Number.POSITIVE_INFINITY,
+    queryFn: async ({ signal }) => {
+      try {
+        return (await jjApi.classifyWorkspaces({ workspaceIds }, { signal })).jjWorkspaceIds
+      } catch (error) {
+        if (signal.aborted) throw error
+        return []
+      }
+    },
+  })
   const cwd = selection?.canonicalPath ?? null
-  const projects: readonly RegisteredProject[] = workspaceSnapshot.items.map(workspace => ({
-    workspaceId: workspace.workspaceId,
-    title: workspace.title,
-    canonicalPath: workspace.path,
-  }))
+  const projects: readonly RegisteredProject[] = useMemo(() => {
+    const classifiedWorkspaceIds = new Set(workspaceClassification.data ?? [])
+    return workspaceSnapshot.items.map(workspace => ({
+      workspaceId: workspace.workspaceId,
+      title: workspace.title,
+      canonicalPath: workspace.path,
+      isJjWorkspace: classifiedWorkspaceIds.has(workspace.workspaceId),
+    }))
+  }, [workspaceSnapshot, workspaceClassification.data])
 
   const clearRevealed = useCallback((): void => {
     revealGeneration.current += 1

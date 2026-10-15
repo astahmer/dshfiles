@@ -5,11 +5,15 @@
     {
       "id": "registered-project-search",
       "title": "Search registered projects by name and path",
-      "summary": "Match registered project labels and canonical directories while preserving project identity in returned choices.",
+      "summary": "Match registered project labels and canonical directories, mark confirmed secondary JJ workspaces when Host classification is available, and preserve project identity in returned choices.",
       "surfaces": ["client", "integration"],
       "configuration": [],
       "states": ["empty", "matched", "selected"],
-      "failureModes": ["An empty result remains selectable-safe.", "Canonical path is returned separately from display name."],
+      "failureModes": [
+        "An empty result remains selectable-safe.",
+        "Canonical path is returned separately from display name.",
+        "Unavailable JJ classification leaves rows unmarked."
+      ],
       "externalDependencies": [],
       "verification": [
         {
