@@ -251,6 +251,13 @@ Given('the isolated plugin profile {string} is booted with the session-content i
   await visitIsolatedPluginProfile(page, profile)
 })
 
+Then('the content-search index exists under the isolated DSH home', async ({ page }: { page: Page }) => {
+  const indexPath = join(profileFor(page).homeRoot, 'plugins', 'session-query-sqlite', 'index.sqlite')
+  await recordAssertion(page, 'command-palette-content-index-is-under-the-isolated-home', () =>
+    expect.poll(async () => (await stat(indexPath).catch(() => undefined))?.isFile() ?? false).toBe(true),
+  )
+})
+
 Given('the isolated plugin composition {string} and {string} is booted', async ({ page }: { page: Page }, packageId: string, companionPackageId: string) => {
   const profile = await bootComposedPluginProfile({
     packageIds: [packageId, companionPackageId],
