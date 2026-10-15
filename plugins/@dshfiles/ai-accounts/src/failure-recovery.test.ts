@@ -36,12 +36,18 @@ const setup = (options: { readonly policy?: RecoveryPolicy; readonly lunaReserve
 
 const rateLimit: LlmFailure = { message: 'Too many requests', code: 'RATE_LIMIT', status: 429 }
 const transport: LlmFailure = { message: 'exceeded request buffer limit while retrying upstream', code: 'TRANSPORT' }
+const codexRetryHint: LlmFailure = {
+  message: 'An error occurred while processing your request. You can retry your request, or contact support if the error persists.',
+  code: 'PI_AI_ERROR',
+}
 const quota: LlmFailure = { message: 'You have hit your usage limit', code: 'QUOTA', status: 429 }
 
 describe('classifyFailure', () => {
   it('sorts provider failures into the kinds the settings name', () => {
     expect(classifyFailure(transport)).toBe('transport')
     expect(classifyFailure({ message: 'bad gateway', code: 'PI_AI_ERROR', status: 502 })).toBe('transport')
+    expect(classifyFailure(codexRetryHint)).toBe('transport')
+    expect(classifyFailure({ message: 'unsupported parameter', code: 'PI_AI_ERROR' })).toBeUndefined()
     expect(classifyFailure(rateLimit)).toBe('rateLimit')
     expect(classifyFailure(quota)).toBe('exhausted')
     expect(classifyFailure({ message: 'token expired', code: 'AUTH', status: 401 })).toBe('auth')
@@ -105,6 +111,15 @@ describe('failure recovery through the account pool', () => {
     expect(engaged).toEqual(['codex'])
     expect(recovery.routeFor('session', 'codex', NOW)).toBe('codex')
     expect(fail(quota)).toMatchObject({ kind: 'retry', step: { kind: 'failover', to: 'codex_work' } })
+  })
+
+  it('retries Codex server failures that explicitly recommend retrying', () => {
+    const { fail } = setup()
+    expect(fail(codexRetryHint)).toMatchObject({
+      kind: 'retry',
+      failureKind: 'transport',
+      step: { kind: 'retry', delayMs: 1_000 },
+    })
   })
 
   it('retries transport failures in place first and numbers every attempt of one step under one retry id', () => {

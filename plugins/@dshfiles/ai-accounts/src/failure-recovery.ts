@@ -13,6 +13,7 @@ const EXHAUSTED_CODES: ReadonlySet<string> = new Set([
 const RATE_LIMIT_CODES: ReadonlySet<string> = new Set(['RATE_LIMIT', 'RATE_LIMIT_EXCEEDED'])
 const AUTH_CODES: ReadonlySet<string> = new Set(['AUTH', 'MISSING_CREDENTIAL', 'INVALID_CREDENTIAL', 'ACCOUNT_SIGNED_OUT', 'ACCOUNT_SIGN_IN_REQUIRED'])
 const TRANSPORT_CODES: ReadonlySet<string> = new Set(['TRANSPORT', 'TIMEOUT', 'OVERLOADED', 'LLM_STREAM_IDLE_TIMEOUT'])
+const OPENAI_RETRY_HINT = /An error occurred while processing your request\.\s+You can retry your request\b/i
 const OVERSIZED_TEXT = /\b(?:request|payload|body)(?: entity)? (?:is )?too large\b/i
 
 /** `undefined` for failures this plugin leaves alone (image offload, empty responses, cancellations…). */
@@ -28,7 +29,13 @@ export const classifyFailure = (failure: Pick<LlmFailure, 'code' | 'message' | '
   if (EXHAUSTED_CODES.has(failure.code) || isQuotaExceededError(`${failure.code} ${failure.message}`)) return 'exhausted'
   if (RATE_LIMIT_CODES.has(failure.code) || failure.status === 429) return 'rateLimit'
   if (AUTH_CODES.has(failure.code) || failure.status === 401 || failure.status === 403) return 'auth'
-  if (TRANSPORT_CODES.has(failure.code) || (failure.status !== undefined && failure.status >= 500)) return 'transport'
+  if (
+    TRANSPORT_CODES.has(failure.code) ||
+    (failure.status !== undefined && failure.status >= 500) ||
+    (failure.code === 'PI_AI_ERROR' && OPENAI_RETRY_HINT.test(failure.message))
+  ) {
+    return 'transport'
+  }
   return undefined
 }
 
