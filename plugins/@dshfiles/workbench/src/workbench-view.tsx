@@ -3,7 +3,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { PlusIcon, RotateCcwIcon } from '@dshfiles/plugin-ui/icons'
 import { DockviewReact, type DockviewApi, type DockviewReadyEvent, type DockviewTheme, type IDockviewPanelProps } from 'dockview-react'
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
-import { applyDefaultLayout, openPanel, restoreLayout, WORKBENCH_COMPONENT, type LayoutStore } from './layout-store.js'
+import { WorkbenchLayout, WORKBENCH_COMPONENT, type LayoutStore } from './layout-store.js'
 import type { WorkbenchTranslate } from './locales.js'
 import type { WorkbenchPanelRegistry } from './registry.js'
 
@@ -52,7 +52,7 @@ export const WorkbenchView = (props: WorkbenchViewProps): JSX.Element => {
   }, [registry, t])
 
   const onReady = (event: DockviewReadyEvent): void => {
-    restoreLayout(event.api, store, registry.list())
+    WorkbenchLayout.restoreLayout(event.api, store, registry.list())
     setApi(event.api)
     props.onApi?.(event.api)
   }
@@ -66,7 +66,7 @@ export const WorkbenchView = (props: WorkbenchViewProps): JSX.Element => {
       syncOpenIds()
     })
     const takeOpenRequests = (): void => {
-      for (const id of registry.takeOpenRequests()) openPanel(api, registry.get(id) ?? { id, title: id })
+      for (const id of registry.takeOpenRequests()) WorkbenchLayout.openPanel(api, registry.get(id) ?? { id, title: id })
     }
     takeOpenRequests()
     const unsubscribe = registry.subscribe(takeOpenRequests)
@@ -94,7 +94,7 @@ export const WorkbenchView = (props: WorkbenchViewProps): JSX.Element => {
                 <DropdownMenuItem disabled>{t('noMorePanels')}</DropdownMenuItem>
               ) : (
                 closed.map(definition => (
-                  <DropdownMenuItem key={definition.id} onSelect={() => api !== null && openPanel(api, definition)}>
+                  <DropdownMenuItem key={definition.id} onSelect={() => api !== null && WorkbenchLayout.openPanel(api, definition)}>
                     {definition.title}
                   </DropdownMenuItem>
                 ))
@@ -108,7 +108,7 @@ export const WorkbenchView = (props: WorkbenchViewProps): JSX.Element => {
             onClick={() => {
               if (api === null) return
               store.remove()
-              applyDefaultLayout(api, registry.list())
+              WorkbenchLayout.applyDefaultLayout(api, registry.list())
             }}
           >
             <RotateCcwIcon /> {t('resetLayout')}

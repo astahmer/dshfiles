@@ -26,7 +26,7 @@ export const createLayoutStore = (options?: {
 
 export type LayoutStore = ReturnType<typeof createLayoutStore>
 
-export const openPanel = (api: DockviewApi, definition: Pick<WorkbenchPanelDefinition, 'id' | 'title'>): void => {
+const openPanel = (api: DockviewApi, definition: Pick<WorkbenchPanelDefinition, 'id' | 'title'>): void => {
   const existing = api.getPanel(definition.id)
   if (existing !== undefined) {
     existing.api.setActive()
@@ -39,7 +39,7 @@ export const openPanel = (api: DockviewApi, definition: Pick<WorkbenchPanelDefin
 const EDITOR_PANEL_ID = 'dshfiles-editor.main'
 
 /** The Editor alone when registered; otherwise the first two panels side by side and the rest as tabs of the first group. */
-export const applyDefaultLayout = (api: DockviewApi, panels: readonly WorkbenchPanelDefinition[]): void => {
+const applyDefaultLayout = (api: DockviewApi, panels: readonly WorkbenchPanelDefinition[]): void => {
   api.clear()
   const editor = panels.find(panel => panel.id === EDITOR_PANEL_ID)
   if (editor !== undefined) {
@@ -57,7 +57,7 @@ export const applyDefaultLayout = (api: DockviewApi, panels: readonly WorkbenchP
 }
 
 /** Restores the saved layout; a missing or unreadable one is cleared and replaced by the default. */
-export const restoreLayout = (api: DockviewApi, store: LayoutStore, panels: readonly WorkbenchPanelDefinition[]): 'restored' | 'default' => {
+const restoreLayout = (api: DockviewApi, store: LayoutStore, panels: readonly WorkbenchPanelDefinition[]): 'restored' | 'default' => {
   const saved = store.get()
   if (saved !== null) {
     try {
@@ -69,4 +69,10 @@ export const restoreLayout = (api: DockviewApi, store: LayoutStore, panels: read
   }
   applyDefaultLayout(api, panels)
   return 'default'
+}
+
+export class WorkbenchLayout {
+  static readonly openPanel = openPanel
+  static readonly applyDefaultLayout = applyDefaultLayout
+  static readonly restoreLayout = restoreLayout
 }
