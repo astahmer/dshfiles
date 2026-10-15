@@ -77,8 +77,7 @@ function modifyHost(source: string, hostFile: string, toolFile: string, name: st
   const argument = call?.arguments[0]
   if (call === undefined || call.arguments.length !== 1 || argument === undefined || argument.type !== 'ObjectExpression')
     return { duplicate: false, invalidTools: false }
-  const object = argument
-  const tools = objectProperty({ expression: object, name: 'tools' })
+  const tools = objectProperty({ expression: argument, name: 'tools' })
   if (tools !== undefined && tools.value.type !== 'ArrayExpression') return { duplicate: false, invalidTools: true }
   const identifier = toolIdentifier(name)
   let importPath = relative(dirname(hostFile), toolFile).replaceAll('\\', '/')
@@ -95,12 +94,12 @@ function modifyHost(source: string, hostFile: string, toolFile: string, name: st
   if (tools !== undefined && tools.value.type === 'ArrayExpression') {
     edits.push({ start: tools.value.end - 1, end: tools.value.end - 1, text: `${tools.value.elements.length > 0 ? ', ' : ''}${identifier}` })
   } else {
-    const objectText = source.slice(object.start, object.end)
-    const openBrace = object.start + objectText.indexOf('{') + 1
+    const objectText = source.slice(argument.start, argument.end)
+    const openBrace = argument.start + objectText.indexOf('{') + 1
     edits.push({
       start: openBrace,
       end: openBrace,
-      text: `${object.properties.length > 0 ? '\n' : ''}  tools: [${identifier}],${object.properties.length > 0 ? '' : '\n'}`,
+      text: `${argument.properties.length > 0 ? '\n' : ''}  tools: [${identifier}],${argument.properties.length > 0 ? '' : '\n'}`,
     })
   }
   edits.sort((a, b) => b.start - a.start)

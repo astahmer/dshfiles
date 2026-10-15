@@ -79,7 +79,6 @@ const nativeRpcResultSchema = z.discriminatedUnion('ok', [
   z.object({ ok: z.literal(true), value: jsonValueSchema }).strict(),
   z.object({ ok: z.literal(false), code: z.string(), message: z.string() }).strict(),
 ])
-const workspaceOpenSchema = workspaceSchema
 const runtimeViewSchema = z.object({ leaseId: z.string().uuid(), launchUrl: z.string().url() }).strict()
 
 const toJsonValue = (value: unknown): JsonValue => {
@@ -136,7 +135,7 @@ export const connectMultiHost = async (options: { readonly url?: string }): Prom
     runtimeList: async hostId => z.object({ runtimes: z.array(runtimeSummarySchema) }).parse(await call('runtimeList', hostId === undefined ? {} : { hostId })),
     runtimeUpsert: async input => runtimeRegistrationSchema.parse(await call('runtimeUpsert', input)),
     runtimeStatus: async runtimeId => runtimeStatusSchema.parse(await call('runtimeStatus', { runtimeId })),
-    workspaceOpen: async (runtimeId, path) => workspaceOpenSchema.parse(await call('workspaceOpen', { runtimeId, path })),
+    workspaceOpen: async (runtimeId, path) => workspaceSchema.parse(await call('workspaceOpen', { runtimeId, path })),
     runtimeCall: async (runtimeId, request, signal) => nativeRpcResultSchema.parse(await call('runtimeCall', toJsonValue({ runtimeId, request }), signal)),
     sessionCursor: async (runtimeId, sessionId) =>
       z.object({ cursor: z.number().int().safe().min(-1) }).parse(await call('sessionCursor', { runtimeId, sessionId })),

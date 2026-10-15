@@ -159,9 +159,8 @@ export const EditorPanel = (props: EditorPanelProps): JSX.Element => {
   }
 
   const editable = active?.status === 'ready' && active.content.kind === 'text'
-  const needsEngine = editable
   useEffect(() => {
-    if (!needsEngine || engineStatus !== 'idle') return
+    if (!editable || engineStatus !== 'idle') return
     setEngineStatus('loading')
     const started = performance.now()
     props.loadEngine().then(
@@ -178,7 +177,7 @@ export const EditorPanel = (props: EditorPanelProps): JSX.Element => {
       },
       () => setEngineStatus('error'),
     )
-  }, [needsEngine, engineStatus, props])
+  }, [editable, engineStatus, props])
 
   useEffect(
     () => () => {

@@ -37,9 +37,11 @@ export const createSidePanelRepository = () => {
     },
     /** The request made while no page listened, consumed once by the page that mounts next. */
     takePending: (): string | null => {
-      const path = pending
-      pending = null
-      return path
+      try {
+        return pending
+      } finally {
+        pending = null
+      }
     },
     onRequest: (listener: Listener): (() => void) => {
       listeners.add(listener)

@@ -3,7 +3,6 @@
     "antislop(no-chained-type-assertions)": 42,
     "antislop(no-conditional-empty-object-spread)": 492,
     "antislop(no-known-value-widening)": 165,
-    "antislop(no-passthrough-variable)": 37,
     "antislop(no-runtime-typeof)": 335,
     "antislop(no-unknown-parameters)": 197,
     "antislop(no-unknown-returns)": 114,

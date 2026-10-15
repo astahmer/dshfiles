@@ -800,9 +800,9 @@ export default defineHost({
           const connection: ConnectionSurface | undefined = scoped.get('connection')
           const launchUrl = connection?.authenticatedUrl?.(`http://127.0.0.1:${webServer.success ? webServer.data.port : 0}`)
           if (disposed || !webServer.success || typeof launchUrl !== 'string') return
-          launchPath = await writeLaunchFile({ dshHome: process.env.DSH_HOME ?? join(homedir(), '.dsh'), launchUrl })
+          const written = await writeLaunchFile({ dshHome: process.env.DSH_HOME ?? join(homedir(), '.dsh'), launchUrl })
+          launchPath = written
           // DSH can exit on a signal without disposing plugins; a stale launch file would point managers at a dead port.
-          const written = launchPath
           process.once('exit', () => removeLaunchFileSync(written))
         })().catch(() => undefined)
         return () => {

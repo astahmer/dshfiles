@@ -109,9 +109,8 @@ const startHost = async () => {
 }
 
 const stopHost = async () => {
-  const child = host
-  if (child === undefined || child.exitCode !== null || child.signalCode !== null) return
-  child.kill('SIGTERM')
+  if (host === undefined || host.exitCode !== null || host.signalCode !== null) return
+  host.kill('SIGTERM')
   let timeout
   try {
     await Promise.race([
@@ -121,7 +120,7 @@ const stopHost = async () => {
       }),
     ])
   } catch (error) {
-    child.kill('SIGKILL')
+    host.kill('SIGKILL')
     await hostExited
     throw error
   } finally {

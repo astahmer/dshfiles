@@ -273,12 +273,11 @@ type SharedArgDefinition = {
 const optionDefinitions = new Map<string, SharedArgDefinition>()
 const toKebabCase = (value: string): string => value.replace(/[A-Z]/g, character => `-${character.toLowerCase()}`)
 
-for (const [name, definition] of Object.entries(sharedArgs)) {
-  const optionDefinition: SharedArgDefinition = definition
-  optionDefinitions.set(`--${toKebabCase(name)}`, optionDefinition)
-  if (optionDefinition.alias !== undefined) {
-    const aliases = typeof optionDefinition.alias === 'string' ? [optionDefinition.alias] : optionDefinition.alias
-    for (const alias of aliases) optionDefinitions.set(`-${alias}`, optionDefinition)
+for (const [name, definition] of Object.entries<SharedArgDefinition>(sharedArgs)) {
+  optionDefinitions.set(`--${toKebabCase(name)}`, definition)
+  if (definition.alias !== undefined) {
+    const aliases = typeof definition.alias === 'string' ? [definition.alias] : definition.alias
+    for (const alias of aliases) optionDefinitions.set(`-${alias}`, definition)
   }
 }
 

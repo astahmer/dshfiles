@@ -49,8 +49,7 @@ describe('defineHost', () => {
       },
     })
     expectTypeOf(status.execute).toBeFunction()
-    const official: ToolDefinition = status
-    expect(official).toBe(status)
+    expectTypeOf(status).toExtend<ToolDefinition>()
   })
 
   it('preserves object identity and literal inference', () => {
@@ -95,8 +94,7 @@ describe('defineHost', () => {
         return { kind: 'success', text: invocation.rawInput }
       },
     })
-    const official: CommandDefinition = command
-    expect(official).toBe(command)
+    expectTypeOf(command).toExtend<CommandDefinition>()
   })
 
   it('wraps official Prompt values without changing their identity or inference', () => {

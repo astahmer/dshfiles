@@ -533,9 +533,9 @@ export async function checkProjectManifest(config: ResolvedDshxConfig, options: 
       ),
     ]
   }
-  let value: unknown
+  let manifest: unknown
   try {
-    value = JSON.parse(source)
+    manifest = JSON.parse(source)
   } catch (error) {
     return [
       issue(
@@ -547,7 +547,7 @@ export async function checkProjectManifest(config: ResolvedDshxConfig, options: 
       ),
     ]
   }
-  if (!isObject(value)) {
+  if (!isObject(manifest)) {
     return [
       issue(
         'DSHX4101',
@@ -558,7 +558,6 @@ export async function checkProjectManifest(config: ResolvedDshxConfig, options: 
       ),
     ]
   }
-  const manifest = value
   await checkFeatureCatalog(diagnostics, config, manifest)
   // A Host-provided package in `dependencies` resolves a second copy and only
   // fails at boot, so it is refused here where the fix can be spelled out.

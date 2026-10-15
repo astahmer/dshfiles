@@ -287,9 +287,8 @@ function modifyClientSource(source: string, file: string, contributionFile: stri
   const argument = call?.arguments[0]
   if (call === undefined || call.arguments.length !== 1 || argument === undefined || argument.type !== 'ObjectExpression')
     return { source: undefined, duplicate: false }
-  const object = argument
-  const slots = objectProperty({ expression: object, name: 'slots' })
-  const slotProperty = object.properties.find(property => property.type === 'Property' && propertyName(property.key) === 'slots')
+  const slots = objectProperty({ expression: argument, name: 'slots' })
+  const slotProperty = argument.properties.find(property => property.type === 'Property' && propertyName(property.key) === 'slots')
   if (slotProperty !== undefined && (slots === undefined || slots.value.type !== 'ArrayExpression')) return { source: undefined, duplicate: false }
   const importPath = relativeImport(file, contributionFile)
   const identifier = contributionIdentifier(slotName)
@@ -302,8 +301,8 @@ function modifyClientSource(source: string, file: string, contributionFile: stri
     const hasItems = array.elements.length > 0
     edits.push({ start: array.end - 1, end: array.end - 1, text: `${hasItems ? ', ' : ''}${identifier}` })
   } else {
-    const openBrace = object.start + source.slice(object.start, object.end).indexOf('{') + 1
-    const hasProperties = object.properties.length > 0
+    const openBrace = argument.start + source.slice(argument.start, argument.end).indexOf('{') + 1
+    const hasProperties = argument.properties.length > 0
     edits.push({ start: openBrace, end: openBrace, text: `${hasProperties ? '\n' : ''}  slots: [${identifier}],${hasProperties ? '' : '\n'}` })
   }
   edits.sort((a, b) => b.start - a.start)

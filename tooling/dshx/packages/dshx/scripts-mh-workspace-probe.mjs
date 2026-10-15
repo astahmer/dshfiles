@@ -4,9 +4,8 @@ const cookie = res.headers
   .getSetCookie()
   .map(c => c.split(';', 1)[0])
   .join('; ')
-const enc = encodeURIComponent
 const raw = async (ns, m, args) => {
-  const r = await fetch(`${origin}/api/${enc(ns)}/${enc(m)}`, {
+  const r = await fetch(`${origin}/api/${encodeURIComponent(ns)}/${encodeURIComponent(m)}`, {
     method: 'POST',
     redirect: 'error',
     headers: { 'content-type': 'application/json', cookie },

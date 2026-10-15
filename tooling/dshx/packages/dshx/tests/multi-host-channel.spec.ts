@@ -1,3 +1,4 @@
+import { once } from 'node:events'
 import { createServer, type Server } from 'node:http'
 import { afterEach, describe, expect, test } from 'vitest'
 import { apiChannel } from '../src/api/common.js'
@@ -7,9 +8,9 @@ let server: Server | undefined
 
 afterEach(async () => {
   if (server === undefined) return
-  const current = server
+  const closed = once(server.close(), 'close')
   server = undefined
-  await new Promise<void>(resolve => current.close(() => resolve()))
+  await closed
 })
 
 describe('multi-host headless API client', () => {

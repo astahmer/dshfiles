@@ -72,9 +72,9 @@ export async function createManifestRepairPlan(config: ResolvedDshxConfig, optio
       diff: '',
     }
   }
-  let parsed: unknown
+  let manifest: unknown
   try {
-    parsed = JSON.parse(source)
+    manifest = JSON.parse(source)
   } catch (error) {
     return {
       root: config.root,
@@ -92,7 +92,7 @@ export async function createManifestRepairPlan(config: ResolvedDshxConfig, optio
       diff: '',
     }
   }
-  if (!isObject(parsed)) {
+  if (!isObject(manifest)) {
     return {
       root: config.root,
       files: [],
@@ -104,7 +104,6 @@ export async function createManifestRepairPlan(config: ResolvedDshxConfig, optio
     }
   }
   const diagnostics: DshxDiagnostic[] = []
-  const manifest = parsed
   let changed = false
 
   let exportsField: Record<string, unknown>

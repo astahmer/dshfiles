@@ -280,7 +280,6 @@ export async function createPresetScaffold(options: AddPresetOptions, dependenci
   }
   const packageAfter = `${JSON.stringify(updatedManifest, null, 2)}\n`
   const packageChanged = JSON.stringify(packageManifest) !== JSON.stringify(updatedManifest)
-  const projectManifest = updatedManifest
   let clientEntryForCheck = project.clientEntry
 
   /**
@@ -551,7 +550,7 @@ export async function createPresetScaffold(options: AddPresetOptions, dependenci
   let postDiagnostics: readonly DshxDiagnostic[]
   try {
     postDiagnostics = await (dependencies.checkManifest ?? checkProjectManifest)(
-      { ...project, ...(clientEntryForCheck === undefined ? {} : { clientEntry: clientEntryForCheck }), manifest: projectManifest },
+      { ...project, ...(clientEntryForCheck === undefined ? {} : { clientEntry: clientEntryForCheck }), manifest: updatedManifest },
       { compatibility },
     )
   } catch (cause) {

@@ -92,14 +92,13 @@ export const StallDetector = (policy: StallPolicy = DEFAULT_STALL_POLICY) => {
 
     /** A `turn/end` closed the turn; returns whether to pause the goal. */
     turnEnded: (): StallDecision => {
-      const round = openRound
-      const empty = round !== undefined && !producedContent
+      const empty = openRound !== undefined && !producedContent
       consecutiveEmptyRounds = empty ? consecutiveEmptyRounds + 1 : 0
       const stalled = empty && consecutiveEmptyRounds >= policy.threshold
       return {
         stalled,
         consecutiveEmptyRounds,
-        ...(round === undefined ? {} : { round: round.round }),
+        ...(openRound === undefined ? {} : { round: openRound.round }),
       }
     },
   }

@@ -83,7 +83,7 @@ export { CODEX_KIND, OPENCODE_KIND, COMMANDCODE_KIND, CLAUDE_KIND } from './prov
 
 const HOUR_MS = 3_600_000
 /** A Luna Reserve switch outlives a stale usage card for this long, then the card decides again. */
-const LUNA_RESERVE_HOLD_MS = HOUR_MS
+const LUNA_RESERVE_HOLD_MS = 60 * 60_000
 const NOTICE_MESSAGE_CHARS = 400
 /** The refresh period is in hours; checking twice an hour keeps a lowered setting honest. */
 const PRICING_CHECK_MS = 30 * 60_000

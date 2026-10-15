@@ -221,8 +221,7 @@ describe('CLI commands', () => {
   it('builds a no-op Host root artifact for an explicit Client-only project', async () => {
     const streams = io()
     const value = project()
-    const { hostEntry: _hostEntry, ...clientOnlyFields } = value
-    const clientOnly: ResolvedDshxConfig = clientOnlyFields
+    const { hostEntry: _hostEntry, ...clientOnly } = value
     const calls: string[] = []
     const code = await runCli(['build'], {
       io: streams,

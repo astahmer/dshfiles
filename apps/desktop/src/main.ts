@@ -108,12 +108,12 @@ void app.whenReady().then(async () => {
  * release the port and the data directory.
  */
 app.on('before-quit', event => {
-  const stopping = session
-  if (quitting || stopping === undefined) return
+  if (quitting || session === undefined) return
   quitting = true
   event.preventDefault()
+  const stopped = session.stop()
   session = undefined
-  void stopping.stop().finally(() => {
+  void stopped.finally(() => {
     app.quit()
   })
 })

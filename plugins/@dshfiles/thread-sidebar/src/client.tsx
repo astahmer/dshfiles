@@ -78,7 +78,6 @@ import {
   type AttentionColor,
   type AttentionColorKey,
   type AttentionColors,
-  type SessionActivity,
   type SidebarPreferences,
   type SidebarSection,
   type ThreadRowDensity,
@@ -920,12 +919,11 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
   }, [props.open, props.tSidebar, routeRequest, sessions, sessionState.phase])
 
   useEffect(() => {
-    const selected = selectedSession
-    if (selected === undefined || routeRequest !== null) return
-    if (suppressUrlForSession.current === selected.id) return
+    if (selectedSession === undefined || routeRequest !== null) return
+    if (suppressUrlForSession.current === selectedSession.id) return
     suppressUrlForSession.current = null
-    const workspaceId = workspaceForLineage(selected, sessionState.byId, workspaceBySession)
-    const next = buildThreadUrl(window.location.href, selected.id, workspaceId)
+    const workspaceId = workspaceForLineage(selectedSession, sessionState.byId, workspaceBySession)
+    const next = buildThreadUrl(window.location.href, selectedSession.id, workspaceId)
     if (next !== window.location.href) window.history.replaceState(window.history.state, '', next)
   }, [routeRequest, selectedSession, sessionState.byId, workspaceBySession])
 
@@ -1163,10 +1161,9 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
     try {
       const now = Date.now()
       for (const session of latest.sessions) {
-        const activity: SessionActivity = session
         if (
           !isAutoArchiveCandidate({
-            session: activity,
+            session,
             workspaceId: latest.workspaceBySession.get(session.id),
             now,
             preferences: latest.preferences,

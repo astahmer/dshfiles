@@ -37,18 +37,18 @@ export const createGatewayPool = ({
     entry.idleTimer?.unref?.()
   }
 
+  const openEntry = (runtimeId: string): PoolEntry => {
+    const created: PoolEntry = { generation: nextGeneration++, gateway: connect(runtimeId), leases: 0, idleTimer: undefined }
+    entries.set(runtimeId, created)
+    created.gateway.then(
+      gateway => void gateway.closed.then(() => evict(runtimeId, created)),
+      () => evict(runtimeId, created),
+    )
+    return created
+  }
+
   const acquire = async (runtimeId: string): Promise<PooledGateway> => {
-    let entry = entries.get(runtimeId)
-    if (entry === undefined) {
-      const created: PoolEntry = { generation: nextGeneration++, gateway: connect(runtimeId), leases: 0, idleTimer: undefined }
-      entries.set(runtimeId, created)
-      created.gateway.then(
-        gateway => void gateway.closed.then(() => evict(runtimeId, created)),
-        () => evict(runtimeId, created),
-      )
-      entry = created
-    }
-    const current = entry
+    const current = entries.get(runtimeId) ?? openEntry(runtimeId)
     current.leases += 1
     scheduleIdle(runtimeId, current)
     let gateway: Gateway

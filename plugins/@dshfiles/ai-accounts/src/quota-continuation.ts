@@ -617,17 +617,14 @@ const createQuotaContinuationService = ({
     }
   }
 
+  // Forgetting the domain before it finishes closing makes a later call open a fresh one instead of the closing one.
   const close = async (): Promise<void> => {
-    const opening = domainOpening
-    if (opening === undefined) return
-    try {
-      await opening.then(
-        opened => opened.close(),
-        () => undefined,
-      )
-    } finally {
-      if (domainOpening === opening) domainOpening = undefined
-    }
+    const closing = domainOpening?.then(
+      opened => opened.close(),
+      () => undefined,
+    )
+    domainOpening = undefined
+    await closing
   }
 
   return { start, close, list, recordFailure, resume, setAutoRetry, snooze }

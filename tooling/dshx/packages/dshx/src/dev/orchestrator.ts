@@ -189,10 +189,17 @@ export async function startDevSession(project: ResolvedDshxConfig, options: DevS
     if (!didExit) target.kill('SIGKILL')
   }
 
-  const startChildNow = async (restarting = false): Promise<void> => {
+  // The project and profile are fixed at launch: a reload may replace the active ones while this child runs.
+  const startChildNow = async ({
+    restarting,
+    project: childProject,
+    profile: childProfile,
+  }: {
+    readonly restarting: boolean
+    readonly project: typeof activeProject
+    readonly profile: typeof activeProfile
+  }): Promise<void> => {
     if (closed || transitioning || child !== undefined || state.dshProcess === 'starting' || !hostBuilt || !clientBuilt) return
-    const childProject = activeProject
-    const childProfile = activeProfile
     setState({ dshProcess: 'starting', hostRestartRequired: false })
     // `--open` is a DSHX-only policy flag. rc.2 opens the browser when no
     // `--no-open` flag is present, but rejects an explicit `--open` argument.
@@ -260,7 +267,7 @@ export async function startDevSession(project: ResolvedDshxConfig, options: DevS
 
   const startChild = (restarting = false): Promise<void> => {
     if (childStart !== undefined) return childStart
-    const operation = startChildNow(restarting)
+    const operation = startChildNow({ restarting, project: activeProject, profile: activeProfile })
     childStart = operation
     void operation.then(
       () => {
@@ -280,14 +287,14 @@ export async function startDevSession(project: ResolvedDshxConfig, options: DevS
   }
 
   const stopDsh = async (): Promise<void> => {
-    const target = child
-    child = undefined
-    if (target === undefined) {
+    if (child === undefined) {
       if (state.dshProcess !== 'stopped') setState({ dshProcess: 'stopped' })
       return
     }
+    const stopped = stopChild(child)
+    child = undefined
     setState({ dshProcess: 'stopped' })
-    await stopChild(target)
+    await stopped
   }
 
   const restartInternal = async (): Promise<void> => {
@@ -474,11 +481,9 @@ export async function startDevSession(project: ResolvedDshxConfig, options: DevS
         await candidateProjectWatcher.close().catch(() => undefined)
         return
       }
-      const previousWatchers = activeWatchers
-      const previousProjectWatcher = projectWatcher
-      if (previousWatchers !== undefined) await closeCompilerWatchers(previousWatchers)
+      if (activeWatchers !== undefined) await closeCompilerWatchers(activeWatchers)
       await stopDsh()
-      await previousProjectWatcher?.close().catch(error => {
+      await projectWatcher?.close().catch(error => {
         emitDiagnostic(
           diagnostic(
             'DSHX4408',
@@ -535,8 +540,7 @@ export async function startDevSession(project: ResolvedDshxConfig, options: DevS
   const drainProjectReloads = async (): Promise<void> => {
     while (reloadPending && !closed) {
       reloadPending = false
-      const changedFile = reloadChangedFile
-      await reloadProject(changedFile)
+      await reloadProject(reloadChangedFile)
     }
   }
 

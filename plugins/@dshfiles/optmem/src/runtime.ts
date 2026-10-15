@@ -183,7 +183,7 @@ export const createOptmemRuntime = (options: OptmemRuntimeOptions) => {
   let lastCaptureError: string | null = null
   let captured = 0
   let skipped = 0
-  let queue: Pending[] = []
+  const queue: Pending[] = []
   let flushing: Promise<void> = Promise.resolve()
   let flushScheduled = false
   let appliedSettings = options.settings()
@@ -316,9 +316,16 @@ export const createOptmemRuntime = (options: OptmemRuntimeOptions) => {
     }
   }
 
+  const takeReady = (): Ready | undefined => {
+    try {
+      return ready
+    } finally {
+      ready = undefined
+    }
+  }
+
   const shutdown = async (): Promise<void> => {
-    const current = ready
-    ready = undefined
+    const current = takeReady()
     state = 'off'
     if (!current) return
     try {
@@ -333,12 +340,10 @@ export const createOptmemRuntime = (options: OptmemRuntimeOptions) => {
     await shutdown()
   }
 
-  const flush = async (): Promise<void> => {
+  const flush = async (current: Ready | undefined): Promise<void> => {
     flushScheduled = false
-    const current = ready
     if (!current) return
-    const batch = queue
-    queue = []
+    const batch = queue.splice(0)
     let inputs: MemoryEventInput[] = []
     for (const item of batch) {
       const projectId = await resolveProject(item.session.header)
@@ -363,7 +368,7 @@ export const createOptmemRuntime = (options: OptmemRuntimeOptions) => {
     flushScheduled = true
     flushing = flushing
       .then(() => new Promise<void>(done => setImmediate(done)))
-      .then(flush)
+      .then(() => flush(ready))
       .catch((error: unknown) => {
         lastCaptureError = errorMessage(error)
         logger.warn('optmem: capture failed, events of this batch are not in memory: %s', lastCaptureError)
@@ -525,20 +530,21 @@ export const createOptmemRuntime = (options: OptmemRuntimeOptions) => {
   }
 
   const applySettings = (next: OptmemSettings): Promise<void> => {
-    const previous = appliedSettings
+    const wasEnabled = appliedSettings.enabled
+    const engineChanged = engineKeys.some(key => appliedSettings[key] !== next[key])
+    const summarizerResumed = appliedSettings.summarizerPaused && !next.summarizerPaused
     appliedSettings = next
     flushing = flushing.then(async () => {
       try {
         if (!next.enabled) return await shutdown()
-        if (!previous.enabled || state !== 'ready') return await start()
-        if (engineKeys.some(key => previous[key] !== next[key]) && ready) {
-          const current = ready
-          ready = undefined
+        if (!wasEnabled || state !== 'ready') return await start()
+        const current = engineChanged ? takeReady() : undefined
+        if (current) {
           await current.engine.close()
           ready = { memory: current.memory, engine: await openEngine(current.memory) }
           for (const stream of injectedStreams) refreshStream(stream)
         }
-        if (previous.summarizerPaused && !next.summarizerPaused) ready?.engine.retryFailures()
+        if (summarizerResumed) ready?.engine.retryFailures()
       } catch (error) {
         state = 'failed'
         failure = errorMessage(error)

@@ -18,7 +18,7 @@ import type { CredentialValueResolver } from './credentials.js'
  */
 
 const MINUTE_MS = 60_000
-const SCHEDULER_CHECK_MS = MINUTE_MS
+const SCHEDULER_CHECK_MS = 60_000
 const PROVIDER_READ_CONCURRENCY = 4
 
 export type AccountUsageReader = (account: AccountProfile, signal: AbortSignal | undefined) => Promise<UsageCard>

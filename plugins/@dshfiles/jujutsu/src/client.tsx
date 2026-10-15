@@ -488,9 +488,8 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
 
   const chooseMoveDestination = (destination: Revision): void => {
     if (moveSource === null) return
-    const source = moveSource
     setMoveSource(null)
-    const resolution = resolveRevisionDrop({ sourceRevisionId: source.commitId, target: destination, revisions: state?.revisions ?? [] })
+    const resolution = resolveRevisionDrop({ sourceRevisionId: moveSource.commitId, target: destination, revisions: state?.revisions ?? [] })
     if (resolution.kind === 'invalid') {
       sendAction({ type: 'reject', error: resolution.message })
       return
