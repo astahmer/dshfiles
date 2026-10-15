@@ -21,9 +21,9 @@
   },
   "devDependencies": {
     "@dshfiles/dshx": "workspace:*",
-    "@types/react": "18.3.31",
-    "typescript": "7.0.2",
-    "vitest": "4.1.11"
+    "@types/react": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   },
   "peerDependencies": {
     "react": ">=18.2.0 <19"

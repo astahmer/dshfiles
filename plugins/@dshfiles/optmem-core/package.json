@@ -22,8 +22,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {
-    "typescript": "7.0.2",
-    "vitest": "4.1.11"
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   },
   "dshx": {
     "features": "./dshx.features.json"

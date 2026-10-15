@@ -9,12 +9,85 @@ packages:
 enableGlobalVirtualStore: false
 
 catalog:
+  '@clack/prompts': 1.7.0
+  '@deepseek-ai/cordis': 4.0.4
+  '@deepseek-ai/cordis-plugin-include': 1.0.9
+  '@deepseek-ai/cordis-plugin-loader': 1.0.5
+  '@deepseek-ai/dsh-agent': 0.2.0-rc.2
+  '@deepseek-ai/dsh-api-gateway': 0.2.0-rc.2
+  '@deepseek-ai/dsh-api-remotes': 0.2.0-rc.2
+  '@deepseek-ai/dsh-api-session-controller': 0.2.0-rc.2
+  '@deepseek-ai/dsh-api-settings-controller': 0.2.0-rc.2
+  '@deepseek-ai/dsh-api-workspace-controller': 0.2.0-rc.2
+  '@deepseek-ai/dsh-client-connection': 0.2.0-rc.2
+  '@deepseek-ai/dsh-client-locale': 0.2.0-rc.2
+  '@deepseek-ai/dsh-client-shortcuts': 0.2.0-rc.2
+  '@deepseek-ai/dsh-client-store': 0.2.0-rc.2
+  '@deepseek-ai/dsh-client-ui-chat': 0.2.0-rc.2
+  '@deepseek-ai/dsh-client-ui-commands': 0.2.0-rc.2
+  '@deepseek-ai/dsh-client-ui-conversation': 0.2.0-rc.2
+  '@deepseek-ai/dsh-client-ui-input-trigger': 0.2.0-rc.2
+  '@deepseek-ai/dsh-client-ui-layout': 0.2.0-rc.2
+  '@deepseek-ai/dsh-client-ui-model-selection': 0.2.0-rc.2
+  '@deepseek-ai/dsh-client-ui-plugin-manager': 0.2.0-rc.2
+  '@deepseek-ai/dsh-client-ui-primitives': 0.2.0-rc.2
+  '@deepseek-ai/dsh-client-ui-renderer': 0.2.0-rc.2
+  '@deepseek-ai/dsh-client-ui-session': 0.2.0-rc.2
+  '@deepseek-ai/dsh-client-ui-settings': 0.2.0-rc.2
+  '@deepseek-ai/dsh-client-ui-sidebar': 0.2.0-rc.2
+  '@deepseek-ai/dsh-client-ui-sidebar-right': 0.2.0-rc.2
+  '@deepseek-ai/dsh-client-ui-slots': 0.2.0-rc.2
+  '@deepseek-ai/dsh-client-ui-workspace': 0.2.0-rc.2
+  '@deepseek-ai/dsh-commands': 0.2.0-rc.2
+  '@deepseek-ai/dsh-config-editor': 0.2.0-rc.2
+  '@deepseek-ai/dsh-cordis-host-runner': 0.2.0-rc.2
+  '@deepseek-ai/dsh-credentials': 0.2.0-rc.2
+  '@deepseek-ai/dsh-home-paths': 0.2.0-rc.2
+  '@deepseek-ai/dsh-host-webserver': 0.2.0-rc.2
+  '@deepseek-ai/dsh-llm': 0.2.0-rc.2
+  '@deepseek-ai/dsh-session': 0.2.0-rc.2
+  '@deepseek-ai/dsh-session-query': 0.2.0-rc.2
+  '@deepseek-ai/dsh-storage': 0.2.0-rc.2
+  '@deepseek-ai/dsh-storage-domain': 0.2.0-rc.2
+  '@deepseek-ai/dsh-storage-json': 0.2.0-rc.2
+  '@deepseek-ai/dsh-subagent': 0.2.0-rc.2
+  '@deepseek-ai/dsh-subprocess': 0.2.0-rc.2
+  '@deepseek-ai/dsh-system-prompt': 0.2.0-rc.2
+  '@deepseek-ai/dsh-tool-cordis': 0.2.0-rc.2
+  '@deepseek-ai/dsh-tools': 0.2.0-rc.2
+  '@deepseek-ai/dsh-workspace': 0.2.0-rc.2
+  '@deepseek-ai/schemastery': 3.18.4
+  '@tanstack/query-core': 5.104.1
+  '@tanstack/react-form': 1.33.5
+  '@tanstack/react-query': 5.104.1
+  '@testing-library/dom': 10.4.2
+  '@testing-library/react': 16.3.3
   '@types/node': 22.19.20
+  '@types/react': 18.3.31
+  '@types/react-dom': 18.3.7
+  '@types/semver': 7.8.0
+  '@types/ws': 8.18.2
+  '@xstate/react': 6.1.0
+  citty: 0.2.2
+  class-variance-authority: 0.7.1
+  clsx: 2.1.1
+  cmdk: 1.1.1
   execa: 10.0.1
+  jsdom: 26.1.0
+  oxfmt: 0.71.0
+  oxlint: 1.86.0
+  react: 18.3.1
+  react-dom: 18.3.1
+  semver: 7.8.5
+  tailwind-merge: 3.7.0
   typescript: 7.0.2
   vite: 8.3.2
   vitest: 4.1.11
+  write-file-atomic: 7.0.0
+  ws: 8.21.3
+  xstate: 5.33.2
   yaml: 2.9.0
+  zod: 4.6.5
 
 dedupePeerDependents: true
 # pnpm 12 reads only auth and registry keys from .npmrc, so exact saves are configured here.

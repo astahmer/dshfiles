@@ -53,8 +53,8 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@clack/prompts": "1.7.0",
-    "citty": "0.2.2",
+    "@clack/prompts": "catalog:",
+    "citty": "catalog:",
     "execa": "catalog:",
     "package-manager-detector": "1.8.0"
   },

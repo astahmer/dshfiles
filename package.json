@@ -33,14 +33,14 @@
   },
   "devDependencies": {
     "@ast-grep/cli": "0.45.3",
-    "@deepseek-ai/cordis": "4.0.4",
+    "@deepseek-ai/cordis": "catalog:",
     "@deepseek-ai/dsh-typert-generator": "0.2.0-rc.2",
     "@types/node": "22.20.5",
-    "oxfmt": "0.71.0",
-    "oxlint": "1.86.0",
+    "oxfmt": "catalog:",
+    "oxlint": "catalog:",
     "turbo": "2.11.8",
-    "typescript": "7.0.2",
-    "zod": "4.6.5"
+    "typescript": "catalog:",
+    "zod": "catalog:"
   },
   "packageManager": "pnpm@12.5.1"
 }

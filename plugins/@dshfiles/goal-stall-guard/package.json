@@ -22,15 +22,15 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {
-    "@deepseek-ai/cordis": "4.0.4",
+    "@deepseek-ai/cordis": "catalog:",
     "@deepseek-ai/dsh": "0.2.0-rc.2",
-    "@deepseek-ai/dsh-agent": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-agent": "catalog:",
     "@deepseek-ai/dsh-goal": "0.2.0-rc.2",
-    "@deepseek-ai/dsh-session": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-session": "catalog:",
     "@dshfiles/dshx": "workspace:*",
     "@types/node": "22.20.5",
-    "typescript": "7.0.2",
-    "vitest": "4.1.11"
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": ">=4.0.0 <5.0.0",
