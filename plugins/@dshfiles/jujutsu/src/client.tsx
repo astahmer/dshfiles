@@ -82,7 +82,7 @@ import { describeDraftChanged, layoutRevisionGraph, type GraphLane, type Revisio
 import { jujutsuApi } from './api.js'
 import { useAutoRefresh } from './auto-refresh.js'
 import { openInEditor } from './open-in-editor.js'
-import { activeDayIndex, flattenRevisionGroups } from './revision-list.js'
+import { activeDayIndex, flattenRevisionGroups, remoteBookmarkRevision } from './revision-list.js'
 import { revisionActionMachine, type ActionPreview, type DropPresentation, type DragOrigin } from './revision-action-machine.js'
 import { BOOKMARK_MIME, BOOKMARK_SOURCE_MIME, resolveBookmarkDrop, resolveRevisionDrop, REVISION_MIME } from './revision-drop.js'
 import { repositoryLoadingState } from './repository-loading.js'
@@ -362,6 +362,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   const workingCopy = state?.revisions.find(revision => revision.workingCopy)
   const defaultBookmark = workingCopy?.localBookmarks[0] ?? localBookmarkNames[0] ?? ''
   const selectedBookmark = localBookmarkNames.includes(bookmark) ? bookmark : defaultBookmark
+  const pushedRevision = remoteBookmarkRevision({ revisions: allRevisions, bookmark: selectedBookmark, remote: selectedRemote })
   const mainRevision = state?.revisions.find(revision => revision.localBookmarks.includes('main') || revision.bookmarks.includes('main'))
 
   const revisionsByCommitId = useMemo(() => new Map(allRevisions.map(revision => [revision.commitId, revision])), [allRevisions])
@@ -441,7 +442,18 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   }, [dropPresentation, state])
   const previewBranchIds = useMemo(() => new Set(previewBranch.map(revision => revision.commitId)), [previewBranch])
 
-  const listItems = useMemo(() => flattenRevisionGroups({ groups, collapsedDays, layouts: graphRowsByCommitId }), [groups, collapsedDays, graphRowsByCommitId])
+  const listItems = useMemo(
+    () =>
+      flattenRevisionGroups({
+        groups,
+        collapsedDays,
+        layouts: graphRowsByCommitId,
+        ...(pushedRevision === undefined || selectedBookmark === '' || selectedRemote === ''
+          ? {}
+          : { pushBoundary: { commitId: pushedRevision.commitId, bookmark: selectedBookmark, remote: selectedRemote } }),
+      }),
+    [groups, collapsedDays, graphRowsByCommitId, pushedRevision, selectedBookmark, selectedRemote],
+  )
   const listScrollRef = useRef<HTMLDivElement | null>(null)
   const pendingFocusIndex = useRef<number | null>(null)
   const scrolledToWorkingCopy = useRef<string | null>(null)
@@ -453,7 +465,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     getItemKey: index => listItems[index]?.key ?? index,
     estimateSize: index => {
       const item = listItems[index]
-      if (item === undefined || item.kind === 'day') return 18
+      if (item === undefined || item.kind !== 'revision') return 18
       return item.key === selectedRevision?.commitId ? rowHeight + 320 : rowHeight
     },
     overscan: 12,
@@ -1169,6 +1181,19 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
                       <span className="dshx:truncate">{item.day}</span>
                       <span className="dshx:ml-auto dshx:font-mono dshx:font-normal">{item.count}</span>
                     </button>
+                  ) : item.kind === 'push' ? (
+                    <div
+                      aria-label={`Last pushed revision: ${item.bookmark}@${item.remote}`}
+                      className="dshx:flex dshx:h-[18px] dshx:w-full dshx:items-center dshx:gap-1 dshx:border-b dshx:border-border/60 dshx:bg-background dshx:pr-3 dshx:text-[10px] dshx:font-semibold dshx:uppercase dshx:tracking-wider dshx:text-muted-foreground"
+                      data-push-boundary=""
+                    >
+                      <span className="dshx:relative dshx:h-full dshx:flex-none" style={{ width: graphWidth }}>
+                        <GraphLanes lanes={item.firstLayout.topLanes} metrics={graphMetrics} width={graphWidth} />
+                      </span>
+                      <span>
+                        Last pushed · {item.bookmark}@{item.remote}
+                      </span>
+                    </div>
                   ) : (
                     <RevisionRow
                       bookmarkMenu={bookmarkMenu}

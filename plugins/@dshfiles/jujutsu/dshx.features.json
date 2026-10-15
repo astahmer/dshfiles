@@ -35,7 +35,7 @@
     {
       "id": "revision-graph",
       "title": "Browse and filter the revision graph",
-      "summary": "Browse one-height rows (the change ID with its unique prefix bold, coloured workspace, bookmark and tag labels, a muted (empty) / (no description), a trailing time column; stacked in the side panel) with authors and conflict/divergence markers, and filter by text, author, mine, immutability, or date.",
+      "summary": "Browse one-height rows (the change ID with its unique prefix bold, coloured workspace, bookmark and tag labels, a muted (empty) / (no description), a trailing time column; stacked in the side panel) with authors and conflict/divergence markers, date headings, and a last-pushed boundary at the selected bookmark's remote-tracking revision; filter by text, author, mine, immutability, or date.",
       "reach": [
         "seed rebase-ready-thread",
         "click button \"Jujutsu\"",
@@ -112,7 +112,7 @@
           "coveredBy": ["jujutsu.refresh-behavior"]
         }
       ],
-      "states": ["current", "immutable", "empty", "conflicted", "divergent", "evolved", "filtered"],
+      "states": ["current", "immutable", "empty", "conflicted", "divergent", "evolved", "filtered", "pushed-boundary"],
       "failureModes": [
         "Invalid repositories and replaced filesystem identities are rejected.",
         "A missing registered path offers direct repository selection from the error alert.",
