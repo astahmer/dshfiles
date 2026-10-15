@@ -15,14 +15,15 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import { ProjectFolderPicker, type DirectoryPickerPort, type ProjectFolderSelection, type RegisteredProject } from '@dshfiles/project-folder-picker'
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { SecretMutationDialog } from './secret-mutation-dialog.js'
-import { defaultCreateScope, type SecretCreateForm, type SecretMutationScope, type SecretRemoveTarget, type SecretUpdateForm } from './secret-mutation-form.js'
-import { createSecretActionPolicy, filterSecretMetadata, nextRowIndex, type SecretScopeFilter } from './secret-catalog-model.js'
+import { SecretMutationForm, type SecretCreateForm, type SecretMutationScope, type SecretRemoveTarget, type SecretUpdateForm } from './secret-mutation-form.js'
+import { SecretCatalogRules, type SecretScopeFilter } from './secret-catalog-model.js'
 import { secretCatalogSettings } from './settings.js'
 import { secretCatalogApi } from './api.js'
 import type { SecretCatalogTranslate } from './locales.js'
 import type { SecretMetadata } from './secret-metadata.js'
 import { SecretCatalogTable, type RevealedSecret } from './secret-catalog-table.js'
 import { SecretQuickAddRow } from './secret-quick-add-row.js'
+import { useSecretReveal } from './use-secret-reveal.js'
 
 interface SecretCatalogPanelProps {
   readonly directoryPicker: DirectoryPickerPort
@@ -32,6 +33,7 @@ interface SecretCatalogPanelProps {
 }
 
 const scopes: readonly SecretScopeFilter[] = ['all', 'project', 'global', 'local']
+const emptySecretRows: readonly SecretMetadata[] = []
 
 const noopSubscribe = (): (() => void) => () => {}
 
@@ -51,7 +53,7 @@ const focusRowFromKey = (event: KeyboardEvent<HTMLDivElement>): void => {
   const row = event.target.closest('tbody tr')
   const rows = [...event.currentTarget.querySelectorAll('tbody tr')]
   if (row === null) return
-  const next = nextRowIndex(rows.indexOf(row), event.key, rows.length)
+  const next = SecretCatalogRules.nextRowIndex(rows.indexOf(row), event.key, rows.length)
   if (next === null) return
   const target = rows[next]?.querySelector('button:not(:disabled)')
   if (!(target instanceof HTMLElement)) return
@@ -75,6 +77,7 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
   const defaultEnvironment = settings.value?.defaultEnvironment ?? 'prod'
   const configuredScope = settings.value?.defaultScope
   const appliedDefaultScope = useRef(false)
+  const [revealSnapshot, sendReveal] = useSecretReveal(api)
   // The store is read here, at render, so a slot that mounts later still sees
   // the live list rather than whatever existed while setup was running.
   // `getSnapshot` reads the model's own cache, so it has to keep its receiver:
@@ -88,14 +91,13 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
   const [scope, setScope] = useState<SecretScopeFilter>('all')
   const [search, setSearch] = useState('')
   const [actionError, setActionError] = useState<string | null>(null)
-  const [revealed, setRevealed] = useState<RevealedSecret | null>(null)
-  const [busyRow, setBusyRow] = useState<{ readonly id: string; readonly action: 'reveal' | 'copy' } | null>(null)
+  const [busyRow, setBusyRow] = useState<{ readonly id: string; readonly action: 'copy' } | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [dialog, setDialog] = useState<ActiveDialog | null>(null)
   const [draftIds, setDraftIds] = useState<readonly number[]>([])
   const nextDraftId = useRef(0)
-  const revealGeneration = useRef(0)
-  const revealTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const revealed: RevealedSecret | null =
+    revealSnapshot.context.revealed === null ? null : { id: revealSnapshot.context.revealed.rowId, value: revealSnapshot.context.revealed.value }
   const queryClient = useQueryClient()
   const workspaceIds = useMemo(() => workspaceSnapshot.items.map(workspace => workspace.workspaceId).sort(), [workspaceSnapshot])
   const workspaceClassification = useQuery({
@@ -123,13 +125,7 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
     }))
   }, [workspaceSnapshot, workspaceClassification.data])
 
-  const clearRevealed = useCallback((): void => {
-    revealGeneration.current += 1
-    if (revealTimer.current !== null) clearTimeout(revealTimer.current)
-    revealTimer.current = null
-    setRevealed(null)
-    setBusyRow(null)
-  }, [])
+  const clearRevealed = useCallback((): void => sendReveal({ type: 'hide' }), [sendReveal])
 
   const listQuery = useQuery({
     queryKey: secretListQueryKey(cwd),
@@ -142,11 +138,11 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
     retry: false,
     staleTime: Number.POSITIVE_INFINITY,
   })
-  const rows = listQuery.data ?? []
+  const rows = listQuery.data ?? emptySecretRows
   const loading = listQuery.isFetching
   const listFailed = listQuery.isError && !listQuery.isFetching
   const showCatalog = !(listFailed && rows.length === 0)
-  const error = actionError ?? (listFailed ? t('loadFailed') : null)
+  const error = actionError ?? (revealSnapshot.matches('failed') ? t('revealFailed') : listFailed ? t('loadFailed') : null)
   const machineName = machineQuery.data?.name ?? null
 
   useEffect(() => {
@@ -174,49 +170,31 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
     }
   }, [clearRevealed, hideOnBlur])
 
-  useEffect(
-    () => () => {
-      revealGeneration.current += 1
-      if (revealTimer.current !== null) clearTimeout(revealTimer.current)
-    },
-    [],
-  )
-
-  const filteredRows = useMemo(() => filterSecretMetadata(rows, scope, search), [rows, scope, search])
-  const canActOnRow = useMemo(() => createSecretActionPolicy(rows, cwd !== null), [rows, cwd])
+  const filteredRows = useMemo(() => SecretCatalogRules.filterSecretMetadata(rows, scope, search), [rows, scope, search])
+  const canActOnRow = useMemo(() => SecretCatalogRules.createSecretActionPolicy(rows, cwd !== null), [rows, cwd])
   const mutationScopeFor = (row: SecretMetadata): SecretMutationScope | null => {
     if (row.scope === 'global' || row.scope === 'project' || row.scope === 'local') return row.scope
     return null
   }
 
-  const onReveal = async (row: SecretMetadata): Promise<void> => {
+  const onReveal = (row: SecretMetadata): void => {
     if (!canActOnRow(row)) return
     const rowScope = mutationScopeFor(row)
     if (rowScope === null) return
-    if (revealed?.id === row.id) {
-      clearRevealed()
-      return
-    }
-    clearRevealed()
-    const generation = ++revealGeneration.current
-    setBusyRow({ id: row.id, action: 'reveal' })
     setActionError(null)
-    try {
-      const value = await api.reveal({ alias: row.alias, cwd, scope: rowScope, environment: row.environment })
-      if (generation !== revealGeneration.current || (hideOnBlur && document.visibilityState === 'hidden')) return
-      setRevealed({ id: row.id, value })
-      revealTimer.current = setTimeout(clearRevealed, revealMs)
-    } catch {
-      if (generation === revealGeneration.current) setActionError(t('revealFailed'))
-    } finally {
-      if (generation === revealGeneration.current) setBusyRow(null)
-    }
+    sendReveal({
+      type: 'toggle',
+      rowId: row.id,
+      payload: { alias: row.alias, cwd, scope: rowScope, environment: row.environment },
+      revealMs,
+    })
   }
 
   const onCopy = async (row: SecretMetadata): Promise<void> => {
     if (!canActOnRow(row)) return
     const rowScope = mutationScopeFor(row)
     if (rowScope === null) return
+    clearRevealed()
     setBusyRow({ id: row.id, action: 'copy' })
     setNotice(null)
     setActionError(null)
@@ -272,7 +250,7 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
   }
 
   const displayedMachineName = machineName ?? t('currentHost')
-  const createScope = defaultCreateScope({ filter: scope, hasProjectFolder: cwd !== null })
+  const createScope = SecretMutationForm.defaultCreateScope({ filter: scope, hasProjectFolder: cwd !== null })
 
   const addDraft = (): void => {
     nextDraftId.current += 1
@@ -436,8 +414,8 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
                 t,
                 revealed,
                 canActOnRow,
-                isRowBusy: row => busyRow?.id === row.id,
-                isRevealing: row => busyRow?.id === row.id && busyRow.action === 'reveal',
+                isRowBusy: row => busyRow?.id === row.id || (revealSnapshot.matches('loading') && revealSnapshot.context.request?.rowId === row.id),
+                isRevealing: row => revealSnapshot.matches('loading') && revealSnapshot.context.request?.rowId === row.id,
                 onReveal: row => void onReveal(row),
                 onRevealedBlur: () => {
                   if (hideOnBlur) clearRevealed()

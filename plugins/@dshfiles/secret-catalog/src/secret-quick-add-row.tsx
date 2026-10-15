@@ -17,7 +17,7 @@ import { useId, useRef, useState, type FocusEvent, type KeyboardEvent } from 're
 import type { SecretCatalogTranslate } from './locales.js'
 import { secretColumnClassName } from './secret-catalog-table.js'
 import type { SecretMetadata } from './secret-metadata.js'
-import { quickAddIssue, toEnvVarName, type QuickAddIssue, type SecretCreateForm, type SecretMutationScope } from './secret-mutation-form.js'
+import { SecretMutationForm, type QuickAddIssue, type SecretCreateForm, type SecretMutationScope } from './secret-mutation-form.js'
 
 interface SecretQuickAddRowProps {
   readonly scope: SecretMutationScope
@@ -53,7 +53,7 @@ export const SecretQuickAddRow = (props: SecretQuickAddRowProps): JSX.Element =>
   const [attempted, setAttempted] = useState(false)
   const menuOpen = useRef(false)
   const nameIssueId = useId()
-  const issue = quickAddIssue({
+  const issue = SecretMutationForm.quickAddIssue({
     name,
     value,
     valueMode,
@@ -113,7 +113,7 @@ export const SecretQuickAddRow = (props: SecretQuickAddRowProps): JSX.Element =>
           autoFocus
           className="dshx:h-8 dshx:font-mono! dshx:text-[13px] dshx:font-semibold"
           disabled={pending}
-          onChange={event => setName(toEnvVarName(event.currentTarget.value))}
+          onChange={event => setName(SecretMutationForm.toEnvVarName(event.currentTarget.value))}
           onKeyDown={onKeyDown}
           placeholder={t('quickAddNamePlaceholder')}
           spellCheck={false}

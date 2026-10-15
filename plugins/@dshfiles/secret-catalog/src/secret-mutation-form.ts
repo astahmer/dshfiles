@@ -30,19 +30,19 @@ export interface SecretUpdateForm {
   readonly tags?: string
 }
 
-export const isSecretScope = (value: string): value is SecretMutationScope => value === 'global' || value === 'project' || value === 'local'
+const isSecretScope = (value: string): value is SecretMutationScope => value === 'global' || value === 'project' || value === 'local'
 
-export const needsProjectFolder = (input: { readonly scope: SecretMutationScope; readonly hasProjectFolder: boolean }): boolean =>
+const needsProjectFolder = (input: { readonly scope: SecretMutationScope; readonly hasProjectFolder: boolean }): boolean =>
   input.scope !== 'global' && !input.hasProjectFolder
 
 /** Where a new secret goes when the user has not said: the scope being viewed, or the selected project under All. */
-export const defaultCreateScope = (input: { readonly filter: SecretScopeFilter; readonly hasProjectFolder: boolean }): SecretMutationScope => {
+const defaultCreateScope = (input: { readonly filter: SecretScopeFilter; readonly hasProjectFolder: boolean }): SecretMutationScope => {
   if (input.filter !== 'all') return input.filter
   return input.hasProjectFolder ? 'project' : 'global'
 }
 
 /** Env-var style, as typed into the quick-add row: upper case, separators become `_`, other characters are dropped. */
-export const toEnvVarName = (raw: string): string =>
+const toEnvVarName = (raw: string): string =>
   raw
     .toUpperCase()
     .replace(/[\s.-]+/g, '_')
@@ -51,7 +51,7 @@ export const toEnvVarName = (raw: string): string =>
 export type QuickAddIssue = 'name-required' | 'name-invalid' | 'duplicate' | 'needs-folder' | 'value-required'
 
 /** The first reason a quick-add draft cannot be saved yet, or null when it can. */
-export const quickAddIssue = (input: {
+const quickAddIssue = (input: {
   readonly name: string
   readonly value: string
   readonly valueMode: 'generate' | 'manual'
@@ -86,7 +86,7 @@ export const secretCreateFormSchema = createMetadataSchema
 
 export type SecretCreateFormValues = z.input<typeof secretCreateFormSchema>
 
-export const secretCreateFormDefaults = (input: { readonly scope: SecretMutationScope; readonly environment: string }): SecretCreateFormValues => ({
+const secretCreateFormDefaults = (input: { readonly scope: SecretMutationScope; readonly environment: string }): SecretCreateFormValues => ({
   alias: '',
   scope: input.scope,
   environment: input.environment,
@@ -100,9 +100,9 @@ export const secretCreateFormDefaults = (input: { readonly scope: SecretMutation
 })
 
 /** The value field the CLI should write for an item type: a Secure Note keeps its value in notes. */
-export const defaultFieldForType = (type: SecretCreateFormValues['type']): string => (type === 'secure-note' ? 'notes' : 'password')
+const defaultFieldForType = (type: SecretCreateFormValues['type']): string => (type === 'secure-note' ? 'notes' : 'password')
 
-export const toSecretCreateInput = (form: SecretCreateFormValues): SecretCreateForm => ({
+const toSecretCreateInput = (form: SecretCreateFormValues): SecretCreateForm => ({
   alias: form.alias,
   scope: form.scope,
   environment: form.environment,
@@ -119,7 +119,7 @@ export const secretUpdateFormSchema = updateMetadataSchema.required().extend({ r
 
 export type SecretUpdateFormValues = z.input<typeof secretUpdateFormSchema>
 
-export const secretUpdateFormDefaults = (alias: string): SecretUpdateFormValues => ({
+const secretUpdateFormDefaults = (alias: string): SecretUpdateFormValues => ({
   renameTo: alias,
   name: '',
   source: '',
@@ -128,7 +128,7 @@ export const secretUpdateFormDefaults = (alias: string): SecretUpdateFormValues 
   value: '',
 })
 
-export const hasSecretUpdate = (input: { readonly alias: string; readonly form: SecretUpdateFormValues }): boolean =>
+const hasSecretUpdate = (input: { readonly alias: string; readonly form: SecretUpdateFormValues }): boolean =>
   input.form.name.length > 0 ||
   input.form.source.length > 0 ||
   input.form.tags.length > 0 ||
@@ -136,7 +136,7 @@ export const hasSecretUpdate = (input: { readonly alias: string; readonly form: 
   input.form.value.length > 0 ||
   input.form.renameTo.trim() !== input.alias
 
-export const toSecretUpdateInput = (input: {
+const toSecretUpdateInput = (input: {
   readonly target: { readonly alias: string; readonly scope: SecretMutationScope; readonly environment: string }
   readonly form: SecretUpdateFormValues
 }): SecretUpdateForm => ({
@@ -149,3 +149,17 @@ export const toSecretUpdateInput = (input: {
   ...(input.form.source.length === 0 ? {} : { source: input.form.source }),
   ...(input.form.clearTags ? { tags: '' } : input.form.tags.length === 0 ? {} : { tags: input.form.tags }),
 })
+
+export class SecretMutationForm {
+  static readonly isSecretScope = isSecretScope
+  static readonly needsProjectFolder = needsProjectFolder
+  static readonly defaultCreateScope = defaultCreateScope
+  static readonly toEnvVarName = toEnvVarName
+  static readonly quickAddIssue = quickAddIssue
+  static readonly secretCreateFormDefaults = secretCreateFormDefaults
+  static readonly defaultFieldForType = defaultFieldForType
+  static readonly toSecretCreateInput = toSecretCreateInput
+  static readonly secretUpdateFormDefaults = secretUpdateFormDefaults
+  static readonly hasSecretUpdate = hasSecretUpdate
+  static readonly toSecretUpdateInput = toSecretUpdateInput
+}

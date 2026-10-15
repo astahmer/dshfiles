@@ -19,29 +19,15 @@ import { useId, useState, type FormEvent, type ReactNode } from 'react'
 import type { SecretCatalogTranslate } from './locales.js'
 import type { SecretMetadata } from './secret-metadata.js'
 import {
-  defaultFieldForType,
-  hasSecretUpdate,
-  isSecretScope,
-  needsProjectFolder,
-  secretCreateFormDefaults,
+  SecretMutationForm,
   secretCreateFormSchema,
-  secretUpdateFormDefaults,
   secretUpdateFormSchema,
-  toSecretCreateInput,
-  toSecretUpdateInput,
   type SecretCreateForm,
   type SecretMutationScope,
   type SecretRemoveTarget,
   type SecretUpdateForm,
 } from './secret-mutation-form.js'
-import {
-  chooseRemovalTarget,
-  confirmedRemovalTarget,
-  maySubmitValueReplacement,
-  requestValueReplacement,
-  type RemovalDialogState,
-  type ValueReplacementStage,
-} from './secret-mutation-model.js'
+import { SecretMutationRules, type RemovalDialogState, type ValueReplacementStage } from './secret-mutation-model.js'
 
 interface SecretMutationDialogProps {
   readonly mode: 'create' | 'edit' | 'remove'
@@ -80,12 +66,12 @@ const CreateSecretForm = (props: SecretMutationDialogProps & { readonly footer: 
   const valueModeId = useId()
   const [advancedOpen, setAdvancedOpen] = useState(false)
   const form = useAppForm({
-    defaultValues: secretCreateFormDefaults({ scope: props.initialCreateScope, environment: props.defaultEnvironment }),
+    defaultValues: SecretMutationForm.secretCreateFormDefaults({ scope: props.initialCreateScope, environment: props.defaultEnvironment }),
     validationLogic: revalidateLogic({ mode: 'blur', modeAfterSubmission: 'change' }),
     validators: { onDynamic: secretCreateFormSchema },
     onSubmit: ({ value }) => {
-      if (needsProjectFolder({ scope: value.scope, hasProjectFolder: props.hasProjectFolder })) return
-      props.onCreate(toSecretCreateInput(value))
+      if (SecretMutationForm.needsProjectFolder({ scope: value.scope, hasProjectFolder: props.hasProjectFolder })) return
+      props.onCreate(SecretMutationForm.toSecretCreateInput(value))
     },
     onSubmitInvalid: ({ formApi }) => {
       if (advancedCreateFields.some(name => (formApi.getFieldMeta(name)?.errors.length ?? 0) > 0)) setAdvancedOpen(true)
@@ -112,7 +98,7 @@ const CreateSecretForm = (props: SecretMutationDialogProps & { readonly footer: 
               {field => (
                 <field.SelectField
                   description={
-                    needsProjectFolder({ scope, hasProjectFolder: props.hasProjectFolder }) ? (
+                    SecretMutationForm.needsProjectFolder({ scope, hasProjectFolder: props.hasProjectFolder }) ? (
                       <span className="dshx:text-destructive">{t('needsProjectFolder')}</span>
                     ) : (
                       t(scopeHintKeys[scope])
@@ -199,8 +185,8 @@ const CreateSecretForm = (props: SecretMutationDialogProps & { readonly footer: 
             listeners={{
               onChange: ({ value }) => {
                 const field = form.getFieldValue('field')
-                if (field === defaultFieldForType('login') || field === defaultFieldForType('secure-note'))
-                  form.setFieldValue('field', defaultFieldForType(value))
+                if (field === SecretMutationForm.defaultFieldForType('login') || field === SecretMutationForm.defaultFieldForType('secure-note'))
+                  form.setFieldValue('field', SecretMutationForm.defaultFieldForType(value))
               },
             }}
             name="type"
@@ -221,7 +207,10 @@ const CreateSecretForm = (props: SecretMutationDialogProps & { readonly footer: 
       {props.footer(
         <form.Subscribe selector={state => [state.values.scope, state.isSubmitting] as const}>
           {([scope, isSubmitting]) => (
-            <Button disabled={props.pending || isSubmitting || needsProjectFolder({ scope, hasProjectFolder: props.hasProjectFolder })} type="submit">
+            <Button
+              disabled={props.pending || isSubmitting || SecretMutationForm.needsProjectFolder({ scope, hasProjectFolder: props.hasProjectFolder })}
+              type="submit"
+            >
               {props.pending ? t('adding') : t('addAlias')}
             </Button>
           )}
@@ -239,16 +228,16 @@ const EditSecretForm = (
   const clearTagsId = useId()
   const [valueReplacementStage, setValueReplacementStage] = useState<ValueReplacementStage>('editing')
   const form = useAppForm({
-    defaultValues: secretUpdateFormDefaults(row.alias),
+    defaultValues: SecretMutationForm.secretUpdateFormDefaults(row.alias),
     validationLogic: revalidateLogic(),
     validators: { onDynamic: secretUpdateFormSchema },
     onSubmit: ({ value }) => {
-      if (value.value.length > 0 && !maySubmitValueReplacement(valueReplacementStage)) {
-        setValueReplacementStage(requestValueReplacement(valueReplacementStage))
+      if (value.value.length > 0 && !SecretMutationRules.maySubmitValueReplacement(valueReplacementStage)) {
+        setValueReplacementStage(SecretMutationRules.requestValueReplacement(valueReplacementStage))
         return
       }
-      if (!isSecretScope(row.scope)) return
-      props.onUpdate(toSecretUpdateInput({ target: { alias: row.alias, scope: row.scope, environment: row.environment }, form: value }))
+      if (!SecretMutationForm.isSecretScope(row.scope)) return
+      props.onUpdate(SecretMutationForm.toSecretUpdateInput({ target: { alias: row.alias, scope: row.scope, environment: row.environment }, form: value }))
     },
   })
   return (
@@ -299,7 +288,7 @@ const EditSecretForm = (
             const replacing = values.value.length > 0
             return (
               <Button
-                disabled={props.pending || !hasSecretUpdate({ alias: row.alias, form: values })}
+                disabled={props.pending || !SecretMutationForm.hasSecretUpdate({ alias: row.alias, form: values })}
                 type="submit"
                 variant={replacing && valueReplacementStage === 'confirming' ? 'destructive' : 'default'}
               >
@@ -334,7 +323,7 @@ export const SecretMutationDialog = (props: SecretMutationDialogProps): JSX.Elem
 
   const finishRemove = (): void => {
     if (props.mode !== 'remove' || row === undefined) return
-    const target = confirmedRemovalTarget(removeState)
+    const target = SecretMutationRules.confirmedRemovalTarget(removeState)
     if (target === null) return
     props.onRemove(target, row)
   }
@@ -376,7 +365,7 @@ export const SecretMutationDialog = (props: SecretMutationDialogProps): JSX.Elem
               <Button
                 className="dshx:justify-start"
                 disabled={props.pending}
-                onClick={() => setRemoveState(chooseRemovalTarget(removeState, 'alias'))}
+                onClick={() => setRemoveState(SecretMutationRules.chooseRemovalTarget(removeState, 'alias'))}
                 type="button"
                 variant="outline"
               >
@@ -385,7 +374,7 @@ export const SecretMutationDialog = (props: SecretMutationDialogProps): JSX.Elem
               <Button
                 className="dshx:justify-start"
                 disabled={props.pending}
-                onClick={() => setRemoveState(chooseRemovalTarget(removeState, 'vault-item'))}
+                onClick={() => setRemoveState(SecretMutationRules.chooseRemovalTarget(removeState, 'vault-item'))}
                 type="button"
                 variant="destructive"
               >
