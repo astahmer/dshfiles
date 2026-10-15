@@ -476,6 +476,16 @@
       "id": "credential-recovery",
       "title": "Open credential setup from failed turns",
       "summary": "Offer an inline route to AI Accounts when a failed turn reports missing or rejected provider credentials.",
+      "reach": [
+        "click button \"New thread\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Reproduce missing credential recovery.\"",
+        "click button \"Send message\"",
+        "expect text \"This turn failed*\"",
+        "expect button \"Add or fix credentials\"",
+        "click button \"Add or fix credentials\"",
+        "expect complementary \"Provider accounts\"",
+        "expect button \"Add account\""
+      ],
       "surfaces": ["client", "settings"],
       "configuration": [],
       "states": ["hidden-for-other-failures", "available-for-credential-failure", "accounts-panel-open"],
