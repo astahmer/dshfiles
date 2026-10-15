@@ -442,18 +442,16 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   }, [dropPresentation, state])
   const previewBranchIds = useMemo(() => new Set(previewBranch.map(revision => revision.commitId)), [previewBranch])
 
-  const listItems = useMemo(
-    () =>
-      flattenRevisionGroups({
-        groups,
-        collapsedDays,
-        layouts: graphRowsByCommitId,
-        ...(pushedRevision === undefined || selectedBookmark === '' || selectedRemote === ''
-          ? {}
-          : { pushBoundary: { commitId: pushedRevision.commitId, bookmark: selectedBookmark, remote: selectedRemote } }),
-      }),
-    [groups, collapsedDays, graphRowsByCommitId, pushedRevision, selectedBookmark, selectedRemote],
-  )
+  const listItems = useMemo(() => {
+    const input = { groups, collapsedDays, layouts: graphRowsByCommitId }
+    if (pushedRevision === undefined || selectedBookmark === '' || selectedRemote === '') {
+      return flattenRevisionGroups(input)
+    }
+    return flattenRevisionGroups({
+      ...input,
+      pushBoundary: { commitId: pushedRevision.commitId, bookmark: selectedBookmark, remote: selectedRemote },
+    })
+  }, [groups, collapsedDays, graphRowsByCommitId, pushedRevision, selectedBookmark, selectedRemote])
   const listScrollRef = useRef<HTMLDivElement | null>(null)
   const pendingFocusIndex = useRef<number | null>(null)
   const scrolledToWorkingCopy = useRef<string | null>(null)
