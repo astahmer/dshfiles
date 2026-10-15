@@ -1,4 +1,5 @@
 import type z from '@deepseek-ai/schemastery'
+import { z as zod } from 'zod'
 import type { SettingsClientOptions, SettingsContract, SettingsContribution, SettingsHostContribution, SettingsHostOptions, SettingsValue } from './types.js'
 
 const NAMESPACE_PATTERN = /^[a-z][a-z0-9-]*$/
@@ -10,21 +11,17 @@ export interface SettingsHostContributionParts {
 
 const settingsHostContributions = new WeakMap<object, SettingsHostContributionParts>()
 
-interface SchemaNode {
-  readonly type?: unknown
-  readonly meta?: { readonly role?: unknown }
-  readonly [key: string]: unknown
-}
-interface SchemaJson {
-  readonly uid?: unknown
-  readonly refs?: Record<string, SchemaNode>
-}
+// Schemastery's toJSON() is typed as a Schema but returns its serialized graph: nodes keyed by uid, linked by uid.
+const serializedSchema = zod.object({
+  uid: zod.union([zod.string(), zod.number()]),
+  refs: zod.record(zod.string(), zod.looseObject({ type: zod.unknown().optional(), meta: zod.looseObject({ role: zod.unknown().optional() }).optional() })),
+})
 const SAFE_SECRET_CONTAINERS = new Set(['object', 'dict', 'array'])
 
 function secretAnalysis(schema: z<any, object>): { readonly contains: boolean; readonly unsafe: boolean } {
-  const json = schema.toJSON() as unknown as SchemaJson
-  const refs = json.refs
-  if (refs === undefined || (typeof json.uid !== 'string' && typeof json.uid !== 'number')) return { contains: false, unsafe: false }
+  const json = serializedSchema.safeParse(schema.toJSON())
+  if (!json.success) return { contains: false, unsafe: false }
+  const refs = json.data.refs
   const memo = new Map<string, { readonly contains: boolean; readonly unsafe: boolean }>()
   const active = new Set<string>()
   const visit = (id: string): { readonly contains: boolean; readonly unsafe: boolean } => {
@@ -57,7 +54,7 @@ function secretAnalysis(schema: z<any, object>): { readonly contains: boolean; r
     active.delete(id)
     return result
   }
-  return visit(String(json.uid))
+  return visit(String(json.data.uid))
 }
 
 export function settingsSchemaContainsSecret(schema: z<any, object>): boolean {

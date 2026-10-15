@@ -87,7 +87,7 @@ export interface ClientPluginDefinition<Uses extends readonly ClientCapability[]
 /** @internal Only this adapter erases the native slot overload implementation. */
 export function createClientPluginApi<Uses extends readonly ClientCapability[]>(
   ctx: ClientContext,
-  uses: Uses,
+  uses: readonly ClientCapability[],
   packageId: string,
   decorate: (component: unknown) => unknown = component => component,
 ): ClientPluginApi<Uses> {
@@ -172,7 +172,8 @@ export function createClientPluginApi<Uses extends readonly ClientCapability[]>(
 /** Define the explicit browser half of a native DSH plugin. Ordinary React components receive native slot props. */
 export function defineClientPlugin<const Uses extends readonly ClientCapability[] = readonly []>(definition: ClientPluginDefinition<Uses>): ClientDefinition {
   assertPluginId(definition.id)
-  const { id, name, uses = [] as unknown as Uses, setup, ...contributions } = definition
+  const { id, name, uses: declaredUses, setup, ...contributions } = definition
+  const uses = declaredUses ?? []
   for (const capability of uses)
     if (!Object.hasOwn(CLIENT_CAPABILITY_INJECTIONS, capability)) throw new TypeError(`Unknown Client capability ${JSON.stringify(capability)}.`)
   return {
@@ -180,8 +181,8 @@ export function defineClientPlugin<const Uses extends readonly ClientCapability[
     name: name ?? id,
     inject: [...new Set([...(definition.inject ?? []), ...uses.flatMap(capability => CLIENT_CAPABILITY_INJECTIONS[capability])])],
     setup: adaptClientSetup(
-      ctx => setup?.(createClientPluginApi(ctx, uses, id)),
-      (ctx, decorate, metadata) => setup?.(createClientPluginApi(ctx, uses, metadata.packageId, decorate)),
+      ctx => setup?.(createClientPluginApi<Uses>(ctx, uses, id)),
+      (ctx, decorate, metadata) => setup?.(createClientPluginApi<Uses>(ctx, uses, metadata.packageId, decorate)),
     ),
   }
 }

@@ -24,7 +24,7 @@
     "react/set-state-in-effect": "off",
     "react/exhaustive-deps": "warn",
     "react/purity": "warn",
-    "antislop/no-chained-type-assertions": "warn",
+    "antislop/no-chained-type-assertions": "error",
     "antislop/no-broad-object-parameters": "error",
     "antislop/no-conditional-empty-object-spread": "warn",
     "antislop/no-known-value-widening": "warn",

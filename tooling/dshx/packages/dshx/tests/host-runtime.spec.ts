@@ -1,4 +1,4 @@
-import type { Context } from '@deepseek-ai/cordis'
+import { Context } from '@deepseek-ai/cordis'
 import type { CommandDefinition } from '@deepseek-ai/dsh-commands'
 import Schema from '@deepseek-ai/schemastery'
 import { defineTool as officialDefineTool, type ToolDefinition } from '@deepseek-ai/dsh-tools'
@@ -24,7 +24,9 @@ function tool(name: string): ToolDefinition {
 }
 
 function context(register: (tool: ToolDefinition) => () => void): Context {
-  return { tools: { register } } as unknown as Context
+  const ctx = new Context()
+  ctx.provide('tools', { register })
+  return ctx
 }
 
 describe('defineHost', () => {
@@ -234,14 +236,14 @@ describe('Host runtime adapter', () => {
       { packageId: '@test/plugin' },
     )
     expect(plugin.inject).toEqual(['commands'])
-    plugin.apply({
-      commands: {
-        register(command: CommandDefinition) {
-          calls.push(`command:${command.name}`)
-          return commandDisposers[calls.length - 1]
-        },
+    const ctx = new Context()
+    ctx.provide('commands', {
+      register(command: CommandDefinition) {
+        calls.push(`command:${command.name}`)
+        return commandDisposers[calls.length - 1]
       },
-    } as unknown as Context)
+    })
+    plugin.apply(ctx)
     expect(calls).toEqual(['command:first', 'command:second', 'setup'])
     expect(commandDisposers[0]).not.toHaveBeenCalled()
     expect(commandDisposers[1]).not.toHaveBeenCalled()
@@ -269,32 +271,32 @@ describe('Host runtime adapter', () => {
     )
 
     expect(plugin.inject).toEqual(['systemPrompt', 'tools', 'commands'])
-    plugin.apply({
-      tools: {
-        register(value: ToolDefinition) {
-          calls.push(`tool:${value.name}`)
-          return disposers[0]
-        },
+    const ctx = new Context()
+    ctx.provide('tools', {
+      register(value: ToolDefinition) {
+        calls.push(`tool:${value.name}`)
+        return disposers[0]
       },
-      commands: {
-        register(value: CommandDefinition) {
-          calls.push(`command:${value.name}`)
-          return disposers[1]
-        },
+    })
+    ctx.provide('commands', {
+      register(value: CommandDefinition) {
+        calls.push(`command:${value.name}`)
+        return disposers[1]
       },
-      systemPrompt: {
-        section(value: PromptSection) {
-          expect(value).toBe(value.name === sectionValue.name ? sectionValue : secondSection)
-          calls.push(`section:${value.name}`)
-          return value === sectionValue ? disposers[2] : disposers[3]
-        },
-        context(value: PromptContext) {
-          expect(value).toBe(contextValue)
-          calls.push(`context:${value.name}`)
-          return disposers[4]
-        },
+    })
+    ctx.provide('systemPrompt', {
+      section(value: PromptSection) {
+        expect(value).toBe(value.name === sectionValue.name ? sectionValue : secondSection)
+        calls.push(`section:${value.name}`)
+        return value === sectionValue ? disposers[2] : disposers[3]
       },
-    } as unknown as Context)
+      context(value: PromptContext) {
+        expect(value).toBe(contextValue)
+        calls.push(`context:${value.name}`)
+        return disposers[4]
+      },
+    })
+    plugin.apply(ctx)
 
     expect(calls).toEqual(['tool:status', 'command:status', 'section:plugin:guidance', 'section:plugin:constraints', 'context:plugin:runtime', 'setup'])
     for (const dispose of disposers) expect(dispose).not.toHaveBeenCalled()
@@ -312,14 +314,16 @@ describe('Host runtime adapter', () => {
     const contract = defineSettings({ namespace: 'example', schema: Schema.object({ enabled: Schema.boolean().default(true) }) })
     const cleanup = vi.fn()
     const configure = vi.fn(() => cleanup)
-    const effects: Array<() => () => void> = []
     const setup = vi.fn()
     const plugin = createHostPlugin({ settings: [contract], setup }, { packageId: '@test/plugin' })
-    plugin.apply({ settings: { configure }, effect: (effect: () => () => void) => effects.push(effect) } as unknown as Context)
+    const ctx = new Context()
+    ctx.provide('settings', { configure })
+    const effect = vi.spyOn(ctx, 'effect')
+    plugin.apply(ctx)
     expect(configure).toHaveBeenCalledWith({ auto: true })
     expect(plugin.inject).toEqual(['settings'])
     expect(plugin.Config).toBeTypeOf('function')
-    expect(effects[0]?.()).toBe(cleanup)
+    expect(effect.mock.calls[0]?.[0]()).toBe(cleanup)
     expect(setup).toHaveBeenCalledOnce()
   })
 

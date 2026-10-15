@@ -1,16 +1,10 @@
 import { createHash } from 'node:crypto'
 import { readFile, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
-import type { Plugin } from 'vite'
+import type { Plugin, Rollup } from 'vite'
 import { DshxError } from '../../diagnostics.js'
 
-interface CssAsset {
-  readonly type: 'asset'
-  readonly fileName: string
-  readonly source: string | Uint8Array
-}
-
-function cssSource(asset: CssAsset): string {
+function cssSource(asset: Rollup.OutputAsset): string {
   return typeof asset.source === 'string' ? asset.source : Buffer.from(asset.source).toString('utf8')
 }
 
@@ -55,7 +49,9 @@ export function clientCssPlugin(options: {
     generateBundle(_options, bundle) {
       const chunks = Object.values(bundle).filter(item => item.type === 'chunk' && item.isEntry)
       if (chunks.length !== 1) return
-      const css = Object.entries(bundle).filter(([, item]) => item.type === 'asset' && item.fileName.endsWith('.css')) as unknown as Array<[string, CssAsset]>
+      const css = Object.entries(bundle).filter(
+        (entry): entry is [string, Rollup.OutputAsset] => entry[1].type === 'asset' && entry[1].fileName.endsWith('.css'),
+      )
       if (css.length > 1) {
         throw new DshxError('DSHX1102', `A DSH Client build emitted multiple CSS assets: ${css.map(([, asset]) => asset.fileName).join(', ')}.`, {
           hint: 'Keep cssCodeSplit disabled and combine styles through the standard Vite CSS graph.',

@@ -1,5 +1,5 @@
 import Schema from '@deepseek-ai/schemastery'
-import { describe, expect, expectTypeOf, it } from 'vitest'
+import { describe, expect, expectTypeOf, it, vi } from 'vitest'
 import { useSettings } from '../src/client/index.js'
 import { createHostPlugin } from '../src/host/runtime.js'
 import { defineSettings, type SettingsState, type SettingsValue } from '../src/settings/index.js'
@@ -96,7 +96,8 @@ describe('defineSettings', () => {
     const invalid = defineSettings({
       namespace: 'throwing-decoder',
       schema: Schema.object({ enabled: Schema.boolean() }),
-      client: { decode: (() => undefined) as unknown as (value: unknown) => { enabled: boolean } },
+      // A mock without an implementation stands in for a JavaScript decoder that returns nothing.
+      client: { decode: vi.fn<(value: unknown) => { enabled: boolean }>() },
     })
     expect(() => invalid.client?.decode({ enabled: true })).toThrow('returned undefined')
   })

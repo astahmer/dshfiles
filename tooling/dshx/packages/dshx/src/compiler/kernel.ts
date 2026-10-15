@@ -1,6 +1,6 @@
 import { mkdir, rm, writeFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
-import type { InlineConfig, Plugin, PluginOption, ResolvedConfig } from 'vite'
+import type { InlineConfig, Plugin, PluginOption, ResolvedConfig, Rollup } from 'vite'
 import { DshxError } from '../diagnostics.js'
 import { resolveVitePlugins } from '../config/vite-plugins.js'
 import type { BuildArtifact, BuildReport, BuildWatcher } from './types.js'
@@ -26,12 +26,12 @@ function sameOutputValue(actual: unknown, expected: unknown): boolean {
   return actual === expected
 }
 
-function outputRecord(config: ResolvedConfig): Record<string, unknown> {
+function outputRecord(config: ResolvedConfig): Rollup.OutputOptions {
   const output = config.build.rollupOptions.output
   if (Array.isArray(output)) {
     throw new DshxError('DSHX1403', 'A Vite plugin replaced the single DSHX output with multiple outputs.')
   }
-  return (output ?? {}) as Record<string, unknown>
+  return output ?? {}
 }
 
 /** Assert that user config hooks did not escape the bounded extension surface. */
@@ -41,9 +41,10 @@ export function kernelBoundaryPlugin(boundary: KernelBoundary): Plugin {
       hint: 'DSHX plugins may transform modules, but cannot replace root, entries, protocol output, target, chunking, externals, or asset policy.',
     })
   }
-  const assertOutput = (output: Record<string, unknown>): void => {
+  const assertOutput = (output: Rollup.OutputOptions): void => {
+    const actual = new Map<string, unknown>(Object.entries(output))
     for (const [field, expected] of Object.entries(boundary.output)) {
-      if (!sameOutputValue(output[field], expected)) fail(`build.rollupOptions.output.${field}`)
+      if (!sameOutputValue(actual.get(field), expected)) fail(`build.rollupOptions.output.${field}`)
     }
     if (output.manualChunks !== undefined) fail('build.rollupOptions.output.manualChunks')
   }
@@ -63,7 +64,7 @@ export function kernelBoundaryPlugin(boundary: KernelBoundary): Plugin {
       assertOutput(outputRecord(config))
     },
     outputOptions(output) {
-      assertOutput(output as unknown as Record<string, unknown>)
+      assertOutput(output)
       return null
     },
   }

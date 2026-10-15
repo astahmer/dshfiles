@@ -5,6 +5,7 @@ import type { SettingsClientRuntime } from '../src/settings/client.js'
 import { createSettingsClientRuntime, useSettings } from '../src/settings/client.js'
 import { defineSettings } from '../src/settings/index.js'
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { z } from 'zod'
 
 type Setter<T> = T | ((previous: T) => T)
 
@@ -39,12 +40,14 @@ const fakeReact = {
   },
 }
 
-const reactInternals = React as unknown as {
-  __SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED: {
-    ReactCurrentDispatcher: { current: unknown }
-  }
-}
-const originalDispatcher = reactInternals.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED.ReactCurrentDispatcher.current
+// React 18 keeps the hook dispatcher on its internals; swapping it runs hooks without a renderer.
+const reactInternalsShape = z.object({
+  __SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED: z.object({ ReactCurrentDispatcher: z.object({ current: z.unknown() }) }),
+})
+const hasReactInternals = (value: unknown): value is z.infer<typeof reactInternalsShape> => reactInternalsShape.safeParse(value).success
+if (!hasReactInternals(React)) throw new Error('React 18 dispatcher internals are unavailable.')
+const dispatcher = React.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED.ReactCurrentDispatcher
+const originalDispatcher = dispatcher.current
 
 function resetRender(): void {
   stateCursor = 0
@@ -65,24 +68,23 @@ function clientWith(options: {
   }
   readonly mirror: Record<string, unknown>
 }): SettingsClientRuntime {
-  return {
-    binding: () => ({
-      scope: options.scope,
-      describe: {
-        getSnapshot: () => options.mirror,
-        subscribe: () => () => undefined,
-        ensure: () => Promise.resolve(),
-      },
+  const configForms = {
+    get: () => options.scope,
+    describe: () => ({
+      getSnapshot: () => options.mirror,
+      subscribe: () => () => undefined,
+      ensure: () => Promise.resolve(),
     }),
-  } as unknown as SettingsClientRuntime
+  }
+  return createSettingsClientRuntime({ get: name => (name === 'configForms' ? configForms : undefined) })
 }
 
 beforeEach(() => {
-  reactInternals.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED.ReactCurrentDispatcher.current = fakeReact
+  dispatcher.current = fakeReact
 })
 
 afterAll(() => {
-  reactInternals.__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED.ReactCurrentDispatcher.current = originalDispatcher
+  dispatcher.current = originalDispatcher
 })
 
 describe('useSettings', () => {

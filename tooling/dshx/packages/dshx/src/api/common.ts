@@ -2,7 +2,7 @@ import type { StandardSchemaV1 } from '@standard-schema/spec'
 import type { ApiError, ApiErrorKind } from './types.js'
 
 const MAX_JSON_BYTES = 1024 * 1024
-const API_ERROR = Symbol('dshx.api-error')
+export const API_ERROR = Symbol('dshx.api-error')
 
 export class ContractViolation extends Error {
   override readonly name = 'ContractViolation'
@@ -150,7 +150,7 @@ export function error(
   cause?: unknown,
   remoteCode?: string,
 ): ApiError {
-  return new InternalApiError(kind, message, apiId, method, retryable, remoteCode, cause === undefined ? undefined : { cause }) as unknown as ApiError
+  return new InternalApiError(kind, message, apiId, method, retryable, remoteCode, cause === undefined ? undefined : { cause })
 }
 
 export function aborted(apiId: string, method: string, cause?: unknown): ApiError {

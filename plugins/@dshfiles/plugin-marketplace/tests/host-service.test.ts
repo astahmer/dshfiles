@@ -101,11 +101,11 @@ async function serviceFixture(options: {
   readonly hubBaseUrl?: string
 }) {
   const profile = await profileFixture(options.bundles)
-  const fetchMock = vi.fn(async (_url: string | URL | Request) => response(options.fetchValue ?? detail()))
+  const fetchMock = vi.fn<typeof fetch>(async () => response(options.fetchValue ?? detail()))
   const runCli = options.runCli ?? vi.fn(async () => cliResult())
   const service = new MarketplaceHostService({
     ...profile.dependencies,
-    fetch: fetchMock as unknown as typeof fetch,
+    fetch: fetchMock,
     resolveDshCli: async () => ({
       cliPath: '/installation/dsh/lib/bin.js',
       version: '0.1.0-rc.8',
@@ -219,12 +219,12 @@ describe('MarketplaceHostService.list', () => {
   it('falls back to the legacy list endpoint when an old Hub reports a list-level 404', async () => {
     const profile = await profileFixture()
     const fetchMock = vi
-      .fn()
+      .fn<typeof fetch>()
       .mockResolvedValueOnce(response({}, 404))
       .mockResolvedValueOnce(response({ items: [card()], nextCursor: null }))
     const service = new MarketplaceHostService({
       ...profile.dependencies,
-      fetch: fetchMock as unknown as typeof fetch,
+      fetch: fetchMock,
       resolveDshCli: async () => ({
         cliPath: '/installation/dsh/lib/bin.js',
         version: '0.1.0-rc.8',
@@ -240,10 +240,10 @@ describe('MarketplaceHostService.list', () => {
 
   it('fails closed instead of treating a dedicated API 500 as an old Hub', async () => {
     const profile = await profileFixture()
-    const fetchMock = vi.fn().mockResolvedValueOnce(response({}, 500))
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValueOnce(response({}, 500))
     const service = new MarketplaceHostService({
       ...profile.dependencies,
-      fetch: fetchMock as unknown as typeof fetch,
+      fetch: fetchMock,
       resolveDshCli: async () => ({
         cliPath: '/installation/dsh/lib/bin.js',
         version: '0.1.0-rc.8',
@@ -258,12 +258,12 @@ describe('MarketplaceHostService.list', () => {
   it('recognizes the production legacy JSON route miss without accepting arbitrary 500 responses', async () => {
     const profile = await profileFixture()
     const fetchMock = vi
-      .fn()
+      .fn<typeof fetch>()
       .mockResolvedValueOnce(response({ error: 'Only HTML requests are supported here' }, 500))
       .mockResolvedValueOnce(response({ items: [card()], nextCursor: null }))
     const service = new MarketplaceHostService({
       ...profile.dependencies,
-      fetch: fetchMock as unknown as typeof fetch,
+      fetch: fetchMock,
       resolveDshCli: async () => ({
         cliPath: '/installation/dsh/lib/bin.js',
         version: '0.1.0-rc.8',
@@ -281,7 +281,7 @@ describe('MarketplaceHostService.list', () => {
   it('recognizes the production legacy redirect, skips placeholder-only pages and remembers legacy mode for install', async () => {
     const profile = await profileFixture(['@fixture/community-tool'])
     const fetchMock = vi
-      .fn()
+      .fn<typeof fetch>()
       .mockResolvedValueOnce(response({}, 307, { location: '/en/marketplace/plugins?locale=en' }))
       .mockResolvedValueOnce(
         response({
@@ -293,7 +293,7 @@ describe('MarketplaceHostService.list', () => {
       .mockResolvedValueOnce(response(detail()))
     const service = new MarketplaceHostService({
       ...profile.dependencies,
-      fetch: fetchMock as unknown as typeof fetch,
+      fetch: fetchMock,
       resolveDshCli: async () => ({
         cliPath: '/installation/dsh/lib/bin.js',
         version: '0.1.0-rc.8',
@@ -317,12 +317,12 @@ describe('MarketplaceHostService.list', () => {
   it('does not downgrade a dedicated detail 404 to the discovery detail API', async () => {
     const profile = await profileFixture()
     const fetchMock = vi
-      .fn()
+      .fn<typeof fetch>()
       .mockResolvedValueOnce(response({ items: [card()], categories: [], nextCursor: null }))
       .mockResolvedValueOnce(response({}, 404))
     const service = new MarketplaceHostService({
       ...profile.dependencies,
-      fetch: fetchMock as unknown as typeof fetch,
+      fetch: fetchMock,
       resolveDshCli: async () => ({
         cliPath: '/installation/dsh/lib/bin.js',
         version: '0.1.0-rc.8',
@@ -383,7 +383,7 @@ describe('MarketplaceHostService.install', () => {
     })
     const service = new MarketplaceHostService({
       ...profile.dependencies,
-      fetch: vi.fn(async () => response(detail())) as unknown as typeof fetch,
+      fetch: vi.fn<typeof fetch>(async () => response(detail())),
       resolveDshCli: async () => ({
         cliPath: '/installation/dsh/lib/bin.js',
         version: '0.1.0-rc.8',
@@ -500,13 +500,13 @@ describe('MarketplaceHostService.install', () => {
     })
     const service = new MarketplaceHostService({
       ...profile.dependencies,
-      fetch: vi.fn(async () =>
+      fetch: vi.fn<typeof fetch>(async () =>
         response(
           detail({
             installTargets: [{ ...detail().installTargets[0], spec: archive }],
           }),
         ),
-      ) as unknown as typeof fetch,
+      ),
       resolveDshCli: async () => ({ cliPath: '/installation/dsh/lib/bin.js', version: '0.1.0-rc.8' }),
       runCli,
       settings: () => ({ hubBaseUrl: 'http://127.0.0.1:4173' }),

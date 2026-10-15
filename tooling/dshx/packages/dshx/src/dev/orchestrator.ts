@@ -64,7 +64,7 @@ function childFromExeca(
     )
   }
   void subprocess.catch(() => undefined)
-  return Promise.resolve(child as unknown as DevChildProcess)
+  return Promise.resolve(child)
 }
 
 function buildOptions(

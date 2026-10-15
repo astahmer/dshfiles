@@ -57,7 +57,7 @@ export interface PluginDefinition<Uses extends readonly HostCapability[] = reado
 /** @internal Capability adapters always resolve services through the caller's context. */
 export function createPluginApi<Uses extends readonly HostCapability[], Config = Readonly<Record<string, unknown>>>(
   ctx: Context,
-  uses: Uses,
+  uses: readonly HostCapability[],
   packageId: string,
   config: Record<string, unknown> = {},
 ): PluginApi<Uses, Config> {
@@ -102,7 +102,8 @@ export function definePlugin<const Uses extends readonly HostCapability[] = read
   definition: PluginDefinition<Uses, Config>,
 ): HostDefinition {
   assertPluginId(definition.id)
-  const { id, name, uses = [] as unknown as Uses, setup, Config, ...contributions } = definition
+  const { id, name, uses: declaredUses, setup, Config, ...contributions } = definition
+  const uses = declaredUses ?? []
   for (const capability of uses)
     if (!Object.hasOwn(HOST_CAPABILITY_INJECTIONS, capability)) throw new TypeError(`Unknown Host capability ${JSON.stringify(capability)}.`)
   return {
@@ -111,7 +112,7 @@ export function definePlugin<const Uses extends readonly HostCapability[] = read
     name: name ?? id,
     inject: [...new Set([...(definition.inject ?? []), ...uses.flatMap(capability => HOST_CAPABILITY_INJECTIONS[capability])])],
     setup: adaptHostSetup(
-      ctx => setup?.(createPluginApi(ctx, uses, id)),
+      ctx => setup?.(createPluginApi<Uses, PluginConfig<Config>>(ctx, uses, id)),
       (ctx, rowConfig, metadata) => setup?.(createPluginApi<Uses, PluginConfig<Config>>(ctx, uses, metadata.packageId, unwrapRowConfig(rowConfig))),
     ),
   }

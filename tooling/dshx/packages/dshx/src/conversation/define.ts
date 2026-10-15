@@ -81,6 +81,7 @@ function descriptorFor<Events extends ConversationEventDescriptors>(
 function makeContribution<Kind extends string, Events extends ConversationEventDescriptors, State, Data>(
   lifecycle: ConversationLifecycle<Kind, Events, State, Data>,
   definitionOptions: ConversationLifecycleDefinition<Kind, Events, State, Data>,
+  project: (state: State, context: ConversationNodeContext<State> & { readonly state: State }) => Data,
   authorComponent: ConversationRendererComponent<Kind, Data>,
 ): ConversationContribution<Kind, State, Data> {
   const definition: ConversationNodeDefinition<State> = {
@@ -104,7 +105,7 @@ function makeContribution<Kind extends string, Events extends ConversationEventD
     buildViewNode(context) {
       if (context.state === undefined) return null
       const stateContext = context as ConversationNodeContext<State> & { readonly state: State }
-      const data = definitionOptions.project === undefined ? (context.state as unknown as Data) : definitionOptions.project(context.state, stateContext)
+      const data = project(context.state, stateContext)
       const node: ConversationRendererNode<Kind, Data> = {
         key: context.key,
         kind: lifecycle.kind,
@@ -149,7 +150,7 @@ export function getConversationContributionParts(value: ConversationContribution
   return parts
 }
 
-export function defineConversation<const Kind extends string, const Events extends ConversationEventDescriptors, State, Data = State>(definition: {
+type ConversationDefinitionInput<Kind extends string, Events extends ConversationEventDescriptors, State, Data> = {
   readonly kind: Kind
   readonly events: Events & NoUnknownEventTypes<Events>
   readonly initial: (context: ConversationNodeContext<never>, event: import('./types.js').ConversationStartEvent<Events>) => State
@@ -159,14 +160,28 @@ export function defineConversation<const Kind extends string, const Events exten
     event: import('./types.js').ConversationUpdateEvent<Events>,
   ) => State
   readonly project?: (state: State, context: ConversationNodeContext<State> & { readonly state: State }) => Data
-}): ConversationLifecycle<Kind, Events, State, Data> {
+}
+
+/** Without `project`, the renderer receives the reduced state itself. */
+export function defineConversation<const Kind extends string, const Events extends ConversationEventDescriptors, State>(
+  definition: ConversationDefinitionInput<Kind, Events, State, State>,
+): ConversationLifecycle<Kind, Events, State, State>
+export function defineConversation<const Kind extends string, const Events extends ConversationEventDescriptors, State, Data>(
+  definition: ConversationDefinitionInput<Kind, Events, State, Data> & {
+    readonly project: (state: State, context: ConversationNodeContext<State> & { readonly state: State }) => Data
+  },
+): ConversationLifecycle<Kind, Events, State, Data>
+export function defineConversation(
+  definition: ConversationDefinitionInput<string, ConversationEventDescriptors, unknown, unknown>,
+): ConversationLifecycle<string, ConversationEventDescriptors, unknown, unknown> {
   validateDefinition(definition)
-  const lifecycle: ConversationLifecycle<Kind, Events, State, Data> = {
+  const project = definition.project ?? ((state: unknown) => state)
+  const lifecycle: ConversationLifecycle<string, ConversationEventDescriptors, unknown, unknown> = {
     kind: definition.kind,
     events: definition.events,
     render(component) {
       if (typeof component !== 'function') throw new TypeError(`Conversation ${JSON.stringify(definition.kind)} renderer must be a component function.`)
-      return makeContribution(lifecycle, definition as never, component)
+      return makeContribution(lifecycle, definition, project, component)
     },
   }
   return lifecycle

@@ -1,4 +1,4 @@
-import type { IWorkspaces } from '@deepseek-ai/dsh-api-workspace-controller/client'
+import type { IWorkspaces, WorkspaceSnapshot } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
@@ -34,8 +34,9 @@ const scopes: readonly SecretScopeFilter[] = ['all', 'project', 'global', 'local
 
 const noopSubscribe = (): (() => void) => () => {}
 
-const emptyWorkspaceSnapshot = (): ReturnType<NonNullable<IWorkspaces['list']>['getSnapshot']> =>
-  ({ items: [], phase: 'idle' }) as unknown as ReturnType<NonNullable<IWorkspaces['list']>['getSnapshot']>
+// One shared value: useSyncExternalStore requires a stable snapshot while no Workspace list is available.
+const emptyWorkspaceSnapshot: WorkspaceSnapshot = { items: [], archivedSessionIds: [], pinnedSessionIds: [], state: 'idle', phase: 'pending', error: null }
+const readEmptyWorkspaceSnapshot = (): WorkspaceSnapshot => emptyWorkspaceSnapshot
 
 const scopeLabelKeys = {
   all: 'scopeAll',
@@ -78,9 +79,8 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
   // passed bare it runs with an undefined `this` and throws.
   const workspaceSource = props.workspaces?.list
   const subscribe = workspaceSource === undefined ? noopSubscribe : workspaceSource.subscribe.bind(workspaceSource)
-  const getSnapshot =
-    workspaceSource === undefined ? emptyWorkspaceSnapshot : (): ReturnType<NonNullable<IWorkspaces['list']>['getSnapshot']> => workspaceSource.getSnapshot()
-  const workspaceSnapshot = useSyncExternalStore(subscribe, getSnapshot, emptyWorkspaceSnapshot)
+  const getSnapshot = workspaceSource === undefined ? readEmptyWorkspaceSnapshot : (): WorkspaceSnapshot => workspaceSource.getSnapshot()
+  const workspaceSnapshot = useSyncExternalStore(subscribe, getSnapshot, readEmptyWorkspaceSnapshot)
   const [selection, setSelection] = useState<ProjectFolderSelection | null>(null)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [scope, setScope] = useState<SecretScopeFilter>('all')

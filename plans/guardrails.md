@@ -76,9 +76,16 @@ wait for the `memory` and `usage` plugins to land.
       159, unknown-returns 120, chained-type-assertions 42, passthrough-variable
       38, reflect-get 28, exhaustive-deps 26, reflect-apply 10, purity 10,
       broad-object-parameters 8.
-- [ ] 2. `refactor`: fix the 126 low-count antislop sites (broad-object 8,
-      reflect-apply 10, reflect-get 28, passthrough 38, chained assertions 42),
-      one revision per rule, then promote each to `error`.
+- [x] 2. `refactor`: fix the 125 low-count antislop sites (broad-object 8,
+      reflect-apply 10, reflect-get 28, passthrough 37, chained assertions 42),
+      one revision per rule; each rule is now an `error` with no cap. No disable
+      comments or replacement casts: typed service slices and type guards for
+      Host/Client services, zod shapes at untyped boundaries, real Cordis
+      `Context`s with provided services instead of `as unknown as Context` test
+      fakes, and restructured snapshots (take-with-finally, parameters, reads
+      before the swap) instead of aliases. Side effects: `require-safety-comment`
+      415 → 326, `no-unsafe-dictionary-type` 236 → 226, `no-runtime-typeof`
+      353 → 333.
 - [x] 3. `chore(lint)`: vendor emilint ast-grep rules, `sgconfig.yml`, `pnpm sg`.
       Rules in `tooling/antislop/ast-grep/rules/`, `@ast-grep/cli 0.45.3`,
       ratcheted by `pnpm lint`. Caps at landing: `JSON.parse` 177 (+1 tsx),

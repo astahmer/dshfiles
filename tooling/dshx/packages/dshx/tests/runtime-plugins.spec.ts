@@ -1,4 +1,4 @@
-import type { Context } from '@deepseek-ai/cordis'
+import { Context } from '@deepseek-ai/cordis'
 import { describe, expect, it, vi } from 'vitest'
 import { loadRuntimePlugins } from '../src/host/runtime-plugins.js'
 import type { DshCompatibility } from '../src/compat/index.js'
@@ -18,15 +18,9 @@ const baseCompatibility: DshCompatibility = {
 
 describe('Host runtime child plugin loader', () => {
   it('skips an adapter plugin when all of its capabilities already exist', async () => {
-    const plugin = vi.fn()
-    const ctx = {
-      get(name: string) {
-        if (name === 'Service' || name === 'Event') return undefined
-        if (name === 'cordisInspect') return { list: () => [{ id: 'Service' }, { id: 'Event' }] }
-        return undefined
-      },
-      plugin,
-    } as unknown as Context
+    const ctx = new Context()
+    ctx.provide('cordisInspect', { list: () => [{ id: 'Service' }, { id: 'Event' }] })
+    const plugin = vi.spyOn(ctx, 'plugin')
     const result = await loadRuntimePlugins(ctx, {
       ...baseCompatibility,
       runtimePlugins: [{ id: 'tool-cordis', packageName: '@deepseek-ai/dsh-tool-cordis', load: 'module', provides: ['Service', 'Event'], optional: true }],
@@ -37,8 +31,8 @@ describe('Host runtime child plugin loader', () => {
   })
 
   it('never imports an adapter package that is not explicitly supported', async () => {
-    const plugin = vi.fn()
-    const ctx = { get: () => undefined, plugin } as unknown as Context
+    const ctx = new Context()
+    const plugin = vi.spyOn(ctx, 'plugin')
     const result = await loadRuntimePlugins(ctx, {
       ...baseCompatibility,
       runtimePlugins: [{ id: 'untrusted', packageName: 'example-untrusted-plugin', load: 'module', provides: ['unknown'], optional: true }],

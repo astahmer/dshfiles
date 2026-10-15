@@ -30,8 +30,9 @@ interface HeaderThreadActionsInjected {
   unpinSession: (sessionId: SessionSummary['id']) => Promise<void>
 }
 
-type HeaderThreadActionsProps = PropsRuntime<'conversation.session.header.utilities'> &
-  PropsLocale<typeof THREAD_SIDEBAR_LOCALE_NAMESPACE> &
+// Only the slot props this component reads, so a test can supply them without the whole runtime surface.
+type HeaderThreadActionsProps = Pick<PropsRuntime<'conversation.session.header.utilities'>, 'sessionId' | 'useSessions' | 'useWorkspaces'> &
+  Pick<PropsLocale<typeof THREAD_SIDEBAR_LOCALE_NAMESPACE>, 't'> &
   HeaderThreadActionsInjected
 
 // Read at the click, outside render.

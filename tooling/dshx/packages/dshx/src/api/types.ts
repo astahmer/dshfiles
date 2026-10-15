@@ -1,9 +1,9 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { ConnectionRpcHandler } from '@deepseek-ai/dsh-client-connection'
 import type { StandardSchemaV1 } from '@standard-schema/spec'
+import type { API_ERROR } from './common.js'
 
 declare const apiHostRegistrationBrand: unique symbol
-declare const apiErrorBrand: unique symbol
 declare const apiClientInputBrand: unique symbol
 declare const apiHostInputBrand: unique symbol
 declare const apiHostOutputBrand: unique symbol
@@ -132,13 +132,13 @@ export type ApiErrorKind = 'transport' | 'remote' | 'contract' | 'aborted' | 'un
 
 /** Read-only, opaque API failure. */
 export interface ApiError extends Error {
-  readonly [apiErrorBrand]: true
+  readonly [API_ERROR]: true
   readonly name: 'ApiError'
   readonly kind: ApiErrorKind
   readonly apiId: string
   readonly method: string
   readonly retryable: boolean
-  readonly remoteCode?: string
+  readonly remoteCode?: string | undefined
 }
 
 export type ApiFetchStatus = 'idle' | 'fetching' | 'paused'

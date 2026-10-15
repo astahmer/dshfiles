@@ -1,4 +1,4 @@
-import type { Context } from '@deepseek-ai/cordis'
+import { Context } from '@deepseek-ai/cordis'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
 import { defineClient, defineLocale, defineSlot } from '../src/client/index.js'
@@ -172,19 +172,19 @@ describe('Client runtime adapter', () => {
     )
     expect(plugin.inject).toEqual(['remote', 'slots'])
     const registered: unknown[] = []
-    plugin.apply({
-      slots: {
-        inject(name: string, register: () => unknown) {
-          calls.push(`inject:${name}`)
-          return register()
-        },
-        register(options: Record<string, unknown>, component: unknown) {
-          calls.push(`register:${String(options.id)}`)
-          registered.push({ options, component })
-          return vi.fn()
-        },
+    const ctx = new Context()
+    ctx.provide('slots', {
+      inject(name: string, register: () => unknown) {
+        calls.push(`inject:${name}`)
+        return register()
       },
-    } as unknown as Context)
+      register(options: { readonly id?: string }, component: unknown) {
+        calls.push(`register:${String(options.id)}`)
+        registered.push({ options, component })
+        return vi.fn()
+      },
+    })
+    plugin.apply(ctx)
     expect(calls).toEqual(['inject:test.slot', 'register:first', 'inject:test.slot', 'register:second', 'setup'])
     expect(registered).toHaveLength(2)
   })
@@ -211,31 +211,28 @@ describe('Client runtime adapter', () => {
     )
     expect(plugin.inject).toEqual(['locale', 'slots'])
     const registered: unknown[] = []
-    plugin.apply({
-      effect(register: () => unknown) {
-        calls.push('effect')
+    const ctx = new Context()
+    const effect = vi.spyOn(ctx, 'effect')
+    const registerLocale = vi.fn((namespace: string, dictionaries: unknown) => {
+      calls.push(`locale:${namespace}`)
+      registered.push({ namespace, dictionaries })
+      return dispose
+    })
+    ctx.provide('locale', { register: registerLocale })
+    ctx.provide('slots', {
+      inject(name: string, register: () => unknown) {
+        calls.push(`inject:${name}`)
         return register()
       },
-      locale: {
-        register(namespace: string, dictionaries: unknown) {
-          calls.push(`locale:${namespace}`)
-          registered.push({ namespace, dictionaries })
-          return dispose
-        },
+      register(options: { readonly locale?: string }, registeredComponent: unknown) {
+        calls.push(`slot:${String(options.locale)}`)
+        registered.push({ options, component: registeredComponent })
+        return vi.fn()
       },
-      slots: {
-        inject(name: string, register: () => unknown) {
-          calls.push(`inject:${name}`)
-          return register()
-        },
-        register(options: Record<string, unknown>, registeredComponent: unknown) {
-          calls.push(`slot:${String(options.locale)}`)
-          registered.push({ options, component: registeredComponent })
-          return vi.fn()
-        },
-      },
-    } as unknown as Context)
-    expect(calls).toEqual(['effect', 'locale:test.copy', 'inject:test.slot', 'slot:test.copy', 'setup'])
+    })
+    plugin.apply(ctx)
+    expect(effect.mock.invocationCallOrder[0]).toBeLessThan(registerLocale.mock.invocationCallOrder[0] ?? 0)
+    expect(calls).toEqual(['locale:test.copy', 'inject:test.slot', 'slot:test.copy', 'setup'])
     expect(registered[0]).toEqual({ namespace: 'test.copy', dictionaries: localeDefinitionParts(copy).dictionaries })
     expect(registered[1]).toEqual({ options: { name: 'test.slot', id: 'localized', locale: 'test.copy' }, component })
     expect(dispose).not.toHaveBeenCalled()
@@ -247,14 +244,20 @@ describe('Client runtime adapter', () => {
     const register = vi.fn()
     const plugin = createClientPlugin({ slots: [slot] }, { packageId: '@test/plugin' })
     expect(plugin.inject).toEqual(['slots'])
-    plugin.apply({ slots: { inject: (_name: string, apply: () => unknown) => apply(), register } } as unknown as Context)
+    const ctx = new Context()
+    ctx.provide('slots', { inject: (_name: string, apply: () => unknown) => apply(), register })
+    plugin.apply(ctx)
     expect(register).toHaveBeenCalledWith({ name: 'test.slot', id: 'native', locale: 'test.native' }, component)
   })
 
   it('does not inject or register an empty Slot list', () => {
     const plugin = createClientPlugin({ slots: [] }, { packageId: '@test/plugin' })
     expect(plugin.inject).toEqual([])
-    plugin.apply({ slots: { inject: vi.fn(), register: vi.fn() } } as unknown as Context)
+    const inject = vi.fn()
+    const ctx = new Context()
+    ctx.provide('slots', { inject, register: vi.fn() })
+    plugin.apply(ctx)
+    expect(inject).not.toHaveBeenCalled()
   })
 
   it('injects the runtime services setup(ctx) may touch imperatively', () => {
@@ -266,7 +269,9 @@ describe('Client runtime adapter', () => {
     const plugin = createClientPlugin({ setup }, { packageId: '@test/plugin' })
 
     expect(plugin.inject).toEqual(['locale', 'slots'])
-    plugin.apply({ slots: { inject, register: vi.fn() } } as unknown as Context)
+    const ctx = new Context()
+    ctx.provide('slots', { inject, register: vi.fn() })
+    plugin.apply(ctx)
     expect(setup).toHaveBeenCalledOnce()
     expect(inject).toHaveBeenCalledWith('test.slot', expect.any(Function))
   })
@@ -290,19 +295,19 @@ describe('Client runtime adapter', () => {
 
   it('adds settingsScope from compiler metadata without a Client settings declaration', () => {
     const slot = defineSlot('test.slot', { id: 'settings', component: () => null })
-    const get = vi.fn(() => ({ bind: vi.fn(), describe: vi.fn() }))
     const registered: unknown[] = []
     const plugin = createClientPlugin({ slots: [slot] }, { packageId: '@test/plugin', settingsCapability: true })
     expect(plugin.inject).toEqual(['slots', 'configForms'])
-    plugin.apply({
-      get,
-      slots: {
-        inject: (_name: string, register: () => unknown) => register(),
-        register: (_options: unknown, component: unknown) => {
-          registered.push(component)
-        },
+    const ctx = new Context()
+    const get = vi.spyOn(ctx, 'get')
+    ctx.provide('configForms', { bind: vi.fn(), describe: vi.fn() })
+    ctx.provide('slots', {
+      inject: (_name: string, register: () => unknown) => register(),
+      register: (_options: unknown, component: unknown) => {
+        registered.push(component)
       },
-    } as unknown as Context)
+    })
+    plugin.apply(ctx)
     expect(get).toHaveBeenCalledWith('configForms')
     expect(registered).toHaveLength(1)
     expect(registered[0]).not.toBe(slotContributionParts(slot).component)
@@ -310,19 +315,19 @@ describe('Client runtime adapter', () => {
 
   it('adds Connection and a lazy API provider from compiler metadata without Client api/apis', async () => {
     const slot = defineSlot('test.slot', { id: 'api-hook', component: () => null })
-    const get = vi.fn(() => ({ rpc: { call: vi.fn() } }))
     const registered: unknown[] = []
     const plugin = createClientPlugin({ inject: ['connection', 'connection'], slots: [slot] }, { packageId: '@test/plugin', apiCapability: true })
     expect(plugin.inject).toEqual(['connection', 'slots'])
-    await plugin.apply({
-      get,
-      slots: {
-        inject: (_name: string, register: () => unknown) => register(),
-        register: (_options: unknown, component: unknown) => {
-          registered.push(component)
-        },
+    const ctx = new Context()
+    const get = vi.spyOn(ctx, 'get')
+    ctx.provide('connection', { rpc: { call: vi.fn() } })
+    ctx.provide('slots', {
+      inject: (_name: string, register: () => unknown) => register(),
+      register: (_options: unknown, component: unknown) => {
+        registered.push(component)
       },
-    } as unknown as Context)
+    })
+    await plugin.apply(ctx)
     expect(registered).toHaveLength(1)
     expect(registered[0]).not.toBe(slotContributionParts(slot).component)
     // Retained-hook contracts bind only when their component invokes useApi().

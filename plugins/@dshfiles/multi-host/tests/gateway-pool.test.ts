@@ -9,12 +9,22 @@ import { callNativeRpc } from '../src/native-rpc.js'
 const fakeGateway = () => {
   let close = (): void => {}
   const state = { disposed: 0 }
-  const gateway = {
+  const unused = async (): Promise<never> => {
+    throw new Error('The pool never calls the gateway itself.')
+  }
+  const gateway: Gateway = {
+    origin: 'http://127.0.0.1:0',
+    launchUrl: 'http://127.0.0.1:0/',
     closed: new Promise<void>(resolve => (close = resolve)),
+    run: unused,
+    runSafe: unused,
+    api: unused,
+    pluginApi: () => unused,
+    follow: unused,
     dispose: async () => {
       state.disposed += 1
     },
-  } as unknown as Gateway
+  }
   return { gateway, state, drop: () => close() }
 }
 

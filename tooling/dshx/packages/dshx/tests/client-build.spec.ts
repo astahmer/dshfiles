@@ -3,11 +3,15 @@ import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 import vm from 'node:vm'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { z } from 'zod'
 import type { Plugin } from 'vite'
 import { buildClient, watchClient } from '../src/compiler/index.js'
 import { writePluginFixture } from './plugin-fixture.js'
 
 const temporaryDirectories: string[] = []
+
+const clientPluginShape = z.object({ name: z.string(), inject: z.array(z.string()), apply: z.function({ input: [z.unknown()], output: z.unknown() }) })
+const isClientPlugin = (value: unknown): value is z.infer<typeof clientPluginShape> => clientPluginShape.safeParse(value).success
 
 async function temporaryProject(): Promise<string> {
   const directory = await mkdtemp(resolve(tmpdir(), 'dshx-fixture-'))
@@ -134,14 +138,10 @@ describe('client compiler', () => {
     expect(sheet?.dataset.dshxSharedCss).toBe(marker?.dataset.dshxCss)
     expect(sheet?.textContent).toContain('background: #101b2a')
     const registered: unknown[] = []
-    const clientPlugin = plugin as unknown as {
-      name: string
-      inject: readonly string[]
-      apply(ctx: unknown): unknown
-    }
-    expect(clientPlugin.name).toBe('@dshx/fixture-plugin')
-    expect(clientPlugin.inject).toEqual(['slots', 'connection'])
-    await clientPlugin.apply({
+    if (!isClientPlugin(plugin)) throw new Error('The built client module did not export a Client plugin.')
+    expect(plugin.name).toBe('@dshx/fixture-plugin')
+    expect(plugin.inject).toEqual(['slots', 'connection'])
+    await plugin.apply({
       slots: {
         inject: (_name: string, register: () => unknown) => register(),
         register: (options: unknown, component: unknown) => {
@@ -1283,13 +1283,13 @@ describe('client compiler', () => {
           load: (value: { id: string; factory: (requireModule: (id: string) => unknown) => unknown }) => factories.set(value.id, value.factory),
         },
       },
-      globalThis: {} as Record<string, unknown>,
+      globalThis: {},
     }
-    sandbox.globalThis = sandbox as unknown as Record<string, unknown>
+    sandbox.globalThis = sandbox
     vm.runInNewContext(await readFile(resolve(supplierRoot, 'dist/client.js'), 'utf8'), sandbox)
     vm.runInNewContext(consumerCode, sandbox)
     requireModule('@dshx/consumer')
-    expect((sandbox as unknown as { probe: unknown }).probe).toEqual(['default-from-@dshx/shared-runtime', 'named-from-@dshx/shared-runtime'])
+    expect('probe' in sandbox ? sandbox.probe : undefined).toEqual(['default-from-@dshx/shared-runtime', 'named-from-@dshx/shared-runtime'])
     expect(styles.map(style => [style.dataset.plugin, style.textContent.includes('#123456')])).toEqual([
       ['@dshx/shared-runtime', false],
       ['dshx:shared-css', true],

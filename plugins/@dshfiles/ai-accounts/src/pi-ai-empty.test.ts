@@ -63,7 +63,7 @@ const CONTEXT = {
 
 const complete = async (body: string): Promise<StreamOutcome> => {
   const originalFetch = globalThis.fetch
-  globalThis.fetch = (async () => new Response(body, { status: 200, headers: { 'content-type': 'text/event-stream' } })) as unknown as typeof fetch
+  globalThis.fetch = async () => new Response(body, { status: 200, headers: { 'content-type': 'text/event-stream' } })
   try {
     const api = openAICompletionsApi()
     const stream = api.stream(MODEL, CONTEXT, { apiKey: 'test-key' } as never)

@@ -14,7 +14,7 @@ const USED_PIERRE_THEMES = new Set(['@pierre/theme/pierre-dark', '@pierre/theme/
  */
 const slimShiki = {
   name: 'dshfiles-slim-shiki',
-  enforce: 'pre',
+  enforce: 'pre' as const,
   resolveId: (source: string, importer: string | undefined): string | null => {
     if (importer === undefined || !importer.includes('/@pierre/')) return null
     if (source === 'shiki') return SHIKI_SLIM
@@ -25,9 +25,5 @@ const slimShiki = {
   load: (id: string): string | null => (id === EMPTY_MODULE ? 'export default undefined' : null),
 }
 
-/**
- * Client Vite plugins every plugin-ui consumer needs; call once per build (dshx rejects reused instances).
- * Typed with dshx's own `PluginOption`: the tooling and plugins workspaces install separate vite copies,
- * which TypeScript cannot unify structurally even at the same version.
- */
-export const pluginUiVite = (): DshxPluginOption => [tailwindcss(), { ...slimShiki }] as unknown as DshxPluginOption
+/** Client Vite plugins every plugin-ui consumer needs; call once per build (dshx rejects reused instances). */
+export const pluginUiVite = (): DshxPluginOption => [tailwindcss(), { ...slimShiki }]

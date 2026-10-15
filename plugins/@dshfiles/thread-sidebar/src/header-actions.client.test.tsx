@@ -1,6 +1,9 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import type { SessionListState, SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
+import type { WorkspaceSnapshot } from '@deepseek-ai/dsh-api-workspace-controller/client'
+import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { HeaderThreadActions } from './header-actions.js'
 import { storedPreferences, PREFERENCES_STORAGE_KEY } from './preferences.js'
 import { SidebarStateProvider } from './sidebar-state.js'
@@ -44,33 +47,39 @@ const resizeTitleCluster = (width: number): void => {
 }
 
 const mount = (options?: { archived?: boolean; blank?: boolean; running?: boolean; failPin?: boolean; nativeHeader?: boolean }) => {
-  const session = {
-    id: 's1',
+  const sessionId = SessionId('s1')
+  const session: SessionSummary = {
+    id: sessionId,
     title: 'Thread',
     displayTitle: 'Thread',
     cwd: '/workspace',
     updatedAt: 1,
     running: options?.running ?? false,
     blank: options?.blank ?? false,
+    retainedBy: {},
+  }
+  const sessions: SessionListState = { ids: [sessionId], byId: { [sessionId]: session }, phase: 'ready', projectionsBySession: {} }
+  const workspaces: WorkspaceSnapshot = {
+    items: [],
+    archivedSessionIds: options?.archived ? [sessionId] : [],
+    pinnedSessionIds: [],
+    state: 'idle',
+    phase: 'ready',
+    error: null,
   }
   const pinSession = vi.fn(async () => {
     if (options?.failPin === true) throw new Error('pin failed')
   })
-  const props = {
-    sessionId: 's1',
-    useSessions: <Value,>(select: (state: unknown) => Value) => select({ ids: ['s1'], byId: { s1: session } }),
-    useWorkspaces: <Value,>(select: (state: unknown) => Value) =>
-      select({
-        archivedSessionIds: options?.archived ? ['s1'] : [],
-        pinnedSessionIds: [],
-      }),
+  const headerActionProps: Parameters<typeof HeaderThreadActions>[0] = {
+    sessionId,
+    useSessions: select => select(sessions),
+    useWorkspaces: select => select(workspaces),
     archiveSession: vi.fn(async () => {}),
     unarchiveSession: vi.fn(async () => {}),
     pinSession,
     unpinSession: vi.fn(async () => {}),
-    t: (key: string) => labels[key] ?? key,
+    t: key => labels[key] ?? key,
   }
-  const headerActionProps = props as unknown as Parameters<typeof HeaderThreadActions>[0]
   const actions = (
     <SidebarStateProvider>
       <HeaderThreadActions {...headerActionProps} />

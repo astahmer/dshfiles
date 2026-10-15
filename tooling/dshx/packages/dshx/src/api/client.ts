@@ -147,6 +147,11 @@ function stableJson(value: unknown, seen = new Set<object>()): string {
   }
 }
 
+// Every runtime client method accepts an optional input; the method form relates both input shapes of ApiMethodClient.
+interface ApiQueryMethod<M> {
+  call(input: ApiClientInput<M> | undefined, options: ApiCallOptions): Promise<ApiClientOutput<M>>
+}
+
 type InternalQueryState<T> =
   | { readonly status: 'pending'; readonly fetchStatus: ApiFetchStatus; readonly data: undefined; readonly error: null }
   | { readonly status: 'success'; readonly fetchStatus: ApiFetchStatus; readonly data: T; readonly error: null }
@@ -206,8 +211,8 @@ export function useApiQuery<const Methods extends Record<string, AnyApiMethodDef
           return value + 1
         }),
       invoke: signal => {
-        const call = api[method] as unknown as (value?: unknown, callOptions?: ApiCallOptions) => Promise<ApiClientOutput<Methods[K]>>
-        return call(input, { signal })
+        const query: ApiQueryMethod<Methods[K]> = { call: api[method] }
+        return query.call(input, { signal })
       },
     })
   }, [api, method, fingerprint, revision, options?.enabled, options?.signal])
