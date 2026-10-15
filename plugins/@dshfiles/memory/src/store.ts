@@ -896,6 +896,103 @@ export const openMemoryStore = (options: { readonly path: string; readonly now?:
       .all(...(filter.project === undefined ? [] : [filter.project]), filter.limit)
       .map(threadRow)
 
+  const projectPaths = (): readonly string[] =>
+    database
+      .prepare(
+        `select project from notes
+         union select project from threads
+         union select project from messages
+         union select project from embeddings
+         union select project from docs_words
+         union select project from docs_ids
+         order by project`,
+      )
+      .all()
+      .map(row => String(row['project']))
+
+  const noRowsMoved = () => ({ notes: 0, threads: 0, messages: 0, embeddings: 0, docsWords: 0, docsIds: 0 })
+
+  const rekeyProjects = (input: { readonly mappings: readonly { readonly from: string; readonly to: string }[] }) => {
+    const targetsBySource = new Map<string, string>()
+    for (const mapping of input.mappings) {
+      if (mapping.from === mapping.to) continue
+      const existingTarget = targetsBySource.get(mapping.from)
+      if (existingTarget !== undefined && existingTarget !== mapping.to) throw new Error('A project path cannot be rekeyed to multiple targets.')
+      targetsBySource.set(mapping.from, mapping.to)
+    }
+    const mappings = [...targetsBySource].map(([from, to]) => ({ from, to }))
+    if (mappings.length === 0) return { projects: 0, moved: noRowsMoved(), conflicts: [] }
+
+    const changedProjects = new Set<string>()
+    const result = transaction(() => {
+      const sourcesByTarget = new Map<string, Set<string>>()
+      for (const mapping of mappings) {
+        const sources = sourcesByTarget.get(mapping.to) ?? new Set<string>()
+        sources.add(mapping.from)
+        sourcesByTarget.set(mapping.to, sources)
+      }
+
+      const conflicts: { kind: 'note' | 'thread'; target: string; collisions: number }[] = []
+      for (const [target, sources] of sourcesByTarget) {
+        const projects = [target, ...sources]
+        const placeholders = projects.map(() => '?').join(', ')
+        const noteCollisions = database
+          .prepare(
+            `select count(*) collisions from (
+               select hash from notes where valid = 1 and hash is not null and project in (${placeholders})
+               group by hash having count(*) > 1)`,
+          )
+          .get(...projects)
+        const noteCount = Number(noteCollisions?.['collisions'] ?? 0)
+        if (noteCount > 0) conflicts.push({ kind: 'note', target, collisions: noteCount })
+        const threadCollisions = database
+          .prepare(
+            `select count(*) collisions from (
+               select digest_hash from threads where duplicate_of is null and project in (${placeholders})
+               group by digest_hash having count(*) > 1)`,
+          )
+          .get(...projects)
+        const threadCount = Number(threadCollisions?.['collisions'] ?? 0)
+        if (threadCount > 0) conflicts.push({ kind: 'thread', target, collisions: threadCount })
+      }
+      if (conflicts.length > 0) return { projects: 0, moved: noRowsMoved(), conflicts }
+
+      const moved = noRowsMoved()
+      let projectsMoved = 0
+      for (const mapping of mappings) {
+        const projectRows = {
+          notes: Number(database.prepare('update notes set project = ? where project = ?').run(mapping.to, mapping.from).changes),
+          threads: Number(database.prepare('update threads set project = ? where project = ?').run(mapping.to, mapping.from).changes),
+          messages: Number(database.prepare('update messages set project = ? where project = ?').run(mapping.to, mapping.from).changes),
+          embeddings: Number(database.prepare('update embeddings set project = ? where project = ?').run(mapping.to, mapping.from).changes),
+          docsWords: Number(database.prepare('update docs_words set project = ? where project = ?').run(mapping.to, mapping.from).changes),
+          docsIds: Number(database.prepare('update docs_ids set project = ? where project = ?').run(mapping.to, mapping.from).changes),
+        }
+        if (Object.values(projectRows).some(count => count > 0)) {
+          projectsMoved++
+          changedProjects.add(mapping.from)
+          changedProjects.add(mapping.to)
+          moved.notes += projectRows.notes
+          moved.threads += projectRows.threads
+          moved.messages += projectRows.messages
+          moved.embeddings += projectRows.embeddings
+          moved.docsWords += projectRows.docsWords
+          moved.docsIds += projectRows.docsIds
+        }
+      }
+      return { projects: projectsMoved, moved, conflicts }
+    })
+
+    for (const project of changedProjects) changed(project)
+    return result
+  }
+
+  const rekeyProject = (input: { readonly from: string; readonly to: string }) => ({
+    from: input.from,
+    to: input.to,
+    ...rekeyProjects({ mappings: [input] }),
+  })
+
   const projects = (): readonly { readonly project: string; readonly threads: number; readonly notes: number }[] =>
     database
       .prepare(
@@ -1007,6 +1104,9 @@ export const openMemoryStore = (options: { readonly path: string; readonly now?:
     listNotes,
     noteHistory,
     listThreads,
+    projectPaths,
+    rekeyProject,
+    rekeyProjects,
     projects,
     usageByDay,
     frozenBlock,

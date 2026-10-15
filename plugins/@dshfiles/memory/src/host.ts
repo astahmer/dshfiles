@@ -1,3 +1,5 @@
+import { isAbsolute } from 'node:path'
+
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-agent'
 import { dshHomePath } from '@deepseek-ai/dsh-home-paths'
@@ -26,6 +28,7 @@ import { openMemoryStore, type MemoryStore, type NoteRecord, type StoredThread }
 
 let runtime: MemoryRuntime | undefined
 let store: MemoryStore | undefined
+let projectNormalization: Promise<void> = Promise.resolve()
 let failure: string | null = null
 let settingsScope: SettingsScope<MemorySettings> | undefined
 
@@ -95,7 +98,10 @@ const hostServices = (ctx: Context): MemoryServices => {
     }),
   })
   return {
-    projectPath: projectPathFor,
+    projectPath: async cwd => {
+      await projectNormalization
+      return projectPathFor(cwd)
+    },
     listSessions: async () => (await sessionQuery().listSessions()).map(record => ({ header: record.header, live: record.live })),
     readSession: async sessionId => {
       const log = await sessionQuery().readSession(SessionId(sessionId))
@@ -330,6 +336,7 @@ const callerOf = (caller: ApiCaller): Caller => {
 
 const withRuntime = async (body: (active: MemoryRuntime) => Promise<string>): Promise<{ readonly summary: string }> => {
   if (!runtime) throw new Error('Memory is not active in this DSH host (setting dshfiles-memory.enabled, or the plugin failed to start).')
+  await projectNormalization
   return { summary: await body(runtime) }
 }
 
@@ -338,12 +345,16 @@ const panelApi = memoryApi.host({
   read: ({ input, caller }) => withRuntime(active => active.read(callerOf(caller), input)),
   note: ({ input, caller }) => withRuntime(active => active.note(callerOf(caller), input)),
   usage: () => usage(),
-  projects: () => requireStore().projects(),
+  projects: async () => {
+    await projectNormalization
+    return requireStore().projects()
+  },
   startBlock: ({ input }) => {
     if (!runtime) throw new Error('Memory is not active in this DSH host (setting dshfiles-memory.enabled, or the plugin failed to start).')
     return runtime.previewStartBlock(input.cwd)
   },
-  notes: ({ input }) => {
+  notes: async ({ input }) => {
+    await projectNormalization
     const filter = notesFilter.parse(input)
     return requireStore()
       .listNotes({
@@ -387,13 +398,31 @@ const panelApi = memoryApi.host({
     const parsed = z.object({ id: noteId, rating: z.enum(['up', 'down']).nullable() }).parse(input)
     return { rated: requireStore().rateCitation(parsed) }
   },
-  threads: ({ input }) => {
+  threads: async ({ input }) => {
+    await projectNormalization
     const project = anyWhenEmpty(4_096).parse(input.project)
     return requireStore().listThreads({ project, limit: 300 }).map(panelThread)
   },
 })
 
 const dayMs = 86_400_000
+
+const normalizeProjectPaths = async (opened: MemoryStore) => {
+  const mappings: { from: string; to: string }[] = []
+  for (const from of opened.projectPaths()) {
+    if (!isAbsolute(from)) continue
+    const to = await projectPathFor(from)
+    if (to !== from) mappings.push({ from, to })
+  }
+  const result = opened.rekeyProjects({ mappings })
+  return {
+    projects: result.projects,
+    notes: result.moved.notes,
+    threads: result.moved.threads,
+    messages: result.moved.messages,
+    conflicts: result.conflicts.length,
+  }
+}
 
 const setup = (ctx: Context): void => {
   const logger = ctx.logger('memory')
@@ -407,6 +436,21 @@ const setup = (ctx: Context): void => {
   }
   store = opened
   failure = null
+  const normalization = normalizeProjectPaths(opened)
+    .then(result => {
+      if (result.projects > 0)
+        logger.info(
+          'memory: normalized %d JJ workspace path(s): %d digest(s), %d note(s), %d indexed message(s)',
+          result.projects,
+          result.threads,
+          result.notes,
+          result.messages,
+        )
+      if (result.conflicts > 0)
+        logger.warn('memory: left %d JJ workspace path(s) separate due to duplicate note or digest hashes', result.conflicts)
+    })
+    .catch(() => logger.warn('memory: JJ workspace memory backfill failed; remaining entries stay separate'))
+  projectNormalization = normalization
   const active = createMemoryRuntime({ services: hostServices(ctx), store: opened, settings: currentSettings, logger })
   runtime = active
 
@@ -455,7 +499,8 @@ const setup = (ctx: Context): void => {
       active.stop()
       if (runtime === active) runtime = undefined
       if (store === opened) store = undefined
-      opened.close()
+      if (projectNormalization === normalization) projectNormalization = Promise.resolve()
+      void normalization.finally(() => opened.close())
     }
   }, 'memory runtime')
 }

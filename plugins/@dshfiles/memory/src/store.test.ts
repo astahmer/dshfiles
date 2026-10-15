@@ -61,6 +61,94 @@ describe('memory store', () => {
     expect(store.usage().notes).toBe(1)
   })
 
+  it('rekeys workspace memory rows to their JJ project and is idempotent', () => {
+    const store = open()
+    const from = '/p/project-threads/thread-a'
+    const to = '/p/project'
+    const storedNote = store.addNote(note(from, 'Repository uses a stable checkpoint.')).note
+    store.putThread(digest('session-a', from, 'Workspace digest includes a checkpoint.'))
+    store.indexMessages({
+      thread: 'session-a',
+      project: from,
+      throughSeq: 1,
+      messages: [{ seq: 1, role: 'user', text: 'Review the checkpoint before landing.', at: start }],
+    })
+    store.putEmbedding({ kind: 'thread', ref: 'session-a', project: from, model: 'test-model', vector: new Float32Array([0.25, 0.75]) })
+
+    expect(store.projectPaths()).toEqual([from])
+    expect(store.rekeyProject({ from, to })).toMatchObject({
+      from,
+      to,
+      moved: { notes: 1, threads: 1, messages: 1, embeddings: 1, docsWords: 2, docsIds: 2 },
+      conflicts: [],
+    })
+    expect(store.projectPaths()).toEqual([to])
+    expect(store.note(storedNote.id)?.project).toBe(to)
+    expect(store.thread('session-a')?.project).toBe(to)
+    const hits = store.search({ query: 'checkpoint', projects: [to], limit: 10 })
+    expect(hits).toHaveLength(3)
+    expect(hits.every(hit => hit.project === to)).toBe(true)
+    expect(store.rekeyProject({ from, to }).moved).toEqual({ notes: 0, threads: 0, messages: 0, embeddings: 0, docsWords: 0, docsIds: 0 })
+  })
+
+  it('includes invalid note history in project-path backfills', () => {
+    const store = open()
+    const from = '/p/project-threads/forgotten'
+    const to = '/p/project'
+    const oldNote = store.addNote(note(from, 'An obsolete project setting.')).note
+    store.forgetNote({ id: oldNote.id, reason: 'replaced' })
+
+    expect(store.projects()).toEqual([])
+    expect(store.projectPaths()).toEqual([from])
+    expect(store.rekeyProject({ from, to }).moved.notes).toBe(1)
+    expect(store.noteHistory(oldNote.id).map(entry => entry.project)).toEqual([to])
+    expect(store.projectPaths()).toEqual([to])
+  })
+
+  it('rejects all project rekeys when source paths collide with each other', () => {
+    const store = open()
+    const unique = '/p/project-threads/unique'
+    const first = '/p/project-threads/first'
+    const second = '/p/project-threads/second'
+    const to = '/p/project'
+    store.putThread(digest('session-unique', unique, 'Unique digest.'))
+    store.addNote(note(first, 'Duplicate history across workspaces.'))
+    store.addNote(note(second, 'Duplicate history across workspaces.'))
+
+    const result = store.rekeyProjects({ mappings: [
+      { from: unique, to },
+      { from: first, to },
+      { from: second, to },
+    ] })
+
+    expect(result.projects).toBe(0)
+    expect(result.conflicts).toEqual([{ kind: 'note', target: to, collisions: 1 }])
+    expect(store.thread('session-unique')?.project).toBe(unique)
+    expect(store.projectPaths()).toEqual([first, second, unique])
+  })
+
+  it('keeps note and digest collisions separate during project rekeying', () => {
+    const store = open()
+    const from = '/p/project-threads/thread-a'
+    const to = '/p/project'
+    const sourceNote = store.addNote(note(from, 'Shared setup requirement.')).note
+    store.addNote(note(to, 'Shared setup requirement.'))
+    store.putThread(digest('session-source', from, 'Same digest.'))
+    store.putThread(digest('session-target', to, 'Same digest.'))
+
+    const result = store.rekeyProject({ from, to })
+
+    expect(result.moved).toEqual({ notes: 0, threads: 0, messages: 0, embeddings: 0, docsWords: 0, docsIds: 0 })
+    expect(result.conflicts).toEqual(
+      expect.arrayContaining([
+        { kind: 'note', target: to, collisions: 1 },
+        { kind: 'thread', target: to, collisions: 1 },
+      ]),
+    )
+    expect(store.note(sourceNote.id)?.project).toBe(from)
+    expect(store.thread('session-source')?.project).toBe(from)
+  })
+
   it('supersedes a note on update and hides it on forget, keeping the history', () => {
     const store = open()
     const original = store.addNote(note('/p/x', 'Retention default is 48 hours.')).note
