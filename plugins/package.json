@@ -9,7 +9,7 @@
     "test": "pnpm --dir .. exec turbo run test --filter='./plugins/@dshfiles/*' -- --testTimeout=30000",
     "build": "pnpm --dir .. exec turbo run build --filter='./plugins/@dshfiles/*'",
     "check": "pnpm run contract && pnpm run build && pnpm run typecheck && pnpm run test",
-    "knip": "pnpm --dir ../tooling/dshx exec knip --directory ../../plugins --config knip.jsonc --reporter compact"
+    "knip": "pnpm --dir .. run knip --workspace plugins --workspace 'plugins/@dshfiles/*'"
   },
   "devDependencies": {
     "@types/node": "22.20.5",

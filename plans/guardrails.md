@@ -126,7 +126,26 @@ rule to `error` once those land.
       it re-resolves 57 dsh peer variants (the lockfile fails `pnpm dedupe
       --check` on `main`); `@types/node` drifts (catalog 22.19.20, 40 manifests
       22.20.5), plus ai-accounts' `typescript 5.9.3` and `yaml 2.9.1`.
-- [ ] 8. `chore(knip)`: root config, added to `check`.
+- [x] 8. `chore(knip)`: root config, added to `check`.
+      One root `knip.jsonc` for root, desktop, plugins and dshx (`plugins/knip.jsonc`
+      and `tooling/dshx/knip.jsonc` folded in); production entries carry `!`.
+      `pnpm knip` runs it and `check:green` ends with it, so any new finding
+      fails `pnpm check`; dshx `deps:check` and `plugins` `knip` filter the same
+      config. Findings at adoption: 41. Fixed: unused `write-file-atomic` (2),
+      `zod` (home), `@testing-library/react` (2), `dsh-client-ui-session`
+      (command-palette), dead `mcp-servers/src/confirmed-action.ts`; listed the
+      unlisted `dsh-llm-retry` (ai-accounts), `jsdom` (2) and `react-dom`.
+      Entries for hand-run bench and scripts (memory, optmem, usage); fixtures
+      ignored. Recorded, not fixed:
+      - jujutsu `src/locales.ts`: a dictionary the client never registers.
+      - devDependency copies of peers no code imports: activity-timeline
+        `dsh-subprocess`, settings-shell `dsh-client-ui-plugin-manager`
+        (editor/secret-catalog/settings-shell inject theirs by name).
+      - root `@deepseek-ai/cordis` and `dsh-typert-generator`: unreferenced, but
+        removing them re-resolves dsh peer variants; do it with `pnpm dedupe`.
+      - memory's `bench` script points at a missing `bench/scale.mjs`.
+      - `knip --production` still lists 26 test-support files (e2e support,
+        `src/testing/*`, vite helpers) that need production ignores.
 - [ ] 9. `chore(tsconfig)`: shared plugin base.
 - [ ] 10. `test(e2e)`: Hono fake Command Code, then the hub fake.
 - [ ] 11. emilint `feat(antislop)`: `no-export-bag`; re-vendor as warn.

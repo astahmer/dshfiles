@@ -1,0 +1,116 @@
+{
+  // Run with --no-config-hints: the plugin glob shares entries and ignores that some plugins do not need.
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "include": ["files", "dependencies", "unlisted", "binaries", "unresolved", "catalog", "catalogReferences"],
+  // playwright runs from tooling/dshx (`pnpm --dir tooling/dshx exec playwright`), where it is installed.
+  // jujutsu's locales.ts is a dictionary its client does not register yet (plans/guardrails.md).
+  "ignore": ["plugins/@dshfiles/jujutsu/src/locales.ts"],
+  "ignoreBinaries": ["dsh", "jj", "knip", "playwright"],
+  "workspaces": {
+    ".": {
+      "entry": ["scripts/*.{ts,mjs}!", "scripts/dsh-lkg/*.mjs!"],
+      // oxlint runs through `pnpm exec` inside scripts/lint-ratchet.ts. Cordis and the typert generator are
+      // unreferenced, but removing them re-resolves dsh peer variants in the undeduped lockfile (plans/guardrails.md).
+      "ignoreDependencies": ["oxlint", "@deepseek-ai/cordis", "@deepseek-ai/dsh-typert-generator"],
+    },
+    "apps/desktop": {},
+    "plugins": {
+      "entry": ["scripts/*.ts!"],
+    },
+    "plugins/@dshfiles/*": {
+      "entry": ["dshx.config.ts", "src/{host,client,client-entry,index}.{ts,tsx}!"],
+      // dshx.config.ts names shared-runtime as a string (`client.shared`); dsh is the runtime the bundles load into.
+      "ignoreDependencies": ["@dshfiles/shared-runtime", "@deepseek-ai/dsh"],
+    },
+    "plugins/@dshfiles/agent-communication": {
+      "entry": ["dshx.config.ts", "src/{host,client,client-entry,index}.{ts,tsx}!"],
+      // dshx's communication module, bundled into the Host entry, imports write-file-atomic at runtime.
+      "ignoreDependencies": ["@dshfiles/shared-runtime", "@deepseek-ai/dsh", "write-file-atomic"],
+    },
+    "plugins/@dshfiles/agent-questions": {
+      // Fixtures are plugin trees loaded from disk, not modules.
+      "entry": ["dshx.config.ts", "src/{host,client,client-entry,index}.{ts,tsx}!"],
+      "ignore": ["tests/fixtures/**"],
+      "ignoreDependencies": ["@dshfiles/shared-runtime", "@deepseek-ai/dsh"],
+    },
+    "plugins/@dshfiles/ai-accounts": {
+      // Fixtures are plugin trees loaded from disk, not modules.
+      "entry": ["dshx.config.ts", "src/{host,client,client-entry,index}.{ts,tsx}!"],
+      "ignore": ["tests/fixtures/**"],
+      "ignoreDependencies": ["@dshfiles/shared-runtime", "@deepseek-ai/dsh"],
+    },
+    "plugins/@dshfiles/memory": {
+      // Benchmarks run by hand.
+      "entry": ["dshx.config.ts", "src/{host,client,client-entry,index}.{ts,tsx}!", "bench/*.{ts,mjs}"],
+      "ignoreDependencies": ["@dshfiles/shared-runtime", "@deepseek-ai/dsh"],
+    },
+    "plugins/@dshfiles/optmem": {
+      // Benchmarks and scripts run by hand; bench scenarios load by path. Fixtures and the probe are project trees.
+      "entry": ["dshx.config.ts", "src/{host,client,client-entry,index}.{ts,tsx}!", "bench/*.mjs", "bench/scenarios/*.mjs", "scripts/*.mjs"],
+      "ignore": ["bench/fixtures/**", "bench/probe/**"],
+      "ignoreDependencies": ["@dshfiles/shared-runtime", "@deepseek-ai/dsh"],
+    },
+    "plugins/@dshfiles/usage": {
+      // Scripts run by hand.
+      "entry": ["dshx.config.ts", "src/{host,client,client-entry,index}.{ts,tsx}!", "scripts/*.mjs"],
+      "ignoreDependencies": ["@dshfiles/shared-runtime", "@deepseek-ai/dsh"],
+    },
+    "plugins/@dshfiles/activity-timeline": {
+      // devDependency copies of peerDependencies the Host provides; listed in plans/guardrails.md for review.
+      "entry": ["dshx.config.ts", "src/{host,client,client-entry,index}.{ts,tsx}!"],
+      "ignoreDependencies": ["@dshfiles/shared-runtime", "@deepseek-ai/dsh", "@deepseek-ai/dsh-subprocess"],
+    },
+    "plugins/@dshfiles/editor": {
+      // devDependency copies of peerDependencies the Host provides; listed in plans/guardrails.md for review.
+      "entry": ["dshx.config.ts", "src/{host,client,client-entry,index}.{ts,tsx}!"],
+      "ignoreDependencies": ["@dshfiles/shared-runtime", "@deepseek-ai/dsh", "@deepseek-ai/dsh-client-ui-workspace"],
+    },
+    "plugins/@dshfiles/secret-catalog": {
+      // devDependency copies of peerDependencies the Host provides; listed in plans/guardrails.md for review.
+      "entry": ["dshx.config.ts", "src/{host,client,client-entry,index}.{ts,tsx}!"],
+      "ignoreDependencies": ["@dshfiles/shared-runtime", "@deepseek-ai/dsh", "@deepseek-ai/dsh-api-remotes"],
+    },
+    "plugins/@dshfiles/settings-shell": {
+      // devDependency copies of peerDependencies the Host provides; listed in plans/guardrails.md for review.
+      "entry": ["dshx.config.ts", "src/{host,client,client-entry,index}.{ts,tsx}!"],
+      "ignoreDependencies": ["@dshfiles/shared-runtime", "@deepseek-ai/dsh", "@deepseek-ai/dsh-api-remotes", "@deepseek-ai/dsh-client-ui-plugin-manager"],
+    },
+    "plugins/@dshfiles/shared-runtime": {
+      "entry": ["dshx.config.ts", "src/client.ts!"],
+      // Every dependency is provided to consumers by name through dshx.config.ts `sharedRuntime.provide`.
+      "ignoreDependencies": [".*"],
+    },
+    "tooling/dshx": {
+      "entry": [
+        "e2e/support/steps.ts",
+        "e2e/support/plugin-journeys/**/*.ts",
+        "e2e/support/fake-mcp-server.mjs",
+        "e2e/support/fake-secret-cli.mjs",
+        "scripts/smoke-client-slot.mjs",
+        "scripts/smoke-multi-host.mjs",
+        "scripts/smoke-multi-host-ssh.mjs",
+      ],
+    },
+    "tooling/dshx/packages/dshx": {
+      "entry": [
+        "src/index.ts!",
+        "src/config/index.ts!",
+        "src/host/index.ts!",
+        "src/client/index.ts!",
+        "src/client/env.ts!",
+        "src/api/index.ts!",
+        "src/settings/index.ts!",
+        "src/conversation/index.ts!",
+        "src/tooling/index.ts!",
+        "src/platform/index.ts!",
+        "src/communication/index.ts!",
+        "src/testing/index.ts!",
+        "src/cli/bin.ts!",
+        "src/cli/index.ts!",
+        "src/compiler/host/index.ts!",
+        "scripts-mh-workspace-probe.mjs",
+      ],
+    },
+    "tooling/dshx/packages/create-dshx": {},
+  },
+}
