@@ -1,6 +1,6 @@
 import type { ComposerBlocks } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
-import { waitForWorkspaceToggle, type WorkspaceToggleActor } from './workspace-toggle-machine.js'
+import { WorkspaceToggle, type WorkspaceToggleActor } from './workspace-toggle-machine.js'
 
 type ComposerState = {
   readonly draft: string
@@ -48,7 +48,7 @@ export const deferWorkspaceSubmit = async (input: {
     input.blocks.set(input.source.sessionId, undefined)
   }
   try {
-    const outcome = await waitForWorkspaceToggle({ actor: input.actor, signal: input.signal })
+    const outcome = await WorkspaceToggle.waitForWorkspaceToggle({ actor: input.actor, signal: input.signal })
     if (input.signal.aborted) return 'cancelled'
     if (outcome.error !== null) {
       const current = input.current()
