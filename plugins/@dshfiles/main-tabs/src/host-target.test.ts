@@ -1,10 +1,23 @@
 import { describe, expect, it } from 'vitest'
-import { readHostView } from './host-target.js'
+import { createThreadWorkspaceResolver, readHostView } from './host-target.js'
 
 const workspaces = [
   { workspaceId: 'w-sample', path: '/projects/sample', sessionIds: ['main'] },
   { workspaceId: 'w-thread', path: '/projects/sample-threads/fix-bug', sessionIds: ['jj-thread'] },
 ]
+
+describe('createThreadWorkspaceResolver', () => {
+  it('resolves a thread workspace to its project, including subagents', () => {
+    const resolveWorkspaceId = createThreadWorkspaceResolver({
+      sessions: [{ id: 'jj-thread' }, { id: 'sub', parentId: 'jj-thread' }, { id: 'orphan', parentId: 'missing' }],
+      workspaces,
+    })
+
+    expect(resolveWorkspaceId('jj-thread')).toBe('w-sample')
+    expect(resolveWorkspaceId('sub')).toBe('w-sample')
+    expect(resolveWorkspaceId('orphan')).toBeUndefined()
+  })
+})
 
 describe('readHostView', () => {
   it('reports a selected global panel without a project', () => {

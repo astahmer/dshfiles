@@ -11,6 +11,7 @@ Feature: Main view tabs
     Then Jujutsu replaced the Workbench preview tab
     When the Jujutsu tab is kept, the Workbench is opened again and a thread is started
     Then each of them has its own tab and the thread tab is active
+    And the thread tab context menu copies its ID and clean link
     When the Workbench tab is pinned and the thread tab is dragged before Jujutsu
     Then the pinned tab leads and the thread tab moved
     When the Jujutsu tab is closed with a middle click and other tabs are closed from the thread tab

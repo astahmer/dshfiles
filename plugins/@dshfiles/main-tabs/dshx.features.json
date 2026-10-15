@@ -5,8 +5,8 @@
     {
       "id": "main-view-tabs",
       "title": "Browser-like tabs above the main view",
-      "summary": "Every thread or global panel shown in the main view opens or focuses a tab above it. The strip looks like DSH's own right-panel tabs (28px pills, hairline separators, a close cross over a faded title end). Tabs close with × or a middle click, reorder by drag, pin to the start, close others or to the right from their context menu, scroll or list in a dropdown when they overflow, and show working, needs-you and unread dots on thread tabs. Opening from outside the strip uses a VS Code-style preview tab by default; double-clicking a sidebar thread keeps its tab open.",
-      "reach": ["click button \"Workbench\"", "expect tab \"Workbench\""],
+      "summary": "Every thread or global panel shown in the main view opens or focuses a tab above it. The strip looks like DSH's own right-panel tabs (28px pills, hairline separators, a close cross over a faded title end). Tabs close with × or a middle click, reorder by drag, pin to the start, close others or to the right from their context menu, scroll or list in a dropdown when they overflow, and show working, needs-you and unread dots on thread tabs. Thread tab menus also copy the thread ID or a clean deep link. Opening from outside the strip uses a VS Code-style preview tab by default; double-clicking a sidebar thread keeps its tab open.",
+      "reach": ["seed tool-call-thread", "rightclick tab \"*\"", "expect menuitem \"Copy thread ID\"", "expect menuitem \"Copy thread link\""],
       "surfaces": ["client", "integration", "storage", "settings"],
       "configuration": [
         {
@@ -142,6 +142,36 @@
           "id": "main-tabs.strip-unit-thread-status",
           "file": "plugins/@dshfiles/main-tabs/src/tab-strip.test.ts",
           "testName": "shows the most urgent thread state: needs you, then working, then unread"
+        },
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.thread-copy-menu",
+          "file": "plugins/@dshfiles/main-tabs/src/tab-strip.client.test.tsx",
+          "testName": "offers copy actions in thread tab menus"
+        },
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.panel-copy-menu",
+          "file": "plugins/@dshfiles/main-tabs/src/tab-strip.client.test.tsx",
+          "testName": "omits thread copy actions from panel tab menus"
+        },
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.thread-copy-feedback",
+          "file": "plugins/@dshfiles/main-tabs/src/tab-strip.client.test.tsx",
+          "testName": "announces clipboard failures accessibly"
+        },
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.thread-link-workspace",
+          "file": "plugins/@dshfiles/main-tabs/src/host-target.test.ts",
+          "testName": "resolves a thread workspace to its project, including subagents"
+        },
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.thread-link-clean",
+          "file": "plugins/@dshfiles/main-tabs/src/thread-link.test.ts",
+          "testName": "copies a clean thread link with its workspace"
         }
       ]
     },

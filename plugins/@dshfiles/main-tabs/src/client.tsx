@@ -14,7 +14,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalS
 import { z } from 'zod'
 import { createPortal } from 'react-dom'
 import { closeActiveTabShortcutBinding, closeActiveTabShortcutDefaults } from './close-active-tab-shortcut.js'
-import { readHostView } from './host-target.js'
+import { createThreadWorkspaceResolver, readHostView } from './host-target.js'
 import { MAIN_TABS_LOCALE_NAMESPACE, mainTabsLocale } from './locales.js'
 import { mainTabsSettings } from './settings.js'
 import { PanelIcon, StartPage, type StartSection } from './start-page.js'
@@ -200,6 +200,11 @@ export default defineClient({
           )
           const byId = props.useSessions(state => state.byId)
           const sessions = useMemo(() => new Map<string, SessionSummary>(Object.values(byId).map(session => [session.id, session])), [byId])
+          const workspaceItems = props.useWorkspaces(state => state.items)
+          const workspaceForThread = useMemo(
+            () => createThreadWorkspaceResolver({ sessions: Object.values(byId), workspaces: workspaceItems }),
+            [byId, workspaceItems],
+          )
           const statuses = props.useSessionStatus(state => state)
           // Attention is Host-owned now, so the dot follows the same record the sidebar acknowledges.
           const attention = useApiQuery(threadSidebarAttentionApi, 'state')
@@ -238,7 +243,8 @@ export default defineClient({
                 status: null,
               }
             }
-            const session = sessions.get(tab.target.sessionId)
+            const sessionId = tab.target.sessionId
+            const session = sessions.get(sessionId)
             const status = session === undefined ? undefined : statuses.get(session.id)
             const tabStatus = threadTabStatus({
               needsYou: status?.pendingInteraction !== undefined,
@@ -246,7 +252,16 @@ export default defineClient({
               unread: session !== undefined && attentionSessionIds.has(session.id),
             })
             const title = session?.title ?? (session === undefined || session.blank ? translate('untitledThread') : session.displayTitle)
-            return { ...base, kind: 'thread', title, available: session !== undefined, status: tabStatus }
+            const workspaceId = workspaceForThread(sessionId)
+            const threadTab = {
+              ...base,
+              kind: 'thread',
+              sessionId,
+              title,
+              available: session !== undefined,
+              status: tabStatus,
+            } satisfies TabView
+            return workspaceId === undefined ? threadTab : { ...threadTab, workspaceId }
           })
 
           const showStrip = host !== null && snapshot.matches('on')

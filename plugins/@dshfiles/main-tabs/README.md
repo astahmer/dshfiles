@@ -8,7 +8,7 @@ This is an owned DSH bundle built with dshx (no port: nothing upstream does this
 
 - **New tab**: "+" after the last tab, or Mod+T (Web: Mod+Alt+T), opens a compact _Start_ tab: New thread and the five most recent threads (running ones first) sit beside the main panels and Settings in wide panes, and stack in one column in narrow panes. Arrow keys, Home/End and Enter move through the list. A picked thread or panel takes the Start tab's place (or focuses its existing tab); New thread and Settings close it. The Start tab is not saved.
 - **Open**: anything shown in the main view gets a tab. By default it is a _preview_ tab (italic) that the next thing you open replaces, VS Code style; double-click it, pin it or drag it to keep it.
-- **Close**: × on the tab, a middle click, or Delete on a focused tab. Closing the active tab shows its right neighbour. The context menu adds _Close other tabs_ and _Close tabs to the right_; pinned tabs survive both.
+- **Close**: × on the tab, a middle click, or Delete on a focused tab. Closing the active tab shows its right neighbour. The context menu adds _Close other tabs_ and _Close tabs to the right_; pinned tabs survive both. Thread tabs also copy their ID or a clean deep link from this menu.
 - **Pin**: from the context menu. Pinned tabs lead the strip and have no ×.
 - **Reorder**: drag a tab. Pinned and unpinned tabs stay in their own groups.
 - **Overflow**: the strip scrolls (mouse wheel works) and a ▾ button lists every tab once they do not fit.

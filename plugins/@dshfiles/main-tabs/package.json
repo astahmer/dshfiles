@@ -47,6 +47,7 @@
     "@deepseek-ai/dsh-client-ui-sidebar": "catalog:",
     "@deepseek-ai/dsh-client-ui-slots": "catalog:",
     "@deepseek-ai/dsh-client-ui-workspace": "catalog:",
+    "@testing-library/react": "catalog:",
     "@types/node": "22.20.5",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",

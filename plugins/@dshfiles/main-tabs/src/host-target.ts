@@ -26,6 +26,31 @@ const owningProject = (workspace: WorkspaceRow, byPath: ReadonlyMap<string, Work
   return byPath.get(parent.slice(0, -THREADS_DIRECTORY_SUFFIX.length)) ?? workspace
 }
 
+/** Resolve a thread or subagent to its owning project workspace, when one is known. */
+export const createThreadWorkspaceResolver = (input: {
+  readonly sessions: readonly Pick<SessionRow, 'id' | 'parentId'>[]
+  readonly workspaces: readonly WorkspaceRow[]
+}): ((sessionId: string) => string | undefined) => {
+  const byPath = new Map(input.workspaces.map(workspace => [workspace.path, workspace]))
+  const bySession = new Map<string, string>()
+  for (const workspace of input.workspaces) {
+    const project = owningProject(workspace, byPath)
+    for (const sessionId of workspace.sessionIds) bySession.set(sessionId, project.workspaceId)
+  }
+  const parents = new Map(input.sessions.map(session => [session.id, session.parentId]))
+  return (sessionId: string): string | undefined => {
+    const visited = new Set<string>()
+    let cursor: string | undefined = sessionId
+    while (cursor !== undefined && !visited.has(cursor)) {
+      visited.add(cursor)
+      const projectId = bySession.get(cursor)
+      if (projectId !== undefined) return projectId
+      cursor = parents.get(cursor)
+    }
+    return undefined
+  }
+}
+
 /**
  * What the main view shows: a global panel, the Conversation of the Session the main view retains, or nothing (the
  * New thread screen). Threads carry the project they belong to, following subagents up to their parent.
@@ -38,18 +63,6 @@ export const readHostView = (input: {
   if (input.activePanelId !== null) return { target: { kind: 'panel', panelId: input.activePanelId }, projectId: null }
   const current = input.sessions.find(session => (session.retainedBy.mainView ?? 0) > 0)
   if (current === undefined) return { target: null, projectId: null }
-  const byPath = new Map(input.workspaces.map(workspace => [workspace.path, workspace]))
-  const bySession = new Map(
-    input.workspaces.flatMap(workspace => workspace.sessionIds.map(sessionId => [sessionId, owningProject(workspace, byPath)] as const)),
-  )
-  const parents = new Map(input.sessions.map(session => [session.id, session.parentId]))
-  const visited = new Set<string>()
-  let cursor: string | undefined = current.id
-  while (cursor !== undefined && !visited.has(cursor)) {
-    visited.add(cursor)
-    const project = bySession.get(cursor)
-    if (project !== undefined) return { target: { kind: 'thread', sessionId: current.id }, projectId: project.workspaceId }
-    cursor = parents.get(cursor)
-  }
-  return { target: { kind: 'thread', sessionId: current.id }, projectId: null }
+  const projectId = createThreadWorkspaceResolver({ sessions: input.sessions, workspaces: input.workspaces })(current.id) ?? null
+  return { target: { kind: 'thread', sessionId: current.id }, projectId }
 }

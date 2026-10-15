@@ -116,6 +116,34 @@ Then('each of them has its own tab and the thread tab is active', async ({ page 
   await tab(page, 'tabs thread').dblclick()
 })
 
+Then('the thread tab context menu copies its ID and clean link', async ({ page }: { page: Page }) => {
+  const threadTab = strip(page).locator('[data-tab-id^="thread:"]').first()
+  const threadTabId = await threadTab.getAttribute('data-tab-id')
+  if (threadTabId === null) throw new Error('The active thread tab has no session ID.')
+  const sessionId = threadTabId.slice('thread:'.length)
+  const origin = new URL(page.url()).origin
+  await page.context().grantPermissions(['clipboard-read', 'clipboard-write'], { origin })
+
+  await threadTab.click({ button: 'right' })
+  await page.getByRole('menuitem', { name: 'Copy thread ID', exact: true }).click()
+  await recordAssertion(page, 'main-tabs-context-menu-copies-thread-id', async () => {
+    await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(sessionId)
+    await expect(page.getByRole('status').filter({ hasText: /^Thread ID copied\.$/ })).toHaveText('Thread ID copied.')
+  })
+
+  await threadTab.click({ button: 'right' })
+  await page.getByRole('menuitem', { name: 'Copy thread link', exact: true }).click()
+  const copiedLink = new URL(await page.evaluate(() => navigator.clipboard.readText()))
+  await recordAssertion(page, 'main-tabs-context-menu-copies-clean-thread-link', async () => {
+    expect(copiedLink.origin).toBe(origin)
+    expect(copiedLink.searchParams.get('thread')).toBe(sessionId)
+    expect(copiedLink.searchParams.has('token')).toBe(false)
+    expect(copiedLink.hash).toBe('')
+    expect([...copiedLink.searchParams.keys()].every(key => key === 'thread' || key === 'workspace')).toBe(true)
+    await expect(page.getByRole('status').filter({ hasText: /^Thread link copied\.$/ })).toHaveText('Thread link copied.')
+  })
+})
+
 When('the Workbench tab is pinned and the thread tab is dragged before Jujutsu', async ({ page }: { page: Page }) => {
   await tab(page, 'Workbench').click({ button: 'right' })
   await page.getByRole('menuitem', { name: 'Pin tab', exact: true }).click()
