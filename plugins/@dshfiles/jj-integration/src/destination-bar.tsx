@@ -110,6 +110,13 @@ export const startWorkspaceToggle = (input: {
       return blankAndExclusive ? spare : undefined
     },
     keepSpare: (key, spare) => void storedSpares.set({ ...storedSpares.get(), [key]: spare }),
+    consumeSpare: (key, spare) => {
+      const stored = storedSpares.get()
+      if (stored[key]?.workspaceId !== spare.workspaceId) return
+      const next = { ...stored }
+      delete next[key]
+      void storedSpares.set(next)
+    },
     generateName: randomThreadName,
     preparationTimeoutReason: () => t('workspacePreparationTimedOut'),
   }

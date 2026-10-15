@@ -26,6 +26,7 @@ export interface WorkspaceToggleClient {
   /** A thread workspace this project left unused for this bookmark, with no other Session assigned to it. */
   readonly findSpare: (key: string) => SpareWorkspace | undefined
   readonly keepSpare: (key: string, spare: SpareWorkspace) => void
+  readonly consumeSpare: (key: string, spare: SpareWorkspace) => void
   readonly generateName: () => string
   readonly preparationTimeoutReason: () => string
 }
@@ -178,6 +179,7 @@ export const workspaceToggleMachine = setup({
       await client.listed(target.workspaceId)
       signal.throwIfAborted()
       await client.open(target.workspaceId, signal)
+      if (pending.spare !== null) client.consumeSpare(spareKey(request.projectWorkspaceId, request.base), pending.spare)
       return target
     }),
   },

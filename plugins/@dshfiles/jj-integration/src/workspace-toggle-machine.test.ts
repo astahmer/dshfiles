@@ -28,6 +28,9 @@ const startToggle = (overrides: Partial<WorkspaceToggleClient> = {}) => {
     open: async workspaceId => void calls.push(`open ${workspaceId}`),
     findSpare: key => spares.get(key),
     keepSpare: (key, spare) => void spares.set(key, spare),
+    consumeSpare: (key, spare) => {
+      if (spares.get(key)?.workspaceId === spare.workspaceId) spares.delete(key)
+    },
     generateName: () => 'thread-abc123',
     preparationTimeoutReason: () => 'Destination lookup timed out.',
     ...overrides,
@@ -188,6 +191,23 @@ describe('workspaceToggleMachine', () => {
     await waitFor(toggle.actor, snapshot => snapshot.matches('idle'))
     expect(toggle.calls.filter(call => call.startsWith('provision'))).toEqual([])
     expect(toggle.switched).toEqual(['ws-spare'])
+    expect(toggle.spares.has(spareKey('project', 'main'))).toBe(false)
+  })
+
+  it('does not assign a claimed spare workspace to a second new thread', async () => {
+    const toggle = startToggle()
+    toggle.release()
+    toggle.spares.set(spareKey('project', 'main'), { workspaceId: 'ws-spare', name: 'thread-5pa4e0' })
+    const request = { isolate: true, base: 'main', projectWorkspaceId: 'project', leaving: null, leavingBase: null }
+
+    for (const visitId of ['s1', 's2']) {
+      toggle.actor.send({ type: 'arrive', visitId, workspaceId: 'project', isolateByDefault: true })
+      toggle.actor.send({ type: 'resolved', visitId, request })
+      await waitFor(toggle.actor, snapshot => snapshot.matches('idle'))
+    }
+
+    expect(toggle.calls.filter(call => call.startsWith('provision'))).toHaveLength(1)
+    expect(toggle.switched).toEqual(['ws-spare', 'ws-thread-abc123'])
   })
 
   it('settles a new thread already at its default destination without blocking Send', () => {
