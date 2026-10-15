@@ -1,4 +1,6 @@
+import { useMachine } from '@dshfiles/plugin-ui/machine'
 import { useEffect, useRef, useState } from 'react'
+import { autoRefreshVisibilityMachine } from './auto-refresh-machine.js'
 import type { JujutsuPreferences } from './preferences.js'
 
 type RefreshPreferences = Pick<JujutsuPreferences, 'refreshMode' | 'refreshIntervalSeconds' | 'refreshOnVisible'>
@@ -17,49 +19,52 @@ export const refreshesOnReturn = (input: { readonly preferences: RefreshPreferen
 
 const documentVisible = (): boolean => typeof document === 'undefined' || document.visibilityState === 'visible'
 
-/** Tracks whether the panel is on screen (tab visible, element intersecting and laid out) and calls `onBecameVisible` when it comes back. */
+/** Tracks whether the panel is on screen (tab visible, element intersecting and laid out) and catches up when it returns. */
 export const useAutoRefresh = (input: { readonly preferences: RefreshPreferences; readonly paused: boolean; readonly onBecameVisible: () => void }) => {
   const [element, setElement] = useState<HTMLElement | null>(null)
-  const [pageVisible, setPageVisible] = useState(documentVisible)
-  const [intersecting, setIntersecting] = useState(true)
-  const [laidOut, setLaidOut] = useState(true)
-  const visible = pageVisible && intersecting && laidOut
-  const previousVisible = useRef(visible)
+  const [initialPageVisible] = useState(documentVisible)
+  const [snapshot, send, actor] = useMachine(autoRefreshVisibilityMachine, { input: { pageVisible: initialPageVisible } })
+  const visible = snapshot.context.pageVisible && snapshot.context.intersecting && snapshot.context.laidOut
   const latest = useRef(input)
   latest.current = input
 
   useEffect(() => {
-    const update = (): void => setPageVisible(documentVisible())
-    document.addEventListener('visibilitychange', update)
-    return () => document.removeEventListener('visibilitychange', update)
-  }, [])
+    const subscription = actor.on('becameVisible', () => {
+      if (refreshesOnReturn(latest.current)) latest.current.onBecameVisible()
+    })
+    return () => subscription.unsubscribe()
+  }, [actor])
 
   useEffect(() => {
-    if (element === null || typeof IntersectionObserver === 'undefined') return
-    const observer = new IntersectionObserver(entries => {
+    const update = (): void => send({ type: 'document.visibility', visible: documentVisible() })
+    document.addEventListener('visibilitychange', update)
+    return () => document.removeEventListener('visibilitychange', update)
+  }, [send])
+
+  useEffect(() => {
+    if (element === null) return
+    const IntersectionObserverConstructor = window.IntersectionObserver
+    if (IntersectionObserverConstructor === undefined) return
+    const observer = new IntersectionObserverConstructor(entries => {
       const entry = entries.at(-1)
-      if (entry !== undefined) setIntersecting(entry.isIntersecting)
+      if (entry !== undefined) send({ type: 'element.intersection', intersecting: entry.isIntersecting })
     })
     observer.observe(element)
     return () => observer.disconnect()
-  }, [element])
+  }, [element, send])
 
   // A collapsed or display:none pane can still report intersecting; a zero-size box means it is closed.
   useEffect(() => {
-    if (element === null || typeof ResizeObserver === 'undefined') return
-    const observer = new ResizeObserver(entries => {
+    if (element === null) return
+    const ResizeObserverConstructor = window.ResizeObserver
+    if (ResizeObserverConstructor === undefined) return
+    const observer = new ResizeObserverConstructor(entries => {
       const entry = entries.at(-1)
-      if (entry !== undefined) setLaidOut(entry.contentRect.width > 0 && entry.contentRect.height > 0)
+      if (entry !== undefined) send({ type: 'element.layout', laidOut: entry.contentRect.width > 0 && entry.contentRect.height > 0 })
     })
     observer.observe(element)
     return () => observer.disconnect()
-  }, [element])
-
-  useEffect(() => {
-    const becameVisible = visible && !previousVisible.current
-    previousVisible.current = visible
-    if (becameVisible && refreshesOnReturn(latest.current)) latest.current.onBecameVisible()
-  }, [visible])
+  }, [element, send])
 
   return { ref: setElement, queryOptions: refreshQueryOptions({ preferences: input.preferences, visible, paused: input.paused }) }
 }
