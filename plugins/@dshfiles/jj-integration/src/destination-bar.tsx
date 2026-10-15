@@ -1,6 +1,5 @@
 import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { IWorkspaces } from '@deepseek-ai/dsh-api-workspace-controller/client'
-import type { ComposerBlocks } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Checkbox } from '@dshfiles/plugin-ui/components/ui/checkbox'
 import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from '@dshfiles/plugin-ui/components/ui/command'
@@ -35,7 +34,6 @@ export type WorkspaceToggleActor = ActorRefFrom<typeof workspaceToggleMachine>
 export interface DestinationBarServices {
   readonly workspaces: IWorkspaces
   readonly sessions: ISessions
-  readonly blocks: ComposerBlocks
   readonly openWorkspace: (workspaceId: string, signal: AbortSignal) => Promise<void>
   readonly bindWorkspacePicker: (pick: (workspaceId: string) => void) => () => void
   /** Replace the blank thread's composer with the remote one; returns the undo. */
@@ -112,15 +110,8 @@ export const startWorkspaceToggle = (input: {
       return blankAndExclusive ? spare : undefined
     },
     keepSpare: (key, spare) => void storedSpares.set({ ...storedSpares.get(), [key]: spare }),
-    blockComposer: reason => {
-      const sessions = services.sessions.list.getSnapshot()
-      const current = sessions.ids.find(sessionId => (sessions.byId[sessionId]?.retainedBy.mainView ?? 0) > 0)
-      if (current === undefined) return () => undefined
-      services.blocks.set(current, { reason })
-      return () => services.blocks.set(current, undefined)
-    },
     generateName: randomThreadName,
-    preparingReason: name => (name === null ? t('switchingDestination') : t('preparingWorkspace', { name })),
+    preparationTimeoutReason: () => t('workspacePreparationTimedOut'),
   }
   const actor = createActor(workspaceToggleMachine, { input: { client } })
   actor.on('switched', event => {
@@ -168,7 +159,7 @@ const useNewThread = (services: DestinationBarServices, workspaceId: string | nu
 /**
  * Where a new thread runs on this machine, chosen before its first message: the jj bookmark it starts from and
  * whether it gets its own jj workspace, rendered in the native New thread row beside its project chip after the host chip.
- * The toggle flips at once and names the thread workspace while the Host creates it; the composer waits until it is ready.
+ * The toggle flips at once and names the thread workspace while the Host creates it; a Send waits only if submitted before it is ready.
  */
 export const DestinationBar = (props: {
   readonly workspaceId: string | undefined

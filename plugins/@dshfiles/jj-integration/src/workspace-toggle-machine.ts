@@ -1,4 +1,4 @@
-import { assign, emit, fromCallback, fromPromise, setup } from '@dshfiles/plugin-ui/machine'
+import { assign, emit, fromPromise, setup, type ActorRefFrom } from '@dshfiles/plugin-ui/machine'
 import type { DestinationView } from './api.js'
 
 export interface ProvisionedDestination {
@@ -26,10 +26,8 @@ export interface WorkspaceToggleClient {
   /** A thread workspace this project left unused for this bookmark, with no other Session assigned to it. */
   readonly findSpare: (key: string) => SpareWorkspace | undefined
   readonly keepSpare: (key: string, spare: SpareWorkspace) => void
-  /** Blocks the current composer until the returned release runs, so nothing is sent to the old destination. */
-  readonly blockComposer: (reason: string) => () => void
   readonly generateName: () => string
-  readonly preparingReason: (name: string | null) => string
+  readonly preparationTimeoutReason: () => string
 }
 
 export interface ToggleRequest {
@@ -74,7 +72,7 @@ type ToggleEvent =
   | { readonly type: 'toggle'; readonly request: ToggleRequest; readonly visitId?: string | undefined }
   /**
    * A blank New-thread Session showed in `workspaceId`. `visitId` names this showing: DSH reuses a workspace's blank
-   * Session, so the same Session can be a new thread again later. With isolation on by default, Send waits until `resolved`.
+   * Session, so the same Session can be a new thread again later. With isolation on by default, a submitted Send waits until the destination Session is open.
    */
   | { readonly type: 'arrive'; readonly visitId: string; readonly workspaceId: string; readonly isolateByDefault: boolean }
   /** Its destination is known: `request` moves it to where new threads start by default, null keeps it. */
@@ -136,7 +134,7 @@ const provisionTolerant = async (client: WorkspaceToggleClient, input: Provision
 }
 
 /**
- * The new-thread workspace toggle: it flips at once (pending name shown, composer blocked), the Host creates or reuses
+ * The new-thread workspace toggle: it flips at once (pending name shown while the composer stays usable), the Host creates or reuses
  * the thread workspace in the background, and `switched` hands the caller the Host's new destination so nothing is
  * re-queried. Leaving a thread workspace keeps it as this project's spare, so toggling back reuses it and its blank
  * Session instead of creating another.
@@ -155,33 +153,25 @@ export const workspaceToggleMachine = setup({
     emitted: {} as ToggleSwitched,
   },
   actors: {
-    holdComposer: fromCallback<{ readonly type: 'noop' }, { readonly client: WorkspaceToggleClient; readonly name: string | null }>(({ input }) =>
-      input.client.blockComposer(input.client.preparingReason(input.name)),
-    ),
     switchDestination: fromPromise<
       ProvisionedDestination,
       { readonly client: WorkspaceToggleClient; readonly request: ToggleRequest; readonly pending: PendingDestination }
     >(async ({ input, signal }) => {
       const { client, request, pending } = input
-      const release = client.blockComposer(client.preparingReason(pending.name))
-      try {
-        if (request.leaving !== null) client.keepSpare(spareKey(request.projectWorkspaceId, request.leavingBase), request.leaving)
-        const target: ProvisionedDestination = !pending.isolate
-          ? { workspaceId: request.projectWorkspaceId }
-          : pending.spare !== null
-            ? { workspaceId: pending.spare.workspaceId }
-            : await provisionTolerant(
-                client,
-                { workspaceId: request.projectWorkspaceId, isolate: true, base: request.base, name: pending.name ?? undefined },
-                signal,
-              )
-        await client.listed(target.workspaceId)
-        signal.throwIfAborted()
-        await client.open(target.workspaceId, signal)
-        return target
-      } finally {
-        release()
-      }
+      if (request.leaving !== null) client.keepSpare(spareKey(request.projectWorkspaceId, request.leavingBase), request.leaving)
+      const target: ProvisionedDestination = !pending.isolate
+        ? { workspaceId: request.projectWorkspaceId }
+        : pending.spare !== null
+          ? { workspaceId: pending.spare.workspaceId }
+          : await provisionTolerant(
+              client,
+              { workspaceId: request.projectWorkspaceId, isolate: true, base: request.base, name: pending.name ?? undefined },
+              signal,
+            )
+      await client.listed(target.workspaceId)
+      signal.throwIfAborted()
+      await client.open(target.workspaceId, signal)
+      return target
     }),
   },
 }).createMachine({
@@ -196,6 +186,7 @@ export const workspaceToggleMachine = setup({
           actions: assign(({ context, event }) => ({
             request: event.request,
             error: null,
+            opened: null,
             pending: pendingFor(context.client, event.request, null),
             settled: event.visitId === undefined ? context.settled : [...context.settled, event.visitId],
           })),
@@ -206,7 +197,7 @@ export const workspaceToggleMachine = setup({
           },
           {
             guard: ({ context, event }) => context.opened === event.workspaceId,
-            actions: assign(({ context, event }) => ({ settled: [...context.settled, event.visitId], opened: null })),
+            actions: assign(({ context, event }) => ({ settled: [...context.settled, event.visitId], opened: null, error: null })),
           },
           {
             guard: ({ event }) => event.isolateByDefault,
@@ -214,10 +205,11 @@ export const workspaceToggleMachine = setup({
             actions: assign(({ context, event }) => ({
               arriving: event.visitId,
               error: null,
+              opened: null,
               pending: { isolate: true, spare: null, name: context.client.generateName() },
             })),
           },
-          { actions: assign({ arriving: ({ event }) => event.visitId }) },
+          { actions: assign({ arriving: ({ event }) => event.visitId, opened: null, error: null }) },
         ],
         resolved: [
           {
@@ -225,7 +217,7 @@ export const workspaceToggleMachine = setup({
           },
           {
             guard: ({ event }) => event.request === null,
-            actions: assign(({ context, event }) => ({ settled: [...context.settled, event.visitId], arriving: null })),
+            actions: assign(({ context, event }) => ({ settled: [...context.settled, event.visitId], arriving: null, opened: null })),
           },
           {
             target: 'switching',
@@ -240,14 +232,14 @@ export const workspaceToggleMachine = setup({
       },
     },
     preparing: {
-      // The Host has not said yet whether this thread moves; Send waits rather than reach the wrong checkout.
-      invoke: { src: 'holdComposer', input: ({ context }) => ({ client: context.client, name: context.pending?.name ?? null }) },
       after: {
         15_000: {
           target: 'idle',
           actions: assign(({ context }) => ({
             pending: null,
             arriving: null,
+            opened: null,
+            error: context.client.preparationTimeoutReason(),
             settled: [...context.settled, ...(context.arriving === null ? [] : [context.arriving])],
           })),
         },
@@ -259,6 +251,7 @@ export const workspaceToggleMachine = setup({
             request: event.request,
             error: null,
             arriving: null,
+            opened: null,
             pending: pendingFor(context.client, event.request, null),
             settled: [...context.settled, ...(context.arriving === null ? [] : [context.arriving])],
           })),
@@ -268,7 +261,7 @@ export const workspaceToggleMachine = setup({
           {
             guard: ({ event }) => event.request === null,
             target: 'idle',
-            actions: assign(({ context, event }) => ({ pending: null, arriving: null, settled: [...context.settled, event.visitId] })),
+            actions: assign(({ context, event }) => ({ pending: null, arriving: null, opened: null, settled: [...context.settled, event.visitId] })),
           },
           {
             target: 'switching',
@@ -278,6 +271,7 @@ export const workspaceToggleMachine = setup({
               return {
                 request,
                 arriving: null,
+                opened: null,
                 settled: [...context.settled, event.visitId],
                 pending: pendingFor(context.client, request, context.pending?.name ?? null),
               }
@@ -302,8 +296,47 @@ export const workspaceToggleMachine = setup({
             assign(({ event }) => ({ request: null, pending: null, opened: event.output.workspaceId })),
           ],
         },
-        onError: { target: 'idle', actions: assign(({ event }) => ({ request: null, pending: null, error: errorText(event.error) })) },
+        onError: { target: 'idle', actions: assign(({ event }) => ({ request: null, pending: null, opened: null, error: errorText(event.error) })) },
       },
     },
   },
 })
+
+export type WorkspaceToggleActor = ActorRefFrom<typeof workspaceToggleMachine>
+
+export interface WorkspaceToggleOutcome {
+  readonly workspaceId: string | null
+  readonly error: string | null
+}
+
+export const waitForWorkspaceToggle = (input: { readonly actor: WorkspaceToggleActor; readonly signal: AbortSignal }): Promise<WorkspaceToggleOutcome> =>
+  new Promise((resolve, reject) => {
+    let settled = false
+    let unsubscribe = (): void => undefined
+    const abort = (): void => {
+      if (settled) return
+      settled = true
+      unsubscribe()
+      input.signal.removeEventListener('abort', abort)
+      reject(input.signal.reason ?? new Error('Waiting for workspace destination was cancelled.'))
+    }
+    const finish = (snapshot: ReturnType<WorkspaceToggleActor['getSnapshot']>): void => {
+      if (settled || !snapshot.matches('idle')) return
+      settled = true
+      unsubscribe()
+      input.signal.removeEventListener('abort', abort)
+      resolve({ workspaceId: snapshot.context.opened, error: snapshot.context.error })
+    }
+    input.signal.addEventListener('abort', abort, { once: true })
+    if (input.signal.aborted) {
+      abort()
+      return
+    }
+    const subscription = input.actor.subscribe(finish)
+    unsubscribe = () => subscription.unsubscribe()
+    if (settled) {
+      unsubscribe()
+      return
+    }
+    finish(input.actor.getSnapshot())
+  })

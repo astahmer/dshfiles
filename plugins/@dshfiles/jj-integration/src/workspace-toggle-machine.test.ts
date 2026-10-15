@@ -1,6 +1,9 @@
+import type { ComposerBlocks } from '@deepseek-ai/dsh-client-ui-conversation/client'
+import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { createActor, waitFor } from '@dshfiles/plugin-ui/machine'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { DestinationView } from './api.js'
+import { deferWorkspaceSubmit, type WorkspaceComposer } from './workspace-submit.js'
 import {
   defaultDestinationMove,
   eagerDestinationMove,
@@ -25,12 +28,8 @@ const startToggle = (overrides: Partial<WorkspaceToggleClient> = {}) => {
     open: async workspaceId => void calls.push(`open ${workspaceId}`),
     findSpare: key => spares.get(key),
     keepSpare: (key, spare) => void spares.set(key, spare),
-    blockComposer: reason => {
-      calls.push(`block ${reason}`)
-      return () => void calls.push('unblock')
-    },
     generateName: () => 'thread-abc123',
-    preparingReason: name => `Preparing ${name ?? 'project'}`,
+    preparationTimeoutReason: () => 'Destination lookup timed out.',
     ...overrides,
   }
   const actor = createActor(workspaceToggleMachine, { input: { client } }).start()
@@ -39,15 +38,41 @@ const startToggle = (overrides: Partial<WorkspaceToggleClient> = {}) => {
   return { actor, calls, spares, switched, release: () => gate() }
 }
 
+afterEach(() => vi.useRealTimers())
+
+type TestComposerState = {
+  readonly draft: string
+  readonly attachmentIds: readonly string[]
+  readonly phase: 'plain'
+}
+
+const composerWithDraft = (draft: string) => {
+  let state: TestComposerState = { draft, attachmentIds: [], phase: 'plain' }
+  const submissions: { readonly mode: 'queue'; readonly source: 'click' | 'enter' }[] = []
+  const notices: string[] = []
+  return {
+    input: {
+      state: { getSnapshot: () => state },
+      submit: (mode: 'queue', source: 'click' | 'enter') => submissions.push({ mode, source }),
+      notify: (_level: 'info' | 'error', text: string) => notices.push(text),
+    },
+    submissions,
+    notices,
+    edit: (nextDraft: string) => {
+      state = { ...state, draft: nextDraft }
+    },
+  }
+}
+
 describe('workspaceToggleMachine', () => {
-  it('shows the client-chosen name at once and blocks the composer until the Host created the workspace', async () => {
+  it('shows the client-chosen name while the Host creates the workspace without blocking the composer', async () => {
     const toggle = startToggle()
     toggle.actor.send({ type: 'toggle', request: { isolate: true, base: 'main', projectWorkspaceId: 'project', leaving: null, leavingBase: null } })
     expect(toggle.actor.getSnapshot().context.pending).toEqual({ isolate: true, name: 'thread-abc123', spare: null })
-    expect(toggle.calls).toEqual(['block Preparing thread-abc123', 'provision isolate thread-abc123'])
+    expect(toggle.calls).toEqual(['provision isolate thread-abc123'])
     toggle.release()
     await waitFor(toggle.actor, snapshot => snapshot.matches('idle'))
-    expect(toggle.calls.slice(2)).toEqual(['open ws-thread-abc123', 'unblock'])
+    expect(toggle.calls).toEqual(['provision isolate thread-abc123', 'open ws-thread-abc123'])
     expect(toggle.switched).toEqual(['ws-thread-abc123'])
   })
 
@@ -79,32 +104,31 @@ describe('workspaceToggleMachine', () => {
     expect(toggle.switched).toEqual(['ws-host-named'])
   })
 
-  it('reports a failed provision and releases the composer', async () => {
+  it('reports a failed provision without blocking the composer', async () => {
     const toggle = startToggle({ provision: async () => Promise.reject(new Error('jj workspace add failed')) })
     toggle.actor.send({ type: 'toggle', request: { isolate: true, projectWorkspaceId: 'project', leaving: null, leavingBase: null } })
     await waitFor(toggle.actor, snapshot => snapshot.matches('idle'))
     expect(toggle.actor.getSnapshot().context).toMatchObject({ pending: null, error: 'jj workspace add failed' })
-    expect(toggle.calls.at(-1)).toBe('unblock')
   })
 
-  it('holds Send for a new thread while its destination loads, then moves it to its own workspace in the background', async () => {
+  it('moves a new thread to its default workspace in the background without blocking its composer', async () => {
     const toggle = startToggle()
     toggle.actor.send({ type: 'arrive', visitId: 's1', workspaceId: 'project', isolateByDefault: true })
     expect(toggle.actor.getSnapshot().matches('preparing')).toBe(true)
     expect(toggle.actor.getSnapshot().context.pending?.name).toBe('thread-abc123')
-    expect(toggle.calls).toEqual(['block Preparing thread-abc123'])
+    expect(toggle.calls).toEqual([])
     toggle.actor.send({
       type: 'resolved',
       visitId: 's1',
       request: { isolate: true, base: 'main', projectWorkspaceId: 'project', leaving: null, leavingBase: null },
     })
-    expect(toggle.calls.slice(1)).toEqual(['unblock', 'block Preparing thread-abc123', 'provision isolate thread-abc123'])
+    expect(toggle.calls).toEqual(['provision isolate thread-abc123'])
     toggle.release()
     await waitFor(toggle.actor, snapshot => snapshot.matches('idle'))
+    expect(toggle.calls).toEqual(['provision isolate thread-abc123', 'open ws-thread-abc123'])
     expect(toggle.switched).toEqual(['ws-thread-abc123'])
     toggle.actor.send({ type: 'arrive', visitId: 's2', workspaceId: 'ws-thread-abc123', isolateByDefault: true })
     expect(toggle.actor.getSnapshot().matches('idle')).toBe(true)
-    expect(toggle.calls.filter(call => call.startsWith('block'))).toHaveLength(2)
   })
 
   it('waits for Host ownership before accepting a thread workspace that appears exclusive', async () => {
@@ -112,7 +136,7 @@ describe('workspaceToggleMachine', () => {
     toggle.actor.send({ type: 'arrive', visitId: 's1', workspaceId: 'ws-shared', isolateByDefault: true })
     expect(toggle.actor.getSnapshot().matches('preparing')).toBe(true)
     expect(eagerDestinationMove({ workspaceId: 'ws-shared', inThreadWorkspace: true, occupied: false, bookmark: 'main' })).toBeNull()
-    expect(toggle.calls).toEqual(['block Preparing thread-abc123'])
+    expect(toggle.calls).toEqual([])
 
     const request = defaultDestinationMove({
       destination: { vcs: 'jj', isolated: true, projectWorkspaceId: 'project', bookmark: 'main', bookmarks: ['main'], isolateByDefault: true },
@@ -141,12 +165,12 @@ describe('workspaceToggleMachine', () => {
     expect(toggle.switched).toEqual(['ws-spare'])
   })
 
-  it('releases Send at once when the new thread already sits where it should', () => {
+  it('settles a new thread already at its default destination without blocking Send', () => {
     const toggle = startToggle()
     toggle.actor.send({ type: 'arrive', visitId: 's1', workspaceId: 'ws-thread', isolateByDefault: true })
     toggle.actor.send({ type: 'resolved', visitId: 's1', request: null })
     expect(toggle.actor.getSnapshot().matches('idle')).toBe(true)
-    expect(toggle.calls).toEqual(['block Preparing thread-abc123', 'unblock'])
+    expect(toggle.calls).toEqual([])
   })
 
   it('never moves a thread again once the user toggled it', async () => {
@@ -158,6 +182,157 @@ describe('workspaceToggleMachine', () => {
     toggle.actor.send({ type: 'resolved', visitId: 's1', request: { isolate: true, projectWorkspaceId: 'project', leaving: null, leavingBase: null } })
     expect(toggle.actor.getSnapshot().matches('idle')).toBe(true)
     expect(toggle.calls.filter(call => call.startsWith('provision'))).toEqual([])
+  })
+})
+
+describe('deferWorkspaceSubmit', () => {
+  it('holds only a requested send and submits it in the newly selected workspace', async () => {
+    const toggle = startToggle()
+    toggle.actor.send({ type: 'toggle', request: { isolate: true, base: 'main', projectWorkspaceId: 'project', leaving: null, leavingBase: null } })
+    const sourceComposer = composerWithDraft('')
+    sourceComposer.edit('send after setup')
+    expect(sourceComposer.input.state.getSnapshot().draft).toBe('send after setup')
+    const targetComposer = composerWithDraft('send after setup')
+    const source: WorkspaceComposer = {
+      sessionId: SessionId('source'),
+      workspaceId: 'project',
+      blank: true,
+      input: sourceComposer.input,
+    }
+    const target: WorkspaceComposer = {
+      sessionId: SessionId('target'),
+      workspaceId: 'ws-thread-abc123',
+      blank: true,
+      input: targetComposer.input,
+    }
+    const blockCalls: string[] = []
+    const blocks: Pick<ComposerBlocks, 'set'> = {
+      set: (_sessionId, block) => blockCalls.push(block?.reason ?? 'released'),
+    }
+    expect(blockCalls).toEqual([])
+
+    const pending = deferWorkspaceSubmit({
+      actor: toggle.actor,
+      source,
+      submitSource: 'enter',
+      current: () => target,
+      blocks,
+      reason: 'Preparing thread-abc123…',
+      failureMessage: 'Workspace setup failed.',
+      changedMessage: 'The draft changed.',
+      signal: new AbortController().signal,
+    })
+    expect(blockCalls).toEqual(['Preparing thread-abc123…'])
+    expect(sourceComposer.submissions).toEqual([])
+    toggle.release()
+    await expect(pending).resolves.toBe('sent')
+    expect(targetComposer.submissions).toEqual([{ mode: 'queue', source: 'enter' }])
+    expect(blockCalls).toEqual(['Preparing thread-abc123…', 'released'])
+  })
+
+  it('leaves the draft unsent and releases the composer when provisioning fails', async () => {
+    const toggle = startToggle({ provision: async () => Promise.reject(new Error('jj workspace add failed')) })
+    toggle.actor.send({ type: 'toggle', request: { isolate: true, projectWorkspaceId: 'project', leaving: null, leavingBase: null } })
+    const sourceComposer = composerWithDraft('send after setup')
+    const source: WorkspaceComposer = {
+      sessionId: SessionId('source'),
+      workspaceId: 'project',
+      blank: true,
+      input: sourceComposer.input,
+    }
+    const blockCalls: string[] = []
+    const blocks: Pick<ComposerBlocks, 'set'> = {
+      set: (_sessionId, block) => blockCalls.push(block?.reason ?? 'released'),
+    }
+
+    await expect(
+      deferWorkspaceSubmit({
+        actor: toggle.actor,
+        source,
+        submitSource: 'click',
+        current: () => source,
+        blocks,
+        reason: 'Preparing thread-abc123…',
+        failureMessage: 'Workspace setup failed.',
+        changedMessage: 'The draft changed.',
+        signal: new AbortController().signal,
+      }),
+    ).resolves.toBe('failed')
+    expect(sourceComposer.submissions).toEqual([])
+    expect(sourceComposer.notices).toEqual(['Workspace setup failed.'])
+    expect(blockCalls).toEqual(['Preparing thread-abc123…', 'released'])
+  })
+
+  it('leaves the draft unsent when destination lookup times out', async () => {
+    vi.useFakeTimers()
+    const toggle = startToggle()
+    toggle.actor.send({ type: 'arrive', visitId: 's1', workspaceId: 'project', isolateByDefault: true })
+    const sourceComposer = composerWithDraft('send after setup')
+    const source: WorkspaceComposer = {
+      sessionId: SessionId('source'),
+      workspaceId: 'project',
+      blank: true,
+      input: sourceComposer.input,
+    }
+    const blockCalls: string[] = []
+    const blocks: Pick<ComposerBlocks, 'set'> = {
+      set: (_sessionId, block) => blockCalls.push(block?.reason ?? 'released'),
+    }
+    const pending = deferWorkspaceSubmit({
+      actor: toggle.actor,
+      source,
+      submitSource: 'enter',
+      current: () => source,
+      blocks,
+      reason: 'Preparing thread-abc123…',
+      failureMessage: 'Workspace setup failed.',
+      changedMessage: 'The draft changed.',
+      signal: new AbortController().signal,
+    })
+
+    await vi.advanceTimersByTimeAsync(15_000)
+    await expect(pending).resolves.toBe('failed')
+    expect(toggle.actor.getSnapshot().context.error).toBe('Destination lookup timed out.')
+    expect(sourceComposer.submissions).toEqual([])
+    expect(sourceComposer.notices).toEqual(['Workspace setup failed.'])
+    expect(blockCalls).toEqual(['Preparing thread-abc123…', 'released'])
+    toggle.actor.send({ type: 'arrive', visitId: 's2', workspaceId: 'project', isolateByDefault: false })
+    expect(toggle.actor.getSnapshot().context.error).toBeNull()
+  })
+
+  it('cancels the deferred send and releases the composer on Escape', async () => {
+    const toggle = startToggle()
+    toggle.actor.send({ type: 'toggle', request: { isolate: true, base: 'main', projectWorkspaceId: 'project', leaving: null, leavingBase: null } })
+    const sourceComposer = composerWithDraft('send after setup')
+    const source: WorkspaceComposer = {
+      sessionId: SessionId('source'),
+      workspaceId: 'project',
+      blank: true,
+      input: sourceComposer.input,
+    }
+    const blockCalls: string[] = []
+    const blocks: Pick<ComposerBlocks, 'set'> = {
+      set: (_sessionId, block) => blockCalls.push(block?.reason ?? 'released'),
+    }
+    const controller = new AbortController()
+    const pending = deferWorkspaceSubmit({
+      actor: toggle.actor,
+      source,
+      submitSource: 'enter',
+      current: () => source,
+      blocks,
+      reason: 'Preparing thread-abc123…',
+      failureMessage: 'Workspace setup failed.',
+      changedMessage: 'The draft changed.',
+      signal: controller.signal,
+    })
+    controller.abort()
+
+    await expect(pending).resolves.toBe('cancelled')
+    expect(sourceComposer.submissions).toEqual([])
+    expect(blockCalls).toEqual(['Preparing thread-abc123…', 'released'])
+    toggle.release()
+    toggle.actor.stop()
   })
 })
 

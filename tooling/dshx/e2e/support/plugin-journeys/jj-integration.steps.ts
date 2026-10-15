@@ -257,6 +257,16 @@ Then('the New thread composer opens before its workspace exists', async ({ page 
   })
 })
 
+Then('the New thread composer remains editable while its workspace is prepared', async ({ page }: { page: Page }) => {
+  const composer = newThreadComposer(page)
+  await recordAssertion(page, 'jj-composer-editable-while-preparing', async () => {
+    await expect(page.getByRole('status', { name: /^thread-/ })).toBeVisible({ timeout: 5_000 })
+    await expect(composer).toBeEditable()
+    await composer.fill('typed during workspace preparation')
+    await expect(composer).toHaveText('typed during workspace preparation')
+  })
+})
+
 Then('the New thread moves to its own jj workspace on {string} in the background', async ({ page }: { page: Page }, bookmark: string) => {
   const repository = repositoryFor(page)
   await expect(projectButton(page)).toHaveText(/^repo · thread-/)
@@ -266,7 +276,34 @@ Then('the New thread moves to its own jj workspace on {string} in the background
     await expect(workspaceToggle(page)).toBeEnabled()
     await expect(page.getByRole('button', { name: bookmark, exact: true })).toBeVisible()
     await expect.poll(() => workspaceNames(repository)).toEqual(['default', threadName])
+    await expect(newThreadComposer(page)).toHaveText('typed during workspace preparation')
     expect(commitIdOf(repository, `${threadName}@-`)).toBe(repository.baseCommitId)
+  })
+  await finishJourneyAssertions(page)
+})
+
+When('a message is submitted before the new thread workspace is ready', async ({ page }: { page: Page }) => {
+  const pending = page.getByRole('status', { name: /^thread-/ })
+  await expect(pending).toBeVisible({ timeout: 5_000 })
+  const threadName = await pending.getAttribute('aria-label')
+  if (threadName === null) throw new Error('The pending workspace has no thread name.')
+  provisionedThreads.set(page, threadName)
+
+  const composer = newThreadComposer(page)
+  await expect(composer).toBeEditable()
+  await composer.fill('message sent during workspace preparation')
+  await expect(composer).toHaveText('message sent during workspace preparation')
+  await composer.press('Enter')
+})
+
+Then('the message is delivered from its new thread workspace', async ({ page }: { page: Page }) => {
+  const repository = repositoryFor(page)
+  const threadName = provisionedThreadName(page)
+  await recordAssertion(page, 'jj-submit-waits-for-workspace-ready', async () => {
+    await expect(newThreadComposer(page)).toHaveCount(0, { timeout: 45_000 })
+    await expect(page.getByText('message sent during workspace preparation', { exact: true })).toBeVisible()
+    await expect(page.getByRole('status', { name: /^thread-/ })).toHaveCount(0)
+    await expect.poll(() => workspaceNames(repository)).toEqual(['default', threadName].sort())
   })
   await finishJourneyAssertions(page)
 })

@@ -22,6 +22,7 @@ import { LandButton } from './land-button.js'
 import { JJ_INTEGRATION_LOCALE_NAMESPACE, jjIntegrationLocale } from './locales.js'
 import { ThreadWorkspacesPanel } from './panel.js'
 import { prepareRemoteFolder } from './remote-destination.js'
+import { deferWorkspaceSubmit, type WorkspaceComposer } from './workspace-submit.js'
 import { jjIntegrationSettings } from './settings.js'
 import './client.css'
 
@@ -43,6 +44,20 @@ const useBookmark = (): string => useSettings(jjIntegrationSettings).value?.book
 // it. This rule lives outside client.css so the Tailwind sheet stays byte-identical to every other plugin's and is
 // injected once.
 const remoteDestinationSheet = `div:has(> [data-slot='conversation.hero.workspace'] [data-remote-destination]) > button:first-child{display:none}`
+
+const isSessionId = (value: string): value is SessionSummary['id'] => value.length > 0
+
+const composerSessionOf = (target: EventTarget | null): { readonly sessionId: SessionSummary['id']; readonly root: Element } | undefined => {
+  if (!(target instanceof Element) || target.closest('[data-composer-card]') === null) return undefined
+  const root = target.closest('[data-conversation-session]')
+  const sessionId = root?.getAttribute('data-conversation-session') ?? ''
+  return root !== null && root !== undefined && isSessionId(sessionId) ? { sessionId, root } : undefined
+}
+
+const isSendButton = (target: EventTarget | null): boolean => {
+  const button = target instanceof Element ? target.closest('button') : null
+  return button !== null && /(?:^|\s)\S*_primary(?:\s|$)/u.test(button.className)
+}
 
 export default defineClient({
   name: '@dshfiles/jj-integration',
@@ -178,7 +193,6 @@ export default defineClient({
     const destinationServices: DestinationBarServices = {
       workspaces: ctx.workspaces,
       sessions: ctx.sessions,
-      blocks: ctx.conversation.blocks,
       openWorkspace: composerNavigation.open,
       bindWorkspacePicker: composerNavigation.bind,
       // A blank thread's composer would create a Session on this machine; while a remote host is chosen it sends there.
@@ -244,6 +258,84 @@ export default defineClient({
       t: translate,
       queryClient: pluginQueryClient(),
     })
+    const pendingSubmissions = new Map<SessionSummary['id'], AbortController>()
+    const workspaceComposerFor = (sessionId?: SessionSummary['id']): WorkspaceComposer | undefined => {
+      const sessions = ctx.sessions.list.getSnapshot()
+      const currentId = sessions.ids.find(id => (sessions.byId[id]?.retainedBy.mainView ?? 0) > 0)
+      if (currentId === undefined || (sessionId !== undefined && currentId !== sessionId)) return undefined
+      const session = sessions.byId[currentId]
+      const workspace = ctx.workspaces.list.getSnapshot().items.find(item => item.sessionIds.includes(currentId))
+      const scoped = ctx.sessions.scope(currentId)
+      if (session === undefined || workspace === undefined || scoped === undefined) return undefined
+      return { sessionId: currentId, workspaceId: workspace.workspaceId, blank: session.blank, input: ctx.conversation.input.for(scoped) }
+    }
+    const stopSubmit = (event: Event): void => {
+      event.preventDefault()
+      event.stopImmediatePropagation()
+    }
+    const deferSubmit = (event: Event, sessionId: SessionSummary['id'], submitSource: 'click' | 'enter'): void => {
+      const existing = pendingSubmissions.get(sessionId)
+      if (existing !== undefined) {
+        stopSubmit(event)
+        return
+      }
+      const toggleSnapshot = workspaceToggle.getSnapshot()
+      if (toggleSnapshot.matches('idle')) return
+      const source = workspaceComposerFor(sessionId)
+      if (source === undefined || !source.blank) return
+      const state = source.input.state.getSnapshot()
+      if (state.phase !== 'plain' || (state.draft.trim() === '' && state.attachmentIds.length === 0)) return
+      stopSubmit(event)
+      const controller = new AbortController()
+      pendingSubmissions.set(sessionId, controller)
+      const name = toggleSnapshot.context.pending?.name ?? null
+      const reason = name === null ? translate('switchingDestination') : translate('preparingWorkspace', { name })
+      void deferWorkspaceSubmit({
+        actor: workspaceToggle,
+        source,
+        submitSource,
+        current: () => workspaceComposerFor(),
+        blocks: ctx.conversation.blocks,
+        reason,
+        failureMessage: translate('workspaceSendFailed'),
+        changedMessage: translate('workspaceSendChanged'),
+        signal: controller.signal,
+      })
+        .catch(() => source.input.notify('error', translate('workspaceSendFailed')))
+        .finally(() => {
+          if (pendingSubmissions.get(sessionId) === controller) pendingSubmissions.delete(sessionId)
+        })
+    }
+    const onSubmitKeyDown = (event: KeyboardEvent): void => {
+      const target = composerSessionOf(event.target)
+      if (target === undefined) return
+      if (event.key === 'Escape') {
+        const controller = pendingSubmissions.get(target.sessionId)
+        if (controller === undefined) return
+        stopSubmit(event)
+        controller.abort()
+        return
+      }
+      if (event.key !== 'Enter' || event.shiftKey || event.altKey || event.isComposing) return
+      if (target.root.querySelector('[role="listbox"]') !== null) return
+      deferSubmit(event, target.sessionId, 'enter')
+    }
+    const onSubmitClick = (event: MouseEvent): void => {
+      if (!isSendButton(event.target)) return
+      const target = composerSessionOf(event.target)
+      if (target === undefined) return
+      deferSubmit(event, target.sessionId, 'click')
+    }
+    ctx.effect(() => {
+      window.addEventListener('keydown', onSubmitKeyDown, true)
+      window.addEventListener('click', onSubmitClick, true)
+      return () => {
+        window.removeEventListener('keydown', onSubmitKeyDown, true)
+        window.removeEventListener('click', onSubmitClick, true)
+        for (const controller of pendingSubmissions.values()) controller.abort()
+        pendingSubmissions.clear()
+      }
+    }, 'jj-integration: defer send until workspace is ready')
     ctx.effect(() => () => workspaceToggle.stop(), 'jj-integration: workspace toggle')
     const pickerPorts = createWorkspacePickerPorts(ctx.remote)
     ctx.slots.inject('conversation.hero.workspace', () =>

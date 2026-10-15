@@ -30,7 +30,18 @@ Feature: jj thread workspaces
     And new threads start in their own jj workspace by default
     And New thread is clicked in the sidebar
     Then the New thread composer opens before its workspace exists
+    And the New thread composer remains editable while its workspace is prepared
     And the New thread moves to its own jj workspace on "main" in the background
+
+  @scenario:jj-integration.new-thread-deferred-submit-browser-journey
+  Scenario: A submitted message waits for background workspace allocation
+    Given the isolated plugin composition of "@dshfiles/jj-integration, @dshfiles/workspace-folder-picker, @dshfiles/home, @dshfiles/thread-sidebar, @dshfiles/multi-host" is booted
+    When a disposable jj repository is chosen as the New thread project
+    And a first message is sent from the shared checkout
+    And new threads start in their own jj workspace by default
+    And New thread is clicked in the sidebar
+    When a message is submitted before the new thread workspace is ready
+    Then the message is delivered from its new thread workspace
 
   @scenario:jj-integration.draft-handoff-browser-journey
   Scenario: Switching the thread destination carries the draft without leaving a stale copy

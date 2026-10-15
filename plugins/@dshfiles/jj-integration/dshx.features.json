@@ -104,7 +104,7 @@
     {
       "id": "new-thread-background",
       "title": "New thread never waits on jj",
-      "summary": "The sidebar's New thread, the palette and the project picker open the composer at once; with isolation on by default, the blank thread then moves to its own jj workspace (the spare when there is one) in the background while the chip names it and Send waits, and a thread left in another thread's workspace moves back to the project checkout when isolation is off.",
+      "summary": "The sidebar's New thread, the palette and the project picker open the composer at once; with isolation on by default, the blank thread moves to its own jj workspace (the spare when there is one) in the background while the chip names it. The composer stays editable; a submitted message waits only if that move is still in progress. A thread left in another thread's workspace moves back to the project checkout when isolation is off.",
       "reach": [
         "click button \"New thread\"",
         "click button \"Choose workspace\"",
@@ -117,7 +117,7 @@
       "configuration": [],
       "states": ["opening", "preparing", "switching", "settled"],
       "failureModes": [
-        "Send stays blocked until the destination Session opens; navigation goes through the native composer picker so draft text and attachments move and the old blank Session is cleared.",
+        "The composer stays editable during preparation; a submitted message is held until the destination Session opens, and native-picker navigation moves its draft and attachments without leaving a stale source copy.",
         "Each New-thread screen is moved at most once; a manual toggle afterwards is never undone."
       ],
       "externalDependencies": [],
@@ -125,6 +125,11 @@
         {
           "kind": "gherkin",
           "id": "jj-integration.new-thread-background-browser-journey",
+          "featureFile": "tooling/dshx/e2e/features/jj-integration.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "jj-integration.new-thread-deferred-submit-browser-journey",
           "featureFile": "tooling/dshx/e2e/features/jj-integration.feature"
         },
         {
@@ -137,7 +142,7 @@
           "kind": "unit-test",
           "id": "jj-integration.new-thread-background-unit-preparing",
           "file": "plugins/@dshfiles/jj-integration/src/workspace-toggle-machine.test.ts",
-          "testName": "holds Send for a new thread while its destination loads, then moves it to its own workspace in the background"
+          "testName": "holds only a requested send and submits it in the newly selected workspace"
         },
         {
           "kind": "unit-test",
