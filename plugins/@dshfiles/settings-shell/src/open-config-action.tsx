@@ -10,15 +10,17 @@ import {
 } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { ChevronDownIcon, ClipboardCopyIcon, CodeIcon, FolderOpenIcon, LoaderIcon } from '@dshfiles/plugin-ui/icons'
 import { useEffect, useState } from 'react'
-import type { SettingsDocumentStore } from './native/document-action.js'
+import type { ObservableSnapshot } from '@deepseek-ai/dsh-client-store'
+import type { SettingsDocumentState } from './native/document-action.js'
 import type { ShellTranslate } from './native/locales.js'
 import { useObservable } from './native/use-observable.js'
 
-/** The Host desktop operations the menu needs, over the Session Remote's path opener (the native open-in service). */
+/** The Host desktop operations the split button needs, over the Session Remote's path opener (the native open-in service). */
 export interface ConfigFileOpeners {
   readonly documentPath: () => Promise<DocumentLocation | null>
   readonly canOpenPaths: () => Promise<boolean>
   readonly applications: (path: string) => Promise<readonly SessionWorkspacePathApplication[] | null>
+  readonly openDefault: (path: string) => Promise<boolean>
   readonly openWith: (path: string, applicationId: string) => Promise<boolean>
   readonly reveal: (path: string) => Promise<boolean>
   /** Hands the file to the in-app Editor; false when it is not loaded or has no thread to open it in. */
@@ -31,6 +33,12 @@ interface DocumentLocation {
   readonly exists: boolean
 }
 
+interface SettingsDocumentController {
+  readonly store: ObservableSnapshot<SettingsDocumentState>
+  load(): Promise<void>
+  open(): Promise<void>
+}
+
 type Feedback = { readonly kind: 'error'; readonly message: string } | { readonly kind: 'copied' } | null
 
 const FEEDBACK_MS = 2_500
@@ -38,19 +46,20 @@ const FEEDBACK_MS = 2_500
 const isMac = (): boolean => /Mac/u.test(navigator.platform)
 
 /**
- * "Open configuration file" as a split button, like the thread header's open-in control: the button keeps the native
- * action (the Host's text editor), and ▾ opens the file with any app the desktop associates with it, in the Editor
- * plugin, copies its path or reveals it in the file manager. Rendered only where the native action is: a loopback
- * page whose Host has a settings document.
+ * Existing documents open through the Session path opener's configured default; the native Host action remains the
+ * fallback when no document exists or desktop path opening is unavailable. The menu also offers associated apps, the
+ * Editor plugin, copying the path, and revealing it in the file manager. Rendered only on a loopback page whose Host
+ * has a settings document.
  */
 export const OpenConfigAction = (props: {
-  readonly controller: SettingsDocumentStore
+  readonly controller: SettingsDocumentController
   readonly openers: ConfigFileOpeners
   readonly t: ShellTranslate
 }): JSX.Element | null => {
   const state = useObservable(props.controller.store)
   const [location, setLocation] = useState<DocumentLocation | null>(null)
-  const [desktop, setDesktop] = useState(false)
+  const [desktop, setDesktop] = useState<boolean | undefined>(undefined)
+  const [opening, setOpening] = useState(false)
   const [apps, setApps] = useState<readonly SessionWorkspacePathApplication[] | null | undefined>(undefined)
   const [feedback, setFeedback] = useState<Feedback>(null)
   const { t, openers } = props
@@ -80,13 +89,36 @@ export const OpenConfigAction = (props: {
     }, failed)
   }
   const path = location?.path ?? null
-  const onDisk = location?.exists === true && desktop
+  const onDisk = location?.exists === true && desktop === true
+  const openPrimary = async (): Promise<void> => {
+    if (state.opening || opening) return
+    setOpening(true)
+    try {
+      const next = await openers.documentPath()
+      setLocation(next)
+      if (next === null || !next.exists) {
+        await props.controller.open()
+        return
+      }
+      const canOpen = desktop ?? (await openers.canOpenPaths())
+      if (desktop === undefined) setDesktop(canOpen)
+      if (!canOpen) {
+        await props.controller.open()
+        return
+      }
+      if (!(await openers.openDefault(next.path))) failed()
+    } catch {
+      failed()
+    } finally {
+      setOpening(false)
+    }
+  }
   // The main button may have just created the document, so each menu opening reads its location again.
   const onMenu = (open: boolean): void => {
     if (!open) return
     void openers.documentPath().then(next => {
       setLocation(next)
-      if (next !== null && next.exists && desktop && apps === undefined) void openers.applications(next.path).then(setApps, () => setApps(null))
+      if (next !== null && next.exists && desktop === true && apps === undefined) void openers.applications(next.path).then(setApps, () => setApps(null))
     })
   }
   const errorText = feedback?.kind === 'error' ? feedback.message : state.error === null ? null : t('openDocument.error')
@@ -106,8 +138,8 @@ export const OpenConfigAction = (props: {
       <div className="dshx:inline-flex dshx:h-7 dshx:items-stretch dshx:overflow-hidden dshx:rounded-md dshx:border dshx:border-border dshx:bg-background dshx:shadow-xs">
         <button
           className="dshx:inline-flex dshx:cursor-pointer dshx:items-center dshx:border-none dshx:bg-transparent dshx:px-2.5 dshx:text-[12px] dshx:font-medium dshx:whitespace-nowrap dshx:text-foreground dshx:hover:bg-accent dshx:disabled:cursor-default dshx:disabled:opacity-60"
-          disabled={state.opening}
-          onClick={() => void props.controller.open()}
+          disabled={state.opening || opening}
+          onClick={() => void openPrimary()}
           title={path ?? undefined}
           type="button"
         >

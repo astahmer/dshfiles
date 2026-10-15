@@ -539,6 +539,7 @@ export default defineClient({
           const result = await ctx.remote.session.workspacePathApplications({ path })
           return result.ok ? result.value : null
         },
+        openDefault: async path => (await ctx.remote.session.openWorkspacePath({ path })).ok,
         openWith: async (path, application) => (await ctx.remote.session.openWorkspacePath({ path, application })).ok,
         reveal: async path => (await ctx.remote.session.openWorkspacePath({ path, action: 'reveal' })).ok,
         openInEditor: path => {

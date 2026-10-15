@@ -180,13 +180,13 @@
     {
       "id": "open-config-menu",
       "title": "Open the configuration file elsewhere",
-      "summary": "Open configuration file is a split button: the native action plus a menu that opens the file with each associated app, in the Editor plugin, copies its path or reveals it in Finder.",
+      "summary": "The primary action opens an existing configuration file with the Session Remote's configured default app; the menu offers associated apps, the Editor plugin, copy and reveal actions.",
       "reach": ["click button \"Settings\"", "click button \"More ways to open the configuration file\"", "expect menuitem \"Copy path\""],
       "surfaces": ["client", "settings", "integration"],
       "configuration": [],
       "states": ["no-document", "document", "copied", "failed"],
       "failureModes": [
-        "Until the native action creates the document, only its path can be copied.",
+        "If the document is absent or desktop path opening is unavailable, the native action creates/opens it in the Host's text editor.",
         "Remote (non-loopback) browsers get neither the action nor the path."
       ],
       "externalDependencies": [],

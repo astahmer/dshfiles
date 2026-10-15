@@ -62,8 +62,9 @@ highlights it for two seconds.
 ### Configuration file
 
 On a loopback browser whose Host keeps a settings document (the profile's `cordis.patch.yml`), the header shows
-**Open configuration file** as a split button, like the thread header's open-in control. The button keeps the native
-action: the Host opens the document in its text editor, creating it if absent. **▾** offers:
+**Open configuration file** as a split button, like the thread header's open-in control. Existing documents open with the
+Session Remote's configured default app. If the document is absent or desktop path opening is unavailable, the Host's
+native action creates/opens it in its text editor. **▾** offers:
 
 - **Open with** each app the desktop associates with the file (icons and the default from the Session Remote's path
   opener, the service behind the native open-in controls; their component is not exported, so the menu is drawn here);

@@ -7,7 +7,7 @@ import type { SettingsDescribeFace } from '@deepseek-ai/dsh-client-ui-settings/c
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 
 /** Mutable: the snapshot store hands updates an immer draft. */
-interface DocumentState {
+export interface SettingsDocumentState {
   status: 'idle' | 'loading' | 'ready' | 'unavailable'
   opening: boolean
   error: string | null
@@ -17,7 +17,7 @@ type OpenDocument = () => Promise<{ readonly ok: true } | { readonly ok: false; 
 
 /** Derives local-document availability from the shared mirror and invokes the pathless Host-owned open operation. */
 export class SettingsDocumentStore {
-  readonly store = createSnapshotStore<DocumentState>({ status: 'idle', opening: false, error: null })
+  readonly store = createSnapshotStore<SettingsDocumentState>({ status: 'idle', opening: false, error: null })
   private following: (() => void) | undefined
 
   constructor(
