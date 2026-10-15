@@ -142,8 +142,6 @@ rule to `error` once those land.
       - devDependency copies of peers no code imports: activity-timeline
         `dsh-subprocess`, settings-shell `dsh-client-ui-plugin-manager`
         (editor/secret-catalog/settings-shell inject theirs by name).
-      - root `@deepseek-ai/cordis` and `dsh-typert-generator`: unreferenced, but
-        removing them re-resolves dsh peer variants; do it with `pnpm dedupe`.
       - memory's `bench` script points at a missing `bench/scale.mjs`.
       - `knip --production` still lists 26 test-support files (e2e support,
         `src/testing/*`, vite helpers) that need production ignores.

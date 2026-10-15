@@ -115,7 +115,7 @@
     "write-file-atomic": "catalog:",
     "ws": "catalog:",
     "yaml": "catalog:",
-    "zod": "^4.6.5"
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "catalog:",

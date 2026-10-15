@@ -11,7 +11,7 @@
       "entry": ["scripts/*.{ts,mjs}!", "scripts/dsh-lkg/*.mjs!"],
       // oxlint runs through `pnpm exec` inside scripts/lint-ratchet.ts. Cordis and the typert generator are
       // unreferenced, but removing them re-resolves dsh peer variants in the undeduped lockfile (plans/guardrails.md).
-      "ignoreDependencies": ["oxlint", "@deepseek-ai/cordis", "@deepseek-ai/dsh-typert-generator"],
+      "ignoreDependencies": ["oxlint"],
     },
     "apps/desktop": {},
     "plugins": {

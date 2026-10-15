@@ -41,9 +41,7 @@ const exactVersion = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/
 const pinnedProtocol = /^(?:catalog|workspace|link|file):/
 const pinnedFields = ['dependencies', 'devDependencies', 'optionalDependencies'] as const
 // Ranges kept on purpose, keyed by `<package directory> <field> <dependency>`.
-const rangeExceptions = new Map([
-  ['tooling/dshx/packages/dshx dependencies zod', 'pinning it re-resolves the dsh peer contexts under dshx until the lockfile is deduped'],
-])
+const rangeExceptions = new Map<string, string>([])
 
 const dependencyManifestSchema = z.object(Object.fromEntries(pinnedFields.map(field => [field, z.record(z.string(), z.string()).optional()])))
 
