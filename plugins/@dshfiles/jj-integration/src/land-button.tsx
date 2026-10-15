@@ -3,13 +3,13 @@ import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
-import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
+import { errorMessage, useIsMutating, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useApi } from '@dshfiles/dshx/client'
 import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react'
 import { jjIntegrationApi } from './api.js'
 import type { JjIntegrationTranslate } from './locales.js'
 import { announceRepositoryChange, describeLandResult, useLandToast } from './land-feedback.js'
-import { threadQueryKeys } from './panel.js'
+import { threadQueryKeys, threadRebaseMutationKey } from './panel.js'
 import { canRebaseThread, hasPendingUserQuestion } from './thread-rebase-eligibility.js'
 
 export interface LandButtonProps {
@@ -25,6 +25,7 @@ const noCwd = (): null => null
 export const LandButton = (props: LandButtonProps): JSX.Element | null => {
   const api = useApi(jjIntegrationApi)
   const queryClient = useQueryClient()
+  const rebasesPending = useIsMutating({ mutationKey: threadRebaseMutationKey }) > 0
   const subscribe = useCallback((listener: () => void) => props.sessions.list.subscribe(listener), [props.sessions])
   const read = useCallback(() => props.sessions.list.getSnapshot().byId[props.sessionId]?.cwd ?? null, [props.sessions, props.sessionId])
   const cwd = useSyncExternalStore(subscribe, read, noCwd)
@@ -36,6 +37,7 @@ export const LandButton = (props: LandButtonProps): JSX.Element | null => {
     refetchInterval: query => (query.state.data?.thread === null ? false : 5_000),
   })
   const rebase = useMutation({
+    mutationKey: threadRebaseMutationKey,
     mutationFn: (path: string) => runHostRequest({ timeoutMs: 300_000, request: signal => api.land({ path, sessionId: props.sessionId }, { signal }) }),
     onSuccess: result => toast.show({ text: describeLandResult(props.t, result), success: result.status === 'landed' }),
     onError: error => toast.show({ text: errorMessage(error, props.t('loadFailed')), success: false }),
@@ -79,7 +81,7 @@ export const LandButton = (props: LandButtonProps): JSX.Element | null => {
     <>
       <Button
         className="dshx-root"
-        disabled={rebase.isPending || thread.isFetching || current.unlanded.length === 0 || !canRebase}
+        disabled={rebasesPending || thread.isFetching || current.unlanded.length === 0 || !canRebase}
         onClick={() => rebase.mutate(current.path)}
         size="sm"
         title={canRebase ? `${label} (${props.t('toRebase', { count: current.unlanded.length })})` : `${label} — ${props.t('rebaseBlocked')}`}
@@ -87,7 +89,7 @@ export const LandButton = (props: LandButtonProps): JSX.Element | null => {
         variant="ghost"
         aria-label={label}
       >
-        {rebase.isPending ? <Spinner /> : null}
+        {rebasesPending ? <Spinner /> : null}
         {props.t('rebase')}
         {current.unlanded.length > 0 ? ` · ${String(current.unlanded.length)}` : ''}
       </Button>

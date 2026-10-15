@@ -20,7 +20,7 @@ import { Skeleton } from '@dshfiles/plugin-ui/components/ui/skeleton'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { EllipsisIcon, RefreshCwIcon } from '@dshfiles/plugin-ui/icons'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
-import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
+import { errorMessage, useIsMutating, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useApi } from '@dshfiles/dshx/client'
 import { useCallback, useEffect, useId, useMemo, useState, useSyncExternalStore } from 'react'
 import { jjIntegrationApi, type ThreadView, type WorkspaceSyncView } from './api.js'
@@ -35,6 +35,7 @@ export const threadQueryKeys = {
   threadAt: (path: string) => ['jj-integration', 'thread', path] as const,
   workspaceSync: ['jj-integration', 'workspace-sync'] as const,
 }
+export const threadRebaseMutationKey = ['jj-integration', 'thread-rebase'] as const
 
 /** The thread sidebar owns restarting DSH (with its confirmation dialog) and registers it as a palette action. */
 const RESTART_ACTION_ID = '@dshfiles/thread-sidebar/action/restart-dsh'
@@ -351,6 +352,7 @@ export const ThreadWorkspacesPanel = (props: {
   const sessionById = useSessionDirectory(props.sessions)
   const api = useApi(jjIntegrationApi)
   const queryClient = useQueryClient()
+  const rebasesPending = useIsMutating({ mutationKey: threadRebaseMutationKey }) > 0
   const toast = useLandToast()
   const [notice, setNotice] = useState<{ readonly tone: 'default' | 'destructive'; readonly text: string } | null>(null)
   const repositories = useQuery({
@@ -362,6 +364,7 @@ export const ThreadWorkspacesPanel = (props: {
     announceRepositoryChange()
   }
   const rebase = useMutation({
+    mutationKey: threadRebaseMutationKey,
     mutationFn: (path: string) => runHostRequest({ timeoutMs: 300_000, request: signal => api.land({ path }, { signal }) }),
     onSuccess: async (result, path) => {
       if (result.status === 'landed') {
@@ -439,7 +442,7 @@ export const ThreadWorkspacesPanel = (props: {
                   openSession={props.openSession}
                   t={t}
                   bookmark={props.bookmark}
-                  busy={rebase.isPending}
+                  busy={rebasesPending}
                   onRebase={() => rebase.mutate(thread.path)}
                   onDiscard={() => discard.request({ path: thread.path, name: thread.name, unlandedCount: thread.unlanded.length })}
                 />
