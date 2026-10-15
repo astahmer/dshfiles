@@ -174,6 +174,20 @@ describe('tabsMachine', () => {
     expect(tabs.navigated.at(-1)).toEqual(thread('c'))
   })
 
+  it('closes the active tab and navigates to its right neighbour', () => {
+    const tabs = start({ preferences: { openMode: 'new' } })
+    tabs.enable()
+    tabs.host(thread('a'))
+    tabs.host(thread('b'))
+    tabs.host(thread('c'))
+    tabs.actor.send({ type: 'tab.select', tabId: 'thread:b' })
+    tabs.host(thread('b'))
+    tabs.actor.send({ type: 'tab.closeActive' })
+    expect(tabs.ids()).toEqual(['thread:a', 'thread:c'])
+    expect(tabs.set().activeTabId).toBe('thread:c')
+    expect(tabs.navigated.at(-1)).toEqual(thread('c'))
+  })
+
   it('closes other tabs and tabs to the right, keeping pinned ones', () => {
     const tabs = start({ preferences: { openMode: 'new' } })
     tabs.enable()

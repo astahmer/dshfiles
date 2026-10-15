@@ -56,6 +56,7 @@ export type TabsEvent =
   /** Open a target from outside the main view; `newTab` keeps every existing tab, whatever `openMode` says (Mod-click). */
   | { readonly type: 'tab.open'; readonly target: TabTarget; readonly newTab: boolean }
   | { readonly type: 'tab.close'; readonly tabId: string }
+  | { readonly type: 'tab.closeActive' }
   | { readonly type: 'tab.closeOthers'; readonly tabId: string }
   | { readonly type: 'tab.closeToRight'; readonly tabId: string }
   | { readonly type: 'tab.togglePin'; readonly tabId: string }
@@ -293,6 +294,7 @@ export const tabsMachine = setup({
     landsPending: ({ context, event }) => event.type === 'host.navigated' && sameTarget(event.target, context.pendingTarget),
     restoresSavedTab: ({ context, event }) =>
       event.type === 'host.navigated' && event.target === null && !context.restored && currentSet(context).activeTabId !== null,
+    hasActiveTab: ({ context }) => currentSet(context).activeTabId !== null,
   },
   delays: { settle: NAVIGATION_SETTLE_MS },
 }).createMachine({
@@ -430,6 +432,21 @@ export const tabsMachine = setup({
                 removeTabs(currentSet(context), tab => tab.id === event.tabId),
               ),
             ),
+            'navigateToActive',
+            'persist',
+          ],
+        },
+        'tab.closeActive': {
+          guard: 'hasActiveTab',
+          target: '.navigating',
+          actions: [
+            assign(({ context }) => {
+              const set = currentSet(context)
+              return withSet(
+                context,
+                removeTabs(set, tab => tab.id === set.activeTabId),
+              )
+            }),
             'navigateToActive',
             'persist',
           ],

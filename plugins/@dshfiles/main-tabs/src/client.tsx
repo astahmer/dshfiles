@@ -3,7 +3,7 @@ import type {} from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
-import type { ShortcutBinding, ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client'
+import type { ShortcutBinding, ShortcutCommand, ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client'
 import { resolveSlotLabel } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { defineClient, useSettings } from '@dshfiles/dshx/client'
@@ -12,6 +12,7 @@ import { createActor } from '@dshfiles/plugin-ui/machine'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { z } from 'zod'
 import { createPortal } from 'react-dom'
+import { closeActiveTabShortcutBinding, closeActiveTabShortcutDefaults } from './close-active-tab-shortcut.js'
 import { readHostView } from './host-target.js'
 import { MAIN_TABS_LOCALE_NAMESPACE, mainTabsLocale } from './locales.js'
 import { mainTabsSettings } from './settings.js'
@@ -331,7 +332,8 @@ export default defineClient({
       readonly desktop: ShortcutBinding
       /** Desktop Linux reserves Tab, so cycling uses Ctrl+Shift+] / [ there. */
       readonly linux?: ShortcutBinding
-      readonly web: ShortcutBinding
+      readonly web?: ShortcutBinding
+      readonly defaults?: ShortcutCommand['defaults']
       readonly event: TabsEvent
     }
     const commands: readonly TabCommand[] = [
@@ -341,6 +343,13 @@ export default defineClient({
         desktop: { code: 'KeyT', modifiers: ['primary'] },
         web: { code: 'KeyT', modifiers: ['primary', 'alt'] },
         event: { type: 'tab.new' },
+      },
+      {
+        id: 'mainTabs.closeActive',
+        label: () => translate('closeActiveTab'),
+        desktop: closeActiveTabShortcutBinding,
+        defaults: closeActiveTabShortcutDefaults,
+        event: { type: 'tab.closeActive' },
       },
       {
         id: 'mainTabs.next',
@@ -366,6 +375,16 @@ export default defineClient({
         event: { type: 'tab.activateIndex', index: index === 9 ? -1 : index - 1 },
       })),
     ]
+    const defaultsFor = (command: TabCommand): ShortcutCommand['defaults'] => {
+      if (command.defaults !== undefined) return command.defaults
+      const defaults: ShortcutCommand['defaults'] = {
+        'desktop:macos': command.desktop,
+        'desktop:windows': command.desktop,
+        'desktop:linux': command.linux ?? command.desktop,
+      }
+      if (command.web === undefined) return defaults
+      return { ...defaults, 'web:macos': command.web, 'web:windows': command.web }
+    }
     for (const command of commands) {
       const commandId = command.id
       if (!isShortcutCommandId(commandId)) continue
@@ -376,18 +395,18 @@ export default defineClient({
             id: commandId,
             label: command.label,
             aliases: ['tab', 'tabs'],
-            defaults: withDefaults
-              ? {
-                  'desktop:macos': command.desktop,
-                  'desktop:windows': command.desktop,
-                  'desktop:linux': command.linux ?? command.desktop,
-                  'web:macos': command.web,
-                  'web:windows': command.web,
-                }
-              : {},
+            defaults: withDefaults ? defaultsFor(command) : {},
             regions: ['page', 'editable'],
             modals: [],
-            resolve: () => (actor.getSnapshot().matches('on') ? { status: 'handled', run: () => actor.send(command.event) } : { status: 'pass' }),
+            resolve: () => {
+              const snapshot = actor.getSnapshot()
+              if (!snapshot.matches('on')) return { status: 'pass' }
+              if (command.event.type === 'tab.closeActive') {
+                const activeTabId = snapshot.context.sets[snapshot.context.scopeKey]?.activeTabId
+                if (activeTabId === undefined || activeTabId === null) return { status: 'pass' }
+              }
+              return { status: 'handled', run: () => actor.send(command.event) }
+            },
           })
         try {
           return register(true)
