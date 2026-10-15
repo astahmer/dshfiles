@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { registerPaletteAction, type PaletteActionContext } from './palette-api.js'
+import { PaletteApi, type PaletteActionContext } from './palette-api.js'
 import { ThreadPalette, type ThreadPaletteCopy } from './thread-palette.js'
 
 const copy: ThreadPaletteCopy = {
@@ -142,10 +142,10 @@ describe('ThreadPalette navigation', () => {
 describe('ThreadPalette actions', () => {
   it('lists New thread once although four entries register it', () => {
     const disposers = [
-      registerPaletteAction({ id: '@dshfiles/command-palette/new-thread', label: 'New thread', group: 'action', run: vi.fn() }),
-      registerPaletteAction({ id: '@dshfiles/thread-sidebar/header/new-thread', label: () => 'New thread', group: 'destination', run: vi.fn() }),
-      registerPaletteAction({ id: '@dshfiles/thread-sidebar/command/commandPalette.newThread', label: 'New thread', group: 'command', run: vi.fn() }),
-      registerPaletteAction({ id: '@dshfiles/thread-sidebar/command/session.new', label: 'New Session', group: 'command', run: vi.fn() }),
+      PaletteApi.registerAction({ id: '@dshfiles/command-palette/new-thread', label: 'New thread', group: 'action', run: vi.fn() }),
+      PaletteApi.registerAction({ id: '@dshfiles/thread-sidebar/header/new-thread', label: () => 'New thread', group: 'destination', run: vi.fn() }),
+      PaletteApi.registerAction({ id: '@dshfiles/thread-sidebar/command/commandPalette.newThread', label: 'New thread', group: 'command', run: vi.fn() }),
+      PaletteApi.registerAction({ id: '@dshfiles/thread-sidebar/command/session.new', label: 'New Session', group: 'command', run: vi.fn() }),
     ]
     mount()
     expect(screen.getAllByRole('option', { name: /New (thread|Session)/ })).toHaveLength(1)
@@ -154,7 +154,7 @@ describe('ThreadPalette actions', () => {
 
   it('selects the first match while typing so Enter runs it', async () => {
     const run = vi.fn()
-    const dispose = registerPaletteAction({ id: '@dshfiles/test/zebra', label: 'Zebra mode', group: 'action', run })
+    const dispose = PaletteApi.registerAction({ id: '@dshfiles/test/zebra', label: 'Zebra mode', group: 'action', run })
     mount()
     const input = screen.getByRole<HTMLInputElement>('combobox')
     input.focus()
@@ -162,6 +162,34 @@ describe('ThreadPalette actions', () => {
     await waitFor(() => expect(screen.getByRole('option', { name: /Zebra mode/ }).getAttribute('aria-selected')).toBe('true'))
     fireEvent.keyDown(input, { key: 'Enter', code: 'Enter' })
     await waitFor(() => expect(run).toHaveBeenCalledTimes(1))
+    dispose()
+  })
+
+  it('shows action failure and retries through the action machine', async () => {
+    let attempts = 0
+    const dispose = PaletteApi.registerAction({
+      id: '@dshfiles/test/retry',
+      label: 'Retry action',
+      group: 'action',
+      run: async () => {
+        attempts += 1
+        if (attempts === 1) throw new Error('controlled failure')
+      },
+    })
+    const onClose = mount()
+    const input = screen.getByRole<HTMLInputElement>('combobox')
+    input.focus()
+    fireEvent.change(input, { target: { value: 'retry' } })
+    const option = await screen.findByRole('option', { name: /Retry action/ })
+    await waitFor(() => expect(option.getAttribute('aria-selected')).toBe('true'))
+
+    fireEvent.keyDown(input, { key: 'Enter', code: 'Enter' })
+    await waitFor(() => expect(screen.getByText(copy.actionFailed)).toBeTruthy())
+    expect(attempts).toBe(1)
+
+    fireEvent.keyDown(input, { key: 'Enter', code: 'Enter' })
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1))
+    expect(attempts).toBe(2)
     dispose()
   })
 })

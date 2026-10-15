@@ -12,7 +12,7 @@ import type { ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client
 import { resolveSlotLabel, type PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
 import { createApiClient, defineClient, provideSettingsPageRenderer, useApiQuery, type SettingsPageRendererProps } from '@dshfiles/dshx/client'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
-import { registerPaletteAction } from '@dshfiles/command-palette/api'
+import { PaletteApi } from '@dshfiles/command-palette/api'
 import { createActor } from '@dshfiles/plugin-ui/machine'
 import { useEffect, useState } from 'react'
 import { z } from 'zod'
@@ -459,7 +459,7 @@ export default defineClient({
       const register = (): void => {
         registered.forEach(dispose => dispose())
         registered = [
-          registerPaletteAction({
+          PaletteApi.registerAction({
             id: '@dshfiles/settings-shell/open',
             label: () => t('palette.open'),
             aliases: ['settings', 'preferences', 'options'],
@@ -467,7 +467,7 @@ export default defineClient({
             run: () => openSettings(),
           }),
           ...[...sections.getSnapshot(), ...pluginPages.getSnapshot().map(page => ({ id: page.pageId, label: page.title }))].map(row =>
-            registerPaletteAction({
+            PaletteApi.registerAction({
               id: `@dshfiles/settings-shell/section/${row.id}`,
               label: () => t('palette.section', { section: row.label }),
               aliases: ['settings', 'preferences'],

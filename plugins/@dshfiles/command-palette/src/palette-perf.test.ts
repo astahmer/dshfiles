@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'vitest'
 import { frecencyBoosts, recordUse, type FrecencyEntries } from './frecency.js'
-import { indexFiles, indexThreads, rankActions, rankFiles, rankThreads, type ThreadCandidate } from './palette.js'
+import { PaletteRules, type ThreadCandidate } from './palette.js'
 
 const WORDS = ['sidebar', 'footer', 'palette', 'jujutsu', 'migration', 'review', 'refactor', 'billing', 'nix', 'theme']
 
@@ -45,25 +45,25 @@ const worstKeystroke = (query: string, rank: (query: string) => void): number =>
 }
 
 test('ranking 2,000 threads per keystroke stays within one frame budget', () => {
-  const index = indexThreads(syntheticThreads(2000))
-  const worst = worstKeystroke('sidfoo', query => assert.ok(rankThreads({ index, query, limit: 50 }).length <= 50))
+  const index = PaletteRules.indexThreads(syntheticThreads(2000))
+  const worst = worstKeystroke('sidfoo', query => assert.ok(PaletteRules.rankThreads({ index, query, limit: 50 }).length <= 50))
   assert.ok(worst < 8, `worst keystroke ${worst.toFixed(2)}ms exceeds half of a 16 ms frame`)
 })
 
 test('ranking 20,000 file paths per keystroke stays within one frame budget', () => {
-  const index = indexFiles(syntheticPaths(20_000))
+  const index = PaletteRules.indexFiles(syntheticPaths(20_000))
   const boosts = frecencyBoosts(
     Array.from({ length: 200 }, (_, order) => ({ id: `file:/repo:${syntheticPaths(200)[order] ?? ''}`, count: 3, lastUsedAt: Date.now() })),
     Date.now(),
   )
   const boost = (path: string): number => boosts.get(`file:/repo:${path}`) ?? 0
-  const worst = worstKeystroke('palrev', query => assert.ok(rankFiles({ index, query, limit: 50, boost }).length <= 50))
+  const worst = worstKeystroke('palrev', query => assert.ok(PaletteRules.rankFiles({ index, query, limit: 50, boost }).length <= 50))
   assert.ok(worst < 16, `worst keystroke ${worst.toFixed(2)}ms exceeds a 16 ms frame`)
 })
 
 test('ranking 500 actions per keystroke stays well inside one frame', () => {
   const actions = syntheticActions(500)
-  const worst = worstKeystroke('jujmig', query => rankActions({ actions, query, boost: () => 0 }))
+  const worst = worstKeystroke('jujmig', query => PaletteRules.rankActions({ actions, query, boost: () => 0 }))
   assert.ok(worst < 4, `worst keystroke ${worst.toFixed(2)}ms exceeds a quarter of a 16 ms frame`)
 })
 
@@ -75,11 +75,11 @@ test('opening the palette prepares 2,000 threads, 20,000 files and 200 frecency 
   let fastest = Infinity
   for (let run = 0; run < RUNS_PER_KEYSTROKE; run++) {
     const started = performance.now()
-    const threadIndex = indexThreads(threads)
-    rankThreads({ index: threadIndex, query: '', limit: 20 })
-    const fileIndex = indexFiles(paths)
+    const threadIndex = PaletteRules.indexThreads(threads)
+    PaletteRules.rankThreads({ index: threadIndex, query: '', limit: 20 })
+    const fileIndex = PaletteRules.indexFiles(paths)
     const boosts = frecencyBoosts(frecency, Date.now())
-    rankFiles({ index: fileIndex, query: '', limit: 50, boost: path => boosts.get(path) ?? 0 })
+    PaletteRules.rankFiles({ index: fileIndex, query: '', limit: 50, boost: path => boosts.get(path) ?? 0 })
     fastest = Math.min(fastest, performance.now() - started)
   }
   assert.ok(fastest < 50, `fastest open ${fastest.toFixed(2)}ms exceeds the 50 ms open budget`)

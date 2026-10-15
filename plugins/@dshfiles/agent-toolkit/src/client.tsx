@@ -5,7 +5,7 @@ import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-host-plugin-inventory/remote'
-import { registerPaletteAction } from '@dshfiles/command-palette/api'
+import { PaletteApi } from '@dshfiles/command-palette/api'
 import { defineClient } from '@dshfiles/dshx/client'
 import { WrenchIcon } from '@dshfiles/plugin-ui/icons'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
@@ -92,7 +92,7 @@ export default defineClient({
 
     ctx.effect(
       () =>
-        registerPaletteAction({
+        PaletteApi.registerAction({
           id: '@dshfiles/agent-toolkit/open',
           label: () => t('paletteOpen'),
           aliases: ['agent toolkit', 'tools', 'skills', 'mcp', 'plugins', 'capabilities'],

@@ -1,14 +1,14 @@
 /** Owned by @dshfiles/editor: `open-file` opens a workspace path, `workspace-files` streams the session's file list. */
-export const OPEN_FILE_EVENT = 'dshfiles:open-file'
-export const WORKSPACE_FILES_EVENT = 'dshfiles:workspace-files'
-export const GO_TO_LINE_EVENT = 'dshfiles:editor-go-to-line'
+const OPEN_FILE_EVENT = 'dshfiles:open-file'
+const WORKSPACE_FILES_EVENT = 'dshfiles:workspace-files'
+const GO_TO_LINE_EVENT = 'dshfiles:editor-go-to-line'
 
 /** Query prefixes route to threads, commands, thread content, editor lines, or the prefix list. */
 export type PalettePrefix = '>' | '#' | ':' | '?' | 'thread:' | 'session:'
 
-export const PALETTE_PREFIXES: readonly PalettePrefix[] = ['thread:', 'session:', '>', '#', ':', '?']
+const PALETTE_PREFIXES: readonly PalettePrefix[] = ['thread:', 'session:', '>', '#', ':', '?']
 
-export const parsePaletteQuery = (query: string): { readonly prefix: PalettePrefix | null; readonly text: string } => {
+const parsePaletteQuery = (query: string) => {
   const lowered = query.toLocaleLowerCase()
   const prefix = PALETTE_PREFIXES.find(candidate => lowered.startsWith(candidate)) ?? null
   return { prefix, text: prefix === null ? query : query.slice(prefix.length) }
@@ -19,7 +19,7 @@ export interface ThreadSearchInput {
   readonly exactId: string | undefined
 }
 
-export const parseThreadSearchInput = (input: string): ThreadSearchInput => {
+const parseThreadSearchInput = (input: string): ThreadSearchInput => {
   const query = input.trim()
   if (/^session-[^\s/?#&]+$/u.test(query)) return { query, exactId: query }
   let url: URL
@@ -36,7 +36,7 @@ export const parseThreadSearchInput = (input: string): ThreadSearchInput => {
 }
 
 /** A positive line number from the text after `:`, or null. */
-export const parseLineNumber = (text: string): number | null => {
+const parseLineNumber = (text: string): number | null => {
   const trimmed = text.trim()
   if (!/^\d{1,7}$/u.test(trimmed)) return null
   const line = Number(trimmed)
@@ -84,7 +84,7 @@ const scoreLowered = (needle: string, haystack: string): number | null => {
  * Subsequence score: every query character must appear in order. Consecutive
  * runs, word starts and an exact substring score higher; null means no match.
  */
-export const fuzzyScore = (query: string, text: string): number | null => scoreLowered(query.trim().toLocaleLowerCase(), text.toLocaleLowerCase())
+const fuzzyScore = (query: string, text: string): number | null => scoreLowered(query.trim().toLocaleLowerCase(), text.toLocaleLowerCase())
 
 interface IndexedThread {
   readonly thread: ThreadCandidate
@@ -100,7 +100,7 @@ export interface ThreadIndex {
   readonly entries: readonly IndexedThread[]
 }
 
-export const indexThreads = (threads: readonly ThreadCandidate[]): ThreadIndex => ({
+const indexThreads = (threads: readonly ThreadCandidate[]): ThreadIndex => ({
   recent: [...threads].sort((left, right) => right.updatedAt - left.updatedAt),
   entries: threads.map(thread => ({
     thread,
@@ -114,7 +114,7 @@ export const indexThreads = (threads: readonly ThreadCandidate[]): ThreadIndex =
 const weighted = (score: number | null, weight: number): number => (score === null ? -Infinity : score * weight)
 
 /** Recent threads for an empty query; otherwise the best title, project, path or id matches. */
-export const rankThreads = ({ index, query, limit }: { index: ThreadIndex; query: string; limit: number }): ThreadCandidate[] => {
+const rankThreads = ({ index, query, limit }: { index: ThreadIndex; query: string; limit: number }): ThreadCandidate[] => {
   const needle = parseThreadSearchInput(query).query.toLocaleLowerCase()
   if (needle.length === 0) return index.recent.slice(0, limit)
   const matches: Array<{ readonly thread: ThreadCandidate; readonly best: number }> = []
@@ -140,14 +140,14 @@ export interface FileIndex {
   readonly basenames: readonly string[]
 }
 
-export const indexFiles = (paths: readonly string[]): FileIndex => ({
+const indexFiles = (paths: readonly string[]): FileIndex => ({
   paths,
   lowered: paths.map(path => path.toLocaleLowerCase()),
   basenames: paths.map(path => path.slice(path.lastIndexOf('/') + 1).toLocaleLowerCase()),
 })
 
 /** Frecent files first for an empty query; otherwise basename matches outrank matches spread over the path. */
-export const rankFiles = ({ index, query, limit, boost }: { index: FileIndex; query: string; limit: number; boost: (path: string) => number }): string[] => {
+const rankFiles = ({ index, query, limit, boost }: { index: FileIndex; query: string; limit: number; boost: (path: string) => number }): string[] => {
   const needle = query.trim().toLocaleLowerCase()
   const matches: Array<{ readonly path: string; readonly score: number; readonly order: number }> = []
   index.paths.forEach((path, order) => {
@@ -176,7 +176,7 @@ export interface RankableAction {
 }
 
 /** Labels weigh more than aliases; frecency breaks ties and lifts habits, and keeps source order otherwise. */
-export const rankActions = <Action extends RankableAction>({
+const rankActions = <Action extends RankableAction>({
   actions,
   query,
   boost,
@@ -198,4 +198,20 @@ export const rankActions = <Action extends RankableAction>({
     if (best !== -Infinity) matches.push({ action, score: best + bonus, order })
   })
   return matches.sort((left, right) => right.score - left.score || left.order - right.order).map(({ action }) => action)
+}
+
+export class PaletteRules {
+  static readonly OPEN_FILE_EVENT = OPEN_FILE_EVENT
+  static readonly WORKSPACE_FILES_EVENT = WORKSPACE_FILES_EVENT
+  static readonly GO_TO_LINE_EVENT = GO_TO_LINE_EVENT
+  static readonly PALETTE_PREFIXES = PALETTE_PREFIXES
+  static readonly parsePaletteQuery = parsePaletteQuery
+  static readonly parseThreadSearchInput = parseThreadSearchInput
+  static readonly parseLineNumber = parseLineNumber
+  static readonly fuzzyScore = fuzzyScore
+  static readonly indexThreads = indexThreads
+  static readonly rankThreads = rankThreads
+  static readonly indexFiles = indexFiles
+  static readonly rankFiles = rankFiles
+  static readonly rankActions = rankActions
 }

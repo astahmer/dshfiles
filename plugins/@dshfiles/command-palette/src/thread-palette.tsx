@@ -7,27 +7,14 @@ import { Kbd, KbdGroup } from '@dshfiles/plugin-ui/components/ui/kbd'
 import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
 import { ArrowLeftIcon, CheckIcon, CommandIcon, FileIcon, FileSearchIcon, HashIcon, ListOrderedIcon, MessageSquareIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { useDeferredValue, useEffect, useMemo, useState, type KeyboardEvent } from 'react'
+import { useMachine } from '@dshfiles/plugin-ui/machine'
+import { useDeferredValue, useEffect, useMemo, useRef, useState, useSyncExternalStore, type KeyboardEvent } from 'react'
 import { z } from 'zod'
 import { frecencyBoosts, paletteFrecency, recordUse } from './frecency.js'
 import { projectGlyphTone } from './project-tone.js'
-import {
-  GO_TO_LINE_EVENT,
-  indexFiles,
-  indexThreads,
-  OPEN_FILE_EVENT,
-  parseLineNumber,
-  parsePaletteQuery,
-  rankActions,
-  rankFiles,
-  rankThreads,
-  parseThreadSearchInput,
-  WORKSPACE_FILES_EVENT,
-  type ContentHit,
-  type PalettePrefix,
-  type ThreadCandidate,
-} from './palette.js'
-import { getPaletteActions, subscribePaletteActions, type PaletteAction, type PaletteActionContext, type PaletteMode } from './palette-api.js'
+import { PaletteRules, type ContentHit, type PalettePrefix, type ThreadCandidate } from './palette.js'
+import { PaletteApi, type PaletteAction, type PaletteActionContext, type PaletteMode } from './palette-api.js'
+import { paletteActionMachine } from './palette-action-machine.js'
 
 export interface ThreadPaletteCopy {
   readonly title: string
@@ -105,6 +92,10 @@ const COMMAND_LIMIT = 30
 const FRECENT_COMMANDS_ON_EMPTY = 5
 const GO_TO_FILE_ID = 'action:go-to-file'
 
+const rememberPaletteUse = (id: string): void => {
+  paletteFrecency.set(recordUse(paletteFrecency.get(), id, Date.now()))
+}
+
 const rowValue = (row: PaletteRow): string => {
   if (row.kind === 'thread') return `thread:${row.thread.id}`
   if (row.kind === 'content') return `content:${row.thread.id}`
@@ -121,14 +112,14 @@ interface PaletteLocation {
   readonly query: string
 }
 
-const VIEW_BY_PREFIX: Readonly<Record<PalettePrefix, PaletteView>> = {
+const VIEW_BY_PREFIX = {
   '>': 'commands',
   '#': 'content',
   ':': 'line',
   '?': 'help',
   'thread:': 'threads',
   'session:': 'threads',
-}
+} satisfies Readonly<Record<PalettePrefix, PaletteView>>
 
 interface ContentState {
   readonly status: 'idle' | 'searching' | 'done' | 'failed'
@@ -192,7 +183,9 @@ const useWorkspaceFiles = (enabled: boolean): FilesState => {
       if (decoded.data.status === 'no-session') setState({ ...NO_FILES, status: 'no-session' })
       else setState(decoded.data)
     }
-    const handled = !window.dispatchEvent(new CustomEvent(WORKSPACE_FILES_EVENT, { detail: { respond, signal: controller.signal }, cancelable: true }))
+    const handled = !window.dispatchEvent(
+      new CustomEvent(PaletteRules.WORKSPACE_FILES_EVENT, { detail: { respond, signal: controller.signal }, cancelable: true }),
+    )
     if (!handled) setState({ ...NO_FILES, status: 'unavailable' })
     return () => controller.abort()
   }, [enabled])
@@ -206,7 +199,7 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
   const [mode, setMode] = useState(props.mode)
   const [query, setQuery] = useState('')
   const [backStack, setBackStack] = useState<readonly PaletteLocation[]>([])
-  const parsed = parsePaletteQuery(query)
+  const parsed = PaletteRules.parsePaletteQuery(query)
   const view: PaletteView = parsed.prefix === null ? mode : VIEW_BY_PREFIX[parsed.prefix]
   const deferredQuery = useDeferredValue(parsed.text)
   const subview = backStack.length > 0 || parsed.prefix !== null
@@ -218,11 +211,17 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
   const emptyQuery = deferredQuery.trim().length === 0
   const [notice, setNotice] = useState<string | null>(null)
   const [selected, setSelected] = useState('')
-  const [runningAction, setRunningAction] = useState(false)
+  const [actionSnapshot, sendAction, actionActor] = useMachine(paletteActionMachine)
+  const latestOnClose = useRef(props.onClose)
+  latestOnClose.current = props.onClose
+  useEffect(() => {
+    const subscription = actionActor.on('completed', () => latestOnClose.current())
+    return () => subscription.unsubscribe()
+  }, [actionActor])
+  const runningAction = actionSnapshot.matches('running')
   const frecency = paletteFrecency.useValue()
   const boosts = useMemo(() => frecencyBoosts(frecency, Date.now()), [frecency])
-  const [registeredActions, setRegisteredActions] = useState(getPaletteActions)
-  useEffect(() => subscribePaletteActions(() => setRegisteredActions(getPaletteActions())), [])
+  const registeredActions = useSyncExternalStore(PaletteApi.subscribe, PaletteApi.getSnapshot, PaletteApi.getSnapshot).actions
   const actionOptions = useMemo<PaletteActionOption[]>(() => {
     // Several bundles register the same command ("New thread" comes from this palette, the sidebar header and the
     // Host shortcut catalog); list it once, keeping an action or destination over its bare shortcut-command twin.
@@ -243,24 +242,24 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
   }, [props.additionalActions, props.context, registeredActions])
 
   const workspaceFiles = useWorkspaceFiles(mode === 'files')
-  const fileIndex = useMemo(() => indexFiles(workspaceFiles.files), [workspaceFiles.files])
+  const fileIndex = useMemo(() => PaletteRules.indexFiles(workspaceFiles.files), [workspaceFiles.files])
   // Frecency follows the workspace folder, so a file picked in one thread is still frecent in its siblings.
   const fileScope = props.threads.find(thread => thread.id === workspaceFiles.sessionId)?.cwd || workspaceFiles.sessionId
   const fileKey = (path: string): string => `file:${fileScope}:${path}`
   const fileRows = useMemo(
     () =>
       view === 'files'
-        ? rankFiles({ index: fileIndex, query: deferredQuery, limit: RESULT_LIMIT, boost: path => boosts.get(`file:${fileScope}:${path}`) ?? 0 })
+        ? PaletteRules.rankFiles({ index: fileIndex, query: deferredQuery, limit: RESULT_LIMIT, boost: path => boosts.get(`file:${fileScope}:${path}`) ?? 0 })
         : [],
     [boosts, deferredQuery, fileIndex, fileScope, view],
   )
 
-  const threadIndex = useMemo(() => indexThreads(props.threads), [props.threads])
-  const threadSearch = parseThreadSearchInput(deferredQuery)
+  const threadIndex = useMemo(() => PaletteRules.indexThreads(props.threads), [props.threads])
+  const threadSearch = PaletteRules.parseThreadSearchInput(deferredQuery)
   const threadRows = useMemo(
     () =>
       view === 'all' || view === 'threads'
-        ? rankThreads({ index: threadIndex, query: threadSearch.query, limit: threadSearch.query.length === 0 ? props.recentLimit : RESULT_LIMIT })
+        ? PaletteRules.rankThreads({ index: threadIndex, query: threadSearch.query, limit: threadSearch.query.length === 0 ? props.recentLimit : RESULT_LIMIT })
         : [],
     [props.recentLimit, threadIndex, threadSearch.query, view],
   )
@@ -277,7 +276,7 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
       return thread === undefined ? [] : [{ thread, snippet: hit.snippet }]
     })
   }, [content.hits, props.threads, view])
-  const line = view === 'line' ? parseLineNumber(deferredQuery) : null
+  const line = view === 'line' ? PaletteRules.parseLineNumber(deferredQuery) : null
   const helpRows = useMemo(
     () =>
       view === 'help'
@@ -307,7 +306,7 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
   const destinationRows = useMemo(
     () =>
       view === 'all' || view === 'commands'
-        ? rankActions({
+        ? PaletteRules.rankActions({
             actions: [goToFile, ...actionOptions.filter(action => action.group !== 'command')],
             query: deferredQuery,
             boost: id => boosts.get(id) ?? 0,
@@ -318,10 +317,11 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
   const commandRows = useMemo(() => {
     if (view !== 'all' && view !== 'commands') return []
     const commands = actionOptions.filter(action => action.group === 'command')
-    if (view === 'commands') return rankActions({ actions: commands, query: deferredQuery, boost: id => boosts.get(id) ?? 0 }).slice(0, RESULT_LIMIT)
+    if (view === 'commands')
+      return PaletteRules.rankActions({ actions: commands, query: deferredQuery, boost: id => boosts.get(id) ?? 0 }).slice(0, RESULT_LIMIT)
     if (deferredQuery.trim().length > 0)
-      return rankActions({ actions: commands, query: deferredQuery, boost: id => boosts.get(id) ?? 0 }).slice(0, COMMAND_LIMIT)
-    return rankActions({ actions: commands.filter(command => boosts.has(command.id)), query: '', boost: id => boosts.get(id) ?? 0 }).slice(
+      return PaletteRules.rankActions({ actions: commands, query: deferredQuery, boost: id => boosts.get(id) ?? 0 }).slice(0, COMMAND_LIMIT)
+    return PaletteRules.rankActions({ actions: commands.filter(command => boosts.has(command.id)), query: '', boost: id => boosts.get(id) ?? 0 }).slice(
       0,
       FRECENT_COMMANDS_ON_EMPTY,
     )
@@ -343,24 +343,20 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
   // Until the pointer or arrows pick a row, the first match is active, so Enter runs it right after typing.
   const activeValue = rows.some(row => rowValue(row) === selected) ? selected : rows[0] === undefined ? '' : rowValue(rows[0])
 
-  const remember = (id: string): void => {
-    paletteFrecency.set(recordUse(paletteFrecency.get(), id, Date.now()))
-  }
-
-  const activate = async (row: PaletteRow): Promise<void> => {
+  const activate = (row: PaletteRow): void => {
     if (row.kind === 'help') {
       setQuery(row.prefix)
       setSelected('')
       return
     }
     if (row.kind === 'line') {
-      const handled = !window.dispatchEvent(new CustomEvent(GO_TO_LINE_EVENT, { detail: { line: row.line }, cancelable: true }))
+      const handled = !window.dispatchEvent(new CustomEvent(PaletteRules.GO_TO_LINE_EVENT, { detail: { line: row.line }, cancelable: true }))
       if (handled) props.onClose()
       else setNotice(props.copy.noEditorFile)
       return
     }
     if (row.kind === 'destination' && row.destination.id === GO_TO_FILE_ID) {
-      remember(GO_TO_FILE_ID)
+      rememberPaletteUse(GO_TO_FILE_ID)
       setBackStack(stack => [...stack, { mode, query }])
       setMode('files')
       setQuery('')
@@ -374,27 +370,24 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
     }
     if (row.kind === 'file') {
       props.onClose()
-      remember(fileKey(row.path))
-      window.dispatchEvent(new CustomEvent(OPEN_FILE_EVENT, { detail: { path: row.path }, cancelable: true }))
+      rememberPaletteUse(fileKey(row.path))
+      window.dispatchEvent(new CustomEvent(PaletteRules.OPEN_FILE_EVENT, { detail: { path: row.path }, cancelable: true }))
       return
     }
-    remember(row.destination.id)
-    setRunningAction(true)
-    try {
-      await row.destination.run(props.context)
-      props.onClose()
-    } catch {
-      setNotice(props.copy.actionFailed)
-    } finally {
-      setRunningAction(false)
-    }
+    rememberPaletteUse(row.destination.id)
+    sendAction({ type: 'run', action: row.destination, context: props.context })
+  }
+
+  const clearNotice = (): void => {
+    setNotice(null)
+    if (actionSnapshot.matches('failed')) sendAction({ type: 'reset' })
   }
 
   const goBack = (): void => {
     if (parsed.prefix !== null) {
       setQuery(parsed.text)
       setSelected('')
-      setNotice(null)
+      clearNotice()
       return
     }
     const previous = backStack.at(-1)
@@ -403,13 +396,13 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
       setMode(previous.mode)
       setQuery(previous.query)
       setSelected('')
-      setNotice(null)
+      clearNotice()
       return
     }
     if (query.length > 0) {
       setQuery('')
       setSelected('')
-      setNotice(null)
+      clearNotice()
       return
     }
     props.onClose()
@@ -448,7 +441,7 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
   }
 
   const itemClass = 'dshx:gap-3 dshx:rounded-md dshx:px-2.5 dshx:py-2'
-  const viewCopy: Readonly<Record<PaletteView, { readonly chip: string; readonly placeholder: string }>> = {
+  const viewCopy = {
     all: { chip: props.copy.viewAll, placeholder: props.copy.allPlaceholder },
     threads: { chip: props.copy.threads, placeholder: props.copy.threadsPlaceholder },
     files: { chip: props.copy.files, placeholder: props.copy.filesPlaceholder },
@@ -456,7 +449,7 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
     content: { chip: props.copy.viewContent, placeholder: props.copy.contentPlaceholder },
     line: { chip: props.copy.viewLine, placeholder: props.copy.linePlaceholder },
     help: { chip: props.copy.viewHelp, placeholder: props.copy.helpPlaceholder },
-  }
+  } satisfies Readonly<Record<PaletteView, { readonly chip: string; readonly placeholder: string }>>
   const placeholder = viewCopy[view].placeholder
   const escapeLabel = subview ? props.copy.back : query.length > 0 ? props.copy.clear : props.copy.close
 
@@ -504,7 +497,7 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
             onValueChange={next => {
               setQuery(next)
               setSelected('')
-              setNotice(null)
+              clearNotice()
             }}
             placeholder={placeholder}
           />
@@ -540,7 +533,7 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
               </Tabs>
             )}
             {subview ? <Badge variant="secondary">{viewCopy[view].chip}</Badge> : null}
-            <span className="dshx:truncate">{notice ?? props.copy.prefixHint}</span>
+            <span className="dshx:truncate">{notice ?? (actionSnapshot.matches('failed') ? props.copy.actionFailed : props.copy.prefixHint)}</span>
           </div>
           <CommandList className="dshx:max-h-[min(60vh,440px)] dshx:p-1">
             <CommandEmpty className="dshx:py-6 dshx:text-center dshx:text-sm dshx:text-muted-foreground">

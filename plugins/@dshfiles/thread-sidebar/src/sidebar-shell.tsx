@@ -76,7 +76,7 @@ import {
   type NavigationHistory,
   type NavigationLocation,
 } from './navigation-history.js'
-import { registerPaletteAction, type PaletteAction } from '@dshfiles/command-palette/api'
+import { PaletteApi, type PaletteAction } from '@dshfiles/command-palette/api'
 import { formatChord, isMacPlatform, matchesChord, parseChord, sameAsHostBinding } from './keyboard-shortcuts.js'
 import { SidebarStateProvider, useSidebarState } from './sidebar-state.js'
 import { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
@@ -981,7 +981,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   )
 
   useEffect(() => {
-    const disposers = paletteActions.map(action => registerPaletteAction(action))
+    const disposers = paletteActions.map(action => PaletteApi.registerAction(action))
     return () => disposers.forEach(dispose => dispose())
   }, [paletteActions])
 

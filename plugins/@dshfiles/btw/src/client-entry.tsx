@@ -10,7 +10,7 @@ import type { CommandClaim, InputTriggerSource } from '@dshfiles/input-trigger/c
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type { PropsRenderFactories, PropsRenderSlots, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
-import { registerPaletteAction } from '@dshfiles/command-palette/api'
+import { PaletteApi } from '@dshfiles/command-palette/api'
 import { defineClient } from '@dshfiles/dshx/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { MessageCircleQuestionIcon } from '@dshfiles/plugin-ui/icons'
@@ -232,7 +232,7 @@ export default defineClient({
 
     ctx.effect(
       () =>
-        registerPaletteAction({
+        PaletteApi.registerAction({
           id: '@dshfiles/btw/ask',
           label: () => t('paletteAsk'),
           aliases: ['btw', 'side question', 'side chat', 'ask about this thread', 'fork'],

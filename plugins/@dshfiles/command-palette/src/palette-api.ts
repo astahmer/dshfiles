@@ -38,11 +38,18 @@ export interface PaletteAction {
   readonly run: (context: PaletteActionContext) => void | Promise<void>
 }
 
+interface PaletteApiSnapshot {
+  readonly actions: readonly PaletteAction[]
+  readonly mode: PaletteMode | null
+  readonly recentLimit: number
+}
+
 interface PaletteRegistry {
   readonly actions: Map<string, PaletteAction>
   readonly listeners: Set<() => void>
   mode: PaletteMode | null
   recentLimit: number
+  snapshot?: PaletteApiSnapshot
 }
 
 declare global {
@@ -75,17 +82,40 @@ const paletteActionSchema = z.object({
 const registry = (): PaletteRegistry => {
   const current = window.__dshfilesCommandPaletteV1
   if (current !== undefined) return current
-  const created: PaletteRegistry = { actions: new Map(), listeners: new Set(), mode: null, recentLimit: 10 }
+  const created: PaletteRegistry = {
+    actions: new Map(),
+    listeners: new Set(),
+    mode: null,
+    recentLimit: 10,
+    snapshot: { actions: [], mode: null, recentLimit: 10 },
+  }
   window.__dshfilesCommandPaletteV1 = created
   return created
 }
 
+const refreshSnapshot = (current: PaletteRegistry): PaletteApiSnapshot => {
+  const actions = [...current.actions.values()]
+  const previous = current.snapshot
+  if (
+    previous !== undefined &&
+    previous.mode === current.mode &&
+    previous.recentLimit === current.recentLimit &&
+    previous.actions.length === actions.length &&
+    previous.actions.every((action, index) => action === actions[index])
+  )
+    return previous
+  const next = { actions, mode: current.mode, recentLimit: current.recentLimit }
+  current.snapshot = next
+  return next
+}
+
 const notify = (current: PaletteRegistry): void => {
+  refreshSnapshot(current)
   for (const listener of current.listeners) listener()
 }
 
 /** Register a browser-local action and return its lifecycle disposer. */
-export const registerPaletteAction = (input: PaletteAction): (() => void) => {
+const registerPaletteAction = (input: PaletteAction): (() => void) => {
   const parsed = paletteActionSchema.safeParse(input)
   if (!parsed.success) throw new Error('Command palette action has an invalid definition.')
   const current = registry()
@@ -99,19 +129,19 @@ export const registerPaletteAction = (input: PaletteAction): (() => void) => {
   }
 }
 
-export const getPaletteActions = (): readonly PaletteAction[] => [...registry().actions.values()]
+const getPaletteSnapshot = (): PaletteApiSnapshot => refreshSnapshot(registry())
 
-export const subscribePaletteActions = (listener: () => void): (() => void) => {
+const subscribePaletteActions = (listener: () => void): (() => void) => {
   const current = registry()
-  current.listeners.add(listener)
-  return () => current.listeners.delete(listener)
+  const onChange = (): void => {
+    refreshSnapshot(current)
+    listener()
+  }
+  current.listeners.add(onChange)
+  return () => current.listeners.delete(onChange)
 }
 
-export const getPaletteMode = (): PaletteMode | null => registry().mode
-
-export const getPaletteRecentLimit = (): number => registry().recentLimit
-
-export const setPaletteRecentLimit = (recentLimit: number): void => {
+const setPaletteRecentLimit = (recentLimit: number): void => {
   const parsed = z.number().int().min(1).max(50).parse(recentLimit)
   const current = registry()
   if (current.recentLimit === parsed) return
@@ -119,14 +149,23 @@ export const setPaletteRecentLimit = (recentLimit: number): void => {
   notify(current)
 }
 
-export const openPalette = (mode: PaletteMode): void => {
+const openPalette = (mode: PaletteMode): void => {
   const current = registry()
   current.mode = mode
   notify(current)
 }
 
-export const closePalette = (): void => {
+const closePalette = (): void => {
   const current = registry()
   current.mode = null
   notify(current)
+}
+
+export class PaletteApi {
+  static readonly getSnapshot = getPaletteSnapshot
+  static readonly subscribe = subscribePaletteActions
+  static readonly registerAction = registerPaletteAction
+  static readonly setRecentLimit = setPaletteRecentLimit
+  static readonly open = openPalette
+  static readonly close = closePalette
 }

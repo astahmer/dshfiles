@@ -10,22 +10,12 @@ import type { SidebarRootComponentProps } from '@deepseek-ai/dsh-client-ui-sideb
 import type { PropsLocale, PropsRuntime, TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import type { WorkspaceBrowserProps } from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { defineClient } from '@dshfiles/dshx/client'
-import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
+import { useMemo, useSyncExternalStore } from 'react'
 import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
 import { CirclePlusIcon, FolderOpenIcon, MoonIcon, SunIcon, SunMoonIcon } from '@dshfiles/plugin-ui/icons'
 import { COMMAND_PALETTE_LOCALE_NAMESPACE, commandPaletteLocale } from './locales.js'
 import { newThreadShortcutDefaults } from './new-thread-shortcut.js'
-import {
-  closePalette,
-  getPaletteMode,
-  getPaletteRecentLimit,
-  openPalette,
-  PALETTE_EVENT,
-  registerPaletteAction,
-  subscribePaletteActions,
-  type PaletteAction,
-  type PaletteActionContext,
-} from './palette-api.js'
+import { PaletteApi, PALETTE_EVENT, type PaletteAction, type PaletteActionContext } from './palette-api.js'
 import { ThreadPalette } from './thread-palette.js'
 
 const isShortcutCommandId = (value: string): value is ShortcutCommandId => /^[a-z][a-zA-Z0-9-]*(?:\.[a-zA-Z][a-zA-Z0-9-]*)+$/u.test(value)
@@ -57,8 +47,8 @@ const workspaceForSession = (
 }
 
 const PaletteOverlay = (props: PaletteOverlayProps): JSX.Element | null => {
-  const [mode, setMode] = useState(getPaletteMode)
-  const [recentLimit, setRecentLimit] = useState(getPaletteRecentLimit)
+  const paletteSnapshot = useSyncExternalStore(PaletteApi.subscribe, PaletteApi.getSnapshot, PaletteApi.getSnapshot)
+  const { mode, recentLimit } = paletteSnapshot
   const sessionState = props.useSessions(state => state)
   const workspaceState = props.useWorkspaces(state => state)
   const themeSnapshot = useSyncExternalStore(props.themeStore.subscribe, props.themeStore.getSnapshot, props.themeStore.getSnapshot)
@@ -105,6 +95,7 @@ const PaletteOverlay = (props: PaletteOverlayProps): JSX.Element | null => {
       }),
     [sessionState.byId, sessions, workspaceBySession, workspaceState.archivedSessionIds, workspaces],
   )
+  const openWorkspace = props.openWorkspace
   const workspaceActions = useMemo<readonly PaletteAction[]>(
     () =>
       workspaceState.items
@@ -116,17 +107,9 @@ const PaletteOverlay = (props: PaletteOverlayProps): JSX.Element | null => {
           icon: <FolderOpenIcon className="dshx:size-4" />,
           group: 'destination',
           isSelected: current => current.workspace?.id === workspace.workspaceId,
-          run: () => props.openWorkspace(workspace.workspaceId),
+          run: () => openWorkspace(workspace.workspaceId),
         })),
-    [props.openWorkspace, workspaceState.items],
-  )
-  useEffect(
-    () =>
-      subscribePaletteActions(() => {
-        setMode(getPaletteMode())
-        setRecentLimit(getPaletteRecentLimit())
-      }),
-    [],
+    [openWorkspace, workspaceState.items],
   )
   if (mode === null) return null
   return (
@@ -188,7 +171,7 @@ const PaletteOverlay = (props: PaletteOverlayProps): JSX.Element | null => {
         const session = sessions.find(candidate => candidate.id === sessionId)
         if (session !== undefined) props.openSession(session.id)
       }}
-      onClose={closePalette}
+      onClose={PaletteApi.close}
     />
   )
 }
@@ -241,7 +224,7 @@ export default defineClient({
         const requestedMode = typeof detail === 'object' && detail !== null && 'mode' in detail ? detail.mode : undefined
         event.preventDefault()
         if (probe) return
-        openPalette(requestedMode === 'threads' || requestedMode === 'files' ? requestedMode : 'all')
+        PaletteApi.open(requestedMode === 'threads' || requestedMode === 'files' ? requestedMode : 'all')
       }
       window.addEventListener(PALETTE_EVENT, onRequest)
       return () => window.removeEventListener(PALETTE_EVENT, onRequest)
@@ -263,7 +246,7 @@ export default defineClient({
             },
             regions: ['page', 'editable'],
             modals: [],
-            resolve: () => ({ status: 'handled', run: () => openPalette('all') }),
+            resolve: () => ({ status: 'handled', run: () => PaletteApi.open('all') }),
           }),
         'command-palette: shortcut',
       )
@@ -276,7 +259,7 @@ export default defineClient({
       group: 'action',
       run: startNewThread,
     }
-    ctx.effect(() => registerPaletteAction(newThreadAction), 'command-palette: new thread action')
+    ctx.effect(() => PaletteApi.registerAction(newThreadAction), 'command-palette: new thread action')
     const newThreadShortcutId = 'commandPalette.newThread'
     if (isShortcutCommandId(newThreadShortcutId))
       ctx.effect(() => {
@@ -332,7 +315,7 @@ export default defineClient({
       },
     ]
     ctx.effect(() => {
-      const disposers = themeActions.map(action => registerPaletteAction(action))
+      const disposers = themeActions.map(action => PaletteApi.registerAction(action))
       return () => disposers.forEach(dispose => dispose())
     }, 'command-palette: appearance actions')
   },
