@@ -9,6 +9,7 @@ import { createPluginUpdateWatch } from './plugin-updates.js'
 import { threadSidebarRestartApi } from './restart-api.js'
 import { createRestartController, readLaunchUrl } from './restart.js'
 import { threadSidebarSettings } from './settings.js'
+import { threadSidebarModelRouteProjection } from './subagent-provenance/projection.js'
 
 const restartApi = threadSidebarRestartApi.host({
   availability: ({ ctx }) => ({ available: createRestartController(ctx).available }),
@@ -58,11 +59,12 @@ interface ClientModuleRegistrySurface {
 export default defineHost({
   name: '@dshfiles/thread-sidebar',
   settings: [threadSidebarSettings],
-  inject: ['connection'],
+  inject: ['connection', 'sessionProjections'],
   apis: [restartApi, machineApi, pluginUpdatesApi],
   // The web Host's client module registry knows where every loaded plugin package lives; Hosts without it
   // (desktop shells, older builds) simply report no pending updates.
   setup: ctx => {
+    ctx.sessionProjections.register(threadSidebarModelRouteProjection)
     ctx.inject(['clientModules'], scoped => {
       const registry: ClientModuleRegistrySurface | undefined = scoped.get('clientModules')
       if (registry?.graph === undefined || registry.clientPath === undefined) return

@@ -191,14 +191,22 @@ thread; selection changes update the URL. Copied links drop existing query
 parameters and fragments, including process launch credentials, and resolve
 only on the same DSH Host/origin where the session exists.
 
-The web app already composes DSH's native subagent tools and presentation:
-continuable children can run concurrently, and `list_agents`, `send_message`,
-and `interrupt_agent` support parent-side orchestration. The native subagent
-catalog traverses descendants recursively. The Host supports up to 8 live
-continuable children by default, and each child persists its direct parent
-session ID. The configurable `subagent.maxDepth` currently defaults to 1, but
-the lineage model and sidebar do not bake in that depth. Change the native
-Subagent depth setting when deeper delegation is desired.
+The web app composes DSH's native subagent tools and runtime, while this plugin
+owns the subagent catalog action, child-thread lineage, and `Create subagent`
+tool-row presentation. A plugin-owned Host projection records the latest safe
+provider/model reported by a completed assistant response; catalog rows and
+child headers display it. The tool row shows an explicit requested route. The
+plugin never looks up account identity, and email- or credential-like route
+values are omitted. The lineage UI is adapted from DSH's MIT-licensed
+implementation; see `third-party/NOTICE.md`.
+
+Continuable children can run concurrently, and `list_agents`, `send_message`,
+and `interrupt_agent` support parent-side orchestration. The catalog traverses
+descendants recursively. The Host supports up to 8 live continuable children by
+default, and each child persists its direct parent session ID. The configurable
+`subagent.maxDepth` currently defaults to 1, but the lineage model and sidebar
+do not bake in that depth. Change the native Subagent depth setting when deeper
+delegation is desired.
 The native `@` reference source already offers recent sessions and searches by
 session ID, title, display label, or workspace path. An empty `@` query is
 limited to the configured recent candidate count (default 50), with

@@ -11,6 +11,7 @@ import type { SidebarPanelMetadata, SidebarRootInjected } from '@deepseek-ai/dsh
 import { rankByName } from '@deepseek-ai/dsh-client-ui-primitives'
 import { resolveSlotLabel, type TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
+import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { defineClient } from '@dshfiles/dshx/client'
 import { createActor } from '@dshfiles/plugin-ui/machine'
@@ -21,6 +22,12 @@ import { archivedViewMachine } from './archived-view-machine.js'
 import { SidebarRoot, type FooterSnapshot, type SidebarShellBaseProps } from './sidebar-shell.js'
 import { ThreadSidebar } from './client.js'
 import { HeaderThreadActions } from './header-actions.js'
+import { SubagentCatalogAction, SubagentHeaderLineage, type SubagentCatalogInjected } from './subagent-provenance/SubagentHeaderLineage.js'
+import { SubagentProvenanceToolRow } from './subagent-provenance/subagent-tool-row.js'
+import { NS as SUBAGENT_LOCALE_NAMESPACE } from './subagent-provenance/locales.js'
+import { subagentChatAddress } from './subagent-provenance/resource.js'
+import type { SubagentAddress } from '@deepseek-ai/dsh-subagent/client'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { sidebarChildren } from './sidebar-contract.js'
 import { THREAD_SIDEBAR_LOCALE_NAMESPACE, threadSidebarLocale } from './locales.js'
 import { archiveWithoutStopping } from './organization.js'
@@ -93,6 +100,7 @@ export default defineClient({
     'workspaces',
     'sessions',
     'conversation',
+    'sidebarRight',
     'remote',
     'remote.workspace',
     'remote.sessionReferenceResolver',
@@ -452,6 +460,58 @@ export default defineClient({
       const result = await ctx.remote.workspace.unpinSession({ sessionId })
       if (!result.ok) throw new Error(result.error.code)
     }
+    const subagentCatalogActions = (_parentSessionId: SessionId): SubagentCatalogInjected => ({
+      openChild(address: SubagentAddress) {
+        ctx.uiWorkspace.openSession(address)
+      },
+      openChildAside(address: SubagentAddress) {
+        ctx.sidebarRight.openResource(subagentChatAddress(address), {
+          kind: 'subagentchat',
+          preferNewPane: true,
+        })
+      },
+      refreshProjection(parentSessionId: SessionId) {
+        void ctx.sessions.refreshProjections(parentSessionId)
+      },
+    })
+    ctx.slots.inject('conversation.session.header.lineage', () =>
+      ctx.slots.register(
+        {
+          name: 'conversation.session.header.lineage',
+          registrant: '@dshfiles/thread-sidebar',
+          priority: -1000,
+          locale: SUBAGENT_LOCALE_NAMESPACE,
+          inject: subagentCatalogActions,
+        },
+        decorate(SubagentHeaderLineage),
+      ),
+    )
+    ctx.slots.inject('conversation.session.header.actions', () =>
+      ctx.slots.register(
+        {
+          name: 'conversation.session.header.actions',
+          id: 'subagent-catalog',
+          priority: -1000,
+          order: -30,
+          locale: SUBAGENT_LOCALE_NAMESPACE,
+          inject: subagentCatalogActions,
+        },
+        decorate(SubagentCatalogAction),
+      ),
+    )
+    ctx.slots.inject('tool.call.toolview', () =>
+      ctx.slots.register(
+        {
+          name: 'tool.call.toolview',
+          key: 'subagent',
+          registrant: '@dshfiles/thread-sidebar',
+          priority: -1000,
+          locale: 'conversation',
+        },
+        decorate(SubagentProvenanceToolRow),
+      ),
+    )
+
     ctx.slots.inject('conversation.session.header.utilities', () =>
       ctx.slots.register(
         {

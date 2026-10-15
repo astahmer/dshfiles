@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { z } from 'zod'
+import { JsonText } from './json-text.js'
 
 /** The slice of the Host's client module registry used to locate each loaded plugin package. */
 export interface PluginRegistry {
@@ -26,8 +27,8 @@ const fingerprint = async (id: string, clientPath: string): Promise<string | nul
   let directory = dirname(clientPath)
   for (;;) {
     const raw = await readOptional(join(directory, 'package.json'))
-    const manifest = manifestSchema.safeParse(raw === '' ? null : JSON.parse(raw))
-    if (manifest.success && manifest.data.name === id) {
+    const manifest = JsonText.decode(manifestSchema, raw)
+    if (manifest?.success === true && manifest.data.name === id) {
       const exported = typeof manifest.data.exports === 'string' ? manifest.data.exports : entryTargetSchema.safeParse(manifest.data.exports?.['.']).data
       const hostEntry = typeof exported === 'string' ? exported : (exported?.import ?? exported?.default ?? manifest.data.main ?? 'index.js')
       const files = await Promise.all([raw, readOptional(join(directory, hostEntry)), readOptional(join(directory, 'cordis.patch.yml'))])
