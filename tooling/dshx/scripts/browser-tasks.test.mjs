@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict'
-import { readFile, readdir } from 'node:fs/promises'
-import { dirname, resolve } from 'node:path'
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { dirname, join, resolve } from 'node:path'
 import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
-import { cucumberExpressionPattern, featureOwner, featureSteps, parseStepDefinitions, planBrowserTasks } from './browser-tasks.mjs'
+import { cucumberExpressionPattern, featureOwner, featureSteps, parseStepDefinitions, planBrowserTasks, runtimeDistDigest } from './browser-tasks.mjs'
 
 const featuresDir = resolve(dirname(fileURLToPath(import.meta.url)), '../e2e/features')
 
@@ -61,4 +62,24 @@ test('tasks key on dist digests, never on a dist glob Turbo would drop inside th
     everyInput.filter(input => input.includes('/dist/')),
     [],
   )
+})
+
+test('a dist digest moves with the runtime JavaScript, never with source maps or declarations', async t => {
+  const dist = await mkdtemp(join(tmpdir(), 'browser-dist-'))
+  t.after(() => rm(dist, { recursive: true, force: true }))
+  await mkdir(join(dist, 'native'))
+  const write = (file, text) => writeFile(join(dist, file), text)
+  await write('client.js', 'export const answer = 42\n//# sourceMappingURL=client.js.map\n')
+  await write('client.js.map', '{"version":3,"mappings":"AAAA"}')
+  await write('client.d.ts', 'export declare const answer: number\n')
+  await write('native/slots.d.ts.map', '{"version":3,"mappings":"AAAA"}')
+  const built = await runtimeDistDigest(dist)
+
+  await write('client.js.map', '{"version":3,"mappings":"AAAA;AACA"}')
+  await write('native/slots.d.ts.map', '{"version":3,"mappings":"AACA"}')
+  await write('client.d.ts', 'export declare const answer: 42\n')
+  assert.equal(await runtimeDistDigest(dist), built)
+
+  await write('client.js', 'export const answer = 43\n//# sourceMappingURL=client.js.map\n')
+  assert.notEqual(await runtimeDistDigest(dist), built)
 })

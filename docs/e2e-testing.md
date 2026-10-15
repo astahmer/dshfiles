@@ -145,10 +145,13 @@ A task's key is what it actually runs, never a build hash: plugin-ui's build
 reads every plugin's sources for the shared stylesheet, so every build hash
 moves together while most bundles' `dist` does not. The inputs are:
 
-- a digest of the runtime `dist` (no source maps or declarations), the
-  `package.json` and the `cordis.patch.yml` of every bundle the package's
-  journeys boot (the packages their Given steps name, every bundle
-  for a step that boots the web profile) and of their workspace dependencies;
+- a digest of the runtime `dist`, the `package.json` and the
+  `cordis.patch.yml` of every bundle the package's journeys boot (the packages
+  their Given steps name, every bundle for a step that boots the web profile)
+  and of their workspace dependencies. The digest leaves out `*.map` and
+  `*.d.ts`: a formatting-only change to plugin-ui rewrites the source maps of
+  every bundle that inlines it while their JavaScript stays byte-identical, so
+  hashing maps would rerun all their journeys for nothing;
 - its feature files and the step files their steps match (plus the step files
   those import); a step no expression matches makes the package depend on every
   step file and bundle, and the planner test fails on it;

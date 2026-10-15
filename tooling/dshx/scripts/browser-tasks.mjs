@@ -157,19 +157,27 @@ const runtimeDistFiles = async root => {
     .sort()
 }
 
+/**
+ * Digest of what a booted bundle runs. Source maps and declarations stay out: a formatting-only change to plugin-ui
+ * rewrites the maps of every bundle that inlines it while their JavaScript stays byte-identical.
+ */
+export const runtimeDistDigest = async distRoot => {
+  const hash = createHash('sha256')
+  for (const file of await runtimeDistFiles(distRoot)) {
+    hash.update(`${file}\0`)
+    hash.update(await readFile(resolve(distRoot, file)))
+    hash.update('\0')
+  }
+  return hash.digest('hex')
+}
+
 /** Record a digest of every workspace package's runtime `dist`, the key the browser tasks read; run after building. */
 export const writeDistDigests = async () => {
   const packages = await listWorkspacePackages()
   await mkdir(resolve(workspaceRoot, distDigestDir), { recursive: true })
   for (const { name, directory } of packages.values()) {
-    const distRoot = resolve(workspaceRoot, directory, 'dist')
-    const hash = createHash('sha256')
-    for (const file of await runtimeDistFiles(distRoot)) {
-      hash.update(`${file}\0`)
-      hash.update(await readFile(resolve(distRoot, file)))
-      hash.update('\0')
-    }
-    await writeFile(resolve(workspaceRoot, distDigestFile(name)), `${hash.digest('hex')}\n`)
+    const digest = await runtimeDistDigest(resolve(workspaceRoot, directory, 'dist'))
+    await writeFile(resolve(workspaceRoot, distDigestFile(name)), `${digest}\n`)
   }
 }
 
