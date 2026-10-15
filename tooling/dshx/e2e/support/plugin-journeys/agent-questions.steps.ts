@@ -43,7 +43,7 @@ Then('the public question and feedback tools pass their real Host acceptance cas
 
   await recordAssertion(page, 'agent-questions-tool-journey-and-boundaries', () => {
     expect(result.output).toContain(
-      'PASS: Question answer, authorization, expiry/defer, feedback submit/read/cancel, unsafe-anchor, and batch-boundary tools passed on a fresh DSH scratch Host.',
+      'PASS: Question inbox (all Sessions and one Session, root-only scope), child-question authorization, native root-only authorization and continued-answer guard, expiry/defer, feedback, and batch-boundary tools passed on a fresh DSH scratch Host.',
     )
     expect(result.output).toContain(
       'PASS: Pending question and feedback cold-resumed; the parent reattached, answered, and resolved the pending feedback after restart.',

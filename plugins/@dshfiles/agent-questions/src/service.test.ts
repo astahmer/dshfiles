@@ -126,6 +126,40 @@ describe('parent question Host contract', () => {
     await service.close()
   })
 
+  it('lists pending questions by direct parent with exact deadline and child filter', async () => {
+    let timestamp = 1_000
+    const service = makeService(createMemoryTable(), () => timestamp)
+    const first = await service.request(requestInput({ timeoutMs: 30_000 }))
+    const second = await service.request(
+      requestInput({
+        agent: secondChild,
+        operationId: 'call-b',
+        question: 'Which validation should I run?',
+        timeoutMs: 10_000,
+      }),
+    )
+    timestamp = 4_000
+
+    const all = await service.listForParent({ agent: root })
+    const firstQuestion = all.find(question => question.questionId === first.questionId)
+    expect(firstQuestion).toMatchObject({
+      childSessionId: firstChild.id,
+      recommendedOptionId: 'expand-contract',
+      expiryBehavior: 'recommended',
+      expiresAt: 31_000,
+      remainingMs: 27_000,
+      expired: false,
+    })
+    expect(await service.listForParent({ agent: root, childSessionId: secondChild.id })).toMatchObject([
+      { questionId: second.questionId, childSessionId: secondChild.id },
+    ])
+    expect(await service.listForParent({ agent: unrelatedAgent })).toEqual([])
+
+    await service.answer({ agent: root, questionId: first.questionId, answer: 'Use expand and contract.' })
+    expect((await service.listForParent({ agent: root })).map(question => question.questionId)).toEqual([second.questionId])
+    await service.close()
+  })
+
   it('isolates concurrent child answers by question id', async () => {
     const service = makeService(createMemoryTable())
     const first = await service.request(requestInput({ operationId: 'call-a' }))

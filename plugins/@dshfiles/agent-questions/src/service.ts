@@ -33,6 +33,7 @@ const requestInputSchema = z
   })
 
 const answerInputSchema = z.string().trim().min(1).max(4_000)
+const parentQuestionListInputSchema = z.object({ childSessionId: z.string().trim().min(1).max(256).optional() }).strict()
 
 const MAX_STORED_QUESTIONS = 1_000
 const MAX_PENDING_PER_PARENT = 50
@@ -81,6 +82,20 @@ export interface ParentQuestionReceipt {
   readonly status: ParentQuestionRecord['status']
 }
 
+export interface ParentQuestionInboxEntry {
+  readonly questionId: string
+  readonly childSessionId: string
+  readonly question: string
+  readonly context?: string
+  readonly options: ParentQuestionRecord['options']
+  readonly recommendedOptionId?: string
+  readonly expiryBehavior?: ParentQuestionExpiryBehavior
+  readonly createdAt: number
+  readonly expiresAt: number
+  readonly remainingMs: number
+  readonly expired: boolean
+}
+
 export interface ParentQuestionService {
   request(input: {
     readonly agent: ParentQuestionAgent
@@ -93,6 +108,7 @@ export interface ParentQuestionService {
     readonly timeoutMs: number
     readonly signal: AbortSignal
   }): Promise<ParentQuestionReceipt>
+  listForParent(input: { readonly agent: ParentQuestionAgent; readonly childSessionId?: string }): Promise<ParentQuestionInboxEntry[]>
   answer(input: { readonly agent: ParentQuestionAgent; readonly questionId: string; readonly answer: string }): Promise<ParentQuestionOutcome>
   wait(input: { readonly agent: ParentQuestionAgent; readonly questionId: string; readonly signal: AbortSignal }): Promise<ParentQuestionOutcome>
   cancel(input: { readonly agent: ParentQuestionAgent; readonly questionId: string }): Promise<ParentQuestionOutcome>
@@ -365,6 +381,38 @@ export const createParentQuestionService = (input: {
         record = await sendQuestion(table, key, created, request.signal)
         return receiptOf(record)
       })
+    },
+    listForParent: async ({ agent, childSessionId }) => {
+      assertOpen()
+      if (!input.runtime.isLive(agent)) throw new Error('Question list requires the exact live parent Agent.')
+      const parsed = parentQuestionListInputSchema.parse({ childSessionId })
+      const table = await input.table()
+      const timestamp = now()
+
+      return Array.from(table.entries(), ([, record]) => record)
+        .filter(
+          record =>
+            record.parentSessionId === agent.id &&
+            record.status === 'pending' &&
+            (parsed.childSessionId === undefined || record.childSessionId === parsed.childSessionId),
+        )
+        .sort((left, right) => left.expiresAt - right.expiresAt)
+        .map((record): ParentQuestionInboxEntry => {
+          const entry = {
+            questionId: record.questionId,
+            childSessionId: record.childSessionId,
+            question: record.question,
+            options: record.options,
+            createdAt: record.createdAt,
+            expiresAt: record.expiresAt,
+            remainingMs: Math.max(0, record.expiresAt - timestamp),
+            expired: record.expiresAt <= timestamp,
+          } satisfies ParentQuestionInboxEntry
+          const entryWithContext = record.context === undefined ? entry : { ...entry, context: record.context }
+          const entryWithRecommendation =
+            record.recommendedOptionId === undefined ? entryWithContext : { ...entryWithContext, recommendedOptionId: record.recommendedOptionId }
+          return record.expiryBehavior === undefined ? entryWithRecommendation : { ...entryWithRecommendation, expiryBehavior: record.expiryBehavior }
+        })
     },
     answer: async answerRequest => {
       assertOpen()

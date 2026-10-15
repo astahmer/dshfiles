@@ -44,7 +44,8 @@ const waitForProviderCalls = async (path, provider, expected) => {
     if (calls >= expected) return calls
     await new Promise(resolveDelay => setTimeout(resolveDelay, 50))
   }
-  throw new Error('The scratch provider did not receive the expected turn.')
+  const observedCalls = (await readJson(path))?.[provider] ?? 0
+  throw new Error(`Scratch provider ${provider} received ${String(observedCalls)} calls; expected ${String(expected)}.`)
 }
 
 const executeTool = (context, { agent, name, args, callId = randomUUID() }) =>
@@ -171,6 +172,65 @@ export const apply = async context => {
         ...questionInput,
         signal: new AbortController().signal,
       })
+      const allThreadQuestionResult = await executeTool(context, {
+        agent: parent,
+        name: 'list_thread_questions',
+        args: {},
+      })
+      const allThreadQuestionView = JSON.parse(requireToolSuccess(allThreadQuestionResult, 'Question inbox across all Sessions'))
+      const selectedThreadQuestionResult = await executeTool(context, {
+        agent: parent,
+        name: 'list_thread_questions',
+        args: { sessionId: child.id, limit: 10 },
+      })
+      const selectedThreadQuestionView = JSON.parse(requireToolSuccess(selectedThreadQuestionResult, 'Question inbox for one Session'))
+      const childScopedQuestionResult = await executeTool(context, {
+        agent: child,
+        name: 'list_thread_questions',
+        args: {},
+      })
+      const childScopedQuestionView = JSON.parse(requireToolSuccess(childScopedQuestionResult, 'Child-scoped question inbox'))
+      if (
+        childScopedQuestionView.scope !== 'direct-children-only' ||
+        childScopedQuestionView.nativeSessionsScanned !== 0 ||
+        childScopedQuestionView.questions.some(question => question.questionId === questionReceipt.questionId)
+      ) {
+        throw new Error('A non-root Agent saw another Session question in its inbox.')
+      }
+      const listedQuestion = selectedThreadQuestionView.questions.find(
+        question => question.kind === 'child' && question.questionId === questionReceipt.questionId,
+      )
+      if (
+        allThreadQuestionView.scope !== 'native-all-sessions-and-direct-children' ||
+        !allThreadQuestionView.questions.some(question => question.kind === 'child' && question.questionId === questionReceipt.questionId) ||
+        selectedThreadQuestionView.sessionIdFilter !== child.id ||
+        listedQuestion?.question !== questionInput.question ||
+        listedQuestion.options.find(option => option.id === questionInput.recommendedOptionId)?.recommended !== true ||
+        listedQuestion.canAnswer !== true ||
+        listedQuestion.blocksChild !== true
+      ) {
+        throw new Error('The thread question inbox omitted its authorized child question, recommendation, or answerability state.')
+      }
+      const unavailableNativeAnswer = await executeTool(context, {
+        agent: parent,
+        name: 'answer_thread_question',
+        args: {
+          sessionId: parent.id,
+          callId: 'not-a-continued-question',
+          answers: [{ id: 'decision', selected: [] }],
+        },
+      })
+      const unavailableNativeAnswerView = JSON.parse(requireToolSuccess(unavailableNativeAnswer, 'Continued native question answer guard'))
+      if (unavailableNativeAnswerView.status !== 'not-continued') {
+        throw new Error('The native answer tool accepted a call that was not continued.')
+      }
+      const unauthorizedNativeAnswer = await executeTool(context, {
+        agent: child,
+        name: 'answer_thread_question',
+        args: { sessionId: parent.id, callId: 'not-a-continued-question', answers: [] },
+      })
+      if (!unauthorizedNativeAnswer.isError) throw new Error('A non-root Agent submitted a native cross-thread answer.')
+
       const unauthorizedAnswer = await executeTool(context, {
         agent: child,
         name: 'answer_parent_question',
@@ -424,6 +484,10 @@ export const apply = async context => {
           questionId: reattachQuestion.questionId,
           childProviderCalls: initialCalls,
           parentQuestionToolPassed: true,
+          questionInboxPassed: true,
+          questionInboxRootScopePassed: true,
+          continuedNativeAnswerGuardPassed: true,
+          nativeAnswerAuthorizationPassed: true,
           expiryRecommendedPassed: true,
           expiryDeferredPassed: true,
           feedbackToolsPassed: true,
@@ -439,6 +503,10 @@ export const apply = async context => {
     if (state.phase !== 'pending') throw new Error('The scratch feedback state has an unsupported phase.')
     if (
       state.parentQuestionToolPassed !== true ||
+      state.questionInboxPassed !== true ||
+      state.questionInboxRootScopePassed !== true ||
+      state.continuedNativeAnswerGuardPassed !== true ||
+      state.nativeAnswerAuthorizationPassed !== true ||
       state.expiryRecommendedPassed !== true ||
       state.expiryDeferredPassed !== true ||
       state.feedbackToolsPassed !== true ||

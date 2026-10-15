@@ -1,9 +1,11 @@
 # Agent Questions
 
 This bundle provides the Host-owned parent/child question contract and its
-`ask_parent_question` and `answer_parent_question` tools. It persists each
-question under a stable id, binds it to one direct parent and child Session,
-and keeps the answer available for a later wait after Host restart.
+`ask_parent_question`, `answer_parent_question`, and `list_thread_questions` tools.
+It also exposes `answer_thread_question` for continued native questions in live
+root Sessions. It persists each child question under a stable id, binds it to one
+direct parent and child Session, and keeps the answer available for a later wait
+after Host restart.
 
 The contract exposes separate request and wait operations. The child tool
 returns the question id when Host shutdown interrupts a wait and accepts that id
@@ -33,6 +35,34 @@ The child tool waits three minutes by default. A request may override this with
 selected recommendation or writes and records the deferred file before the
 child continues.
 
+## Cross-thread question inbox
+
+`list_thread_questions` lists pending timed native forms across all Sessions
+for a root Agent, or filters to one exact `sessionId`. It also lists durable
+pending questions from the caller's own direct children. Non-root Agents see only
+their direct-child questions and cannot scan native Sessions; root Agents can
+inspect native forms in child Sessions. The inventory uses SessionQuery
+projections and the parent-question store, not transcripts. It reports options and recommendation markers, open
+versus continued state, blocking/timed mode, answerability, and a page of results
+(`offset`/`limit`). Root inventory scans Session projections with bounded
+concurrency before paginating, so very large corpora may take longer.
+
+Native coverage is the timed `ask_user_question` projection; legacy-schema
+calls are not included. A timed deadline is derived from the recorded tool-call
+time and timeout argument or request-schema default, so `remainingMs` is an
+estimate rather than the exact Client-attached Host timer. Missing or
+unrecognized timeout metadata is reported as unknown. Native forms on child
+Sessions and stopped/persisted Sessions are inspection-only: DSH's native answer
+service accepts only continued forms owned by a live root Agent. Forms still
+open on the answerer waterfall also remain unanswerable by this plugin.
+`answer_thread_question` submits a complete structured batch only to a continued
+form on a live root Agent; accepted replies are queued until that Agent admits
+them. The native projection does not expose this in-memory queue before
+admission, so a continued row may still appear while its answer is queued; the
+native service rejects duplicate submissions. `answer_parent_question` remains
+the answer path for direct-child plugin questions. Global native inspection and
+answering are root-only.
+
 The same Host bundle supports revisioned Markdown feedback. A child submits an
 exact workspace-relative line excerpt; the Host records its whole-file SHA-256
 revision and rejects unsafe paths, symlinks, or excerpts that no longer match.
@@ -49,7 +79,8 @@ path and hash. Element anchors still require a browser/evidence provider.
 
 ## Root questions use the native timed mode
 
-This bundle does not touch root questions. The `web` profile switches DSH's own
+The inbox reads DSH's own root questions and can answer continued calls; it does
+not replace the native question service. The `web` profile switches DSH's own
 `tool-ask-user` row to `mode: timed` with a 300 s foreground wait
 (`profiles/web/cordis.patch.yml`). After that wait the tool returns
 `{ pending: true, callId }` and the root Agent keeps working; the question stays

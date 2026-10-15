@@ -185,6 +185,45 @@
           "reason": "The card only renders while a model turn calls ask_user_question, which dshx dev reach steps cannot trigger; check it on a live question at 800px and 420px pane widths."
         }
       ]
+    },
+    {
+      "id": "cross-thread-question-inbox",
+      "title": "List and answer thread questions",
+      "summary": "Root Agents can list timed native questions across Sessions or by id, plus direct-child durable questions, with recommendation, timeout, and answerability metadata. Continued native forms and parent-scoped child questions use their authorized answer tools.",
+      "surfaces": ["tool", "host"],
+      "configuration": [],
+      "states": ["native-open", "native-continued", "child-pending", "answer-queued", "expired", "unavailable"],
+      "failureModes": [
+        "A non-root Agent attempts cross-thread native access.",
+        "An open native form remains on the answerer waterfall or its target root is not live.",
+        "The Session projection is unavailable or a legacy-schema question has no timed projection."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "agent-questions.cross-thread-inbox",
+          "featureFile": "tooling/dshx/e2e/features/plugin-journeys.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agent-questions.inbox-parent-list-exact-countdown",
+          "file": "plugins/@dshfiles/agent-questions/src/service.test.ts",
+          "testName": "lists pending questions by direct parent with exact deadline and child filter"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agent-questions.inbox-native-wait-projection",
+          "file": "plugins/@dshfiles/agent-questions/src/question-wait-projection.test.ts",
+          "testName": "records a timed deadline, continues after a pending result, then settles on reply"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agent-questions.inbox-native-answerability",
+          "file": "plugins/@dshfiles/agent-questions/src/question-inbox.test.ts",
+          "testName": "marks continued native forms answerable only for live root Sessions"
+        }
+      ]
     }
   ],
   "kind": "bundle"

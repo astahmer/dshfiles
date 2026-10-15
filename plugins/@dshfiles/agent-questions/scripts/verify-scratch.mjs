@@ -156,6 +156,10 @@ try {
   assert.ok(prepared.batchFeedbackId, 'The pending feedback state omitted the batch-boundary id.')
   assert.ok(prepared.questionId, 'The pending question state omitted the reattachment id.')
   assert.equal(prepared.parentQuestionToolPassed, true)
+  assert.equal(prepared.questionInboxPassed, true)
+  assert.equal(prepared.questionInboxRootScopePassed, true)
+  assert.equal(prepared.continuedNativeAnswerGuardPassed, true)
+  assert.equal(prepared.nativeAnswerAuthorizationPassed, true)
   assert.equal(prepared.expiryRecommendedPassed, true)
   assert.equal(prepared.expiryDeferredPassed, true)
   assert.equal(prepared.feedbackToolsPassed, true)
@@ -163,7 +167,7 @@ try {
   assert.deepEqual(prepared.feedbackResolutionStatuses, { current: 'resolved', stale: 'stale', cancelled: 'rejected', batch: 'resolved' })
   assert.equal(prepared.oversizedBatchRejected, true)
   process.stdout.write(
-    'PASS: Question answer, authorization, expiry/defer, feedback submit/read/cancel, unsafe-anchor, and batch-boundary tools passed on a fresh DSH scratch Host.\n',
+    'PASS: Question inbox (all Sessions and one Session, root-only scope), child-question authorization, native root-only authorization and continued-answer guard, expiry/defer, feedback, and batch-boundary tools passed on a fresh DSH scratch Host.\n',
   )
   await stopHost()
   await startHost()
