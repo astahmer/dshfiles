@@ -12,7 +12,7 @@ import {
 import { anthropicMessagesApi } from '@earendil-works/pi-ai/api/anthropic-messages.lazy'
 import { openAICompletionsApi } from '@earendil-works/pi-ai/api/openai-completions.lazy'
 import { z } from 'zod'
-import { isAllowedCommandCodeBase, isKeyEnvName } from './api.js'
+import { AccountsRules } from './api.js'
 import { CommandCodeCapabilities } from './commandcode-capabilities.js'
 import { streamCommandCodeCli } from './commandcode-cli.js'
 import { readKeyFromEnv, type CredentialValueResolver } from './credentials.js'
@@ -90,7 +90,7 @@ export class CommandCodeConfigError extends Error {}
 
 export const resolveCommandCodeBase = (baseUrl: string | undefined): string => {
   const base = baseUrl === undefined || baseUrl.trim() === '' ? DEFAULT_COMMANDCODE_BASE_URL : baseUrl.trim()
-  if (!isAllowedCommandCodeBase(base)) {
+  if (!AccountsRules.isAllowedCommandCodeBase(base)) {
     throw new CommandCodeConfigError(`Refusing Command Code base '${base}': use https on commandcode.ai, or a loopback address.`)
   }
   return base.replace(/\/$/, '')
@@ -98,7 +98,7 @@ export const resolveCommandCodeBase = (baseUrl: string | undefined): string => {
 
 const resolveKeyEnv = (keyEnv: string | undefined): string => {
   const name = keyEnv === undefined || keyEnv.trim() === '' ? DEFAULT_COMMANDCODE_KEY_ENV : keyEnv.trim()
-  if (!isKeyEnvName(name)) {
+  if (!AccountsRules.isKeyEnvName(name)) {
     throw new CommandCodeConfigError(`Refusing key variable '${name}': name one ending in _API_KEY.`)
   }
   return name

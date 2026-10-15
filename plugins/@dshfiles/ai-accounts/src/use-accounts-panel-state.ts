@@ -6,7 +6,7 @@ import { draftProblem, newAccountDraft, sameDraft, toDraft } from './account-dra
 import { useAutoSaver } from './auto-save.js'
 import { connectHintFor } from './account-labels.js'
 import { aiAccountsKeys, aiAccountsQueries } from './accounts-queries.js'
-import { aiAccountsApi, isKeyEnvName, type AccountDraft, type AccountOrderDirection, type AccountProfile, type AccountsFile } from './api.js'
+import { AccountsRules, aiAccountsApi, type AccountDraft, type AccountOrderDirection, type AccountProfile, type AccountsFile } from './api.js'
 import type { CredentialSetupPort } from './credential-setup-port.js'
 import { useAccountsUsage } from './use-accounts-usage.js'
 import { usePreferences } from './use-preferences.js'
@@ -76,7 +76,7 @@ export const useAccountsPanelState = (credentialSetup?: CredentialSetupPort) => 
   const credentialInfoQuery = useQuery({
     queryKey: aiAccountsKeys.credential(credentialRefName),
     queryFn: () => credentialSetup?.describe(credentialRefName) ?? Promise.reject(new Error('Credential setup is unavailable.')),
-    enabled: credentialSetup !== undefined && isKeyEnvName(credentialRefName),
+    enabled: credentialSetup !== undefined && AccountsRules.isKeyEnvName(credentialRefName),
     staleTime: 10_000,
     retry: false,
   })
@@ -136,7 +136,7 @@ export const useAccountsPanelState = (credentialSetup?: CredentialSetupPort) => 
   }
 
   const storeCredential = async (input: { readonly ref: string; readonly value: string }): Promise<boolean> => {
-    if (credentialSetup === undefined || draft === null || problem !== null || input.ref !== draft.apiKeyEnv.trim() || !isKeyEnvName(input.ref)) {
+    if (credentialSetup === undefined || draft === null || problem !== null || input.ref !== draft.apiKeyEnv.trim() || !AccountsRules.isKeyEnvName(input.ref)) {
       setNotice('Save a valid account and API-key variable before storing a key.')
       return false
     }
@@ -167,7 +167,7 @@ export const useAccountsPanelState = (credentialSetup?: CredentialSetupPort) => 
     readonly cwd: string | null
     readonly replaceExisting?: boolean
   }): Promise<boolean> => {
-    if (draft === null || problem !== null || !isKeyEnvName(draft.apiKeyEnv.trim())) {
+    if (draft === null || problem !== null || !AccountsRules.isKeyEnvName(draft.apiKeyEnv.trim())) {
       setNotice('Save a valid API-key variable ending in _API_KEY before importing a key.')
       return false
     }

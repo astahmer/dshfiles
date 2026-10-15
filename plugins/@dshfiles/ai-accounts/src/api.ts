@@ -32,24 +32,24 @@ export const accountStateSchema = z.enum(['healthy', 'cooling', 'disabled', 'unc
  * never point an arbitrary environment variable at an arbitrary host.
  */
 const keyEnvNamePattern = /^[A-Z][A-Z0-9_]*_API_KEY$/
-
-export const isKeyEnvName = (name: string): boolean => keyEnvNamePattern.test(name)
-
 const ACCOUNT_MODEL_SEPARATOR = '/'
-
-// Route slugs stay unique when two accounts share a display name.
-export const accountModelName = (instanceId: string, modelName: string): string => `${instanceId}${ACCOUNT_MODEL_SEPARATOR}${modelName}`
-
-export const baseModelName = (instanceId: string, label: string): string =>
-  label.startsWith(`${instanceId}${ACCOUNT_MODEL_SEPARATOR}`) ? label.slice(instanceId.length + ACCOUNT_MODEL_SEPARATOR.length) : label
-
 const isLoopbackHost = (hostname: string): boolean => hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]'
 
-export const isAllowedCommandCodeBase = (value: string): boolean => {
-  const url = URL.parse(value)
-  if (url === null || url.username !== '' || url.password !== '') return false
-  if (isLoopbackHost(url.hostname)) return url.protocol === 'https:' || url.protocol === 'http:'
-  return url.protocol === 'https:' && (url.hostname === 'commandcode.ai' || url.hostname.endsWith('.commandcode.ai'))
+export class AccountsRules {
+  static isKeyEnvName = (name: string): boolean => keyEnvNamePattern.test(name)
+
+  // Route slugs stay unique when two accounts share a display name.
+  static accountModelName = (instanceId: string, modelName: string): string => `${instanceId}${ACCOUNT_MODEL_SEPARATOR}${modelName}`
+
+  static baseModelName = (instanceId: string, label: string): string =>
+    label.startsWith(`${instanceId}${ACCOUNT_MODEL_SEPARATOR}`) ? label.slice(instanceId.length + ACCOUNT_MODEL_SEPARATOR.length) : label
+
+  static isAllowedCommandCodeBase = (value: string): boolean => {
+    const url = URL.parse(value)
+    if (url === null || url.username !== '' || url.password !== '') return false
+    if (isLoopbackHost(url.hostname)) return url.protocol === 'https:' || url.protocol === 'http:'
+    return url.protocol === 'https:' && (url.hostname === 'commandcode.ai' || url.hostname.endsWith('.commandcode.ai'))
+  }
 }
 
 const isPlainHomePath = (path: string): boolean => (path.startsWith('/') || path.startsWith('~/')) && !path.includes('\0') && !path.split('/').includes('..')
@@ -103,7 +103,7 @@ const apiKeyEnvSchema = z
   .string()
   .trim()
   .max(128)
-  .refine(name => name === '' || isKeyEnvName(name), {
+  .refine(name => name === '' || AccountsRules.isKeyEnvName(name), {
     message: 'Name an environment variable ending in _API_KEY, e.g. COMMANDCODE_API_KEY.',
   })
 
@@ -111,7 +111,7 @@ const apiBaseUrlSchema = z
   .string()
   .trim()
   .max(512)
-  .refine(url => url === '' || isAllowedCommandCodeBase(url), {
+  .refine(url => url === '' || AccountsRules.isAllowedCommandCodeBase(url), {
     message: 'Use https on commandcode.ai, or a loopback address.',
   })
 

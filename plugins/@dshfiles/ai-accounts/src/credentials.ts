@@ -1,19 +1,19 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { credentialRef } from '@deepseek-ai/dsh-credentials'
 import type { CredentialProvider } from '@deepseek-ai/dsh-credentials'
-import { isKeyEnvName } from './api.js'
+import { AccountsRules } from './api.js'
 
 export type CredentialValueResolver = (name: string) => Promise<string>
 
 /** Read an API-key reference from the process environment for legacy callers without DSH credentials. */
 export const readKeyFromEnv = (name: string): string => {
   const trimmed = name.trim()
-  return isKeyEnvName(trimmed) ? (process.env[trimmed] ?? '').trim() : ''
+  return AccountsRules.isKeyEnvName(trimmed) ? (process.env[trimmed] ?? '').trim() : ''
 }
 
 export const resolveKeyFromProvider = async (credentials: Pick<CredentialProvider, 'resolve'> | undefined, name: string): Promise<string> => {
   const trimmed = name.trim()
-  if (!isKeyEnvName(trimmed)) return ''
+  if (!AccountsRules.isKeyEnvName(trimmed)) return ''
   if (credentials === undefined) return readKeyFromEnv(trimmed)
   return (await credentials.resolve(credentialRef(trimmed)))?.value.trim() ?? ''
 }

@@ -4,7 +4,7 @@ import { CopyIcon } from '@dshfiles/plugin-ui/icons'
 import { useState } from 'react'
 import type { WorkspacePickerPorts } from '@dshfiles/project-folder-picker'
 import { ApiKeySetupDialog } from './api-key-setup-dialog.js'
-import { isKeyEnvName, type AccountDraft } from './api.js'
+import { AccountsRules, type AccountDraft } from './api.js'
 import { NumberedSection } from './panel-primitives.js'
 import { suggestedApiKeyRef } from './account-draft.js'
 import { shouldOfferCredentialSetup } from './credential-setup-model.js'
@@ -81,7 +81,7 @@ export const RuntimePathsSection = (props: {
   })
   const configureLabel = credentialInfo?.configured === true ? 'Replace or import key…' : 'Set up key…'
   let credentialStatus = 'Credential status is not available yet.'
-  if (!isKeyEnvName(credentialRef))
+  if (!AccountsRules.isKeyEnvName(credentialRef))
     credentialStatus =
       'Choose a name ending in _API_KEY, then use Set up key to add a value or import it from Secret Catalog. The secret value never goes in account JSON.'
   else if (props.state.credentialInfoLoading) credentialStatus = 'Checking credential status…'
@@ -158,7 +158,7 @@ export const RuntimePathsSection = (props: {
             placeholder={suggestedApiKeyRef(draft.instanceId)}
             value={draft.apiKeyEnv}
           />
-          {!isKeyEnvName(credentialRef) ? (
+          {!AccountsRules.isKeyEnvName(credentialRef) ? (
             <Button
               className="dshx:self-start"
               onClick={() => setDraft({ ...draft, apiKeyEnv: suggestedApiKeyRef(draft.instanceId) })}
@@ -174,9 +174,9 @@ export const RuntimePathsSection = (props: {
             {canConfigureKey ? (
               <Button
                 onClick={() => {
-                  const setupDraft = isKeyEnvName(credentialRef) ? draft : { ...draft, apiKeyEnv: suggestedApiKeyRef(draft.instanceId) }
+                  const setupDraft = AccountsRules.isKeyEnvName(credentialRef) ? draft : { ...draft, apiKeyEnv: suggestedApiKeyRef(draft.instanceId) }
                   setDraft(setupDraft)
-                  if (!isKeyEnvName(credentialRef) || props.state.dirty) {
+                  if (!AccountsRules.isKeyEnvName(credentialRef) || props.state.dirty) {
                     void save(setupDraft).then(saved => saved && setConfigureOpen(true))
                     return
                   }

@@ -2,7 +2,7 @@ import type { GenerateOptions, LlmImageRequestPricing, LlmResolvedModelInfo, Pre
 import { ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import type { ResolvedPiAiProviderProfile } from '@deepseek-ai/dsh-llm-pi-ai'
 import { PiAiAdapter } from '@deepseek-ai/dsh-llm-pi-ai'
-import { accountModelName } from './api.js'
+import { AccountsRules } from './api.js'
 import type { openaiCodexProvider } from '@earendil-works/pi-ai/providers/openai-codex'
 import type { opencodeGoProvider } from '@earendil-works/pi-ai/providers/opencode-go'
 import type { anthropicProvider } from '@earendil-works/pi-ai/providers/anthropic'
@@ -67,7 +67,7 @@ export const buildProfile = (params: {
   const upstreamModels = params.upstream.getModels()
   const offersThinkingOff = params.upstream.id === 'opencode-go'
   const models = upstreamModels.map(model => {
-    const named = { ...model, provider: params.provider, name: accountModelName(params.provider, model.name) }
+    const named = { ...model, provider: params.provider, name: AccountsRules.accountModelName(params.provider, model.name) }
     return offersThinkingOff ? offerThinkingOff(named) : named
   })
   for (const id of new Set(params.additionalModelIds)) {
@@ -75,7 +75,7 @@ export const buildProfile = (params: {
     // Command Code knows each model's own efforts and modalities; a neighbour's would be wrong.
     const described = 'describeModel' in params.upstream ? params.upstream.describeModel(id) : undefined
     if (described !== undefined) {
-      models.push({ ...described, provider: params.provider, name: accountModelName(params.provider, id) })
+      models.push({ ...described, provider: params.provider, name: AccountsRules.accountModelName(params.provider, id) })
       continue
     }
     const api = id.startsWith('anthropic/') || id.startsWith('claude-') ? 'anthropic-messages' : 'openai-completions'
@@ -87,7 +87,7 @@ export const buildProfile = (params: {
       upstreamModels.find(model => model.api === api) ??
       upstreamModels[0]
     if (template === undefined) continue
-    models.push({ ...template, id, provider: params.provider, name: accountModelName(params.provider, id) })
+    models.push({ ...template, id, provider: params.provider, name: AccountsRules.accountModelName(params.provider, id) })
   }
   const offeredModels = models.filter(model => !hidden.has(model.id)).sort((left, right) => rank(left.id) - rank(right.id))
   // A pinned effort is offered as an override on the model it belongs to, which

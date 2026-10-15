@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { accountDraftSchema, accountModelName, baseModelName, type AccountDraft } from './api.js'
+import { AccountsRules, accountDraftSchema, type AccountDraft } from './api.js'
 
 const draft: AccountDraft = {
   instanceId: 'commandcode_work',
@@ -48,12 +48,12 @@ describe('account draft boundary', () => {
 
 describe('account model labels', () => {
   it('identifies the account route in the model picker label', () => {
-    expect(accountModelName('codex-alex2', 'gpt-6-luna')).toBe('codex-alex2/gpt-6-luna')
+    expect(AccountsRules.accountModelName('codex-alex2', 'gpt-6-luna')).toBe('codex-alex2/gpt-6-luna')
   })
 
   it('removes only the matching account prefix for model curation', () => {
-    expect(baseModelName('codex-alex2', 'codex-alex2/gpt-6-luna')).toBe('gpt-6-luna')
-    expect(baseModelName('codex-alex2', 'codex-work/gpt-6-luna')).toBe('codex-work/gpt-6-luna')
-    expect(baseModelName('codex-alex2', 'gpt-6-luna')).toBe('gpt-6-luna')
+    expect(AccountsRules.baseModelName('codex-alex2', 'codex-alex2/gpt-6-luna')).toBe('gpt-6-luna')
+    expect(AccountsRules.baseModelName('codex-alex2', 'codex-work/gpt-6-luna')).toBe('codex-work/gpt-6-luna')
+    expect(AccountsRules.baseModelName('codex-alex2', 'gpt-6-luna')).toBe('gpt-6-luna')
   })
 })

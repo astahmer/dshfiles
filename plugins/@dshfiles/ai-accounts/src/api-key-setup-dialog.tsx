@@ -1,12 +1,14 @@
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@dshfiles/plugin-ui/components/ui/dialog'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
+import { useMachine } from '@dshfiles/plugin-ui/machine'
 import { useQuery } from '@dshfiles/plugin-ui/query'
 import { useApi } from '@dshfiles/dshx/client'
 import { ProjectFolderPicker, type ProjectFolderSelection, type WorkspacePickerPorts } from '@dshfiles/project-folder-picker'
-import { useState } from 'react'
-import { aiAccountsApi, isKeyEnvName, type AccountDraft, type SecretCatalogKeyOption } from './api.js'
+import { useCallback, useEffect, useState } from 'react'
 import { aiAccountsQueries } from './accounts-queries.js'
+import { AccountsRules, aiAccountsApi, type AccountDraft, type SecretCatalogKeyOption } from './api.js'
+import { apiKeySetupMachineWithWriter } from './api-key-setup-machine.js'
 import type { AccountsPanelState } from './use-accounts-panel-state.js'
 
 const catalogOptionKey = (option: SecretCatalogKeyOption): string => JSON.stringify([option.scope, option.alias, option.environment, option.cwd])
@@ -27,75 +29,87 @@ export const ApiKeySetupDialog = (props: {
   readonly onOpenChange: (open: boolean) => void
 }): JSX.Element => {
   const api = useApi(aiAccountsApi)
+  const { onOpenChange } = props
+  const [snapshot, send] = useMachine(apiKeySetupMachineWithWriter)
   const [manualValue, setManualValue] = useState('')
   const [selectedCatalogKey, setSelectedCatalogKey] = useState('')
   const [folderPickerOpen, setFolderPickerOpen] = useState(false)
   const [cwd, setCwd] = useState<string | null>(null)
-  const [saving, setSaving] = useState(false)
-  const [importing, setImporting] = useState(false)
-  const [confirmReplaceCatalogKey, setConfirmReplaceCatalogKey] = useState(false)
   const catalogQuery = useQuery({ ...aiAccountsQueries.secretCatalogKeys(api, cwd), enabled: props.open && !folderPickerOpen, staleTime: 30_000 })
   const catalogKeys = catalogQuery.data?.items ?? []
   const selectedCatalogEntry = catalogKeys.find(option => catalogOptionKey(option) === selectedCatalogKey)
   const catalogAvailable = catalogQuery.data?.available === true
-  const validCredentialRef = isKeyEnvName(props.draft.apiKeyEnv.trim())
+  const validCredentialRef = AccountsRules.isKeyEnvName(props.draft.apiKeyEnv.trim())
   const credentialInfo = props.state.credentialInfo
   const targetWritable = credentialInfo?.writable === true
   const canReplace = credentialInfo?.configured === true && targetWritable
   const canImport = validCredentialRef && targetWritable && credentialInfo?.configured === false
+  const busy = snapshot.matches('saving') || snapshot.matches('importing')
+  const confirmingReplacement = snapshot.matches('confirming')
 
-  const close = (open: boolean): void => {
-    if (!open) {
-      setManualValue('')
-      setSelectedCatalogKey('')
-      setConfirmReplaceCatalogKey(false)
-      setFolderPickerOpen(false)
-      setCwd(null)
+  const close = useCallback(
+    (open: boolean): void => {
+      if (!open) {
+        send({ type: 'reset' })
+        setManualValue('')
+        setSelectedCatalogKey('')
+        setFolderPickerOpen(false)
+        setCwd(null)
+      }
+      onOpenChange(open)
+    },
+    [onOpenChange, send],
+  )
+
+  useEffect(() => {
+    if (props.open) return
+    send({ type: 'reset' })
+    setManualValue('')
+    setSelectedCatalogKey('')
+    setFolderPickerOpen(false)
+    setCwd(null)
+  }, [props.open, send])
+
+  useEffect(() => {
+    send({ type: 'reset' })
+    setManualValue('')
+    setSelectedCatalogKey('')
+    setFolderPickerOpen(false)
+    setCwd(null)
+  }, [props.draft.instanceId, props.draft.apiKeyEnv, send])
+
+  useEffect(() => {
+    if (snapshot.matches('success')) {
+      close(false)
+      return
     }
-    props.onOpenChange(open)
-  }
+    if (snapshot.matches('error') && snapshot.context.operation === 'manual') setManualValue('')
+  }, [close, snapshot])
 
   const chooseFolder = (selection: ProjectFolderSelection): void => {
+    send({ type: 'reset' })
     setManualValue('')
     setSelectedCatalogKey('')
     setCwd(selection.canonicalPath)
     setFolderPickerOpen(false)
   }
 
-  const saveManualKey = async (): Promise<void> => {
+  const saveManualKey = (): void => {
     if (manualValue.length === 0) return
-    setSaving(true)
-    let saved = false
-    try {
-      saved = await props.state.storeCredential({ ref: props.draft.apiKeyEnv.trim(), value: manualValue })
-    } catch {
-      saved = false
-    } finally {
-      setSaving(false)
-      setManualValue('')
-    }
-    if (saved) close(false)
+    const ref = props.draft.apiKeyEnv.trim()
+    send({ type: 'manual.submit', write: () => props.state.storeCredential({ ref, value: manualValue }) })
   }
 
-  const importCatalogKey = async (): Promise<void> => {
+  const importCatalogKey = (): void => {
     if (selectedCatalogEntry === undefined) return
-    setImporting(true)
-    let imported = false
-    try {
-      const request: SecretCatalogImportRequest = {
-        alias: selectedCatalogEntry.alias,
-        environment: selectedCatalogEntry.environment,
-        scope: selectedCatalogEntry.scope,
-        cwd: selectedCatalogEntry.cwd,
-      }
-      if (confirmReplaceCatalogKey) request.replaceExisting = true
-      imported = await props.state.importSecretCatalogKey(request)
-    } catch {
-      imported = false
-    } finally {
-      setImporting(false)
+    const request: SecretCatalogImportRequest = {
+      alias: selectedCatalogEntry.alias,
+      environment: selectedCatalogEntry.environment,
+      scope: selectedCatalogEntry.scope,
+      cwd: selectedCatalogEntry.cwd,
     }
-    if (imported) close(false)
+    if (canReplace) request.replaceExisting = true
+    send({ type: 'catalog.submit', requiresConfirmation: canReplace, write: () => props.state.importSecretCatalogKey(request) })
   }
 
   if (folderPickerOpen) {
@@ -137,8 +151,11 @@ export const ApiKeySetupDialog = (props: {
             <h3 className="dshx:text-sm dshx:font-medium">Use a Secret Catalog entry</h3>
             <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
               <Button
+                disabled={busy}
                 onClick={() => {
+                  send({ type: 'reset' })
                   setManualValue('')
+                  setSelectedCatalogKey('')
                   setFolderPickerOpen(true)
                 }}
                 size="sm"
@@ -149,7 +166,9 @@ export const ApiKeySetupDialog = (props: {
               </Button>
               {cwd !== null ? (
                 <Button
+                  disabled={busy}
                   onClick={() => {
+                    send({ type: 'reset' })
                     setCwd(null)
                     setSelectedCatalogKey('')
                   }}
@@ -176,8 +195,12 @@ export const ApiKeySetupDialog = (props: {
                   <select
                     aria-label="Secret Catalog entry"
                     className="dshx:h-9 dshx:w-full dshx:rounded-md dshx:border dshx:border-input dshx:bg-background dshx:px-3 dshx:text-sm"
+                    disabled={busy}
                     id="ai-account-secret-catalog-entry"
-                    onChange={event => setSelectedCatalogKey(event.target.value)}
+                    onChange={event => {
+                      send({ type: 'reset' })
+                      setSelectedCatalogKey(event.target.value)
+                    }}
                     value={selectedCatalogKey}
                   >
                     <option value="">Choose an entry</option>
@@ -192,15 +215,19 @@ export const ApiKeySetupDialog = (props: {
                   </p>
                   {canReplace ? <p className="dshx:text-xs dshx:text-muted-foreground">This will replace the currently stored key for this account.</p> : null}
                   <Button
-                    disabled={selectedCatalogEntry === undefined || importing || (!canImport && !canReplace)}
+                    disabled={selectedCatalogEntry === undefined || busy || (!canImport && !canReplace)}
                     onClick={() => {
-                      if (canReplace && !confirmReplaceCatalogKey) setConfirmReplaceCatalogKey(true)
-                      else void importCatalogKey()
+                      if (confirmingReplacement) send({ type: 'catalog.confirm' })
+                      else importCatalogKey()
                     }}
                     size="sm"
                     type="button"
                   >
-                    {importing ? 'Importing…' : canReplace && !confirmReplaceCatalogKey ? 'Replace with selected entry…' : 'Import selected entry'}
+                    {snapshot.matches('importing')
+                      ? 'Importing…'
+                      : canReplace && !confirmingReplacement
+                        ? 'Replace with selected entry…'
+                        : 'Import selected entry'}
                   </Button>
                 </>
               ) : (
@@ -221,6 +248,7 @@ export const ApiKeySetupDialog = (props: {
             <Input
               autoComplete="new-password"
               className="dshx:font-mono! dshx:text-sm"
+              disabled={busy}
               id="ai-account-api-key-value"
               onChange={event => setManualValue(event.target.value)}
               placeholder="Enter key"
@@ -242,8 +270,8 @@ export const ApiKeySetupDialog = (props: {
           <Button onClick={() => close(false)} type="button" variant="outline">
             Cancel
           </Button>
-          <Button disabled={manualValue.length === 0 || saving || !validCredentialRef || !targetWritable} onClick={() => void saveManualKey()} type="button">
-            {saving ? 'Saving…' : canReplace ? 'Replace key' : 'Store key'}
+          <Button disabled={manualValue.length === 0 || busy || !validCredentialRef || !targetWritable} onClick={saveManualKey} type="button">
+            {snapshot.matches('saving') ? 'Saving…' : canReplace ? 'Replace key' : 'Store key'}
           </Button>
         </DialogFooter>
       </DialogContent>
