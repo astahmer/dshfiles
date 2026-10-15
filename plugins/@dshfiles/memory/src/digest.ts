@@ -39,7 +39,7 @@ const indexedMessageBytes = 16_000
 const tokenizedUrl = /([?&#](?:token|access_token|key|api_key|auth|sig|signature)=)[^\s&#"')]+/gi
 
 /** A cheap pass: known credential shapes, bearer tokens, `key=value` secrets and tokenized URLs. */
-export const redact = (text: string): string => Redaction.redact(text, []).text.replace(tokenizedUrl, '$1[REDACTED]')
+const redact = (text: string): string => Redaction.redact(text, []).text.replace(tokenizedUrl, '$1[REDACTED]')
 
 const oneLine = (text: string, bytes: number): string => Utf8.clip(text.replace(/\s+/g, ' ').trim(), bytes)
 
@@ -62,7 +62,7 @@ const signalPatterns: readonly { readonly kind: Exclude<Signal['kind'], 'flagged
   },
 ]
 
-export const flagSignal = (text: string): Exclude<Signal['kind'], 'flagged'> | undefined => {
+const flagSignal = (text: string): Exclude<Signal['kind'], 'flagged'> | undefined => {
   // Long pastes (logs, documents) are material, not something the user said to the agent.
   if (Utf8.byteLength(text) > 1_500) return undefined
   return signalPatterns.find(({ pattern }) => pattern.test(text))?.kind
@@ -76,7 +76,7 @@ const textOf = (content: readonly ContentBlock[]): string =>
 
 const day = (time: number): string => new Date(time).toISOString().slice(0, 10)
 
-export const shortId = (sessionId: string): string => sessionId.replace(/^session-/, '').slice(0, 8)
+const shortId = (sessionId: string): string => sessionId.replace(/^session-/, '').slice(0, 8)
 
 const firstSentence = (text: string): string => {
   const line = text.split('\n').find(candidate => /[\p{L}\p{N}]/u.test(candidate)) ?? ''
@@ -89,7 +89,7 @@ const firstSentence = (text: string): string => {
  * assistant text to index, and the user's flagged corrections, decisions and preferences. The digest follows a
  * chronological task history: what the user asked, in their words, kept apart from what the agent produced.
  */
-export const readThread = (input: {
+const readThread = (input: {
   readonly header: ThreadHeader
   readonly project: string
   readonly events: readonly SessionEvent[]
@@ -202,4 +202,11 @@ export const readThread = (input: {
     signals,
     lastSeq,
   }
+}
+
+export class ThreadDigestRules {
+  static readonly redact = redact
+  static readonly flagSignal = flagSignal
+  static readonly shortId = shortId
+  static readonly readThread = readThread
 }

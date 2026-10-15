@@ -11,6 +11,7 @@ import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/p
 import { useState, type ReactNode } from 'react'
 
 import { memoryApi, type MemoryCitation, type MemoryNoteType, type MemoryUsage, type PanelNote, type PanelThread } from './api.ts'
+import { useNoteEditor } from './use-note-editor.js'
 
 const noteTypes: readonly { readonly value: MemoryNoteType; readonly label: string; readonly hint: string }[] = [
   { value: 'feedback', label: 'Feedback', hint: 'Corrections and confirmed approaches' },
@@ -76,33 +77,17 @@ const NoteSource = (props: { readonly note: PanelNote; readonly openThread: Open
 
 /** One note, editable in place: text with an edit/preview toggle, type and scope; forget with an optional reason. */
 const NoteEditor = (props: { readonly note: PanelNote; readonly openThread: OpenThread; readonly onSelect?: () => void }): JSX.Element => {
-  const api = useApi(memoryApi)
-  const client = useQueryClient()
   const note = props.note
-  const [mode, setMode] = useState<'view' | 'edit' | 'forget'>('view')
-  const [preview, setPreview] = useState(false)
-  const [text, setText] = useState(note.text)
-  const [type, setType] = useState<MemoryNoteType>(note.type)
-  const [scope, setScope] = useState(note.scope)
-  const [reason, setReason] = useState('')
-  const refresh = (): void => void client.invalidateQueries({ queryKey: ['dshfiles-memory'] })
-  const save = useMutation({
-    mutationFn: () => api.editNote({ id: note.id, text, type, scope, reason }),
-    onSuccess: () => (setMode('view'), refresh()),
-  })
-  const forget = useMutation({
-    mutationFn: () => api.forgetNote({ id: note.id, reason }),
-    onSuccess: () => (setMode('view'), refresh()),
-  })
-  const startEdit = (): void => {
-    setText(note.text)
-    setType(note.type)
-    setScope(note.scope)
-    setReason('')
-    setPreview(false)
-    setMode('edit')
-  }
-  const failure = save.error ?? forget.error
+  const { snapshot, send } = useNoteEditor(note)
+  const mode =
+    snapshot.matches('editing') || snapshot.matches('saving')
+      ? 'edit'
+      : snapshot.matches('forgetting') || snapshot.matches('forgettingPending')
+        ? 'forget'
+        : 'view'
+  const { draft, preview, failure } = snapshot.context
+  const { text, type, scope, reason } = draft
+  const pending = snapshot.matches('saving') || snapshot.matches('forgettingPending')
   return (
     <article className="dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-lg dshx:border dshx:border-border dshx:p-3" aria-label={`Note n:${note.id}`}>
       <header className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:text-xs">
@@ -130,7 +115,7 @@ const NoteEditor = (props: { readonly note: PanelNote; readonly openThread: Open
               aria-label="Edit note type"
               className={selectClass}
               value={type}
-              onChange={event => setType(noteTypeOf(event.currentTarget.value) ?? note.type)}
+              onChange={event => send({ type: 'type.change', value: noteTypeOf(event.currentTarget.value) ?? note.type })}
             >
               {noteTypes.map(item => (
                 <option key={item.value} value={item.value}>
@@ -138,15 +123,20 @@ const NoteEditor = (props: { readonly note: PanelNote; readonly openThread: Open
                 </option>
               ))}
             </select>
-            <Input aria-label="Edit note scope" value={scope} onChange={event => setScope(event.currentTarget.value)} className="dshx:h-8 dshx:max-w-48" />
-            <Button size="xs" variant="ghost" aria-pressed={preview} onClick={() => setPreview(!preview)}>
+            <Input
+              aria-label="Edit note scope"
+              value={scope}
+              onChange={event => send({ type: 'scope.change', value: event.currentTarget.value })}
+              className="dshx:h-8 dshx:max-w-48"
+            />
+            <Button size="xs" variant="ghost" aria-pressed={preview} onClick={() => send({ type: 'preview.toggle' })}>
               {preview ? 'Edit text' : 'Preview'}
             </Button>
           </div>
           {preview ? (
             <MarkdownText text={text} labels={markdownLabels} variant="compact" />
           ) : (
-            <Textarea aria-label="Note text" value={text} onChange={event => setText(event.currentTarget.value)} rows={4} />
+            <Textarea aria-label="Note text" value={text} onChange={event => send({ type: 'text.change', value: event.currentTarget.value })} rows={4} />
           )}
         </div>
       ) : (
@@ -156,10 +146,10 @@ const NoteEditor = (props: { readonly note: PanelNote; readonly openThread: Open
       {mode === 'view' ? (
         note.status === 'valid' ? (
           <div className="dshx:flex dshx:gap-1">
-            <Button size="xs" variant="outline" onClick={startEdit}>
+            <Button size="xs" variant="outline" onClick={() => send({ type: 'edit' })}>
               Edit
             </Button>
-            <Button size="xs" variant="outline" onClick={() => (setReason(''), setMode('forget'))}>
+            <Button size="xs" variant="outline" onClick={() => send({ type: 'forget' })}>
               Forget
             </Button>
           </div>
@@ -170,23 +160,23 @@ const NoteEditor = (props: { readonly note: PanelNote; readonly openThread: Open
             aria-label="Reason"
             placeholder="Reason (optional)"
             value={reason}
-            onChange={event => setReason(event.currentTarget.value)}
+            onChange={event => send({ type: 'reason.change', value: event.currentTarget.value })}
             className="dshx:h-8 dshx:max-w-80"
           />
           <Button
             size="xs"
             variant={mode === 'forget' ? 'destructive' : 'default'}
-            disabled={(mode === 'edit' && text.trim().length === 0) || save.isPending || forget.isPending}
-            onClick={() => (mode === 'edit' ? save.mutate() : forget.mutate())}
+            disabled={(mode === 'edit' && text.trim().length === 0) || pending}
+            onClick={() => send({ type: mode === 'edit' ? 'save' : 'forget.confirm' })}
           >
             {mode === 'edit' ? 'Save note' : 'Forget note'}
           </Button>
-          <Button size="xs" variant="ghost" onClick={() => setMode('view')}>
+          <Button size="xs" variant="ghost" onClick={() => send({ type: 'cancel' })}>
             Cancel
           </Button>
         </div>
       )}
-      {failure ? <p className="dshx:text-xs dshx:text-destructive">{errorMessage(failure, 'The change failed.')}</p> : null}
+      {failure ? <p className="dshx:text-xs dshx:text-destructive">{failure}</p> : null}
     </article>
   )
 }

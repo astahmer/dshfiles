@@ -5,7 +5,7 @@ import { PluginApiError } from '@dshfiles/dshx/api'
 import { Utf8 } from '@dshfiles/optmem-core'
 
 import { renderStartBlock } from './block.ts'
-import { flagSignal, readThread, redact, shortId, type Signal, type ThreadHeader } from './digest.ts'
+import { ThreadDigestRules, type Signal, type ThreadHeader } from './digest.ts'
 import { MemoryGuidance } from './guidance.ts'
 import type { MemoryEmbedder, RetrievalStatus } from './embedder.ts'
 import { JevClassifier } from './jev.ts'
@@ -147,7 +147,7 @@ export const createMemoryRuntime = (options: {
         store.recordCost({ kind: 'jev', provider: 'typesafe', model: 'jev', input: verdict.inputTokens, cacheRead: 0, output: 0 })
         logger.info('memory: jev call {"question":"signal","inputTokens":%d}', verdict.inputTokens)
         if (verdict.probability >= options.settings().jevThreshold)
-          signals.push({ seq: event.seq, kind: 'flagged', text: Utf8.clip(redact(text).replace(/\s+/g, ' '), 260) })
+          signals.push({ seq: event.seq, kind: 'flagged', text: Utf8.clip(ThreadDigestRules.redact(text).replace(/\s+/g, ' '), 260) })
       } catch (error) {
         store.bump('jev.failures')
         logger.warn('memory: Jev signal check failed, keeping the heuristics: %s', error instanceof Error ? error.message : String(error))
@@ -214,7 +214,14 @@ export const createMemoryRuntime = (options: {
     if (lastStart > lastEnd) return 'running'
     const project = await projectOf(log.header)
     const extraSignals = await jevSignals(log)
-    const material = readThread({ header: log.header, project, events: log.events, inheritedEventCount: log.inheritedEventCount, now: now(), extraSignals })
+    const material = ThreadDigestRules.readThread({
+      header: log.header,
+      project,
+      events: log.events,
+      inheritedEventCount: log.inheritedEventCount,
+      now: now(),
+      extraSignals,
+    })
     const through = store.indexedThrough(sessionId)
     store.indexMessages({ thread: sessionId, project, messages: material.messages.filter(message => message.seq > through), throughSeq: material.lastSeq })
     if (material.digest === undefined) {
@@ -233,7 +240,7 @@ export const createMemoryRuntime = (options: {
         store.bump('digests.modelCalls')
         if (result.usage !== undefined) store.recordCost({ kind: 'digest', ...result.usage })
         if (answer === 'NONE') return 'trivial'
-        const text = Utf8.clip(redact(answer), 1_800)
+        const text = Utf8.clip(ThreadDigestRules.redact(answer), 1_800)
         digest = {
           ...digest,
           digest: `${digest.digest.split('\n')[0] ?? ''}\n${text}`,
@@ -290,7 +297,7 @@ export const createMemoryRuntime = (options: {
       const text = event.data.content.flatMap(block => (block.type === 'text' ? [block.text] : [])).join('\n')
       lastUserMessage.set(session.id, { seq: event.seq, text })
       // Heuristic: the user corrects an answer that cited memory.
-      if (flagSignal(text) === 'correction') store.flagCitations({ thread: session.id, by: 'user', sinceMs: correctionWindowMs })
+      if (ThreadDigestRules.flagSignal(text) === 'correction') store.flagCitations({ thread: session.id, by: 'user', sinceMs: correctionWindowMs })
       return
     }
     if (event.type === 'assistant/message') {
@@ -373,7 +380,11 @@ export const createMemoryRuntime = (options: {
   }
 
   const hitId = (hit: SearchHit): string =>
-    hit.kind === 'note' ? `n:${hit.id}` : hit.kind === 'thread' ? `t:${shortId(hit.id)}` : `t:${shortId(hit.thread)}#${hit.seq}`
+    hit.kind === 'note'
+      ? `n:${hit.id}`
+      : hit.kind === 'thread'
+        ? `t:${ThreadDigestRules.shortId(hit.id)}`
+        : `t:${ThreadDigestRules.shortId(hit.thread)}#${hit.seq}`
 
   const snippet = (text: string, query: string, bytes = 240): string => {
     const flat = text.replace(/\s+/g, ' ')
@@ -426,11 +437,12 @@ export const createMemoryRuntime = (options: {
         const note = store.note(hit.id)
         if (note)
           lines.push(
-            `${hitId(hit)} (${day(note.createdAt)}${where}, ${note.category}, ${note.scope}${note.sourceThread === null ? '' : `, from t:${shortId(note.sourceThread)}`}) ${note.text}`,
+            `${hitId(hit)} (${day(note.createdAt)}${where}, ${note.category}, ${note.scope}${note.sourceThread === null ? '' : `, from t:${ThreadDigestRules.shortId(note.sourceThread)}`}) ${note.text}`,
           )
       } else {
         const text = await messageText(hit.thread, hit.seq)
-        if (text !== undefined) lines.push(`${hitId(hit)} (${day(hit.updatedAt)}${where}, ${hit.role} message) ${snippet(redact(text), args.query)}`)
+        if (text !== undefined)
+          lines.push(`${hitId(hit)} (${day(hit.updatedAt)}${where}, ${hit.role} message) ${snippet(ThreadDigestRules.redact(text), args.query)}`)
       }
     }
     store.recordToolCall({
@@ -622,12 +634,12 @@ export const createMemoryRuntime = (options: {
       const note = store.note(Number(id.slice(2)))
       recordRead(note === undefined ? 0 : 1, [id.toLowerCase()])
       if (!note) return `No valid note ${id} (it may have been updated or forgotten; search for its topic).`
-      return `${id} [${note.category}, ${note.scope}, ${note.confidence}] ${day(note.createdAt)}${note.sourceThread === null ? '' : ` from t:${shortId(note.sourceThread)}`}${note.supersedes === null ? '' : `, supersedes n:${note.supersedes}`}\n${note.text}`
+      return `${id} [${note.category}, ${note.scope}, ${note.confidence}] ${day(note.createdAt)}${note.sourceThread === null ? '' : ` from t:${ThreadDigestRules.shortId(note.sourceThread)}`}${note.supersedes === null ? '' : `, supersedes n:${note.supersedes}`}\n${note.text}`
     }
     const threadKey = id.replace(/^t:/i, '').replace(/#\d+$/, '')
     const thread = store.thread(threadKey)
     const sessionId = thread?.id ?? (threadKey.startsWith('session-') ? threadKey : undefined)
-    const ids = [`t:${shortId(sessionId ?? threadKey)}`]
+    const ids = [`t:${ThreadDigestRules.shortId(sessionId ?? threadKey)}`]
     if (args.range === undefined || args.range.trim().length === 0) {
       recordRead(thread === undefined ? 0 : 1, ids)
       if (!thread) return `No digest for ${id}. It may still be running, trivial, or past retention; memory_search finds its messages.`
@@ -662,7 +674,7 @@ export const createMemoryRuntime = (options: {
         line = `#${event.seq} result: ${callPaths.get(event.data.message.toolCallId) === true ? '[omitted: credential file]' : Utf8.clip(result, 600)}`
       }
       if (line === undefined) continue
-      const clipped = Utf8.clip(redact(line), 1_500)
+      const clipped = Utf8.clip(ThreadDigestRules.redact(line), 1_500)
       if (bytes + Utf8.byteLength(clipped) > 8_000) {
         lines.push(`(cut at 8 KB; continue from #${event.seq})`)
         break
@@ -693,7 +705,7 @@ export const createMemoryRuntime = (options: {
   ): Promise<string> => {
     const action = args.action ?? 'add'
     const project = await projectOf(caller.session.header)
-    const text = args.text === undefined ? undefined : redact(args.text.trim())
+    const text = args.text === undefined ? undefined : ThreadDigestRules.redact(args.text.trim())
     store.recordToolCall({ thread: caller.id, tool: `memory_note.${action}`, results: 1, ids: [] })
     const source = lastUserMessage.get(caller.id)
     const provenance = {

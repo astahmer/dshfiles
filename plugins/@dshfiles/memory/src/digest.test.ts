@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { readThread } from './digest.ts'
+import { ThreadDigestRules } from './digest.ts'
 import { createThread } from './testing/session-fixture.ts'
 
 const header = { id: 'session-3f2a9c1e-0000-4000-8000-000000000001', cwd: '/work/halyard' }
@@ -21,7 +21,7 @@ describe('thread digest', () => {
       ['edit', { file_path: 'broker/coordinator.ts', old_string: 'true', new_string: 'false' }, 'ok'],
       ['bash', { command: 'jj describe -m "fix(broker): reload coordinator config in place (INC-20931)"' }, 'Working copy now at: abc'],
     ])
-    const material = readThread({ header, project: '/work/halyard', events: thread.events, now })
+    const material = ThreadDigestRules.readThread({ header, project: '/work/halyard', events: thread.events, now })
     expect(material.needsModel).toBe(false)
     expect(material.digest?.source).toBe('trail')
     expect(material.digest?.decision).toBe('fix(broker): reload coordinator config in place (INC-20931)')
@@ -39,10 +39,10 @@ describe('thread digest', () => {
   it('skips blank and trivial threads', () => {
     const blank = createThread(header)
     blank.injected('Runtime context: cwd /work/halyard')
-    expect(readThread({ header, project: '/work/halyard', events: blank.events, now }).digest).toBeUndefined()
+    expect(ThreadDigestRules.readThread({ header, project: '/work/halyard', events: blank.events, now }).digest).toBeUndefined()
     const hello = createThread(header)
     hello.exchange('hi', 'Hello! How can I help?')
-    expect(readThread({ header, project: '/work/halyard', events: hello.events, now }).digest).toBeUndefined()
+    expect(ThreadDigestRules.readThread({ header, project: '/work/halyard', events: hello.events, now }).digest).toBeUndefined()
   })
 
   it("keeps the user's corrections and decisions verbatim, apart from the agent's answer", () => {
@@ -50,7 +50,7 @@ describe('thread digest', () => {
     thread.exchange('Rename the retention flag to retention.hours across the CLI.', 'Renamed it to retentionHours in every command.')
     thread.exchange("No, that's wrong: the flag must stay snake_case, retention_hours, because the ops scripts parse it.", 'Reverted to retention_hours.')
     thread.exchange("Let's go with 240 hours for Northwind and keep 72 as the default.", 'Done: Northwind 240 h, default 72 h.')
-    const digest = readThread({ header, project: '/work/halyard', events: thread.events, now }).digest?.digest ?? ''
+    const digest = ThreadDigestRules.readThread({ header, project: '/work/halyard', events: thread.events, now }).digest?.digest ?? ''
     expect(digest).toContain(`- [correction] "No, that's wrong: the flag must stay snake_case, retention_hours, because the ops scripts parse it."`)
     expect(digest).toContain(`- [decision] "Let's go with 240 hours for Northwind and keep 72 as the default."`)
     expect(digest.indexOf('User said (verbatim):')).toBeLessThan(digest.indexOf("Agent's last answer:"))
@@ -62,7 +62,7 @@ describe('thread digest', () => {
       ['bash', { command: 'wc -l logs/api-gateway.log' }, '48210 logs/api-gateway.log'],
     ])
     thread.exchange('And the worker log?', 'Ok.', [['bash', { command: 'grep -c retry logs/worker.log' }, '312']])
-    const material = readThread({ header, project: '/work/halyard', events: thread.events, now })
+    const material = ThreadDigestRules.readThread({ header, project: '/work/halyard', events: thread.events, now })
     expect(material.digest).toBeDefined()
     expect(material.needsModel).toBe(true)
     expect(material.transcript).toContain('[user #')
@@ -74,7 +74,7 @@ describe('thread digest', () => {
       'Use this key for the staging API: sk-proj-abcdefghijklmnopqrstuvwx and open http://127.0.0.1:3080/?token=deadbeefcafe0123 to check.',
       'Configured staging with the provided key; the dashboard loads.',
     )
-    const material = readThread({ header, project: '/work/halyard', events: thread.events, now })
+    const material = ThreadDigestRules.readThread({ header, project: '/work/halyard', events: thread.events, now })
     const stored = [material.digest?.digest ?? '', ...material.messages.map(message => message.text)].join('\n')
     expect(stored).not.toContain('sk-proj-abcdefghijklmnopqrstuvwx')
     expect(stored).not.toContain('deadbeefcafe0123')

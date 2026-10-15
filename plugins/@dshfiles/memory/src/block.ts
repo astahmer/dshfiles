@@ -2,7 +2,7 @@ import { basename } from 'node:path'
 
 import { Utf8 } from '@dshfiles/optmem-core'
 
-import { shortId } from './digest.ts'
+import { ThreadDigestRules } from './digest.ts'
 import { MemoryGuidance } from './guidance.ts'
 import type { MemoryStore, Note, StoredThread } from './store.ts'
 
@@ -15,7 +15,7 @@ const noteLine = (note: Note): string =>
   `- n:${note.id} [${note.category}${note.scope === 'repo' ? '' : `, ${note.scope}`}${note.confidence === 'inferred' ? ', inferred' : ''}] ${Utf8.clip(note.text.replace(/\s+/g, ' '), 220)}`
 
 const threadLine = (thread: StoredThread): string =>
-  `- ${day(thread.updatedAt)} t:${shortId(thread.id)} ${Utf8.clip(`${thread.title} — ${thread.decision}`, 200)}`
+  `- ${day(thread.updatedAt)} t:${ThreadDigestRules.shortId(thread.id)} ${Utf8.clip(`${thread.title} — ${thread.decision}`, 200)}`
 
 /**
  * The start block: a fixed instruction, then pointers ranked by citations and recency and grouped by project, cut to a
