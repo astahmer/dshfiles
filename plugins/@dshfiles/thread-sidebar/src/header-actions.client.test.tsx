@@ -8,7 +8,7 @@ import { HeaderThreadActions } from './header-actions.js'
 import { storedPreferences, PREFERENCES_STORAGE_KEY } from './preferences.js'
 import { SidebarStateProvider } from './sidebar-state.js'
 
-const labels: Readonly<Record<string, string>> = {
+const labels = {
   threadSidebarPin: 'Pin',
   threadSidebarUnpin: 'Unpin',
   threadSidebarPark: 'Park',
@@ -25,9 +25,16 @@ const labels: Readonly<Record<string, string>> = {
   threadSidebarMuteForever: 'Until I unmute it',
   threadSidebarUnmute: 'Unmute',
   threadSidebarActionFailure: 'Could not update thread',
+  threadSidebarCopyId: 'Copy thread ID',
+  threadSidebarCopyLink: 'Copy thread link',
+  threadSidebarIdCopied: 'Thread ID copied.',
+  threadSidebarLinkCopied: 'Thread link copied.',
+  threadSidebarClipboardFailure: 'Could not access the clipboard.',
   threadSidebarThreadActions: 'Thread actions',
   threadSidebarMoreThreadActions: 'More thread actions',
-}
+} satisfies Readonly<Record<string, string>>
+
+const labelFor = (key: string): string => Object.entries(labels).find(([label]) => label === key)?.[1] ?? key
 
 type ClusterResize = (entries: readonly { readonly contentRect: { readonly width: number } }[]) => void
 const resizeCallbacks: ClusterResize[] = []
@@ -78,7 +85,7 @@ const mount = (options?: { archived?: boolean; blank?: boolean; running?: boolea
     unarchiveSession: vi.fn(async () => {}),
     pinSession,
     unpinSession: vi.fn(async () => {}),
-    t: key => labels[key] ?? key,
+    t: key => labelFor(key),
   }
   const actions = (
     <SidebarStateProvider>
@@ -163,10 +170,27 @@ describe('HeaderThreadActions', () => {
     mount({ archived: true })
     expect(screen.queryByRole('button', { name: 'Pin' })).toBeNull()
     openMoreMenu()
-    expect(screen.getAllByRole('menuitem').map(item => item.textContent)).toEqual(['Restore'])
+    expect(screen.getAllByRole('menuitem').map(item => item.textContent)).toEqual(['Restore', 'Copy thread ID', 'Copy thread link'])
     cleanup()
     mount({ blank: true })
     expect(screen.queryByRole('group', { name: 'Thread actions' })).toBeNull()
+  })
+
+  it('offers copy thread ID and link actions in the header menu', async () => {
+    const writeText = vi.fn(async () => {})
+    vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } })
+    window.history.replaceState({}, '', '/?token=private#section')
+    mount()
+    openMoreMenu()
+
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Copy thread ID' }))
+    await vi.waitFor(() => expect(screen.getByRole('status').textContent).toBe('Thread ID copied.'))
+    expect(writeText).toHaveBeenCalledWith('s1')
+
+    openMoreMenu()
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Copy thread link' }))
+    await vi.waitFor(() => expect(screen.getByRole('status').textContent).toBe('Thread link copied.'))
+    expect(writeText).toHaveBeenCalledWith('http://localhost:3000/?thread=s1')
   })
 
   it('disables park and archive while a thread is running', () => {

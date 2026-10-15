@@ -1,4 +1,5 @@
 import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
+import type { WorkspaceView } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { FinishedSubagentsMode } from './thread-children.js'
 import type { ThreadMutes } from './thread-mute.js'
 
@@ -192,6 +193,29 @@ export const sessionLineage = (session: Pick<SessionSummary, 'id' | 'parentId'>,
     parentId: session.parentId,
     parentTitle: directParent?.displayTitle ?? session.parentId,
   }
+}
+
+const THREADS_DIRECTORY_SUFFIX = '-threads'
+
+const projectOfThreadWorkspace = (workspace: WorkspaceView, byPath: ReadonlyMap<string, WorkspaceView>): WorkspaceView | undefined => {
+  const parent = workspace.path.slice(0, workspace.path.lastIndexOf('/'))
+  return parent.endsWith(THREADS_DIRECTORY_SUFFIX) ? byPath.get(parent.slice(0, -THREADS_DIRECTORY_SUFFIX.length)) : undefined
+}
+
+/** jj-integration's thread workspaces are attributed to their owning project workspace. */
+export const workspaceForSessions = (workspaces: readonly WorkspaceView[]): Map<string, string> => {
+  const byPath = new Map(workspaces.map(workspace => [workspace.path, workspace]))
+  const map = new Map<string, string>()
+  for (const workspace of workspaces) {
+    const owner = projectOfThreadWorkspace(workspace, byPath) ?? workspace
+    for (const sessionId of workspace.sessionIds) map.set(sessionId, owner.workspaceId)
+  }
+  return map
+}
+
+export const projectWorkspaces = (workspaces: readonly WorkspaceView[]): readonly WorkspaceView[] => {
+  const byPath = new Map(workspaces.map(workspace => [workspace.path, workspace]))
+  return workspaces.filter(workspace => projectOfThreadWorkspace(workspace, byPath) === undefined)
 }
 
 /** Resolve a workspace from the session or its nearest known ancestor. */

@@ -1,6 +1,5 @@
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
-import type { WorkspaceView } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { WorkspaceBrowserProps } from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import { RemoteThreadsSection } from './remote-threads-section.js'
@@ -81,7 +80,9 @@ import {
   type SidebarPreferences,
   type SidebarSection,
   type ThreadRowDensity,
+  projectWorkspaces,
   workspaceForLineage,
+  workspaceForSessions,
 } from './organization.js'
 import { attentionColorDotClass, attentionDotClass, attentionLabelClass, type ThreadAttentionLabel } from './attention-presentation.js'
 import { attentionColorSchema, toggleCollapsedSection } from './preferences.js'
@@ -252,29 +253,6 @@ const sessionsForAutoArchive = (ids: readonly SessionSummary['id'][], byId: Read
     const session = byId[sessionId]
     return session === undefined ? [] : [session]
   })
-
-const THREADS_DIRECTORY_SUFFIX = '-threads'
-
-/** jj-integration puts a thread's own workspace at `<project>-threads/<name>`; its sessions belong to `<project>`. */
-const projectOfThreadWorkspace = (workspace: WorkspaceView, byPath: ReadonlyMap<string, WorkspaceView>): WorkspaceView | undefined => {
-  const parent = workspace.path.slice(0, workspace.path.lastIndexOf('/'))
-  return parent.endsWith(THREADS_DIRECTORY_SUFFIX) ? byPath.get(parent.slice(0, -THREADS_DIRECTORY_SUFFIX.length)) : undefined
-}
-
-const workspaceForSessions = (workspaces: readonly WorkspaceView[]): Map<string, string> => {
-  const byPath = new Map(workspaces.map(workspace => [workspace.path, workspace]))
-  const map = new Map<string, string>()
-  for (const workspace of workspaces) {
-    const owner = projectOfThreadWorkspace(workspace, byPath) ?? workspace
-    for (const sessionId of workspace.sessionIds) map.set(sessionId, owner.workspaceId)
-  }
-  return map
-}
-
-const projectWorkspaces = (workspaces: readonly WorkspaceView[]): readonly WorkspaceView[] => {
-  const byPath = new Map(workspaces.map(workspace => [workspace.path, workspace]))
-  return workspaces.filter(workspace => projectOfThreadWorkspace(workspace, byPath) === undefined)
-}
 
 const RELATIVE_TIME_SUFFIX = { now: '', minutes: 'm', hours: 'h', days: 'd', months: 'mo', years: 'y' } as const
 

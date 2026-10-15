@@ -16,12 +16,14 @@ import {
 } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
-import { ArchiveIcon, ArchiveRestoreIcon, BellIcon, BellOffIcon, EllipsisIcon, PauseIcon, PinIcon, PinOffIcon } from '@dshfiles/plugin-ui/icons'
+import { ArchiveIcon, ArchiveRestoreIcon, BellIcon, BellOffIcon, CopyIcon, EllipsisIcon, PauseIcon, PinIcon, PinOffIcon } from '@dshfiles/plugin-ui/icons'
 import { useLayoutEffect, useState } from 'react'
 import { isSessionMuted, muteOptionLabelKeys, muteSessions, muteUntil, THREAD_MUTE_OPTIONS, unmuteSessions, type ThreadMuteOption } from './thread-mute.js'
 import { threadActionTargetIds } from './thread-children.js'
 import { usePreferences } from './sidebar-state.js'
 import { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
+import { workspaceForLineage, workspaceForSessions } from './organization.js'
+import { buildThreadUrl } from './thread-url.js'
 
 interface HeaderThreadActionsInjected {
   archiveSession: (sessionId: SessionSummary['id']) => Promise<void>
@@ -88,6 +90,7 @@ export const HeaderThreadActions = ({
   const workspaceState = useWorkspaces(state => state)
   const { preferences, updatePreferences } = usePreferences()
   const [actionFailed, setActionFailed] = useState(false)
+  const [copyStatus, setCopyStatus] = useState('')
   const [bar, setBar] = useState<HTMLElement | null>(null)
   const crowded = useCrowdedHeader(bar)
   if (session === undefined || session.blank) return null
@@ -102,6 +105,7 @@ export const HeaderThreadActions = ({
     threads: actionThreads,
     cascadeToChildren: preferences.applyActionsToChildThreads,
   })
+  const workspaceId = workspaceForLineage(session, sessionState.byId, workspaceForSessions(workspaceState.items))
   const updateParked = (): void => {
     if (session.running) return
     const parkedIds = new Set(preferences.parkedSessionIds)
@@ -136,6 +140,18 @@ export const HeaderThreadActions = ({
         until: muteUntilNow(option),
       }),
     })
+  }
+  const copy = async (value: string, successKey: 'threadSidebarIdCopied' | 'threadSidebarLinkCopied'): Promise<void> => {
+    try {
+      if (navigator.clipboard === undefined) {
+        setCopyStatus(t('threadSidebarClipboardFailure'))
+        return
+      }
+      await navigator.clipboard.writeText(value)
+      setCopyStatus(t(successKey))
+    } catch {
+      setCopyStatus(t('threadSidebarClipboardFailure'))
+    }
   }
   const togglePinned = (): void => void updateThreadOperation(pinned ? 'unpin' : 'pin')
   const pinLabel = t(pinned ? 'threadSidebarUnpin' : 'threadSidebarPin')
@@ -208,11 +224,25 @@ export const HeaderThreadActions = ({
               {archived ? <ArchiveRestoreIcon aria-hidden="true" /> : <ArchiveIcon aria-hidden="true" />}
               {t(archived ? 'threadSidebarRestore' : 'threadSidebarArchive')}
             </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={() => void copy(sessionId, 'threadSidebarIdCopied')}>
+              <CopyIcon aria-hidden="true" />
+              {t('threadSidebarCopyId')}
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => void copy(buildThreadUrl(window.location.href, sessionId, workspaceId), 'threadSidebarLinkCopied')}>
+              <CopyIcon aria-hidden="true" />
+              {t('threadSidebarCopyLink')}
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
         {actionFailed ? (
           <span className="dshx:px-2 dshx:py-1.5 dshx:text-xs dshx:text-destructive" role="alert">
             {t('threadSidebarActionFailure')}
+          </span>
+        ) : null}
+        {copyStatus ? (
+          <span className="dshx:sr-only" role="status">
+            {copyStatus}
           </span>
         ) : null}
       </div>
