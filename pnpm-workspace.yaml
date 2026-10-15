@@ -17,6 +17,8 @@ catalog:
   yaml: 2.9.0
 
 dedupePeerDependents: true
+# pnpm 12 reads only auth and registry keys from .npmrc, so exact saves are configured here.
+saveExact: true
 publicHoistPattern:
   - '@deepseek-ai/*'
   - '@dshfiles/*'

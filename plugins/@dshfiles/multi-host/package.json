@@ -29,8 +29,8 @@
   "dependencies": {
     "@dshfiles/plugin-ui": "workspace:*",
     "@dshfiles/shared-runtime": "workspace:*",
-    "ws": "^8.18.0",
-    "zod": "^4.4.3"
+    "ws": "8.21.3",
+    "zod": "4.6.5"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "4.0.4",
@@ -44,12 +44,12 @@
     "@deepseek-ai/dsh-cordis-host-runner": "0.2.0-rc.2",
     "@deepseek-ai/dsh-tool-cordis": "0.2.0-rc.2",
     "@dshfiles/dshx": "workspace:*",
-    "@types/node": "^22.19.0",
-    "@types/react": "~18.3.31",
-    "@types/ws": "^8.18.1",
-    "react": "^18.3.1",
+    "@types/node": "22.20.5",
+    "@types/react": "18.3.31",
+    "@types/ws": "8.18.2",
+    "react": "18.3.1",
     "typescript": "7.0.2",
-    "vitest": "^4.1.10"
+    "vitest": "4.1.11"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "~4.0.4",

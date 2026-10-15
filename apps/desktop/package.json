@@ -13,7 +13,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {
-    "@types/node": "^22.0.0",
+    "@types/node": "22.20.5",
     "electron": "43.6.0",
     "typescript": "7.0.2"
   }

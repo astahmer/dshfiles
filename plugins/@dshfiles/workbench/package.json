@@ -26,12 +26,12 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@deepseek-ai/schemastery": "^3.18.4",
+    "@deepseek-ai/schemastery": "3.18.4",
     "@dshfiles/dshx": "workspace:*",
     "@dshfiles/plugin-ui": "workspace:*",
     "@dshfiles/shared-runtime": "workspace:*",
     "dockview-react": "8.4.1",
-    "zod": "^4.4.3"
+    "zod": "4.6.5"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "4.0.4",
@@ -45,15 +45,15 @@
     "@deepseek-ai/dsh-client-ui-sidebar": "0.2.0-rc.2",
     "@deepseek-ai/dsh-client-ui-sidebar-right": "0.2.0-rc.2",
     "@deepseek-ai/dsh-client-ui-slots": "0.2.0-rc.2",
-    "@testing-library/react": "^16.1.0",
-    "@types/node": "^22.19.0",
-    "@types/react": "~18.3.31",
-    "@types/react-dom": "~18.3.7",
-    "jsdom": "^26.1.0",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
+    "@testing-library/react": "16.3.3",
+    "@types/node": "22.20.5",
+    "@types/react": "18.3.31",
+    "@types/react-dom": "18.3.7",
+    "jsdom": "26.1.0",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
     "typescript": "7.0.2",
-    "vitest": "^4.1.10"
+    "vitest": "4.1.11"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "~4.0.4",

@@ -25,7 +25,7 @@
     "@dshfiles/jj-integration": "workspace:*",
     "@dshfiles/plugin-ui": "workspace:*",
     "@dshfiles/shared-runtime": "workspace:*",
-    "zod": "^4.4.3"
+    "zod": "4.6.5"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "4.0.4",
@@ -40,13 +40,13 @@
     "@deepseek-ai/dsh-client-ui-slots": "0.2.0-rc.2",
     "@deepseek-ai/dsh-client-ui-workspace": "0.2.0-rc.2",
     "@deepseek-ai/dsh-tools": "0.2.0-rc.2",
-    "@deepseek-ai/schemastery": "^3.18.4",
+    "@deepseek-ai/schemastery": "3.18.4",
     "@dshfiles/dshx": "workspace:*",
-    "@types/node": "^22.19.0",
-    "@types/react": "~18.3.31",
-    "react": "^18.3.1",
+    "@types/node": "22.20.5",
+    "@types/react": "18.3.31",
+    "react": "18.3.1",
     "typescript": "7.0.2",
-    "vitest": "^4.1.10"
+    "vitest": "4.1.11"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "~4.0.4",

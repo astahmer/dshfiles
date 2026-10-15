@@ -37,14 +37,14 @@
     "verify:scratch": "node scripts/verify-scratch.mjs"
   },
   "dependencies": {
-    "@deepseek-ai/schemastery": "^3.18.4",
+    "@deepseek-ai/schemastery": "3.18.4",
     "@dshfiles/plugin-ui": "workspace:*",
     "@dshfiles/project-folder-picker": "workspace:*",
     "@dshfiles/shared-runtime": "workspace:*",
-    "@earendil-works/pi-ai": "~0.87.1",
-    "react-dom": "^18.3.1",
+    "@earendil-works/pi-ai": "0.87.1",
+    "react-dom": "18.3.1",
     "yaml": "2.9.1",
-    "zod": "^4.4.3"
+    "zod": "4.6.5"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "4.0.4",
@@ -78,12 +78,12 @@
     "@dshfiles/dshx": "workspace:*",
     "@dshfiles/request-messages": "workspace:*",
     "@dshfiles/secret-catalog": "workspace:*",
-    "@types/node": "^22.19.0",
-    "@types/react": "~18.3.31",
-    "@types/react-dom": "~18.3.7",
-    "react": "^18.3.1",
-    "typescript": "^5.9.3",
-    "vitest": "^4.1.10"
+    "@types/node": "22.20.5",
+    "@types/react": "18.3.31",
+    "@types/react-dom": "18.3.7",
+    "react": "18.3.1",
+    "typescript": "5.9.3",
+    "vitest": "4.1.11"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "~4.0.4",

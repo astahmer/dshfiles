@@ -207,7 +207,7 @@ importers:
         specifier: 0.2.0-rc.2
         version: 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
       '@types/node':
-        specifier: ^22.20.5
+        specifier: 22.20.5
         version: 22.20.5
       oxfmt:
         specifier: 0.71.0
@@ -222,13 +222,13 @@ importers:
         specifier: 7.0.2
         version: 7.0.2
       zod:
-        specifier: ^4.6.5
+        specifier: 4.6.5
         version: 4.6.5
 
   apps/desktop:
     devDependencies:
       '@types/node':
-        specifier: ^22.0.0
+        specifier: 22.20.5
         version: 22.20.5
       electron:
         specifier: 43.6.0
@@ -240,13 +240,13 @@ importers:
   plugins:
     devDependencies:
       '@types/node':
-        specifier: ^22.19.0
+        specifier: 22.20.5
         version: 22.20.5
       typescript:
         specifier: 7.0.2
         version: 7.0.2
       zod:
-        specifier: ^4.4.3
+        specifier: 4.6.5
         version: 4.6.5
 
   plugins/@dshfiles/activity-timeline:
@@ -261,7 +261,7 @@ importers:
         specifier: 7.0.0
         version: 7.0.0
       zod:
-        specifier: ^4.4.3
+        specifier: 4.6.5
         version: 4.6.5
     devDependencies:
       '@deepseek-ai/cordis':
@@ -307,19 +307,19 @@ importers:
         specifier: workspace:*
         version: link:../../../tooling/dshx/packages/dshx
       '@types/node':
-        specifier: ^22.19.0
+        specifier: 22.20.5
         version: 22.20.5
       '@types/react':
-        specifier: ~18.3.31
+        specifier: 18.3.31
         version: 18.3.31
       react:
-        specifier: ^18.3.1
+        specifier: 18.3.1
         version: 18.3.1
       typescript:
         specifier: 7.0.2
         version: 7.0.2
       vitest:
-        specifier: ^4.1.10
+        specifier: 4.1.11
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.5)(jsdom@26.1.0)(vite@8.3.2(@types/node@22.20.5))
 
   plugins/@dshfiles/agent-communication:
@@ -334,7 +334,7 @@ importers:
         specifier: 7.0.0
         version: 7.0.0
       zod:
-        specifier: ^4.4.3
+        specifier: 4.6.5
         version: 4.6.5
     devDependencies:
       '@deepseek-ai/cordis':
@@ -395,19 +395,19 @@ importers:
         specifier: workspace:*
         version: link:../../../tooling/dshx/packages/dshx
       '@types/node':
-        specifier: ^22.19.0
+        specifier: 22.20.5
         version: 22.20.5
       '@types/react':
-        specifier: ~18.3.31
+        specifier: 18.3.31
         version: 18.3.31
       react:
-        specifier: ^18.3.1
+        specifier: 18.3.1
         version: 18.3.1
       typescript:
         specifier: 7.0.2
         version: 7.0.2
       vitest:
-        specifier: ^4.1.10
+        specifier: 4.1.11
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.5)(jsdom@26.1.0)(vite@8.3.2(@types/node@22.20.5))
 
   plugins/@dshfiles/agent-questions:
@@ -416,7 +416,7 @@ importers:
         specifier: '>=0.2.0-rc.1 <0.3.0-0'
         version: 0.2.0-rc.2(52b5a8ab481be2b3d891c22a71641755)
       zod:
-        specifier: ^4.4.3
+        specifier: 4.6.5
         version: 4.6.5
     devDependencies:
       '@deepseek-ai/cordis':
@@ -453,13 +453,13 @@ importers:
         specifier: workspace:*
         version: link:../../../tooling/dshx/packages/dshx
       '@types/node':
-        specifier: ^22.19.0
+        specifier: 22.20.5
         version: 22.20.5
       typescript:
         specifier: 7.0.2
         version: 7.0.2
       vitest:
-        specifier: ^4.1.10
+        specifier: 4.1.11
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.5)(jsdom@26.1.0)(vite@8.3.2(@types/node@22.20.5))
 
   plugins/@dshfiles/agent-toolkit:
@@ -480,7 +480,7 @@ importers:
         specifier: workspace:*
         version: link:../shared-runtime
       zod:
-        specifier: ^4.4.3
+        specifier: 4.6.5
         version: 4.6.5
     devDependencies:
       '@deepseek-ai/cordis':
@@ -529,19 +529,19 @@ importers:
         specifier: workspace:*
         version: link:../../../tooling/dshx/packages/dshx
       '@testing-library/react':
-        specifier: ^16.1.0
+        specifier: 16.3.3
         version: 16.3.3(@testing-library/dom@10.4.2)(@types/react-dom@18.3.7(@types/react@18.3.31))(@types/react@18.3.31)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@types/node':
-        specifier: ^22.19.0
+        specifier: 22.20.5
         version: 22.20.5
       '@types/react':
-        specifier: ~18.3.31
+        specifier: 18.3.31
         version: 18.3.31
       jsdom:
-        specifier: ^26.1.0
+        specifier: 26.1.0
         version: 26.1.0
       react:
-        specifier: ^18.3.1
+        specifier: 18.3.1
         version: 18.3.1
       typescript:
         specifier: 7.0.2
@@ -553,7 +553,7 @@ importers:
   plugins/@dshfiles/ai-accounts:
     dependencies:
       '@deepseek-ai/schemastery':
-        specifier: ^3.18.4
+        specifier: 3.18.4
         version: 3.18.4
       '@dshfiles/plugin-ui':
         specifier: workspace:*
@@ -565,16 +565,16 @@ importers:
         specifier: workspace:*
         version: link:../shared-runtime
       '@earendil-works/pi-ai':
-        specifier: ~0.87.1
+        specifier: 0.87.1
         version: 0.87.1(@modelcontextprotocol/sdk@1.30.0(zod@4.6.5))(ws@8.21.3)(zod@4.6.5)
       react-dom:
-        specifier: ^18.3.1
+        specifier: 18.3.1
         version: 18.3.1(react@18.3.1)
       yaml:
         specifier: 2.9.1
         version: 2.9.1
       zod:
-        specifier: ^4.4.3
+        specifier: 4.6.5
         version: 4.6.5
     devDependencies:
       '@deepseek-ai/cordis':
@@ -671,22 +671,22 @@ importers:
         specifier: workspace:*
         version: link:../secret-catalog
       '@types/node':
-        specifier: ^22.19.0
+        specifier: 22.20.5
         version: 22.20.5
       '@types/react':
-        specifier: ~18.3.31
+        specifier: 18.3.31
         version: 18.3.31
       '@types/react-dom':
-        specifier: ~18.3.7
+        specifier: 18.3.7
         version: 18.3.7(@types/react@18.3.31)
       react:
-        specifier: ^18.3.1
+        specifier: 18.3.1
         version: 18.3.1
       typescript:
-        specifier: ^5.9.3
+        specifier: 5.9.3
         version: 5.9.3
       vitest:
-        specifier: ^4.1.10
+        specifier: 4.1.11
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.5)(jsdom@26.1.0)(vite@8.3.2(@types/node@22.20.5))
 
   plugins/@dshfiles/btw:
@@ -704,7 +704,7 @@ importers:
         specifier: workspace:*
         version: link:../shared-runtime
       zod:
-        specifier: ^4.4.3
+        specifier: 4.6.5
         version: 4.6.5
     devDependencies:
       '@deepseek-ai/cordis':
@@ -762,13 +762,13 @@ importers:
         specifier: 0.2.0-rc.2
         version: 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)))
       '@types/node':
-        specifier: ^22.19.0
+        specifier: 22.20.5
         version: 22.20.5
       '@types/react':
-        specifier: ~18.3.31
+        specifier: 18.3.31
         version: 18.3.31
       react:
-        specifier: ^18.3.1
+        specifier: 18.3.1
         version: 18.3.1
       typescript:
         specifier: 7.0.2
@@ -786,7 +786,7 @@ importers:
         specifier: workspace:*
         version: link:../shared-runtime
       zod:
-        specifier: ^4.4.3
+        specifier: 4.6.5
         version: 4.6.5
     devDependencies:
       '@deepseek-ai/cordis':
@@ -844,25 +844,25 @@ importers:
         specifier: workspace:*
         version: link:../../../tooling/dshx/packages/dshx
       '@testing-library/dom':
-        specifier: ^10.4.2
+        specifier: 10.4.2
         version: 10.4.2
       '@testing-library/react':
-        specifier: ^16.3.3
+        specifier: 16.3.3
         version: 16.3.3(@testing-library/dom@10.4.2)(@types/react-dom@18.3.7(@types/react@18.3.31))(@types/react@18.3.31)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@types/node':
-        specifier: ^22.19.0
+        specifier: 22.20.5
         version: 22.20.5
       '@types/react':
-        specifier: ~18.3.31
+        specifier: 18.3.31
         version: 18.3.31
       react:
-        specifier: ^18.3.1
+        specifier: 18.3.1
         version: 18.3.1
       typescript:
         specifier: 7.0.2
         version: 7.0.2
       vitest:
-        specifier: ^4.1.10
+        specifier: 4.1.11
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.5)(jsdom@26.1.0)(vite@8.3.2(@types/node@22.20.5))
 
   plugins/@dshfiles/diff-viewed:
@@ -877,7 +877,7 @@ importers:
         specifier: workspace:*
         version: link:../shared-runtime
       zod:
-        specifier: ^4.4.3
+        specifier: 4.6.5
         version: 4.6.5
     devDependencies:
       '@deepseek-ai/cordis':
@@ -899,16 +899,16 @@ importers:
         specifier: workspace:*
         version: link:../../../tooling/dshx/packages/dshx
       '@types/react':
-        specifier: ~18.3.31
+        specifier: 18.3.31
         version: 18.3.31
       react:
-        specifier: ^18.3.1
+        specifier: 18.3.1
         version: 18.3.1
       typescript:
         specifier: 7.0.2
         version: 7.0.2
       vitest:
-        specifier: ^4.1.10
+        specifier: 4.1.11
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.5)(jsdom@26.1.0)(vite@8.3.2(@types/node@22.20.5))
 
   plugins/@dshfiles/editor:
@@ -917,7 +917,7 @@ importers:
         specifier: '>=0.2.0-rc.1 <0.3.0-0'
         version: 0.2.0-rc.2(52b5a8ab481be2b3d891c22a71641755)
       '@deepseek-ai/schemastery':
-        specifier: ^3.18.4
+        specifier: 3.18.4
         version: 3.18.4
       '@dshfiles/plugin-ui':
         specifier: workspace:*
@@ -932,7 +932,7 @@ importers:
         specifier: 0.57.0
         version: 0.57.0
       zod:
-        specifier: ^4.4.3
+        specifier: 4.6.5
         version: 4.6.5
     devDependencies:
       '@deepseek-ai/cordis':
@@ -975,19 +975,19 @@ importers:
         specifier: workspace:*
         version: link:../../../tooling/dshx/packages/dshx
       '@types/node':
-        specifier: ^22.19.0
+        specifier: 22.20.5
         version: 22.20.5
       '@types/react':
-        specifier: ~18.3.31
+        specifier: 18.3.31
         version: 18.3.31
       react:
-        specifier: ^18.3.1
+        specifier: 18.3.1
         version: 18.3.1
       typescript:
         specifier: 7.0.2
         version: 7.0.2
       vitest:
-        specifier: ^4.1.10
+        specifier: 4.1.11
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.5)(jsdom@26.1.0)(vite@8.3.2(@types/node@22.20.5))
 
   plugins/@dshfiles/goal-stall-guard:
@@ -1015,13 +1015,13 @@ importers:
         specifier: workspace:*
         version: link:../../../tooling/dshx/packages/dshx
       '@types/node':
-        specifier: ^22.19.0
+        specifier: 22.20.5
         version: 22.20.5
       typescript:
         specifier: 7.0.2
         version: 7.0.2
       vitest:
-        specifier: ^4.1.10
+        specifier: 4.1.11
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.5)(jsdom@26.1.0)(vite@8.3.2(@types/node@22.20.5))
 
   plugins/@dshfiles/home:
@@ -1036,7 +1036,7 @@ importers:
         specifier: workspace:*
         version: link:../shared-runtime
       zod:
-        specifier: ^4.4.3
+        specifier: 4.6.5
         version: 4.6.5
     devDependencies:
       '@deepseek-ai/cordis':
@@ -1076,25 +1076,25 @@ importers:
         specifier: 0.2.0-rc.2
         version: 0.2.0-rc.2(52b5a8ab481be2b3d891c22a71641755)
       '@deepseek-ai/schemastery':
-        specifier: ^3.18.4
+        specifier: 3.18.4
         version: 3.18.4
       '@dshfiles/dshx':
         specifier: workspace:*
         version: link:../../../tooling/dshx/packages/dshx
       '@types/node':
-        specifier: ^22.19.0
+        specifier: 22.20.5
         version: 22.20.5
       '@types/react':
-        specifier: ~18.3.31
+        specifier: 18.3.31
         version: 18.3.31
       react:
-        specifier: ^18.3.1
+        specifier: 18.3.1
         version: 18.3.1
       typescript:
         specifier: 7.0.2
         version: 7.0.2
       vitest:
-        specifier: ^4.1.10
+        specifier: 4.1.11
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.5)(jsdom@26.1.0)(vite@8.3.2(@types/node@22.20.5))
 
   plugins/@dshfiles/jj-integration:
@@ -1115,7 +1115,7 @@ importers:
         specifier: workspace:*
         version: link:../shared-runtime
       zod:
-        specifier: ^4.4.3
+        specifier: 4.6.5
         version: 4.6.5
     devDependencies:
       '@deepseek-ai/cordis':
@@ -1179,25 +1179,25 @@ importers:
         specifier: 0.2.0-rc.2
         version: 0.2.0-rc.2(0af55daf1da1f010142729c9967a6080)
       '@deepseek-ai/schemastery':
-        specifier: ^3.18.4
+        specifier: 3.18.4
         version: 3.18.4
       '@dshfiles/dshx':
         specifier: workspace:*
         version: link:../../../tooling/dshx/packages/dshx
       '@types/node':
-        specifier: ^22.19.0
+        specifier: 22.20.5
         version: 22.20.5
       '@types/react':
-        specifier: ~18.3.31
+        specifier: 18.3.31
         version: 18.3.31
       react:
-        specifier: ^18.3.1
+        specifier: 18.3.1
         version: 18.3.1
       typescript:
         specifier: 7.0.2
         version: 7.0.2
       vitest:
-        specifier: ^4.1.10
+        specifier: 4.1.11
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.5)(jsdom@26.1.0)(vite@8.3.2(@types/node@22.20.5))
 
   plugins/@dshfiles/jujutsu:
@@ -1212,7 +1212,7 @@ importers:
         specifier: '>=0.2.0-rc.1 <0.3.0-0'
         version: 0.2.0-rc.2(52b5a8ab481be2b3d891c22a71641755)
       '@deepseek-ai/schemastery':
-        specifier: ^3.18.4
+        specifier: 3.18.4
         version: 3.18.4
       '@dshfiles/plugin-ui':
         specifier: workspace:*
@@ -1224,7 +1224,7 @@ importers:
         specifier: workspace:*
         version: link:../shared-runtime
       zod:
-        specifier: ^4.4.3
+        specifier: 4.6.5
         version: 4.6.5
     devDependencies:
       '@deepseek-ai/cordis':
@@ -1273,19 +1273,19 @@ importers:
         specifier: workspace:*
         version: link:../../../tooling/dshx/packages/dshx
       '@types/node':
-        specifier: ^22.19.0
+        specifier: 22.20.5
         version: 22.20.5
       '@types/react':
-        specifier: ~18.3.31
+        specifier: 18.3.31
         version: 18.3.31
       react:
-        specifier: ^18.3.1
+        specifier: 18.3.1
         version: 18.3.1
       typescript:
         specifier: 7.0.2
         version: 7.0.2
       vitest:
-        specifier: ^4.1.10
+        specifier: 4.1.11
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.5)(jsdom@26.1.0)(vite@8.3.2(@types/node@22.20.5))
 
   plugins/@dshfiles/main-tabs:
@@ -1294,7 +1294,7 @@ importers:
         specifier: '>=0.2.0-rc.1 <0.3.0-0'
         version: 0.2.0-rc.2(52b5a8ab481be2b3d891c22a71641755)
       '@deepseek-ai/schemastery':
-        specifier: ^3.18.4
+        specifier: 3.18.4
         version: 3.18.4
       '@dshfiles/dshx':
         specifier: workspace:*
@@ -1306,7 +1306,7 @@ importers:
         specifier: workspace:*
         version: link:../shared-runtime
       zod:
-        specifier: ^4.4.3
+        specifier: 4.6.5
         version: 4.6.5
     devDependencies:
       '@deepseek-ai/cordis':
@@ -1349,31 +1349,31 @@ importers:
         specifier: 0.2.0-rc.2
         version: 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
       '@testing-library/react':
-        specifier: ^16.1.0
+        specifier: 16.3.3
         version: 16.3.3(@testing-library/dom@10.4.2)(@types/react-dom@18.3.7(@types/react@18.3.31))(@types/react@18.3.31)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@types/node':
-        specifier: ^22.19.0
+        specifier: 22.20.5
         version: 22.20.5
       '@types/react':
-        specifier: ~18.3.31
+        specifier: 18.3.31
         version: 18.3.31
       '@types/react-dom':
-        specifier: ~18.3.7
+        specifier: 18.3.7
         version: 18.3.7(@types/react@18.3.31)
       jsdom:
-        specifier: ^26.1.0
+        specifier: 26.1.0
         version: 26.1.0
       react:
-        specifier: ^18.3.1
+        specifier: 18.3.1
         version: 18.3.1
       react-dom:
-        specifier: ^18.3.1
+        specifier: 18.3.1
         version: 18.3.1(react@18.3.1)
       typescript:
         specifier: 7.0.2
         version: 7.0.2
       vitest:
-        specifier: ^4.1.10
+        specifier: 4.1.11
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.5)(jsdom@26.1.0)(vite@8.3.2(@types/node@22.20.5))
 
   plugins/@dshfiles/mcp-servers:
@@ -1397,7 +1397,7 @@ importers:
         specifier: 3.8.8
         version: 3.8.8
       zod:
-        specifier: ^4.4.3
+        specifier: 4.6.5
         version: 4.6.5
     devDependencies:
       '@deepseek-ai/cordis':
@@ -1455,25 +1455,25 @@ importers:
         specifier: workspace:*
         version: link:../../../tooling/dshx/packages/dshx
       '@types/node':
-        specifier: ^22.19.0
+        specifier: 22.20.5
         version: 22.20.5
       '@types/react':
-        specifier: ~18.3.31
+        specifier: 18.3.31
         version: 18.3.31
       react:
-        specifier: ^18.3.1
+        specifier: 18.3.1
         version: 18.3.1
       typescript:
         specifier: 7.0.2
         version: 7.0.2
       vitest:
-        specifier: ^4.1.10
+        specifier: 4.1.11
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.5)(jsdom@26.1.0)(vite@8.3.2(@types/node@22.20.5))
 
   plugins/@dshfiles/memory:
     dependencies:
       '@deepseek-ai/schemastery':
-        specifier: ^3.18.4
+        specifier: 3.18.4
         version: 3.18.4
       '@dshfiles/ai-accounts':
         specifier: workspace:*
@@ -1488,7 +1488,7 @@ importers:
         specifier: workspace:*
         version: link:../shared-runtime
       zod:
-        specifier: ^4.4.3
+        specifier: 4.6.5
         version: 4.6.5
     devDependencies:
       '@deepseek-ai/cordis':
@@ -1543,19 +1543,19 @@ importers:
         specifier: workspace:*
         version: link:../../../tooling/dshx/packages/dshx
       '@types/node':
-        specifier: ^22.19.0
+        specifier: 22.20.5
         version: 22.20.5
       '@types/react':
-        specifier: ~18.3.31
+        specifier: 18.3.31
         version: 18.3.31
       react:
-        specifier: ^18.3.1
+        specifier: 18.3.1
         version: 18.3.1
       typescript:
         specifier: 7.0.2
         version: 7.0.2
       vitest:
-        specifier: ^4.1.10
+        specifier: 4.1.11
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.5)(jsdom@26.1.0)(vite@8.3.2(@types/node@22.20.5))
 
   plugins/@dshfiles/mentions:
@@ -1567,7 +1567,7 @@ importers:
         specifier: workspace:*
         version: link:../shared-runtime
       zod:
-        specifier: ^4.4.3
+        specifier: 4.6.5
         version: 4.6.5
     devDependencies:
       '@deepseek-ai/cordis':
@@ -1613,13 +1613,13 @@ importers:
         specifier: 0.2.0-rc.2
         version: 0.2.0-rc.2(dfda4f0f564e7a2f37d6e87b2ba3112d)
       '@types/node':
-        specifier: ^22.19.0
+        specifier: 22.20.5
         version: 22.20.5
       '@types/react':
-        specifier: ~18.3.31
+        specifier: 18.3.31
         version: 18.3.31
       react:
-        specifier: ^18.3.1
+        specifier: 18.3.1
         version: 18.3.1
       typescript:
         specifier: 7.0.2
@@ -1637,7 +1637,7 @@ importers:
         specifier: workspace:*
         version: link:../plugin-ui
       react-dom:
-        specifier: ^18.3.1
+        specifier: 18.3.1
         version: 18.3.1(react@18.3.1)
     devDependencies:
       '@deepseek-ai/cordis':
@@ -1674,10 +1674,10 @@ importers:
         specifier: workspace:*
         version: link:../../../tooling/dshx/packages/dshx
       '@types/node':
-        specifier: ^22.19.0
+        specifier: 22.20.5
         version: 22.20.5
       '@types/react':
-        specifier: ~18.3.31
+        specifier: 18.3.31
         version: 18.3.31
       oxfmt:
         specifier: 0.71.0
@@ -1686,13 +1686,13 @@ importers:
         specifier: 1.86.0
         version: 1.86.0
       react:
-        specifier: ^18.3.1
+        specifier: 18.3.1
         version: 18.3.1
       typescript:
-        specifier: ^7.0.2
+        specifier: 7.0.2
         version: 7.0.2
       vitest:
-        specifier: ^4.1.11
+        specifier: 4.1.11
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.5)(jsdom@26.1.0)(vite@8.3.2(@types/node@22.20.5))
 
   plugins/@dshfiles/multi-host:
@@ -1722,10 +1722,10 @@ importers:
         specifier: workspace:*
         version: link:../shared-runtime
       ws:
-        specifier: ^8.18.0
+        specifier: 8.21.3
         version: 8.21.3
       zod:
-        specifier: ^4.4.3
+        specifier: 4.6.5
         version: 4.6.5
     devDependencies:
       '@deepseek-ai/cordis':
@@ -1762,28 +1762,28 @@ importers:
         specifier: workspace:*
         version: link:../../../tooling/dshx/packages/dshx
       '@types/node':
-        specifier: ^22.19.0
+        specifier: 22.20.5
         version: 22.20.5
       '@types/react':
-        specifier: ~18.3.31
+        specifier: 18.3.31
         version: 18.3.31
       '@types/ws':
-        specifier: ^8.18.1
+        specifier: 8.18.2
         version: 8.18.2
       react:
-        specifier: ^18.3.1
+        specifier: 18.3.1
         version: 18.3.1
       typescript:
         specifier: 7.0.2
         version: 7.0.2
       vitest:
-        specifier: ^4.1.10
+        specifier: 4.1.11
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.5)(jsdom@26.1.0)(vite@8.3.2(@types/node@22.20.5))
 
   plugins/@dshfiles/optmem:
     dependencies:
       '@deepseek-ai/schemastery':
-        specifier: ^3.18.4
+        specifier: 3.18.4
         version: 3.18.4
       '@dshfiles/optmem-core':
         specifier: workspace:*
@@ -1798,7 +1798,7 @@ importers:
         specifier: workspace:*
         version: link:../shared-runtime
       zod:
-        specifier: ^4.4.3
+        specifier: 4.6.5
         version: 4.6.5
     devDependencies:
       '@deepseek-ai/cordis':
@@ -1874,19 +1874,19 @@ importers:
         specifier: workspace:*
         version: link:../request-messages
       '@types/node':
-        specifier: ^22.19.0
+        specifier: 22.20.5
         version: 22.20.5
       '@types/react':
-        specifier: ~18.3.31
+        specifier: 18.3.31
         version: 18.3.31
       react:
-        specifier: ^18.3.1
+        specifier: 18.3.1
         version: 18.3.1
       typescript:
         specifier: 7.0.2
         version: 7.0.2
       vitest:
-        specifier: ^4.1.10
+        specifier: 4.1.11
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.5)(jsdom@26.1.0)(vite@8.3.2(@types/node@22.20.5))
 
   plugins/@dshfiles/optmem-core:
@@ -1895,7 +1895,7 @@ importers:
         specifier: 7.0.2
         version: 7.0.2
       vitest:
-        specifier: ^4.1.10
+        specifier: 4.1.11
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.5)(jsdom@26.1.0)(vite@8.3.2(@types/node@22.20.5))
 
   plugins/@dshfiles/optmem-sqlite:
@@ -1905,13 +1905,13 @@ importers:
         version: link:../optmem-core
     devDependencies:
       '@types/node':
-        specifier: ^22.19.0
+        specifier: 22.20.5
         version: 22.20.5
       typescript:
         specifier: 7.0.2
         version: 7.0.2
       vitest:
-        specifier: ^4.1.10
+        specifier: 4.1.11
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.5)(jsdom@26.1.0)(vite@8.3.2(@types/node@22.20.5))
 
   plugins/@dshfiles/plugin-marketplace:
@@ -1932,7 +1932,7 @@ importers:
         specifier: 7.8.5
         version: 7.8.5
       zod:
-        specifier: ^4.4.3
+        specifier: 4.6.5
         version: 4.6.5
     devDependencies:
       '@deepseek-ai/cordis':
@@ -1960,43 +1960,43 @@ importers:
         specifier: 0.2.0-rc.2
         version: 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
       '@deepseek-ai/schemastery':
-        specifier: ^3.18.4
+        specifier: 3.18.4
         version: 3.18.4
       '@dshfiles/dshx':
         specifier: workspace:*
         version: link:../../../tooling/dshx/packages/dshx
       '@testing-library/dom':
-        specifier: ^10.4.1
+        specifier: 10.4.2
         version: 10.4.2
       '@testing-library/react':
-        specifier: ^16.1.0
+        specifier: 16.3.3
         version: 16.3.3(@testing-library/dom@10.4.2)(@types/react-dom@18.3.7(@types/react@18.3.31))(@types/react@18.3.31)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@types/node':
-        specifier: ^22.19.0
+        specifier: 22.20.5
         version: 22.20.5
       '@types/react':
-        specifier: ~18.3.31
+        specifier: 18.3.31
         version: 18.3.31
       '@types/react-dom':
-        specifier: ~18.3.7
+        specifier: 18.3.7
         version: 18.3.7(@types/react@18.3.31)
       '@types/semver':
-        specifier: ^7.7.1
+        specifier: 7.8.0
         version: 7.8.0
       jsdom:
-        specifier: ^26.1.0
+        specifier: 26.1.0
         version: 26.1.0
       react:
-        specifier: ^18.3.1
+        specifier: 18.3.1
         version: 18.3.1
       react-dom:
-        specifier: ^18.3.1
+        specifier: 18.3.1
         version: 18.3.1(react@18.3.1)
       typescript:
         specifier: 7.0.2
         version: 7.0.2
       vitest:
-        specifier: ^4.1.10
+        specifier: 4.1.11
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.5)(jsdom@26.1.0)(vite@8.3.2(@types/node@22.20.5))
 
   plugins/@dshfiles/plugin-ui:
@@ -2014,16 +2014,16 @@ importers:
         specifier: 1.0.0
         version: 1.0.0(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@tanstack/query-core':
-        specifier: ^5.104.1
+        specifier: 5.104.1
         version: 5.104.1
       '@tanstack/react-form':
-        specifier: ^1.33.5
+        specifier: 1.33.5
         version: 1.33.5(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@tanstack/react-query':
-        specifier: ^5.104.1
+        specifier: 5.104.1
         version: 5.104.1(react@18.3.1)
       '@tanstack/react-table':
-        specifier: ^9.2.6
+        specifier: 9.3.1
         version: 9.3.1(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@tanstack/react-virtual':
         specifier: 3.14.13
@@ -2072,37 +2072,37 @@ importers:
         specifier: workspace:*
         version: link:../../../tooling/dshx/packages/dshx
       '@testing-library/dom':
-        specifier: ^10.4.1
+        specifier: 10.4.2
         version: 10.4.2
       '@testing-library/react':
-        specifier: ^16.1.0
+        specifier: 16.3.3
         version: 16.3.3(@testing-library/dom@10.4.2)(@types/react-dom@18.3.7(@types/react@18.3.31))(@types/react@18.3.31)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@types/node':
-        specifier: ^22.19.0
+        specifier: 22.20.5
         version: 22.20.5
       '@types/react':
-        specifier: ~18.3.31
+        specifier: 18.3.31
         version: 18.3.31
       '@types/react-dom':
-        specifier: ~18.3.7
+        specifier: 18.3.7
         version: 18.3.7(@types/react@18.3.31)
       jsdom:
-        specifier: ^26.1.0
+        specifier: 26.1.0
         version: 26.1.0
       react:
-        specifier: ^18.3.1
+        specifier: 18.3.1
         version: 18.3.1
       react-dom:
-        specifier: ^18.3.1
+        specifier: 18.3.1
         version: 18.3.1(react@18.3.1)
       typescript:
         specifier: 7.0.2
         version: 7.0.2
       vitest:
-        specifier: ^4.1.10
+        specifier: 4.1.11
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.5)(jsdom@26.1.0)(vite@8.3.2(@types/node@22.20.5))
       zod:
-        specifier: ^4.4.3
+        specifier: 4.6.5
         version: 4.6.5
 
   plugins/@dshfiles/project-checks:
@@ -2117,7 +2117,7 @@ importers:
         specifier: workspace:*
         version: link:../shared-runtime
       zod:
-        specifier: ^4.4.3
+        specifier: 4.6.5
         version: 4.6.5
     devDependencies:
       '@deepseek-ai/cordis':
@@ -2166,19 +2166,19 @@ importers:
         specifier: workspace:*
         version: link:../../../tooling/dshx/packages/dshx
       '@types/node':
-        specifier: ^22.19.0
+        specifier: 22.20.5
         version: 22.20.5
       '@types/react':
-        specifier: ~18.3.31
+        specifier: 18.3.31
         version: 18.3.31
       react:
-        specifier: ^18.3.1
+        specifier: 18.3.1
         version: 18.3.1
       typescript:
         specifier: 7.0.2
         version: 7.0.2
       vitest:
-        specifier: ^4.1.10
+        specifier: 4.1.11
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.5)(jsdom@26.1.0)(vite@8.3.2(@types/node@22.20.5))
 
   plugins/@dshfiles/project-folder-picker:
@@ -2194,13 +2194,13 @@ importers:
         specifier: workspace:*
         version: link:../../../tooling/dshx/packages/dshx
       '@types/react':
-        specifier: ~18.3.31
+        specifier: 18.3.31
         version: 18.3.31
       typescript:
         specifier: 7.0.2
         version: 7.0.2
       vitest:
-        specifier: ^4.1.10
+        specifier: 4.1.11
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.5)(jsdom@26.1.0)(vite@8.3.2(@types/node@22.20.5))
 
   plugins/@dshfiles/prompt-stash:
@@ -2218,7 +2218,7 @@ importers:
         specifier: workspace:*
         version: link:../shared-runtime
       zod:
-        specifier: ^4.4.3
+        specifier: 4.6.5
         version: 4.6.5
     devDependencies:
       '@deepseek-ai/cordis':
@@ -2243,13 +2243,13 @@ importers:
         specifier: 0.2.0-rc.2
         version: 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
       '@types/node':
-        specifier: ^22.19.0
+        specifier: 22.20.5
         version: 22.20.5
       '@types/react':
-        specifier: ~18.3.31
+        specifier: 18.3.31
         version: 18.3.31
       react:
-        specifier: ^18.3.1
+        specifier: 18.3.1
         version: 18.3.1
       typescript:
         specifier: 7.0.2
@@ -2270,7 +2270,7 @@ importers:
         specifier: '>=0.2.0-rc.1 <0.3.0-0'
         version: 0.2.0-rc.2(52b5a8ab481be2b3d891c22a71641755)
       '@deepseek-ai/schemastery':
-        specifier: ^3.18.4
+        specifier: 3.18.4
         version: 3.18.4
       '@dshfiles/plugin-ui':
         specifier: workspace:*
@@ -2279,7 +2279,7 @@ importers:
         specifier: workspace:*
         version: link:../shared-runtime
       zod:
-        specifier: ^4.4.3
+        specifier: 4.6.5
         version: 4.6.5
     devDependencies:
       '@deepseek-ai/cordis':
@@ -2319,19 +2319,19 @@ importers:
         specifier: workspace:*
         version: link:../../../tooling/dshx/packages/dshx
       '@types/node':
-        specifier: ^22.19.0
+        specifier: 22.20.5
         version: 22.20.5
       '@types/react':
-        specifier: ~18.3.31
+        specifier: 18.3.31
         version: 18.3.31
       react:
-        specifier: ^18.3.1
+        specifier: 18.3.1
         version: 18.3.1
       typescript:
         specifier: 7.0.2
         version: 7.0.2
       vitest:
-        specifier: ^4.1.10
+        specifier: 4.1.11
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.5)(jsdom@26.1.0)(vite@8.3.2(@types/node@22.20.5))
 
   plugins/@dshfiles/request-messages:
@@ -2359,13 +2359,13 @@ importers:
         specifier: workspace:*
         version: link:../../../tooling/dshx/packages/dshx
       '@types/node':
-        specifier: ^22.19.0
+        specifier: 22.20.5
         version: 22.20.5
       typescript:
         specifier: 7.0.2
         version: 7.0.2
       vitest:
-        specifier: ^4.1.10
+        specifier: 4.1.11
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.5)(jsdom@26.1.0)(vite@8.3.2(@types/node@22.20.5))
 
   plugins/@dshfiles/secret-catalog:
@@ -2398,7 +2398,7 @@ importers:
         specifier: workspace:*
         version: link:../shared-runtime
       zod:
-        specifier: ^4.4.3
+        specifier: 4.6.5
         version: 4.6.5
     devDependencies:
       '@deepseek-ai/cordis':
@@ -2441,19 +2441,19 @@ importers:
         specifier: workspace:*
         version: link:../../../tooling/dshx/packages/dshx
       '@types/node':
-        specifier: ^22.19.0
+        specifier: 22.20.5
         version: 22.20.5
       '@types/react':
-        specifier: ~18.3.31
+        specifier: 18.3.31
         version: 18.3.31
       react:
-        specifier: ^18.3.1
+        specifier: 18.3.1
         version: 18.3.1
       typescript:
         specifier: 7.0.2
         version: 7.0.2
       vitest:
-        specifier: ^4.1.10
+        specifier: 4.1.11
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.5)(jsdom@26.1.0)(vite@8.3.2(@types/node@22.20.5))
 
   plugins/@dshfiles/send-after-upload:
@@ -2468,7 +2468,7 @@ importers:
         specifier: workspace:*
         version: link:../shared-runtime
       zod:
-        specifier: ^4.4.3
+        specifier: 4.6.5
         version: 4.6.5
     devDependencies:
       '@deepseek-ai/cordis':
@@ -2493,13 +2493,13 @@ importers:
         specifier: 0.2.0-rc.2
         version: 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-scope@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-invariants@0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)))
       '@types/node':
-        specifier: ^22.19.0
+        specifier: 22.20.5
         version: 22.20.5
       '@types/react':
-        specifier: ~18.3.31
+        specifier: 18.3.31
         version: 18.3.31
       react:
-        specifier: ^18.3.1
+        specifier: 18.3.1
         version: 18.3.1
       typescript:
         specifier: 7.0.2
@@ -2514,7 +2514,7 @@ importers:
         specifier: '>=0.2.0-rc.1 <0.3.0-0'
         version: 0.2.0-rc.2(52b5a8ab481be2b3d891c22a71641755)
       '@deepseek-ai/schemastery':
-        specifier: ^3.18.4
+        specifier: 3.18.4
         version: 3.18.4
       '@dshfiles/command-palette':
         specifier: workspace:*
@@ -2529,7 +2529,7 @@ importers:
         specifier: workspace:*
         version: link:../shared-runtime
       zod:
-        specifier: ^4.4.3
+        specifier: 4.6.5
         version: 4.6.5
     devDependencies:
       '@deepseek-ai/cordis':
@@ -2593,31 +2593,31 @@ importers:
         specifier: 0.2.0-rc.2
         version: 0.2.0-rc.2(bfdc2f8c3f35c0e5915b546a4b15b3ab)
       '@testing-library/react':
-        specifier: ^16.1.0
+        specifier: 16.3.3
         version: 16.3.3(@testing-library/dom@10.4.2)(@types/react-dom@18.3.7(@types/react@18.3.31))(@types/react@18.3.31)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@types/node':
-        specifier: ^22.19.0
+        specifier: 22.20.5
         version: 22.20.5
       '@types/react':
-        specifier: ~18.3.31
+        specifier: 18.3.31
         version: 18.3.31
       '@types/react-dom':
-        specifier: ~18.3.7
+        specifier: 18.3.7
         version: 18.3.7(@types/react@18.3.31)
       jsdom:
-        specifier: ^26.1.0
+        specifier: 26.1.0
         version: 26.1.0
       react:
-        specifier: ^18.3.1
+        specifier: 18.3.1
         version: 18.3.1
       react-dom:
-        specifier: ^18.3.1
+        specifier: 18.3.1
         version: 18.3.1(react@18.3.1)
       typescript:
         specifier: 7.0.2
         version: 7.0.2
       vitest:
-        specifier: ^4.1.10
+        specifier: 4.1.11
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.5)(jsdom@26.1.0)(vite@8.3.2(@types/node@22.20.5))
 
   plugins/@dshfiles/shared-runtime:
@@ -2798,22 +2798,22 @@ importers:
         specifier: workspace:*
         version: link:../../../tooling/dshx/packages/dshx
       '@types/node':
-        specifier: ^22.19.0
+        specifier: 22.20.5
         version: 22.20.5
       '@types/react':
-        specifier: ~18.3.31
+        specifier: 18.3.31
         version: 18.3.31
       react:
-        specifier: ^18.3.1
+        specifier: 18.3.1
         version: 18.3.1
       react-dom:
-        specifier: ^18.3.1
+        specifier: 18.3.1
         version: 18.3.1(react@18.3.1)
       typescript:
         specifier: 7.0.2
         version: 7.0.2
       vitest:
-        specifier: ^4.1.10
+        specifier: 4.1.11
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.5)(jsdom@26.1.0)(vite@8.3.2(@types/node@22.20.5))
 
   plugins/@dshfiles/shared-streams:
@@ -2834,16 +2834,16 @@ importers:
         specifier: workspace:*
         version: link:../../../tooling/dshx/packages/dshx
       '@types/node':
-        specifier: ^22.19.0
+        specifier: 22.20.5
         version: 22.20.5
       typescript:
         specifier: 7.0.2
         version: 7.0.2
       vitest:
-        specifier: ^4.1.10
+        specifier: 4.1.11
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.5)(jsdom@26.1.0)(vite@8.3.2(@types/node@22.20.5))
       zod:
-        specifier: ^4.6.5
+        specifier: 4.6.5
         version: 4.6.5
 
   plugins/@dshfiles/shortcuts:
@@ -2871,16 +2871,16 @@ importers:
         specifier: workspace:*
         version: link:../../../tooling/dshx/packages/dshx
       '@types/node':
-        specifier: ^22.19.0
+        specifier: 22.20.5
         version: 22.20.5
       jsdom:
-        specifier: ^26.1.0
+        specifier: 26.1.0
         version: 26.1.0
       typescript:
         specifier: 7.0.2
         version: 7.0.2
       vitest:
-        specifier: ^4.1.10
+        specifier: 4.1.11
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.5)(jsdom@26.1.0)(vite@8.3.2(@types/node@22.20.5))
 
   plugins/@dshfiles/sidebar-commands:
@@ -2923,13 +2923,13 @@ importers:
         specifier: workspace:*
         version: link:../../../tooling/dshx/packages/dshx
       '@types/react':
-        specifier: ~18.3.31
+        specifier: 18.3.31
         version: 18.3.31
       typescript:
         specifier: 7.0.2
         version: 7.0.2
       vitest:
-        specifier: ^4.1.10
+        specifier: 4.1.11
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.5)(jsdom@26.1.0)(vite@8.3.2(@types/node@22.20.5))
 
   plugins/@dshfiles/thread-sidebar:
@@ -2941,7 +2941,7 @@ importers:
         specifier: '>=0.2.0-rc.1 <0.3.0-0'
         version: 0.2.0-rc.2(52b5a8ab481be2b3d891c22a71641755)
       '@deepseek-ai/schemastery':
-        specifier: ^3.18.4
+        specifier: 3.18.4
         version: 3.18.4
       '@dshfiles/command-palette':
         specifier: workspace:*
@@ -2956,7 +2956,7 @@ importers:
         specifier: workspace:*
         version: link:../shared-runtime
       zod:
-        specifier: ^4.4.3
+        specifier: 4.6.5
         version: 4.6.5
     devDependencies:
       '@deepseek-ai/cordis':
@@ -3023,22 +3023,22 @@ importers:
         specifier: workspace:*
         version: link:../../../tooling/dshx/packages/dshx
       '@testing-library/react':
-        specifier: ^16.1.0
+        specifier: 16.3.3
         version: 16.3.3(@testing-library/dom@10.4.2)(@types/react-dom@18.3.7(@types/react@18.3.31))(@types/react@18.3.31)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@types/node':
-        specifier: ^22.19.0
+        specifier: 22.20.5
         version: 22.20.5
       '@types/react':
-        specifier: ~18.3.31
+        specifier: 18.3.31
         version: 18.3.31
       react:
-        specifier: ^18.3.1
+        specifier: 18.3.1
         version: 18.3.1
       typescript:
         specifier: 7.0.2
         version: 7.0.2
       vitest:
-        specifier: ^4.1.10
+        specifier: 4.1.11
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.5)(jsdom@26.1.0)(vite@8.3.2(@types/node@22.20.5))
 
   plugins/@dshfiles/tool-meta:
@@ -3047,7 +3047,7 @@ importers:
         specifier: '>=0.2.0-rc.1 <0.3.0-0'
         version: 0.2.0-rc.2(52b5a8ab481be2b3d891c22a71641755)
       '@deepseek-ai/schemastery':
-        specifier: ^3.18.4
+        specifier: 3.18.4
         version: 3.18.4
       '@dshfiles/dshx':
         specifier: workspace:*
@@ -3059,7 +3059,7 @@ importers:
         specifier: workspace:*
         version: link:../shared-runtime
       zod:
-        specifier: ^4.4.3
+        specifier: 4.6.5
         version: 4.6.5
     devDependencies:
       '@deepseek-ai/cordis':
@@ -3090,31 +3090,31 @@ importers:
         specifier: 0.2.0-rc.2
         version: 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
       '@testing-library/react':
-        specifier: ^16.1.0
+        specifier: 16.3.3
         version: 16.3.3(@testing-library/dom@10.4.2)(@types/react-dom@18.3.7(@types/react@18.3.31))(@types/react@18.3.31)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@types/node':
-        specifier: ^22.19.0
+        specifier: 22.20.5
         version: 22.20.5
       '@types/react':
-        specifier: ~18.3.31
+        specifier: 18.3.31
         version: 18.3.31
       '@types/react-dom':
-        specifier: ~18.3.7
+        specifier: 18.3.7
         version: 18.3.7(@types/react@18.3.31)
       jsdom:
-        specifier: ^26.1.0
+        specifier: 26.1.0
         version: 26.1.0
       react:
-        specifier: ^18.3.1
+        specifier: 18.3.1
         version: 18.3.1
       react-dom:
-        specifier: ^18.3.1
+        specifier: 18.3.1
         version: 18.3.1(react@18.3.1)
       typescript:
         specifier: 7.0.2
         version: 7.0.2
       vitest:
-        specifier: ^4.1.10
+        specifier: 4.1.11
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.5)(jsdom@26.1.0)(vite@8.3.2(@types/node@22.20.5))
 
   plugins/@dshfiles/usage:
@@ -3126,7 +3126,7 @@ importers:
         specifier: workspace:*
         version: link:../shared-runtime
       zod:
-        specifier: ^4.4.3
+        specifier: 4.6.5
         version: 4.6.5
     devDependencies:
       '@deepseek-ai/cordis':
@@ -3178,19 +3178,19 @@ importers:
         specifier: workspace:*
         version: link:../../../tooling/dshx/packages/dshx
       '@types/node':
-        specifier: ^22.19.0
+        specifier: 22.20.5
         version: 22.20.5
       '@types/react':
-        specifier: ~18.3.31
+        specifier: 18.3.31
         version: 18.3.31
       react:
-        specifier: ^18.3.1
+        specifier: 18.3.1
         version: 18.3.1
       typescript:
         specifier: 7.0.2
         version: 7.0.2
       vitest:
-        specifier: ^4.1.10
+        specifier: 4.1.11
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.5)(jsdom@26.1.0)(vite@8.3.2(@types/node@22.20.5))
 
   plugins/@dshfiles/workbench:
@@ -3199,7 +3199,7 @@ importers:
         specifier: '>=0.2.0-rc.1 <0.3.0-0'
         version: 0.2.0-rc.2(52b5a8ab481be2b3d891c22a71641755)
       '@deepseek-ai/schemastery':
-        specifier: ^3.18.4
+        specifier: 3.18.4
         version: 3.18.4
       '@dshfiles/dshx':
         specifier: workspace:*
@@ -3214,7 +3214,7 @@ importers:
         specifier: 8.4.1
         version: 8.4.1(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       zod:
-        specifier: ^4.4.3
+        specifier: 4.6.5
         version: 4.6.5
     devDependencies:
       '@deepseek-ai/cordis':
@@ -3251,31 +3251,31 @@ importers:
         specifier: 0.2.0-rc.2
         version: 0.2.0-rc.2(@deepseek-ai/cordis@4.0.4)
       '@testing-library/react':
-        specifier: ^16.1.0
+        specifier: 16.3.3
         version: 16.3.3(@testing-library/dom@10.4.2)(@types/react-dom@18.3.7(@types/react@18.3.31))(@types/react@18.3.31)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
       '@types/node':
-        specifier: ^22.19.0
+        specifier: 22.20.5
         version: 22.20.5
       '@types/react':
-        specifier: ~18.3.31
+        specifier: 18.3.31
         version: 18.3.31
       '@types/react-dom':
-        specifier: ~18.3.7
+        specifier: 18.3.7
         version: 18.3.7(@types/react@18.3.31)
       jsdom:
-        specifier: ^26.1.0
+        specifier: 26.1.0
         version: 26.1.0
       react:
-        specifier: ^18.3.1
+        specifier: 18.3.1
         version: 18.3.1
       react-dom:
-        specifier: ^18.3.1
+        specifier: 18.3.1
         version: 18.3.1(react@18.3.1)
       typescript:
         specifier: 7.0.2
         version: 7.0.2
       vitest:
-        specifier: ^4.1.10
+        specifier: 4.1.11
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.5)(jsdom@26.1.0)(vite@8.3.2(@types/node@22.20.5))
 
   plugins/@dshfiles/workspace-folder-picker:
@@ -3321,10 +3321,10 @@ importers:
         specifier: workspace:*
         version: link:../../../tooling/dshx/packages/dshx
       '@types/node':
-        specifier: ^22.19.0
+        specifier: 22.20.5
         version: 22.20.5
       '@types/react':
-        specifier: ~18.3.31
+        specifier: 18.3.31
         version: 18.3.31
       oxfmt:
         specifier: 0.71.0
@@ -3333,13 +3333,13 @@ importers:
         specifier: 1.86.0
         version: 1.86.0
       react:
-        specifier: ^18.3.1
+        specifier: 18.3.1
         version: 18.3.1
       typescript:
         specifier: 7.0.2
         version: 7.0.2
       vitest:
-        specifier: ^4.1.11
+        specifier: 4.1.11
         version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.5)(jsdom@26.1.0)(vite@8.3.2(@types/node@22.20.5))
 
   tooling/dshx:
@@ -3357,7 +3357,7 @@ importers:
         specifier: 6.32.2
         version: 6.32.2
       playwright-bdd:
-        specifier: ^8.5.1
+        specifier: 8.5.1
         version: 8.5.1(@playwright/test@1.56.1)
       typescript:
         specifier: 'catalog:'
@@ -3415,10 +3415,10 @@ importers:
         specifier: 1.30.0
         version: 1.30.0(zod@4.6.5)
       '@standard-schema/spec':
-        specifier: ^1.1.0
+        specifier: 1.1.0
         version: 1.1.0
       '@types/ws':
-        specifier: ^8.5.13
+        specifier: 8.18.2
         version: 8.18.2
       chokidar:
         specifier: 5.0.0
@@ -3457,7 +3457,7 @@ importers:
         specifier: 7.0.0
         version: 7.0.0
       ws:
-        specifier: ^8.18.0
+        specifier: 8.21.3
         version: 8.21.3
       yaml:
         specifier: 'catalog:'
@@ -3533,22 +3533,22 @@ importers:
         specifier: 0.2.0-rc.2
         version: 0.2.0-rc.2(52b5a8ab481be2b3d891c22a71641755)
       '@deepseek-ai/schemastery':
-        specifier: ~3.18.4
+        specifier: 3.18.4
         version: 3.18.4
       '@types/node':
         specifier: 'catalog:'
         version: 22.19.20
       '@types/react':
-        specifier: ~18.3.31
+        specifier: 18.3.31
         version: 18.3.31
       '@types/semver':
-        specifier: ^7.7.1
+        specifier: 7.8.0
         version: 7.8.0
       '@types/write-file-atomic':
         specifier: 4.0.3
         version: 4.0.3
       react:
-        specifier: ^18.3.1
+        specifier: 18.3.1
         version: 18.3.1
       vitest:
         specifier: 'catalog:'
