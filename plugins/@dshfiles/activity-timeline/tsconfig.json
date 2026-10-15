@@ -1,12 +1,10 @@
 {
+  "extends": "../../../tsconfig.base.client.json",
   "compilerOptions": {
     "target": "ES2023",
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "jsx": "react-jsx",
-    "strict": true,
-    "noUncheckedIndexedAccess": true,
-    "skipLibCheck": true,
     "outDir": "dist",
     "rootDir": "src",
     "types": ["node", "react", "@dshfiles/dshx/client/env"]

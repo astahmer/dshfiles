@@ -265,7 +265,7 @@ export default defineClient({
   },
 })
 
-const EditorGlyph = (props: { readonly size?: number }): JSX.Element => (
+const EditorGlyph = (props: { readonly size?: number | undefined }): JSX.Element => (
   <svg
     aria-hidden
     fill="none"

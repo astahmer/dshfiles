@@ -58,7 +58,7 @@ const runSshCommand = async ({
 }: {
   readonly sshTarget: string
   readonly command: string
-  readonly signal?: AbortSignal
+  readonly signal?: AbortSignal | undefined
 }): Promise<string> => {
   if (signal?.aborted) throw new GatewayUnavailableError('cancelled', 'The SSH request was cancelled.')
   const target = sshTargetOf(sshTarget)
@@ -134,7 +134,7 @@ const remoteLaunch = async ({
 }: {
   readonly sshTarget: string
   readonly remoteHome: string
-  readonly signal?: AbortSignal
+  readonly signal?: AbortSignal | undefined
 }): Promise<RuntimeLaunch> => {
   const [launchFile, webUrlFile] = launchFilePaths(remoteHome)
   const content = await runSshCommand({
@@ -177,7 +177,7 @@ const openTunnel = async ({
   readonly remotePort: number
   readonly localAddress: string
   readonly localPort: number
-  readonly signal?: AbortSignal
+  readonly signal?: AbortSignal | undefined
 }): Promise<ChildProcess> => {
   const target = sshTargetOf(sshTarget)
   const child = spawn('ssh', [...sshOptions(), '-N', '-L', `${localAddress}:${localPort}:127.0.0.1:${remotePort}`, target], {
@@ -235,7 +235,7 @@ export const connectSsh = async ({
   readonly sshTarget: string
   readonly remoteHome: string
   readonly originPort?: number
-  readonly signal?: AbortSignal
+  readonly signal?: AbortSignal | undefined
 }): Promise<Gateway> => {
   const target = sshTargetOf(sshTarget)
   const launch = await remoteLaunch({ sshTarget: target, remoteHome, signal })
@@ -279,7 +279,7 @@ export const connectSsh = async ({
 }
 
 /** Cheapest proof that SSH reaches the machine with BatchMode keys: run `true`. */
-export const probeSsh = async ({ sshTarget, signal }: { readonly sshTarget: string; readonly signal?: AbortSignal }): Promise<void> => {
+export const probeSsh = async ({ sshTarget, signal }: { readonly sshTarget: string; readonly signal?: AbortSignal | undefined }): Promise<void> => {
   await runSshCommand({ sshTarget: sshTargetOf(sshTarget), command: 'true', signal })
 }
 
@@ -289,7 +289,7 @@ export const discoverRemoteHomes = async ({
   signal,
 }: {
   readonly sshTarget: string
-  readonly signal?: AbortSignal
+  readonly signal?: AbortSignal | undefined
 }): Promise<{ path: string; source: 'multi-host' | 'web-url' }[]> => {
   const output = await runSshCommand({
     sshTarget: sshTargetOf(sshTarget),

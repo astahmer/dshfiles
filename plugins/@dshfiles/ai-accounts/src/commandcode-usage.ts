@@ -100,7 +100,7 @@ export const parseCommandCodeUsage = (input: { readonly credits: unknown; readon
 const COMMAND_CODE_HEADERS = { 'accept-encoding': 'identity', 'x-cli-environment': 'production', accept: 'application/json' }
 
 export const readCommandCodeUsage = async (
-  input: { readonly keyEnv: string; readonly apiBaseUrl: string; readonly resolveCredential?: CredentialValueResolver },
+  input: { readonly keyEnv: string; readonly apiBaseUrl: string; readonly resolveCredential?: CredentialValueResolver | undefined },
   signal?: AbortSignal,
 ): Promise<UsageCard> => {
   if (signal?.aborted) return emptyUsage('error', 'Usage collection was cancelled.')

@@ -144,7 +144,7 @@ const connectRuntime = async ({
 }: {
   readonly host: HostRecord
   readonly runtime: RuntimeRecord
-  readonly signal?: AbortSignal
+  readonly signal?: AbortSignal | undefined
   readonly originPort?: number
 }): Promise<Gateway> => {
   if (runtime.locator.kind === 'local' && host.connector.kind === 'local')
@@ -336,7 +336,7 @@ const qualifyRuntime = async ({
   readonly host: HostRecord
   readonly locator: RuntimeRecord['locator']
   readonly name: string
-  readonly signal?: AbortSignal
+  readonly signal?: AbortSignal | undefined
 }): Promise<{ readonly identity: RuntimeIdentity; readonly steps: ConnectionTestStep[] }> => {
   const steps: ConnectionTestStep[] = []
   const timed = async <T>(step: ConnectionTestStep['step'], run: () => Promise<T>): Promise<T> => {

@@ -21,7 +21,7 @@ export interface SecretCatalogCredentialBridge {
     readonly scope: SecretScope
     readonly cwd: string | null
     readonly targetRef: string
-    readonly replaceExisting?: boolean
+    readonly replaceExisting?: boolean | undefined
   }): Promise<void>
 }
 

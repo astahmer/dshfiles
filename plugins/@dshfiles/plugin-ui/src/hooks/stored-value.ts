@@ -31,7 +31,7 @@ export const createStoredValue = <Schema extends ZodType, Fallback = output<Sche
   readonly key: string
   readonly schema: Schema
   readonly fallback: Fallback
-  readonly storage?: () => ValueStorage | null
+  readonly storage?: (() => ValueStorage | null) | undefined
 }): StoredValue<output<Schema>, Fallback> => {
   const storage = options.storage ?? browserStorage
   const listeners = new Set<() => void>()

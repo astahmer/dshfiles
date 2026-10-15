@@ -1,13 +1,11 @@
 {
+  "extends": "../../../tsconfig.base.client.json",
   "compilerOptions": {
     "target": "ES2022",
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "jsx": "react-jsx",
-    "strict": true,
-    "noUncheckedIndexedAccess": true,
     "noEmit": true,
-    "skipLibCheck": true,
     "types": ["node", "react", "@dshfiles/dshx/client/env"],
     "paths": {
       "@dshfiles/plugin-ui/*": ["./src/*"]

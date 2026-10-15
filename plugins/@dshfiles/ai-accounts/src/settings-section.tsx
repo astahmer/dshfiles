@@ -110,7 +110,7 @@ const NumberSelect = (props: {
 }): JSX.Element => {
   const options = props.options.includes(props.value) ? props.options : [...props.options, props.value].sort((left, right) => left - right)
   return (
-    <Select disabled={props.disabled} onValueChange={value => props.onChange(Number(value))} value={String(props.value)}>
+    <Select disabled={props.disabled === true} onValueChange={value => props.onChange(Number(value))} value={String(props.value)}>
       <SelectTrigger className="dshx:w-36" id={props.id} size="sm">
         <SelectValue />
       </SelectTrigger>

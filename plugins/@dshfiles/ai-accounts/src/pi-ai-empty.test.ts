@@ -41,7 +41,7 @@ interface StreamOutcome {
   readonly threw: boolean
   readonly message?: string
   readonly blockTypes: readonly string[]
-  readonly stopReason?: string
+  readonly stopReason?: string | undefined
 }
 
 const MODEL = {

@@ -109,7 +109,7 @@ export const describeClaudeAuth = async (input: {
   readonly configDir: string
   readonly keyEnv: string
   readonly now: number
-  readonly resolveCredential?: CredentialValueResolver
+  readonly resolveCredential?: CredentialValueResolver | undefined
 }): Promise<ClaudeAuthView> => {
   const [login, identity, named] = await Promise.all([
     readClaudeLogin(input.configDir),
@@ -130,7 +130,7 @@ export const resolveClaudeInferenceToken = async (input: {
   readonly configDir: string
   readonly keyEnv: string
   readonly now: number
-  readonly resolveCredential?: CredentialValueResolver
+  readonly resolveCredential?: CredentialValueResolver | undefined
 }): Promise<string> => {
   const named = input.resolveCredential === undefined ? readKeyFromEnv(input.keyEnv) : await input.resolveCredential(input.keyEnv)
   if (named.length > 0) return named

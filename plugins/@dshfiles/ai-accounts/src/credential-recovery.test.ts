@@ -3,11 +3,11 @@ import { isCredentialRecoveryFailure } from './credential-recovery.js'
 
 describe('credential recovery actions', () => {
   it('offers setup for a missing credential failure', () => {
-    expect(isCredentialRecoveryFailure({ code: 'MISSING_CREDENTIAL', status: undefined })).toBe(true)
+    expect(isCredentialRecoveryFailure({ code: 'MISSING_CREDENTIAL' })).toBe(true)
   })
 
   it.each(['AUTH', 'INVALID_CREDENTIAL', 'ACCOUNT_SIGNED_OUT', 'ACCOUNT_SIGN_IN_REQUIRED'])('offers setup for %s failures', code => {
-    expect(isCredentialRecoveryFailure({ code, status: undefined })).toBe(true)
+    expect(isCredentialRecoveryFailure({ code })).toBe(true)
   })
 
   it.each([401, 403])('offers setup for HTTP %s authentication failures', status => {

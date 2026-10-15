@@ -102,7 +102,7 @@ function ContextMenuItem({
   )
 }
 
-function ContextMenuCheckboxItem({ className, children, checked, ...props }: React.ComponentProps<typeof ContextMenuPrimitive.CheckboxItem>) {
+function ContextMenuCheckboxItem({ className, children, ...props }: React.ComponentProps<typeof ContextMenuPrimitive.CheckboxItem>) {
   return (
     <ContextMenuPrimitive.CheckboxItem
       data-slot="context-menu-checkbox-item"
@@ -110,7 +110,6 @@ function ContextMenuCheckboxItem({ className, children, checked, ...props }: Rea
         'dshx:relative dshx:flex dshx:cursor-default dshx:items-center dshx:gap-2 dshx:rounded-sm dshx:py-1.5 dshx:pr-2 dshx:pl-8 dshx:text-sm dshx:outline-hidden dshx:select-none dshx:focus:bg-accent dshx:focus:text-accent-foreground dshx:data-[disabled]:pointer-events-none dshx:data-[disabled]:opacity-50 dshx:[&_svg]:pointer-events-none dshx:[&_svg]:shrink-0 dshx:[&_svg:not([class*=size-])]:size-4',
         className,
       )}
-      checked={checked}
       {...props}
     >
       <span className="dshx:pointer-events-none dshx:absolute dshx:left-2 dshx:flex dshx:size-3.5 dshx:items-center dshx:justify-center">

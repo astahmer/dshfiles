@@ -14,12 +14,11 @@ const copy = {
 }
 
 const session = (id: string, fields: Partial<Pick<SessionSummary, 'blank' | 'origin' | 'cwd' | 'updatedAt' | 'displayTitle'>> = {}) => ({
+  ...fields,
   id,
   displayTitle: fields.displayTitle ?? id,
   blank: fields.blank ?? false,
   updatedAt: fields.updatedAt ?? 0,
-  cwd: fields.cwd,
-  origin: fields.origin,
 })
 
 type Row = ReturnType<typeof session>

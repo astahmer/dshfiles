@@ -87,7 +87,7 @@ export default defineClient({
     ctx.slots.inject('sidebar.panellist', () =>
       ctx.slots.register(
         { name: 'sidebar.panellist', id: PANEL_ID, order: 3, label: () => translate('title'), locale: WORKBENCH_LOCALE_NAMESPACE },
-        (props: { readonly size?: number }) => <LayoutGridIcon aria-hidden size={props.size ?? 18} />,
+        (props: { readonly size?: number | undefined }) => <LayoutGridIcon aria-hidden size={props.size ?? 18} />,
       ),
     )
     ctx.slots.inject('main', () =>
@@ -114,7 +114,7 @@ export default defineClient({
               order: 46,
               title: () => translate('title'),
               description: () => translate('sidePanelGuide'),
-              icon: (props: { readonly size?: number }) => <LayoutGridIcon aria-hidden size={props.size ?? 18} />,
+              icon: (props: { readonly size?: number | undefined }) => <LayoutGridIcon aria-hidden size={props.size ?? 18} />,
             },
           ],
         }),

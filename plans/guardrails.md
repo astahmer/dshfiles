@@ -131,7 +131,8 @@ rule to `error` once those land.
       and `tooling/dshx/knip.jsonc` folded in); production entries carry `!`.
       `pnpm knip` runs it and `check:green` ends with it, so any new finding
       fails `pnpm check`; dshx `deps:check` and `plugins` `knip` filter the same
-      config. Findings at adoption: 41. Fixed: unused `write-file-atomic` (2),
+      config. Findings at adoption: 41. Fixed: unused `write-file-atomic`
+      (activity-timeline; agent-communication's is a runtime import of bundled dshx),
       `zod` (home), `@testing-library/react` (2), `dsh-client-ui-session`
       (command-palette), dead `mcp-servers/src/confirmed-action.ts`; listed the
       unlisted `dsh-llm-retry` (ai-accounts), `jsdom` (2) and `react-dom`.
@@ -146,7 +147,16 @@ rule to `error` once those land.
       - memory's `bench` script points at a missing `bench/scale.mjs`.
       - `knip --production` still lists 26 test-support files (e2e support,
         `src/testing/*`, vite helpers) that need production ignores.
-- [ ] 9. `chore(tsconfig)`: shared plugin base.
+- [x] 9. `chore(tsconfig)`: shared plugin base.
+      All 41 plugin `tsconfig.json` files extend the root `tsconfig.base.client.json`
+      (dshx's `verbatimModuleSyntax`, `noImplicitOverride`, `isolatedModules`,
+      `exactOptionalPropertyTypes`, plus strict and `noUncheckedIndexedAccess`);
+      the workspace contract requires the `extends` and rejects a flag turned off.
+      Measured fallout: 0, 0, 0 and 99 `exactOptionalPropertyTypes` errors (about
+      60 distinct sites, the rest repeats through plugin-ui, command-palette and
+      multi-host sources). Fixed by widening our own input types to
+      `?: T | undefined` where callers forward optional values, and by not
+      passing `undefined` to library props (Radix, Monaco, oauth4webapi, Toast).
 - [ ] 10. `test(e2e)`: Hono fake Command Code, then the hub fake.
 - [ ] 11. emilint `feat(antislop)`: `no-export-bag`; re-vendor as warn.
 - [ ] 12. `refactor(<plugin>)`: XState and namespace classes per plugin

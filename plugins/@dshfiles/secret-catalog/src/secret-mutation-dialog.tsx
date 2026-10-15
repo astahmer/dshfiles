@@ -45,7 +45,7 @@ import {
 
 interface SecretMutationDialogProps {
   readonly mode: 'create' | 'edit' | 'remove'
-  readonly row?: SecretMetadata
+  readonly row?: SecretMetadata | undefined
   /** Loaded aliases, to flag a duplicate alias and environment while typing. */
   readonly rows: readonly SecretMetadata[]
   readonly hasProjectFolder: boolean

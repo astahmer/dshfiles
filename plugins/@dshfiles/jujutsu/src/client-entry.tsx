@@ -175,7 +175,7 @@ const ProjectsBoundPanel = (props: Omit<Parameters<typeof JujutsuPanel>[0], 'pro
   return <JujutsuPanel {...panelProps} projects={useRegisteredProjects(workspaces)} />
 }
 
-const PanelGlyph = (props: { readonly size?: number }): JSX.Element => (
+const PanelGlyph = (props: { readonly size?: number | undefined }): JSX.Element => (
   <svg
     aria-hidden
     width={props.size ?? 18}

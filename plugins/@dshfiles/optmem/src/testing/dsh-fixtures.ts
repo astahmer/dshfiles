@@ -122,7 +122,7 @@ export const createTestRuntime = (request: {
   readonly settings?: Partial<OptmemSettings>
   readonly workspaces?: Readonly<Record<string, string>>
   readonly sessionLogs?: SessionLogSource
-  readonly summarizer?: Summarizer
+  readonly summarizer?: Summarizer | undefined
   readonly requestMessagesHook?: boolean
 }) => {
   let settings: OptmemSettings = { ...defaultSettings, ...request.settings }

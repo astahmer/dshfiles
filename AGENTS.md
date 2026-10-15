@@ -170,7 +170,10 @@ Docs: [authoring guide](tooling/dshx/docs/sdk/getting-started.md),
 
 - Every plugin joins the workspace contract
   (`plugins/scripts/check-workspace-contract.ts`): `build`, `test` and
-  `typecheck` scripts, `strict` and `noUncheckedIndexedAccess`. Every plugin
+  `typecheck` scripts, and a `tsconfig.json` that extends the root
+  `tsconfig.base.client.json` (strict, `noUncheckedIndexedAccess`,
+  `exactOptionalPropertyTypes`, `noImplicitOverride`, `verbatimModuleSyntax`,
+  `isolatedModules`) without turning a flag off. Every plugin
   also needs at least one end-to-end journey in the running client.
 - Workspace manifests name exact versions outside `peerDependencies`; a version
   two manifests share goes in the `catalog:` of `pnpm-workspace.yaml`. The same

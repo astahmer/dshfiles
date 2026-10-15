@@ -48,11 +48,11 @@ export interface SecretCreateInput {
   readonly environment: string
   readonly valueMode: 'generate' | 'manual'
   readonly value: string | null
-  readonly name?: string
-  readonly source?: string
-  readonly tags?: string
-  readonly type?: string
-  readonly field?: string
+  readonly name?: string | undefined
+  readonly source?: string | undefined
+  readonly tags?: string | undefined
+  readonly type?: string | undefined
+  readonly field?: string | undefined
 }
 
 export interface SecretUpdateInput {
@@ -61,10 +61,10 @@ export interface SecretUpdateInput {
   readonly cwd: string | null
   readonly value: string | null
   readonly environment: string
-  readonly newAlias?: string
-  readonly name?: string
-  readonly source?: string
-  readonly tags?: string
+  readonly newAlias?: string | undefined
+  readonly name?: string | undefined
+  readonly source?: string | undefined
+  readonly tags?: string | undefined
 }
 
 const flagArguments = (metadata: Readonly<Record<string, string | undefined>>): string[] =>

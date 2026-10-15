@@ -81,8 +81,8 @@ export const PatchView = (props: PatchViewProps): JSX.Element => {
                 hunkSeparators: 'line-info',
                 overflow: 'scroll',
               }}
-              renderHeaderMetadata={props.renderHeaderMetadata}
-              renderHeaderPrefix={props.renderHeaderPrefix}
+              renderHeaderMetadata={file => props.renderHeaderMetadata?.(file)}
+              renderHeaderPrefix={file => props.renderHeaderPrefix?.(file)}
             />
           </div>
         ))}

@@ -308,7 +308,7 @@ export const streamCommandCodeCli = (input: {
         'x-command-code-version': COMMAND_CODE_CLI_VERSION,
       },
       body: JSON.stringify(requestBody(model, input.context, options)),
-      signal: options?.signal,
+      signal: options?.signal ?? null,
     })
     if (!response.ok || response.body === null) return fail('error', httpFailure(response.status, await response.text()))
     stream.push({ type: 'start', partial: output })

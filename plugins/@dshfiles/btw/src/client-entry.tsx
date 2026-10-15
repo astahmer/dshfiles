@@ -143,7 +143,10 @@ export default defineClient({
             const renamed = await ctx.remote.session.rename({ sessionId: childId, title: input.title })
             if (!renamed.ok) throw new Error(renamed.error.message)
             if (input.route === null) return
-            const selected = await ctx.remote.session.selectModel({ sessionId: childId, ...input.route })
+            const { reasoningEffort, ...route } = input.route
+            const selected = await ctx.remote.session.selectModel(
+              reasoningEffort === undefined ? { sessionId: childId, ...route } : { sessionId: childId, ...route, reasoningEffort },
+            )
             if (!selected.ok) throw new Error(selected.error.message)
           },
           ask: async input => {

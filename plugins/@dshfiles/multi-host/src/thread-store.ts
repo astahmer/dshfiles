@@ -66,7 +66,7 @@ export const recordRemoteThread = (thread: RemoteThread): Promise<RemoteThread> 
     result: thread,
   }))
 
-export const forgetRemoteThreads = (match: { readonly runtimeId: string; readonly sessionId?: string }): Promise<number> =>
+export const forgetRemoteThreads = (match: { readonly runtimeId: string; readonly sessionId?: string | undefined }): Promise<number> =>
   update(threads => {
     const next = threads.filter(item => item.runtimeId !== match.runtimeId || (match.sessionId !== undefined && item.sessionId !== match.sessionId))
     return { next, result: threads.length - next.length }

@@ -1,18 +1,15 @@
 {
+  "extends": "../../../tsconfig.base.client.json",
   "compilerOptions": {
     "target": "ES2023",
     "lib": ["ES2023", "DOM"],
     "jsx": "react-jsx",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
-    "strict": true,
-    "noUncheckedIndexedAccess": true,
     "erasableSyntaxOnly": true,
     "allowImportingTsExtensions": true,
     "rewriteRelativeImportExtensions": true,
-    "verbatimModuleSyntax": true,
     "noEmit": true,
-    "skipLibCheck": true,
     "types": ["node", "@dshfiles/dshx/client/env"]
   },
   "include": ["src"]

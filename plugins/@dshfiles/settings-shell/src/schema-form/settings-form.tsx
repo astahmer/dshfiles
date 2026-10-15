@@ -188,7 +188,7 @@ const TextInput = (props: {
   readonly multiline: boolean
   readonly value: JsonValue | undefined
   readonly disabled: boolean
-  readonly className?: string
+  readonly className?: string | undefined
   readonly onChange: (value: JsonValue) => void
 }): JSX.Element => {
   const draft = useDraft(z.string().catch('').parse(props.value), text => props.onChange(text))

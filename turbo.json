@@ -5,7 +5,7 @@
   "remoteCache": {
     "enabled": false
   },
-  "globalDependencies": [".node-version", "pnpm-workspace.yaml", "tooling/dshx/tsconfig.base.json"],
+  "globalDependencies": [".node-version", "pnpm-workspace.yaml", "tooling/dshx/tsconfig.base.json", "tsconfig.base.client.json"],
   "globalEnv": ["NODE_ENV"],
   "tasks": {
     "build": {

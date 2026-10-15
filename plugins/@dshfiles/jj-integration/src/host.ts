@@ -77,7 +77,7 @@ const registryOf = () => {
 const emitActivity = (input: {
   readonly type: string
   readonly summary: string
-  readonly detail?: string
+  readonly detail?: string | undefined
   readonly path: string
   readonly level?: string
 }): void => {

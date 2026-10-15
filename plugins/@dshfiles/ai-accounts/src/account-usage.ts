@@ -15,8 +15,8 @@ export const readAccountUsage = async (input: {
   readonly account: AccountProfile
   /** The file's shadow root: an account with no explicit shadow home reads the one its route uses. */
   readonly shadowRoot: string
-  readonly signal?: AbortSignal
-  readonly resolveCredential?: CredentialValueResolver
+  readonly signal?: AbortSignal | undefined
+  readonly resolveCredential?: CredentialValueResolver | undefined
 }): Promise<UsageCard> => {
   const { account, signal } = input
   switch (account.kind) {

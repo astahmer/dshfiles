@@ -34,6 +34,7 @@ export const selectTests = ({ packages, files, deletedFiles = [] }) => {
       path.startsWith('tooling/dshx/scripts/') ||
       path.startsWith('profiles/') ||
       path === 'tooling/dshx/tsconfig.base.json' ||
+      path === 'tsconfig.base.client.json' ||
       path === 'tooling/dshx/scratch-pnpm-policy.yaml' ||
       path === 'plugins/package.json' ||
       path === 'tooling/dshx/package.json',

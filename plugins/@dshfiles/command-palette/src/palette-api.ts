@@ -63,12 +63,12 @@ const paletteActionSchema = z.object({
     .regex(/^@[^/]+\/.+/u)
     .max(180),
   label: z.custom<PaletteAction['label']>(isActionLabel),
-  aliases: z.array(z.string().trim().min(1)).max(20).optional(),
-  keys: z.array(z.string().trim().min(1)).max(5).optional(),
-  icon: z.custom<ReactNode>().optional(),
-  group: z.enum(['destination', 'command', 'action']).optional(),
-  isAvailable: z.custom<PaletteAction['isAvailable']>(isOptionalAction).optional(),
-  isSelected: z.custom<PaletteAction['isSelected']>(isOptionalAction).optional(),
+  aliases: z.array(z.string().trim().min(1)).max(20).exactOptional(),
+  keys: z.array(z.string().trim().min(1)).max(5).exactOptional(),
+  icon: z.custom<ReactNode>().exactOptional(),
+  group: z.enum(['destination', 'command', 'action']).exactOptional(),
+  isAvailable: z.custom<NonNullable<PaletteAction['isAvailable']>>(isOptionalAction).exactOptional(),
+  isSelected: z.custom<NonNullable<PaletteAction['isSelected']>>(isOptionalAction).exactOptional(),
   run: z.custom<PaletteAction['run']>(isActionRun),
 })
 

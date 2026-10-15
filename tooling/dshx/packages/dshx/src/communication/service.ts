@@ -121,16 +121,16 @@ export interface CommunicationSendInput {
 
 export interface CommunicationInboxInput {
   readonly principal: CommunicationPrincipal
-  readonly topic?: string
-  readonly limit?: number
+  readonly topic?: string | undefined
+  readonly limit?: number | undefined
 }
 
 export interface CommunicationBrowseInput {
-  readonly topic?: string
-  readonly agentId?: string
-  readonly search?: string
-  readonly beforeId?: string
-  readonly limit?: number
+  readonly topic?: string | undefined
+  readonly agentId?: string | undefined
+  readonly search?: string | undefined
+  readonly beforeId?: string | undefined
+  readonly limit?: number | undefined
 }
 
 export interface CommunicationActivityInput {

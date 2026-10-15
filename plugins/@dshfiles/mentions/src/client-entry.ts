@@ -203,17 +203,14 @@ export default defineClient({
           const parent = slash < 0 ? '' : candidate.path.slice(0, slash)
           const directory = candidate.kind === 'directory'
           const value: PickValue = { kind: 'file', fileKind: candidate.kind, label: name, mention, drillText: drillTextFor(query, mention) }
-          fileRows.set(
-            { kind: 'file', path: candidate.path, hostRank },
-            {
-              name: `${name}${directory ? '/' : ''}`,
-              description: withLocation && parent !== '' ? parent : undefined,
-              icon: directory ? 'folder' : 'file',
-              section,
-              value: keep(value),
-              drill: directory,
-            },
-          )
+          const row: InputTriggerCandidate = {
+            name: `${name}${directory ? '/' : ''}`,
+            icon: directory ? 'folder' : 'file',
+            section,
+            value: keep(value),
+            drill: directory,
+          }
+          fileRows.set({ kind: 'file', path: candidate.path, hostRank }, withLocation && parent !== '' ? { ...row, description: parent } : row)
         })
 
         const threadRows = new Map<ThreadEntry, InputTriggerCandidate>()

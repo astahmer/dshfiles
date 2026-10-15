@@ -1419,7 +1419,11 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
                       entry.kind === 'settings' ? (
                         <IconSettingsOutlineRegular size={16} />
                       ) : (
-                        props.renderSlot('sidebar.footer.action', { wide: false }, { only: entry.registrationId ?? undefined })
+                        props.renderSlot(
+                          'sidebar.footer.action',
+                          { wide: false },
+                          entry.registrationId === undefined || entry.registrationId === null ? {} : { only: entry.registrationId },
+                        )
                       ),
                     hidden: preferences.hiddenFooterIds.includes(entry.id),
                     control: 'switch',

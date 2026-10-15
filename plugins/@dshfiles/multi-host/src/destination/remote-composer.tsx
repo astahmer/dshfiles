@@ -121,7 +121,7 @@ export const RemoteComposer = (props: {
             <Spinner className="dshx:size-3.5" />
           ) : null
         ) : (
-          <Select value={effectiveModel ?? undefined} onValueChange={setModel}>
+          <Select value={effectiveModel ?? ''} onValueChange={setModel}>
             <SelectTrigger size="sm" className="dshx:h-7 dshx:max-w-56 dshx:text-xs" aria-label="Model on this host">
               <SelectValue placeholder="Model" />
             </SelectTrigger>

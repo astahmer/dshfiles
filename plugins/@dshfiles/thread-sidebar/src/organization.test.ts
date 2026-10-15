@@ -32,16 +32,10 @@ interface SessionFixture extends Partial<Omit<SessionSummary, 'id' | 'parentId'>
   parentId?: string
 }
 
-const sessionSummary = ({ id, parentId, ...overrides }: SessionFixture): SessionSummary => ({
-  displayTitle: id,
-  running: false,
-  retainedBy: {},
-  blank: false,
-  updatedAt: 0,
-  ...overrides,
-  id: SessionId(id),
-  parentId: parentId === undefined ? undefined : SessionId(parentId),
-})
+const sessionSummary = ({ id, parentId, ...overrides }: SessionFixture): SessionSummary => {
+  const summary: SessionSummary = { displayTitle: id, running: false, retainedBy: {}, blank: false, updatedAt: 0, ...overrides, id: SessionId(id) }
+  return parentId === undefined ? summary : { ...summary, parentId: SessionId(parentId) }
+}
 
 class MemoryStorage implements Storage {
   readonly #values = new Map<string, string>()

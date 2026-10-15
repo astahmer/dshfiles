@@ -13,7 +13,7 @@ interface LiveAgentDirectoryRecord {
   readonly id: string
   readonly status: string
   readonly createdAt: number
-  readonly cwd?: string
+  readonly cwd?: string | undefined
 }
 
 export const findOwnedLiveAgents = <Agent extends { readonly id: string }>(input: {

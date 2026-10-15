@@ -55,10 +55,10 @@ export interface CommandCodeProviderOptions {
 }
 
 export interface CommandCodeCatalogOptions {
-  readonly baseUrl?: string
+  readonly baseUrl?: string | undefined
   /** The key itself, already resolved for exactly this base. */
   readonly apiKey: string
-  readonly signal?: AbortSignal
+  readonly signal?: AbortSignal | undefined
 }
 
 /**
@@ -125,7 +125,7 @@ export const fetchCommandCodeCatalog = async (options: CommandCodeCatalogOptions
   if (options.apiKey.length === 0) return FALLBACK
   const response = await fetch(`${base}/provider/v1/models`, {
     headers: { authorization: `Bearer ${options.apiKey}`, accept: 'application/json' },
-    signal: options.signal,
+    signal: options.signal ?? null,
   })
   if (!response.ok) return FALLBACK
   const parsed = commandCodeCatalogResponseSchema.safeParse(await response.json())

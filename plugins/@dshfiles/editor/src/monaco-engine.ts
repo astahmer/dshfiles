@@ -61,15 +61,18 @@ export const monacoEngine: CodeEditorEngine = {
     const reportedDirty = new Map<string, boolean>()
     let currentId: string | null = null
 
-    const editor = monaco.editor.create(container, {
+    const codeFont = getComputedStyle(document.body).getPropertyValue('--ds-font-family-code').trim()
+    const editorOptions: monaco.editor.IStandaloneEditorConstructionOptions = {
       automaticLayout: true,
-      fontFamily: getComputedStyle(document.body).getPropertyValue('--ds-font-family-code').trim() || undefined,
       fontSize: 12,
       minimap: { enabled: false },
       model: null,
       scrollBeyondLastLine: false,
       theme: options.dark ? DARK_THEME : LIGHT_THEME,
-    })
+    }
+    // Monaco keeps its own font when the theme defines no code font.
+    if (codeFont !== '') editorOptions.fontFamily = codeFont
+    const editor = monaco.editor.create(container, editorOptions)
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => options.onSave())
 
     const isDirty = (documentId: string): boolean => {

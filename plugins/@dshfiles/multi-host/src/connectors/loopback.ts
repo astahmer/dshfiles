@@ -47,7 +47,7 @@ export const createLoopbackForward = async ({
 }: {
   readonly target: URL
   readonly originPort?: number
-  readonly signal?: AbortSignal
+  readonly signal?: AbortSignal | undefined
 }): Promise<LoopbackEndpoint & { dispose(): Promise<void> }> => {
   const targetHost = target.hostname.replace(/^\[|\]$/g, '')
   const addressParts = targetHost.split('.')

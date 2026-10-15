@@ -3,7 +3,7 @@ import { assign, createActor, fromPromise, setup, waitFor, type ActorRefFrom } f
 export interface ModelRoute {
   readonly provider: string
   readonly model: string
-  readonly reasoningEffort?: string
+  readonly reasoningEffort?: string | undefined
 }
 
 export interface SideChatPorts {

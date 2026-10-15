@@ -118,7 +118,7 @@ const LabelledSelect = (props: {
       <Label className="dshx:text-xs dshx:font-normal dshx:text-muted-foreground" htmlFor={id}>
         {props.label}
       </Label>
-      <Select disabled={props.disabled} onValueChange={props.onChange} value={props.value}>
+      <Select disabled={props.disabled === true} onValueChange={props.onChange} value={props.value}>
         <SelectTrigger aria-label={props.ariaLabel} className="dshx:min-w-36" id={id} size="sm">
           <SelectValue />
         </SelectTrigger>

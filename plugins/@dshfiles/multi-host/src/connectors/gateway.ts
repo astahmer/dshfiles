@@ -76,7 +76,7 @@ export const connectGateway = async ({
 }: {
   readonly launchUrl: string
   readonly createTransport: (origin: URL, signal?: AbortSignal) => Promise<GatewayTransport>
-  readonly signal?: AbortSignal
+  readonly signal?: AbortSignal | undefined
 }): Promise<Gateway> => {
   const parsedLaunch = loopbackLaunchUrl(launchUrl)
   const transport = await createTransport(new URL(parsedLaunch.origin), signal)
@@ -159,7 +159,7 @@ const followOnce = async ({
   readonly endpoint: string
   readonly args: unknown
   readonly timeoutMs: number
-  readonly signal?: AbortSignal
+  readonly signal?: AbortSignal | undefined
 }): Promise<readonly unknown[]> => {
   if (!/^[A-Za-z][A-Za-z0-9-]*\/[A-Za-z][A-Za-z0-9-]*$/.test(endpoint)) {
     throw new GatewayUnavailableError('invalid-endpoint', 'The requested runtime stream endpoint is invalid.')
@@ -265,7 +265,7 @@ const attemptRun = async ({
   readonly namespace: string
   readonly method: string
   readonly args: Record<string, unknown>
-  readonly signal?: AbortSignal
+  readonly signal?: AbortSignal | undefined
 }): Promise<GatewayOutcome> => {
   if (!/^[A-Za-z][A-Za-z0-9-]*$/.test(namespace) || !/^[A-Za-z][A-Za-z0-9-]*$/.test(method)) {
     return { ok: false, code: 'invalid-endpoint', message: 'The requested runtime API endpoint is invalid.' }

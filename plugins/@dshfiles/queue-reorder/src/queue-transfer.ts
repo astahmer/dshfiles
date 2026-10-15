@@ -166,7 +166,7 @@ export const startQueueTransfer = (ports: QueueTransferPorts): QueueTransferActo
 export const transferTargets = (input: {
   readonly ids: readonly string[]
   readonly rows: Readonly<
-    Record<string, { readonly displayTitle: string; readonly blank: boolean; readonly origin?: string; readonly updatedAt: number } | undefined>
+    Record<string, { readonly displayTitle: string; readonly blank: boolean; readonly origin?: string | undefined; readonly updatedAt: number } | undefined>
   >
   readonly currentId: string
 }): readonly TransferTarget[] =>

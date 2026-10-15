@@ -30,7 +30,7 @@ const PANEL_ID = 'jj-integration'
 const RIGHT_PANE_ID = '@dshfiles/jj-integration/thread-workspaces'
 const RIGHT_PANE_KIND = 'dshfiles-jj-integration-thread-workspaces'
 
-const PanelGlyph = (props: { readonly size?: number }): JSX.Element => (
+const PanelGlyph = (props: { readonly size?: number | undefined }): JSX.Element => (
   <svg aria-hidden width={props.size ?? 18} height={props.size ?? 18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
     <path d="M6 4v16M18 4v16M6 9h7a4 4 0 0 1 4 4v3" />
     <circle cx="6" cy="4" r="1.6" />

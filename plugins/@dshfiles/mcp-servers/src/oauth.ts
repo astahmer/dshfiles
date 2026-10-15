@@ -53,7 +53,14 @@ const trustedEndpoint = (value: string | undefined): void => {
 const requestOptions = (fetcher: Fetch, target: string) => {
   const url = new URL(target)
   return {
-    [oauth.customFetch]: fetcher,
+    [oauth.customFetch]: (url: string, options: oauth.CustomFetchOptions<string, URLSearchParams | string | undefined>) =>
+      fetcher(url, {
+        method: options.method,
+        headers: options.headers,
+        body: options.body ?? null,
+        redirect: options.redirect,
+        signal: options.signal ?? null,
+      }),
     signal: () => AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     ...(url.protocol === 'http:' && isLoopback(url.hostname) ? { [oauth.allowInsecureRequests]: true } : {}),
   }

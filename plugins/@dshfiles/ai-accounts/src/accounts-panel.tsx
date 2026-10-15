@@ -21,7 +21,7 @@ import type { CredentialSetupPort } from './credential-setup-port.js'
  */
 export const AccountsPanel = (props: {
   readonly onOpenUsageHistory: () => void
-  readonly credentialSetup?: CredentialSetupPort
+  readonly credentialSetup?: CredentialSetupPort | undefined
   readonly folderPicker: WorkspacePickerPorts
 }): JSX.Element => {
   const state = useAccountsPanelState(props.credentialSetup)

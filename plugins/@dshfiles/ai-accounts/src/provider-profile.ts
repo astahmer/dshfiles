@@ -37,7 +37,7 @@ const offerThinkingOff = <Model extends ThinkingCatalogModel>(model: Model): Mod
 
 export const buildProfile = (params: {
   /** Per-model default effort ids this account pins. */
-  readonly reasoningDefaults?: Readonly<Record<string, string>>
+  readonly reasoningDefaults?: Readonly<Record<string, string>> | undefined
   /** Ids this account never offers. */
   readonly hiddenModelIds?: readonly string[]
   /** Ids offered ahead of the rest. */

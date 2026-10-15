@@ -233,7 +233,7 @@ const findInProvider = (cache: PricingCache, provider: string, model: string): {
 export const resolveRouteQuote = (input: {
   readonly route: { readonly provider: string; readonly model: string }
   readonly cache: PricingCache | null
-  readonly accountKind?: string
+  readonly accountKind?: string | undefined
   readonly overrides: Readonly<Record<string, string>>
 }): RouteQuote => {
   const { route, cache } = input

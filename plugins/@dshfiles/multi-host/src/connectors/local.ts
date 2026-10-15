@@ -9,7 +9,7 @@ export const connectLocal = ({
 }: {
   readonly launchUrl: string
   readonly originPort?: number
-  readonly signal?: AbortSignal
+  readonly signal?: AbortSignal | undefined
 }): Promise<Gateway> => {
   const locator = runtimeLocatorSchema.parse({ kind: 'local', launchUrl })
   if (locator.kind !== 'local') throw new GatewayUnavailableError('invalid-runtime-locator', 'The local runtime locator is invalid.')

@@ -12,7 +12,7 @@ const workspace = resolve(import.meta.dirname, '../../..')
 const packageDirectory = resolve(import.meta.dirname, '..')
 const dshCli = join(packageDirectory, 'node_modules/.bin', process.platform === 'win32' ? 'dsh.cmd' : 'dsh')
 
-async function waitForFile(path: string, child: ReturnType<typeof execa>): Promise<void> {
+async function waitForFile(path: string, child: PromiseLike<{ readonly stdout: unknown; readonly stderr: unknown }>): Promise<void> {
   let exit: { readonly stdout: string; readonly stderr: string } | Error | undefined
   void child.then(
     result => {

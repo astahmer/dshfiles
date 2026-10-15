@@ -41,12 +41,19 @@ export const useLandToast = () => {
   const show = (input: { readonly text: string; readonly success: boolean }): void =>
     setToast(previous => ({ sequence: (previous?.sequence ?? 0) + 1, text: input.text, success: input.success }))
   const element =
-    toast === null ? null : (
+    toast === null ? null : toast.success ? (
       <Toast
         key={toast.sequence}
         text={toast.text}
-        holdMs={toast.success ? 6_000 : 9_000}
-        tone={toast.success ? 'success' : undefined}
+        holdMs={6_000}
+        tone="success"
+        onDone={() => setToast(current => (current?.sequence === toast.sequence ? null : current))}
+      />
+    ) : (
+      <Toast
+        key={toast.sequence}
+        text={toast.text}
+        holdMs={9_000}
         onDone={() => setToast(current => (current?.sequence === toast.sequence ? null : current))}
       />
     )

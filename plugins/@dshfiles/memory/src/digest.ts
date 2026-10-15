@@ -100,15 +100,9 @@ export const readThread = (input: {
 }): ThreadMaterial => {
   const own = input.events.slice(input.inheritedEventCount ?? 0)
   const records = own.map(event => ({ type: 'event' as const, event }))
+  const header = { sessionId: input.header.id, updatedAt: input.now, running: false, blank: false, agentAvailable: false } as const
   const summary: SessionDigest = digestSession({
-    summary: {
-      sessionId: input.header.id,
-      updatedAt: input.now,
-      running: false,
-      blank: false,
-      agentAvailable: false,
-      cwd: input.header.cwd,
-    },
+    summary: input.header.cwd === undefined ? header : { ...header, cwd: input.header.cwd },
     records,
     now: input.now,
   })

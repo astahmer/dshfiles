@@ -3,7 +3,7 @@ import type { DestinationView } from './api.js'
 
 export interface ProvisionedDestination {
   readonly workspaceId: string
-  readonly destination?: DestinationView
+  readonly destination?: DestinationView | undefined
 }
 
 export interface ProvisionInput {
