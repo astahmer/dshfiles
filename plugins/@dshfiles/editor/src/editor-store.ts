@@ -1,7 +1,7 @@
 import type { ClientRemote } from '@deepseek-ai/dsh-api-gateway/client'
 import type {} from '@deepseek-ai/dsh-api-workspace-files/remote'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
-import { resolveRequestedPath, type OpenFileRequest } from './open-file.js'
+import { OpenFileAddress, type OpenFileRequest } from './open-file.js'
 
 export const MAX_EDITABLE_BYTES = 5 * 1024 * 1024
 
@@ -221,7 +221,7 @@ export const createEditorStore = (options: {
     getSnapshot: (): EditorState => state,
     open: (sessionId: SessionId, request: OpenFileRequest): void => {
       const roots = rootsOf(sessionId)
-      const path = resolveRequestedPath(request, roots)
+      const path = OpenFileAddress.resolve(request, roots)
       const spellings = new Set(path.startsWith('/') ? [path] : [path, ...roots.map(root => root.replace(/\/+$/, '') + '/' + path)])
       const existing = state.documents.find(
         document =>

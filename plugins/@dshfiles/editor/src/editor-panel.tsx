@@ -1,7 +1,6 @@
 import type { ClientRemote } from '@deepseek-ai/dsh-api-gateway/client'
 import type {} from '@deepseek-ai/dsh-api-session-controller/remote'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
-import { useApi } from '@dshfiles/dshx/client'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -16,11 +15,11 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { ExternalLinkIcon, FileQuestionIcon, FolderOpenIcon, FolderTreeIcon, RefreshCwIcon, SaveIcon, XIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
-import { editorApi } from './api.js'
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { CodeEditorEngine, CodeEditorHandle } from './code-editor.js'
 import type { EditorStore, OpenDocument } from './editor-store.js'
 import { FileTree } from './file-tree.js'
+import { useEditorSaveMachine } from './use-editor-save-machine.js'
 
 export interface EditorPanelProps {
   readonly store: EditorStore
@@ -29,7 +28,10 @@ export interface EditorPanelProps {
   readonly loadEngine: () => Promise<CodeEditorEngine>
 }
 
-type Dialog = { readonly kind: 'approve' | 'conflict' | 'discard'; readonly document: OpenDocument } | null
+type Dialog =
+  | { readonly kind: 'approve' | 'conflict'; readonly document: { readonly id: string; readonly path: string } }
+  | { readonly kind: 'discard'; readonly document: OpenDocument }
+  | null
 
 const subscribeToDarkTheme = (onChange: () => void): (() => void) => {
   const observer = new MutationObserver(onChange)
@@ -110,7 +112,6 @@ const FilePreview = (props: { readonly document: OpenDocument; readonly remote: 
 
 /** File tree, tabs and one editor surface for the session on screen. Usable as a right-pane tab or a docked panel. */
 export const EditorPanel = (props: EditorPanelProps): JSX.Element => {
-  const api = useApi(editorApi)
   const queryClient = useQueryClient()
   const state = useSyncExternalStore(props.store.subscribe, props.store.getSnapshot)
   const dark = useSyncExternalStore(subscribeToDarkTheme, isDarkTheme, () => false)
@@ -118,47 +119,55 @@ export const EditorPanel = (props: EditorPanelProps): JSX.Element => {
   const activeId = props.sessionId === undefined ? undefined : state.activeBySession[props.sessionId]
   const active = sessionDocuments.find(document => document.id === activeId)
   const [showTree, setShowTree] = useState(true)
-  const [dialog, setDialog] = useState<Dialog>(null)
+  const [discardDocument, setDiscardDocument] = useState<OpenDocument | null>(null)
   const [engineStatus, setEngineStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
   const containerRef = useRef<HTMLDivElement>(null)
   const handleRef = useRef<CodeEditorHandle | null>(null)
   const appliedText = useRef(new Map<string, string>())
   const revealed = useRef(new Map<string, number>())
-  const approved = useRef(new Set<string>())
   const requestSaveRef = useRef<() => void>(() => undefined)
-
-  const save = useMutation({
-    mutationFn: async (variables: { readonly document: OpenDocument; readonly overwrite: boolean }) => {
-      const snapshot = handleRef.current?.snapshot(variables.document.id)
-      if (snapshot === undefined) throw new Error('Nothing to save.')
-      const result = await api.write({
-        sessionId: variables.document.sessionId,
-        path: variables.document.path,
-        text: snapshot.text,
-        expectedSha256: variables.document.sha256,
-        overwrite: variables.overwrite,
-      })
-      if (result.status === 'conflict') {
-        setDialog({ kind: 'conflict', document: variables.document })
-        return
-      }
-      handleRef.current?.markSaved(variables.document.id, snapshot.version)
-      props.store.saved(variables.document.id, result.sha256)
+  const onSaved = useCallback(
+    (documentId: string, bufferVersion: number, sha256: string) => {
+      handleRef.current?.markSaved(documentId, bufferVersion)
+      props.store.saved(documentId, sha256)
     },
-  })
+    [props.store],
+  )
+  const { snapshot: saveSnapshot, send: sendSave } = useEditorSaveMachine(onSaved)
+
+  useEffect(() => {
+    sendSave({ type: 'document.changed', documentId: active?.id ?? null })
+  }, [active?.id, sendSave])
 
   requestSaveRef.current = () => {
-    if (active === undefined || active.status !== 'ready' || active.content.kind !== 'text' || save.isPending) return
-    // Host approval (`ctx.approval`) only answers for an Agent with an open turn; a user save has none, so the
-    // panel asks once per open tab instead.
-    if (!approved.current.has(active.id)) {
-      setDialog({ kind: 'approve', document: active })
+    if (
+      active === undefined ||
+      active.status !== 'ready' ||
+      active.content.kind !== 'text' ||
+      saveSnapshot.matches('approval') ||
+      saveSnapshot.matches('writing') ||
+      saveSnapshot.matches('conflict')
+    ) {
       return
     }
-    save.mutate({ document: active, overwrite: false })
+    const buffer = handleRef.current?.snapshot(active.id)
+    if (buffer === undefined) return
+    sendSave({ type: 'document.changed', documentId: active.id })
+    sendSave({
+      type: 'save.request',
+      request: {
+        documentId: active.id,
+        sessionId: active.sessionId,
+        path: active.path,
+        text: buffer.text,
+        expectedSha256: active.sha256,
+        bufferVersion: buffer.version,
+      },
+    })
   }
 
   const editable = active?.status === 'ready' && active.content.kind === 'text'
+  const savePending = saveSnapshot.matches('writing')
   useEffect(() => {
     if (!editable || engineStatus !== 'idle') return
     setEngineStatus('loading')
@@ -214,21 +223,32 @@ export const EditorPanel = (props: EditorPanelProps): JSX.Element => {
     return <p className="dshx-root dshx:p-3 dshx:text-xs dshx:text-muted-foreground">Open a session to browse and edit its files.</p>
   }
   const sessionId = props.sessionId
+  const pendingSave = saveSnapshot.context.pending
+  const saveDialog: Dialog =
+    pendingSave !== null && saveSnapshot.matches('approval')
+      ? { kind: 'approve', document: { id: pendingSave.documentId, path: pendingSave.path } }
+      : pendingSave !== null && saveSnapshot.matches('conflict')
+        ? { kind: 'conflict', document: { id: pendingSave.documentId, path: pendingSave.path } }
+        : null
+  const dialog: Dialog = saveDialog ?? (discardDocument === null ? null : { kind: 'discard', document: discardDocument })
 
   const closeDocument = (document: OpenDocument): void => {
-    if (document.dirty) setDialog({ kind: 'discard', document })
+    if (document.dirty) setDiscardDocument(document)
     else props.store.close(document.id)
   }
 
   const confirmDialog = (): void => {
     if (dialog === null) return
     if (dialog.kind === 'approve') {
-      approved.current.add(dialog.document.id)
-      save.mutate({ document: dialog.document, overwrite: false })
+      sendSave({ type: 'approve' })
+      return
     }
-    if (dialog.kind === 'conflict') save.mutate({ document: dialog.document, overwrite: true })
-    if (dialog.kind === 'discard') props.store.close(dialog.document.id)
-    setDialog(null)
+    if (dialog.kind === 'conflict') {
+      sendSave({ type: 'overwrite' })
+      return
+    }
+    props.store.close(dialog.document.id)
+    setDiscardDocument(null)
   }
 
   return (
@@ -277,7 +297,7 @@ export const EditorPanel = (props: EditorPanelProps): JSX.Element => {
         </div>
         <Button
           aria-label="Save"
-          disabled={!editable || save.isPending}
+          disabled={!editable || savePending || saveSnapshot.matches('approval') || saveSnapshot.matches('conflict')}
           onClick={() => requestSaveRef.current()}
           size="icon-xs"
           title="Save (⌘S)"
@@ -325,9 +345,9 @@ export const EditorPanel = (props: EditorPanelProps): JSX.Element => {
         <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate" title={active?.path}>
           {active?.path ?? ''}
         </span>
-        {save.isPending && <span>Saving…</span>}
-        {save.isError && <span className="dshx:text-destructive">{errorMessage(save.error, 'Save failed.')}</span>}
-        {active !== undefined && !save.isPending && (
+        {savePending && <span>Saving…</span>}
+        {saveSnapshot.context.failure !== null && <span className="dshx:text-destructive">{saveSnapshot.context.failure}</span>}
+        {active !== undefined && !savePending && (
           <span>
             {active.content.kind !== 'text'
               ? 'Read-only'
@@ -339,7 +359,14 @@ export const EditorPanel = (props: EditorPanelProps): JSX.Element => {
           </span>
         )}
       </div>
-      <AlertDialog onOpenChange={open => !open && setDialog(null)} open={dialog !== null}>
+      <AlertDialog
+        onOpenChange={open => {
+          if (open) return
+          if (dialog?.kind === 'discard') setDiscardDocument(null)
+          sendSave({ type: 'cancel' })
+        }}
+        open={dialog !== null}
+      >
         {dialog !== null && (
           <AlertDialogContent>
             <AlertDialogHeader>
@@ -354,7 +381,7 @@ export const EditorPanel = (props: EditorPanelProps): JSX.Element => {
                 <Button
                   onClick={() => {
                     void props.store.reload(dialog.document.id)
-                    setDialog(null)
+                    sendSave({ type: 'cancel' })
                   }}
                   variant="outline"
                 >

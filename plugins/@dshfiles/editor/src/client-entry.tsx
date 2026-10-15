@@ -16,15 +16,7 @@ import { EditorOpenFileLinksSetting } from './editor-open-file-links-setting.js'
 import { editorSettingsLocale, EDITOR_SETTINGS_LOCALE_NAMESPACE } from './editor-settings-locales.js'
 import { EDITOR_OPEN_FILE_LINKS_OWNER_ID } from './editor-settings-row.js'
 import { EditorPanel } from './editor-panel.js'
-import {
-  editorClaimsFileAddress,
-  fileLinkParamsSchema,
-  GO_TO_LINE_EVENT,
-  goToLineRequestSchema,
-  OPEN_FILE_EVENT,
-  openFileRequestSchema,
-  parseSessionFileAddress,
-} from './open-file.js'
+import { OpenFileAddress, fileLinkParamsSchema, GO_TO_LINE_EVENT, goToLineRequestSchema, OPEN_FILE_EVENT, openFileRequestSchema } from './open-file.js'
 import { openFileLinksPreference } from './open-file-links-preference.js'
 import { EDITOR_SETTINGS_NAMESPACE } from './settings-namespace.js'
 import { editorSettings } from './settings.js'
@@ -172,8 +164,8 @@ export default defineClient({
           kind: FILE_LINK_KIND,
           patterns: ['dsh-resource://file/**'],
           priority: 'extension',
-          canOpen: address => openFileLinksPreference.get() && editorClaimsFileAddress(address),
-          title: address => parseSessionFileAddress(address)?.path.split('/').at(-1) ?? 'File',
+          canOpen: address => openFileLinksPreference.get() && OpenFileAddress.claims(address),
+          title: address => OpenFileAddress.parse(address)?.path.split('/').at(-1) ?? 'File',
         }),
       'dshfiles-editor: claim file links',
     )
@@ -184,7 +176,7 @@ export default defineClient({
       const params = tab.navigation.params
       const actions = tab.actions
       useEffect(() => {
-        const parsed = parseSessionFileAddress(address)
+        const parsed = OpenFileAddress.parse(address)
         const line = fileLinkParamsSchema.safeParse(params).data?.line
         if (parsed !== undefined) {
           // SAFETY: the id comes from a Host-built address for this Client's Sessions.

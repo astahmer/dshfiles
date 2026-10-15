@@ -1,7 +1,7 @@
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { describe, expect, it, vi } from 'vitest'
 import { createEditorStore } from './editor-store.js'
-import { resolveRequestedPath } from './open-file.js'
+import { OpenFileAddress } from './open-file.js'
 
 // SAFETY: test ids only flow back into the fake remote below.
 const session = 'ses_1' as SessionId
@@ -36,11 +36,11 @@ const loaded = (store: ReturnType<typeof createEditorStore>) =>
 
 describe('resolveRequestedPath', () => {
   it('collapses ./, // and .. and strips a known root', () => {
-    expect(resolveRequestedPath({ path: './src//a/../b.ts' })).toBe('src/b.ts')
-    expect(resolveRequestedPath({ path: '/link/w/./src/b.ts' }, ['/link/w/'])).toBe('src/b.ts')
-    expect(resolveRequestedPath({ path: 'b.ts', cwd: '/link/w/src' }, ['/link/w'])).toBe('src/b.ts')
-    expect(resolveRequestedPath({ path: '/elsewhere/b.ts' }, ['/link/w'])).toBe('/elsewhere/b.ts')
-    expect(resolveRequestedPath({ path: '/link/wx/b.ts' }, ['/link/w'])).toBe('/link/wx/b.ts')
+    expect(OpenFileAddress.resolve({ path: './src//a/../b.ts' })).toBe('src/b.ts')
+    expect(OpenFileAddress.resolve({ path: '/link/w/./src/b.ts' }, ['/link/w/'])).toBe('src/b.ts')
+    expect(OpenFileAddress.resolve({ path: 'b.ts', cwd: '/link/w/src' }, ['/link/w'])).toBe('src/b.ts')
+    expect(OpenFileAddress.resolve({ path: '/elsewhere/b.ts' }, ['/link/w'])).toBe('/elsewhere/b.ts')
+    expect(OpenFileAddress.resolve({ path: '/link/wx/b.ts' }, ['/link/w'])).toBe('/link/wx/b.ts')
   })
 })
 

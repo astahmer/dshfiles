@@ -38,7 +38,7 @@ const normalizeSegments = (path: string): string => {
  * tab: resolve against `cwd`, collapse `.`/`..`/`//`, and make it workspace-relative when it lies under one of the
  * session's known roots (its `cwd`, plus the symlink-resolved root learnt from Host `absolutePath`s).
  */
-export const resolveRequestedPath = (request: OpenFileRequest, roots: readonly string[] = []): string => {
+const resolveRequestedPath = (request: OpenFileRequest, roots: readonly string[] = []): string => {
   const raw = request.path.replace(/\\/g, '/')
   const joined = raw.startsWith('/') || request.cwd === undefined ? raw : request.cwd.replace(/\/+$/, '') + '/' + raw
   const path = normalizeSegments(joined)
@@ -59,7 +59,7 @@ const HOST_PREVIEW_EXTENSIONS = new Set(['pdf', 'doc', 'docx', 'xls', 'xlsx', 'p
  * A `dsh-resource://file/session/<sessionId>/<path>` address (what thread tool-call links and composer references
  * open), decoded per segment; query and fragment ignored. `absolute/…` addresses carry no Session and are left alone.
  */
-export const parseSessionFileAddress = (address: string): { readonly sessionId: string; readonly path: string } | undefined => {
+const parseSessionFileAddress = (address: string): { readonly sessionId: string; readonly path: string } | undefined => {
   if (!address.startsWith(FILE_ADDRESS_PREFIX)) return undefined
   const end = address.search(/[?#]/)
   const [scope, id, ...segments] = address.slice(FILE_ADDRESS_PREFIX.length, end === -1 ? undefined : end).split('/')
@@ -72,10 +72,16 @@ export const parseSessionFileAddress = (address: string): { readonly sessionId: 
   }
 }
 
-export const editorClaimsFileAddress = (address: string): boolean => {
+const editorClaimsFileAddress = (address: string): boolean => {
   const parsed = parseSessionFileAddress(address)
   if (parsed === undefined || parsed.path.endsWith('/')) return false
   return !HOST_PREVIEW_EXTENSIONS.has(parsed.path.split('.').at(-1)?.toLowerCase() ?? '')
 }
 
 export const fileLinkParamsSchema = z.object({ line: z.number().int().positive().optional() }).optional()
+
+export class OpenFileAddress {
+  static readonly resolve = resolveRequestedPath
+  static readonly parse = parseSessionFileAddress
+  static readonly claims = editorClaimsFileAddress
+}
