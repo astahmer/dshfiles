@@ -30,7 +30,7 @@ import type { SubagentAddress } from '@deepseek-ai/dsh-subagent/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { sidebarChildren } from './sidebar-contract.js'
 import { THREAD_SIDEBAR_LOCALE_NAMESPACE, threadSidebarLocale } from './locales.js'
-import { archiveWithoutStopping } from './organization.js'
+import { SidebarOrganization } from './organization.js'
 import { NAVIGATION_EVENT } from './navigation-history.js'
 import { PALETTE_EVENT } from '@dshfiles/command-palette/api'
 import { SettingsTab } from './settings-tab.js'
@@ -449,7 +449,7 @@ export default defineClient({
     )
 
     const archiveSession = (sessionId: SessionSummary['id']) =>
-      archiveWithoutStopping((targetId, options) => ctx.workspaces.archiveSession(targetId, options), sessionId)
+      SidebarOrganization.archiveWithoutStopping((targetId, options) => ctx.workspaces.archiveSession(targetId, options), sessionId)
     const unarchiveSession = (sessionId: SessionSummary['id']) => ctx.workspaces.unarchiveSession(sessionId)
     const pinSession = async (sessionId: SessionSummary['id']) => {
       const result = await ctx.remote.workspace.pinSession({ sessionId })
@@ -549,7 +549,7 @@ export default defineClient({
           inject: () => ({
             tSidebar: ctx.locale.bind(THREAD_SIDEBAR_LOCALE_NAMESPACE),
             archiveSession: (sessionId: SessionSummary['id']) =>
-              archiveWithoutStopping((targetId, options) => ctx.workspaces.archiveSession(targetId, options), sessionId),
+              SidebarOrganization.archiveWithoutStopping((targetId, options) => ctx.workspaces.archiveSession(targetId, options), sessionId),
             unarchiveSession: (sessionId: SessionSummary['id']) => ctx.workspaces.unarchiveSession(sessionId),
             pinSession: async (sessionId: SessionSummary['id']) => {
               const result = await ctx.remote.workspace.pinSession({ sessionId })

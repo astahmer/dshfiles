@@ -142,7 +142,7 @@ export interface OrderedSidebarEntry {
 
 export type SessionActivity = Pick<SessionSummary, 'id' | 'running' | 'updatedAt' | 'blank'>
 
-export const isAttentionSessionIncluded = (session: Pick<SessionSummary, 'origin' | 'parentId'>, includeSubagentAttention: boolean): boolean =>
+const isAttentionSessionIncluded = (session: Pick<SessionSummary, 'origin' | 'parentId'>, includeSubagentAttention: boolean): boolean =>
   includeSubagentAttention || (session.origin !== 'subagent' && session.parentId === undefined)
 
 export interface AutoArchiveContext {
@@ -156,13 +156,13 @@ export interface AutoArchiveContext {
 
 export type AutoArchiveOverride = 'inherit' | 'enabled' | 'disabled'
 
-export const autoArchiveOverrideForSession = (preferences: SidebarPreferences, sessionId: string): AutoArchiveOverride => {
+const autoArchiveOverrideForSession = (preferences: SidebarPreferences, sessionId: string): AutoArchiveOverride => {
   if (preferences.autoArchiveDisabledSessionIds.includes(sessionId)) return 'disabled'
   if (preferences.autoArchiveSessionIds.includes(sessionId)) return 'enabled'
   return 'inherit'
 }
 
-export const setAutoArchiveOverride = (preferences: SidebarPreferences, sessionId: string, override: AutoArchiveOverride): SidebarPreferences => ({
+const setAutoArchiveOverride = (preferences: SidebarPreferences, sessionId: string, override: AutoArchiveOverride): SidebarPreferences => ({
   ...preferences,
   autoArchiveSessionIds:
     override === 'enabled' ? [...new Set([...preferences.autoArchiveSessionIds, sessionId])] : preferences.autoArchiveSessionIds.filter(id => id !== sessionId),
@@ -172,8 +172,7 @@ export const setAutoArchiveOverride = (preferences: SidebarPreferences, sessionI
       : preferences.autoArchiveDisabledSessionIds.filter(id => id !== sessionId),
 })
 
-export const shouldScanForAutoArchive = (preferences: SidebarPreferences): boolean =>
-  preferences.autoArchiveEnabled || preferences.autoArchiveSessionIds.length > 0
+const shouldScanForAutoArchive = (preferences: SidebarPreferences): boolean => preferences.autoArchiveEnabled || preferences.autoArchiveSessionIds.length > 0
 
 export interface SessionLineage {
   /** Number of known direct-parent edges above the session. */
@@ -189,7 +188,7 @@ export interface SessionLineage {
  * chain. A visited set keeps corrupt cycles bounded; missing ancestors still
  * preserve the direct relationship and one level of indentation.
  */
-export const sessionLineage = (session: Pick<SessionSummary, 'id' | 'parentId'>, byId: Readonly<Record<string, SessionSummary>>): SessionLineage => {
+const sessionLineage = (session: Pick<SessionSummary, 'id' | 'parentId'>, byId: Readonly<Record<string, SessionSummary>>): SessionLineage => {
   if (session.parentId === undefined) return { depth: 0 }
 
   let depth = 0
@@ -233,7 +232,7 @@ export const projectWorkspaces = (workspaces: readonly WorkspaceView[]): readonl
 }
 
 /** Resolve a workspace from the session or its nearest known ancestor. */
-export const workspaceForLineage = (
+const workspaceForLineage = (
   session: Pick<SessionSummary, 'id' | 'parentId'>,
   byId: Readonly<Record<string, SessionSummary>>,
   workspaceBySession: ReadonlyMap<string, string>,
@@ -249,7 +248,7 @@ export const workspaceForLineage = (
   return undefined
 }
 
-export const parseSessionIds = (value: string): string[] => [
+const parseSessionIds = (value: string): string[] => [
   ...new Set(
     value
       .split(/[\s,;]+/)
@@ -258,7 +257,7 @@ export const parseSessionIds = (value: string): string[] => [
   ),
 ]
 
-export const orderSidebarEntries = <Entry extends OrderedSidebarEntry>(entries: readonly Entry[], savedOrder: readonly string[]): Entry[] => {
+const orderSidebarEntries = <Entry extends OrderedSidebarEntry>(entries: readonly Entry[], savedOrder: readonly string[]): Entry[] => {
   const savedPositions = new Map(savedOrder.map((id, index) => [id, index]))
   return entries
     .map((entry, index) => ({ entry, index, savedPosition: savedPositions.get(entry.id) }))
@@ -273,7 +272,7 @@ export const orderSidebarEntries = <Entry extends OrderedSidebarEntry>(entries: 
     .map(({ entry }) => entry)
 }
 
-export const moveSidebarEntry = (orderedIds: readonly string[], id: string, direction: -1 | 1): string[] => {
+const moveSidebarEntry = (orderedIds: readonly string[], id: string, direction: -1 | 1): string[] => {
   const next = [...orderedIds]
   const index = next.indexOf(id)
   const target = index + direction
@@ -293,7 +292,7 @@ export const moveSidebarEntry = (orderedIds: readonly string[], id: string, dire
  * the target sits after the source. An out-of-range or unknown source leaves the
  * order untouched rather than dropping an unrelated entry.
  */
-export const reorderSidebarEntry = (orderedIds: readonly string[], fromIndex: number, toIndex: number): string[] => {
+const reorderSidebarEntry = (orderedIds: readonly string[], fromIndex: number, toIndex: number): string[] => {
   if (!Number.isInteger(fromIndex) || !Number.isInteger(toIndex)) return [...orderedIds]
   if (fromIndex < 0 || fromIndex >= orderedIds.length) return [...orderedIds]
   if (toIndex < 0 || toIndex >= orderedIds.length) return [...orderedIds]
@@ -309,7 +308,7 @@ export const reorderSidebarEntry = (orderedIds: readonly string[], fromIndex: nu
  * Reorder among the shown entries while hidden ones keep their saved slots: the
  * dragged entry lands where the shown entry it was dropped on sits in the full order.
  */
-export const reorderVisibleEntry = (options: {
+const reorderVisibleEntry = (options: {
   readonly orderedIds: readonly string[]
   readonly visibleIds: readonly string[]
   readonly fromVisible: number
@@ -325,10 +324,10 @@ export const reorderVisibleEntry = (options: {
  * Final index for a pointer drag along one axis: how many of the other items'
  * centres the pointer has passed.
  */
-export const dropIndexAt = (options: { readonly centers: readonly number[]; readonly fromIndex: number; readonly position: number }): number =>
+const dropIndexAt = (options: { readonly centers: readonly number[]; readonly fromIndex: number; readonly position: number }): number =>
   options.centers.filter((center, index) => index !== options.fromIndex && center < options.position).length
 
-export const archiveWithoutStopping = <SessionId extends string>(
+const archiveWithoutStopping = <SessionId extends string>(
   archive: (sessionId: SessionId, options: { readonly stopActivity: false }) => Promise<void>,
   sessionId: SessionId,
 ): Promise<void> => archive(sessionId, { stopActivity: false })
@@ -336,7 +335,7 @@ export const archiveWithoutStopping = <SessionId extends string>(
 const hasPassedIdleThreshold = (session: Pick<SessionActivity, 'updatedAt'>, now: number, idleMinutes: number): boolean =>
   Number.isFinite(session.updatedAt) && session.updatedAt <= now && now - session.updatedAt >= idleMinutes * 60_000
 
-export const nextIdleTransitionAt = (sessions: readonly Pick<SessionActivity, 'running' | 'updatedAt'>[], now: number, idleMinutes: number): number | null => {
+const nextIdleTransitionAt = (sessions: readonly Pick<SessionActivity, 'running' | 'updatedAt'>[], now: number, idleMinutes: number): number | null => {
   let next: number | null = null
   for (const session of sessions) {
     if (session.running || !Number.isFinite(session.updatedAt)) continue
@@ -346,7 +345,7 @@ export const nextIdleTransitionAt = (sessions: readonly Pick<SessionActivity, 'r
   return next
 }
 
-export const isAutoArchiveCandidate = ({ session, workspaceId, now, preferences, archivedSessionIds, pinnedSessionIds }: AutoArchiveContext): boolean => {
+const isAutoArchiveCandidate = ({ session, workspaceId, now, preferences, archivedSessionIds, pinnedSessionIds }: AutoArchiveContext): boolean => {
   if (session.running || session.blank) return false
   if (archivedSessionIds.has(session.id) || pinnedSessionIds.has(session.id)) return false
   if (preferences.parkedSessionIds.includes(session.id)) return false
@@ -359,7 +358,7 @@ export const isAutoArchiveCandidate = ({ session, workspaceId, now, preferences,
   return hasPassedIdleThreshold(session, now, preferences.idleMinutes)
 }
 
-export const sectionForSession = ({
+const sectionForSession = ({
   session,
   archivedSessionIds,
   pinnedSessionIds,
@@ -389,17 +388,7 @@ export const sectionForSession = ({
  * Which items stay inline, in order. An item too wide for the remaining space overflows on its own,
  * so one wide third-party footer card cannot push every later entry into the More menu.
  */
-export const fitItems = ({
-  widths,
-  available,
-  gap,
-  reserve,
-}: {
-  widths: readonly number[]
-  available: number
-  gap: number
-  reserve: number
-}): readonly boolean[] => {
+const fitItems = ({ widths, available, gap, reserve }: { widths: readonly number[]; available: number; gap: number; reserve: number }): readonly boolean[] => {
   const total = widths.reduce((sum, width, index) => sum + width + (index === 0 ? 0 : gap), 0)
   if (total <= available) return widths.map(() => true)
   let used = reserve
@@ -409,4 +398,24 @@ export const fitItems = ({
     used = next
     return true
   })
+}
+
+export class SidebarOrganization {
+  static readonly isAttentionSessionIncluded = isAttentionSessionIncluded
+  static readonly autoArchiveOverrideForSession = autoArchiveOverrideForSession
+  static readonly setAutoArchiveOverride = setAutoArchiveOverride
+  static readonly shouldScanForAutoArchive = shouldScanForAutoArchive
+  static readonly sessionLineage = sessionLineage
+  static readonly workspaceForLineage = workspaceForLineage
+  static readonly parseSessionIds = parseSessionIds
+  static readonly orderSidebarEntries = orderSidebarEntries
+  static readonly moveSidebarEntry = moveSidebarEntry
+  static readonly reorderSidebarEntry = reorderSidebarEntry
+  static readonly reorderVisibleEntry = reorderVisibleEntry
+  static readonly dropIndexAt = dropIndexAt
+  static readonly archiveWithoutStopping = archiveWithoutStopping
+  static readonly nextIdleTransitionAt = nextIdleTransitionAt
+  static readonly isAutoArchiveCandidate = isAutoArchiveCandidate
+  static readonly sectionForSession = sectionForSession
+  static readonly fitItems = fitItems
 }

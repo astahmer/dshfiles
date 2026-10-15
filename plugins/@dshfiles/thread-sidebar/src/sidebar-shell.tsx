@@ -43,6 +43,7 @@ import {
 } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import {
+  useCallback,
   useEffect,
   useId,
   useLayoutEffect,
@@ -54,11 +55,7 @@ import {
   type ReactNode,
 } from 'react'
 import {
-  dropIndexAt,
-  fitItems,
-  orderSidebarEntries,
-  reorderSidebarEntry,
-  reorderVisibleEntry,
+  SidebarOrganization,
   SIDEBAR_HEADER_MIN_HEIGHT,
   SIDEBAR_ICON_ROW_THRESHOLD,
   SIDEBAR_SPLITTER_HEIGHT,
@@ -85,6 +82,7 @@ import { SidebarStateProvider, useSidebarState } from './sidebar-state.js'
 import { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
 import { threadSidebarPluginUpdatesApi } from './plugin-updates-api.js'
 import { threadSidebarRestartApi } from './restart-api.js'
+import { useRestartMachine } from './use-restart-machine.js'
 import type { sidebarChildren } from './sidebar-contract.js'
 
 interface FooterRegistration {
@@ -240,7 +238,7 @@ const NavigationIconRow = (props: NavigationIconRowProps): JSX.Element => {
 
   const fitting =
     props.overflow === 'menu'
-      ? fitItems({
+      ? SidebarOrganization.fitItems({
           widths: props.items.map(() => ICON_BUTTON_SIZE),
           available: width,
           gap: ICON_GAP,
@@ -251,7 +249,7 @@ const NavigationIconRow = (props: NavigationIconRowProps): JSX.Element => {
   const rowItems =
     drag === null
       ? fittingItems
-      : reorderSidebarEntry(
+      : SidebarOrganization.reorderSidebarEntry(
           fittingItems.map(item => item.id),
           drag.from,
           drag.to,
@@ -339,14 +337,17 @@ const NavigationIconRow = (props: NavigationIconRowProps): JSX.Element => {
                       event.currentTarget.setPointerCapture(event.pointerId)
                     }
                     event.preventDefault()
-                    setDrag({ from: current.index, to: dropIndexAt({ centers: current.centers, fromIndex: current.index, position: event.clientX }) })
+                    setDrag({
+                      from: current.index,
+                      to: SidebarOrganization.dropIndexAt({ centers: current.centers, fromIndex: current.index, position: event.clientX }),
+                    })
                   }}
                   onPointerUp={event => {
                     const current = dragRef.current
                     if (current === null || current.pointerId !== event.pointerId) return
                     if (current.centers !== null) {
                       suppressClick.current = true
-                      const to = dropIndexAt({ centers: current.centers, fromIndex: current.index, position: event.clientX })
+                      const to = SidebarOrganization.dropIndexAt({ centers: current.centers, fromIndex: current.index, position: event.clientX })
                       if (to !== current.index) props.onReorder(current.index, to)
                     }
                     endDrag()
@@ -450,6 +451,7 @@ const expandedRowClass: Record<NavigationDensity, string> = {
 }
 
 const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
+  const { collapsed, renderSlot, selectPanel, startSession, toggleSidebar } = props
   const panels = props.usePanels(items => items)
   const activePanelId = props.usePanelInfo(info => info.activePanelId)
   const hostShortcuts = props.useShortcuts(entries => entries)
@@ -460,6 +462,10 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   const historyGroupRef = useRef<HTMLDivElement>(null)
   const historyHold = useRef<{ timer: number | undefined; opened: boolean }>({ timer: undefined, opened: false })
   const restartApi = useApi(threadSidebarRestartApi)
+  const [restartSnapshot, sendRestart] = useRestartMachine(restartApi)
+  const restartRequestPending = restartSnapshot.matches('requesting')
+  const restartRequestFailed = restartSnapshot.matches('failed')
+  const restartDialogOpen = !restartSnapshot.matches('closed')
   const restartAvailability = useApiQuery(threadSidebarRestartApi, 'availability')
   const restartAvailable = restartAvailability.data?.available === true
   const launchUrl = useApiQuery(threadSidebarRestartApi, 'launchUrl').data?.url ?? null
@@ -468,10 +474,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   const pluginUpdatesSupported = pluginUpdates.status !== 'error'
   const refetchPluginUpdates = pluginUpdates.refetch
   const [updatesPopoverOpen, setUpdatesPopoverOpen] = useState(false)
-  const [restartDialogOpen, setRestartDialogOpen] = useState(false)
   const [launchUrlCopied, setLaunchUrlCopied] = useState(false)
-  const [restartRequestPending, setRestartRequestPending] = useState(false)
-  const [restartRequestFailed, setRestartRequestFailed] = useState(false)
   const [previewHeaderHeight, setPreviewHeaderHeight] = useState<number | null>(null)
   const [splitBounds, setSplitBounds] = useState<SidebarSplitBounds>({
     value: SIDEBAR_HEADER_MIN_HEIGHT,
@@ -728,7 +731,10 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
     [panels, props.t],
   )
 
-  const orderedHeaderEntries = useMemo(() => orderSidebarEntries(headerEntries, preferences.headerOrder), [headerEntries, preferences.headerOrder])
+  const orderedHeaderEntries = useMemo(
+    () => SidebarOrganization.orderSidebarEntries(headerEntries, preferences.headerOrder),
+    [headerEntries, preferences.headerOrder],
+  )
   const visibleHeaderEntries = useMemo(
     () => orderedHeaderEntries.filter(entry => !preferences.hiddenHeaderIds.includes(entry.id)),
     [orderedHeaderEntries, preferences.hiddenHeaderIds],
@@ -760,7 +766,10 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
     [footerSnapshot, props.t],
   )
 
-  const orderedFooterEntries = useMemo(() => orderSidebarEntries(footerEntries, preferences.footerOrder), [footerEntries, preferences.footerOrder])
+  const orderedFooterEntries = useMemo(
+    () => SidebarOrganization.orderSidebarEntries(footerEntries, preferences.footerOrder),
+    [footerEntries, preferences.footerOrder],
+  )
   const visibleFooterEntries = orderedFooterEntries.filter(entry => !preferences.hiddenFooterIds.includes(entry.id))
   const hiddenFooterEntries = orderedFooterEntries.filter(entry => preferences.hiddenFooterIds.includes(entry.id))
   const footerEntryFits = (index: number): boolean => !wide || footerFit === null || footerFit[index] !== false
@@ -782,7 +791,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
       const available = footer.clientWidth - Number.parseFloat(style.paddingLeft) - Number.parseFloat(style.paddingRight)
       const moreAlwaysShown = hiddenFooterEntries.length > 0
       setFooterFit(
-        fitItems({
+        SidebarOrganization.fitItems({
           widths,
           available: moreAlwaysShown ? available - FOOTER_MORE_WIDTH - FOOTER_GAP : available,
           gap: FOOTER_GAP,
@@ -806,39 +815,45 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
     return props.renderSlot('sidebar.footer.action', { wide: renderWide }, { only: entry.registrationId })
   }
 
-  const activateHeaderEntry = (entry: HeaderEntry): void => {
-    if (entry.kind === 'new-thread') {
-      props.startSession()
-      return
-    }
-    if (entry.kind === 'search') {
-      openPalette('threads')
-      return
-    }
-    if (entry.panelId !== undefined) props.selectPanel(entry.panelId)
-  }
+  const activateHeaderEntry = useCallback(
+    (entry: HeaderEntry): void => {
+      if (entry.kind === 'new-thread') {
+        startSession()
+        return
+      }
+      if (entry.kind === 'search') {
+        openPalette('threads')
+        return
+      }
+      if (entry.panelId !== undefined) selectPanel(entry.panelId)
+    },
+    [openPalette, selectPanel, startSession],
+  )
 
-  const headerIconFor = (entry: HeaderEntry, size: number): ReactNode => {
-    if (entry.kind === 'new-thread')
-      return (
-        <span className="dshx:inline-flex" aria-hidden="true">
-          <IconNewChatOutlineRegular size={size} />
-        </span>
-      )
-    if (entry.kind === 'search')
-      return (
-        <span className="dshx:inline-flex" aria-hidden="true">
-          <IconSearchOutlineRegular size={size} />
-        </span>
-      )
-    if (entry.panelId === undefined) return null
-    return props.renderSlot('sidebar.panellist', { size, active: activePanelId === entry.panelId }, { only: entry.panelId })
-  }
+  const headerIconFor = useCallback(
+    (entry: HeaderEntry, size: number): ReactNode => {
+      if (entry.kind === 'new-thread')
+        return (
+          <span className="dshx:inline-flex" aria-hidden="true">
+            <IconNewChatOutlineRegular size={size} />
+          </span>
+        )
+      if (entry.kind === 'search')
+        return (
+          <span className="dshx:inline-flex" aria-hidden="true">
+            <IconSearchOutlineRegular size={size} />
+          </span>
+        )
+      if (entry.panelId === undefined) return null
+      return renderSlot('sidebar.panellist', { size, active: activePanelId === entry.panelId }, { only: entry.panelId })
+    },
+    [activePanelId, renderSlot],
+  )
 
-  const openCustomize = (): void => {
-    if (props.collapsed) props.toggleSidebar()
+  const openCustomize = useCallback(() => {
+    if (collapsed) toggleSidebar()
     setCustomizeOpen(true)
-  }
+  }, [collapsed, toggleSidebar])
 
   const navigationItems: NavigationItem[] = visibleHeaderEntries.map(entry => ({
     id: entry.id,
@@ -848,25 +863,11 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
     run: () => activateHeaderEntry(entry),
   }))
 
-  const requestDshRestart = (): void => {
-    if (restartRequestPending) return
-    setRestartRequestPending(true)
-    setRestartRequestFailed(false)
-    void restartApi
-      .requestRestart(undefined)
-      .then(
-        () => setRestartDialogOpen(false),
-        () => setRestartRequestFailed(true),
-      )
-      .finally(() => setRestartRequestPending(false))
-  }
-
-  const openRestartDialog = (): void => {
+  const openRestartDialog = useCallback((): void => {
     if (!restartAvailable) return
     setUpdatesPopoverOpen(false)
-    setRestartRequestFailed(false)
-    setRestartDialogOpen(true)
-  }
+    sendRestart({ type: 'open' })
+  }, [restartAvailable, sendRestart, setUpdatesPopoverOpen])
   const pendingUpdatesLabel =
     pendingPlugins.length === 0
       ? null
@@ -888,7 +889,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
         group: 'destination',
         label: text(props.t, 'threadSidebarToggleSidebar'),
         icon: <PanelLeftIcon className="dshx:size-4" />,
-        run: props.toggleSidebar,
+        run: toggleSidebar,
       },
       {
         id: '@dshfiles/thread-sidebar/action/focus-composer',
@@ -965,13 +966,14 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
     [
       orderedHeaderEntries,
       props.t,
-      props.toggleSidebar,
+      toggleSidebar,
       restartAvailable,
       launchUrl,
       pendingUpdatesLabel,
       hostShortcuts,
       runCommand,
       history,
+      headerIconFor,
       activateHeaderEntry,
       openCustomize,
       openRestartDialog,
@@ -1270,7 +1272,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
                 dragHint={text(props.t, 'threadSidebarDragToReorder')}
                 onReorder={(fromIndex, toIndex) =>
                   updatePreferences({
-                    headerOrder: reorderVisibleEntry({
+                    headerOrder: SidebarOrganization.reorderVisibleEntry({
                       orderedIds: orderedHeaderEntries.map(entry => entry.id),
                       visibleIds: visibleHeaderEntries.map(entry => entry.id),
                       fromVisible: fromIndex,
@@ -1396,7 +1398,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
                   control: 'checkbox',
                   onReorder: (from, to) =>
                     updatePreferences({
-                      headerOrder: reorderSidebarEntry(
+                      headerOrder: SidebarOrganization.reorderSidebarEntry(
                         orderedHeaderEntries.map(item => item.id),
                         from,
                         to,
@@ -1429,7 +1431,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
                     control: 'switch',
                     onReorder: (from, to) =>
                       updatePreferences({
-                        footerOrder: reorderSidebarEntry(
+                        footerOrder: SidebarOrganization.reorderSidebarEntry(
                           orderedFooterEntries.map(item => item.id),
                           from,
                           to,
@@ -1645,8 +1647,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
         open={restartDialogOpen}
         onOpenChange={open => {
           if (restartRequestPending && !open) return
-          setRestartDialogOpen(open)
-          if (!open) setRestartRequestFailed(false)
+          sendRestart({ type: open ? 'open' : 'cancel' })
         }}
       >
         <AlertDialogContent>
@@ -1670,10 +1671,10 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
             </p>
           ) : null}
           <AlertDialogFooter>
-            <Button type="button" variant="outline" disabled={restartRequestPending} onClick={() => setRestartDialogOpen(false)}>
+            <Button type="button" variant="outline" disabled={restartRequestPending} onClick={() => sendRestart({ type: 'cancel' })}>
               {text(props.t, 'threadSidebarRestartCancel')}
             </Button>
-            <Button type="button" variant="destructive" disabled={restartRequestPending} onClick={requestDshRestart}>
+            <Button type="button" variant="destructive" disabled={restartRequestPending} onClick={() => sendRestart({ type: 'confirm' })}>
               {text(props.t, restartRequestPending ? 'threadSidebarRestartPending' : 'threadSidebarRestartConfirm')}
             </Button>
           </AlertDialogFooter>

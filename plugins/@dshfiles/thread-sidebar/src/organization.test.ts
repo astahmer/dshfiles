@@ -2,29 +2,7 @@ import { SessionId } from '@deepseek-ai/dsh-session/types'
 import assert from 'node:assert/strict'
 import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
 import { test, vi } from 'vitest'
-import {
-  archiveWithoutStopping,
-  autoArchiveOverrideForSession,
-  dropIndexAt,
-  fitItems,
-  type AutoArchiveContext,
-  DEFAULT_PREFERENCES,
-  isAutoArchiveCandidate,
-  isAttentionSessionIncluded,
-  nextIdleTransitionAt,
-  moveSidebarEntry,
-  reorderSidebarEntry,
-  reorderVisibleEntry,
-  orderSidebarEntries,
-  parseSessionIds,
-  sessionLineage,
-  sectionForSession,
-  setAutoArchiveOverride,
-  shouldScanForAutoArchive,
-  type SidebarPreferences,
-  type SidebarSection,
-  workspaceForLineage,
-} from './organization.js'
+import { SidebarOrganization, type AutoArchiveContext, DEFAULT_PREFERENCES, type SidebarPreferences, type SidebarSection } from './organization.js'
 import { decodePreferences, PREFERENCES_STORAGE_KEY, storedPreferences } from './preferences.js'
 
 interface SessionFixture extends Partial<Omit<SessionSummary, 'id' | 'parentId'>> {
@@ -81,16 +59,16 @@ test('every default collapsed section is one the sidebar can actually render', (
 
 test('subagent attention is opt-in and recognizes durable child links or origin', () => {
   assert.equal(DEFAULT_PREFERENCES.includeSubagentAttention, false)
-  assert.equal(isAttentionSessionIncluded(sessionSummary({ id: 'parent' }), false), true)
-  assert.equal(isAttentionSessionIncluded(sessionSummary({ id: 'child', parentId: 'parent' }), false), false)
-  assert.equal(isAttentionSessionIncluded(sessionSummary({ id: 'origin-child', origin: 'subagent' }), false), false)
-  assert.equal(isAttentionSessionIncluded(sessionSummary({ id: 'child', parentId: 'parent' }), true), true)
+  assert.equal(SidebarOrganization.isAttentionSessionIncluded(sessionSummary({ id: 'parent' }), false), true)
+  assert.equal(SidebarOrganization.isAttentionSessionIncluded(sessionSummary({ id: 'child', parentId: 'parent' }), false), false)
+  assert.equal(SidebarOrganization.isAttentionSessionIncluded(sessionSummary({ id: 'origin-child', origin: 'subagent' }), false), false)
+  assert.equal(SidebarOrganization.isAttentionSessionIncluded(sessionSummary({ id: 'child', parentId: 'parent' }), true), true)
 })
 
 test('recent threads stay active until idle threshold; running and organization state keep priority', () => {
   const parkedIds = new Set(['parked'])
   const classify = (session: SessionSummary, overrides: { archived?: ReadonlySet<string>; pinned?: ReadonlySet<string>; parked?: ReadonlySet<string> } = {}) =>
-    sectionForSession({
+    SidebarOrganization.sectionForSession({
       session,
       archivedSessionIds: overrides.archived ?? idSets.archivedSessionIds,
       pinnedSessionIds: overrides.pinned ?? idSets.pinnedSessionIds,
@@ -109,7 +87,7 @@ test('recent threads stay active until idle threshold; running and organization 
 
 test('next idle transition ignores running sessions and returns earliest future boundary', () => {
   assert.equal(
-    nextIdleTransitionAt(
+    SidebarOrganization.nextIdleTransitionAt(
       [
         { running: false, updatedAt: now - 60 * 60_000 },
         { running: true, updatedAt: now + 60_000 },
@@ -120,7 +98,7 @@ test('next idle transition ignores running sessions and returns earliest future 
     ),
     now + 60 * 60_000,
   )
-  assert.equal(nextIdleTransitionAt([{ running: false, updatedAt: now - 120 * 60_000 }], now, 120), null)
+  assert.equal(SidebarOrganization.nextIdleTransitionAt([{ running: false, updatedAt: now - 120 * 60_000 }], now, 120), null)
 })
 
 test('auto archive requires an old, idle, nonblank, unpinned, unparked, included session', () => {
@@ -131,17 +109,17 @@ test('auto archive requires an old, idle, nonblank, unpinned, unparked, included
     preferences,
     ...idSets,
   }
-  assert.equal(isAutoArchiveCandidate(candidate), true)
-  assert.equal(isAutoArchiveCandidate({ ...candidate, session: { ...candidate.session, running: true } }), false)
-  assert.equal(isAutoArchiveCandidate({ ...candidate, session: { ...candidate.session, blank: true } }), false)
-  assert.equal(isAutoArchiveCandidate({ ...candidate, session: { ...candidate.session, updatedAt: now - 1 } }), false)
-  assert.equal(isAutoArchiveCandidate({ ...candidate, session: { ...candidate.session, updatedAt: now + 1 } }), false)
-  assert.equal(isAutoArchiveCandidate({ ...candidate, pinnedSessionIds: new Set(['idle']) }), false)
-  assert.equal(isAutoArchiveCandidate({ ...candidate, archivedSessionIds: new Set(['idle']) }), false)
-  assert.equal(isAutoArchiveCandidate({ ...candidate, preferences: { ...preferences, parkedSessionIds: ['idle'] } }), false)
-  assert.equal(isAutoArchiveCandidate({ ...candidate, preferences: { ...preferences, excludedSessionIds: ['idle'] } }), false)
-  assert.equal(isAutoArchiveCandidate({ ...candidate, preferences: { ...preferences, excludedWorkspaceIds: ['project-a'] } }), false)
-  assert.equal(isAutoArchiveCandidate({ ...candidate, preferences: { ...preferences, autoArchiveEnabled: false } }), false)
+  assert.equal(SidebarOrganization.isAutoArchiveCandidate(candidate), true)
+  assert.equal(SidebarOrganization.isAutoArchiveCandidate({ ...candidate, session: { ...candidate.session, running: true } }), false)
+  assert.equal(SidebarOrganization.isAutoArchiveCandidate({ ...candidate, session: { ...candidate.session, blank: true } }), false)
+  assert.equal(SidebarOrganization.isAutoArchiveCandidate({ ...candidate, session: { ...candidate.session, updatedAt: now - 1 } }), false)
+  assert.equal(SidebarOrganization.isAutoArchiveCandidate({ ...candidate, session: { ...candidate.session, updatedAt: now + 1 } }), false)
+  assert.equal(SidebarOrganization.isAutoArchiveCandidate({ ...candidate, pinnedSessionIds: new Set(['idle']) }), false)
+  assert.equal(SidebarOrganization.isAutoArchiveCandidate({ ...candidate, archivedSessionIds: new Set(['idle']) }), false)
+  assert.equal(SidebarOrganization.isAutoArchiveCandidate({ ...candidate, preferences: { ...preferences, parkedSessionIds: ['idle'] } }), false)
+  assert.equal(SidebarOrganization.isAutoArchiveCandidate({ ...candidate, preferences: { ...preferences, excludedSessionIds: ['idle'] } }), false)
+  assert.equal(SidebarOrganization.isAutoArchiveCandidate({ ...candidate, preferences: { ...preferences, excludedWorkspaceIds: ['project-a'] } }), false)
+  assert.equal(SidebarOrganization.isAutoArchiveCandidate({ ...candidate, preferences: { ...preferences, autoArchiveEnabled: false } }), false)
 })
 
 test('per-thread auto-archive override inherits, enables, disables, and resets without losing other overrides', () => {
@@ -152,25 +130,29 @@ test('per-thread auto-archive override inherits, enables, disables, and resets w
     preferences: DEFAULT_PREFERENCES,
     ...idSets,
   }
-  assert.equal(autoArchiveOverrideForSession(DEFAULT_PREFERENCES, 'thread'), 'inherit')
-  assert.equal(shouldScanForAutoArchive(DEFAULT_PREFERENCES), false)
+  assert.equal(SidebarOrganization.autoArchiveOverrideForSession(DEFAULT_PREFERENCES, 'thread'), 'inherit')
+  assert.equal(SidebarOrganization.shouldScanForAutoArchive(DEFAULT_PREFERENCES), false)
 
-  const enabled = setAutoArchiveOverride(DEFAULT_PREFERENCES, 'thread', 'enabled')
-  assert.equal(autoArchiveOverrideForSession(enabled, 'thread'), 'enabled')
-  assert.equal(shouldScanForAutoArchive(enabled), true)
-  assert.equal(isAutoArchiveCandidate({ ...idleCandidate, preferences: enabled }), true)
+  const enabled = SidebarOrganization.setAutoArchiveOverride(DEFAULT_PREFERENCES, 'thread', 'enabled')
+  assert.equal(SidebarOrganization.autoArchiveOverrideForSession(enabled, 'thread'), 'enabled')
+  assert.equal(SidebarOrganization.shouldScanForAutoArchive(enabled), true)
+  assert.equal(SidebarOrganization.isAutoArchiveCandidate({ ...idleCandidate, preferences: enabled }), true)
 
-  const disabled = setAutoArchiveOverride({ ...preferences, autoArchiveSessionIds: ['other'], excludedSessionIds: ['globally-excluded'] }, 'thread', 'disabled')
-  assert.equal(autoArchiveOverrideForSession(disabled, 'thread'), 'disabled')
-  assert.equal(isAutoArchiveCandidate({ ...idleCandidate, preferences: disabled }), false)
-  const inherited = setAutoArchiveOverride(disabled, 'thread', 'inherit')
-  assert.equal(autoArchiveOverrideForSession(inherited, 'thread'), 'inherit')
+  const disabled = SidebarOrganization.setAutoArchiveOverride(
+    { ...preferences, autoArchiveSessionIds: ['other'], excludedSessionIds: ['globally-excluded'] },
+    'thread',
+    'disabled',
+  )
+  assert.equal(SidebarOrganization.autoArchiveOverrideForSession(disabled, 'thread'), 'disabled')
+  assert.equal(SidebarOrganization.isAutoArchiveCandidate({ ...idleCandidate, preferences: disabled }), false)
+  const inherited = SidebarOrganization.setAutoArchiveOverride(disabled, 'thread', 'inherit')
+  assert.equal(SidebarOrganization.autoArchiveOverrideForSession(inherited, 'thread'), 'inherit')
   assert.deepEqual(inherited.autoArchiveSessionIds, ['other'])
   assert.deepEqual(inherited.autoArchiveDisabledSessionIds, [])
   assert.deepEqual(inherited.excludedSessionIds, ['globally-excluded'])
-  assert.equal(isAutoArchiveCandidate({ ...idleCandidate, preferences: { ...enabled, excludedSessionIds: ['thread'] } }), false)
+  assert.equal(SidebarOrganization.isAutoArchiveCandidate({ ...idleCandidate, preferences: { ...enabled, excludedSessionIds: ['thread'] } }), false)
   assert.equal(
-    isAutoArchiveCandidate({
+    SidebarOrganization.isAutoArchiveCandidate({
       ...idleCandidate,
       workspaceId: 'excluded-project',
       preferences: { ...enabled, excludedWorkspaceIds: ['excluded-project'] },
@@ -180,8 +162,8 @@ test('per-thread auto-archive override inherits, enables, disables, and resets w
 })
 
 test('session exclusion input trims, splits, and deduplicates ids without logging them', () => {
-  assert.deepEqual(parseSessionIds(' s1, s2\ns1;\t s3 '), ['s1', 's2', 's3'])
-  assert.deepEqual(parseSessionIds(' , ;\n '), [])
+  assert.deepEqual(SidebarOrganization.parseSessionIds(' s1, s2\ns1;\t s3 '), ['s1', 's2', 's3'])
+  assert.deepEqual(SidebarOrganization.parseSessionIds(' , ;\n '), [])
 })
 
 test('session lineage preserves direct parent identity and computes unbounded parent depth safely', () => {
@@ -190,18 +172,18 @@ test('session lineage preserves direct parent identity and computes unbounded pa
     child: sessionSummary({ id: 'child', displayTitle: 'Child', parentId: 'root' }),
     grandchild: sessionSummary({ id: 'grandchild', displayTitle: 'Grandchild', parentId: 'child' }),
   }
-  assert.deepEqual(sessionLineage(byId.grandchild, byId), {
+  assert.deepEqual(SidebarOrganization.sessionLineage(byId.grandchild, byId), {
     depth: 2,
     parentId: 'child',
     parentTitle: 'Child',
   })
-  assert.deepEqual(sessionLineage(sessionSummary({ id: 'orphan', parentId: 'missing' }), {}), {
+  assert.deepEqual(SidebarOrganization.sessionLineage(sessionSummary({ id: 'orphan', parentId: 'missing' }), {}), {
     depth: 1,
     parentId: 'missing',
     parentTitle: 'missing',
   })
   assert.equal(
-    sessionLineage(byId.child, {
+    SidebarOrganization.sessionLineage(byId.child, {
       ...byId,
       root: { ...byId.root, parentId: SessionId('child') },
     }).depth,
@@ -215,8 +197,8 @@ test('child threads inherit the nearest known workspace through the parent chain
     child: sessionSummary({ id: 'child', parentId: 'root' }),
     grandchild: sessionSummary({ id: 'grandchild', parentId: 'child' }),
   }
-  assert.equal(workspaceForLineage(byId.grandchild, byId, new Map([['root', 'workspace-a']])), 'workspace-a')
-  assert.equal(workspaceForLineage(byId.grandchild, byId, new Map()), undefined)
+  assert.equal(SidebarOrganization.workspaceForLineage(byId.grandchild, byId, new Map([['root', 'workspace-a']])), 'workspace-a')
+  assert.equal(SidebarOrganization.workspaceForLineage(byId.grandchild, byId, new Map()), undefined)
 })
 
 test('invalid stored preference data is rejected without exposing the raw value', () => {
@@ -271,60 +253,72 @@ test('header and footer entries use saved ordering and boundary-safe movement', 
     { id: 'search', order: -1 },
     { id: 'panel:files', order: 0 },
   ]
-  const ordered = orderSidebarEntries(entries, ['panel:files', 'new-thread'])
+  const ordered = SidebarOrganization.orderSidebarEntries(entries, ['panel:files', 'new-thread'])
   assert.deepEqual(
     ordered.map(entry => entry.id),
     ['panel:files', 'new-thread', 'search'],
   )
-  assert.deepEqual(moveSidebarEntry(['a', 'b', 'c'], 'b', -1), ['b', 'a', 'c'])
-  assert.deepEqual(moveSidebarEntry(['a', 'b', 'c'], 'a', -1), ['a', 'b', 'c'])
-  assert.deepEqual(moveSidebarEntry(['a', 'b', 'c'], 'c', 1), ['a', 'b', 'c'])
+  assert.deepEqual(SidebarOrganization.moveSidebarEntry(['a', 'b', 'c'], 'b', -1), ['b', 'a', 'c'])
+  assert.deepEqual(SidebarOrganization.moveSidebarEntry(['a', 'b', 'c'], 'a', -1), ['a', 'b', 'c'])
+  assert.deepEqual(SidebarOrganization.moveSidebarEntry(['a', 'b', 'c'], 'c', 1), ['a', 'b', 'c'])
 })
 
 test('drag reordering moves to the dropped index in both directions', () => {
   // Forward past the source must not skip a slot: removing index 0 then
   // inserting at the pre-move index 2 would land the entry back at 1.
-  assert.deepEqual(reorderSidebarEntry(['a', 'b', 'c', 'd'], 0, 2), ['b', 'c', 'a', 'd'])
-  assert.deepEqual(reorderSidebarEntry(['a', 'b', 'c', 'd'], 3, 1), ['a', 'd', 'b', 'c'])
-  assert.deepEqual(reorderSidebarEntry(['a', 'b', 'c'], 1, 1), ['a', 'b', 'c'])
+  assert.deepEqual(SidebarOrganization.reorderSidebarEntry(['a', 'b', 'c', 'd'], 0, 2), ['b', 'c', 'a', 'd'])
+  assert.deepEqual(SidebarOrganization.reorderSidebarEntry(['a', 'b', 'c', 'd'], 3, 1), ['a', 'd', 'b', 'c'])
+  assert.deepEqual(SidebarOrganization.reorderSidebarEntry(['a', 'b', 'c'], 1, 1), ['a', 'b', 'c'])
 })
 
 test('a pointer drag drops past every other icon centre it crosses', () => {
   const centers = [16, 50, 84, 118]
-  assert.equal(dropIndexAt({ centers, fromIndex: 0, position: 90 }), 2)
-  assert.equal(dropIndexAt({ centers, fromIndex: 3, position: 10 }), 0)
-  assert.equal(dropIndexAt({ centers, fromIndex: 1, position: 52 }), 1)
-  assert.equal(dropIndexAt({ centers, fromIndex: 0, position: 500 }), 3)
+  assert.equal(SidebarOrganization.dropIndexAt({ centers, fromIndex: 0, position: 90 }), 2)
+  assert.equal(SidebarOrganization.dropIndexAt({ centers, fromIndex: 3, position: 10 }), 0)
+  assert.equal(SidebarOrganization.dropIndexAt({ centers, fromIndex: 1, position: 52 }), 1)
+  assert.equal(SidebarOrganization.dropIndexAt({ centers, fromIndex: 0, position: 500 }), 3)
 })
 
 test('reordering the icon row keeps hidden entries in their saved slots', () => {
   const orderedIds = ['new', 'hidden', 'search', 'panel:a', 'panel:b']
   const visibleIds = ['new', 'search', 'panel:a', 'panel:b']
-  assert.deepEqual(reorderVisibleEntry({ orderedIds, visibleIds, fromVisible: 3, toVisible: 0 }), ['panel:b', 'new', 'hidden', 'search', 'panel:a'])
-  assert.deepEqual(reorderVisibleEntry({ orderedIds, visibleIds, fromVisible: 0, toVisible: 2 }), ['hidden', 'search', 'panel:a', 'new', 'panel:b'])
-  assert.deepEqual(reorderVisibleEntry({ orderedIds, visibleIds, fromVisible: 9, toVisible: 0 }), orderedIds)
+  assert.deepEqual(SidebarOrganization.reorderVisibleEntry({ orderedIds, visibleIds, fromVisible: 3, toVisible: 0 }), [
+    'panel:b',
+    'new',
+    'hidden',
+    'search',
+    'panel:a',
+  ])
+  assert.deepEqual(SidebarOrganization.reorderVisibleEntry({ orderedIds, visibleIds, fromVisible: 0, toVisible: 2 }), [
+    'hidden',
+    'search',
+    'panel:a',
+    'new',
+    'panel:b',
+  ])
+  assert.deepEqual(SidebarOrganization.reorderVisibleEntry({ orderedIds, visibleIds, fromVisible: 9, toVisible: 0 }), orderedIds)
 })
 
 test('drag reordering ignores an out-of-range or non-integer index', () => {
-  assert.deepEqual(reorderSidebarEntry(['a', 'b', 'c'], -1, 1), ['a', 'b', 'c'])
-  assert.deepEqual(reorderSidebarEntry(['a', 'b', 'c'], 0, 9), ['a', 'b', 'c'])
-  assert.deepEqual(reorderSidebarEntry(['a', 'b', 'c'], 5, 0), ['a', 'b', 'c'])
-  assert.deepEqual(reorderSidebarEntry(['a', 'b', 'c'], 0.5, 1), ['a', 'b', 'c'])
-  assert.deepEqual(reorderSidebarEntry(['a', 'b', 'c'], Number.NaN, 1), ['a', 'b', 'c'])
+  assert.deepEqual(SidebarOrganization.reorderSidebarEntry(['a', 'b', 'c'], -1, 1), ['a', 'b', 'c'])
+  assert.deepEqual(SidebarOrganization.reorderSidebarEntry(['a', 'b', 'c'], 0, 9), ['a', 'b', 'c'])
+  assert.deepEqual(SidebarOrganization.reorderSidebarEntry(['a', 'b', 'c'], 5, 0), ['a', 'b', 'c'])
+  assert.deepEqual(SidebarOrganization.reorderSidebarEntry(['a', 'b', 'c'], 0.5, 1), ['a', 'b', 'c'])
+  assert.deepEqual(SidebarOrganization.reorderSidebarEntry(['a', 'b', 'c'], Number.NaN, 1), ['a', 'b', 'c'])
 })
 
 test('archive adapter explicitly refuses to stop Host activity', async () => {
   let request
-  await archiveWithoutStopping(async (sessionId, options) => {
+  await SidebarOrganization.archiveWithoutStopping(async (sessionId, options) => {
     request = { sessionId, options }
   }, 'session-1')
   assert.deepEqual(request, { sessionId: 'session-1', options: { stopActivity: false } })
 })
 
 test('footer and icon-row overflow keep whole items and reserve the More control only when something overflows', () => {
-  assert.deepEqual(fitItems({ widths: [80, 120], available: 208, gap: 8, reserve: 36 }), [true, true])
-  assert.deepEqual(fitItems({ widths: [80, 120], available: 200, gap: 8, reserve: 36 }), [true, false])
-  assert.deepEqual(fitItems({ widths: [80, 120, 40], available: 100, gap: 8, reserve: 36 }), [false, false, true])
-  assert.deepEqual(fitItems({ widths: [90, 250, 70], available: 260, gap: 8, reserve: 36 }), [true, false, true])
-  assert.deepEqual(fitItems({ widths: [], available: 0, gap: 8, reserve: 36 }), [])
+  assert.deepEqual(SidebarOrganization.fitItems({ widths: [80, 120], available: 208, gap: 8, reserve: 36 }), [true, true])
+  assert.deepEqual(SidebarOrganization.fitItems({ widths: [80, 120], available: 200, gap: 8, reserve: 36 }), [true, false])
+  assert.deepEqual(SidebarOrganization.fitItems({ widths: [80, 120, 40], available: 100, gap: 8, reserve: 36 }), [false, false, true])
+  assert.deepEqual(SidebarOrganization.fitItems({ widths: [90, 250, 70], available: 260, gap: 8, reserve: 36 }), [true, false, true])
+  assert.deepEqual(SidebarOrganization.fitItems({ widths: [], available: 0, gap: 8, reserve: 36 }), [])
 })
