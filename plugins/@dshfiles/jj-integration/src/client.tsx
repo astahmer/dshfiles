@@ -353,7 +353,13 @@ export default defineClient({
         { name: 'conversation.session.header.utilities', id: 'dshfiles-jj-integration-land', order: 39, inject: sessionId => ({ sessionId }) },
         decorate((props: { readonly sessionId: Parameters<typeof LandButton>[0]['sessionId'] }) => (
           <PluginQueryProvider>
-            <LandButton sessionId={props.sessionId} sessions={ctx.sessions} t={translate} bookmark={useBookmark()} />
+            <LandButton
+              sessionId={props.sessionId}
+              sessions={ctx.sessions}
+              t={translate}
+              bookmark={useBookmark()}
+              openThreadWorkspaces={() => ctx.sidebarRight.openTab(RIGHT_PANE_KIND, { revealIfOpened: true })}
+            />
           </PluginQueryProvider>
         )),
       ),

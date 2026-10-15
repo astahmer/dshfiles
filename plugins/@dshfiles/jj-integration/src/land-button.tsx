@@ -1,6 +1,7 @@
 import type { ISessions, SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { FolderGit2Icon } from '@dshfiles/plugin-ui/icons'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { errorMessage, useIsMutating, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
@@ -17,6 +18,7 @@ export interface LandButtonProps {
   readonly sessions: ISessions
   readonly t: JjIntegrationTranslate
   readonly bookmark: string
+  readonly openThreadWorkspaces: () => void
 }
 
 const noCwd = (): null => null
@@ -79,6 +81,18 @@ export const LandButton = (props: LandButtonProps): JSX.Element | null => {
   const label = props.t('rebaseThread', { bookmark: props.bookmark })
   return (
     <>
+      <Button
+        aria-label={props.t('currentThreadWorkspace', { name: current.name })}
+        className="dshx-root dshx:min-w-0 dshx:shrink dshx:max-w-32 dshx:gap-1 dshx:px-2"
+        onClick={props.openThreadWorkspaces}
+        size="sm"
+        title={current.path}
+        type="button"
+        variant="outline"
+      >
+        <FolderGit2Icon aria-hidden="true" className="dshx:size-3.5 dshx:shrink-0" />
+        <span className="dshx:min-w-0 dshx:truncate dshx:font-mono dshx:text-xs">{current.name}</span>
+      </Button>
       <Button
         className="dshx-root"
         disabled={rebasesPending || thread.isFetching || current.unlanded.length === 0 || !canRebase}

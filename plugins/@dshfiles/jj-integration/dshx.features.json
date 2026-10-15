@@ -167,7 +167,7 @@
     {
       "id": "rebase",
       "title": "Rebase a thread onto the bookmark",
-      "summary": "Rebase a thread's described work onto the target bookmark and advance it; conflicts and undescribed revisions are handed back to the thread's agent. Rebase is disabled while any thread session is working or waiting for input. Afterwards the checkout running DSH follows the bookmark in the background through `dshx checkout sync`, with a panel line saying what was rebuilt and whether to restart.",
+      "summary": "The conversation header identifies the current thread's jj workspace and opens its workspace panel. Rebase a thread's described work onto the target bookmark and advance it; conflicts and undescribed revisions are handed back to the thread's agent. Rebase is disabled while any thread session is working or waiting for input. Afterwards the checkout running DSH follows the bookmark in the background through `dshx checkout sync`, with a panel line saying what was rebuilt and whether to restart.",
       "reach": ["seed rebase-ready-thread", "expect button \"Rebase this thread onto main\"", "expect text \"Rebase · 1\""],
       "surfaces": ["host", "tool", "client", "integration"],
       "configuration": [

@@ -200,6 +200,17 @@ When('a message is sent in the thread workspace', async ({ page }: { page: Page 
   await expect(page.getByRole('navigation', { name: 'Session hierarchy', exact: true })).toContainText('jj integration rebase e2e thread')
 })
 
+Then('the current thread header identifies its jj workspace', async ({ page }: { page: Page }) => {
+  const threadName = provisionedThreadName(page)
+  const repository = repositoryFor(page)
+  const indicator = page.getByRole('button', { name: `Current thread workspace: ${threadName}`, exact: true })
+  await expect(indicator).toBeVisible()
+  await expect(indicator).toHaveAttribute('title', join(repository.threadsPath, threadName))
+  await indicator.click()
+  await expect(page.getByRole('heading', { name: 'Thread workspaces', exact: true }).last()).toBeVisible()
+  await expect(indicator).toBeVisible()
+})
+
 When('{string} is typed in the New thread composer', async ({ page }: { page: Page }, text: string) => {
   await page.getByRole('textbox', { name: newThreadComposerName, exact: true }).fill(text)
 })

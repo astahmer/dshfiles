@@ -64,7 +64,8 @@ Feature: jj thread workspaces
     When a disposable jj repository is chosen as the New thread project
     And the New thread workspace toggle is turned on
     And a message is sent in the thread workspace
-    Then Rebase is disabled before there are revisions to rebase
+    Then the current thread header identifies its jj workspace
+    And Rebase is disabled before there are revisions to rebase
     When the thread workspace gains a revision described "wip"
     Then Rebase refuses the placeholder description and leaves main in place
     When the thread workspace gains a revision described "Add the feature"
