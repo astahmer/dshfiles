@@ -342,7 +342,7 @@ When('a first message is sent from the shared checkout', async ({ page }: { page
   await composer.fill('background new thread e2e')
   await composer.press('Enter')
   // The first send also creates the session and its workspace; on a loaded machine that outlasts the 15s default.
-  await expect(page.getByRole('navigation', { name: 'Session hierarchy', exact: true })).toContainText('background new thread e2e', { timeout: 45_000 })
+  await expect(page.getByRole('region', { name: 'Threads' }).getByRole('button', { name: /background new thread e2e/u })).toBeVisible({ timeout: 45_000 })
 })
 
 When('New thread is clicked in the sidebar', async ({ page }: { page: Page }) => {
@@ -361,7 +361,9 @@ Then('the New thread composer remains editable while its workspace is prepared',
   await recordAssertion(page, 'jj-composer-editable-while-preparing', async () => {
     await expect(page.getByRole('status', { name: /^thread-/ })).toBeVisible({ timeout: 5_000 })
     await expect(composer).toBeEditable()
-    await composer.fill('typed during workspace preparation')
+    await composer.click()
+    await expect(composer).toBeFocused()
+    await page.keyboard.type('typed during workspace preparation')
     await expect(composer).toHaveText('typed during workspace preparation')
   })
 })
