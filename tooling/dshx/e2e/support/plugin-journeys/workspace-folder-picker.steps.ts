@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { expect, type Page } from '@playwright/test'
@@ -48,6 +48,34 @@ Then('a new folder can be created and registered as a workspace', async ({ page 
     await recordAssertion(page, 'created-folder-is-registered-as-workspace', () =>
       expect(page.getByRole('treeitem').filter({ hasText: workspaceName })).toBeVisible(),
     )
+    await finishJourneyAssertions(page)
+  } finally {
+    await rm(scratchRoot, { recursive: true, force: true })
+  }
+})
+
+Then('a typed absolute folder path can be registered without browsing', async ({ page }: { page: Page }) => {
+  const scratchRoot = await mkdtemp(join(tmpdir(), 'dsh-folder-picker-e2e-'))
+  const workspaceName = 'typed-path-workspace'
+  const workspacePath = join(scratchRoot, workspaceName)
+  const dialog = folderPickerDialog(page)
+  try {
+    await mkdir(workspacePath)
+    const pathInput = dialog.getByRole('textbox', { name: 'Enter a folder path' })
+    await pathInput.fill(workspacePath)
+    await recordAssertion(page, 'typed-absolute-path-has-direct-action', () =>
+      expect(dialog.getByRole('button', { name: 'Use this folder', exact: true })).toBeVisible(),
+    )
+    await recordAssertion(page, 'stale-folder-actions-are-hidden', () =>
+      expect(dialog.getByRole('button', { name: 'Select this folder', exact: true })).toHaveCount(0),
+    )
+    await dialog.getByRole('button', { name: 'Use this folder', exact: true }).click()
+    await recordAssertion(page, 'direct-path-is-registered-as-workspace', () =>
+      expect(page.getByRole('treeitem').filter({ hasText: workspaceName })).toBeVisible(),
+    )
+    await page.getByRole('button', { name: 'Choose workspace', exact: true }).click()
+    await page.getByRole('menuitem', { name: /Add workspace/ }).click()
+    await recordAssertion(page, 'add-workspace-flow-can-reopen', () => expect(dialog).toBeVisible())
     await finishJourneyAssertions(page)
   } finally {
     await rm(scratchRoot, { recursive: true, force: true })

@@ -7,6 +7,7 @@ Feature: Workspace folder picker
     Given the isolated plugin profile "@dshfiles/workspace-folder-picker" is booted
     When the header workspace Add workspace action is opened
     Then the picker starts in folder browsing mode without project actions
+    And a typed absolute folder path can be registered without browsing
     And a new folder can be created and registered as a workspace
 
   @scenario:workspace-folder-picker.sidebar-folder-mode

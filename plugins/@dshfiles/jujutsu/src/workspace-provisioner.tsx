@@ -78,6 +78,10 @@ export const WorkspaceProvisionerDialog = (props: WorkspaceProvisionerDialogProp
             mode="directories"
             onClose={() => setPickerOpen(false)}
             onRegisterWorkspace={props.registerWorkspace}
+            onUseAbsolutePath={path => {
+              setPickerOpen(false)
+              setParentPath(path)
+            }}
             onSelect={selected => {
               setPickerOpen(false)
               setParentPath(selected.canonicalPath)

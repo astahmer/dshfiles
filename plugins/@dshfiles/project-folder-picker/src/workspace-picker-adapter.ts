@@ -20,7 +20,7 @@ export interface WorkspacePickerRemote {
 
 export interface WorkspacePickerPorts {
   readonly directoryPicker: DirectoryPickerPort
-  readonly registerWorkspace: (canonicalPath: string) => Promise<RegisteredProject>
+  readonly registerWorkspace: (absolutePath: string) => Promise<RegisteredProject>
 }
 
 export const createWorkspacePickerPorts = (remote: WorkspacePickerRemote): WorkspacePickerPorts => ({
@@ -41,8 +41,8 @@ export const createWorkspacePickerPorts = (remote: WorkspacePickerRemote): Works
       return result.value
     },
   },
-  registerWorkspace: async canonicalPath => {
-    const result = await remote.workspace.create({ path: canonicalPath })
+  registerWorkspace: async absolutePath => {
+    const result = await remote.workspace.create({ path: absolutePath })
     if (!result.ok) throw new Error('Workspace registration was refused.')
     return {
       workspaceId: result.value.workspace.workspaceId,

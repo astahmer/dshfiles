@@ -22,6 +22,7 @@ const DirectoryFlow = (props: DirectoryFlowOwnerProps & WorkspacePickerPorts): J
         showNativePicker={false}
         onClose={props.onCancel}
         onRegisterWorkspace={props.registerWorkspace}
+        onUseAbsolutePath={props.onPicked}
         onSelect={selection => props.onPicked(selection.canonicalPath)}
         placeholder="Browse for a workspace folder…"
         projects={[]}

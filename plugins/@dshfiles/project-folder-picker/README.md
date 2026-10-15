@@ -17,12 +17,17 @@ port, and a workspace registration callback.
 ```
 
 Optional props: `title`, `machineName`, `placeholder`, `recentFolders`,
-`disabled`, `mode`, and `showNativePicker`. The default `projects` mode shows
-registered projects and switches to browsing when the query starts with `/`.
+`disabled`, `mode`, `showNativePicker`, and `onUseAbsolutePath`. The default
+`projects` mode shows registered projects and switches to browsing when the
+query starts with `/`; while an absolute query is not the current listing, its
+direct-path action uses the workspace-registration callback, which returns the
+Host-canonical path.
 `directories` starts in folder browsing and hides project choices and project
-registration. Set `showNativePicker` to `false` when the injected Host backend
-has no native chooser. Recent folders (previously chosen paths listed after the
-projects) yield a `directory` selection.
+registration. It offers direct path submission only when `onUseAbsolutePath` is
+provided, so the caller can validate the uncanonicalized path. Set
+`showNativePicker` to `false` when the injected Host backend has no native
+chooser. Recent folders (previously chosen paths listed after the projects)
+yield a `directory` selection.
 
 `RegisteredProject` requires `workspaceId`, `title`, and the Host-canonical
 `canonicalPath`. Selection is a discriminated union:
@@ -32,10 +37,14 @@ projects) yield a `directory` selection.
 
 The component filters registered projects by title/path, enters path browsing
 when the query starts with `/`, and supports arrows, Enter, and
-Command/Ctrl+1–9. Escape, mask click, focus trapping, and return focus come
-from the Host `Modal` it renders in headless mode. Folder browsing, OS picking, folder creation, and project
-registration are injected ports, so a consumer can replace them in tests or
-reuse this UI from another DSH plugin without importing Secret Catalog code.
+Command/Ctrl+1–9. An absolute path can also be submitted without browsing:
+project mode uses the workspace-registration callback, and directory mode calls
+the opt-in `onUseAbsolutePath` callback. The callback owner must validate and
+canonicalize that raw path. Escape, mask click, focus trapping, and return focus
+come from the Host `Modal` it renders in headless mode. Folder browsing, OS
+picking, folder creation, and project registration are injected ports, so a
+consumer can replace them in tests or reuse this UI from another DSH plugin
+without importing Secret Catalog code.
 
 ## Marketplace decision
 

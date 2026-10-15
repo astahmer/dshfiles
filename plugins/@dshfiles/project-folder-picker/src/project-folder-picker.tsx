@@ -14,6 +14,7 @@ import {
   movePickerSelection,
   pickerEntries,
   pickerEntrySelection,
+  workspaceSelection,
   type PickerEntry,
 } from './project-folder-picker-model.js'
 
@@ -45,7 +46,9 @@ export type ProjectFolderSelection =
 export interface ProjectFolderPickerProps {
   readonly projects: readonly RegisteredProject[]
   readonly directoryPicker: DirectoryPickerPort
-  readonly onRegisterWorkspace: (canonicalPath: string) => Promise<RegisteredProject>
+  readonly onRegisterWorkspace: (absolutePath: string) => Promise<RegisteredProject>
+  /** Receives an absolute path before Host canonicalization; the caller must validate it before use. */
+  readonly onUseAbsolutePath?: (absolutePath: string) => void
   readonly onSelect: (selection: ProjectFolderSelection) => void
   readonly onClose: () => void
   readonly mode?: 'projects' | 'directories'
@@ -107,6 +110,11 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
     retry: false,
   })
   const listing = browseTarget === null ? null : (listingQuery.data ?? null)
+  const absolutePath = query.trim()
+  const hasAbsolutePath = absolutePath.startsWith('/')
+  const canUseTypedPath =
+    pathMode && hasAbsolutePath && listing?.path !== absolutePath && (props.mode !== 'directories' || props.onUseAbsolutePath !== undefined)
+  const showListingActions = listing !== null && (!hasAbsolutePath || listing.path === absolutePath)
   const folderEntries = pathMode ? (listing?.entries ?? []) : []
   const itemCount = pathMode ? folderEntries.length : entries.length
   const pickMutation = useMutation({
@@ -125,7 +133,7 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
   if (pickMutation.isError) error = 'The folder picker is unavailable on this Host.'
   else if (registerMutation.isError) error = 'This folder could not be registered as a project.'
   else if (createMutation.isError) error = 'This folder could not be created.'
-  else if (listingQuery.isError) error = 'This folder could not be opened.'
+  else if (listingQuery.isError) error = canUseTypedPath ? 'Folder browsing failed. You can still use this absolute path.' : 'This folder could not be opened.'
 
   useEffect(() => () => pickRequest.current?.abort(), [])
 
@@ -152,11 +160,24 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
     })
   }
 
+  const registerWorkspacePath = (path: string): void => {
+    registerMutation.mutate(path, {
+      onSuccess: project => props.onSelect(workspaceSelection(project)),
+    })
+  }
+
   const registerCurrentFolder = (): void => {
     if (listing === null) return
-    registerMutation.mutate(listing.path, {
-      onSuccess: project => props.onSelect({ kind: 'workspace', workspaceId: project.workspaceId, canonicalPath: project.canonicalPath, title: project.title }),
-    })
+    registerWorkspacePath(listing.path)
+  }
+
+  const useTypedPath = (): void => {
+    if (!canUseTypedPath) return
+    if (props.mode === 'directories') {
+      props.onUseAbsolutePath?.(absolutePath)
+      return
+    }
+    registerWorkspacePath(absolutePath)
   }
 
   const createFolder = (): void => {
@@ -288,7 +309,20 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
               {listing === null && <p className={emptyClassName}>Enter an absolute folder path, then press Enter.</p>}
               {listing !== null && folderEntries.length === 0 && <p className={emptyClassName}>No folders here.</p>}
             </div>
-            {listing !== null && (
+            {canUseTypedPath && (
+              <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:border-t dshx:p-2">
+                <Button
+                  disabled={props.disabled === true || pickMutation.isPending || registerMutation.isPending || createMutation.isPending}
+                  onClick={() => useTypedPath()}
+                  size="sm"
+                  type="button"
+                  variant={props.mode === 'directories' ? 'default' : 'outline'}
+                >
+                  {props.mode === 'directories' ? 'Use this folder' : 'Register project'}
+                </Button>
+              </div>
+            )}
+            {showListingActions && (
               <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:border-t dshx:p-2">
                 <Button disabled={busy} onClick={() => props.onSelect(folderSelection(listing.path))} size="sm" type="button">
                   Select this folder
