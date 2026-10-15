@@ -1,12 +1,12 @@
 import Schema from '@deepseek-ai/schemastery'
 import { describe, expect, it } from 'vitest'
-import { localizedTextReader, pluginSettingsPages } from './plugin-settings.js'
+import { SettingsPluginPages } from './plugin-settings.js'
 import { jsonValueSchema } from './schema-form/schema-model.js'
 import { searchSettings } from './settings-search.js'
 
 const wire = (schema: Schema) => jsonValueSchema.parse(schema.toJSON())
 
-const pages = pluginSettingsPages({
+const pages = SettingsPluginPages.pluginSettingsPages({
   namespaces: [
     {
       ns: 'thread-sidebar',
@@ -23,7 +23,7 @@ const pages = pluginSettingsPages({
     { ns: 'dshfiles-main-tabs', autoGenerate: true, schema: wire(Schema.object({ maxTabs: Schema.natural().description('Préférences des onglets.') })) },
   ],
   labels: new Map([['thread-sidebar', { title: 'Thread Sidebar', description: '' }]]),
-  text: localizedTextReader('en'),
+  text: SettingsPluginPages.localizedTextReader('en'),
 })
 const sections = [
   { id: 'general', order: 0, label: 'General' },

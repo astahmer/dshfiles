@@ -1,11 +1,11 @@
 import Schema from '@deepseek-ai/schemastery'
 import { describe, expect, it } from 'vitest'
-import { localizedTextReader, pluginSettingsPages } from './plugin-settings.js'
+import { SettingsPluginPages } from './plugin-settings.js'
 import { jsonValueSchema } from './schema-form/schema-model.js'
 
 const wire = (schema: Schema) => jsonValueSchema.parse(schema.toJSON())
 
-const text = localizedTextReader('en')
+const text = SettingsPluginPages.localizedTextReader('en')
 
 describe('pluginSettingsPages', () => {
   const namespaces = [
@@ -16,7 +16,7 @@ describe('pluginSettingsPages', () => {
   ]
 
   it('titles pages by manifest label, then by id, and files native-owned namespaces under More settings', () => {
-    const pages = pluginSettingsPages({ namespaces, labels: new Map([['thread-sidebar', { title: 'Thread Sidebar', description: 'Group threads.' }]]), text })
+    const pages = SettingsPluginPages.pluginSettingsPages({ namespaces, labels: new Map([['thread-sidebar', { title: 'Thread Sidebar', description: 'Group threads.' }]]), text })
     expect(pages.map(page => [page.title, page.group, page.fields.length])).toEqual([
       ['Main tabs', 'plugins', 1],
       ['Thread Sidebar', 'plugins', 1],
@@ -28,8 +28,8 @@ describe('pluginSettingsPages', () => {
 
 describe('localizedTextReader', () => {
   it('picks the active language, then English', () => {
-    expect(localizedTextReader('zh')({ en: 'Tabs', zh: '标签页' })).toBe('标签页')
-    expect(localizedTextReader('fr')({ en: 'Tabs', zh: '标签页' })).toBe('Tabs')
+    expect(SettingsPluginPages.localizedTextReader('zh')({ en: 'Tabs', zh: '标签页' })).toBe('标签页')
+    expect(SettingsPluginPages.localizedTextReader('fr')({ en: 'Tabs', zh: '标签页' })).toBe('Tabs')
     expect(text(42)).toBe('')
   })
 })

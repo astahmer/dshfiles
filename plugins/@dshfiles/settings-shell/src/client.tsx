@@ -32,7 +32,7 @@ import { OPEN_SETTINGS_EVENT, openSettingsRequestSchema, type OpenSettingsReques
 import { PluginSettingsPageView } from './plugin-settings-page.js'
 import type { SettingField } from './schema-form/schema-model.js'
 import { SettingsForm } from './schema-form/settings-form.js'
-import { localizedTextReader, pluginPageId, pluginSettingsPages, type NamespaceLabel, type PluginSettingsPage } from './plugin-settings.js'
+import { SettingsPluginPages, type NamespaceLabel, type PluginSettingsPage } from './plugin-settings.js'
 import { preferredSurface } from './settings-preference.js'
 import { SettingsDialog, SettingsTab, type SectionRow } from './settings-view.js'
 import { shellMachine, type FieldTarget, type ShellSurface } from './shell-machine.js'
@@ -212,10 +212,10 @@ export default defineClient({
     const labelsVersion = identityVersion(() => labels.getSnapshot())
     const pluginPages = ledgerProjection<readonly PluginSettingsPage[]>(
       () =>
-        pluginSettingsPages({
+        SettingsPluginPages.pluginSettingsPages({
           namespaces: describe.getSnapshot().view?.namespaces ?? [],
           labels: labels.getSnapshot(),
-          text: localizedTextReader(ctx.locale.getSnapshot().active),
+          text: SettingsPluginPages.localizedTextReader(ctx.locale.getSnapshot().active),
         }),
       () => `${String(describe.getSnapshot().view?.namespaces.length)}:${ctx.locale.getSnapshot().revision}:${labelsVersion()}:${describeVersion()}`,
       listener => {
@@ -235,7 +235,7 @@ export default defineClient({
       void describe.ensure()
       const page = pluginPages.getSnapshot().find(candidate => candidate.ns === target.entryId)
       if (page === undefined) return false
-      const field: FieldTarget = { sectionId: pluginPageId(page.ns), fieldPath: target.fieldPath }
+      const field: FieldTarget = { sectionId: SettingsPluginPages.pluginPageId(page.ns), fieldPath: target.fieldPath }
       actor.send({ type: 'open', surface: requested ?? surface(), field })
       return true
     }

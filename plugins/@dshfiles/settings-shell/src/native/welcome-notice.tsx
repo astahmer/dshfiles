@@ -6,12 +6,14 @@
  */
 import type { ConfigForm } from '@deepseek-ai/dsh-client-ui-settings/client'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
+import { createActor, fromPromise, waitFor, type ActorRefFrom } from '@dshfiles/plugin-ui/machine'
 import { Button, Modal } from '@deepseek-ai/dsh-client-ui-primitives'
 import { defineLocale } from '@dshfiles/dshx/client'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import { useCallback, useEffect, useRef } from 'react'
 import { z } from 'zod'
 import { useObservable } from './use-observable.js'
+import { welcomeNoticeMachine, type WelcomeNoticeScopeState } from './welcome-notice-machine.js'
 
 export const WELCOME_STEP_ID = 'welcome-notice'
 /** Field storing the last welcome notice version the user acknowledged, in `dshfiles-settings-shell`. */
@@ -56,89 +58,86 @@ interface WelcomeState {
 
 const ackSchema = z.object({ [WELCOME_NOTICE_ACK_FIELD]: z.string() })
 
+type WelcomeNoticeActor = ActorRefFrom<typeof welcomeNoticeMachine>
+
+type PersistAcknowledgementInput = { readonly write: () => Promise<boolean> }
+
+const persistAcknowledgement = fromPromise<boolean, PersistAcknowledgementInput>(({ input }) => input.write())
+
+const providedWelcomeNoticeMachine = welcomeNoticeMachine.provide({ actors: { persistAcknowledgement } })
+
+const scopeState = (scope: ConfigForm<unknown>): WelcomeNoticeScopeState => {
+  const snapshot = scope.getSnapshot()
+  if (snapshot.mode === 'memory') return { mode: snapshot.mode, status: snapshot.status, acknowledged: false }
+  const parsed = ackSchema.safeParse(snapshot.value)
+  return {
+    mode: snapshot.mode,
+    status: snapshot.status,
+    acknowledged: snapshot.status === 'ready' && parsed.success && parsed.data[WELCOME_NOTICE_ACK_FIELD] === WELCOME_NOTICE_VERSION,
+  }
+}
+
+const welcomeStatus = (snapshot: ReturnType<WelcomeNoticeActor['getSnapshot']>): WelcomeState['status'] => {
+  if (snapshot.matches('loading')) return 'loading'
+  if (snapshot.matches('saving')) return 'saving'
+  if (snapshot.matches('error')) return 'error'
+  return 'ready'
+}
+
+const welcomeState = (snapshot: ReturnType<WelcomeNoticeActor['getSnapshot']>): WelcomeState => ({
+  status: welcomeStatus(snapshot),
+  acknowledged: snapshot.context.acknowledged,
+  error: snapshot.context.error,
+})
+
 /** Durable Host acknowledgement, or a process-local one for a remote browser whose settings stay in memory. */
 export class WelcomeNoticeStore {
   readonly store = createSnapshotStore<WelcomeState>({ status: 'idle', acknowledged: false, error: null })
-  private localAcknowledged = false
-  private saving = false
+  private actor: WelcomeNoticeActor | undefined
   private following: (() => void) | undefined
+  private stopObservingActor: (() => void) | undefined
 
   constructor(private readonly scope: ConfigForm<unknown>) {}
 
   /** Begin following the bound scope (idempotent) and publish its current answer. */
-  load(): Promise<void> {
-    this.following ??= this.scope.subscribe(() => this.derive())
-    this.derive()
-    return Promise.resolve()
+  load(): void {
+    if (this.actor !== undefined) return
+    const actor = createActor(providedWelcomeNoticeMachine, {
+      input: {
+        scope: scopeState(this.scope),
+        write: () => this.scope.set(WELCOME_NOTICE_ACK_FIELD, WELCOME_NOTICE_VERSION),
+      },
+    })
+    const subscription = actor.subscribe(snapshot => this.store.set(welcomeState(snapshot)))
+    this.actor = actor
+    this.stopObservingActor = () => subscription.unsubscribe()
+    this.following = this.scope.subscribe(() => actor.send({ type: 'scope.changed', scope: scopeState(this.scope) }))
+    actor.start()
   }
 
   /** Persist this copy version, or advance only this process for a remote browser. */
   async acknowledge(): Promise<boolean> {
-    if (this.scope.getSnapshot().mode === 'memory') {
-      this.localAcknowledged = true
-      this.derive()
-      return true
-    }
-    this.saving = true
-    this.store.update(state => {
-      state.status = 'saving'
-      state.error = null
-    })
+    const actor = this.actor
+    if (actor === undefined) return false
+    const current = actor.getSnapshot()
+    if (current.context.acknowledged) return true
+    if (current.matches('loading') || current.matches('sync')) return false
+    if (!current.matches('saving')) actor.send({ type: 'acknowledge' })
     try {
-      await this.scope.set(WELCOME_NOTICE_ACK_FIELD, WELCOME_NOTICE_VERSION)
-    } finally {
-      this.saving = false
+      const result = await waitFor(actor, snapshot => snapshot.context.acknowledged || snapshot.matches('error'))
+      return result.context.acknowledged
+    } catch {
+      return false
     }
-    this.derive()
-    const acknowledged = this.store.getSnapshot().acknowledged
-    if (!acknowledged) {
-      this.store.update(state => {
-        state.status = 'error'
-        state.error = 'the acknowledgement did not persist'
-      })
-    }
-    return acknowledged
   }
 
   dispose(): void {
     this.following?.()
     this.following = undefined
-  }
-
-  private derive(): void {
-    if (this.saving) return
-    const scope = this.scope.getSnapshot()
-    if (scope.mode === 'memory') {
-      const acknowledged = this.localAcknowledged
-      this.store.update(state => {
-        state.status = 'ready'
-        state.acknowledged = acknowledged
-        state.error = null
-      })
-      return
-    }
-    if (scope.status === 'loading') {
-      this.store.update(state => {
-        state.status = 'loading'
-        state.error = null
-      })
-      return
-    }
-    if (scope.status === 'unavailable') {
-      this.store.update(state => {
-        state.status = 'error'
-        state.acknowledged = false
-        state.error = 'welcome acknowledgement settings are unavailable'
-      })
-      return
-    }
-    const ack = ackSchema.safeParse(scope.value)
-    const acknowledged = ack.success && ack.data[WELCOME_NOTICE_ACK_FIELD] === WELCOME_NOTICE_VERSION
-    this.store.update(state => {
-      state.status = 'ready'
-      state.acknowledged = acknowledged
-      state.error = null
-    })
+    this.stopObservingActor?.()
+    this.stopObservingActor = undefined
+    this.actor?.stop()
+    this.actor = undefined
   }
 }
 
