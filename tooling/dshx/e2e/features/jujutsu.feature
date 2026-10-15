@@ -9,6 +9,12 @@ Feature: Jujutsu revision interactions
     When a disposable Jujutsu repository is selected
     Then revision and bookmark moves preview in the target context without changing history
 
+  @scenario:jujutsu.stale-repository-recovery
+  Scenario: a missing repository offers a direct recovery path
+    Given the isolated plugin profile "@dshfiles/jujutsu" is booted
+    When a disposable Jujutsu repository is selected
+    Then removing the selected repository offers a way to choose another
+
   @scenario:jujutsu.copy-ids
   Scenario: revision context menu copies full IDs
     Given the isolated plugin profile "@dshfiles/jujutsu" is booted

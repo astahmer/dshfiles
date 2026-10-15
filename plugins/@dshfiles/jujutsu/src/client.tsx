@@ -1239,11 +1239,21 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
 
           {(errorMessages.length > 0 || copyNotice !== null || provisionedPath !== null || (confirmResult !== null && confirmResult.output.length > 0)) && (
             <div className="dshx:flex dshx:max-h-48 dshx:flex-none dshx:flex-col dshx:gap-1.5 dshx:overflow-auto dshx:border-b dshx:px-3 dshx:py-2">
-              {errorMessages.map(message => (
-                <Alert className="dshx:px-3 dshx:py-2" key={message} variant="destructive">
-                  <AlertDescription className="dshx:text-xs">{message}</AlertDescription>
-                </Alert>
-              ))}
+              {errorMessages.map(message => {
+                const repositoryError = stateQuery.error !== null || registerMutation.error !== null
+                return (
+                  <Alert className="dshx:px-3 dshx:py-2" key={message} variant="destructive">
+                    <AlertDescription className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-xs">
+                      <span className="dshx:min-w-0 dshx:flex-1">{message}</span>
+                      {repositoryError && (
+                        <Button onClick={() => setPickerOpen(true)} size="xs" type="button" variant="outline">
+                          Choose another repository
+                        </Button>
+                      )}
+                    </AlertDescription>
+                  </Alert>
+                )
+              })}
               {provisionedPath !== null && (
                 <Alert className="dshx:px-3 dshx:py-2" variant="success">
                   <AlertDescription className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-xs">

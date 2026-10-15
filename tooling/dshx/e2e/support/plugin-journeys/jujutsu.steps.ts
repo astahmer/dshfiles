@@ -155,6 +155,15 @@ When('a disposable Jujutsu repository is selected', async ({ page }: { page: Pag
   await selectRepository(page, fixture)
 })
 
+Then('removing the selected repository offers a way to choose another', async ({ page }: { page: Page }) => {
+  const fixture = fixtureFor(page)
+  await rm(fixture.repositoryPath, { recursive: true, force: true })
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click()
+  await expect(page.getByText('Registered repository path is unavailable. Select it again.', { exact: true })).toBeVisible({ timeout: 10_000 })
+  await page.getByRole('button', { name: 'Choose another repository', exact: true }).click()
+  await expect(page.getByRole('dialog', { name: 'Choose a Jujutsu repository', exact: true })).toBeVisible()
+})
+
 Then('revision and bookmark moves preview in the target context without changing history', async ({ page }: { page: Page }) => {
   const fixture = fixtureFor(page)
   const before = snapshotRepository(fixture)

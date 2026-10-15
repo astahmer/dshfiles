@@ -80,6 +80,7 @@
       "states": ["current", "immutable", "empty", "conflicted", "divergent", "evolved", "filtered"],
       "failureModes": [
         "Invalid repositories and replaced filesystem identities are rejected.",
+        "A missing registered path offers direct repository selection from the error alert.",
         "A stale repository snapshot does not silently authorize a mutation."
       ],
       "externalDependencies": [
@@ -93,6 +94,11 @@
         {
           "kind": "gherkin",
           "id": "jujutsu.graph-filters",
+          "featureFile": "tooling/dshx/e2e/features/jujutsu.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "jujutsu.stale-repository-recovery",
           "featureFile": "tooling/dshx/e2e/features/jujutsu.feature"
         },
         {
