@@ -4,13 +4,14 @@
   "features": [
     {
       "id": "registered-project-search",
-      "title": "Search registered projects by name and path",
-      "summary": "Match registered project labels and canonical directories, mark confirmed secondary JJ workspaces when Host classification is available, and preserve project identity in returned choices.",
+      "title": "Search projects and browse folder paths",
+      "summary": "Match registered project labels and canonical directories, browse absolute or home-relative paths through the Host, mark confirmed secondary JJ workspaces when classification is available, and preserve project identity in returned choices.",
       "surfaces": ["client", "integration"],
       "configuration": [],
       "states": ["empty", "matched", "selected"],
       "failureModes": [
         "An empty result remains selectable-safe.",
+        "Home-relative paths resolve against the Host-reported home before listing.",
         "Canonical path is returned separately from display name.",
         "Unavailable JJ classification leaves rows unmarked."
       ],
@@ -27,6 +28,12 @@
           "id": "project-folder-picker.identity-path",
           "file": "plugins/@dshfiles/project-folder-picker/src/project-folder-picker-model.test.ts",
           "testName": "keeps project identity and canonical folder path explicit"
+        },
+        {
+          "kind": "unit-test",
+          "id": "project-folder-picker.home-relative-paths",
+          "file": "plugins/@dshfiles/project-folder-picker/src/project-folder-picker-model.test.ts",
+          "testName": "resolves home-relative queries using the Host-reported home path"
         }
       ]
     },

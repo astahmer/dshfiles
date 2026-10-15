@@ -2,7 +2,7 @@ import { expect, type Page } from '@playwright/test'
 import { spawnSync } from 'node:child_process'
 import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { After, Then, When } from '../bdd.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
@@ -82,8 +82,8 @@ const provisionedThreadName = (page: Page): string => {
 const threadRow = (page: Page) =>
   page.getByRole('listitem').filter({ has: page.getByRole('button', { name: `More actions for ${provisionedThreadName(page)}`, exact: true }) })
 
-const createRepository = async (page: Page): Promise<ThreadRepository> => {
-  const temporaryRoot = await realpath(await mkdtemp(join(tmpdir(), 'dshx-jj-integration-e2e-')))
+const createRepository = async (page: Page, temporaryParent = tmpdir()): Promise<ThreadRepository> => {
+  const temporaryRoot = await realpath(await mkdtemp(join(temporaryParent, 'dshx-jj-integration-e2e-')))
   const repositoryPath = join(temporaryRoot, 'repo')
   await mkdir(repositoryPath)
   try {
@@ -151,6 +151,25 @@ const chooseProjectPath = async (page: Page, path: string): Promise<void> => {
 When('a disposable jj repository is chosen as the New thread project', async ({ page }: { page: Page }) => {
   const repository = await createRepository(page)
   await chooseProjectPath(page, repository.repositoryPath)
+  await expect(projectButton(page)).toHaveText('repo')
+})
+
+When('a disposable jj repository is chosen by its home-relative path', async ({ page }: { page: Page }) => {
+  await projectButton(page).click()
+  const picker = page.getByRole('dialog', { name: 'Choose a project', exact: true })
+  const search = picker.getByRole('textbox', { name: 'Search projects or enter a folder path', exact: true })
+  await search.fill('~')
+  const homePathLabel = picker.locator('p').filter({ hasText: /^\// }).first()
+  await expect(homePathLabel).toBeVisible()
+  const homePath = (await homePathLabel.textContent())?.trim()
+  if (!homePath) throw new Error('The project picker did not expose its Host home path.')
+  const repository = await createRepository(page, homePath)
+  const homeRelativeRepositoryPath = join(homePath, basename(repository.temporaryRoot), 'repo')
+  await search.fill(`~/${basename(repository.temporaryRoot)}/repo`)
+  await search.press('Enter')
+  await expect(picker.locator('p').filter({ hasText: homeRelativeRepositoryPath }).first()).toBeVisible()
+  await picker.getByRole('button', { name: 'Select this folder', exact: true }).click()
+  await expect(picker).toBeHidden()
   await expect(projectButton(page)).toHaveText('repo')
 })
 

@@ -3,7 +3,10 @@ import {
   filterRegisteredProjects,
   initialBrowseTarget,
   folderSelection,
+  isHomeRelativePathQuery,
+  isPathQuery,
   movePickerSelection,
+  resolvePathQuery,
   pickerEntries,
   pickerEntrySelection,
   workspaceSelection,
@@ -20,9 +23,27 @@ describe('project and folder selection', () => {
     expect(initialBrowseTarget('directories')).toEqual({ path: undefined })
   })
 
+  it('recognizes absolute and home-relative folder queries', () => {
+    expect(isPathQuery('/Users/me/dev')).toBe(true)
+    expect(isPathQuery('~/dev/')).toBe(true)
+    expect(isHomeRelativePathQuery(' ~ ')).toBe(true)
+    expect(isPathQuery('dev')).toBe(false)
+    expect(isPathQuery('~other/dev')).toBe(false)
+  })
+
+  it('resolves home-relative queries using the Host-reported home path', () => {
+    expect(resolvePathQuery('~/dev/', '/Users/me')).toBe('/Users/me/dev')
+    expect(resolvePathQuery('~', '/Users/me')).toBe('/Users/me')
+    expect(resolvePathQuery('~/dev', '/')).toBe('/dev')
+    expect(resolvePathQuery('/Users/me/dev', '/Other/home')).toBe('/Users/me/dev')
+    expect(resolvePathQuery('~/dev', undefined)).toBeNull()
+    expect(resolvePathQuery('dev', '/Users/me')).toBeNull()
+  })
+
   it('searches registered project names and canonical paths', () => {
     expect(filterRegisteredProjects(projects, 'EMI')).toEqual([projects[1]])
     expect(filterRegisteredProjects(projects, '/Users/me/dev/dsh')).toEqual([])
+    expect(filterRegisteredProjects(projects, '~/dev/dsh')).toEqual([])
   })
 
   it('wraps keyboard selection and handles an empty list', () => {
@@ -50,6 +71,7 @@ describe('project and folder selection', () => {
     expect(entries.map(entry => (entry.kind === 'project' ? entry.project.title : entry.path))).toEqual(['dshfiles', 'emisoup', '/Users/me/dev/bb-plugins'])
     expect(pickerEntries(projects, ['/Users/me/dev/bb-plugins'], 'emi').map(entry => entry.kind)).toEqual(['project'])
     expect(pickerEntries(projects, ['/Users/me/dev/bb-plugins'], '/Users')).toEqual([])
+    expect(pickerEntries(projects, ['/Users/me/dev/bb-plugins'], '~/dev')).toEqual([])
     const recent = entries[2]
     expect(recent === undefined ? null : pickerEntrySelection(recent)).toEqual({
       kind: 'directory',

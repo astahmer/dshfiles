@@ -78,6 +78,11 @@
         },
         {
           "kind": "gherkin",
+          "id": "jj-integration.home-relative-project-path",
+          "featureFile": "tooling/dshx/e2e/features/jj-integration.feature"
+        },
+        {
+          "kind": "gherkin",
           "id": "jj-integration.draft-handoff-browser-journey",
           "featureFile": "tooling/dshx/e2e/features/jj-integration.feature"
         },

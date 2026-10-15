@@ -10,6 +10,12 @@ Feature: jj thread workspaces
     Given the isolated plugin composition of "@dshfiles/jj-integration, @dshfiles/workspace-folder-picker, @dshfiles/multi-host" is booted
     When a disposable jj repository is chosen as the New thread project
     Then the destination bar offers the main bookmark in the shared checkout
+
+  @scenario:jj-integration.home-relative-project-path
+  Scenario: Browse and select a New thread project by its home-relative path
+    Given the isolated plugin composition of "@dshfiles/jj-integration, @dshfiles/workspace-folder-picker, @dshfiles/multi-host" is booted
+    When a disposable jj repository is chosen by its home-relative path
+    Then the destination bar offers the main bookmark in the shared checkout
     When the New thread composer has a draft "Keep this draft" with an image and a file attached
     And the New thread workspace toggle is turned on
     Then the New thread runs in its own jj workspace on "main"

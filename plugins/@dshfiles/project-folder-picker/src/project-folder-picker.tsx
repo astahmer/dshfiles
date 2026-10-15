@@ -11,11 +11,14 @@ import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import {
   folderSelection,
   initialBrowseTarget,
+  isHomeRelativePathQuery,
+  isPathQuery,
   movePickerSelection,
   pickerEntries,
   pickerEntrySelection,
-  workspaceSelection,
+  resolvePathQuery,
   type PickerEntry,
+  workspaceSelection,
 } from './project-folder-picker-model.js'
 
 export interface RegisteredProject {
@@ -98,7 +101,7 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
   const [browseTarget, setBrowseTarget] = useState<{ readonly path: string | undefined } | null>(() => initialBrowseTarget(props.mode))
   const pickRequest = useRef<AbortController | null>(null)
   const searchInput = useRef<HTMLInputElement | null>(null)
-  const pathMode = props.mode === 'directories' || query.startsWith('/')
+  const pathMode = props.mode === 'directories' || isPathQuery(query)
   const recentFolders = props.recentFolders
   const entries = useMemo(() => pickerEntries(props.projects, recentFolders ?? [], query), [props.projects, recentFolders, query])
 
@@ -140,8 +143,10 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
   useEffect(() => setSelectedIndex(0), [query, listing?.path])
 
   useEffect(() => {
-    if (listingQuery.data !== undefined && !listingQuery.isPlaceholderData) setQuery(listingQuery.data.path)
-  }, [listingQuery.data, listingQuery.isPlaceholderData])
+    if (listingQuery.data === undefined || listingQuery.isPlaceholderData || browseTarget === null) return
+    const currentListing = listingQuery.data
+    setQuery(currentQuery => (browseTarget.path === undefined && isHomeRelativePathQuery(currentQuery) ? currentQuery : currentListing.path))
+  }, [listingQuery.data, listingQuery.isPlaceholderData, browseTarget])
 
   const browse = (path: string | undefined): void => {
     pickMutation.reset()
@@ -221,11 +226,17 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
     }
     if (event.key === 'Enter') {
       event.preventDefault()
-      if (pathMode && query.trim().length > 0 && listing?.path !== query.trim()) {
-        browse(query.trim())
-      } else {
-        selectVisibleItem()
+      const pathQuery = query.trim()
+      if (pathMode && pathQuery.length > 0) {
+        const requestedPath = resolvePathQuery(pathQuery, listing?.home)
+        if (isHomeRelativePathQuery(pathQuery) && requestedPath === null) return
+        const path = requestedPath ?? pathQuery
+        if (listing?.path !== path) {
+          browse(path)
+          return
+        }
       }
+      selectVisibleItem()
     }
   }
 
@@ -250,7 +261,7 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
         <DialogDescription className="dshx:sr-only">
           {props.mode === 'directories'
             ? 'Browse folders and choose one to add as a workspace.'
-            : 'Search registered projects, or type a path starting with / to browse folders.'}
+            : 'Search registered projects, or type an absolute or ~/ path to browse folders.'}
         </DialogDescription>
         <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:border-b dshx:p-2">
           <div className="dshx:relative dshx:flex-1">
@@ -263,14 +274,16 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
               autoComplete="off"
               className="dshx:h-9 dshx:pl-8"
               onChange={event => {
-                setQuery(event.currentTarget.value)
-                if (!event.currentTarget.value.startsWith('/')) setBrowseTarget(null)
+                const nextQuery = event.currentTarget.value
+                setQuery(nextQuery)
+                if (isHomeRelativePathQuery(nextQuery)) setBrowseTarget({ path: undefined })
+                if (!isPathQuery(nextQuery)) setBrowseTarget(null)
                 pickMutation.reset()
                 registerMutation.reset()
                 createMutation.reset()
               }}
               onKeyDown={onKeyDown}
-              placeholder={props.placeholder ?? (props.mode === 'directories' ? 'Enter a folder path…' : 'Search projects or type / for a folder…')}
+              placeholder={props.placeholder ?? (props.mode === 'directories' ? 'Enter a folder path…' : 'Search projects or type a path to browse folders…')}
               ref={searchInput}
               value={query}
             />
@@ -306,7 +319,7 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
                   {entry.hidden && <Badge variant="muted">Hidden</Badge>}
                 </button>
               ))}
-              {listing === null && <p className={emptyClassName}>Enter an absolute folder path, then press Enter.</p>}
+              {listing === null && <p className={emptyClassName}>Enter an absolute or ~/ folder path, then press Enter.</p>}
               {listing !== null && folderEntries.length === 0 && <p className={emptyClassName}>No folders here.</p>}
             </div>
             {canUseTypedPath && (
