@@ -151,7 +151,7 @@
     {
       "id": "modified-settings",
       "title": "Modified settings and reset to default",
-      "summary": "A setting the user layer overrides carries a bar on its left; hovering it offers Reset to default, which unsets the override.",
+      "summary": "A setting the user layer overrides carries a bar on its left; hovering it offers Reset to default, which unsets the override, also while the change that set it is still saving.",
       "reach": [
         "click button \"Settings\"",
         "click button \"Main tabs\"",
@@ -168,6 +168,11 @@
         {
           "kind": "gherkin",
           "id": "settings-shell.modified-reset",
+          "featureFile": "tooling/dshx/e2e/features/settings-shell.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "settings-shell.reset-while-saving",
           "featureFile": "tooling/dshx/e2e/features/settings-shell.feature"
         }
       ]

@@ -1,5 +1,6 @@
-import { expect, type Page } from '@playwright/test'
+import { expect, type Page, type Request, type Response, type Route } from '@playwright/test'
 import { Then, When } from '../bdd.js'
+import { z } from 'zod'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
 
 const settingsView = (page: Page) => page.locator('[data-settings-view]')
@@ -172,6 +173,52 @@ Then('Max tabs is back to {int} and no longer marked modified', async ({ page }:
     await expect(settingRow(page, 'maxTabs').getByRole('spinbutton', { name: 'Max tabs', exact: true })).toHaveValue(String(value))
     await expect(settingRow(page, 'maxTabs')).not.toHaveAttribute('data-modified')
     await expect(settingRow(page, 'maxTabs').getByRole('button', { name: 'Reset to default', exact: true })).toHaveCount(0)
+  })
+  await finishJourneyAssertions(page)
+})
+
+const SETTINGS_MUTATE = /settings[./]mutate/
+const isSettingsWrite = (request: Request): boolean => request.method() === 'POST' && SETTINGS_MUTATE.test(`${request.url()} ${request.postData() ?? ''}`)
+const heldSettingsWrites = new Map<Page, Route[]>()
+const settledSettingsWrites = new Map<Page, Response[]>()
+
+// A Host write persists the profile and reloads the entry, so a user can act while one is in flight; holding it makes
+// that window deterministic instead of depending on machine load.
+When('settings writes are held', async ({ page }: { page: Page }) => {
+  heldSettingsWrites.set(page, [])
+  await page.route('**/*', async route => {
+    const held = heldSettingsWrites.get(page)
+    if (held === undefined || !isSettingsWrite(route.request())) {
+      await route.fallback()
+      return
+    }
+    held.push(route)
+  })
+})
+
+When('the held settings writes finish', async ({ page }: { page: Page }) => {
+  await expect.poll(() => heldSettingsWrites.get(page)?.length).toBe(1)
+  const settled: Response[] = []
+  settledSettingsWrites.set(page, settled)
+  page.on('response', response => {
+    if (isSettingsWrite(response.request())) settled.push(response)
+  })
+  const held = heldSettingsWrites.get(page) ?? []
+  heldSettingsWrites.delete(page)
+  for (const route of held) await route.fallback()
+  // Set, then reset: the form queues the reset behind the held set, so both reach the Host one after the other.
+  await expect.poll(() => settled.length).toBe(2)
+})
+
+Then('the Host accepted both writes and Max tabs is back to {int}', async ({ page }: { page: Page }, value: number) => {
+  await recordAssertion(page, 'settings-shell-reset-while-saving', async () => {
+    const accepted = await Promise.all(
+      (settledSettingsWrites.get(page) ?? []).map(async response => z.object({ result: z.object({ ok: z.boolean() }) }).parse(await response.json()).result.ok),
+    )
+    expect(accepted).toEqual([true, true])
+    await expect(settingRow(page, 'maxTabs').getByRole('spinbutton', { name: 'Max tabs', exact: true })).toHaveValue(String(value))
+    await expect(settingRow(page, 'maxTabs')).not.toHaveAttribute('data-modified')
+    await expect(settingRow(page, 'maxTabs').getByRole('alert')).toHaveCount(0)
   })
   await finishJourneyAssertions(page)
 })

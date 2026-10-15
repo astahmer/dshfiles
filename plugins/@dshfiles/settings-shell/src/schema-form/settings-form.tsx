@@ -564,10 +564,12 @@ export const SettingsForm = (props: {
       }),
     )
   }
+  // No revision of our own: the form queues writes per namespace and fences each with the revision the previous one
+  // answered, so a reset clicked while a change is saving lands after it instead of carrying the pre-change revision.
   const write = (field: SettingField, value: JsonValue): Promise<boolean> =>
-    settle(field.path.join('.'), { kind: 'set', value }, props.form.mutate([{ op: 'set', path: [...field.path], value }], snapshot.revision))
+    settle(field.path.join('.'), { kind: 'set', value }, props.form.mutate([{ op: 'set', path: [...field.path], value }]))
   const reset = (field: SettingField): Promise<boolean> =>
-    settle(field.path.join('.'), { kind: 'reset' }, props.form.mutate([{ op: 'unset', path: [...field.path] }], snapshot.revision))
+    settle(field.path.join('.'), { kind: 'reset' }, props.form.mutate([{ op: 'unset', path: [...field.path] }]))
   const user = jsonValueSchema.safeParse(snapshot.user)
   const base = jsonValueSchema.safeParse(snapshot.base)
   const focusKey = props.focusPath?.join('.')

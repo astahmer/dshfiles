@@ -56,6 +56,16 @@ Feature: Settings shell
     When Max tabs is reset to its default
     Then Max tabs is back to 12 and no longer marked modified
 
+  @scenario:settings-shell.reset-while-saving
+  Scenario: Reset to default right after a change resets once the change is saved
+    Given the isolated plugin composition of "@dshfiles/settings-shell, @dshfiles/main-tabs" is booted
+    When the Main tabs page is opened in Settings
+    And settings writes are held
+    And Max tabs is set to 8
+    And Max tabs is reset to its default
+    And the held settings writes finish
+    Then the Host accepted both writes and Max tabs is back to 12
+
   @scenario:settings-shell.open-config-menu
   Scenario: The configuration file split button offers other ways to open it
     Given the isolated plugin profile "@dshfiles/settings-shell" is booted
