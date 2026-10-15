@@ -132,6 +132,44 @@ const detailsSchema = z.object({
 // dshx replaces any thrown handler error with a generic message, so reads report their real failure in the output.
 const readFailureSchema = z.object({ failure: z.object({ message: z.string().max(500) }) })
 
+const graphSliceSchema = z.object({
+  operationId: z.string().regex(/^[a-f0-9]{128}$/),
+  revisions: z.array(revisionSchema).max(500),
+  truncated: z.boolean(),
+})
+
+export const graphNavigationSchema = z.object({
+  operationId: z.string().regex(/^[a-f0-9]{128}$/),
+  landmarks: z
+    .array(
+      z.object({
+        kind: z.enum(['current', 'main-origin', 'main', 'default']),
+        label: z.string(),
+        status: z.enum(['resolved', 'missing', 'ambiguous']),
+        revisions: z.array(revisionSchema).max(500),
+      }),
+    )
+    .max(4),
+})
+
+export const revisionRelationshipSchema = graphSliceSchema.extend({
+  commitId: commitIdSchema,
+  targetCommitId: commitIdSchema,
+  relation: z.enum(['same', 'ancestor', 'descendant', 'diverged', 'no-common-ancestor']),
+  selectedOnlyCount: z.number().int().nonnegative(),
+  targetOnlyCount: z.number().int().nonnegative(),
+  commonAncestorIds: z.array(commitIdSchema).max(500),
+  commonAncestorsTruncated: z.boolean(),
+  connectionIds: z.array(commitIdSchema).max(500),
+  historyIds: z.array(commitIdSchema).max(500),
+  differenceIds: z.array(commitIdSchema).max(500),
+})
+
+export type GraphSlice = z.infer<typeof graphSliceSchema>
+export type GraphLandmark = z.infer<typeof graphNavigationSchema>['landmarks'][number]
+export type GraphNavigation = z.infer<typeof graphNavigationSchema>
+export type RevisionRelationship = z.infer<typeof revisionRelationshipSchema>
+
 export const jujutsuApi = defineApi({
   id: 'jujutsu',
   version: 1,
@@ -146,6 +184,21 @@ export const jujutsuApi = defineApi({
       input: z.object({ repoId: repoIdSchema, limit: z.number().int().min(20).max(500).default(300) }),
       output: z.union([stateSchema, readFailureSchema]),
       description: 'Repository status: the revision graph, working-copy revision, bookmarks and conflicts, or a read failure.',
+    }),
+    graphNavigation: method({
+      input: z.object({ repoId: repoIdSchema }),
+      output: z.union([graphNavigationSchema, readFailureSchema]),
+      description: 'Resolve current, main@origin, main and default workspace landmarks at one operation.',
+    }),
+    revisionRelationship: method({
+      input: z.object({ repoId: repoIdSchema, commitId: commitIdSchema, targetCommitId: commitIdSchema }),
+      output: z.union([revisionRelationshipSchema, readFailureSchema]),
+      description: 'Exact ancestry counts and bounded graph sets at one operation; relation is selected relative to target.',
+    }),
+    graphSlice: method({
+      input: z.object({ repoId: repoIdSchema, commitId: commitIdSchema, mode: z.enum(['history', 'exclusive']) }),
+      output: z.union([graphSliceSchema, readFailureSchema]),
+      description: 'Bounded selected history or history exclusive of other heads, bookmarks and workspaces.',
     }),
     details: method({
       input: z.object({ repoId: repoIdSchema, commitId: commitIdSchema }),

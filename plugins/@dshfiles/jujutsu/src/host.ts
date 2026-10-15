@@ -19,6 +19,7 @@ import {
 } from './core.js'
 import { EVOLUTION_TEMPLATE, OPERATION_TEMPLATE, REVISION_TEMPLATE } from './jj-templates.js'
 import { RevisionReads, type JjRun } from './revision-reads.js'
+import { readGraphNavigation, readGraphSlice, readRevisionRelationship } from './graph-navigation-reads.js'
 import { composerContextHost } from './composer-context-host.js'
 import { jujutsuSettings } from './settings.js'
 import { resolveWorkspaceDestination, sameWorkspaceParent } from './workspace-path.js'
@@ -641,6 +642,30 @@ const jujutsuHostApi = jujutsuApi.host({
       return (await snapshot(ctx, repo, input.limit, signal)).state
     } catch (error) {
       return RevisionReads.failure(error, 'Could not load this repository.')
+    }
+  },
+  graphNavigation: async ({ input, ctx, signal }) => {
+    try {
+      const repo = await resolveRepo(ctx, input.repoId, signal)
+      return await readGraphNavigation(repoRun(ctx, repo, signal))
+    } catch (error) {
+      return RevisionReads.failure(error, 'Could not resolve graph landmarks.')
+    }
+  },
+  revisionRelationship: async ({ input, ctx, signal }) => {
+    try {
+      const repo = await resolveRepo(ctx, input.repoId, signal)
+      return await readRevisionRelationship({ run: repoRun(ctx, repo, signal), commitId: input.commitId, targetCommitId: input.targetCommitId })
+    } catch (error) {
+      return RevisionReads.failure(error, 'Could not compare revisions.')
+    }
+  },
+  graphSlice: async ({ input, ctx, signal }) => {
+    try {
+      const repo = await resolveRepo(ctx, input.repoId, signal)
+      return await readGraphSlice({ run: repoRun(ctx, repo, signal), commitId: input.commitId, mode: input.mode })
+    } catch (error) {
+      return RevisionReads.failure(error, 'Could not read revision history.')
     }
   },
   details: async ({ input, ctx, signal }) => {
