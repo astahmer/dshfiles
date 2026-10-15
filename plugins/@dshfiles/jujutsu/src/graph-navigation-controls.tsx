@@ -60,52 +60,65 @@ const SELECT_CLASS = 'dshx:h-7 dshx:min-w-0 dshx:max-w-full dshx:rounded-md dshx
 export const RelationshipInspector = ({ navigation, selected, revisions, onLocate }: RelationshipInspectorProps): JSX.Element => {
   const [search, setSearch] = useState('')
   const relationship = navigation.relationshipQuery.data
+  const subjectLabel = selected.workingCopy ? 'Current' : selected.shortestChangeId
   const candidates = revisions.filter(revision => matchesRevisionSearch(revision, search)).slice(0, 50)
   const target = relationship?.revisions.find(revision => revision.commitId === relationship.targetCommitId)
+  const unavailableLandmark =
+    navigation.targetKey !== 'revision' && navigation.comparisonTarget !== undefined && navigation.comparisonTarget.status !== 'resolved'
+  const unavailableConnection = relationship?.relation === 'same' || relationship?.relation === 'no-common-ancestor'
   return (
     <section
-      aria-label="Revision relationship"
-      className="dshx:flex dshx:flex-none dshx:flex-col dshx:gap-1.5 dshx:border-b dshx:bg-muted/20 dshx:px-3 dshx:py-2 dshx:text-xs"
+      aria-label="Revision comparison"
+      className="dshx:flex dshx:flex-none dshx:flex-col dshx:gap-1 dshx:border-b dshx:bg-muted/20 dshx:px-3 dshx:py-1.5 dshx:text-xs"
     >
-      <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
-        <strong className="dshx:font-medium" title={selected.description}>
-          Selected: {selected.shortestChangeId}
-        </strong>
-        <label className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
-          Relative to
-          <select
-            aria-label="Relationship target"
-            className={SELECT_CLASS}
-            onChange={event => navigation.setTargetKey(event.target.value)}
-            value={navigation.targetKey}
-          >
-            {navigation.landmarks.map(landmark => (
-              <option disabled={landmark.status !== 'resolved'} key={landmark.kind} value={landmark.kind}>
-                {landmark.label}
-                {landmark.status === 'resolved' ? '' : ` (${landmark.status})`}
-              </option>
-            ))}
-            <option value="revision">Another revision…</option>
-          </select>
-        </label>
+      <div className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-center dshx:gap-1.5">
+        <strong className="dshx:font-medium">Compare</strong>
+        <span className={selected.workingCopy ? 'dshx:font-medium' : 'dshx:font-mono'} title={selected.description}>
+          {subjectLabel}
+        </span>
+        <span className="dshx:text-muted-foreground">with</span>
+        <select
+          aria-label="Comparison target"
+          className={`${SELECT_CLASS} dshx:w-40 dshx:max-w-full`}
+          onChange={event => navigation.chooseTarget(event.target.value)}
+          value={navigation.targetKey}
+        >
+          {navigation.landmarks.map(landmark => (
+            <option disabled={landmark.status !== 'resolved'} key={landmark.kind} value={landmark.kind}>
+              {landmark.label}
+              {landmark.status === 'resolved' ? '' : ` (${landmark.status})`}
+            </option>
+          ))}
+          <option value="revision">Another revision…</option>
+        </select>
         {target !== undefined && (
-          <Button onClick={() => onLocate(target)} size="xs" type="button" variant="ghost">
-            Locate target
+          <Button
+            aria-label="Locate comparison target"
+            onClick={() => onLocate(target)}
+            size="icon-xs"
+            title="Locate target in graph"
+            type="button"
+            variant="ghost"
+          >
+            <LocateFixedIcon aria-hidden />
           </Button>
         )}
+        <Button aria-label="Close comparison" onClick={navigation.closeComparison} size="icon-xs" type="button" variant="ghost">
+          <XIcon />
+        </Button>
       </div>
       {navigation.targetKey === 'revision' && (
-        <div className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:gap-1.5">
+        <div className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-center dshx:gap-1.5">
           <Input
-            aria-label="Find relationship target"
-            className="dshx:h-7 dshx:w-48 dshx:text-xs"
+            aria-label="Find comparison target"
+            className="dshx:h-7 dshx:w-40 dshx:max-w-full dshx:text-xs"
             onChange={event => setSearch(event.target.value)}
             placeholder="Search loaded revisions…"
             value={search}
           />
           <select
             aria-label="Choose revision target"
-            className={SELECT_CLASS}
+            className={`${SELECT_CLASS} dshx:flex-1`}
             onChange={event => navigation.setCustomTargetId(event.target.value)}
             value={navigation.customTargetId}
           >
@@ -116,68 +129,67 @@ export const RelationshipInspector = ({ navigation, selected, revisions, onLocat
               </option>
             ))}
           </select>
-          <span className="dshx:self-center dshx:text-muted-foreground">Search loaded history; up to 50 results.</span>
         </div>
       )}
-      {navigation.relationshipQuery.isFetching && <p role="status">Reading exact ancestry…</p>}
-      {navigation.relationshipQuery.error !== null && (
-        <p className="dshx:text-destructive" role="status">
-          {errorMessage(navigation.relationshipQuery.error, 'Relationship unavailable. Updated Host required.')}
+      {navigation.relationshipQuery.isFetching && (
+        <p className="dshx:text-muted-foreground" role="status">
+          Reading ancestry…
         </p>
       )}
-      {!navigation.relationshipQuery.isFetching && relationship === undefined && navigation.relationshipQuery.error === null && (
-        <p className="dshx:text-muted-foreground">Choose an available target to compare.</p>
+      {navigation.relationshipQuery.error !== null && (
+        <p className="dshx:text-destructive" role="status">
+          {errorMessage(navigation.relationshipQuery.error, 'Comparison unavailable. Updated Host required.')}
+        </p>
+      )}
+      {unavailableLandmark && navigation.relationshipQuery.error === null && (
+        <p className="dshx:text-muted-foreground" role="status">
+          Target unavailable. Choose a resolved landmark.
+        </p>
+      )}
+      {navigation.targetKey === 'revision' && navigation.customTargetId.length === 0 && (
+        <p className="dshx:text-muted-foreground" role="status">
+          Choose a revision from loaded history to compare.
+        </p>
       )}
       {relationship !== undefined && (
         <>
-          <div aria-live="polite" className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-x-4 dshx:gap-y-1">
-            <strong className="dshx:font-medium">{relationshipLabel(relationship.relation)}</strong>
-            <span>
-              Selected-only <strong>{relationship.selectedOnlyCount}</strong>
-            </span>
-            <span>
-              Target-only <strong>{relationship.targetOnlyCount}</strong>
-            </span>
-            <span className="dshx:text-muted-foreground">Exact ancestry counts · no file comparison</span>
-          </div>
-          {relationship.commonAncestorIds.length > 0 && (
-            <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-1">
-              <span className="dshx:text-muted-foreground">Shared {relationship.commonAncestorIds.length === 1 ? 'ancestor' : 'ancestors'}:</span>
-              {relationship.commonAncestorIds.slice(0, 4).map(commitId => {
-                const revision = relationship.revisions.find(row => row.commitId === commitId)
-                return (
-                  <Button
-                    disabled={revision === undefined}
-                    key={commitId}
-                    onClick={() => {
-                      if (revision !== undefined) onLocate(revision)
-                    }}
-                    size="xs"
-                    title={revision?.description ?? commitId}
-                    type="button"
-                    variant="ghost"
-                  >
-                    {revision?.shortestChangeId ?? commitId.slice(0, 12)}
-                  </Button>
-                )
-              })}
-              {relationship.commonAncestorIds.length > 4 && <span>+{relationship.commonAncestorIds.length - 4} more</span>}
+          <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
+            <div
+              aria-live="polite"
+              className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-x-3 dshx:gap-y-1"
+              title="Exact revision ancestry counts; not a file or patch comparison."
+            >
+              <strong className="dshx:font-medium">{relationshipLabel(relationship.relation)}</strong>
+              <span title={`Changes reachable only from ${subjectLabel}`}>
+                <strong>{relationship.selectedOnlyCount}</strong> only in {subjectLabel}
+              </span>
+              <span title={`Changes reachable only from ${navigation.targetLabel}`}>
+                <strong>{relationship.targetOnlyCount}</strong> only in {navigation.targetLabel}
+              </span>
+              <span className="dshx:text-muted-foreground">{relationship.commonAncestorIds.length} shared</span>
             </div>
-          )}
-          <div className="dshx:flex dshx:flex-wrap dshx:gap-1.5">
-            <Button onClick={navigation.showConnection} size="xs" type="button" variant="outline">
-              Show connection
-            </Button>
-            <Button onClick={() => navigation.applyRelationship('connection')} size="xs" type="button" variant="outline">
-              Only connection
-            </Button>
-            <Button onClick={() => navigation.applyRelationship('difference')} size="xs" type="button" variant="outline">
-              Work since target
-            </Button>
+            <div className="dshx:flex dshx:flex-wrap dshx:gap-1.5">
+              <Button disabled={unavailableConnection} onClick={navigation.showConnection} size="xs" type="button" variant="outline">
+                Highlight path
+              </Button>
+              <Button disabled={unavailableConnection} onClick={() => navigation.applyRelationship('connection')} size="xs" type="button" variant="outline">
+                Show only path
+              </Button>
+              <Button
+                disabled={relationship.selectedOnlyCount === 0}
+                onClick={() => navigation.applyRelationship('difference')}
+                size="xs"
+                title={relationship.selectedOnlyCount === 0 ? 'No changes exist only on this side.' : 'Show changes on this side that are not in the target.'}
+                type="button"
+                variant="outline"
+              >
+                Work since target
+              </Button>
+            </div>
           </div>
           {relationship.truncated && (
             <p className="dshx:text-warning" role="status">
-              Graph view limited to bounded history; ancestry counts remain exact. Dotted ends mark omitted history.
+              View limited to bounded history; ancestry counts remain exact.
             </p>
           )}
         </>

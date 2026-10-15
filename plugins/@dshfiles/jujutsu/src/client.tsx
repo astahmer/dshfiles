@@ -23,6 +23,9 @@ import {
   ContextMenuItem,
   ContextMenuLabel,
   ContextMenuSeparator,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
   ContextMenuTrigger,
 } from '@dshfiles/plugin-ui/components/ui/context-menu'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@dshfiles/plugin-ui/components/ui/dialog'
@@ -72,7 +75,7 @@ import { useApi } from '@dshfiles/dshx/client'
 import { ProjectFolderPicker, type DirectoryPickerPort, type RegisteredProject } from '@dshfiles/project-folder-picker'
 import { useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent, type ReactNode } from 'react'
 import { z } from 'zod'
-import type { Mutation, ReadFailure, Revision } from './api.js'
+import type { GraphLandmark, Mutation, ReadFailure, Revision } from './api.js'
 import { ChangedFiles, FileViewToggle, LineCounts } from './changed-files.js'
 import { FullDiffDialog } from './full-diff-dialog.js'
 import { describeDraftChanged, layoutRevisionGraph, type GraphLane, type RevisionGraphRow } from './graph.js'
@@ -198,6 +201,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   const [showDates, setShowDates] = useState(false)
   const [collapsedDays, setCollapsedDays] = useState<ReadonlySet<string>>(() => new Set())
   const [selection, setSelection] = useState<RevisionSelection | null>(null)
+  const [comparisonSelection, setComparisonSelection] = useState<RevisionSelection | null>(null)
   const [editingDescription, setEditingDescription] = useState<string | null>(null)
   const [reviewStore, setReviewStore] = useState<ReviewStore>(() => {
     try {
@@ -258,6 +262,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
       setRepoId(registered.repoId)
       setPath(registered.root)
       setSelection(null)
+      setComparisonSelection(null)
       setMoveSource(null)
       setDescribeDrafts({})
       setFullDiff(null)
@@ -290,6 +295,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     root: path,
     refreshedAt: stateQuery.dataUpdatedAt,
     selected: selection ?? undefined,
+    comparison: comparisonSelection ?? undefined,
     revisions: state?.revisions ?? [],
   })
   const allRevisions = useMemo(() => mergeGraphRevisions(navigation.extraRevisions, state?.revisions ?? []), [navigation.extraRevisions, state])
@@ -299,6 +305,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   const [locatedId, setLocatedId] = useState<string | null>(null)
   useEffect(() => {
     setLocateRequest(null)
+    setComparisonSelection(null)
     setPendingLocateId(null)
     setLocatedId(null)
   }, [repoId])
@@ -647,6 +654,17 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     toggleRevision(revision)
   }
 
+  const compareRevision = (revision: Revision, target?: GraphLandmark['kind'] | 'revision'): void => {
+    setComparisonSelection({ commitId: revision.commitId, changeId: revision.changeId })
+    navigation.beginComparison(target)
+    locateRevision(revision)
+  }
+
+  const compareCurrentRevision = (): void => {
+    const revision = selectedRevision ?? workingCopy
+    if (revision !== undefined) compareRevision(revision)
+  }
+
   const copyText = async (value: string, label: string): Promise<void> => {
     try {
       const copied = await writeClipboard(value)
@@ -667,14 +685,20 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
         <ContextMenuLabel className="dshx:truncate dshx:text-xs dshx:text-muted-foreground">
           {revision.shortestChangeId} · {firstLine(revision.description)}
         </ContextMenuLabel>
-        <ContextMenuItem
-          onSelect={() => {
-            setSelection({ commitId: revision.commitId, changeId: revision.changeId })
-            navigation.setNotice('Choose a target in the relationship inspector above the graph.')
-          }}
-        >
-          Compare relative to…
-        </ContextMenuItem>
+        <ContextMenuSub>
+          <ContextMenuSubTrigger>Compare with</ContextMenuSubTrigger>
+          <ContextMenuSubContent className="dshx-root dshx:w-52">
+            <ContextMenuLabel className="dshx:text-xs dshx:text-muted-foreground">Choose a landmark</ContextMenuLabel>
+            {navigation.landmarks.map(landmark => (
+              <ContextMenuItem disabled={landmark.status !== 'resolved'} key={landmark.kind} onSelect={() => compareRevision(revision, landmark.kind)}>
+                {landmark.label}
+                {landmark.status === 'resolved' ? '' : ` · ${landmark.status}`}
+              </ContextMenuItem>
+            ))}
+            <ContextMenuSeparator />
+            <ContextMenuItem onSelect={() => compareRevision(revision, 'revision')}>Another revision…</ContextMenuItem>
+          </ContextMenuSubContent>
+        </ContextMenuSub>
         <ContextMenuItem disabled={navigation.sliceMutation.isPending} onSelect={() => navigation.applySlice(revision, 'history')}>
           Focus history leading here
         </ContextMenuItem>
@@ -929,8 +953,18 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
       <>
         <div className="dshx:flex dshx:flex-none dshx:flex-col dshx:gap-1.5 dshx:border-b dshx:px-3 dshx:py-1.5">
           <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-end dshx:gap-1">
-            <div className="dshx:mr-auto dshx:min-w-0">
+            <div className="dshx:mr-auto dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-center dshx:gap-1">
               <LandmarkControls navigation={navigation} onLocate={locateRevision} />
+              <Button
+                disabled={workingCopy === undefined && selectedRevision === undefined}
+                onClick={compareCurrentRevision}
+                size="xs"
+                title="Compare selected revision, or current workspace revision, with a landmark"
+                type="button"
+                variant="outline"
+              >
+                Compare
+              </Button>
             </div>
             <Toggle
               className="dshx:h-7 dshx:gap-1.5 dshx:border dshx:border-transparent dshx:px-2 dshx:font-mono! dshx:text-xs dshx:font-normal dshx:text-muted-foreground dshx:data-[state=on]:border-border dshx:data-[state=on]:bg-card dshx:data-[state=on]:text-foreground"
@@ -1069,8 +1103,8 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
             </Button>
           </div>
         )}
-        {selectedRevision !== undefined && (
-          <RelationshipInspector navigation={navigation} onLocate={locateRevision} revisions={allRevisions} selected={selectedRevision} />
+        {navigation.comparisonOpen && navigation.comparisonRevision !== undefined && (
+          <RelationshipInspector navigation={navigation} onLocate={locateRevision} revisions={allRevisions} selected={navigation.comparisonRevision} />
         )}
         <div
           aria-label="Revisions"

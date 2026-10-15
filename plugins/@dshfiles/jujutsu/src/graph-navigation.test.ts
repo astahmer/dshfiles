@@ -99,8 +99,9 @@ describe('graph navigation projection', () => {
     ).toEqual([])
   })
   it('labels relationship direction explicitly', () => {
-    expect(relationshipLabel('ancestor')).toBe('Selected is ancestor of target')
-    expect(relationshipLabel('descendant')).toBe('Selected descends from target')
+    expect(relationshipLabel('ancestor')).toBe('Behind target')
+    expect(relationshipLabel('descendant')).toBe('Ahead of target')
     expect(relationshipLabel('same')).toBe('Same revision')
+    expect(relationshipLabel('no-common-ancestor')).toBe('Unrelated histories')
   })
 })

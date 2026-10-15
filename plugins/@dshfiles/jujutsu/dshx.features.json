@@ -4,7 +4,7 @@
     {
       "id": "graph-navigation",
       "title": "Locate landmarks and compare revision ancestry",
-      "summary": "Locate Current, main@origin, main and Default; compare exact ancestry counts, highlight connections, focus history or selected-only work, and temporarily hide exclusive history with visible reset controls.",
+      "summary": "Jump to Current, main@origin, main or Default in one click; compare from toolbar or revision menu only when needed, then highlight the path, show changes since target, or open an ancestry view.",
       "reach": [
         "click button \"Jujutsu\"",
         "click button \"Choose repository\"",
@@ -12,8 +12,8 @@
         "expect option \"sample*\"",
         "press Enter",
         "expect button \"Locate Current\"",
-        "click button \"Sample project*\"",
-        "expect region \"Revision relationship\""
+        "click button \"Compare\"",
+        "expect region \"Revision comparison\""
       ],
       "surfaces": ["client", "host", "integration"],
       "configuration": [],

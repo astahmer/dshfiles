@@ -73,17 +73,20 @@ contracts.
 - Locate scrolls, focuses, and briefly highlights its row. A filtered or
   outside-page target offers **Show temporarily** or **Clear filters and
   locate**; temporary reveal preserves existing filter settings and is removable.
-- Select a revision to compare it against a landmark or another loaded revision.
-  The inspector reports same/ancestor/descendant/diverged and exact
-  selected-only/target-only ancestry counts, not file differences or patch
-  equivalence. Rewritten selections follow a unique current change ID;
-  ambiguous divergent copies are never selected automatically.
-- **Show connection** highlights existing connection rows and dims unrelated
-  text without changing graph membership or fading passing rails.
-  **Only connection** loads the bounded connecting DAG, including all relevant
-  merge paths and best common ancestors. **Work since target** shows only
-  selected ancestry absent from target ancestry; identical endpoints yield an
-  empty view.
+- Comparison is opt-in: the **Compare** toolbar button uses the selected row,
+  or the current workspace revision when no row is selected. Right-click any
+  revision and choose **Compare with** to compare it with a specific landmark
+  or another loaded revision without opening that revision's details. The compact
+  comparison strip reports ahead/behind direction and exact per-side ancestry
+  counts; path actions are disabled when there is no useful path or no work
+  since the target. It compares ancestry, not file contents or patch equivalence.
+  Rewritten comparison subjects follow a unique current change ID; ambiguous
+  divergent copies are never selected automatically.
+- **Highlight path** dims unrelated text while preserving graph membership and
+  passing rails. **Show only path** loads bounded connecting DAG, including all
+  relevant merge paths and best common ancestors. **Work since target** shows
+  only selected ancestry absent from target ancestry; identical endpoints yield
+  an empty view and disable this action.
 - Right-click **Focus history leading here** for all-parent ancestry.
   **Hide exclusive history leading here** hides only ancestry not needed by
   any retained repository head, bookmark, remote bookmark, or workspace tip.
@@ -103,9 +106,10 @@ contracts.
 
 ### Verification
 
-The navigation journey covers landmarks, exact comparisons, connection highlighting,
-selected-only and empty views, temporary reveal, focus/hide/undo, unchanged repository
-history, and 360/480/768/1024 px pane widths. Real JJ integration fixtures cover
+The navigation journey covers one-click landmarks, hidden-by-default comparison,
+toolbar and context-menu entry points, exact counts, path highlighting, disabled
+empty actions, temporary reveal, focus/hide/undo, unchanged repository history,
+and 360/480/768/1024 px pane widths. Real JJ integration fixtures cover
 multiple merge bases, concurrent operations, missing/conflicting bookmarks,
 independent default workspaces, local remote bookmarks, and history beyond 500 rows.
 

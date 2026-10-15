@@ -1,16 +1,19 @@
 import { useApi } from '@dshfiles/dshx/client'
 import { errorMessage, useMutation, useQuery } from '@dshfiles/plugin-ui/query'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { jujutsuApi, type Revision, type RevisionRelationship } from './api.js'
+import { jujutsuApi, type GraphLandmark, type Revision, type RevisionRelationship } from './api.js'
 import { mergeGraphRevisions, type GraphViewFilter, type HiddenGraphHistory } from './graph-navigation.js'
 import { resolveGraphSelection } from './graph-selection.js'
 import { JUJUTSU_QUERY_GC_TIME, JUJUTSU_QUERY_STALE_TIME } from './repository-query-cache.js'
+
+type ComparisonTarget = GraphLandmark['kind'] | 'revision'
 
 interface GraphNavigationInput {
   readonly repoId: string | null
   readonly root: string
   readonly refreshedAt: number
   readonly selected: Pick<Revision, 'commitId' | 'changeId'> | undefined
+  readonly comparison: Pick<Revision, 'commitId' | 'changeId'> | undefined
   readonly revisions: readonly Revision[]
 }
 
@@ -25,7 +28,8 @@ export const useGraphNavigation = (input: GraphNavigationInput) => {
   const activeScope = useRef(scope)
   activeScope.current = scope
   const generation = useRef(0)
-  const [targetKey, setTargetKey] = useState('main')
+  const [targetKey, setTargetKey] = useState<ComparisonTarget>('main')
+  const [comparisonOpen, setComparisonOpen] = useState(false)
   const [customTargetId, setCustomTargetId] = useState('')
   const [view, setView] = useState<GraphViewFilter | null>(null)
   const [hidden, setHidden] = useState<readonly HiddenGraphHistory[]>([])
@@ -42,6 +46,7 @@ export const useGraphNavigation = (input: GraphNavigationInput) => {
     setNotice('')
     setTargetKey('main')
     setCustomTargetId('')
+    setComparisonOpen(false)
   }, [scope])
 
   const landmarksQuery = useQuery({
@@ -55,25 +60,47 @@ export const useGraphNavigation = (input: GraphNavigationInput) => {
   })
   const extraRevisions = useMemo(() => mergeGraphRevisions(view?.revisions ?? [], revealed), [view, revealed])
   const selectedRevision = resolveGraphSelection({ selection: input.selected, revisions: input.revisions, extraRevisions })
+  const comparisonRevision = resolveGraphSelection({ selection: input.comparison, revisions: input.revisions, extraRevisions })
   const landmarks = landmarksQuery.data?.landmarks ?? []
   const targetLandmark = landmarks.find(landmark => landmark.kind === targetKey)
   const targetRevision = targetKey === 'revision' ? undefined : targetLandmark?.status === 'resolved' ? targetLandmark.revisions[0] : undefined
   const targetCommitId = targetKey === 'revision' ? customTargetId : (targetRevision?.commitId ?? '')
   const targetLabel = targetKey === 'revision' ? customTargetId.slice(0, 12) : (targetLandmark?.label ?? targetKey)
+  const comparisonTarget = landmarks.find(landmark => landmark.kind === targetKey)
+  const preferredTarget =
+    landmarks.find(landmark => landmark.kind === 'main' && landmark.status === 'resolved') ??
+    landmarks.find(landmark => landmark.kind === 'main-origin' && landmark.status === 'resolved') ??
+    landmarks.find(landmark => landmark.kind === 'default' && landmark.status === 'resolved')
+  const defaultTargetKey: ComparisonTarget = preferredTarget?.kind ?? 'main'
+  const beginComparison = (target?: ComparisonTarget): void => {
+    const nextTarget = target ?? defaultTargetKey
+    setTargetKey(nextTarget)
+    if (nextTarget === 'revision') setCustomTargetId('')
+    setComparisonOpen(true)
+  }
+
+  const chooseTarget = (value: string): void => {
+    if (value !== 'current' && value !== 'main-origin' && value !== 'main' && value !== 'default' && value !== 'revision') return
+    setTargetKey(value)
+    if (value === 'revision') setCustomTargetId('')
+  }
+
+  const closeComparison = (): void => setComparisonOpen(false)
+
   const relationshipQuery = useQuery({
-    queryKey: ['jujutsu', input.root, 'relationship', input.repoId, selectedRevision?.commitId, targetCommitId, input.refreshedAt],
+    queryKey: ['jujutsu', input.root, 'relationship', input.repoId, comparisonRevision?.commitId, targetCommitId, input.refreshedAt],
     queryFn: async ({ signal }) =>
       readResult(
         await api.revisionRelationship(
           {
             repoId: input.repoId ?? '',
-            commitId: selectedRevision?.commitId ?? '',
+            commitId: comparisonRevision?.commitId ?? '',
             targetCommitId,
           },
           { signal },
         ),
       ),
-    enabled: input.repoId !== null && selectedRevision !== undefined && targetCommitId.length > 0,
+    enabled: comparisonOpen && input.repoId !== null && comparisonRevision !== undefined && targetCommitId.length > 0,
     retry: false,
     staleTime: JUJUTSU_QUERY_STALE_TIME,
     gcTime: JUJUTSU_QUERY_GC_TIME,
@@ -169,10 +196,16 @@ export const useGraphNavigation = (input: GraphNavigationInput) => {
 
   return {
     selectedRevision,
+    comparisonRevision,
+    comparisonOpen,
+    comparisonTarget,
+    defaultTargetKey,
     landmarks,
     landmarksQuery,
     targetKey,
-    setTargetKey,
+    chooseTarget,
+    beginComparison,
+    closeComparison,
     customTargetId,
     setCustomTargetId,
     targetLabel,

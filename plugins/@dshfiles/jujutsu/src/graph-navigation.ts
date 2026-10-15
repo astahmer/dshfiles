@@ -58,12 +58,12 @@ export const relationshipLabel = (relation: 'same' | 'ancestor' | 'descendant' |
     case 'same':
       return 'Same revision'
     case 'ancestor':
-      return 'Selected is ancestor of target'
+      return 'Behind target'
     case 'descendant':
-      return 'Selected descends from target'
+      return 'Ahead of target'
     case 'diverged':
       return 'Diverged'
     case 'no-common-ancestor':
-      return 'No shared ancestor'
+      return 'Unrelated histories'
   }
 }
