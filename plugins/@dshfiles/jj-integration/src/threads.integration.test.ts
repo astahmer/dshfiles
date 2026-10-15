@@ -3,6 +3,8 @@ import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileS
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { z } from 'zod'
+import { JsonText } from './json-text.js'
 import { checkoutSyncArgv, createThreads, defaultThreadsDirectory, isSecondaryWorkspace, type JjExecutor } from './threads.js'
 
 const jjAvailable = spawnSync('jj', ['--version']).status === 0
@@ -143,7 +145,10 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
 
     const [command = '', ...args] = checkoutSyncArgv({ repoRoot: repo, workspace: 'default', bookmark: 'main' })
     const synced = spawnSync(command, args, { encoding: 'utf8', env: { ...process.env, JJ_CONFIG: '' } })
-    expect(JSON.parse(synced.stdout)).toMatchObject({ ok: true, data: { status: 'synced', kept: [{ description: '' }], changedFiles: ['feature.txt'] } })
+    expect(JsonText.decode(z.unknown(), synced.stdout)?.data).toMatchObject({
+      ok: true,
+      data: { status: 'synced', kept: [{ description: '' }], changedFiles: ['feature.txt'] },
+    })
     expect(readFileSync(join(repo, 'feature.txt'), 'utf8')).toBe('feature\n')
     expect(readFileSync(join(repo, '.secret.json'), 'utf8')).toBe('local\n')
   })
