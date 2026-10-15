@@ -6,7 +6,7 @@
       "title": "Navigate image previews",
       "summary": "Open a draft image and move among all attached images with left/right keyboard controls or the thumbnail strip.",
       "reach": [
-        "click button \"New session\"",
+        "click button \"New thread\"",
         "attach \"tooling/dshx/e2e/fixtures/attachments/red.png\"",
         "attach \"tooling/dshx/e2e/fixtures/attachments/blue.png\"",
         "click button \"red.png, click to view original\"",
