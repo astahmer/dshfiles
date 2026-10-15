@@ -64,6 +64,60 @@ contracts.
   directory. Forking a Session is left to DSH's native Branch action, and
   thread workspaces to `@dshfiles/jj-integration`.
 
+## Graph landmarks and temporary views
+
+- **Current**, **main@origin**, **main**, and **Default** locate exact revisions.
+  Current is the selected JJ workspace's `@`; Default is `default@`, not the
+  trunk bookmark. Missing or conflicting landmarks are disabled rather than
+  guessed. Coincident landmarks remain separate shortcuts to the same row.
+- Locate scrolls, focuses, and briefly highlights its row. A filtered or
+  outside-page target offers **Show temporarily** or **Clear filters and
+  locate**; temporary reveal preserves existing filter settings and is removable.
+- Select a revision to compare it against a landmark or another loaded revision.
+  The inspector reports same/ancestor/descendant/diverged and exact
+  selected-only/target-only ancestry counts, not file differences or patch
+  equivalence. Rewritten selections follow a unique current change ID;
+  ambiguous divergent copies are never selected automatically.
+- **Show connection** highlights existing connection rows and dims unrelated
+  text without changing graph membership or fading passing rails.
+  **Only connection** loads the bounded connecting DAG, including all relevant
+  merge paths and best common ancestors. **Work since target** shows only
+  selected ancestry absent from target ancestry; identical endpoints yield an
+  empty view.
+- Right-click **Focus history leading here** for all-parent ancestry.
+  **Hide exclusive history leading here** hides only ancestry not needed by
+  any retained repository head, bookmark, remote bookmark, or workspace tip.
+  Internal revisions with retained descendants normally have nothing exclusive
+  to hide. Multiple hidden histories have individual restore chips and Undo.
+- All filters participate in a visible status strip. **Show all** clears
+  temporary views, hidden/revealed sets, search, author, date, collapsed days,
+  Mine, and Hide immutable. Focus, lens, and hide sets capture the operation
+  when applied; clear/reapply them to incorporate subsequent history changes.
+  They remain local to the mounted graph and reset when switching repositories.
+- Every membership filter is applied before layout, so omitted ancestry uses
+  dashed bridges or dotted boundary stubs rather than misleading adjacent rails.
+  Navigation reads use `--ignore-working-copy` at one pinned JJ operation.
+  Graph/ID output is capped at 500 revisions and advertises truncation. Counts
+  remain exact independently of that cap; overly large or timed-out exact
+  reads fail explicitly instead of returning estimates.
+
+### Verification
+
+The navigation journey covers landmarks, exact comparisons, connection highlighting,
+selected-only and empty views, temporary reveal, focus/hide/undo, unchanged repository
+history, and 360/480/768/1024 px pane widths. Real JJ integration fixtures cover
+multiple merge bases, concurrent operations, missing/conflicting bookmarks,
+independent default workspaces, local remote bookmarks, and history beyond 500 rows.
+
+Local-remote fetch tests need the Git version supported by the installed JJ
+(at least 2.41); macOS system Git may be too old. Use an ephemeral cached tool,
+not a global install:
+
+```sh
+nix shell nixpkgs#git --command pnpm --dir plugins/@dshfiles/jujutsu exec vitest run --fileParallelism=false
+DSHX_E2E_PREBUILT=1 pnpm --dir tooling/dshx run test:e2e jujutsu --workers=1
+```
+
 ## Host and command boundary
 
 The Host injects both `subprocess` and `webServer`: DSH's ConnectionService

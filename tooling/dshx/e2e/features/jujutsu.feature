@@ -3,6 +3,13 @@ Feature: Jujutsu revision interactions
   These journeys use a disposable local JJ repository and the real isolated
   plugin profile. Mutation previews are cancelled before any repository change.
 
+  @scenario:jujutsu.graph-navigation
+  Scenario: Landmarks, exact relationships and reversible graph views
+    Given the isolated plugin profile "@dshfiles/jujutsu" is booted
+    When a disposable Jujutsu navigation repository is selected
+    Then landmarks and relationships navigate without mutating history
+    And graph focus and hide can be undone without losing shared history
+
   @scenario:jujutsu.drag-drop-preview
   Scenario: revision and bookmark moves preview in the target context
     Given the isolated plugin profile "@dshfiles/jujutsu" is booted

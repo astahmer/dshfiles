@@ -161,7 +161,6 @@ export const revisionRelationshipSchema = graphSliceSchema.extend({
   commonAncestorIds: z.array(commitIdSchema).max(500),
   commonAncestorsTruncated: z.boolean(),
   connectionIds: z.array(commitIdSchema).max(500),
-  historyIds: z.array(commitIdSchema).max(500),
   differenceIds: z.array(commitIdSchema).max(500),
 })
 

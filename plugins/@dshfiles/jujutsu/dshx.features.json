@@ -2,6 +2,37 @@
   "schemaVersion": 1,
   "features": [
     {
+      "id": "graph-navigation",
+      "title": "Locate landmarks and compare revision ancestry",
+      "summary": "Locate Current, main@origin, main and Default; compare exact ancestry counts, highlight connections, focus history or selected-only work, and temporarily hide exclusive history with visible reset controls.",
+      "reach": [
+        "click button \"Jujutsu\"",
+        "click button \"Choose repository\"",
+        "fill textbox \"Search projects or enter a folder path\" \"sample\"",
+        "expect option \"sample*\"",
+        "press Enter",
+        "expect button \"Locate Current\"",
+        "click button \"Sample project*\"",
+        "expect region \"Revision relationship\""
+      ],
+      "surfaces": ["client", "host", "integration"],
+      "configuration": [],
+      "states": ["resolved", "missing", "ambiguous", "same", "ancestor", "descendant", "diverged", "filtered", "truncated"],
+      "failureModes": [
+        "Missing or ambiguous landmarks cannot be guessed.",
+        "Older Hosts show an unavailable notice without breaking the graph.",
+        "Counts fail explicitly if bounded exact counting cannot complete; filtered graph output advertises truncation."
+      ],
+      "externalDependencies": [
+        {
+          "id": "jj-repository",
+          "boundary": "Snapshot-pinned read-only local JJ queries.",
+          "deterministicFake": "Real disposable local JJ repositories, including merge DAGs and multiple workspaces."
+        }
+      ],
+      "verification": [{ "kind": "gherkin", "id": "jujutsu.graph-navigation", "featureFile": "tooling/dshx/e2e/features/jujutsu.feature" }]
+    },
+    {
       "id": "revision-graph",
       "title": "Browse and filter the revision graph",
       "summary": "Browse one-height rows (the change ID with its unique prefix bold, coloured workspace, bookmark and tag labels, a muted (empty) / (no description), a trailing time column; stacked in the side panel) with authors and conflict/divergence markers, and filter by text, author, mine, immutability, or date.",

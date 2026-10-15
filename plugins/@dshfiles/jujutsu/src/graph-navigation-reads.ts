@@ -61,6 +61,20 @@ export const readGraphNavigation = async (run: JjRun): Promise<GraphNavigation> 
   return { operationId: snapshot.operationId, landmarks }
 }
 
+const relationshipFromCounts = (input: {
+  readonly selected: string
+  readonly target: string
+  readonly selectedOnlyCount: number
+  readonly targetOnlyCount: number
+  readonly hasCommonAncestor: boolean
+}): RevisionRelationship['relation'] => {
+  if (input.selected === input.target) return 'same'
+  if (input.selectedOnlyCount === 0) return 'ancestor'
+  if (input.targetOnlyCount === 0) return 'descendant'
+  if (!input.hasCommonAncestor) return 'no-common-ancestor'
+  return 'diverged'
+}
+
 export const readRevisionRelationship = async (input: { run: JjRun; commitId: string; targetCommitId: string }): Promise<RevisionRelationship> => {
   const selected = commitIdSchema.parse(input.commitId)
   const target = commitIdSchema.parse(input.targetCommitId)
@@ -74,9 +88,8 @@ export const readRevisionRelationship = async (input: { run: JjRun; commitId: st
   const difference = `::${selected} ~ ::${target}`
   const ancestors = await snapshot.ids(common)
   const connectionIds = await snapshot.ids(connection)
-  const historyIds = await snapshot.ids(`::${selected}`)
   const differenceIds = await snapshot.ids(difference)
-  const rows = await snapshot.revisions(`${selected} | ${target} | (${connection}) | ::${selected}`)
+  const rows = await snapshot.revisions(`${selected} | ${target} | (${connection}) | (${difference})`)
   const endpointRows = await snapshot.revisions(`${selected} | ${target}`)
   const endpointIds = new Set(endpointRows.revisions.map(revision => revision.commitId))
   const combined = [...endpointRows.revisions, ...rows.revisions.filter(revision => !endpointIds.has(revision.commitId))]
@@ -84,25 +97,15 @@ export const readRevisionRelationship = async (input: { run: JjRun; commitId: st
     operationId: snapshot.operationId,
     commitId: selected,
     targetCommitId: target,
-    relation:
-      selected === target
-        ? 'same'
-        : selectedOnlyCount === 0
-          ? 'ancestor'
-          : targetOnlyCount === 0
-            ? 'descendant'
-            : ancestors.ids.length === 0
-              ? 'no-common-ancestor'
-              : 'diverged',
+    relation: relationshipFromCounts({ selected, target, selectedOnlyCount, targetOnlyCount, hasCommonAncestor: ancestors.ids.length > 0 }),
     selectedOnlyCount,
     targetOnlyCount,
     commonAncestorIds: ancestors.ids,
     commonAncestorsTruncated: ancestors.truncated,
     connectionIds: connectionIds.ids,
-    historyIds: historyIds.ids,
     differenceIds: differenceIds.ids,
     revisions: combined.slice(0, LIMIT),
-    truncated: ancestors.truncated || connectionIds.truncated || historyIds.truncated || differenceIds.truncated || rows.truncated || combined.length > LIMIT,
+    truncated: ancestors.truncated || connectionIds.truncated || differenceIds.truncated || rows.truncated || combined.length > LIMIT,
   }
 }
 

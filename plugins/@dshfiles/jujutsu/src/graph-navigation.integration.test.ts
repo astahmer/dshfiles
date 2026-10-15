@@ -44,6 +44,21 @@ test('landmarks resolve exact local tips, missing remote, and do not snapshot di
   assert.equal(jj(['--ignore-working-copy', 'op', 'log', '--no-graph', '-T', 'id']), operations)
 })
 
+test('main@origin resolves the exact fetched remote bookmark independently of local main', async () => {
+  const remote = await fixture()
+  remote.jj(['bookmark', 'create', 'main'])
+  remote.jj(['git', 'export'])
+  const remoteTip = remote.id()
+  const local = await fixture()
+  local.jj(['bookmark', 'create', 'main'])
+  const localTip = local.id()
+  local.jj(['git', 'remote', 'add', 'origin', join(remote.repo, '.jj', 'repo', 'store', 'git')])
+  local.jj(['git', 'fetch', '--remote', 'origin'])
+  const navigation = await readGraphNavigation(local.run)
+  assert.equal(navigation.landmarks.find(item => item.kind === 'main-origin')?.revisions[0]?.commitId, remoteTip)
+  assert.equal(navigation.landmarks.find(item => item.kind === 'main')?.revisions[0]?.commitId, localTip)
+}, 30_000)
+
 test('relationships count exact ancestry, connection and both common ancestors in a criss-cross DAG', async () => {
   const { jj, id, run } = await fixture()
   const base = id()
@@ -69,7 +84,7 @@ test('relationships count exact ancestry, connection and both common ancestors i
   const same = await readRevisionRelationship({ run, commitId: one, targetCommitId: one })
   assert.equal(same.relation, 'same')
   assert.equal(same.selectedOnlyCount, 0)
-})
+}, 30_000)
 
 test('exclusive history preserves shared ancestors and retained descendants', async () => {
   const { jj, id, run } = await fixture()
@@ -117,13 +132,16 @@ test('old landmarks outside 500 revisions resolve and bounded histories never tr
   const result = await readRevisionRelationship({ run, commitId: tip, targetCommitId: base })
   assert.equal(result.selectedOnlyCount, 501)
   assert.equal(result.targetOnlyCount, 0)
-  assert.equal(result.historyIds.length, 500)
+  assert.equal(result.connectionIds.length, 500)
   assert.equal(result.revisions.length, 500)
   assert.ok(result.revisions.some(revision => revision.commitId === base))
   assert.ok(result.revisions.some(revision => revision.commitId === tip))
   assert.equal(result.truncated, true)
   const slice = await readGraphSlice({ run, commitId: tip, mode: 'history' })
   assert.equal(slice.truncated, true)
+  const same = await readRevisionRelationship({ run, commitId: tip, targetCommitId: tip })
+  assert.equal(same.revisions.length, 1)
+  assert.equal(same.truncated, false)
 }, 120_000)
 
 test('Default resolves default workspace rather than current workspace or main', async () => {

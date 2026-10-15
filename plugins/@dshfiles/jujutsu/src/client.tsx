@@ -56,7 +56,6 @@ import {
   ChevronRightIcon,
   EllipsisVerticalIcon,
   FolderGit2Icon,
-  LocateFixedIcon,
   MonitorIcon,
   RefreshCwIcon,
   SearchIcon,
@@ -76,7 +75,7 @@ import { z } from 'zod'
 import type { Mutation, ReadFailure, Revision } from './api.js'
 import { ChangedFiles, FileViewToggle, LineCounts } from './changed-files.js'
 import { FullDiffDialog } from './full-diff-dialog.js'
-import { describeDraftChanged, layoutRevisionGraph, matchesRevisionSearch, type GraphLane, type RevisionGraphRow } from './graph.js'
+import { describeDraftChanged, layoutRevisionGraph, type GraphLane, type RevisionGraphRow } from './graph.js'
 import { jujutsuApi } from './api.js'
 import { useAutoRefresh } from './auto-refresh.js'
 import { openInEditor } from './open-in-editor.js'
@@ -91,6 +90,9 @@ import { descendantCommitIds, emptyAncestorCandidates } from './source-control.j
 import { SourceControlView } from './source-control-view.js'
 import { WorkspaceProvisionerDialog } from './workspace-provisioner.js'
 import { containsPath, sidePanelRepository } from './side-panel-repository.js'
+import { filterGraphRevisions, mergeGraphRevisions } from './graph-navigation.js'
+import { GraphViewStatus, LandmarkControls, RelationshipInspector } from './graph-navigation-controls.js'
+import { useGraphNavigation } from './use-graph-navigation.js'
 
 type View = 'graph' | 'source'
 
@@ -283,10 +285,23 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   })
   const state = stateQuery.data
 
-  const selectedRevision = useMemo(() => {
-    if (state === undefined || selection === null) return undefined
-    return state.revisions.find(row => row.commitId === selection.commitId) ?? state.revisions.find(row => row.changeId === selection.changeId)
-  }, [state, selection])
+  const navigation = useGraphNavigation({
+    repoId,
+    root: path,
+    refreshedAt: stateQuery.dataUpdatedAt,
+    selected: selection ?? undefined,
+    revisions: state?.revisions ?? [],
+  })
+  const allRevisions = useMemo(() => mergeGraphRevisions(navigation.extraRevisions, state?.revisions ?? []), [navigation.extraRevisions, state])
+  const selectedRevision = navigation.selectedRevision
+  const [locateRequest, setLocateRequest] = useState<Revision | null>(null)
+  const [pendingLocateId, setPendingLocateId] = useState<string | null>(null)
+  const [locatedId, setLocatedId] = useState<string | null>(null)
+  useEffect(() => {
+    setLocateRequest(null)
+    setPendingLocateId(null)
+    setLocatedId(null)
+  }, [repoId])
 
   const detailsQuery = useQuery({
     queryKey: jujutsuQueryKeys.details(path, selectedRevision?.commitId ?? ''),
@@ -342,26 +357,45 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   const selectedBookmark = localBookmarkNames.includes(bookmark) ? bookmark : defaultBookmark
   const mainRevision = state?.revisions.find(revision => revision.localBookmarks.includes('main') || revision.bookmarks.includes('main'))
 
-  const revisionsByCommitId = useMemo(() => new Map(state?.revisions.map(revision => [revision.commitId, revision]) ?? []), [state])
+  const revisionsByCommitId = useMemo(() => new Map(allRevisions.map(revision => [revision.commitId, revision])), [allRevisions])
   const graphRows = useMemo(() => {
-    if (state === undefined) return []
-    const graphRevisions = state.revisions.filter(revision => (!hideImmutable || !revision.immutable) && (!mineOnly || revision.mine || revision.workingCopy))
-    return layoutRevisionGraph(graphRevisions, revisionsByCommitId, hideImmutable)
-  }, [state, revisionsByCommitId, hideImmutable, mineOnly])
-  const visibleRevisions = useMemo(() => {
-    return graphRows
-      .flatMap(row => {
+    const graphRevisions = filterGraphRevisions(allRevisions, {
+      mineOnly,
+      hideImmutable,
+      author: authorFilter,
+      text: textFilter,
+      fromDate,
+      toDate,
+      view: navigation.view,
+      hidden: navigation.hidden,
+      revealed: new Set(navigation.revealed.map(row => row.commitId)),
+    })
+    return layoutRevisionGraph(graphRevisions, revisionsByCommitId, false)
+  }, [
+    allRevisions,
+    revisionsByCommitId,
+    hideImmutable,
+    mineOnly,
+    authorFilter,
+    textFilter,
+    fromDate,
+    toDate,
+    navigation.view,
+    navigation.hidden,
+    navigation.revealed,
+  ])
+  const visibleRevisions = useMemo(
+    () =>
+      graphRows.flatMap(row => {
         const revision = revisionsByCommitId.get(row.commitId)
         return revision === undefined ? [] : [revision]
-      })
-      .filter(revision => {
-        if (authorFilter && !revision.author.toLocaleLowerCase().includes(authorFilter.toLocaleLowerCase())) return false
-        const timestamp = Date.parse(revision.authorTime)
-        if (fromDate && Number.isFinite(timestamp) && timestamp < Date.parse(fromDate + 'T00:00:00')) return false
-        if (toDate && Number.isFinite(timestamp) && timestamp > Date.parse(toDate + 'T23:59:59')) return false
-        return matchesRevisionSearch(revision, textFilter)
-      })
-  }, [graphRows, revisionsByCommitId, authorFilter, textFilter, fromDate, toDate])
+      }),
+    [graphRows, revisionsByCommitId],
+  )
+  const connectionIds =
+    navigation.lens === null
+      ? null
+      : new Set([...navigation.lens.connectionIds, navigation.lens.commitId, navigation.lens.targetCommitId, ...navigation.lens.commonAncestorIds])
 
   const dropDestination = dropPresentation === null ? undefined : revisionsByCommitId.get(dropPresentation.destinationId)
   /** The drop preview renders in its destination row, or above the list while a filter hides that row. */
@@ -426,11 +460,50 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
       return [...indexes].sort((left, right) => left - right)
     },
   })
+  const virtualItems = listVirtualizer.getVirtualItems()
   const stickyDayIndex = activeDayIndex(listItems, listVirtualizer.range?.startIndex ?? 0)
 
-  const scrollToWorkingCopy = (): void => {
-    if (workingCopyIndex >= 0) listVirtualizer.scrollToIndex(workingCopyIndex, { align: 'center' })
+  const locateRevision = (revision: Revision): void => {
+    setLocateRequest(null)
+    const listed = visibleRevisions.some(row => row.commitId === revision.commitId)
+    if (!listed) {
+      setLocateRequest(revision)
+      return
+    }
+    setCollapsedDays(current => new Set([...current].filter(day => day !== dayLabel(revision.authorTime))))
+    setPendingLocateId(revision.commitId)
   }
+
+  const resetGraphView = (): void => {
+    navigation.reset()
+    setPreference('mineOnly', false)
+    setPreference('hideImmutable', false)
+    setAuthorFilter('')
+    setTextFilter('')
+    setFromDate('')
+    setToDate('')
+    setCollapsedDays(new Set())
+    setLocateRequest(null)
+  }
+
+  useEffect(() => {
+    if (pendingLocateId === null) return
+    const index = listItems.findIndex(item => item.kind === 'revision' && item.revision.commitId === pendingLocateId)
+    if (index < 0) return
+    scrolledToWorkingCopy.current = repoId
+    listVirtualizer.scrollToIndex(index, { align: 'center' })
+    const target = listScrollRef.current?.querySelector<HTMLElement>(`[data-index="${index}"] [data-row-focus]`)
+    if (target === null || target === undefined) return
+    target.focus({ preventScroll: true })
+    setLocatedId(pendingLocateId)
+    setPendingLocateId(null)
+  }, [pendingLocateId, listItems, listVirtualizer, repoId, virtualItems])
+
+  useEffect(() => {
+    if (locatedId === null) return
+    const timeout = window.setTimeout(() => setLocatedId(null), 1800)
+    return () => window.clearTimeout(timeout)
+  }, [locatedId])
 
   useEffect(() => {
     if (repoId === null || workingCopyIndex < 0 || listScrollRef.current === null || scrolledToWorkingCopy.current === repoId) return
@@ -594,6 +667,21 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
         <ContextMenuLabel className="dshx:truncate dshx:text-xs dshx:text-muted-foreground">
           {revision.shortestChangeId} · {firstLine(revision.description)}
         </ContextMenuLabel>
+        <ContextMenuItem
+          onSelect={() => {
+            setSelection({ commitId: revision.commitId, changeId: revision.changeId })
+            navigation.setNotice('Choose a target in the relationship inspector above the graph.')
+          }}
+        >
+          Compare relative to…
+        </ContextMenuItem>
+        <ContextMenuItem disabled={navigation.sliceMutation.isPending} onSelect={() => navigation.applySlice(revision, 'history')}>
+          Focus history leading here
+        </ContextMenuItem>
+        <ContextMenuItem disabled={navigation.sliceMutation.isPending} onSelect={() => navigation.applySlice(revision, 'exclusive')}>
+          Hide exclusive history leading here
+        </ContextMenuItem>
+        <ContextMenuSeparator />
         <ContextMenuItem onSelect={() => openFullDiff(revision, null)}>Show full diff</ContextMenuItem>
         {!revision.immutable && (
           <ContextMenuItem
@@ -840,19 +928,10 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     state === undefined ? null : (
       <>
         <div className="dshx:flex dshx:flex-none dshx:flex-col dshx:gap-1.5 dshx:border-b dshx:px-3 dshx:py-1.5">
-          <div className="dshx:flex dshx:items-center dshx:justify-end dshx:gap-1">
-            <Button
-              aria-label="Scroll to the working copy"
-              className="dshx:mr-auto dshx:text-muted-foreground"
-              disabled={workingCopyIndex < 0}
-              onClick={scrollToWorkingCopy}
-              size="icon-sm"
-              title="Scroll to @"
-              type="button"
-              variant="ghost"
-            >
-              <LocateFixedIcon />
-            </Button>
+          <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-end dshx:gap-1">
+            <div className="dshx:mr-auto dshx:min-w-0">
+              <LandmarkControls navigation={navigation} onLocate={locateRevision} />
+            </div>
             <Toggle
               className="dshx:h-7 dshx:gap-1.5 dshx:border dshx:border-transparent dshx:px-2 dshx:font-mono! dshx:text-xs dshx:font-normal dshx:text-muted-foreground dshx:data-[state=on]:border-border dshx:data-[state=on]:bg-card dshx:data-[state=on]:text-foreground"
               onPressedChange={pressed => setPreference('mineOnly', pressed)}
@@ -935,6 +1014,64 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
             </div>
           )}
         </div>
+        <GraphViewStatus
+          navigation={navigation}
+          filters={[
+            ...(mineOnly ? [{ label: 'Mine', clear: () => setPreference('mineOnly', false) }] : []),
+            ...(hideImmutable ? [{ label: 'Hide immutable', clear: () => setPreference('hideImmutable', false) }] : []),
+            ...(textFilter ? [{ label: `Search: ${textFilter}`, clear: () => setTextFilter('') }] : []),
+            ...(authorFilter ? [{ label: `Author: ${authorFilter}`, clear: () => setAuthorFilter('') }] : []),
+            ...(fromDate || toDate
+              ? [
+                  {
+                    label: `Dates: ${fromDate || 'any'} – ${toDate || 'any'}`,
+                    clear: () => {
+                      setFromDate('')
+                      setToDate('')
+                    },
+                  },
+                ]
+              : []),
+            ...(collapsedDays.size > 0 ? [{ label: `${collapsedDays.size} days collapsed`, clear: () => setCollapsedDays(new Set()) }] : []),
+          ]}
+          onReset={resetGraphView}
+        />
+        {locateRequest !== null && (
+          <div className="dshx:flex dshx:flex-none dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:border-b dshx:px-3 dshx:py-2 dshx:text-xs" role="status">
+            <span>{locateRequest.shortestChangeId} is outside the current view.</span>
+            <Button
+              onClick={() => {
+                navigation.reveal(locateRequest)
+                setCollapsedDays(new Set())
+                setPendingLocateId(locateRequest.commitId)
+                setLocateRequest(null)
+              }}
+              size="xs"
+              type="button"
+              variant="outline"
+            >
+              Show temporarily
+            </Button>
+            <Button
+              onClick={() => {
+                resetGraphView()
+                navigation.reveal(locateRequest)
+                setPendingLocateId(locateRequest.commitId)
+              }}
+              size="xs"
+              type="button"
+              variant="outline"
+            >
+              Clear filters and locate
+            </Button>
+            <Button onClick={() => setLocateRequest(null)} size="xs" type="button" variant="ghost">
+              Cancel
+            </Button>
+          </div>
+        )}
+        {selectedRevision !== undefined && (
+          <RelationshipInspector navigation={navigation} onLocate={locateRevision} revisions={allRevisions} selected={selectedRevision} />
+        )}
         <div
           aria-label="Revisions"
           className="dshx:min-h-0 dshx:flex-1 dshx:overflow-auto dshx:overscroll-contain"
@@ -961,7 +1098,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
             <div className="dshx:border-b dshx:p-2">{dropPreviewAt(dropDestination)}</div>
           )}
           <div className="dshx:relative dshx:w-full" style={{ height: listVirtualizer.getTotalSize() }}>
-            {listVirtualizer.getVirtualItems().map(virtualRow => {
+            {virtualItems.map(virtualRow => {
               const item = listItems[virtualRow.index]
               if (item === undefined) return null
               const sticky = virtualRow.index === stickyDayIndex
@@ -1001,6 +1138,8 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
                   ) : (
                     <RevisionRow
                       bookmarkMenu={bookmarkMenu}
+                      connectionDimmed={connectionIds !== null && !connectionIds.has(item.revision.commitId)}
+                      highlighted={locatedId === item.revision.commitId || connectionIds?.has(item.revision.commitId) === true}
                       dimmed={movingBranch?.has(item.revision.commitId) === true || previewBranchIds.has(item.revision.commitId)}
                       dropTarget={dropTarget === item.revision.commitId || rowDropPresentation !== null}
                       expanded={selectedRevision?.commitId === item.revision.commitId || rowDropPresentation !== null}
@@ -1776,6 +1915,8 @@ interface RevisionRowProps {
   readonly revision: Revision
   readonly expanded: boolean
   readonly dimmed: boolean
+  readonly connectionDimmed: boolean
+  readonly highlighted: boolean
   readonly dropTarget: boolean
   readonly graphLayout: RevisionGraphRow
   readonly graphWidth: number
@@ -1862,7 +2003,15 @@ const RevisionRow = (props: RevisionRowProps): JSX.Element => {
   )
   return (
     <article
-      className={cn('dshx:group/row dshx:relative dshx:@container', props.expanded && 'dshx:bg-muted-foreground/[0.07]', props.dimmed && 'dshx:opacity-40')}
+      className={cn(
+        'dshx:group/row dshx:relative dshx:@container',
+        props.expanded && 'dshx:bg-muted-foreground/[0.07]',
+        props.dimmed && 'dshx:opacity-40',
+        props.highlighted && 'dshx:bg-primary/10',
+      )}
+      data-commit-id={revision.commitId}
+      data-connection-dimmed={props.connectionDimmed || undefined}
+      data-highlighted={props.highlighted || undefined}
       onDragEnter={props.onDragEnter}
       onDragLeave={event => {
         if (!(event.relatedTarget instanceof Node) || !event.currentTarget.contains(event.relatedTarget)) props.onDragLeave()
@@ -1892,7 +2041,7 @@ const RevisionRow = (props: RevisionRowProps): JSX.Element => {
             title={draggable ? 'Drag onto another revision to rebase · right-click for actions' : 'Right-click for actions'}
           >
             <RevisionGraphCell height={props.rowHeight} layout={props.graphLayout} metrics={props.metrics} revision={revision} width={props.graphWidth} />
-            <div className="dshx:flex dshx:h-full dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:gap-1.5">
+            <div className={cn('dshx:flex dshx:h-full dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:gap-1.5', props.connectionDimmed && 'dshx:opacity-40')}>
               <ChevronRightIcon
                 aria-hidden
                 className={cn(
