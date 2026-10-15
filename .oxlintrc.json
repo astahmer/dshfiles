@@ -28,6 +28,19 @@
     "antislop/no-broad-object-parameters": "error",
     "antislop/no-conditional-empty-object-spread": "warn",
     "antislop/no-known-value-widening": "warn",
+    "antislop/no-export-bag": [
+      "warn",
+      {
+        "minExports": 3,
+        "excludePaths": [
+          "plugins/@dshfiles/plugin-ui/src/components/ui/**",
+          "tooling/dshx/packages/**/src/**/index.ts",
+          "**/test/**",
+          "**/tests/**",
+          "**/testing/**"
+        ]
+      }
+    ],
     "antislop/no-reflect-apply": "error",
     "antislop/no-reflect-get": "error",
     "antislop/no-passthrough-variable": "error",
