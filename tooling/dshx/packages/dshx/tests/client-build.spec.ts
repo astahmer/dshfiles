@@ -1295,7 +1295,10 @@ describe('client compiler', () => {
       ['dshx:shared-css', true],
       ['@dshx/consumer', false],
     ])
-    expect(styles[2]?.dataset.dshxCss).toBe(manifest.cssHash)
+    // The supplier owns the sheet, so the consumer must ship neither the marker hash nor any sheet-derived literal:
+    // a class change anywhere must leave this bundle byte-identical.
+    expect(styles[2]?.dataset.dshxCss).toBeUndefined()
+    expect(consumerCode).not.toContain(manifest.cssHash)
   })
 
   it('keeps its own sheet when the supplier sheet differs', async () => {
