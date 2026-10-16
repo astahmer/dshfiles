@@ -24,20 +24,7 @@ import {
 import { McpCatalogModel } from './catalog.js'
 import { McpCommandLineModel } from './command-line.js'
 import { ManagedLocalCommand, type LocalProcessStatus } from './local-process.js'
-import {
-  authorizationUrl,
-  callbackRedirectUri,
-  createPkcePair,
-  createState,
-  discoverOAuth,
-  exchangeCode,
-  needsRefresh,
-  oauthGrantSchema,
-  refreshGrant,
-  registerClient,
-  type OAuthGrant,
-  type PendingAuthorization,
-} from './oauth.js'
+import { McpOAuthModel, oauthGrantSchema, type OAuthGrant, type PendingAuthorization } from './oauth.js'
 import { redactingLogger } from './redaction.js'
 import { ClientReconciler, type ClientTarget } from './reconcile.js'
 import { McpServerStateModel } from './server-state.js'
@@ -130,18 +117,18 @@ const readGrant = async (ctx: Context, server: StoredServer): Promise<OAuthGrant
 /** Current grant, refreshed under the credential record lock when it is about to expire. */
 const liveGrant = async (ctx: Context, server: StoredServer): Promise<OAuthGrant | undefined> => {
   const grant = await readGrant(ctx, server)
-  if (grant === undefined || !needsRefresh(grant)) return grant
+  if (grant === undefined || !McpOAuthModel.needsRefresh({ grant })) return grant
   let refreshed: OAuthGrant | undefined
   try {
     await ctx.credentials.modifyRecord(grantKey(server), async current => {
       const parsed = current?.kind === 'grant' ? oauthGrantSchema.safeParse(current.payload) : undefined
       const stored = parsed?.success === true ? parsed.data : undefined
       if (stored === undefined) return current
-      if (!needsRefresh(stored)) {
+      if (!McpOAuthModel.needsRefresh({ grant: stored })) {
         refreshed = stored
         return current
       }
-      refreshed = await refreshGrant(stored)
+      refreshed = await McpOAuthModel.refreshGrant({ grant: stored })
       return refreshed === undefined ? current : { kind: 'grant', payload: refreshed }
     })
   } catch {
@@ -504,7 +491,7 @@ const handleOAuthCallback = async (ctx: Context, request: IncomingMessage, respo
   if (code === null || code.length === 0 || code.length > 4096) return callbackPage(response, 400, 'The provider returned no authorization code.')
   try {
     const server = oauthServer(ctx, pending.serverId)
-    const grant = await exchangeCode(pending, url.searchParams)
+    const grant = await McpOAuthModel.exchangeCode({ pending, callbackParameters: url.searchParams })
     await ctx.credentials.modifyRecord(grantKey(server), async () => ({ kind: 'grant', payload: grant }))
     await reconnect(ctx, server.id)
     callbackPage(response, 200, 'Signed in. The MCP server is reconnecting.')
@@ -548,14 +535,18 @@ const hostApi = mcpServersApi.host({
   },
   authorize: async ({ ctx, input }) => {
     const server = oauthServer(ctx, input.id)
-    const redirectUri = callbackRedirectUri(input.origin, OAUTH_CALLBACK_PATH)
-    const endpoints = await discoverOAuth(server.url)
+    const redirectUri = McpOAuthModel.callbackRedirectUri({ origin: input.origin, callbackPath: OAUTH_CALLBACK_PATH })
+    const endpoints = await McpOAuthModel.discover({ serverUrl: server.url })
     if (endpoints.authorizationServer.registration_endpoint === undefined) {
       throw new Error('This provider requires a pre-registered OAuth client. Store its token as a credential reference header instead.')
     }
-    const client = await registerClient({ authorizationServer: endpoints.authorizationServer, redirectUri, clientName: preferencesFor(ctx).oauthClientName })
-    const pkce = await createPkcePair()
-    const state = createState()
+    const client = await McpOAuthModel.registerClient({
+      authorizationServer: endpoints.authorizationServer,
+      redirectUri,
+      clientName: preferencesFor(ctx).oauthClientName,
+    })
+    const pkce = await McpOAuthModel.createPkcePair()
+    const state = McpOAuthModel.createState()
     pendingAuthorizations.set(state, {
       serverId: server.id,
       state,
@@ -567,7 +558,7 @@ const hostApi = mcpServersApi.host({
       resource: endpoints.resource,
       createdAt: Date.now(),
     })
-    return { authorizationUrl: authorizationUrl({ endpoints, clientId: client.clientId, redirectUri, challenge: pkce.challenge, state }) }
+    return { authorizationUrl: McpOAuthModel.authorizationUrl({ endpoints, clientId: client.clientId, redirectUri, challenge: pkce.challenge, state }) }
   },
   signOut: async ({ ctx, input }) => {
     const server = oauthServer(ctx, input.id)
