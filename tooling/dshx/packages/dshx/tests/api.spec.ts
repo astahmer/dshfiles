@@ -2,7 +2,7 @@ import type { StandardSchemaV1 } from '@standard-schema/spec'
 import type { ConnectionFetchRoute } from '@deepseek-ai/dsh-client-connection'
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
 import { z } from 'zod'
-import { createApiClientRuntime, startApiQueryEffect } from '../src/api/client.js'
+import { ApiClientLifecycle } from '../src/api/client.js'
 import { defineApi, method } from '../src/api/define.js'
 import * as publicApi from '../src/api/index.js'
 import { apiChannel, apiConnectionAvailable, createApiClient, subscribeApiConnection } from '../src/api/runtime.js'
@@ -174,7 +174,7 @@ describe('generic API runtime', () => {
 
   it('lazily reuses API clients by contract identity within one Client Fiber runtime', () => {
     const get = vi.fn(() => ({ rpc: { call: vi.fn() } }))
-    const firstRuntime = createApiClientRuntime({ get }, '@scope/plugin')
+    const firstRuntime = ApiClientLifecycle.create({ get }, '@scope/plugin')
     const sameShape = defineApi({
       id: 'status-copy',
       version: 1,
@@ -189,14 +189,14 @@ describe('generic API runtime', () => {
     expect(firstRuntime.client(sameShape)).not.toBe(first)
     expect(get).toHaveBeenCalledTimes(2)
 
-    const nextRuntime = createApiClientRuntime({ get }, '@scope/plugin')
+    const nextRuntime = ApiClientLifecycle.create({ get }, '@scope/plugin')
     expect(nextRuntime.client(api)).not.toBe(first)
     expect(get).toHaveBeenCalledTimes(3)
   })
 
   it('does not eagerly bind contracts before useApi requests one', () => {
     const get = vi.fn(() => ({ rpc: { call: vi.fn() } }))
-    const client = createApiClientRuntime({ get }, '@scope/plugin')
+    const client = ApiClientLifecycle.create({ get }, '@scope/plugin')
     expect(get).not.toHaveBeenCalled()
     expect(client.client(api)).toBe(client.client(api))
     expect(get).toHaveBeenCalledOnce()
@@ -386,7 +386,7 @@ describe('generic API runtime', () => {
     const listeners = new Set<() => void>()
     const invoke = vi.fn(async () => 'ready')
     const onReconnect = vi.fn()
-    const dispose = startApiQueryEffect({
+    const dispose = ApiClientLifecycle.startQuery({
       available: () => connected,
       subscribe(listener) {
         listeners.add(listener)
@@ -414,7 +414,7 @@ describe('generic API runtime', () => {
     const onPending = vi.fn()
     const onError = vi.fn()
     const onReconnect = vi.fn()
-    const dispose = startApiQueryEffect({
+    const dispose = ApiClientLifecycle.startQuery({
       available: () => connected,
       subscribe(listener) {
         listeners.add(listener)

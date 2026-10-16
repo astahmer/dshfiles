@@ -41,7 +41,7 @@ function context(): import('react').Context<ApiClientRuntime | undefined> {
 }
 
 /** One lazy contract-identity map for the lifetime of a Client Fiber. */
-export function createApiClientRuntime(ctx: ContextLike, packageId: string): ApiClientRuntime {
+const createApiClientRuntime = (ctx: ContextLike, packageId: string): ApiClientRuntime => {
   const clients = new Map<object, ApiClient>()
   return {
     client<const Methods extends Record<string, AnyApiMethodDefinition>>(contract: ApiContract<Methods>): ApiClient<Methods> {
@@ -54,7 +54,7 @@ export function createApiClientRuntime(ctx: ContextLike, packageId: string): Api
   }
 }
 
-export function provideApiContext(component: (props: any) => ReactNode, client: ApiClientRuntime): (props: any) => ReactNode {
+const provideApiContext = (component: (props: any) => ReactNode, client: ApiClientRuntime): ((props: any) => ReactNode) => {
   return (props: any) => runtime().createElement(context().Provider, { value: client }, runtime().createElement(component, props))
 }
 
@@ -76,7 +76,7 @@ interface ApiQueryEffectOptions<T> {
 }
 
 /** Query lifecycle seam kept React-free for generation-loss tests. */
-export function startApiQueryEffect<T>(options: ApiQueryEffectOptions<T>): () => void {
+const startApiQueryEffect = <T>(options: ApiQueryEffectOptions<T>): (() => void) => {
   const controller = new AbortController()
   let disposed = false
   let disconnected = !options.available()
@@ -185,7 +185,7 @@ export function useApiQuery<const Methods extends Record<string, AnyApiMethodDef
       return undefined
     }
     let manualPending = manuallyRequested
-    return startApiQueryEffect<ApiClientOutput<Methods[K]>>({
+    return ApiClientLifecycle.startQuery<ApiClientOutput<Methods[K]>>({
       available: () => apiConnectionAvailable(api),
       subscribe: listener => subscribeApiConnection(api, listener),
       ...(options?.signal === undefined ? {} : { signal: options.signal }),
@@ -224,4 +224,10 @@ export function useApiQuery<const Methods extends Record<string, AnyApiMethodDef
     })
   }, [])
   return { ...state, refetch } as ApiQueryResult<ApiClientOutput<Methods[K]>>
+}
+
+export class ApiClientLifecycle {
+  static readonly create = createApiClientRuntime
+  static readonly provide = provideApiContext
+  static readonly startQuery = startApiQueryEffect
 }
