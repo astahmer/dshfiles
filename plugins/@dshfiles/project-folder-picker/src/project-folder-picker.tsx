@@ -57,6 +57,7 @@ export interface ProjectFolderPickerProps {
   readonly mode?: 'projects' | 'directories'
   readonly showNativePicker?: boolean
   readonly disabled?: boolean
+  readonly loading?: boolean
   readonly title?: string
   /**
    * Identity of the machine these paths live on, shown with each row the way the
@@ -369,7 +370,7 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
           </>
         ) : (
           <>
-            <div aria-label="Projects and recent folders" className={cn(listClassName, 'dshx:pt-2')} role="listbox">
+            <div aria-busy={props.loading === true} aria-label="Projects and recent folders" className={cn(listClassName, 'dshx:pt-2')} role="listbox">
               {entries.map((entry, index) => {
                 const previous = entries[index - 1]
                 const heading = previous === undefined || previous.kind !== entry.kind ? (entry.kind === 'project' ? 'Projects' : 'Recent folders') : null
@@ -386,7 +387,7 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
                   />
                 )
               })}
-              {entries.length === 0 && <p className={emptyClassName}>No registered projects match.</p>}
+              {entries.length === 0 && <p className={emptyClassName}>{props.loading === true ? 'Loading projects…' : 'No registered projects match.'}</p>}
             </div>
           </>
         )}

@@ -17,6 +17,7 @@ import { JsonText } from './json-text.js'
 import { jjIntegrationSettings, type JjIntegrationSettings } from './settings.js'
 import { canRebaseThreadIfKnown, hasPendingUserQuestion, type ThreadSessionActivity } from './thread-rebase-eligibility.js'
 import { workspaceHasOtherSession } from './thread-session-ownership.js'
+import { registeredProjects } from './registered-projects.js'
 import {
   checkoutSyncArgv,
   createThreads,
@@ -553,15 +554,16 @@ const api = jjIntegrationApi.host({
   },
   projects: async () => {
     const workspaces = [...registryOf().list()].sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt))
-    const projects = []
-    for (const workspace of workspaces) {
-      const location = existsSync(workspace.path)
-        ? await requireThreads()
-            .locate(workspace.path)
-            .catch(() => undefined)
-        : undefined
-      if (location === undefined || !isSecondaryWorkspace(location)) projects.push({ workspaceId: workspace.id, title: workspace.title, path: workspace.path })
-    }
+    const projects = await registeredProjects({
+      workspaces: workspaces.map(workspace => ({ workspaceId: workspace.id, title: workspace.title, path: workspace.path })),
+      isSecondaryWorkspace: async path => {
+        if (!existsSync(path)) return false
+        const location = await requireThreads()
+          .locate(path)
+          .catch(() => undefined)
+        return location !== undefined && isSecondaryWorkspace(location)
+      },
+    })
     return { projects }
   },
   noFolder: async () => {

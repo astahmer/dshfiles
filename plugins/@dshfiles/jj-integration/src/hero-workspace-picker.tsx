@@ -44,7 +44,7 @@ export const HeroWorkspacePicker = (
   useEffect(() => (remote ? takeOverComposer() : undefined), [remote, takeOverComposer])
   const projects = useQuery({
     queryKey: ['jj-integration', 'projects'],
-    enabled: props.open && !remote,
+    enabled: !remote,
     queryFn: ({ signal }) => runHostRequest({ signal, timeoutMs: 30_000, request: hostSignal => api.projects({}, { signal: hostSignal }) }),
   })
   if (destination.kind === 'runtime') {
@@ -101,6 +101,7 @@ export const HeroWorkspacePicker = (
         onClose={props.onClose}
         showNativePicker={false}
         disabled={projects.isLoading}
+        loading={projects.isLoading}
         title={props.t('chooseProject')}
       />
     </>
