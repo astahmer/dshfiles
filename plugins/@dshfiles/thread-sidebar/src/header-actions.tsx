@@ -18,7 +18,7 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { ArchiveIcon, ArchiveRestoreIcon, BellIcon, BellOffIcon, CopyIcon, EllipsisIcon, PauseIcon, PinIcon, PinOffIcon } from '@dshfiles/plugin-ui/icons'
 import { useLayoutEffect, useState } from 'react'
-import { isSessionMuted, muteOptionLabelKeys, muteSessions, muteUntil, THREAD_MUTE_OPTIONS, unmuteSessions, type ThreadMuteOption } from './thread-mute.js'
+import { ThreadMuteModel, THREAD_MUTE_OPTIONS, type ThreadMuteOption } from './thread-mute.js'
 import { ThreadChildrenModel } from './thread-children.js'
 import { usePreferences } from './sidebar-state.js'
 import { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
@@ -38,7 +38,7 @@ type HeaderThreadActionsProps = Pick<PropsRuntime<'conversation.session.header.u
   HeaderThreadActionsInjected
 
 // Read at the click, outside render.
-const muteUntilNow = (option: ThreadMuteOption): number | null => muteUntil(option, Date.now())
+const muteUntilNow = (option: ThreadMuteOption): number | null => ThreadMuteModel.muteUntil(option, Date.now())
 
 // Room the native title cluster keeps for the breadcrumb before Pin folds into the menu.
 const TITLE_MIN_WIDTH = 160
@@ -98,7 +98,7 @@ export const HeaderThreadActions = ({
   const archived = workspaceState.archivedSessionIds.includes(sessionId)
   const pinned = workspaceState.pinnedSessionIds.includes(sessionId)
   const parked = preferences.parkedSessionIds.includes(sessionId)
-  const muted = isSessionMuted(preferences.mutedThreads, sessionId, Date.now())
+  const muted = ThreadMuteModel.isSessionMuted(preferences.mutedThreads, sessionId, Date.now())
   const actionThreads = Object.values(sessionState.byId).filter(candidate => !candidate.blank)
   const targetIds = ThreadChildrenModel.threadActionTargetIds({
     threadId: sessionId,
@@ -134,7 +134,7 @@ export const HeaderThreadActions = ({
   }
   const mute = (option: ThreadMuteOption): void => {
     updatePreferences({
-      mutedThreads: muteSessions({
+      mutedThreads: ThreadMuteModel.muteSessions({
         mutes: preferences.mutedThreads,
         sessions: actionThreads.filter(thread => targetIds.includes(thread.id)),
         until: muteUntilNow(option),
@@ -205,13 +205,13 @@ export const HeaderThreadActions = ({
                   <DropdownMenuSubContent className="dshx-root dshx:min-w-44" aria-label={t('threadSidebarMute')}>
                     {THREAD_MUTE_OPTIONS.map(option => (
                       <DropdownMenuItem key={option} onSelect={() => mute(option)}>
-                        {t(muteOptionLabelKeys[option])}
+                        {t(ThreadMuteModel.muteOptionLabelKeys[option])}
                       </DropdownMenuItem>
                     ))}
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
                       disabled={!muted}
-                      onSelect={() => updatePreferences({ mutedThreads: unmuteSessions(preferences.mutedThreads, targetIds) })}
+                      onSelect={() => updatePreferences({ mutedThreads: ThreadMuteModel.unmuteSessions(preferences.mutedThreads, targetIds) })}
                     >
                       {t('threadSidebarUnmute')}
                     </DropdownMenuItem>
