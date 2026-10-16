@@ -403,6 +403,24 @@
         },
         {
           "kind": "unit-test",
+          "id": "jj-integration.rebase-asking-agent",
+          "file": "plugins/@dshfiles/jj-integration/src/thread-rebase-eligibility.test.ts",
+          "testName": "tells an Agent its own thread is rebasable while it works"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.rebase-sibling-still-blocks",
+          "file": "plugins/@dshfiles/jj-integration/src/thread-rebase-eligibility.test.ts",
+          "testName": "keeps a sibling Session blocking the same Agent"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.rebase-status-matches-guard",
+          "file": "plugins/@dshfiles/jj-integration/src/thread-rebase-eligibility.test.ts",
+          "testName": "agrees with the guard the rebase itself applies"
+        },
+        {
+          "kind": "unit-test",
           "id": "jj-integration.rebase",
           "file": "plugins/@dshfiles/jj-integration/src/threads.integration.test.ts",
           "testName": "rebases described work onto the bookmark and leaves a fresh working copy"

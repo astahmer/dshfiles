@@ -5,6 +5,7 @@ import {
   canRebaseThreadIfKnown,
   hasPendingUserQuestion,
   rebaseGuardSessionIds,
+  threadRebaseEligibility,
 } from './thread-rebase-eligibility.js'
 
 describe('thread rebase eligibility', () => {
@@ -83,5 +84,72 @@ describe('rebase guard session scope', () => {
   it('lets the exempted caller rebase while its own activity is unknown', () => {
     const guardSessionIds = rebaseGuardSessionIds({ sessionIds: ['agent'], fromAgent: true, sessionId: 'agent' })
     expect(canRebaseThreadIfKnown(guardSessionIds, new Map())).toBe(true)
+  })
+})
+
+describe('thread rebase eligibility as the caller sees it', () => {
+  const idle = { running: false, pendingUserQuestion: false }
+  const working = { running: true, pendingUserQuestion: false }
+
+  it('tells an Agent its own thread is rebasable while it works', () => {
+    expect(
+      threadRebaseEligibility({
+        sessionIds: ['agent'],
+        activity: new Map([['agent', working]]),
+        fromAgent: true,
+        sessionId: 'agent',
+      }),
+    ).toBe(true)
+  })
+
+  it('keeps a sibling Session blocking the same Agent', () => {
+    expect(
+      threadRebaseEligibility({
+        sessionIds: ['agent', 'sibling'],
+        activity: new Map([
+          ['agent', working],
+          ['sibling', working],
+        ]),
+        fromAgent: true,
+        sessionId: 'agent',
+      }),
+    ).toBe(false)
+  })
+
+  it('keeps the UI and /rebase paths strict about the Session they show', () => {
+    expect(
+      threadRebaseEligibility({
+        sessionIds: ['agent'],
+        activity: new Map([['agent', working]]),
+        fromAgent: false,
+        sessionId: 'agent',
+      }),
+    ).toBe(false)
+  })
+
+  it('still fails closed when a checked Session has no activity', () => {
+    expect(
+      threadRebaseEligibility({
+        sessionIds: ['agent', 'ghost'],
+        activity: new Map([['agent', working]]),
+        fromAgent: true,
+        sessionId: 'agent',
+      }),
+    ).toBe(false)
+    expect(threadRebaseEligibility({ sessionIds: ['agent'], activity: undefined, fromAgent: true, sessionId: 'agent' })).toBe(true)
+    expect(threadRebaseEligibility({ sessionIds: ['agent', 'ghost'], activity: undefined, fromAgent: true, sessionId: 'agent' })).toBeUndefined()
+  })
+
+  it('agrees with the guard the rebase itself applies', () => {
+    const input = {
+      sessionIds: ['agent', 'sibling'],
+      activity: new Map([
+        ['agent', working],
+        ['sibling', idle],
+      ]),
+      fromAgent: true,
+      sessionId: 'agent',
+    }
+    expect(threadRebaseEligibility(input)).toBe(canRebaseThreadIfKnown(rebaseGuardSessionIds(input), input.activity))
   })
 })

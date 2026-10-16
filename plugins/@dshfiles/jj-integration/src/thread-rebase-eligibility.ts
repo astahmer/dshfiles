@@ -44,6 +44,20 @@ export const rebaseGuardSessionIds = (input: {
   return input.sessionIds.filter(sessionId => sessionId !== input.sessionId)
 }
 
+/**
+ * One answer to "may this thread be rebased", shared by the guard that refuses a
+ * rebase and by the status an Agent reads before asking for one. Both apply the
+ * same caller exemption, so `jj_thread_status` reports what a rebase would do
+ * instead of counting the asking Agent's own turn against it.
+ */
+export const threadRebaseEligibility = (input: {
+  readonly sessionIds: readonly string[]
+  readonly activity: ReadonlyMap<string, ThreadSessionActivity> | undefined
+  readonly fromAgent: boolean
+  readonly sessionId: string | undefined
+}): boolean | undefined =>
+  canRebaseThreadIfKnown(rebaseGuardSessionIds({ sessionIds: input.sessionIds, fromAgent: input.fromAgent, sessionId: input.sessionId }), input.activity)
+
 export const canRebaseFromClientSnapshot = (input: {
   readonly threadSessionsEligible: boolean
   readonly sessionRunning: boolean

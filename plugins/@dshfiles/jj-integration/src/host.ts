@@ -15,7 +15,7 @@ import { z } from 'zod'
 import { jjIntegrationApi, type DestinationView, type LandResult, type RepositoryView, type ThreadView, type WorkspaceSyncView } from './api.js'
 import { JsonText } from './json-text.js'
 import { jjIntegrationSettings, type JjIntegrationSettings } from './settings.js'
-import { canRebaseThreadIfKnown, hasPendingUserQuestion, rebaseGuardSessionIds, type ThreadSessionActivity } from './thread-rebase-eligibility.js'
+import { hasPendingUserQuestion, threadRebaseEligibility, type ThreadSessionActivity } from './thread-rebase-eligibility.js'
 import { workspaceHasOtherSession } from './thread-session-ownership.js'
 import { registeredProjects } from './registered-projects.js'
 import {
@@ -152,17 +152,15 @@ const readSessionActivity = async (): Promise<ReadonlyMap<string, ThreadSessionA
   }
 }
 
-const canRebaseWorkspace = (sessionIds: readonly string[], activity: ReadonlyMap<string, ThreadSessionActivity> | undefined): boolean =>
-  canRebaseThreadIfKnown(sessionIds, activity) === true
-
 const threadView = (
   status: ThreadStatus,
   workspace: Workspace | undefined,
   archived: ReadonlySet<string>,
   activity: ReadonlyMap<string, ThreadSessionActivity> | undefined,
+  caller: { readonly fromAgent: boolean; readonly sessionId: string | undefined } = { fromAgent: false, sessionId: undefined },
 ): ThreadView => {
   const sessionIds = [...new Set([...(workspace?.sessionIds ?? []), ...isolatedSessionIdsAt(status.path)])]
-  const canRebase = canRebaseThreadIfKnown(sessionIds, activity)
+  const canRebase = threadRebaseEligibility({ sessionIds, activity, fromAgent: caller.fromAgent, sessionId: caller.sessionId })
   const view: ThreadView = {
     name: status.name,
     path: status.path,
@@ -208,6 +206,8 @@ const listRepositories = async (): Promise<readonly RepositoryView[]> => {
 const findThread = async (input: {
   readonly location: ThreadLocation
   readonly includeActivity?: boolean
+  /** The Session asking, so its own turn is not counted against the thread it wants to rebase. */
+  readonly caller?: { readonly fromAgent: boolean; readonly sessionId: string | undefined } | undefined
 }): Promise<{ readonly repoRoot: string; readonly thread: ThreadView } | undefined> => {
   const location = input.location
   if (location.threadName === undefined) return undefined
@@ -221,7 +221,7 @@ const findThread = async (input: {
   ])
   return {
     repoRoot: location.repoRoot,
-    thread: threadView(threadStatus, workspace, new Set(registry.archivedSessionIds), activity),
+    thread: threadView(threadStatus, workspace, new Set(registry.archivedSessionIds), activity, input.caller),
   }
 }
 
@@ -368,12 +368,13 @@ const landThread = async (input: {
     const workspace = await registry.resolveByPath(location.workspaceRoot)
     if (workspace === undefined) throw new PluginApiError('Could not verify thread activity before rebasing.', { code: 'thread-activity-unknown' })
     const activity = await readSessionActivity()
-    const guardSessionIds = rebaseGuardSessionIds({
+    const eligible = threadRebaseEligibility({
       sessionIds: workspace.sessionIds,
+      activity,
       fromAgent: input.fromAgent,
       sessionId: input.sessionId,
     })
-    if (!canRebaseWorkspace(guardSessionIds, activity)) {
+    if (eligible !== true) {
       throw new PluginApiError('Finish all work and answer pending questions before rebasing this thread.', { code: 'thread-active' })
     }
   }
@@ -591,7 +592,10 @@ const api = jjIntegrationApi.host({
   land: ({ input }) => landThread({ path: input.path, sessionId: input.sessionId, fromAgent: false }),
   threadStatus: async ({ input, caller }) => {
     const location = await requireThreads().locate(threadPath(input, caller))
-    const found = await findThread({ location })
+    const found = await findThread({
+      location,
+      caller: caller.kind === 'agent' ? { fromAgent: true, sessionId: caller.sessionId } : { fromAgent: false, sessionId: undefined },
+    })
     return { bookmark: readSettings().bookmark, thread: found?.thread ?? null }
   },
   landThread: async ({ input, caller }) => {
