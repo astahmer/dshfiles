@@ -17,7 +17,7 @@ for close to native cost?
 | summaries | memory digests and OptMem summaries on the thread's cheap route, DeepSeek V4.1 Flash with reasoning `off`                                                                |
 | arms      | **native** (neither plugin), **memory** (`@dshfiles/memory`, defaults, Jev off), **compat** (OptMem compatibility as on main)                                            |
 | scenarios | `support` (28 + 2 turns, 2 threads), `logs` (24 + 1, 2 threads), `infra-rollout` long (68 turns, 3 threads, acceptance tests); 2 repetitions each, seeds paired          |
-| harness   | Retired OptMem harness, arm M; between threads it waited for the previous digest (idleMs 60 s), as a pause between threads would                                  |
+| harness   | Retired OptMem harness, arm M; between threads it waited for the previous digest (idleMs 60 s), as a pause between threads would                                         |
 | prices    | list prices: /bin/zsh.15 / /bin/zsh.003 cached / /bin/zsh.60 per M tokens                                                                                                |
 | load      | load average 15–60 (other agents and the embedding experiment); wall times are noisy                                                                                     |
 
