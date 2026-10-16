@@ -43,7 +43,7 @@ const runJj = (input: { readonly cwd: string; readonly home: string; readonly ar
 }
 
 /** A jj repository with a `main` bookmark, so jj-integration's destination bar has a bookmark and isolation to show. */
-export const seedSampleProject = async (home: string): Promise<string> => {
+const seedSampleProject = async (home: string): Promise<string> => {
   const project = join(home, 'projects', 'sample')
   await mkdir(project, { recursive: true })
   await writeFile(join(project, 'README.md'), '# Sample\n\nScratch project created by dshx dev up.\n')
@@ -138,7 +138,7 @@ const seedPendingRestart = async (state: ScratchState): Promise<string> => {
 }
 
 /** Undo `seed pending-restart`: the restored file, or undefined when it no longer carries the seed. */
-export const restorePendingRestart = async (state: ScratchState, dryRun: boolean): Promise<string | undefined> => {
+const restorePendingRestart = async (state: ScratchState, dryRun: boolean): Promise<string | undefined> => {
   const hostEntry = state.seeds?.find(applied => applied.seed === 'pending-restart')?.changedFile
   if (hostEntry === undefined) return undefined
   const source = await readFile(hostEntry, 'utf8').catch(() => '')
@@ -302,7 +302,7 @@ const fakeSecretStore = (project: string): string => {
  * Install the e2e fake `secret` CLI in the scratch home with a synthetic store for `project`, so a Host started with
  * the returned directory first on PATH never reaches a real vault. Returns that directory.
  */
-export const installFakeSecretCli = async (input: { readonly home: string; readonly project: string }): Promise<string> => {
+const installFakeSecretCli = async (input: { readonly home: string; readonly project: string }): Promise<string> => {
   const bin = join(input.home, 'fake-secret-cli')
   await mkdir(bin, { recursive: true })
   await copyFile(FAKE_SECRET_CLI, join(bin, 'secret'))
@@ -344,7 +344,7 @@ const seedFakeSecretCli = async (state: ScratchState): Promise<void> => {
 }
 
 /** Apply one seed: the checkout file it changed and the process it started, if any. */
-export const applySeed = async (input: {
+const applySeed = async (input: {
   readonly state: ScratchState
   readonly seed: ReachSeed
   readonly page: Page
@@ -359,4 +359,11 @@ export const applySeed = async (input: {
   if (input.seed === 'chat-reference-thread') return { fakeProvider: await seedChatReferenceThread(input.state, input.page, input.timeoutMs) }
   await seedRebaseReadyThread(input.state, input.page, input.timeoutMs)
   return {}
+}
+
+export class ScratchSeedRuntime {
+  static readonly sampleProject = seedSampleProject
+  static readonly restorePendingRestart = restorePendingRestart
+  static readonly installFakeSecretCli = installFakeSecretCli
+  static readonly applySeed = applySeed
 }

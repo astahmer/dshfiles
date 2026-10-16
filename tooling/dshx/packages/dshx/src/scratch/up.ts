@@ -6,7 +6,7 @@ import { prepareComposedBootProfile } from '../project/boot-profile.js'
 import { DSHFILES_ROOT, buildPlugin, findFreePort, listLocalBootBundles, resolveLocalBundles, withSharedStylesheet } from '../project/local-bundles.js'
 import { compositionFailures, readProfileComposition } from '../project/profile-composition.js'
 import { ScratchProfileRuntime } from '../project/scratch-profile.js'
-import { installFakeSecretCli, seedSampleProject } from './seed.js'
+import { ScratchSeedRuntime } from './seed.js'
 import {
   LIVE_DSH_HOME,
   LIVE_DSH_PORT,
@@ -150,9 +150,9 @@ export const scratchUp = async (options: ScratchUpOptions): Promise<ScratchState
       )
 
     // DSH compares a Session's resolved cwd with the stored path, and macOS temp dirs live behind the /var -> /private/var link.
-    const project = await realpath(options.project === undefined ? await seedSampleProject(home) : resolve(options.project))
+    const project = await realpath(options.project === undefined ? await ScratchSeedRuntime.sampleProject(home) : resolve(options.project))
     const workspaceId = await registerProject(home, project)
-    const fakeSecretCli = options.fakeSecretCli ? await installFakeSecretCli({ home, project }) : undefined
+    const fakeSecretCli = options.fakeSecretCli ? await ScratchSeedRuntime.installFakeSecretCli({ home, project }) : undefined
     const hostSource = fakeSecretCli === undefined ? process.env : { ...process.env, PATH: `${fakeSecretCli}${delimiter}${process.env.PATH ?? ''}` }
 
     await mkdir(options.stateDir, { recursive: true, mode: 0o700 })

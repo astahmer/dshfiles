@@ -4,7 +4,7 @@ import type { Browser, Page } from 'playwright'
 import { DshxFeatureCatalogSchema, parseReachStep } from '../project/features.js'
 import { DSHFILES_ROOT } from '../project/local-bundles.js'
 import { StartupDialogs } from '../project/startup-dialogs.js'
-import { applySeed } from './seed.js'
+import { ScratchSeedRuntime } from './seed.js'
 import { ScratchError, ownedProcessStatus, redactUrls, writeScratchState, type ScratchState } from './state.js'
 
 export interface CatalogFeature {
@@ -145,7 +145,7 @@ export const scratchOpen = async (state: ScratchState, reference: string, timeou
         if (parsed.action === 'seed') {
           if (!seeded.some(applied => applied.seed === parsed.seed)) {
             const applied: NonNullable<ScratchState['seeds']>[number] = { seed: parsed.seed }
-            const outcome = await applySeed({ state, seed: parsed.seed, page, timeoutMs })
+            const outcome = await ScratchSeedRuntime.applySeed({ state, seed: parsed.seed, page, timeoutMs })
             if (outcome.changedFile !== undefined) applied.changedFile = outcome.changedFile
             if (outcome.fakeProvider !== undefined) fakeProvider = outcome.fakeProvider
             seeded = [...seeded, applied]
