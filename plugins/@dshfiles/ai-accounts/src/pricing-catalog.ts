@@ -69,7 +69,7 @@ const toModelPrice = (raw: unknown): ModelPrice | undefined => {
 }
 
 /** Keep every model that publishes a usable price; skip the rest without failing the catalog. */
-export const trimModelsDev = (raw: unknown, fetchedAt: number): PricingCache => {
+const trimModelsDev = (raw: unknown, fetchedAt: number): PricingCache => {
   const providers: Record<string, Record<string, ModelPrice>> = {}
   if (typeof raw === 'object' && raw !== null) {
     for (const [providerId, provider] of Object.entries(raw)) {
@@ -151,7 +151,7 @@ const OVERRIDE_PRICE_KEYS: Readonly<Record<string, keyof Omit<ModelPrice, 'tiers
  * One override value: `free`, a models.dev id (`openai/gpt-6-luna`), or USD per
  * million tokens (`input=3 output=15 cacheRead=0.3`). Anything else is ignored.
  */
-export const parsePricingOverride = (value: string): PricingOverride | undefined => {
+const parsePricingOverride = (value: string): PricingOverride | undefined => {
   const trimmed = value.trim()
   if (trimmed.toLowerCase() === 'free') return { kind: 'price', price: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } }
   if (trimmed.includes('=')) {
@@ -230,7 +230,7 @@ const findInProvider = (cache: PricingCache, provider: string, model: string): {
  * `provider/*`; the route's own models.dev provider (by account kind, alias or
  * id); then any provider pricing the same normalized model id, vendors first.
  */
-export const resolveRouteQuote = (input: {
+const resolveRouteQuote = (input: {
   readonly route: { readonly provider: string; readonly model: string }
   readonly cache: PricingCache | null
   readonly accountKind?: string | undefined
@@ -268,6 +268,12 @@ export const resolveRouteQuote = (input: {
     if (hit !== undefined && price !== undefined) return quoteFrom({ route, match: 'fuzzy', modelsDevId: `${hit.provider}/${hit.model}`, price })
   }
   return none
+}
+
+export class PricingCatalogModel {
+  static readonly trimModelsDev = trimModelsDev
+  static readonly parsePricingOverride = parsePricingOverride
+  static readonly resolveRouteQuote = resolveRouteQuote
 }
 
 export interface PricingStatus {
@@ -323,7 +329,7 @@ export const createPricingCatalog = (options: {
         headers: { accept: 'application/json' },
       })
       if (!response.ok) throw new Error(`models.dev answered ${String(response.status)}`)
-      const next = trimModelsDev(await response.json(), now())
+      const next = PricingCatalogModel.trimModelsDev(await response.json(), now())
       if (Object.keys(next.providers).length === 0) throw new Error('models.dev returned no priced models')
       await mkdir(dirname(options.path), { recursive: true })
       const temporary = `${options.path}.${String(process.pid)}.tmp`

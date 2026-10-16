@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { createPricingCatalog, parsePricingOverride, resolveRouteQuote, trimModelsDev, type PricingCache } from './pricing-catalog.js'
+import { createPricingCatalog, PricingCatalogModel, type PricingCache } from './pricing-catalog.js'
 
 const modelsDev = {
   openai: {
@@ -33,7 +33,7 @@ const modelsDev = {
   broken: { models: 'nope' },
 }
 
-const cache: PricingCache = trimModelsDev(modelsDev, 1_000)
+const cache: PricingCache = PricingCatalogModel.trimModelsDev(modelsDev, 1_000)
 
 describe('trimModelsDev', () => {
   it('keeps priced models, drops unpriced ones and malformed providers', () => {
@@ -55,7 +55,7 @@ describe('trimModelsDev', () => {
 
 describe('resolveRouteQuote', () => {
   const quote = (provider: string, model: string, extra: { accountKind?: string; overrides?: Record<string, string> } = {}) => {
-    const result = resolveRouteQuote({
+    const result = PricingCatalogModel.resolveRouteQuote({
       route: { provider, model },
       cache,
       overrides: extra.overrides ?? {},
@@ -102,17 +102,21 @@ describe('resolveRouteQuote', () => {
   })
 
   it('prices an explicit override even without a catalog', () => {
-    const result = resolveRouteQuote({ route: { provider: 'local', model: 'm' }, cache: null, overrides: { 'local/m': 'input=1 output=2 cacheRead=0.1' } })
+    const result = PricingCatalogModel.resolveRouteQuote({
+      route: { provider: 'local', model: 'm' },
+      cache: null,
+      overrides: { 'local/m': 'input=1 output=2 cacheRead=0.1' },
+    })
     expect(result.price).toEqual({ input: 1, output: 2, cacheRead: 0.1 })
   })
 })
 
 describe('parsePricingOverride', () => {
   it('rejects values it cannot read', () => {
-    expect(parsePricingOverride('input=abc')).toBeUndefined()
-    expect(parsePricingOverride('bogus=1 input=1 output=1')).toBeUndefined()
-    expect(parsePricingOverride('no-slash')).toBeUndefined()
-    expect(parsePricingOverride('input=1')).toBeUndefined()
+    expect(PricingCatalogModel.parsePricingOverride('input=abc')).toBeUndefined()
+    expect(PricingCatalogModel.parsePricingOverride('bogus=1 input=1 output=1')).toBeUndefined()
+    expect(PricingCatalogModel.parsePricingOverride('no-slash')).toBeUndefined()
+    expect(PricingCatalogModel.parsePricingOverride('input=1')).toBeUndefined()
   })
 })
 

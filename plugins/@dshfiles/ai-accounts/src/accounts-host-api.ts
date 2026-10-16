@@ -28,7 +28,7 @@ import { resolveKeyFromContext } from './credentials.js'
 import { readUsageHistory, readUsageHistorySettings, saveUsageHistorySettings } from './usage-recorder.js'
 import { knownQuotaResetAt } from './quota-reset.js'
 import { readNativeProviders, setNativeProviderEnabled } from './native-providers.js'
-import { resolveRouteQuote } from './pricing-catalog.js'
+import { PricingCatalogModel } from './pricing-catalog.js'
 import { readPricingSettings } from './settings.js'
 import { readCopilotCredential } from './copilot-credentials.js'
 
@@ -211,7 +211,9 @@ export const accountsHostApi = aiAccountsApi.host({
     const cache = pricing.current()
     return {
       fetchedAt: cache?.fetchedAt ?? null,
-      quotes: input.routes.map(route => resolveRouteQuote({ route, cache, accountKind: kinds.get(route.provider), overrides: settings.pricingOverrides })),
+      quotes: input.routes.map(route =>
+        PricingCatalogModel.resolveRouteQuote({ route, cache, accountKind: kinds.get(route.provider), overrides: settings.pricingOverrides }),
+      ),
     }
   },
   quotaContinuations: async ({ ctx }) => quotaContinuationServiceFor(ctx).list(),
