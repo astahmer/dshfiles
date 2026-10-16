@@ -23,6 +23,7 @@ import { createRestartController, readLaunchUrl } from './restart.js'
 import { threadSidebarSettings } from './settings.js'
 import { threadSidebarModelRouteProjection } from './subagent-provenance/projection.js'
 import { setThreadActionsContext, threadActionsHost } from './thread-actions-host.js'
+import { threadQueueHost } from './queue-host.js'
 
 const restartRecoveryStore = createRestartRecoveryStore()
 
@@ -181,6 +182,7 @@ export default defineHost({
     threadAttentionApiHost,
     sessionArchiveApi,
     threadActionsHost,
+    threadQueueHost,
   ],
   // The web Host's client module registry knows where every loaded plugin package lives; Hosts without it
   // (desktop shells, older builds) simply report no pending updates.
