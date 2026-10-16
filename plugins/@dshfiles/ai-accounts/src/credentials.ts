@@ -5,25 +5,6 @@ import { AccountsRules } from './api.js'
 
 export type CredentialValueResolver = (name: string) => Promise<string>
 
-/** Read an API-key reference from the process environment for legacy callers without DSH credentials. */
-export const readKeyFromEnv = (name: string): string => {
-  const trimmed = name.trim()
-  return AccountsRules.isKeyEnvName(trimmed) ? (process.env[trimmed] ?? '').trim() : ''
-}
-
-export const resolveKeyFromProvider = async (credentials: Pick<CredentialProvider, 'resolve'> | undefined, name: string): Promise<string> => {
-  const trimmed = name.trim()
-  if (!AccountsRules.isKeyEnvName(trimmed)) return ''
-  if (credentials === undefined) return readKeyFromEnv(trimmed)
-  return (await credentials.resolve(credentialRef(trimmed)))?.value.trim() ?? ''
-}
-
-/** Resolve a key per operation; provider-managed changes need no plugin restart. */
-export const resolveKeyFromContext =
-  (ctx: Context): CredentialValueResolver =>
-  name =>
-    resolveKeyFromProvider(ctx.get('credentials'), name)
-
 interface DiscoveryRequest {
   readonly baseURL?: string
   readonly apiKey?: string
@@ -34,10 +15,28 @@ interface StoredKeyedRoute {
   readonly keyEnv: string
 }
 
-/** A draft's own key may probe the draft's endpoint; the stored key only ever goes to the stored base. */
-export const discoveryCatalogOptions = (request: DiscoveryRequest, stored: StoredKeyedRoute, resolvedKey?: string) => {
-  const draftKey = request.apiKey?.trim() ?? ''
-  return draftKey.length > 0
-    ? { baseUrl: request.baseURL ?? stored.apiBaseUrl, apiKey: draftKey }
-    : { baseUrl: stored.apiBaseUrl, apiKey: resolvedKey ?? readKeyFromEnv(stored.keyEnv) }
+export class CredentialModel {
+  static readonly readKeyFromEnv = (name: string): string => {
+    const trimmed = name.trim()
+    return AccountsRules.isKeyEnvName(trimmed) ? (process.env[trimmed] ?? '').trim() : ''
+  }
+
+  static readonly discoveryCatalogOptions = (request: DiscoveryRequest, stored: StoredKeyedRoute, resolvedKey?: string) => {
+    const draftKey = request.apiKey?.trim() ?? ''
+    return draftKey.length > 0
+      ? { baseUrl: request.baseURL ?? stored.apiBaseUrl, apiKey: draftKey }
+      : { baseUrl: stored.apiBaseUrl, apiKey: resolvedKey ?? CredentialModel.readKeyFromEnv(stored.keyEnv) }
+  }
 }
+
+export const createCredentialResolver =
+  (credentials: Pick<CredentialProvider, 'resolve'> | undefined): CredentialValueResolver =>
+  async name => {
+    const trimmed = name.trim()
+    if (!AccountsRules.isKeyEnvName(trimmed)) return ''
+    if (credentials === undefined) return CredentialModel.readKeyFromEnv(trimmed)
+    return (await credentials.resolve(credentialRef(trimmed)))?.value.trim() ?? ''
+  }
+
+/** Resolve a key per operation; provider-managed changes need no plugin restart. */
+export const resolveKeyFromContext = (ctx: Context): CredentialValueResolver => createCredentialResolver(ctx.get('credentials'))

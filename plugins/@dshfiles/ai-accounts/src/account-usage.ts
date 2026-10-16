@@ -2,7 +2,7 @@ import type { AccountProfile, UsageCard } from './api.js'
 import { ClaudeAccountModel, claudeAccountService } from './claude-account.js'
 import { codexLayoutFor } from './account-store.js'
 import { readCommandCodeUsage } from './commandcode-usage.js'
-import { readKeyFromEnv, type CredentialValueResolver } from './credentials.js'
+import { CredentialModel, type CredentialValueResolver } from './credentials.js'
 import { readCursorUsage } from './cursor-account.js'
 import { ProviderUsageModel, readCodexUsage, readOpenCodeUsage } from './usage.js'
 
@@ -38,7 +38,7 @@ export const readAccountUsage = async (input: {
     case 'cursor':
       return readCursorUsage(account.apiKeyEnv, signal, input.resolveCredential)
     case 'opencode-go': {
-      const key = input.resolveCredential === undefined ? readKeyFromEnv(account.apiKeyEnv) : await input.resolveCredential(account.apiKeyEnv)
+      const key = input.resolveCredential === undefined ? CredentialModel.readKeyFromEnv(account.apiKeyEnv) : await input.resolveCredential(account.apiKeyEnv)
       return readOpenCodeUsage(key, signal)
     }
   }

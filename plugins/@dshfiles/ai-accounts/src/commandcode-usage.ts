@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { z } from 'zod'
 import type { UsageCard } from './api.js'
 import { DEFAULT_COMMANDCODE_KEY_ENV, resolveCommandCodeBase } from './commandcode-provider.js'
-import { readKeyFromEnv, type CredentialValueResolver } from './credentials.js'
+import { CredentialModel, type CredentialValueResolver } from './credentials.js'
 import { ProviderUsageModel, type UsageWindow } from './usage.js'
 
 type JsonValue = string | number | boolean | null | undefined | readonly JsonValue[] | { readonly [key: string]: JsonValue }
@@ -40,7 +40,7 @@ const keyFromRecord = (record: z.infer<typeof credentialRecordSchema> | undefine
 
 export const readCommandCodeKey = async (keyEnv: string, resolveCredential?: CredentialValueResolver): Promise<string> => {
   const name = keyEnv.trim() === '' ? DEFAULT_COMMANDCODE_KEY_ENV : keyEnv
-  const named = resolveCredential === undefined ? readKeyFromEnv(name) : await resolveCredential(name)
+  const named = resolveCredential === undefined ? CredentialModel.readKeyFromEnv(name) : await resolveCredential(name)
   if (named.length > 0) return named
   try {
     const parsed = authFileSchema.safeParse(JSON.parse(await readFile(join(homedir(), '.commandcode', 'auth.json'), 'utf8')))

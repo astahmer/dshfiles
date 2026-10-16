@@ -18,7 +18,7 @@ import { aiAccountsTool } from './accounts-tool.js'
 import { closeUsageDomain, createUsageHistoryScheduler } from './usage-recorder.js'
 import { CommandCodeCapabilities } from './commandcode-capabilities.js'
 import { fetchCommandCodeCatalog, createCommandCodeProvider } from './commandcode-provider.js'
-import { discoveryCatalogOptions, resolveKeyFromContext } from './credentials.js'
+import { CredentialModel, resolveKeyFromContext } from './credentials.js'
 import { fetchOpenCodeGoCatalog } from './opencode-go-catalog.js'
 import { definePlugin } from '@dshfiles/dshx/host'
 import { openaiCodexProvider } from '@earendil-works/pi-ai/providers/openai-codex'
@@ -435,7 +435,7 @@ export default definePlugin({
       const dispose = llm.registerModelDiscovery(`ai-accounts.${route.kind}.${id}`, async (request, signal) => {
         if (route.kind === COMMANDCODE_KIND) {
           const entries = await fetchCommandCodeCatalog({
-            ...discoveryCatalogOptions(
+            ...CredentialModel.discoveryCatalogOptions(
               request,
               { apiBaseUrl: route.apiBaseUrl, keyEnv: ProviderRoutes.keyEnvFor(route) },
               await resolveCredential(ProviderRoutes.keyEnvFor(route)),

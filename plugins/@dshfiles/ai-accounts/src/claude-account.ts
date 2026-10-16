@@ -4,13 +4,13 @@ import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { z } from 'zod'
 import type { UsageCard } from './api.js'
-import { readKeyFromEnv, type CredentialValueResolver } from './credentials.js'
+import { CredentialModel, type CredentialValueResolver } from './credentials.js'
 import { readKeychainSecret } from './keychain.js'
 import { ProviderUsageModel, type UsageWindow } from './usage.js'
 
 export interface ClaudeAccountServiceDependencies {
   readonly readFile: typeof readFile
-  readonly readKeyFromEnv: typeof readKeyFromEnv
+  readonly readKeyFromEnv: typeof CredentialModel.readKeyFromEnv
   readonly readKeychainSecret: typeof readKeychainSecret
   readonly fetch: typeof fetch
   readonly now: () => number
@@ -217,4 +217,10 @@ export const createClaudeAccountService = (dependencies: ClaudeAccountServiceDep
   },
 })
 
-export const claudeAccountService = createClaudeAccountService({ readFile, readKeyFromEnv, readKeychainSecret, fetch, now: Date.now })
+export const claudeAccountService = createClaudeAccountService({
+  readFile,
+  readKeyFromEnv: CredentialModel.readKeyFromEnv,
+  readKeychainSecret,
+  fetch,
+  now: Date.now,
+})

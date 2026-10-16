@@ -6,7 +6,7 @@ import { dirname, join, resolve } from 'node:path'
 import { accountDraftSchema, accountsFileSchema, type AccountDraft, type AccountOrderDirection, type AccountProfile, type AccountsFile } from './api.js'
 import { codexAccountHome, describeCodexAuth, materializeCodexShadowHome, CodexHomeError, resolveCodexHomeLayout } from './codex-home.js'
 import { DEFAULT_DISTRIBUTION, type AccountStatus } from './account-pool.js'
-import { readKeyFromEnv, type CredentialValueResolver } from './credentials.js'
+import { CredentialModel, type CredentialValueResolver } from './credentials.js'
 import { KIND_LABEL } from './account-labels.js'
 import { ClaudeAccountModel, claudeAccountService } from './claude-account.js'
 import { DEFAULT_COMMANDCODE_KEY_ENV } from './commandcode-provider.js'
@@ -159,7 +159,7 @@ const observe = async (
   isCopilotSignedIn?: (instanceId: string) => Promise<boolean>,
 ): Promise<AccountProfile> => {
   const cooling = status?.state === 'cooling'
-  const resolveKey = async (name: string): Promise<string> => (resolveCredential === undefined ? readKeyFromEnv(name) : resolveCredential(name))
+  const resolveKey = async (name: string): Promise<string> => (resolveCredential === undefined ? CredentialModel.readKeyFromEnv(name) : resolveCredential(name))
   if (draft.kind === 'opencode-go') {
     const hasKey = (await resolveKey(draft.apiKeyEnv)).length > 0
     return observed(draft, {

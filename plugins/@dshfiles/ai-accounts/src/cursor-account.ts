@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { z } from 'zod'
 import type { UsageCard } from './api.js'
 import { decodeJwtPayload } from './codex-home.js'
-import { readKeyFromEnv, type CredentialValueResolver } from './credentials.js'
+import { CredentialModel, type CredentialValueResolver } from './credentials.js'
 import { readKeychainSecret } from './keychain.js'
 import { ProviderUsageModel } from './usage.js'
 
@@ -32,7 +32,7 @@ export const CURSOR_LOGIN_HINT = 'cursor-agent login'
 const fileAuthSchema = z.object({ accessToken: z.string().min(1) })
 
 export const readCursorToken = async (keyEnv: string, resolveCredential?: CredentialValueResolver): Promise<string | undefined> => {
-  const named = resolveCredential === undefined ? readKeyFromEnv(keyEnv) : await resolveCredential(keyEnv)
+  const named = resolveCredential === undefined ? CredentialModel.readKeyFromEnv(keyEnv) : await resolveCredential(keyEnv)
   if (named.length > 0) return named
   const fromKeychain = await readKeychainSecret({ service: 'cursor-access-token', account: 'cursor-user' })
   if (fromKeychain !== undefined) return fromKeychain

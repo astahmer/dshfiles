@@ -15,7 +15,7 @@ import { z } from 'zod'
 import { AccountsRules } from './api.js'
 import { CommandCodeCapabilities } from './commandcode-capabilities.js'
 import { streamCommandCodeCli } from './commandcode-cli.js'
-import { readKeyFromEnv, type CredentialValueResolver } from './credentials.js'
+import { CredentialModel, type CredentialValueResolver } from './credentials.js'
 import { isEmptyCompletion } from './empty-response.js'
 
 /**
@@ -333,7 +333,7 @@ export const createCommandCodeProvider = (options: CommandCodeProviderOptions = 
     // pi-ai calls this during a catalog refresh and owns persistence of the
     // result, so it only has to answer with the models it advertises now.
     fetchModels: async () => {
-      const named = options.resolveCredential === undefined ? readKeyFromEnv(keyEnv) : await options.resolveCredential(keyEnv)
+      const named = options.resolveCredential === undefined ? CredentialModel.readKeyFromEnv(keyEnv) : await options.resolveCredential(keyEnv)
       const apiKey = named.length > 0 ? named : ((await options.readFallbackKey?.()) ?? '')
       return modelsFor(await fetchCommandCodeCatalog({ baseUrl: options.baseUrl, apiKey }))
     },
