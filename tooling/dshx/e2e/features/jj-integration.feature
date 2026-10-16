@@ -99,7 +99,7 @@ Feature: jj thread workspaces
 
   @scenario:jj-integration.rebase-browser-journey
   Scenario: Rebase a thread's described work onto main
-    Given the isolated plugin composition of "@dshfiles/jj-integration, @dshfiles/workspace-folder-picker, @dshfiles/multi-host" is booted
+    Given the isolated plugin composition of "@dshfiles/jj-integration, @dshfiles/workspace-folder-picker, @dshfiles/multi-host, @dshfiles/thread-sidebar" is booted
     When a disposable jj repository is chosen as the New thread project
     And the New thread workspace toggle is turned on
     And a message is sent in the thread workspace
@@ -113,6 +113,8 @@ Feature: jj thread workspaces
     Then Rebase detects the follow-up revision without reloading
     When the thread's work is rebased outside the UI
     Then Rebase reflects the external rebase without reloading
+    When the thread is archived from the rebase notice
+    Then the thread appears in the Archived sidebar section
 
   @scenario:jj-integration.rebase-command-browser-journey
   Scenario: Rebase a thread from its composer command

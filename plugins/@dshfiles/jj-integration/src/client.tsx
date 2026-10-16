@@ -10,16 +10,19 @@ import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import { createApiClient, defineClient, useApi, useSettings } from '@dshfiles/dshx/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { ArchiveIcon } from '@dshfiles/plugin-ui/icons'
 import { hostDestination, multiHostApi, multiHostQueries, REMOTE_THREAD_PANEL, RemoteComposer } from '@dshfiles/multi-host/destination'
-import { PluginQueryProvider, pluginQueryClient, useQuery } from '@dshfiles/plugin-ui/query'
+import { errorMessage, PluginQueryProvider, pluginQueryClient, useMutation, useQuery } from '@dshfiles/plugin-ui/query'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { createWorkspacePickerPorts } from '@dshfiles/project-folder-picker'
+import { useCallback, useSyncExternalStore } from 'react'
 import { startWorkspaceToggle, type DestinationBarServices } from './destination-bar.js'
 import { createComposerWorkspaceNavigation, type ComposerReferenceHandoff } from './composer-workspace-navigation.js'
 import { mainViewSessionId } from './main-view-session.js'
 import { jjIntegrationApi } from './api.js'
 import { HeroWorkspacePicker } from './hero-workspace-picker.js'
 import { LandButton } from './land-button.js'
+import { useLandToast } from './land-feedback.js'
 import { JJ_INTEGRATION_LOCALE_NAMESPACE, jjIntegrationLocale } from './locales.js'
 import { ThreadWorkspacesPanel } from './panel.js'
 import { prepareRemoteFolder } from './remote-destination.js'
@@ -227,18 +230,57 @@ export default defineClient({
               })),
       })
       const bookmark = useBookmark()
+      const subscribeToSessions = useCallback((listener: () => void) => ctx.sessions.list.subscribe(listener), [])
+      const sessionRunning = useSyncExternalStore(
+        subscribeToSessions,
+        () => ctx.sessions.list.getSnapshot().byId[props.sessionId]?.running === true,
+        () => true,
+      )
+      const subscribeToWorkspaces = useCallback((listener: () => void) => ctx.workspaces.list.subscribe(listener), [])
+      const archived = useSyncExternalStore(
+        subscribeToWorkspaces,
+        () => ctx.workspaces.list.getSnapshot().archivedSessionIds.includes(props.sessionId),
+        () => false,
+      )
+      const archiveToast = useLandToast()
+      const archive = useMutation({
+        mutationFn: () => ctx.workspaces.archiveSession(props.sessionId),
+        onError: error => archiveToast.show({ text: errorMessage(error, translate('archiveFailed')), success: false }),
+      })
       const rebasedAt = status.data?.thread?.rebasedAt
-      if (rebasedAt === undefined || rebasedAt === null) return null
+      if (rebasedAt === undefined || rebasedAt === null) return archiveToast.element
+      const rebasedTipChangeId = status.data?.thread?.rebasedTipChangeId
+      const notice =
+        rebasedTipChangeId === undefined
+          ? translate('rebaseNotice', { bookmark })
+          : translate('rebaseNoticeWithTip', { bookmark, revisionId: rebasedTipChangeId })
       return (
-        <div
-          data-testid="jj-thread-rebased-notice"
-          className="dshx-root dshx:mx-auto dshx:my-3 dshx:flex dshx:max-w-3xl dshx:items-center dshx:gap-2 dshx:rounded-md dshx:border dshx:bg-muted/40 dshx:px-3 dshx:py-2 dshx:text-sm dshx:text-muted-foreground"
-        >
-          <span className="dshx:min-w-0 dshx:flex-1">{translate('rebaseNotice', { bookmark })}</span>
-          <time className="dshx:shrink-0 dshx:text-xs dshx:tabular-nums" dateTime={new Date(rebasedAt).toISOString()}>
-            {new Date(rebasedAt).toLocaleString()}
-          </time>
-        </div>
+        <>
+          <div
+            data-testid="jj-thread-rebased-notice"
+            className="dshx-root dshx:mx-auto dshx:my-3 dshx:flex dshx:max-w-3xl dshx:items-center dshx:gap-2 dshx:rounded-md dshx:border dshx:bg-muted/40 dshx:px-3 dshx:py-2 dshx:text-sm dshx:text-muted-foreground"
+          >
+            <span className="dshx:min-w-0 dshx:flex-1">{notice}</span>
+            <time className="dshx:shrink-0 dshx:text-xs dshx:tabular-nums" dateTime={new Date(rebasedAt).toISOString()}>
+              {new Date(rebasedAt).toLocaleString()}
+            </time>
+            {archived ? null : (
+              <Button
+                aria-label={translate('archiveRebasedThread')}
+                disabled={sessionRunning || archive.isPending}
+                onClick={() => archive.mutate()}
+                size="sm"
+                title={translate('archiveRebasedThread')}
+                type="button"
+                variant="outline"
+              >
+                {archive.isPending ? null : <ArchiveIcon aria-hidden="true" size={16} />}
+                {archive.isPending ? translate('archivingThread') : translate('archiveThread')}
+              </Button>
+            )}
+          </div>
+          {archiveToast.element}
+        </>
       )
     }
     ctx.slots.inject('conversation.chat.turnTail', () =>

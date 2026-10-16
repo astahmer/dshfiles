@@ -80,6 +80,10 @@ When Rebase stops on conflicts or descriptions, it queues a message asking the
 thread's agent to fix them and rebase again with `/rebase` or the
 `jj_thread_rebase` tool (`askAgentToFixLanding`). Nothing is pushed.
 
+After a successful rebase, the conversation notice shows the target bookmark and
+12-character tip change ID. Its **Archive** action archives only that Session
+and is disabled while the Session is running.
+
 ## Cleanup
 
 Every 10 minutes, a thread workspace whose threads are all archived and that

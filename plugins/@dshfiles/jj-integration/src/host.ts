@@ -175,7 +175,9 @@ const threadView = (
   }
   const withEligibility: ThreadView = canRebase === undefined ? view : { ...view, canRebase }
   if (status.rebasedAt === undefined) return withEligibility
-  return { ...withEligibility, rebasedAt: status.rebasedAt }
+  const viewWithRebaseTimestamp = { ...withEligibility, rebasedAt: status.rebasedAt }
+  if (status.rebasedTipChangeId === undefined) return viewWithRebaseTimestamp
+  return { ...viewWithRebaseTimestamp, rebasedTipChangeId: status.rebasedTipChangeId }
 }
 
 /** Every registered project that is the owning checkout of a jj repository, with its thread workspaces. */

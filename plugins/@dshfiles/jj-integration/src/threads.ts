@@ -51,6 +51,8 @@ export interface ThreadStatus {
   readonly behind: boolean
   /** Timestamp of the latest successful land, persisted beside the thread workspaces. */
   readonly rebasedAt?: number
+  /** Change ID of the bookmark tip when this thread last landed. */
+  readonly rebasedTipChangeId?: string
 }
 
 export type LandOutcome =
@@ -65,7 +67,11 @@ const REVISION_TEMPLATE = 'change_id.short(12) ++ "\\t" ++ commit_id ++ "\\t" ++
 const PLACEHOLDER_DESCRIPTIONS = new Set(['', 'wip'])
 const MAX_CONFLICT_FILES = 50
 const LAND_ATTEMPTS = 3
-const rebaseTimestampSchema = z.record(z.string(), z.number().int().nonnegative().safe())
+const rebaseTimestampSchema = z.number().int().nonnegative().safe()
+const rebaseMetadataEntrySchema = z.object({ at: rebaseTimestampSchema, tipChangeId: z.string().min(1).max(128).optional() }).strict()
+const rebaseMetadataValueSchema = z.union([rebaseTimestampSchema, rebaseMetadataEntrySchema])
+const rebaseMetadataSchema = z.record(z.string(), rebaseMetadataValueSchema)
+type RebaseMetadataEntry = z.infer<typeof rebaseMetadataEntrySchema>
 
 const parseRevisions = (stdout: string): readonly ThreadRevision[] =>
   stdout
@@ -133,31 +139,43 @@ export const createThreads = (options: {
 
   const unlandedRevset = (name: string): string => `(::${name}@ ~ ::${options.bookmark()}) ~ empty()`
   const timestampFile = (repoRoot: string): string => join(options.threadsDirectory(repoRoot), '.dshfiles-rebase-timestamps.json')
-  const readRebaseTimestamps = async (repoRoot: string): Promise<Readonly<Record<string, number>>> => {
+  const readRebaseMetadata = async (repoRoot: string): Promise<Readonly<Record<string, RebaseMetadataEntry>>> => {
     try {
-      const parsed = JsonText.decode(rebaseTimestampSchema, await readFile(timestampFile(repoRoot), 'utf8'))
+      const parsed = JsonText.decode(rebaseMetadataSchema, await readFile(timestampFile(repoRoot), 'utf8'))
       if (parsed?.success !== true) return {}
-      return Object.fromEntries(Object.entries(parsed.data).filter(([name]) => name.startsWith('thread-')))
+      return Object.fromEntries(
+        Object.entries(parsed.data)
+          .filter(([name]) => name.startsWith('thread-'))
+          .map(([name, value]) => [name, typeof value === 'number' ? { at: value } : value]),
+      )
     } catch {
       return {}
     }
   }
-  const writeRebaseTimestamp = async (repoRoot: string, name: string): Promise<number> => {
+  const writeRebaseMetadata = async (repoRoot: string, name: string, tipChangeId: string | undefined): Promise<number> => {
     const at = Date.now()
     const directory = options.threadsDirectory(repoRoot)
     await mkdir(directory, { recursive: true })
     const path = timestampFile(repoRoot)
     const temporaryPath = `${path}.${randomBytes(4).toString('hex')}.tmp`
-    const timestamps = { ...(await readRebaseTimestamps(repoRoot)), [name]: at }
-    await writeFile(temporaryPath, JSON.stringify(timestamps), 'utf8')
+    const metadataForThread: RebaseMetadataEntry = { at }
+    if (tipChangeId !== undefined) metadataForThread.tipChangeId = tipChangeId
+    const metadata = { ...(await readRebaseMetadata(repoRoot)), [name]: metadataForThread }
+    await writeFile(temporaryPath, JSON.stringify(metadata), 'utf8')
     await rename(temporaryPath, path)
     return at
+  }
+  const withRebaseMetadata = (status: ThreadStatus, metadata: RebaseMetadataEntry | undefined): ThreadStatus => {
+    if (metadata === undefined) return status
+    const statusWithTimestamp = { ...status, rebasedAt: metadata.at }
+    if (metadata.tipChangeId === undefined) return statusWithTimestamp
+    return { ...statusWithTimestamp, rebasedTipChangeId: metadata.tipChangeId }
   }
 
   const list = async (repoRoot: string): Promise<readonly ThreadStatus[]> => {
     const directory = options.threadsDirectory(repoRoot)
     const names = (await jj(['--ignore-working-copy', 'workspace', 'list', '-T', 'name ++ "\\n"'], repoRoot)).split('\n').filter(name => name.length > 0)
-    const rebaseTimestamps = await readRebaseTimestamps(repoRoot)
+    const rebaseMetadata = await readRebaseMetadata(repoRoot)
     const threads: ThreadStatus[] = []
     for (const name of names) {
       const path = join(directory, name)
@@ -171,9 +189,7 @@ export const createThreads = (options: {
         unlanded: await revisions(unlandedRevset(name), repoRoot, true),
         behind: (await revisions(`${name}@ ~ ${options.bookmark()}::`, repoRoot, true)).length > 0,
       }
-      const rebasedAt = rebaseTimestamps[name]
-      if (rebasedAt === undefined) threads.push(status)
-      else threads.push({ ...status, rebasedAt })
+      threads.push(withRebaseMetadata(status, rebaseMetadata[name]))
     }
     return threads
   }
@@ -181,15 +197,13 @@ export const createThreads = (options: {
   const status = async (repoRoot: string, name: string): Promise<ThreadStatus> => {
     const path = join(options.threadsDirectory(repoRoot), name)
     const bookmark = options.bookmark()
-    const [unlanded, behind, rebaseTimestamps] = await Promise.all([
+    const [unlanded, behind, rebaseMetadata] = await Promise.all([
       revisions(`(::@ ~ ::${bookmark}) ~ empty()`, path, true),
       revisions(`@ ~ ${bookmark}::`, path, true),
-      readRebaseTimestamps(repoRoot),
+      readRebaseMetadata(repoRoot),
     ])
     const threadStatus = { name, path, repoRoot, missing: !existsSync(join(path, '.jj')), unlanded, behind: behind.length > 0 }
-    const rebasedAt = rebaseTimestamps[name]
-    if (rebasedAt === undefined) return threadStatus
-    return { ...threadStatus, rebasedAt }
+    return withRebaseMetadata(threadStatus, rebaseMetadata[name])
   }
 
   const provision = (repoRoot: string, base?: string, requestedName?: string): Promise<{ readonly name: string; readonly path: string }> =>
@@ -240,7 +254,7 @@ export const createThreads = (options: {
         if (moved.exitCode === 0) {
           if (!workingCopyEmpty) await jj(['new', bookmark], cwd, signal)
           const [head] = await revisions(bookmark, cwd)
-          await writeRebaseTimestamp(thread.repoRoot, thread.threadName).catch(() => undefined)
+          await writeRebaseMetadata(thread.repoRoot, thread.threadName, head?.changeId).catch(() => undefined)
           return { status: 'landed', revisions: rebased, head }
         }
         if (attempt >= LAND_ATTEMPTS) throw new ThreadError('jj-failed', `Could not move ${bookmark}: ${moved.stderr.trim().slice(0, 400)}`)

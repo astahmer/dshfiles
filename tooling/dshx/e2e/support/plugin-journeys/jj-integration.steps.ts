@@ -55,6 +55,17 @@ const commitIdAt = (repositoryPath: string, home: string, revset: string): strin
 
 const commitIdOf = (repository: ThreadRepository, revset: string): string => commitIdAt(repository.repositoryPath, repository.temporaryRoot, revset)
 
+const changeIdOf = (repository: ThreadRepository, revset: string): string =>
+  jjAt(repository.repositoryPath, repository.temporaryRoot, [
+    '--ignore-working-copy',
+    'log',
+    '--no-graph',
+    '-r',
+    revset,
+    '-T',
+    'change_id.short(12)',
+  ]).trim()
+
 const descriptionOf = (repository: ThreadRepository, revset: string): string =>
   jjAt(repository.repositoryPath, repository.temporaryRoot, [
     '--ignore-working-copy',
@@ -513,6 +524,10 @@ Then('Rebase moves main onto the work described {string}', async ({ page }: { pa
     await expect(rebaseButton(page)).toBeDisabled()
     await expect(page.getByTestId('jj-thread-rebased-notice')).toContainText('This thread was rebased onto main.')
     expect(descriptionOf(repository, 'main')).toBe(description)
+    const notice = page.getByTestId('jj-thread-rebased-notice').last()
+    await expect(notice).toBeVisible()
+    await expect(notice).toContainText(`This thread was rebased onto main (${changeIdOf(repository, 'main')}).`)
+    await expect(notice.getByRole('button', { name: 'Archive this rebased thread', exact: true })).toBeEnabled()
     await expect(rebasedToast).toContainText('main is now at')
     await expect(rebasedToast).toContainText(`(${commitIdOf(repository, 'main').slice(0, 8)})`)
     expect(commitIdOf(repository, 'main-')).toBe(repository.baseCommitId)
@@ -542,6 +557,16 @@ Then('Rebase reflects the external rebase without reloading', async ({ page }: {
     await expect(rebaseButton(page)).toHaveAttribute('title', 'Rebase this thread onto main (0 to rebase)')
     expect(descriptionOf(repository, 'main')).toBe('Follow-up after a steer')
   })
+})
+
+When('the thread is archived from the rebase notice', async ({ page }: { page: Page }) => {
+  await page.getByTestId('jj-thread-rebased-notice').last().getByRole('button', { name: 'Archive this rebased thread', exact: true }).click()
+})
+
+Then('the thread appears in the Archived sidebar section', async ({ page }: { page: Page }) => {
+  const archivedSection = page.getByRole('region', { name: 'Threads', exact: true }).getByRole('button', { name: 'Archived (1)', exact: true })
+  await recordAssertion(page, 'jj-integration-rebased-thread-can-be-archived-from-notice', () => expect(archivedSection).toBeVisible())
+  await finishJourneyAssertions(page)
 })
 
 When('the Thread workspaces panel is opened', async ({ page }: { page: Page }) => {

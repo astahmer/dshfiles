@@ -23,6 +23,8 @@ const jj = (cwd: string, ...args: string[]): string =>
   })
 
 const bookmarkTarget = (cwd: string): string => jj(cwd, '--ignore-working-copy', 'log', '--no-graph', '-r', 'main', '-T', 'description.first_line()')
+const changeIdAt = (cwd: string, revset: string): string =>
+  jj(cwd, '--ignore-working-copy', 'log', '--no-graph', '-r', revset, '-T', 'change_id.short(12)').trim()
 
 describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
   let root: string
@@ -126,6 +128,17 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
     expect((await threads.bookmarks(thread.path)).current).toBe('feature')
   })
 
+  it('reads legacy rebase timestamps without a stored tip revision', async () => {
+    const thread = await threads.provision(repo)
+    const rebasedAt = Date.now()
+    writeFileSync(join(defaultThreadsDirectory(repo), '.dshfiles-rebase-timestamps.json'), JSON.stringify({ [thread.name]: rebasedAt }))
+
+    const status = await threads.status(repo, thread.name)
+
+    expect(status.rebasedAt).toBe(rebasedAt)
+    expect(status.rebasedTipChangeId).toBeUndefined()
+  })
+
   it('rebases described work onto the bookmark and leaves a fresh working copy', async () => {
     const thread = await threads.provision(repo)
     writeFileSync(join(thread.path, 'feature.txt'), 'feature\n')
@@ -143,9 +156,11 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
     expect(bookmarkTarget(repo)).toBe('feat: add feature')
     expect(jj(repo, '--ignore-working-copy', 'log', '--no-graph', '-r', 'main-', '-T', 'description.first_line()')).toBe('other work')
     const [status] = await threads.list(repo)
-    expect(status).toMatchObject({ unlanded: [], behind: false, rebasedAt: expect.any(Number) })
+    const tipChangeId = changeIdAt(repo, 'main')
+    expect(status).toMatchObject({ unlanded: [], behind: false, rebasedAt: expect.any(Number), rebasedTipChangeId: tipChangeId })
     const reloaded = createThreads({ executor, bookmark: () => 'main', threadsDirectory: defaultThreadsDirectory })
     expect((await reloaded.list(repo))[0]?.rebasedAt).toBe(status?.rebasedAt)
+    expect((await reloaded.list(repo))[0]?.rebasedTipChangeId).toBe(tipChangeId)
   })
 
   it('brings the default checkout onto the rebased bookmark with dshx checkout sync, keeping its local edits', async () => {

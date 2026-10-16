@@ -15,6 +15,7 @@ const threadSchema = z
     missing: z.boolean(),
     behind: z.boolean(),
     rebasedAt: z.number().int().nonnegative().optional(),
+    rebasedTipChangeId: z.string().min(1).max(128).optional(),
     unlanded: z.array(revisionSchema),
   })
   .strict()

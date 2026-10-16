@@ -265,14 +265,15 @@
     {
       "id": "rebase",
       "title": "Rebase a thread onto the bookmark",
-      "summary": "The conversation header identifies the current thread's jj workspace and opens its workspace panel. Rebase a thread's described work onto the target bookmark and advance it from the thread header, panel, or `/rebase` composer command. The command refuses non-thread workspaces and Rebase is disabled while any thread session is working or waiting for input. Conflicts and undescribed revisions are handed back to the thread's agent. Afterwards the checkout running DSH follows the bookmark in the background through `dshx checkout sync`, with a panel line saying what was rebuilt and whether to restart.",
+      "summary": "The conversation header identifies the current thread's jj workspace and opens its workspace panel. Rebase a thread's described work onto the target bookmark and advance it from the thread header, panel, or `/rebase` composer command. The in-chat notice shows the tip change ID and offers Archive for the current thread. The command refuses non-thread workspaces and Rebase is disabled while any thread session is working or waiting for input. Conflicts and undescribed revisions are handed back to the thread's agent. Afterwards the checkout running DSH follows the bookmark in the background through `dshx checkout sync`, with a panel line saying what was rebuilt and whether to restart.",
       "reach": [
         "seed rebase-ready-thread",
         "expect button \"Rebase this thread onto main\"",
         "expect text \"Rebase · 1\"",
         "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"/rebase\"",
         "press Enter",
-        "expect text \"Rebased 1 revision(s) onto main.\""
+        "expect text \"Rebased 1 revision(s) onto main.\"",
+        "expect button \"Archive this rebased thread\""
       ],
       "surfaces": ["host", "tool", "command", "client", "integration"],
       "configuration": [
@@ -289,12 +290,23 @@
           "coveredBy": ["jj-integration.checkout-sync"]
         }
       ],
-      "states": ["rebased", "nothing-to-rebase", "rebase-blocked", "needs-description", "conflicted", "shared-checkout-refused", "checkout-synced"],
+      "states": [
+        "rebased",
+        "rebased-notice",
+        "archived",
+        "nothing-to-rebase",
+        "rebase-blocked",
+        "needs-description",
+        "conflicted",
+        "shared-checkout-refused",
+        "checkout-synced"
+      ],
       "failureModes": [
         "The `/rebase` command refuses non-thread workspaces because they have no safe per-thread workspace boundary.",
         "A conflict leaves the bookmark where it was.",
         "Placeholder descriptions (empty or wip) are refused.",
         "Rebase is refused while any thread session is running or waiting for input.",
+        "Archive from the rebase notice affects only the current Session and is disabled while it is running.",
         "The post-rebase checkout sync refuses described work the bookmark lacks and undoes a conflicting rebase; the panel line names the files and the rebase itself stands."
       ],
       "externalDependencies": [
