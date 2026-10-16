@@ -1,7 +1,7 @@
 import { lstat, realpath, stat } from 'node:fs/promises'
 import { isAbsolute, join, relative, sep } from 'node:path'
 import { workspaceNameSchema } from './api.js'
-import { validatedRepositoryPath } from './core.js'
+import { JujutsuPathModel } from './core.js'
 
 const pathContains = (parentPath: string, candidatePath: string): boolean => {
   const relativePath = relative(parentPath, candidatePath)
@@ -22,7 +22,7 @@ export const resolveWorkspaceDestination = async (
   name: string,
 ): Promise<{ readonly parentPath: string; readonly path: string; readonly parentIdentity: WorkspaceParentIdentity }> => {
   if (!workspaceNameSchema.safeParse(name).success) throw new Error('Choose a valid Jujutsu workspace name.')
-  const parentPath = await realpath(validatedRepositoryPath(selectedParentPath))
+  const parentPath = await realpath(JujutsuPathModel.validatedRepositoryPath(selectedParentPath))
   const parentStat = await stat(parentPath, { bigint: true })
   if (!parentStat.isDirectory()) throw new Error('Choose an existing parent directory for the new workspace.')
   const repositoryRoot = await realpath(repositoryPath)

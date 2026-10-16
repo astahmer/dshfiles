@@ -4,7 +4,7 @@ import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { onTestFinished, test } from 'vitest'
-import { buildMutationArgv } from './core.ts'
+import { JujutsuMutationModel } from './core.ts'
 
 const jjAt = (cwd: string, home: string, argv: readonly string[]): string => {
   const result = spawnSync(process.env.JJ_TEST_EXECUTABLE ?? 'jj', ['--color=never', '--no-pager', ...argv], {
@@ -34,7 +34,7 @@ test('set bookmark creates a name and moves an existing bookmark to any visible 
   const nextCommit = jjAt(repo, home, ['--ignore-working-copy', 'log', '--no-graph', '--revisions', '@', '--template', 'commit_id']).trim()
 
   const setBookmark = (commitId: string): void => {
-    const argv = buildMutationArgv({ kind: 'bookmark-set', bookmark: 'feature/test', destinationId: commitId })
+    const argv = JujutsuMutationModel.buildMutationArgv({ kind: 'bookmark-set', bookmark: 'feature/test', destinationId: commitId })
     jjAt(repo, home, argv)
   }
 

@@ -12,7 +12,7 @@ import {
   COMPOSER_WORKSPACE_TEMPLATE,
   ComposerContextModel,
 } from './composer-context-core.js'
-import { fileStatusLetter, parseJsonLines, validatedRepositoryPath } from './core.js'
+import { JujutsuOutputModel, JujutsuPathModel } from './core.js'
 
 type RunJj = (
   ctx: Context,
@@ -39,7 +39,7 @@ const MAX_FILES = 500
 const workspaceRoot = async (ctx: Context, run: RunJj, cwd: string, signal: AbortSignal | undefined): Promise<string | null> => {
   let canonical: string
   try {
-    canonical = await realpath(validatedRepositoryPath(cwd))
+    canonical = await realpath(JujutsuPathModel.validatedRepositoryPath(cwd))
   } catch {
     return null
   }
@@ -67,7 +67,7 @@ export const composerContextHost = (run: RunJj) =>
       const root = await workspaceRoot(ctx, run, input.cwd, signal)
       if (root === null) return { repository: null }
       const headResult = await run(ctx, root, ['log', '--no-graph', '--revisions', '@', '--template', COMPOSER_HEAD_TEMPLATE], signal, { outputLimit: 64_000 })
-      const head = parseJsonLines(headResult.stdout, value => headSchema.parse(value))[0]
+      const head = JujutsuOutputModel.parseJsonLines(headResult.stdout, value => headSchema.parse(value))[0]
       if (head === undefined) return { repository: null }
       const read = (args: readonly string[], outputLimit: number) => run(ctx, root, ['--ignore-working-copy', ...args], signal, { outputLimit })
       const range = ComposerContextModel.composerDiffRange(input.base)
@@ -84,11 +84,12 @@ export const composerContextHost = (run: RunJj) =>
       ])
       const completeLines = (result: { readonly stdout: string; readonly truncated: boolean }): string =>
         result.truncated ? result.stdout.slice(0, result.stdout.lastIndexOf('\n') + 1) : result.stdout
-      const nearestBookmarks = parseJsonLines(completeLines(nearest), value => nameListSchema.parse(value)).flat()
-      const targetBookmarks = baseTarget === null ? [] : parseJsonLines(completeLines(baseTarget), value => nameListSchema.parse(value))
-      const fileRows = files === null ? [] : parseJsonLines(completeLines(files), value => fileRowSchema.parse(value))
-      const bookmarkNames = localBookmarks === null ? [] : parseJsonLines(completeLines(localBookmarks), value => z.string().max(256).parse(value))
-      const workspaceNames = workspaces === null ? [] : parseJsonLines(completeLines(workspaces), value => z.string().max(128).parse(value))
+      const nearestBookmarks = JujutsuOutputModel.parseJsonLines(completeLines(nearest), value => nameListSchema.parse(value)).flat()
+      const targetBookmarks = baseTarget === null ? [] : JujutsuOutputModel.parseJsonLines(completeLines(baseTarget), value => nameListSchema.parse(value))
+      const fileRows = files === null ? [] : JujutsuOutputModel.parseJsonLines(completeLines(files), value => fileRowSchema.parse(value))
+      const bookmarkNames =
+        localBookmarks === null ? [] : JujutsuOutputModel.parseJsonLines(completeLines(localBookmarks), value => z.string().max(256).parse(value))
+      const workspaceNames = workspaces === null ? [] : JujutsuOutputModel.parseJsonLines(completeLines(workspaces), value => z.string().max(128).parse(value))
       return {
         repository: {
           root,
@@ -103,7 +104,7 @@ export const composerContextHost = (run: RunJj) =>
           nearestBookmarks: [...new Set(nearestBookmarks)].slice(0, 32),
           base: { label: baseLabel(input.base, targetBookmarks[0] ?? []), found: targetBookmarks.length > 0 },
           totals: stat === null || stat.truncated ? null : ComposerContextModel.parseStatTotals(stat.stdout),
-          files: fileRows.slice(0, MAX_FILES).map(row => ({ path: row.path, status: fileStatusLetter(row.status) })),
+          files: fileRows.slice(0, MAX_FILES).map(row => ({ path: row.path, status: JujutsuOutputModel.fileStatusLetter(row.status) })),
           filesTruncated: files === null || files.truncated || fileRows.length > MAX_FILES,
           localBookmarks: bookmarkNames.slice(0, 200),
         },

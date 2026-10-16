@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { revisionSchema, type GraphNavigation, type RevisionRelationship } from './api.js'
-import { parseJsonLines } from './core.js'
+import { JujutsuOutputModel } from './core.js'
 import { REVISION_TEMPLATE } from './jj-templates.js'
 import type { JjRun } from './revision-reads.js'
 
@@ -16,7 +16,7 @@ const pinned = async (run: JjRun) => {
   const revisions = async (revset: string) => {
     const output = await read(['log', '--no-graph', '--limit', String(LIMIT + 1), '-r', revset, '-T', REVISION_TEMPLATE])
     if (output.truncated) throw new Error('Revision graph exceeded the bounded output limit.')
-    const rows = parseJsonLines(output.stdout, value => revisionSchema.parse(value))
+    const rows = JujutsuOutputModel.parseJsonLines(output.stdout, value => revisionSchema.parse(value))
     return { revisions: rows.slice(0, LIMIT), truncated: rows.length > LIMIT }
   }
   const ids = async (revset: string) => {

@@ -12,7 +12,7 @@ import {
   COMPOSER_WORKSPACE_TEMPLATE,
   ComposerContextModel,
 } from './composer-context-core.ts'
-import { parseJsonLines } from './core.ts'
+import { JujutsuOutputModel } from './core.ts'
 
 const runJj = (cwd: string, home: string, argv: readonly string[]): string => {
   const result = spawnSync(process.env.JJ_TEST_EXECUTABLE ?? 'jj', ['--color=never', '--no-pager', ...argv], {
@@ -44,7 +44,7 @@ test('composer templates and ranges read head, bookmarks, totals and files from 
   await writeFile(join(repo, 'base.txt'), 'one\nthree\n')
   await writeFile(join(repo, 'new file.txt'), 'hello\n')
 
-  const head = parseJsonLines(runJj(repo, home, ['log', '--no-graph', '-r', '@', '-T', COMPOSER_HEAD_TEMPLATE]), value => value)[0]
+  const head = JujutsuOutputModel.parseJsonLines(runJj(repo, home, ['log', '--no-graph', '-r', '@', '-T', COMPOSER_HEAD_TEMPLATE]), value => value)[0]
   expect(head).toMatchObject({ bookmarks: [], empty: false, conflict: false, description: '' })
   expect(runJj(repo, home, ['--ignore-working-copy', 'workspace', 'list', '-T', COMPOSER_WORKSPACE_TEMPLATE]).trim()).toBe('"default"')
 
@@ -78,7 +78,10 @@ test('composer templates and ranges read head, bookmarks, totals and files from 
     additions: 2,
     deletions: 1,
   })
-  const parentFiles = parseJsonLines(runJj(repo, home, ['--ignore-working-copy', 'diff', ...parentRange, '-T', COMPOSER_FILE_TEMPLATE]), value => value)
+  const parentFiles = JujutsuOutputModel.parseJsonLines(
+    runJj(repo, home, ['--ignore-working-copy', 'diff', ...parentRange, '-T', COMPOSER_FILE_TEMPLATE]),
+    value => value,
+  )
   expect(parentFiles).toEqual([
     { path: 'base.txt', status: 'modified' },
     { path: 'new file.txt', status: 'added' },

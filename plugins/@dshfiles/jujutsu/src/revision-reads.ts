@@ -1,7 +1,7 @@
 import { PluginApiError } from '@dshfiles/dshx/api'
 import { z } from 'zod'
 import type { FileStat, ReadFailure, RevisionDetails } from './api.js'
-import { fileStatusLetter, isCommitId, parseJsonLines, parsePatchStats } from './core.js'
+import { JujutsuMutationModel, JujutsuOutputModel } from './core.js'
 import { FILE_STATS_TEMPLATE } from './jj-templates.js'
 
 export interface JjRunResult {
@@ -53,7 +53,7 @@ export class RevisionReads {
       outputLimit: 1_000_000,
     })
     const completeOutput = result.truncated ? result.stdout.slice(0, result.stdout.lastIndexOf('\n') + 1) : result.stdout
-    const rows = parseJsonLines(completeOutput, value => fileStatsRowSchema.parse(value))
+    const rows = JujutsuOutputModel.parseJsonLines(completeOutput, value => fileStatsRowSchema.parse(value))
     let truncated = result.truncated
     const revisions = rows.map(row => {
       if (row.files.length > 2000) truncated = true
@@ -62,7 +62,7 @@ export class RevisionReads {
         commitId: row.commitId,
         files: row.files.slice(0, 2000).map(file => ({
           path: file.path,
-          status: fileStatusLetter(file.status),
+          status: JujutsuOutputModel.fileStatusLetter(file.status),
           additions: file.additions,
           deletions: file.deletions,
           conflict: conflicts.has(file.path),
@@ -73,7 +73,7 @@ export class RevisionReads {
   }
 
   static async details(run: JjRun, commitId: string): Promise<RevisionDetails> {
-    if (!isCommitId(commitId)) throw new Error('Invalid revision id.')
+    if (!JujutsuMutationModel.isCommitId(commitId)) throw new Error('Invalid revision id.')
     try {
       await run([RevisionReads.ignoreWorkingCopy, 'log', '--no-graph', '--revisions', commitId, '--limit', '1', '--template', 'commit_id'], {
         outputLimit: 1_000,
@@ -87,9 +87,9 @@ export class RevisionReads {
     const evolution = await run([RevisionReads.ignoreWorkingCopy, 'evolog', '--no-graph', '--revisions', commitId, '--limit', '30'], { outputLimit: 118_000 })
     const stats = await RevisionReads.fileStats(run, [commitId])
     const statByPath = new Map(stats.revisions[0]?.files.map(file => [file.path, file]) ?? [])
-    const files = parsePatchStats(patch.stdout, paths, patch.truncated).map(file => ({
+    const files = JujutsuOutputModel.parsePatchStats(patch.stdout, paths, patch.truncated).map(file => ({
       ...file,
-      status: statByPath.get(file.path)?.status ?? fileStatusLetter('modified'),
+      status: statByPath.get(file.path)?.status ?? JujutsuOutputModel.fileStatusLetter('modified'),
       conflict: statByPath.get(file.path)?.conflict ?? false,
     }))
     return {
