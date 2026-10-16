@@ -7,7 +7,7 @@ import { parse } from 'yaml'
 import { DEFAULT_COMPATIBILITY } from '../../compat/index.js'
 import type { DshCompatibility } from '../../compat/types.js'
 import { DshxError } from '../../diagnostics.js'
-import { artifactDeclarationPlugin, buildReport, buildWatcher, kernelBoundaryPlugin, resolveUserPlugins } from '../kernel.js'
+import { CompilerKernel } from '../kernel.js'
 import type { BuildReport, BuildWatcher, ViteExtensionOptions } from '../types.js'
 import { clientCssPlugin } from './css.js'
 import { SharedRuntime } from './shared-runtime.js'
@@ -476,7 +476,7 @@ async function clientConfig(paths: Awaited<ReturnType<typeof resolveOptions>>, o
     intro: 'var module = { exports: {} }; var exports = module.exports;',
     footer: 'return module.exports; } });',
   } as const
-  const userPlugins = await resolveUserPlugins(options.vite?.plugins, watch)
+  const userPlugins = await CompilerKernel.resolveUserPlugins(options.vite?.plugins, watch)
   const mode = watch ? 'development' : 'production'
   return {
     root: paths.root,
@@ -490,7 +490,7 @@ async function clientConfig(paths: Awaited<ReturnType<typeof resolveOptions>>, o
       ...(watch ? [clientSetupServiceGuardPlugin(paths, options)] : []),
       clientGuardPlugin(externals, options.packageId, bundleDependencies),
       ...userPlugins,
-      artifactDeclarationPlugin('client', paths.outDir, options.declarations ?? true),
+      CompilerKernel.artifactDeclarationPlugin('client', paths.outDir, options.declarations ?? true),
       ...(supplier === undefined || options.shared === undefined
         ? []
         : [SharedRuntime.consumerPlugin({ supplier: options.shared, modules: supplier.modules, bundleDependencies })]),
@@ -514,7 +514,7 @@ async function clientConfig(paths: Awaited<ReturnType<typeof resolveOptions>>, o
         },
       }),
       clientCapabilitiesPlugin(options),
-      kernelBoundaryPlugin({
+      CompilerKernel.boundaryPlugin({
         face: 'client',
         root: paths.root,
         input: VIRTUAL_CLIENT_ENTRY,
@@ -567,7 +567,7 @@ export async function watchClient(options: BuildClientOptions): Promise<BuildWat
   await validateConversationProviderEdges(paths, options)
   await validateLocaleNamespaceOwnership(paths, options, await siblingLocaleNamespaces(options))
   const config = await clientConfig(paths, options, true)
-  return buildWatcher(
+  return CompilerKernel.buildWatcher(
     await build({
       ...config,
       build: { ...config.build, watch: {} },
@@ -588,5 +588,5 @@ export async function buildClient(options: BuildClientOptions): Promise<ClientBu
   await validateLocaleNamespaceOwnership(paths, options, await siblingLocaleNamespaces(options))
   const config = await clientConfig(paths, options, false)
   const declarations = options.declarations ?? true
-  return buildReport(await build(config), 'client', 'client.js', paths.outDir, declarations, 'DSHX1103')
+  return CompilerKernel.buildReport(await build(config), 'client', 'client.js', paths.outDir, declarations, 'DSHX1103')
 }

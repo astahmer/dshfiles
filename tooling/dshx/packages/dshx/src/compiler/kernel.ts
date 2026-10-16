@@ -17,7 +17,7 @@ interface KernelBoundary {
 }
 
 /** Resolve native Vite PluginOption nesting while retaining its declared order. */
-export async function resolveUserPlugins(options: readonly PluginOption[] | undefined, watch: boolean): Promise<Plugin[]> {
+const resolveUserPlugins = async (options: readonly PluginOption[] | undefined, watch: boolean): Promise<Plugin[]> => {
   return resolveVitePlugins(options, watch)
 }
 
@@ -35,7 +35,7 @@ function outputRecord(config: ResolvedConfig): Rollup.OutputOptions {
 }
 
 /** Assert that user config hooks did not escape the bounded extension surface. */
-export function kernelBoundaryPlugin(boundary: KernelBoundary): Plugin {
+const kernelBoundaryPlugin = (boundary: KernelBoundary): Plugin => {
   const fail = (field: string): never => {
     throw new DshxError('DSHX1403', `A Vite plugin attempted to override protected ${boundary.face} build field ${field}.`, {
       hint: 'DSHX plugins may transform modules, but cannot replace root, entries, protocol output, target, chunking, externals, or asset policy.',
@@ -83,7 +83,7 @@ function declarationSource(): string {
 }
 
 /** Materialize declarations for the actual module shape loaded by DSH/Cordis. */
-export function artifactDeclarationPlugin(face: 'host' | 'client', outDir: string, enabled: boolean): Plugin {
+const artifactDeclarationPlugin = (face: 'host' | 'client', outDir: string, enabled: boolean): Plugin => {
   const fileName = face === 'host' ? 'index.d.ts' : 'client.d.ts'
   return {
     name: `dshx-${face}-artifact-declaration`,
@@ -115,14 +115,7 @@ function rollupOutput(result: unknown, code: string): CompletedOutput {
 }
 
 /** Convert Vite/Rolldown output to the stable DSHX report surface. */
-export function buildReport(
-  result: unknown,
-  face: 'host' | 'client',
-  entryFile: string,
-  outDir: string,
-  declarations: boolean,
-  errorCode: string,
-): BuildReport {
+const buildReport = (result: unknown, face: 'host' | 'client', entryFile: string, outDir: string, declarations: boolean, errorCode: string): BuildReport => {
   const built = rollupOutput(result, errorCode)
   const output: BuildArtifact[] = built.output.map(item => ({
     fileName: item.fileName,
@@ -133,7 +126,7 @@ export function buildReport(
 }
 
 /** Validate the structural Vite watcher once at the compiler boundary. */
-export function buildWatcher(result: unknown, face: 'host' | 'client', errorCode: string): BuildWatcher {
+const buildWatcher = (result: unknown, face: 'host' | 'client', errorCode: string): BuildWatcher => {
   const candidate = result as { on?: unknown; close?: unknown }
   if (Array.isArray(result) || typeof result !== 'object' || result === null || typeof candidate.on !== 'function' || typeof candidate.close !== 'function') {
     throw new DshxError(errorCode, `Expected one ${face} watcher result.`, {
@@ -141,4 +134,12 @@ export function buildWatcher(result: unknown, face: 'host' | 'client', errorCode
     })
   }
   return result as BuildWatcher
+}
+
+export class CompilerKernel {
+  static readonly resolveUserPlugins = resolveUserPlugins
+  static readonly boundaryPlugin = kernelBoundaryPlugin
+  static readonly artifactDeclarationPlugin = artifactDeclarationPlugin
+  static readonly buildReport = buildReport
+  static readonly buildWatcher = buildWatcher
 }
