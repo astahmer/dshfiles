@@ -1,6 +1,6 @@
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
-import type { InputTriggerCandidate, InputTriggerCrumb, InputTriggerSource } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
+import type { InputTriggerCandidate, InputTriggerCrumb, InputTriggerSource } from '@dshfiles/input-trigger/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'

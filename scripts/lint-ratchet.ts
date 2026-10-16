@@ -5,7 +5,11 @@ import { z } from 'zod'
 const lintRoots = ['tooling/dshx/packages', 'plugins', 'scripts', 'apps/desktop/src']
 
 // Deliberate public re-export boundaries, exempt from the ast-grep forwarding rules.
-const astGrepBoundaries = ['tooling/dshx/packages/dshx/client/index.d.ts', 'plugins/@dshfiles/plugin-ui/src/icons.ts']
+const astGrepBoundaries = [
+  'tooling/dshx/packages/dshx/client/index.d.ts',
+  'plugins/@dshfiles/plugin-ui/src/icons.ts',
+  'plugins/@dshfiles/input-trigger/src/client/index.ts',
+]
 
 // Vendored upstream source: kept byte-comparable to its pinned revision, so this repository's rules do not apply.
 const astGrepVendored = ['plugins/@dshfiles/rich-composer/src/native/**', 'plugins/@dshfiles/frame-layout/src/native/**']

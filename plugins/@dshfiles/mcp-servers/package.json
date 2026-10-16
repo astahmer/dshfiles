@@ -27,6 +27,7 @@
     "test:e2e": "node ../../../tooling/dshx/scripts/run-e2e.mjs"
   },
   "dependencies": {
+    "@dshfiles/input-trigger": "workspace:*",
     "@dshfiles/plugin-ui": "workspace:*",
     "@dshfiles/shared-runtime": "workspace:*",
     "oauth4webapi": "3.8.8",
@@ -39,7 +40,6 @@
     "@deepseek-ai/dsh-client-locale": "catalog:",
     "@deepseek-ai/dsh-client-ui-commands": "catalog:",
     "@deepseek-ai/dsh-client-ui-conversation": "catalog:",
-    "@deepseek-ai/dsh-client-ui-input-trigger": "catalog:",
     "@deepseek-ai/dsh-client-ui-layout": "catalog:",
     "@deepseek-ai/dsh-client-ui-primitives": "catalog:",
     "@deepseek-ai/dsh-client-ui-sidebar": "catalog:",
@@ -64,7 +64,6 @@
     "@deepseek-ai/dsh-client-locale": ">=0.2.0-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-client-ui-commands": ">=0.2.0-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-client-ui-conversation": ">=0.2.0-rc.1 <0.3.0-0",
-    "@deepseek-ai/dsh-client-ui-input-trigger": ">=0.2.0-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-client-ui-layout": ">=0.2.0-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-client-ui-primitives": ">=0.2.0-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-client-ui-renderer": ">=0.2.0-rc.1 <0.3.0-0",
@@ -77,7 +76,8 @@
     "@deepseek-ai/dsh-settings": ">=0.2.0-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-subprocess": ">=0.2.0-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-tools": ">=0.2.0-rc.1 <0.3.0-0",
-    "@deepseek-ai/schemastery": "^3.18.4"
+    "@deepseek-ai/schemastery": "^3.18.4",
+    "@dshfiles/input-trigger": ">=0.1.0 <0.2.0-0"
   },
   "dsh": {
     "bundle": {
@@ -89,7 +89,7 @@
         "@deepseek-ai/dsh-client-connection",
         "@deepseek-ai/dsh-client-ui-commands",
         "@deepseek-ai/dsh-client-ui-conversation",
-        "@deepseek-ai/dsh-client-ui-input-trigger",
+        "@dshfiles/input-trigger",
         "@deepseek-ai/dsh-client-ui-layout",
         "@deepseek-ai/dsh-client-ui-sidebar",
         "@deepseek-ai/dsh-client-ui-slots",
@@ -98,6 +98,7 @@
         "@deepseek-ai/dsh-client-ui-primitives"
       ],
       "external": [
+        "@dshfiles/input-trigger",
         "@dshfiles/shared-runtime"
       ],
       "immediately": false,

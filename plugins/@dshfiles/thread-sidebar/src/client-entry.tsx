@@ -1,6 +1,6 @@
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
-import type {} from '@deepseek-ai/dsh-client-ui-input-trigger/client'
+import type {} from '@dshfiles/input-trigger/client'
 import type { InputActions } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { WorkspaceView } from '@deepseek-ai/dsh-api-workspace-controller/client'

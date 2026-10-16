@@ -29,6 +29,7 @@
   "dependencies": {
     "@deepseek-ai/schemastery": "catalog:",
     "@dshfiles/command-palette": "workspace:*",
+    "@dshfiles/input-trigger": "workspace:*",
     "@dshfiles/jj-integration": "workspace:*",
     "@dshfiles/multi-host": "workspace:*",
     "@dshfiles/plugin-ui": "workspace:*",
@@ -48,7 +49,6 @@
     "@deepseek-ai/dsh-client-store": "catalog:",
     "@deepseek-ai/dsh-client-ui-chat": "catalog:",
     "@deepseek-ai/dsh-client-ui-conversation": "catalog:",
-    "@deepseek-ai/dsh-client-ui-input-trigger": "catalog:",
     "@deepseek-ai/dsh-client-ui-layout": "catalog:",
     "@deepseek-ai/dsh-client-ui-primitives": "catalog:",
     "@deepseek-ai/dsh-client-ui-session": "catalog:",
@@ -90,7 +90,6 @@
     "@deepseek-ai/dsh-client-store": ">=0.2.0-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-client-ui-chat": ">=0.2.0-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-client-ui-conversation": ">=0.2.0-rc.1 <0.3.0-0",
-    "@deepseek-ai/dsh-client-ui-input-trigger": ">=0.2.0-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-client-ui-layout": ">=0.2.0-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-client-ui-primitives": ">=0.2.0-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-client-ui-settings": ">=0.2.0-rc.1 <0.3.0-0",
@@ -106,7 +105,8 @@
     "@deepseek-ai/dsh-subagent": ">=0.2.0-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-tools": ">=0.2.0-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-user-questions": ">=0.2.0-rc.2 <0.3.0-0",
-    "@deepseek-ai/schemastery": "~3.18.4"
+    "@deepseek-ai/schemastery": "~3.18.4",
+    "@dshfiles/input-trigger": ">=0.1.0 <0.2.0-0"
   },
   "dsh": {
     "bundle": {
@@ -133,10 +133,11 @@
         "@deepseek-ai/dsh-client-ui-sidebar-right",
         "@deepseek-ai/dsh-client-ui-primitives",
         "@deepseek-ai/dsh-client-ui-settings",
-        "@deepseek-ai/dsh-client-ui-input-trigger"
+        "@dshfiles/input-trigger"
       ],
       "external": [
         "@deepseek-ai/dsh-client-store",
+        "@dshfiles/input-trigger",
         "@dshfiles/shared-runtime"
       ]
     }

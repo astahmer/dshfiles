@@ -1,4 +1,4 @@
-import type { ClientSessionContext, InputTriggerCandidate, InputTriggerSource } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
+import type { ClientSessionContext, InputTriggerCandidate, InputTriggerSource } from '@dshfiles/input-trigger/client'
 import type { rankByName } from '@deepseek-ai/dsh-client-ui-primitives'
 import { z } from 'zod'
 import { jsonTextSchema } from './json-text.js'

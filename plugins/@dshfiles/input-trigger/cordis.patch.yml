@@ -1,0 +1,5 @@
+- id: ui-input-trigger
+  disabled: true
+- insert:
+    - id: dshfiles-input-trigger
+      name: '@dshfiles/input-trigger'

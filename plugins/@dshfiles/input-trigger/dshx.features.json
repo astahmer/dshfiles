@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "multiword-at-queries",
+      "title": "Unquoted multiword @ autocomplete",
+      "summary": "The shared tokenizer sends an unquoted, same-line phrase and the exact caret span to registered @ sources while preserving quoted @ and slash-command behavior.",
+      "reach": [
+        "click button \"New thread\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"deploy\"",
+        "press Enter",
+        "expect text \"This turn failed\"",
+        "expect text \"deploy\"",
+        "click button \"New thread\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"fix the deploy script\"",
+        "press Enter",
+        "expect text \"This turn failed\"",
+        "expect text \"fix the deploy script\"",
+        "click button \"New thread\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"@fix the\"",
+        "expect option \"fix the deploy script*\""
+      ],
+      "surfaces": ["client"],
+      "configuration": [],
+      "states": ["unquoted-multiword", "quoted-multiword", "email-boundary", "slash-command"],
+      "failureModes": [
+        "A typed multiword query is limited to the current line and stops at the caret.",
+        "The change does not reduce the separate Host session-search latency."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "input-trigger.unquoted-query",
+          "file": "plugins/@dshfiles/input-trigger/tests/detect.test.ts",
+          "testName": "keeps an unquoted multiword @ query active through the caret"
+        },
+        {
+          "kind": "gherkin",
+          "id": "input-trigger.unquoted-multiword",
+          "featureFile": "tooling/dshx/e2e/features/input-trigger.feature"
+        }
+      ]
+    }
+  ]
+}

@@ -1,5 +1,5 @@
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
-import type {} from '@deepseek-ai/dsh-client-ui-input-trigger/client'
+import type {} from '@dshfiles/input-trigger/client'
 import type {} from '@deepseek-ai/dsh-client-ui-commands/client'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import { rankByName, type IconProps } from '@deepseek-ai/dsh-client-ui-primitives'
