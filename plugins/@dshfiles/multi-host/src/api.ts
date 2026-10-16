@@ -3,6 +3,9 @@ import { nativeRpcRequestSchema } from '@dshfiles/dshx/platform/native-rpc'
 import { z } from 'zod'
 import { hostConnectorSchema, runtimeIdentitySchema, runtimeLocatorSchema } from './records.js'
 
+/** Model-facing text for a structured tool result. */
+const compactJson = <Output>(output: Output): string => JSON.stringify(output)
+
 const idSchema = z.string().min(1).max(64)
 const sessionIdSchema = z.string().min(1).max(256)
 
@@ -154,7 +157,12 @@ export const multiHostApi = defineApi({
   version: 1,
   owner: '@dshfiles/multi-host',
   methods: {
-    identity: method({ input: z.void(), output: runtimeIdentitySchema, description: 'Identity of this DSH runtime as other hosts see it.' }),
+    identity: method({
+      input: z.void(),
+      output: runtimeIdentitySchema,
+      description: 'Identity of this DSH runtime as other hosts see it. Read-only.',
+      tool: { name: 'multi_host_identity', readOnly: true, render: compactJson },
+    }),
     list: method({
       input: z.void(),
       output: z.object({ hosts: z.array(hostSummarySchema), runtimes: z.array(runtimeSummarySchema) }),
@@ -169,14 +177,24 @@ export const multiHostApi = defineApi({
     hostRemove: method({
       input: z.object({ id: idSchema, removeDirectory: z.boolean() }).strict(),
       output: z.object({ removed: z.boolean() }),
+      description:
+        'Remove one host record, optionally deleting its directory on that machine; its threads are kept. Call only when the user asked to remove that host.',
+      tool: { name: 'multi_host_remove_host', render: compactJson },
     }),
-    sshConfigHosts: method({ input: z.void(), output: z.object({ hosts: z.object({ aliases: z.array(z.string()), knownHosts: z.array(z.string()) }) }) }),
+    sshConfigHosts: method({
+      input: z.void(),
+      output: z.object({ hosts: z.object({ aliases: z.array(z.string()), knownHosts: z.array(z.string()) }) }),
+      description: 'SSH aliases from the local ssh config and known_hosts entries, as suggestions when adding a host. Read-only.',
+      tool: { name: 'multi_host_ssh_hosts', readOnly: true, render: compactJson },
+    }),
     discoverHomes: method({
       input: z.object({ sshTarget: sshTargetSchema }).strict(),
       output: z.discriminatedUnion('ok', [
         z.object({ ok: z.literal(true), homes: z.array(z.object({ path: z.string(), source: z.enum(['multi-host', 'web-url']) })) }),
         failedSchema,
       ]),
+      description: 'Look for DSH homes on a host over SSH, the way the add-host dialog does. Call only when the user asked to set that host up.',
+      tool: { name: 'multi_host_find_homes', render: compactJson },
     }),
     testConnection: method({
       input: z.object({ name: z.string().trim().min(1).max(120), sshTarget: sshTargetSchema, remoteHome: remoteHomeSchema }).strict(),
@@ -184,12 +202,18 @@ export const multiHostApi = defineApi({
         z.object({ ok: z.literal(true), steps: z.array(connectionTestStepSchema), identity: runtimeIdentitySchema }),
         failedSchema,
       ]),
+      description:
+        'Run the stepwise connection test for one host configuration (ssh, then runtime, then identity). Call only when the user asked to test that host.',
+      tool: { name: 'multi_host_test', render: compactJson },
     }),
     saveSshHost: method({
       input: z
         .object({ hostId: idSchema.optional(), name: z.string().trim().min(1).max(120), sshTarget: sshTargetSchema, remoteHome: remoteHomeSchema })
         .strict(),
       output: runtimeRegistrationSchema,
+      description:
+        'Add or edit an SSH host: its name, ssh target and the remote DSH home to register. Call only when the user asked to add or change that host.',
+      tool: { name: 'multi_host_save_ssh_host', render: compactJson },
     }),
     runtimeUpsert: method({
       input: z
@@ -204,6 +228,8 @@ export const multiHostApi = defineApi({
     runtimeStatus: method({
       input: z.object({ runtimeId: idSchema }).strict(),
       output: runtimeStatusSchema,
+      description: 'Connection state of one remote DSH runtime: whether a connection is open, the last error, and when it was last seen. Read-only.',
+      tool: { name: 'multi_host_status', readOnly: true, render: compactJson },
     }),
     /** Connect if needed and round-trip once; the chip menu shows the latency as the host's status. */
     runtimePing: method({
@@ -213,6 +239,8 @@ export const multiHostApi = defineApi({
     runtimeReconnect: method({
       input: z.object({ runtimeId: idSchema }).strict(),
       output: z.discriminatedUnion('ok', [z.object({ ok: z.literal(true) }), failedSchema]),
+      description: 'Drop and reopen the pooled connection to one remote runtime. Call only when the user asked to reconnect it.',
+      tool: { name: 'multi_host_reconnect', render: compactJson },
     }),
     /** This runtime's own folders; a manager calls it on a remote runtime to browse that machine. */
     listDirectory: method({
@@ -226,15 +254,22 @@ export const multiHostApi = defineApi({
     runtimeCreateDirectory: method({
       input: z.object({ runtimeId: idSchema, path: z.string().min(1).max(4096), name: z.string().min(1).max(255) }).strict(),
       output: z.discriminatedUnion('ok', [z.object({ ok: z.literal(true), path: z.string() }), failedSchema]),
+      description: 'Create one folder on a remote runtime. Call only when the user asked to create that folder.',
+      tool: { name: 'multi_host_mkdir', render: compactJson },
     }),
     /** Register a folder as a workspace on the runtime, so its jj-integration can describe and isolate it. */
     runtimeOpenFolder: method({
       input: z.object({ runtimeId: idSchema, path: z.string().min(1).max(4096) }).strict(),
       output: z.discriminatedUnion('ok', [z.object({ ok: z.literal(true), workspaceId: z.string(), path: z.string() }), failedSchema]),
+      description:
+        'Register a folder on a remote runtime as a workspace, so the remote jj-integration can describe and isolate it. Call only when the user asked to open that folder there.',
+      tool: { name: 'multi_host_open_folder', render: compactJson },
     }),
     runtimeBrowse: method({
       input: z.object({ runtimeId: idSchema, path: z.string().min(1).max(4096).optional() }).strict(),
       output: z.discriminatedUnion('ok', [directoryListingSchema.extend({ ok: z.literal(true) }), failedSchema]),
+      description: 'List folders on a remote runtime at one path (default: the runtime home), for choosing where a remote thread runs. Read-only.',
+      tool: { name: 'multi_host_browse', readOnly: true, render: compactJson },
     }),
     runtimePluginCall: method({
       input: z.object({ runtimeId: idSchema, method: remotePluginMethodSchema, input: jsonValueSchema }).strict(),
@@ -250,6 +285,9 @@ export const multiHostApi = defineApi({
         }),
         failedSchema,
       ]),
+      description:
+        'The provider-grouped model catalog of one remote runtime with its default model, so a remote thread can be started on a chosen model. Read-only.',
+      tool: { name: 'multi_host_models', readOnly: true, render: compactJson },
     }),
     threadStart: method({
       input: z
@@ -265,6 +303,9 @@ export const multiHostApi = defineApi({
         z.object({ ok: z.literal(true), sessionId: sessionIdSchema }),
         failedSchema.extend({ sessionId: sessionIdSchema.optional() }),
       ]),
+      description:
+        'Start a thread on one remote runtime: its directory, the first message, and optionally an agent preset and model. Call only when the user asked to start a thread on that machine.',
+      tool: { name: 'multi_host_start_thread', render: compactJson },
     }),
     /** The latest messages of a remote thread, reduced to text, for the local remote-thread view. */
     threadTranscript: method({
@@ -281,11 +322,21 @@ export const multiHostApi = defineApi({
         }),
         failedSchema,
       ]),
+      description: 'The latest messages of one remote thread, reduced to text, with its cursor, directory, title, running state and model. Read-only.',
+      tool: { name: 'multi_host_thread_transcript', readOnly: true, render: compactJson },
     }),
-    threadList: method({ input: z.void(), output: z.object({ threads: z.array(remoteThreadSchema) }) }),
+    threadList: method({
+      input: z.void(),
+      output: z.object({ threads: z.array(remoteThreadSchema) }),
+      description: 'Every thread this DSH started on remote runtimes, with its host, Session, title and state. Read-only.',
+      tool: { name: 'multi_host_threads', readOnly: true, render: compactJson },
+    }),
     threadForget: method({
       input: z.object({ runtimeId: idSchema, sessionId: sessionIdSchema.optional() }).strict(),
       output: z.object({ removed: z.number().int().nonnegative() }),
+      description:
+        'Forget the local records of remote threads (one Session, or every thread on a runtime). The remote threads keep running. Call only when the user asked to forget them.',
+      tool: { name: 'multi_host_forget_thread', render: compactJson },
     }),
     runtimeCall: method({
       input: z.object({ runtimeId: idSchema, request: nativeRpcSchema }).strict(),
@@ -306,6 +357,8 @@ export const multiHostApi = defineApi({
     runtimeRemove: method({
       input: z.object({ runtimeId: idSchema }).strict(),
       output: z.object({ removed: z.boolean() }),
+      description: 'Remove one runtime registration from a host. Call only when the user asked to remove it.',
+      tool: { name: 'multi_host_remove_runtime', render: compactJson },
     }),
   },
 })
