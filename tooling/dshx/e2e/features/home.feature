@@ -13,6 +13,7 @@ Feature: New thread home screen
     Then the New thread screen shows the mark "🚀" and the headline "Ship repo"
     When the New thread workspace toggle is turned on
     And a message is sent in the thread workspace
+    Then the thread details do not show the New thread shortcuts
     And the thread workspace gains a revision described "Feature to rebase"
     And the page is reloaded so the home screen reads the thread workspaces afresh
     And a new thread is started from the sidebar

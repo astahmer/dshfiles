@@ -66,6 +66,13 @@ Then('the New thread screen shows the mark {string} and the headline {string}', 
   await recordAssertion(page, 'home-brand-settings-survive-reload', () => expect(heroHeadline(page).getByText(headline, { exact: true })).toBeVisible())
 })
 
+Then('the thread details do not show the New thread shortcuts', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'home-strip-stays-hidden-in-thread-details', async () => {
+    await expect(page.getByText('Resume', { exact: true })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: /threads? has work to rebase/ })).toHaveCount(0)
+  })
+})
+
 Then('the New thread screen offers to resume {string} and reports one thread with work to rebase', async ({ page }: { page: Page }, title: string) => {
   await recordAssertion(page, 'home-strip-lists-the-project-recent-thread', async () => {
     await expect(page.getByText('Resume', { exact: true })).toBeVisible()
