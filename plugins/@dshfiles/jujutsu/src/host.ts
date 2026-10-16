@@ -20,6 +20,7 @@ import { EVOLUTION_TEMPLATE, OPERATION_TEMPLATE, REVISION_TEMPLATE } from './jj-
 import { RevisionReads, type JjRun } from './revision-reads.js'
 import { readGraphNavigation, readGraphSlice, readRevisionRelationship } from './graph-navigation-reads.js'
 import { composerContextHost } from './composer-context-host.js'
+import { closeReviewProgress, jujutsuReviewProgressApiHost, reviewProgressFor } from './review-progress-host.js'
 import { jujutsuSettings } from './settings.js'
 import { resolveWorkspaceDestination, sameWorkspaceParent } from './workspace-path.js'
 import { graphPageRevset } from './graph-page.js'
@@ -794,8 +795,19 @@ const chatReferenceSection = definePromptSection({
 
 export default defineHost({
   name: '@dshfiles/jujutsu',
-  inject: ['subprocess', 'webServer'],
-  apis: [jujutsuHostApi, composerContextHost((ctx, cwd, args, signal, options) => runAt(ctx, cwd, undefined, args, signal, options))],
+  inject: ['subprocess', 'webServer', 'storageDomain'],
+  apis: [
+    jujutsuHostApi,
+    jujutsuReviewProgressApiHost,
+    composerContextHost((ctx, cwd, args, signal, options) => runAt(ctx, cwd, undefined, args, signal, options)),
+  ],
   prompts: [chatReferenceSection],
   settings: [jujutsuSettings],
+  setup: ctx => {
+    // Review progress belongs to the Host so every browser, plugin and CLI reads the same marks.
+    ctx.effect(() => {
+      void reviewProgressFor(ctx).catch(() => undefined)
+      return () => closeReviewProgress()
+    }, 'jujutsu: review progress store')
+  },
 })

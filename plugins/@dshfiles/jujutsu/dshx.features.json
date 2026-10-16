@@ -140,7 +140,7 @@
     {
       "id": "revision-detail-and-diff",
       "title": "Inspect revisions and changed files",
-      "summary": "Open revision details, describe/full diff, browse files in flat or tree mode, and mark review status against the exact change.",
+      "summary": "Open revision details, describe/full diff, browse files in flat or tree mode, and mark review status against the exact change; the Host stores review progress so every browser and CLI shares it.",
       "reach": [
         "click button \"Jujutsu\"",
         "click button \"Choose repository\"",
@@ -178,7 +178,8 @@
       "states": ["summary", "full-diff", "tree-files", "flat-files", "reviewed", "unreviewed"],
       "failureModes": [
         "Paths containing spaces, Unicode, or shell metacharacters remain literal file identities.",
-        "Missing review or diff data is reported rather than guessed."
+        "Missing review or diff data is reported rather than guessed.",
+        "An older Host without the review-progress API keeps review marks in the browser store and migrates them once the Host serves it."
       ],
       "externalDependencies": [],
       "verification": [
@@ -191,6 +192,12 @@
           "kind": "gherkin",
           "id": "jujutsu.copy-ids",
           "featureFile": "tooling/dshx/e2e/features/jujutsu.feature"
+        },
+        {
+          "kind": "host-test",
+          "id": "jujutsu.review-progress-host-store",
+          "file": "plugins/@dshfiles/jujutsu/src/host.test.ts",
+          "testName": "stores review progress for every browser on the Host"
         }
       ]
     },
