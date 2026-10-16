@@ -50,8 +50,10 @@ and keeps the rest for Back and Forward.
 
 **Saved views.** The view row above the thread list is backed by validated view
 presets (`src/thread-view-preferences.ts`): each preset carries a name, order,
-and the grouping/status/source filters it applies. Stored v1 view preferences
-migrate into that preset list once. **Customize views** opens
+and the grouping/status/source filters it applies. The whole document is the
+Host-synced `threadViews` setting, so every browser offers the same views; the
+v1 browser copy this plugin wrote migrates into it once. Stored v1 view
+preferences migrate into that preset list once. **Customize views** opens
 `src/thread-view-manager.tsx`, where presets are saved, renamed, reordered,
 selected, and removed; the row's quick controls apply the selected preset
 without opening the manager. **Not working** includes non-running threads even
@@ -118,12 +120,21 @@ generated text field cannot capture.
 
 Every thread row also exposes **Copy thread ID**, **Copy thread link**, **Mark
 unread**, per-thread auto-settle behavior, and a **Mute thread** menu.
-Opening or selecting a thread clears its manual unread marker. For a finished
-turn, the sidebar also records that completion as seen locally. If the Host
-still reports the same completion unread, it stays dismissed until that status
-clears or the Host reports a fresh unread completion. Manual unread and
-seen-completion markers are saved in this browser, separate from Host running
-and pending-interaction state.
+Attention is Host-owned: the plugin records one durable row per unacknowledged
+thread (a finished turn, a manual unread mark, or both) in the
+`thread_attention` storage domain and serves it through the
+`thread-sidebar-attention` API, which also exposes the current state to the
+agent as the `thread_attention_state` tool. Other plugins import the contract
+from `@dshfiles/thread-sidebar/attention-api` (a dshx shared module, so one
+definition serves every consumer); `main-tabs` reads it for its unread dot. The turn end is recorded where it
+happens — a Host listener on committed session events — so a completion
+survives even when every browser was closed while the thread finished. Watching
+a thread finish acknowledges that completion, and so does opening the thread
+from any tab; the acknowledgement carries the record version the browser
+rendered, so a turn that finishes in between stays unacknowledged, and it never
+clears a manual unread mark on the same thread. A browser that still holds markers
+from the older browser-local version hands them to the Host once and then drops
+its copy.
 Auto-settle can inherit the global auto-archive setting, explicitly enable it
 for one thread, or exclude that thread; the global idle threshold and safety
 exclusions still apply. **Mute thread** (row bell, context menu, and the
@@ -137,7 +148,9 @@ its own, and **Unmute** is always in the same menu. The **Muted** filter lists
 muted threads. Mutes follow child-thread action preferences and live in the
 Host-synced `mutedThreads` setting, so every browser stays quiet; mutes saved
 in this browser by older versions are copied there once. Desktop notifications
-are opt-in in Sidebar settings and show the thread title.
+are opt-in in Sidebar settings (the `desktopNotificationsEnabled` setting, so
+the choice follows the user rather than one browser) and show the thread title;
+the browser still asks for its own notification permission.
 
 **Park vs mute.** Park files a finished thread away: it moves to the Parked
 section, is skipped by auto-archive, and stays parked until unparked, but its
@@ -151,18 +164,17 @@ Client's explicit Session pending-interaction status; the sidebar also checks
 active native question projections for continued forms, which can remain
 answerable after a timed wait lets the Agent keep working. Unknown interaction
 kinds and generic unstructured questions remain unclassified. **Turn finished**
-marks an eligible completed turn with a local attention marker; selecting that
-thread from any route acknowledges it. The sidebar keeps the same completion
-dismissed while its seen marker is active, even if Host still reports it unread.
-**Needs resume** contains only Sessions the managed restart captures as running
-immediately before its Host exit. Completed, already-idle, and user-cancelled
-Sessions are not added. Each row has explicit **Resume** and dismiss actions,
-and the group offers **Resume all** (up to three requests at once). Resume sends
-a new continuation prompt that directs the agent to inspect its transcript and
-workspace before continuing; it does not replay the interrupted model/tool
-call. A manual process stop or crash without the managed restart handshake does
-not create a recovery marker. Approval, Input, and Turn finished can be
-configured independently as a separate group or inline thread-row label.
+marks an eligible finished turn from the Host's attention record; selecting that
+thread from any route acknowledges it. **Needs resume** contains only Sessions
+the managed restart captures as running immediately before its Host exit.
+Completed, already-idle, and user-cancelled Sessions are not added. Each row has
+explicit **Resume** and dismiss actions, and the group offers **Resume all** (up
+to three requests at once). Resume sends a new continuation prompt that directs
+the agent to inspect its transcript and workspace before continuing; it does not
+replay the interrupted model/tool call. A manual process stop or crash without
+the managed restart handshake does not create a recovery marker. Approval, Input,
+and Turn finished can be configured independently as a separate group or inline
+thread-row label.
 Approval and Input default to groups; Turn finished defaults to an inline
 label. Each status has an independently configurable semantic color in Sidebar
 settings (Muted, Primary, Info, Success, Warning, or Danger); the default colors
@@ -172,14 +184,20 @@ Subagent attention is
 excluded from groups, labels, and desktop alerts by default; enable **Include
 subagent threads** in Sidebar settings to opt in. An unresolved request stays
 available in its conversation composer and returns to its configured attention
-display when that thread is no longer selected. The seen marker clears when Host
-reports completion unread as false or reports a fresh completion unread, so a
-later turn can surface normally. Completion alerts are observable only while the
-DSH page is connected, so offline completion notifications are not replayed
-after reconnect. A failed latest turn shows a destructive dot and **Failed · time**
+display when that thread is no longer selected. The Host records attention for
+turn ends that ask for something (`completed`, `error`, `aborted`, `blocked`,
+`max-tokens`); `forked` and `interrupted` turn ends never raise it, because the
+first closes fork bookkeeping and the second continues in the next turn.
+Attention rows still require a thread that is not running, not blank, not
+archived, not muted, and not already waiting on approval or input, so a later
+turn can surface normally. Completion alerts are observable only while a DSH
+page watching that Host is open; a completion recorded while every tab is
+closed still appears when one is opened, but no desktop alert is replayed. A
+failed latest turn shows a destructive dot and **Failed · time**
 in its row, using its durable turn-end timestamp. The row exposes failure time,
 not error details. Errors without a durable `turn/end` event are not shown.
-Previously cached history is not backfilled; this status tracks new turn endings.
+Attention is not backfilled from history that predates the Host's attention
+store; it tracks new turn endings, plus the one-time browser migration.
 
 Child sessions render with increasing indentation and a direct “child of …”
 label. The sidebar follows DSH's durable `parentId` chain, so the presentation

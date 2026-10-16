@@ -12,6 +12,8 @@ import {
   WORKING_VIEW_ID,
   decodeThreadViewPreferences,
   decodeThreadViewSettings,
+  updateThreadViewPreferences,
+  updateThreadViewSettings,
   type ThreadViewPreset,
 } from './thread-view-preferences.js'
 
@@ -150,5 +152,24 @@ describe('thread view preferences', () => {
     const added = saveThreadView(updated, attentionView)
     expect(added.views.at(-1)).toEqual(attentionView)
     expect(added.activeViewId).toBe(ALL_THREADS_VIEW_ID)
+  })
+})
+
+describe('saved-view preference updates', () => {
+  it('applies a patch to the active view and keeps the rest of the document', () => {
+    const settings = {
+      ...DEFAULT_THREAD_VIEW_SETTINGS,
+      activeViewId: WORKING_VIEW_ID,
+    }
+    const updated = updateThreadViewPreferences(settings, { groupBy: 'project', statusFilters: ['attention'] })
+    expect(updated.activeViewId).toBe(WORKING_VIEW_ID)
+    expect(updated.views.find(view => view.id === WORKING_VIEW_ID)).toMatchObject({ groupBy: 'project', statusFilters: ['attention'] })
+    expect(updated.views.find(view => view.id === ALL_THREADS_VIEW_ID)).toEqual(DEFAULT_THREAD_VIEW_SETTINGS.views[0])
+  })
+
+  it('clones the view list so a saved document never aliases its input', () => {
+    const saved = updateThreadViewSettings(DEFAULT_THREAD_VIEW_SETTINGS)
+    expect(saved.views).not.toBe(DEFAULT_THREAD_VIEW_SETTINGS.views)
+    expect(saved.views).toEqual(DEFAULT_THREAD_VIEW_SETTINGS.views)
   })
 })

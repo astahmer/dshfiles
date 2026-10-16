@@ -8,6 +8,8 @@ import { promisify } from 'node:util'
 import type { Context } from '@deepseek-ai/cordis'
 import type { SessionRequestId } from '@deepseek-ai/dsh-api-session-controller'
 import { z } from 'zod'
+import { attentionFor, closeAttention, threadAttentionApiHost } from './attention-host.js'
+import { finishReasonFromEvent } from './attention-store.js'
 import { threadSidebarMachineApi } from './machine-api.js'
 import { threadSidebarPendingQuestionsApi } from './pending-questions-api.js'
 import { threadSidebarPluginUpdatesApi } from './plugin-updates-api.js'
@@ -146,12 +148,27 @@ interface ClientModuleRegistrySurface {
 export default defineHost({
   name: '@dshfiles/thread-sidebar',
   settings: [threadSidebarSettings],
-  inject: ['connection', 'sessionProjections', 'sessionQuery', 'agents', 'sessionController', 'sessionPersistence'],
-  apis: [restartApi, recoveryApi, machineApi, pluginUpdatesApi, pendingQuestionsApi],
+  inject: ['connection', 'sessionProjections', 'sessionQuery', 'agents', 'sessionController', 'sessionPersistence', 'storageDomain'],
+  apis: [restartApi, recoveryApi, machineApi, pluginUpdatesApi, pendingQuestionsApi, threadAttentionApiHost],
   // The web Host's client module registry knows where every loaded plugin package lives; Hosts without it
   // (desktop shells, older builds) simply report no pending updates.
   setup: ctx => {
     ctx.sessionProjections.register(threadSidebarModelRouteProjection)
+    // One durable attention record per session, written where the turn actually ends, so every browser,
+    // plugin and CLI reads the same unacknowledged-thread state instead of each tab guessing from its own memory.
+    ctx.effect(() => {
+      const opening = attentionFor(ctx)
+      void opening.catch(() => undefined)
+      const stop = ctx.on('session/event', (session, event) => {
+        const reason = finishReasonFromEvent(event)
+        if (reason === null) return
+        void opening.then(store => store.recordFinish({ sessionId: String(session.id), seq: event.seq, time: event.time, reason })).catch(() => undefined)
+      })
+      return async () => {
+        stop()
+        await closeAttention()
+      }
+    }, 'thread-sidebar: thread attention store')
     ctx.inject(['clientModules'], scoped => {
       const registry: ClientModuleRegistrySurface | undefined = scoped.get('clientModules')
       if (registry?.graph === undefined || registry.clientPath === undefined) return

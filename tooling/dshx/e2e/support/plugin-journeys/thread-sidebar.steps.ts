@@ -18,6 +18,15 @@ interface ThreadHistoryJourney {
 const threadHistoryJourneys = new WeakMap<Page, ThreadHistoryJourney>()
 const archivedOpenJourneys = new WeakMap<Page, string>()
 
+interface FinishedTurnJourney {
+  readonly targetThreadId: string
+}
+
+const finishedTurnJourneys = new WeakMap<Page, FinishedTurnJourney>()
+
+/** The key the plugin read before attention became Host-owned. */
+const LEGACY_NOTIFICATION_STORAGE_KEY = 'dshfiles.thread-sidebar.notifications.v1'
+
 const threadSidebar = (page: Page) => page.getByRole('region', { name: 'Threads' })
 const sidebarNavigation = (page: Page) => page.getByRole('navigation', { name: 'Sidebar navigation' })
 const customizeSidebar = (page: Page) => page.getByRole('region', { name: 'Customize sidebar' })
@@ -564,6 +573,56 @@ Then('its unread marker clears on open', async ({ page }: { page: Page }) => {
     await expect(targetRow).toHaveCount(1)
     await expect(targetRow.getByRole('img', { name: 'Unread', exact: true })).toHaveCount(0)
   })
+  await finishJourneyAssertions(page)
+})
+
+When('a thread finishes its turn and the browser hands its unfinished marker to the Host', async ({ page }: { page: Page }) => {
+  const targetThreadId = await startBlankThread(page)
+  const composer = page.getByRole('textbox').first()
+  await composer.fill('thread sidebar finished turn e2e target')
+  await composer.press('Enter')
+  await expect(page.getByText(/This turn failed/).first()).toBeVisible({ timeout: 30_000 })
+
+  // Watch another thread first, so the target stays out of this tab's main view while it is unacknowledged.
+  await startBlankThread(page)
+  // A browser that still holds the older browser-local markers hands them to the Host on its next load.
+  await page.evaluate(
+    ([key, sessionId]) =>
+      localStorage.setItem(
+        key ?? '',
+        JSON.stringify({ enabled: false, needsYouAt: { [sessionId ?? '']: Date.now() }, mutedUntil: {}, manuallyUnreadSessionIds: [], seenCompletionSessionIds: [] }),
+      ),
+    [LEGACY_NOTIFICATION_STORAGE_KEY, targetThreadId],
+  )
+  finishedTurnJourneys.set(page, { targetThreadId })
+})
+
+Then('every open tab shows the finished turn until one tab opens it', async ({ page }: { page: Page }) => {
+  const journey = finishedTurnJourneys.get(page)
+  if (journey === undefined) throw new Error('No finished-turn journey was recorded for this browser page.')
+  const finishedLabel = (target: Page) => threadRow(target, journey.targetThreadId).getByText('Turn finished', { exact: true })
+  await recordAssertion(page, 'thread-sidebar-turn-finished-outlives-its-client', async () => {
+    await page.reload()
+    await expect(finishedLabel(page)).toBeVisible({ timeout: 60_000 })
+  })
+  const otherTab = await page.context().newPage()
+  try {
+    await otherTab.goto(page.url())
+    await recordAssertion(page, 'thread-sidebar-turn-finished-is-shared-across-tabs', async () => {
+      await expect(finishedLabel(otherTab)).toBeVisible({ timeout: 30_000 })
+      await otherTab.reload()
+      await expect(finishedLabel(otherTab)).toBeVisible({ timeout: 30_000 })
+    })
+    await recordAssertion(page, 'thread-sidebar-turn-finished-clears-in-every-tab', async () => {
+      await threadRow(otherTab, journey.targetThreadId).getByRole('button').first().click()
+      await expect(finishedLabel(otherTab)).toHaveCount(0, { timeout: 15_000 })
+      await page.bringToFront()
+      await page.reload()
+      await expect(finishedLabel(page)).toHaveCount(0, { timeout: 30_000 })
+    })
+  } finally {
+    await otherTab.close()
+  }
   await finishJourneyAssertions(page)
 })
 

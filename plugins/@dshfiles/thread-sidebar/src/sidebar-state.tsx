@@ -95,6 +95,8 @@ interface SidebarState {
   preferences: SidebarPreferences
   updatePreferences: (patch: Partial<SidebarPreferences>) => void
   storageWarning: boolean
+  /** True while DSH Settings serves the sidebar namespace and accepts writes. */
+  hostBacked: boolean
   openPalette: (mode: PaletteMode) => void
   closePalette: () => void
   /** The thread shown in the main view, reported by the thread list for navigation history. */
@@ -113,13 +115,13 @@ export const useSidebarState = (): SidebarState => {
 }
 
 export const SidebarStateProvider = ({ children }: { children: ReactNode }): JSX.Element => {
-  const { preferences, storageWarning, updatePreferences } = usePreferences()
+  const { preferences, storageWarning, hostBacked, updatePreferences } = usePreferences()
   const [selectedThreadId, setSelectedThreadId] = useState<SessionSummary['id'] | null>(null)
   const threadTitle = useRef<(sessionId: SessionSummary['id']) => string | undefined>(() => undefined)
 
   const state = useMemo(
-    () => ({ preferences, updatePreferences, storageWarning, openPalette, closePalette, selectedThreadId, setSelectedThreadId, threadTitle }),
-    [preferences, updatePreferences, storageWarning, selectedThreadId],
+    () => ({ preferences, updatePreferences, storageWarning, hostBacked, openPalette, closePalette, selectedThreadId, setSelectedThreadId, threadTitle }),
+    [preferences, updatePreferences, storageWarning, hostBacked, selectedThreadId],
   )
 
   return <SidebarStateContext.Provider value={state}>{children}</SidebarStateContext.Provider>

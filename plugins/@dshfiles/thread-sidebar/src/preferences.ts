@@ -2,6 +2,7 @@ import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import { z } from 'zod'
 import { threadMutesSchema } from './thread-mute.js'
 import { ATTENTION_COLOR_OPTIONS, DEFAULT_PREFERENCES, REBASED_THREAD_ARCHIVE_DELAYS, type SidebarPreferences, type SidebarSection } from './organization.js'
+import { threadViewSettingsSchema } from './thread-view-preferences.js'
 
 export const PREFERENCES_STORAGE_KEY = 'dshfiles.thread-sidebar.v1'
 
@@ -59,9 +60,11 @@ const preferencesSchema = z
       .strict()
       .default(DEFAULT_PREFERENCES.attentionColors),
     includeSubagentAttention: z.boolean().default(DEFAULT_PREFERENCES.includeSubagentAttention),
+    desktopNotificationsEnabled: z.boolean().default(DEFAULT_PREFERENCES.desktopNotificationsEnabled),
     applyActionsToChildThreads: z.boolean().default(DEFAULT_PREFERENCES.applyActionsToChildThreads),
     maxChildren: z.number().int().min(1).max(50).default(DEFAULT_PREFERENCES.maxChildren),
     finishedSubagents: z.enum(['show', 'collapse', 'hide']).default(DEFAULT_PREFERENCES.finishedSubagents),
+    threadViews: threadViewSettingsSchema.default(DEFAULT_PREFERENCES.threadViews),
   })
   .strict()
 

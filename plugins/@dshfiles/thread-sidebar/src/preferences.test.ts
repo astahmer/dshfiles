@@ -120,3 +120,11 @@ test('settings saved before the finished-subagents choice collapse them and reje
   assert.equal(finishedSubagents, 'collapse')
   assert.equal(decodePreferences({ ...DEFAULT_PREFERENCES, finishedSubagents: 'archive' }), null)
 })
+
+test('the saved thread views live in the Host-synced preferences', () => {
+  assert.deepEqual(decodePreferences(DEFAULT_PREFERENCES)?.threadViews, DEFAULT_PREFERENCES.threadViews)
+  const custom = { ...DEFAULT_PREFERENCES.threadViews, activeViewId: 'working' }
+  assert.equal(decodePreferences({ ...DEFAULT_PREFERENCES, threadViews: custom })?.threadViews.activeViewId, 'working')
+  assert.equal(decodePreferences({ ...DEFAULT_PREFERENCES, threadViews: { ...custom, views: [] } }), null)
+  assert.equal(decodePreferences({ ...DEFAULT_PREFERENCES, threadViews: { views: [{ id: 'x' }], activeViewId: 'x' } }), null)
+})

@@ -1,8 +1,15 @@
 import Schema from '@deepseek-ai/schemastery'
 import { defineSettings } from '@dshfiles/dshx/settings'
 import { ATTENTION_COLOR_OPTIONS, DEFAULT_PREFERENCES, REBASED_THREAD_ARCHIVE_DELAYS } from './organization.js'
+import { DEFAULT_THREAD_VIEW_SETTINGS } from './thread-view-preferences.js'
 
 const ids = (): Schema<string[]> => Schema.array(Schema.string()).default([]).hidden()
+
+/** Schemastery validates mutable arrays, so the saved-view default is cloned field by field. */
+const threadViewsDefault = {
+  ...DEFAULT_THREAD_VIEW_SETTINGS,
+  views: DEFAULT_THREAD_VIEW_SETTINGS.views.map(view => ({ ...view, statusFilters: [...view.statusFilters] })),
+}
 
 export const threadSidebarSettings = defineSettings({
   namespace: 'thread-sidebar',
@@ -55,6 +62,9 @@ export const threadSidebarSettings = defineSettings({
     includeSubagentAttention: Schema.boolean()
       .default(DEFAULT_PREFERENCES.includeSubagentAttention)
       .description('Include child session attention in groups, thread-row labels, and desktop alerts.'),
+    desktopNotificationsEnabled: Schema.boolean()
+      .default(DEFAULT_PREFERENCES.desktopNotificationsEnabled)
+      .description('Raise a desktop alert when a turn finishes or a thread needs input; the browser still asks for its own permission.'),
     applyActionsToChildThreads: Schema.boolean()
       .default(DEFAULT_PREFERENCES.applyActionsToChildThreads)
       .description('Apply manual pin, park, archive, and restore actions to all child threads.'),
@@ -124,6 +134,8 @@ export const threadSidebarSettings = defineSettings({
     hiddenHeaderIds: ids(),
     footerOrder: ids(),
     hiddenFooterIds: ids(),
+    // An internal document rather than a form field: the client validates it with the same zod schema it stores.
+    threadViews: Schema.any().default(threadViewsDefault).hidden(),
   }),
   applies: 'live',
 })

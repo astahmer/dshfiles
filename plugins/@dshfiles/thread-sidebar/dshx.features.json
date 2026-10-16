@@ -263,7 +263,7 @@
         {
           "key": "views",
           "defaultValue": "[{\"id\":\"all-threads\",\"name\":null,\"groupBy\":\"status\",\"statusFilters\":[],\"sourceFilter\":\"all\",\"enabled\":true},{\"id\":\"working\",\"name\":null,\"groupBy\":\"status\",\"statusFilters\":[\"working\"],\"sourceFilter\":\"all\",\"enabled\":true}]",
-          "constraints": "Browser-local saved views: 1–12 items, unique IDs and names, at least one enabled; each preset stores group, status, and source filters.",
+          "constraints": "Host-synced saved views: 1\u201312 items, unique IDs and names, at least one enabled; each preset stores group, status, and source filters. The browser copy an older version wrote is handed to the Host on the next load.",
           "coveredBy": ["thread-sidebar.custom-views"]
         },
         {
@@ -289,7 +289,7 @@
         {
           "key": "viewPresets",
           "defaultValue": "[{\"id\":\"all-threads\",\"name\":null,\"groupBy\":\"status\",\"statusFilters\":[],\"sourceFilter\":\"all\",\"enabled\":true},{\"id\":\"working\",\"name\":null,\"groupBy\":\"status\",\"statusFilters\":[\"working\"],\"sourceFilter\":\"all\",\"enabled\":true}]",
-          "constraints": "Browser-local saved views: 1–12 items, unique IDs and names, at least one enabled; each preset stores group, status, and source filters.",
+          "constraints": "Host-synced saved views: 1\u201312 items, unique IDs and names, at least one enabled; each preset stores group, status, and source filters. The browser copy an older version wrote is handed to the Host on the next load.",
           "coveredBy": ["thread-sidebar.custom-views"]
         }
       ],
@@ -314,7 +314,7 @@
       ],
       "failureModes": [
         "Working and not-working status matching uses session activity plus attention, archive, and mute state; source filters use parentId and origin.",
-        "Saved view IDs and names must be unique; at least one of 1–12 presets must remain enabled."
+        "Saved view IDs and names must be unique; at least one of 1\u201312 presets must remain enabled."
       ],
       "externalDependencies": [],
       "verification": [
@@ -543,7 +543,7 @@
         {
           "key": "mutedThreads",
           "defaultValue": "{}",
-          "constraints": "Hidden; session id → { until: epoch ms or null for until unmuted, activityAt: the activity time the row keeps while muted }. Expired entries are dropped when they wake.",
+          "constraints": "Hidden; session id \u2192 { until: epoch ms or null for until unmuted, activityAt: the activity time the row keeps while muted }. Expired entries are dropped when they wake.",
           "coveredBy": ["thread-sidebar.thread-mute"]
         }
       ],
@@ -589,7 +589,7 @@
     {
       "id": "manual-unread",
       "title": "Keep selected threads manually unread",
-      "summary": "Mark a thread unread from the sidebar and clear that marker when the thread is opened.",
+      "summary": "Mark a thread unread from the sidebar and clear that marker in every browser when the thread is opened.",
       "reach": [
         "click button \"All threads\"",
         "click button \"New thread\"",
@@ -604,12 +604,13 @@
         "click menuitem \"Mark unread\"",
         "expect img \"Unread\""
       ],
-      "surfaces": ["client", "storage"],
+      "surfaces": ["client", "host", "storage"],
       "configuration": [],
       "states": ["read", "manual-unread"],
       "failureModes": [
-        "Manual unread is a per-thread sidebar preference; it does not read or change Host attention state.",
-        "Opening a thread clears its manual unread marker without clearing another thread's marker."
+        "The Host stores the mark for the whole user, so every open tab, plugin and CLI reads the same unread state.",
+        "Opening a thread drops its whole attention record without touching another thread\u2019s record.",
+        "The Host still holds the record after a DSH restart, while a failed migration keeps the browser copy for a retry."
       ],
       "externalDependencies": [],
       "verification": [
@@ -620,9 +621,55 @@
         },
         {
           "kind": "unit-test",
-          "id": "thread-sidebar.manual-unread-unit-seen-clears-local-marker",
+          "id": "thread-sidebar.manual-unread-unit-host-record",
+          "file": "plugins/@dshfiles/thread-sidebar/src/attention-store.test.ts",
+          "testName": "marking a thread unread by hand keeps its finish"
+        }
+      ]
+    },
+    {
+      "id": "finished-turn-attention",
+      "title": "See finished turns on the Host until they are acknowledged",
+      "summary": "The Host records every finished turn as an unacknowledged thread; the sidebar, other plugins and CLIs read that one record, and opening the thread acknowledges it everywhere.",
+      "reach": [
+        "click button \"New thread\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"thread sidebar finished turn e2e target\"",
+        "click button \"Send message\"",
+        "expect text \"Turn finished\""
+      ],
+      "surfaces": ["client", "host", "storage", "integration"],
+      "configuration": [],
+      "states": ["finished-unacknowledged", "acknowledged"],
+      "failureModes": [
+        "Only turn ends that ask the user for something (completed, error, aborted, blocked, max-tokens) are stored; forked and interrupted turns never are.",
+        "Acknowledging compares the record version the browser rendered, so a finish stored after that read stays unacknowledged.",
+        "Watching a selected thread finish acknowledges that completion, while a manual mark on it survives until the thread is opened.",
+        "Attention rows still require a non-running, unarchived, unmuted thread without a pending interaction."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "thread-sidebar.turn-finished-attention",
+          "featureFile": "tooling/dshx/e2e/features/thread-sidebar.feature"
+        },
+        {
+          "kind": "host-test",
+          "id": "thread-sidebar.finished-turn-attention-host-wiring",
+          "file": "plugins/@dshfiles/thread-sidebar/src/host.test.ts",
+          "testName": "stores a finished turn and ignores turn ends that ask for nothing"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.finished-turn-attention-unit-record",
+          "file": "plugins/@dshfiles/thread-sidebar/src/attention-store.test.ts",
+          "testName": "a finish recorded after the browser read the row survives that acknowledgement"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.finished-turn-attention-unit-migration",
           "file": "plugins/@dshfiles/thread-sidebar/src/thread-notifications.test.ts",
-          "testName": "opening a thread clears its needs-you and manual unread markers"
+          "testName": "browser attention carries over its needs-you timestamps and manual marks"
         }
       ]
     },
@@ -832,7 +879,11 @@
       "id": "thread-children-and-links",
       "title": "Browse child sessions and share thread URLs",
       "summary": "Default child lists to open only while a subagent is working, preserve manual toggles, expand recursive child sessions with inherited workspace context, fold or hide finished subagents, and copy credential-free thread URLs.",
-      "reach": ["click button \"Sidebar settings\"", "click button \"Finished subagents: Fold into “N finished”\"", "expect menuitemradio \"Hide them\""],
+      "reach": [
+        "click button \"Sidebar settings\"",
+        "click button \"Finished subagents: Fold into \u201cN finished\u201d\"",
+        "expect menuitemradio \"Hide them\""
+      ],
       "surfaces": ["client", "host", "settings", "integration"],
       "configuration": [
         {
@@ -1089,7 +1140,7 @@
     {
       "id": "thread-reference-mention",
       "title": "Insert cross-session references into the composer",
-      "summary": "Resolve a target Host session and insert its native reference chip at the active composer’s captured selection.",
+      "summary": "Resolve a target Host session and insert its native reference chip at the active composer\u2019s captured selection.",
       "reach": [
         "click button \"All threads\"",
         "click button \"New thread\"",

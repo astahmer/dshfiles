@@ -46,7 +46,7 @@ export const DEFAULT_THREAD_VIEW_PRESETS = [
 ] as const satisfies readonly [ThreadViewPreset, ThreadViewPreset]
 
 export const DEFAULT_THREAD_VIEW_SETTINGS: ThreadViewSettings = {
-  views: DEFAULT_THREAD_VIEW_PRESETS,
+  views: [...DEFAULT_THREAD_VIEW_PRESETS],
   activeViewId: ALL_THREADS_VIEW_ID,
   showGroupControl: true,
   showFilterControl: true,
@@ -91,14 +91,15 @@ const threadViewPresetSchema = z
     name: z.string().trim().min(1).max(32).nullable(),
     enabled: z.boolean(),
     groupBy: groupBySchema,
-    statusFilters: statusFiltersSchema,
+    statusFilters: z.array(selectedStatusFilterSchema).readonly(),
     sourceFilter: sourceFilterSchema,
   })
   .strict()
 
-const threadViewSettingsSchema = z
+/** The whole saved-view document; the Host settings value and the browser's older copy share it. */
+export const threadViewSettingsSchema = z
   .object({
-    views: z.array(threadViewPresetSchema).min(1).max(MAX_THREAD_VIEWS),
+    views: z.array(threadViewPresetSchema).min(1).max(MAX_THREAD_VIEWS).readonly(),
     activeViewId: z.string().min(1).max(64),
     showGroupControl: z.boolean().default(true),
     showFilterControl: z.boolean().default(true),
@@ -240,21 +241,24 @@ export const removeThreadView = (settings: ThreadViewSettings, viewId: string): 
   return { ...settings, views, activeViewId }
 }
 
+/** The browser copy this plugin wrote before the saved views became Host settings; read once to migrate. */
 export const threadViewPreferences = createStoredValue({
   key: 'dshfiles.thread-sidebar.view.v1',
   schema: storedThreadViewSettingsSchema,
   fallback: DEFAULT_THREAD_VIEW_SETTINGS,
 })
 
-export const updateThreadViewPreferences = (patch: Partial<ThreadViewPreferences>): boolean => {
-  const current = threadViewPreferences.get() ?? DEFAULT_THREAD_VIEW_SETTINGS
-  const active = activeThreadView(current)
-  const views = current.views.map(view => {
+/** Apply one view's group/filter change to the saved-view document. */
+export const updateThreadViewPreferences = (settings: ThreadViewSettings, patch: Partial<ThreadViewPreferences>): ThreadViewSettings => {
+  const active = activeThreadView(settings)
+  const views = settings.views.map(view => {
     if (view.id !== active.id) return { ...view, statusFilters: [...view.statusFilters] }
     return { ...view, ...patch, statusFilters: [...(patch.statusFilters ?? view.statusFilters)] }
   })
-  return threadViewPreferences.set({ ...current, views })
+  return { ...settings, views }
 }
 
-export const updateThreadViewSettings = (settings: ThreadViewSettings): boolean =>
-  threadViewPreferences.set({ ...settings, views: settings.views.map(view => ({ ...view, statusFilters: [...view.statusFilters] })) })
+export const updateThreadViewSettings = (settings: ThreadViewSettings): ThreadViewSettings => ({
+  ...settings,
+  views: settings.views.map(view => ({ ...view, statusFilters: [...view.statusFilters] })),
+})

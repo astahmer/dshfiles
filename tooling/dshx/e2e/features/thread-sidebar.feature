@@ -73,6 +73,12 @@ Feature: Thread sidebar journeys
     When one thread is marked unread and another thread is opened
     Then its unread marker clears on open
 
+  @scenario:thread-sidebar.turn-finished-attention
+  Scenario: A finished turn keeps asking every tab for attention until it is opened
+    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
+    When a thread finishes its turn and the browser hands its unfinished marker to the Host
+    Then every open tab shows the finished turn until one tab opens it
+
   @scenario:thread-sidebar.auto-archive-overrides
   Scenario: Per-thread auto-archive overrides the global opt-in
     Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted

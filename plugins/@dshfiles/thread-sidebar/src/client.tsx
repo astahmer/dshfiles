@@ -138,16 +138,9 @@ import {
 } from './thread-view-preferences.js'
 import { ThreadViewManager, threadViewPresetLabel } from './thread-view-manager.js'
 import { captureThreadMentionInsertion, requestThreadMentionInsertion } from './thread-mention.js'
-import {
-  DEFAULT_THREAD_NOTIFICATION_PREFERENCES,
-  isThreadUnread,
-  markThreadSeen,
-  markThreadUnread,
-  reconcileFinishedThreadNotifications,
-  threadAttentionTransitions,
-  threadNotificationPreferences,
-  type ThreadAttentionStatus,
-} from './thread-notifications.js'
+import { legacyAttentionEntries, legacyNotificationPreferences, threadInteractionTransitions, type ThreadInteractionStatus } from './thread-notifications.js'
+import { useThreadAttention } from './attention-client.js'
+import type { ThreadAttentionView } from './attention-api.js'
 import {
   effectiveActivityAt,
   isMuteActive,
@@ -880,8 +873,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const sessionState = props.useSessions(state => state)
   const sessionStatus = props.useSessionStatus(state => state)
   const workspaceState = props.useWorkspaces(state => state)
-  const { preferences, updatePreferences, storageWarning, setSelectedThreadId, threadTitle } = useSidebarState()
-  const notificationPreferences = threadNotificationPreferences.useValue() ?? DEFAULT_THREAD_NOTIFICATION_PREFERENCES
+  const { preferences, updatePreferences, storageWarning, hostBacked, setSelectedThreadId, threadTitle } = useSidebarState()
+  const attention = useThreadAttention({ enabled: sessionState.phase === 'ready' })
   const pendingQuestionsApi = useApi(threadSidebarPendingQuestionsApi)
   const recoveryApi = useApi(threadSidebarRecoveryApi)
   const queryClient = useQueryClient()
@@ -917,9 +910,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [viewsManagerOpen, setViewsManagerOpen] = useState(false)
   const [threadToScrollTo, setThreadToScrollTo] = useState<string | null>(null)
-  const threadViewSettings = threadViewPreferences.useValue() ?? DEFAULT_THREAD_VIEW_SETTINGS
+  const threadViewSettings = preferences.threadViews
   const threadView = activeThreadView(threadViewSettings)
-  const [threadViewStorageWarning, setThreadViewStorageWarning] = useState(false)
   const [now, setNow] = useState(() => Date.now())
   const settingsId = useId()
   const [notice, setNotice] = useState<SidebarNotice | null>(null)
@@ -959,9 +951,13 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     typeof window === 'undefined' ? null : (readThreadUrl(window.location.href)?.sessionId ?? null),
   )
   const archiveInFlight = useRef(false)
-  const previousStatus = useRef<Readonly<Record<string, ThreadAttentionStatus>> | null>(null)
+  const previousStatus = useRef<Readonly<Record<string, ThreadInteractionStatus>> | null>(null)
   const openedRouteId = useRef<string | null>(null)
   const suppressUrlForSession = useRef<string | null>(null)
+  const migrationStarted = useRef(false)
+  const attentionRefreshed = useRef(false)
+  const previousAttention = useRef<ReadonlyMap<string, ThreadAttentionView> | null>(null)
+  const previousSelectedId = useRef<string | null>(null)
   const latestAutoArchive = useRef<{
     sessions: SessionSummary[]
     workspaceBySession: Map<string, string>
@@ -1042,7 +1038,6 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   )
   const selectedSession = useMemo(() => sessions.find(session => (session.retainedBy.mainView ?? 0) > 0), [sessions])
   const selectedSessionId = selectedSession?.id
-  const selectedSessionCompletionUnread = selectedSessionId === undefined ? false : sessionStatus.get(selectedSessionId)?.completionUnread === true
   const attentionSessions = useMemo(
     () => sessions.filter(session => isAttentionSessionIncluded(session, preferences.includeSubagentAttention)),
     [preferences.includeSubagentAttention, sessions],
@@ -1225,8 +1220,26 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   }
   const unreadSessionIds = useMemo(
     () =>
-      new Set(sessions.filter(session => !mutedSessionIds.has(session.id) && isThreadUnread(notificationPreferences, session.id)).map(session => session.id)),
-    [mutedSessionIds, notificationPreferences, sessions],
+      new Set(
+        sessions.filter(session => !mutedSessionIds.has(session.id) && attention.records.get(session.id)?.manuallyUnread === true).map(session => session.id),
+      ),
+    [attention.records, mutedSessionIds, sessions],
+  )
+  /** Only an unacknowledged completion carries a timestamp; a hand mark alone is not a finished turn. */
+  const finishedAtBySession = useMemo(() => {
+    const completionAt: Record<string, number> = {}
+    for (const record of attention.records.values()) if (record.finishedAt !== null) completionAt[record.sessionId] = record.finishedAt
+    return completionAt
+  }, [attention.records])
+  // Sessions that stop running hold a fresh attention record on the Host; refresh then rather than on a timer alone.
+  const runningSignature = useMemo(
+    () =>
+      sessions
+        .filter(session => session.running)
+        .map(session => session.id)
+        .sort()
+        .join(','),
+    [sessions],
   )
 
   useEffect(() => setSelectedThreadId(selectedSession?.id ?? null), [selectedSession?.id, setSelectedThreadId])
@@ -1238,11 +1251,46 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     window.addEventListener(THREAD_TAB_FOCUS_EVENT, onFocusThread)
     return () => window.removeEventListener(THREAD_TAB_FOCUS_EVENT, onFocusThread)
   }, [])
+  const refreshAttention = attention.refresh
   useEffect(() => {
-    if (selectedSessionId === undefined) return
-    const current = threadNotificationPreferences.get() ?? DEFAULT_THREAD_NOTIFICATION_PREFERENCES
-    threadNotificationPreferences.set(markThreadSeen(current, selectedSessionId, selectedSessionCompletionUnread))
-  }, [selectedSessionId, selectedSessionCompletionUnread])
+    if (!attentionRefreshed.current) {
+      attentionRefreshed.current = true
+      return
+    }
+    refreshAttention()
+  }, [refreshAttention, runningSignature])
+  useEffect(() => {
+    const refresh = (): void => refreshAttention()
+    const onVisibility = (): void => {
+      if (document.visibilityState === 'visible') refresh()
+    }
+    window.addEventListener('focus', refresh)
+    document.addEventListener('visibilitychange', onVisibility)
+    // Another browser can acknowledge a thread at any time; this keeps this tab's list honest.
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === 'visible') refresh()
+    }, 15_000)
+    return () => {
+      window.removeEventListener('focus', refresh)
+      document.removeEventListener('visibilitychange', onVisibility)
+      window.clearInterval(timer)
+    }
+  }, [refreshAttention])
+  const selectedAttention = selectedSessionId === undefined ? undefined : attention.records.get(selectedSessionId)
+  const acknowledgeAttention = attention.acknowledge
+  const acknowledgeManualUnread = attention.clearUnread
+  useEffect(() => {
+    if (selectedSessionId === undefined) {
+      previousSelectedId.current = null
+      return
+    }
+    const justSelected = previousSelectedId.current !== selectedSessionId
+    previousSelectedId.current = selectedSessionId
+    if (selectedAttention === undefined) return
+    // Watching a thread finish acknowledges that turn; it never clears a mark the user made on purpose just now.
+    if (selectedAttention.finishedAt !== null) acknowledgeAttention(selectedSessionId, selectedAttention.version)
+    else if (justSelected) acknowledgeManualUnread(selectedSessionId, selectedAttention.version)
+  }, [acknowledgeAttention, acknowledgeManualUnread, selectedAttention, selectedSessionId])
   threadTitle.current = sessionId => sessionState.byId[sessionId]?.displayTitle
 
   useEffect(() => {
@@ -1287,6 +1335,18 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const changePreferences = (patch: Partial<SidebarPreferences>): void => {
     updatePreferences(patch)
   }
+
+  // Saved views moved from browser storage to Host settings: hand the browser copy over once, then drop it.
+  const viewsMigrationStarted = useRef(false)
+  useEffect(() => {
+    if (!hostBacked || viewsMigrationStarted.current) return
+    viewsMigrationStarted.current = true
+    const legacy = threadViewPreferences.get()
+    threadViewPreferences.remove()
+    if (JSON.stringify(legacy) === JSON.stringify(DEFAULT_THREAD_VIEW_SETTINGS)) return
+    if (JSON.stringify(preferences.threadViews) !== JSON.stringify(DEFAULT_THREAD_VIEW_SETTINGS)) return
+    changePreferences({ threadViews: legacy })
+  }, [changePreferences, hostBacked, preferences.threadViews])
 
   const attentionDisplayRow = (key: AttentionDisplayPreferenceKey, label: ThreadAttentionLabel, colorKey: AttentionColorKey): JSX.Element => {
     const mode = preferences[key]
@@ -1447,8 +1507,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   }, [archivedView, reopenThread, tSidebar, unarchiveSession])
 
   const openThread = (sessionId: SessionSummary['id']): void => {
-    const current = threadNotificationPreferences.get() ?? DEFAULT_THREAD_NOTIFICATION_PREFERENCES
-    threadNotificationPreferences.set(markThreadSeen(current, sessionId, sessionStatus.get(sessionId)?.completionUnread === true))
+    const opened = attention.records.get(sessionId)
+    if (opened !== undefined) attention.clearUnread(sessionId, opened.version)
     setRouteRequest(null)
     openedRouteId.current = sessionId
     suppressUrlForSession.current = null
@@ -1464,6 +1524,28 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         ? { tone: 'success', message: successMessage }
         : { tone: 'danger', message: props.tSidebar('threadSidebarClipboardFailure') },
     )
+  }
+
+  const notifyThread = (sessionId: SessionSummary['id'], title: string, fallbackBody: string): void => {
+    if (
+      !preferences.desktopNotificationsEnabled ||
+      isMuteActive(mutedThreads[sessionId], Date.now()) ||
+      !('Notification' in window) ||
+      window.Notification.permission !== 'granted'
+    )
+      return
+    const session = sessionState.byId[sessionId]
+    if (session === undefined || !isAttentionSessionIncluded(session, preferences.includeSubagentAttention)) return
+    try {
+      const notification = new window.Notification(title, { body: session.displayTitle ?? fallbackBody })
+      notification.onclick = () => {
+        window.focus()
+        openThread(sessionId)
+        notification.close()
+      }
+    } catch {
+      setNotice({ tone: 'warning', message: props.tSidebar('threadSidebarNotificationsUnavailable') })
+    }
   }
 
   const toggleParked = (sessionId: SessionSummary['id']): void => {
@@ -1483,8 +1565,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
 
   const changeDesktopNotifications = async (enabled: boolean): Promise<void> => {
     if (!enabled) {
-      const current = threadNotificationPreferences.get() ?? DEFAULT_THREAD_NOTIFICATION_PREFERENCES
-      threadNotificationPreferences.set({ ...current, enabled: false })
+      changePreferences({ desktopNotificationsEnabled: false })
       return
     }
     if (!('Notification' in window)) {
@@ -1497,8 +1578,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         setNotice({ tone: 'warning', message: props.tSidebar('threadSidebarNotificationsPermission') })
         return
       }
-      const current = threadNotificationPreferences.get() ?? DEFAULT_THREAD_NOTIFICATION_PREFERENCES
-      threadNotificationPreferences.set({ ...current, enabled: true })
+      changePreferences({ desktopNotificationsEnabled: true })
       setNotice(null)
     } catch {
       setNotice({ tone: 'warning', message: props.tSidebar('threadSidebarNotificationsPermission') })
@@ -1701,18 +1781,29 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     if (Object.keys(mutesAwake).length !== Object.keys(mutedThreads).length) updatePreferences({ mutedThreads: mutesAwake })
   }, [mutedThreads, mutesAwake, updatePreferences])
 
+  // The Host owns attention now: hand it whatever this browser still holds, then drop the browser copy.
   useEffect(() => {
-    const legacy = notificationPreferences.mutedUntil
-    if (Object.keys(legacy).length === 0 || sessionState.phase !== 'ready') return
+    if (migrationStarted.current || !attention.available || sessionState.phase !== 'ready') return
+    migrationStarted.current = true
+    const legacy = legacyNotificationPreferences.get()
+    if (legacy === null) return
     const migrated = legacyMutesToMigrate({
-      legacy,
+      legacy: legacy.mutedUntil,
       hostMutes: mutedThreads,
       updatedAt: sessionId => sessions.find(session => session.id === sessionId)?.updatedAt,
       now: Date.now(),
     })
     if (Object.keys(migrated).length > 0) updatePreferences({ mutedThreads: { ...mutedThreads, ...migrated } })
-    threadNotificationPreferences.set({ ...notificationPreferences, mutedUntil: {} })
-  }, [mutedThreads, notificationPreferences, sessionState.phase, sessions, updatePreferences])
+    if (legacy.enabled) updatePreferences({ desktopNotificationsEnabled: true })
+    const entries = legacyAttentionEntries(legacy)
+    // Keep the browser copy until the Host stored it, so a failed write is retried on the next load.
+    if (entries.length === 0) legacyNotificationPreferences.remove()
+    else
+      void attention.migrate(entries).then(
+        () => legacyNotificationPreferences.remove(),
+        () => undefined,
+      )
+  }, [attention, mutedThreads, sessionState.phase, sessions, updatePreferences])
 
   const needsInputRows = useMemo(
     () =>
@@ -1772,7 +1863,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         selectedSessionId: selectedSession?.id,
         inputNeededSessionIds: needsInputIds,
         approvalNeededSessionIds: approvalNeededIds,
-        completionAt: notificationPreferences.needsYouAt,
+        completionAt: finishedAtBySession,
         mutedSessionIds,
         archivedSessionIds,
         excludedSessionIds: usageLimitSessionIds,
@@ -1783,9 +1874,9 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       approvalNeededIds,
       archivedSessionIds,
       attentionSessions,
+      finishedAtBySession,
       mutedSessionIds,
       needsInputIds,
-      notificationPreferences.needsYouAt,
       preferences.workspaceFilter,
       selectedSession?.id,
       sessionState.byId,
@@ -1993,12 +2084,12 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const projectFilterLabel = projectOptions.find(option => option.id === projectFilterValue)?.label ?? props.tSidebar('threadSidebarAllProjects')
 
   const updateThreadView = (patch: Partial<ThreadViewPreferences>): void => {
-    setThreadViewStorageWarning(!updateThreadViewPreferences(patch))
+    changePreferences({ threadViews: updateThreadViewPreferences(threadViewSettings, patch) })
   }
+  // The Settings write is asynchronous; a failure surfaces through the shared storage warning.
   const saveThreadViewSettings = (settings: ThreadViewSettings): boolean => {
-    const saved = updateThreadViewSettings(settings)
-    setThreadViewStorageWarning(!saved)
-    return saved
+    changePreferences({ threadViews: updateThreadViewSettings(settings) })
+    return true
   }
   const updateThreadViewControls = (patch: Partial<Pick<ThreadViewSettings, 'showGroupControl' | 'showFilterControl'>>): void => {
     saveThreadViewSettings({ ...threadViewSettings, ...patch })
@@ -2049,6 +2140,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     copyContextValue,
     resumeRecoverySession,
     dismissRecoverySession,
+    markAttentionUnread: attention.markUnread,
+    notifyThread,
     props,
     sessionsById: sessionState.byId,
     preferences,
@@ -2061,6 +2154,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     copyContextValue,
     resumeRecoverySession,
     dismissRecoverySession,
+    markAttentionUnread: attention.markUnread,
+    notifyThread,
     props,
     sessionsById: sessionState.byId,
     preferences,
@@ -2154,8 +2249,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         current.changePreferences({ mutedThreads: unmuteSessions(current.preferences.mutedThreads, targetIds) })
       },
       markUnread: sessionId => {
-        const current = threadNotificationPreferences.get() ?? DEFAULT_THREAD_NOTIFICATION_PREFERENCES
-        threadNotificationPreferences.set(markThreadUnread(current, sessionId))
+        latestRowActions.current.markAttentionUnread(sessionId)
       },
       resume: sessionId => void latestRowActions.current.resumeRecoverySession(sessionId),
       dismissRecovery: sessionId => void latestRowActions.current.dismissRecoverySession(sessionId),
@@ -2235,78 +2329,44 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       const status = sessionStatus.get(session.id)
       return {
         sessionId: session.id,
-        status: {
-          pendingInteractionKey: status?.pendingInteraction?.key,
-          pendingInteractionKind: status?.pendingInteraction?.kind,
-          completionUnread: status?.completionUnread ?? false,
-        },
+        status: { pendingInteractionKey: status?.pendingInteraction?.key, pendingInteractionKind: status?.pendingInteraction?.kind },
       }
     })
-    const currentStatus: Readonly<Record<string, ThreadAttentionStatus>> = Object.fromEntries(
-      currentStatusEntries.map((entry): [string, ThreadAttentionStatus] => [entry.sessionId, entry.status]),
+    const currentStatus: Readonly<Record<string, ThreadInteractionStatus>> = Object.fromEntries(
+      currentStatusEntries.map((entry): [string, ThreadInteractionStatus] => [entry.sessionId, entry.status]),
     )
-    const transitions = threadAttentionTransitions(previousStatus.current, currentStatusEntries)
+    const transitions = threadInteractionTransitions(previousStatus.current, currentStatusEntries)
     previousStatus.current = currentStatus
-    const now = Date.now()
-    const current = threadNotificationPreferences.get() ?? DEFAULT_THREAD_NOTIFICATION_PREFERENCES
-    const mutes = latestRowActions.current.preferences.mutedThreads
-    const eligibleSessionIds = new Set(
-      currentStatusEntries.flatMap(({ sessionId, status }) => {
-        const session = sessionState.byId[sessionId]
-        return status.completionUnread &&
-          !isMuteActive(mutes[sessionId], now) &&
-          session !== undefined &&
-          isAttentionSessionIncluded(session, preferences.includeSubagentAttention)
-          ? [sessionId]
-          : []
-      }),
-    )
-    const completionReconciliation = reconcileFinishedThreadNotifications({
-      preferences: current,
-      statuses: currentStatusEntries.map(({ sessionId }) => ({ sessionId, completionUnread: sessionStatus.get(sessionId)?.completionUnread })),
-      eligibleSessionIds,
-      newlyFinishedSessionIds: transitions.turnFinished,
-      now,
-    })
-    const notifyThread = (sessionId: SessionSummary['id'], title: string, fallbackBody: string): void => {
-      if (!current.enabled || isMuteActive(mutes[sessionId], now) || !('Notification' in window) || window.Notification.permission !== 'granted') return
-      const session = sessionState.byId[sessionId]
-      if (session === undefined || !isAttentionSessionIncluded(session, preferences.includeSubagentAttention)) return
-      try {
-        const notification = new window.Notification(title, { body: session?.displayTitle ?? fallbackBody })
-        notification.onclick = () => {
-          window.focus()
-          if (session !== undefined) openThread(sessionId)
-          notification.close()
-        }
-      } catch {
-        setNotice({ tone: 'warning', message: props.tSidebar('threadSidebarNotificationsUnavailable') })
-      }
-    }
     for (const sessionId of transitions.approvalNeeded) {
       if (selectedSession?.id === sessionId) continue
-      notifyThread(sessionId, props.tSidebar('threadSidebarApprovalNotificationTitle'), props.tSidebar('threadSidebarApprovalNotificationBody'))
+      latestRowActions.current.notifyThread(
+        sessionId,
+        props.tSidebar('threadSidebarApprovalNotificationTitle'),
+        props.tSidebar('threadSidebarApprovalNotificationBody'),
+      )
     }
     for (const sessionId of transitions.inputNeeded) {
       if (selectedSession?.id === sessionId) continue
-      notifyThread(sessionId, props.tSidebar('threadSidebarInputNotificationTitle'), props.tSidebar('threadSidebarInputNotificationBody'))
+      latestRowActions.current.notifyThread(
+        sessionId,
+        props.tSidebar('threadSidebarInputNotificationTitle'),
+        props.tSidebar('threadSidebarInputNotificationBody'),
+      )
     }
-    for (const sessionId of transitions.turnFinished) {
-      if (selectedSession?.id === sessionId) continue
-      notifyThread(sessionId, props.tSidebar('threadSidebarNotificationTitle'), props.tSidebar('threadSidebarNotificationDone'))
+  }, [props.tSidebar, selectedSession?.id, sessionStatus, sessionState.phase, sessions])
+
+  // A completion the user has not acknowledged yet is announced once per browser, from the shared record.
+  useEffect(() => {
+    const previous = previousAttention.current
+    previousAttention.current = attention.records
+    if (previous === null) return
+    for (const [sessionId, record] of attention.records) {
+      if (previous.has(sessionId) || record.finishedAt === null || selectedSession?.id === sessionId) continue
+      const session = sessions.find(candidate => candidate.id === sessionId)
+      if (session === undefined) continue
+      latestRowActions.current.notifyThread(session.id, props.tSidebar('threadSidebarNotificationTitle'), props.tSidebar('threadSidebarNotificationDone'))
     }
-    if (completionReconciliation.changed) threadNotificationPreferences.set(completionReconciliation.preferences)
-  }, [
-    notificationPreferences.enabled,
-    openThread,
-    preferences.includeSubagentAttention,
-    props.tSidebar,
-    selectedSession?.id,
-    sessionStatus,
-    sessionState.byId,
-    sessionState.phase,
-    sessions,
-  ])
+  }, [attention.records, props.tSidebar, selectedSession?.id, sessions])
 
   const isTransientNotice =
     notice !== null && (notice.tone === 'success' || notice.durationMs !== undefined || (notice.actionLabel !== undefined && notice.onAction !== undefined))
@@ -2593,7 +2653,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
               </div>
             </div>
             <Label className="dshx:font-normal dshx:leading-snug">
-              <Checkbox checked={notificationPreferences.enabled} onCheckedChange={checked => void changeDesktopNotifications(checked === true)} />
+              <Checkbox checked={preferences.desktopNotificationsEnabled} onCheckedChange={checked => void changeDesktopNotifications(checked === true)} />
               {props.tSidebar('threadSidebarDesktopNotifications')}
             </Label>
             <p className="dshx:text-xs dshx:text-muted-foreground">{props.tSidebar('threadSidebarNotificationPrivacy')}</p>
@@ -2694,10 +2754,10 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
             {noticeAlert}
           </div>
         ) : null}
-        {(notice !== null && !isTransientNotice) || storageWarning || threadViewStorageWarning ? (
+        {(notice !== null && !isTransientNotice) || storageWarning ? (
           <div className="dshx:grid dshx:gap-2 dshx:px-2 dshx:pb-2">
             {notice !== null && !isTransientNotice ? noticeAlert : null}
-            {storageWarning || threadViewStorageWarning ? (
+            {storageWarning ? (
               <Alert variant="warning" className={noticeClass}>
                 <SidebarNoticeMessage message={props.tSidebar('threadSidebarStorageFailure')} />
               </Alert>
