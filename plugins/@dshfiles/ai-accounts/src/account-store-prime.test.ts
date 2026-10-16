@@ -58,7 +58,7 @@ describe('account store priming', () => {
   it('serves stored accounts to the first synchronous read', async () => {
     const store = await loadStoreWith([accountDraft])
 
-    const primed = store.primeAccountFile()
+    const primed = store.accountStoreService.primeAccountFile()
 
     expect(primed.accounts).toHaveLength(1)
     expect(primed.accounts[0]?.instanceId).toBe('codex-test')
@@ -68,9 +68,9 @@ describe('account store priming', () => {
   it('keeps the sync read stable across repeats without an async re-read', async () => {
     const store = await loadStoreWith([accountDraft])
 
-    store.primeAccountFile()
-    const first = store.readAccountFileSync()
-    const second = store.readAccountFileSync()
+    store.accountStoreService.primeAccountFile()
+    const first = store.accountStoreService.readAccountFileSync()
+    const second = store.accountStoreService.readAccountFileSync()
 
     expect(first.accounts).toHaveLength(1)
     expect(second.accounts).toEqual(first.accounts)
@@ -79,7 +79,7 @@ describe('account store priming', () => {
   it('yields an empty file when the cache was never primed', async () => {
     const store = await loadStoreWith([accountDraft])
 
-    expect(store.readAccountFileSync().accounts).toEqual([])
+    expect(store.accountStoreService.readAccountFileSync().accounts).toEqual([])
   })
 
   it('is what boot depends on: priming before the sync read is the only path that registers routes', async () => {
@@ -88,8 +88,8 @@ describe('account store priming', () => {
     // This is the boot sequence in host.ts, in order. Without the priming call
     // the sync read yields no accounts, buildRoutes registers nothing, and the
     // panel never mounts.
-    const unprimed = store.readAccountFileSync()
-    const primed = store.primeAccountFile()
+    const unprimed = store.accountStoreService.readAccountFileSync()
+    const primed = store.accountStoreService.primeAccountFile()
 
     expect(unprimed.accounts).toHaveLength(0)
     expect(primed.accounts).toHaveLength(1)
@@ -100,7 +100,7 @@ describe('account store priming', () => {
     const secondCodex = { ...accountDraft, instanceId: 'codex-second', displayName: 'Codex Second' }
     const store = await loadStoreWith([accountDraft, claude, secondCodex])
 
-    const moved = await store.moveAccount('codex-test', 'later')
+    const moved = await store.accountStoreService.moveAccount('codex-test', 'later')
 
     expect(moved.accounts.map(account => account.instanceId)).toEqual(['codex-second', 'claude-work', 'codex-test'])
     expect(moved.accounts.filter(account => account.kind === 'codex').map(account => account.instanceId)).toEqual(['codex-second', 'codex-test'])

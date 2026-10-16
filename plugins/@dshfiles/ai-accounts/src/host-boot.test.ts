@@ -62,11 +62,11 @@ afterEach(async () => {
 
 describe('host boot against the account store', () => {
   it('routes every kind that serves models and leaves Cursor to its runtime driver', async () => {
-    const { primeAccountFile, readAccountFileSync } = await import('./account-store.js')
+    const { accountStoreService } = await import('./account-store.js')
     const { configFromAccountsFile } = await import('./account-config.js')
     const { ProviderRoutes } = await import('./provider-routes.js')
-    primeAccountFile()
-    const file = readAccountFileSync()
+    accountStoreService.primeAccountFile()
+    const file = accountStoreService.readAccountFileSync()
     expect(file.accounts.find(account => account.instanceId === 'codex')?.reasoningDefaults['gpt-6-luna']).toBe('low')
     const { routes, rejected } = ProviderRoutes.buildRoutes(configFromAccountsFile(file))
     expect(rejected).toEqual([])
@@ -75,14 +75,14 @@ describe('host boot against the account store', () => {
   })
 
   it('renames an account in place instead of leaving the old slug behind', async () => {
-    const { readAccountFile, upsertAccount } = await import('./account-store.js')
-    const before = await readAccountFile()
+    const { accountStoreService } = await import('./account-store.js')
+    const before = await accountStoreService.readAccountFile()
     const original = before.accounts.find(account => account.instanceId === 'commandcode_a')
     expect(original).toBeDefined()
     if (original === undefined) return
-    await upsertAccount({ ...original, instanceId: 'commandcode_b' }, 'commandcode_a')
-    const after = await readAccountFile()
+    await accountStoreService.upsertAccount({ ...original, instanceId: 'commandcode_b' }, 'commandcode_a')
+    const after = await accountStoreService.readAccountFile()
     expect(after.accounts.map(account => account.instanceId)).toEqual(['codex', 'claude_work', 'commandcode_b', 'cursor_a'])
-    await expect(upsertAccount({ ...original, instanceId: 'codex' }, 'commandcode_b')).rejects.toThrow(/already exists/)
+    await expect(accountStoreService.upsertAccount({ ...original, instanceId: 'codex' }, 'commandcode_b')).rejects.toThrow(/already exists/)
   })
 })

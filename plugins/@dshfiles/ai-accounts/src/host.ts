@@ -13,7 +13,7 @@ import { shouldUseLunaReserve, withLunaReserve } from './codex-luna-reserve.js'
 import { createPricingCatalog, DEFAULT_PRICING_PATH } from './pricing-catalog.js'
 import { installCostProjection } from './cost-projection.js'
 export { accountsSnapshot } from './accounts-host-api.js'
-import { primeAccountFile, readAccountFile, readAccountFileSync } from './account-store.js'
+import { accountStoreService, type AccountStoreFile } from './account-store.js'
 import { aiAccountsTool } from './accounts-tool.js'
 import { createUsageHistoryService } from './usage-recorder.js'
 import { CommandCodeCapabilities } from './commandcode-capabilities.js'
@@ -104,7 +104,7 @@ export default definePlugin({
     })
     runtime.usageCache = createUsageCache({ ttlMs: 30_000, read: () => AccountsHostApiModel.readAccountsUsage(ctx) })
     ctx.on('credentials/reference-updated', ref => {
-      if (readAccountFileSync().accounts.some(account => account.apiKeyEnv === ref)) runtime.usageCache?.invalidate()
+      if (accountStoreService.readAccountFileSync().accounts.some(account => account.apiKeyEnv === ref)) runtime.usageCache?.invalidate()
     })
     const pricing = createPricingCatalog({ path: DEFAULT_PRICING_PATH })
     runtime.pricing = pricing
@@ -134,8 +134,8 @@ export default definePlugin({
     // Cordis activates this plugin synchronously, so the cache must hold the file
     // before the first read: an unprimed cache answers emptyFile(), which
     // registers no routes at all and hides the whole page.
-    primeAccountFile()
-    const initialFile = readAccountFileSync()
+    accountStoreService.primeAccountFile()
+    const initialFile = accountStoreService.readAccountFileSync()
     let config = configFromAccountsFile(initialFile)
     let routes = ProviderRoutes.buildRoutes(config).routes
     const copilotLogin = createCopilotLoginService({
@@ -182,10 +182,7 @@ export default definePlugin({
     // whenever the caller did not choose an effort.
     // Curation comes from the same file, so a hidden model cannot outlive the
     // account that hid it.
-    const buildProfiles = (
-      nextRoutes: ReadonlyMap<string, Route>,
-      sourceFile: ReturnType<typeof readAccountFileSync>,
-    ): Map<string, ResolvedPiAiProviderProfile> => {
+    const buildProfiles = (nextRoutes: ReadonlyMap<string, Route>, sourceFile: AccountStoreFile): Map<string, ResolvedPiAiProviderProfile> => {
       const enabled = [...nextRoutes].filter(([, route]) => route.enabled)
       const curation = sourceFile.accounts.map(
         account =>
@@ -239,7 +236,7 @@ export default definePlugin({
       )
     }
 
-    const buildReasoningDefaults = (sourceFile: ReturnType<typeof readAccountFileSync>): Map<string, Readonly<Record<string, string>>> =>
+    const buildReasoningDefaults = (sourceFile: AccountStoreFile): Map<string, Readonly<Record<string, string>>> =>
       new Map(
         sourceFile.accounts.map(
           account =>
@@ -456,7 +453,7 @@ export default definePlugin({
     }
 
     let registeredProviders: ReadonlySet<string> = new Set()
-    const applyRouteSnapshot = (sourceFile: ReturnType<typeof readAccountFileSync>): void => {
+    const applyRouteSnapshot = (sourceFile: AccountStoreFile): void => {
       const nextConfig = configFromAccountsFile(sourceFile)
       const takenProviders = new Set(
         llm
@@ -520,7 +517,7 @@ export default definePlugin({
     applyRouteSnapshot(initialFile)
     let refreshQueue: Promise<void> = Promise.resolve()
     const refreshRoutes = (): Promise<void> => {
-      const next = refreshQueue.then(async () => applyRouteSnapshot(await readAccountFile()))
+      const next = refreshQueue.then(async () => applyRouteSnapshot(await accountStoreService.readAccountFile()))
       refreshQueue = next.catch(() => {
         ctx.logger.warn('ai-accounts: provider route refresh failed')
       })

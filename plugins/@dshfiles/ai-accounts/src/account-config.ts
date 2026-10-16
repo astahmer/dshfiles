@@ -1,5 +1,5 @@
 import z from '@deepseek-ai/schemastery'
-import type { readAccountFileSync } from './account-store.js'
+import type { AccountStoreFile } from './account-store.js'
 import { DEFAULT_DISTRIBUTION, type Distribution } from './account-pool.js'
 import { CodexHomeModel } from './codex-home.js'
 import { CredentialModel } from './credentials.js'
@@ -80,7 +80,7 @@ export const Config = z.object({
   codexShadowRoot: z.string().default('').volatile(),
 })
 
-export const configFromAccountsFile = (file: ReturnType<typeof readAccountFileSync>): AiAccountsConfig => {
+export const configFromAccountsFile = (file: AccountStoreFile): AiAccountsConfig => {
   const codexAccounts = file.accounts
     .filter(account => account.kind === 'codex')
     .map(account => ({
