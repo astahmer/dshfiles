@@ -13,6 +13,10 @@ Feature: Client plugin boot integrity
   Scenario: The shipped Web UI mounts every client plugin
     Then the Web UI mounts without a plugin failure card
 
+  # A Slot entry that throws while rendering only shows up in the browser, and the
+  # sidebar's cells shadow the native entries, so a crash is silent once the
+  # fallback renders. This is the only @smoke check that fails on it.
+  @smoke
   Scenario: No Slot fell back to its error boundary
     Then no Slot fell back to its error boundary
 

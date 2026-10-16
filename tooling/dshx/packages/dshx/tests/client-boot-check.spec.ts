@@ -4,7 +4,13 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { checkClientBoot } from '../src/project/client-boot-check.js'
 import { clientEntryFailures, compositionFailures, parseBootText } from '../src/project/client-boot-check.js'
-import { readClientBootOutcome, slotRenderFailures, type BrowserBootEvidence, type BrowserBootOutcome } from '../src/project/browser-boot.js'
+import {
+  readClientBootOutcome,
+  slotCrashesFromConsole,
+  slotRenderFailures,
+  type BrowserBootEvidence,
+  type BrowserBootOutcome,
+} from '../src/project/browser-boot.js'
 
 /**
  * The boot card is the only surface that records why a client entry did not
@@ -96,15 +102,55 @@ describe('slot render failures', () => {
   })
 
   it('reports the Slot named by the boundary marker', () => {
-    expect(slotRenderFailures(['sidebar'])).toEqual([{ slot: 'sidebar' }])
+    expect(slotRenderFailures(['sidebar'])).toEqual([{ slot: 'sidebar', source: 'boundary' }])
   })
 
   it('reports every failing Slot, not just the first', () => {
-    expect(slotRenderFailures(['sidebar', 'conversation.input.overlay'])).toEqual([{ slot: 'sidebar' }, { slot: 'conversation.input.overlay' }])
+    expect(slotRenderFailures(['sidebar', 'conversation.input.overlay'])).toEqual([
+      { slot: 'sidebar', source: 'boundary' },
+      { slot: 'conversation.input.overlay', source: 'boundary' },
+    ])
   })
 
   it('ignores a marker with no Slot name', () => {
-    expect(slotRenderFailures([null, 'sidebar', ''])).toEqual([{ slot: 'sidebar' }])
+    expect(slotRenderFailures([null, 'sidebar', ''])).toEqual([{ slot: 'sidebar', source: 'boundary' }])
+  })
+})
+
+/**
+ * The second shape of the same failure. A shadowing Slot kind retires the crashed
+ * entry onto the cell's next survivor, so the boundary marker is gone by the time
+ * a reader looks: only the renderer's console line still names the Slot. This is
+ * how @dshfiles/thread-sidebar silently lost its sidebar to the native workspace
+ * browser, with every marker-based check green.
+ */
+describe('slot crashes read from the console', () => {
+  it('names the Slot from the entry crash line', () => {
+    expect(slotCrashesFromConsole(["slot entry crashed in 'sidebar.workspaces': Error: No QueryClient set, use QueryClientProvider to set one"])).toEqual([
+      { slot: 'sidebar.workspaces', source: 'crash' },
+    ])
+  })
+
+  it('names the Slot from a Factory occurrence crash line', () => {
+    expect(slotCrashesFromConsole(["slot factory occurrence crashed in 'sidebar': TypeError: x is not a function"])).toEqual([
+      { slot: 'sidebar', source: 'crash' },
+    ])
+  })
+
+  it('reads past the diagnostics prefix the E2E harness adds', () => {
+    expect(slotCrashesFromConsole(["console.error: slot entry crashed in 'conversation.chat.turnTail': Error: boom"])).toEqual([
+      { slot: 'conversation.chat.turnTail', source: 'crash' },
+    ])
+  })
+
+  it('ignores every other console line and reports each Slot once', () => {
+    expect(
+      slotCrashesFromConsole([
+        'Failed to load plugin @dshfiles/demo',
+        "slot entry crashed in 'sidebar.workspaces': Error: boom",
+        "slot entry crashed in 'sidebar.workspaces': Error: boom again",
+      ]),
+    ).toEqual([{ slot: 'sidebar.workspaces', source: 'crash' }])
   })
 })
 
@@ -236,7 +282,27 @@ describe('client boot outcome reader', () => {
       ready: false,
       evidence: 'failure-card',
       text,
-      slotFailures: [{ slot: 'settings' }],
+      slotFailures: [{ slot: 'settings', source: 'boundary' }],
     })
+  })
+
+  it('reports a retired Slot entry the DOM no longer marks', async () => {
+    const outcome = await readClientBootOutcome(page(nativeOutcome('app-outlet', true)), {
+      ...options,
+      consoleMessages: ["slot entry crashed in 'sidebar.workspaces': Error: No QueryClient set, use QueryClientProvider to set one"],
+    })
+
+    // The page mounted, the audit is clean and no marker is left; only the crash line proves the takeover.
+    expect(outcome).toMatchObject({ ready: true, evidence: 'app-outlet' })
+    expect(outcome.slotFailures).toEqual([{ slot: 'sidebar.workspaces', source: 'crash' }])
+  })
+
+  it('keeps the mounted boundary when a Slot appears in both traces', async () => {
+    const outcome = await readClientBootOutcome(page(nativeOutcome('app-outlet', true), ['sidebar.workspaces']), {
+      ...options,
+      consoleMessages: ["slot entry crashed in 'sidebar.workspaces': Error: boom"],
+    })
+
+    expect(outcome.slotFailures).toEqual([{ slot: 'sidebar.workspaces', source: 'boundary' }])
   })
 })

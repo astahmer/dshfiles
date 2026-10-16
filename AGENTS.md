@@ -278,3 +278,13 @@ A `Failed to load plugins` card lists symptoms. The first entry named is often
 not the broken one: a plugin that throws during `apply` is the cause, and the
 entries `pending (waiting for service: X)` are its innocent dependents. `dshx
 check --boot` catches these across the installed set; `tsc` alone does not.
+
+A client slot entry can also activate and then throw while rendering, which shows
+no card at all. A shadowing cell (the sidebar is one) retires the entry and
+renders the next registration, so a native fallback replaces the plugin's UI and
+only the browser console says so. `check:plugin-boot` and the `@smoke` client-boot
+scenario fail on both traces — the `[data-slot-error]` marker and the renderer's
+`slot entry crashed in '<slot>'` line. **A plugin-ui `useQuery`/`useMutation` hook
+needs a `PluginQueryProvider` in the entry's own tree**: dshx decorates slot
+components with the API context, not the Query client, and the missing provider
+throws exactly this way.

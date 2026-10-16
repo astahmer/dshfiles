@@ -113,7 +113,9 @@ const describe = (result, ignoredIds = new Set()) => {
   if (result.evidence === 'blank') return 'booted a blank page: the kernel-owned boot element never appeared, so nothing was verified'
   if (result.evidence === 'stalled') return 'left the boot element up for the whole window without reporting a failure'
   if (result.slotFailures.length > 0) {
-    return `mounted an error boundary for ${result.slotFailures.map(entry => entry.slot).join(', ')}, so those panels are blank even though every entry activated`
+    return `lost ${result.slotFailures.map(entry => entry.slot).join(', ')} to a render crash, so ${
+      result.slotFailures.length === 1 ? 'that panel shows a fallback entry' : 'those panels show fallback entries'
+    } even though every entry activated`
   }
   const failures = result.failures.filter(entry => !ignoredIds.has(entry.id))
   if (failures.length > 0) return failures.map(entry => `${entry.id} (${entry.state})`).join(', ')

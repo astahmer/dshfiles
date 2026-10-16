@@ -44,6 +44,15 @@ skip one, but each entry needs a known package id, a reason, an owner and a
 removal condition, and an expired entry fails the check (validated uncached on
 every run, since no cache key sees the date).
 
+A Client entry can also reach `active` and then throw while rendering its Slot.
+The boot audit stays clean, so the boot smoke reads the two traces the browser
+leaves: the renderer's `[data-slot-error]` marker when the cell went dry, and the
+`slot entry crashed in '<slot>'` console line it logs before a shadowing cell
+retires the entry onto the cell's next survivor. Reading only the marker passes a
+takeover: `@dshfiles/thread-sidebar` lost its whole sidebar to the stock
+workspace browser that way, because `sidebar.workspaces` is a shadowing single
+cell and a native entry was still registered behind it.
+
 ## Choices
 
 - **Real Host, never a mock.** Both defects were about services packages

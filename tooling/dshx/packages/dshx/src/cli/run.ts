@@ -1165,11 +1165,11 @@ async function runClientBootCheck(args: CliArgs, options: CliRunOptions, project
     printDiagnostic(io, {
       code: 'DSHX4112',
       severity: 'error',
-      message: `The Web UI rendered ${String(result.slotFailures.length)} Slot(s) through their error boundary instead of their entry.`,
+      message: `The Web UI lost ${String(result.slotFailures.length)} Slot(s) to a render crash instead of showing their entry.`,
       file: project.packageFile,
-      hint: 'An entry that throws while rendering still reaches active, so the boot audit stays clean and only the boundary catches it. A Slot that reads a Cordis service from outside setup, or inside a component rather than the Slot entry itself, is the usual cause.',
+      hint: 'An entry that throws while rendering still reaches active, so the boot audit stays clean and only the renderer records it: as a boundary marker, or as a crash line when a fallback entry took the cell. A missing React context provider, or a Cordis service read inside a component rather than the Slot entry, is the usual cause.',
     })
-    for (const failure of result.slotFailures) write(io.stdout, `  ${failure.slot}\n`)
+    for (const failure of result.slotFailures) write(io.stdout, `  ${failure.slot} (${failure.source})\n`)
     return 1
   }
   if (result.evidence === 'blank') {

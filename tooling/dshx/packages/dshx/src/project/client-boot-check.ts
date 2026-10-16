@@ -4,7 +4,8 @@ import type { ChildProcess } from 'node:child_process'
 import { spawnOwnedProcess, stopOwnedProcess } from './owned-process.js'
 import { compositionFailures, readProfileComposition } from './profile-composition.js'
 import { isolatedHostEnvironment, redactHostOutput } from './scratch-profile.js'
-import type { BrowserBootEvidence } from './browser-boot.js'
+import { dismissProviderSetupIfShown } from './startup-dialogs.js'
+import type { BrowserBootEvidence, SlotRenderFailure } from './browser-boot.js'
 export { compositionFailures }
 
 /**
@@ -55,8 +56,8 @@ export interface ClientBootCheckResult {
   readonly entries: readonly ClientBootCheckEntry[]
   /** Entries that failed, with their detail. */
   readonly failures: readonly ClientBootCheckEntry[]
-  /** Slots that mounted an error boundary instead of their entry. */
-  readonly slotFailures: readonly { readonly slot: string }[]
+  /** Slots that lost their entry to a render crash, by boundary marker or by console line. */
+  readonly slotFailures: readonly SlotRenderFailure[]
   /** Expected bundles absent from the offline composition. */
   readonly compositionFailures: readonly string[]
   /** Expected Client entries absent from DSH's boot manifest. */
@@ -80,6 +81,9 @@ export interface ClientBootCheckResult {
 }
 
 const DEFAULT_TIMEOUT_MS = 90_000
+
+/** Time for the shell behind the first-run provider dialog to render, including its Slot entry crashes. */
+const SLOT_SETTLE_MS = 1_000
 
 /**
  * Recover entry states from the boot card text. The card prints the summary line
@@ -167,7 +171,7 @@ export const checkClientBoot = async (options: ClientBootCheckOptions): Promise<
   let output = ''
   let composition: readonly string[] = []
   let entries: ClientBootCheckEntry[] = []
-  let slotFailures: readonly { readonly slot: string }[] = []
+  let slotFailures: readonly SlotRenderFailure[] = []
   let missingClientEntries: readonly string[] = []
   let browserReady = false
   let failureCardVisible = false
@@ -225,6 +229,12 @@ export const checkClientBoot = async (options: ClientBootCheckOptions): Promise<
             const browser = await engine.launch({ headless: true })
             try {
               const page = await browser.newPage()
+              // Attach before the navigation: a Slot that abdicates logs its crash once, and a reader attached after the
+              // mount can no longer see it in the DOM.
+              const consoleErrors: string[] = []
+              page.on('console', message => {
+                if (message.type() === 'error') consoleErrors.push(message.text())
+              })
               await page.goto(launchUrl, { waitUntil: 'domcontentloaded' })
               const { readClientBootOutcome } = await import('./browser-boot.js')
               const outcome = await readClientBootOutcome(page, {
@@ -232,13 +242,24 @@ export const checkClientBoot = async (options: ClientBootCheckOptions): Promise<
                 expectedClientEntries: options.expectedClientEntries,
                 inspectSlotFailures: options.expectedClientEntries.length > 0,
               })
+              // A scratch home has no provider, so DSH opens "Add an API key" over the shell, and the Slots behind it
+              // never mount: an entry that crashes while rendering there leaves no trace at all. Dismiss it, let the
+              // shell render, then read the Slot traces once more without disturbing the audit read above.
+              await dismissProviderSetupIfShown(page)
+              await new Promise(resolve => setTimeout(resolve, SLOT_SETTLE_MS))
+              const mounted = await readClientBootOutcome(page, {
+                timeoutMs,
+                expectedClientEntries: options.expectedClientEntries,
+                inspectSlotFailures: options.expectedClientEntries.length > 0,
+                consoleMessages: consoleErrors,
+              })
               browserReady = outcome.ready
               evidence = outcome.evidence
               missingClientEntries = outcome.missingClientEntries
               failureCardVisible = outcome.failureCardVisible
               readinessError = outcome.readinessError
               timedOut ||= outcome.timedOut
-              slotFailures = outcome.slotFailures
+              slotFailures = mounted.slotFailures
               entries = parseBootText(outcome.text)
             } finally {
               await browser.close()

@@ -162,6 +162,8 @@ const readProfileOutcome = (page: Page, profile: BootedProfile) =>
     expectedClientEntries: profile.expectedClientEntries,
     timeoutMs: OUTCOME_TIMEOUT_MS,
     inspectSlotFailures: profile.expectedClientEntries.length > 0,
+    // Collected from before the first navigation, so a Slot entry that abdicated onto a fallback survivor still counts.
+    consoleMessages: browserDiagnosticsFor(page),
   })
 
 const visitScratchProfile = async (page: Page, profile: BootedProfile): Promise<void> => {

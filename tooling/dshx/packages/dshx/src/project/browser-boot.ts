@@ -4,11 +4,23 @@ export interface BrowserBootOptions {
   readonly timeoutMs: number
   readonly expectedClientEntries: readonly string[]
   readonly inspectSlotFailures?: boolean
+  /**
+   * Console text the caller captured from before the first navigation. A
+   * shadowing Slot kind retires a crashed entry and leaves no marker behind, so
+   * its crash line is the only surviving trace.
+   */
+  readonly consoleMessages?: readonly string[]
 }
 
-/** A Slot that threw while rendering, as the renderer marked it in the DOM. */
+/** A Slot that lost its entry to a render crash, however the renderer recorded it. */
 export interface SlotRenderFailure {
   readonly slot: string
+  /**
+   * `boundary`: the Slot mounted its error face, marked `[data-slot-error]`.
+   * `crash`: the entry threw and a shadowing Slot kind retired it onto the
+   * cell's next survivor, so the marker is gone but the console line remains.
+   */
+  readonly source: 'boundary' | 'crash'
 }
 
 /**
@@ -39,9 +51,11 @@ export interface BrowserBootOutcome {
   /** Why readiness could not be established. */
   readonly readinessError?: string
   /**
-   * Slots that mounted an error boundary instead of their entry. An entry that
-   * throws while rendering never reaches the boot audit, because the fiber itself
-   * activated fine — only the boundary caught it.
+   * Slots that lost their entry to a render crash: the boundary markers still in
+   * the DOM, plus the entries the renderer retired onto a fallback survivor.
+   *
+   * An entry that throws while rendering never reaches the boot audit, because
+   * the fiber itself activated fine. Only the renderer records it.
    */
   readonly slotFailures: readonly SlotRenderFailure[]
   readonly evidence: BrowserBootEvidence
@@ -68,23 +82,27 @@ interface BootPage {
 }
 
 /**
- * Read the boot card, the mount handoff, and any Slot that fell to its error
- * boundary.
+ * Read the boot card, the mount handoff, and any Slot that lost its entry to a
+ * render crash.
  *
  * Read DSH's native boot manifest and readiness promise, then verify the app root
  * mounted. The boot card is useful failure detail, but its absence alone cannot
  * distinguish a mounted application from a blank or unauthenticated document.
  *
- * The error boundaries matter as much as the card, and for a different reason. A
- * plugin whose apply throws never reaches active and lands in the audit, but one
- * that reads a service it never declared throws while rendering, after it has
- * already activated. The fiber is fine, the audit is clean, and the only trace is
- * a marker element where a panel should be. Checking one without the other misses
- * a whole class: the audit catches activation, the boundary catches render.
+ * Render crashes matter as much as the card, and for a different reason. A plugin
+ * whose apply throws never reaches active and lands in the audit, but one that
+ * reads a service it never declared throws while rendering, after it has already
+ * activated. The fiber is fine and the audit is clean, so the crash has only two
+ * possible traces: a `[data-slot-error]` marker where a fallback-entry-free cell
+ * went dry, or the renderer's console line when a shadowing cell retired the
+ * entry onto the next survivor. Reading one without the other misses whichever
+ * shape the profile happens to compose: the audit catches activation, the marker
+ * catches a dry cell, and the console line catches a takeover.
  *
  * The page is passed in rather than opened here so this module stays a pure
  * reader: the caller owns the browser and the Host, which is also what lets the
- * E2E scenarios share one launch across every assertion.
+ * E2E scenarios share one launch across every assertion. That is also why the
+ * caller captures console text: only it can attach before the first navigation.
  */
 export const readClientBootOutcome = async (page: BootPage, options: BrowserBootOptions): Promise<BrowserBootOutcome> => {
   const nativeReadiness = NativeReadinessSchema.parse(
@@ -213,7 +231,8 @@ export const readClientBootOutcome = async (page: BootPage, options: BrowserBoot
     ),
   )
 
-  const failures = options.inspectSlotFailures === false ? [] : await slotFailures(page)
+  const failures =
+    options.inspectSlotFailures === false ? [] : mergeSlotFailures(await slotFailures(page), slotCrashesFromConsole(options.consoleMessages ?? []))
   const ok = (nativeReadiness.evidence === 'app-outlet' || nativeReadiness.evidence === 'boot-card-cleared') && !nativeReadiness.failureCardVisible
   return {
     ...nativeReadiness,
@@ -229,7 +248,40 @@ export const readClientBootOutcome = async (page: BootPage, options: BrowserBoot
  * the callback runs in the page, so a stub could never exercise it directly.
  */
 export const slotRenderFailures = (slotNames: readonly (string | null)[]): readonly SlotRenderFailure[] =>
-  slotNames.filter((slot): slot is string => slot !== null && slot !== '').map(slot => ({ slot }))
+  slotNames.filter((slot): slot is string => slot !== null && slot !== '').map(slot => ({ slot, source: 'boundary' }))
+
+/**
+ * Console lines DSH's renderer writes when a Slot entry, or one Factory
+ * occurrence, throws while rendering.
+ */
+const SLOT_CRASH_PATTERNS = [/slot entry crashed in '([^']+)'/, /slot factory occurrence crashed in '([^']+)'/] as const
+
+/**
+ * Turn the renderer's crash lines back into failed Slots.
+ *
+ * A shadowing Slot kind (`single` cells with priority) abdicates the crashed
+ * entry and re-renders onto the cell's next survivor. The boundary face only
+ * shows until that re-render lands, so the DOM afterwards reports the takeover
+ * as clean while the panel still shows the wrong component. The console line is
+ * what stays, which is why the DOM-only reader called this class invisible.
+ */
+export const slotCrashesFromConsole = (messages: readonly string[]): readonly SlotRenderFailure[] => {
+  const crashed = new Map<string, SlotRenderFailure>()
+  for (const message of messages) {
+    for (const pattern of SLOT_CRASH_PATTERNS) {
+      const slot = pattern.exec(message)?.[1]
+      if (slot !== undefined && slot !== '') crashed.set(slot, { slot, source: 'crash' })
+    }
+  }
+  return [...crashed.values()]
+}
+
+/** One entry per crashed Slot; a mounted boundary is the stronger evidence for the same name. */
+const mergeSlotFailures = (boundary: readonly SlotRenderFailure[], crashes: readonly SlotRenderFailure[]): readonly SlotRenderFailure[] => {
+  const merged = new Map<string, SlotRenderFailure>()
+  for (const failure of [...crashes, ...boundary]) merged.set(failure.slot, failure)
+  return [...merged.values()]
+}
 
 /** Every Slot currently rendering its error boundary. */
 const slotFailures = async (page: BootPage): Promise<readonly SlotRenderFailure[]> => {

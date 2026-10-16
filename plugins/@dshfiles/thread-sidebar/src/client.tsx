@@ -8,7 +8,7 @@ import { RemoteThreadsSection } from './remote-threads-section.js'
 import type { ActorRefFrom } from '@dshfiles/plugin-ui/machine'
 import type { archivedViewMachine } from './archived-view-machine.js'
 import { useApi, useApiQuery } from '@dshfiles/dshx/client'
-import { useQuery } from '@dshfiles/plugin-ui/query'
+import { PluginQueryProvider, useQuery } from '@dshfiles/plugin-ui/query'
 import { threadSidebarPendingQuestionsApi } from './pending-questions-api.js'
 import {
   IconArchiveOutlineRegular,
@@ -822,7 +822,15 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
   )
 })
 
-export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
+// The sidebar reads the pending-question projection through TanStack, and the kit's provider supplies the one client
+// dshx inlines per bundle. Mounting it here keeps the slot entry resolvable from any registration site.
+export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => (
+  <PluginQueryProvider>
+    <ThreadSidebarContent {...props} />
+  </PluginQueryProvider>
+)
+
+const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const sessionState = props.useSessions(state => state)
   const sessionStatus = props.useSessionStatus(state => state)
   const workspaceState = props.useWorkspaces(state => state)
