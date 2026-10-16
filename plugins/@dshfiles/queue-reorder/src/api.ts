@@ -44,6 +44,9 @@ export const queueFileAttachmentSchema = z.object({
 export type QueueMoveInput = z.infer<typeof queueMoveInputSchema>
 export type QueuePosition = z.infer<typeof queuePositionSchema>
 
+/** Model-facing text for a structured tool result. */
+const compactJson = <Output>(output: Output): string => JSON.stringify(output)
+
 export const queueApi = defineApi({
   id: 'queue-order',
   version: 1,
@@ -52,6 +55,8 @@ export const queueApi = defineApi({
     describe: method({
       input: z.object({ sessionId: z.string().min(1).max(128) }),
       output: z.array(queueEntrySchema).max(4),
+      description: 'The messages queued for one thread, in order, with their previews and whether each carries attachments. Read-only.',
+      tool: { name: 'queue_describe', readOnly: true, render: compactJson },
     }),
     // Added after the first release: a Host started before it answers with an unknown-endpoint error.
     readFile: method({

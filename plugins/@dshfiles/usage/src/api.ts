@@ -143,6 +143,9 @@ export const indexStatusSchema = z.object({
   lastError: z.string().nullable(),
 })
 
+/** Model-facing text for a structured tool result. */
+const compactJson = <Output>(output: Output): string => JSON.stringify(output)
+
 export const usageApi = defineApi({
   id: 'dshfiles-usage',
   version: 1,
@@ -164,9 +167,15 @@ export const usageApi = defineApi({
     status: method({
       input: z.object({}).strict(),
       output: indexStatusSchema,
-      description: 'How far the request index has read the session logs, and when prices were fetched.',
+      description: 'How far the request index has read the session logs, and when prices were fetched. Read-only.',
+      tool: { name: 'usage_status', readOnly: true, render: compactJson },
     }),
     /** Index whatever the session logs gained since the last pass, then report. */
-    refresh: method({ input: z.object({}).strict(), output: indexStatusSchema }),
+    refresh: method({
+      input: z.object({}).strict(),
+      output: indexStatusSchema,
+      description: 'Index whatever the session logs gained since the last pass, then report the new status. Call only when the user asked to re-index.',
+      tool: { name: 'usage_reindex', render: compactJson },
+    }),
   },
 })
