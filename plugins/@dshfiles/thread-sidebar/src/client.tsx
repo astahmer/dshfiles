@@ -8,7 +8,8 @@ import { RemoteThreadsSection } from './remote-threads-section.js'
 import type { ActorRefFrom } from '@dshfiles/plugin-ui/machine'
 import type { archivedViewMachine } from './archived-view-machine.js'
 import { useApi, useApiQuery } from '@dshfiles/dshx/client'
-import { PluginQueryProvider, useQuery } from '@dshfiles/plugin-ui/query'
+import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
+import { isApiOwnerMissing } from '@dshfiles/dshx/api'
 import { threadSidebarPendingQuestionsApi } from './pending-questions-api.js'
 import {
   IconArchiveOutlineRegular,
@@ -22,6 +23,7 @@ import {
   relativeTime,
   writeClipboard,
 } from '@deepseek-ai/dsh-client-ui-primitives'
+import { useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { Alert } from '@dshfiles/plugin-ui/components/ui/alert'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
@@ -64,7 +66,9 @@ import {
   CirclePauseIcon,
   LinkIcon,
   MonitorIcon,
+  RefreshCwIcon,
   Settings2Icon,
+  XIcon,
 } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { memo, useCallback, useEffect, useId, useMemo, useRef, useState, type ReactElement, type ReactNode } from 'react'
@@ -101,6 +105,8 @@ import { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
 import { projectTextTone } from './project-tone.js'
 import { archivedOpenFailureNotice, scheduleSuccessNoticeDismissal, SidebarNoticeMessage, type SidebarNotice } from './sidebar-notice.js'
 import { threadSidebarMachineApi } from './machine-api.js'
+import { threadSidebarRecoveryApi } from './recovery-api.js'
+import { selectRestartRecoveryRows } from './restart-recovery-rows.js'
 import { groupThreadChildren, partitionFinishedChildren, shouldOpenChildThreadList, threadActionTargetIds, visibleChildren } from './thread-children.js'
 import { buildThreadUrl, clearThreadUrl, readThreadUrl } from './thread-url.js'
 import { workingThreadIds } from './working-threads.js'
@@ -270,6 +276,8 @@ const toggleSetMember = (values: ReadonlySet<string>, value: string): ReadonlySe
   return next
 }
 
+const restartRecoveryQueryKey = ['thread-sidebar', 'restart-recovery', 'pending'] as const
+
 const sessionsForAutoArchive = (ids: readonly SessionSummary['id'][], byId: Readonly<Record<string, SessionSummary>>): SessionSummary[] =>
   ids.flatMap(sessionId => {
     const session = byId[sessionId]
@@ -300,6 +308,8 @@ interface RowActions {
   readonly mute: (sessionId: SessionSummary['id'], option: ThreadMuteOption) => void
   readonly unmute: (sessionId: SessionSummary['id']) => void
   readonly markUnread: (sessionId: SessionSummary['id']) => void
+  readonly resume: (sessionId: SessionSummary['id']) => void
+  readonly dismissRecovery: (sessionId: SessionSummary['id']) => void
   readonly setAutoArchiveOverride: (sessionId: SessionSummary['id'], override: AutoArchiveOverride) => void
   readonly translate: ThreadSidebarTranslate
 }
@@ -335,6 +345,8 @@ interface ThreadRowProps {
   readonly mute: ThreadMute | undefined
   readonly attentionLabel: ThreadAttentionLabel | undefined
   readonly rebasedAt: number | undefined
+  readonly needsResume: boolean
+  readonly resumeBusy: boolean
   readonly childAttentionLabels: ReadonlyMap<SessionSummary['id'], ThreadAttentionLabel>
   readonly rowStyle: RowStyle
   readonly childThreads: readonly SessionSummary[]
@@ -650,6 +662,34 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
               data-testid="thread-row-actions"
               className="dshx:pointer-events-none dshx:absolute dshx:top-1 dshx:right-1.5 dshx:flex dshx:gap-0.5 dshx:rounded-md dshx:border dshx:bg-popover dshx:p-0.5 dshx:opacity-0 dshx:shadow-xs dshx:transition-opacity dshx:group-hover/row:pointer-events-auto dshx:group-hover/row:opacity-100 dshx:focus-within:pointer-events-auto dshx:focus-within:opacity-100"
             >
+              {props.needsResume ? (
+                <>
+                  {withTooltip(
+                    t('threadSidebarResume'),
+                    <Button
+                      variant="ghost"
+                      size="icon-xs"
+                      aria-label={t('threadSidebarResume')}
+                      disabled={props.resumeBusy}
+                      onClick={() => props.actions.resume(session.id)}
+                    >
+                      {props.resumeBusy ? <Spinner className="dshx:size-3.5" /> : <RefreshCwIcon className="dshx:size-3.5" />}
+                    </Button>,
+                  )}
+                  {withTooltip(
+                    t('threadSidebarResumeDismiss'),
+                    <Button
+                      variant="ghost"
+                      size="icon-xs"
+                      aria-label={t('threadSidebarResumeDismiss')}
+                      disabled={props.resumeBusy}
+                      onClick={() => props.actions.dismissRecovery(session.id)}
+                    >
+                      <XIcon className="dshx:size-3.5" />
+                    </Button>,
+                  )}
+                </>
+              ) : null}
               {!archived ? (
                 <>
                   {withTooltip(
@@ -837,6 +877,19 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const { preferences, updatePreferences, storageWarning, setSelectedThreadId, threadTitle } = useSidebarState()
   const notificationPreferences = threadNotificationPreferences.useValue() ?? DEFAULT_THREAD_NOTIFICATION_PREFERENCES
   const pendingQuestionsApi = useApi(threadSidebarPendingQuestionsApi)
+  const recoveryApi = useApi(threadSidebarRecoveryApi)
+  const queryClient = useQueryClient()
+  const recoveryQuery = useQuery({
+    queryKey: restartRecoveryQueryKey,
+    queryFn: ({ signal }) => recoveryApi.pending(undefined, { signal }),
+    refetchInterval: query => (isApiOwnerMissing(query.state.error) ? false : 5000),
+    retry: false,
+  })
+  const resumeMutation = useMutation({ mutationFn: (input: { readonly sessionId: SessionSummary['id'] }) => recoveryApi.resume(input) })
+  const dismissMutation = useMutation({ mutationFn: (input: { readonly sessionId: SessionSummary['id'] }) => recoveryApi.dismiss(input) })
+  const recoverySessionIds = useMemo(() => new Set(recoveryQuery.data?.sessionIds ?? []), [recoveryQuery.data?.sessionIds])
+  const [resumeBusySessionIds, setResumeBusySessionIds] = useState<ReadonlySet<string>>(() => new Set())
+  const [resumeAllBusy, setResumeAllBusy] = useState(false)
   const machine = useApiQuery(threadSidebarMachineApi, 'name', { enabled: preferences.threadRowMachine }).data?.name
   const jjRepositories = useApiQuery(jjIntegrationApi, 'repositories', { input: {} })
   const refetchJjRepositories = jjRepositories.refetch
@@ -855,6 +908,34 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const [now, setNow] = useState(() => Date.now())
   const settingsId = useId()
   const [notice, setNotice] = useState<SidebarNotice | null>(null)
+  const resumeRecoverySession = async (sessionId: SessionSummary['id']): Promise<boolean> => {
+    if (resumeBusySessionIds.has(sessionId)) return false
+    setResumeBusySessionIds(current => new Set(current).add(sessionId))
+    try {
+      const result = await resumeMutation.mutateAsync({ sessionId })
+      if (!result.accepted) throw new Error('The recovery request is no longer pending.')
+      await queryClient.invalidateQueries({ queryKey: restartRecoveryQueryKey })
+      setNotice({ tone: 'success', message: props.tSidebar('threadSidebarResumeSent', { count: 1 }) })
+      return true
+    } catch {
+      setNotice({ tone: 'danger', message: props.tSidebar('threadSidebarActionFailure') })
+      return false
+    } finally {
+      setResumeBusySessionIds(current => {
+        const next = new Set(current)
+        next.delete(sessionId)
+        return next
+      })
+    }
+  }
+  const dismissRecoverySession = async (sessionId: SessionSummary['id']): Promise<void> => {
+    try {
+      await dismissMutation.mutateAsync({ sessionId })
+      await queryClient.invalidateQueries({ queryKey: restartRecoveryQueryKey })
+    } catch {
+      setNotice({ tone: 'danger', message: props.tSidebar('threadSidebarActionFailure') })
+    }
+  }
   useEffect(() => {
     if (notice === null) return
     return scheduleSuccessNoticeDismissal(notice, setNotice)
@@ -951,6 +1032,68 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     () => sessions.filter(session => isAttentionSessionIncluded(session, preferences.includeSubagentAttention)),
     [preferences.includeSubagentAttention, sessions],
   )
+  const needsResumeRows = useMemo(
+    () =>
+      selectRestartRecoveryRows({
+        sessions,
+        sessionIds: recoverySessionIds,
+        mutedSessionIds,
+        archivedSessionIds,
+        matchesWorkspace: session =>
+          preferences.workspaceFilter === null || (workspaceForLineage(session, sessionState.byId, workspaceBySession) ?? '') === preferences.workspaceFilter,
+        matchesSource: session => matchesThreadSourceFilter(session, threadView.sourceFilter),
+      }),
+    [
+      archivedSessionIds,
+      mutedSessionIds,
+      preferences.workspaceFilter,
+      recoverySessionIds,
+      sessionState.byId,
+      sessions,
+      threadView.sourceFilter,
+      workspaceBySession,
+    ],
+  )
+  const resumeAllRecoveries = async (): Promise<void> => {
+    if (resumeAllBusy) return
+    const sessionIds = needsResumeRows.filter(session => !resumeBusySessionIds.has(session.id)).map(session => session.id)
+    if (sessionIds.length === 0) return
+    setResumeAllBusy(true)
+    setResumeBusySessionIds(current => new Set([...current, ...sessionIds]))
+    let nextIndex = 0
+    let sent = 0
+    let failed = 0
+    const worker = async (): Promise<void> => {
+      while (nextIndex < sessionIds.length) {
+        const sessionId = sessionIds[nextIndex]
+        nextIndex += 1
+        if (sessionId === undefined) continue
+        try {
+          const result = await resumeMutation.mutateAsync({ sessionId })
+          if (result.accepted) sent += 1
+          else failed += 1
+        } catch {
+          failed += 1
+        }
+      }
+    }
+    try {
+      await Promise.all(Array.from({ length: Math.min(3, sessionIds.length) }, worker))
+      await queryClient.invalidateQueries({ queryKey: restartRecoveryQueryKey })
+      setNotice(
+        failed === 0
+          ? { tone: 'success', message: props.tSidebar('threadSidebarResumeSent', { count: sent }) }
+          : { tone: 'warning', message: props.tSidebar('threadSidebarResumePartial', { sent, failed }) },
+      )
+    } finally {
+      setResumeBusySessionIds(current => {
+        const next = new Set(current)
+        for (const sessionId of sessionIds) next.delete(sessionId)
+        return next
+      })
+      setResumeAllBusy(false)
+    }
+  }
   const unreadSessionIds = useMemo(
     () =>
       new Set(sessions.filter(session => !mutedSessionIds.has(session.id) && isThreadUnread(notificationPreferences, session.id)).map(session => session.id)),
@@ -1521,8 +1664,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   )
   const waitingSessionIds = useMemo(() => new Set([...approvalNeededRows, ...needsInputRows].map(session => session.id)), [approvalNeededRows, needsInputRows])
   const attentionSessionIds = useMemo(
-    () => new Set([...approvalNeededRows, ...needsInputRows, ...turnFinishedRows].map(session => session.id)),
-    [approvalNeededRows, needsInputRows, turnFinishedRows],
+    () => new Set([...approvalNeededRows, ...needsInputRows, ...turnFinishedRows, ...needsResumeRows].map(session => session.id)),
+    [approvalNeededRows, needsInputRows, needsResumeRows, turnFinishedRows],
   )
   const attentionRootIds = useMemo(() => {
     const ids = new Set(attentionSessionIds)
@@ -1590,8 +1733,12 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   ])
   const attentionIds = useMemo(
     () =>
-      new Set([...groupedAttentionRows.approvalNeeded, ...groupedAttentionRows.inputNeeded, ...groupedAttentionRows.turnFinished].map(session => session.id)),
-    [groupedAttentionRows],
+      new Set(
+        [...groupedAttentionRows.approvalNeeded, ...groupedAttentionRows.inputNeeded, ...groupedAttentionRows.turnFinished, ...needsResumeRows].map(
+          session => session.id,
+        ),
+      ),
+    [groupedAttentionRows, needsResumeRows],
   )
   const inlineAttentionLabels = useMemo(() => {
     const labels = new Map<SessionSummary['id'], ThreadAttentionLabel>()
@@ -1765,6 +1912,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     mutateSession,
     toggleParked,
     copyContextValue,
+    resumeRecoverySession,
+    dismissRecoverySession,
     props,
     sessionsById: sessionState.byId,
     preferences,
@@ -1775,6 +1924,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     mutateSession,
     toggleParked,
     copyContextValue,
+    resumeRecoverySession,
+    dismissRecoverySession,
     props,
     sessionsById: sessionState.byId,
     preferences,
@@ -1871,6 +2022,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         const current = threadNotificationPreferences.get() ?? DEFAULT_THREAD_NOTIFICATION_PREFERENCES
         threadNotificationPreferences.set(markThreadUnread(current, sessionId))
       },
+      resume: sessionId => void latestRowActions.current.resumeRecoverySession(sessionId),
+      dismissRecovery: sessionId => void latestRowActions.current.dismissRecoverySession(sessionId),
       setAutoArchiveOverride: (sessionId, override) => {
         const current = latestRowActions.current
         const next = updateAutoArchiveOverride(current.preferences, sessionId, override)
@@ -1927,6 +2080,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         mute={mutedSessionIds.has(session.id) ? mutedThreads[session.id] : undefined}
         attentionLabel={rowAttentionLabel}
         rebasedAt={rebasedIndex.rebasedAtBySessionId.get(session.id)}
+        needsResume={recoverySessionIds.has(session.id)}
+        resumeBusy={resumeBusySessionIds.has(session.id)}
         childAttentionLabels={inlineAttentionLabels}
         rowStyle={rowStyle}
         childThreads={childThreads}
@@ -2421,6 +2576,22 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
               <Spinner />
               {props.tSidebar('threadSidebarLoading')}
             </div>
+          ) : null}
+          {needsResumeRows.length > 0 ? (
+            <section className="dshx:mt-1" aria-label={props.tSidebar('threadSidebarNeedsResume')}>
+              <div className={cn(stickyHeaderClass, 'dshx:flex dshx:h-8 dshx:items-center dshx:gap-2 dshx:px-2.5 dshx:text-sm')}>
+                <span className={cn('dshx:whitespace-nowrap dshx:font-medium', attentionLabelClass('threadSidebarNeedsResume', preferences.attentionColors))}>
+                  {props.tSidebar('threadSidebarNeedsResume')}
+                </span>
+                <span className="dshx:text-xs dshx:tabular-nums">({needsResumeRows.length})</span>
+                <span className="dshx:h-px dshx:flex-1 dshx:bg-border" aria-hidden="true" />
+                <Button type="button" size="xs" variant="outline" disabled={resumeAllBusy} onClick={() => void resumeAllRecoveries()}>
+                  {resumeAllBusy ? <Spinner className="dshx:size-3" /> : null}
+                  {props.tSidebar('threadSidebarResumeAll')}
+                </Button>
+              </div>
+              {needsResumeRows.map(session => renderThreadRow(session, 'threadSidebarNeedsResume'))}
+            </section>
           ) : null}
           {groupedAttentionRows.approvalNeeded.length > 0 ? (
             <section className="dshx:mt-1" aria-label={props.tSidebar('threadSidebarApprovalNeeded')}>

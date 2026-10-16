@@ -10,7 +10,9 @@ const RESTART_EXIT_CODE = 75
 
 export interface RestartControllerOptions {
   readonly env?: NodeJS.ProcessEnv
-  readonly scheduleExit?: (exit: () => void) => void
+  readonly scheduleExit?: (exit: () => Promise<void>) => void
+  readonly recordRunningSessions?: () => Promise<void>
+  readonly onExitFailure?: (error: unknown) => void
 }
 
 /** Written by the dsh-web supervisor next to its restart requests, mode 600. */
@@ -36,7 +38,7 @@ export const createRestartController = (ctx: Pick<Context, 'appExit'>, options: 
   const scheduleExit =
     options.scheduleExit ??
     (exit => {
-      const timer = setTimeout(exit, EXIT_DELAY_MS)
+      const timer = setTimeout(() => void exit(), EXIT_DELAY_MS)
       timer.unref()
     })
 
@@ -62,7 +64,18 @@ export const createRestartController = (ctx: Pick<Context, 'appExit'>, options: 
         throw new Error('A DSH restart request could not be scheduled.')
       }
       await requestFile.close()
-      scheduleExit(() => appExit(RESTART_EXIT_CODE))
+      let exitStarted = false
+      scheduleExit(async () => {
+        if (exitStarted) return
+        exitStarted = true
+        try {
+          await options.recordRunningSessions?.()
+          appExit(RESTART_EXIT_CODE)
+        } catch (error) {
+          await unlink(expectedRequestPath).catch(() => undefined)
+          options.onExitFailure?.(error)
+        }
+      })
       return { accepted: true }
     },
   }

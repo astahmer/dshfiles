@@ -32,6 +32,10 @@ Attention is separate from running state:
 - A structured question appears as **Input needed**.
 - A completed turn appears as **Turn finished** when the Host reports it unread
   and the thread is eligible to surface.
+- A thread appears as **Needs resume** only when the managed restart captures it
+  still running immediately before Host exit. Idle, completed, and user-cancelled
+  threads are not added by a restart. Resume is an explicit new continuation
+  prompt; it does not replay the interrupted model or tool request.
 
 The selected thread is not listed in these attention groups. Mutes, archives,
 the workspace filter, and—by default—the subagent setting can also keep a row
@@ -56,11 +60,13 @@ as unread, the sidebar keeps it dismissed instead of immediately adding it
 back. The seen marker clears when the Host reports the completion read. If a
 later completion then becomes newly unread, it can surface normally.
 
-> **Technical note:** Host owns running and completion-unread status. The
-> Client reports blocking pending interactions; the sidebar also queries the
-> Host's native question projection so continued forms remain **Input needed**.
-> The browser stores the manual unread marker, local Turn finished timestamp,
-> and seen-completion marker. The local seen marker does not change Host status.
+> **Technical note:** Host owns running, pending-interaction, completion-unread,
+> and managed-restart recovery status. The Client reports blocking pending
+> interactions; the sidebar also queries the Host's native question projection
+> so continued forms remain **Input needed**. Restart candidates are stored under
+> `DSH_HOME/runtime` until resumed or dismissed. The browser stores the manual
+> unread marker, the local Turn finished timestamp, and the seen-completion
+> marker. The local seen marker does not itself change Host status.
 
 ## Groups and filters
 

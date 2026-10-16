@@ -144,7 +144,7 @@ section, is skipped by auto-archive, and stays parked until unparked, but its
 alerts still fire. Mute keeps the thread where it is and only silences it, for
 a while or for good. They answer different questions ("not now" vs "not
 noisy"), so they stay separate and combine freely. The sidebar separates **Approval needed**,
-**Input needed**, and **Turn finished**.
+**Input needed**, **Turn finished**, and **Needs resume**.
 Permission approvals and plan-review decisions use **Approval needed**;
 structured user-question requests use **Input needed**. Open questions use the
 Client's explicit Session pending-interaction status; the sidebar also checks
@@ -154,8 +154,15 @@ kinds and generic unstructured questions remain unclassified. **Turn finished**
 marks an eligible completed turn with a local attention marker; selecting that
 thread from any route acknowledges it. The sidebar keeps the same completion
 dismissed while its seen marker is active, even if Host still reports it unread.
-Each category can be configured independently as a separate group or an inline
-thread-row label.
+**Needs resume** contains only Sessions the managed restart captures as running
+immediately before its Host exit. Completed, already-idle, and user-cancelled
+Sessions are not added. Each row has explicit **Resume** and dismiss actions,
+and the group offers **Resume all** (up to three requests at once). Resume sends
+a new continuation prompt that directs the agent to inspect its transcript and
+workspace before continuing; it does not replay the interrupted model/tool
+call. A manual process stop or crash without the managed restart handshake does
+not create a recovery marker. Approval, Input, and Turn finished can be
+configured independently as a separate group or inline thread-row label.
 Approval and Input default to groups; Turn finished defaults to an inline
 label. Each status has an independently configurable semantic color in Sidebar
 settings (Muted, Primary, Info, Success, Warning, or Danger); the default colors

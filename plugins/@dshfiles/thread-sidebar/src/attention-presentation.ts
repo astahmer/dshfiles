@@ -1,6 +1,6 @@
 import type { AttentionColor, AttentionColors, AttentionColorKey } from './organization.js'
 
-export type ThreadAttentionLabel = 'threadSidebarApprovalNeeded' | 'threadSidebarInputNeeded' | 'threadSidebarTurnFinished'
+export type ThreadAttentionLabel = 'threadSidebarApprovalNeeded' | 'threadSidebarInputNeeded' | 'threadSidebarTurnFinished' | 'threadSidebarNeedsResume'
 
 export interface ThreadStatusVisualInput {
   readonly attentionLabel: ThreadAttentionLabel | undefined
@@ -13,7 +13,10 @@ const attentionColorKeys = {
   threadSidebarApprovalNeeded: 'approvalNeeded',
   threadSidebarInputNeeded: 'inputNeeded',
   threadSidebarTurnFinished: 'turnFinished',
-} satisfies Record<ThreadAttentionLabel, AttentionColorKey>
+} satisfies Record<Exclude<ThreadAttentionLabel, 'threadSidebarNeedsResume'>, AttentionColorKey>
+
+const attentionColorForLabel = (label: ThreadAttentionLabel, attentionColors: AttentionColors): AttentionColor =>
+  label === 'threadSidebarNeedsResume' ? 'warning' : attentionColors[attentionColorKeys[label]]
 
 const attentionTextClasses = {
   muted: 'dshx:text-muted-foreground',
@@ -34,10 +37,10 @@ const attentionDotClasses = {
 } satisfies Record<AttentionColor, string>
 
 export const attentionLabelClass = (label: ThreadAttentionLabel, attentionColors: AttentionColors): string =>
-  `${attentionTextClasses[attentionColors[attentionColorKeys[label]]]}/80`
+  `${attentionTextClasses[attentionColorForLabel(label, attentionColors)]}/80`
 
 export const attentionDotClass = (input: ThreadStatusVisualInput): string => {
-  if (input.attentionLabel !== undefined) return attentionDotClasses[input.attentionColors[attentionColorKeys[input.attentionLabel]]]
+  if (input.attentionLabel !== undefined) return attentionDotClasses[attentionColorForLabel(input.attentionLabel, input.attentionColors)]
   if (input.unread) return 'dshx:bg-primary'
   if (input.running) return 'dshx:animate-pulse dshx:bg-info'
   return 'dshx:bg-muted-foreground/45'

@@ -1044,9 +1044,45 @@
         },
         {
           "kind": "unit-test",
+          "id": "thread-sidebar.restart-recovery-unit-snapshot-failure-blocks-exit",
+          "file": "plugins/@dshfiles/thread-sidebar/src/restart.test.ts",
+          "testName": "a failed recovery snapshot cancels the managed restart request"
+        },
+        {
+          "kind": "unit-test",
           "id": "thread-sidebar.pending-host-restart-unit-host-vs-client-restart-detection",
           "file": "plugins/@dshfiles/thread-sidebar/src/plugin-updates.test.ts",
           "testName": "only Host code or manifest changes since boot need a restart, not client rebuilds or identical rebuilds"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.restart-recovery-unit-active-agent-capture",
+          "file": "plugins/@dshfiles/thread-sidebar/src/restart-recovery.test.ts",
+          "testName": "restart capture includes only Agents still running at the exit boundary"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.restart-recovery-unit-persisted-and-deduplicated",
+          "file": "plugins/@dshfiles/thread-sidebar/src/restart-recovery.test.ts",
+          "testName": "restart recovery entries survive Host replacement and dedupe later restart captures"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.restart-recovery-unit-visible-candidates",
+          "file": "plugins/@dshfiles/thread-sidebar/src/restart-recovery-rows.test.ts",
+          "testName": "recovery rows include only persisted restart candidates that remain idle and visible"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.restart-recovery-unit-concurrent-snapshots",
+          "file": "plugins/@dshfiles/thread-sidebar/src/restart-recovery.test.ts",
+          "testName": "concurrent restart snapshots keep every unique recovery candidate"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.restart-recovery-unit-dismiss-one",
+          "file": "plugins/@dshfiles/thread-sidebar/src/restart-recovery.test.ts",
+          "testName": "dismiss removes one recovery candidate without changing other entries"
         }
       ]
     },

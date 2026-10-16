@@ -5,25 +5,87 @@ import { defineHost } from '@dshfiles/dshx/host'
 import { execFile } from 'node:child_process'
 import { hostname } from 'node:os'
 import { promisify } from 'node:util'
+import type { Context } from '@deepseek-ai/cordis'
+import type { SessionRequestId } from '@deepseek-ai/dsh-api-session-controller'
 import { z } from 'zod'
 import { threadSidebarMachineApi } from './machine-api.js'
 import { threadSidebarPendingQuestionsApi } from './pending-questions-api.js'
 import { threadSidebarPluginUpdatesApi } from './plugin-updates-api.js'
+import { threadSidebarRecoveryApi } from './recovery-api.js'
 import { createPluginUpdateWatch } from './plugin-updates.js'
 import { threadSidebarRestartApi } from './restart-api.js'
+import { activeRestartSessionIds, createRestartRecoveryStore } from './restart-recovery.js'
 import { createRestartController, readLaunchUrl } from './restart.js'
 import { threadSidebarSettings } from './settings.js'
 import { threadSidebarModelRouteProjection } from './subagent-provenance/projection.js'
 
+const restartRecoveryStore = createRestartRecoveryStore()
+
+const restartController = (ctx: Context) =>
+  createRestartController(ctx, {
+    recordRunningSessions: async () => {
+      const persistence = ctx.get('sessionPersistence')
+      if (persistence === undefined) throw new Error('Session persistence is unavailable.')
+      await persistence.flush()
+      await restartRecoveryStore.record(activeRestartSessionIds(ctx.agents.list()))
+    },
+    onExitFailure: () => console.error('thread-sidebar: managed restart was canceled because running-thread recovery could not be saved'),
+  })
+
 const restartApi = threadSidebarRestartApi.host({
-  availability: ({ ctx }) => ({ available: createRestartController(ctx).available }),
+  availability: ({ ctx }) => ({ available: restartController(ctx).available }),
   launchUrl: async () => ({ url: await readLaunchUrl() }),
   requestRestart: async ({ ctx }) => {
     try {
-      return await createRestartController(ctx).request()
+      return await restartController(ctx).request()
     } catch {
       throw new Error('Could not schedule a safe DSH restart.')
     }
+  },
+})
+
+const resumePrompt = [
+  'Your previous turn was interrupted while DSH was restarting.',
+  'Continue from the persisted transcript and current workspace state.',
+  'First inspect the last assistant and tool events and verify the current state of the workspace.',
+  'Do not repeat or assume success for any tool action whose result is missing; verify its effects before taking further action.',
+  'If safe continuation is unclear, explain what needs human input instead of guessing.',
+].join(' ')
+
+const recoveryApi = threadSidebarRecoveryApi.host({
+  pending: async ({ ctx }) => {
+    await restartRecoveryStore.remove(new Set(activeRestartSessionIds(ctx.agents.list())))
+    return { sessionIds: (await restartRecoveryStore.list()).map(entry => entry.sessionId) }
+  },
+  resume: async ({ ctx, input }) => {
+    const entry = (await restartRecoveryStore.list()).find(candidate => candidate.sessionId === input.sessionId)
+    if (entry === undefined) return { accepted: false }
+
+    const active = ctx.agents.list().find(agent => agent.id === SessionId(input.sessionId))
+    if (active?.status === 'running') {
+      await restartRecoveryStore.complete(input.sessionId)
+      return { accepted: true }
+    }
+
+    const controller = ctx.get('sessionController')
+    if (controller === undefined) throw new Error('Session resume is unavailable.')
+    await controller.prompt(
+      {
+        // SAFETY: the persisted schema validated this request id as a UUID before it was branded here.
+        requestId: entry.requestId as SessionRequestId,
+        sessionId: SessionId(input.sessionId),
+        mode: 'queue',
+        content: [{ type: 'text', text: resumePrompt }],
+      },
+      AbortSignal.timeout(15_000),
+    )
+    await restartRecoveryStore.complete(input.sessionId)
+    return { accepted: true }
+  },
+  dismiss: async ({ input }) => {
+    const exists = (await restartRecoveryStore.list()).some(entry => entry.sessionId === input.sessionId)
+    await restartRecoveryStore.dismiss(input.sessionId)
+    return { dismissed: exists }
   },
 })
 
@@ -84,8 +146,8 @@ interface ClientModuleRegistrySurface {
 export default defineHost({
   name: '@dshfiles/thread-sidebar',
   settings: [threadSidebarSettings],
-  inject: ['connection', 'sessionProjections', 'sessionQuery'],
-  apis: [restartApi, machineApi, pluginUpdatesApi, pendingQuestionsApi],
+  inject: ['connection', 'sessionProjections', 'sessionQuery', 'agents', 'sessionController', 'sessionPersistence'],
+  apis: [restartApi, recoveryApi, machineApi, pluginUpdatesApi, pendingQuestionsApi],
   // The web Host's client module registry knows where every loaded plugin package lives; Hosts without it
   // (desktop shells, older builds) simply report no pending updates.
   setup: ctx => {

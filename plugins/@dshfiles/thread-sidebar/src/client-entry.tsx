@@ -565,7 +565,11 @@ export default defineClient({
             openRemoteThreads: () => ctx.layout.selectPanel('dshfiles-multi-host-thread' as MainPanelId),
           }),
         },
-        decorate(ThreadSidebar),
+        decorate((props: Parameters<typeof ThreadSidebar>[0]) => (
+          <PluginQueryProvider>
+            <ThreadSidebar {...props} />
+          </PluginQueryProvider>
+        )),
       ),
     )
   },

@@ -44,13 +44,17 @@ test('restart availability requires both the launcher handoff and the DSH exit h
 test('restart request writes one marker and schedules a distinct graceful exit code', async () => {
   const home = await mkdtemp(join(tmpdir(), 'thread-sidebar-restart-'))
   try {
-    let scheduledExit: (() => void) | undefined
+    let scheduledExit: (() => Promise<void>) | undefined
     const exitCodes: number[] = []
+    let recoveryCaptured = false
     const env = testEnvironment(home)
     const controller = createRestartController(
       { appExit: code => exitCodes.push(code) },
       {
         env,
+        recordRunningSessions: async () => {
+          recoveryCaptured = true
+        },
         scheduleExit: exit => {
           scheduledExit = exit
         },
@@ -61,11 +65,45 @@ test('restart request writes one marker and schedules a distinct graceful exit c
     assert.deepEqual(await controller.request(), { accepted: true })
     assert.equal(await readFile(requestPath, 'utf8'), RUN_ID)
     assert.deepEqual(exitCodes, [])
+    assert.equal(recoveryCaptured, false)
     assert.ok(scheduledExit)
-    scheduledExit()
+    await scheduledExit()
+    assert.equal(recoveryCaptured, true)
     assert.deepEqual(exitCodes, [75])
     await assert.rejects(controller.request(), /could not be scheduled/u)
     assert.deepEqual(exitCodes, [75])
+  } finally {
+    await rm(home, { recursive: true, force: true })
+  }
+})
+
+test('a failed recovery snapshot cancels the managed restart request', async () => {
+  const home = await mkdtemp(join(tmpdir(), 'thread-sidebar-restart-recovery-'))
+  try {
+    let scheduledExit: (() => Promise<void>) | undefined
+    const exitCodes: number[] = []
+    const failures: unknown[] = []
+    const env = testEnvironment(home)
+    const controller = createRestartController(
+      { appExit: code => exitCodes.push(code) },
+      {
+        env,
+        recordRunningSessions: async () => {
+          throw new Error('recovery storage unavailable')
+        },
+        onExitFailure: error => failures.push(error),
+        scheduleExit: exit => {
+          scheduledExit = exit
+        },
+      },
+    )
+
+    await controller.request()
+    assert.ok(scheduledExit)
+    await scheduledExit()
+    assert.deepEqual(exitCodes, [])
+    assert.equal(failures.length, 1)
+    await assert.rejects(readFile(env.DSH_RESTART_REQUEST_PATH), { code: 'ENOENT' })
   } finally {
     await rm(home, { recursive: true, force: true })
   }

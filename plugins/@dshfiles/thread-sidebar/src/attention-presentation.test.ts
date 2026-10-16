@@ -9,6 +9,7 @@ describe('thread attention presentation', () => {
     ['threadSidebarApprovalNeeded', 'dshx:text-warning/80', 'dshx:bg-warning'],
     ['threadSidebarInputNeeded', 'dshx:text-warning/80', 'dshx:bg-warning'],
     ['threadSidebarTurnFinished', 'dshx:text-success/80', 'dshx:bg-success'],
+    ['threadSidebarNeedsResume', 'dshx:text-warning/80', 'dshx:bg-warning'],
   ] as const)('uses configured semantic colors for %s', (label, textClass, dotClass) => {
     expect(attentionLabelClass(label, defaultColors)).toBe(textClass)
     expect(attentionDotClass({ attentionLabel: label, attentionColors: defaultColors, unread: false, running: false })).toBe(dotClass)
