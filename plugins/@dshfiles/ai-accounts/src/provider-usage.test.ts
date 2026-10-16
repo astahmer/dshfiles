@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { claudeKeychainService, parseClaudeUsage, resolveClaudeConfigDir } from './claude-account.js'
 import { parseCommandCodeUsage } from './commandcode-usage.js'
-import { cursorSessionCookie, parseCursorUsage } from './cursor-account.js'
+import { CursorAccountModel } from './cursor-account.js'
 import { ProviderUsageModel } from './usage.js'
 
 const noCredits = { available: 0, resets: [] }
@@ -114,14 +114,18 @@ describe('Command Code usage', () => {
 describe('Cursor usage', () => {
   it('builds the dashboard cookie from the token subject', () => {
     const token = jwt({ sub: 'auth0|user_123' })
-    expect(cursorSessionCookie(token)).toBe(`WorkosCursorSessionToken=${encodeURIComponent(`user_123::${token}`)}`)
-    expect(cursorSessionCookie('not-a-jwt')).toBeUndefined()
+    expect(CursorAccountModel.cursorSessionCookie(token)).toBe(`WorkosCursorSessionToken=${encodeURIComponent(`user_123::${token}`)}`)
+    expect(CursorAccountModel.cursorSessionCookie('not-a-jwt')).toBeUndefined()
   })
 
   it('reads included usage for the billing cycle, and reports an unknown shape as unsupported', () => {
-    const card = parseCursorUsage({ billingCycleEnd: '2026-11-01T00:00:00Z', membershipType: 'pro', individualUsage: { plan: { used: 500, limit: 2000 } } })
+    const card = CursorAccountModel.parseCursorUsage({
+      billingCycleEnd: '2026-11-01T00:00:00Z',
+      membershipType: 'pro',
+      individualUsage: { plan: { used: 500, limit: 2000 } },
+    })
     expect(card.windows).toEqual([{ label: 'Monthly limit', percentRemaining: 75, resetsAt: Date.parse('2026-11-01T00:00:00Z') }])
-    expect(parseCursorUsage({ individualUsage: { plan: {} } }).status).toBe('unsupported')
-    expect(parseCursorUsage('nope').status).toBe('unsupported')
+    expect(CursorAccountModel.parseCursorUsage({ individualUsage: { plan: {} } }).status).toBe('unsupported')
+    expect(CursorAccountModel.parseCursorUsage('nope').status).toBe('unsupported')
   })
 })
