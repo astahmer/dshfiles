@@ -5,7 +5,7 @@
     {
       "id": "agent-toolkit-page",
       "title": "Agent toolkit page",
-      "summary": "A main panel (sidebar → Agent toolkit; main-tabs opens it as a tab) showing what the agent can use in one thread: its tools with source (native, plugin, MCP, memory), owner, read-only marker and whether the preset restricts them; the API methods plugins serve each other, with the agent tool each is exposed as; the loaded plugins with versions, state and a link to their settings; MCP servers with status and tools; skills from the project and the user's .agents/skills with who can invoke them; and memory's start block and note counts for the project, with a link to the Memory panel. Search and a source filter narrow every section. It replaces the Tools tab of Settings › Built-in plugins.",
+      "summary": "A main panel (sidebar → Agent toolkit; main-tabs opens it as a tab) showing what the agent can use in one thread: tools with source, owner, read-only marker and preset restrictions; plugin API methods and agent tools; loaded plugins with versions, state and settings links; MCP servers with status and tools; skills with Host-reported origin, provider and invocation mode; and Memory's start block and note counts. Search and source filters narrow every section. Skill origin is never inferred from filesystem paths, and Host paths are not sent to the browser. It replaces the Tools tab of Settings › Built-in plugins.",
       "reach": [
         "click button \"Agent toolkit\"",
         "expect heading \"Agent toolkit\"",
@@ -19,7 +19,8 @@
       "failureModes": [
         "Without a dshx Host serving the registry, the page says the catalog is unavailable instead of listing nothing.",
         "Without MCP servers or memory loaded, their section says so; the rest still renders.",
-        "A registry served by an older dshx lacks read-only, restriction and invocation fields; the page omits those badges and treats skills as user-invocable."
+        "A registry served by an older dshx lacks read-only, restriction, skill-source and invocation fields; the page omits missing tool badges, labels unknown skill provenance as other, and assumes the person can invoke a skill.",
+        "Modern Hosts do not forward absolute skill paths, and the Agent Toolkit decoder drops legacy path fields before rendering."
       ],
       "externalDependencies": [],
       "verification": [
@@ -66,9 +67,9 @@
         },
         {
           "kind": "unit-test",
-          "id": "agent-toolkit.skill-scope",
+          "id": "agent-toolkit.skill-origin",
           "file": "plugins/@dshfiles/agent-toolkit/src/toolkit-model.test.ts",
-          "testName": "tells project skills from the user’s own and says who can invoke them"
+          "testName": "uses the Host source for skill provenance and drops legacy paths"
         },
         {
           "kind": "unit-test",

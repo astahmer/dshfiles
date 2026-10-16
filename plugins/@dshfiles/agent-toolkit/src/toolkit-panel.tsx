@@ -16,7 +16,7 @@ import { useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useState, type ReactNode } from 'react'
 import { agentToolkitApi } from './api.js'
 import type { AgentToolkitKey } from './locales.js'
-import { AgentToolkit, type SkillInvocation, type SkillScope, type ToolkitFilter, type ToolkitSource } from './toolkit-model.js'
+import { AgentToolkit, type SkillInvocation, type SkillOrigin, type ToolkitFilter, type ToolkitSource } from './toolkit-model.js'
 
 type Translate = (key: AgentToolkitKey, params?: Record<string, string | number>) => string
 
@@ -47,7 +47,16 @@ const SOURCE_LABEL = { native: 'sourceNative', plugin: 'sourcePlugin', mcp: 'sou
   AgentToolkitKey
 >
 const SOURCE_VARIANT = { native: 'muted', plugin: 'info', mcp: 'warning', memory: 'success' } as const satisfies Record<ToolkitSource, string>
-const SCOPE_LABEL = { project: 'skillProject', user: 'skillUser', other: 'skillOther' } as const satisfies Record<SkillScope, AgentToolkitKey>
+const SKILL_ORIGIN_LABEL = {
+  'project-dsh': 'skillProjectDsh',
+  'project-agents': 'skillProjectAgents',
+  'user-dsh': 'skillUserDsh',
+  'user-agents': 'skillUserAgents',
+  runtime: 'skillRuntime',
+  custom: 'skillCustom',
+  bundled: 'skillBundled',
+  other: 'skillOther',
+} as const satisfies Record<SkillOrigin, AgentToolkitKey>
 const INVOCATION_LABEL = { both: 'invokeBoth', user: 'invokeUser', model: 'invokeModel', none: 'invokeNone' } as const satisfies Record<
   SkillInvocation,
   AgentToolkitKey
@@ -402,12 +411,13 @@ export const AgentToolkitPanel = (props: {
                         <div className="dshx:flex dshx:flex-col dshx:items-start dshx:gap-1">
                           <span className="dshx:font-mono dshx:text-xs dshx:break-all">/{skill.name}</span>
                           <div className="dshx:flex dshx:flex-wrap dshx:gap-1">
-                            <Badge variant="info">{t(SCOPE_LABEL[AgentToolkit.skillScope(skill, cwd)])}</Badge>
+                            <Badge variant="info">{t(SKILL_ORIGIN_LABEL[AgentToolkit.skillOrigin(skill)])}</Badge>
+                            {skill.provider === '' ? null : <Badge variant="outline">{skill.provider}</Badge>}
                             <Badge variant="outline">{t(INVOCATION_LABEL[AgentToolkit.invocation(skill)])}</Badge>
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell className="dshx:align-top dshx:whitespace-normal dshx:text-xs dshx:text-muted-foreground" title={skill.path}>
+                      <TableCell className="dshx:align-top dshx:whitespace-normal dshx:text-xs dshx:text-muted-foreground">
                         <span className="dshx:line-clamp-3">{skill.description}</span>
                       </TableCell>
                     </TableRow>

@@ -15,9 +15,9 @@ const skillSchema = z.object({
   name: z.string(),
   description: z.string().catch(''),
   provider: z.string().catch(''),
+  source: z.string().optional().catch(undefined),
   modelInvocable: z.boolean().catch(true),
   userInvocable: z.boolean().optional().catch(undefined),
-  path: z.string().optional().catch(undefined),
 })
 
 const apiSchema = z.object({
@@ -41,7 +41,7 @@ export type ToolkitListing = z.infer<typeof listingSchema>
 /** Where a tool comes from, as the page filters it. `native` is DSH's own tools and plugins not built with dshx. */
 export type ToolkitSource = 'native' | 'plugin' | 'mcp' | 'memory'
 export type ToolkitFilter = 'all' | ToolkitSource | 'skills'
-export type SkillScope = 'project' | 'user' | 'other'
+export type SkillOrigin = 'project-dsh' | 'project-agents' | 'user-dsh' | 'user-agents' | 'runtime' | 'custom' | 'bundled' | 'other'
 export type SkillInvocation = 'both' | 'user' | 'model' | 'none'
 export type PluginOrigin = 'dshfiles' | 'deepseek' | 'other'
 export type ToolkitSection = 'tools' | 'apis' | 'plugins' | 'mcp' | 'skills' | 'memory'
@@ -135,11 +135,20 @@ export class AgentToolkit {
       .filter(row => AgentToolkit.matches(input.query, row.owner, row.path, row.description, row.tool))
   }
 
-  /** Project skills live under the thread's folder; other `.agents/skills` folders are the user's own. */
-  static skillScope(skill: ToolkitSkill, cwd: string | undefined): SkillScope {
-    if (skill.path === undefined) return 'other'
-    if (cwd !== undefined && cwd !== '' && skill.path.startsWith(`${cwd.replace(/\/+$/u, '')}/`)) return 'project'
-    return skill.path.includes('/.agents/skills/') ? 'user' : 'other'
+  /** The Host's source is authoritative; origin never depends on cwd or an exposed filesystem path. */
+  static skillOrigin(skill: ToolkitSkill): SkillOrigin {
+    switch (skill.source) {
+      case 'project-dsh':
+      case 'project-agents':
+      case 'user-dsh':
+      case 'user-agents':
+      case 'runtime':
+      case 'custom':
+      case 'bundled':
+        return skill.source
+      default:
+        return 'other'
+    }
   }
 
   /** An older registry does not say whether a person can invoke a skill; DSH's default is yes. */

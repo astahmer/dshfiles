@@ -13,6 +13,7 @@ import type {
   RegistryToolView,
   RegistryListInput,
   RegistryListing,
+  RegistrySkillView,
 } from './types.js'
 import { apiHostRegistrationParts, DSHX_REGISTRY_OWNER, dshxRegistryApi } from './define.js'
 import { apiChannel, ContractViolation, error, isApiError, isPluginApiError, jsonBytes, throwIfAborted, validate } from './common.js'
@@ -250,13 +251,11 @@ interface AgentsLike {
 /** The slice of DSH's skill registry the listing reads. */
 interface SkillsLike {
   list(options: { readonly cwd?: string; readonly scope?: object }): Promise<
-    ReadonlyArray<{
-      readonly name: string
-      readonly description: string
-      readonly provider: string
-      readonly path?: string
-      readonly invocation: { readonly modelInvocable: boolean; readonly userInvocable: boolean }
-    }>
+    ReadonlyArray<
+      Pick<RegistrySkillView, 'name' | 'description' | 'provider' | 'source'> & {
+        readonly invocation: { readonly modelInvocable: boolean; readonly userInvocable: boolean }
+      }
+    >
   >
 }
 
@@ -278,17 +277,14 @@ async function listSkills(ctx: Context, options: { readonly cwd?: string; readon
   try {
     const skills: SkillsLike | undefined = ctx.get('skills')
     if (skills === undefined) return []
-    return (await skills.list(options)).map(skill => {
-      const view = {
-        name: skill.name,
-        description: skill.description,
-        provider: skill.provider,
-        modelInvocable: skill.invocation.modelInvocable,
-        userInvocable: skill.invocation.userInvocable,
-      }
-      if (skill.path !== undefined) Object.assign(view, { path: skill.path })
-      return view
-    })
+    return (await skills.list(options)).map(skill => ({
+      name: skill.name,
+      description: skill.description,
+      provider: skill.provider,
+      ...(skill.source === undefined ? {} : { source: skill.source }),
+      modelInvocable: skill.invocation.modelInvocable,
+      userInvocable: skill.invocation.userInvocable,
+    }))
   } catch (cause) {
     warn(ctx, `dshx registry: skill listing failed: ${describeFailure(cause)}`)
     return []

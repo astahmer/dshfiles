@@ -38,11 +38,13 @@ Then(
       await expect(section(page, /^MCP servers \(\d+\)$/)).toBeVisible()
     })
     await recordAssertion(page, 'agent-toolkit-lists-skills', async () => {
-      await expect(
-        section(page, /^Skills \(\d+\)$/)
-          .getByRole('row')
-          .filter({ hasText: '/e2e-skill-mentions' }),
-      ).toContainText('/name only')
+      const skill = section(page, /^Skills \(\d+\)$/)
+        .getByRole('row')
+        .filter({ hasText: '/e2e-skill-mentions' })
+      await expect(skill).toContainText('/name only')
+      await expect(skill).toContainText('user · .dsh')
+      await expect(skill).toContainText('filesystem')
+      await expect(skill.locator('[title*="/skills/e2e-skill-mentions/"]')).toHaveCount(0)
     })
     await recordAssertion(page, 'agent-toolkit-shows-memory', async () => {
       const memory = section(page, /^Memory$/)

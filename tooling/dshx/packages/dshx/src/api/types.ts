@@ -230,10 +230,12 @@ export interface RegistrySkillView {
   readonly name: string
   readonly description: string
   readonly provider: string
+  /** Registry origin, such as project-dsh, project-agents, user-dsh, user-agents, runtime, custom, or bundled. */
+  readonly source?: string
   readonly modelInvocable: boolean
   /** Whether a person can invoke it as `/name`. Absent from an older registry. */
   readonly userInvocable?: boolean
-  /** Absolute SKILL.md path when a filesystem provider supplied it. */
+  /** @deprecated Legacy absolute path. Modern Hosts intentionally omit it. */
   readonly path?: string
 }
 

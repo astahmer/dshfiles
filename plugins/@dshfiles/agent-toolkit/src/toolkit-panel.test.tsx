@@ -79,6 +79,7 @@ const listing = {
       name: 'verify-dsh',
       description: 'Launch a scratch DSH.',
       provider: 'filesystem',
+      source: 'project-agents',
       modelInvocable: true,
       userInvocable: true,
       path: '/repo/.agents/skills/verify-dsh/SKILL.md',
@@ -87,6 +88,7 @@ const listing = {
       name: 'caveman',
       description: 'Talk terse.',
       provider: 'filesystem',
+      source: 'user-agents',
       modelInvocable: false,
       userInvocable: true,
       path: '/home/me/.agents/skills/caveman/SKILL.md',
@@ -139,7 +141,12 @@ describe('Agent toolkit page', () => {
 
     expect(await screen.findByText('1 tools')).toBeTruthy()
     expect(screen.getByText('search')).toBeTruthy()
-    expect(within(screen.getByRole('region', { name: 'Skills (2)' })).getByText('skillProject')).toBeTruthy()
+    const skills = screen.getByRole('region', { name: 'Skills (2)' })
+    expect(within(skills).getByText('skillProjectAgents')).toBeTruthy()
+    expect(within(skills).getByText('skillUserAgents')).toBeTruthy()
+    expect(within(skills).getAllByText('filesystem')).toHaveLength(2)
+    expect(screen.queryByTitle('/repo/.agents/skills/verify-dsh/SKILL.md')).toBeNull()
+    expect(screen.queryByTitle('/home/me/.agents/skills/caveman/SKILL.md')).toBeNull()
     expect(await screen.findByText('feedback · 2')).toBeTruthy()
     expect(screen.getByText('Start block for /repo')).toBeTruthy()
   })

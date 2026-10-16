@@ -14,15 +14,17 @@ section.
 | Plugin APIs | the same registry listing                                                       | the methods plugins serve each other (`useApi`, `createHostApiClient`), with the agent tool each is exposed as                                                                         |
 | Plugins     | the Session Remote's `pluginInventory.list()`, versions from this plugin's Host | each Loader entry, ours first, with its version, state and a link to its settings page (`dshfiles:open-settings`)                                                                      |
 | MCP servers | `@dshfiles/mcp-servers/api` `list`                                              | each server's status and its `mcp__<server>__*` tools                                                                                                                                  |
-| Skills      | the same registry listing                                                       | project skills (under the thread's folder) and the user's `.agents/skills`, with who can invoke them (`/name`, the model, both)                                                        |
+| Skills      | the same registry listing                                                       | Host-reported origin, provider and invocation mode across project, user, runtime, custom and bundled skills; absolute paths stay on the Host                                                     |
 | Memory      | `@dshfiles/memory/api` `startBlock({ cwd })` and `notes`                        | the block a new thread of the project gets now, note counts by type, and a link to the Memory panel                                                                                    |
 
 "Native" is DSH's own tools and any plugin not built with dshx: the tools registry does not record who registered a
 tool, so only dshx Hosts (`defineHost({ tools })` and API methods) name their owner. "Read-only" is the tool's own
 claim that it can run beside sibling calls (dshx `readOnly: true`); a classifier may still refuse some arguments.
 
-A section whose plugin is not loaded says so instead of failing the page. A registry served by an older dshx lacks
-the read-only, restriction and invocation fields; the page then omits those badges.
+A section whose plugin is not loaded says so instead of failing the page. A registry served by older dshx lacks
+read-only, restriction, source and invocation fields; missing skill origin is shown as `other` rather than guessed from
+CWD or path, and missing user invocation defaults to true. Modern Hosts omit absolute skill paths, and the client drops
+legacy path fields before rendering.
 
 ## Host
 

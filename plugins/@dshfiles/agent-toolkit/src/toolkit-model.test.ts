@@ -54,22 +54,54 @@ describe('agent toolkit model', () => {
       skills: [{ name: 'a', description: 'b', provider: 'fs', modelInvocable: true }],
     })
     expect(old.tools[0]).toEqual({ name: 'bash', description: 'Run.', source: 'tool', enabled: true })
+    expect(AgentToolkit.skillOrigin(old.skills[0]!)).toBe('other')
     expect(AgentToolkit.invocation(old.skills[0]!)).toBe('both')
     expect(AgentToolkit.listingSchema.parse({})).toEqual({ apis: [], tools: [], skills: [] })
   })
 
-  it('tells project skills from the user’s own and says who can invoke them', () => {
-    const skill = (path: string | undefined, modelInvocable: boolean, userInvocable: boolean) =>
-      AgentToolkit.listingSchema.parse({ skills: [{ name: 's', description: '', provider: 'fs', modelInvocable, userInvocable, path }] }).skills[0]!
-    const cwd = '/repo/'
-    expect(AgentToolkit.skillScope(skill('/repo/.agents/skills/verify/SKILL.md', true, true), cwd)).toBe('project')
-    expect(AgentToolkit.skillScope(skill('/home/me/.agents/skills/caveman/SKILL.md', true, true), cwd)).toBe('user')
-    expect(AgentToolkit.skillScope(skill(undefined, true, true), cwd)).toBe('other')
-    expect([skill(undefined, false, true), skill(undefined, true, false), skill(undefined, false, false)].map(AgentToolkit.invocation)).toEqual([
-      'user',
-      'model',
-      'none',
+  it('uses the Host source for skill provenance and drops legacy paths', () => {
+    const skills = AgentToolkit.listingSchema.parse({
+      skills: [
+        {
+          name: 'project-agents',
+          description: '',
+          provider: 'filesystem',
+          source: 'project-agents',
+          modelInvocable: true,
+          userInvocable: true,
+          path: 'C:\\Users\\me\\.agents\\skills\\nested\\SKILL.md',
+        },
+        {
+          name: 'user-agents',
+          description: '',
+          provider: 'filesystem',
+          source: 'user-agents',
+          modelInvocable: true,
+          userInvocable: true,
+          path: '/repo/nested/.agents/skills/user/SKILL.md',
+        },
+        { name: 'project-dsh', description: '', provider: 'filesystem', source: 'project-dsh', modelInvocable: true, userInvocable: true },
+        { name: 'user-dsh', description: '', provider: 'filesystem', source: 'user-dsh', modelInvocable: true, userInvocable: true },
+        { name: 'runtime', description: '', provider: 'built-in', source: 'runtime', modelInvocable: true, userInvocable: false },
+        { name: 'custom', description: '', provider: 'custom', source: 'custom', modelInvocable: false, userInvocable: true },
+        { name: 'bundled', description: '', provider: 'plugin', source: 'bundled', modelInvocable: true, userInvocable: false },
+        { name: 'unknown', description: '', provider: 'future', source: 'future-source', modelInvocable: true, userInvocable: true },
+      ],
+    }).skills
+
+    expect(skills.map(AgentToolkit.skillOrigin)).toEqual([
+      'project-agents',
+      'user-agents',
+      'project-dsh',
+      'user-dsh',
+      'runtime',
+      'custom',
+      'bundled',
+      'other',
     ])
+    expect(skills[0]).not.toHaveProperty('path')
+    expect(skills[1]).not.toHaveProperty('path')
+    expect(skills.slice(4, 7).map(AgentToolkit.invocation)).toEqual(['model', 'user', 'model'])
   })
 
   it('groups MCP tools under their server', () => {
