@@ -17,7 +17,6 @@ import { errorMessage, PluginQueryProvider, useMutation, useQuery, useQueryClien
 import { useState } from 'react'
 import { privacyControlsApi, type PrivacyFeatureState } from './api/privacy-controls.js'
 import type { PrivacyFeatureId } from './features.js'
-import './client.css'
 
 const privacyControlsQueryKey = ['privacy-controls', 'snapshot'] as const
 

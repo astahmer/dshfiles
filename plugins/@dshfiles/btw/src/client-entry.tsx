@@ -23,7 +23,6 @@ import { mainViewThreadId } from './main-view-thread.js'
 import { PrefixCache } from './prefix-cache.js'
 import { sideChatStarted, startSideChat, type ModelRoute, type SideChatActor } from './side-chat-machine.js'
 import { SideQuestionDialog } from './side-question-dialog.js'
-import './client.css'
 
 const TAB_ID = '@dshfiles/btw'
 const TAB_KIND = 'btwchat'

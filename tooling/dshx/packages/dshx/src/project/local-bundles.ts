@@ -11,7 +11,19 @@ import { redactHostOutput } from './scratch-profile.js'
 export const DSHFILES_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../../../../')
 const pluginsRoot = join(DSHFILES_ROOT, 'plugins/@dshfiles')
 
-const PackageManifest = z.object({ name: z.string().min(1), dsh: z.unknown().optional() }).passthrough()
+const DependencyRecord = z.record(z.string(), z.string()).optional()
+const PackageManifest = z
+  .object({
+    name: z.string().min(1),
+    dsh: z.unknown().optional(),
+    dependencies: DependencyRecord,
+    devDependencies: DependencyRecord,
+    peerDependencies: DependencyRecord,
+  })
+  .passthrough()
+
+/** The one bundle that compiles and injects the shared plugin-ui stylesheet. */
+export const SHARED_STYLES_BUNDLE_ID = '@dshfiles/ui-styles'
 const DshManifest = z
   .object({
     client: z
@@ -24,6 +36,8 @@ const DshManifest = z
 export interface LocalBootBundle extends BootProfileBundle {
   readonly hasClient: boolean
   readonly clientExternalPackages: readonly string[]
+  /** Declares @dshfiles/plugin-ui, so its client renders plugin-ui classes that only the shared sheet defines. */
+  readonly usesPluginUi: boolean
 }
 
 /** Owned Cordis bundles under plugins/@dshfiles, sorted by package id. */
@@ -49,6 +63,7 @@ export const listLocalBootBundles = async (): Promise<LocalBootBundle[]> => {
       packageId: manifest.name,
       hasClient: dsh.client !== undefined,
       clientExternalPackages: dsh.client?.external ?? [],
+      usesPluginUi: Object.keys({ ...manifest.dependencies, ...manifest.devDependencies, ...manifest.peerDependencies }).includes('@dshfiles/plugin-ui'),
     })
   }
   return bundles.sort((first, second) => first.packageId.localeCompare(second.packageId))
@@ -75,6 +90,20 @@ export const resolveLocalBundles = (packageIds: readonly string[], available: re
     visit(bundle)
   }
   return [...ordered.values()]
+}
+
+/**
+ * Resolve the composition a client needs: a bundle that declares plugin-ui renders classes only the shared sheet
+ * defines, so the owner loads first. The boot *check* keeps its per-bundle isolation and does not call this.
+ */
+export const withSharedStylesheet = (bundles: readonly LocalBootBundle[], available: readonly LocalBootBundle[]): LocalBootBundle[] => {
+  if (bundles.some(bundle => bundle.packageId === SHARED_STYLES_BUNDLE_ID)) return [...bundles]
+  if (!bundles.some(bundle => bundle.usesPluginUi)) return [...bundles]
+  const owner = available.find(candidate => candidate.packageId === SHARED_STYLES_BUNDLE_ID)
+  if (owner === undefined) {
+    throw new Error(`${SHARED_STYLES_BUNDLE_ID} was not found under plugins/@dshfiles, so its shared plugin-ui stylesheet cannot be composed.`)
+  }
+  return [owner, ...bundles]
 }
 
 export const buildPlugin = async (projectRoot: string, packageId: string): Promise<void> => {

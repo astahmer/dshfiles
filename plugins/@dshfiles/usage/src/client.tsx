@@ -8,7 +8,6 @@ import { defineClient } from '@dshfiles/dshx/client'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import type { OpenThread } from './format.js'
 import { UsagePanel } from './panel.js'
-import './client.css'
 
 const PANEL_ID = 'dshfiles-usage'
 

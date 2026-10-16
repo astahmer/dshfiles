@@ -16,7 +16,6 @@ import { WORKBENCH_LOCALE_NAMESPACE, workbenchLocale } from './locales.js'
 import { workbenchPanels, type WORKBENCH_MAIN_PANEL_ID } from './registry.js'
 import { workbenchSettings } from './settings.js'
 import { WorkbenchView } from './workbench-view.js'
-import './client.css'
 
 // A literal so dshx's slot-occupancy check can read the id; `satisfies` keeps it equal to the exported contract.
 const PANEL_ID = 'dshfiles-workbench' satisfies typeof WORKBENCH_MAIN_PANEL_ID

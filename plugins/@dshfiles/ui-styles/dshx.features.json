@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "one-shared-stylesheet",
+      "title": "One shared plugin stylesheet",
+      "summary": "One bundle compiles the union Tailwind sheet over every owned plugin and injects it once per page; every other plugin ships no stylesheet of its own, and an isolated plugin boot still composes the owner.",
+      "surfaces": ["client"],
+      "configuration": [],
+      "states": ["sheet-injected", "sheet-missing"],
+      "failureModes": [
+        "The owner is missing from an isolated composition, so the plugin mounts with no utility rules and same-specificity base rules have nothing to resolve against.",
+        "A second bundle compiles its own copy of the sheet, so two order-dependent sheets load and a later plugin's base rule can beat an earlier plugin's responsive variant."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "ui-styles.isolated-boot-sheet",
+          "featureFile": "tooling/dshx/e2e/features/ui-styles.feature"
+        }
+      ]
+    }
+  ]
+}

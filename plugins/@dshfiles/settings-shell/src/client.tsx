@@ -37,7 +37,6 @@ import { preferredSurface } from './settings-preference.js'
 import { SettingsDialog, SettingsTab, type SectionRow } from './settings-view.js'
 import { shellMachine, type FieldTarget, type ShellSurface } from './shell-machine.js'
 import { PORTED_FROM } from './upstream.js'
-import './client.css'
 
 /** The main panel Settings fills when it opens as a tab; main-tabs names the tab "Settings" from this id. */
 const SETTINGS_PANEL_ID = 'dshfiles-settings'

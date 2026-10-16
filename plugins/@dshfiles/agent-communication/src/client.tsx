@@ -8,7 +8,6 @@ import { defineClient } from '@dshfiles/dshx/client'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { AgentCommunicationPanel } from './agent-communication-panel.js'
 import { AGENT_COMMUNICATION_LOCALE_NAMESPACE, agentCommunicationLocale } from './locales.js'
-import './client.css'
 
 const PANEL_ID = 'agent-communication'
 

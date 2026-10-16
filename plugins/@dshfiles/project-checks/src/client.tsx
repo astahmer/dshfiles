@@ -11,7 +11,6 @@ import { Card, CardAction, CardDescription, CardHeader, CardTitle } from '@dshfi
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from '@dshfiles/plugin-ui/components/ui/item'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { PluginQueryProvider, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
-import './client.css'
 
 type Listener = () => void
 

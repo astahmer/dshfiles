@@ -6,7 +6,6 @@ import { defineClientPlugin, type ComposerActionProps } from '@dshfiles/dshx/cli
 import { createDraftAttachmentKeeper } from './draft-attachment-retention.js'
 import PromptLibraryAction from './prompt-stash-action.js'
 import { PromptStashAction as PromptDraftsAction } from './prompt-stash.js'
-import './client.css'
 
 declare module '@deepseek-ai/dsh-api-session-controller/client' {
   interface SessionReferenceSourceMap {

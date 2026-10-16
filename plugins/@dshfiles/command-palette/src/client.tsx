@@ -27,7 +27,6 @@ import {
   type PaletteActionContext,
 } from './palette-api.js'
 import { ThreadPalette } from './thread-palette.js'
-import './client.css'
 
 const isShortcutCommandId = (value: string): value is ShortcutCommandId => /^[a-z][a-zA-Z0-9-]*(?:\.[a-zA-Z][a-zA-Z0-9-]*)+$/u.test(value)
 

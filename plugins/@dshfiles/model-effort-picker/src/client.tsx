@@ -1,6 +1,5 @@
 import { defineClientPlugin } from '@dshfiles/dshx/client'
 import { ModelEffortPicker } from './model-effort-picker.js'
-import './client.css'
 
 export default defineClientPlugin({
   id: 'dshfiles-model-effort-picker',

@@ -45,7 +45,6 @@ import {
   THREAD_MENTION_INSERT_EVENT,
   type ThreadMentionFailureDiagnosticInput,
 } from './thread-mention.js'
-import './client.css'
 
 declare module '@deepseek-ai/dsh-api-session-controller/client' {
   interface SessionReferenceSourceMap {

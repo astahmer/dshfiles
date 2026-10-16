@@ -1,0 +1,4 @@
+# The one owner of the shared plugin-ui stylesheet: its client entry injects the compiled union sheet once per page.
+- insert:
+    - id: dshfiles-ui-styles
+      name: '@dshfiles/ui-styles'

@@ -7,7 +7,6 @@ import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import { defineClient } from '@dshfiles/dshx/client'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { createWorkspacePickerPorts, ProjectFolderPicker, type WorkspacePickerPorts } from '@dshfiles/project-folder-picker'
-import './client.css'
 
 const directoryFlowSlotNames: readonly DirectoryFlowSlotName[] = ['sidebar.workspaces.directoryFlow', 'conversation.hero.workspace.directoryFlow']
 

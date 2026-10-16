@@ -11,7 +11,6 @@ import { useCallback, useSyncExternalStore } from 'react'
 
 import { ExplorerPanel } from './explorer-panel.tsx'
 import { OptmemSettingsPanel } from './settings-panel.tsx'
-import './client.css'
 
 const PACKAGE_NAME = '@dshfiles/optmem'
 const EXPLORER_ID = 'dshfiles-optmem-explorer'

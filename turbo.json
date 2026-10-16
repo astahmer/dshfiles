@@ -29,7 +29,7 @@
       ],
       "outputs": ["dist/**", ".cache/*.tsbuildinfo"]
     },
-    "@dshfiles/plugin-ui#build": {
+    "@dshfiles/ui-styles#build": {
       "dependsOn": ["^build"],
       "inputs": [
         "$TURBO_DEFAULT$",
@@ -50,7 +50,7 @@
         "!node_modules/**",
         "!.vite/**"
       ],
-      "outputs": []
+      "outputs": ["dist/**", ".cache/*.tsbuildinfo"]
     },
     "typecheck": {
       "dependsOn": ["build", "^typecheck"],

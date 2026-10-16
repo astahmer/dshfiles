@@ -11,7 +11,6 @@ import { MessageImages } from './client/MessageImages.js'
 import type { MessageImagesProps } from '@deepseek-ai/dsh-client-ui-chat/client'
 import { imageLightboxLabels } from './client/labels.js'
 import { ATTACHMENT_GALLERY_LOCALE_NAMESPACE, attachmentGalleryLocale } from './locales.js'
-import './client.css'
 
 export default defineClient({
   name: '@dshfiles/attachment-gallery',

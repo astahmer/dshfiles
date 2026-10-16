@@ -5,7 +5,6 @@ import { TOOL_META_LOCALE_NAMESPACE, toolMetaLocale } from './locales.js'
 import { installToolCallTreeWrapper, isToolCallTreeWrapped } from './tool-call-tree.js'
 import { ToolMetaLine } from './tool-meta-line.js'
 import { warnOnce } from './warn-once.js'
-import './client.css'
 
 /** The chat and the tool renderer load beside this plugin; past this they are not coming. */
 const WRAP_DEADLINE_MS = 15_000

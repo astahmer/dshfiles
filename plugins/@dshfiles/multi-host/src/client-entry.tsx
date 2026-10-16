@@ -3,7 +3,6 @@ import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import { defineClient } from '@dshfiles/dshx/client'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { RemoteThreadView } from './remote-thread-view.js'
-import './client.css'
 
 export default defineClient({
   name: '@dshfiles/multi-host',

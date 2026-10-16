@@ -12,7 +12,6 @@ import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { useSyncExternalStore } from 'react'
 import { AGENT_TOOLKIT_LOCALE_NAMESPACE, agentToolkitLocale, type AgentToolkitKey } from './locales.js'
 import { AgentToolkitPanel, type ToolkitThread } from './toolkit-panel.js'
-import './client.css'
 
 const PANEL_ID = 'dshfiles-agent-toolkit'
 const MEMORY_PANEL_ID = 'dshfiles-memory-panel'

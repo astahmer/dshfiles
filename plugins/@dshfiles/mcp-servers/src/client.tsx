@@ -15,7 +15,6 @@ import { ManagerView } from './manager-view.js'
 import { createMcpMentionSource, decodeMcpMentionTools } from './mcp-mentions.js'
 import { McpQuickPanel } from './mcp-quick-panel.js'
 import { createQuickPanelContribution, SessionQuickPanels, type QuickPanelState } from './quick-panel.js'
-import './client.css'
 
 const PANEL_ID = 'mcp-servers'
 

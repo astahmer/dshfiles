@@ -4,7 +4,6 @@ import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import type { ReactNode } from 'react'
 import { MarketplaceTab, type MarketplaceTabProps } from './MarketplaceTab.js'
 import { marketplaceLocale, MARKETPLACE_LOCALE_NAMESPACE } from './locales.js'
-import './client.css'
 
 let tabLabel = (): string => 'Framework Hub'
 

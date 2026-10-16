@@ -30,7 +30,6 @@ import { ThreadWorkspaceControl } from './thread-workspace-control.js'
 import { useToast } from './toast.js'
 import { deferWorkspaceSubmit } from './workspace-submit.js'
 import { jjIntegrationSettings } from './settings.js'
-import './client.css'
 
 const PANEL_ID = 'jj-integration'
 const RIGHT_PANE_ID = '@dshfiles/jj-integration/thread-workspaces'

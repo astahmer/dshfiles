@@ -8,7 +8,6 @@ import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { useSelector } from '@dshfiles/plugin-ui/machine'
 import { disposeSessionComposers, sessionComposer, type SessionComposer } from './session-composer.js'
 import { SEND_AFTER_UPLOAD_LOCALE_NAMESPACE, sendAfterUploadLocale } from './locales.js'
-import './client.css'
 
 const isSessionId = (value: string): value is SessionId => value.length > 0
 

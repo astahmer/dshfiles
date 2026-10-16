@@ -1,7 +1,7 @@
 import { type ChildProcess } from 'node:child_process'
 import { join } from 'node:path'
 import { prepareComposedBootProfile, type PreparedBootProfile } from '../../packages/dshx/src/project/boot-profile.js'
-import { DSHFILES_ROOT, buildPlugin, findFreePort, listLocalBootBundles, resolveLocalBundles } from '../../packages/dshx/src/project/local-bundles.js'
+import { DSHFILES_ROOT, buildPlugin, findFreePort, listLocalBootBundles, resolveLocalBundles, withSharedStylesheet } from '../../packages/dshx/src/project/local-bundles.js'
 import { compositionFailures, readProfileComposition } from '../../packages/dshx/src/project/profile-composition.js'
 import { spawnOwnedProcess, stopOwnedProcess } from '../../packages/dshx/src/project/owned-process.js'
 import { isolatedHostEnvironment, redactHostOutput } from './scratch-profile.js'
@@ -153,7 +153,8 @@ export const bootComposedPluginProfile = async ({
   readonly seedHome?: (homeRoot: string) => Promise<void>
   readonly cordisPatch?: string
 }): Promise<BootedProfile> => {
-  const bundles = resolveLocalBundles(packageIds, await listLocalBootBundles())
+  const available = await listLocalBootBundles()
+  const bundles = withSharedStylesheet(resolveLocalBundles(packageIds, available), available)
   for (const bundle of bundles) await buildBundleOnce(bundle)
   const prepared = await prepareComposedBootProfile(
     bundles,

@@ -23,7 +23,6 @@ import { QuotaRetryMessage } from './quota-retry-message.js'
 import { AiAccountsSettingsSection } from './settings-section.js'
 import { AI_ACCOUNTS_LOCALE_NAMESPACE, aiAccountsLocale } from './locales.js'
 import { useSyncExternalStore } from 'react'
-import './client.css'
 
 /**
  * The accounts page is a main panel with its own sidebar row, the same shape the

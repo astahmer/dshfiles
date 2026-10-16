@@ -3,7 +3,7 @@ import { mkdir, readFile, realpath, rm, stat, writeFile } from 'node:fs/promises
 import { basename, delimiter, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { prepareComposedBootProfile } from '../project/boot-profile.js'
-import { DSHFILES_ROOT, buildPlugin, findFreePort, listLocalBootBundles, resolveLocalBundles } from '../project/local-bundles.js'
+import { DSHFILES_ROOT, buildPlugin, findFreePort, listLocalBootBundles, resolveLocalBundles, withSharedStylesheet } from '../project/local-bundles.js'
 import { compositionFailures, readProfileComposition } from '../project/profile-composition.js'
 import { isolatedHostEnvironment } from '../project/scratch-profile.js'
 import { installFakeSecretCli, seedSampleProject } from './seed.js'
@@ -119,7 +119,7 @@ export const scratchUp = async (options: ScratchUpOptions): Promise<ScratchState
 
   const available = await listLocalBootBundles()
   const requested = options.plugins.length > 0 ? options.plugins : available.map(bundle => bundle.packageId)
-  const bundles = resolveLocalBundles(requested, available)
+  const bundles = withSharedStylesheet(resolveLocalBundles(requested, available), available)
   const [firstBundle, ...otherBundles] = bundles
   if (firstBundle === undefined) throw new ScratchError('no-bundles', 'No owned plugin bundles were selected.', 'Pass --plugin @dshfiles/<name>.')
   if (!options.skipBuild) {

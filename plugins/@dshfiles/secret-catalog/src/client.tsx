@@ -10,7 +10,6 @@ import { ProjectFolderPicker } from '@dshfiles/project-folder-picker'
 import { SECRET_CATALOG_LOCALE_NAMESPACE, secretCatalogLocale } from './locales.js'
 import { SecretCatalogPanel } from './secret-catalog-panel.js'
 import { createWorkspacePickerPorts } from './workspace-picker-adapter.js'
-import './client.css'
 
 const PANEL_ID = 'secret-catalog'
 

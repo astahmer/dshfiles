@@ -422,7 +422,7 @@ After(async ({ page, $testInfo }) => {
 })
 
 Then('exactly one shared plugin stylesheet is injected', async ({ page }: { page: Page }) => {
-  await page.locator('[data-plugin-css="@dshfiles/thread-sidebar/client.css"]').waitFor({ state: 'attached', timeout: OUTCOME_TIMEOUT_MS })
+  await page.locator('[data-plugin-css="@dshfiles/ui-styles/client.css"]').waitFor({ state: 'attached', timeout: OUTCOME_TIMEOUT_MS })
   const sheets = await page.evaluate(() =>
     [...document.querySelectorAll<HTMLStyleElement>('style[data-plugin^="@dshfiles/"], style[data-plugin="dshx:shared-css"]')]
       // The budget guards copies of the Tailwind sheet; a plugin's small hand-written CSS (agent-questions, mentions) is not one.
@@ -436,7 +436,7 @@ Then('exactly one shared plugin stylesheet is injected', async ({ page }: { page
 Then(
   'the command palette opens within {int} ms and filters each keystroke within {int} ms',
   async ({ page }: { page: Page }, openBudgetMs: number, keystrokeBudgetMs: number) => {
-    await page.locator('[data-plugin-css="@dshfiles/thread-sidebar/client.css"]').waitFor({ state: 'attached', timeout: OUTCOME_TIMEOUT_MS })
+    await page.locator('[data-plugin-css="@dshfiles/ui-styles/client.css"]').waitFor({ state: 'attached', timeout: OUTCOME_TIMEOUT_MS })
     // Commit latency, measured in-page so Playwright's own round trips do not count: dispatch → DOM mutation.
     const timings = await page.evaluate(async () => {
       const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms))

@@ -7,7 +7,6 @@ import { defineClient } from '@dshfiles/dshx/client'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { ActivityTimelinePanel } from './panel.js'
 import { ACTIVITY_TIMELINE_LOCALE_NAMESPACE, activityTimelineLocale } from './locales.js'
-import './client.css'
 
 const PANEL_ID = 'activity-timeline'
 

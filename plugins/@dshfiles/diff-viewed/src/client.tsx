@@ -6,7 +6,6 @@ import type { ComponentProps } from 'react'
 import { diffViewedLocale } from './locales.js'
 import { createViewedMarks } from './viewed-marks.js'
 import { ViewedToggle } from './viewed-toggle.js'
-import './client.css'
 
 const marks = createViewedMarks({ storage: () => window.localStorage })
 

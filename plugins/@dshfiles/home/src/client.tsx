@@ -14,7 +14,6 @@ import { HOME_LOCALE_NAMESPACE, homeLocale, type HomeTranslate } from './locales
 import { NewThreadSettings } from './settings-section.js'
 import { brandStyle, projectOf } from './home-model.js'
 import { homeSettings, type HomeSettings } from './settings.js'
-import './client.css'
 
 const RECENT_THREADS = 3
 const EMPTY_SCREEN_SETTLE_MS = 1_000
