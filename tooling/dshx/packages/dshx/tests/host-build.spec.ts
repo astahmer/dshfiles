@@ -2,6 +2,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { Context } from '@deepseek-ai/cordis'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { Plugin } from 'vite'
 import { buildHost } from '../src/compiler/index.js'
@@ -705,5 +706,124 @@ describe('host compiler', () => {
     } finally {
       await watcher.close()
     }
+  })
+
+  it('publishes an immutable generation behind a stable wrapper and manifest', async () => {
+    const root = await temporaryProject()
+    await writeFile(
+      resolve(root, 'src/host.ts'),
+      [
+        "import { defineHost, defineTool } from '@dshfiles/dshx/host'",
+        'const status = defineTool({',
+        "  name: 'generation_status',",
+        "  description: 'Return generation status.',",
+        '  parameters: {},',
+        "  output: { schema: { type: 'string' }, render: () => [] },",
+        "  async execute() { return 'ok' },",
+        '})',
+        'export default defineHost({',
+        "  name: 'generation-host',",
+        '  tools: [status],',
+        '})',
+        '',
+      ].join('\n'),
+    )
+
+    const report = await buildHost({
+      packageId: '@dshx/fixture-plugin',
+      logicalName: 'logical-fixture',
+      root,
+      entry: 'src/host.ts',
+      outDir: 'dist',
+      generation: { hostContractVersion: 'v1' },
+    })
+
+    const wrapper = await readFile(resolve(root, 'dist/index.js'), 'utf8')
+    const imported = /from '\.\/\.dshx-host-generations\/([A-Za-z0-9_-]+)\.js'/.exec(wrapper)
+    expect(imported).not.toBeNull()
+    const generation = imported![1]!
+    expect(wrapper).toContain('createGenerationManager')
+    expect(wrapper).toContain(`generation: ${JSON.stringify(generation)}`)
+
+    const manifest = JSON.parse(await readFile(resolve(root, 'dist/.dshx-host-manifest.json'), 'utf8')) as Record<string, unknown>
+    expect(manifest).toEqual({ version: 1, generation, hostContractVersion: 'v1' })
+
+    const generationCode = await readFile(resolve(root, 'dist/.dshx-host-generations', `${generation}.js`), 'utf8')
+    expect(generationCode).toContain('export {')
+    expect(generationCode).toContain('implementation')
+    expect(generationCode).not.toMatch(/from ['"]@dshfiles\/dshx\//)
+
+    expect(report.output.map(item => item.fileName)).toEqual(
+      expect.arrayContaining(['index.js', '.dshx-host-manifest.json', `.dshx-host-generations/${generation}.js`, 'index.d.ts']),
+    )
+  })
+
+  it('reuses the generation file name when the source is unchanged', async () => {
+    const root = await temporaryProject()
+    await writeFile(resolve(root, 'src/host.ts'), "import { defineHost } from '@dshfiles/dshx/host'\nexport default defineHost({ name: 'stable-host' })\n")
+    const options = {
+      packageId: '@dshx/fixture-plugin',
+      logicalName: 'logical-fixture',
+      root,
+      entry: 'src/host.ts',
+      outDir: 'dist',
+      generation: { hostContractVersion: 'v1' },
+    } as const
+
+    await buildHost(options)
+    const first = await readFile(resolve(root, 'dist/index.js'), 'utf8')
+    await buildHost(options)
+    const second = await readFile(resolve(root, 'dist/index.js'), 'utf8')
+
+    expect(second).toBe(first)
+  })
+
+  it('loads the published wrapper through a real Cordis context', async () => {
+    const root = await temporaryProject()
+    await writeFile(
+      resolve(root, 'src/host.ts'),
+      [
+        "import { defineHost, defineTool } from '@dshfiles/dshx/host'",
+        'const status = defineTool({',
+        "  name: 'generation_status',",
+        "  description: 'Return generation status.',",
+        '  parameters: {},',
+        "  output: { schema: { type: 'string' }, render: () => [] },",
+        "  async execute() { return 'ok' },",
+        '})',
+        'export default defineHost({',
+        "  name: 'generation-host',",
+        '  tools: [status],',
+        '})',
+        '',
+      ].join('\n'),
+    )
+    await buildHost({
+      packageId: '@dshx/fixture-plugin',
+      logicalName: 'logical-fixture',
+      root,
+      entry: 'src/host.ts',
+      outDir: 'dist',
+      generation: { hostContractVersion: 'v1' },
+    })
+
+    const output = resolve(root, 'dist/index.js')
+    const module = (await import(`${pathToFileURL(output).href}?generation=${Date.now()}`)) as {
+      name: string
+      apply(ctx: Context, config?: unknown): unknown
+    }
+    const registered: string[] = []
+    const context = new Context()
+    context.provide('tools', {
+      register(value: { name: string }) {
+        registered.push(value.name)
+      },
+    })
+
+    expect(module.name).toBe('generation-host')
+    const fiber = context.plugin(module)
+    await fiber
+    expect(registered).toEqual(['generation_status'])
+    await fiber.dispose()
   })
 })

@@ -186,14 +186,38 @@ function validateConfig(value: unknown, file: string): DshxConfig {
 
   if (value.dev !== undefined) {
     if (!isObject(value.dev)) {
-      throw new DshxError('DSHX4004', 'dev must be an object.', { file, hint: 'Use dev: { hostRestart: "manual" | "auto" }.' })
+      throw new DshxError('DSHX4004', 'dev must be an object.', {
+        file,
+        hint: 'Use dev: { hostRestart: "manual" | "auto", hostHmr: { hostContractVersion: "v1" } }.',
+      })
     }
-    rejectUnknownKeys(value.dev, new Set(['hostRestart']), 'dev', file)
+    rejectUnknownKeys(value.dev, new Set(['hostRestart', 'hostHmr']), 'dev', file)
     if (value.dev.hostRestart !== undefined && value.dev.hostRestart !== 'manual' && value.dev.hostRestart !== 'auto') {
       throw new DshxError('DSHX4004', 'dev.hostRestart must be "manual" or "auto".', {
         file,
         hint: 'Choose "manual" or "auto", or remove the field to use "auto".',
       })
+    }
+    if (value.dev.hostHmr !== undefined) {
+      if (!isObject(value.dev.hostHmr)) {
+        throw new DshxError('DSHX4004', 'dev.hostHmr must be an object.', {
+          file,
+          hint: 'Use dev: { hostHmr: { hostContractVersion: "v1" } } to opt into in-process Host generation replacement.',
+        })
+      }
+      rejectUnknownKeys(value.dev.hostHmr, new Set(['hostContractVersion']), 'dev.hostHmr', file)
+      if (optionalNonEmptyString(value.dev.hostHmr.hostContractVersion, 'dev.hostHmr.hostContractVersion', file) === undefined) {
+        throw new DshxError('DSHX4004', 'dev.hostHmr.hostContractVersion is required.', {
+          file,
+          hint: 'Choose a stable version string and change it whenever Loader metadata or Config/Settings schemas change.',
+        })
+      }
+      if (value.host === false) {
+        throw new DshxError('DSHX4004', 'dev.hostHmr requires an enabled Host entry.', {
+          file,
+          hint: 'Remove dev.hostHmr or enable a Host entry.',
+        })
+      }
     }
   }
   if (value.build !== undefined) {
@@ -365,6 +389,12 @@ export async function resolveDshxConfig(options: ResolveDshxConfigOptions = {}):
       hint: 'Create src/host.ts or src/client.tsx, or configure an explicit entry.',
     })
   }
+  if (hostEntry === undefined && loaded.config.dev?.hostHmr !== undefined) {
+    throw new DshxError('DSHX4004', 'dev.hostHmr requires an enabled Host entry.', {
+      file: loaded.configFile ?? packageFile,
+      hint: 'Remove dev.hostHmr, or create src/host.ts.',
+    })
+  }
   const modules = await resolveModules(root, loaded.config.modules, loaded.configFile)
   const packageId = manifest.name as string
   return {
@@ -387,7 +417,10 @@ export async function resolveDshxConfig(options: ResolveDshxConfigOptions = {}):
     ...(clientVitePlugins.length === 0 ? {} : { clientVitePlugins }),
     outDir: resolve(root, 'dist'),
     profile: loaded.config.profile ?? 'web',
-    dev: { hostRestart: loaded.config.dev?.hostRestart ?? 'auto' },
+    dev: {
+      hostRestart: loaded.config.dev?.hostRestart ?? 'auto',
+      ...(loaded.config.dev?.hostHmr === undefined ? {} : { hostHmr: loaded.config.dev.hostHmr }),
+    },
     build: {
       sourcemap: loaded.config.build?.sourcemap ?? true,
       declarations: loaded.config.build?.declarations ?? true,

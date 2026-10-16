@@ -40,6 +40,7 @@ export type DevEvent =
   | { readonly type: 'diagnostic'; readonly diagnostic: DshxDiagnostic }
   | { readonly type: 'build-success'; readonly face: 'host' | 'client'; readonly initial: boolean }
   | { readonly type: 'client-rebuilt' }
+  | { readonly type: 'host-generation-updated' }
   | { readonly type: 'host-restart-required' }
   | { readonly type: 'build-error'; readonly face: 'host' | 'client'; readonly error: unknown; readonly diagnostic: DshxDiagnostic }
   | { readonly type: 'dsh-exit'; readonly code: number | null; readonly signal: string | null; readonly diagnostic: DshxDiagnostic }

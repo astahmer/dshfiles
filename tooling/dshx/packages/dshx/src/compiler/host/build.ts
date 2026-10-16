@@ -1,11 +1,13 @@
-import { realpath } from 'node:fs/promises'
+import { mkdir, realpath } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
-import { isAbsolute, relative, resolve } from 'node:path'
+import { basename, isAbsolute, relative, resolve } from 'node:path'
+import writeFileAtomic from 'write-file-atomic'
 import { build, type InlineConfig, type Plugin } from 'vite'
 import { DshxError } from '../../diagnostics.js'
 import type { DshCompatibility } from '../../compat/types.js'
+import { HOST_GENERATION_DIRECTORY, HOST_GENERATION_MANIFEST } from '../../host/generation-contract.js'
 import { artifactDeclarationPlugin, buildReport, buildWatcher, kernelBoundaryPlugin, resolveUserPlugins } from '../kernel.js'
-import type { BuildReport, BuildWatcher, ViteExtensionOptions } from '../types.js'
+import type { BuildArtifact, BuildReport, BuildWatcher, ViteExtensionOptions } from '../types.js'
 import { hostPeerDependencyPlugin, isHostExternal, singleHostChunkPlugin } from './guards.js'
 
 const VIRTUAL_HOST_ENTRY = '\0virtual:dshx-host-entry'
@@ -36,6 +38,12 @@ const COMMUNICATION_TYPES_PATH = fileURLToPath(new URL('../../communication/type
 const PLATFORM_HOST_API_PATH = fileURLToPath(new URL('../../platform/host-api.js', import.meta.url))
 const NATIVE_RPC_SCHEMA_PATH = fileURLToPath(new URL('../../platform/native-rpc.js', import.meta.url))
 const SESSION_DIGEST_PATH = fileURLToPath(new URL('../../platform/session-digest.js', import.meta.url))
+const HOST_GENERATION_PATH = fileURLToPath(new URL('../../host/generation.js', import.meta.url))
+
+/** Opt-in in-process Host replacement: publish immutable generations behind a stable wrapper. */
+export interface HostGenerationBuild {
+  readonly hostContractVersion: string
+}
 
 /** Options for producing one Node ESM Host bundle. */
 export interface BuildHostOptions {
@@ -49,6 +57,7 @@ export interface BuildHostOptions {
   readonly bundleDependencies?: readonly string[]
   readonly vite?: ViteExtensionOptions
   readonly compatibility?: DshCompatibility
+  readonly generation?: HostGenerationBuild
 }
 
 export type HostBuildResult = BuildReport
@@ -135,11 +144,29 @@ function hostEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, opti
         sourceFile: relative(paths.root, paths.entry).replaceAll('\\', '/'),
         compatibility: options.compatibility,
       }
-      return [
+      const metadataExpression = `{ ...${JSON.stringify(metadata)}${rootUrl === undefined ? '' : `, root: dshxFileURLToPath(new URL(${JSON.stringify(rootUrl)}, import.meta.url))`} }`
+      const createModule = [
         `import * as source from ${JSON.stringify(paths.entry)}`,
         `import { createHostModule } from ${JSON.stringify(HOST_RUNTIME_PATH)}`,
         ...(rootUrl === undefined ? [] : [`import { fileURLToPath as dshxFileURLToPath } from 'node:url'`]),
-        `const plugin = createHostModule(source, { ...${JSON.stringify(metadata)}${rootUrl === undefined ? '' : `, root: dshxFileURLToPath(new URL(${JSON.stringify(rootUrl)}, import.meta.url))`} })`,
+        `const pluginMetadata = ${metadataExpression}`,
+        'const plugin = createHostModule(source, pluginMetadata)',
+      ]
+      if (options.generation !== undefined) {
+        return [
+          ...createModule,
+          `import { createHostGenerationPlugin } from ${JSON.stringify(HOST_GENERATION_PATH)}`,
+          'export const implementation = plugin',
+          'export const createGenerationManager = options => createHostGenerationPlugin({ ...options, metadata: pluginMetadata, implementation: plugin })',
+          'export const name = plugin.name',
+          'export const inject = plugin.inject',
+          'export const Config = plugin.Config',
+          'export function apply(ctx, config) { return plugin.apply(ctx, config) }',
+          '',
+        ].join('\n')
+      }
+      return [
+        ...createModule,
         'export const name = plugin.name',
         'export const inject = plugin.inject',
         'export const Config = plugin.Config',
@@ -175,6 +202,60 @@ async function resolveOptions(options: BuildHostOptions) {
   return { root, entry, outDir }
 }
 
+/**
+ * Publish the immutable generation under a stable wrapper.
+ *
+ * The manifest is written before the wrapper: a running DSH loads the wrapper
+ * once, and a process starting inside the write window must never see a
+ * manifest older than the generation its wrapper imports.
+ */
+function hostGenerationPublishPlugin(outDir: string, generation: HostGenerationBuild): Plugin {
+  return {
+    name: 'dshx-host-generation-publish',
+    enforce: 'post',
+    async writeBundle(_options, bundle) {
+      const chunk = Object.values(bundle).find(item => item.type === 'chunk')
+      if (chunk === undefined) {
+        throw new DshxError('DSHX1306', 'A Host generation build emitted no entry chunk.')
+      }
+      const generationId = basename(chunk.fileName).replace(/\.js$/u, '')
+      const manifest = { version: 1, generation: generationId, hostContractVersion: generation.hostContractVersion }
+      await mkdir(outDir, { recursive: true })
+      await writeFileAtomic(resolve(outDir, HOST_GENERATION_MANIFEST), `${JSON.stringify(manifest, null, 2)}\n`, { encoding: 'utf8' })
+      await writeFileAtomic(resolve(outDir, 'index.js'), hostGenerationWrapperSource(generationId, generation.hostContractVersion), { encoding: 'utf8' })
+    },
+  }
+}
+
+function hostGenerationWrapperSource(generationId: string, hostContractVersion: string): string {
+  return [
+    `import { implementation, createGenerationManager } from './${HOST_GENERATION_DIRECTORY}/${generationId}.js'`,
+    '',
+    'export const name = implementation.name',
+    'export const inject = implementation.inject',
+    'export const Config = implementation.Config',
+    '',
+    'export function apply(ctx, config) {',
+    '  return createGenerationManager({',
+    `    generation: ${JSON.stringify(generationId)},`,
+    `    hostContractVersion: ${JSON.stringify(hostContractVersion)},`,
+    `    manifestUrl: new URL('./${HOST_GENERATION_MANIFEST}', import.meta.url),`,
+    '  }).apply(ctx, config)',
+    '}',
+    '',
+  ].join('\n')
+}
+
+function hostGenerationReport(report: BuildReport, declarations: boolean): BuildReport {
+  const output: BuildArtifact[] = [
+    { fileName: 'index.js', type: 'chunk' },
+    { fileName: HOST_GENERATION_MANIFEST, type: 'asset' },
+    ...report.output.filter(item => item.type !== 'declaration').map(item => ({ ...item, fileName: `${HOST_GENERATION_DIRECTORY}/${item.fileName}` })),
+  ]
+  if (declarations) output.push({ fileName: 'index.d.ts', type: 'declaration' })
+  return { ...report, output }
+}
+
 async function hostConfig(paths: Awaited<ReturnType<typeof resolveOptions>>, options: BuildHostOptions, watch: boolean): Promise<InlineConfig> {
   const bundleDependencies = options.bundleDependencies ?? []
   if (bundleDependencies.includes('@deepseek-ai/cordis')) {
@@ -188,9 +269,11 @@ async function hostConfig(paths: Awaited<ReturnType<typeof resolveOptions>>, opt
     return !bundled && isHostExternal(source)
   }
   const assetsInlineLimit = (): boolean => true
+  const generation = options.generation
+  const generationOutDir = generation === undefined ? paths.outDir : resolve(paths.outDir, HOST_GENERATION_DIRECTORY)
   const output = {
     format: 'es',
-    entryFileNames: 'index.js',
+    entryFileNames: generation === undefined ? 'index.js' : '[hash].js',
     codeSplitting: false,
     exports: 'named',
   } as const
@@ -216,7 +299,8 @@ async function hostConfig(paths: Awaited<ReturnType<typeof resolveOptions>>, opt
         external,
         output,
       }),
-      singleHostChunkPlugin(),
+      singleHostChunkPlugin(generation === undefined ? 'index.js' : () => true),
+      ...(generation === undefined ? [] : [hostGenerationPublishPlugin(paths.outDir, generation)]),
     ],
     ssr: { noExternal: [...bundleDependencies] },
     build: {
@@ -226,7 +310,7 @@ async function hostConfig(paths: Awaited<ReturnType<typeof resolveOptions>>, opt
       // `process.env.X` read in plugin source to an empty-object lookup.
       ssr: true,
       target: 'es2024',
-      outDir: paths.outDir,
+      outDir: generationOutDir,
       emptyOutDir: false,
       copyPublicDir: false,
       assetsInlineLimit,
@@ -266,5 +350,6 @@ export async function buildHost(options: BuildHostOptions): Promise<HostBuildRes
   const paths = await resolveOptions(options)
   const config = await hostConfig(paths, options, false)
   const declarations = options.declarations ?? true
-  return buildReport(await build(config), 'host', 'index.js', paths.outDir, declarations, 'DSHX1304')
+  const report = buildReport(await build(config), 'host', 'index.js', paths.outDir, declarations, 'DSHX1304')
+  return options.generation === undefined ? report : hostGenerationReport(report, declarations)
 }

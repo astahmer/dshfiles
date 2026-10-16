@@ -231,6 +231,35 @@ describe('development process orchestration', () => {
     await session.close()
   })
 
+  it('keeps DSH running and publishes a generation when Host HMR is enabled', async () => {
+    const projectValue: ResolvedDshxConfig = { ...project('host'), dev: { hostRestart: 'auto', hostHmr: { hostContractVersion: 'v1' } } }
+    const host = new FakeWatcher()
+    const children: FakeChild[] = []
+    const published = vi.fn()
+    const session = await startDevSession(projectValue, {
+      ensureProfile: async () => prepared(projectValue),
+      hostWatcher: async options => {
+        expect(options.generation).toEqual({ hostContractVersion: 'v1' })
+        return host
+      },
+      child: async () => {
+        const child = new FakeChild()
+        children.push(child)
+        return child
+      },
+    })
+    session.on('host-generation-updated', published)
+    host.build({ code: 'BUNDLE_END' })
+    await flush()
+    host.build({ code: 'BUNDLE_END' })
+    await flush()
+
+    expect(published).toHaveBeenCalledTimes(1)
+    expect(children).toHaveLength(1)
+    expect(session.state).toMatchObject({ hostRestartRequired: false, dshProcess: 'running' })
+    await session.close()
+  })
+
   it('passes profile, no-open, extra arguments, cwd project and merged environment', async () => {
     const projectValue: ResolvedDshxConfig = {
       ...project(),

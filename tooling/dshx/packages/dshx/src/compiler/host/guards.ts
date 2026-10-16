@@ -77,7 +77,9 @@ export function isHostExternal(source: string): boolean {
 }
 
 /** Enforce the stable single-file Host artifact surface. */
-export function singleHostChunkPlugin(): Plugin {
+export function singleHostChunkPlugin(expectedEntry: string | ((fileName: string) => boolean) = 'index.js'): Plugin {
+  const matchesEntry = typeof expectedEntry === 'function' ? expectedEntry : (fileName: string): boolean => fileName === expectedEntry
+  const expectedLabel = typeof expectedEntry === 'function' ? 'content-addressed' : expectedEntry
   return {
     name: 'dshx-single-host-chunk',
     enforce: 'post',
@@ -86,8 +88,8 @@ export function singleHostChunkPlugin(): Plugin {
       handler(_options, bundle) {
         const chunks = Object.values(bundle).filter(output => output.type === 'chunk')
         const assets = Object.values(bundle).filter(output => output.type === 'asset')
-        if (chunks.length !== 1 || chunks[0]?.isEntry !== true || chunks[0].fileName !== 'index.js') {
-          throw new DshxError('DSHX1302', 'A DSH Host build must emit exactly one index.js entry chunk.')
+        if (chunks.length !== 1 || chunks[0]?.isEntry !== true || !matchesEntry(chunks[0].fileName)) {
+          throw new DshxError('DSHX1302', `A DSH Host build must emit exactly one ${expectedLabel} entry chunk.`)
         }
         const chunk = chunks[0]
         const requiredExports = ['Config', 'apply', 'inject', 'name']

@@ -89,6 +89,7 @@ function buildOptions(
             bundleDependencies: project.hostBundleDependencies ?? [],
             ...(project.hostVitePlugins === undefined ? {} : { vite: { plugins: project.hostVitePlugins } }),
             compatibility,
+            ...(project.dev.hostHmr === undefined ? {} : { generation: { hostContractVersion: project.dev.hostHmr.hostContractVersion } }),
           },
         }),
     ...(project.clientEntry === undefined
@@ -341,6 +342,8 @@ export async function startDevSession(project: ResolvedDshxConfig, options: DevS
     if (!initial && state.dshProcess === 'running') {
       if (face === 'client') {
         emit({ type: 'client-rebuilt' })
+      } else if (activeProject.dev.hostHmr !== undefined) {
+        emit({ type: 'host-generation-updated' })
       } else if (activeProject.dev.hostRestart === 'auto') {
         await restart()
       } else {

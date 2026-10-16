@@ -1357,6 +1357,8 @@ function eventLine(stream: Writable, event: DevEvent): string | undefined {
   if (event.type === 'build-success')
     return `${statusSymbol(stream, 'success')} ${paint(stream, 'green', `${face} build succeeded`)}${event.initial ? paint(stream, 'gray', ' (initial)') : ''}`
   if (event.type === 'client-rebuilt') return `${statusSymbol(stream, 'success')} ${paint(stream, 'green', 'Client rebuilt')}`
+  if (event.type === 'host-generation-updated')
+    return `${statusSymbol(stream, 'success')} ${paint(stream, 'green', 'Host generation published')}${paint(stream, 'gray', ' (replaced in-process)')}`
   if (event.type === 'host-restart-required') return `${statusSymbol(stream, 'pending')} Host rebuilt; press ${paint(stream, 'cyan', 'r')} to restart DSH`
   if (event.type === 'dsh-exit')
     return `${statusSymbol(stream, 'failure')} ${paint(stream, 'red', `DSH exited${event.code === null ? ` by ${event.signal ?? 'signal'}` : ` with code ${event.code}`}`)}`

@@ -289,6 +289,41 @@ describe('resolveDshxConfig', () => {
     })
   })
 
+  it('normalizes an opt-in Host HMR contract version', async () => {
+    const { root } = await temporaryProject()
+    await source(root, 'src/host.ts')
+    await writeFile(resolve(root, 'dshx.config.ts'), "export default { dev: { hostHmr: { hostContractVersion: 'v2' } } }\n")
+    await expect(resolveDshxConfig({ cwd: root })).resolves.toMatchObject({
+      dev: { hostRestart: 'auto', hostHmr: { hostContractVersion: 'v2' } },
+    })
+  })
+
+  it.each([
+    ['export default { dev: { hostHmr: {} } }\n', 'hostContractVersion'],
+    ["export default { dev: { hostHmr: { hostContractVersion: '' } } }\n", 'hostContractVersion'],
+    ["export default { dev: { hostHmr: { hostContractVersion: 'v1', typo: 1 } } }\n", 'unknown field'],
+    ['export default { dev: { hostHmr: true } }\n', 'must be an object'],
+  ])('rejects invalid Host HMR config: %s', async (config, message) => {
+    const { root } = await temporaryProject()
+    await source(root, 'src/host.ts')
+    await writeFile(resolve(root, 'dshx.config.ts'), config)
+    await expect(resolveDshxConfig({ cwd: root })).rejects.toMatchObject({
+      code: 'DSHX4004',
+      message: expect.stringContaining(message),
+      file: resolve(root, 'dshx.config.ts'),
+    })
+  })
+
+  it('rejects Host HMR without a Host entry', async () => {
+    const { root } = await temporaryProject()
+    await source(root, 'src/client.tsx')
+    await writeFile(resolve(root, 'dshx.config.ts'), "export default { dev: { hostHmr: { hostContractVersion: 'v1' } } }\n")
+    await expect(resolveDshxConfig({ cwd: root })).rejects.toMatchObject({
+      code: 'DSHX4004',
+      message: expect.stringContaining('requires an enabled Host entry'),
+    })
+  })
+
   it('rejects a missing explicit entry with an actionable file and hint', async () => {
     const { root } = await temporaryProject()
     await writeFile(resolve(root, 'dshx.config.ts'), "export default { host: { entry: 'src/missing.ts' } }\n")

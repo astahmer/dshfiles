@@ -15,6 +15,7 @@ export type {
   BuildWatcher,
   ClientBuildResult,
   HostBuildResult,
+  HostGenerationBuild,
   ViteExtensionOptions,
 } from '../compiler/index.js'
 export {

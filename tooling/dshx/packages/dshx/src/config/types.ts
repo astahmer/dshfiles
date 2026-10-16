@@ -35,6 +35,10 @@ export interface DshxModuleEntry {
 }
 
 /** User-authored DSHX project exceptions. */
+export interface DshxHostHmrConfig {
+  readonly hostContractVersion: string
+}
+
 export interface DshxConfig {
   readonly name?: string
   readonly host?: false | DshxHostConfig
@@ -49,6 +53,7 @@ export interface DshxConfig {
   readonly profile?: string
   readonly dev?: {
     readonly hostRestart?: 'manual' | 'auto'
+    readonly hostHmr?: DshxHostHmrConfig
   }
   readonly build?: {
     readonly sourcemap?: boolean
@@ -87,6 +92,7 @@ export interface ResolvedDshxConfig {
   readonly profile: string
   readonly dev: {
     readonly hostRestart: 'manual' | 'auto'
+    readonly hostHmr?: DshxHostHmrConfig
   }
   readonly build: {
     readonly sourcemap: boolean

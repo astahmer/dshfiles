@@ -46,7 +46,10 @@ interface DshxConfig {
         readonly vite?: { readonly plugins?: readonly PluginOption[] };
       };
   readonly profile?: string;
-  readonly dev?: { readonly hostRestart?: "manual" | "auto" };
+  readonly dev?: {
+    readonly hostRestart?: "manual" | "auto";
+    readonly hostHmr?: { readonly hostContractVersion: string };
+  };
   readonly build?: {
     readonly sourcemap?: boolean;
     readonly declarations?: boolean;
@@ -67,6 +70,14 @@ String face shorthand was removed. Resolution rules are exact:
 DSHX reads only `dshx.config.ts`; it does not read `vite.config.*` and does not accept arbitrary Vite `UserConfig` fields.
 
 `dev.hostRestart` defaults to `"auto"`: every successful Host rebuild serially restarts DSH so only one child process is active. Set it to `"manual"` when Host restarts must wait for an explicit `r` command.
+
+`dev.hostHmr` replaces the Host implementation inside the running DSH process instead of restarting it. Each build publishes an immutable generation under `dist/.dshx-host-generations/<hash>.js`, points `dist/.dshx-host-manifest.json` at it, and regenerates the stable `dist/index.js` wrapper that DSH loaded at startup. The wrapper keeps the Loader contract (`name`, `inject`, `Config`) it was built with, watches the manifest, imports the new generation, disposes the previous Cordis fiber, and activates the replacement. A generation that fails to start is reported and the last-known-good one is restored; a failed generation is not retried until its content changes.
+
+`hostContractVersion` is the boundary DSH cannot detect for you. It is compared on every activation, and a mismatch is refused with a restart instruction. Standard Schema has no canonical serializer, so DSHX cannot infer a stable schema fingerprint. Bump `dev.hostHmr.hostContractVersion` whenever Loader metadata changes: `name`, `inject`, or the shape of native `Config` / dshx `settings`. Code-only changes do not need a bump. Editing `dshx.config.ts` already reloads the project and restarts DSH.
+
+The choice follows the boundaries in other plugin reload systems: OpenCode V2 scopes plugin lifetimes and restores failed activation; Pi stages extension registration, but neither offers the declared schema contracts DSHX must preserve. DSHX therefore swaps one Cordis generation at a time and requires the explicit version boundary for schema changes.
+
+The feature is development-only and opt-in. `dshx build` still emits one self-contained `dist/index.js`, because `dev` is not read outside `dshx dev`. Disposal cancels nothing by itself: a plugin that owns timers, sockets, or subscriptions must register them through `ctx.effect` so the replaced generation releases them.
 
 ## Vite plugin contract
 
