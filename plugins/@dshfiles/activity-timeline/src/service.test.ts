@@ -2,8 +2,8 @@ import { mkdtemp, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { communicationActivity, communicationMessage, integrationActivity, sessionActivity } from './adapters.js'
-import { condenseEvents } from './condensation.js'
+import { ActivityTimelineAdapters } from './adapters.js'
+import { ActivityTimelineCondensation } from './condensation.js'
 import { createActivityTimelineService } from './service.js'
 import type { ActivityIngest } from './types.js'
 
@@ -57,7 +57,7 @@ describe('activity timeline service', () => {
   it('orders out-of-order timestamps and preserves references', async () => {
     const service = createActivityTimelineService({ statePath: await statePath(), now: () => now })
     await service.ingest(
-      integrationActivity({
+      ActivityTimelineAdapters.integrationActivity({
         id: 'evt-2',
         at: now + 500,
         type: 'integration.completed',
@@ -69,7 +69,7 @@ describe('activity timeline service', () => {
         outcome: 'integrated',
       }),
     )
-    await service.ingest(sessionActivity({ kind: 'created', at: now + 100, sessionId: 'session-a' }))
+    await service.ingest(ActivityTimelineAdapters.sessionActivity({ kind: 'created', at: now + 100, sessionId: 'session-a' }))
     const page = await service.page({ detailed: true })
     expect(page.items.map(item => item.type)).toEqual(['session.started', 'integration.completed'])
     expect(page.items[1]?.references.map(reference => reference.kind)).toEqual(['integration-candidate', 'workspace'])
@@ -105,7 +105,7 @@ describe('activity timeline service', () => {
       routine(1, now, 'session-a'),
       routine(2, now + 1, 'session-a'),
       routine(3, now + 2, 'session-a'),
-      sessionActivity({ kind: 'error', at: now + 3, sessionId: 'session-a', detail: 'boom' }),
+      ActivityTimelineAdapters.sessionActivity({ kind: 'error', at: now + 3, sessionId: 'session-a', detail: 'boom' }),
       routine(4, now + 4, 'session-a'),
     ])
     const condensed = await service.page({})
@@ -133,7 +133,7 @@ describe('activity timeline service', () => {
     const service = createActivityTimelineService({ statePath: await statePath(), now: () => now })
     await service.ingestMany([
       routine(1, now, 'session-a'),
-      integrationActivity({
+      ActivityTimelineAdapters.integrationActivity({
         id: 'evt-block',
         at: now + 1,
         type: 'integration.blocked',
@@ -155,8 +155,8 @@ describe('activity timeline service', () => {
   it('filters and searches without scanning the whole history on the client', async () => {
     const service = createActivityTimelineService({ statePath: await statePath(), now: () => now })
     await service.ingestMany([
-      sessionActivity({ kind: 'created', at: now, sessionId: 'session-a' }),
-      communicationMessage({
+      ActivityTimelineAdapters.sessionActivity({ kind: 'created', at: now, sessionId: 'session-a' }),
+      ActivityTimelineAdapters.communicationMessage({
         at: now + 1,
         messageId: 'message-1',
         senderId: 'session-a',
@@ -165,7 +165,7 @@ describe('activity timeline service', () => {
         topic: null,
         sessionId: 'session-a',
       }),
-      integrationActivity({
+      ActivityTimelineAdapters.integrationActivity({
         id: 'evt-1',
         at: now + 2,
         type: 'integration.completed',
@@ -241,21 +241,30 @@ describe('activity condensation primitives', () => {
       references: [],
       provenance: 'observed' as const,
     }))
-    const first = condenseEvents(events)
-    const second = condenseEvents(events)
+    const first = ActivityTimelineCondensation.condenseEvents(events)
+    const second = ActivityTimelineCondensation.condenseEvents(events)
     expect(first).toEqual(second)
     expect(first[0]?.eventIds).toEqual(['routine-1', 'routine-2'])
-    expect(condenseEvents(events, { detailed: true })).toHaveLength(2)
+    expect(ActivityTimelineCondensation.condenseEvents(events, { detailed: true })).toHaveLength(2)
   })
 
   it('maps adapters with authoritative levels', () => {
-    expect(sessionActivity({ kind: 'error', at: now, sessionId: 's' }).level).toBe('attention')
-    expect(communicationActivity({ at: now, sessionId: 's', operation: 'dshx_comm_inbox', outcome: 'failure', callId: 'c1', rootCallId: null }).level).toBe(
-      'attention',
-    )
-    expect(communicationMessage({ at: now, messageId: 'm1', senderId: 's', recipientCount: 2, intent: 'request', topic: null }).level).toBe('notable')
+    expect(ActivityTimelineAdapters.sessionActivity({ kind: 'error', at: now, sessionId: 's' }).level).toBe('attention')
     expect(
-      integrationActivity({
+      ActivityTimelineAdapters.communicationActivity({
+        at: now,
+        sessionId: 's',
+        operation: 'dshx_comm_inbox',
+        outcome: 'failure',
+        callId: 'c1',
+        rootCallId: null,
+      }).level,
+    ).toBe('attention')
+    expect(
+      ActivityTimelineAdapters.communicationMessage({ at: now, messageId: 'm1', senderId: 's', recipientCount: 2, intent: 'request', topic: null }).level,
+    ).toBe('notable')
+    expect(
+      ActivityTimelineAdapters.integrationActivity({
         id: 'e',
         at: now,
         type: 'integration.completed',

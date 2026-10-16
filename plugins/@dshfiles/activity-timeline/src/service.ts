@@ -11,7 +11,7 @@ import {
   type ActivityPage,
   type ActivityState,
 } from './types.js'
-import { condenseEvents } from './condensation.js'
+import { ActivityTimelineCondensation } from './condensation.js'
 
 const MAX_EVENTS = 5000
 const DEFAULT_PAGE = 60
@@ -156,7 +156,7 @@ export class ActivityTimelineService {
       return true
     })
     const slice = matching.slice(-limit)
-    const items = condenseEvents(slice, { detailed: filter.detailed === true })
+    const items = ActivityTimelineCondensation.condenseEvents(slice, { detailed: filter.detailed === true })
     const oldest = slice[0]
     return {
       items,
