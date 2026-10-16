@@ -19,7 +19,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfi
 import { ArchiveIcon, ArchiveRestoreIcon, BellIcon, BellOffIcon, CopyIcon, EllipsisIcon, PauseIcon, PinIcon, PinOffIcon } from '@dshfiles/plugin-ui/icons'
 import { useLayoutEffect, useState } from 'react'
 import { isSessionMuted, muteOptionLabelKeys, muteSessions, muteUntil, THREAD_MUTE_OPTIONS, unmuteSessions, type ThreadMuteOption } from './thread-mute.js'
-import { threadActionTargetIds } from './thread-children.js'
+import { ThreadChildrenModel } from './thread-children.js'
 import { usePreferences } from './sidebar-state.js'
 import { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
 import { SidebarOrganization, workspaceForSessions } from './organization.js'
@@ -100,7 +100,7 @@ export const HeaderThreadActions = ({
   const parked = preferences.parkedSessionIds.includes(sessionId)
   const muted = isSessionMuted(preferences.mutedThreads, sessionId, Date.now())
   const actionThreads = Object.values(sessionState.byId).filter(candidate => !candidate.blank)
-  const targetIds = threadActionTargetIds({
+  const targetIds = ThreadChildrenModel.threadActionTargetIds({
     threadId: sessionId,
     threads: actionThreads,
     cascadeToChildren: preferences.applyActionsToChildThreads,
