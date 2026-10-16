@@ -221,23 +221,90 @@ export type RegistryEntry = z.infer<typeof registryEntrySchema>
 export type ManagerSnapshot = z.infer<typeof snapshotSchema>
 export type ManagerPreferences = z.infer<typeof preferencesInputSchema>
 
+/** Model-facing one-server line. */
+const serverLine = (server: ManagerSnapshot['servers'][number]): string =>
+  `${server.id} · ${server.name} · ${server.transport} · ${server.enabled ? 'enabled' : 'disabled'} · ${server.clientLifecycle} · ${String(server.registeredToolCount)} tool(s)${server.configuration === 'ready' ? '' : ` · ${server.configuration}`}`
+
+/** Model-facing summary of a manager snapshot, so a tool result is the servers and preferences rather than every provider row. */
+const summarizeSnapshot = (snapshot: ManagerSnapshot): string =>
+  [
+    snapshot.servers.length === 0 ? 'No MCP servers configured.' : snapshot.servers.map(serverLine).join('\n'),
+    `preferences: connect on startup ${String(snapshot.preferences.connectOnStartup)}, tool timeout ${String(snapshot.preferences.toolCallTimeoutSeconds)}s, registry search ${String(snapshot.preferences.registrySearch)}, OAuth client ${snapshot.preferences.oauthClientName}`,
+  ].join('\n')
+
+/** Model-facing registry search result. */
+const summarizeRegistry = (entries: readonly RegistryEntry[]): string =>
+  entries
+    .map(entry => `${entry.name} · ${entry.title} · ${entry.category} · v${entry.version}${entry.endpoint === null ? '' : ` · ${entry.endpoint}`}`)
+    .join('\n') || 'No MCP registry entry matched.'
+
 export const mcpServersApi = defineApi({
   id: 'mcp-servers',
   owner: '@dshfiles/mcp-servers',
   version: 1,
   methods: {
-    list: method({ input: z.void(), output: snapshotSchema }),
-    refresh: method({ input: z.void(), output: snapshotSchema }),
-    save: method({ input: z.object({ server: serverDraftSchema }), output: snapshotSchema }),
-    setEnabled: method({ input: z.object({ id: z.string().min(1).max(80), enabled: z.boolean() }), output: snapshotSchema }),
-    setConnection: method({ input: z.object({ id: z.string().min(1).max(80), connected: z.boolean() }), output: snapshotSchema }),
-    remove: method({ input: z.object({ id: z.string().min(1).max(80) }), output: snapshotSchema }),
+    list: method({
+      input: z.void(),
+      output: snapshotSchema,
+      description:
+        'Every MCP server configured in this profile with its transport, whether it is enabled, its client lifecycle and how many tools it registered. Read-only.',
+      tool: { name: 'mcp_list_servers', readOnly: true, render: summarizeSnapshot },
+    }),
+    refresh: method({
+      input: z.void(),
+      output: snapshotSchema,
+      description:
+        'Reconcile the native MCP clients with the stored server list and report the result, for example after the profile changed outside this DSH. Call only when the user asked to refresh the servers.',
+      tool: { name: 'mcp_refresh_servers', render: summarizeSnapshot },
+    }),
+    save: method({
+      input: z.object({ server: serverDraftSchema }),
+      output: snapshotSchema,
+      description:
+        'Add or edit one MCP server in the profile: stdio with a command line, environment references and a working directory, or streamable HTTP with a URL, header references, optional auth and a local start command. Call only when the user asked for that change.',
+      tool: { name: 'mcp_save_server', render: summarizeSnapshot },
+    }),
+    setEnabled: method({
+      input: z.object({ id: z.string().min(1).max(80), enabled: z.boolean() }),
+      output: snapshotSchema,
+      description: 'Enable or disable one MCP server in the profile without removing it. Call only when the user asked to enable or disable that server.',
+      tool: { name: 'mcp_set_server_enabled', render: summarizeSnapshot },
+    }),
+    setConnection: method({
+      input: z.object({ id: z.string().min(1).max(80), connected: z.boolean() }),
+      output: snapshotSchema,
+      description:
+        'Connect or disconnect one MCP server native client in this Host process without changing its saved enabled state. Call only when the user asked to connect or disconnect it.',
+      tool: { name: 'mcp_set_connection', render: summarizeSnapshot },
+    }),
+    remove: method({
+      input: z.object({ id: z.string().min(1).max(80) }),
+      output: snapshotSchema,
+      description: 'Remove one MCP server from the profile, including its stored OAuth grant. Call only when the user asked to remove that server.',
+      tool: { name: 'mcp_remove_server', render: summarizeSnapshot },
+    }),
     authorize: method({
       input: z.object({ id: z.string().min(1).max(80), origin: z.string().url().max(2048) }),
       output: z.object({ authorizationUrl: z.string().url() }),
     }),
-    signOut: method({ input: z.object({ id: z.string().min(1).max(80) }), output: snapshotSchema }),
-    setPreferences: method({ input: z.object({ preferences: preferencesInputSchema }), output: snapshotSchema }),
-    searchRegistry: method({ input: z.object({ query: z.string().trim().min(1).max(80) }), output: z.array(registryEntrySchema).max(20) }),
+    signOut: method({
+      input: z.object({ id: z.string().min(1).max(80) }),
+      output: snapshotSchema,
+      description: 'Remove the stored OAuth grant of one MCP server, so the next connect authorizes again. Call only when the user asked to sign out of it.',
+      tool: { name: 'mcp_sign_out_server', render: summarizeSnapshot },
+    }),
+    setPreferences: method({
+      input: z.object({ preferences: preferencesInputSchema }),
+      output: snapshotSchema,
+      description:
+        'Replace the four MCP manager preferences: connect on startup, tool-call timeout in seconds, whether registry search is offered, and the OAuth client name. Call only when the user asked for those preferences.',
+      tool: { name: 'mcp_set_preferences', render: summarizeSnapshot },
+    }),
+    searchRegistry: method({
+      input: z.object({ query: z.string().trim().min(1).max(80) }),
+      output: z.array(registryEntrySchema).max(20),
+      description: 'Search the curated MCP registry for servers matching a term, with each entry transport and documentation link. Read-only.',
+      tool: { name: 'mcp_search_registry', readOnly: true, render: summarizeRegistry },
+    }),
   },
 })
