@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { serverDraftSchema, type ServerDraft, type ServerView } from './api.js'
-import { hasUnexpandedTilde, parseCommandLine, UNEXPANDED_TILDE_MESSAGE } from './command-line.js'
+import { McpCommandLineModel } from './command-line.js'
 import { jsonTextSchema } from './json-text.js'
 
 export const serverTransports = ['streamable-http', 'stdio'] as const
@@ -118,7 +118,7 @@ export const serverFormFromView = (server: ServerView): ServerFormValues => {
 /** Incomplete quoting is reported as a field issue instead of throwing out of schema validation. */
 const commandArgv = (commandLine: string, issues: ServerFormIssue[]): readonly string[] => {
   try {
-    return parseCommandLine(commandLine)
+    return McpCommandLineModel.parseCommandLine(commandLine)
   } catch (error) {
     issues.push({ field: 'commandLine', message: error instanceof Error ? error.message : 'Enter a valid command line.' })
     return []
@@ -140,7 +140,7 @@ export const parseServerForm = (values: ServerFormValues): ParsedServerForm => {
   const base = { id: values.id, name: values.name, serverName: values.serverName, enabled: values.enabled }
   if (values.transport === 'stdio') {
     const argv = commandArgv(values.commandLine, issues)
-    if (hasUnexpandedTilde(argv)) issues.push({ field: 'commandLine', message: UNEXPANDED_TILDE_MESSAGE })
+    if (McpCommandLineModel.hasUnexpandedTilde(argv)) issues.push({ field: 'commandLine', message: McpCommandLineModel.UNEXPANDED_TILDE_MESSAGE })
   }
   const candidate =
     values.transport === 'stdio'

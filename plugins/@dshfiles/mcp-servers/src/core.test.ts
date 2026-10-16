@@ -1,6 +1,6 @@
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { describe, expect, it, vi } from 'vitest'
-import { hasInlineCredential, hasUnexpandedTilde, parseCommandLine, formatCommandLine } from './command-line.js'
+import { McpCommandLineModel } from './command-line.js'
 import { serverDraftSchema, type StoredServer } from './api.js'
 import { PROVIDERS, filterProviders, searchOfficialRegistry } from './catalog.js'
 import { ManagedLocalCommand } from './local-process.js'
@@ -189,28 +189,28 @@ describe('native composer quick panel', () => {
 
 describe('local command parsing', () => {
   it('preserves quoted spaces and round-trips arguments without shell evaluation', () => {
-    const argv = parseCommandLine('npx -y "@example/mcp server" --label \'two words\'')
+    const argv = McpCommandLineModel.parseCommandLine('npx -y "@example/mcp server" --label \'two words\'')
     expect(argv).toEqual(['npx', '-y', '@example/mcp server', '--label', 'two words'])
-    expect(parseCommandLine(formatCommandLine(argv))).toEqual(argv)
-    expect(parseCommandLine('node $(touch /tmp/not-run)')).toEqual(['node', '$(touch', '/tmp/not-run)'])
+    expect(McpCommandLineModel.parseCommandLine(McpCommandLineModel.formatCommandLine(argv))).toEqual(argv)
+    expect(McpCommandLineModel.parseCommandLine('node $(touch /tmp/not-run)')).toEqual(['node', '$(touch', '/tmp/not-run)'])
   })
 
   it('rejects incomplete quotes and escapes', () => {
-    expect(() => parseCommandLine('node "unfinished')).toThrow(/quote/)
-    expect(() => parseCommandLine('node trailing\\')).toThrow(/escape/)
+    expect(() => McpCommandLineModel.parseCommandLine('node "unfinished')).toThrow(/quote/)
+    expect(() => McpCommandLineModel.parseCommandLine('node trailing\\')).toThrow(/escape/)
   })
 
   it('rejects common inline credential arguments while allowing normal arguments', () => {
-    expect(hasInlineCredential(parseCommandLine('node server.js --api-key=do-not-store'))).toBe(true)
-    expect(hasInlineCredential(parseCommandLine('node server.js --token value'))).toBe(true)
-    expect(hasInlineCredential(parseCommandLine('node server.js --port 3000'))).toBe(false)
+    expect(McpCommandLineModel.hasInlineCredential(McpCommandLineModel.parseCommandLine('node server.js --api-key=do-not-store'))).toBe(true)
+    expect(McpCommandLineModel.hasInlineCredential(McpCommandLineModel.parseCommandLine('node server.js --token value'))).toBe(true)
+    expect(McpCommandLineModel.hasInlineCredential(McpCommandLineModel.parseCommandLine('node server.js --port 3000'))).toBe(false)
   })
 
   it('detects tilde paths that no shell will expand', () => {
-    expect(hasUnexpandedTilde(parseCommandLine('node ~/dev/dadabase/dist/mcp/stdio.js'))).toBe(true)
-    expect(hasUnexpandedTilde(parseCommandLine('node ~'))).toBe(true)
-    expect(hasUnexpandedTilde(parseCommandLine('node /home/user/dev/dadabase/dist/mcp/stdio.js'))).toBe(false)
-    expect(hasUnexpandedTilde(parseCommandLine('node server.js --home /srv/~/data'))).toBe(false)
+    expect(McpCommandLineModel.hasUnexpandedTilde(McpCommandLineModel.parseCommandLine('node ~/dev/dadabase/dist/mcp/stdio.js'))).toBe(true)
+    expect(McpCommandLineModel.hasUnexpandedTilde(McpCommandLineModel.parseCommandLine('node ~'))).toBe(true)
+    expect(McpCommandLineModel.hasUnexpandedTilde(McpCommandLineModel.parseCommandLine('node /home/user/dev/dadabase/dist/mcp/stdio.js'))).toBe(false)
+    expect(McpCommandLineModel.hasUnexpandedTilde(McpCommandLineModel.parseCommandLine('node server.js --home /srv/~/data'))).toBe(false)
   })
 })
 

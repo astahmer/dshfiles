@@ -22,7 +22,7 @@ import {
   type StoredServer,
 } from './api.js'
 import { PROVIDERS, searchOfficialRegistry } from './catalog.js'
-import { hasInlineCredential, hasUnexpandedTilde, parseCommandLine, UNEXPANDED_TILDE_MESSAGE } from './command-line.js'
+import { McpCommandLineModel } from './command-line.js'
 import { ManagedLocalCommand, type LocalProcessStatus } from './local-process.js'
 import {
   authorizationUrl,
@@ -58,13 +58,13 @@ export const Config = z
   .object({ servers: z.array(storedServerSchema).max(MAX_SERVERS).default([]), preferences: preferencesSchema.optional() })
   .superRefine((value, context) => {
     value.servers.forEach((server, index) => {
-      if (server.transport === 'stdio' && hasInlineCredential([server.command, ...server.args])) {
+      if (server.transport === 'stdio' && McpCommandLineModel.hasInlineCredential([server.command, ...server.args])) {
         context.addIssue({ code: 'custom', path: ['servers', index], message: 'Use credential references instead of inline command credentials.' })
       }
       if (
         server.transport === 'streamable-http' &&
         server.startCommand !== undefined &&
-        hasInlineCredential([server.startCommand.command, ...server.startCommand.args])
+        McpCommandLineModel.hasInlineCredential([server.startCommand.command, ...server.startCommand.args])
       ) {
         context.addIssue({
           code: 'custom',
@@ -297,10 +297,10 @@ const storedDraft = (draft: ServerDraft): StoredServer => {
         ...(draft.auth === 'oauth' ? { auth: 'oauth' as const } : {}),
       }
     }
-    const [command, ...args] = parseCommandLine(localStart.commandLine)
+    const [command, ...args] = McpCommandLineModel.parseCommandLine(localStart.commandLine)
     if (command === undefined) throw new TypeError('Enter a local start command.')
-    if (hasInlineCredential([command, ...args])) throw new TypeError('Use credential references instead of inline command credentials.')
-    if (hasUnexpandedTilde([command, ...args])) throw new TypeError(UNEXPANDED_TILDE_MESSAGE)
+    if (McpCommandLineModel.hasInlineCredential([command, ...args])) throw new TypeError('Use credential references instead of inline command credentials.')
+    if (McpCommandLineModel.hasUnexpandedTilde([command, ...args])) throw new TypeError(McpCommandLineModel.UNEXPANDED_TILDE_MESSAGE)
     return {
       id,
       name: draft.name,
@@ -313,10 +313,10 @@ const storedDraft = (draft: ServerDraft): StoredServer => {
       startCommand: { command, args, cwd: localStart.cwd, envRefs: localStart.envRefs },
     }
   }
-  const [command, ...args] = parseCommandLine(draft.commandLine)
+  const [command, ...args] = McpCommandLineModel.parseCommandLine(draft.commandLine)
   if (command === undefined) throw new TypeError('Enter a command.')
-  if (hasInlineCredential([command, ...args])) throw new TypeError('Use credential references instead of inline command credentials.')
-  if (hasUnexpandedTilde([command, ...args])) throw new TypeError(UNEXPANDED_TILDE_MESSAGE)
+  if (McpCommandLineModel.hasInlineCredential([command, ...args])) throw new TypeError('Use credential references instead of inline command credentials.')
+  if (McpCommandLineModel.hasUnexpandedTilde([command, ...args])) throw new TypeError(McpCommandLineModel.UNEXPANDED_TILDE_MESSAGE)
   return {
     id,
     name: draft.name,

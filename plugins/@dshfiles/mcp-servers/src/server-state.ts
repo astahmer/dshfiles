@@ -1,5 +1,5 @@
 import type { ServerView, StoredServer } from './api.js'
-import { formatCommandLine } from './command-line.js'
+import { McpCommandLineModel } from './command-line.js'
 import type { LocalProcessStatus } from './local-process.js'
 import type { ClientLifecycle } from './reconcile.js'
 
@@ -61,7 +61,7 @@ export const publicServerView = (
     oauth: usesOAuth ? (signedIn ? ('signed-in' as const) : ('needs-sign-in' as const)) : ('not-used' as const),
   }
   if (server.transport === 'stdio') {
-    return { ...common, transport: 'stdio', commandLine: formatCommandLine([server.command, ...server.args]), cwd: server.cwd }
+    return { ...common, transport: 'stdio', commandLine: McpCommandLineModel.formatCommandLine([server.command, ...server.args]), cwd: server.cwd }
   }
   return {
     ...common,
@@ -70,7 +70,10 @@ export const publicServerView = (
     ...(server.startCommand === undefined
       ? {}
       : {
-          startCommand: { commandLine: formatCommandLine([server.startCommand.command, ...server.startCommand.args]), cwd: server.startCommand.cwd },
+          startCommand: {
+            commandLine: McpCommandLineModel.formatCommandLine([server.startCommand.command, ...server.startCommand.args]),
+            cwd: server.startCommand.cwd,
+          },
         }),
   }
 }
