@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { createCommunicationService } from '@dshfiles/dshx/communication'
 import { initializeCommunicationAgent } from './agent-lifecycle.js'
-import { communicationWorkspaceTopic } from './live-agent-directory.js'
+import { LiveAgentDirectoryModel } from './live-agent-directory.js'
 
 const temporaryRoots: string[] = []
 
@@ -27,7 +27,7 @@ describe('communication Agent initialization', () => {
       ]),
     )
 
-    const workspaceTopic = communicationWorkspaceTopic(workspaceCwd)
+    const workspaceTopic = LiveAgentDirectoryModel.communicationWorkspaceTopic(workspaceCwd)
     expect(workspaceTopic).toMatch(/^workspace\/[a-f0-9]{24}$/)
     expect(await service.listTopics()).toEqual([{ topic: workspaceTopic, subscribers: agents.length }])
 

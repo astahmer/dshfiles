@@ -8,7 +8,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { createCommunicationService, type CommunicationService } from '@dshfiles/dshx/communication'
 import { initializeCommunicationAgent } from './agent-lifecycle.js'
 import { createAgentCommunicationOperations } from './api-operations.js'
-import { communicationWorkspaceTopic, findOwnedLiveAgent, findOwnedLiveAgents, observeLiveAgent, projectRegisteredWorkspace } from './live-agent-directory.js'
+import { LiveAgentDirectoryModel } from './live-agent-directory.js'
 import { createSessionHistorySearchRequest, projectSessionHistoryPage } from './session-history.js'
 
 interface TestAgent {
@@ -68,7 +68,7 @@ describe('Agent communication integration', () => {
     const agentB = createAgent({ id: 'session-b', status: 'idle', cwd })
     await register(service, agentA)
     await register(service, agentB)
-    const topic = communicationWorkspaceTopic(cwd)
+    const topic = LiveAgentDirectoryModel.communicationWorkspaceTopic(cwd)
     expect(topic).toBeDefined()
 
     const message = await service.publish({ sender: { kind: 'agent', id: agentA.id }, topic: topic ?? '', text: 'The build passed.', intent: 'notice' })
@@ -115,21 +115,28 @@ describe('Agent communication integration', () => {
     const registry = registryFor([worker, unrelated], { [orchestrator.id]: [worker.id] })
     const snapshot = JSON.stringify([orchestrator, worker, unrelated].map(agent => ({ id: agent.id, status: agent.status })))
 
-    const descendants = findOwnedLiveAgents({
+    const descendants = LiveAgentDirectoryModel.findOwnedLiveAgents({
       caller: orchestrator,
       liveAgents: registry.list(),
       isOwnedBy: registry.isOwnedBy,
     })
     expect(descendants.map(entry => entry.agent.id)).toEqual([worker.id])
-    expect(findOwnedLiveAgent({ caller: orchestrator, liveAgents: registry.list(), targetId: unrelated.id, isOwnedBy: registry.isOwnedBy })).toBeUndefined()
+    expect(
+      LiveAgentDirectoryModel.findOwnedLiveAgent({ caller: orchestrator, liveAgents: registry.list(), targetId: unrelated.id, isOwnedBy: registry.isOwnedBy }),
+    ).toBeUndefined()
 
-    const observed = observeLiveAgent({
+    const observed = LiveAgentDirectoryModel.observeLiveAgent({
       id: worker.id,
       status: worker.status,
       createdAt: worker.session.header.createdAt,
       cwd: worker.session.header.cwd,
     })
-    expect(observed).toEqual({ id: worker.id, status: 'idle', createdAt: 1_800_000_000_000, workspaceTopic: communicationWorkspaceTopic(cwd) })
+    expect(observed).toEqual({
+      id: worker.id,
+      status: 'idle',
+      createdAt: 1_800_000_000_000,
+      workspaceTopic: LiveAgentDirectoryModel.communicationWorkspaceTopic(cwd),
+    })
     expect(JSON.stringify(observed)).not.toContain(cwd)
 
     const workspace = {
@@ -145,7 +152,7 @@ describe('Agent communication integration', () => {
       detachSession: async () => undefined,
       status: async (): Promise<'ok' | 'missing-dir'> => 'ok',
     } satisfies Workspace
-    expect(projectRegisteredWorkspace(workspace)).toEqual({ workspace_id: 'workspace-id', workspace_title: 'project-a' })
+    expect(LiveAgentDirectoryModel.projectRegisteredWorkspace(workspace)).toEqual({ workspace_id: 'workspace-id', workspace_title: 'project-a' })
 
     const sessionId = SessionId(worker.id)
     const page: SessionEventSearchPage = {
@@ -274,7 +281,9 @@ describe('Agent communication integration', () => {
 
     const liveAgents = [orchestrator]
     const registry = registryFor(liveAgents, {})
-    expect(findOwnedLiveAgent({ caller: orchestrator, liveAgents, targetId: completed.id, isOwnedBy: registry.isOwnedBy })).toBeUndefined()
+    expect(
+      LiveAgentDirectoryModel.findOwnedLiveAgent({ caller: orchestrator, liveAgents, targetId: completed.id, isOwnedBy: registry.isOwnedBy }),
+    ).toBeUndefined()
     expect(await service.browseMessages({ agentId: completed.id })).toMatchObject({ totalMatching: 1 })
 
     const inbox = await service.inbox({ principal: { kind: 'agent', id: orchestrator.id }, topic: 'inbox' })

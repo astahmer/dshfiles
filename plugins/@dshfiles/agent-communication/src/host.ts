@@ -14,7 +14,7 @@ import { z } from 'zod'
 import { agentCommunicationApi } from './api.js'
 import { createAgentCommunicationOperations } from './api-operations.js'
 import { initializeCommunicationAgent } from './agent-lifecycle.js'
-import { communicationWorkspaceTopic, findOwnedLiveAgent, findOwnedLiveAgents, observeLiveAgent, projectRegisteredWorkspace } from './live-agent-directory.js'
+import { LiveAgentDirectoryModel } from './live-agent-directory.js'
 import { formatInbox } from './messages.js'
 import { createSessionHistorySearchRequest, projectSessionHistoryPage, sessionHistorySearchInputSchema } from './session-history.js'
 
@@ -63,12 +63,12 @@ const agentListTool = defineTool({
         const ownedDescendants =
           execution.agent === undefined
             ? []
-            : findOwnedLiveAgents({
+            : LiveAgentDirectoryModel.findOwnedLiveAgents({
                 caller: execution.agent,
                 liveAgents,
                 isOwnedBy: (candidate, owner) => registry.isOwnedBy(candidate.id, owner),
               }).map(({ agent, owner }) => {
-                const observation = observeLiveAgent({
+                const observation = LiveAgentDirectoryModel.observeLiveAgent({
                   id: agent.id,
                   status: agent.status,
                   createdAt: agent.session.header.createdAt,
@@ -110,7 +110,7 @@ const workspaceLookupTool = defineTool({
         if (caller === undefined) return { summary: JSON.stringify({ status: 'caller-unavailable' }) }
 
         const registry = hostContext.agents
-        const target = findOwnedLiveAgent({
+        const target = LiveAgentDirectoryModel.findOwnedLiveAgent({
           caller,
           liveAgents: registry.list(),
           targetId: input.sessionId,
@@ -141,7 +141,7 @@ const workspaceLookupTool = defineTool({
             summary: JSON.stringify({
               status: 'registered',
               ...targetMetadata,
-              ...projectRegisteredWorkspace(workspace),
+              ...LiveAgentDirectoryModel.projectRegisteredWorkspace(workspace),
             }),
           }
         } catch {
@@ -187,7 +187,7 @@ const historySearchTool = defineTool({
         if (caller === undefined) return { summary: JSON.stringify({ status: 'caller-unavailable' }) }
 
         const registry = hostContext.agents
-        const target = findOwnedLiveAgent({
+        const target = LiveAgentDirectoryModel.findOwnedLiveAgent({
           caller,
           liveAgents: registry.list(),
           targetId: input.sessionId,
@@ -446,7 +446,7 @@ const communicationOperations = createAgentCommunicationOperations({
     hostContext?.agents.list().map((agent): CommunicationAgent => ({
       id: agent.id,
       status: agent.status,
-      workspaceTopic: communicationWorkspaceTopic(agent.session.header.cwd) ?? null,
+      workspaceTopic: LiveAgentDirectoryModel.communicationWorkspaceTopic(agent.session.header.cwd) ?? null,
     })) ?? [],
 })
 
@@ -561,7 +561,7 @@ const setupHost = (context: Context): Effect<void> => {
               context.agents.list().map(agent => ({
                 id: agent.id,
                 status: agent.status,
-                workspaceTopic: communicationWorkspaceTopic(agent.session.header.cwd) ?? null,
+                workspaceTopic: LiveAgentDirectoryModel.communicationWorkspaceTopic(agent.session.header.cwd) ?? null,
               })),
           })
         } catch (error) {

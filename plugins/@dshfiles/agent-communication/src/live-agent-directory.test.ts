@@ -1,6 +1,6 @@
 import { WorkspaceId, type Workspace } from '@deepseek-ai/dsh-workspace'
 import { describe, expect, it } from 'vitest'
-import { communicationWorkspaceTopic, findOwnedLiveAgent, findOwnedLiveAgents, observeLiveAgent, projectRegisteredWorkspace } from './live-agent-directory.js'
+import { LiveAgentDirectoryModel } from './live-agent-directory.js'
 
 interface DirectoryAgent {
   readonly id: string
@@ -23,14 +23,14 @@ describe('live Agent directory', () => {
       }),
     ])
 
-    const observed = input.map(observeLiveAgent)
+    const observed = input.map(LiveAgentDirectoryModel.observeLiveAgent)
 
     expect(observed).toEqual([
       {
         id: 'running-session',
         status: 'running',
         createdAt: 1_800_000_000_000,
-        workspaceTopic: communicationWorkspaceTopic(cwd),
+        workspaceTopic: LiveAgentDirectoryModel.communicationWorkspaceTopic(cwd),
       },
       {
         id: 'idle-child',
@@ -56,7 +56,7 @@ describe('live Agent directory', () => {
       [unrelated.id, 'another-coordinator'],
     ])
 
-    const observed = findOwnedLiveAgents({
+    const observed = LiveAgentDirectoryModel.findOwnedLiveAgents({
       caller,
       liveAgents,
       isOwnedBy: (candidate, owner) => runtimeOwners.get(candidate.id) === owner.id,
@@ -81,7 +81,7 @@ describe('live Agent directory', () => {
       [unrelated.id, 'another-coordinator'],
     ])
     const isOwnedBy = (candidate: DirectoryAgent, owner: DirectoryAgent) => runtimeOwners.get(candidate.id) === owner.id
-    const findTarget = (targetId: string) => findOwnedLiveAgent({ caller, liveAgents, targetId, isOwnedBy })
+    const findTarget = (targetId: string) => LiveAgentDirectoryModel.findOwnedLiveAgent({ caller, liveAgents, targetId, isOwnedBy })
 
     expect(findTarget(child.id)).toEqual({ agent: child, owner: caller })
     expect(findTarget(grandchild.id)).toEqual({ agent: grandchild, owner: child })
@@ -105,7 +105,7 @@ describe('live Agent directory', () => {
       status: async (): Promise<'ok' | 'missing-dir'> => 'ok',
     } satisfies Workspace
 
-    const observed = projectRegisteredWorkspace(workspace)
+    const observed = LiveAgentDirectoryModel.projectRegisteredWorkspace(workspace)
 
     expect(observed).toEqual({ workspace_id: workspace.id, workspace_title: workspace.title })
     expect(JSON.stringify(observed)).not.toContain(workspace.path)
