@@ -1,7 +1,6 @@
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type { EmptyWorkspaceOwnerProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
-import type { TurnTailOwnerProps, UseChat } from '@deepseek-ai/dsh-client-ui-chat/client'
 import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
@@ -201,13 +200,7 @@ export default defineClient({
         ),
     }
     const jjThreads = createApiClient(ctx, jjIntegrationApi)
-    // The notice is thread state, but this slot renders once per completed Turn: only the newest Turn's tail shows it.
-    const ThreadRebaseNotice = (props: TurnTailOwnerProps & { readonly sessionId: SessionSummary['id']; readonly useChat: UseChat }): JSX.Element | null => {
-      const isNewestTurn = props.useChat(state => {
-        const turns = state.navigation.items()
-        const newest = turns[turns.length - 1]
-        return newest === undefined || newest.turn === props.turn.turn
-      })
+    const ThreadRebaseNotice = (props: { readonly sessionId: SessionSummary['id'] }): JSX.Element | null => {
       const api = useApi(jjIntegrationApi)
       const session = ctx.sessions.list.getSnapshot().byId[props.sessionId]
       const path = session?.cwd
@@ -241,7 +234,7 @@ export default defineClient({
         onError: error => archiveToast.show({ text: errorMessage(error, translate('archiveFailed')), success: false }),
       })
       const rebasedAt = status.data?.thread?.rebasedAt
-      if (rebasedAt === undefined || rebasedAt === null || !isNewestTurn) return archiveToast.element
+      if (rebasedAt === undefined || rebasedAt === null) return archiveToast.element
       const rebasedTipChangeId = status.data?.thread?.rebasedTipChangeId
       const notice =
         rebasedTipChangeId === undefined
@@ -286,7 +279,7 @@ export default defineClient({
           order: 1,
           inject: sessionId => ({ sessionId: SessionId(sessionId) }),
         },
-        decorate((props: TurnTailOwnerProps & { readonly sessionId: SessionSummary['id']; readonly useChat: UseChat }) => (
+        decorate((props: { readonly sessionId: SessionSummary['id'] }) => (
           <PluginQueryProvider>
             <ThreadRebaseNotice {...props} />
           </PluginQueryProvider>
