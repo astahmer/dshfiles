@@ -6,7 +6,8 @@ import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type { ShortcutBinding, ShortcutCommand, ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client'
 import { resolveSlotLabel } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
-import { defineClient, useSettings } from '@dshfiles/dshx/client'
+import { defineClient, useApiQuery, useSettings } from '@dshfiles/dshx/client'
+import { threadSidebarAttentionApi } from '@dshfiles/thread-sidebar/attention-api'
 import { MessageSquareIcon, MessageSquarePlusIcon, PanelsTopLeftIcon, SettingsIcon } from '@dshfiles/plugin-ui/icons'
 import { createActor } from '@dshfiles/plugin-ui/machine'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
@@ -200,6 +201,26 @@ export default defineClient({
           const byId = props.useSessions(state => state.byId)
           const sessions = useMemo(() => new Map<string, SessionSummary>(Object.values(byId).map(session => [session.id, session])), [byId])
           const statuses = props.useSessionStatus(state => state)
+          // Attention is Host-owned now, so the dot follows the same record the sidebar acknowledges.
+          const attention = useApiQuery(threadSidebarAttentionApi, 'state')
+          const attentionRefresh = attention.refetch
+          useEffect(() => {
+            const refresh = (): void => attentionRefresh()
+            const onVisibility = (): void => {
+              if (document.visibilityState === 'visible') refresh()
+            }
+            window.addEventListener('focus', refresh)
+            document.addEventListener('visibilitychange', onVisibility)
+            const timer = window.setInterval(() => {
+              if (document.visibilityState === 'visible') refresh()
+            }, 5_000)
+            return () => {
+              window.removeEventListener('focus', refresh)
+              document.removeEventListener('visibilitychange', onVisibility)
+              window.clearInterval(timer)
+            }
+          }, [attentionRefresh])
+          const attentionSessionIds = useMemo(() => new Set((attention.data?.sessions ?? []).map(record => record.sessionId)), [attention.data])
           const catalog = useSyncExternalStore(subscribeCatalog, catalogSnapshot)
           const host = useStripHost()
 
@@ -222,7 +243,7 @@ export default defineClient({
             const tabStatus = threadTabStatus({
               needsYou: status?.pendingInteraction !== undefined,
               running: status?.running ?? session?.running ?? false,
-              unread: status?.completionUnread ?? false,
+              unread: session !== undefined && attentionSessionIds.has(session.id),
             })
             const title = session?.title ?? (session === undefined || session.blank ? translate('untitledThread') : session.displayTitle)
             return { ...base, kind: 'thread', title, available: session !== undefined, status: tabStatus }

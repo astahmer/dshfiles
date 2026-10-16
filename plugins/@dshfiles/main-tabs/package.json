@@ -29,6 +29,7 @@
     "@dshfiles/dshx": "workspace:*",
     "@dshfiles/plugin-ui": "workspace:*",
     "@dshfiles/shared-runtime": "workspace:*",
+    "@dshfiles/thread-sidebar": "workspace:*",
     "zod": "catalog:"
   },
   "devDependencies": {
@@ -36,6 +37,7 @@
     "@deepseek-ai/dsh": "0.2.0-rc.2",
     "@deepseek-ai/dsh-api-session-controller": "catalog:",
     "@deepseek-ai/dsh-api-workspace-controller": "catalog:",
+    "@deepseek-ai/dsh-client-connection": "catalog:",
     "@deepseek-ai/dsh-client-locale": "catalog:",
     "@deepseek-ai/dsh-client-shortcuts": "catalog:",
     "@deepseek-ai/dsh-client-ui-layout": "catalog:",
@@ -59,6 +61,7 @@
     "@deepseek-ai/dsh": ">=0.2.0-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-api-session-controller": ">=0.2.0-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-api-workspace-controller": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-client-connection": ">=0.2.0-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-client-locale": ">=0.2.0-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-client-shortcuts": ">=0.2.0-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-client-ui-layout": ">=0.2.0-rc.1 <0.3.0-0",
@@ -69,7 +72,8 @@
     "@deepseek-ai/dsh-client-ui-slots": ">=0.2.0-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-client-ui-workspace": ">=0.2.0-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-tools": ">=0.2.0-rc.1 <0.3.0-0",
-    "@deepseek-ai/schemastery": "~3.18.4"
+    "@deepseek-ai/schemastery": "~3.18.4",
+    "@dshfiles/thread-sidebar": ">=0.1.0"
   },
   "dsh": {
     "bundle": {
@@ -78,6 +82,7 @@
     "client": {
       "platform": "web",
       "inject": [
+        "@deepseek-ai/dsh-client-connection",
         "@deepseek-ai/dsh-api-session-controller",
         "@deepseek-ai/dsh-api-workspace-controller",
         "@deepseek-ai/dsh-client-ui-layout",
