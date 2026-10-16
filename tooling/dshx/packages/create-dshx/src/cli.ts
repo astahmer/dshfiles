@@ -4,7 +4,7 @@ import { stdin, stdout, stderr } from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { confirm as clackConfirm, isCancel, select as clackSelect, spinner as clackSpinner, text as clackText } from '@clack/prompts'
 import { defineCommand, parseArgs as parseCittyArgs, renderUsage } from 'citty'
-import { createProject, DEFAULT_STYLE, DEFAULT_TEMPLATE, packageVersion, type CreateDependencies } from './create.js'
+import { CreateProjectModel, DEFAULT_STYLE, DEFAULT_TEMPLATE, type CreateDependencies } from './create.js'
 import { TEMPLATE_REGISTRY } from './templates.js'
 import type { CreateIO, PackageManager, ProjectStyle, TemplateName } from './types.js'
 
@@ -141,7 +141,7 @@ export async function runCreate(argv = process.argv.slice(2), io: CreateIO = {},
     return 0
   }
   if (args.version) {
-    output.write(`${packageVersion()}\n`)
+    output.write(`${CreateProjectModel.packageVersion()}\n`)
     return 0
   }
   let name = args.name
@@ -232,7 +232,7 @@ export async function runCreate(argv = process.argv.slice(2), io: CreateIO = {},
     }
   }
   const installSpinner = installDependencies && interactive ? clackSpinner({ output }) : undefined
-  const result = await createProject(
+  const result = await CreateProjectModel.create(
     {
       name,
       template,

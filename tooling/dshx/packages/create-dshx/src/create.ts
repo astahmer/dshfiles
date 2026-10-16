@@ -39,7 +39,7 @@ export const DEFAULT_DSH_RANGE = DSH_PROTOCOL_2.range
 export const DEFAULT_TEMPLATE = 'starter' as const
 export const DEFAULT_STYLE = 'css-modules' as const
 
-export function packageVersion(): string {
+const packageVersion = (): string => {
   try {
     const manifest = require('../package.json') as { version?: unknown }
     if (typeof manifest.version === 'string' && manifest.version !== '') return manifest.version
@@ -53,7 +53,7 @@ function diagnostic(code: `DSHX${number}`, message: string, file: string, hint: 
   return { code, severity: 'error', message, file, hint, ...(cause === undefined ? {} : { cause }) }
 }
 
-export function validateProjectName(name: string): CreateDiagnostic | undefined {
+const validateProjectName = (name: string): CreateDiagnostic | undefined => {
   if (!NAME_RE.test(name) || name.length > 214 || name.startsWith('.') || name.endsWith('.')) {
     return diagnostic(
       'DSHX6001',
@@ -97,12 +97,12 @@ function packageManagerFromEnvironment(environment: Readonly<Record<string, stri
   return manager === 'pnpm' || manager === 'yarn' || manager === 'npm' ? manager : undefined
 }
 
-export async function detectPackageManager(
+const detectPackageManager = async (
   root: string,
   fs: FileSystem = defaultFileSystem,
   runner: CommandRunner = CreateCommandRuntime.defaultRunner,
   environment: Readonly<Record<string, string | undefined>> = process.env,
-): Promise<PackageManager | undefined> {
+): Promise<PackageManager | undefined> => {
   const projectManager = await packageManagerFromProject(root, fs)
   if (projectManager !== undefined) return projectManager
   const invokingManager = packageManagerFromEnvironment(environment)
@@ -113,7 +113,7 @@ export async function detectPackageManager(
   return undefined
 }
 
-export async function createProject(options: CreateProjectOptions, dependencies: CreateDependencies = {}): Promise<CreateProjectResult> {
+const createProject = async (options: CreateProjectOptions, dependencies: CreateDependencies = {}): Promise<CreateProjectResult> => {
   const fs = dependencies.fs ?? defaultFileSystem
   const runner = dependencies.runner ?? CreateCommandRuntime.defaultRunner
   const root = resolve(options.cwd ?? process.cwd(), options.name)
@@ -215,4 +215,11 @@ export async function createProject(options: CreateProjectOptions, dependencies:
       ],
     }
   return { root, packageId: options.name, template, style, files, packageManager: manager, installed: true, diagnostics: [] }
+}
+
+export class CreateProjectModel {
+  static readonly create = createProject
+  static readonly packageVersion = packageVersion
+  static readonly validateName = validateProjectName
+  static readonly detectPackageManager = detectPackageManager
 }

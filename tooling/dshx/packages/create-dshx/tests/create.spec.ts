@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
-import { createProject, DEFAULT_DSH_RANGE, DEFAULT_DSH_VERSION, detectPackageManager, packageVersion, validateProjectName } from '../src/index.js'
+import { CreateProjectModel, DEFAULT_DSH_RANGE, DEFAULT_DSH_VERSION } from '../src/index.js'
 import { renderProjectTemplate } from '../src/templates.js'
 import { DEFAULT_COMPATIBILITY } from '../../dshx/src/compat/index.js'
 import { defaultFileSystem } from '../src/fs.js'
@@ -37,7 +37,7 @@ describe('create-dshx', () => {
     const patch = renderProjectTemplate(
       {
         packageId: '@dshfiles/shortcuts',
-        dshxVersion: packageVersion(),
+        dshxVersion: CreateProjectModel.packageVersion(),
         dshVersion: DEFAULT_DSH_VERSION,
         dshRange: DEFAULT_DSH_RANGE,
       },
@@ -50,10 +50,10 @@ describe('create-dshx', () => {
   })
 
   it('validates names and rejects existing targets before writing', async () => {
-    expect(validateProjectName('Bad Name')?.code).toBe('DSHX6001')
+    expect(CreateProjectModel.validateName('Bad Name')?.code).toBe('DSHX6001')
     const root = await temp()
     await mkdir(resolve(root, 'demo'))
-    const result = await createProject({ name: 'demo', cwd: root, install: false })
+    const result = await CreateProjectModel.create({ name: 'demo', cwd: root, install: false })
     expect(result.diagnostics[0]?.code).toBe('DSHX6002')
     await rm(root, { recursive: true, force: true })
   })
@@ -67,7 +67,7 @@ describe('create-dshx', () => {
     ['showcase', 'none'],
   ] as const)('renders the %s + %s combination with exact files and dependencies', async (template, style) => {
     const root = await temp()
-    const result = await createProject({ name: `demo-${template}-${style}`, cwd: root, install: false, template, style })
+    const result = await CreateProjectModel.create({ name: `demo-${template}-${style}`, cwd: root, install: false, template, style })
     expect(result.diagnostics).toEqual([])
     expect(result.template).toBe(template)
     expect(result.style).toBe(style)
@@ -173,7 +173,7 @@ describe('create-dshx', () => {
 
   it('defaults programmatic and --yes generation to starter + css-modules', async () => {
     const root = await temp()
-    const direct = await createProject({ name: 'direct-default', cwd: root, install: false })
+    const direct = await CreateProjectModel.create({ name: 'direct-default', cwd: root, install: false })
     expect(direct.template).toBe('starter')
     expect(direct.style).toBe('css-modules')
     expect(await readFile(resolve(direct.root, 'src/Plugin.module.css'), 'utf8')).toContain('.card')
@@ -190,7 +190,7 @@ describe('create-dshx', () => {
     const root = await temp()
     await writeFile(resolve(root, 'yarn.lock'), '')
     const runner = async (): Promise<{ exitCode: number }> => ({ exitCode: 0 })
-    await expect(detectPackageManager(root, defaultFileSystem, runner)).resolves.toBe('yarn')
+    await expect(CreateProjectModel.detectPackageManager(root, defaultFileSystem, runner)).resolves.toBe('yarn')
     await rm(root, { recursive: true, force: true })
   })
 
@@ -198,7 +198,7 @@ describe('create-dshx', () => {
     const root = await temp()
     await writeFile(resolve(root, 'package.json'), JSON.stringify({ packageManager: 'yarn@4.9.4' }))
     const runner = async (): Promise<{ exitCode: number }> => ({ exitCode: 0 })
-    await expect(detectPackageManager(root, defaultFileSystem, runner)).resolves.toBe('yarn')
+    await expect(CreateProjectModel.detectPackageManager(root, defaultFileSystem, runner)).resolves.toBe('yarn')
 
     const fs = {
       ...defaultFileSystem,
@@ -209,7 +209,7 @@ describe('create-dshx', () => {
       calls.push(args[0] ?? '')
       return { exitCode: args[0] === 'pnpm' ? 0 : 1 }
     }
-    await expect(detectPackageManager(root, fs, pathRunner, {})).resolves.toBe('pnpm')
+    await expect(CreateProjectModel.detectPackageManager(root, fs, pathRunner, {})).resolves.toBe('pnpm')
     expect(calls).toEqual(['pnpm'])
     await rm(root, { recursive: true, force: true })
   })
@@ -222,7 +222,7 @@ describe('create-dshx', () => {
       return { exitCode: 0 }
     }
     await expect(
-      detectPackageManager(root, defaultFileSystem, runner, {
+      CreateProjectModel.detectPackageManager(root, defaultFileSystem, runner, {
         npm_config_user_agent: 'npm/11.6.0 node/v25.8.1 darwin arm64',
       }),
     ).resolves.toBe('npm')
@@ -236,7 +236,7 @@ describe('create-dshx', () => {
     const runner = async (command: string): Promise<{ exitCode: number }> => ({
       exitCode: command === 'npm' ? 0 : 1,
     })
-    const result = await createProject(
+    const result = await CreateProjectModel.create(
       {
         name: 'progress-demo',
         cwd: root,
@@ -277,7 +277,7 @@ describe('create-dshx', () => {
       calls.push(command)
       return { exitCode: 0 }
     }
-    const result = await createProject({ name: 'demo', cwd: root, packageManager: 'npm' }, { runner })
+    const result = await CreateProjectModel.create({ name: 'demo', cwd: root, packageManager: 'npm' }, { runner })
     expect(result.packageManager).toBe('npm')
     expect(calls).toEqual(['npm'])
     await rm(root, { recursive: true, force: true })
@@ -286,7 +286,7 @@ describe('create-dshx', () => {
   it('keeps generated files when installation fails', async () => {
     const root = await temp()
     const runner = async (command: string): Promise<{ exitCode: number }> => ({ exitCode: command === 'which' ? 0 : 1 })
-    const result = await createProject({ name: 'demo', cwd: root }, { runner })
+    const result = await CreateProjectModel.create({ name: 'demo', cwd: root }, { runner })
     expect(result.diagnostics[0]?.code).toBe('DSHX6004')
     expect(result.files).not.toHaveLength(0)
     await rm(root, { recursive: true, force: true })

@@ -1,13 +1,4 @@
-export {
-  createProject,
-  DEFAULT_DSH_RANGE,
-  DEFAULT_DSH_VERSION,
-  DEFAULT_STYLE,
-  DEFAULT_TEMPLATE,
-  detectPackageManager,
-  packageVersion,
-  validateProjectName,
-} from './create.js'
+export { CreateProjectModel, DEFAULT_DSH_RANGE, DEFAULT_DSH_VERSION, DEFAULT_STYLE, DEFAULT_TEMPLATE } from './create.js'
 export { capabilityReport } from './catalog.js'
 export {
   CLIENT_CAPABILITIES,
