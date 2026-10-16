@@ -1,11 +1,11 @@
 import { definePlugin } from '@dshfiles/dshx/host'
 import { privacyControlsApi } from './api/privacy-controls.js'
-import { readPrivacyControls, setAllPrivacyFeaturesEnabled, setPrivacyFeatureEnabled } from './controls.js'
+import { createPrivacyControlsService } from './controls.js'
 
 const privacyControlsHostApi = privacyControlsApi.host({
-  read: async ({ ctx }) => readPrivacyControls(ctx),
-  setFeature: async ({ input, ctx }) => setPrivacyFeatureEnabled(ctx, input),
-  setAll: async ({ input, ctx }) => setAllPrivacyFeaturesEnabled(ctx, input.enabled),
+  read: async ({ ctx }) => createPrivacyControlsService(ctx).read(),
+  setFeature: async ({ input, ctx }) => createPrivacyControlsService(ctx).setFeature(input),
+  setAll: async ({ input, ctx }) => createPrivacyControlsService(ctx).setAll(input.enabled),
 })
 
 export default definePlugin({

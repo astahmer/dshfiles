@@ -51,7 +51,7 @@ const unavailableSnapshot = (reason: string): PrivacyControlsSnapshot => ({
   features: privacyFeatures.map(feature => unavailableFeature(feature, reason)),
 })
 
-export const readPrivacyControls = async (ctx: Context): Promise<PrivacyControlsSnapshot> => {
+const readPrivacyControls = async (ctx: Context): Promise<PrivacyControlsSnapshot> => {
   const patchPath = ctx.get('profileContext')?.patchPath
   const loader = ctx.get('loader')
   if (patchPath === undefined || loader === undefined) return unavailableSnapshot(unavailableReason)
@@ -139,12 +139,12 @@ const persistFeatureUpdates = async (ctx: Context, updates: readonly FeatureUpda
   return readPrivacyControls(ctx)
 }
 
-export const setPrivacyFeatureEnabled = async (
+const setPrivacyFeatureEnabled = async (
   ctx: Context,
   input: { readonly feature: PrivacyFeatureId; readonly enabled: boolean },
 ): Promise<PrivacyControlsSnapshot> => persistFeatureUpdates(ctx, [input])
 
-export const setAllPrivacyFeaturesEnabled = async (ctx: Context, enabled: boolean): Promise<PrivacyControlsSnapshot> => {
+const setAllPrivacyFeaturesEnabled = async (ctx: Context, enabled: boolean): Promise<PrivacyControlsSnapshot> => {
   const snapshot = await readPrivacyControls(ctx)
   if (!snapshot.available) throw new Error(snapshot.reason ?? unavailableReason)
 
@@ -157,3 +157,10 @@ export const setAllPrivacyFeaturesEnabled = async (ctx: Context, enabled: boolea
   }
   return persistFeatureUpdates(ctx, enabled ? updates : updates.filter(update => stateOf(snapshot, update.feature).available))
 }
+
+export const createPrivacyControlsService = (ctx: Context) => ({
+  read: (): Promise<PrivacyControlsSnapshot> => readPrivacyControls(ctx),
+  setFeature: (input: { readonly feature: PrivacyFeatureId; readonly enabled: boolean }): Promise<PrivacyControlsSnapshot> =>
+    setPrivacyFeatureEnabled(ctx, input),
+  setAll: (enabled: boolean): Promise<PrivacyControlsSnapshot> => setAllPrivacyFeaturesEnabled(ctx, enabled),
+})
