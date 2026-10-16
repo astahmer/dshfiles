@@ -62,8 +62,10 @@ and filters fit together, see [Thread sidebar states](sidebar-state.md).
 **Archive undo notice.** Archiving reports itself as a compact overlay anchored
 to the sidebar (`data-testid="thread-sidebar-transient-notice"`), so the thread
 list does not move, and the notice offers an immediate undo before it disappears.
-Persistent warnings — storage failures and restart requests — stay in the list
-flow instead.
+Opening a thread DSH keeps closing shows the same overlay with **Restore and
+open**; it stays for 10 seconds, longer than a confirmation, and returns if the
+thread is opened again. Persistent warnings — storage failures and restart
+requests — stay in the list flow instead.
 
 **Command palette.** Search threads, the ⌘ button in the header, and the
 keyboard all open a shadcn `CommandDialog`: fuzzy search over thread title,

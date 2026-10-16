@@ -97,7 +97,7 @@ import { registerPaletteAction, setPaletteRecentLimit, type PaletteAction } from
 import { useSidebarState } from './sidebar-state.js'
 import { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
 import { projectTextTone } from './project-tone.js'
-import { scheduleSuccessNoticeDismissal, SidebarNoticeMessage, type SidebarNotice } from './sidebar-notice.js'
+import { archivedOpenFailureNotice, scheduleSuccessNoticeDismissal, SidebarNoticeMessage, type SidebarNotice } from './sidebar-notice.js'
 import { threadSidebarMachineApi } from './machine-api.js'
 import { groupThreadChildren, partitionFinishedChildren, shouldOpenChildThreadList, threadActionTargetIds, visibleChildren } from './thread-children.js'
 import { buildThreadUrl, clearThreadUrl, readThreadUrl } from './thread-url.js'
@@ -1120,18 +1120,19 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
     const subscription = archivedView.on('failed', event => {
       const sessionId = event.sessionId
       if (sessionId === null) return
-      setNotice({
-        tone: 'danger',
-        message: tSidebar(event.failure === 'keeps-closing' ? 'threadSidebarArchivedKeepsClosing' : 'threadSidebarArchivedLoadFailed'),
-        actionLabel: tSidebar('threadSidebarRestoreAndOpen'),
-        onAction: () => {
-          setNotice(null)
-          void unarchiveSession(sessionId).then(
-            () => reopenThread(sessionId),
-            () => setNotice({ tone: 'danger', message: tSidebar('threadSidebarActionFailure') }),
-          )
-        },
-      })
+      setNotice(
+        archivedOpenFailureNotice({
+          message: tSidebar(event.failure === 'keeps-closing' ? 'threadSidebarArchivedKeepsClosing' : 'threadSidebarArchivedLoadFailed'),
+          actionLabel: tSidebar('threadSidebarRestoreAndOpen'),
+          onAction: () => {
+            setNotice(null)
+            void unarchiveSession(sessionId).then(
+              () => reopenThread(sessionId),
+              () => setNotice({ tone: 'danger', message: tSidebar('threadSidebarActionFailure') }),
+            )
+          },
+        }),
+      )
     })
     return () => subscription.unsubscribe()
   }, [archivedView, reopenThread, tSidebar, unarchiveSession])

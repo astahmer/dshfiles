@@ -16,6 +16,7 @@ interface ThreadHistoryJourney {
 }
 
 const threadHistoryJourneys = new WeakMap<Page, ThreadHistoryJourney>()
+const archivedOpenJourneys = new WeakMap<Page, string>()
 
 const threadSidebar = (page: Page) => page.getByRole('region', { name: 'Threads' })
 const sidebarNavigation = (page: Page) => page.getByRole('navigation', { name: 'Sidebar navigation' })
@@ -222,6 +223,45 @@ Then('archive undo settings control the temporary notice', async ({ page }: { pa
   await recordAssertion(page, 'thread-sidebar-archive-undo-preferences-respected', async () => {
     await expect(threadSidebar(page).getByRole('button', { name: 'Archived (2)', exact: true })).toBeVisible()
     await expect(threadSidebar(page).getByText('Thread archived.', { exact: true })).toHaveCount(0)
+  })
+  await finishJourneyAssertions(page)
+})
+
+When('an archived thread is opened from the Archived section', async ({ page }: { page: Page }) => {
+  if (currentThreadId(page) === null) await startBlankThread(page)
+  const prompt = 'thread sidebar archived open e2e'
+  await page.getByRole('textbox').first().fill(prompt)
+  await page.getByRole('textbox').first().press('Enter')
+  const archivedThreadId = currentThreadId(page)
+  if (archivedThreadId === null) throw new Error('The Host did not keep the selected thread after its first message.')
+  const targetRow = threadRow(page, archivedThreadId)
+  await expect(targetRow.getByRole('button', { name: 'Archive', exact: true })).toBeEnabled()
+  await targetRow.click({ button: 'right' })
+  await page.getByRole('menuitem', { name: 'Archive', exact: true }).click()
+
+  await threadSidebar(page).getByRole('button', { name: 'Archived (1)', exact: true }).click()
+  await targetRow.click()
+  const restoreButton = threadSidebar(page)
+    .getByTestId('thread-sidebar-transient-notice')
+    .getByRole('button', { name: 'Restore and open', exact: true })
+  await expect(restoreButton).toBeVisible({ timeout: 15_000 })
+  archivedOpenJourneys.set(page, archivedThreadId)
+})
+
+Then('the archived-open notice dismisses and returns on the next attempt', async ({ page }: { page: Page }) => {
+  const archivedThreadId = archivedOpenJourneys.get(page)
+  if (archivedThreadId === undefined) throw new Error('No archived thread was opened in this journey.')
+  const targetRow = threadRow(page, archivedThreadId)
+  const transientNotice = threadSidebar(page).getByTestId('thread-sidebar-transient-notice')
+  const restoreButton = transientNotice.getByRole('button', { name: 'Restore and open', exact: true })
+
+  await recordAssertion(page, 'thread-sidebar-archived-open-notice-dismisses', async () => {
+    await expect(restoreButton).toBeHidden({ timeout: 15_000 })
+    await expect(transientNotice).toHaveCount(0)
+  })
+  await recordAssertion(page, 'thread-sidebar-archived-open-notice-returns', async () => {
+    await targetRow.click()
+    await expect(restoreButton).toBeVisible({ timeout: 15_000 })
   })
   await finishJourneyAssertions(page)
 })

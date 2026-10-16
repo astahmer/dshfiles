@@ -15,6 +15,12 @@ Feature: Thread sidebar journeys
     When archive undo settings are changed and threads are archived
     Then archive undo settings control the temporary notice
 
+  @scenario:thread-sidebar.archived-open-notice
+  Scenario: The archived-open recovery notice clears itself
+    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
+    When an archived thread is opened from the Archived section
+    Then the archived-open notice dismisses and returns on the next attempt
+
   @smoke
   @scenario:thread-sidebar.park-context-menu
   Scenario: Park a thread from its context menu and keep it parked

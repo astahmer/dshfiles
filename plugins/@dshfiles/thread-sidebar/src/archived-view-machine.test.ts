@@ -1,6 +1,6 @@
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { createActor, waitFor } from '@dshfiles/plugin-ui/machine'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { archivedViewMachine, type ArchivedViewClient } from './archived-view-machine.js'
 
 const sessionA = SessionId('session-a')
@@ -53,6 +53,14 @@ describe('archivedViewMachine', () => {
     view.actor.send({ type: 'open', sessionId: sessionA, archived: true })
     await waitFor(view.actor, snapshot => snapshot.matches('failed'))
     expect(view.failures).toEqual([{ failure: 'load-failed', error: 'Session reference "session-a" is released' }])
+  })
+
+  it('reports the failure again when the user opens the same archived thread', async () => {
+    const view = startView({ ready: async () => Promise.reject(new Error('Session reference "session-a" is released')) })
+    view.actor.send({ type: 'open', sessionId: sessionA, archived: true })
+    await waitFor(view.actor, snapshot => snapshot.matches('failed'))
+    view.actor.send({ type: 'open', sessionId: sessionA, archived: true })
+    await vi.waitFor(() => expect(view.failures).toHaveLength(2))
   })
 
   it('lets go once the user opens another thread, and ignores active threads', async () => {

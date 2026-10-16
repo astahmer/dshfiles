@@ -1,7 +1,14 @@
 import assert from 'node:assert/strict'
 import { renderToString } from 'react-dom/server'
 import { afterEach, test, vi } from 'vitest'
-import { scheduleSuccessNoticeDismissal, SidebarNoticeMessage, SUCCESS_NOTICE_DURATION_MS, type SidebarNotice } from './sidebar-notice.js'
+import {
+  ARCHIVED_OPEN_NOTICE_DURATION_MS,
+  archivedOpenFailureNotice,
+  scheduleSuccessNoticeDismissal,
+  SidebarNoticeMessage,
+  SUCCESS_NOTICE_DURATION_MS,
+  type SidebarNotice,
+} from './sidebar-notice.js'
 
 afterEach(() => {
   vi.useRealTimers()
@@ -78,6 +85,24 @@ test('a success timeout does not dismiss a replacement notice', () => {
   state.update(() => replacementNotice)
   vi.advanceTimersByTime(SUCCESS_NOTICE_DURATION_MS)
   assert.equal(state.current, replacementNotice)
+  dispose?.()
+})
+
+test('the archived-open recovery notice dismisses after its own duration', () => {
+  vi.useFakeTimers()
+  const recoveryNotice = archivedOpenFailureNotice({
+    message: 'Thread is archived.',
+    actionLabel: 'Restore and open',
+    onAction: () => {},
+  })
+  const state = createNoticeState(null)
+  state.update(() => recoveryNotice)
+  const dispose = scheduleSuccessNoticeDismissal(recoveryNotice, state.update)
+
+  vi.advanceTimersByTime(ARCHIVED_OPEN_NOTICE_DURATION_MS - 1)
+  assert.equal(state.current, recoveryNotice)
+  vi.advanceTimersByTime(1)
+  assert.equal(state.current, null)
   dispose?.()
 })
 

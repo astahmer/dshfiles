@@ -158,7 +158,7 @@
     {
       "id": "manual-archive-undo",
       "title": "Undo a manual thread archive",
-      "summary": "Configure a temporary notice after manual archive, restore exactly the threads archived by that action when Undo is selected, or open an archived thread read-only (composer blocked, \"Restore to reply\" banner); when DSH closes or cannot load it, the sidebar names the failure and offers Restore and open.",
+      "summary": "Configure a temporary notice after manual archive, restore exactly the threads archived by that action when Undo is selected, or open an archived thread read-only (composer blocked, \"Restore to reply\" banner); when DSH closes or cannot load it, the sidebar names the failure and offers Restore and open in a notice that clears itself.",
       "reach": [
         "click button \"New thread\"",
         "click button \"Choose workspace\"",
@@ -196,7 +196,8 @@
         "A partial restore reports failure without hiding the remaining archive state.",
         "Disabling the undo notice does not prevent archival.",
         "Opening an archived thread leaves it archived.",
-        "DSH clears an archived main Session whenever its lists change; the sidebar reopens it at most 3 times in 10 s, then shows the failure with Restore and open instead of a blank composer."
+        "DSH clears an archived main Session whenever its lists change; the sidebar reopens it at most 3 times in 10 s, then shows the failure with Restore and open instead of a blank composer.",
+        "The archived-open failure notice clears itself after 10 s and returns when the thread is opened again, so it does not stay over the thread list."
       ],
       "externalDependencies": [],
       "verification": [
@@ -208,6 +209,11 @@
         {
           "kind": "gherkin",
           "id": "thread-sidebar.archive-undo-preferences",
+          "featureFile": "tooling/dshx/e2e/features/thread-sidebar.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "thread-sidebar.archived-open-notice",
           "featureFile": "tooling/dshx/e2e/features/thread-sidebar.feature"
         },
         {
