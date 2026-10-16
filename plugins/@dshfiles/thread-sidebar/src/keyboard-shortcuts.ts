@@ -29,7 +29,7 @@ interface KeyState {
   readonly shiftKey: boolean
 }
 
-export const chordFromEvent = (event: KeyState, mac: boolean): Chord | null => {
+const chordFromEvent = (event: KeyState, mac: boolean): Chord | null => {
   if (MODIFIER_CODES.has(event.code)) return null
   const primary = mac ? event.metaKey : event.ctrlKey
   const modifiers: ChordModifier[] = []
@@ -42,7 +42,7 @@ export const chordFromEvent = (event: KeyState, mac: boolean): Chord | null => {
   return { code: event.code, modifiers }
 }
 
-export const matchesChord = (event: KeyState, chord: Chord, mac: boolean): boolean => {
+const matchesChord = (event: KeyState, chord: Chord, mac: boolean): boolean => {
   const recorded = chordFromEvent(event, mac)
   return recorded !== null && serializeChord(recorded) === serializeChord(chord)
 }
@@ -73,7 +73,7 @@ const keyLabel = (code: string): string => {
   return KEY_LABELS[code] ?? code
 }
 
-export const formatChord = (chord: Chord, mac: boolean): string[] => [
+const formatChord = (chord: Chord, mac: boolean): string[] => [
   ...chord.modifiers.map(modifier => {
     if (modifier === 'primary') return mac ? '⌘' : 'Ctrl'
     if (modifier === 'control') return mac ? '⌃' : 'Ctrl'
@@ -89,7 +89,7 @@ interface HostBinding {
   readonly modifiers: readonly ('control' | 'alt' | 'shift' | 'meta')[]
 }
 
-export const sameAsHostBinding = (chord: Chord, binding: HostBinding | null, mac: boolean): boolean => {
+const sameAsHostBinding = (chord: Chord, binding: HostBinding | null, mac: boolean): boolean => {
   if (binding === null || binding.secondCode !== undefined || binding.code !== chord.code) return false
   const physical = new Set(
     chord.modifiers.map(modifier => {
@@ -100,4 +100,12 @@ export const sameAsHostBinding = (chord: Chord, binding: HostBinding | null, mac
   return physical.size === binding.modifiers.length && binding.modifiers.every(modifier => physical.has(modifier))
 }
 
-export const isMacPlatform = (platform: string): boolean => platform.startsWith('Mac') || platform === 'macOS' || platform === 'iPhone' || platform === 'iPad'
+const isMacPlatform = (platform: string): boolean => platform.startsWith('Mac') || platform === 'macOS' || platform === 'iPhone' || platform === 'iPad'
+
+export class KeyboardShortcutModel {
+  static readonly chordFromEvent = chordFromEvent
+  static readonly formatChord = formatChord
+  static readonly isMacPlatform = isMacPlatform
+  static readonly matchesChord = matchesChord
+  static readonly sameAsHostBinding = sameAsHostBinding
+}

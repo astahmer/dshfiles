@@ -67,7 +67,7 @@ import {
 } from './organization.js'
 import { NAVIGATION_EVENT, ThreadNavigationHistoryModel, type NavigationHistory, type NavigationLocation } from './navigation-history.js'
 import { PaletteApi, type PaletteAction } from '@dshfiles/command-palette/api'
-import { formatChord, isMacPlatform, matchesChord, parseChord, sameAsHostBinding } from './keyboard-shortcuts.js'
+import { KeyboardShortcutModel, parseChord } from './keyboard-shortcuts.js'
 import { SidebarStateProvider, useSidebarState } from './sidebar-state.js'
 import { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
 import { threadSidebarPluginUpdatesApi } from './plugin-updates-api.js'
@@ -495,7 +495,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   const wide = !props.collapsed
   const effectiveHeaderHeight = previewHeaderHeight ?? preferences.headerRegionHeight
   const iconRow = wide && (preferences.headerMode === 'compact' || (effectiveHeaderHeight !== null && effectiveHeaderHeight <= SIDEBAR_ICON_ROW_THRESHOLD))
-  const mac = isMacPlatform(navigator.platform)
+  const mac = KeyboardShortcutModel.isMacPlatform(navigator.platform)
 
   const measureElements = () => ({
     shell: shellRef.current,
@@ -675,7 +675,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
 
   useEffect(() => {
     const ownedByHost = (chord: NonNullable<ReturnType<typeof parseChord>>): boolean =>
-      hostShortcuts.some(entry => sameAsHostBinding(chord, entry.binding, mac))
+      hostShortcuts.some(entry => KeyboardShortcutModel.sameAsHostBinding(chord, entry.binding, mac))
     // ⌘[ / ⌘] are browser-reserved for Host web shortcuts, so on the web they are claimed here before the browser.
     const chords = [
       { chord: parseChord(preferences.paletteChord), run: () => openPalette('all') },
@@ -687,7 +687,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
 
     const onKeyDown = (event: KeyboardEvent): void => {
       if (event.defaultPrevented || event.isComposing || event.repeat) return
-      const match = chords.find(({ chord }) => matchesChord(event, chord, mac))
+      const match = chords.find(({ chord }) => KeyboardShortcutModel.matchesChord(event, chord, mac))
       if (match === undefined) return
       event.preventDefault()
       event.stopPropagation()
@@ -1045,7 +1045,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   const paletteHint = parseChord(preferences.paletteChord)
   const withChordHint = (label: string, chordValue: string | null): string => {
     const chord = parseChord(chordValue)
-    return chord === null ? label : `${label} (${formatChord(chord, mac).join('')})`
+    return chord === null ? label : `${label} (${KeyboardShortcutModel.formatChord(chord, mac).join('')})`
   }
 
   return (
@@ -1194,7 +1194,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
                 title={
                   paletteHint === null
                     ? text(props.t, 'threadSidebarCommandPalette')
-                    : `${text(props.t, 'threadSidebarCommandPalette')} (${formatChord(paletteHint, mac).join('')})`
+                    : `${text(props.t, 'threadSidebarCommandPalette')} (${KeyboardShortcutModel.formatChord(paletteHint, mac).join('')})`
                 }
                 onClick={() => openPalette('all')}
               >

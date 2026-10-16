@@ -8,7 +8,7 @@ import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Kbd, KbdGroup } from '@dshfiles/plugin-ui/components/ui/kbd'
 import { useState, useSyncExternalStore } from 'react'
 import { DEFAULT_PREFERENCES } from './organization.js'
-import { chordFromEvent, formatChord, isMacPlatform, parseChord, sameAsHostBinding, serializeChord } from './keyboard-shortcuts.js'
+import { KeyboardShortcutModel, parseChord, serializeChord } from './keyboard-shortcuts.js'
 import type { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
 import { usePreferences } from './sidebar-state.js'
 import { ThreadNotificationSettings } from './thread-notification-settings.js'
@@ -28,11 +28,11 @@ export const SettingsTab = (props: SettingsTabProps): JSX.Element => {
   const { preferences, updatePreferences, storageWarning } = usePreferences()
   const hostShortcuts = useSyncExternalStore(props.hostShortcuts.subscribe, props.hostShortcuts.getSnapshot)
   const [recording, setRecording] = useState<ChordKey | null>(null)
-  const mac = isMacPlatform(navigator.platform)
+  const mac = KeyboardShortcutModel.isMacPlatform(navigator.platform)
 
   const chordRow = (key: ChordKey, label: string): JSX.Element => {
     const chord = parseChord(preferences[key])
-    const hostOwned = chord !== null && hostShortcuts.some(entry => sameAsHostBinding(chord, entry.binding, mac))
+    const hostOwned = chord !== null && hostShortcuts.some(entry => KeyboardShortcutModel.sameAsHostBinding(chord, entry.binding, mac))
     const duplicate = chord !== null && CHORD_KEYS.slice(0, CHORD_KEYS.indexOf(key)).some(earlier => preferences[earlier] === preferences[key])
     return (
       <Field orientation="horizontal" className="dshx:items-start">
@@ -56,7 +56,7 @@ export const SettingsTab = (props: SettingsTabProps): JSX.Element => {
                   setRecording(null)
                   return
                 }
-                const recorded = chordFromEvent(event, mac)
+                const recorded = KeyboardShortcutModel.chordFromEvent(event, mac)
                 if (recorded === null) return
                 updatePreferences({ [key]: serializeChord(recorded) })
                 setRecording(null)
@@ -76,7 +76,7 @@ export const SettingsTab = (props: SettingsTabProps): JSX.Element => {
                 <span className="dshx:text-muted-foreground">{props.t('threadSidebarChordDisabled')}</span>
               ) : (
                 <KbdGroup>
-                  {formatChord(chord, mac).map(part => (
+                  {KeyboardShortcutModel.formatChord(chord, mac).map(part => (
                     <Kbd key={part}>{part}</Kbd>
                   ))}
                 </KbdGroup>
