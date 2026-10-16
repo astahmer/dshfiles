@@ -4,7 +4,7 @@ import { SourceSyntax } from '../project/syntax.js'
 import type { ResolvedDshxConfig } from '../config/types.js'
 import type { DshxDiagnostic } from '../diagnostics.js'
 import { checkProjectManifest } from '../project/index.js'
-import { applyFilePlan, insideProject, readOptionalFile, renderFileDiff, rollbackFilePlan } from './common.js'
+import { ScaffoldFilePlan } from './common.js'
 import type { FilePlan } from './common.js'
 
 export interface AddCommandOptions {
@@ -159,7 +159,7 @@ export async function createCommandScaffold(options: AddCommandOptions, dependen
   if (description.trim() === '')
     return result(project, options, [diagnostic('DSHX6501', 'Command description must not be empty.', file, 'Pass a non-empty --description value.')], [])
   const commandFile = resolve(project.root, options.file ?? `src/commands/${options.name}.ts`)
-  if (!insideProject(project.root, commandFile) || !commandFile.endsWith('.ts')) {
+  if (!ScaffoldFilePlan.insideProject(project.root, commandFile) || !commandFile.endsWith('.ts')) {
     return result(
       project,
       options,
@@ -174,7 +174,7 @@ export async function createCommandScaffold(options: AddCommandOptions, dependen
       [],
     )
   }
-  const existingCommandFile = await readOptionalFile(commandFile)
+  const existingCommandFile = await ScaffoldFilePlan.readOptionalFile(commandFile)
   if (existingCommandFile !== undefined) {
     const ast = SourceSyntax.parse({ file: commandFile, source: existingCommandFile })
     if (hasCommand(ast, options.name))
@@ -207,14 +207,14 @@ export async function createCommandScaffold(options: AddCommandOptions, dependen
     )
   }
   const hostFile = project.hostEntry ?? resolve(project.root, 'src/host.ts')
-  if (!insideProject(project.root, hostFile))
+  if (!ScaffoldFilePlan.insideProject(project.root, hostFile))
     return result(
       project,
       options,
       [diagnostic('DSHX6502', `Host file must stay inside the project root: ${hostFile}.`, file, 'Move the Host entry under the project root.')],
       [],
     )
-  const configSource = project.configFile === undefined ? undefined : await readOptionalFile(project.configFile)
+  const configSource = project.configFile === undefined ? undefined : await ScaffoldFilePlan.readOptionalFile(project.configFile)
   if (explicitHostDisabled(project, configSource))
     return result(
       project,
@@ -229,7 +229,7 @@ export async function createCommandScaffold(options: AddCommandOptions, dependen
       ],
       [],
     )
-  const hostBefore = await readOptionalFile(hostFile)
+  const hostBefore = await ScaffoldFilePlan.readOptionalFile(hostFile)
   const commandAfter = sourceForCommand(options.name, description)
   let hostAfter: string
   if (hostBefore === undefined) hostAfter = newHostSource(commandFile, hostFile, options.name)
@@ -277,9 +277,9 @@ export async function createCommandScaffold(options: AddCommandOptions, dependen
     { file: commandFile, after: commandAfter },
     ...(hostBefore === undefined ? [{ file: hostFile, after: hostAfter }] : [{ file: hostFile, before: hostBefore, after: hostAfter }]),
   ]
-  if (options.dryRun) return result(project, options, [], plan, renderFileDiff(plan))
+  if (options.dryRun) return result(project, options, [], plan, ScaffoldFilePlan.renderFileDiff(plan))
   try {
-    await applyFilePlan(plan)
+    await ScaffoldFilePlan.applyFilePlan(plan)
   } catch (cause) {
     return result(
       project,
@@ -300,7 +300,7 @@ export async function createCommandScaffold(options: AddCommandOptions, dependen
   try {
     postDiagnostics = await (dependencies.checkManifest ?? checkProjectManifest)(postProject)
   } catch (cause) {
-    await rollbackFilePlan(plan)
+    await ScaffoldFilePlan.rollbackFilePlan(plan)
     return result(
       project,
       options,
@@ -316,7 +316,7 @@ export async function createCommandScaffold(options: AddCommandOptions, dependen
     )
   }
   if (postDiagnostics.some(item => item.severity === 'error')) {
-    await rollbackFilePlan(plan)
+    await ScaffoldFilePlan.rollbackFilePlan(plan)
     return result(
       project,
       options,

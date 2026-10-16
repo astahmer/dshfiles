@@ -11,7 +11,7 @@ import { inspectProjectComposition } from '../inspect/index.js'
 import type { InspectOptions, InspectResult, SlotSummary } from '../inspect/index.js'
 import { checkProjectManifest } from '../project/index.js'
 import { CLIENT_AUTHORING_TOOLCHAIN, CLIENT_CAPABILITIES, CLIENT_SERVICES, DSH_PACKAGES } from 'create-dshx/capabilities'
-import { applyFilePlanWithFileSystem, renderFileDiff, rollbackFilePlanWithFileSystem, writeFileAtomically } from './common.js'
+import { ScaffoldFilePlan } from './common.js'
 
 import { slotOwnerImports } from '../client/slot-reference.js'
 
@@ -62,7 +62,7 @@ interface PlannedFile {
   readonly after: string
 }
 
-const defaultFs: ScaffoldFileSystem = { readFile, writeFile, mkdir, rename, unlink, access, writeFileAtomic: writeFileAtomically }
+const defaultFs: ScaffoldFileSystem = { readFile, writeFile, mkdir, rename, unlink, access, writeFileAtomic: ScaffoldFilePlan.writeFileAtomically }
 
 function diagnostic(code: string, message: string, file: string, hint: string, severity: 'error' | 'warning' = 'error'): DshxDiagnostic {
   return { code, severity, message, file, hint }
@@ -673,9 +673,9 @@ export async function createUiScaffold(options: AddUiOptions, dependencies: AddU
     ...(clientBefore === undefined ? [{ file: clientFile, after: clientAfter }] : [{ file: clientFile, before: clientBefore, after: clientAfter }]),
     ...(manifestAfter === undefined || manifestAfter === packageBefore ? [] : [{ file: packageFile, before: packageBefore, after: manifestAfter }]),
   ]
-  if (options.dryRun) return result(project, slot, provider, [], plan, manifestChanged, renderFileDiff(plan))
+  if (options.dryRun) return result(project, slot, provider, [], plan, manifestChanged, ScaffoldFilePlan.renderFileDiff(plan))
   try {
-    await applyFilePlanWithFileSystem(plan, fs)
+    await ScaffoldFilePlan.applyFilePlanWithFileSystem(plan, fs)
   } catch (cause) {
     const item = diagnostic(
       'DSHX6107',
@@ -695,7 +695,7 @@ export async function createUiScaffold(options: AddUiOptions, dependencies: AddU
   try {
     postDiagnostics = await (dependencies.checkManifest ?? checkProjectManifest)(postProject, { compatibility })
   } catch (cause) {
-    await rollbackFilePlanWithFileSystem(plan, fs)
+    await ScaffoldFilePlan.rollbackFilePlanWithFileSystem(plan, fs)
     const item = diagnostic(
       'DSHX6108',
       `Generated Slot scaffold could not be validated: ${cause instanceof Error ? cause.message : String(cause)}`,
@@ -705,7 +705,7 @@ export async function createUiScaffold(options: AddUiOptions, dependencies: AddU
     return result(project, slot, provider, [item], [], manifestChanged)
   }
   if (postDiagnostics.some(item => item.severity === 'error')) {
-    await rollbackFilePlanWithFileSystem(plan, fs)
+    await ScaffoldFilePlan.rollbackFilePlanWithFileSystem(plan, fs)
     const item = diagnostic(
       'DSHX6108',
       'Generated Slot scaffold failed Manifest Checker validation and was rolled back.',

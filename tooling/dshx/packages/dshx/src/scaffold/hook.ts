@@ -4,7 +4,7 @@ import { SourceSyntax } from '../project/syntax.js'
 import type { ResolvedDshxConfig } from '../config/types.js'
 import type { DshxDiagnostic } from '../diagnostics.js'
 import { checkProjectManifest } from '../project/index.js'
-import { applyFilePlan, insideProject, readOptionalFile, renderFileDiff, rollbackFilePlan } from './common.js'
+import { ScaffoldFilePlan } from './common.js'
 import type { FilePlan } from './common.js'
 
 export interface AddHookOptions {
@@ -172,7 +172,7 @@ export async function createHookScaffold(options: AddHookOptions, dependencies: 
     )
   }
   const hookFile = resolve(project.root, options.file ?? `src/hooks/${safeFileName(options.event)}.ts`)
-  if (!insideProject(project.root, hookFile) || !hookFile.endsWith('.ts')) {
+  if (!ScaffoldFilePlan.insideProject(project.root, hookFile) || !hookFile.endsWith('.ts')) {
     return makeResult(
       project,
       options,
@@ -187,7 +187,7 @@ export async function createHookScaffold(options: AddHookOptions, dependencies: 
       [],
     )
   }
-  const existingHook = await readOptionalFile(hookFile)
+  const existingHook = await ScaffoldFilePlan.readOptionalFile(hookFile)
   if (existingHook !== undefined) {
     const ast = SourceSyntax.parse({ file: hookFile, source: existingHook })
     if (hasHookRegistration(ast, options.event))
@@ -220,14 +220,14 @@ export async function createHookScaffold(options: AddHookOptions, dependencies: 
     )
   }
   const hostFile = project.hostEntry ?? resolve(project.root, 'src/host.ts')
-  if (!insideProject(project.root, hostFile))
+  if (!ScaffoldFilePlan.insideProject(project.root, hostFile))
     return makeResult(
       project,
       options,
       [diagnostic('DSHX6302', `Host file must stay inside the project root: ${hostFile}.`, packageFile, 'Move the Host entry under the project root.')],
       [],
     )
-  const configSource = project.configFile === undefined ? undefined : await readOptionalFile(project.configFile)
+  const configSource = project.configFile === undefined ? undefined : await ScaffoldFilePlan.readOptionalFile(project.configFile)
   if (explicitHostDisabled(project, configSource))
     return makeResult(
       project,
@@ -242,7 +242,7 @@ export async function createHookScaffold(options: AddHookOptions, dependencies: 
       ],
       [],
     )
-  const hostBefore = await readOptionalFile(hostFile)
+  const hostBefore = await ScaffoldFilePlan.readOptionalFile(hostFile)
   let hostAfter: string
   if (hostBefore === undefined) hostAfter = newHostSource(hostFile, hookFile, options.event)
   else {
@@ -296,9 +296,9 @@ export async function createHookScaffold(options: AddHookOptions, dependencies: 
     { file: hookFile, after: sourceForHook(options.event) },
     ...(hostBefore === undefined ? [{ file: hostFile, after: hostAfter }] : [{ file: hostFile, before: hostBefore, after: hostAfter }]),
   ]
-  if (options.dryRun) return makeResult(project, options, [], plan, renderFileDiff(plan))
+  if (options.dryRun) return makeResult(project, options, [], plan, ScaffoldFilePlan.renderFileDiff(plan))
   try {
-    await applyFilePlan(plan)
+    await ScaffoldFilePlan.applyFilePlan(plan)
   } catch (cause) {
     return makeResult(
       project,
@@ -319,7 +319,7 @@ export async function createHookScaffold(options: AddHookOptions, dependencies: 
   try {
     postDiagnostics = await (dependencies.checkManifest ?? checkProjectManifest)(postProject)
   } catch (cause) {
-    await rollbackFilePlan(plan)
+    await ScaffoldFilePlan.rollbackFilePlan(plan)
     return makeResult(
       project,
       options,
@@ -335,7 +335,7 @@ export async function createHookScaffold(options: AddHookOptions, dependencies: 
     )
   }
   if (postDiagnostics.some(item => item.severity === 'error')) {
-    await rollbackFilePlan(plan)
+    await ScaffoldFilePlan.rollbackFilePlan(plan)
     return makeResult(
       project,
       options,

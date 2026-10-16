@@ -14,7 +14,7 @@ import type { DshCompatibility } from '../compat/types.js'
 import type { ResolvedDshxConfig } from '../config/types.js'
 import { DshxError } from '../diagnostics.js'
 import type { DshxDiagnostic } from '../diagnostics.js'
-import { applyFilePlan, rollbackFilePlan } from '../scaffold/common.js'
+import { ScaffoldFilePlan } from '../scaffold/common.js'
 import type { FilePlan } from '../scaffold/common.js'
 
 export interface ManifestRepairPlan {
@@ -290,10 +290,10 @@ export async function applyManifestRepairPlan(plan: ManifestRepairPlan): Promise
       hint: 'Resolve the reported manifest diagnostics manually before applying a repair plan.',
     })
   }
-  await applyFilePlan(plan.files)
+  await ScaffoldFilePlan.applyFilePlan(plan.files)
 }
 
 /** Restore the exact pre-repair contents after a post-write validation failure. */
 export async function rollbackManifestRepairPlan(plan: ManifestRepairPlan): Promise<void> {
-  await rollbackFilePlan(plan.files)
+  await ScaffoldFilePlan.rollbackFilePlan(plan.files)
 }

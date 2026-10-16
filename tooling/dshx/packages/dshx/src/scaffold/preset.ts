@@ -8,7 +8,7 @@ import type { DshxDiagnostic } from '../diagnostics.js'
 import type { DshCompatibility } from '../compat/types.js'
 import { DEFAULT_COMPATIBILITY } from '../compat/index.js'
 import { checkProjectManifest } from '../project/index.js'
-import { applyFilePlanWithFileSystem, renderFileDiff, rollbackFilePlanWithFileSystem, writeFileAtomically } from './common.js'
+import { ScaffoldFilePlan } from './common.js'
 import { ScaffoldPresets } from './presets.js'
 
 export type AddPresetName = 'panel' | 'api'
@@ -60,7 +60,7 @@ const defaultFs: ScaffoldFileSystem = {
   mkdir,
   rename,
   unlink,
-  writeFileAtomic: writeFileAtomically,
+  writeFileAtomic: ScaffoldFilePlan.writeFileAtomically,
 }
 
 const mergeFs = (input: Partial<ScaffoldFileSystem> | undefined): ScaffoldFileSystem => ({ ...defaultFs, ...input })
@@ -531,11 +531,11 @@ export async function createPresetScaffold(options: AddPresetOptions, dependenci
     plan.push({ file: resolve(project.root, file.path), after: file.content })
   }
 
-  const diff = renderFileDiff(plan.map(toFilePlan))
+  const diff = ScaffoldFilePlan.renderFileDiff(plan.map(toFilePlan))
   if (options.dryRun) return finish(diff)
   const filePlan = plan.map(toFilePlan)
   try {
-    await applyFilePlanWithFileSystem(filePlan, fs)
+    await ScaffoldFilePlan.applyFilePlanWithFileSystem(filePlan, fs)
   } catch (cause) {
     return refuse(
       diagnostic(
@@ -554,7 +554,7 @@ export async function createPresetScaffold(options: AddPresetOptions, dependenci
       { compatibility },
     )
   } catch (cause) {
-    await rollbackFilePlanWithFileSystem(filePlan, fs)
+    await ScaffoldFilePlan.rollbackFilePlanWithFileSystem(filePlan, fs)
     return refuse(
       diagnostic(
         'DSHX6308',
@@ -565,7 +565,7 @@ export async function createPresetScaffold(options: AddPresetOptions, dependenci
     )
   }
   if (postDiagnostics.some(item => item.severity === 'error')) {
-    await rollbackFilePlanWithFileSystem(filePlan, fs)
+    await ScaffoldFilePlan.rollbackFilePlanWithFileSystem(filePlan, fs)
     diagnostics.push(...postDiagnostics)
     return finish()
   }

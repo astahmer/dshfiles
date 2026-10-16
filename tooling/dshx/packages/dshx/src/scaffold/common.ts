@@ -25,12 +25,12 @@ const defaultFileSystem: FilePlanFileSystem = {
   writeFileAtomic: async (file, data) => writeFileAtomic(file, data, { encoding: 'utf8' }),
 }
 
-export function insideProject(root: string, target: string): boolean {
+const insideProject = (root: string, target: string): boolean => {
   const path = relative(root, target)
   return path !== '' && path !== '..' && !path.startsWith(`..${sep}`) && !path.startsWith(sep)
 }
 
-export async function readOptionalFile(file: string): Promise<string | undefined> {
+const readOptionalFile = async (file: string): Promise<string | undefined> => {
   try {
     return await readFile(file, 'utf8')
   } catch {
@@ -38,7 +38,7 @@ export async function readOptionalFile(file: string): Promise<string | undefined
   }
 }
 
-export function renderFileDiff(plan: readonly FilePlan[]): string {
+const renderFileDiff = (plan: readonly FilePlan[]): string => {
   return plan
     .map(item => createTwoFilesPatch(item.file, item.file, item.before ?? '', item.after, item.before === undefined ? 'new file' : 'before', 'after'))
     .join('\n')
@@ -59,7 +59,7 @@ async function atomicWrite(file: string, data: string, fs: FilePlanFileSystem, i
   }
 }
 
-export async function applyFilePlanWithFileSystem(plan: readonly FilePlan[], fs: FilePlanFileSystem): Promise<void> {
+const applyFilePlanWithFileSystem = async (plan: readonly FilePlan[], fs: FilePlanFileSystem): Promise<void> => {
   const applied: FilePlan[] = []
   try {
     for (let index = 0; index < plan.length; index += 1) {
@@ -74,21 +74,32 @@ export async function applyFilePlanWithFileSystem(plan: readonly FilePlan[], fs:
   }
 }
 
-export async function applyFilePlan(plan: readonly FilePlan[]): Promise<void> {
+const applyFilePlan = async (plan: readonly FilePlan[]): Promise<void> => {
   await applyFilePlanWithFileSystem(plan, defaultFileSystem)
 }
 
-export async function rollbackFilePlanWithFileSystem(plan: readonly FilePlan[], fs: FilePlanFileSystem): Promise<void> {
+const rollbackFilePlanWithFileSystem = async (plan: readonly FilePlan[], fs: FilePlanFileSystem): Promise<void> => {
   for (const [index, item] of [...plan].reverse().entries()) {
     if (item.before === undefined) await fs.unlink(item.file).catch(() => undefined)
     else await atomicWrite(item.file, item.before, fs, index).catch(() => undefined)
   }
 }
 
-export async function rollbackFilePlan(plan: readonly FilePlan[]): Promise<void> {
+const rollbackFilePlan = async (plan: readonly FilePlan[]): Promise<void> => {
   await rollbackFilePlanWithFileSystem(plan, defaultFileSystem)
 }
 
-export async function writeFileAtomically(file: string, data: string): Promise<void> {
+const writeFileAtomically = async (file: string, data: string): Promise<void> => {
   await defaultFileSystem.writeFileAtomic!(file, data)
+}
+
+export class ScaffoldFilePlan {
+  static readonly insideProject = insideProject
+  static readonly readOptionalFile = readOptionalFile
+  static readonly renderFileDiff = renderFileDiff
+  static readonly applyFilePlan = applyFilePlan
+  static readonly applyFilePlanWithFileSystem = applyFilePlanWithFileSystem
+  static readonly rollbackFilePlan = rollbackFilePlan
+  static readonly rollbackFilePlanWithFileSystem = rollbackFilePlanWithFileSystem
+  static readonly writeFileAtomically = writeFileAtomically
 }

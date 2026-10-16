@@ -4,7 +4,7 @@ import { SourceSyntax } from '../project/syntax.js'
 import type { ResolvedDshxConfig } from '../config/types.js'
 import type { DshxDiagnostic } from '../diagnostics.js'
 import { checkProjectManifest } from '../project/index.js'
-import { applyFilePlan, insideProject, readOptionalFile, renderFileDiff, rollbackFilePlan } from './common.js'
+import { ScaffoldFilePlan } from './common.js'
 import type { FilePlan } from './common.js'
 
 export interface AddToolOptions {
@@ -157,7 +157,7 @@ export async function createToolScaffold(options: AddToolOptions, dependencies: 
     )
   }
   const toolFile = resolve(project.root, options.file ?? `src/tools/${safeFileName(options.name)}.ts`)
-  if (!insideProject(project.root, toolFile) || !toolFile.endsWith('.ts')) {
+  if (!ScaffoldFilePlan.insideProject(project.root, toolFile) || !toolFile.endsWith('.ts')) {
     return result(
       project,
       options,
@@ -172,7 +172,7 @@ export async function createToolScaffold(options: AddToolOptions, dependencies: 
       [],
     )
   }
-  const existingToolFile = await readOptionalFile(toolFile)
+  const existingToolFile = await ScaffoldFilePlan.readOptionalFile(toolFile)
   if (existingToolFile !== undefined) {
     const ast = SourceSyntax.parse({ file: toolFile, source: existingToolFile })
     if (hasTool(ast, options.name))
@@ -205,14 +205,14 @@ export async function createToolScaffold(options: AddToolOptions, dependencies: 
     )
   }
   const hostFile = project.hostEntry ?? resolve(project.root, 'src/host.ts')
-  if (!insideProject(project.root, hostFile))
+  if (!ScaffoldFilePlan.insideProject(project.root, hostFile))
     return result(
       project,
       options,
       [diagnostic('DSHX6202', `Host file must stay inside the project root: ${hostFile}.`, file, 'Move the Host entry under the project root.')],
       [],
     )
-  const configSource = project.configFile === undefined ? undefined : await readOptionalFile(project.configFile)
+  const configSource = project.configFile === undefined ? undefined : await ScaffoldFilePlan.readOptionalFile(project.configFile)
   if (explicitHostDisabled(project, configSource))
     return result(
       project,
@@ -227,7 +227,7 @@ export async function createToolScaffold(options: AddToolOptions, dependencies: 
       ],
       [],
     )
-  const hostBefore = await readOptionalFile(hostFile)
+  const hostBefore = await ScaffoldFilePlan.readOptionalFile(hostFile)
   const toolAfter = sourceForTool(options.name, options.description ?? 'Generated DSHX tool.')
   let hostAfter: string
   if (hostBefore === undefined) {
@@ -276,9 +276,9 @@ export async function createToolScaffold(options: AddToolOptions, dependencies: 
     { file: toolFile, after: toolAfter },
     ...(hostBefore === undefined ? [{ file: hostFile, after: hostAfter }] : [{ file: hostFile, before: hostBefore, after: hostAfter }]),
   ]
-  if (options.dryRun) return result(project, options, [], plan, renderFileDiff(plan))
+  if (options.dryRun) return result(project, options, [], plan, ScaffoldFilePlan.renderFileDiff(plan))
   try {
-    await applyFilePlan(plan)
+    await ScaffoldFilePlan.applyFilePlan(plan)
   } catch (cause) {
     return result(
       project,
@@ -299,7 +299,7 @@ export async function createToolScaffold(options: AddToolOptions, dependencies: 
   try {
     postDiagnostics = await (dependencies.checkManifest ?? checkProjectManifest)(postProject)
   } catch (cause) {
-    await rollbackFilePlan(plan)
+    await ScaffoldFilePlan.rollbackFilePlan(plan)
     return result(
       project,
       options,
@@ -315,7 +315,7 @@ export async function createToolScaffold(options: AddToolOptions, dependencies: 
     )
   }
   if (postDiagnostics.some(item => item.severity === 'error')) {
-    await rollbackFilePlan(plan)
+    await ScaffoldFilePlan.rollbackFilePlan(plan)
     return result(
       project,
       options,
