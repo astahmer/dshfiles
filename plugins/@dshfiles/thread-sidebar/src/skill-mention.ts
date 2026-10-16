@@ -14,7 +14,7 @@ type SkillSessionId = ClientSessionContext['sessionId']
 const MENTION_SCOPE = /^(thread|t|file|f|skill|mcp):/iu
 
 /** The query this source ranks: the text after its own scope prefix, or undefined while another scope is typed. */
-export const scopedMentionQuery = (query: string, ownScope: 'skill' | 'mcp'): string | undefined => {
+const scopedMentionQuery = (query: string, ownScope: 'skill' | 'mcp'): string | undefined => {
   const scope = MENTION_SCOPE.exec(query)?.[1]
   if (scope === undefined) return query
   return scope.toLowerCase() === ownScope ? query.slice(scope.length + 1) : undefined
@@ -33,7 +33,7 @@ type SkillMentionSourceOptions = {
   readonly userOnlyLabel: string
 }
 
-export const skillMentionCandidates = (input: {
+const skillMentionCandidates = (input: {
   readonly skills: readonly SkillEntry[]
   readonly section: string
   readonly userOnlyLabel: string
@@ -44,10 +44,16 @@ export const skillMentionCandidates = (input: {
     section: input.section,
   }))
 
-export const skillMentionPick = (candidate: Pick<InputTriggerCandidate, 'name'>): { readonly text: string } | undefined => {
+const skillMentionPick = (candidate: Pick<InputTriggerCandidate, 'name'>): { readonly text: string } | undefined => {
   const parsedName = skillNameSchema.safeParse(candidate.name)
   if (!parsedName.success) return undefined
   return { text: `/${parsedName.data} ` }
+}
+
+export class SkillMentionModel {
+  static readonly scopedMentionQuery = scopedMentionQuery
+  static readonly skillMentionCandidates = skillMentionCandidates
+  static readonly skillMentionPick = skillMentionPick
 }
 
 export const createSkillMentionSource = (options: SkillMentionSourceOptions) => {
@@ -80,12 +86,12 @@ export const createSkillMentionSource = (options: SkillMentionSourceOptions) => 
     order: -10,
     showGroupTitle: false,
     async candidates(session, request) {
-      const query = scopedMentionQuery(request.query, 'skill')
+      const query = SkillMentionModel.scopedMentionQuery(request.query, 'skill')
       if (query === undefined || request.quoted === true || options.isSubagent(session.sessionId)) return []
       try {
         const skills = await fetchCatalog(session.sessionId).promise
         if (request.signal.aborted) return []
-        return skillMentionCandidates({
+        return SkillMentionModel.skillMentionCandidates({
           skills: options.rank(skills, query),
           section: options.section,
           userOnlyLabel: options.userOnlyLabel,
@@ -99,7 +105,7 @@ export const createSkillMentionSource = (options: SkillMentionSourceOptions) => 
       fetchCatalog(session.sessionId).promise.catch(() => undefined)
     },
     onPick({ candidate }) {
-      return skillMentionPick(candidate)
+      return SkillMentionModel.skillMentionPick(candidate)
     },
   }
 
