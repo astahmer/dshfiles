@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { DSH_PROTOCOL_2 } from './capabilities.js'
 import { detect } from 'package-manager-detector'
 import { defaultFileSystem } from './fs.js'
-import { commandAvailable, defaultCommandRunner, installCommand } from './command.js'
+import { CreateCommandRuntime } from './command.js'
 import { renderProjectTemplate } from './templates.js'
 import type { CommandRunner, CreateDiagnostic, CreateProjectOptions, CreateProjectResult, FileSystem, PackageManager } from './types.js'
 
@@ -100,7 +100,7 @@ function packageManagerFromEnvironment(environment: Readonly<Record<string, stri
 export async function detectPackageManager(
   root: string,
   fs: FileSystem = defaultFileSystem,
-  runner: CommandRunner = defaultCommandRunner,
+  runner: CommandRunner = CreateCommandRuntime.defaultRunner,
   environment: Readonly<Record<string, string | undefined>> = process.env,
 ): Promise<PackageManager | undefined> {
   const projectManager = await packageManagerFromProject(root, fs)
@@ -108,14 +108,14 @@ export async function detectPackageManager(
   const invokingManager = packageManagerFromEnvironment(environment)
   if (invokingManager !== undefined) return invokingManager
   for (const manager of ['pnpm', 'yarn', 'npm'] as const) {
-    if (await commandAvailable(manager, runner)) return manager
+    if (await CreateCommandRuntime.available(manager, runner)) return manager
   }
   return undefined
 }
 
 export async function createProject(options: CreateProjectOptions, dependencies: CreateDependencies = {}): Promise<CreateProjectResult> {
   const fs = dependencies.fs ?? defaultFileSystem
-  const runner = dependencies.runner ?? defaultCommandRunner
+  const runner = dependencies.runner ?? CreateCommandRuntime.defaultRunner
   const root = resolve(options.cwd ?? process.cwd(), options.name)
   const template = options.template ?? DEFAULT_TEMPLATE
   const style = options.style ?? DEFAULT_STYLE
@@ -194,7 +194,7 @@ export async function createProject(options: CreateProjectOptions, dependencies:
         ),
       ],
     }
-  const command = installCommand(manager)
+  const command = CreateCommandRuntime.install(manager)
   options.onInstallProgress?.({ phase: 'start', packageManager: manager })
   const result = await runner(command.command, command.args, { cwd: root })
   options.onInstallProgress?.({
