@@ -3,7 +3,7 @@ import { join, relative, resolve } from 'node:path'
 import type { Browser, Page } from 'playwright'
 import { DshxFeatureCatalogSchema, parseReachStep } from '../project/features.js'
 import { DSHFILES_ROOT } from '../project/local-bundles.js'
-import { dismissPreviewNotice, dismissProviderSetupDuringStartup, dismissProviderSetupIfShown } from '../project/startup-dialogs.js'
+import { StartupDialogs } from '../project/startup-dialogs.js'
 import { applySeed } from './seed.js'
 import { ScratchError, ownedProcessStatus, redactUrls, writeScratchState, type ScratchState } from './state.js'
 
@@ -127,8 +127,8 @@ export const scratchOpen = async (state: ScratchState, reference: string, timeou
   const openAppRoot = async (): Promise<void> => {
     await page.goto(state.launchUrl, { waitUntil: 'domcontentloaded' })
     await page.locator('[data-slot="root"]').first().waitFor({ state: 'attached', timeout: timeoutMs })
-    await dismissPreviewNotice(page, 3_000)
-    await dismissProviderSetupDuringStartup(page, 3_000)
+    await StartupDialogs.dismissPreviewNotice(page, 3_000)
+    await StartupDialogs.dismissProviderSetupDuringStartup(page, 3_000)
   }
   try {
     await openAppRoot()
@@ -141,7 +141,7 @@ export const scratchOpen = async (state: ScratchState, reference: string, timeou
       const startedAt = Date.now()
       try {
         if (parsed === undefined) throw new Error('step does not match the reach grammar')
-        await dismissProviderSetupIfShown(page)
+        await StartupDialogs.dismissProviderSetupIfShown(page)
         if (parsed.action === 'seed') {
           if (!seeded.some(applied => applied.seed === parsed.seed)) {
             const applied: NonNullable<ScratchState['seeds']>[number] = { seed: parsed.seed }
