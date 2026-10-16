@@ -229,13 +229,22 @@ When('the repository is registered and a thread is started in it', async ({ page
   await sendMessage(page, 'jujutsu composer context thread')
 })
 
-Then('the composer bar names the repository, its workspace and its working copy', async ({ page }: { page: Page }) => {
-  await recordAssertion(page, 'jujutsu-composer-bar-shows-the-repository', async () => {
-    await expect(page.getByRole('button', { name: 'repo', exact: true })).toBeVisible()
-    await expect(page.getByRole('button', { name: 'default', exact: true })).toBeVisible()
-    await expect(page.getByRole('button', { name: /^@ \w+ · main\+$/ })).toBeVisible()
+Then('the composer dock shows one repository, workspace and bookmark chip', async ({ page }: { page: Page }) => {
+  const chip = page.getByRole('button', { name: 'repo (default / main+)', exact: true })
+  const viewport = page.viewportSize()
+  await recordAssertion(page, 'jujutsu-composer-dock-has-one-context-chip', async () => {
+    await expect(chip).toBeVisible()
+    await expect(page.getByRole('button', { name: 'repo', exact: true })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'default', exact: true })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: /^@ \w+ · main\+$/ })).toHaveCount(0)
   })
-  await page.getByRole('button', { name: 'repo', exact: true }).click()
+  for (const width of [360, 480, 768, 1024]) {
+    await page.setViewportSize({ width, height: viewport?.height ?? 900 })
+    await expect(chip).toBeVisible()
+    await expect.poll(() => chip.evaluate(button => button.scrollWidth <= button.clientWidth)).toBe(true)
+  }
+  if (viewport !== null) await page.setViewportSize(viewport)
+  await chip.click()
   await recordAssertion(page, 'jujutsu-composer-chip-opens-the-repository', () => expect(revisionRow(page, 'Feature work by Ada')).toBeVisible())
   await finishJourneyAssertions(page)
 })

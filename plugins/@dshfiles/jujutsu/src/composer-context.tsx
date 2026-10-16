@@ -11,7 +11,7 @@ import {
   DropdownMenuTrigger,
 } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
-import { ChevronDownIcon, FileCodeIcon, FileDiffIcon, FolderIcon, GitBranchIcon, GitCommitHorizontalIcon, LayersIcon } from '@dshfiles/plugin-ui/icons'
+import { ChevronDownIcon, FileCodeIcon, FileDiffIcon, FolderIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useQuery } from '@dshfiles/plugin-ui/query'
 import { useCallback, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react'
@@ -292,7 +292,7 @@ const Chip = (props: { readonly title: string; readonly onClick: () => void; rea
   </button>
 )
 
-/** Folder, JJ workspace and working-copy chips below the composer; each toggles the Jujutsu panel on this repository. */
+/** One contextual chip below the composer; it opens the Jujutsu panel for this repository. */
 export const ComposerChips = (props: ComposerSlotProps): JSX.Element | null => {
   const context = useComposerContext(props, 'composerChips')
   const repository = context.repository
@@ -301,39 +301,32 @@ export const ComposerChips = (props: ComposerSlotProps): JSX.Element | null => {
 
   const ownBookmark = repository.bookmarks[0]
   const nearestBookmark = repository.nearestBookmarks[0]
+  const bookmark = ownBookmark ?? nearestBookmark
+  const project = basename(repository.root)
+  const workspace = repository.workspace === project ? undefined : repository.workspace
+  const location = [workspace, bookmark === undefined ? undefined : bookmark + (ownBookmark === undefined ? '+' : '')]
+    .filter((value): value is string => value !== undefined)
+    .join(' / ')
+  const label = location.length === 0 ? `@ ${repository.changeId}` : location
+  const title = [
+    'Toggle Jujutsu on ' + repository.root,
+    repository.workspace === null ? undefined : 'Workspace: ' + repository.workspace,
+    bookmark === undefined ? undefined : 'Bookmark: ' + bookmark + (ownBookmark === undefined ? ' (nearest ancestor)' : ''),
+    'Working copy: @ ' + repository.changeId + ' (' + repository.commitId + ')',
+    repository.description.length === 0 ? undefined : repository.description,
+  ]
+    .filter((value): value is string => value !== undefined)
+    .join('\n')
   return (
-    // A 20rem container that shrinks with the dock: once squeezed the folder chip goes, then the workspace chip,
-    // leaving only the working-copy chip, so the chips never spill over the context meter.
     <div
-      className="dshx-root dshx:@container dshx:flex dshx:w-80 dshx:max-w-full dshx:min-w-0 dshx:shrink dshx:items-center dshx:justify-center dshx:gap-0.5 dshx:overflow-hidden dshx:text-xs dshx:text-muted-foreground"
+      className="dshx-root dshx:flex dshx:w-80 dshx:max-w-full dshx:min-w-0 dshx:shrink dshx:items-center dshx:justify-center dshx:overflow-hidden dshx:text-xs dshx:text-muted-foreground"
       ref={context.ref}
     >
-      <Chip className="dshx:shrink-[3] dshx:@max-xs:hidden" onClick={toggle} title={'Toggle Jujutsu on ' + repository.root}>
+      <Chip className="dshx:max-w-full dshx:shrink" onClick={toggle} title={title}>
         <FolderIcon />
-        <span className="dshx:max-w-40 dshx:truncate">{basename(repository.root)}</span>
-      </Chip>
-      {repository.workspace !== null && (
-        <Chip className="dshx:shrink-[2] dshx:@max-3xs:hidden" onClick={toggle} title={'JJ workspace ' + repository.workspace}>
-          <LayersIcon />
-          <span className="dshx:max-w-32 dshx:truncate">{repository.workspace}</span>
-        </Chip>
-      )}
-      <Chip
-        onClick={toggle}
-        title={'@ ' + repository.changeId + ' (' + repository.commitId + ')' + (repository.description.length > 0 ? ' — ' + repository.description : '')}
-      >
-        {ownBookmark !== undefined || nearestBookmark !== undefined ? <GitBranchIcon /> : <GitCommitHorizontalIcon />}
-        <span className="dshx:min-w-0 dshx:truncate dshx:font-mono!">@ {repository.changeId}</span>
-        {repository.conflict && <span className="dshx:text-destructive">conflict</span>}
-        {ownBookmark !== undefined ? (
-          <span className="dshx:max-w-48 dshx:min-w-0 dshx:shrink-[3] dshx:truncate dshx:text-foreground">· {ownBookmark}</span>
-        ) : nearestBookmark !== undefined ? (
-          <span className="dshx:max-w-48 dshx:min-w-0 dshx:shrink-[3] dshx:truncate" title={'Nearest ancestor bookmark: ' + nearestBookmark}>
-            · {nearestBookmark}+
-          </span>
-        ) : (
-          <span>· detached</span>
-        )}
+        <span className="dshx:min-w-0 dshx:truncate">{project}</span>
+        <span className="dshx:min-w-0 dshx:truncate dshx:text-foreground">({label})</span>
+        {repository.conflict && <span className="dshx:shrink-0 dshx:text-destructive">conflict</span>}
       </Chip>
     </div>
   )
