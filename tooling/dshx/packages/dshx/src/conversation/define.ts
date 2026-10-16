@@ -140,11 +140,11 @@ function makeContribution<Kind extends string, Events extends ConversationEventD
   return contribution
 }
 
-export function isConversationContribution(value: unknown): value is ConversationContribution {
+function isConversationContribution(value: unknown): value is ConversationContribution {
   return typeof value === 'object' && value !== null && contributionParts.has(value)
 }
 
-export function getConversationContributionParts(value: ConversationContribution): ConversationContributionParts {
+function getConversationContributionParts(value: ConversationContribution): ConversationContributionParts {
   const parts = contributionParts.get(value)
   if (parts === undefined) throw new TypeError('Invalid Conversation contribution; use defineConversation(...).render(Component).')
   return parts
@@ -163,15 +163,15 @@ type ConversationDefinitionInput<Kind extends string, Events extends Conversatio
 }
 
 /** Without `project`, the renderer receives the reduced state itself. */
-export function defineConversation<const Kind extends string, const Events extends ConversationEventDescriptors, State>(
+function defineConversation<const Kind extends string, const Events extends ConversationEventDescriptors, State>(
   definition: ConversationDefinitionInput<Kind, Events, State, State>,
 ): ConversationLifecycle<Kind, Events, State, State>
-export function defineConversation<const Kind extends string, const Events extends ConversationEventDescriptors, State, Data>(
+function defineConversation<const Kind extends string, const Events extends ConversationEventDescriptors, State, Data>(
   definition: ConversationDefinitionInput<Kind, Events, State, Data> & {
     readonly project: (state: State, context: ConversationNodeContext<State> & { readonly state: State }) => Data
   },
 ): ConversationLifecycle<Kind, Events, State, Data>
-export function defineConversation(
+function defineConversation(
   definition: ConversationDefinitionInput<string, ConversationEventDescriptors, unknown, unknown>,
 ): ConversationLifecycle<string, ConversationEventDescriptors, unknown, unknown> {
   validateDefinition(definition)
@@ -185,4 +185,10 @@ export function defineConversation(
     },
   }
   return lifecycle
+}
+
+export class ConversationContributionModel {
+  static readonly isContribution = isConversationContribution
+  static readonly parts = getConversationContributionParts
+  static readonly define = defineConversation
 }

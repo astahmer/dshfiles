@@ -1,5 +1,7 @@
 /** @experimental Conversation remains outside the API Candidate surface. */
-export { defineConversation } from './define.js'
+import { ConversationContributionModel } from './define.js'
+
+export const defineConversation = ConversationContributionModel.define
 export type {
   ConversationContribution,
   ConversationContractEvent,

@@ -1,7 +1,7 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
 import { defineConversation, type ConversationRenderProps } from '../src/conversation/index.js'
-import { getConversationContributionParts, isConversationContribution } from '../src/conversation/define.js'
+import { ConversationContributionModel } from '../src/conversation/define.js'
 
 declare module '@deepseek-ai/dsh-session/types' {
   interface SessionEventMap {
@@ -41,16 +41,16 @@ describe('experimental Conversation lifecycle', () => {
       expectTypeOf(props.data).toEqualTypeOf<{ label: string }>()
       return null
     })
-    expect(isConversationContribution(contribution)).toBe(true)
+    expect(ConversationContributionModel.isContribution(contribution)).toBe(true)
     expect(Object.keys(contribution)).toEqual([])
-    const parts = getConversationContributionParts(contribution)
+    const parts = ConversationContributionModel.parts(contribution)
     expect(parts.definition).toMatchObject({ kind: 'review-job', target: 'chat' })
     expect(parts.renderer).toMatchObject({ name: 'conversation.chat.node', options: { key: 'review-job', locale: 'conversation' } })
   })
 
   it('runs pure initial, reduce, and project stages through the official Definition', () => {
     const contribution = review.render(() => null)
-    const definition = getConversationContributionParts(contribution).definition
+    const definition = ConversationContributionModel.parts(contribution).definition
     const startEvent = { type: 'dshx-test/review-start', seq: 1, time: 1, data: { reviewId: 'r1', title: 'Audit' } } as SessionEvent<'dshx-test/review-start'>
     const progressEvent = {
       type: 'dshx-test/review-progress',
@@ -94,6 +94,6 @@ describe('experimental Conversation lifecycle', () => {
         initial: () => ({}),
       }),
     ).toThrow('reduce must be a function')
-    expect(isConversationContribution({ ...review.render(() => null) })).toBe(false)
+    expect(ConversationContributionModel.isContribution({ ...review.render(() => null) })).toBe(false)
   })
 })

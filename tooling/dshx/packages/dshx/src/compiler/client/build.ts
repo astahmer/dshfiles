@@ -176,7 +176,11 @@ function clientEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, op
         return `export { defineSettings } from ${JSON.stringify(SETTINGS_DEFINE_PATH)}\n`
       }
       if (id === `${VIRTUAL_CLIENT_PUBLIC}-conversation`) {
-        return `export { defineConversation } from ${JSON.stringify(CONVERSATION_DEFINE_PATH)}\n`
+        return [
+          `import { ConversationContributionModel } from ${JSON.stringify(CONVERSATION_DEFINE_PATH)}`,
+          'export const defineConversation = ConversationContributionModel.define',
+          '',
+        ].join('\n')
       }
       if (id !== VIRTUAL_CLIENT_ENTRY) return null
       const metadata = {

@@ -12,7 +12,7 @@ import type {
 } from './types.js'
 import { isSlotContribution, slotContributionParts, type SlotRegistrationOptions } from './define.js'
 import { isLocaleDefinition, localeDefinitionParts } from './locale.js'
-import { getConversationContributionParts, isConversationContribution } from '../conversation/define.js'
+import { ConversationContributionModel } from '../conversation/define.js'
 import { ApiClientLifecycle } from '../api/client.js'
 import { createSettingsClientRuntime, provideSettingsContext } from '../settings/client.js'
 import { registerPluginPageSettings } from '../settings/plugin-page.js'
@@ -190,7 +190,7 @@ function validateLocaleContribution(value: unknown, metadata: ClientPluginMetada
 }
 
 function validateConversationContribution(value: unknown, metadata: ClientPluginMetadata, index: number): ClientConversationContribution {
-  if (!isConversationContribution(value)) {
+  if (!ConversationContributionModel.isContribution(value)) {
     fail(
       'DSHX2301',
       `Client Conversation contribution at index ${index} must be returned by defineConversation(...).render(Component).`,
@@ -302,7 +302,7 @@ function registerLocales(client: ClientRuntimeContext, definition: ClientDefinit
 
 function registerContributions(client: ClientRuntimeContext, definition: ClientDefinition, decorate: ComponentDecorator): void {
   for (const conversation of definition.conversations ?? []) {
-    const { definition: conversationDefinition, renderer } = getConversationContributionParts(conversation)
+    const { definition: conversationDefinition, renderer } = ConversationContributionModel.parts(conversation)
     client.conversationEvents.register(conversationDefinition)
     client.slots.inject(renderer.name, () => client.slots.register({ name: renderer.name, ...renderer.options }, decorate(renderer.component)))
   }
