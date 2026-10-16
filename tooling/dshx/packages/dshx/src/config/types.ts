@@ -28,11 +28,24 @@ export interface DshxClientConfig extends DshxFaceConfig {
   }
 }
 
+/** One extra shared entry point: an export subpath name and the source entry it builds from. */
+export interface DshxModuleEntry {
+  readonly name: string
+  readonly entry: string
+}
+
 /** User-authored DSHX project exceptions. */
 export interface DshxConfig {
   readonly name?: string
   readonly host?: false | DshxHostConfig
   readonly client?: false | DshxClientConfig
+  /**
+   * Extra entry points other plugins import, keyed by export subpath name
+   * (`{ contract: 'src/contract.ts' }` builds `dist/contract.js`). Point the
+   * package.json `types` condition at the source file; the built JavaScript
+   * keeps every bare import external so consumers share one copy.
+   */
+  readonly modules?: Readonly<Record<string, string>>
   readonly profile?: string
   readonly dev?: {
     readonly hostRestart?: 'manual' | 'auto'
@@ -69,6 +82,7 @@ export interface ResolvedDshxConfig {
   readonly clientVitePlugins?: readonly PluginOption[]
   readonly clientShared?: string
   readonly clientSharedRuntime?: readonly string[]
+  readonly modules?: readonly DshxModuleEntry[]
   readonly outDir: string
   readonly profile: string
   readonly dev: {

@@ -5,7 +5,7 @@
  * entries. They may change while the build and compatibility protocol evolves.
  * @experimental
  */
-export { buildClient, buildHost, watchClient, watchHost } from '../compiler/index.js'
+export { buildClient, buildHost, buildModule, watchClient, watchHost } from '../compiler/index.js'
 export type {
   BuildArtifact,
   BuildClientOptions,

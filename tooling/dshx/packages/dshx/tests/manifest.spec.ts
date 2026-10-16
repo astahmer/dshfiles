@@ -518,3 +518,34 @@ describe('checkProjectManifest', () => {
     expect(after).toEqual(before)
   })
 })
+
+describe('shared modules', () => {
+  it('resolves declared shared entries and requires an export subpath for each', async () => {
+    const root = await temporaryProject()
+    await writeFile(resolve(root, 'src/contract.ts'), 'export const contract = 1\n')
+    await writeFile(resolve(root, 'dshx.config.ts'), 'export default { name: "@test/plugin", modules: { contract: "src/contract.ts" } }\n')
+    const config = await resolveDshxConfig({ cwd: root })
+    expect(config.modules).toEqual([{ name: 'contract', entry: resolve(root, 'src/contract.ts') }])
+    await expect(checkPackageTargets(config)).resolves.toContainEqual(
+      expect.objectContaining({ code: 'DSHX4192', message: expect.stringContaining('./contract') }),
+    )
+
+    const manifest = fullManifest()
+    manifest.exports = {
+      ...(manifest.exports as object),
+      './contract': { types: './src/contract.ts', default: './dist/contract.js' },
+    }
+    await writeManifest(root, manifest)
+    await mkdir(resolve(root, 'dist'), { recursive: true })
+    await writeFile(resolve(root, 'dist/contract.js'), '')
+    const remaining = await checkPackageTargets(await resolveDshxConfig({ cwd: root }))
+    expect(remaining.filter(item => item.message.includes('./contract'))).toEqual([])
+  })
+
+  it('rejects a reserved or malformed shared module name', async () => {
+    const root = await temporaryProject()
+    await writeFile(resolve(root, 'src/contract.ts'), 'export const contract = 1\n')
+    await writeFile(resolve(root, 'dshx.config.ts'), 'export default { name: "@test/plugin", modules: { client: "src/contract.ts" } }\n')
+    await expect(resolveDshxConfig({ cwd: root })).rejects.toThrow(/Invalid shared module name/u)
+  })
+})

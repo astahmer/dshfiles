@@ -3,11 +3,11 @@ import { dirname, isAbsolute, relative, resolve } from 'node:path'
 import { loadConfigFromFile } from 'vite'
 import { DshxError } from '../diagnostics.js'
 import { resolveVitePlugins } from './vite-plugins.js'
-import type { DshxConfig, ResolvedDshxConfig, ResolveDshxConfigOptions } from './types.js'
+import type { DshxConfig, DshxModuleEntry, ResolvedDshxConfig, ResolveDshxConfigOptions } from './types.js'
 
 const CONFIG_FILENAME = 'dshx.config.ts'
 const PACKAGE_FILENAME = 'package.json'
-const TOP_LEVEL_KEYS = new Set(['name', 'host', 'client', 'profile', 'dev', 'build', 'compatibility'])
+const TOP_LEVEL_KEYS = new Set(['name', 'host', 'client', 'modules', 'profile', 'dev', 'build', 'compatibility'])
 const FACE_KEYS = new Set(['entry', 'vite'])
 const HOST_FACE_KEYS = new Set([...FACE_KEYS, 'bundleDependencies'])
 const CLIENT_FACE_KEYS = new Set([...HOST_FACE_KEYS, 'shared', 'sharedRuntime'])
@@ -280,7 +280,7 @@ async function resolveEntry(
   root: string,
   configured: false | { readonly entry?: string } | undefined,
   convention: string,
-  field: 'host' | 'client',
+  field: 'host' | 'client' | `modules.${string}`,
   configFile: string | undefined,
 ): Promise<string | undefined> {
   if (configured === false) return undefined
@@ -291,13 +291,13 @@ async function resolveEntry(
     throw new DshxError('DSHX4005', `${field} entry does not exist: ${unresolved}`, {
       cause,
       file: configFile ?? unresolved,
-      hint: `Create the file or set ${field}: false.`,
+      hint: field.startsWith('modules.') ? `Create the file or remove modules.${field.slice('modules.'.length)}.` : `Create the file or set ${field}: false.`,
     })
   })
   if (!isInside(root, entry)) {
     throw new DshxError('DSHX4005', `${field} entry must stay inside the project root: ${entry}`, {
       file: configFile ?? entry,
-      hint: `Move the entry under ${root} or set ${field}: false.`,
+      hint: field.startsWith('modules.') ? `Move the entry under ${root}.` : `Move the entry under ${root} or set ${field}: false.`,
     })
   }
   return entry
@@ -322,6 +322,40 @@ export async function resolveDshxConfig(options: ResolveDshxConfigOptions = {}):
       hint: 'Call the plugin factory separately in host.vite.plugins and client.vite.plugins.',
     })
   }
+  const MODULE_NAME_PATTERN = /^[a-z][a-z0-9-]{0,63}$/u
+  /** Artifact names the Host and Client faces already own. */
+  const RESERVED_MODULE_NAMES = new Set(['index', 'client', 'package', 'cordis'])
+
+  /** Resolve the extra shared entry points other plugins import. */
+  async function resolveModules(
+    root: string,
+    modules: Readonly<Record<string, string>> | undefined,
+    configFile: string | undefined,
+  ): Promise<readonly DshxModuleEntry[]> {
+    const resolved: DshxModuleEntry[] = []
+    for (const [name, entry] of Object.entries(modules ?? {})) {
+      if (!MODULE_NAME_PATTERN.test(name) || RESERVED_MODULE_NAMES.has(name)) {
+        throw new DshxError('DSHX4007', `Invalid shared module name ${JSON.stringify(name)}.`, {
+          ...(configFile === undefined ? {} : { file: configFile }),
+          hint: 'Use a lower-case name such as "contract"; "index", "client", "package" and "cordis" are reserved.',
+        })
+      }
+      if (typeof entry !== 'string' || entry.trim() === '') {
+        throw new DshxError('DSHX4007', `Shared module ${JSON.stringify(name)} needs a source entry.`, {
+          ...(configFile === undefined ? {} : { file: configFile }),
+        })
+      }
+      const absolute = await resolveEntry(root, { entry }, 'src/module.ts', `modules.${name}`, configFile)
+      if (absolute === undefined) {
+        throw new DshxError('DSHX4007', `Shared module ${JSON.stringify(name)} has no entry.`, {
+          ...(configFile === undefined ? {} : { file: configFile }),
+        })
+      }
+      resolved.push({ name, entry: absolute })
+    }
+    return resolved
+  }
+
   const hostEntry = await resolveEntry(root, loaded.config.host, 'src/host.ts', 'host', loaded.configFile)
   const clientEntry = await resolveEntry(root, loaded.config.client, 'src/client.tsx', 'client', loaded.configFile)
   const hostBundleDependencies = loaded.config.host === false ? [] : (loaded.config.host?.bundleDependencies ?? [])
@@ -331,6 +365,7 @@ export async function resolveDshxConfig(options: ResolveDshxConfigOptions = {}):
       hint: 'Create src/host.ts or src/client.tsx, or configure an explicit entry.',
     })
   }
+  const modules = await resolveModules(root, loaded.config.modules, loaded.configFile)
   const packageId = manifest.name as string
   return {
     root,
@@ -342,6 +377,7 @@ export async function resolveDshxConfig(options: ResolveDshxConfigOptions = {}):
     ...(hostEntry === undefined ? {} : { hostEntry }),
     ...(clientEntry === undefined ? {} : { clientEntry }),
     hostBundleDependencies,
+    ...(modules.length === 0 ? {} : { modules }),
     clientBundleDependencies: loaded.config.client === false ? [] : (loaded.config.client?.bundleDependencies ?? []),
     ...(loaded.config.client === false || loaded.config.client?.shared === undefined ? {} : { clientShared: loaded.config.client.shared }),
     ...(loaded.config.client === false || loaded.config.client?.sharedRuntime === undefined

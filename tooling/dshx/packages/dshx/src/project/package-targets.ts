@@ -56,6 +56,20 @@ export async function checkPackageTargets(config: ResolvedDshxConfig): Promise<D
 
   const targets = packageTargets(manifest)
   const diagnostics: DshxDiagnostic[] = []
+  // A shared module other plugins import must be reachable through its own export subpath.
+  for (const shared of config.modules ?? []) {
+    const subpath = `./${shared.name}`
+    const exported = typeof manifest.exports === 'object' && manifest.exports !== null ? (manifest.exports as Record<string, unknown>)[subpath] : undefined
+    if (exported === undefined) {
+      diagnostics.push({
+        code: 'DSHX4192',
+        severity: 'error',
+        message: `exports: the shared module "${shared.name}" built by dshx.config.ts has no "${subpath}" subpath.`,
+        file: config.packageFile,
+        hint: `Add "${subpath}": { "types": "<source>", "default": "./dist/${shared.name}.js" } so another plugin can import it.`,
+      })
+    }
+  }
   const checked = new Set<string>()
   for (const target of targets) {
     const key = `${target.field}\0${target.target}`

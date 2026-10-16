@@ -62,6 +62,14 @@ shipping a workaround: an `as unknown as`, a local `declare module`, or a
 restated interface is a toolchain bug report. Keep such abstractions narrow and
 name the plugin that forced them.
 
+**A contract another plugin imports is a dshx module, not an exports trick.**
+Declare it in `dshx.config.ts` — `modules: { 'attention-api': 'src/attention-api.ts' }`
+— and publish the matching `exports` subpath (`"./attention-api"`: types from the
+source, `default` from `dist/attention-api.js`); `dshx build` emits the entry,
+keeps its bare imports external, and fails when the subpath is missing. Never
+point a runtime export at raw TypeScript source, and never restate another
+plugin's API schemas locally: both make the contract drift silently.
+
 ## Never restart the running DSH instance
 
 The `web` profile runs on `127.0.0.1:3080`, usually with other agents mid-turn.

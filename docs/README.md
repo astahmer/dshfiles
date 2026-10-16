@@ -7,6 +7,7 @@ This directory holds repository-wide operational guidance. Product and API docum
 | [`profile-installs.md`](profile-installs.md) | Local profile installs, pnpm behavior, peer dependencies, and composition.                           |
 | [`e2e-testing.md`](e2e-testing.md)           | Test layers, boot smoke, Gherkin journeys, feature catalogs, and run evidence.                       |
 | [Incremental checks](incremental-checks.md)  | Unified pnpm workspace, Turbo caching, JJ-aware changed/related tests, and safe fallback boundaries. |
+| [Client state ownership](client-state-ownership.md) | Which plugin state belongs on the Host, which belongs to a browser window, and what to move next. |
 | [`scripts/README.md`](../scripts/README.md)  | Repository-level scripts and their owning workflows.                                                 |
 
 For the complete package guide index, see the [repository README](../README.md#owned-dsh-bundles). For dshx, see the [toolchain documentation index](../tooling/dshx/docs/index.md).

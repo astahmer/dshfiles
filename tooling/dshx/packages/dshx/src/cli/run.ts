@@ -4,7 +4,7 @@ import { createRequire } from 'node:module'
 import { relative, resolve as resolvePath } from 'node:path'
 import { styleText } from 'node:util'
 import { isCancel, select, text } from '@clack/prompts'
-import { buildClient, buildHost } from '../compiler/index.js'
+import { buildClient, buildHost, buildModule } from '../compiler/index.js'
 import { resolveDshxConfig } from '../config/resolve.js'
 import { startDevSession } from '../dev/index.js'
 import type { DevEvent, DevSession } from '../dev/index.js'
@@ -78,6 +78,7 @@ export interface CliRuntime {
   readonly ensureProfile?: typeof ensureProjectProfile
   readonly buildHost?: typeof buildHost
   readonly buildClient?: typeof buildClient
+  readonly buildModule?: typeof buildModule
   readonly startDev?: typeof startDevSession
   readonly inspectComposition?: typeof inspectProjectComposition
   readonly inspectRuntimePlugins?: typeof inspectRuntimePlugins
@@ -389,6 +390,19 @@ async function runBuild(args: CliArgs, options: CliRunOptions, project: Resolved
         external,
         inject,
         compatibility,
+      }),
+    })
+  }
+  for (const shared of project.modules ?? []) {
+    jobs.push({
+      fallback: resolvePath(project.outDir, `${shared.name}.js`),
+      task: (runtime.buildModule ?? buildModule)({
+        packageId: project.packageId,
+        root: project.root,
+        name: shared.name,
+        entry: shared.entry,
+        outDir: project.outDir,
+        sourcemap: project.build.sourcemap,
       }),
     })
   }

@@ -34,6 +34,33 @@ export default defineConfig({
 
 Declared package roots are embedded instead of externalized. Platform modules, including Cordis and React, cannot be bundled; Node imports remain forbidden. Other runtime requests still belong in `dsh.client.external`.
 
+### Shared modules other plugins import
+
+A plugin that exposes a contract — an API definition, an event name, a schema — declares it as a
+shared module. DSHX builds one ESM artifact per name next to the Host and Client faces, keeps every
+bare import external so both sides resolve one copy, and fails the build when the package.json
+`exports` subpath is missing:
+
+```ts
+export default defineConfig({
+  name: '@dshfiles/thread-sidebar',
+  modules: { 'attention-api': 'src/attention-api.ts' },
+})
+```
+
+```json
+{
+  "exports": {
+    "./attention-api": { "types": "./src/attention-api.ts", "default": "./dist/attention-api.js" }
+  }
+}
+```
+
+The consumer imports the subpath (`import { threadSidebarAttentionApi } from '@dshfiles/thread-sidebar/attention-api'`)
+and adds the owning package as a workspace dependency. Names are lower-case and may not be `index`,
+`client`, `package` or `cordis`. Point `types` at the source entry: DSHX does not emit per-module
+declarations, and the source is the single definition both sides compile.
+
 ## Create and develop
 
 Build the source fork's `create-dshx` and `@dshfiles/dshx` packages, then invoke its CLI:
