@@ -1,6 +1,6 @@
 import { createConnection } from 'node:net'
 import { describe, expect, test } from 'vitest'
-import { connectSsh, discoverRemoteHomes, probeSsh } from '../src/connectors/ssh.js'
+import { SshConnector } from '../src/connectors/ssh.js'
 import { GatewayUnavailableError } from '../src/connectors/gateway.js'
 import { createGatewayPool } from '../src/gateway-pool.js'
 
@@ -26,22 +26,22 @@ const localSshdListening = (): Promise<boolean> =>
 // The system OpenSSH client, exactly as the connector runs it.
 describe('SSH connector error mapping (real ssh)', () => {
   test('an unresolvable host maps to ssh-host-unresolved', async () => {
-    expect(await failureCode(() => probeSsh({ sshTarget: 'nobody@multi-host-test.invalid' }))).toBe('ssh-host-unresolved')
+    expect(await failureCode(() => SshConnector.probe({ sshTarget: 'nobody@multi-host-test.invalid' }))).toBe('ssh-host-unresolved')
   })
 
   test('a refused port maps to ssh-unreachable', async context => {
     if (await localSshdListening()) context.skip()
-    expect(await failureCode(() => probeSsh({ sshTarget: 'nobody@127.0.0.1' }))).toBe('ssh-unreachable')
+    expect(await failureCode(() => SshConnector.probe({ sshTarget: 'nobody@127.0.0.1' }))).toBe('ssh-unreachable')
   })
 
   test('a shell-shaped target is refused before ssh runs', async () => {
-    await expect(probeSsh({ sshTarget: 'host; touch /tmp/pwned' })).rejects.toThrow()
+    await expect(SshConnector.probe({ sshTarget: 'host; touch /tmp/pwned' })).rejects.toThrow()
   })
 
   test('a cancelled probe stops ssh', async () => {
     const controller = new AbortController()
     controller.abort()
-    expect(await failureCode(() => probeSsh({ sshTarget: 'nobody@multi-host-test.invalid', signal: controller.signal }))).toBe('cancelled')
+    expect(await failureCode(() => SshConnector.probe({ sshTarget: 'nobody@multi-host-test.invalid', signal: controller.signal }))).toBe('cancelled')
   })
 })
 
@@ -54,16 +54,16 @@ describe.skipIf(sshTarget === undefined || remoteHome === undefined)('SSH connec
   const home = remoteHome ?? ''
 
   test('discovers the remote DSH home from its launch file', async () => {
-    const homes = await discoverRemoteHomes({ sshTarget: target })
+    const homes = await SshConnector.discoverHomes({ sshTarget: target })
     expect(homes).toContainEqual({ path: home, source: 'multi-host' })
   })
 
   test('a missing launch file maps to runtime-not-running', async () => {
-    expect(await failureCode(() => connectSsh({ sshTarget: target, remoteHome: '/nonexistent/dsh-home' }))).toBe('runtime-not-running')
+    expect(await failureCode(() => SshConnector.connect({ sshTarget: target, remoteHome: '/nonexistent/dsh-home' }))).toBe('runtime-not-running')
   })
 
   test('one pooled tunnel serves consecutive calls and is replaced after it closes', async () => {
-    const pool = createGatewayPool({ isTransportFailure: () => false, connect: () => connectSsh({ sshTarget: target, remoteHome: home }) })
+    const pool = createGatewayPool({ isTransportFailure: () => false, connect: () => SshConnector.connect({ sshTarget: target, remoteHome: home }) })
     try {
       const first = await pool.run('live', gateway => gateway.api('identity'), { mutation: false })
       expect(first).toMatchObject({ protocolVersion: 1 })

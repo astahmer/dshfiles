@@ -5,7 +5,7 @@ import { z } from 'zod'
 import { defineHost } from '@dshfiles/dshx/host'
 import { multiHostApi, type ConnectionTestStep, type RuntimeStatus } from './api.js'
 import { connectLocal } from './connectors/local.js'
-import { connectSsh, discoverRemoteHomes, probeSsh } from './connectors/ssh.js'
+import { SshConnector } from './connectors/ssh.js'
 import { GatewayUnavailableError, type Gateway } from './connectors/gateway.js'
 import { createGatewayPool, type PooledGateway } from './gateway-pool.js'
 import { readOrCreateRuntimeIdentity, RuntimeIdentityError } from './identity.js'
@@ -150,7 +150,7 @@ const connectRuntime = async ({
   if (runtime.locator.kind === 'local' && host.connector.kind === 'local')
     return connectLocal({ launchUrl: runtime.locator.launchUrl, ...(originPort === undefined ? {} : { originPort }), signal })
   if (runtime.locator.kind === 'ssh' && host.connector.kind === 'ssh')
-    return connectSsh({
+    return SshConnector.connect({
       sshTarget: host.connector.sshTarget,
       remoteHome: runtime.locator.remoteHome,
       ...(originPort === undefined ? {} : { originPort }),
@@ -352,7 +352,7 @@ const qualifyRuntime = async ({
   }
   if (host.connector.kind === 'ssh') {
     const sshTarget = host.connector.sshTarget
-    await timed('ssh', () => probeSsh({ sshTarget, signal }))
+    await timed('ssh', () => SshConnector.probe({ sshTarget, signal }))
   }
   const provisional: RuntimeRecord = {
     schemaVersion: 2,
@@ -417,7 +417,7 @@ const multiHostHandlers = multiHostApi.host({
   sshConfigHosts: async () => ({ hosts: await listSshConfigHosts(join(homedir(), '.ssh')) }),
   discoverHomes: async ({ input, signal }) => {
     try {
-      return { ok: true as const, homes: await discoverRemoteHomes({ sshTarget: input.sshTarget, signal }) }
+      return { ok: true as const, homes: await SshConnector.discoverHomes({ sshTarget: input.sshTarget, signal }) }
     } catch (error) {
       return { ok: false as const, ...safeFailure(error) }
     }

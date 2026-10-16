@@ -226,7 +226,7 @@ const openTunnel = async ({
   }
 }
 
-export const connectSsh = async ({
+const connectSsh = async ({
   sshTarget,
   remoteHome,
   originPort,
@@ -279,12 +279,12 @@ export const connectSsh = async ({
 }
 
 /** Cheapest proof that SSH reaches the machine with BatchMode keys: run `true`. */
-export const probeSsh = async ({ sshTarget, signal }: { readonly sshTarget: string; readonly signal?: AbortSignal | undefined }): Promise<void> => {
+const probeSsh = async ({ sshTarget, signal }: { readonly sshTarget: string; readonly signal?: AbortSignal | undefined }): Promise<void> => {
   await runSshCommand({ sshTarget: sshTargetOf(sshTarget), command: 'true', signal })
 }
 
 /** DSH homes under the remote user's home that publish a launch file, newest first. Paths only, never contents. */
-export const discoverRemoteHomes = async ({
+const discoverRemoteHomes = async ({
   sshTarget,
   signal,
 }: {
@@ -306,4 +306,10 @@ export const discoverRemoteHomes = async ({
     if (home !== undefined && !homes.has(home)) homes.set(home, multiHost === null ? 'web-url' : 'multi-host')
   }
   return [...homes.entries()].map(([path, source]) => ({ path, source }))
+}
+
+export class SshConnector {
+  static readonly connect = connectSsh
+  static readonly probe = probeSsh
+  static readonly discoverHomes = discoverRemoteHomes
 }
