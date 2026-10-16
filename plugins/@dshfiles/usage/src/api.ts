@@ -1,14 +1,14 @@
 import { defineApi, method } from '@dshfiles/dshx/api'
 import { z } from 'zod'
-import { REQUEST_PURPOSES, REQUEST_STATUSES } from './fold.js'
+import { UsageFoldModel } from './fold.js'
 
-export const purposeSchema = z.enum(REQUEST_PURPOSES)
-export const statusSchema = z.enum(REQUEST_STATUSES)
+export const purposeSchema = z.enum(UsageFoldModel.REQUEST_PURPOSES)
+export const statusSchema = z.enum(UsageFoldModel.REQUEST_STATUSES)
 
 const rangeShape = {
   from: z.number().int().min(0).describe('Range start, Unix milliseconds.'),
   to: z.number().int().min(0).describe('Range end, Unix milliseconds.'),
-  purposes: z.array(purposeSchema).max(REQUEST_PURPOSES.length).optional(),
+  purposes: z.array(purposeSchema).max(UsageFoldModel.REQUEST_PURPOSES.length).optional(),
 }
 
 export const SORT_COLUMNS = ['startedAt', 'cost', 'input', 'cacheRead', 'output', 'durationMs', 'ttftMs'] as const

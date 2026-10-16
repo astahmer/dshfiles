@@ -1,6 +1,6 @@
 import { readdir, stat } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
-import { decodeFoldState, foldRecords, initialFoldState } from './fold.js'
+import { UsageFoldModel } from './fold.js'
 import { readLogFrom } from './session-log.js'
 import type { UsageStore } from './store.js'
 
@@ -46,8 +46,8 @@ export const indexSessionLog = async (store: UsageStore, path: string): Promise<
   if (info === undefined) return 0
   const cursor = store.fileCursor(path)
   if (cursor !== undefined && cursor.size === info.size && cursor.mtime_ms === info.mtimeMs) return 0
-  const resumed = cursor === undefined || info.size < cursor.offset ? undefined : decodeFoldState(cursor.state)
-  let state = resumed ?? initialFoldState()
+  const resumed = cursor === undefined || info.size < cursor.offset ? undefined : UsageFoldModel.decodeFoldState(cursor.state)
+  let state = resumed ?? UsageFoldModel.initialFoldState()
   let offset = resumed === undefined || cursor === undefined ? 0 : cursor.offset
   const fallbackSessionId = basename(dirname(path))
   let rows = 0
@@ -56,7 +56,7 @@ export const indexSessionLog = async (store: UsageStore, path: string): Promise<
     let chunk = await readLogFrom({ path, fromOffset: offset, size: window })
     if (chunk.endOffset === offset && window < info.size) chunk = await readLogFrom({ path, fromOffset: offset, size: info.size })
     if (chunk.endOffset === offset) break
-    const folded = foldRecords({ state, records: chunk.records, sessionId: fallbackSessionId })
+    const folded = UsageFoldModel.foldRecords({ state, records: chunk.records, sessionId: fallbackSessionId })
     state = folded.state
     offset = chunk.endOffset
     store.commitLogSlice({

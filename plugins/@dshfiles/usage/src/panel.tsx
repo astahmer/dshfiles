@@ -12,7 +12,7 @@ import { useState } from 'react'
 import { z } from 'zod'
 import { purposeSchema, usageApi } from './api.js'
 import { UsageCharts } from './charts.js'
-import { REQUEST_PURPOSES, type RequestPurpose } from './fold.js'
+import { UsageFoldModel, type RequestPurpose } from './fold.js'
 import { UsageFormattingModel, type OpenThread } from './format.js'
 import { RequestLog } from './request-log.js'
 
@@ -96,7 +96,7 @@ export const UsagePanel = (props: { readonly openThread: OpenThread }): JSX.Elem
     const current = new Set(preferences.purposes)
     if (current.has(purpose)) current.delete(purpose)
     else current.add(purpose)
-    update({ purposes: REQUEST_PURPOSES.filter(item => current.has(item)) })
+    update({ purposes: UsageFoldModel.REQUEST_PURPOSES.filter(item => current.has(item)) })
   }
 
   return (
@@ -195,7 +195,7 @@ export const UsagePanel = (props: { readonly openThread: OpenThread }): JSX.Elem
         >
           All
         </Button>
-        {REQUEST_PURPOSES.map(purpose => (
+        {UsageFoldModel.REQUEST_PURPOSES.map(purpose => (
           <Button
             key={purpose}
             size="xs"

@@ -20,10 +20,8 @@ import type { LogRecord } from './session-log.js'
  *   `session/title`; the log keeps no usage for it.
  */
 
-export const REQUEST_PURPOSES = ['agent', 'subagent', 'compaction', 'title', 'memory', 'other'] as const
-export type RequestPurpose = (typeof REQUEST_PURPOSES)[number]
-export const REQUEST_STATUSES = ['ok', 'aborted', 'failed'] as const
-export type RequestStatus = (typeof REQUEST_STATUSES)[number]
+export type RequestPurpose = (typeof UsageFoldModel.REQUEST_PURPOSES)[number]
+export type RequestStatus = (typeof UsageFoldModel.REQUEST_STATUSES)[number]
 
 export interface TokenUsage {
   /** Prompt tokens billed at the input rate (not read from or written to the cache). */
@@ -87,27 +85,6 @@ const foldStateSchema = z.object({
 })
 
 export type FoldState = z.infer<typeof foldStateSchema>
-
-export const initialFoldState = (): FoldState => ({
-  session: null,
-  route: null,
-  stepStarts: {},
-  settledSteps: [],
-  silentSteps: [],
-  compactionStarts: {},
-  pendingTitle: null,
-  openAttempts: [],
-})
-
-/** A stored state that no longer decodes restarts the fold from the file's first byte. */
-export const decodeFoldState = (raw: string): FoldState | undefined => {
-  try {
-    const parsed = foldStateSchema.safeParse(JSON.parse(raw))
-    return parsed.success ? parsed.data : undefined
-  } catch {
-    return undefined
-  }
-}
 
 const headerSchema = z.object({
   id: z.string(),
@@ -178,211 +155,237 @@ const STOP_REASON_BY_FINISH: Readonly<Record<string, string>> = { 'tool-calls': 
 
 const ABORTED_TURN_REASONS = new Set(['aborted', 'interrupted'])
 
-export const foldRecords = (input: {
-  readonly state: FoldState
-  readonly records: readonly LogRecord[]
-  /** Fallback session id when the header record was folded in an earlier pass (always in state then). */
-  readonly sessionId: string
-}): { readonly state: FoldState; readonly rows: RequestRow[] } => {
-  const state: FoldState = structuredClone(input.state)
-  const rows: RequestRow[] = []
-  const sessionId = (): string => state.session?.id ?? input.sessionId
-  const agentPurpose = (): RequestPurpose => (state.session?.subagent === true ? 'subagent' : 'agent')
+export class UsageFoldModel {
+  static readonly REQUEST_PURPOSES = ['agent', 'subagent', 'compaction', 'title', 'memory', 'other'] as const
+  static readonly REQUEST_STATUSES = ['ok', 'aborted', 'failed'] as const
 
-  for (const record of input.records) {
-    const time = typeof record.time === 'number' ? record.time : null
-    const seq = typeof record.seq === 'number' ? record.seq : null
-    switch (record.type) {
-      case 'session': {
-        const header = headerSchema.safeParse(record)
-        if (!header.success) break
-        state.session = {
-          id: header.data.id,
-          cwd: header.data.cwd ?? null,
-          parentSession: header.data.parentSession ?? null,
-          subagent: header.data.origin === 'subagent',
-          createdAt: header.data.createdAt ?? null,
-          title: state.session?.title ?? null,
-        }
-        break
-      }
-      case 'request/header': {
-        const parsed = requestHeaderSchema.safeParse(record.data)
-        if (parsed.success) state.route = { provider: parsed.data.header.config.provider, model: parsed.data.header.config.model }
-        break
-      }
-      case 'request/context':
-      case 'model/selection': {
-        const parsed = routeSchema.safeParse(record.data)
-        if (parsed.success) state.route = { provider: parsed.data.provider, model: parsed.data.model }
-        break
-      }
-      case 'step/start': {
-        const parsed = turnStepSchema.safeParse(record.data)
-        if (parsed.success && time !== null) state.stepStarts[stepKey(parsed.data.turn, parsed.data.step)] = time
-        break
-      }
-      case 'assistant/message':
-      case 'assistant/attempt': {
-        const parsed = assistantSchema.safeParse(record.data)
-        if (!parsed.success || seq === null) break
-        const data = parsed.data
-        const key = stepKey(data.turn, data.step)
-        let usage = data.usage === undefined ? null : toUsage(data.usage)
-        let firstChunkAt: number | null = null
-        let finish: { readonly kind: string; readonly code: string | null; readonly at: number | null } | null = null
-        for (const raw of data.stream ?? []) {
-          const entry = streamEntrySchema.safeParse(raw)
-          if (!entry.success) continue
-          const at = entry.data.time ?? null
-          const chunk = entry.data.chunk
-          // A stream that only carries its error `finish` never produced a token.
-          if (firstChunkAt === null && at !== null && chunk?.type !== 'finish' && chunk?.type !== 'usage') firstChunkAt = at
-          if (chunk?.type === 'usage' && chunk.usage !== undefined && data.usage === undefined) usage = toUsage(chunk.usage)
-          if (chunk?.type === 'finish' && chunk.reason !== undefined) finish = { kind: chunk.reason.kind, code: chunk.reason.failure?.code ?? null, at }
-        }
-        const stepStart = state.stepStarts[key]
-        const startedAt = stepStart ?? firstChunkAt ?? finish?.at ?? time ?? 0
-        const failed = finish?.kind === 'error' || record.type === 'assistant/attempt'
-        const aborted = finish !== null && ABORTED_TURN_REASONS.has(finish.kind)
-        const source = data.message?.source
-        const row: RequestRow = {
-          id: `${sessionId()}#${String(seq)}`,
-          sessionId: sessionId(),
-          seq,
-          messageId: data.message?.id ?? null,
-          turn: data.turn,
-          step: data.step,
-          purpose: agentPurpose(),
-          source: 'log',
-          provider: source?.provider ?? state.route?.provider ?? '',
-          model: source?.model ?? state.route?.model ?? '',
-          startedAt,
-          endedAt: finish?.at ?? time,
-          ttftMs: stepStart !== undefined && firstChunkAt !== null ? Math.max(0, firstChunkAt - stepStart) : null,
-          usage,
-          status: failed ? 'failed' : aborted ? 'aborted' : 'ok',
-          stopReason: source?.replayState?.response?.stopReason ?? (finish === null ? null : (STOP_REASON_BY_FINISH[finish.kind] ?? finish.kind)),
-          errorCode: finish?.code ?? null,
-        }
-        if (record.type === 'assistant/attempt' && finish === null) state.openAttempts.push({ key, row })
-        else rows.push(row)
-        if (!state.settledSteps.includes(key)) state.settledSteps.push(key)
-        break
-      }
-      case 'llm/retry': {
-        const parsed = retrySchema.safeParse(record.data)
-        if (!parsed.success) break
-        const key = stepKey(parsed.data.turn, parsed.data.step)
-        const code = parsed.data.failure?.code ?? null
-        for (const open of state.openAttempts.filter(attempt => attempt.key === key)) rows.push({ ...open.row, status: 'failed', errorCode: code })
-        state.openAttempts = state.openAttempts.filter(attempt => attempt.key !== key)
-        break
-      }
-      case 'step/end': {
-        const parsed = turnStepSchema.safeParse(record.data)
-        if (!parsed.success || seq === null || time === null) break
-        const key = stepKey(parsed.data.turn, parsed.data.step)
-        const startedAt = state.stepStarts[key]
-        if (startedAt !== undefined && !state.settledSteps.includes(key))
-          state.silentSteps.push({ turn: parsed.data.turn, step: parsed.data.step, seq, startedAt, endedAt: time })
-        break
-      }
-      case 'turn/end': {
-        const parsed = turnEndSchema.safeParse(record.data)
-        if (!parsed.success) break
-        const reason = parsed.data.reason?.kind ?? null
-        const turnPrefix = `${String(parsed.data.turn)}:`
-        for (const open of state.openAttempts.filter(attempt => attempt.key.startsWith(turnPrefix))) {
-          const aborted = reason !== null && ABORTED_TURN_REASONS.has(reason)
-          rows.push({
-            ...open.row,
-            status: aborted ? 'aborted' : 'failed',
-            stopReason: aborted ? reason : open.row.stopReason,
-            errorCode: aborted ? null : (parsed.data.reason?.error?.code ?? open.row.errorCode),
-          })
-        }
-        state.openAttempts = state.openAttempts.filter(attempt => !attempt.key.startsWith(turnPrefix))
-        if (reason !== null && ABORTED_TURN_REASONS.has(reason)) {
-          for (const silent of state.silentSteps.filter(step => step.turn === parsed.data.turn)) {
-            rows.push({
-              id: `${sessionId()}#${String(silent.seq)}`,
-              sessionId: sessionId(),
-              seq: silent.seq,
-              messageId: null,
-              turn: silent.turn,
-              step: silent.step,
-              purpose: agentPurpose(),
-              source: 'log',
-              provider: state.route?.provider ?? '',
-              model: state.route?.model ?? '',
-              startedAt: silent.startedAt,
-              endedAt: silent.endedAt,
-              ttftMs: null,
-              usage: null,
-              status: 'aborted',
-              stopReason: reason,
-              errorCode: null,
-            })
-          }
-        }
-        // A turn's step bookkeeping is never needed again once it ends.
-        state.stepStarts = Object.fromEntries(Object.entries(state.stepStarts).filter(([key]) => !key.startsWith(turnPrefix)))
-        state.settledSteps = state.settledSteps.filter(key => !key.startsWith(turnPrefix))
-        state.silentSteps = state.silentSteps.filter(step => step.turn !== parsed.data.turn)
-        break
-      }
-      case 'compaction/start': {
-        const parsed = compactionStartSchema.safeParse(record.data)
-        if (parsed.success && time !== null) state.compactionStarts[parsed.data.compactionId] = time
-        break
-      }
-      case 'compaction/summary': {
-        const parsed = compactionSummarySchema.safeParse(record.data)
-        if (!parsed.success || seq === null) break
-        const startedAt = state.compactionStarts[parsed.data.compactionId] ?? time ?? 0
-        delete state.compactionStarts[parsed.data.compactionId]
-        rows.push({
-          id: `${sessionId()}#${String(seq)}`,
-          sessionId: sessionId(),
-          seq,
-          messageId: null,
-          turn: null,
-          step: null,
-          purpose: 'compaction',
-          source: 'log',
-          provider: parsed.data.provider,
-          model: parsed.data.model,
-          startedAt,
-          endedAt: time,
-          ttftMs: null,
-          usage: parsed.data.usage === undefined ? null : toUsage(parsed.data.usage),
-          status: 'ok',
-          stopReason: null,
-          errorCode: null,
-        })
-        break
-      }
-      case 'session/title-llm-request': {
-        const parsed = titleRequestSchema.safeParse(record.data)
-        if (!parsed.success || seq === null || time === null) break
-        state.pendingTitle = { seq, startedAt: time, provider: parsed.data.route.provider, model: parsed.data.route.model }
-        rows.push(titleRow(sessionId(), state.pendingTitle, null))
-        break
-      }
-      case 'session/title': {
-        const parsed = titleSchema.safeParse(record.data)
-        if (!parsed.success) break
-        if (state.session !== null) state.session = { ...state.session, title: parsed.data.title }
-        if (parsed.data.source?.kind === 'provider' && state.pendingTitle !== null && time !== null) {
-          rows.push(titleRow(sessionId(), state.pendingTitle, time))
-          state.pendingTitle = null
-        }
-        break
-      }
+  static readonly initialFoldState = (): FoldState => ({
+    session: null,
+    route: null,
+    stepStarts: {},
+    settledSteps: [],
+    silentSteps: [],
+    compactionStarts: {},
+    pendingTitle: null,
+    openAttempts: [],
+  })
+
+  /** A stored state that no longer decodes restarts the fold from the file's first byte. */
+  static readonly decodeFoldState = (raw: string): FoldState | undefined => {
+    try {
+      const parsed = foldStateSchema.safeParse(JSON.parse(raw))
+      return parsed.success ? parsed.data : undefined
+    } catch {
+      return undefined
     }
   }
-  return { state, rows }
+
+  static readonly foldRecords = (input: {
+    readonly state: FoldState
+    readonly records: readonly LogRecord[]
+    /** Fallback session id when the header record was folded in an earlier pass (always in state then). */
+    readonly sessionId: string
+  }): { readonly state: FoldState; readonly rows: RequestRow[] } => {
+    const state: FoldState = structuredClone(input.state)
+    const rows: RequestRow[] = []
+    const sessionId = (): string => state.session?.id ?? input.sessionId
+    const agentPurpose = (): RequestPurpose => (state.session?.subagent === true ? 'subagent' : 'agent')
+
+    for (const record of input.records) {
+      const time = typeof record.time === 'number' ? record.time : null
+      const seq = typeof record.seq === 'number' ? record.seq : null
+      switch (record.type) {
+        case 'session': {
+          const header = headerSchema.safeParse(record)
+          if (!header.success) break
+          state.session = {
+            id: header.data.id,
+            cwd: header.data.cwd ?? null,
+            parentSession: header.data.parentSession ?? null,
+            subagent: header.data.origin === 'subagent',
+            createdAt: header.data.createdAt ?? null,
+            title: state.session?.title ?? null,
+          }
+          break
+        }
+        case 'request/header': {
+          const parsed = requestHeaderSchema.safeParse(record.data)
+          if (parsed.success) state.route = { provider: parsed.data.header.config.provider, model: parsed.data.header.config.model }
+          break
+        }
+        case 'request/context':
+        case 'model/selection': {
+          const parsed = routeSchema.safeParse(record.data)
+          if (parsed.success) state.route = { provider: parsed.data.provider, model: parsed.data.model }
+          break
+        }
+        case 'step/start': {
+          const parsed = turnStepSchema.safeParse(record.data)
+          if (parsed.success && time !== null) state.stepStarts[stepKey(parsed.data.turn, parsed.data.step)] = time
+          break
+        }
+        case 'assistant/message':
+        case 'assistant/attempt': {
+          const parsed = assistantSchema.safeParse(record.data)
+          if (!parsed.success || seq === null) break
+          const data = parsed.data
+          const key = stepKey(data.turn, data.step)
+          let usage = data.usage === undefined ? null : toUsage(data.usage)
+          let firstChunkAt: number | null = null
+          let finish: { readonly kind: string; readonly code: string | null; readonly at: number | null } | null = null
+          for (const raw of data.stream ?? []) {
+            const entry = streamEntrySchema.safeParse(raw)
+            if (!entry.success) continue
+            const at = entry.data.time ?? null
+            const chunk = entry.data.chunk
+            // A stream that only carries its error `finish` never produced a token.
+            if (firstChunkAt === null && at !== null && chunk?.type !== 'finish' && chunk?.type !== 'usage') firstChunkAt = at
+            if (chunk?.type === 'usage' && chunk.usage !== undefined && data.usage === undefined) usage = toUsage(chunk.usage)
+            if (chunk?.type === 'finish' && chunk.reason !== undefined) finish = { kind: chunk.reason.kind, code: chunk.reason.failure?.code ?? null, at }
+          }
+          const stepStart = state.stepStarts[key]
+          const startedAt = stepStart ?? firstChunkAt ?? finish?.at ?? time ?? 0
+          const failed = finish?.kind === 'error' || record.type === 'assistant/attempt'
+          const aborted = finish !== null && ABORTED_TURN_REASONS.has(finish.kind)
+          const source = data.message?.source
+          const row: RequestRow = {
+            id: `${sessionId()}#${String(seq)}`,
+            sessionId: sessionId(),
+            seq,
+            messageId: data.message?.id ?? null,
+            turn: data.turn,
+            step: data.step,
+            purpose: agentPurpose(),
+            source: 'log',
+            provider: source?.provider ?? state.route?.provider ?? '',
+            model: source?.model ?? state.route?.model ?? '',
+            startedAt,
+            endedAt: finish?.at ?? time,
+            ttftMs: stepStart !== undefined && firstChunkAt !== null ? Math.max(0, firstChunkAt - stepStart) : null,
+            usage,
+            status: failed ? 'failed' : aborted ? 'aborted' : 'ok',
+            stopReason: source?.replayState?.response?.stopReason ?? (finish === null ? null : (STOP_REASON_BY_FINISH[finish.kind] ?? finish.kind)),
+            errorCode: finish?.code ?? null,
+          }
+          if (record.type === 'assistant/attempt' && finish === null) state.openAttempts.push({ key, row })
+          else rows.push(row)
+          if (!state.settledSteps.includes(key)) state.settledSteps.push(key)
+          break
+        }
+        case 'llm/retry': {
+          const parsed = retrySchema.safeParse(record.data)
+          if (!parsed.success) break
+          const key = stepKey(parsed.data.turn, parsed.data.step)
+          const code = parsed.data.failure?.code ?? null
+          for (const open of state.openAttempts.filter(attempt => attempt.key === key)) rows.push({ ...open.row, status: 'failed', errorCode: code })
+          state.openAttempts = state.openAttempts.filter(attempt => attempt.key !== key)
+          break
+        }
+        case 'step/end': {
+          const parsed = turnStepSchema.safeParse(record.data)
+          if (!parsed.success || seq === null || time === null) break
+          const key = stepKey(parsed.data.turn, parsed.data.step)
+          const startedAt = state.stepStarts[key]
+          if (startedAt !== undefined && !state.settledSteps.includes(key))
+            state.silentSteps.push({ turn: parsed.data.turn, step: parsed.data.step, seq, startedAt, endedAt: time })
+          break
+        }
+        case 'turn/end': {
+          const parsed = turnEndSchema.safeParse(record.data)
+          if (!parsed.success) break
+          const reason = parsed.data.reason?.kind ?? null
+          const turnPrefix = `${String(parsed.data.turn)}:`
+          for (const open of state.openAttempts.filter(attempt => attempt.key.startsWith(turnPrefix))) {
+            const aborted = reason !== null && ABORTED_TURN_REASONS.has(reason)
+            rows.push({
+              ...open.row,
+              status: aborted ? 'aborted' : 'failed',
+              stopReason: aborted ? reason : open.row.stopReason,
+              errorCode: aborted ? null : (parsed.data.reason?.error?.code ?? open.row.errorCode),
+            })
+          }
+          state.openAttempts = state.openAttempts.filter(attempt => !attempt.key.startsWith(turnPrefix))
+          if (reason !== null && ABORTED_TURN_REASONS.has(reason)) {
+            for (const silent of state.silentSteps.filter(step => step.turn === parsed.data.turn)) {
+              rows.push({
+                id: `${sessionId()}#${String(silent.seq)}`,
+                sessionId: sessionId(),
+                seq: silent.seq,
+                messageId: null,
+                turn: silent.turn,
+                step: silent.step,
+                purpose: agentPurpose(),
+                source: 'log',
+                provider: state.route?.provider ?? '',
+                model: state.route?.model ?? '',
+                startedAt: silent.startedAt,
+                endedAt: silent.endedAt,
+                ttftMs: null,
+                usage: null,
+                status: 'aborted',
+                stopReason: reason,
+                errorCode: null,
+              })
+            }
+          }
+          // A turn's step bookkeeping is never needed again once it ends.
+          state.stepStarts = Object.fromEntries(Object.entries(state.stepStarts).filter(([key]) => !key.startsWith(turnPrefix)))
+          state.settledSteps = state.settledSteps.filter(key => !key.startsWith(turnPrefix))
+          state.silentSteps = state.silentSteps.filter(step => step.turn !== parsed.data.turn)
+          break
+        }
+        case 'compaction/start': {
+          const parsed = compactionStartSchema.safeParse(record.data)
+          if (parsed.success && time !== null) state.compactionStarts[parsed.data.compactionId] = time
+          break
+        }
+        case 'compaction/summary': {
+          const parsed = compactionSummarySchema.safeParse(record.data)
+          if (!parsed.success || seq === null) break
+          const startedAt = state.compactionStarts[parsed.data.compactionId] ?? time ?? 0
+          delete state.compactionStarts[parsed.data.compactionId]
+          rows.push({
+            id: `${sessionId()}#${String(seq)}`,
+            sessionId: sessionId(),
+            seq,
+            messageId: null,
+            turn: null,
+            step: null,
+            purpose: 'compaction',
+            source: 'log',
+            provider: parsed.data.provider,
+            model: parsed.data.model,
+            startedAt,
+            endedAt: time,
+            ttftMs: null,
+            usage: parsed.data.usage === undefined ? null : toUsage(parsed.data.usage),
+            status: 'ok',
+            stopReason: null,
+            errorCode: null,
+          })
+          break
+        }
+        case 'session/title-llm-request': {
+          const parsed = titleRequestSchema.safeParse(record.data)
+          if (!parsed.success || seq === null || time === null) break
+          state.pendingTitle = { seq, startedAt: time, provider: parsed.data.route.provider, model: parsed.data.route.model }
+          rows.push(titleRow(sessionId(), state.pendingTitle, null))
+          break
+        }
+        case 'session/title': {
+          const parsed = titleSchema.safeParse(record.data)
+          if (!parsed.success) break
+          if (state.session !== null) state.session = { ...state.session, title: parsed.data.title }
+          if (parsed.data.source?.kind === 'provider' && state.pendingTitle !== null && time !== null) {
+            rows.push(titleRow(sessionId(), state.pendingTitle, time))
+            state.pendingTitle = null
+          }
+          break
+        }
+      }
+    }
+    return { state, rows }
+  }
 }
 
 const titleRow = (sessionId: string, pending: NonNullable<FoldState['pendingTitle']>, endedAt: number | null): RequestRow => ({

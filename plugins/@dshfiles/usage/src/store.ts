@@ -4,7 +4,7 @@ import { DatabaseSync, type SQLInputValue, type StatementSync } from 'node:sqlit
 import { z } from 'zod'
 import { CostEstimateModel } from '@dshfiles/ai-accounts/cost-estimate'
 import type { ChartQuery, ChartView, RequestPage, RequestQuery, RequestView } from './api.js'
-import { REQUEST_PURPOSES, REQUEST_STATUSES, type RequestRow, type SessionMeta } from './fold.js'
+import { UsageFoldModel, type RequestRow, type SessionMeta } from './fold.js'
 
 /**
  * The usage index: one row per model request, one per session, and one per
@@ -124,7 +124,7 @@ const requestRowSchema = z.object({
   message_id: textColumn,
   turn: numberColumn,
   step: numberColumn,
-  purpose: z.enum(REQUEST_PURPOSES),
+  purpose: z.enum(UsageFoldModel.REQUEST_PURPOSES),
   provider: z.string(),
   model: z.string(),
   started_at: z.number(),
@@ -135,7 +135,7 @@ const requestRowSchema = z.object({
   cache_write: numberColumn,
   output: numberColumn,
   cost: numberColumn,
-  status: z.enum(REQUEST_STATUSES),
+  status: z.enum(UsageFoldModel.REQUEST_STATUSES),
   stop_reason: textColumn,
   error_code: textColumn,
 })

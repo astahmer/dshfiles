@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { foldRecords, initialFoldState } from './fold.js'
+import { UsageFoldModel } from './fold.js'
 import type { LogRecord } from './session-log.js'
 
-const fold = (records: readonly LogRecord[]) => foldRecords({ state: initialFoldState(), records, sessionId: 'session-a' })
+const fold = (records: readonly LogRecord[]) => UsageFoldModel.foldRecords({ state: UsageFoldModel.initialFoldState(), records, sessionId: 'session-a' })
 
 describe('foldRecords', () => {
   it('fails an attempt the loop retried with the retry failure code, then records the settled retry', () => {
@@ -74,7 +74,7 @@ describe('foldRecords', () => {
       },
     ]
     const first = fold(records.slice(0, 1))
-    const second = foldRecords({ state: JSON.parse(JSON.stringify(first.state)), records: records.slice(1), sessionId: 'session-a' })
+    const second = UsageFoldModel.foldRecords({ state: JSON.parse(JSON.stringify(first.state)), records: records.slice(1), sessionId: 'session-a' })
     expect(second.rows).toEqual(fold(records).rows)
     expect(second.rows[0]?.ttftMs).toBe(40)
   })
