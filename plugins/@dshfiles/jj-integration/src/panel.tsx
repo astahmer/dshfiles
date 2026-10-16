@@ -14,13 +14,13 @@ import {
 } from '@dshfiles/plugin-ui/components/ui/alert-dialog'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@dshfiles/plugin-ui/components/ui/card'
+import { Card, CardContent, CardHeader } from '@dshfiles/plugin-ui/components/ui/card'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { Skeleton } from '@dshfiles/plugin-ui/components/ui/skeleton'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { EllipsisIcon, RefreshCwIcon } from '@dshfiles/plugin-ui/icons'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
-import { errorMessage, useIsMutating, useMutation, useMutationState, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
+import { errorMessage, useIsMutating, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useApi } from '@dshfiles/dshx/client'
 import { useCallback, useEffect, useId, useMemo, useState, useSyncExternalStore } from 'react'
 import { jjIntegrationApi, type ThreadView, type WorkspaceSyncView } from './api.js'
@@ -173,7 +173,6 @@ const ThreadRow = (props: {
   readonly t: JjIntegrationTranslate
   readonly bookmark: string
   readonly busy: boolean
-  readonly rebasing: boolean
   readonly onRebase: () => void
   readonly onDiscard: () => void
 }): JSX.Element => {
@@ -202,72 +201,82 @@ const ThreadRow = (props: {
   const clientCanRebase = useSyncExternalStore(subscribe, readClientCanRebase, () => false)
   const sessionWaitingForInput = useSyncExternalStore(subscribe, readClientQuestionPending, () => true)
   const canRebase = thread.canRebase === true && !sessionRunning && !sessionWaitingForInput
-  const blockedReason = thread.canRebase === undefined ? t('rebaseActivityUnknown') : t('rebaseBlocked')
   useEffect(() => {
     if (thread.canRebase !== false || !clientCanRebase) return
     void queryClient.invalidateQueries({ queryKey: threadQueryKeys.repositories })
   }, [clientCanRebase, queryClient, thread.canRebase])
   const conflicted = thread.unlanded.some(revision => revision.conflict)
   return (
-    <li className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-2 dshx:rounded-md dshx:border dshx:p-3">
-      <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
-        <span className="dshx:font-mono dshx:text-sm">{thread.name}</span>
-        <Badge variant="secondary">{t('sessions', { count: thread.sessionIds.length })}</Badge>
-        {thread.unlanded.length === 0 ? <Badge variant="outline">{t('upToDate')}</Badge> : <Badge>{t('toRebase', { count: thread.unlanded.length })}</Badge>}
-        {thread.behind ? <Badge variant="outline">{t('behind', { bookmark: props.bookmark })}</Badge> : null}
-        {props.rebasing ? <Badge variant="secondary">{t('rebasing')}</Badge> : null}
-        {thread.rebasedAt === undefined ? null : (
-          <Badge variant="secondary" title={new Date(thread.rebasedAt).toLocaleString()}>
-            {t('rebasedTag')}
-          </Badge>
+    <li className="dshx:grid dshx:min-w-0 dshx:grid-cols-[minmax(0,0.8fr)_minmax(0,2fr)_minmax(6rem,0.7fr)_minmax(7rem,0.8fr)_auto_auto] dshx:items-center dshx:gap-x-4 dshx:gap-y-2 dshx:border-b dshx:px-3 dshx:py-2.5 dshx:last:border-b-0 dshx:@max-pane-compact:flex dshx:@max-pane-compact:flex-wrap">
+      <span className="dshx:truncate dshx:font-mono dshx:text-xs dshx:text-muted-foreground">{thread.name}</span>
+      <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-0.5">
+        {thread.sessionIds.length > 0 ? (
+          <ul className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-0.5">
+            {thread.sessionIds.map(sessionId => {
+              const session = props.sessionById.get(sessionId)
+              if (session === undefined)
+                return (
+                  <li key={sessionId} className="dshx:truncate dshx:text-xs dshx:text-muted-foreground">
+                    {sessionId}
+                  </li>
+                )
+              return <ThreadSessionRow key={session.id} session={session} sessions={props.sessions} t={t} openSession={props.openSession} />
+            })}
+          </ul>
+        ) : (
+          <span className="dshx:text-sm dshx:text-muted-foreground">{thread.name}</span>
         )}
-        {conflicted ? <Badge variant="destructive">{t('conflict')}</Badge> : null}
-        {thread.finished ? <Badge variant="outline">{t('finished')}</Badge> : null}
-        {thread.missing ? <Badge variant="destructive">{t('missing')}</Badge> : null}
-        <span className="dshx:ml-auto dshx:flex dshx:items-center dshx:gap-2">
-          {thread.unlanded.length > 0 ? (
-            <Button size="sm" disabled={props.busy || thread.missing || !canRebase} onClick={props.onRebase} title={canRebase ? undefined : blockedReason}>
-              {props.rebasing ? <Spinner /> : null}
-              {props.rebasing ? t('rebasing') : t('rebase')}
-            </Button>
-          ) : null}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button size="icon-sm" variant="ghost" disabled={props.busy} aria-label={t('moreActions', { name: thread.name })}>
-                <EllipsisIcon />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem variant="destructive" onSelect={props.onDiscard}>
-                {thread.unlanded.length > 0 ? t('removeWorkspaceWorkMenu') : t('removeWorkspaceMenu')}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </span>
+        {thread.unlanded.length > 0 ? (
+          <span
+            className="dshx:truncate dshx:font-mono dshx:text-[11px] dshx:text-muted-foreground"
+            title={thread.unlanded.map(revision => `${revision.changeId} ${revision.description}`).join(' · ')}
+          >
+            {thread.unlanded
+              .slice(0, 2)
+              .map(revision => `${revision.changeId} ${revision.description}`)
+              .join(' · ')}
+            {thread.unlanded.length > 2 ? ` · ${t('andMore', { count: thread.unlanded.length - 2 })}` : ''}
+          </span>
+        ) : null}
       </div>
-      {thread.sessionIds.length > 0 ? (
-        <ul className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-1 dshx:border-l dshx:pl-2">
-          {thread.sessionIds.map(sessionId => {
-            const session = props.sessionById.get(sessionId)
-            if (session === undefined)
-              return (
-                <li key={sessionId} className="dshx:truncate dshx:px-2 dshx:text-xs dshx:text-muted-foreground">
-                  {sessionId}
-                </li>
-              )
-            return <ThreadSessionRow key={session.id} session={session} sessions={props.sessions} t={t} openSession={props.openSession} />
-          })}
-        </ul>
-      ) : null}
-      {thread.unlanded.length > 0 ? (
-        <ul className="dshx:flex dshx:flex-col dshx:gap-0.5 dshx:text-xs dshx:text-muted-foreground">
-          {thread.unlanded.map(revision => (
-            <li key={revision.commitId} className="dshx:truncate">
-              <span className="dshx:font-mono">{revision.changeId}</span> {revision.description}
-            </li>
-          ))}
-        </ul>
-      ) : null}
+      <span className="dshx:text-xs dshx:text-muted-foreground">{t('sessions', { count: thread.sessionIds.length })}</span>
+      <span className="dshx:text-xs dshx:text-muted-foreground">{thread.unlanded.length > 0 ? t('toRebase', { count: thread.unlanded.length }) : null}</span>
+      <Badge
+        className={canRebase ? 'dshx:justify-self-start dshx:border-success/30 dshx:bg-success/10 dshx:text-success' : 'dshx:justify-self-start'}
+        variant={conflicted || thread.missing ? 'destructive' : 'outline'}
+      >
+        {thread.missing
+          ? t('missing')
+          : conflicted
+            ? t('conflict')
+            : thread.unlanded.length === 0
+              ? thread.behind
+                ? t('behind', { bookmark: props.bookmark })
+                : t('upToDate')
+              : canRebase
+                ? t('canRebaseHeading')
+                : t('waiting')}
+      </Badge>
+      <span className="dshx:flex dshx:items-center dshx:gap-1">
+        {thread.unlanded.length > 0 ? (
+          <Button size="sm" disabled={props.busy || thread.missing || !canRebase} onClick={props.onRebase} title={canRebase ? undefined : t('rebaseBlocked')}>
+            {props.busy ? <Spinner /> : null}
+            {props.busy ? t('rebasing') : t('rebase')}
+          </Button>
+        ) : null}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button size="icon-sm" variant="ghost" disabled={props.busy} aria-label={t('moreActions', { name: thread.name })}>
+              <EllipsisIcon />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem variant="destructive" onSelect={props.onDiscard}>
+              {thread.unlanded.length > 0 ? t('removeWorkspaceWorkMenu') : t('removeWorkspaceMenu')}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </span>
     </li>
   )
 }
@@ -357,10 +366,6 @@ export const ThreadWorkspacesPanel = (props: {
   const api = useApi(jjIntegrationApi)
   const queryClient = useQueryClient()
   const rebasesPending = useIsMutating({ mutationKey: threadRebaseMutationKey }) > 0
-  const rebasingPaths = useMutationState({
-    filters: { mutationKey: threadRebaseMutationKey, status: 'pending' },
-    select: mutation => mutation.state.variables,
-  })
   const toast = useToast()
   const [notice, setNotice] = useState<{ readonly tone: 'default' | 'destructive'; readonly text: string } | null>(null)
   const repositories = useQuery({
@@ -402,18 +407,75 @@ export const ThreadWorkspacesPanel = (props: {
     },
     onSettled: refreshAfterChange,
   })
+  const [filter, setFilter] = useState<'all' | 'can-rebase' | 'behind' | 'conflicts' | 'up-to-date'>('all')
+  const [search, setSearch] = useState('')
   const repositoriesWithThreads = repositories.data?.repositories.filter(repository => repository.threads.length > 0)
+  const threads = repositoriesWithThreads?.flatMap(repository => repository.threads.map(thread => ({ repository, thread }))) ?? []
+  const categoryOf = (thread: ThreadView): Exclude<typeof filter, 'all'> => {
+    if (thread.unlanded.some(revision => revision.conflict)) return 'conflicts'
+    if (thread.unlanded.length === 0 && !thread.behind) return 'up-to-date'
+    if (thread.canRebase === true && thread.unlanded.length > 0) return 'can-rebase'
+    return 'behind'
+  }
+  const counts = {
+    all: threads.length,
+    'can-rebase': threads.filter(({ thread }) => categoryOf(thread) === 'can-rebase').length,
+    behind: threads.filter(({ thread }) => categoryOf(thread) === 'behind').length,
+    conflicts: threads.filter(({ thread }) => categoryOf(thread) === 'conflicts').length,
+    'up-to-date': threads.filter(({ thread }) => categoryOf(thread) === 'up-to-date').length,
+  }
+  const visibleThreads = threads.filter(({ thread }) => {
+    const query = search.trim().toLocaleLowerCase()
+    const matchesSearch =
+      query === '' ||
+      [thread.name, ...thread.sessionIds.map(id => sessionById.get(id)?.displayTitle ?? ''), ...thread.unlanded.map(revision => revision.description)]
+        .join(' ')
+        .toLocaleLowerCase()
+        .includes(query)
+    return matchesSearch && (filter === 'all' || categoryOf(thread) === filter)
+  })
+  const groups: readonly { readonly id: Exclude<typeof filter, 'all'>; readonly title: string; readonly color: string }[] = [
+    { id: 'conflicts', title: t('conflictsHeading'), color: 'dshx:text-destructive' },
+    { id: 'can-rebase', title: t('canRebaseHeading'), color: 'dshx:text-success' },
+    { id: 'behind', title: t('behindHeading', { bookmark: props.bookmark }), color: 'dshx:text-warning' },
+    { id: 'up-to-date', title: t('upToDateHeading'), color: 'dshx:text-muted-foreground' },
+  ]
+  const tabs: readonly { readonly id: typeof filter; readonly label: string }[] = [
+    { id: 'all', label: t('allThreads') },
+    { id: 'can-rebase', label: t('canRebaseHeading') },
+    { id: 'behind', label: t('behindTab') },
+    { id: 'conflicts', label: t('conflictsHeading') },
+    { id: 'up-to-date', label: t('upToDateHeading') },
+  ]
 
   return (
-    <div className="dshx-root dshx:flex dshx:h-full dshx:flex-col dshx:gap-4 dshx:overflow-auto dshx:p-6">
-      <header className="dshx:flex dshx:flex-wrap dshx:items-start dshx:gap-3">
-        <div className="dshx:flex dshx:flex-col dshx:gap-1">
+    <div className="dshx-root dshx:@container dshx:flex dshx:h-full dshx:flex-col dshx:gap-4 dshx:overflow-auto dshx:p-6 dshx:@max-pane-narrow:p-3">
+      <header className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-4">
+        <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-1">
           <h1 className="dshx:text-xl dshx:font-semibold">{t('title')}</h1>
           <p className="dshx:text-sm dshx:text-muted-foreground">{t('subtitle', { bookmark: props.bookmark })}</p>
         </div>
-        <Button className="dshx:ml-auto" size="sm" variant="outline" onClick={() => void repositories.refetch()} disabled={repositories.isFetching}>
+        {threads.length > 0 ? (
+          <label className="dshx:ml-auto dshx:flex dshx:min-w-56 dshx:flex-1 dshx:items-center dshx:gap-2 dshx:rounded-md dshx:border dshx:bg-background dshx:px-3 dshx:py-2 dshx:text-sm dshx:text-muted-foreground dshx:@max-pane-narrow:order-3 dshx:@max-pane-narrow:w-full dshx:@max-pane-narrow:flex-auto">
+            <span aria-hidden="true">⌕</span>
+            <input
+              aria-label={t('searchThreads')}
+              className="dshx:min-w-0 dshx:flex-1 dshx:bg-transparent dshx:outline-hidden dshx:font-mono! dshx:text-sm"
+              placeholder={t('searchThreads')}
+              value={search}
+              onChange={event => setSearch(event.currentTarget.value)}
+            />
+          </label>
+        ) : null}
+        <Button
+          size="icon-sm"
+          variant="outline"
+          aria-label={t('refresh')}
+          title={t('refresh')}
+          onClick={() => void repositories.refetch()}
+          disabled={repositories.isFetching}
+        >
           {repositories.isFetching ? <Spinner /> : <RefreshCwIcon />}
-          {t('refresh')}
         </Button>
       </header>
       {toast.element}
@@ -430,36 +492,86 @@ export const ThreadWorkspacesPanel = (props: {
       ) : null}
       {repositories.isPending ? <PanelSkeleton /> : null}
       {repositories.data?.repositories.length === 0 ? <p className="dshx:text-sm dshx:text-muted-foreground">{t('noRepositories')}</p> : null}
-      {repositories.data !== undefined && repositories.data.repositories.length > 0 && repositoriesWithThreads?.length === 0 ? (
+      {repositories.data !== undefined && repositories.data.repositories.length > 0 && threads.length === 0 ? (
         <p className="dshx:text-sm dshx:text-muted-foreground">{t('noThreads')}</p>
       ) : null}
-      {repositoriesWithThreads?.map(repository => (
-        <Card key={repository.repoRoot}>
-          <CardHeader>
-            <CardTitle>{repository.title}</CardTitle>
-            <CardDescription className="dshx:break-all dshx:font-mono">{repository.repoRoot}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ul className="dshx:flex dshx:flex-col dshx:gap-2">
-              {repository.threads.map(thread => (
-                <ThreadRow
-                  key={thread.path}
-                  thread={thread}
-                  sessionById={sessionById}
-                  sessions={props.sessions}
-                  openSession={props.openSession}
-                  t={t}
-                  bookmark={props.bookmark}
-                  busy={rebasesPending}
-                  rebasing={rebasingPaths.includes(thread.path)}
-                  onRebase={() => rebase.mutate(thread.path)}
-                  onDiscard={() => discard.request({ path: thread.path, name: thread.name, unlandedCount: thread.unlanded.length })}
-                />
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
-      ))}
+      {threads.length > 0 ? (
+        <>
+          <nav
+            aria-label={t('workspaceFilters')}
+            className="dshx:flex dshx:flex-wrap dshx:gap-1 dshx:self-start dshx:rounded-lg dshx:border dshx:bg-muted/30 dshx:p-1"
+          >
+            {tabs.map(tab => (
+              <Button
+                key={tab.id}
+                size="sm"
+                variant={filter === tab.id ? 'default' : 'ghost'}
+                aria-pressed={filter === tab.id}
+                onClick={() => setFilter(tab.id)}
+              >
+                {tab.label}
+                <Badge variant="secondary">{counts[tab.id]}</Badge>
+              </Button>
+            ))}
+          </nav>
+          {counts['can-rebase'] > 0 ? (
+            <Alert className="dshx:border-success/30 dshx:bg-success/5">
+              <AlertDescription className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-3">
+                <span className="dshx:min-w-0 dshx:flex-1">{t('rebaseReadySummary', { count: counts['can-rebase'] })}</span>
+                <Button
+                  size="sm"
+                  disabled={rebasesPending}
+                  onClick={() => threads.filter(({ thread }) => categoryOf(thread) === 'can-rebase').forEach(({ thread }) => rebase.mutate(thread.path))}
+                >
+                  {t('rebaseAll', { count: counts['can-rebase'] })}
+                </Button>
+              </AlertDescription>
+            </Alert>
+          ) : null}
+          {groups.map(group => {
+            const entries = visibleThreads.filter(({ thread }) => categoryOf(thread) === group.id)
+            if (entries.length === 0) return null
+            return (
+              <section key={group.id} className="dshx:flex dshx:flex-col dshx:gap-2">
+                <h2 className={`dshx:text-base dshx:font-semibold ${group.color}`}>
+                  {group.title} <span className="dshx:text-muted-foreground">({entries.length})</span>
+                </h2>
+                {repositoriesWithThreads?.map(repository => {
+                  const repoEntries = entries.filter(entry => entry.repository.repoRoot === repository.repoRoot)
+                  if (repoEntries.length === 0) return null
+                  return (
+                    <div key={repository.repoRoot} className="dshx:flex dshx:flex-col dshx:gap-1">
+                      {repositoriesWithThreads.length > 1 ? (
+                        <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:px-1 dshx:text-xs">
+                          <span className="dshx:font-medium">{repository.title}</span>
+                          <span className="dshx:min-w-0 dshx:truncate dshx:font-mono dshx:text-muted-foreground">{repository.repoRoot}</span>
+                        </div>
+                      ) : null}
+                      <ul className="dshx:flex dshx:flex-col">
+                        {repoEntries.map(({ thread }) => (
+                          <ThreadRow
+                            key={thread.path}
+                            thread={thread}
+                            sessionById={sessionById}
+                            sessions={props.sessions}
+                            openSession={props.openSession}
+                            t={t}
+                            bookmark={props.bookmark}
+                            busy={rebasesPending}
+                            onRebase={() => rebase.mutate(thread.path)}
+                            onDiscard={() => discard.request({ path: thread.path, name: thread.name, unlandedCount: thread.unlanded.length })}
+                          />
+                        ))}
+                      </ul>
+                    </div>
+                  )
+                })}
+              </section>
+            )
+          })}
+          {visibleThreads.length === 0 ? <p className="dshx:text-sm dshx:text-muted-foreground">{t('noMatchingThreads')}</p> : null}
+        </>
+      ) : null}
       <DiscardDialog t={t} confirmation={discard} />
     </div>
   )

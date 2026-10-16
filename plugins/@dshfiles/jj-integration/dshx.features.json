@@ -451,7 +451,7 @@
     {
       "id": "thread-workspaces-panel",
       "title": "Thread workspaces page",
-      "summary": "Available from the left panel and conversation side panel beside Jujutsu. Rows show conversation titles with open links and lazy message previews; Rebase is disabled until every thread session is stopped and no user question is pending. A successful rebase immediately marks its row up to date while the refreshed repository data arrives. Removal confirms folder and registry effects and any revisions to abandon.",
+      "summary": "A full-page status dashboard, also available in the conversation side panel, groups thread workspaces into conflicts, can-rebase, behind-bookmark and up-to-date sections. Search and status filters narrow the rows; safe work can be rebased together. Each row keeps the conversation title, lazy message preview, rebase state and cleanup actions. Removal confirms folder and registry effects and any revisions to abandon.",
       "reach": [
         "seed rebase-ready-thread",
         "click button \"Current thread workspace: thread-*\"",
@@ -460,7 +460,9 @@
         "expect heading \"Thread workspaces\"",
         "expect button \"Rebase\"",
         "click button \"Preview\"",
-        "expect text \"You\""
+        "expect text \"You\"",
+        "click button \"Thread workspaces\"",
+        "expect heading \"Thread workspaces\""
       ],
       "configuration": [],
       "surfaces": ["client", "host", "integration"],
