@@ -160,7 +160,7 @@ export const jjIntegrationApi = defineApi({
       input: threadPathInput,
       output: z.object({ summary: z.string(), result: landResultSchema.nullable() }).strict(),
       description:
-        'Rebase this thread’s described work onto the target bookmark (main by default) and advance the bookmark. An agent calling it for its own thread is exempt from its own running session, so it can rebase again after resolving handed-back conflicts or descriptions; every other thread session must still be idle and free of pending questions. It refuses undescribed revisions, reports conflicts to resolve, and never pushes. Call only when the user asked to rebase this thread’s work.',
+        'Integrate this thread’s described work into the target bookmark (main by default): rebase the thread revisions onto the current bookmark tip, then advance the bookmark to the new tip. Existing bookmark ancestry stays intact; nothing is pushed. An agent calling it for its own thread is exempt from its own running session, while every other thread session must be idle and free of pending questions. It refuses undescribed revisions and reports conflicts. Call only when the user asked to integrate this thread’s work.',
       tool: { name: 'jj_thread_rebase', render: output => output.summary },
     }),
     workspaceSync: method({

@@ -107,7 +107,7 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
   const label = props.t('rebaseThread', { bookmark: props.bookmark })
   const triggerLabel = isThread ? props.t('currentThreadWorkspace', { name }) : props.t('workspaceMenuShared', { name })
   const rebaseDisabled = rebasesPending || !isThread || unlanded === 0 || !canRebase
-  const blockedReason = isThread && !canRebase ? props.t('rebaseBlocked') : undefined
+  const blockedReason = isThread && !canRebase ? props.t(clientCanRebase === undefined ? 'rebaseActivityUnknown' : 'rebaseBlocked') : undefined
   const statusText = (): string => {
     if (loading) return props.t('workspaceStatusLoading')
     if (!isThread) return props.t('sharedCheckoutHint')
@@ -172,7 +172,7 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
                   disabled={rebaseDisabled}
                   onClick={() => rebase.mutate(current.path)}
                   size="sm"
-                  title={canRebase ? `${label} (${props.t('toRebase', { count: unlanded })})` : `${label} — ${props.t('rebaseBlocked')}`}
+                  title={canRebase ? `${label} (${props.t('toRebase', { count: unlanded })})` : `${label} — ${blockedReason}`}
                   type="button"
                   variant="outline"
                 >

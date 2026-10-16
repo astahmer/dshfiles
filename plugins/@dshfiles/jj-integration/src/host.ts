@@ -374,8 +374,13 @@ const landThread = async (input: {
       fromAgent: input.fromAgent,
       sessionId: input.sessionId,
     })
-    if (eligible !== true) {
-      throw new PluginApiError('Finish all work and answer pending questions before rebasing this thread.', { code: 'thread-active' })
+    if (eligible === undefined) {
+      throw new PluginApiError('Could not verify whether this thread is idle. Refresh and retry integration.', { code: 'thread-activity-unknown' })
+    }
+    if (!eligible) {
+      throw new PluginApiError('This thread still has active work or unanswered questions. Stop work and resolve questions before integrating.', {
+        code: 'thread-active',
+      })
     }
   }
   const outcome = await requireThreads().land(input.path, input.signal)
@@ -634,8 +639,8 @@ const rebaseCommand = defineCommand({
       fromAgent: false,
       signal: invocation.signal,
     })
-    if (result.status === 'landed') return { kind: 'success', text: `Rebased ${String(result.revisions.length)} revision(s) onto ${result.bookmark}.` }
-    if (result.status === 'nothing-to-land') return { kind: 'success', text: `Nothing to rebase; the workspace now sits on ${result.bookmark}.` }
+    if (result.status === 'landed') return { kind: 'success', text: `Integrated ${String(result.revisions.length)} revision(s) into ${result.bookmark}.` }
+    if (result.status === 'nothing-to-land') return { kind: 'success', text: `Nothing to integrate; the workspace now sits on ${result.bookmark}.` }
     if (result.status === 'needs-description') {
       return {
         kind: 'error',

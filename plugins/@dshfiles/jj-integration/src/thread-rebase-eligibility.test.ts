@@ -42,14 +42,17 @@ describe('thread rebase eligibility', () => {
     expect(canRebaseThread(['waiting'], () => ({ running: false, pendingUserQuestion: true }))).toBe(false)
   })
 
-  it('fails closed when any session activity is unknown', () => {
+  it('distinguishes unknown session activity from confirmed active work', () => {
     expect(canRebaseThread(['finished', 'unknown'], sessionId => (sessionId === 'finished' ? { running: false, pendingUserQuestion: false } : undefined))).toBe(
+      undefined,
+    )
+    expect(canRebaseThread(['active', 'unknown'], sessionId => (sessionId === 'active' ? { running: true, pendingUserQuestion: false } : undefined))).toBe(
       false,
     )
   })
 
-  it('fails closed when pending-question state is unknown', () => {
-    expect(canRebaseThread(['session'], () => ({ running: false, pendingUserQuestion: undefined }))).toBe(false)
+  it('reports unknown when pending-question state is unavailable', () => {
+    expect(canRebaseThread(['session'], () => ({ running: false, pendingUserQuestion: undefined }))).toBeUndefined()
   })
 
   it('reads unanswered questions from the user-question projection', () => {
@@ -135,7 +138,7 @@ describe('thread rebase eligibility as the caller sees it', () => {
         fromAgent: true,
         sessionId: 'agent',
       }),
-    ).toBe(false)
+    ).toBeUndefined()
     expect(threadRebaseEligibility({ sessionIds: ['agent'], activity: undefined, fromAgent: true, sessionId: 'agent' })).toBe(true)
     expect(threadRebaseEligibility({ sessionIds: ['agent', 'ghost'], activity: undefined, fromAgent: true, sessionId: 'agent' })).toBeUndefined()
   })

@@ -1,8 +1,10 @@
 # Thread workspaces (jj-integration)
 
 Lets many agents work on one jj repository at once: a thread can run in its own
-jj workspace beside the repository, and **Rebase** moves its finished work onto
-`main`. Works on stock DSH 0.2.0-rc.2; no core patch.
+jj workspace beside the repository, and **Integrate** moves its finished work
+into `main`. Internally, jj rebases the thread revisions onto current `main`,
+then advances the bookmark to the new tip; existing `main` ancestry stays intact.
+Works on stock DSH 0.2.0-rc.2; no core patch.
 
 ## Starting a thread
 
@@ -52,8 +54,8 @@ One control in the conversation header carries the workspace state:
   the other threads. It never disappears while the state loads, so the header
   cannot lose the only way to the thread's workspace actions.
 - Its menu shows the workspace path, what the workspace state is (ready to
-  rebase, up to date, behind `main`, conflicted, shared checkout, or blocked),
-  **Rebase onto `main`** disabled with the reason when a session is running or a
+  integrate, up to date, behind `main`, conflicted, shared checkout, or blocked),
+  **Integrate into `main`** disabled with the reason when a session is running or a
   question waits, **Open thread workspaces in side panel**, and **Download
   session log**.
 
@@ -88,16 +90,18 @@ the current thread workspace chip in the conversation header to load a compact
 revision graph for the thread, configured bookmark and origin ref, and default
 workspace.
 
-## Rebasing
+## Integrating into main
 
-**Rebase** (the thread workspace control, the panel, `/rebase` in the composer, or the
-`jj_thread_rebase` tool) runs in the thread's own workspace, serialized per
-repository. The command accepts no arguments and refuses from any workspace
-that is not a managed thread workspace (including a shared checkout), where
-there is no safe per-thread target to rebase. Rebase is available only
-after every Session in the thread has stopped running and no question is waiting
-for an answer, except the calling agent's own session (see the hand-back note
-below):
+**Integrate** (the thread workspace control or panel) runs in the thread's own
+workspace, serialized per repository. It rebases the thread's described
+revisions onto current `main`, then advances `main` to the resulting tip; it
+never rebases existing `main` ancestors or pushes. `/rebase` and the
+`jj_thread_rebase` tool remain compatible names for the same operation. They
+refuse from any workspace that is not a managed thread workspace (including a
+shared checkout), where there is no safe per-thread target. Integration is
+available only after every Session in the thread has stopped running and no
+question is waiting for an answer, except the calling agent's own session (see
+the hand-back note below):
 
 1. Abandon empty leftovers between `main` and `@`.
 2. Refuse revisions described as nothing or `wip`.

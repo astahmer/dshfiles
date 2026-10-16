@@ -201,6 +201,7 @@ const ThreadRow = (props: {
   const clientCanRebase = useSyncExternalStore(subscribe, readClientCanRebase, () => false)
   const sessionWaitingForInput = useSyncExternalStore(subscribe, readClientQuestionPending, () => true)
   const canRebase = thread.canRebase === true && !sessionRunning && !sessionWaitingForInput
+  const blockedReason = thread.canRebase === undefined ? t('rebaseActivityUnknown') : t('rebaseBlocked')
   useEffect(() => {
     if (thread.canRebase !== false || !clientCanRebase) return
     void queryClient.invalidateQueries({ queryKey: threadQueryKeys.repositories })
@@ -223,7 +224,7 @@ const ThreadRow = (props: {
         {thread.missing ? <Badge variant="destructive">{t('missing')}</Badge> : null}
         <span className="dshx:ml-auto dshx:flex dshx:items-center dshx:gap-2">
           {thread.unlanded.length > 0 ? (
-            <Button size="sm" disabled={props.busy || thread.missing || !canRebase} onClick={props.onRebase} title={canRebase ? undefined : t('rebaseBlocked')}>
+            <Button size="sm" disabled={props.busy || thread.missing || !canRebase} onClick={props.onRebase} title={canRebase ? undefined : blockedReason}>
               {props.busy ? <Spinner /> : null}
               {props.busy ? t('rebasing') : t('rebase')}
             </Button>

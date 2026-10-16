@@ -12,11 +12,15 @@ export const hasPendingUserQuestion = (projectionValues: UserQuestionProjectionV
   return userQuestions === undefined ? undefined : userQuestions.active.length > 0
 }
 
-export const canRebaseThread = (sessionIds: readonly string[], getActivity: (sessionId: string) => ThreadSessionActivity | undefined): boolean =>
-  sessionIds.every(sessionId => {
+export const canRebaseThread = (sessionIds: readonly string[], getActivity: (sessionId: string) => ThreadSessionActivity | undefined): boolean | undefined => {
+  let hasUnknownActivity = false
+  for (const sessionId of sessionIds) {
     const activity = getActivity(sessionId)
-    return activity?.running === false && activity.pendingUserQuestion === false
-  })
+    if (activity?.running === true || activity?.pendingUserQuestion === true) return false
+    if (activity?.running === undefined || activity.pendingUserQuestion === undefined) hasUnknownActivity = true
+  }
+  return hasUnknownActivity ? undefined : true
+}
 
 export const canRebaseThreadIfKnown = (
   sessionIds: readonly string[],
@@ -59,7 +63,7 @@ export const threadRebaseEligibility = (input: {
   canRebaseThreadIfKnown(rebaseGuardSessionIds({ sessionIds: input.sessionIds, fromAgent: input.fromAgent, sessionId: input.sessionId }), input.activity)
 
 export const canRebaseFromClientSnapshot = (input: {
-  readonly threadSessionsEligible: boolean
+  readonly threadSessionsEligible: boolean | undefined
   readonly sessionRunning: boolean
   readonly questionPending: boolean
-}): boolean => input.threadSessionsEligible && !input.sessionRunning && !input.questionPending
+}): boolean => input.threadSessionsEligible === true && !input.sessionRunning && !input.questionPending
