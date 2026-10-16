@@ -1,4 +1,5 @@
 import { expect, type Page } from '@playwright/test'
+import { randomUUID } from 'node:crypto'
 import { mkdir, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { After, Then, When } from '../bdd.js'
@@ -6,6 +7,38 @@ import { finishJourneyAssertions, recordAssertion } from '../steps.js'
 import { createScratchDirectory, registerWorkspaceFolder, sendMessage, startThreadWithModel } from '../threads.js'
 
 const STORAGE_KEY = 'dshfiles.diffViewed.v1'
+
+interface MarksApiCall {
+  readonly url: string
+  readonly body: string
+}
+
+/** The client's own viewed-marks request, replayed to read the Host store the browser no longer holds. */
+const marksApiCalls = new WeakMap<Page, MarksApiCall>()
+
+const captureMarksApi = (page: Page): void => {
+  page.on('response', async response => {
+    if (!response.url().includes('/api/dshx-')) return
+    const body = response.request().postData()
+    if (body === null || !body.includes('/state')) return
+    const payload = await response.json().catch(() => null)
+    if (payload?.result?.value?.output?.marks === undefined) return
+    marksApiCalls.set(page, { url: response.url(), body })
+  })
+}
+
+const readHostMarks = async (page: Page): Promise<string[]> => {
+  const call = marksApiCalls.get(page)
+  if (call === undefined) throw new Error('The viewed-marks API call was not captured.')
+  const parsed: unknown = JSON.parse(call.body)
+  if (typeof parsed !== 'object' || parsed === null) throw new Error('The captured viewed-marks request was not JSON.')
+  const envelope = { ...parsed, rpcId: randomUUID() }
+  const response = await page.request.post(call.url, { data: JSON.stringify(envelope), headers: { 'content-type': 'application/json' } })
+  const payload: unknown = await response.json()
+  const marks = (payload as { result?: { value?: { output?: { marks?: unknown } } } }).result?.value?.output?.marks
+  if (!Array.isArray(marks)) throw new Error(`Unexpected viewed-marks response: ${JSON.stringify(payload).slice(0, 200)}`)
+  return marks.filter((mark): mark is string => typeof mark === 'string')
+}
 const roots = new WeakMap<Page, string>()
 const checks = new WeakMap<Page, number>()
 /** The same state is asserted more than once in a journey; evidence ids must stay unique. */
@@ -73,6 +106,7 @@ When('{string} is marked as not viewed', async ({ page }: { page: Page }, file: 
 })
 
 When('the viewed marks already hold {int} older marks', async ({ page }: { page: Page }, count: number) => {
+  captureMarksApi(page)
   await page.evaluate(
     ({ key, total }) =>
       localStorage.setItem(
@@ -108,12 +142,11 @@ Then('the review journey is complete', async ({ page }: { page: Page }) => {
   await finishJourneyAssertions(page)
 })
 
-Then('the oldest stored mark was evicted to keep {int}', async ({ page }: { page: Page }, cap: number) => {
-  await recordAssertion(page, 'diff-viewed-retention-evicts-the-oldest-mark', async () => {
-    const stored: unknown = await page.evaluate(key => JSON.parse(localStorage.getItem(key) ?? '[]'), STORAGE_KEY)
-    expect(Array.isArray(stored) && stored.length).toBe(cap)
-    expect(Array.isArray(stored) && stored.includes(JSON.stringify(['older-session', 0, 'old-0.txt']))).toBe(false)
-    expect(Array.isArray(stored) && stored.includes(JSON.stringify(['older-session', 1, 'old-1.txt']))).toBe(true)
+Then('the Host keeps at most {int} viewed marks', async ({ page }: { page: Page }, cap: number) => {
+  await recordAssertion(page, 'diff-viewed-retention-bounds-the-host-store', async () => {
+    // The browser hands its whole cap over in batches, so wait for the replay to settle on the bound.
+    await expect.poll(async () => (await readHostMarks(page)).length, { timeout: 120_000 }).toBe(cap)
+    expect(await readHostMarks(page)).toContain(JSON.stringify(['older-session', 1, 'old-1.txt']))
   })
 })
 

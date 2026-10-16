@@ -5,7 +5,7 @@
       "id": "review-file-markers",
       "title": "Mark review files as viewed",
       "summary": "Toggle viewed state for one file in one review-session change and show the viewed progress count.",
-      "surfaces": ["client", "storage"],
+      "surfaces": ["client", "api", "storage"],
       "configuration": [],
       "states": ["unviewed", "viewed", "progress-updated"],
       "failureModes": [
@@ -63,13 +63,17 @@
       ]
     },
     {
-      "id": "cross-tab-view-state",
-      "title": "Retain viewed marks across tabs",
-      "summary": "Persist bounded browser-local marks, adopt cross-tab changes, and fall back safely when stored data is corrupt.",
-      "surfaces": ["storage", "client"],
+      "id": "host-owned-view-state",
+      "title": "Retain viewed marks on the Host",
+      "summary": "Keep the marks in the Host's durable diff_viewed domain, capped at the 2000 most recent, fall back to browser-held marks until the Host serves the API, and adopt those browser marks once.",
+      "surfaces": ["host", "api", "storage", "client"],
       "configuration": [],
-      "states": ["stored", "cross-tab-updated", "corrupt-fallback", "retention-evicted"],
-      "failureModes": ["A full retention cap evicts the oldest mark.", "Corrupt storage initializes the feature empty without crashing the panel."],
+      "states": ["host-owned", "browser-fallback", "legacy-adopted", "retention-evicted"],
+      "failureModes": [
+        "A full retention cap evicts the oldest mark.",
+        "An older Host without the API keeps the browser-held marks working.",
+        "A malformed stored mark reads as unviewed instead of crashing the panel."
+      ],
       "externalDependencies": [],
       "verification": [
         {
@@ -84,27 +88,45 @@
         },
         {
           "kind": "unit-test",
-          "id": "diff-viewed.cross-tab-view-state-unit-corrupt-storage",
+          "id": "diff-viewed.host-owned-view-state-unit-corrupt-storage",
           "file": "plugins/@dshfiles/diff-viewed/src/viewed-marks.test.ts",
           "testName": "starts empty when the stored value is corrupt"
         },
         {
           "kind": "unit-test",
-          "id": "diff-viewed.cross-tab-view-state-unit-retention-cap",
+          "id": "diff-viewed.host-owned-view-state-unit-retention-cap",
           "file": "plugins/@dshfiles/diff-viewed/src/viewed-marks.test.ts",
           "testName": "evicts the oldest marks beyond the cap"
         },
         {
           "kind": "unit-test",
-          "id": "diff-viewed.cross-tab-view-state-unit-cross-window-reload",
+          "id": "diff-viewed.host-owned-view-state-unit-cross-window-reload",
           "file": "plugins/@dshfiles/diff-viewed/src/viewed-marks.test.ts",
           "testName": "adopts marks another window wrote when reloaded"
         },
         {
           "kind": "unit-test",
-          "id": "diff-viewed.cross-tab-view-state-unit-subscriber-snapshot",
+          "id": "diff-viewed.host-owned-view-state-unit-subscriber-snapshot",
           "file": "plugins/@dshfiles/diff-viewed/src/viewed-marks.test.ts",
           "testName": "notifies subscribers with a new snapshot identity"
+        },
+        {
+          "kind": "unit-test",
+          "id": "diff-viewed.host-owned-view-state-unit-durable-mark",
+          "file": "plugins/@dshfiles/diff-viewed/src/marks-store.test.ts",
+          "testName": "a mark is stored durably and belongs to its own turn"
+        },
+        {
+          "kind": "unit-test",
+          "id": "diff-viewed.host-owned-view-state-unit-retention-trim",
+          "file": "plugins/@dshfiles/diff-viewed/src/marks-store.test.ts",
+          "testName": "the oldest marks are trimmed past the bound"
+        },
+        {
+          "kind": "host-test",
+          "id": "diff-viewed.host-owned-view-state-host-domain-wiring",
+          "file": "plugins/@dshfiles/diff-viewed/src/host.test.ts",
+          "testName": "opens the durable marks domain and closes it on unload"
         }
       ]
     }

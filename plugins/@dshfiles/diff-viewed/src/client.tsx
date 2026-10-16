@@ -4,19 +4,29 @@ import { defineClient, defineSlot } from '@dshfiles/dshx/client'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import type { ComponentProps } from 'react'
 import { diffViewedLocale } from './locales.js'
-import { createViewedMarks } from './viewed-marks.js'
+import { useViewedMarksSync } from './use-viewed-marks.js'
+import { createViewedMarks, type SyncedViewedMarks } from './viewed-marks.js'
 import { ViewedToggle } from './viewed-toggle.js'
 
 const marks = createViewedMarks({ storage: () => window.localStorage })
+
+interface SyncedViewedToggleProps extends Omit<ComponentProps<typeof ViewedToggle>, 'marks'> {
+  readonly marks: SyncedViewedMarks
+}
+
+const SyncedViewedToggle = (props: SyncedViewedToggleProps): JSX.Element => {
+  useViewedMarksSync(props.marks)
+  return <ViewedToggle {...props} />
+}
 
 const reviewFileAction = defineSlot('deliverables.review.file.actions', {
   id: 'dshfiles-diff-viewed',
   order: 10,
   locale: diffViewedLocale,
   inject: () => ({ marks }),
-  component: (props: ComponentProps<typeof ViewedToggle>) => (
+  component: (props: SyncedViewedToggleProps) => (
     <PluginQueryProvider>
-      <ViewedToggle {...props} />
+      <SyncedViewedToggle {...props} />
     </PluginQueryProvider>
   ),
 })
