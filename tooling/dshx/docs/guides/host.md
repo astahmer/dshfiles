@@ -1,6 +1,6 @@
 # Host API
 
-**Status: API Candidate**
+**Status: Supported**
 
 **Entry: `@dshfiles/dshx/host`**
 

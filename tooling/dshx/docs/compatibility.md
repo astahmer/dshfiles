@@ -25,6 +25,16 @@ ranges, selects the adapter, and reports capabilities.
 | Custom durable event vocabulary | not available |
 | Conversation component contributions | not available |
 
+## Supported authoring API policy
+
+The `@dshfiles/dshx/host` entry is Supported. DSHX tests its documented exports,
+Host definition contract, and Cordis-scoped setup/disposal behavior against the
+verified DSH protocol versions above. Breaking changes to this entry require a
+migration note here before release; additive changes are preferred. DSHX is
+pre-1.0, so this policy supplements semver and does not promise compatibility
+across unsupported DSH protocol generations. Other API Candidate entries do not
+receive this stability promise.
+
 ## What protocol-2 changed
 
 - `@deepseek-ai/dsh-client-runtime` no longer exists. Its types moved to

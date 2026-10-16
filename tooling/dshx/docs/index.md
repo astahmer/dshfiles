@@ -1,12 +1,13 @@
 # DSHX documentation
 
-DSHX exposes a small authoring surface and keeps compiler/runtime internals out of application bundles. These labels describe API maturity, not stability promises.
+DSHX exposes a small authoring surface and keeps compiler/runtime internals out of application bundles. These labels describe API maturity and change policy.
 
-| Label             | Meaning                                                                                                     |
-| ----------------- | ----------------------------------------------------------------------------------------------------------- |
-| **API Candidate** | Intended authoring shape. Breaking changes are recorded in [compatibility](./compatibility.md). |
-| **Experimental**  | May change at any time; import only from an `experimental` or Tooling entry.                             |
-| **Tooling**       | Node-only compiler, compatibility, diagnostic, and CLI APIs. Never import into Host or Client source.       |
+| Label             | Meaning |
+| ----------------- | ------- |
+| **Supported** | Documented production API. Breaking changes require a migration note and an entry in [compatibility](./compatibility.md). |
+| **API Candidate** | Intended authoring shape; names and behavior may change. Breaking changes are recorded in [compatibility](./compatibility.md). |
+| **Experimental** | May change at any time; import only from an `experimental` or Tooling entry. |
+| **Tooling** | Node-only compiler, compatibility, diagnostic, and CLI APIs. Never import into Host or Client source. |
 
 ## API chapters
 
@@ -33,7 +34,7 @@ Additional references:
 | ------------------------------------------ | ---------------------- | ------------ | ----------------------------------------------------------------------------- |
 | `@dshfiles/dshx`                           | API Candidate          | Yes          | `defineConfig`, `DshxConfig` only                                             |
 | `@dshfiles/dshx/config`                    | API Candidate          | Yes          | Same config-only surface                                                      |
-| `@dshfiles/dshx/host`                      | API Candidate          | No           | Host definitions and contributions                                            |
+| `@dshfiles/dshx/host`                      | Supported              | No           | Host definitions, contributions, and scoped lifecycle setup                   |
 | `@dshfiles/dshx/client`                    | API Candidate          | Yes          | Client definitions, Locale/Slot contributions, and React Hooks                |
 | `@dshfiles/dshx/api`                       | API Candidate          | Yes          | Shared typed API contracts and error guards                                   |
 | `@dshfiles/dshx/settings`                  | API Candidate          | Yes          | Shared Settings contracts                                                     |

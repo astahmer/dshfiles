@@ -25,10 +25,12 @@ if startup fails.
   [OpenCode options](https://github.com/anomalyco/opencode/blob/dev/packages/plugin/src/options.ts),
   [Pi loader](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/src/core/extensions/loader.ts),
   [Pi lifecycle docs](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/extensions.md).
-- Proposed contract rule: use a separate contract revision for Loader-facing
-  `name`, `inject`, `Config`, and Settings schema. Keep it fixed for code-only
-  changes; changing the contract revision requires a normal DSH process restart.
-  This is not yet approved by the user.
+- User approved an explicit `hostContractVersion` for HMR-enabled plugins. Keep
+  it fixed for code-only changes; changing it for Loader metadata or schema
+  changes triggers a normal DSH process restart.
+- Mark `@dshfiles/dshx/host` Supported before depending on its Cordis lifecycle
+  contract. This support is limited to the verified DSH protocol range; DSHX
+  remains pre-1.0 and documents breaking changes with migration notes.
 - In-flight work is not cancelled by Fiber disposal. Plugins must own and cancel
   work through Cordis effects when replacement should stop it.
 - No DSH core changes; live `:3080` must remain untouched.
@@ -39,11 +41,12 @@ if startup fails.
 |---|---|---|
 | Inspect DSHX and Cordis Host lifecycle | done | Cordis `ctx.plugin()` returns an awaitable Fiber with `dispose()`; a temporary native bundle replacement was proven in an isolated DSH by the investigation thread. |
 | Compare OpenCode V2 and Pi reload contracts | done | OpenCode tracks code generations and restores failed activations, but has no plugin-declared settings schema. Pi replaces extension runtimes and stages each extension's registrations, but has no persisted extension-settings schema or whole-generation rollback. Neither needs a schema fingerprint. |
-| Choose loader-contract fingerprint and API stability policy | in progress | User selected Config/Settings support and Host API stabilization. DSHX needs an explicit static contract boundary because Standard Schema has no canonical serialization. |
+| Define contract and stabilize Host API | done | User approved `hostContractVersion`; `@dshfiles/dshx/host` docs now mark the entry Supported and define migration policy. |
 | Implement generation build protocol and manager | pending | Production single-file guard must remain strict; dev builds need immutable generation files and an atomic pointer. |
 | Add rollback, lifecycle, and contract regression tests | pending | Include activation failure, rollback, Config/Settings compatibility, concurrent rebuilds, and owned cleanup. |
 | Verify through isolated DSH and document behavior | pending | Same-process proof, HMR errors, restart-required contract changes, no live DSH access. |
 
-Resume here: define the static Loader-contract descriptor and decide whether its
-opaque Config/Settings schema revision is explicit or derived. Then stabilize the
-`@dshfiles/dshx/host` API before implementing the generation watcher.
+Resume here: inspect the documented Supported-API diff, then design the dev-only
+stable Loader wrapper, immutable implementation generations, and atomic
+manifest carrying `hostContractVersion`. Keep production `dist/index.js` a single
+self-contained Host artifact.
