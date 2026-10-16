@@ -6,7 +6,7 @@ import { z } from 'zod'
 import type { UsageCard } from './api.js'
 import { readKeyFromEnv, type CredentialValueResolver } from './credentials.js'
 import { readKeychainSecret } from './keychain.js'
-import { emptyUsage, remainingFromUsed, usageSignal, type UsageWindow } from './usage.js'
+import { ProviderUsageModel, type UsageWindow } from './usage.js'
 
 /**
  * Claude (Anthropic subscription) accounts.
@@ -168,37 +168,38 @@ const CLAUDE_WINDOWS = [
 /** `utilization` is percent used; a window the plan does not meter arrives as null. */
 export const parseClaudeUsage = (raw: unknown, plan: string | undefined): UsageCard => {
   const parsed = claudeUsageSchema.safeParse(raw)
-  if (!parsed.success) return emptyUsage('error', 'Claude returned an unsupported usage response.')
+  if (!parsed.success) return ProviderUsageModel.emptyUsage('error', 'Claude returned an unsupported usage response.')
   const windows: UsageWindow[] = []
   for (const [key, label] of CLAUDE_WINDOWS) {
     const window = parsed.data[key]
     if (window === undefined || window === null) continue
     const resetsAt = window.resets_at === undefined || window.resets_at === null ? Number.NaN : Date.parse(window.resets_at)
-    windows.push({ label, percentRemaining: remainingFromUsed(window.utilization), resetsAt: Number.isNaN(resetsAt) ? null : resetsAt })
+    windows.push({ label, percentRemaining: ProviderUsageModel.remainingFromUsed(window.utilization), resetsAt: Number.isNaN(resetsAt) ? null : resetsAt })
   }
   return { status: 'ok', message: null, identity: null, plan: plan ?? null, windows, bankedResets: 0, bankedResetExpiries: [] }
 }
 
 export const readClaudeUsage = async (configDir: string, signal?: AbortSignal): Promise<UsageCard> => {
-  if (signal?.aborted) return emptyUsage('error', 'Usage collection was cancelled.')
+  if (signal?.aborted) return ProviderUsageModel.emptyUsage('error', 'Usage collection was cancelled.')
   const login = await readClaudeLogin(configDir)
-  if (login.kind === 'signed-out') return emptyUsage('unauthenticated', signedOutMessage(configDir))
-  if (login.kind === 'missing') return emptyUsage('unauthenticated', 'Quota needs the Claude Code login; a setup-token cannot read it.')
+  if (login.kind === 'signed-out') return ProviderUsageModel.emptyUsage('unauthenticated', signedOutMessage(configDir))
+  if (login.kind === 'missing') return ProviderUsageModel.emptyUsage('unauthenticated', 'Quota needs the Claude Code login; a setup-token cannot read it.')
   const credential = login.credential
   if (credential.expiresAt !== undefined && credential.expiresAt <= Date.now()) {
-    return emptyUsage('unauthenticated', 'The Claude Code login has expired. Run Claude Code once to refresh it.')
+    return ProviderUsageModel.emptyUsage('unauthenticated', 'The Claude Code login has expired. Run Claude Code once to refresh it.')
   }
   try {
     const response = await fetch(CLAUDE_USAGE_URL, {
       headers: { authorization: `Bearer ${credential.accessToken}`, 'anthropic-beta': 'oauth-2025-04-20', accept: 'application/json' },
       redirect: 'error',
-      signal: usageSignal(signal),
+      signal: ProviderUsageModel.usageSignal(signal),
     })
-    if (response.status === 401 || response.status === 403) return emptyUsage('unauthenticated', 'Claude rejected this login; sign in again.')
-    if (response.status === 429) return emptyUsage('rate-limited', 'Claude rate-limited the usage request.')
-    if (!response.ok) return emptyUsage('error', `Claude returned ${String(response.status)} for usage.`)
+    if (response.status === 401 || response.status === 403)
+      return ProviderUsageModel.emptyUsage('unauthenticated', 'Claude rejected this login; sign in again.')
+    if (response.status === 429) return ProviderUsageModel.emptyUsage('rate-limited', 'Claude rate-limited the usage request.')
+    if (!response.ok) return ProviderUsageModel.emptyUsage('error', `Claude returned ${String(response.status)} for usage.`)
     return parseClaudeUsage(await response.json(), credential.plan)
   } catch (cause) {
-    return emptyUsage('error', cause instanceof Error ? cause.message : 'Claude usage could not be read.')
+    return ProviderUsageModel.emptyUsage('error', cause instanceof Error ? cause.message : 'Claude usage could not be read.')
   }
 }

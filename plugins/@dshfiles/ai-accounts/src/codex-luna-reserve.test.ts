@@ -2,7 +2,7 @@ import { openaiCodexProvider } from '@earendil-works/pi-ai/providers/openai-code
 import { normalizeContext } from '@earendil-works/pi-ai/utils/transcript'
 import { describe, expect, it } from 'vitest'
 import { CODEX_RESERVE_MODEL, shouldUseLunaReserve, withLunaReserve } from './codex-luna-reserve.js'
-import { parseCodexUsage } from './usage.js'
+import { ProviderUsageModel } from './usage.js'
 
 const noCredits = { available: 0, resets: [] }
 const WEEK = 604_800
@@ -22,7 +22,7 @@ const reserveResponse = (weeklyUsed: number, reserveUsed: number) => ({
 
 describe('Codex Luna Reserve', () => {
   it('adds the reserve as its own window beside the ordinary gauges, and skips unrelated or broken limits', () => {
-    const card = parseCodexUsage(reserveResponse(100, 0), noCredits, 0)
+    const card = ProviderUsageModel.parseCodexUsage(reserveResponse(100, 0), noCredits, 0)
     expect(card.windows).toEqual([
       { label: 'Weekly limit', percentRemaining: 0, resetsAt: 2_000_000 },
       { label: 'Luna Reserve', percentRemaining: 100, resetsAt: 9_000_000, reserve: true },
@@ -30,17 +30,17 @@ describe('Codex Luna Reserve', () => {
   })
 
   it('keeps fresh ordinary gauges after a reset even when the reserve meter is still reported', () => {
-    const card = parseCodexUsage(reserveResponse(0, 40), noCredits, 0)
+    const card = ProviderUsageModel.parseCodexUsage(reserveResponse(0, 40), noCredits, 0)
     expect(card.windows[0]).toEqual({ label: 'Weekly limit', percentRemaining: 100, resetsAt: 2_000_000 })
     expect(shouldUseLunaReserve(card, 0)).toBe(false)
   })
 
   it('routes to the reserve only while the ordinary limit is spent, unreset, and the reserve lasts', () => {
-    const spent = parseCodexUsage(reserveResponse(100, 30), noCredits, 0)
+    const spent = ProviderUsageModel.parseCodexUsage(reserveResponse(100, 30), noCredits, 0)
     expect(shouldUseLunaReserve(spent, 1_000)).toBe(true)
     expect(shouldUseLunaReserve(spent, 2_000_001)).toBe(false)
-    expect(shouldUseLunaReserve(parseCodexUsage(reserveResponse(100, 100), noCredits, 0), 1_000)).toBe(false)
-    expect(shouldUseLunaReserve(parseCodexUsage({ rate_limit: reserveResponse(100, 0).rate_limit }, noCredits, 0), 1_000)).toBe(false)
+    expect(shouldUseLunaReserve(ProviderUsageModel.parseCodexUsage(reserveResponse(100, 100), noCredits, 0), 1_000)).toBe(false)
+    expect(shouldUseLunaReserve(ProviderUsageModel.parseCodexUsage({ rate_limit: reserveResponse(100, 0).rate_limit }, noCredits, 0), 1_000)).toBe(false)
     expect(shouldUseLunaReserve(undefined, 0)).toBe(false)
   })
 })

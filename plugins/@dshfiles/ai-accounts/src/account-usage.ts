@@ -4,7 +4,7 @@ import { codexLayoutFor } from './account-store.js'
 import { readCommandCodeUsage } from './commandcode-usage.js'
 import { readKeyFromEnv, type CredentialValueResolver } from './credentials.js'
 import { readCursorUsage } from './cursor-account.js'
-import { emptyUsage, readCodexUsage, readOpenCodeUsage } from './usage.js'
+import { ProviderUsageModel, readCodexUsage, readOpenCodeUsage } from './usage.js'
 
 /**
  * One account's live quota, read with that account's own credential. The page,
@@ -25,7 +25,7 @@ export const readAccountUsage = async (input: {
       try {
         home = codexLayoutFor(account, input.shadowRoot).effectiveHomePath
       } catch (cause) {
-        return emptyUsage('error', cause instanceof Error ? cause.message : 'The Codex home is invalid.')
+        return ProviderUsageModel.emptyUsage('error', cause instanceof Error ? cause.message : 'The Codex home is invalid.')
       }
       return readCodexUsage(home, signal)
     }
@@ -34,7 +34,7 @@ export const readAccountUsage = async (input: {
     case 'commandcode':
       return readCommandCodeUsage({ keyEnv: account.apiKeyEnv, apiBaseUrl: account.apiBaseUrl, resolveCredential: input.resolveCredential }, signal)
     case 'github-copilot':
-      return emptyUsage('unsupported', 'GitHub does not expose a supported subscription quota endpoint.')
+      return ProviderUsageModel.emptyUsage('unsupported', 'GitHub does not expose a supported subscription quota endpoint.')
     case 'cursor':
       return readCursorUsage(account.apiKeyEnv, signal, input.resolveCredential)
     case 'opencode-go': {

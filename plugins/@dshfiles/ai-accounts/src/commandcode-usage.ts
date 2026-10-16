@@ -5,7 +5,7 @@ import { z } from 'zod'
 import type { UsageCard } from './api.js'
 import { DEFAULT_COMMANDCODE_KEY_ENV, resolveCommandCodeBase } from './commandcode-provider.js'
 import { readKeyFromEnv, type CredentialValueResolver } from './credentials.js'
-import { emptyUsage, usageSignal, type UsageWindow } from './usage.js'
+import { ProviderUsageModel, type UsageWindow } from './usage.js'
 
 /**
  * Command Code subscription quota.
@@ -73,7 +73,7 @@ const percentLeft = (limit: z.infer<typeof windowLimitSchema>): number => {
 
 export const parseCommandCodeUsage = (input: { readonly credits: unknown; readonly whoami: unknown; readonly subscription: unknown }): UsageCard => {
   const credits = creditsSchema.safeParse(input.credits)
-  if (!credits.success) return emptyUsage('error', 'Command Code returned an unsupported billing response.')
+  if (!credits.success) return ProviderUsageModel.emptyUsage('error', 'Command Code returned an unsupported billing response.')
   const windows: UsageWindow[] = []
   for (const [key, label] of [
     ['fiveHour', 'Current session'],
@@ -103,18 +103,18 @@ export const readCommandCodeUsage = async (
   input: { readonly keyEnv: string; readonly apiBaseUrl: string; readonly resolveCredential?: CredentialValueResolver | undefined },
   signal?: AbortSignal,
 ): Promise<UsageCard> => {
-  if (signal?.aborted) return emptyUsage('error', 'Usage collection was cancelled.')
+  if (signal?.aborted) return ProviderUsageModel.emptyUsage('error', 'Usage collection was cancelled.')
   const key = await readCommandCodeKey(input.keyEnv, input.resolveCredential)
-  if (key.length === 0) return emptyUsage('unauthenticated', 'Export the account key variable or run `cmd login`.')
+  if (key.length === 0) return ProviderUsageModel.emptyUsage('unauthenticated', 'Export the account key variable or run `cmd login`.')
   let base: string
   try {
     base = resolveCommandCodeBase(input.apiBaseUrl)
   } catch (cause) {
-    return emptyUsage('error', cause instanceof Error ? cause.message : 'Invalid Command Code base.')
+    return ProviderUsageModel.emptyUsage('error', cause instanceof Error ? cause.message : 'Invalid Command Code base.')
   }
   const headers = { ...COMMAND_CODE_HEADERS, authorization: `Bearer ${key}` }
   const getJson = async (path: string): Promise<{ readonly status: number; readonly body: unknown }> => {
-    const response = await fetch(`${base}${path}`, { headers, redirect: 'error', signal: usageSignal(signal) })
+    const response = await fetch(`${base}${path}`, { headers, redirect: 'error', signal: ProviderUsageModel.usageSignal(signal) })
     return { status: response.status, body: response.ok ? await response.json() : undefined }
   }
   try {
@@ -123,10 +123,10 @@ export const readCommandCodeUsage = async (
       getJson('/alpha/whoami').catch(() => ({ status: 0, body: undefined })),
       getJson('/alpha/billing/subscriptions').catch(() => ({ status: 0, body: undefined })),
     ])
-    if (credits.status === 401 || credits.status === 403) return emptyUsage('unauthenticated', 'Command Code rejected this key.')
-    if (credits.body === undefined) return emptyUsage('error', `Command Code returned ${String(credits.status)} for billing.`)
+    if (credits.status === 401 || credits.status === 403) return ProviderUsageModel.emptyUsage('unauthenticated', 'Command Code rejected this key.')
+    if (credits.body === undefined) return ProviderUsageModel.emptyUsage('error', `Command Code returned ${String(credits.status)} for billing.`)
     return parseCommandCodeUsage({ credits: credits.body, whoami: whoami.body, subscription: subscription.body })
   } catch (cause) {
-    return emptyUsage('error', cause instanceof Error ? cause.message : 'Command Code usage could not be read.')
+    return ProviderUsageModel.emptyUsage('error', cause instanceof Error ? cause.message : 'Command Code usage could not be read.')
   }
 }

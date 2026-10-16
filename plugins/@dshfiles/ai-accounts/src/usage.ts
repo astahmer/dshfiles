@@ -5,6 +5,8 @@ import type { UsageCard } from './api.js'
 import { readCodexResetCredits, type CodexResetCredits } from './codex-reset-credits.js'
 import { decodeJwtPayload } from './codex-home.js'
 
+type JsonValue = string | number | boolean | null | readonly JsonValue[] | { readonly [key: string]: JsonValue }
+
 /**
  * Subscription usage for one account.
  *
@@ -20,22 +22,6 @@ import { decodeJwtPayload } from './codex-home.js'
 export type UsageWindow = UsageCard['windows'][number]
 
 const READ_TIMEOUT_MS = 5_000
-
-export const usageSignal = (signal: AbortSignal | undefined): AbortSignal =>
-  signal === undefined ? AbortSignal.timeout(READ_TIMEOUT_MS) : AbortSignal.any([signal, AbortSignal.timeout(READ_TIMEOUT_MS)])
-
-export const emptyUsage = (status: UsageCard['status'], message: string | null = null): UsageCard => ({
-  status,
-  message,
-  identity: null,
-  plan: null,
-  windows: [],
-  bankedResets: 0,
-  bankedResetExpiries: [],
-})
-
-/** Percent remaining, clamped to one decimal, from a percent used. */
-export const remainingFromUsed = (usedPercent: number): number => Math.max(0, Math.min(100, Math.round((100 - usedPercent) * 10) / 10))
 
 const codexWindowSchema = z.object({
   used_percent: z.number().finite(),
@@ -102,54 +88,19 @@ const codexResetAt = (window: z.infer<typeof codexWindowSchema>, now: number): n
   return null
 }
 
-export const parseCodexUsage = (raw: unknown, credits: CodexResetCredits, now: number): UsageCard => {
-  const parsed = codexUsageSchema.safeParse(raw)
-  if (!parsed.success) return emptyUsage('error', 'Codex returned an unsupported usage response.')
-  const windows: UsageWindow[] = []
-  for (const position of ['primary', 'secondary'] as const) {
-    const window = parsed.data.rate_limit?.[`${position}_window`]
-    if (window === undefined || window === null) continue
-    windows.push({
-      label: codexWindowLabel(window.limit_window_seconds, position),
-      percentRemaining: remainingFromUsed(window.used_percent),
-      resetsAt: codexResetAt(window, now),
-    })
-  }
-  // Reserve meters only ever add a window: the ordinary gauges above always come from `rate_limit`.
-  for (const limit of parsed.data.additional_rate_limits ?? []) {
-    if (limit === null || !(isReserveLimit(limit.limit_name) || isReserveLimit(limit.metered_feature))) continue
-    const reserveWindows = [limit.rate_limit?.primary_window, limit.rate_limit?.secondary_window].flatMap(window =>
-      window === undefined || window === null ? [] : [{ percentRemaining: remainingFromUsed(window.used_percent), resetsAt: codexResetAt(window, now) }],
-    )
-    const tightest = reserveWindows.sort((left, right) => left.percentRemaining - right.percentRemaining)[0]
-    if (tightest === undefined || windows.length >= 6) continue
-    const name = limit.limit_name?.trim() ?? ''
-    windows.push({ label: isReserveLimit(name) ? name.slice(0, 32) : 'Luna Reserve', ...tightest, reserve: true })
-  }
-  return {
-    status: 'ok',
-    message: null,
-    identity: null,
-    plan: parsed.data.plan_type ?? null,
-    windows,
-    bankedResets: credits.available,
-    bankedResetExpiries: credits.resets.map(reset => reset.expiresAt ?? null),
-  }
-}
-
 /** Read one Codex account's live quota using the credential in its own home. */
 export const readCodexUsage = async (codexHome: string, signal?: AbortSignal): Promise<UsageCard> => {
-  if (signal?.aborted) return emptyUsage('error', 'Usage collection was cancelled.')
+  if (signal?.aborted) return ProviderUsageModel.emptyUsage('error', 'Usage collection was cancelled.')
   let auth: z.infer<typeof codexAuthSchema>
   try {
     auth = codexAuthSchema.parse(JSON.parse(await readFile(join(codexHome, 'auth.json'), 'utf8')))
   } catch {
-    return emptyUsage('unauthenticated')
+    return ProviderUsageModel.emptyUsage('unauthenticated')
   }
   const claims = auth.tokens.id_token === undefined ? undefined : decodeJwtPayload(auth.tokens.id_token)
   const authClaims = z.object({ chatgpt_account_id: z.string().optional() }).safeParse(claims?.['https://api.openai.com/auth'])
   const accountId = auth.tokens.account_id ?? (authClaims.success ? authClaims.data.chatgpt_account_id : undefined)
-  if (accountId === undefined) return emptyUsage('error', 'The Codex account identifier was not found in its sign-in data.')
+  if (accountId === undefined) return ProviderUsageModel.emptyUsage('error', 'The Codex account identifier was not found in its sign-in data.')
 
   try {
     const [credits, response] = await Promise.all([
@@ -162,14 +113,14 @@ export const readCodexUsage = async (codexHome: string, signal?: AbortSignal): P
           [LUNA_RESERVE_HEADER]: '1',
         },
         redirect: 'error',
-        signal: usageSignal(signal),
+        signal: ProviderUsageModel.usageSignal(signal),
       }),
     ])
-    if (response.status === 401 || response.status === 403) return emptyUsage('unauthenticated', 'Codex rejected this login; sign in again.')
-    if (!response.ok) return emptyUsage('error', `Codex returned ${String(response.status)} for usage.`)
-    return parseCodexUsage(await response.json(), credits, Date.now())
+    if (response.status === 401 || response.status === 403) return ProviderUsageModel.emptyUsage('unauthenticated', 'Codex rejected this login; sign in again.')
+    if (!response.ok) return ProviderUsageModel.emptyUsage('error', `Codex returned ${String(response.status)} for usage.`)
+    return ProviderUsageModel.parseCodexUsage(await response.json(), credits, Date.now())
   } catch (cause) {
-    return emptyUsage('error', cause instanceof Error ? cause.message : 'Codex usage could not be read.')
+    return ProviderUsageModel.emptyUsage('error', cause instanceof Error ? cause.message : 'Codex usage could not be read.')
   }
 }
 
@@ -194,35 +145,90 @@ const OPENCODE_WINDOWS = [
   ['monthly', 'Monthly limit'],
 ] as const
 
-export const parseOpenCodeUsage = (raw: unknown): UsageCard => {
-  const parsed = opencodeUsageSchema.safeParse(raw)
-  if (!parsed.success) return emptyUsage('error', 'OpenCode returned an unsupported usage response.')
-  const windows: UsageWindow[] = []
-  for (const [key, label] of OPENCODE_WINDOWS) {
-    const window = parsed.data.usage[key]
-    if (window === undefined) continue
-    windows.push({
-      label,
-      percentRemaining: window.status === 'rate-limited' ? 0 : remainingFromUsed(window.percent),
-      resetsAt: window.resetsAt === undefined ? null : Date.parse(window.resetsAt),
-    })
-  }
-  return { status: 'ok', message: null, identity: null, plan: null, windows, bankedResets: 0, bankedResetExpiries: [] }
-}
-
 /** Read OpenCode Go's live quota with the key the account names. */
 export const readOpenCodeUsage = async (apiKey: string, signal?: AbortSignal): Promise<UsageCard> => {
-  if (apiKey.trim().length === 0) return emptyUsage('unauthenticated')
-  if (signal?.aborted) return emptyUsage('error', 'Usage collection was cancelled.')
+  if (apiKey.trim().length === 0) return ProviderUsageModel.emptyUsage('unauthenticated')
+  if (signal?.aborted) return ProviderUsageModel.emptyUsage('error', 'Usage collection was cancelled.')
   try {
     const response = await fetch('https://opencode.ai/zen/go/v1/usage', {
       headers: { authorization: `Bearer ${apiKey.trim()}`, accept: 'application/json' },
-      signal: usageSignal(signal),
+      signal: ProviderUsageModel.usageSignal(signal),
     })
-    if (response.status === 401 || response.status === 403) return emptyUsage('unauthenticated', 'OpenCode rejected this key.')
-    if (!response.ok) return emptyUsage('error', `OpenCode returned ${String(response.status)} for usage.`)
-    return parseOpenCodeUsage(await response.json())
+    if (response.status === 401 || response.status === 403) return ProviderUsageModel.emptyUsage('unauthenticated', 'OpenCode rejected this key.')
+    if (!response.ok) return ProviderUsageModel.emptyUsage('error', `OpenCode returned ${String(response.status)} for usage.`)
+    return ProviderUsageModel.parseOpenCodeUsage(await response.json())
   } catch (cause) {
-    return emptyUsage('error', cause instanceof Error ? cause.message : 'OpenCode usage could not be read.')
+    return ProviderUsageModel.emptyUsage('error', cause instanceof Error ? cause.message : 'OpenCode usage could not be read.')
+  }
+}
+
+export class ProviderUsageModel {
+  static usageSignal = (signal: AbortSignal | undefined): AbortSignal =>
+    signal === undefined ? AbortSignal.timeout(READ_TIMEOUT_MS) : AbortSignal.any([signal, AbortSignal.timeout(READ_TIMEOUT_MS)])
+
+  static emptyUsage = (status: UsageCard['status'], message: string | null = null): UsageCard => ({
+    status,
+    message,
+    identity: null,
+    plan: null,
+    windows: [],
+    bankedResets: 0,
+    bankedResetExpiries: [],
+  })
+
+  /** Percent remaining, clamped to one decimal, from a percent used. */
+  static remainingFromUsed = (usedPercent: number): number => Math.max(0, Math.min(100, Math.round((100 - usedPercent) * 10) / 10))
+
+  static parseCodexUsage = (raw: JsonValue, credits: CodexResetCredits, now: number): UsageCard => {
+    const parsed = codexUsageSchema.safeParse(raw)
+    if (!parsed.success) return ProviderUsageModel.emptyUsage('error', 'Codex returned an unsupported usage response.')
+    const windows: UsageWindow[] = []
+    for (const position of ['primary', 'secondary'] as const) {
+      const window = parsed.data.rate_limit?.[`${position}_window`]
+      if (window === undefined || window === null) continue
+      windows.push({
+        label: codexWindowLabel(window.limit_window_seconds, position),
+        percentRemaining: ProviderUsageModel.remainingFromUsed(window.used_percent),
+        resetsAt: codexResetAt(window, now),
+      })
+    }
+    // Reserve meters only ever add a window: the ordinary gauges above always come from `rate_limit`.
+    for (const limit of parsed.data.additional_rate_limits ?? []) {
+      if (limit === null || !(isReserveLimit(limit.limit_name) || isReserveLimit(limit.metered_feature))) continue
+      const reserveWindows = [limit.rate_limit?.primary_window, limit.rate_limit?.secondary_window].flatMap(window =>
+        window === undefined || window === null
+          ? []
+          : [{ percentRemaining: ProviderUsageModel.remainingFromUsed(window.used_percent), resetsAt: codexResetAt(window, now) }],
+      )
+      const tightest = reserveWindows.sort((left, right) => left.percentRemaining - right.percentRemaining)[0]
+      if (tightest === undefined || windows.length >= 6) continue
+      const name = limit.limit_name?.trim() ?? ''
+      windows.push({ label: isReserveLimit(name) ? name.slice(0, 32) : 'Luna Reserve', ...tightest, reserve: true })
+    }
+    return {
+      status: 'ok',
+      message: null,
+      identity: null,
+      plan: parsed.data.plan_type ?? null,
+      windows,
+      bankedResets: credits.available,
+      bankedResetExpiries: credits.resets.map(reset => reset.expiresAt ?? null),
+    }
+  }
+
+  static parseOpenCodeUsage = (raw: JsonValue): UsageCard => {
+    const parsed = opencodeUsageSchema.safeParse(raw)
+    if (!parsed.success) return ProviderUsageModel.emptyUsage('error', 'OpenCode returned an unsupported usage response.')
+    const windows: UsageWindow[] = []
+    for (const [key, label] of OPENCODE_WINDOWS) {
+      const window = parsed.data.usage[key]
+      if (window === undefined) continue
+      windows.push({
+        label,
+        percentRemaining: window.status === 'rate-limited' ? 0 : ProviderUsageModel.remainingFromUsed(window.percent),
+        resetsAt: window.resetsAt === undefined ? null : Date.parse(window.resetsAt),
+      })
+    }
+    return { status: 'ok', message: null, identity: null, plan: null, windows, bankedResets: 0, bankedResetExpiries: [] }
   }
 }

@@ -4,19 +4,23 @@ import { describe, expect, it } from 'vitest'
 import { claudeKeychainService, parseClaudeUsage, resolveClaudeConfigDir } from './claude-account.js'
 import { parseCommandCodeUsage } from './commandcode-usage.js'
 import { cursorSessionCookie, parseCursorUsage } from './cursor-account.js'
-import { parseCodexUsage, parseOpenCodeUsage } from './usage.js'
+import { ProviderUsageModel } from './usage.js'
 
 const noCredits = { available: 0, resets: [] }
 const jwt = (payload: Record<string, unknown>): string => `h.${Buffer.from(JSON.stringify(payload)).toString('base64url')}.s`
 
 describe('Codex usage', () => {
   it('labels windows by their span, so a weekly-only plan is not shown as a session', () => {
-    const card = parseCodexUsage({ rate_limit: { primary_window: { used_percent: 30, limit_window_seconds: 604_800, reset_at: 1_900_000_000 } } }, noCredits, 0)
+    const card = ProviderUsageModel.parseCodexUsage(
+      { rate_limit: { primary_window: { used_percent: 30, limit_window_seconds: 604_800, reset_at: 1_900_000_000 } } },
+      noCredits,
+      0,
+    )
     expect(card.windows).toEqual([{ label: 'Weekly limit', percentRemaining: 70, resetsAt: 1_900_000_000_000 }])
   })
 
   it('reads both windows, millisecond resets, relative resets and banked credits', () => {
-    const card = parseCodexUsage(
+    const card = ProviderUsageModel.parseCodexUsage(
       {
         plan_type: 'pro',
         rate_limit: {
@@ -39,7 +43,7 @@ describe('Codex usage', () => {
 
 describe('OpenCode Go usage', () => {
   it('reports percent left, not the percent used the API returns', () => {
-    const card = parseOpenCodeUsage({
+    const card = ProviderUsageModel.parseOpenCodeUsage({
       usage: {
         rolling: { status: 'ok', percent: 25, resetsAt: '2026-10-08T12:00:00.000Z' },
         weekly: { status: 'rate-limited', percent: 100 },

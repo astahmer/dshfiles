@@ -6,7 +6,7 @@ import type { UsageCard } from './api.js'
 import { decodeJwtPayload } from './codex-home.js'
 import { readKeyFromEnv, type CredentialValueResolver } from './credentials.js'
 import { readKeychainSecret } from './keychain.js'
-import { emptyUsage, remainingFromUsed, usageSignal } from './usage.js'
+import { ProviderUsageModel } from './usage.js'
 
 /**
  * Cursor accounts.
@@ -65,41 +65,48 @@ const cursorUsageSchema = z.object({
 
 export const parseCursorUsage = (raw: unknown): UsageCard => {
   const parsed = cursorUsageSchema.safeParse(raw)
-  if (!parsed.success) return emptyUsage('unsupported', 'Cursor answered in a shape this plugin does not recognise.')
+  if (!parsed.success) return ProviderUsageModel.emptyUsage('unsupported', 'Cursor answered in a shape this plugin does not recognise.')
   const plan = parsed.data.individualUsage?.plan
   const usedPercent =
     plan?.totalPercentUsed ?? (plan?.used !== undefined && plan.limit !== undefined && plan.limit > 0 ? (plan.used / plan.limit) * 100 : undefined)
   const resetsAt = parsed.data.billingCycleEnd === undefined ? Number.NaN : Date.parse(parsed.data.billingCycleEnd)
   if (usedPercent === undefined) {
-    return { ...emptyUsage('unsupported', 'Cursor reported no included-usage limit for this plan.'), plan: parsed.data.membershipType ?? null }
+    return {
+      ...ProviderUsageModel.emptyUsage('unsupported', 'Cursor reported no included-usage limit for this plan.'),
+      plan: parsed.data.membershipType ?? null,
+    }
   }
   return {
     status: 'ok',
     message: null,
     identity: null,
     plan: parsed.data.membershipType ?? null,
-    windows: [{ label: 'Monthly limit', percentRemaining: remainingFromUsed(usedPercent), resetsAt: Number.isNaN(resetsAt) ? null : resetsAt }],
+    windows: [
+      { label: 'Monthly limit', percentRemaining: ProviderUsageModel.remainingFromUsed(usedPercent), resetsAt: Number.isNaN(resetsAt) ? null : resetsAt },
+    ],
     bankedResets: 0,
     bankedResetExpiries: [],
   }
 }
 
 export const readCursorUsage = async (keyEnv: string, signal?: AbortSignal, resolveCredential?: CredentialValueResolver): Promise<UsageCard> => {
-  if (signal?.aborted) return emptyUsage('error', 'Usage collection was cancelled.')
+  if (signal?.aborted) return ProviderUsageModel.emptyUsage('error', 'Usage collection was cancelled.')
   const token = await readCursorToken(keyEnv, resolveCredential)
-  if (token === undefined) return emptyUsage('unauthenticated', `Sign in with ${CURSOR_LOGIN_HINT}.`)
+  if (token === undefined) return ProviderUsageModel.emptyUsage('unauthenticated', `Sign in with ${CURSOR_LOGIN_HINT}.`)
   const cookie = cursorSessionCookie(token)
-  if (cookie === undefined) return emptyUsage('unsupported', 'This Cursor token does not identify a user, so its dashboard usage cannot be read.')
+  if (cookie === undefined)
+    return ProviderUsageModel.emptyUsage('unsupported', 'This Cursor token does not identify a user, so its dashboard usage cannot be read.')
   try {
     const response = await fetch(CURSOR_USAGE_URL, {
       headers: { cookie, accept: 'application/json' },
       redirect: 'error',
-      signal: usageSignal(signal),
+      signal: ProviderUsageModel.usageSignal(signal),
     })
-    if (response.status === 401 || response.status === 403) return emptyUsage('unauthenticated', `Cursor rejected this login; run ${CURSOR_LOGIN_HINT}.`)
-    if (!response.ok) return emptyUsage('error', `Cursor returned ${String(response.status)} for usage.`)
+    if (response.status === 401 || response.status === 403)
+      return ProviderUsageModel.emptyUsage('unauthenticated', `Cursor rejected this login; run ${CURSOR_LOGIN_HINT}.`)
+    if (!response.ok) return ProviderUsageModel.emptyUsage('error', `Cursor returned ${String(response.status)} for usage.`)
     return parseCursorUsage(await response.json())
   } catch (cause) {
-    return emptyUsage('error', cause instanceof Error ? cause.message : 'Cursor usage could not be read.')
+    return ProviderUsageModel.emptyUsage('error', cause instanceof Error ? cause.message : 'Cursor usage could not be read.')
   }
 }
