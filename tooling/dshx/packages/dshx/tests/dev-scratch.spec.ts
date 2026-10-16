@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { PassThrough } from 'node:stream'
 import { afterEach, describe, expect, it } from 'vitest'
 import { runCli } from '../src/cli/run.js'
-import { installFakeSecretCli } from '../src/scratch/seed.js'
+import { installFakeSecretCli, NEW_THREAD_START_BUTTON_NAME } from '../src/scratch/seed.js'
 import type { ScratchState } from '../src/scratch/state.js'
 
 const run = async (argv: readonly string[]): Promise<{ readonly code: number; readonly stdout: string; readonly stderr: string }> => {
@@ -58,6 +58,14 @@ describe('dshx dev scratch commands', () => {
       for (const action of ['up', 'doctor', 'open', 'shot', 'down']) expect(help.stdout).toMatch(new RegExp(`dshx dev ${action}\\b`))
       expect(help.stdout).toContain('dshx dev [--cwd <path>] [--port <port>] [--open]')
     }
+  })
+
+  it('matches native and ThreadSidebar start buttons by accessible name', () => {
+    expect(NEW_THREAD_START_BUTTON_NAME.test('New thread')).toBe(true)
+    expect(NEW_THREAD_START_BUTTON_NAME.test('New session')).toBe(true)
+    expect(NEW_THREAD_START_BUTTON_NAME.test('New Session')).toBe(true)
+    expect(NEW_THREAD_START_BUTTON_NAME.test('New session in sample')).toBe(false)
+    expect(NEW_THREAD_START_BUTTON_NAME.test('Settings')).toBe(false)
   })
 
   it('explains each action and names the fix for misuse', async () => {

@@ -18,15 +18,18 @@ pnpm --dir tooling/dshx --filter @dshfiles/dshx build   # once per checkout, and
 ## Launch
 
 ```sh
-dshx dev up --plugin @dshfiles/jj-integration --plugin @dshfiles/thread-sidebar --plugin @dshfiles/home --json
+dshx dev up --plugin @dshfiles/jj-integration --plugin @dshfiles/home --json
 ```
 
 Builds the named bundles (plus the client bundles they load), installs a scratch
 profile in a temp `DSH_HOME`, seeds a jj project `sample` with a `main`
 bookmark, starts `dsh` on a free port and a headless Chromium. Without
-`--plugin` it loads every owned bundle (slow). `--skip-build` reuses `dist/`;
-`--project <dir>` registers a real folder instead (kept on `down`); `--name`
-runs another instance beside it. Takes ~20 s for three bundles.
+`--plugin` it loads every owned bundle (slow); that broad profile currently
+fails `doctor` because ThreadSidebar is pending on the `workspaces` Host
+service. Use a targeted set for the feature and do not relax `doctor` to mask an
+inactive entry. `--skip-build` reuses `dist/`; `--project <dir>` registers a
+real folder instead (kept on `down`); `--name` runs another instance beside it.
+Takes ~20 s for three bundles.
 
 ## Doctor
 
@@ -62,7 +65,7 @@ such as `tooling/dshx/e2e/fixtures/attachments/red.png` to the composer's file
 input. `hover <role> "<name>"` leaves the pointer on hover-only UI for the next
 `shot`. The browser keeps its page between commands, so
 `shot` captures where `open` stopped. A failing step exits 1 with a screenshot:
-decide drift vs regression with `maintain-verify-dsh`. To drive something
+decide drift vs regression with `maintain-verification-skill`. To drive something
 ad hoc, add `reach` to its catalog entry rather than scripting Playwright.
 
 ## Evidence
@@ -98,15 +101,19 @@ Results are cached per package on the built bundles each journey boots, so a
 rerun without changes replays in seconds. A replayed pass is not a new run:
 pass `--force` when a binary outside the repository changed (other than jj).
 
-A red journey is drift or a regression: triage it with `maintain-verify-dsh`.
+A red journey is drift or a regression: triage it with `maintain-verification-skill`.
 
 ## Gotchas
 
 - `reach` starts from the app root of the default `up` seed: the project is
   `sample`; a `--project` run needs steps that pick its folder name.
-- The root reopens the last thread, so a reach that needs the New thread screen
-  starts with `click button "New thread"`; that button and the thread rows come
-  from `@dshfiles/thread-sidebar`, so load it for any thread reach.
+- The root reopens the last thread. ThreadSidebar supplies its `New thread`
+  button and thread rows; include it only for paths that need those surfaces.
+  The `tool-call-thread` fake-provider seed accepts either `New thread` or the
+  core DSH button displayed as `New Session` (accessible name `New session`),
+  so Activity Timeline verification can run
+  without ThreadSidebar. If a path requires ThreadSidebar and `doctor` reports
+  it pending on `workspaces`, record the Host gap instead of weakening the check.
 - Reaches share one browser and project selection persists. A reach that needs
   the project picker should run before another selects `sample` or use a separate
   `--name` instance. A reach that changes a sidebar view leaves it for the next

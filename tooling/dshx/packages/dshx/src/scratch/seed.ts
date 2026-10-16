@@ -10,6 +10,7 @@ import { FAKE_COMMAND_CODE_MODEL } from './fake-command-code.js'
 import { ScratchError, spawnDetached, type ScratchState } from './state.js'
 
 const NEW_THREAD_COMPOSER = 'Describe what you want to build, / commands, @ files or sessions'
+export const NEW_THREAD_START_BUTTON_NAME = /^(?:New thread|New session)$/i
 const fakeProviderScript = fileURLToPath(new URL('./fake-provider-main.js', import.meta.url))
 const FAKE_PROVIDER_ACCOUNT = 'Command Code 1'
 /** A call that runs long enough to watch a live tool-call counter, then settles. */
@@ -207,7 +208,7 @@ const configureFakeProviderThread = async (input: {
   await keyDialog.getByRole('button', { name: 'Store key', exact: true }).click({ timeout: timeoutMs })
   await keyDialog.waitFor({ state: 'hidden', timeout: timeoutMs })
 
-  await page.getByRole('button', { name: 'New thread', exact: true }).first().click({ timeout: timeoutMs })
+  await page.getByRole('button', { name: NEW_THREAD_START_BUTTON_NAME }).first().click({ timeout: timeoutMs })
   const composer = page.getByRole('textbox', { name: NEW_THREAD_COMPOSER, exact: true })
   await composer.waitFor({ state: 'visible', timeout: timeoutMs })
   const projectName = basename(state.project.path)

@@ -30,7 +30,7 @@ The review covered the receipt allowlist and strict schemas, persistence-before-
 - **Note — pending snapshot:** the same [navigation guard](../plugins/@dshfiles/activity-timeline/src/panel.tsx#L215-L227) fails closed when Workspace state is not ready. Impact: a transiently pending snapshot temporarily prevents opening Sessions. Remediation: add a focused pending-state test if a supported test seam becomes available; no browser test currently forces this phase.
 - **Note — activation:** the [package manifest](../plugins/@dshfiles/activity-timeline/package.json#L30-L87) and [Client composition](../plugins/@dshfiles/activity-timeline/src/client.tsx#L23-L39) add the Workspace Controller dependency and injection. An active profile must load the updated bundle; manifest changes take effect after a Host/profile restart. Verification used disposable named scratch profiles only; the live `127.0.0.1:3080` profile was not synced or restarted.
 
-The `dshx dev` verification scratch also loads ThreadSidebar for its `tool-call-thread` seed UI and Multi-host to avoid its optional `/threadList` 404s; neither is an Activity Timeline runtime dependency.
+The `tool-call-thread` scratch seed accepts ThreadSidebar's `New thread` button or the core DSH button displayed as `New Session` (accessible name `New session`). This Activity Timeline verification omits ThreadSidebar because its Host entry remains pending on the `workspaces` service in the stock scratch profile; the Activity Timeline does not depend on it. Multi-host is loaded only to avoid its optional `/threadList` 404s.
 
 ## Verification
 
@@ -51,7 +51,7 @@ The Activity Timeline `verification-receipts` reach is exercised in an isolated 
 ```sh
 fnm exec --using=22.23.3 pnpm --dir tooling/dshx --filter @dshfiles/dshx build
 dshx() { fnm exec --using=22.23.3 node "$PWD/tooling/dshx/packages/dshx/dist/cli/bin.js" "$@"; }
-dshx dev up --plugin @dshfiles/activity-timeline --plugin @dshfiles/project-checks --plugin @dshfiles/ai-accounts --plugin @dshfiles/workspace-folder-picker --plugin @dshfiles/thread-sidebar --plugin @dshfiles/multi-host --name verification-evidence --json
+dshx dev up --plugin @dshfiles/activity-timeline --plugin @dshfiles/project-checks --plugin @dshfiles/ai-accounts --plugin @dshfiles/workspace-folder-picker --plugin @dshfiles/multi-host --plugin @dshfiles/jj-integration --plugin @dshfiles/home --name verification-evidence --json
 dshx dev doctor --name verification-evidence
 dshx dev open activity-timeline/verification-receipts --name verification-evidence
 dshx dev shot --label verification-receipts --name verification-evidence --json
