@@ -1,3 +1,4 @@
+import type {} from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type {} from '@deepseek-ai/dsh-session-query'
 import type {} from '@deepseek-ai/dsh-user-questions'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
@@ -16,6 +17,7 @@ import { threadSidebarPluginUpdatesApi } from './plugin-updates-api.js'
 import { threadSidebarRecoveryApi } from './recovery-api.js'
 import { createPluginUpdateWatch } from './plugin-updates.js'
 import { threadSidebarRestartApi } from './restart-api.js'
+import { threadSidebarSessionArchiveApi } from './session-archive-api.js'
 import { activeRestartSessionIds, createRestartRecoveryStore } from './restart-recovery.js'
 import { createRestartController, readLaunchUrl } from './restart.js'
 import { threadSidebarSettings } from './settings.js'
@@ -33,6 +35,15 @@ const restartController = (ctx: Context) =>
     },
     onExitFailure: () => console.error('thread-sidebar: managed restart was canceled because running-thread recovery could not be saved'),
   })
+
+const sessionArchiveApi = threadSidebarSessionArchiveApi.host({
+  status: ({ ctx, input }) => {
+    const requestedSessionIds = new Set(input.sessionIds)
+    return {
+      archivedSessionIds: ctx.workspaces.list.getSnapshot().archivedSessionIds.filter(sessionId => requestedSessionIds.has(sessionId)),
+    }
+  },
+})
 
 const restartApi = threadSidebarRestartApi.host({
   availability: ({ ctx }) => ({ available: restartController(ctx).available }),
@@ -148,8 +159,8 @@ interface ClientModuleRegistrySurface {
 export default defineHost({
   name: '@dshfiles/thread-sidebar',
   settings: [threadSidebarSettings],
-  inject: ['connection', 'sessionProjections', 'sessionQuery', 'agents', 'sessionController', 'sessionPersistence', 'storageDomain'],
-  apis: [restartApi, recoveryApi, machineApi, pluginUpdatesApi, pendingQuestionsApi, threadAttentionApiHost],
+  inject: ['connection', 'sessionProjections', 'sessionQuery', 'agents', 'sessionController', 'sessionPersistence', 'storageDomain', 'workspaces'],
+  apis: [restartApi, recoveryApi, machineApi, pluginUpdatesApi, pendingQuestionsApi, threadAttentionApiHost, sessionArchiveApi],
   // The web Host's client module registry knows where every loaded plugin package lives; Hosts without it
   // (desktop shells, older builds) simply report no pending updates.
   setup: ctx => {

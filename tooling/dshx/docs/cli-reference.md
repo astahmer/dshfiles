@@ -110,7 +110,10 @@ All add commands accept `--file`, `--dry-run`, and `--json`. They generate sourc
 
 These commands use DSH's authenticated local Remote APIs through the reusable
 typed client in `packages/dshx/src/platform/`. They do not read session storage,
-edit profile files, or call Cordis internals directly.
+edit profile files, or call Cordis internals directly. `sessions list` also reads
+archive state from a registered DSHX archive-status API when available; its
+human-readable `ARCHIVED` column says `unknown` when that API is unavailable,
+and JSON rows omit `archived` in that case.
 
 ```bash
 dshx status [--url <launch-url>] [--json]

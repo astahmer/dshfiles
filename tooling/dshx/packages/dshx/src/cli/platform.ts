@@ -147,6 +147,7 @@ function sessionRows(items: readonly SessionSummary[]): string {
     { heading: 'SESSION', render: item => item.sessionId },
     { heading: 'STATE', render: item => (item.running ? 'running' : 'idle') },
     { heading: 'BLANK', render: item => (item.blank ? 'yes' : 'no') },
+    { heading: 'ARCHIVED', render: item => (item.archived === undefined ? 'unknown' : item.archived ? 'yes' : 'no') },
     {
       heading: 'UPDATED',
       render: item => new Date(item.updatedAt).toISOString(),

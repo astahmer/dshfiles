@@ -183,6 +183,7 @@ describe('DSH platform CLI', () => {
 
   it('keeps launch tokens out of RPC URLs and forwards command cancellation signals', async () => {
     const calls: { readonly url: string; readonly init?: RequestInit }[] = []
+    let archiveApiCallCount = 0
     const request = vi.fn<typeof fetch>(async (input, init) => {
       const url = input instanceof Request ? input.url : String(input)
       calls.push({ url, ...(init === undefined ? {} : { init }) })
@@ -203,7 +204,36 @@ describe('DSH platform CLI', () => {
           rpcId: requestBody.rpcId,
           result: {
             ok: true,
-            value: requestBody.method === 'session/list' ? { items: [] } : null,
+            value:
+              requestBody.method === 'session/list'
+                ? {
+                    items: [
+                      {
+                        sessionId: 'session-1',
+                        updatedAt: 10,
+                        running: false,
+                        blank: false,
+                        agentAvailable: true,
+                      },
+                    ],
+                  }
+                : url.includes('/api/dshx-')
+                  ? archiveApiCallCount++ === 0
+                    ? {
+                        version: 1,
+                        output: {
+                          apis: [
+                            {
+                              owner: '@dshfiles/thread-sidebar',
+                              id: 'thread-sidebar-session-archive',
+                              version: 1,
+                              methods: [{ name: 'status' }],
+                            },
+                          ],
+                        },
+                      }
+                    : { version: 1, output: { archivedSessionIds: ['session-1'] } }
+                  : null,
           },
         }),
         {
@@ -217,17 +247,22 @@ describe('DSH platform CLI', () => {
       url: 'http://127.0.0.1:3080/?token=synthetic-token',
       fetch: request,
     })
-    expect(await client.sessions.list()).toEqual([])
+    expect(await client.sessions.list()).toMatchObject([{ sessionId: 'session-1', archived: true }])
     const controller = new AbortController()
     expect(await client.commands.execute('session-1', '/help', controller.signal)).toBeNull()
     const apiCall = calls[1]
-    const commandCall = calls[2]
+    const commandCall = calls[4]
     const abortedCommand = new AbortController()
     abortedCommand.abort()
     await expect(client.commands.execute('session-1', '/help', abortedCommand.signal)).rejects.toMatchObject({ code: 'cancelled' })
 
-    expect(calls).toHaveLength(4)
+    expect(calls).toHaveLength(6)
     expect(calls[0]?.url).toContain('synthetic-token')
+    expect(calls[2]?.url).toMatch(/^http:\/\/127\.0\.0\.1:3080\/api\/dshx-[a-f0-9]+\/list$/u)
+    expect(JSON.parse(String(calls[2]?.init?.body)).method).toMatch(/^dshx-[a-f0-9]+\/list$/u)
+    expect(calls[3]?.url).toMatch(/^http:\/\/127\.0\.0\.1:3080\/api\/dshx-[a-f0-9]+\/status$/u)
+    expect(JSON.parse(String(calls[3]?.init?.body)).method).toMatch(/^dshx-[a-f0-9]+\/status$/u)
+    expect(JSON.parse(String(calls[3]?.init?.body)).payload).toMatchObject({ version: 1, input: { sessionIds: ['session-1'] } })
     expect(apiCall?.url).toBe('http://127.0.0.1:3080/api/session/list')
     expect(new Headers(apiCall?.init?.headers).get('cookie')).toBe('dsh.session=example-cookie')
     expect(commandCall?.url).toBe('http://127.0.0.1:3080/api/commands/execute')
@@ -247,9 +282,44 @@ describe('DSH platform CLI', () => {
     expect(request).not.toHaveBeenCalled()
   })
 
+  it('shows archive state in the human-readable Session list', async () => {
+    const streams = io()
+    const stdout = capture(streams.out)
+    const client = createDshPlatformClientFromTransport({
+      sessionCursor: async () => 0,
+      archivedSessionIds: async () => ['session-1'],
+      rpc: async (namespace, method) => {
+        if (namespace === 'session' && method === 'list')
+          return {
+            items: [
+              {
+                sessionId: 'session-1',
+                updatedAt: 10,
+                running: false,
+                blank: false,
+                agentAvailable: true,
+              },
+            ],
+          }
+        throw new Error(`Unexpected RPC ${namespace}/${method}`)
+      },
+    })
+
+    const exitCode = await runCli(['sessions', 'list'], {
+      io: streams,
+      version: 'test-version',
+      runtime: { connectPlatform: async () => client },
+    })
+
+    expect(exitCode).toBe(0)
+    expect(stdout()).toContain('ARCHIVED')
+    expect(stdout()).toContain('yes')
+  })
+
   it('preserves Host Session projections and command input descriptors', async () => {
     const client = createDshPlatformClientFromTransport({
       sessionCursor: async () => 0,
+      archivedSessionIds: async () => ['session-1'],
       rpc: async (namespace, method) => {
         if (namespace === 'session' && method === 'list') {
           return {
@@ -282,6 +352,7 @@ describe('DSH platform CLI', () => {
     expect(await client.sessions.list()).toMatchObject([
       {
         sessionId: 'session-1',
+        archived: true,
         projections: { summary: 'Ready', state: 'idle' },
       },
     ])

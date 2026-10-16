@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { isIPv4 } from 'node:net'
 import { z } from 'zod'
 import WebSocket, { type RawData } from 'ws'
+import { createDshxApiCaller, type DshxApiCall } from './dshx-api.js'
 
 const jsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
   z.union([z.string(), z.number().finite(), z.boolean(), z.null(), z.array(jsonValueSchema), z.record(z.string(), jsonValueSchema)]),
@@ -206,6 +207,8 @@ const historyRecordSchema = z
 
 export interface SessionSummary {
   readonly sessionId: string
+  /** Host archive state when the optional thread-sidebar status API is available. */
+  readonly archived?: boolean
   readonly updatedAt: number
   readonly running: boolean
   readonly blank: boolean
@@ -372,6 +375,7 @@ export interface ChangeResult {
 export interface DshPlatformTransport {
   rpc(namespace: string, method: string, args: Readonly<Record<string, JsonValue>>, signal?: AbortSignal): Promise<unknown>
   sessionCursor(sessionId: string): Promise<number>
+  archivedSessionIds?(sessionIds: readonly string[]): Promise<readonly string[] | undefined>
 }
 
 export interface DshPlatformClient {
@@ -477,9 +481,9 @@ export function loopbackLaunchUrl(value: string): {
   return { origin: url.origin, token }
 }
 
-function mapSession(value: unknown): SessionSummary {
+function mapSession(value: unknown, archived?: boolean): SessionSummary {
   const parsed = sessionSummarySchema.parse(value)
-  return {
+  const summary = {
     sessionId: parsed.sessionId,
     updatedAt: parsed.updatedAt,
     running: parsed.running,
@@ -490,6 +494,8 @@ function mapSession(value: unknown): SessionSummary {
     ...(parsed.cwd === undefined ? {} : { cwd: parsed.cwd }),
     ...(parsed.projections === undefined ? {} : { projections: parsed.projections }),
   }
+  if (archived === undefined) return summary
+  return { ...summary, archived }
 }
 
 function mapPlugin(value: unknown): PluginSummary {
@@ -675,7 +681,10 @@ function mapSkillEntry(value: z.infer<typeof skillEntrySchema>): SkillEntry {
 function makeTypedClient(transport: DshPlatformTransport): DshPlatformClient {
   const listSessions = async (): Promise<readonly SessionSummary[]> => {
     const result = z.object({ items: z.array(sessionSummarySchema) }).parse(await transport.rpc('session', 'list', { _request: {} }))
-    return result.items.map(mapSession)
+    const sessionIds = result.items.map(item => item.sessionId)
+    const archivedSessionIds = await transport.archivedSessionIds?.(sessionIds)
+    const archivedSessionIdSet = archivedSessionIds === undefined ? undefined : new Set(archivedSessionIds)
+    return result.items.map(item => mapSession(item, archivedSessionIdSet?.has(item.sessionId)))
   }
 
   const page = async (sessionId: string, throughSeq: number, beforeSeq?: number, maxMessages = 100): Promise<SessionPage> => {
@@ -940,6 +949,53 @@ export async function connectDshPlatformClient(options: ConnectDshPlatformClient
     return envelope.data.result.value
   }
 
+  let archiveStatusCall: Promise<DshxApiCall | undefined> | undefined
+  const archivedSessionIds = async (sessionIds: readonly string[]): Promise<readonly string[] | undefined> => {
+    try {
+      archiveStatusCall ??= (async () => {
+        const registryCall = createDshxApiCaller({
+          origin: parsed.origin,
+          cookie,
+          packageId: '@dshfiles/dshx',
+          apiId: 'registry',
+          version: 1,
+          fetch: request,
+        })
+        const registry = z
+          .object({
+            apis: z.array(
+              z.object({
+                owner: z.string(),
+                id: z.string(),
+                version: z.number().int().positive(),
+                methods: z.array(z.object({ name: z.string() })),
+              }),
+            ),
+          })
+          .parse(await registryCall('list'))
+        const archiveApi = registry.apis.find(
+          api =>
+            api.owner === '@dshfiles/thread-sidebar' && api.id === 'thread-sidebar-session-archive' && api.methods.some(method => method.name === 'status'),
+        )
+        if (archiveApi === undefined) return undefined
+        return createDshxApiCaller({
+          origin: parsed.origin,
+          cookie,
+          packageId: archiveApi.owner,
+          apiId: archiveApi.id,
+          version: archiveApi.version,
+          fetch: request,
+        })
+      })()
+      const call = await archiveStatusCall
+      if (call === undefined) return undefined
+      return z.object({ archivedSessionIds: z.array(z.string().min(1).max(256)).max(10_000) }).parse(await call('status', { sessionIds: [...sessionIds] }))
+        .archivedSessionIds
+    } catch {
+      return undefined
+    }
+  }
+
   const sessionCursor = async (sessionId: string): Promise<number> =>
     new Promise((resolve, reject) => {
       const streamId = randomUUID()
@@ -1013,5 +1069,5 @@ export async function connectDshPlatformClient(options: ConnectDshPlatformClient
       socket.once('close', () => finish(new DshPlatformError('stream-closed', 'DSH closed the session history stream before it returned a cursor.')))
     })
 
-  return makeTypedClient({ rpc, sessionCursor })
+  return makeTypedClient({ rpc, sessionCursor, archivedSessionIds })
 }
