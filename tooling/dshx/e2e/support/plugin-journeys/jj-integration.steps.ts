@@ -472,6 +472,7 @@ Then('Rebase moves main onto the work described {string}', async ({ page }: { pa
     const rebasedToast = page.getByRole('alert').filter({ hasText: 'Rebased 1 revision(s) onto main:' })
     await expect(rebasedToast).toContainText(description)
     await expect(rebaseButton(page)).toBeDisabled()
+    await expect(page.getByTestId('jj-thread-rebased-notice')).toContainText('This thread was rebased onto main.')
     expect(descriptionOf(repository, 'main')).toBe(description)
     await expect(rebasedToast).toContainText('main is now at')
     await expect(rebasedToast).toContainText(`(${commitIdOf(repository, 'main').slice(0, 8)})`)

@@ -41,11 +41,11 @@ export const LandButton = (props: LandButtonProps): JSX.Element | null => {
   const rebase = useMutation({
     mutationKey: threadRebaseMutationKey,
     mutationFn: (path: string) => runHostRequest({ timeoutMs: 300_000, request: signal => api.land({ path, sessionId: props.sessionId }, { signal }) }),
-    onSuccess: result => toast.show({ text: describeLandResult(props.t, result), success: result.status === 'landed' }),
     onError: error => toast.show({ text: errorMessage(error, props.t('loadFailed')), success: false }),
-    onSettled: () => {
+    onSettled: async (result, _error, path) => {
       announceRepositoryChange()
-      return queryClient.invalidateQueries({ queryKey: ['jj-integration'] })
+      await queryClient.invalidateQueries({ queryKey: threadQueryKeys.threadAt(path) })
+      if (result !== undefined && result !== null) toast.show({ text: describeLandResult(props.t, result), success: result.status === 'landed' })
     },
   })
   const current = thread.data?.thread
