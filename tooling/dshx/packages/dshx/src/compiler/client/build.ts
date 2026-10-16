@@ -139,7 +139,9 @@ function clientEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, op
     async load(id) {
       if (id === VIRTUAL_CLIENT_PUBLIC)
         return [
-          `export { defineClient, defineSlot } from ${JSON.stringify(CLIENT_DEFINE_PATH)}`,
+          `import { ClientContributionModel } from ${JSON.stringify(CLIENT_DEFINE_PATH)}`,
+          'export const defineClient = ClientContributionModel.defineClient',
+          'export const defineSlot = ClientContributionModel.defineSlot',
           `export { defineClientPlugin } from ${JSON.stringify(CLIENT_SDK_PATH)}`,
           `export { declareLocaleNamespace, defineLocale } from ${JSON.stringify(CLIENT_LOCALE_PATH)}`,
           `export { useApi, useApiQuery } from ${JSON.stringify(VIRTUAL_CLIENT_API_HOOKS)}`,

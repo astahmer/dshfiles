@@ -35,21 +35,21 @@ type RendersCheck<C, D> = [keyof D & keyof SlotMap & string] extends [never]
         : { 'children declared but the component consumes no renderSlot': keyof D & keyof SlotMap & string }
     : unknown
 
-export function defineClient<const T extends ClientDefinition>(definition: T & Record<Exclude<keyof T, keyof ClientDefinition>, never>): T {
+function defineClient<const T extends ClientDefinition>(definition: T & Record<Exclude<keyof T, keyof ClientDefinition>, never>): T {
   return definition
 }
 
-export function isSlotContribution(value: unknown): value is SlotContribution {
+function isSlotContribution(value: unknown): value is SlotContribution {
   return typeof value === 'object' && value !== null && slotContributions.has(value)
 }
 
-export function slotContributionParts(value: SlotContribution): SlotContributionParts {
+function slotContributionParts(value: SlotContribution): SlotContributionParts {
   const parts = slotContributions.get(value)
   if (parts === undefined) throw new TypeError('Invalid Slot contribution; create it with defineSlot(name, options).')
   return parts
 }
 
-export function defineSlot<
+function defineSlot<
   K extends keyof SlotMap & string,
   L extends LocaleDefinition,
   const EntryKey extends EntryKeyOf<K> = EntryKeyOf<K>,
@@ -72,7 +72,7 @@ export function defineSlot<
     readonly registrant?: string
   } & KindOptions<K, EntryKey, M>,
 ): SlotContribution<K, WithoutComponent<typeof options>, C>
-export function defineSlot<
+function defineSlot<
   K extends keyof SlotMap & string,
   L extends LocaleDefinition,
   I extends object,
@@ -97,7 +97,7 @@ export function defineSlot<
     readonly registrant?: string
   } & KindOptions<K, EntryKey, M>,
 ): SlotContribution<K, WithoutComponent<typeof options>, C>
-export function defineSlot<
+function defineSlot<
   K extends keyof SlotMap & string,
   const EntryKey extends EntryKeyOf<K> = EntryKeyOf<K>,
   const D extends ChildrenDecl = Record<never, never>,
@@ -117,7 +117,7 @@ export function defineSlot<
     readonly registrant?: string
   } & KindOptions<K, EntryKey, M>,
 ): SlotContribution<K, WithoutComponent<typeof options>, C>
-export function defineSlot<
+function defineSlot<
   K extends keyof SlotMap & string,
   I extends object,
   const EntryKey extends EntryKeyOf<K> = EntryKeyOf<K>,
@@ -139,7 +139,7 @@ export function defineSlot<
     readonly registrant?: string
   } & KindOptions<K, EntryKey, M>,
 ): SlotContribution<K, WithoutComponent<typeof options>, C>
-export function defineSlot<K extends keyof SlotMap & string, const O extends { readonly component: unknown }>(
+function defineSlot<K extends keyof SlotMap & string, const O extends { readonly component: unknown }>(
   name: K,
   options: O,
 ): SlotContribution<K, Omit<O, 'component'>, O['component']> {
@@ -147,4 +147,11 @@ export function defineSlot<K extends keyof SlotMap & string, const O extends { r
   const contribution = {} as SlotContribution<K, Omit<O, 'component'>, O['component']>
   slotContributions.set(contribution, { name, options: registration, component })
   return contribution
+}
+
+export class ClientContributionModel {
+  static readonly defineClient = defineClient
+  static readonly isContribution = isSlotContribution
+  static readonly parts = slotContributionParts
+  static readonly defineSlot = defineSlot
 }

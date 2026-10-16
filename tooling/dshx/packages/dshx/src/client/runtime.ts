@@ -10,7 +10,7 @@ import type {
   LocaleDictionaries,
   SlotContribution,
 } from './types.js'
-import { isSlotContribution, slotContributionParts, type SlotRegistrationOptions } from './define.js'
+import { ClientContributionModel, type SlotRegistrationOptions } from './define.js'
 import { isLocaleDefinition, localeDefinitionParts } from './locale.js'
 import { ConversationContributionModel } from '../conversation/define.js'
 import { ApiClientLifecycle } from '../api/client.js'
@@ -79,7 +79,7 @@ function fallbackName(metadata: ClientPluginMetadata): string {
 }
 
 function validateContribution(value: unknown, metadata: ClientPluginMetadata, index: number): SlotContribution {
-  if (!isSlotContribution(value)) {
+  if (!ClientContributionModel.isContribution(value)) {
     fail(
       'DSHX2201',
       `Client slot contribution at index ${index} must be an object returned by defineSlot().`,
@@ -87,7 +87,7 @@ function validateContribution(value: unknown, metadata: ClientPluginMetadata, in
       'Use defineSlot("slot.name", { component: Component, ...registrationOptions }) inside defineClient({ slots: [...] }).',
     )
   }
-  const parts = slotContributionParts(value)
+  const parts = ClientContributionModel.parts(value)
   const slotName: unknown = parts.name
   if (typeof slotName !== 'string' || slotName.trim() === '') {
     fail(
@@ -307,7 +307,7 @@ function registerContributions(client: ClientRuntimeContext, definition: ClientD
     client.slots.inject(renderer.name, () => client.slots.register({ name: renderer.name, ...renderer.options }, decorate(renderer.component)))
   }
   for (const slot of definition.slots ?? []) {
-    const { name, options, component } = slotContributionParts(slot)
+    const { name, options, component } = ClientContributionModel.parts(slot)
     client.slots.inject(name, () => client.slots.register({ name, ...normalizedSlotOptions(options) }, decorate(component)))
   }
 }

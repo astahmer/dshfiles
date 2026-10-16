@@ -5,7 +5,7 @@ import { defineClient, defineLocale, defineSlot } from '../src/client/index.js'
 import type { ClientContext, LocaleDefinition, LocaleKeyOf, PropsLocaleOf } from '../src/client/index.js'
 import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { SessionStore } from '@deepseek-ai/dsh-session'
-import { slotContributionParts } from '../src/client/define.js'
+import { ClientContributionModel } from '../src/client/define.js'
 import { localeDefinitionParts } from '../src/client/locale.js'
 import type { ClientConversationContribution } from '../src/client/types.js'
 import { defineConversation } from '../src/conversation/index.js'
@@ -78,7 +78,7 @@ describe('defineClient', () => {
     const options = { id: 'test-entry', order: 3, component }
     const contribution = defineSlot('test.slot', options)
     expect(contribution).toEqual({})
-    expect(slotContributionParts(contribution)).toEqual({ name: 'test.slot', options: { id: 'test-entry', order: 3 }, component })
+    expect(ClientContributionModel.parts(contribution)).toEqual({ name: 'test.slot', options: { id: 'test-entry', order: 3 }, component })
     expectTypeOf(contribution).toMatchTypeOf<import('../src/client/types.js').SlotContribution<'test.slot'>>()
     // @ts-expect-error Unknown SlotMap keys must be provided by an official augmentation.
     defineSlot('missing.slot', { component })
@@ -310,7 +310,7 @@ describe('Client runtime adapter', () => {
     plugin.apply(ctx)
     expect(get).toHaveBeenCalledWith('configForms')
     expect(registered).toHaveLength(1)
-    expect(registered[0]).not.toBe(slotContributionParts(slot).component)
+    expect(registered[0]).not.toBe(ClientContributionModel.parts(slot).component)
   })
 
   it('adds Connection and a lazy API provider from compiler metadata without Client api/apis', async () => {
@@ -329,7 +329,7 @@ describe('Client runtime adapter', () => {
     })
     await plugin.apply(ctx)
     expect(registered).toHaveLength(1)
-    expect(registered[0]).not.toBe(slotContributionParts(slot).component)
+    expect(registered[0]).not.toBe(ClientContributionModel.parts(slot).component)
     // Retained-hook contracts bind only when their component invokes useApi().
     expect(get).not.toHaveBeenCalled()
   })
