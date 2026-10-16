@@ -10,10 +10,7 @@ import {
   COMPOSER_HEAD_TEMPLATE,
   COMPOSER_LOCAL_BOOKMARK_LIST_TEMPLATE,
   COMPOSER_WORKSPACE_TEMPLATE,
-  composerBaseTarget,
-  composerDiffRange,
-  parsePatchFileStats,
-  parseStatTotals,
+  ComposerContextModel,
 } from './composer-context-core.js'
 import { fileStatusLetter, parseJsonLines, validatedRepositoryPath } from './core.js'
 
@@ -73,12 +70,13 @@ export const composerContextHost = (run: RunJj) =>
       const head = parseJsonLines(headResult.stdout, value => headSchema.parse(value))[0]
       if (head === undefined) return { repository: null }
       const read = (args: readonly string[], outputLimit: number) => run(ctx, root, ['--ignore-working-copy', ...args], signal, { outputLimit })
-      const range = composerDiffRange(input.base)
+      const range = ComposerContextModel.composerDiffRange(input.base)
       const [nearest, baseTarget, stat, files, localBookmarks, workspaces] = await Promise.all([
         read(['log', '--no-graph', '--revisions', 'heads(::@- & bookmarks())', '--limit', '2', '--template', COMPOSER_BOOKMARKS_TEMPLATE], 16_000),
-        read(['log', '--no-graph', '--revisions', composerBaseTarget(input.base), '--limit', '1', '--template', COMPOSER_BOOKMARKS_TEMPLATE], 16_000).catch(
-          () => null,
-        ),
+        read(
+          ['log', '--no-graph', '--revisions', ComposerContextModel.composerBaseTarget(input.base), '--limit', '1', '--template', COMPOSER_BOOKMARKS_TEMPLATE],
+          16_000,
+        ).catch(() => null),
         read(['diff', ...range, '--stat'], 256_000).catch(() => null),
         read(['diff', ...range, '--template', COMPOSER_FILE_TEMPLATE], 512_000).catch(() => null),
         read(['bookmark', 'list', '--template', COMPOSER_LOCAL_BOOKMARK_LIST_TEMPLATE], 32_000).catch(() => null),
@@ -104,7 +102,7 @@ export const composerContextHost = (run: RunJj) =>
           bookmarks: head.bookmarks,
           nearestBookmarks: [...new Set(nearestBookmarks)].slice(0, 32),
           base: { label: baseLabel(input.base, targetBookmarks[0] ?? []), found: targetBookmarks.length > 0 },
-          totals: stat === null || stat.truncated ? null : parseStatTotals(stat.stdout),
+          totals: stat === null || stat.truncated ? null : ComposerContextModel.parseStatTotals(stat.stdout),
           files: fileRows.slice(0, MAX_FILES).map(row => ({ path: row.path, status: fileStatusLetter(row.status) })),
           filesTruncated: files === null || files.truncated || fileRows.length > MAX_FILES,
           localBookmarks: bookmarkNames.slice(0, 200),
@@ -115,11 +113,11 @@ export const composerContextHost = (run: RunJj) =>
       try {
         const root = await workspaceRoot(ctx, run, input.cwd, signal)
         if (root === null) throw new Error('Jujutsu could not find a workspace for this Session.')
-        const patch = await run(ctx, root, ['diff', ...composerDiffRange(input.base), '--git'], signal, { outputLimit: 1_160_000 })
+        const patch = await run(ctx, root, ['diff', ...ComposerContextModel.composerDiffRange(input.base), '--git'], signal, { outputLimit: 1_160_000 })
         return {
           patch: patch.truncated ? patch.stdout + '\n[diff truncated at the output limit]' : patch.stdout,
           truncated: patch.truncated,
-          files: parsePatchFileStats(patch.stdout).slice(0, 2000),
+          files: ComposerContextModel.parsePatchFileStats(patch.stdout).slice(0, 2000),
         }
       } catch (error) {
         throw RevisionReads.publicError(error)

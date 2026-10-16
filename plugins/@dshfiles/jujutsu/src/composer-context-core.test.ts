@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { composerBaseFromSetting, composerBaseSetting, composerDiffRange, parsePatchFileStats, parseStatTotals } from './composer-context-core.js'
+import { ComposerContextModel, composerBaseFromSetting } from './composer-context-core.js'
 
 describe('composer base setting', () => {
   it('maps the settings string to a base and back', () => {
     expect(composerBaseFromSetting('parent')).toEqual({ kind: 'parent' })
     expect(composerBaseFromSetting('trunk')).toEqual({ kind: 'trunk' })
     expect(composerBaseFromSetting('feat/x')).toEqual({ kind: 'bookmark', name: 'feat/x' })
-    expect(composerBaseSetting({ kind: 'bookmark', name: 'feat/x' })).toBe('feat/x')
+    expect(ComposerContextModel.composerBaseSetting({ kind: 'bookmark', name: 'feat/x' })).toBe('feat/x')
   })
 
   it('falls back to the parent for empty, missing or revset-injecting values', () => {
@@ -16,26 +16,31 @@ describe('composer base setting', () => {
   })
 
   it('compares the parent as the working-copy change and other bases from their fork point', () => {
-    expect(composerDiffRange({ kind: 'parent' })).toEqual(['-r', '@'])
-    expect(composerDiffRange({ kind: 'trunk' })).toEqual(['--from', 'fork_point(trunk() | @)', '--to', '@'])
-    expect(composerDiffRange({ kind: 'bookmark', name: 'feat/x' })).toEqual(['--from', 'fork_point(bookmarks(exact:"feat/x") | @)', '--to', '@'])
+    expect(ComposerContextModel.composerDiffRange({ kind: 'parent' })).toEqual(['-r', '@'])
+    expect(ComposerContextModel.composerDiffRange({ kind: 'trunk' })).toEqual(['--from', 'fork_point(trunk() | @)', '--to', '@'])
+    expect(ComposerContextModel.composerDiffRange({ kind: 'bookmark', name: 'feat/x' })).toEqual([
+      '--from',
+      'fork_point(bookmarks(exact:"feat/x") | @)',
+      '--to',
+      '@',
+    ])
   })
 })
 
 describe('parseStatTotals', () => {
   it('reads the summary line of jj diff --stat', () => {
     const stdout = 'src/a.ts | 12 +++++++++---\nsrc/b.ts |  2 --\n2 files changed, 9 insertions(+), 5 deletions(-)\n'
-    expect(parseStatTotals(stdout)).toEqual({ files: 2, additions: 9, deletions: 5 })
+    expect(ComposerContextModel.parseStatTotals(stdout)).toEqual({ files: 2, additions: 9, deletions: 5 })
   })
 
   it('handles singular forms and omitted counts', () => {
-    expect(parseStatTotals('a | 1 +\n1 file changed, 1 insertion(+), 0 deletions(-)')).toEqual({ files: 1, additions: 1, deletions: 0 })
-    expect(parseStatTotals('0 files changed, 0 insertions(+), 0 deletions(-)\n')).toEqual({ files: 0, additions: 0, deletions: 0 })
-    expect(parseStatTotals('a | 1 -\n1 file changed, 1 deletion(-)')).toEqual({ files: 1, additions: 0, deletions: 1 })
+    expect(ComposerContextModel.parseStatTotals('a | 1 +\n1 file changed, 1 insertion(+), 0 deletions(-)')).toEqual({ files: 1, additions: 1, deletions: 0 })
+    expect(ComposerContextModel.parseStatTotals('0 files changed, 0 insertions(+), 0 deletions(-)\n')).toEqual({ files: 0, additions: 0, deletions: 0 })
+    expect(ComposerContextModel.parseStatTotals('a | 1 -\n1 file changed, 1 deletion(-)')).toEqual({ files: 1, additions: 0, deletions: 1 })
   })
 
   it('returns null without a summary line', () => {
-    expect(parseStatTotals('src/a.ts | 12 +++++++++---\n')).toBeNull()
+    expect(ComposerContextModel.parseStatTotals('src/a.ts | 12 +++++++++---\n')).toBeNull()
   })
 })
 
@@ -65,7 +70,7 @@ describe('parsePatchFileStats', () => {
       '@@ -0,0 +1 @@',
       '+hello',
     ].join('\n')
-    expect(parsePatchFileStats(patch)).toEqual([
+    expect(ComposerContextModel.parsePatchFileStats(patch)).toEqual([
       { path: 'src/a.ts', additions: 2, deletions: 1 },
       { path: 'old.txt', additions: 0, deletions: 2 },
       { path: 'new file.txt', additions: 1, deletions: 0 },

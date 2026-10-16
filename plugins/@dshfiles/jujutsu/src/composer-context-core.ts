@@ -25,10 +25,10 @@ export const composerBaseFromSetting = (value: unknown): ComposerBase => {
   return bookmark.success ? bookmark.data : { kind: 'parent' }
 }
 
-export const composerBaseSetting = (base: ComposerBase): string => (base.kind === 'bookmark' ? base.name : base.kind)
+const composerBaseSetting = (base: ComposerBase): string => (base.kind === 'bookmark' ? base.name : base.kind)
 
 /** The revision the base names; empty when a bookmark does not exist. */
-export const composerBaseTarget = (base: ComposerBase): string => {
+const composerBaseTarget = (base: ComposerBase): string => {
   if (base.kind === 'parent') return '@-'
   if (base.kind === 'trunk') return 'trunk()'
   // The schema already excludes quotes and backslashes from bookmark names.
@@ -36,11 +36,11 @@ export const composerBaseTarget = (base: ComposerBase): string => {
 }
 
 /** Diff range for `jj diff`: the working copy against its parents, or everything since it forked from the base. */
-export const composerDiffRange = (base: ComposerBase): readonly string[] =>
+const composerDiffRange = (base: ComposerBase): readonly string[] =>
   base.kind === 'parent' ? ['-r', '@'] : ['--from', 'fork_point(' + composerBaseTarget(base) + ' | @)', '--to', '@']
 
 /** Totals from the last line of `jj diff --stat`; null when the summary line is missing (e.g. truncated output). */
-export const parseStatTotals = (stdout: string): { files: number; additions: number; deletions: number } | null => {
+const parseStatTotals = (stdout: string): { files: number; additions: number; deletions: number } | null => {
   const lastLine = stdout.trimEnd().split(/\r?\n/).at(-1) ?? ''
   const match = /^\s*(\d+) files? changed(?:, (\d+) insertions?\(\+\))?(?:, (\d+) deletions?\(-\))?\s*$/.exec(lastLine)
   if (match === null) return null
@@ -58,7 +58,7 @@ const unquoteGitPath = (value: string): string => {
 }
 
 /** Per-file added/removed line counts of a `jj diff --git` patch, keyed by the post-change path (pre-change for deletions). */
-export const parsePatchFileStats = (patch: string): { path: string; additions: number; deletions: number }[] =>
+const parsePatchFileStats = (patch: string): { path: string; additions: number; deletions: number }[] =>
   patch
     .split(/(?=^diff --git )/m)
     .filter(section => section.startsWith('diff --git '))
@@ -80,3 +80,11 @@ export const parsePatchFileStats = (patch: string): { path: string; additions: n
       const path = chosen === null || chosen === '/dev/null' ? (header?.[2] ?? '') : unquoteGitPath(chosen).replace(/^[ab]\//, '')
       return { path, additions, deletions }
     })
+
+export class ComposerContextModel {
+  static readonly composerBaseSetting = composerBaseSetting
+  static readonly composerBaseTarget = composerBaseTarget
+  static readonly composerDiffRange = composerDiffRange
+  static readonly parsePatchFileStats = parsePatchFileStats
+  static readonly parseStatTotals = parseStatTotals
+}

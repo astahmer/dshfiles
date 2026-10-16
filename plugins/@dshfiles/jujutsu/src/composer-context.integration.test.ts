@@ -10,10 +10,7 @@ import {
   COMPOSER_HEAD_TEMPLATE,
   COMPOSER_LOCAL_BOOKMARK_LIST_TEMPLATE,
   COMPOSER_WORKSPACE_TEMPLATE,
-  composerBaseTarget,
-  composerDiffRange,
-  parsePatchFileStats,
-  parseStatTotals,
+  ComposerContextModel,
 } from './composer-context-core.ts'
 import { parseJsonLines } from './core.ts'
 
@@ -69,23 +66,31 @@ test('composer templates and ranges read head, bookmarks, totals and files from 
     'log',
     '--no-graph',
     '-r',
-    composerBaseTarget({ kind: 'bookmark', name: 'absent' }),
+    ComposerContextModel.composerBaseTarget({ kind: 'bookmark', name: 'absent' }),
     '-T',
     'commit_id',
   ])
   expect(missing).toBe('')
 
-  const parentRange = composerDiffRange({ kind: 'parent' })
-  expect(parseStatTotals(runJj(repo, home, ['--ignore-working-copy', 'diff', ...parentRange, '--stat']))).toEqual({ files: 2, additions: 2, deletions: 1 })
+  const parentRange = ComposerContextModel.composerDiffRange({ kind: 'parent' })
+  expect(ComposerContextModel.parseStatTotals(runJj(repo, home, ['--ignore-working-copy', 'diff', ...parentRange, '--stat']))).toEqual({
+    files: 2,
+    additions: 2,
+    deletions: 1,
+  })
   const parentFiles = parseJsonLines(runJj(repo, home, ['--ignore-working-copy', 'diff', ...parentRange, '-T', COMPOSER_FILE_TEMPLATE]), value => value)
   expect(parentFiles).toEqual([
     { path: 'base.txt', status: 'modified' },
     { path: 'new file.txt', status: 'added' },
   ])
 
-  const bookmarkRange = composerDiffRange({ kind: 'bookmark', name: 'main' })
-  expect(parseStatTotals(runJj(repo, home, ['--ignore-working-copy', 'diff', ...bookmarkRange, '--stat']))).toEqual({ files: 3, additions: 3, deletions: 1 })
-  expect(parsePatchFileStats(runJj(repo, home, ['--ignore-working-copy', 'diff', ...bookmarkRange, '--git']))).toEqual([
+  const bookmarkRange = ComposerContextModel.composerDiffRange({ kind: 'bookmark', name: 'main' })
+  expect(ComposerContextModel.parseStatTotals(runJj(repo, home, ['--ignore-working-copy', 'diff', ...bookmarkRange, '--stat']))).toEqual({
+    files: 3,
+    additions: 3,
+    deletions: 1,
+  })
+  expect(ComposerContextModel.parsePatchFileStats(runJj(repo, home, ['--ignore-working-copy', 'diff', ...bookmarkRange, '--git']))).toEqual([
     { path: 'base.txt', additions: 1, deletions: 1 },
     { path: 'feature.txt', additions: 1, deletions: 0 },
     { path: 'new file.txt', additions: 1, deletions: 0 },
