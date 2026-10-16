@@ -9,7 +9,7 @@ import type { DshCompatibility } from '../compat/types.js'
 import { DEFAULT_COMPATIBILITY } from '../compat/index.js'
 import { checkProjectManifest } from '../project/index.js'
 import { applyFilePlanWithFileSystem, renderFileDiff, rollbackFilePlanWithFileSystem, writeFileAtomically } from './common.js'
-import { panelClientEntry, presetFiles, presetSymbols } from './presets.js'
+import { ScaffoldPresets } from './presets.js'
 
 export type AddPresetName = 'panel' | 'api'
 
@@ -220,7 +220,7 @@ const insertObjectProperty = (edits: { start: number; end: number; text: string 
 export async function createPresetScaffold(options: AddPresetOptions, dependencies: AddPresetDependencies = {}): Promise<AddPresetResult> {
   const fs = mergeFs(dependencies.fs)
   const { project, preset, id } = options
-  const symbols = presetSymbols({ preset, id, packageId: project.packageId })
+  const symbols = ScaffoldPresets.symbols({ preset, id, packageId: project.packageId })
   const plan: PlannedFile[] = []
   const diagnostics: DshxDiagnostic[] = []
   const finish = (diff?: string): AddPresetResult => ({
@@ -241,7 +241,7 @@ export async function createPresetScaffold(options: AddPresetOptions, dependenci
    * Existing files first: an existing generated file means the preset ran
    * before, so nothing else may change — no second contract, no wiring edits.
    */
-  for (const file of presetFiles({ preset, id, packageId: project.packageId })) {
+  for (const file of ScaffoldPresets.files({ preset, id, packageId: project.packageId })) {
     const absolute = resolve(project.root, file.path)
     if ((await readExisting(fs, absolute)) !== undefined) {
       return refuse(diagnostic('DSHX6302', `${absolute} already exists.`, absolute, 'Remove it or choose another id; the preset refuses to overwrite.'))
@@ -347,7 +347,7 @@ export async function createPresetScaffold(options: AddPresetOptions, dependenci
       plan.push({ file: configFile, before: configBefore, after: applyEdits(configBefore, configEdits) })
       plan.push({
         file: clientEntry,
-        after: panelClientEntry({ preset, id, packageId: project.packageId, ...(options.title === undefined ? {} : { title: options.title }) }),
+        after: ScaffoldPresets.panelClientEntry({ preset, id, packageId: project.packageId, ...(options.title === undefined ? {} : { title: options.title }) }),
       })
       clientEntryForCheck = clientEntry
     } else {
@@ -527,7 +527,7 @@ export async function createPresetScaffold(options: AddPresetOptions, dependenci
    * exact plan, and an applied plan either fully lands or fully rolls back.
    */
   if (packageChanged) plan.push({ file: project.packageFile, before: packageBefore, after: packageAfter })
-  for (const file of presetFiles({ preset, id, packageId: project.packageId })) {
+  for (const file of ScaffoldPresets.files({ preset, id, packageId: project.packageId })) {
     plan.push({ file: resolve(project.root, file.path), after: file.content })
   }
 

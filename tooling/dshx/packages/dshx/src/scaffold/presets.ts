@@ -53,9 +53,6 @@ const packageEntryId = (packageId: string): string => {
   return scope === '' ? slug : `${scope}-${slug}`
 }
 
-/** The default `definePlugin`/`defineClientPlugin` id a fresh entry gets. */
-export const presetEntryId = (options: Pick<PresetOptions, 'packageId'>): string => packageEntryId(options.packageId)
-
 export interface PresetSymbols {
   readonly stem: string
   readonly component: string
@@ -65,7 +62,7 @@ export interface PresetSymbols {
 }
 
 /** Names the presets and the wiring share, derived once so they cannot drift apart. */
-export const presetSymbols = (options: PresetOptions): PresetSymbols => {
+const presetSymbols = (options: PresetOptions): PresetSymbols => {
   const stem = kebab(options.id).replace(/-panel$/, '')
   let apiId = kebab(options.id).replace(/-api$/, '')
   if (/^\d/.test(apiId) || apiId === '') apiId = 'api'
@@ -79,7 +76,7 @@ export const presetSymbols = (options: PresetOptions): PresetSymbols => {
 }
 
 /** Files one preset writes, plus the manifest edits it implies. */
-export const presetFiles = (options: PresetOptions): readonly PresetFile[] => {
+const presetFiles = (options: PresetOptions): readonly PresetFile[] => {
   switch (options.preset) {
     case 'panel':
       return panelFiles(options)
@@ -180,7 +177,7 @@ describe('the ${options.id} panel', () => {
  * Slot registry and the layout controller, and the type-only imports are what
  * make the `main`/`sidebar.panellist` names typecheck.
  */
-export const panelClientEntry = (options: PresetOptions & { title?: string }): string => {
+const panelClientEntry = (options: PresetOptions & { title?: string }): string => {
   const { stem, component } = presetSymbols(options)
   return `import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
@@ -318,6 +315,12 @@ describe('the ${apiId} API', () => {
 `,
     },
   ]
+}
+
+export class ScaffoldPresets {
+  static readonly symbols = presetSymbols
+  static readonly files = presetFiles
+  static readonly panelClientEntry = panelClientEntry
 }
 
 export { DEFAULT_COMPATIBILITY }
