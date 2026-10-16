@@ -26,7 +26,7 @@ const sentPromptNodeSchema = z
   })
   .passthrough()
 
-const savedDraftSchema = z
+export const savedDraftSchema = z
   .object({
     id: z.string().uuid(),
     title: z.string().min(1).max(MAX_DRAFT_TITLE_CHARS),

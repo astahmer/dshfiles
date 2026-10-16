@@ -4,8 +4,8 @@
     {
       "id": "prompt-library",
       "title": "Manage reusable prompt snippets",
-      "summary": "Save, edit, delete, search, and insert bounded prompt snippets with revision checks across browser tabs.",
-      "surfaces": ["client", "storage"],
+      "summary": "Save, edit, delete, search, and insert bounded prompt snippets from one Host-owned library every browser shares, with revision checks against concurrent writers.",
+      "surfaces": ["client", "host", "storage"],
       "configuration": [],
       "states": ["empty", "saved", "editing", "conflicted", "save-as-copy"],
       "failureModes": [
@@ -41,6 +41,24 @@
           "id": "prompt-stash.prompt-library-unit-library-size-and-identity",
           "file": "plugins/@dshfiles/prompt-stash/src/library.test.ts",
           "testName": "rejects oversized text and duplicate prompt identities"
+        },
+        {
+          "kind": "host-test",
+          "id": "prompt-stash.prompt-library-host-store",
+          "file": "plugins/@dshfiles/prompt-stash/src/store.test.ts",
+          "testName": "saves prompts durably, newest edit first, with a monotone revision"
+        },
+        {
+          "kind": "host-test",
+          "id": "prompt-stash.prompt-library-host-conflict",
+          "file": "plugins/@dshfiles/prompt-stash/src/store.test.ts",
+          "testName": "refuses to overwrite a prompt another writer changed"
+        },
+        {
+          "kind": "host-test",
+          "id": "prompt-stash.prompt-library-host-wiring",
+          "file": "plugins/@dshfiles/prompt-stash/src/host.test.ts",
+          "testName": "opens the declared domain and serves the shared prompt library"
         }
       ]
     },
@@ -105,8 +123,8 @@
     {
       "id": "draft-and-sent-history",
       "title": "Save and restore composer drafts",
-      "summary": "Save bounded plain-text drafts and restore sent text without submitting or converting attachments and references.",
-      "surfaces": ["client", "storage"],
+      "summary": "Save bounded plain-text drafts to the Host-owned stash every browser shares, and restore sent text without submitting or converting attachments and references.",
+      "surfaces": ["client", "host", "storage"],
       "configuration": [],
       "states": ["draft", "saved", "restored", "sent-history"],
       "failureModes": [
@@ -137,6 +155,18 @@
           "id": "prompt-stash.draft-and-sent-history-unit-sent-history-projection",
           "file": "plugins/@dshfiles/prompt-stash/src/draft-store.test.ts",
           "testName": "reads only bounded plain-text user messages"
+        },
+        {
+          "kind": "host-test",
+          "id": "prompt-stash.draft-and-sent-history-host-store",
+          "file": "plugins/@dshfiles/prompt-stash/src/store.test.ts",
+          "testName": "saves drafts, rejects a duplicate id, and removes one"
+        },
+        {
+          "kind": "host-test",
+          "id": "prompt-stash.draft-and-sent-history-host-wiring",
+          "file": "plugins/@dshfiles/prompt-stash/src/host.test.ts",
+          "testName": "serves saved drafts through the same Host store"
         }
       ]
     },

@@ -9,19 +9,8 @@ import { Textarea } from '@dshfiles/plugin-ui/components/ui/textarea'
 import { useEffect, useId, useRef, useState } from 'react'
 import type { ComposerActionProps } from '@dshfiles/dshx/client'
 import { areRecentPromptsEqual, MAX_RECENT_PROMPTS, MAX_RECENT_SCAN_NODES, projectRecentPrompts } from './recent-prompts.js'
-import {
-  MAX_PROMPTS,
-  MAX_PROMPT_TEXT_LENGTH,
-  MAX_PROMPT_TITLE_LENGTH,
-  defaultPromptTitle,
-  PROMPT_LIBRARY_STORAGE_KEY,
-  readPromptLibrary,
-  removePromptIfCurrent,
-  serializePromptLibrary,
-  writePromptIfCurrent,
-  type PromptLibraryRead,
-  type SavedPrompt,
-} from './library.js'
+import { MAX_PROMPTS, MAX_PROMPT_TEXT_LENGTH, MAX_PROMPT_TITLE_LENGTH, defaultPromptTitle, type SavedPrompt } from './library.js'
+import { usePromptLibrary } from './library-client.js'
 import { draftSaveBlock, type DraftSaveBlock } from './draft-store.js'
 
 const draftBlockNotice = {
@@ -30,8 +19,6 @@ const draftBlockNotice = {
   'rich-content': 'Saved prompts are text-only. Remove attachments and references first.',
   'too-long': 'The composer text is too long to save as a prompt.',
 } as const satisfies Record<DraftSaveBlock, string>
-
-type LibraryState = 'loading' | 'ready' | 'invalid' | 'unavailable'
 
 type PromptEditor = {
   readonly id: string | null
@@ -46,24 +33,15 @@ type DeleteConfirmation = {
   readonly revision: string
 }
 
-type StorageRead = { readonly kind: 'ready'; readonly prompts: readonly SavedPrompt[] } | { readonly kind: 'invalid' } | { readonly kind: 'unavailable' }
-
-const readLatestPrompts = (): StorageRead => {
-  try {
-    const result = readPromptLibrary(window.localStorage.getItem(PROMPT_LIBRARY_STORAGE_KEY))
-    if (!result.ok) return { kind: 'invalid' }
-    return { kind: 'ready', prompts: result.prompts }
-  } catch {
-    return { kind: 'unavailable' }
-  }
-}
-
 const PromptStashAction = (props: ComposerActionProps): JSX.Element => {
   const input = props.useInput(state => state)
+  const library = usePromptLibrary()
+  const libraryState = library.state
+  const prompts = library.prompts
+  const promptSignature = prompts.map(prompt => `${prompt.id}:${prompt.revision}`).join('|')
+  const lastPromptSignature = useRef(promptSignature)
   const [isOpen, setIsOpen] = useState(false)
   const [activeSource, setActiveSource] = useState<'saved' | 'recent'>('saved')
-  const [libraryState, setLibraryState] = useState<LibraryState>('loading')
-  const [prompts, setPrompts] = useState<readonly SavedPrompt[]>([])
   const [editor, setEditor] = useState<PromptEditor | null>(null)
   const [deleteConfirmation, setDeleteConfirmation] = useState<DeleteConfirmation | null>(null)
   const [hasInserted, setHasInserted] = useState(false)
@@ -99,64 +77,28 @@ const PromptStashAction = (props: ComposerActionProps): JSX.Element => {
   const textId = useId()
 
   useEffect(() => {
-    const initial = readLatestPrompts()
-    if (initial.kind === 'ready') {
-      setPrompts(initial.prompts)
-      setLibraryState('ready')
-    } else {
-      setLibraryState(initial.kind === 'invalid' ? 'invalid' : 'unavailable')
-      setNotice(initial.kind === 'invalid' ? 'Saved prompts could not be read. Stored data was left untouched.' : 'Browser storage is unavailable.')
-    }
+    if (!isOpen) return
+    const timer = window.setInterval(library.refresh, 2_000)
+    return () => window.clearInterval(timer)
+  }, [isOpen, library.refresh])
 
-    const onStorage = (event: StorageEvent): void => {
-      if (event.key !== PROMPT_LIBRARY_STORAGE_KEY) return
-      const update: PromptLibraryRead = readPromptLibrary(event.newValue)
-      if (!update.ok) {
-        setLibraryState('invalid')
-        setNotice('Saved prompts changed to data this version cannot read. Stored data was left untouched.')
-        return
-      }
-
-      setPrompts(update.prompts)
-      setLibraryState('ready')
-      setDeleteConfirmation(null)
-      setEditor(current => {
-        if (current === null || current.id === null) return current
-        const saved = update.prompts.find(prompt => prompt.id === current.id)
-        if (saved?.revision === current.originalRevision) return current
-        return { ...current, stale: true }
-      })
-    }
-
-    window.addEventListener('storage', onStorage)
-    return () => window.removeEventListener('storage', onStorage)
-  }, [])
+  useEffect(() => {
+    if (promptSignature === lastPromptSignature.current) return
+    lastPromptSignature.current = promptSignature
+    setDeleteConfirmation(null)
+    setEditor(current => {
+      if (current === null || current.id === null) return current
+      const saved = prompts.find(prompt => prompt.id === current.id)
+      if (saved?.revision === current.originalRevision) return current
+      return { ...current, stale: true }
+    })
+  }, [prompts, promptSignature])
 
   useEffect(() => {
     if (!shouldFocusNewPrompt.current || editor?.id !== null) return
     shouldFocusNewPrompt.current = false
     promptTextRef.current?.focus()
   }, [editor])
-
-  const persist = (next: readonly SavedPrompt[]): boolean => {
-    const serialized = serializePromptLibrary(next)
-    if (serialized === null) {
-      setNotice('This library reached its size limit. Edit or remove a saved prompt first.')
-      return false
-    }
-
-    try {
-      window.localStorage.setItem(PROMPT_LIBRARY_STORAGE_KEY, serialized)
-    } catch {
-      setLibraryState('unavailable')
-      setNotice('The browser could not save this prompt. The current library is unchanged.')
-      return false
-    }
-
-    setPrompts(next)
-    setLibraryState('ready')
-    return true
-  }
 
   const openLibrary = (): void => {
     insertionSpan.current = props.inputActions.captureInsertion()
@@ -185,7 +127,7 @@ const PromptStashAction = (props: ComposerActionProps): JSX.Element => {
     setNotice('')
   }
 
-  const saveEditor = (saveAsCopy: boolean): void => {
+  const saveEditor = async (saveAsCopy: boolean): Promise<void> => {
     if (editor === null) return
     if (libraryState !== 'ready') return
     const title = editor.title.trim() || defaultPromptTitle(editor.text)
@@ -194,15 +136,8 @@ const PromptStashAction = (props: ComposerActionProps): JSX.Element => {
       return
     }
 
-    const latest = readLatestPrompts()
-    if (latest.kind !== 'ready') {
-      setLibraryState(latest.kind === 'invalid' ? 'invalid' : 'unavailable')
-      setNotice('The saved library changed or became unavailable. Your editor text is still here.')
-      return
-    }
-
     const makeCopy = saveAsCopy || editor.id === null
-    if (makeCopy && latest.prompts.length >= MAX_PROMPTS) {
+    if (makeCopy && prompts.length >= MAX_PROMPTS) {
       setNotice('The saved prompt limit is 50. Remove a prompt before saving another.')
       return
     }
@@ -214,21 +149,27 @@ const PromptStashAction = (props: ComposerActionProps): JSX.Element => {
       text: editor.text,
       updatedAt: Date.now(),
     }
-    const result = writePromptIfCurrent(latest.prompts, nextPrompt, makeCopy ? null : editor.originalRevision)
+    const result = await library.save({ prompt: nextPrompt, expectedRevision: makeCopy ? null : editor.originalRevision })
 
     if (result.kind === 'conflict') {
-      setPrompts(result.prompts)
       setEditor(current => (current === null ? null : { ...current, stale: true }))
       setNotice('This saved prompt changed in another tab. Your edits remain here; save a copy or reopen it.')
       return
     }
+    if (result.kind === 'unavailable') {
+      setNotice('The saved library changed or became unavailable. Your editor text is still here.')
+      return
+    }
+    if (result.kind === 'limit') {
+      setNotice('This library reached its size limit. Edit or remove a saved prompt first.')
+      return
+    }
 
-    if (!persist(result.prompts)) return
     setEditor(null)
-    setNotice('Saved in this browser.')
+    setNotice('Saved to the prompt library.')
   }
 
-  const saveCurrentPrompt = (): void => {
+  const saveCurrentPrompt = async (): Promise<void> => {
     if (currentDraftBlock !== null) {
       setNotice(draftBlockNotice[currentDraftBlock])
       return
@@ -237,15 +178,7 @@ const PromptStashAction = (props: ComposerActionProps): JSX.Element => {
       setNotice(`Current text exceeds the ${MAX_PROMPT_TEXT_LENGTH.toLocaleString()} character prompt limit.`)
       return
     }
-
-    const latest = readLatestPrompts()
-    if (latest.kind !== 'ready') {
-      setLibraryState(latest.kind === 'invalid' ? 'invalid' : 'unavailable')
-      setNotice('The saved library is unavailable. The composer text is unchanged.')
-      return
-    }
-    if (latest.prompts.length >= MAX_PROMPTS) {
-      setPrompts(latest.prompts)
+    if (prompts.length >= MAX_PROMPTS) {
       setNotice(`The saved prompt limit is ${MAX_PROMPTS}. Remove a prompt before saving another.`)
       return
     }
@@ -257,45 +190,46 @@ const PromptStashAction = (props: ComposerActionProps): JSX.Element => {
       text: input.draft,
       updatedAt: Date.now(),
     }
-    const result = writePromptIfCurrent(latest.prompts, prompt, null)
+    const result = await library.save({ prompt, expectedRevision: null })
+    if (result.kind === 'unavailable') {
+      setNotice('The saved library is unavailable. The composer text is unchanged.')
+      return
+    }
+    if (result.kind === 'limit') {
+      setNotice(`The saved prompt limit is ${MAX_PROMPTS}. Remove a prompt before saving another.`)
+      return
+    }
     if (result.kind === 'conflict') {
-      setPrompts(result.prompts)
       setNotice('The prompt library changed in another tab. Try saving again.')
       return
     }
 
-    if (!persist(result.prompts)) return
     setNotice('Current composer text saved as a prompt. The composer was not changed.')
   }
 
-  const requestDelete = (prompt: SavedPrompt): void => {
+  const requestDelete = async (prompt: SavedPrompt): Promise<void> => {
     if (deleteConfirmation === null || deleteConfirmation.id !== prompt.id || deleteConfirmation.revision !== prompt.revision) {
       setDeleteConfirmation({ id: prompt.id, revision: prompt.revision })
       setNotice('Select Confirm delete to remove this saved prompt.')
       return
     }
 
-    const latest = readLatestPrompts()
-    if (latest.kind !== 'ready') {
-      setLibraryState(latest.kind === 'invalid' ? 'invalid' : 'unavailable')
-      setNotice('The saved library changed or became unavailable. Nothing was deleted.')
-      return
-    }
-
-    const result = removePromptIfCurrent(latest.prompts, prompt.id, prompt.revision)
-    if (result.kind === 'conflict') {
-      setPrompts(result.prompts)
+    const result = await library.remove({ id: prompt.id, expectedRevision: prompt.revision })
+    if (result.kind !== 'applied') {
       setDeleteConfirmation(null)
-      setNotice('This prompt changed in another tab. Nothing was deleted.')
+      setNotice(
+        result.kind === 'conflict'
+          ? 'This prompt changed in another tab. Nothing was deleted.'
+          : 'The saved library changed or became unavailable. Nothing was deleted.',
+      )
       return
     }
 
-    if (!persist(result.prompts)) return
     setDeleteConfirmation(null)
     setNotice('Prompt removed.')
   }
 
-  const insertPrompt = (prompt: SavedPrompt): void => {
+  const insertPrompt = async (prompt: SavedPrompt): Promise<void> => {
     if (hasInserted) return
     const span = insertionSpan.current
     if (span === null) {
@@ -303,16 +237,14 @@ const PromptStashAction = (props: ComposerActionProps): JSX.Element => {
       return
     }
 
-    const latest = readLatestPrompts()
+    const latest = await library.readLatest()
     if (latest.kind !== 'ready') {
-      setLibraryState(latest.kind === 'invalid' ? 'invalid' : 'unavailable')
       setNotice('The saved library changed or became unavailable. Nothing was inserted.')
       return
     }
 
     const currentPrompt = latest.prompts.find(item => item.id === prompt.id)
     if (currentPrompt === undefined || currentPrompt.revision !== prompt.revision) {
-      setPrompts(latest.prompts)
       setNotice('This prompt changed in another tab. Choose it again from the refreshed list.')
       return
     }
@@ -393,7 +325,7 @@ const PromptStashAction = (props: ComposerActionProps): JSX.Element => {
               <p className="dshx:text-xs dshx:text-muted-foreground">
                 {activeSource === 'recent'
                   ? 'Recent text from this conversation only. Attachments are not included.'
-                  : 'Saved text stays in this browser. Files and attachments are not included.'}
+                  : 'Saved text is shared through the Host. Files and attachments are not included.'}
               </p>
             </div>
             <Button type="button" variant="ghost" size="xs" onClick={closeLibrary}>
@@ -414,7 +346,7 @@ const PromptStashAction = (props: ComposerActionProps): JSX.Element => {
                 <span className="dshx:text-xs dshx:text-muted-foreground" aria-label={`${prompts.length} of ${MAX_PROMPTS} prompts`}>
                   {prompts.length}/{MAX_PROMPTS}
                 </span>
-                <Button type="button" size="xs" disabled={currentPromptSaveDisabled} onClick={saveCurrentPrompt}>
+                <Button type="button" size="xs" disabled={currentPromptSaveDisabled} onClick={() => void saveCurrentPrompt()}>
                   Save current
                 </Button>
                 <Button
@@ -481,7 +413,7 @@ const PromptStashAction = (props: ComposerActionProps): JSX.Element => {
                       <CommandItem
                         key={prompt.id}
                         value={`${prompt.id} ${prompt.title} ${prompt.text}`}
-                        onSelect={() => insertPrompt(prompt)}
+                        onSelect={() => void insertPrompt(prompt)}
                         className="dshx:group/prompt dshx:items-start"
                       >
                         <div className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-0.5">
@@ -511,7 +443,7 @@ const PromptStashAction = (props: ComposerActionProps): JSX.Element => {
                             variant={isConfirmingDelete(prompt) ? 'destructive' : 'ghost'}
                             size="xs"
                             className={isConfirmingDelete(prompt) ? undefined : 'dshx:text-muted-foreground dshx:hover:text-destructive'}
-                            onClick={() => requestDelete(prompt)}
+                            onClick={() => void requestDelete(prompt)}
                           >
                             {isConfirmingDelete(prompt) ? 'Confirm delete' : 'Delete'}
                           </Button>
@@ -532,7 +464,7 @@ const PromptStashAction = (props: ComposerActionProps): JSX.Element => {
                 className="dshx:flex dshx:flex-col dshx:gap-3 dshx:p-3"
                 onSubmit={event => {
                   event.preventDefault()
-                  saveEditor(false)
+                  void saveEditor(false)
                 }}
               >
                 <Field orientation="vertical" className="dshx:flex dshx:w-full dshx:flex-col dshx:items-stretch dshx:gap-1.5">
@@ -572,7 +504,7 @@ const PromptStashAction = (props: ComposerActionProps): JSX.Element => {
                     Cancel
                   </Button>
                   {editor.stale ? (
-                    <Button type="button" variant="outline" size="sm" onClick={() => saveEditor(true)}>
+                    <Button type="button" variant="outline" size="sm" onClick={() => void saveEditor(true)}>
                       Save as new copy
                     </Button>
                   ) : null}

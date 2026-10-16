@@ -225,7 +225,7 @@ When('the composer text {string} is saved as {string}', async ({ page }: { page:
 Then('saving leaves the current composer text unchanged', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'saving-draft-keeps-current-composer-text', async () => {
     await expect(composerInput({ page })).toHaveText('Draft body to keep')
-    await expect(page.getByRole('status')).toHaveText('Saved in this browser. The composer draft remains unchanged.')
+    await expect(page.getByRole('status')).toHaveText('Saved to the thread-sidebar stash. The composer draft remains unchanged.')
   })
 })
 

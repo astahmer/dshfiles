@@ -6,7 +6,7 @@ export const MAX_PROMPT_TITLE_LENGTH = 100
 export const MAX_PROMPT_TEXT_LENGTH = 20_000
 const MAX_LIBRARY_CHARACTERS = 450_000
 
-const promptSchema = z
+export const promptSchema = z
   .object({
     id: z.string().uuid(),
     revision: z.string().uuid(),
