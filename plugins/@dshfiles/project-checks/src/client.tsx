@@ -116,9 +116,7 @@ const revisionEvidenceLabel = (receipt: ProjectCheckReceipt): string => {
 }
 
 const executionModeLabel = (receipt: ProjectCheckReceipt): string =>
-  receipt.automatic
-    ? `Automatic · attempt ${receipt.attempt} · turn ${receipt.verificationTurn ?? 'unknown'}`
-    : 'Manual'
+  receipt.automatic ? `Automatic · attempt ${receipt.attempt} · turn ${receipt.verificationTurn ?? 'unknown'}` : 'Manual'
 
 function ProjectChecksPanel(props: { readonly sessionId: string; readonly panel: SessionPanel }): JSX.Element | null {
   const api = useApi(projectChecksApi)

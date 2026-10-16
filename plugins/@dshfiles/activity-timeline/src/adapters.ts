@@ -194,9 +194,7 @@ export const workspaceActivity = (input: {
 
 export const verificationReceiptActivity = (receipt: VerificationReceiptSummary): ActivityIngest => {
   const statusLabel = receipt.status === 'timed-out' ? 'timed out' : receipt.status
-  const modeLabel = receipt.automatic
-    ? `automatic · attempt ${receipt.attempt} · verification turn ${receipt.verificationTurn ?? 'unknown'}`
-    : 'manual'
+  const modeLabel = receipt.automatic ? `automatic · attempt ${receipt.attempt} · verification turn ${receipt.verificationTurn ?? 'unknown'}` : 'manual'
   const revisionLabel = (revision: string | null): string => (revision === null ? 'unavailable' : revision)
   const level: ActivityLevel =
     receipt.status === 'failed' || receipt.status === 'timed-out' ? 'attention' : receipt.status === 'cancelled' ? 'notable' : 'routine'

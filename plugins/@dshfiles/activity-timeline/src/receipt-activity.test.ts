@@ -52,6 +52,7 @@ describe('verification receipt activity contract', () => {
     expect(verificationReceiptEventSchema.safeParse({ ...event, version: 2 }).success).toBe(false)
     expect(verificationReceiptEventSchema.safeParse({ ...event, value: { ...value, argv: ['/secret'] } }).success).toBe(false)
     expect(verificationReceiptEventSchema.safeParse({ ...event, value: { ...value, label: 'bad\nlabel' } }).success).toBe(false)
+    expect(verificationReceiptEventSchema.safeParse({ ...event, value: { ...value, label: 'bad\u0085label' } }).success).toBe(false)
   })
 
   it('maps failure and cancellation truthfully and deduplicates receipt replay', async () => {
@@ -62,7 +63,13 @@ describe('verification receipt activity contract', () => {
     const first = await service.ingest(failed)
     const replay = await service.ingest(verificationReceiptActivity(value))
     const cancelled = verificationReceiptActivity({ ...value, receiptId: '00000000-0000-4000-8000-000000000002', status: 'cancelled', exitCode: null })
-    const timedOut = verificationReceiptActivity({ ...value, receiptId: '00000000-0000-4000-8000-000000000003', status: 'timed-out', failure: null, exitCode: null })
+    const timedOut = verificationReceiptActivity({
+      ...value,
+      receiptId: '00000000-0000-4000-8000-000000000003',
+      status: 'timed-out',
+      failure: null,
+      exitCode: null,
+    })
     const passed = verificationReceiptActivity({ ...value, receiptId: '00000000-0000-4000-8000-000000000004', status: 'passed', failure: null, exitCode: 0 })
 
     expect(first.event.id).toBe(`verification:${value.receiptId}`)

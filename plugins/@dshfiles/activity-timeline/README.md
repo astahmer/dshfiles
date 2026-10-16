@@ -77,9 +77,15 @@ bounded receipt. Configuration equivalence is explicitly unknown.
   ready but that source is deferred.
 - The panel polls the newest page every 5s; a push/stream subscription is the
   next step (the page API is already incremental via cursor).
-- Thread/workspace references remain badges. Session navigation checks current
-  Host-list membership before calling `uiWorkspace.openSession`; archived/missing
-  Session feedback remains a final acceptance check.
+- Thread/workspace references remain badges. Session navigation checks the
+  complete Workspace archive snapshot and current Host session list before
+  calling `uiWorkspace.openSession`; it fails closed while the archive snapshot
+  is pending. Archived or missing Sessions show the same unavailable message;
+  navigation does not open, wake, restore, or message them. The archived path is
+  browser-tested; the installed `ISessions` contract has no delete operation,
+  so no test-only orphan mutation is used for missing-ID UI coverage. See the
+  [verification evidence guide](../../../docs/verification-evidence.md) for the
+  cross-plugin security review and verification details.
 - Scratch journeys cover the feed, condensation, manual and automatic verification
   projection, retry attempts, cancellation as notable/non-failure, revision
   privacy, Session navigation, restart/backfill dedupe, and Project Checks

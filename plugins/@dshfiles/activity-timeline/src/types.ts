@@ -1,13 +1,20 @@
 import { z } from 'zod'
 
-const revisionEvidenceSchema = z.string().regex(/^[a-f0-9]{40,64}$/).nullable()
+const revisionEvidenceSchema = z
+  .string()
+  .regex(/^[a-f0-9]{40,64}$/)
+  .nullable()
 
 export const verificationReceiptSummarySchema = z
   .object({
     receiptId: z.string().uuid(),
     sessionId: z.string().min(1).max(128),
     actionId: z.string().regex(/^[a-z0-9][a-z0-9-]{0,31}$/),
-    label: z.string().min(1).max(80).regex(/^[^\u0000-\u001f\u007f]+$/),
+    label: z
+      .string()
+      .min(1)
+      .max(80)
+      .regex(/^[^\p{Cc}]+$/u),
     status: z.enum(['passed', 'failed', 'cancelled', 'timed-out']),
     failure: z.enum(['spawn-failed', 'process-group-failed', 'revision-unavailable', 'source-changed']).nullable(),
     startedAt: z.number().int().nonnegative(),

@@ -7,7 +7,7 @@ const receipt: StoredReceipt = {
   id: '00000000-0000-4000-8000-000000000001',
   sessionId: 'session-a',
   actionId: 'unit-check',
-  label: 'Unit\ncheck',
+  label: 'Unit\n\u0085check',
   status: 'passed',
   failure: null,
   startedAt: 10,
@@ -77,6 +77,10 @@ describe('Project Checks activity summary', () => {
     ).rejects.toThrow('storage unavailable')
     expect(publish).toHaveBeenCalledTimes(1)
 
-    expect(() => emitProjectChecksActivity(receipt, () => { throw new Error('timeline unavailable') })).not.toThrow()
+    expect(() =>
+      emitProjectChecksActivity(receipt, () => {
+        throw new Error('timeline unavailable')
+      }),
+    ).not.toThrow()
   })
 })

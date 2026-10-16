@@ -8,6 +8,7 @@ import { RefreshCwIcon, SearchIcon } from '@dshfiles/plugin-ui/icons'
 import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
 import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
 import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
+import type { IWorkspaces } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { UiWorkspace } from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { errorMessage, useMutation, useQuery } from '@dshfiles/plugin-ui/query'
 import { useApi } from '@dshfiles/dshx/client'
@@ -76,6 +77,7 @@ const ActivityRow = (props: {
 export const ActivityTimelinePanel = (props: {
   readonly sessions: ISessions
   readonly uiWorkspace: UiWorkspace
+  readonly workspaces: IWorkspaces
   readonly t: ActivityTimelineTranslate
 }): JSX.Element => {
   const api = useApi(activityTimelineApi)
@@ -211,6 +213,11 @@ export const ActivityTimelinePanel = (props: {
   }
   const selectedEvent: ActivityEvent | undefined = detailQuery.data
   const openOwningSession = (sessionId: string): void => {
+    const workspaceList = props.workspaces.list.getSnapshot()
+    if (workspaceList.phase !== 'ready' || workspaceList.archivedSessionIds.some(archivedId => archivedId === sessionId)) {
+      setNavigationError(t('sessionUnavailable'))
+      return
+    }
     const sessionList = props.sessions.list.getSnapshot()
     const availableId = sessionList.ids.find(candidate => candidate === sessionId)
     const session = availableId === undefined ? undefined : sessionList.byId[availableId]

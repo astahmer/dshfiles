@@ -16,12 +16,12 @@ import { isAbsolute, normalize } from 'node:path'
 import { projectChecksApi, type ProjectHookEvent } from './api.js'
 import { PluginApiError, type ApiCaller } from '@dshfiles/dshx/api'
 import { isWithinRoot, projectChecksConfigSchema, receiptFreshness, verificationPrompt, type ProjectAction } from './core.js'
-import { emitProjectChecksActivity, persistReceiptAndEmitActivity } from './receipt-activity.js'
+import { emitProjectChecksActivity, persistReceiptAndEmitActivity, type ProjectChecksActivityEvent } from './receipt-activity.js'
 import { MAX_RECEIPTS_TOTAL, projectChecksDomain, receiptKey, receiptsAfter, trimReceiptRows, type StoredReceipt } from './store.js'
 
 declare module '@deepseek-ai/cordis' {
   interface Events {
-    'dshfiles/activity/event'(payload: unknown): void
+    'dshfiles/activity/event'(payload: ProjectChecksActivityEvent): void
     'dshfiles/activity/backfill'(payload: { readonly since?: number }): void
     'dshfiles/activity/source-ready'(payload: { readonly source: 'project-checks-receipts'; readonly version: 1 }): void
   }

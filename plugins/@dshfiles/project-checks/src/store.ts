@@ -19,11 +19,7 @@ export const receiptKey = (receipt: StoredReceipt): string =>
 
 export const MAX_RECEIPTS_TOTAL = 2_000
 
-export const receiptsAfter = (
-  entries: readonly (readonly [string, StoredReceipt])[],
-  since: number,
-  requestedLimit: number,
-): readonly StoredReceipt[] => {
+export const receiptsAfter = (entries: readonly (readonly [string, StoredReceipt])[], since: number, requestedLimit: number): readonly StoredReceipt[] => {
   const limit = Math.max(0, Math.min(MAX_RECEIPTS_TOTAL, Math.trunc(requestedLimit)))
   if (limit === 0) return []
   return entries

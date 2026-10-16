@@ -38,7 +38,7 @@ When Activity Timeline announces `dshfiles/activity/source-ready`, Project Check
 
 Failed and timed-out checks receive attention; cancellation stays `cancelled` with no failure category and is notable rather than a failed check. Automatic retries retain one receipt/event per attempt.
 
-The Activity detail is historical; it does not certify the current working copy or configuration. Open its Session and refresh Project Checks to read current source freshness from the authoritative API. The bounded source receipt may have expired even while its historical Activity summary remains.
+The Activity detail is historical; it does not certify the current working copy or configuration. Open its Session and refresh Project Checks to read current source freshness from the authoritative API. The bounded source receipt may have expired even while its historical Activity summary remains. See the [cross-plugin verification evidence guide](../../../docs/verification-evidence.md) for the archived/missing Session boundary, security review, and full verification commands.
 
 The panel reads hook events from the native session query service. DSH 0.2 records `hook/invoked` and `hook/result`; it does not emit durable skipped/unsupported-hook events, so the panel states that gap instead of inventing per-hook skip records. Hook stderr content and raw subprocess output are not exposed.
 

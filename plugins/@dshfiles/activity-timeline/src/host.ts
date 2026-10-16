@@ -1,7 +1,14 @@
 import type { Context, Effect } from '@deepseek-ai/cordis'
 import { defineHost } from '@dshfiles/dshx/host'
 import { z } from 'zod'
-import { communicationActivity, communicationMessage, integrationActivity, sessionActivity, verificationReceiptActivity, workspaceActivity } from './adapters.js'
+import {
+  communicationActivity,
+  communicationMessage,
+  integrationActivity,
+  sessionActivity,
+  verificationReceiptActivity,
+  workspaceActivity,
+} from './adapters.js'
 import { activityTimelineApi } from './api.js'
 import { verificationReceiptEventSchema } from './types.js'
 import { createActivityTimelineService, type ActivityTimelineService } from './service.js'
@@ -41,9 +48,7 @@ const activityEventPayloadSchema = z.discriminatedUnion('kind', [
   verificationReceiptEventSchema,
 ])
 
-const projectChecksReadySchema = z
-  .object({ source: z.literal('project-checks-receipts'), version: z.literal(1) })
-  .strict()
+const projectChecksReadySchema = z.object({ source: z.literal('project-checks-receipts'), version: z.literal(1) }).strict()
 
 const describeError = (error: unknown): string => (error instanceof Error ? error.message : String(error)).slice(0, 2000)
 

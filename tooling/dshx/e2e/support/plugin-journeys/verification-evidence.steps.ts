@@ -148,5 +148,32 @@ Then('the receipt is backfilled once after restarting the scratch Host', async (
   await expect(stalePass).toContainText('Stale: working copy changed after this check.')
   await expect(stalePass).toContainText('Action configuration equivalence: unknown')
 
+  await recordAssertion(page, 'activity-timeline-archived-session-unavailable', async () => {
+    await projectChecksPanel(page).getByRole('button', { name: 'Close project checks', exact: true }).click()
+    const owningSession = page.getByRole('treeitem', { name: /project checks in the project/ })
+    await owningSession.hover()
+    const archiveSession = owningSession.getByRole('button', { name: 'Archive session', exact: true })
+    await expect(archiveSession).toBeVisible({ timeout: 10_000 })
+    await archiveSession.click()
+    await expect(owningSession).toHaveCount(0, { timeout: 10_000 })
+
+    await page.getByRole('button', { name: 'View options', exact: true }).click()
+    await page.getByRole('menuitem', { name: 'Archived only', exact: true }).click()
+    await expect(owningSession).toBeVisible({ timeout: 10_000 })
+    await owningSession.hover()
+    await expect(owningSession.getByRole('button', { name: 'Unarchive session', exact: true })).toBeVisible()
+
+    await page.getByRole('button', { name: 'View options', exact: true }).click()
+    await page.getByRole('menuitem', { name: 'Hide archived', exact: true }).click()
+    await expect(owningSession).toHaveCount(0, { timeout: 10_000 })
+
+    await openActivity(page)
+    await page.getByRole('button', { name: /^Detailed/ }).click()
+    await page.getByRole('button', { name: /Manual pass passed/ }).click()
+    await page.getByRole('button', { name: 'Open Session', exact: true }).click()
+    await expect(page.getByRole('alert').filter({ hasText: 'This Session is archived or unavailable and cannot be opened.' })).toBeVisible({ timeout: 10_000 })
+    await expect(page.getByRole('textbox', { name: 'Message or run a task, / commands, @ files or sessions', exact: true })).toHaveCount(0)
+    await expect(owningSession).toHaveCount(0, { timeout: 10_000 })
+  })
   await finishJourneyAssertions(page)
 })
