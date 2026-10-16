@@ -8,18 +8,7 @@ import { FolderIcon, FolderOpenIcon, HistoryIcon, SearchIcon } from '@dshfiles/p
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { keepPreviousData, useMutation, useQuery } from '@dshfiles/plugin-ui/query'
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
-import {
-  folderSelection,
-  initialBrowseTarget,
-  isHomeRelativePathQuery,
-  isPathQuery,
-  movePickerSelection,
-  pickerEntries,
-  pickerEntrySelection,
-  resolvePathQuery,
-  type PickerEntry,
-  workspaceSelection,
-} from './project-folder-picker-model.js'
+import { ProjectFolderPickerModel, type PickerEntry } from './project-folder-picker-model.js'
 
 export interface RegisteredProject {
   readonly workspaceId: string
@@ -99,12 +88,12 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
   const [query, setQuery] = useState('')
   const [selectedIndex, setSelectedIndex] = useState(0)
   const [newDirectoryName, setNewDirectoryName] = useState('')
-  const [browseTarget, setBrowseTarget] = useState<{ readonly path: string | undefined } | null>(() => initialBrowseTarget(props.mode))
+  const [browseTarget, setBrowseTarget] = useState<{ readonly path: string | undefined } | null>(() => ProjectFolderPickerModel.initialBrowseTarget(props.mode))
   const pickRequest = useRef<AbortController | null>(null)
   const searchInput = useRef<HTMLInputElement | null>(null)
-  const pathMode = props.mode === 'directories' || isPathQuery(query)
+  const pathMode = props.mode === 'directories' || ProjectFolderPickerModel.isPathQuery(query)
   const recentFolders = props.recentFolders
-  const entries = useMemo(() => pickerEntries(props.projects, recentFolders ?? [], query), [props.projects, recentFolders, query])
+  const entries = useMemo(() => ProjectFolderPickerModel.pickerEntries(props.projects, recentFolders ?? [], query), [props.projects, recentFolders, query])
 
   const listingQuery = useQuery({
     queryKey: ['project-folder-picker', 'list', browseTarget?.path ?? null],
@@ -146,7 +135,9 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
   useEffect(() => {
     if (listingQuery.data === undefined || listingQuery.isPlaceholderData || browseTarget === null) return
     const currentListing = listingQuery.data
-    setQuery(currentQuery => (browseTarget.path === undefined && isHomeRelativePathQuery(currentQuery) ? currentQuery : currentListing.path))
+    setQuery(currentQuery =>
+      browseTarget.path === undefined && ProjectFolderPickerModel.isHomeRelativePathQuery(currentQuery) ? currentQuery : currentListing.path,
+    )
   }, [listingQuery.data, listingQuery.isPlaceholderData, browseTarget])
 
   const browse = (path: string | undefined): void => {
@@ -168,7 +159,7 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
 
   const registerWorkspacePath = (path: string): void => {
     registerMutation.mutate(path, {
-      onSuccess: project => props.onSelect(workspaceSelection(project)),
+      onSuccess: project => props.onSelect(ProjectFolderPickerModel.workspaceSelection(project)),
     })
   }
 
@@ -206,7 +197,7 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
       return
     }
     const entry = entries[selectedIndex]
-    if (entry !== undefined) props.onSelect(pickerEntrySelection(entry))
+    if (entry !== undefined) props.onSelect(ProjectFolderPickerModel.pickerEntrySelection(entry))
   }
 
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>): void => {
@@ -214,7 +205,7 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
       const entry = entries[Number(event.key) - 1]
       if (entry !== undefined) {
         event.preventDefault()
-        props.onSelect(pickerEntrySelection(entry))
+        props.onSelect(ProjectFolderPickerModel.pickerEntrySelection(entry))
       }
       return
     }
@@ -222,15 +213,15 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
       if (itemCount === 0) return
       event.preventDefault()
       const direction = event.key === 'ArrowDown' ? 'down' : 'up'
-      setSelectedIndex(index => movePickerSelection(index, itemCount, direction))
+      setSelectedIndex(index => ProjectFolderPickerModel.movePickerSelection(index, itemCount, direction))
       return
     }
     if (event.key === 'Enter') {
       event.preventDefault()
       const pathQuery = query.trim()
       if (pathMode && pathQuery.length > 0) {
-        const requestedPath = resolvePathQuery(pathQuery, listing?.home)
-        if (isHomeRelativePathQuery(pathQuery) && requestedPath === null) return
+        const requestedPath = ProjectFolderPickerModel.resolvePathQuery(pathQuery, listing?.home)
+        if (ProjectFolderPickerModel.isHomeRelativePathQuery(pathQuery) && requestedPath === null) return
         const path = requestedPath ?? pathQuery
         if (listing?.path !== path) {
           browse(path)
@@ -277,8 +268,8 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
               onChange={event => {
                 const nextQuery = event.currentTarget.value
                 setQuery(nextQuery)
-                if (isHomeRelativePathQuery(nextQuery)) setBrowseTarget({ path: undefined })
-                if (!isPathQuery(nextQuery)) setBrowseTarget(null)
+                if (ProjectFolderPickerModel.isHomeRelativePathQuery(nextQuery)) setBrowseTarget({ path: undefined })
+                if (!ProjectFolderPickerModel.isPathQuery(nextQuery)) setBrowseTarget(null)
                 pickMutation.reset()
                 registerMutation.reset()
                 createMutation.reset()
@@ -338,7 +329,7 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
             )}
             {showListingActions && (
               <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:border-t dshx:p-2">
-                <Button disabled={busy} onClick={() => props.onSelect(folderSelection(listing.path))} size="sm" type="button">
+                <Button disabled={busy} onClick={() => props.onSelect(ProjectFolderPickerModel.folderSelection(listing.path))} size="sm" type="button">
                   Select this folder
                 </Button>
                 {props.mode !== 'directories' && (
@@ -383,7 +374,7 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
                     key={entry.kind === 'project' ? entry.project.workspaceId : 'recent:' + entry.path}
                     machineName={props.machineName}
                     onHover={() => setSelectedIndex(index)}
-                    onSelect={() => props.onSelect(pickerEntrySelection(entry))}
+                    onSelect={() => props.onSelect(ProjectFolderPickerModel.pickerEntrySelection(entry))}
                   />
                 )
               })}
