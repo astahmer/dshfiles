@@ -51,6 +51,7 @@
     "**/node_modules/**",
     "tooling/antislop/index.mjs",
     "output/**",
+    "plugins/@dshfiles/frame-layout/src/native/**",
     "plugins/@dshfiles/rich-composer/src/native/**",
     "plugins/@dshfiles/rich-composer/src/submission-settings.ts"
   ],

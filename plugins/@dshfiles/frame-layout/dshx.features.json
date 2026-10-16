@@ -1,0 +1,90 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "panel-width-persistence",
+      "title": "Persist the frame's dragged panel widths",
+      "summary": "The layout bundle keeps the dragged sidebar and right-panel widths in the browser, so a reload reopens the sidebar at its last open width and the right panel keeps its px preference while still booting hidden.",
+      "reach": ["expect button \"New session\""],
+      "surfaces": ["client", "storage"],
+      "configuration": [],
+      "states": ["default-width", "dragged", "reloaded"],
+      "failureModes": [
+        "Malformed or blocked browser storage falls back to the contract default widths.",
+        "A stored width outside the drag range is clamped instead of trusted."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "frame-layout.panel-width-persistence",
+          "featureFile": "tooling/dshx/e2e/features/frame-layout.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "frame-layout.panel-width-persistence-unit-restore",
+          "file": "plugins/@dshfiles/frame-layout/src/frame-widths.test.ts",
+          "testName": "reopens the sidebar at its last dragged width and keeps the right panel width"
+        },
+        {
+          "kind": "unit-test",
+          "id": "frame-layout.panel-width-persistence-unit-fallback",
+          "file": "plugins/@dshfiles/frame-layout/src/frame-widths.test.ts",
+          "testName": "ignores malformed stored geometry"
+        },
+        {
+          "kind": "unit-test",
+          "id": "frame-layout.panel-width-persistence-unit-clamp",
+          "file": "plugins/@dshfiles/frame-layout/src/frame-widths.test.ts",
+          "testName": "clamps stored widths into the drag range instead of trusting them"
+        }
+      ]
+    },
+    {
+      "id": "collapsed-state-persistence",
+      "title": "Persist the collapsed sidebar",
+      "summary": "Closing the left sidebar is remembered: a reload boots it collapsed, and reopening restores the last open width instead of the 280px contract default.",
+      "reach": ["expect button \"New session\""],
+      "surfaces": ["client", "storage"],
+      "configuration": [],
+      "states": ["open", "collapsed", "reloaded", "reopened"],
+      "failureModes": [
+        "A narrow frame keeps its own responsive auto-collapse instead of restoring a stored wide-frame override.",
+        "A record written before the collapsed flag boots open."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "frame-layout.collapsed-state-persistence",
+          "featureFile": "tooling/dshx/e2e/features/frame-layout.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "frame-layout.collapsed-state-persistence-unit-boot",
+          "file": "plugins/@dshfiles/frame-layout/src/frame-widths.test.ts",
+          "testName": "boots collapsed when the last wide state was collapsed, and reopens at the remembered width"
+        },
+        {
+          "kind": "unit-test",
+          "id": "frame-layout.collapsed-state-persistence-unit-write-back",
+          "file": "plugins/@dshfiles/frame-layout/src/frame-widths.test.ts",
+          "testName": "writes the collapsed state back and remembers the open width across it"
+        },
+        {
+          "kind": "unit-test",
+          "id": "frame-layout.collapsed-state-persistence-unit-legacy",
+          "file": "plugins/@dshfiles/frame-layout/src/frame-widths.test.ts",
+          "testName": "accepts a record written before the collapsed flag and boots open"
+        },
+        {
+          "kind": "unit-test",
+          "id": "frame-layout.collapsed-state-persistence-unit-narrow",
+          "file": "plugins/@dshfiles/frame-layout/src/frame-widths.test.ts",
+          "testName": "leaves a narrow frame's auto-collapse to the frame"
+        }
+      ]
+    }
+  ]
+}

@@ -2,6 +2,7 @@
   "name": "dsh-profile-web",
   "private": true,
   "dependencies": {
+    "@dshfiles/frame-layout": "link:../../plugins/@dshfiles/frame-layout",
     "@dshfiles/activity-timeline": "link:../../plugins/@dshfiles/activity-timeline",
     "@dshfiles/attachment-gallery": "link:../../plugins/@dshfiles/attachment-gallery",
     "@dshfiles/rich-composer": "link:../../plugins/@dshfiles/rich-composer",
@@ -49,6 +50,7 @@
         "@deepseek-ai/dsh-web-app",
         "dshmarket",
         "dsh-our-free-model",
+        "@dshfiles/frame-layout",
         "@dshfiles/shared-runtime",
         "@dshfiles/shared-streams",
         "@dshfiles/shortcuts",

@@ -1,0 +1,10 @@
+{
+  "extends": "../../../tsconfig.base.client.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "types": ["node", "@dshfiles/dshx/client/env"]
+  },
+  "include": ["dshx.config.ts", "src/**/*.ts", "src/**/*.tsx"]
+}

@@ -1,0 +1,10 @@
+# The native layout package owns the frame's in-memory geometry, and no plugin
+# API writes a panel width, so this bundle ports the whole package (see README
+# "Port") and switches the native client row off. One owner, not two: both rows
+# provide ctx.layout and register into the single `root` slot.
+- id: ui-layout
+  disabled: true
+# Loader ids share one namespace per profile.
+- insert:
+    - id: dshfiles-frame-layout
+      name: '@dshfiles/frame-layout'

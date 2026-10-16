@@ -22,6 +22,12 @@
       // dshx.config.ts names shared-runtime as a string (`client.shared`); dsh is the runtime the bundles load into.
       "ignoreDependencies": ["@dshfiles/shared-runtime", "@deepseek-ai/dsh"],
     },
+    "plugins/@dshfiles/frame-layout": {
+      "entry": ["dshx.config.ts", "src/{host,client,client-entry,index}.{ts,tsx}!"],
+      // @deepseek-ai/dsh-client-store's node build imports zustand and immer without declaring them; the
+      // persisted-widths unit test drives that store, so the engine's own deps stay in devDependencies.
+      "ignoreDependencies": ["@dshfiles/shared-runtime", "@deepseek-ai/dsh", "zustand", "immer"],
+    },
     "plugins/@dshfiles/agent-communication": {
       "entry": ["dshx.config.ts", "src/{host,client,client-entry,index}.{ts,tsx}!"],
       // dshx's communication module, bundled into the Host entry, imports write-file-atomic at runtime.
