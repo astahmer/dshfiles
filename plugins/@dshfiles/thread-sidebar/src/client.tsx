@@ -63,6 +63,7 @@ import {
 } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { memo, useEffect, useId, useMemo, useRef, useState, type ReactElement, type ReactNode } from 'react'
+import { z } from 'zod'
 import {
   autoArchiveOverrideForSession,
   isAutoArchiveCandidate,
@@ -229,6 +230,9 @@ const sectionLabels: Record<SidebarSection, Parameters<ThreadSidebarTranslate>[0
   inactive: 'threadSidebarInactive',
   archived: 'threadSidebarArchived',
 }
+
+const THREAD_TAB_FOCUS_EVENT = 'dshfiles:main-tabs:focus-thread'
+const threadTabFocusEventSchema = z.object({ sessionId: z.string().min(1) }).strict()
 
 const noticeClass = 'dshx:w-auto dshx:px-3 dshx:py-2 dshx:text-xs'
 const stickyHeaderClass = 'dshx:sticky dshx:top-0 dshx:z-10 dshx:bg-background'
@@ -803,6 +807,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
   const [expandedParents, setExpandedParents] = useState<ReadonlySet<string>>(() => new Set())
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [viewsManagerOpen, setViewsManagerOpen] = useState(false)
+  const [threadToScrollTo, setThreadToScrollTo] = useState<string | null>(null)
   const threadViewSettings = threadViewPreferences.useValue() ?? DEFAULT_THREAD_VIEW_SETTINGS
   const threadView = activeThreadView(threadViewSettings)
   const [threadViewStorageWarning, setThreadViewStorageWarning] = useState(false)
@@ -862,6 +867,14 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
   )
 
   useEffect(() => setSelectedThreadId(selectedSession?.id ?? null), [selectedSession?.id, setSelectedThreadId])
+  useEffect(() => {
+    const onFocusThread = (event: Event): void => {
+      const request = event instanceof CustomEvent ? threadTabFocusEventSchema.safeParse(event.detail) : undefined
+      if (request?.success === true) setThreadToScrollTo(request.data.sessionId)
+    }
+    window.addEventListener(THREAD_TAB_FOCUS_EVENT, onFocusThread)
+    return () => window.removeEventListener(THREAD_TAB_FOCUS_EVENT, onFocusThread)
+  }, [])
   useEffect(() => {
     if (selectedSessionId === undefined) return
     const current = threadNotificationPreferences.get() ?? DEFAULT_THREAD_NOTIFICATION_PREFERENCES
@@ -1201,6 +1214,23 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
     }
     return groupThreadChildren({ threads: listed })
   }, [preferences.workspaceFilter, sessionState.byId, sessionState.ids, workspaceBySession])
+
+  useEffect(() => {
+    if (threadToScrollTo === null) return
+    const scrollArea = document.querySelector<HTMLElement>('[data-testid="thread-sidebar-scroll"]')
+    const row = Array.from(scrollArea?.querySelectorAll<HTMLElement>('[data-thread-id]') ?? []).find(element => element.dataset.threadId === threadToScrollTo)
+    if (row !== undefined) {
+      row.scrollIntoView({ block: 'nearest' })
+      setThreadToScrollTo(null)
+      return
+    }
+    const parent = Array.from(threadTree.childrenByRoot).find(([, children]) => children.some(child => child.id === threadToScrollTo))?.[0]
+    if (parent !== undefined && childrenOpenOverrides.get(parent) !== true) {
+      setChildrenOpenOverrides(current => new Map(current).set(parent, true))
+      return
+    }
+    setThreadToScrollTo(null)
+  }, [childrenOpenOverrides, threadToScrollTo, threadTree])
 
   const sectionEntries = useMemo(
     () =>

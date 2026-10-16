@@ -25,6 +25,7 @@ import { saveTabs, storedTabs } from './tabs-storage.js'
 import './client.css'
 
 const THREAD_TAB_KEEP_EVENT = 'dshfiles:main-tabs:keep-thread'
+const THREAD_TAB_FOCUS_EVENT = 'dshfiles:main-tabs:focus-thread'
 const threadTabKeepRequestSchema = z.object({ sessionId: z.string().min(1) }).strict()
 
 const isShortcutCommandId = (value: string): value is ShortcutCommandId => /^[a-z][a-zA-Z0-9-]*(?:\.[a-zA-Z][a-zA-Z0-9-]*)+$/u.test(value)
@@ -182,6 +183,7 @@ export default defineClient({
           const settings = useSettings(mainTabsSettings)
           const preferences: TabPreferences | null =
             settings.value !== undefined ? settings.value : settings.status === 'loading' && settings.error === null ? null : DEFAULT_TAB_PREFERENCES
+          const focusThreadInSidebar = settings.value?.focusThreadInSidebar ?? true
           useEffect(() => {
             if (preferences !== null) actor.send({ type: 'preferences.changed', preferences })
           }, [preferences])
@@ -315,9 +317,17 @@ export default defineClient({
             return sections.filter(section => section.suggestions.length > 0)
           }
 
+          const sendStripEvent = (event: TabsEvent): void => {
+            actor.send(event)
+            if (event.type !== 'tab.select' || !focusThreadInSidebar) return
+            const selected = set?.tabs.find(tab => tab.id === event.tabId)
+            if (selected?.target.kind !== 'thread') return
+            window.dispatchEvent(new CustomEvent(THREAD_TAB_FOCUS_EVENT, { detail: { sessionId: selected.target.sessionId } }))
+          }
+
           return createPortal(
             <>
-              <TabStrip tabs={tabs} send={event => actor.send(event)} t={props.t} newTabKeys={shortcutOf('mainTabs.newTab')?.keys.join('') ?? ''} />
+              <TabStrip tabs={tabs} send={sendStripEvent} t={props.t} newTabKeys={shortcutOf('mainTabs.newTab')?.keys.join('') ?? ''} />
               {startShown ? <StartPage sections={startSections()} t={props.t} /> : null}
             </>,
             host,
