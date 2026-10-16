@@ -15,6 +15,7 @@ import { spawn, spawnSync } from 'node:child_process'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { planBrowserTasks, writeDistDigests } from '../tooling/dshx/scripts/browser-tasks.mjs'
+import { turboCacheDir } from './turbo-cache.mjs'
 
 const workspaceRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const tasks = { e2e: 'test:e2e', smoke: 'test:e2e:smoke', boot: 'test:boot' }
@@ -39,9 +40,15 @@ const filters = names.length === 0 ? ['--filter=./plugins', '--filter=./plugins/
 const jj = spawnSync('jj', ['--version'], { encoding: 'utf8' })
 const toolVersions = jj.status === 0 ? jj.stdout.trim() : 'jj unavailable'
 
+const turboCache = turboCacheDir()
+
 const turbo = (args, env = {}) =>
   new Promise((resolveRun, reject) => {
-    const child = spawn('pnpm', ['exec', 'turbo', 'run', ...args], { cwd: workspaceRoot, stdio: 'inherit', env: { ...process.env, ...env } })
+    const child = spawn('pnpm', ['exec', 'turbo', 'run', ...args], {
+      cwd: workspaceRoot,
+      stdio: 'inherit',
+      env: { ...process.env, ...env, TURBO_CACHE_DIR: turboCache },
+    })
     child.once('error', reject)
     child.once('close', code => resolveRun(code ?? 1))
   })
@@ -58,5 +65,5 @@ if (mode === 'boot') {
 const status = await turbo([task, ...filters, '--concurrency=1', '--continue', '--output-logs=new-only', ...(force ? ['--force'] : [])], {
   DSHX_TOOL_VERSIONS: toolVersions,
 })
-console.log(`check-browser ${mode}: ${status === 0 ? 'passed' : 'failed'} in ${String(Math.round((Date.now() - startedAt) / 1000))}s`)
+console.log(`check-browser ${mode}: ${status === 0 ? 'passed' : 'failed'} in ${String(Math.round((Date.now() - startedAt) / 1000))}s (cache ${turboCache})`)
 process.exitCode = status

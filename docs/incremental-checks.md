@@ -4,7 +4,7 @@
 
 The root pnpm workspace includes plugins, SDK packages, workspace check packages and desktop. Run `pnpm install --frozen-lockfile` once. Plugin SDK dependencies use `workspace:*`; external installed DSH profiles retain `link:` because they live outside this workspace. The checked-in web profile seed remains a standalone deployment manifest. Scratch installation retains its separate [pnpm policy](../tooling/dshx/scratch-pnpm-policy.yaml) so a disposable profile never inherits development workspace discovery.
 
-Turborepo 2.11.8 is pinned as a development dependency and uses its official platform binary. Vitest stays on 4.1.11. Local caches live in `.turbo/cache`; remote caching is disabled. Neither install nor verification changes the active web profile.
+Turborepo 2.11.8 is pinned as a development dependency and uses its official platform binary. Vitest stays on 4.1.11. One local cache, `${XDG_CACHE_HOME:-$HOME/.cache}/dshfiles/turbo`, is shared by every JJ workspace of this repository: Turbo keys a task on its input content, not on the directory it runs in, so a linked thread workspace replays what another workspace already built instead of starting from an empty `.turbo/cache`. `scripts/turbo-cache.mjs` resolves that path, the dev shell exports it as `TURBO_CACHE_DIR`, and the check entry points pass it on; remote caching is disabled. Neither install nor verification changes the active web profile.
 
 ## Package orchestration
 

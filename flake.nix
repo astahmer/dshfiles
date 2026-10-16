@@ -141,6 +141,11 @@
           fi
           hash -r 2>/dev/null || true
 
+          # One Turbo cache for every JJ workspace of this repository: Turbo keys a task on its input content, so a
+          # fresh workspace replays another workspace's builds and browser checks instead of redoing them.
+          # scripts/turbo-cache.mjs resolves the same location for the check entry points.
+          export TURBO_CACHE_DIR="''${XDG_CACHE_HOME:-$HOME/.cache}/dshfiles/turbo"
+
           # pnpm comes only from fnm's corepack, pinned by packageManager; a
           # second nixpkgs pnpm would shadow it with a different version.
           echo "dshx: node $(node --version), pnpm $(pnpm --version 2>/dev/null || echo 'n/a')"
