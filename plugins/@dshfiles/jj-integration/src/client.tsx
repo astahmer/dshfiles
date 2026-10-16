@@ -16,6 +16,7 @@ import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { createWorkspacePickerPorts } from '@dshfiles/project-folder-picker'
 import { startWorkspaceToggle, type DestinationBarServices } from './destination-bar.js'
 import { createComposerWorkspaceNavigation, type ComposerReferenceHandoff } from './composer-workspace-navigation.js'
+import { mainViewSessionId } from './main-view-session.js'
 import { jjIntegrationApi } from './api.js'
 import { HeroWorkspacePicker } from './hero-workspace-picker.js'
 import { LandButton } from './land-button.js'
@@ -178,7 +179,7 @@ export default defineClient({
     const composerNavigation = createComposerWorkspaceNavigation({
       selectedWorkspace: () => {
         const sessions = ctx.sessions.list.getSnapshot()
-        const current = sessions.ids.find(id => (sessions.byId[id]?.retainedBy.mainView ?? 0) > 0)
+        const current = mainViewSessionId(sessions)
         return ctx.workspaces.list.getSnapshot().items.find(workspace => current !== undefined && workspace.sessionIds.includes(current))?.workspaceId
       },
       subscribe: listener => {
@@ -196,6 +197,7 @@ export default defineClient({
       workspaces: ctx.workspaces,
       sessions: ctx.sessions,
       openWorkspace: composerNavigation.open,
+      pickWorkspace: composerNavigation.pickWorkspace,
       bindWorkspacePicker: composerNavigation.bind,
       // A blank thread's composer would create a Session on this machine; while a remote host is chosen it sends there.
       takeOverComposer: () =>
@@ -263,7 +265,7 @@ export default defineClient({
     const pendingSubmissions = new Map<SessionSummary['id'], AbortController>()
     const workspaceComposerFor = (sessionId?: SessionSummary['id']) => {
       const sessions = ctx.sessions.list.getSnapshot()
-      const currentId = sessions.ids.find(id => (sessions.byId[id]?.retainedBy.mainView ?? 0) > 0)
+      const currentId = mainViewSessionId(sessions)
       if (currentId === undefined || (sessionId !== undefined && currentId !== sessionId)) return undefined
       const session = sessions.byId[currentId]
       const workspace = ctx.workspaces.list.getSnapshot().items.find(item => item.sessionIds.includes(currentId))

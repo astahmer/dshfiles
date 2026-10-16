@@ -38,6 +38,7 @@ export interface ToggleRequest {
   /** The isolated thread workspace the blank thread sits in now, kept as a spare instead of being thrown away. */
   readonly leaving: SpareWorkspace | null
   readonly leavingBase: string | null
+  readonly excludeSpareWorkspaceId?: string
 }
 
 export interface PendingDestination {
@@ -55,8 +56,10 @@ interface ToggleContext {
   readonly settled: readonly string[]
   /** The New-thread visit waiting for its destination to decide whether it moves. */
   readonly arriving: string | null
-  /** The workspace a switch just opened: its fresh blank Session is where the thread belongs, so it stays. */
+  /** The workspace a switch just opened for the same blank-thread visit. */
   readonly opened: string | null
+  readonly openedFor: string | null
+  readonly switchingVisitId: string | null
 }
 
 interface ToggleInput {
@@ -81,45 +84,47 @@ type ToggleEvent =
   | { readonly type: 'dismiss' }
 
 /**
- * Where a blank New-thread Session should start, given its current destination: its own thread workspace when
- * isolation is on by default (unless it already sits alone in one), the project checkout when it is off and the
- * Session started in another thread's workspace. Null keeps it where it is.
+ * Where a blank New-thread Session should start: in its own workspace when isolation is the default, or in the
+ * project checkout when it inherited another thread's workspace and isolation is off.
  */
-export const defaultDestinationMove = (input: {
-  readonly destination: DestinationView
-  readonly workspaceId: string
-  /** The workspace already holds another thread Session. */
-  readonly occupied: boolean
-}): ToggleRequest | null => {
+export const defaultDestinationMove = (input: { readonly destination: DestinationView; readonly workspaceId: string }): ToggleRequest | null => {
   const { destination } = input
   if (destination.vcs !== 'jj') return null
   const projectWorkspaceId = destination.projectWorkspaceId ?? input.workspaceId
   const move = { projectWorkspaceId, leaving: null, leavingBase: null }
-  if (destination.isolateByDefault && (!destination.isolated || input.occupied)) {
-    if (destination.bookmark === null) return { ...move, isolate: true }
-    return { ...move, isolate: true, base: destination.bookmark }
+  if (destination.isolateByDefault) {
+    let isolateMove: ToggleRequest = { ...move, isolate: true }
+    if (input.workspaceId !== projectWorkspaceId) isolateMove = { ...isolateMove, excludeSpareWorkspaceId: input.workspaceId }
+    if (destination.bookmark === null) return isolateMove
+    return { ...isolateMove, base: destination.bookmark }
   }
-  if (!destination.isolateByDefault && destination.isolated && input.occupied) return { ...move, isolate: false }
+  if (destination.isolated) return { ...move, isolate: false }
   return null
 }
 
 /**
- * The same decision before the Host answered, for isolation on by default: a blank thread outside a thread workspace
- * (`<repository>-threads/thread-<id>`), or in one that holds another thread's work, gets its own. The Host resolves
- * the repository from whichever workspace it is given, and answers a folder outside jj with that folder unchanged.
+ * Starts isolation before the Host answers. When the composer inherited a thread workspace, exclude that workspace
+ * from spare reuse so this New thread cannot keep using the previous thread's folder.
  */
 export const eagerDestinationMove = (input: {
   readonly workspaceId: string
-  readonly inThreadWorkspace: boolean
-  readonly occupied: boolean
+  readonly projectWorkspaceId: string
   readonly bookmark: string
-}): ToggleRequest | null =>
-  input.inThreadWorkspace && !input.occupied
-    ? null
-    : { isolate: true, base: input.bookmark, projectWorkspaceId: input.workspaceId, leaving: null, leavingBase: null }
+}): ToggleRequest => {
+  const request: ToggleRequest = {
+    isolate: true,
+    base: input.bookmark,
+    projectWorkspaceId: input.projectWorkspaceId,
+    leaving: null,
+    leavingBase: null,
+  }
+  if (input.workspaceId === input.projectWorkspaceId) return request
+  return { ...request, excludeSpareWorkspaceId: input.workspaceId }
+}
 
 const pendingFor = (client: WorkspaceToggleClient, request: ToggleRequest, name: string | null): PendingDestination => {
-  const spare = request.isolate ? (client.findSpare(spareKey(request.projectWorkspaceId, request.base)) ?? null) : null
+  const candidate = request.isolate ? client.findSpare(spareKey(request.projectWorkspaceId, request.base)) : undefined
+  const spare = candidate?.workspaceId === request.excludeSpareWorkspaceId ? null : (candidate ?? null)
   return { isolate: request.isolate, spare, name: request.isolate ? (spare?.name ?? name ?? client.generateName()) : null }
 }
 
@@ -185,7 +190,17 @@ export const workspaceToggleMachine = setup({
   },
 }).createMachine({
   id: 'workspaceToggle',
-  context: ({ input }) => ({ client: input.client, request: null, pending: null, error: null, settled: [], arriving: null, opened: null }),
+  context: ({ input }) => ({
+    client: input.client,
+    request: null,
+    pending: null,
+    error: null,
+    settled: [],
+    arriving: null,
+    opened: null,
+    openedFor: null,
+    switchingVisitId: null,
+  }),
   initial: 'idle',
   states: {
     idle: {
@@ -195,7 +210,10 @@ export const workspaceToggleMachine = setup({
           actions: assign(({ context, event }) => ({
             request: event.request,
             error: null,
+            arriving: null,
             opened: null,
+            openedFor: null,
+            switchingVisitId: event.visitId ?? null,
             pending: pendingFor(context.client, event.request, null),
             settled: event.visitId === undefined ? context.settled : [...context.settled, event.visitId],
           })),
@@ -205,8 +223,8 @@ export const workspaceToggleMachine = setup({
             guard: ({ context, event }) => context.settled.includes(event.visitId),
           },
           {
-            guard: ({ context, event }) => context.opened === event.workspaceId,
-            actions: assign(({ context, event }) => ({ settled: [...context.settled, event.visitId], opened: null, error: null })),
+            guard: ({ context, event }) => context.opened === event.workspaceId && context.openedFor === event.visitId,
+            actions: assign(({ context, event }) => ({ settled: [...context.settled, event.visitId], opened: null, openedFor: null, error: null })),
           },
           {
             guard: ({ event }) => event.isolateByDefault,
@@ -215,10 +233,11 @@ export const workspaceToggleMachine = setup({
               arriving: event.visitId,
               error: null,
               opened: null,
+              openedFor: null,
               pending: { isolate: true, spare: null, name: context.client.generateName() },
             })),
           },
-          { actions: assign({ arriving: ({ event }) => event.visitId, opened: null, error: null }) },
+          { actions: assign({ arriving: ({ event }) => event.visitId, opened: null, openedFor: null, error: null }) },
         ],
         resolved: [
           {
@@ -226,14 +245,29 @@ export const workspaceToggleMachine = setup({
           },
           {
             guard: ({ event }) => event.request === null,
-            actions: assign(({ context, event }) => ({ settled: [...context.settled, event.visitId], arriving: null, opened: null })),
+            actions: assign(({ context, event }) => ({
+              settled: [...context.settled, event.visitId],
+              arriving: null,
+              opened: null,
+              openedFor: null,
+              switchingVisitId: null,
+            })),
           },
           {
             target: 'switching',
             actions: assign(({ context, event }) => {
               // SAFETY of the fallback: the previous branch took every null request.
               const request = event.request ?? { isolate: false, projectWorkspaceId: '', leaving: null, leavingBase: null }
-              return { request, error: null, arriving: null, settled: [...context.settled, event.visitId], pending: pendingFor(context.client, request, null) }
+              return {
+                request,
+                error: null,
+                arriving: null,
+                opened: null,
+                openedFor: null,
+                switchingVisitId: event.visitId,
+                settled: [...context.settled, event.visitId],
+                pending: pendingFor(context.client, request, null),
+              }
             }),
           },
         ],
@@ -248,6 +282,8 @@ export const workspaceToggleMachine = setup({
             pending: null,
             arriving: null,
             opened: null,
+            openedFor: null,
+            switchingVisitId: null,
             error: context.client.preparationTimeoutReason(),
             settled: [...context.settled, ...(context.arriving === null ? [] : [context.arriving])],
           })),
@@ -261,6 +297,8 @@ export const workspaceToggleMachine = setup({
             error: null,
             arriving: null,
             opened: null,
+            openedFor: null,
+            switchingVisitId: event.visitId ?? null,
             pending: pendingFor(context.client, event.request, null),
             settled: [...context.settled, ...(context.arriving === null ? [] : [context.arriving])],
           })),
@@ -270,7 +308,14 @@ export const workspaceToggleMachine = setup({
           {
             guard: ({ event }) => event.request === null,
             target: 'idle',
-            actions: assign(({ context, event }) => ({ pending: null, arriving: null, opened: null, settled: [...context.settled, event.visitId] })),
+            actions: assign(({ context, event }) => ({
+              pending: null,
+              arriving: null,
+              opened: null,
+              openedFor: null,
+              switchingVisitId: null,
+              settled: [...context.settled, event.visitId],
+            })),
           },
           {
             target: 'switching',
@@ -281,6 +326,8 @@ export const workspaceToggleMachine = setup({
                 request,
                 arriving: null,
                 opened: null,
+                openedFor: null,
+                switchingVisitId: event.visitId,
                 settled: [...context.settled, event.visitId],
                 pending: pendingFor(context.client, request, context.pending?.name ?? null),
               }
@@ -302,10 +349,26 @@ export const workspaceToggleMachine = setup({
           target: 'idle',
           actions: [
             emit(({ event }) => ({ type: 'switched' as const, workspaceId: event.output.workspaceId, destination: event.output.destination })),
-            assign(({ event }) => ({ request: null, pending: null, opened: event.output.workspaceId })),
+            assign(({ context, event }) => ({
+              request: null,
+              pending: null,
+              opened: event.output.workspaceId,
+              openedFor: context.switchingVisitId,
+              switchingVisitId: null,
+            })),
           ],
         },
-        onError: { target: 'idle', actions: assign(({ event }) => ({ request: null, pending: null, opened: null, error: errorText(event.error) })) },
+        onError: {
+          target: 'idle',
+          actions: assign(({ event }) => ({
+            request: null,
+            pending: null,
+            opened: null,
+            openedFor: null,
+            switchingVisitId: null,
+            error: errorText(event.error),
+          })),
+        },
       },
     },
   },

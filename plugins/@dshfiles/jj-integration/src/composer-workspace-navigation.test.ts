@@ -23,6 +23,20 @@ const navigationFixture = (callbacks: Partial<Pick<ComposerWorkspaceNavigationIn
 }
 
 describe('composer-owned workspace navigation', () => {
+  it('picks immediately through the native composer without waiting for a Session route', () => {
+    const fixture = navigationFixture()
+    const picked: string[] = []
+    fixture.navigation.bind(workspaceId => picked.push(workspaceId))
+    expect(fixture.navigation.pickWorkspace('thread')).toBe(true)
+    expect(picked).toEqual(['thread'])
+    expect(fixture.listeners.size).toBe(0)
+  })
+
+  it('reports when no native composer picker is bound', () => {
+    const fixture = navigationFixture()
+    expect(fixture.navigation.pickWorkspace('thread')).toBe(false)
+  })
+
   it('uses the native picker and waits for the destination rather than releasing Send at the pending chip', async () => {
     const fixture = navigationFixture()
     const picked: string[] = []

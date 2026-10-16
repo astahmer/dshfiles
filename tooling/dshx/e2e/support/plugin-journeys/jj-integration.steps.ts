@@ -282,6 +282,15 @@ Then('the New thread composer is empty and no consumed draft remains stored', as
   await finishJourneyAssertions(page)
 })
 
+When('new threads start in the shared checkout by default', async ({ page }: { page: Page }) => {
+  await page.getByRole('button', { name: 'Settings', exact: true }).last().click()
+  await page.getByRole('dialog').getByText('New thread', { exact: true }).click()
+  const isolateByDefault = page.getByRole('switch', { name: 'Own jj workspace by default', exact: true })
+  if (await isolateByDefault.isChecked()) await isolateByDefault.click()
+  await expect(isolateByDefault).not.toBeChecked()
+  await page.keyboard.press('Escape')
+})
+
 When('new threads start in their own jj workspace by default', async ({ page }: { page: Page }) => {
   await page.getByRole('button', { name: 'Settings', exact: true }).last().click()
   await page.getByRole('dialog').getByText('New thread', { exact: true }).click()
@@ -332,6 +341,7 @@ Then('the New thread moves to its own jj workspace on {string} in the background
     await expect(newThreadComposer(page)).toHaveText('typed during workspace preparation')
     expect(commitIdOf(repository, `${threadName}@-`)).toBe(repository.baseCommitId)
   })
+  provisionedThreads.set(page, threadName)
   await finishJourneyAssertions(page)
 })
 
@@ -366,6 +376,35 @@ When('the thread workspace gains a revision described {string}', async ({ page }
   const threadPath = join(repository.threadsPath, provisionedThreadName(page))
   await writeFile(join(threadPath, 'feature.txt'), `${description}\n`)
   jjAt(threadPath, repository.temporaryRoot, ['describe', '--message', description])
+})
+
+Then('the blank new thread uses a different jj workspace from the previous thread', async ({ page }: { page: Page }) => {
+  const repository = repositoryFor(page)
+  const previousThread = provisionedThreadName(page)
+  await recordAssertion(page, 'jj-integration-new-thread-does-not-reuse-previous-workspace', async () => {
+    await expect(newThreadComposer(page)).toBeVisible()
+    await expect(newThreadComposer(page)).toHaveText('')
+    await expect(projectButton(page)).not.toHaveText(`repo · ${previousThread}`, { timeout: 30_000 })
+    const nextThread = await currentThreadName(page)
+    expect(nextThread).not.toBe(previousThread)
+    await expect(workspaceToggle(page)).toBeChecked()
+    await expect.poll(() => workspaceNames(repository)).toEqual(['default', previousThread, nextThread].sort())
+  })
+  await finishJourneyAssertions(page)
+})
+
+Then('the blank new thread returns to the owning project checkout', async ({ page }: { page: Page }) => {
+  const repository = repositoryFor(page)
+  await recordAssertion(page, 'jj-integration-new-thread-returns-to-project', async () => {
+    await expect(newThreadComposer(page)).toBeVisible()
+    await expect(newThreadComposer(page)).toHaveText('')
+    await expect(projectButton(page)).toHaveText('repo', { timeout: 15_000 })
+    await expect(page.getByRole('button', { name: 'main', exact: true })).toBeVisible()
+    await expect(workspaceToggle(page)).toBeVisible()
+    await expect(workspaceToggle(page)).not.toBeChecked()
+    expect(workspaceNames(repository)).toEqual(['default', provisionedThreadName(page)])
+  })
+  await finishJourneyAssertions(page)
 })
 
 Then('the destination bar offers the main bookmark in the shared checkout', async ({ page }: { page: Page }) => {

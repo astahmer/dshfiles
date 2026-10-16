@@ -90,7 +90,6 @@ describe('workspaceToggleMachine', () => {
     const request = defaultDestinationMove({
       destination: { vcs: 'jj', isolated: false, projectWorkspaceId: 'project', bookmark: null, bookmarks: [], isolateByDefault: true },
       workspaceId: 'project',
-      occupied: false,
     })
     if (request === null) throw new Error('Expected the new thread to move into an isolated workspace.')
     toggle.actor.send({ type: 'toggle', request })
@@ -109,6 +108,27 @@ describe('workspaceToggleMachine', () => {
     await waitFor(toggle.actor, snapshot => snapshot.matches('idle'))
     expect(toggle.calls.filter(call => call.startsWith('provision'))).toEqual([])
     expect(toggle.switched).toEqual(['project', 'ws-thread-abc123'])
+  })
+
+  it('does not reuse the inherited thread workspace even when it is also the stored spare', async () => {
+    const toggle = startToggle()
+    toggle.release()
+    const key = spareKey('project', 'main')
+    toggle.spares.set(key, { workspaceId: 'ws-old', name: 'thread-old' })
+    toggle.actor.send({
+      type: 'toggle',
+      request: {
+        isolate: true,
+        base: 'main',
+        projectWorkspaceId: 'project',
+        leaving: null,
+        leavingBase: null,
+        excludeSpareWorkspaceId: 'ws-old',
+      },
+    })
+    await waitFor(toggle.actor, snapshot => snapshot.matches('idle'))
+    expect(toggle.calls).toEqual(['provision isolate thread-abc123', 'open ws-thread-abc123'])
+    expect(toggle.spares.get(key)).toEqual({ workspaceId: 'ws-old', name: 'thread-old' })
   })
 
   it('retries without unsupported fields on a Host that does not know the name yet', async () => {
@@ -155,26 +175,32 @@ describe('workspaceToggleMachine', () => {
     await waitFor(toggle.actor, snapshot => snapshot.matches('idle'))
     expect(toggle.calls).toEqual(['provision isolate thread-abc123', 'open ws-thread-abc123'])
     expect(toggle.switched).toEqual(['ws-thread-abc123'])
-    toggle.actor.send({ type: 'arrive', visitId: 's2', workspaceId: 'ws-thread-abc123', isolateByDefault: true })
+    toggle.actor.send({ type: 'arrive', visitId: 's1', workspaceId: 'ws-thread-abc123', isolateByDefault: true })
     expect(toggle.actor.getSnapshot().matches('idle')).toBe(true)
   })
 
-  it('waits for Host ownership before accepting a thread workspace that appears exclusive', async () => {
+  it('creates a fresh workspace when a new thread inherits another thread workspace', async () => {
     const toggle = startToggle()
     toggle.actor.send({ type: 'arrive', visitId: 's1', workspaceId: 'ws-shared', isolateByDefault: true })
     expect(toggle.actor.getSnapshot().matches('preparing')).toBe(true)
-    expect(eagerDestinationMove({ workspaceId: 'ws-shared', inThreadWorkspace: true, occupied: false, bookmark: 'main' })).toBeNull()
+    expect(eagerDestinationMove({ workspaceId: 'ws-shared', projectWorkspaceId: 'project', bookmark: 'main' })).toEqual({
+      isolate: true,
+      base: 'main',
+      projectWorkspaceId: 'project',
+      leaving: null,
+      leavingBase: null,
+      excludeSpareWorkspaceId: 'ws-shared',
+    })
     expect(toggle.calls).toEqual([])
 
     const request = defaultDestinationMove({
       destination: { vcs: 'jj', isolated: true, projectWorkspaceId: 'project', bookmark: 'main', bookmarks: ['main'], isolateByDefault: true },
       workspaceId: 'ws-shared',
-      occupied: true,
     })
-    expect(request).not.toBeNull()
     toggle.actor.send({ type: 'resolved', visitId: 's1', request })
     toggle.release()
     await waitFor(toggle.actor, snapshot => snapshot.matches('idle'))
+    expect(toggle.calls).toEqual(['provision isolate thread-abc123', 'open ws-thread-abc123'])
     expect(toggle.switched).toEqual(['ws-thread-abc123'])
   })
 
@@ -216,6 +242,29 @@ describe('workspaceToggleMachine', () => {
     toggle.actor.send({ type: 'resolved', visitId: 's1', request: null })
     expect(toggle.actor.getSnapshot().matches('idle')).toBe(true)
     expect(toggle.calls).toEqual([])
+  })
+
+  it('moves a reused blank Session from a workspace opened for an earlier visit', async () => {
+    const toggle = startToggle()
+    toggle.release()
+    toggle.actor.send({
+      type: 'toggle',
+      visitId: 'session:0',
+      request: { isolate: true, base: 'main', projectWorkspaceId: 'project', leaving: null, leavingBase: null },
+    })
+    await waitFor(toggle.actor, snapshot => snapshot.matches('idle'))
+    expect(toggle.actor.getSnapshot().context).toMatchObject({ opened: 'ws-thread-abc123', openedFor: 'session:0' })
+
+    toggle.actor.send({ type: 'arrive', visitId: 'session:1', workspaceId: 'ws-thread-abc123', isolateByDefault: false })
+    toggle.actor.send({
+      type: 'resolved',
+      visitId: 'session:1',
+      request: { isolate: false, projectWorkspaceId: 'project', leaving: null, leavingBase: null },
+    })
+    await waitFor(toggle.actor, snapshot => snapshot.matches('idle'))
+
+    expect(toggle.switched).toEqual(['ws-thread-abc123', 'project'])
+    expect(toggle.actor.getSnapshot().context).toMatchObject({ opened: 'project', openedFor: 'session:1' })
   })
 
   it('never moves a thread again once the user toggled it', async () => {
@@ -392,8 +441,8 @@ describe('defaultDestinationMove', () => {
     ...overrides,
   })
 
-  it('moves a new thread out of the checkout into its own workspace when isolation is the default', () => {
-    expect(defaultDestinationMove({ destination: destination({}), workspaceId: 'project', occupied: false })).toEqual({
+  it('isolates a new thread from the project checkout when isolation is the default', () => {
+    expect(defaultDestinationMove({ destination: destination({}), workspaceId: 'project' })).toEqual({
       isolate: true,
       base: 'main',
       projectWorkspaceId: 'project',
@@ -402,33 +451,48 @@ describe('defaultDestinationMove', () => {
     })
   })
 
-  it('moves a new thread out of another thread workspace, whichever the default', () => {
-    expect(defaultDestinationMove({ destination: destination({ isolated: true }), workspaceId: 'ws-other', occupied: true })?.isolate).toBe(true)
-    expect(defaultDestinationMove({ destination: destination({ isolated: true, isolateByDefault: false }), workspaceId: 'ws-other', occupied: true })).toEqual({
+  it('does not reuse the inherited thread workspace when isolation is the default', () => {
+    expect(defaultDestinationMove({ destination: destination({ isolated: true }), workspaceId: 'ws-other' })).toEqual({
+      isolate: true,
+      base: 'main',
+      projectWorkspaceId: 'project',
+      leaving: null,
+      leavingBase: null,
+      excludeSpareWorkspaceId: 'ws-other',
+    })
+  })
+
+  it('returns a new thread to the project checkout when isolation is off', () => {
+    expect(defaultDestinationMove({ destination: destination({ isolated: true, isolateByDefault: false }), workspaceId: 'ws-other' })).toEqual({
       isolate: false,
       projectWorkspaceId: 'project',
       leaving: null,
       leavingBase: null,
     })
+    expect(defaultDestinationMove({ destination: destination({ isolateByDefault: false }), workspaceId: 'project' })).toBeNull()
   })
 
-  it('keeps a new thread that is already where it belongs, or outside jj', () => {
-    expect(defaultDestinationMove({ destination: destination({ isolated: true }), workspaceId: 'ws-own', occupied: false })).toBeNull()
-    expect(defaultDestinationMove({ destination: destination({ isolateByDefault: false }), workspaceId: 'project', occupied: false })).toBeNull()
-    expect(defaultDestinationMove({ destination: destination({ vcs: 'none' }), workspaceId: 'project', occupied: false })).toBeNull()
+  it('keeps a new thread outside jj unchanged', () => {
+    expect(defaultDestinationMove({ destination: destination({ vcs: 'none' }), workspaceId: 'project' })).toBeNull()
   })
 })
 
 describe('eagerDestinationMove', () => {
-  it('gives a new thread its own workspace without waiting for the Host, unless it already sits alone in one', () => {
-    expect(eagerDestinationMove({ workspaceId: 'project', inThreadWorkspace: false, occupied: false, bookmark: 'main' })).toEqual({
+  it('isolates before the Host answers and excludes an inherited thread workspace from spare reuse', () => {
+    expect(eagerDestinationMove({ workspaceId: 'project', projectWorkspaceId: 'project', bookmark: 'main' })).toEqual({
       isolate: true,
       base: 'main',
       projectWorkspaceId: 'project',
       leaving: null,
       leavingBase: null,
     })
-    expect(eagerDestinationMove({ workspaceId: 'ws-other', inThreadWorkspace: true, occupied: true, bookmark: 'main' })?.isolate).toBe(true)
-    expect(eagerDestinationMove({ workspaceId: 'ws-own', inThreadWorkspace: true, occupied: false, bookmark: 'main' })).toBeNull()
+    expect(eagerDestinationMove({ workspaceId: 'ws-other', projectWorkspaceId: 'project', bookmark: 'main' })).toEqual({
+      isolate: true,
+      base: 'main',
+      projectWorkspaceId: 'project',
+      leaving: null,
+      leavingBase: null,
+      excludeSpareWorkspaceId: 'ws-other',
+    })
   })
 })

@@ -118,9 +118,84 @@
       ]
     },
     {
+      "id": "new-thread-project-default",
+      "title": "New thread returns to its project",
+      "summary": "With isolation off, a blank thread inherited from a prior thread workspace returns to the owning project checkout; with isolation on, it gets a fresh workspace instead of reusing that prior folder.",
+      "reach": [
+        "click button \"New thread\"",
+        "click button \"Choose workspace\"",
+        "fill textbox \"Search projects or enter a folder path\" \"sample\"",
+        "expect option \"sample*\"",
+        "press Enter",
+        "expect button \"main\"",
+        "click checkbox \"workspace\"",
+        "expect text \"sample · thread-*\"",
+        "expect button \"main\"",
+        "expect checkbox \"workspace\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"previous workspace thread\"",
+        "press Enter",
+        "expect text \"previous workspace thread\"",
+        "click button \"New thread\"",
+        "expect textbox \"Describe what you want to build, / commands, @ files or sessions\"",
+        "expect button \"Choose workspace\"",
+        "expect button \"main\"",
+        "expect checkbox \"workspace\""
+      ],
+      "surfaces": ["host", "client", "integration"],
+      "configuration": [],
+      "states": ["previous-thread-workspace", "project-checkout"],
+      "failureModes": [
+        "With isolation off, a blank new thread retains its previous thread workspace instead of returning to its owning project checkout.",
+        "With isolation on, a blank thread reuses its previous thread workspace instead of getting a fresh one."
+      ],
+      "externalDependencies": [
+        {
+          "id": "jj",
+          "boundary": "Fixed-argv jj CLI through the DSH subprocess service with a timeout; workspace provisioning runs no setup commands.",
+          "deterministicFake": "A disposable jj repository is created by the browser journey."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "jj-integration.new-thread-from-thread-workspace-browser-journey",
+          "featureFile": "tooling/dshx/e2e/features/jj-integration.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "jj-integration.new-thread-from-thread-workspace-isolation-browser-journey",
+          "featureFile": "tooling/dshx/e2e/features/jj-integration.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.new-thread-project-workspace-fallback",
+          "file": "plugins/@dshfiles/jj-integration/src/new-thread-workspace.test.ts",
+          "testName": "recovers the selected workspace from cwd while session membership is unavailable"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.main-view-session-selection",
+          "file": "plugins/@dshfiles/jj-integration/src/main-view-session.test.ts",
+          "testName": "prefers the blank New-thread Session over an older retained conversation"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.composer-picker-immediate-selection",
+          "file": "plugins/@dshfiles/jj-integration/src/composer-workspace-navigation.test.ts",
+          "testName": "picks immediately through the native composer without waiting for a Session route"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.new-thread-project-default-move",
+          "file": "plugins/@dshfiles/jj-integration/src/workspace-toggle-machine.test.ts",
+          "testName": "does not reuse the inherited thread workspace when isolation is the default"
+        }
+      ]
+    },
+    {
       "id": "new-thread-background",
       "title": "New thread never waits on jj",
-      "summary": "The sidebar's New thread, the palette and the project picker open the composer at once; with isolation on by default, the blank thread moves to its own jj workspace (the spare when there is one) in the background while the chip names it. The composer stays editable; a submitted message waits only if that move is still in progress. A thread left in another thread's workspace moves back to the project checkout when isolation is off.",
+      "summary": "The sidebar's New thread, the palette and the project picker open the composer at once; with isolation on by default, the blank thread moves to its own jj workspace (a spare when available, but never the inherited source workspace) in the background while the chip names it. The composer stays editable; a submitted message waits only if that move is still in progress. A thread left in another thread's workspace moves back to the project checkout when isolation is off.",
       "reach": [
         "click button \"New thread\"",
         "click button \"Choose workspace\"",
@@ -134,7 +209,8 @@
       "states": ["opening", "preparing", "switching", "settled"],
       "failureModes": [
         "The composer stays editable during preparation; a submitted message is held until the destination Session opens, and native-picker navigation moves its draft, attachments, and structured references without leaving a stale source copy.",
-        "Each New-thread screen is moved at most once; a manual toggle afterwards is never undone."
+        "Each New-thread screen is moved at most once; a manual toggle afterwards is never undone.",
+        "An inherited thread workspace is not reused as the new thread's own destination, even when it is registered as a spare."
       ],
       "externalDependencies": [],
       "verification": [
@@ -168,6 +244,12 @@
         },
         {
           "kind": "unit-test",
+          "id": "jj-integration.new-thread-background-unit-excludes-source-spare",
+          "file": "plugins/@dshfiles/jj-integration/src/workspace-toggle-machine.test.ts",
+          "testName": "does not reuse the inherited thread workspace even when it is also the stored spare"
+        },
+        {
+          "kind": "unit-test",
           "id": "jj-integration.new-thread-background-unit-settled-once",
           "file": "plugins/@dshfiles/jj-integration/src/workspace-toggle-machine.test.ts",
           "testName": "never moves a thread again once the user toggled it"
@@ -176,7 +258,7 @@
           "kind": "unit-test",
           "id": "jj-integration.new-thread-background-unit-eager",
           "file": "plugins/@dshfiles/jj-integration/src/workspace-toggle-machine.test.ts",
-          "testName": "gives a new thread its own workspace without waiting for the Host, unless it already sits alone in one"
+          "testName": "isolates before the Host answers and excludes an inherited thread workspace from spare reuse"
         }
       ]
     },

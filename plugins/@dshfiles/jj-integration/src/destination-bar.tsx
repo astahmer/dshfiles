@@ -12,10 +12,12 @@ import { createActor, useSelector, type ActorRefFrom } from '@dshfiles/plugin-ui
 import { useQuery, type QueryClient } from '@dshfiles/plugin-ui/query'
 import { useApi, useSettings } from '@dshfiles/dshx/client'
 import { HostChip, multiHostApi } from '@dshfiles/multi-host/destination'
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { z } from 'zod'
 import { jjIntegrationApi, threadWorkspaceName } from './api.js'
 import type { JjIntegrationTranslate } from './locales.js'
+import { mainViewSessionId } from './main-view-session.js'
+import { resolveNewThreadWorkspaceId } from './new-thread-workspace.js'
 import { workspaceHasOtherSession } from './thread-session-ownership.js'
 import { jjIntegrationSettings } from './settings.js'
 import {
@@ -35,6 +37,7 @@ export interface DestinationBarServices {
   readonly workspaces: IWorkspaces
   readonly sessions: ISessions
   readonly openWorkspace: (workspaceId: string, signal: AbortSignal) => Promise<void>
+  readonly pickWorkspace: (workspaceId: string) => boolean
   readonly bindWorkspacePicker: (pick: (workspaceId: string) => void) => () => void
   /** Replace the blank thread's composer with the remote one; returns the undo. */
   readonly takeOverComposer: () => () => void
@@ -144,8 +147,8 @@ const useWorkspaceToggle = (actor: WorkspaceToggleActor) => {
   return { ...events, pending, error, busy }
 }
 
-/** The blank New-thread Session in the main view, and whether its workspace already holds another thread's work. */
-const useNewThread = (services: DestinationBarServices, workspaceId: string | null) => {
+/** The selected main-view Session and its workspace; only a blank Session can drive New-thread moves. */
+const useComposerWorkspace = (services: DestinationBarServices, selectedWorkspaceId: string | undefined) => {
   // Read each store through the service on every call, as the rest of this file does; a detached store loses its owner.
   const sessions = useSyncExternalStore(
     useCallback((listener: () => void) => services.sessions.list.subscribe(listener), [services]),
@@ -155,12 +158,26 @@ const useNewThread = (services: DestinationBarServices, workspaceId: string | nu
     useCallback((listener: () => void) => services.workspaces.list.subscribe(listener), [services]),
     useCallback(() => services.workspaces.list.getSnapshot(), [services]),
   )
-  const sessionId = sessions.ids.find(id => (sessions.byId[id]?.retainedBy.mainView ?? 0) > 0)
+  const sessionId = mainViewSessionId(sessions)
   const session = sessionId === undefined ? undefined : sessions.byId[sessionId]
-  if (session === undefined || !session.blank || workspaceId === null) return null
+  if (session === undefined) return null
+  const workspaceId = resolveNewThreadWorkspaceId({
+    selectedWorkspaceId,
+    sessionId: session.id,
+    sessionCwd: session.cwd,
+    workspaces: workspaces.items,
+  })
+  if (workspaceId === undefined) return null
   const workspace = workspaces.items.find(item => item.workspaceId === workspaceId)
-  const occupied = workspaceHasOtherSession({ sessionId: session.id, workspaceSessionIds: workspace?.sessionIds })
-  return { sessionId: session.id, occupied, path: workspace?.path }
+  const completedSessionCount = sessions.ids.filter(id => sessions.byId[id]?.blank === false).length
+  const occupied = session.blank && workspaceHasOtherSession({ sessionId: session.id, workspaceSessionIds: workspace?.sessionIds })
+  return {
+    sessionId: session.blank ? session.id : undefined,
+    visitId: `new-thread:${completedSessionCount}`,
+    workspaceId,
+    occupied: session.blank ? occupied : true,
+    path: workspace?.path ?? session.cwd,
+  }
 }
 
 /**
@@ -177,20 +194,23 @@ export const DestinationBar = (props: {
   const { t, services } = props
   const api = useApi(jjIntegrationApi)
   const [branchOpen, setBranchOpen] = useState(false)
-  const workspaceId = props.workspaceId ?? null
   const toggle = useWorkspaceToggle(props.toggle)
-  const newThread = useNewThread(services, workspaceId)
+  const composerWorkspace = useComposerWorkspace(services, props.workspaceId)
+  const workspaceId = props.workspaceId ?? composerWorkspace?.workspaceId ?? null
   const destination = useQuery({
-    queryKey: ['jj-integration', 'destination', workspaceId ?? '', newThread?.sessionId ?? ''],
+    queryKey: ['jj-integration', 'destination', workspaceId ?? '', composerWorkspace?.sessionId ?? ''],
     // While a new thread is moving, the destination it leaves does not matter; asking would only slow jj down.
     enabled: workspaceId !== null && !toggle.busy,
     queryFn: async ({ signal }) => {
-      const input = newThread === null ? { workspaceId: workspaceId ?? '' } : { workspaceId: workspaceId ?? '', sessionId: newThread.sessionId }
+      const input =
+        composerWorkspace?.sessionId === undefined
+          ? { workspaceId: workspaceId ?? '' }
+          : { workspaceId: workspaceId ?? '', sessionId: composerWorkspace.sessionId }
       try {
         return await runHostRequest({ signal, timeoutMs: 30_000, request: hostSignal => api.destination(input, { signal: hostSignal }) })
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
-        if (newThread === null || !/sessionId|unrecognized|unknown key/iu.test(message)) throw error
+        if (composerWorkspace?.sessionId === undefined || !/sessionId|unrecognized|unknown key/iu.test(message)) throw error
         return runHostRequest({
           signal,
           timeoutMs: 30_000,
@@ -202,11 +222,10 @@ export const DestinationBar = (props: {
   const settings = useSettings(jjIntegrationSettings).value
   const isolateByDefault = settings?.isolateByDefault ?? false
   const bookmark = settings?.bookmark ?? 'main'
-  // One visit per showing of the New-thread screen: DSH hands the same blank Session to the next New thread.
   const [mountId] = useState(() => crypto.randomUUID())
-  const newThreadId = newThread === null ? null : `${mountId}:${newThread.sessionId}`
-  const occupied = destination.data?.ownedByAnotherSession ?? newThread?.occupied ?? true
-  const inThreadWorkspace = newThread?.path === undefined ? null : threadNameOf(newThread.path) !== null
+  const newThreadId = composerWorkspace?.sessionId === undefined ? null : composerWorkspace.visitId
+  const occupied = destination.data?.ownedByAnotherSession ?? composerWorkspace?.occupied ?? true
+  const inThreadWorkspace = composerWorkspace?.path === undefined ? null : threadNameOf(composerWorkspace.path) !== null
 
   // A New thread opens its composer at once wherever it was started; the machine then moves it, in the background,
   // to where new threads start by default (its own jj workspace, or the project checkout).
@@ -215,16 +234,31 @@ export const DestinationBar = (props: {
     if (newThreadId === null || workspaceId === null) return
     arrive({ visitId: newThreadId, workspaceId, isolateByDefault })
     if (!isolateByDefault || inThreadWorkspace === null) return
-    // A shared workspace can move immediately; a seemingly exclusive one still waits for the Host's ownership check.
-    const request = eagerDestinationMove({ workspaceId, inThreadWorkspace, occupied, bookmark })
-    if (request !== null) resolved(newThreadId, request)
-  }, [arrive, bookmark, inThreadWorkspace, isolateByDefault, newThreadId, occupied, resolved, workspaceId])
+    // Use the owning checkout when known, and never reuse the inherited thread workspace as its own spare.
+    resolved(
+      newThreadId,
+      eagerDestinationMove({
+        workspaceId,
+        projectWorkspaceId: destination.data?.projectWorkspaceId ?? workspaceId,
+        bookmark,
+      }),
+    )
+  }, [arrive, bookmark, destination.data?.projectWorkspaceId, inThreadWorkspace, isolateByDefault, newThreadId, resolved, workspaceId])
   useEffect(() => {
     if (newThreadId === null || workspaceId === null || destination.data === undefined) return
-    resolved(newThreadId, defaultDestinationMove({ destination: destination.data, workspaceId, occupied }))
-  }, [destination.data, newThreadId, occupied, resolved, workspaceId])
+    resolved(newThreadId, defaultDestinationMove({ destination: destination.data, workspaceId }))
+  }, [destination.data, newThreadId, resolved, workspaceId])
 
   const current = destination.data
+  const rootSelectionHandledFor = useRef<string | null>(null)
+  const rootSelectionVisitId = composerWorkspace?.visitId ?? mountId
+  useEffect(() => {
+    if (rootSelectionHandledFor.current === rootSelectionVisitId || workspaceId === null || current === undefined || toggle.busy) return
+    rootSelectionHandledFor.current = rootSelectionVisitId
+    if (newThreadId !== null || current.vcs !== 'jj' || !current.isolated || current.projectWorkspaceId === null || current.projectWorkspaceId === workspaceId)
+      return
+    services.pickWorkspace(current.projectWorkspaceId)
+  }, [current, newThreadId, rootSelectionVisitId, services, toggle.busy, workspaceId])
   const projectId = current?.projectWorkspaceId ?? workspaceId ?? ''
   const isJj = current?.vcs === 'jj'
   const isolated = toggle.pending?.isolate ?? current?.isolated === true

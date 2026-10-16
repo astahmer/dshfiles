@@ -29,6 +29,26 @@ Feature: jj thread workspaces
     When No folder is chosen as the New thread project
     Then the destination bar offers neither a bookmark nor a workspace toggle
 
+  @scenario:jj-integration.new-thread-from-thread-workspace-browser-journey
+  Scenario: A blank thread returns to its owning project instead of inheriting a prior thread workspace
+    Given the isolated plugin composition of "@dshfiles/jj-integration, @dshfiles/workspace-folder-picker, @dshfiles/home, @dshfiles/thread-sidebar, @dshfiles/multi-host" is booted
+    And new threads start in the shared checkout by default
+    When a disposable jj repository is chosen as the New thread project
+    And the New thread workspace toggle is turned on
+    And a message is sent in the thread workspace
+    And New thread is clicked in the sidebar
+    Then the blank new thread returns to the owning project checkout
+
+  @scenario:jj-integration.new-thread-from-thread-workspace-isolation-browser-journey
+  Scenario: A blank thread gets a fresh workspace instead of reusing the previous one
+    Given the isolated plugin composition of "@dshfiles/jj-integration, @dshfiles/workspace-folder-picker, @dshfiles/home, @dshfiles/thread-sidebar, @dshfiles/multi-host" is booted
+    When a disposable jj repository is chosen as the New thread project
+    And the New thread workspace toggle is turned on
+    And a message is sent in the thread workspace
+    And new threads start in their own jj workspace by default
+    And New thread is clicked in the sidebar
+    Then the blank new thread uses a different jj workspace from the previous thread
+
   @scenario:jj-integration.new-thread-background-browser-journey
   Scenario: New thread opens its composer at once and gets its own workspace in the background
     Given the isolated plugin composition of "@dshfiles/jj-integration, @dshfiles/workspace-folder-picker, @dshfiles/home, @dshfiles/thread-sidebar, @dshfiles/multi-host" is booted

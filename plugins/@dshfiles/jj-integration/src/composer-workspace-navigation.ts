@@ -21,6 +21,12 @@ export const createComposerWorkspaceNavigation = (input: {
     }
   }
 
+  const pickWorkspace = (workspaceId: string): boolean => {
+    if (pick === undefined) return false
+    pick(workspaceId)
+    return true
+  }
+
   const open = (workspaceId: string, signal: AbortSignal): Promise<void> => {
     signal.throwIfAborted()
     if (input.selectedWorkspace() === workspaceId) return Promise.resolve()
@@ -66,5 +72,5 @@ export const createComposerWorkspaceNavigation = (input: {
     })
   }
 
-  return { bind, open }
+  return { bind, open, pickWorkspace }
 }
