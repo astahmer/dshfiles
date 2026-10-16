@@ -15,7 +15,7 @@ import { z } from 'zod'
 import { jjIntegrationApi, type DestinationView, type LandResult, type RepositoryView, type ThreadView, type WorkspaceSyncView } from './api.js'
 import { JsonText } from './json-text.js'
 import { jjIntegrationSettings, type JjIntegrationSettings } from './settings.js'
-import { canRebaseThreadIfKnown, hasPendingUserQuestion, type ThreadSessionActivity } from './thread-rebase-eligibility.js'
+import { canRebaseThreadIfKnown, hasPendingUserQuestion, rebaseGuardSessionIds, type ThreadSessionActivity } from './thread-rebase-eligibility.js'
 import { workspaceHasOtherSession } from './thread-session-ownership.js'
 import { registeredProjects } from './registered-projects.js'
 import {
@@ -368,7 +368,12 @@ const landThread = async (input: {
     const workspace = await registry.resolveByPath(location.workspaceRoot)
     if (workspace === undefined) throw new PluginApiError('Could not verify thread activity before rebasing.', { code: 'thread-activity-unknown' })
     const activity = await readSessionActivity()
-    if (!canRebaseWorkspace(workspace.sessionIds, activity)) {
+    const guardSessionIds = rebaseGuardSessionIds({
+      sessionIds: workspace.sessionIds,
+      fromAgent: input.fromAgent,
+      sessionId: input.sessionId,
+    })
+    if (!canRebaseWorkspace(guardSessionIds, activity)) {
       throw new PluginApiError('Finish all work and answer pending questions before rebasing this thread.', { code: 'thread-active' })
     }
   }

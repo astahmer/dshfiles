@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { canRebaseFromClientSnapshot, canRebaseThread, canRebaseThreadIfKnown, hasPendingUserQuestion } from './thread-rebase-eligibility.js'
+import {
+  canRebaseFromClientSnapshot,
+  canRebaseThread,
+  canRebaseThreadIfKnown,
+  hasPendingUserQuestion,
+  rebaseGuardSessionIds,
+} from './thread-rebase-eligibility.js'
 
 describe('thread rebase eligibility', () => {
   it('allows a thread with no sessions', () => {
@@ -50,5 +56,32 @@ describe('thread rebase eligibility', () => {
     expect(hasPendingUserQuestion({ userQuestions: { active: [] } })).toBe(false)
     expect(hasPendingUserQuestion({})).toBeUndefined()
     expect(hasPendingUserQuestion(undefined)).toBeUndefined()
+  })
+})
+
+describe('rebase guard session scope', () => {
+  it('exempts the calling agent so it can rebase its own thread after a handed-back problem', () => {
+    expect(rebaseGuardSessionIds({ sessionIds: ['agent'], fromAgent: true, sessionId: 'agent' })).toEqual([])
+  })
+
+  it('keeps another working session of the same thread in scope', () => {
+    expect(rebaseGuardSessionIds({ sessionIds: ['agent', 'sibling'], fromAgent: true, sessionId: 'agent' })).toEqual(['sibling'])
+  })
+
+  it('keeps the caller in scope for the UI and /rebase paths', () => {
+    expect(rebaseGuardSessionIds({ sessionIds: ['agent'], fromAgent: false, sessionId: 'agent' })).toEqual(['agent'])
+  })
+
+  it('keeps a supervisor in scope when it rebases another thread', () => {
+    expect(rebaseGuardSessionIds({ sessionIds: ['worker'], fromAgent: true, sessionId: 'supervisor' })).toEqual(['worker'])
+  })
+
+  it('exempts nothing when the agent session id is unknown', () => {
+    expect(rebaseGuardSessionIds({ sessionIds: ['agent'], fromAgent: true, sessionId: undefined })).toEqual(['agent'])
+  })
+
+  it('lets the exempted caller rebase while its own activity is unknown', () => {
+    const guardSessionIds = rebaseGuardSessionIds({ sessionIds: ['agent'], fromAgent: true, sessionId: 'agent' })
+    expect(canRebaseThreadIfKnown(guardSessionIds, new Map())).toBe(true)
   })
 })

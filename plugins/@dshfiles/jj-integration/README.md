@@ -58,7 +58,8 @@ repository. The command accepts no arguments and refuses from any workspace
 that is not a managed thread workspace (including a shared checkout), where
 there is no safe per-thread target to rebase. Rebase is available only
 after every Session in the thread has stopped running and no question is waiting
-for an answer:
+for an answer, except the calling agent's own session (see the hand-back note
+below):
 
 1. Abandon empty leftovers between `main` and `@`.
 2. Refuse revisions described as nothing or `wip`.
@@ -78,7 +79,11 @@ for an answer:
 
 When Rebase stops on conflicts or descriptions, it queues a message asking the
 thread's agent to fix them and rebase again with `/rebase` or the
-`jj_thread_rebase` tool (`askAgentToFixLanding`). Nothing is pushed.
+`jj_thread_rebase` tool (`askAgentToFixLanding`). Nothing is pushed. That
+handed-back agent is the one session exempt from the idle check above: it cannot
+resolve conflicts and then rebase while its own turn still counts as running.
+Every other session of the thread must be idle, and the UI paths keep the caller
+in scope, so Rebase stays refused while a user's session works.
 
 After a successful rebase, the conversation notice shows the target bookmark and
 12-character tip change ID. Its **Archive** action archives only that Session

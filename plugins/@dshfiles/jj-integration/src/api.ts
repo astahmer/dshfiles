@@ -135,7 +135,7 @@ export const jjIntegrationApi = defineApi({
       input: z.object({ path: z.string().min(1), sessionId: z.string().optional() }).strict(),
       output: landResultSchema,
       description:
-        'Rebase the thread at a path: move its described revisions onto the target bookmark and advance the bookmark. Never pushes. Refuses while any thread session is running or waiting for input.',
+        'Rebase the thread at a path: move its described revisions onto the target bookmark and advance the bookmark. Never pushes. Refuses while any thread session is running or waiting for input; the calling agent may rebase its own thread once it resolved a handed-back problem.',
     }),
     threadStatus: method({
       input: threadPathInput,
@@ -155,7 +155,7 @@ export const jjIntegrationApi = defineApi({
       input: threadPathInput,
       output: z.object({ summary: z.string(), result: landResultSchema.nullable() }).strict(),
       description:
-        'Rebase this thread’s described work onto the target bookmark (main by default) and advance the bookmark. Refuses while any thread session is running or waiting for input, refuses undescribed revisions, reports conflicts to resolve, and never pushes. Call only when the user asked to rebase this thread’s work.',
+        'Rebase this thread’s described work onto the target bookmark (main by default) and advance the bookmark. An agent calling it for its own thread is exempt from its own running session, so it can rebase again after resolving handed-back conflicts or descriptions; every other thread session must still be idle and free of pending questions. It refuses undescribed revisions, reports conflicts to resolve, and never pushes. Call only when the user asked to rebase this thread’s work.',
       tool: { name: 'jj_thread_rebase', render: output => output.summary },
     }),
     workspaceSync: method({

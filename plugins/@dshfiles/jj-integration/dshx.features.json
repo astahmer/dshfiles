@@ -265,7 +265,7 @@
     {
       "id": "rebase",
       "title": "Rebase a thread onto the bookmark",
-      "summary": "The conversation header identifies the current thread's jj workspace and opens its workspace panel. Rebase a thread's described work onto the target bookmark and advance it from the thread header, panel, or `/rebase` composer command. The in-chat notice shows the tip change ID and offers Archive for the current thread. The command refuses non-thread workspaces and Rebase is disabled while any thread session is working or waiting for input. Conflicts and undescribed revisions are handed back to the thread's agent. Afterwards the checkout running DSH follows the bookmark in the background through `dshx checkout sync`, with a panel line saying what was rebuilt and whether to restart.",
+      "summary": "The conversation header identifies the current thread's jj workspace and opens its workspace panel. Rebase a thread's described work onto the target bookmark and advance it from the thread header, panel, or `/rebase` composer command. The in-chat notice shows the tip change ID and offers Archive for the current thread. The command refuses non-thread workspaces and Rebase is disabled while any thread session is working or waiting for input; an agent handed back conflicts or descriptions may rebase its own thread once they are fixed, while every other session of that thread must still be idle. Afterwards the checkout running DSH follows the bookmark in the background through `dshx checkout sync`, with a panel line saying what was rebuilt and whether to restart.",
       "reach": [
         "seed rebase-ready-thread",
         "expect button \"Rebase this thread onto main\"",
@@ -305,7 +305,7 @@
         "The `/rebase` command refuses non-thread workspaces because they have no safe per-thread workspace boundary.",
         "A conflict leaves the bookmark where it was.",
         "Placeholder descriptions (empty or wip) are refused.",
-        "Rebase is refused while any thread session is running or waiting for input.",
+        "Rebase is refused while any thread session is running or waiting for input, except the calling agent's own session.",
         "Archive from the rebase notice affects only the current Session and is disabled while it is running.",
         "The post-rebase checkout sync refuses described work the bookmark lacks and undoes a conflicting rebase; the panel line names the files and the rebase itself stands."
       ],
@@ -415,7 +415,7 @@
         "Work that appears after the removal dialog opened is refused by the Host and never deleted unseen; the dialog asks for a refresh.",
         "A Host error while removing stays in the dialog with a retry.",
         "Removal deletes the jj workspace and folder but retains conversation sessions in DSH without changing their archive state.",
-        "Rebase stays disabled while any thread session is running or has a pending user question, and the Host rejects direct calls under the same conditions."
+        "Rebase stays disabled while any thread session is running or has a pending user question, and the Host rejects direct calls under the same conditions except for the calling agent's own session."
       ],
       "externalDependencies": [
         {
