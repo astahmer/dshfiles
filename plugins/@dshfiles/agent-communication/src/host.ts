@@ -16,7 +16,7 @@ import { createAgentCommunicationOperations } from './api-operations.js'
 import { initializeCommunicationAgent } from './agent-lifecycle.js'
 import { LiveAgentDirectoryModel } from './live-agent-directory.js'
 import { formatInbox } from './messages.js'
-import { createSessionHistorySearchRequest, projectSessionHistoryPage, sessionHistorySearchInputSchema } from './session-history.js'
+import { SessionHistoryModel } from './session-history.js'
 
 declare module '@deepseek-ai/cordis' {
   interface Events {
@@ -182,7 +182,7 @@ const historySearchTool = defineTool({
       operation: 'dshx_comm_history',
       run: async () => {
         if (hostContext === undefined) throw new Error('Agent communication Host is not active.')
-        const input = sessionHistorySearchInputSchema.parse(args)
+        const input = SessionHistoryModel.searchInputSchema.parse(args)
         const caller = execution.agent
         if (caller === undefined) return { summary: JSON.stringify({ status: 'caller-unavailable' }) }
 
@@ -206,7 +206,7 @@ const historySearchTool = defineTool({
 
         try {
           const page = await sessionQuery.searchEvents(
-            createSessionHistorySearchRequest({
+            SessionHistoryModel.createSessionHistorySearchRequest({
               sessionId: target.agent.id,
               query: input.query,
               limit: input.limit ?? 8,
@@ -216,7 +216,7 @@ const historySearchTool = defineTool({
           )
           return {
             summary: JSON.stringify(
-              projectSessionHistoryPage({
+              SessionHistoryModel.projectSessionHistoryPage({
                 page,
                 sessionId: target.agent.id,
                 runtimeOwnerSessionId: target.owner.id,

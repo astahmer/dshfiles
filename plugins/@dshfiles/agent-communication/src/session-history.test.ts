@@ -1,11 +1,11 @@
 import { SESSION_FORMAT_VERSION, SessionId, SessionSeq } from '@deepseek-ai/dsh-session'
 import { SessionSearchCursor, type SessionEventSearchPage } from '@deepseek-ai/dsh-session-query'
 import { describe, expect, it } from 'vitest'
-import { createSessionHistorySearchRequest, projectSessionHistoryPage, sessionHistorySearchInputSchema } from './session-history.js'
+import { SessionHistoryModel } from './session-history.js'
 
 describe('Agent session history search', () => {
   it('validates bounded inputs and normalizes literal queries', () => {
-    const parsed = sessionHistorySearchInputSchema.parse({
+    const parsed = SessionHistoryModel.searchInputSchema.parse({
       sessionId: 'child-session',
       query: '  visible result  ',
       limit: 10,
@@ -14,10 +14,10 @@ describe('Agent session history search', () => {
 
     expect(parsed.query).toBe('visible result')
     expect(parsed.limit).toBe(10)
-    expect(sessionHistorySearchInputSchema.safeParse({ sessionId: 'child-session', query: ' ' }).success).toBe(false)
-    expect(sessionHistorySearchInputSchema.safeParse({ sessionId: 'child-session', query: 'x', limit: 11 }).success).toBe(false)
+    expect(SessionHistoryModel.searchInputSchema.safeParse({ sessionId: 'child-session', query: ' ' }).success).toBe(false)
+    expect(SessionHistoryModel.searchInputSchema.safeParse({ sessionId: 'child-session', query: 'x', limit: 11 }).success).toBe(false)
     expect(
-      sessionHistorySearchInputSchema.safeParse({
+      SessionHistoryModel.searchInputSchema.safeParse({
         sessionId: 'child-session',
         query: 'x',
         cursor: 'x'.repeat(4097),
@@ -26,7 +26,7 @@ describe('Agent session history search', () => {
   })
 
   it('searches only visible messages with a canonical continuation cursor', () => {
-    const request = createSessionHistorySearchRequest({
+    const request = SessionHistoryModel.createSessionHistorySearchRequest({
       sessionId: SessionId('child-session'),
       query: 'visible result',
       limit: 3,
@@ -41,7 +41,7 @@ describe('Agent session history search', () => {
       cursor: SessionSearchCursor('opaque-cursor'),
     })
 
-    const firstPage = createSessionHistorySearchRequest({
+    const firstPage = SessionHistoryModel.createSessionHistorySearchRequest({
       sessionId: SessionId('child-session'),
       query: 'visible result',
       limit: 3,
@@ -73,7 +73,7 @@ describe('Agent session history search', () => {
       nextCursor: SessionSearchCursor('opaque-next-page'),
     }
 
-    const projected = projectSessionHistoryPage({
+    const projected = SessionHistoryModel.projectSessionHistoryPage({
       page,
       sessionId,
       runtimeOwnerSessionId: SessionId('parent-session'),
@@ -124,7 +124,7 @@ describe('Agent session history search', () => {
       nextCursor: SessionSearchCursor('next-page'),
     }
 
-    const projected = projectSessionHistoryPage({
+    const projected = SessionHistoryModel.projectSessionHistoryPage({
       page,
       sessionId,
       runtimeOwnerSessionId: SessionId('parent-session'),
@@ -148,7 +148,7 @@ describe('Agent session history search', () => {
       nextCursor: SessionSearchCursor('x'.repeat(4097)),
     }
 
-    const projected = projectSessionHistoryPage({
+    const projected = SessionHistoryModel.projectSessionHistoryPage({
       page,
       sessionId,
       runtimeOwnerSessionId: SessionId('parent-session'),
@@ -174,7 +174,7 @@ describe('Agent session history search', () => {
       nextCursor: SessionSearchCursor(''),
     }
 
-    const projected = projectSessionHistoryPage({
+    const projected = SessionHistoryModel.projectSessionHistoryPage({
       page,
       sessionId,
       runtimeOwnerSessionId: SessionId('parent-session'),

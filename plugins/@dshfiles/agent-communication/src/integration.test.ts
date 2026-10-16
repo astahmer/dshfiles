@@ -9,7 +9,7 @@ import { createCommunicationService, type CommunicationService } from '@dshfiles
 import { initializeCommunicationAgent } from './agent-lifecycle.js'
 import { createAgentCommunicationOperations } from './api-operations.js'
 import { LiveAgentDirectoryModel } from './live-agent-directory.js'
-import { createSessionHistorySearchRequest, projectSessionHistoryPage } from './session-history.js'
+import { SessionHistoryModel } from './session-history.js'
 
 interface TestAgent {
   readonly id: string
@@ -168,8 +168,10 @@ describe('Agent communication integration', () => {
       },
     }
 
-    const projected = projectSessionHistoryPage({
-      page: await sessionQuery.searchEvents(createSessionHistorySearchRequest({ sessionId, query: 'visible', limit: 8, cursor: undefined })),
+    const projected = SessionHistoryModel.projectSessionHistoryPage({
+      page: await sessionQuery.searchEvents(
+        SessionHistoryModel.createSessionHistorySearchRequest({ sessionId, query: 'visible', limit: 8, cursor: undefined }),
+      ),
       sessionId,
       runtimeOwnerSessionId: SessionId(orchestrator.id),
     })
