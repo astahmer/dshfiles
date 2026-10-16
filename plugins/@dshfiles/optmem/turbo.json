@@ -27,18 +27,13 @@
         "$TURBO_ROOT$/plugins/@dshfiles/shared-runtime/package.json",
         "$TURBO_ROOT$/pnpm-lock.yaml",
         "$TURBO_ROOT$/profiles/web/**",
-        "$TURBO_ROOT$/tooling/dshx/e2e/fixtures/**",
-        "$TURBO_ROOT$/tooling/dshx/e2e/support/*",
         "$TURBO_ROOT$/tooling/dshx/package.json",
         "$TURBO_ROOT$/tooling/dshx/packages/dshx/cordis.patch.yml",
         "$TURBO_ROOT$/tooling/dshx/packages/dshx/package.json",
-        "$TURBO_ROOT$/tooling/dshx/packages/dshx/src/**",
-        "$TURBO_ROOT$/tooling/dshx/playwright.e2e.config.ts",
         "$TURBO_ROOT$/tooling/dshx/scripts/boot-check-web.mjs",
         "$TURBO_ROOT$/tooling/dshx/scripts/boot-ignore.json",
         "$TURBO_ROOT$/tooling/dshx/scripts/browser-tasks.mjs",
-        "$TURBO_ROOT$/tooling/dshx/scripts/plugin-inventory.mjs",
-        "$TURBO_ROOT$/tooling/dshx/scripts/run-e2e.mjs"
+        "$TURBO_ROOT$/tooling/dshx/scripts/plugin-inventory.mjs"
       ],
       "outputs": [],
       "env": ["CI", "DSHX_TOOL_VERSIONS"],
@@ -99,7 +94,6 @@
         "$TURBO_ROOT$/tooling/dshx/package.json",
         "$TURBO_ROOT$/tooling/dshx/packages/dshx/cordis.patch.yml",
         "$TURBO_ROOT$/tooling/dshx/packages/dshx/package.json",
-        "$TURBO_ROOT$/tooling/dshx/packages/dshx/src/**",
         "$TURBO_ROOT$/tooling/dshx/playwright.e2e.config.ts",
         "$TURBO_ROOT$/tooling/dshx/scripts/browser-tasks.mjs",
         "$TURBO_ROOT$/tooling/dshx/scripts/run-e2e.mjs"

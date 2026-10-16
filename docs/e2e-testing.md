@@ -150,23 +150,31 @@ generates those scripts and each package's `turbo.json` from the feature files;
 `dshx check` runs it without `--write` and fails on drift, so add or retag a
 feature, then regenerate.
 
-A task's key is what it actually runs, never a build hash: plugin-ui's build
-reads every plugin's sources for the shared stylesheet, so every build hash
-moves together while most bundles' `dist` does not. The inputs are:
+A task's key is what it actually runs, never a build hash and never the sources
+behind the built artifact: plugin-ui's build reads every plugin's sources for
+the shared stylesheet, so every build hash moves together while most bundles'
+`dist` does not. The inputs are:
 
 - a digest of the runtime `dist`, the `package.json` and the
   `cordis.patch.yml` of every bundle the package's journeys boot (the packages
   their Given steps name, every bundle for a step that boots the web profile)
-  and of their workspace dependencies. The digest leaves out `*.map` and
-  `*.d.ts`: a formatting-only change to plugin-ui rewrites the source maps of
-  every bundle that inlines it while their JavaScript stays byte-identical, so
-  hashing maps would rerun all their journeys for nothing;
+  and of their workspace dependencies, dshx included. The digest leaves out
+  `*.map` and `*.d.ts`: a formatting-only change to plugin-ui rewrites the
+  source maps of every bundle that inlines it while their JavaScript stays
+  byte-identical, so hashing maps would rerun all their journeys for nothing.
+  A dshx source edit that compiles to the same JavaScript therefore keeps the
+  browser tasks cached, while one that changes the boot check invalidates them
+  through the rebuilt digest;
 - its feature files and the step files their steps match (plus the step files
   those import); a step no expression matches makes the package depend on every
   step file and bundle, and the planner test fails on it;
-- the shared harness (`e2e/support/*`, fixtures, the Playwright config, dshx
-  `src`/`dist`), `pnpm-lock.yaml` (DSH, Playwright and Chromium versions) and
-  the `profiles/web` seed;
+- `pnpm-lock.yaml` (DSH, Playwright and Chromium versions) and the
+  `profiles/web` seed, for every browser task;
+- the journey harness (`e2e/support/*`, fixtures, the Playwright config,
+  `run-e2e.mjs`) for `test:e2e`, and `boot-check-web.mjs`, `plugin-inventory.mjs`
+  and `boot-ignore.json` for `test:boot`: the boot gate runs its own entry point
+  and never loads the journey harness, so editing a shared step file must not
+  rerun forty boots;
 - env `CI` and `DSHX_TOOL_VERSIONS` (the `jj --version` the Host runs).
 
 Journeys and boots copy registry dependencies from the checked-in
@@ -177,10 +185,19 @@ see its own `dist` and the `plugins` workspace would see none: the entry points
 write each package's digest to `.turbo/browser-dist/` after building, and
 tasks key on those files.
 
+Every JJ workspace of this repository shares one Turbo cache,
+`${XDG_CACHE_HOME:-$HOME/.cache}/dshfiles/turbo` (`scripts/turbo-cache.mjs`,
+exported by the dev shell and passed on by the check entry points). Turbo keys a
+task on the content of its inputs, not on the directory it runs in, so a fresh
+thread workspace replays the builds and browser checks another workspace already
+ran; a per-workspace `.turbo/cache` starts empty, which is what made a
+plugin-only change re-boot every bundle once per workspace.
+
 To bust the cache: `--force` reruns everything (do it after changing anything
 the inputs above cannot see, such as a system binary other than jj), and
-deleting `.turbo/cache` clears it for every task. A result is only as fresh as
-the built bundles, which is why the entry points always build first.
+deleting that shared directory clears it for every task and workspace. A result
+is only as fresh as the built bundles, which is why the entry points always
+build first.
 
 In CI, `check.yml` runs `pnpm check`, which includes `features:check`, the
 web-profile boot and the `@smoke` journeys. `plugin-e2e-coverage.yml` runs the
