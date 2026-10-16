@@ -1,13 +1,13 @@
 import { waitFor } from '@dshfiles/plugin-ui/machine'
 import { describe, expect, it } from 'vitest'
-import { decodeQueuedRows, type QueuedBlock, type QueuedRow } from './queue-edit.js'
+import { QueueEditModel, type QueuedBlock, type QueuedRow } from './queue-edit.js'
 import { startQueueTransfer, transferTargets, type QueueTransferPorts, type TransferDestination } from './queue-transfer.js'
 
 const text = (value: string): QueuedBlock => ({ type: 'text', text: value })
 const image = (name: string): QueuedBlock => ({ type: 'image', attachment: { attachmentId: `stored:${name}`, mediaType: 'image/png', name } })
 const file = (name: string): QueuedBlock => ({ type: 'file', attachment: { attachmentId: `stored:${name}`, name, bytes: 3 } })
 const rowOf = (id: string, content: readonly QueuedBlock[]): QueuedRow => {
-  const row = decodeQueuedRows({ 'next-turn': [{ id, content }] })[0]
+  const row = QueueEditModel.decodeQueuedRows({ 'next-turn': [{ id, content }] })[0]
   if (row === undefined) throw new Error('row did not decode')
   return row
 }

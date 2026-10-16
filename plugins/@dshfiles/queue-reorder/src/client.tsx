@@ -13,7 +13,7 @@ import type { ComposedProps } from '@deepseek-ai/dsh-client-ui-slots'
 import { queueApi } from './api.js'
 import { attachmentPreviews, messagePreview } from './message-preview.js'
 import { QueuedAttachments, type ReadQueuedImage } from './queued-attachments.js'
-import { decodeQueuedRows, restoredIndex, type QueueEditor, type QueueEditView, type QueuedRow } from './queue-edit.js'
+import { QueueEditModel, type QueueEditor, type QueueEditView, type QueuedRow } from './queue-edit.js'
 import { useQueueClientForEditing } from './session-queue-editor.js'
 import { QueueTransferDialog } from './queue-transfer-dialog.js'
 import { transferTargets, useQueueTransfer, type QueueTransferActor, type TransferOutcome } from './queue-transfer.js'
@@ -142,7 +142,7 @@ export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
   const expandByDefault = preferences.value?.expandByDefault ?? true
   const previewLength = preferences.value?.previewLength ?? 200
   const showAttachments = preferences.value?.attachmentPreviews ?? true
-  const rows = useMemo(() => decodeQueuedRows(inbox), [inbox])
+  const rows = useMemo(() => QueueEditModel.decodeQueuedRows(inbox), [inbox])
   const rowCount = rows.length
 
   const running = props.useSession((state: SessionState) => state.running)
@@ -220,7 +220,7 @@ export const DraggableQueueDock = (props: DockProps): JSX.Element | null => {
   const listVisible = listCount === 1 || expanded
 
   const dragEnabled = queueMutable && !queueEditActive && busy === null
-  const placeholderIndex = record === null ? -1 : restoredIndex({ rows, before: record.before })
+  const placeholderIndex = record === null ? -1 : QueueEditModel.restoredIndex({ rows, before: record.before })
   const placeholderPreview =
     record === null
       ? ''

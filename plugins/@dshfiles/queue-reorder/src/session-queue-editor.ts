@@ -10,8 +10,7 @@ import { z } from 'zod'
 import type { queueApi } from './api.js'
 import {
   createQueueEditor,
-  decodeQueuedRows,
-  promptPartsFor,
+  QueueEditModel,
   queueEditRecordsSchema,
   type PromptPart,
   type QueuedFileAttachment,
@@ -197,7 +196,7 @@ const createEditor = (input: {
     },
   }
   return createQueueEditor<DraftAttachmentId, SubmitAttachment>({
-    queue: { getSnapshot: memoized(() => inbox.getSnapshot(), decodeQueuedRows), subscribe: listener => inbox.subscribe(listener) },
+    queue: { getSnapshot: memoized(() => inbox.getSnapshot(), QueueEditModel.decodeQueuedRows), subscribe: listener => inbox.subscribe(listener) },
     pendingRequestIds: {
       getSnapshot: memoized(
         () => input.session.getSnapshot(),
@@ -333,7 +332,7 @@ export const sessionQueueTransfer = (ctx: Context, sessionId: SessionFace['sessi
       ),
     remove: io.remove,
     restore: async input => {
-      await io.enqueue(promptPartsFor(input.blocks, await serializeFiles(source.drafts, sessionId, input.files)))
+      await io.enqueue(QueueEditModel.promptPartsFor(input.blocks, await serializeFiles(source.drafts, sessionId, input.files)))
     },
     deliver: async input => {
       const targetId = ctx.sessions.list.getSnapshot().ids.find(id => id === input.target.id)
@@ -345,7 +344,7 @@ export const sessionQueueTransfer = (ctx: Context, sessionId: SessionFace['sessi
         if (conversation === undefined) throw new Error('that thread has no composer')
         if (target.session.getSnapshot().running) {
           await sessionQueueIo({ sessionId: targetId, session: target.session }).enqueue(
-            promptPartsFor(input.blocks, await serializeFiles(conversation.drafts, targetId, input.files)),
+            QueueEditModel.promptPartsFor(input.blocks, await serializeFiles(conversation.drafts, targetId, input.files)),
           )
           return 'queue'
         }

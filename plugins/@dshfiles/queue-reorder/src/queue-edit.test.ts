@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'vitest'
-import { createQueueEditor, decodeQueuedRows, restoredIndex, type QueueEditRecord, type QueuedBlock } from './queue-edit.js'
+import { createQueueEditor, QueueEditModel, type QueueEditRecord, type QueuedBlock } from './queue-edit.js'
 
 interface RawRow {
   readonly id: string
@@ -72,7 +72,7 @@ const createWorld = (options: { readonly running?: boolean } = {}) => {
   }
 
   const ports = {
-    queue: { getSnapshot: () => decodeQueuedRows({ 'next-turn': world.rows }), subscribe: queueSubject.subscribe },
+    queue: { getSnapshot: () => QueueEditModel.decodeQueuedRows({ 'next-turn': world.rows }), subscribe: queueSubject.subscribe },
     pendingRequestIds: { getSnapshot: () => world.pending, subscribe: pendingSubject.subscribe },
     composer: {
       getSnapshot: () => world.composer,
@@ -197,7 +197,7 @@ const createWorld = (options: { readonly running?: boolean } = {}) => {
   return { world, ports, enqueueRow, finishTurn, editor: () => createQueueEditor(ports) }
 }
 
-const rowsOf = (world: { readonly rows: readonly RawRow[] }) => decodeQueuedRows({ 'next-turn': world.rows })
+const rowsOf = (world: { readonly rows: readonly RawRow[] }) => QueueEditModel.decodeQueuedRows({ 'next-turn': world.rows })
 const textsOf = (world: { readonly rows: readonly RawRow[] }) =>
   world.rows.map(row => row.content.flatMap(block => (block.type === 'text' ? [block.text] : [`[${block.attachment.name}]`])).join(' '))
 
@@ -222,7 +222,7 @@ test('Edit moves the text and attachments into the composer and keeps the user d
   const record = queueEditor.getSnapshot().record
   assert.equal(record?.status, 'editing')
   assert.equal(record?.backupDraft, 'unsent idea')
-  assert.equal(restoredIndex({ rows: rowsOf(world), before: record?.before ?? [] }), 1)
+  assert.equal(QueueEditModel.restoredIndex({ rows: rowsOf(world), before: record?.before ?? [] }), 1)
 })
 
 test('Submit queues the edited message, with its attachments, back at the same position', async () => {
@@ -407,7 +407,7 @@ test('A restore that fails stays recoverable until retried', async () => {
 })
 
 test('decodeQueuedRows tolerates malformed rows and marks unknown blocks as not editable', () => {
-  const rows = decodeQueuedRows({
+  const rows = QueueEditModel.decodeQueuedRows({
     'next-turn': [
       { id: 'ok', content: [{ type: 'text', text: 'hi' }], source: { kind: 'user', rpcId: 'r1' } },
       { id: 'odd', content: [{ type: 'text', text: 'hi' }, { type: 'audio' }] },
@@ -422,6 +422,6 @@ test('decodeQueuedRows tolerates malformed rows and marks unknown blocks as not 
       ['odd', false, undefined],
     ],
   )
-  assert.deepEqual(decodeQueuedRows(undefined), [])
-  assert.deepEqual(decodeQueuedRows({ 'next-turn': 'nope' }), [])
+  assert.deepEqual(QueueEditModel.decodeQueuedRows(undefined), [])
+  assert.deepEqual(QueueEditModel.decodeQueuedRows({ 'next-turn': 'nope' }), [])
 })

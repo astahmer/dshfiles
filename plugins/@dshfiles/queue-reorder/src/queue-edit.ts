@@ -57,7 +57,7 @@ export interface QueuedRow {
 }
 
 /** Decode the Host `inbox` projection once, tolerating fields an older or newer Host shapes differently. */
-export const decodeQueuedRows = (value: unknown): readonly QueuedRow[] => {
+const decodeQueuedRows = (value: unknown): readonly QueuedRow[] => {
   const inbox = inboxSchema.safeParse(value)
   if (!inbox.success) return []
   return inbox.data['next-turn'].flatMap(raw => {
@@ -173,13 +173,13 @@ export interface QueueEditor {
 }
 
 /** Where the edited message goes back: after every message that was ahead of it and is still queued. */
-export const restoredIndex = (input: { readonly rows: readonly QueuedRow[]; readonly before: readonly string[]; readonly itemId?: string }): number => {
+const restoredIndex = (input: { readonly rows: readonly QueuedRow[]; readonly before: readonly string[]; readonly itemId?: string }): number => {
   const ahead = new Set(input.before)
   return input.rows.filter(row => row.id !== input.itemId && ahead.has(row.id)).length
 }
 
 /** The message's parts in block order, each attachment block replaced by its serialized upload. */
-export const promptPartsFor = <Attachment>(blocks: readonly QueuedBlock[], attachments: readonly Attachment[]): PromptPart<Attachment>[] => {
+const promptPartsFor = <Attachment>(blocks: readonly QueuedBlock[], attachments: readonly Attachment[]): PromptPart<Attachment>[] => {
   let attachmentIndex = 0
   const parts = blocks.flatMap((block): PromptPart<Attachment>[] => {
     if (block.type === 'text') return [{ type: 'text', text: block.text }]
@@ -189,6 +189,12 @@ export const promptPartsFor = <Attachment>(blocks: readonly QueuedBlock[], attac
   })
   if (attachmentIndex !== attachments.length || parts.length !== blocks.length) throw new Error('attachments did not serialize')
   return parts
+}
+
+export class QueueEditModel {
+  static readonly decodeQueuedRows = decodeQueuedRows
+  static readonly restoredIndex = restoredIndex
+  static readonly promptPartsFor = promptPartsFor
 }
 
 const textOf = (blocks: readonly QueuedBlock[]): string => blocks.flatMap(block => (block.type === 'text' ? [block.text] : [])).join('')
