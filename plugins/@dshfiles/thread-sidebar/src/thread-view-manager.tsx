@@ -13,10 +13,7 @@ import {
   ALL_THREADS_VIEW_ID,
   LEGACY_CURRENT_VIEW_ID,
   MAX_THREAD_VIEWS,
-  moveThreadView,
-  removeThreadView,
-  saveThreadView,
-  setThreadViewEnabled,
+  ThreadViewPreferencesModel,
   type ThreadViewPreset,
   type ThreadViewSettings,
   WORKING_VIEW_ID,
@@ -208,7 +205,7 @@ export const ThreadViewManager = (props: ThreadViewManagerProps): JSX.Element =>
     })
   }
 
-  const saveView = (view: ThreadViewPreset): boolean => saveSettings(saveThreadView(props.settings, view))
+  const saveView = (view: ThreadViewPreset): boolean => saveSettings(ThreadViewPreferencesModel.saveThreadView(props.settings, view))
 
   return (
     <Dialog
@@ -257,14 +254,14 @@ export const ThreadViewManager = (props: ThreadViewManagerProps): JSX.Element =>
                           aria-label={`${props.t('threadSidebarEnableView')} ${label}`}
                           checked={view.enabled}
                           disabled={view.enabled && enabledCount === 1}
-                          onCheckedChange={checked => saveSettings(setThreadViewEnabled(props.settings, view.id, checked === true))}
+                          onCheckedChange={checked => saveSettings(ThreadViewPreferencesModel.setThreadViewEnabled(props.settings, view.id, checked === true))}
                         />
                         <span className="dshx:truncate">{label}</span>
                       </Label>
                       <Button
                         aria-label={`${props.t('threadSidebarMoveViewUp')} ${label}`}
                         disabled={index === 0}
-                        onClick={() => saveSettings(moveThreadView(props.settings, view.id, -1))}
+                        onClick={() => saveSettings(ThreadViewPreferencesModel.moveThreadView(props.settings, view.id, -1))}
                         size="icon"
                         type="button"
                         variant="ghost"
@@ -274,7 +271,7 @@ export const ThreadViewManager = (props: ThreadViewManagerProps): JSX.Element =>
                       <Button
                         aria-label={`${props.t('threadSidebarMoveViewDown')} ${label}`}
                         disabled={index === props.settings.views.length - 1}
-                        onClick={() => saveSettings(moveThreadView(props.settings, view.id, 1))}
+                        onClick={() => saveSettings(ThreadViewPreferencesModel.moveThreadView(props.settings, view.id, 1))}
                         size="icon"
                         type="button"
                         variant="ghost"
@@ -293,7 +290,7 @@ export const ThreadViewManager = (props: ThreadViewManagerProps): JSX.Element =>
                       <Button
                         aria-label={`${props.t('threadSidebarRemoveView')} ${label}`}
                         disabled={props.settings.views.length === 1 || (view.enabled && enabledCount === 1)}
-                        onClick={() => saveSettings(removeThreadView(props.settings, view.id))}
+                        onClick={() => saveSettings(ThreadViewPreferencesModel.removeThreadView(props.settings, view.id))}
                         size="icon"
                         type="button"
                         variant="ghost"
