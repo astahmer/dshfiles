@@ -5,14 +5,14 @@
     {
       "id": "thread-review-scopes",
       "title": "Group a thread workspace's changes into review scopes",
-      "summary": "Read the current thread workspace's jj diff against its base bookmark, group the changed files with pulls.review's deterministic rules, and review one scope at a time with locally persisted progress.",
+      "summary": "Read the current thread workspace's jj diff against its base bookmark, group the changed files with pulls.review's deterministic rules, and review one scope at a time with locally persisted progress. The same grouping is available as the /pulls command in a thread and the pulls_review agent tool.",
       "surfaces": ["client", "host"],
       "configuration": [],
       "states": ["no-thread", "no-folder", "loading", "empty-diff", "scoped", "reviewed", "truncated", "failed"],
       "failureModes": [
         "A missing workspace, a workspace without a jj repository, no resolvable base bookmark, or a missing jj binary is reported with its own reason instead of an empty diff.",
         "jj stderr never reaches the client; a failed command is classified, not quoted.",
-        "A patch larger than the Host cap is flagged as truncated rather than silently shortened."
+        "A patch larger than the Host cap, or one with more files than one message carries, is flagged as truncated and clipped rather than silently shortened or rejected."
       ],
       "externalDependencies": [
         {
@@ -23,6 +23,9 @@
       ],
       "reach": [
         "seed rebase-ready-thread",
+        "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"/pulls\"",
+        "press Enter",
+        "expect text \"pulls.review \u00b7 main..@*\"",
         "click button \"pulls.review\"",
         "expect heading \"pulls.review\"",
         "expect text \"main..@\"",
@@ -66,6 +69,71 @@
           "id": "pulls-review.thread-review-scopes-unit-reviewed-key",
           "file": "plugins/@dshfiles/pulls-review/tests/reviewed.spec.ts",
           "testName": "separates the same path across workspaces and revisions"
+        },
+        {
+          "kind": "unit-test",
+          "id": "pulls-review.thread-review-scopes-unit-command-report",
+          "file": "plugins/@dshfiles/pulls-review/tests/report.spec.ts",
+          "testName": "renders the range, totals and one line per scope with its files"
+        }
+      ]
+    },
+    {
+      "id": "ai-scope-summaries",
+      "title": "Summarize review scopes with the thread's own model",
+      "summary": "One model call over the whole diff turns the deterministic scope summaries into short one-line-per-scope prose, using the provider the thread last requested with and the first model that provider offers.",
+      "surfaces": ["client", "host"],
+      "configuration": [],
+      "states": ["idle", "summarizing", "summarized", "no-route", "unparsed", "failed"],
+      "failureModes": [
+        "No thread provider, no offered model, or no Host llm service is reported as its own reason, never as an empty summary.",
+        "A review that failed, or a workspace with no changes, keeps its own reason instead of blaming the model.",
+        "An answer without a usable `key: text` line leaves the deterministic summaries in place.",
+        "An explicit provider/model from the caller wins over the thread route."
+      ],
+      "externalDependencies": [
+        {
+          "id": "thread-model",
+          "boundary": "The DSH llm service and the provider route the thread's session log records.",
+          "deterministicFake": "Unit tests inject a scripted complete() and route sources; the scratch profile has no provider, so its UI path can only be reached with a configured account."
+        }
+      ],
+      "reach": [
+        "seed rebase-ready-thread",
+        "click button \"pulls.review\"",
+        "expect button \"Summarize\"",
+        "click button \"Summarize\"",
+        "expect text \"The model call failed*\""
+      ],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "pulls-review.ai-scope-summaries-unit-parse",
+          "file": "plugins/@dshfiles/pulls-review/tests/summarize.spec.ts",
+          "testName": "reads a fenced JSON answer and keeps every known scope"
+        },
+        {
+          "kind": "unit-test",
+          "id": "pulls-review.ai-scope-summaries-unit-route",
+          "file": "plugins/@dshfiles/pulls-review/tests/summarize.spec.ts",
+          "testName": "uses the thread provider with its cheapest offered model"
+        },
+        {
+          "kind": "unit-test",
+          "id": "pulls-review.ai-scope-summaries-unit-no-route",
+          "file": "plugins/@dshfiles/pulls-review/tests/summarize.spec.ts",
+          "testName": "reports no route when neither the caller nor the thread names a provider"
+        },
+        {
+          "kind": "unit-test",
+          "id": "pulls-review.ai-scope-summaries-unit-unparsed",
+          "file": "plugins/@dshfiles/pulls-review/tests/summarize.spec.ts",
+          "testName": "reports an unusable answer instead of inventing summaries"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "pulls-review.ai-scope-summaries-browser",
+          "reason": "A *successful* summary needs a configured provider account and the scratch/e2e profiles have none, so no browser journey can drive one. The failure footer is asserted by the catalog reach, and the route, protocol and failure paths by unit tests."
         }
       ]
     }

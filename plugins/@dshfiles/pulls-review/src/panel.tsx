@@ -4,15 +4,15 @@ import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Progress } from '@dshfiles/plugin-ui/components/ui/progress'
 import { PatchView, parsePatchFiles } from '@dshfiles/plugin-ui/diff'
-import { Check, ChevronLeft, ChevronRight, RefreshCw } from '@dshfiles/plugin-ui/icons'
+import { Check, ChevronLeft, ChevronRight, RefreshCw, Sparkles } from '@dshfiles/plugin-ui/icons'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
-import { errorMessage, useQuery } from '@dshfiles/plugin-ui/query'
+import { errorMessage, useMutation, useQuery } from '@dshfiles/plugin-ui/query'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { z } from 'zod'
 import { MAX_FILES, pullsReviewApi } from './api.js'
-import { reviewedKeyOf, toggleReviewed } from './reviewed.js'
+import { recordReviewed, reviewedKeyOf, toggleReviewed } from './reviewed.js'
 import type { SessionFocus } from './session-focus.js'
 
 const NO_REVIEWED: Record<string, string[]> = {}
@@ -68,7 +68,17 @@ export const PullsReviewPanel = (props: PullsReviewPanelProps): ReactNode => {
 
   const result = query.data
   const head = result?.status === 'ok' ? result.head : undefined
-  const scopeKeyOf = cwd !== undefined && head !== undefined ? reviewedKeyOf(cwd, head) : undefined
+  const base = result?.status === 'ok' ? result.base : undefined
+  const summarize = useMutation({
+    mutationFn: () =>
+      runHostRequest({
+        timeoutMs: 120_000,
+        request: signal => api.summarize(sessionId === undefined ? { path: cwd ?? '' } : { path: cwd ?? '', sessionId: String(sessionId) }, { signal }),
+      }),
+  })
+  const summarized = summarize.data
+  const aiSummaries = summarized?.status === 'ok' ? summarized.summaries : undefined
+  const scopeKeyOf = cwd !== undefined && head !== undefined ? reviewedKeyOf(cwd, base ?? '', head) : undefined
   const reviewedPaths = useMemo(() => {
     const paths = scopeKeyOf === undefined ? undefined : reviewed[scopeKeyOf]
     return new Set(paths ?? [])
@@ -82,6 +92,11 @@ export const PullsReviewPanel = (props: PullsReviewPanelProps): ReactNode => {
   const scopes = result?.status === 'ok' ? result.scopes : []
   const scope = scopes.find(candidate => candidate.key === selectedKey) ?? scopes[0]
   const scopeIndex = scope === undefined ? -1 : scopes.indexOf(scope)
+
+  const resetSummarize = summarize.reset
+  useEffect(() => {
+    resetSummarize()
+  }, [head, resetSummarize])
 
   const parsed = useMemo(() => (result?.status === 'ok' && result.patch.length > 0 ? parsePatchFiles(result.patch).flatMap(file => file.files) : []), [result])
   const scopeFiles = useMemo(() => {
@@ -98,7 +113,7 @@ export const PullsReviewPanel = (props: PullsReviewPanelProps): ReactNode => {
 
   const markReviewed = (path: string): void => {
     if (scopeKeyOf === undefined) return
-    reviewedStore.set({ ...reviewed, [scopeKeyOf]: toggleReviewed(reviewed[scopeKeyOf] ?? [], path) })
+    reviewedStore.set(recordReviewed(reviewed, scopeKeyOf, toggleReviewed(reviewed[scopeKeyOf] ?? [], path)))
   }
 
   const selectScope = (next: number): void => {
@@ -113,6 +128,20 @@ export const PullsReviewPanel = (props: PullsReviewPanelProps): ReactNode => {
     if (query.isError) return <p className="dshx:text-xs dshx:text-destructive">{errorMessage(query.error, 'The workspace diff could not be read.')}</p>
     if (result === undefined) return null
     if (result.status === 'failed') return <p className="dshx:text-xs dshx:text-destructive">{result.message}</p>
+    if (summarize.isError) return <p className="dshx:text-xs dshx:text-destructive">{errorMessage(summarize.error, 'Summarizing failed.')}</p>
+    if (summarized?.status === 'failed') return <p className={HINT}>{summarized.message}</p>
+    if (summarize.isPending)
+      return (
+        <p className={HINT}>
+          Summarizing {scopes.length} scope{scopes.length === 1 ? '' : 's'} with the thread model…
+        </p>
+      )
+    if (summarized?.status === 'ok')
+      return (
+        <p className={HINT}>
+          Summaries from {summarized.route.provider} · {summarized.route.model}
+        </p>
+      )
     return null
   })()
 
@@ -127,6 +156,12 @@ export const PullsReviewPanel = (props: PullsReviewPanelProps): ReactNode => {
             </Badge>
           ) : null}
           <span className="dshx:ml-auto" />
+          {result?.status === 'ok' && result.fileCount > 0 && scopes.length > 0 ? (
+            <Button variant="outline" size="sm" disabled={summarize.isPending} onClick={() => summarize.mutate()} className="dshx:gap-1.5 dshx:shrink">
+              <Sparkles aria-hidden className={cn('dshx:size-3.5', summarize.isPending && 'dshx:animate-pulse')} />
+              {aiSummaries === undefined ? 'Summarize' : 'Re-summarize'}
+            </Button>
+          ) : null}
           <Button variant="ghost" size="icon" aria-label="Refresh" disabled={query.isFetching} onClick={() => void query.refetch()}>
             <RefreshCw aria-hidden className={cn(query.isFetching && 'dshx:animate-spin')} />
           </Button>
@@ -178,7 +213,7 @@ export const PullsReviewPanel = (props: PullsReviewPanelProps): ReactNode => {
               <div className="dshx:flex dshx:items-start dshx:gap-2">
                 <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-0.5">
                   <span className="dshx:text-xs dshx:font-medium">{scope.label}</span>
-                  <span className={HINT}>{scope.summary}</span>
+                  <span className={HINT}>{aiSummaries?.[scope.key] ?? scope.summary}</span>
                 </div>
                 <span className="dshx:ml-auto dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1">
                   <Button variant="ghost" size="icon" aria-label="Previous scope" disabled={scopeIndex <= 0} onClick={() => selectScope(scopeIndex - 1)}>

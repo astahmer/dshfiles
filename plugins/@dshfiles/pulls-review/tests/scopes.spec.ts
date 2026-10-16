@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { MAX_FILES } from '../src/api.js'
 import { groupPatch } from '../src/scopes.js'
 
 const PATCH = [
@@ -39,10 +40,31 @@ describe('groupPatch', () => {
     expect(grouped.scopes[0]?.label).toBe('Docs')
     expect(grouped.scopes[1]?.label).toBe('Code')
     expect(grouped.scopes[3]?.label).toBe('Generated')
+    expect(grouped.clipped).toBe(false)
   })
 
   it('reports an empty patch as no scopes rather than an error', async () => {
     const grouped = await groupPatch({ patch: '', title: 'main..@' })
-    expect(grouped).toEqual({ fileCount: 0, additions: 0, deletions: 0, files: [], scopes: [] })
+    expect(grouped).toEqual({ fileCount: 0, additions: 0, deletions: 0, files: [], scopes: [], clipped: false })
+  })
+
+  it('caps the listed files and scales each scope down to what it still lists', async () => {
+    const grouped = await groupPatch({ patch: PATCH, title: 'main..@', limit: 2 })
+    expect(grouped.fileCount).toBe(4)
+    expect(grouped.additions).toBe(4)
+    expect(grouped.files.map(file => file.path)).toEqual(['README.md', 'src/app.ts'])
+    expect(grouped.scopes.map(scope => [scope.key, scope.filePaths])).toEqual([
+      ['docs', ['README.md']],
+      ['code', ['src/app.ts']],
+    ])
+    expect(grouped.scopes.reduce((total, scope) => total + scope.additions, 0)).toBe(2)
+    expect(grouped.clipped).toBe(true)
+  })
+
+  it('admits exactly the cap without flagging a clip', async () => {
+    const files = Array.from({ length: MAX_FILES }, (_, index) => [`diff --git a/f${index}.txt b/f${index}.txt`, '@@ -0,0 +1 @@', '+x', ''].join('\n'))
+    const grouped = await groupPatch({ patch: files.join(''), title: 'main..@' })
+    expect(grouped.fileCount).toBe(MAX_FILES)
+    expect(grouped.clipped).toBe(false)
   })
 })

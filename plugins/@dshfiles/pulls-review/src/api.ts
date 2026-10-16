@@ -65,6 +65,37 @@ export const reviewResultSchema = z.discriminatedUnion('status', [
 ])
 export type ReviewResult = z.infer<typeof reviewResultSchema>
 
+export const summaryFailureReasonSchema = z.enum(['no-route', 'llm-unavailable', 'llm-failed', 'unparsed', 'review-failed', 'no-changes'])
+export type SummaryFailureReason = z.infer<typeof summaryFailureReasonSchema>
+
+/** One model call over the whole diff; a partial answer is still a success. */
+export const summarizeResultSchema = z.discriminatedUnion('status', [
+  z
+    .object({
+      status: z.literal('ok'),
+      route: z.object({ provider: z.string().min(1).max(120), model: z.string().min(1).max(200) }).strict(),
+      summaries: z.record(scopeKeySchema, z.string().min(1).max(600)),
+    })
+    .strict(),
+  z
+    .object({
+      status: z.literal('failed'),
+      reason: summaryFailureReasonSchema,
+      message: z.string().min(1).max(600),
+    })
+    .strict(),
+])
+export type SummarizeResult = z.infer<typeof summarizeResultSchema>
+
+export const summarizeInputSchema = z.object({
+  path: z.string().min(1).max(2048),
+  base: z.string().min(1).max(256).optional(),
+  /** The thread whose model route should summarize; ignored when provider/model are given. */
+  sessionId: z.string().min(1).max(128).optional(),
+  provider: z.string().min(1).max(120).optional(),
+  model: z.string().min(1).max(200).optional(),
+})
+
 export const pullsReviewApi = defineApi({
   id: 'pulls-review',
   owner: '@dshfiles/pulls-review',
@@ -74,6 +105,11 @@ export const pullsReviewApi = defineApi({
       input: z.object({ path: z.string().min(1).max(2048), base: z.string().min(1).max(256).optional() }),
       output: reviewResultSchema,
       description: "Read a workspace's changes since a base bookmark and group the changed files into review scopes.",
+    }),
+    summarize: method({
+      input: summarizeInputSchema,
+      output: summarizeResultSchema,
+      description: "Summarize a workspace's review scopes with the thread's own model route.",
     }),
   },
 })

@@ -55,6 +55,11 @@ export interface ReviewWorkspaceInput {
   readonly signal?: AbortSignal | undefined
 }
 
+/** The argv the Host builds for a review; exported so a test can drive the same one. */
+export const revisionArgs = (revision: string): readonly string[] => ['log', '-r', revision, '--no-graph', '-T', REVISION_TEMPLATE]
+
+export const diffArgs = (base: string): readonly string[] => ['diff', '--git', '--from', base, '--to', HEAD_REVISION]
+
 /** Read one thread workspace's changes since its base bookmark and group them. */
 export const reviewWorkspace = async (input: ReviewWorkspaceInput): Promise<ReviewResult> => {
   if (!(await isDirectory(input.path))) return failure(input.path, 'workspace-missing', 'That thread workspace is no longer on disk.')
@@ -66,7 +71,7 @@ export const reviewWorkspace = async (input: ReviewWorkspaceInput): Promise<Revi
     const head = (
       await input.run({
         path: input.path,
-        args: ['log', '-r', HEAD_REVISION, '--no-graph', '-T', REVISION_TEMPLATE],
+        args: revisionArgs(HEAD_REVISION),
         signal: input.signal,
         outputLimit: 4_096,
       })
@@ -74,7 +79,7 @@ export const reviewWorkspace = async (input: ReviewWorkspaceInput): Promise<Revi
     if (head.length === 0) return failure(input.path, 'jj-failed', 'The working-copy revision could not be read.')
     const diff = await input.run({
       path: input.path,
-      args: ['diff', '--git', '--from', base, '--to', HEAD_REVISION],
+      args: diffArgs(base),
       signal: input.signal,
       outputLimit: MAX_PATCH_CHARS,
     })
@@ -86,7 +91,7 @@ export const reviewWorkspace = async (input: ReviewWorkspaceInput): Promise<Revi
       head,
       range: `${base}..${HEAD_REVISION}`,
       patch: diff.stdout,
-      truncated: diff.truncated,
+      truncated: diff.truncated || grouped.clipped,
       fileCount: grouped.fileCount,
       additions: grouped.additions,
       deletions: grouped.deletions,

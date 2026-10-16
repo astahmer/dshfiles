@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { JjCommandError, JjUnavailableError, type JjRun, type JjRunInput } from '../src/jj.js'
+import { MAX_FILES, reviewResultSchema } from '../src/api.js'
 import { reviewWorkspace } from '../src/review.js'
 
 const PATCH = [
@@ -102,5 +103,18 @@ describe('reviewWorkspace', () => {
     }
     const result = await reviewWorkspace({ run, path: workspace })
     expect(result).toMatchObject({ status: 'ok', truncated: true })
+  })
+
+  it('clips a diff with more files than one message carries instead of failing output validation', async () => {
+    const files = Array.from({ length: MAX_FILES + 1 }, (_, index) => [`diff --git a/f${index}.txt b/f${index}.txt`, '@@ -0,0 +1 @@', '+x', ''].join('\n'))
+    const run: JjRun = async input => {
+      if (input.args[0] === 'log') return { stdout: input.args[2] === '@' ? 'abc1234\n' : 'def5678\n', truncated: false }
+      return { stdout: files.join(''), truncated: false }
+    }
+    const result = await reviewWorkspace({ run, path: workspace })
+    expect(result).toMatchObject({ status: 'ok', fileCount: MAX_FILES + 1, truncated: true })
+    expect(result.status === 'ok' ? result.files : []).toHaveLength(MAX_FILES)
+    const parsed = reviewResultSchema.safeParse(result)
+    expect(parsed.success ? undefined : parsed.error.issues).toBeUndefined()
   })
 })

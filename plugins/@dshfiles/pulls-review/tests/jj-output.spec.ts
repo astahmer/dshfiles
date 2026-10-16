@@ -4,34 +4,43 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { groupPatch } from '../src/scopes.js'
+import { reviewResultSchema } from '../src/api.js'
+import type { JjRun } from '../src/jj.js'
+import { diffArgs, reviewWorkspace, revisionArgs } from '../src/review.js'
 
 const run = promisify(execFile)
 
-/** The argv the Host builds, against the real CLI: a wrong flag or range fails here, not in the browser. */
-const jjArgs = (args: readonly string[]): readonly string[] => ['--config', 'user.name=Test', '--config', 'user.email=test@example.com', ...args]
+const CONFIG = ['--config', 'user.name=Test', '--config', 'user.email=test@example.com']
+
+/**
+ * The argv `reviewWorkspace` builds, executed against the real CLI: a wrong flag
+ * or range fails this test rather than the browser.
+ */
+const createRealRunner = (): JjRun => async input => {
+  const { stdout } = await run('jj', [...CONFIG, ...input.args], { cwd: input.path, maxBuffer: 8 * 1024 * 1024 })
+  return { stdout, truncated: false }
+}
+
+const jj = async (cwd: string, args: readonly string[]): Promise<void> => {
+  await run('jj', [...CONFIG, ...args], { cwd })
+}
 
 let available = true
 let workspace = ''
-
-const jj = async (args: readonly string[]): Promise<string> => {
-  const { stdout } = await run('jj', jjArgs(args), { cwd: workspace })
-  return stdout
-}
 
 describe('jj diff output', () => {
   beforeAll(async () => {
     workspace = await mkdtemp(join(tmpdir(), 'pulls-review-jj-'))
     try {
-      await jj(['git', 'init'])
+      await jj(workspace, ['git', 'init'])
     } catch {
       available = false
       return
     }
     await writeFile(join(workspace, 'README.md'), '# Title\n')
     await writeFile(join(workspace, 'src-app.ts'), 'export const answer = 1\n')
-    await jj(['commit', '-m', 'base'])
-    await jj(['bookmark', 'create', 'main', '-r', '@-'])
+    await jj(workspace, ['commit', '-m', 'base'])
+    await jj(workspace, ['bookmark', 'create', 'main', '-r', '@-'])
     await writeFile(join(workspace, 'src-app.ts'), 'export const answer = 2\n')
     await writeFile(join(workspace, 'src-app.test.ts'), "it('works', () => {})\n")
   })
@@ -40,21 +49,17 @@ describe('jj diff output', () => {
     if (workspace.length > 0) await rm(workspace, { recursive: true, force: true })
   })
 
-  it.skipIf(!available)('groups a real `jj diff --git --from main --to @` into scopes', async () => {
-    const patch = await jj(['diff', '--git', '--from', 'main', '--to', '@'])
-    const grouped = await groupPatch({ patch, title: 'main..@' })
-    expect(grouped.fileCount).toBe(2)
-    expect(grouped.scopes.map(scope => scope.key).sort()).toEqual(['code', 'tests'])
-    expect(
-      grouped.scopes
-        .map(scope => scope.filePaths)
-        .flat()
-        .sort(),
-    ).toEqual(['src-app.test.ts', 'src-app.ts'])
+  it.skipIf(!available)('reviews a real workspace through the argv the Host builds', async () => {
+    const result = await reviewWorkspace({ run: createRealRunner(), path: workspace })
+    expect(result).toMatchObject({ status: 'ok', base: 'main', range: 'main..@', fileCount: 2, additions: 2, deletions: 1, truncated: false })
+    const parsed = reviewResultSchema.safeParse(result)
+    expect(parsed.success ? undefined : parsed.error.issues).toBeUndefined()
+    expect(result.status === 'ok' ? result.scopes.map(scope => scope.key).sort() : []).toEqual(['code', 'tests'])
+    expect(result.status === 'ok' ? result.head : '').toMatch(/^[a-f0-9]{8,}$/)
   })
 
-  it.skipIf(!available)('reads the working-copy revision id the Host reports', async () => {
-    const output = await jj(['log', '-r', '@', '--no-graph', '-T', 'commit_id.short()'])
-    expect(output.trim()).toMatch(/^[a-f0-9]{8,}$/)
+  it.skipIf(!available)('builds the revision and diff argv the review passes to jj', () => {
+    expect(revisionArgs('@')).toEqual(['log', '-r', '@', '--no-graph', '-T', 'commit_id.short()'])
+    expect(diffArgs('main')).toEqual(['diff', '--git', '--from', 'main', '--to', '@'])
   })
 })
