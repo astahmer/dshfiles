@@ -16,7 +16,7 @@ import { useId, useMemo, useState, type ReactNode } from 'react'
 import { aiAccountsKeys, aiAccountsQueries } from './accounts-queries.js'
 import { aiAccountsApi, type AccountsUsage, type UsageHistoryMeta } from './api.js'
 import { MAX_USAGE_HISTORY_POINTS } from './usage-history-model.js'
-import { changedBankedResetSnapshots, forecastQuotaWindow } from './usage-history-analysis.js'
+import { QuotaHistoryAnalysis } from './usage-history-analysis.js'
 import { QuotaMeter } from './panel-primitives.js'
 import { QuotaHistoryChart } from './quota-history-chart.js'
 import { QUOTA_TONE_TEXT, quotaTone } from './quota-tone.js'
@@ -34,7 +34,7 @@ const formatTimestamp = (value: number | null | undefined): string =>
 
 const formatReset = (value: number | null): string => formatResetIn(value, Date.now())
 
-const formatForecast = (forecast: ReturnType<typeof forecastQuotaWindow>): string => {
+const formatForecast = (forecast: ReturnType<typeof QuotaHistoryAnalysis.forecastQuotaWindow>): string => {
   switch (forecast.status) {
     case 'insufficient-history':
       return 'Need at least three snapshots spanning 30 minutes in this reset window.'
@@ -206,7 +206,7 @@ export const UsageHistoryPanel = (props: { readonly onBack: () => void }): JSX.E
     return current.windows.map(window => ({
       label: window.label,
       remaining: window.percentRemaining,
-      forecast: forecastQuotaWindow({
+      forecast: QuotaHistoryAnalysis.forecastQuotaWindow({
         points,
         label: window.label,
         remainingPercent: window.percentRemaining,
@@ -215,7 +215,7 @@ export const UsageHistoryPanel = (props: { readonly onBack: () => void }): JSX.E
       }),
     }))
   }, [current, points])
-  const bankChanges = useMemo(() => changedBankedResetSnapshots(points).slice(-BANK_EVENT_LIMIT).reverse(), [points])
+  const bankChanges = useMemo(() => QuotaHistoryAnalysis.changedBankedResetSnapshots(points).slice(-BANK_EVENT_LIMIT).reverse(), [points])
 
   const resetCount = points.at(-1)?.bankedResets ?? 0
 
@@ -407,7 +407,7 @@ export const UsageHistoryPanel = (props: { readonly onBack: () => void }): JSX.E
                     })}
                   </TableBody>
                 </Table>
-                {changedBankedResetSnapshots(points).length > BANK_EVENT_LIMIT ? (
+                {QuotaHistoryAnalysis.changedBankedResetSnapshots(points).length > BANK_EVENT_LIMIT ? (
                   <p className="dshx:text-xs dshx:text-muted-foreground">Showing the latest {String(BANK_EVENT_LIMIT)} reset-bank changes.</p>
                 ) : null}
               </div>

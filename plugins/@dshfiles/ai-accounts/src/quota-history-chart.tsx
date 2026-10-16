@@ -3,7 +3,7 @@ import { Empty, EmptyDescription } from '@dshfiles/plugin-ui/components/ui/empty
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useMemo } from 'react'
 import type { UsageHistoryPoint } from './api.js'
-import { quotaHistoryRows } from './usage-history-analysis.js'
+import { QuotaHistoryAnalysis } from './usage-history-analysis.js'
 
 const CHART_POINT_LIMIT = 500
 
@@ -21,7 +21,7 @@ export const QuotaHistoryChart = (props: {
   readonly height: number
   readonly className?: string
 }): JSX.Element => {
-  const rows = useMemo(() => quotaHistoryRows(props.points, CHART_POINT_LIMIT), [props.points])
+  const rows = useMemo(() => QuotaHistoryAnalysis.quotaHistoryRows(props.points, CHART_POINT_LIMIT), [props.points])
   const windows = useMemo(() => [...new Set(rows.map(row => row.window))], [rows])
   const definition = useMemo(
     () =>
