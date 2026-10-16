@@ -77,3 +77,12 @@ Feature: Jujutsu revision interactions
     When a disposable Jujutsu repository with two authors is opened in the Jujutsu panel
     And a workspace "review-ws" is provisioned at the Feature revision under the fixture root
     Then the workspace "review-ws" exists and a session opens in it only when asked
+
+  @scenario:jujutsu.chat-references
+  Scenario: An explicit reference in an answer opens its revision
+    Given the isolated plugin composition of "@dshfiles/jujutsu, @dshfiles/workspace-folder-picker, @dshfiles/jj-integration, @dshfiles/ai-accounts" is booted
+    When a disposable Jujutsu repository with two authors is opened in the Jujutsu panel
+    And a Command Code account backed by a local fake provider is added
+    And the repository is registered and its thread answers "[[answer Trunk is `jj:main` here]]"
+    Then clicking the reference opens the panel focused on that revision
+    And the Agent prompt tells it to write Jujutsu references with the jj: prefix

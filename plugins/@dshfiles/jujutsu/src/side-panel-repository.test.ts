@@ -11,20 +11,27 @@ describe('side panel repository', () => {
 
   it('holds a request until a page mounts, then hands it over once', () => {
     const repository = createSidePanelRepository()
-    repository.request('/dev/a')
-    expect(repository.takePending()).toBe('/dev/a')
+    repository.request({ path: '/dev/a' })
+    expect(repository.takePending()).toEqual({ path: '/dev/a' })
     expect(repository.takePending()).toBeNull()
   })
 
   it('delivers requests to a mounted page instead of queuing them', () => {
     const repository = createSidePanelRepository()
-    const received: string[] = []
-    const stop = repository.onRequest(path => received.push(path))
-    repository.request('/dev/b')
+    const received: { readonly path: string }[] = []
+    const stop = repository.onRequest(request => received.push(request))
+    repository.request({ path: '/dev/b' })
     stop()
-    repository.request('/dev/c')
-    expect(received).toEqual(['/dev/b'])
-    expect(repository.takePending()).toBe('/dev/c')
+    repository.request({ path: '/dev/c' })
+    expect(received).toEqual([{ path: '/dev/b' }])
+    expect(repository.takePending()).toEqual({ path: '/dev/c' })
+  })
+
+  it('preserves a reference target until the side panel mounts', () => {
+    const repository = createSidePanelRepository()
+    const request = { path: '/dev/a', reference: { value: 'main', kind: 'bookmark' as const, behavior: 'path' as const } }
+    repository.request(request)
+    expect(repository.takePending()).toEqual(request)
   })
 
   it('reports what the page shows until that page clears it', () => {

@@ -59,6 +59,17 @@ contracts.
 - View settings (default tab, ancestor groups, file layout, raw patch expanded,
   day grouping, graph density, hide immutable, mine only, revisions loaded) are saved in this
   browser and shared live by the main page and side panel.
+- Inline code in a chat message becomes a link when it is an explicit JJ
+  identity: a `jj:`-prefixed name (`` `jj:main` ``, `` `jj:94526da8` ``), a
+  revision-shaped token (a hex commit prefix of 7+, or a k–z change ID), or a
+  name that really is a local bookmark of the Session repository. The prefix is
+  the writing convention: the Host adds a system-prompt section telling every
+  Agent to write references that way, it needs no repository lookup, and the
+  reader sees the bare name (`jj:main` renders as a linked `main`). A click
+  opens the Jujutsu side panel on that repository and either
+  focuses the revision or compares it with main/default while showing its
+  history path (`chatReferenceClickBehavior`); `chatReferenceLinks` turns the
+  behavior off. A token outside the loaded page falls back to the graph search.
 - Right-click a revision → New workspace here… to create an isolated JJ
   workspace checked out at it, then explicitly open a DSH Session in that
   directory. Forking a Session is left to DSH's native Branch action, and

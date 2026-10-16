@@ -1,10 +1,9 @@
-import { waitForManagedExit } from '@dshfiles/dshx/host'
+import { defineHost, definePromptSection, waitForManagedExit } from '@dshfiles/dshx/host'
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-subprocess'
 import { createHash, randomUUID } from 'node:crypto'
 import { realpath, stat } from 'node:fs/promises'
 import { isAbsolute, join, normalize, relative } from 'node:path'
-import { defineHost } from '@dshfiles/dshx/host'
 import { jujutsuApi, revisionSchema, type JujutsuState, type Mutation, type Revision } from './api.js'
 import {
   buildMutationArgv,
@@ -779,9 +778,24 @@ const jujutsuHostApi = jujutsuApi.host({
   }),
 })
 
+/**
+ * One writing convention for every Agent in this DSH: an explicit revision or bookmark reference is written
+ * `jj:<name>`, which the client links to the panel and renders as the bare name.
+ */
+const chatReferenceSection = definePromptSection({
+  name: 'dshfiles-jujutsu:chat-references',
+  order: 900,
+  text: [
+    'In chat, write a Jujutsu revision, change or bookmark reference as `jj:<name>` inside inline code — for example',
+    '`jj:main`, `jj:94526da8` or `jj:feature/topic`. DSH turns such a token into a link that opens the Jujutsu panel on',
+    'that revision, and shows the reader the bare name.',
+  ].join(' '),
+})
+
 export default defineHost({
   name: '@dshfiles/jujutsu',
   inject: ['subprocess', 'webServer'],
   apis: [jujutsuHostApi, composerContextHost((ctx, cwd, args, signal, options) => runAt(ctx, cwd, undefined, args, signal, options))],
+  prompts: [chatReferenceSection],
   settings: [jujutsuSettings],
 })

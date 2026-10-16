@@ -91,13 +91,17 @@ export default defineClient({
         sidebar.toggleExpanded()
         return
       }
-      if (path !== null) sidePanelRepository.request(path)
+      if (path !== null) sidePanelRepository.request({ path })
       sidebar.openTab(RIGHT_PANE_KIND)
     }
     const composerServices: ComposerJujutsuServices = {
       sessions: ctx.sessions,
       workspaces: ctx.workspaces,
       toggleJujutsu,
+      openJujutsuReference: (path, reference) => {
+        sidePanelRepository.request({ path, reference })
+        ctx.sidebarRight.openTab(RIGHT_PANE_KIND)
+      },
     }
     const composerSlot = (Component: (props: ComposerSlotProps) => JSX.Element | null) =>
       decorate((props: ComposerSlotProps) => (

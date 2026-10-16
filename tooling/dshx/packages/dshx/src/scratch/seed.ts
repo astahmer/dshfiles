@@ -6,12 +6,12 @@ import type { Page } from 'playwright'
 import { z } from 'zod'
 import type { ReachSeed } from '../project/features.js'
 import { DSHFILES_ROOT } from '../project/local-bundles.js'
+import { FAKE_COMMAND_CODE_MODEL } from './fake-command-code.js'
 import { ScratchError, spawnDetached, type ScratchState } from './state.js'
 
 const NEW_THREAD_COMPOSER = 'Describe what you want to build, / commands, @ files or sessions'
 const fakeProviderScript = fileURLToPath(new URL('./fake-provider-main.js', import.meta.url))
 const FAKE_PROVIDER_ACCOUNT = 'Command Code 1'
-const FAKE_PROVIDER_MODEL = 'commandcode_work/gpt-6-luna'
 /** A call that runs long enough to watch a live tool-call counter, then settles. */
 const TOOL_CALL_DIRECTIVE = `[[call bash ${JSON.stringify({ command: 'sleep 3 && echo tool-call-thread', description: 'Wait three seconds' })}]]`
 const REBASE_READY_THREAD_MESSAGE = 'Seeded thread to rebase'
@@ -168,14 +168,20 @@ const startFakeProvider = async (
 }
 
 /**
- * Point a Command Code account at a loopback fake provider (ai-accounts), then start a thread in the seeded project
- * whose model calls `bash` for a few seconds, so tool-call cards with real call and result times exist.
+ * Point a Command Code account at a loopback fake provider (ai-accounts) and start a New thread whose model is that
+ * account's, so a seed can drive one deterministic turn through the real provider path.
  */
-const seedToolCallThread = async (state: ScratchState, page: Page, timeoutMs: number): Promise<NonNullable<ScratchState['fakeProvider']>> => {
+const configureFakeProviderThread = async (input: {
+  readonly state: ScratchState
+  readonly page: Page
+  readonly seed: string
+  readonly timeoutMs: number
+}): Promise<NonNullable<ScratchState['fakeProvider']>> => {
+  const { state, page, timeoutMs } = input
   if (!state.bundles.includes('@dshfiles/ai-accounts')) {
     throw new ScratchError(
       'seed-needs-plugin',
-      'Seed tool-call-thread needs @dshfiles/ai-accounts.',
+      `Seed ${input.seed} needs @dshfiles/ai-accounts.`,
       'Run "dshx dev down" then "dshx dev up --plugin @dshfiles/ai-accounts ...".',
     )
   }
@@ -224,22 +230,36 @@ const seedToolCallThread = async (state: ScratchState, page: Page, timeoutMs: nu
     await page.getByRole('button', { name: /^Select model/ }).click({ timeout: timeoutMs })
     await page.getByRole('menuitem', { name: /^Model / }).click({ timeout: timeoutMs })
     const picked = await page
-      .getByRole('menuitemradio', { name: FAKE_PROVIDER_MODEL, exact: true })
+      .getByRole('menuitemradio', { name: FAKE_COMMAND_CODE_MODEL, exact: true })
       .click({ timeout: 2_000 })
       .then(
         () => true,
         () => false,
       )
     if (picked) break
-    if (Date.now() > deadline) throw new ScratchError('seed-failed', `The model picker never listed ${FAKE_PROVIDER_MODEL}.`, 'Check the AI Accounts panel.')
+    if (Date.now() > deadline)
+      throw new ScratchError('seed-failed', `The model picker never listed ${FAKE_COMMAND_CODE_MODEL}.`, 'Check the AI Accounts panel.')
   }
-  await composer.fill(TOOL_CALL_DIRECTIVE, { timeout: timeoutMs })
+  return fake.process
+}
+
+const fakeProviderComposer = (page: Page) => page.getByRole('textbox', { name: NEW_THREAD_COMPOSER, exact: true })
+
+const sendFakeProviderTurn = async (page: Page, prompt: string, timeoutMs: number): Promise<void> => {
+  const composer = fakeProviderComposer(page)
+  await composer.fill(prompt, { timeout: timeoutMs })
   await composer.press('Enter')
+}
+
+/** A thread whose model calls `bash` for a few seconds, so tool-call cards with real call and result times exist. */
+const seedToolCallThread = async (state: ScratchState, page: Page, timeoutMs: number): Promise<NonNullable<ScratchState['fakeProvider']>> => {
+  const process = await configureFakeProviderThread({ state, page, seed: 'tool-call-thread', timeoutMs })
+  await sendFakeProviderTurn(page, TOOL_CALL_DIRECTIVE, timeoutMs)
   await page
     .getByText('Tool finished.', { exact: true })
     .first()
     .waitFor({ state: 'visible', timeout: timeoutMs + 10_000 })
-  return fake.process
+  return process
 }
 
 const FAKE_SECRET_CLI = join(DSHFILES_ROOT, 'tooling', 'dshx', 'e2e', 'support', 'fake-secret-cli.mjs')
@@ -290,6 +310,27 @@ export const installFakeSecretCli = async (input: { readonly home: string; reado
   return bin
 }
 
+const CHAT_REFERENCE_PROMPT = '[[answer Trunk is `jj:main` here]]'
+const CHAT_REFERENCE_LINK = 'main'
+
+/**
+ * A thread whose assistant answer holds an explicit `` `jj:main` `` code span, so the chat link exists in a real
+ * rendered transcript before the walk clicks it. Waits for the link itself: marking it is what the walk proves.
+ */
+const seedChatReferenceThread = async (state: ScratchState, page: Page, timeoutMs: number): Promise<NonNullable<ScratchState['fakeProvider']>> => {
+  if (!state.bundles.includes('@dshfiles/jujutsu')) {
+    throw new ScratchError(
+      'seed-needs-plugin',
+      'Seed chat-reference-thread needs @dshfiles/jujutsu.',
+      'Run "dshx dev down" then "dshx dev up --plugin @dshfiles/jujutsu ...".',
+    )
+  }
+  const process = await configureFakeProviderThread({ state, page, seed: 'chat-reference-thread', timeoutMs })
+  await sendFakeProviderTurn(page, CHAT_REFERENCE_PROMPT, timeoutMs)
+  await page.getByRole('link', { name: CHAT_REFERENCE_LINK, exact: true }).first().waitFor({ state: 'visible', timeout: timeoutMs })
+  return process
+}
+
 const seedFakeSecretCli = async (state: ScratchState): Promise<void> => {
   if (state.fakeSecretCli === undefined) {
     throw new ScratchError(
@@ -314,6 +355,7 @@ export const applySeed = async (input: {
     return {}
   }
   if (input.seed === 'tool-call-thread') return { fakeProvider: await seedToolCallThread(input.state, input.page, input.timeoutMs) }
+  if (input.seed === 'chat-reference-thread') return { fakeProvider: await seedChatReferenceThread(input.state, input.page, input.timeoutMs) }
   await seedRebaseReadyThread(input.state, input.page, input.timeoutMs)
   return {}
 }

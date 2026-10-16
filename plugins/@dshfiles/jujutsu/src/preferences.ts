@@ -21,6 +21,8 @@ const preferencesSchema = z.object({
   composerBar: z.boolean().catch(true),
   composerChips: z.boolean().catch(true),
   headerToggle: z.boolean().catch(true),
+  chatReferenceLinks: z.boolean().catch(true),
+  chatReferenceClickBehavior: z.enum(['focus', 'path']).catch('focus'),
   composerBarBase: z.string().max(256).catch('parent'),
 })
 

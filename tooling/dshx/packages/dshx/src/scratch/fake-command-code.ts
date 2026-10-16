@@ -10,11 +10,14 @@ import { z } from 'zod'
  * every other key reports a 75%-left session window and a 10%-left weekly window. A turn answers `Answered by <key
  * suffix>` unless its latest message carries a directive: `[[call TOOL {json}]]` calls any tool (several in one turn when repeated), `[[once call TOOL {json}]]` calls only on its first match, `[[read PATH]]` calls the read tool and
  * `[[memory_search QUERY]]` or `[[memory_search QUERY in SCOPE]]` calls the memory search tool, `[[empty]]` settles with reasoning and no answer (a stalled round), and `[[hold]]`
- * keeps the turn running until `releaseHeldTurns`; `[[title NAME]]` names the thread NAME; the turn after a tool
+ * keeps the turn running until `releaseHeldTurns`; `[[title NAME]]` names the thread NAME; `[[answer TEXT]]` answers markdown TEXT (the way a journey renders a code span); the turn after a tool
  * result answers `Tool finished.`. OptMem summary calls answer, fail or hang as `summaries` says.
  *
  * E2E journeys start it per page; `dshx dev`'s `tool-call-thread` seed runs it as its own process.
  */
+
+/** The only model the fake provider advertises, so a journey and a `dshx dev` seed both pick the same route. */
+export const FAKE_COMMAND_CODE_MODEL = 'commandcode_work/gpt-6-luna'
 
 const HOUR_MS = 3_600_000
 const SUMMARY_INSTRUCTION = 'You maintain the long-term memory of a software engineering assistant.'
@@ -154,6 +157,8 @@ export const startFakeCommandCode = async (): Promise<FakeCommandCode> => {
           held.add(response)
           return
         }
+        const answer = /\[\[answer ([^\]]+)\]\]/.exec(last?.text ?? '')
+        if (answer?.[1] !== undefined) return streamAnswer(response, { content: answer[1] })
         const calls = [...(last?.text ?? '').matchAll(/\[\[(once )?call (\w+) (\{.*?\})\]\]/g)].flatMap(match => {
           const directive = match[0] ?? ''
           if (match[1] !== undefined) {

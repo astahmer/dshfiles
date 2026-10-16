@@ -74,9 +74,10 @@ import { useMachine } from '@dshfiles/plugin-ui/machine'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useApi } from '@dshfiles/dshx/client'
 import { ProjectFolderPicker, type DirectoryPickerPort, type RegisteredProject } from '@dshfiles/project-folder-picker'
-import { useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent, type ReactNode } from 'react'
 import { z } from 'zod'
 import type { GraphLandmark, Mutation, ReadFailure, Revision } from './api.js'
+import { resolveChatReference } from './chat-reference.js'
 import { ChangedFiles, FileViewToggle, LineCounts } from './changed-files.js'
 import { FullDiffDialog } from './full-diff-dialog.js'
 import { describeDraftChanged, layoutRevisionGraph, type GraphLane, type RevisionGraphRow } from './graph.js'
@@ -190,7 +191,9 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     preferences.diffLayout !== 'auto' ? preferences.diffLayout : !sidePanel && window.matchMedia('(min-width: 1100px)').matches ? 'split' : 'unified'
   const autoRegisterPath = useRef<string | null>(null)
   const repositoryRootsById = useRef(new Map<string, string>())
-  const [path, setPath] = useState(() => (sidePanel ? sidePanelRepository.takePending() : null) ?? storedRepoPath.get())
+  const [initialRequest] = useState(() => (sidePanel ? sidePanelRepository.takePending() : null))
+  const [path, setPath] = useState(() => initialRequest?.path ?? storedRepoPath.get())
+  const [pendingReferenceRequest, setPendingReferenceRequest] = useState(initialRequest?.reference ?? null)
   const [repoId, setRepoId] = useState<string | null>(null)
   const [repoHistory, setRepoHistory] = useState(() => storedRepoHistory.get().slice(0, REPO_HISTORY_LIMIT))
   const [pickerOpen, setPickerOpen] = useState(false)
@@ -342,6 +345,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   const [locateRequest, setLocateRequest] = useState<Revision | null>(null)
   const [pendingLocateId, setPendingLocateId] = useState<string | null>(null)
   const [locatedId, setLocatedId] = useState<string | null>(null)
+  const pendingReferenceSearch = useRef('')
   useEffect(() => {
     setLocateRequest(null)
     setComparisonSelection(null)
@@ -372,9 +376,10 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   useEffect(() => {
     if (!sidePanel) return
     return sidePanelRepository.onRequest(requested => {
-      if (shownRootRef.current !== null && containsPath(shownRootRef.current, requested)) return
-      autoRegisterPath.current = requested
-      registerMutation.mutate(requested)
+      if (requested.reference !== undefined) setPendingReferenceRequest(requested.reference)
+      if (shownRootRef.current !== null && containsPath(shownRootRef.current, requested.path)) return
+      autoRegisterPath.current = requested.path
+      registerMutation.mutate(requested.path)
     })
   }, [sidePanel, registerMutation.mutate])
 
@@ -531,16 +536,42 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     })
   }
 
-  const locateRevision = (revision: Revision): void => {
-    setLocateRequest(null)
-    const listed = visibleRevisions.some(row => row.commitId === revision.commitId)
-    if (!listed) {
-      setLocateRequest(revision)
+  const locateRevision = useCallback(
+    (revision: Revision): void => {
+      setLocateRequest(null)
+      const listed = visibleRevisions.some(row => row.commitId === revision.commitId)
+      if (!listed) {
+        setLocateRequest(revision)
+        return
+      }
+      setCollapsedDays(current => new Set([...current].filter(day => day !== dayLabel(revision.authorTime))))
+      setPendingLocateId(revision.commitId)
+    },
+    [visibleRevisions],
+  )
+
+  useEffect(() => {
+    if (pendingReferenceRequest === null || state === undefined) return
+    const match = resolveChatReference({ reference: pendingReferenceRequest, revisions: allRevisions })
+    if (match === undefined) {
+      const searchKey = `${repoId ?? ''}:${pendingReferenceRequest.kind}:${pendingReferenceRequest.value}`
+      if (pendingReferenceSearch.current !== searchKey) {
+        pendingReferenceSearch.current = searchKey
+        setTextFilter(pendingReferenceRequest.value)
+      }
       return
     }
-    setCollapsedDays(current => new Set([...current].filter(day => day !== dayLabel(revision.authorTime))))
-    setPendingLocateId(revision.commitId)
-  }
+    pendingReferenceSearch.current = ''
+    setPendingReferenceRequest(null)
+    setView('graph')
+    setSelection({ commitId: match.commitId, changeId: match.changeId })
+    if (pendingReferenceRequest.behavior === 'path') {
+      setComparisonSelection({ commitId: match.commitId, changeId: match.changeId })
+      navigation.beginComparison()
+      navigation.applySlice(match, 'history')
+    }
+    locateRevision(match)
+  }, [allRevisions, locateRevision, navigation, pendingReferenceRequest, repoId, state])
 
   const resetGraphView = (): void => {
     navigation.reset()
@@ -1678,6 +1709,34 @@ const PreferencesMenu = (): JSX.Element => {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="dshx-root dshx:w-60">
         <DropdownMenuLabel className="dshx:text-xs dshx:text-muted-foreground">Saved in this browser</DropdownMenuLabel>
+        <DropdownMenuCheckboxItem
+          checked={preferences.chatReferenceLinks}
+          className="dshx:text-xs"
+          onCheckedChange={checked => setPreference('chatReferenceLinks', checked)}
+        >
+          Open Jujutsu refs from chat
+        </DropdownMenuCheckboxItem>
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger className="dshx:text-xs">
+            Chat reference click ({preferences.chatReferenceClickBehavior === 'focus' ? 'focus revision' : 'show path'})
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent className="dshx-root">
+            <DropdownMenuRadioGroup
+              onValueChange={value => {
+                if (value === 'focus' || value === 'path') setPreference('chatReferenceClickBehavior', value)
+              }}
+              value={preferences.chatReferenceClickBehavior}
+            >
+              <DropdownMenuRadioItem className="dshx:text-xs" value="focus">
+                Focus revision
+              </DropdownMenuRadioItem>
+              <DropdownMenuRadioItem className="dshx:text-xs" value="path">
+                Compare with main/default and show history path
+              </DropdownMenuRadioItem>
+            </DropdownMenuRadioGroup>
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
+        <DropdownMenuSeparator />
         <DropdownMenuSub>
           <DropdownMenuSubTrigger className="dshx:text-xs">Default tab</DropdownMenuSubTrigger>
           <DropdownMenuSubContent className="dshx-root">

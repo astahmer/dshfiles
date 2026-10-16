@@ -18,13 +18,14 @@ import { ChevronDownIcon, FileCodeIcon, FileDiffIcon, FolderIcon } from '@dshfil
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { useQuery } from '@dshfiles/plugin-ui/query'
-import { useCallback, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react'
 import { z } from 'zod'
 import { useAutoRefresh } from './auto-refresh.js'
 import { openInEditor } from './open-in-editor.js'
 import { composerContextApi, type ComposerBase, type ComposerRepository } from './composer-context-api.js'
 import { composerBaseFromSetting, composerBaseSetting } from './composer-context-core.js'
 import { composerSessionCwd } from './composer-context-session.js'
+import { installChatReferenceLinks } from './chat-reference-links.js'
 import { FullDiffDialog } from './full-diff-dialog.js'
 import { decodePreferences } from './preferences.js'
 import { jujutsuSettings } from './settings.js'
@@ -34,6 +35,10 @@ export interface ComposerJujutsuServices {
   readonly workspaces: IWorkspaces
   /** Open the right panel on the repository holding `path`, or collapse it when it already shows that repository. */
   readonly toggleJujutsu: (path: string) => void
+  readonly openJujutsuReference: (
+    path: string,
+    reference: { readonly value: string; readonly kind: 'revision' | 'bookmark'; readonly behavior: 'focus' | 'path' },
+  ) => void
 }
 
 export interface ComposerSlotProps {
@@ -93,13 +98,15 @@ const useComposerContext = (props: ComposerSlotProps, surface: 'composerBar' | '
   const base: ComposerBase = composerBaseFromSetting((cwd === null ? undefined : bases[cwd]) ?? preferences.composerBarBase)
   const baseKey = composerBaseSetting(base)
   const api = useApi(composerContextApi)
-  const enabled = preferences[surface] && cwd !== null
+  // Chat reference links read the repository's bookmarks to decide which inline code is a link, so the
+  // shared context query stays on for them even when this surface's own toggle is off.
+  const loaded = (preferences[surface] || preferences.chatReferenceLinks) && cwd !== null
   const refetch = useRef<() => void>(() => undefined)
   const refresh = useAutoRefresh({ preferences, paused: false, onBecameVisible: () => refetch.current() })
   const query = useQuery({
     queryKey: composerKeys.context(cwd ?? '', baseKey),
     queryFn: ({ signal }) => api.context({ cwd: cwd ?? '', base }, { signal }),
-    enabled,
+    enabled: loaded,
     retry: false,
     ...refresh.queryOptions,
   })
@@ -107,13 +114,15 @@ const useComposerContext = (props: ComposerSlotProps, surface: 'composerBar' | '
   const chooseBase = (next: ComposerBase): void => {
     if (cwd !== null) storedBases.set({ ...bases, [cwd]: composerBaseSetting(next) })
   }
+  const repository = query.isSuccess ? query.data.repository : null
   return {
     ref: refresh.ref,
     cwd,
     base,
     baseKey,
     chooseBase,
-    repository: enabled && query.isSuccess ? query.data.repository : null,
+    repository: preferences[surface] ? repository : null,
+    bookmarks: repository?.localBookmarks ?? [],
   }
 }
 
@@ -375,6 +384,22 @@ export const ComposerChips = (props: ComposerSlotProps): JSX.Element | null => {
 export const ConversationHeaderToggle = (props: ComposerSlotProps & { readonly icon: ReactNode }): JSX.Element | null => {
   const context = useComposerContext(props, 'headerToggle')
   const repository = context.repository
+  const settings = useSettings(jujutsuSettings)
+  const preferences = decodePreferences(settings.value ?? {})
+
+  // The query returns a fresh array whenever it refetches; key on the names so the effect only reinstalls on a real change.
+  const bookmarkKey = context.bookmarks.join('\u0000')
+  const bookmarks = useMemo(() => (bookmarkKey === '' ? [] : bookmarkKey.split('\u0000')), [bookmarkKey])
+  useEffect(() => {
+    if (!preferences.chatReferenceLinks || context.cwd === null) return
+    const cwd = context.cwd
+    const behavior = preferences.chatReferenceClickBehavior
+    return installChatReferenceLinks({
+      sessionId: props.sessionId,
+      bookmarks,
+      onOpen: reference => props.jujutsu.openJujutsuReference(cwd, { ...reference, behavior }),
+    })
+  }, [bookmarks, context.cwd, preferences.chatReferenceClickBehavior, preferences.chatReferenceLinks, props.jujutsu, props.sessionId])
   if (repository === null) return null
   const label = 'Toggle Jujutsu on ' + basename(repository.root)
   return (

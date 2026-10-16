@@ -1,10 +1,12 @@
 import { expect, type Page } from '@playwright/test'
 import { spawnSync } from 'node:child_process'
 import { mkdir, rm, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
+import { FAKE_COMMAND_CODE_MODEL } from '../../../packages/dshx/src/scratch/fake-command-code.js'
 import { After, Then, When } from '../bdd.js'
+import { fakeCommandCodeFor } from '../fake-command-code.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
-import { createScratchDirectory, registerWorkspaceFolder, sendMessage } from '../threads.js'
+import { createScratchDirectory, registerWorkspaceFolder, sendMessage, startThreadWithModel } from '../threads.js'
 
 interface Repository {
   readonly root: string
@@ -242,6 +244,34 @@ When('the repository is registered and a thread is started in it', async ({ page
   await registerWorkspaceFolder(page, repository.path)
   await page.getByRole('checkbox', { name: 'workspace', exact: true }).check()
   await sendMessage(page, 'jujutsu composer context thread')
+})
+
+/** Register the fixture repository and let its thread answer `prompt`, so the answer renders as markdown. */
+When('the repository is registered and its thread answers {string}', async ({ page }: { page: Page }, prompt: string) => {
+  const repository = repositoryFor(page)
+  await registerWorkspaceFolder(page, repository.path)
+  await page.getByRole('checkbox', { name: 'workspace', exact: true }).check()
+  await startThreadWithModel(page, { project: basename(repository.path), model: FAKE_COMMAND_CODE_MODEL })
+  await sendMessage(page, prompt)
+})
+
+Then('clicking the reference opens the panel focused on that revision', async ({ page }: { page: Page }) => {
+  const link = page.getByRole('link', { name: 'main', exact: true })
+  await expect(link).toBeVisible({ timeout: 30_000 })
+  await link.click()
+  await recordAssertion(page, 'jujutsu-chat-reference-opens-focused-revision', async () => {
+    await expect(page.getByRole('button', { name: 'Jujutsu view settings', exact: true })).toBeVisible()
+    // `Full diff` renders only inside one revision's expanded details, so it proves the reference was selected.
+    await expect(page.getByRole('button', { name: 'Full diff', exact: true })).toBeVisible()
+  })
+})
+
+Then('the Agent prompt tells it to write Jujutsu references with the jj: prefix', async ({ page }: { page: Page }) => {
+  const request = fakeCommandCodeFor(page).requests.find(candidate => candidate.kind === 'turn')
+  await recordAssertion(page, 'jujutsu-chat-reference-instruction-reaches-the-model', () =>
+    expect(request?.messages.some(message => message.text.includes('jj:<name>'))).toBe(true),
+  )
+  await finishJourneyAssertions(page)
 })
 
 Then('the composer dock names the project, thread workspace and bookmark in one chip', async ({ page }: { page: Page }) => {

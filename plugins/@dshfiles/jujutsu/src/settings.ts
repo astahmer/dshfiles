@@ -35,6 +35,15 @@ export const jujutsuSettings = defineSettings({
     headerToggle: Schema.boolean()
       .default(true)
       .description('Show a button in the conversation header that toggles the Jujutsu side panel on the Session repository.'),
+    chatReferenceLinks: Schema.boolean()
+      .default(true)
+      .description('Link explicit Jujutsu references in chat (`jj:main`, a revision id, or a repository bookmark) to the Jujutsu panel.'),
+    chatReferenceClickBehavior: Schema.union([
+      Schema.const('focus').description('Focus revision'),
+      Schema.const('path').description('Compare with main/default and show revision ancestry'),
+    ])
+      .default('focus')
+      .description('What happens when a Jujutsu reference in chat is clicked.'),
     composerBarBase: Schema.string()
       .default('parent')
       .description('Default base of the composer bar: `parent` (working copy vs @-), `trunk` (since trunk()), or a local bookmark name.'),

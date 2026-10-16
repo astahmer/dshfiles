@@ -335,6 +335,78 @@
           "featureFile": "tooling/dshx/e2e/features/jujutsu.feature"
         }
       ]
+    },
+    {
+      "id": "chat-references",
+      "title": "Open Jujutsu references from a chat message",
+      "summary": "Inline code in a message becomes a link when it is an explicit JJ identity — a revision-shaped token, a repository bookmark, or a `jj:`-prefixed name — and clicking it opens the side panel on the Session repository, focused on that revision or comparing it with main/default along its history path. The `jj:` prefix is the writing convention Agents are told to use, and the reader sees the bare name.",
+      "reach": [
+        "seed chat-reference-thread",
+        "click link \"main\"",
+        "expect button \"Jujutsu view settings\"",
+        "click button \"Jujutsu view settings\"",
+        "expect text \"Open Jujutsu refs from chat\"",
+        "click menuitem \"Chat reference click (focus revision)\"",
+        "expect text \"Focus revision\"",
+        "expect text \"Compare with main/default and show history path\"",
+        "press Escape",
+        "expect button \"Full diff\""
+      ],
+      "surfaces": ["client", "settings"],
+      "configuration": [
+        {
+          "key": "chatReferenceLinks",
+          "defaultValue": "true",
+          "constraints": "Boolean; link explicit inline-code revision ids, repository bookmarks and `jj:`-prefixed names in chat.",
+          "choices": ["true", "false"],
+          "coveredBy": ["jujutsu.chat-reference-tokens"]
+        },
+        {
+          "key": "chatReferenceClickBehavior",
+          "defaultValue": "focus",
+          "constraints": "One of focus or path; path compares against main/default and shows ancestry.",
+          "choices": ["focus", "path"],
+          "coveredBy": ["jujutsu.chat-reference-tokens"]
+        }
+      ],
+      "states": ["linked", "focused", "path", "disabled", "not-a-reference", "unresolved"],
+      "failureModes": [
+        "Ordinary inline code and another thread's conversation are never rewritten.",
+        "A reference that is not in the loaded graph page falls back to the graph search.",
+        "Without a link owner (the plugin is not loaded) native inline code stays inert text."
+      ],
+      "externalDependencies": [
+        {
+          "id": "jj-repository",
+          "boundary": "Local bookmark names read through the composer context query; the reference must appear in a rendered message.",
+          "deterministicFake": "A real scratch jj repository with a `main` bookmark, and a Command Code account on the loopback fake provider answering `[[answer …]]` so the code span is deterministic."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "jujutsu.chat-references",
+          "featureFile": "tooling/dshx/e2e/features/jujutsu.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jujutsu.chat-reference-tokens",
+          "file": "plugins/@dshfiles/jujutsu/src/chat-reference.test.ts",
+          "testName": "treats an explicit jj: token as a reference without asking the repository"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jujutsu.chat-reference-links",
+          "file": "plugins/@dshfiles/jujutsu/src/chat-reference-links.test.ts",
+          "testName": "navigates with the plain name on click and on Enter, and ignores other clicks"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jujutsu.chat-reference-display",
+          "file": "plugins/@dshfiles/jujutsu/src/chat-reference-links.test.ts",
+          "testName": "re-strips a prefix React rewrites and stops linking a token that changed"
+        }
+      ]
     }
   ],
   "kind": "bundle"

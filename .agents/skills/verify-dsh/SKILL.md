@@ -52,7 +52,10 @@ creates, once per instance: `rebase-ready-thread` (a jj workspace thread with a
 described revision, for Rebase), `pending-restart` (changes thread-sidebar's
 `dist/index.js`; `down` restores it), and `tool-call-thread` (an AI Accounts
 Command Code account on a loopback fake provider, which `down` stops, and a
-thread whose model ran a 3 s `bash` call; needs `@dshfiles/ai-accounts`), and `fake-secret-cli` (resets synthetic
+thread whose model ran a 3 s `bash` call; needs `@dshfiles/ai-accounts`),
+`chat-reference-thread` (the same fake-provider account; a thread whose answer
+holds a `` `jj:main` `` code span, so a chat link is really rendered; needs
+`@dshfiles/ai-accounts` and `@dshfiles/jujutsu`), and `fake-secret-cli` (resets synthetic
 aliases; needs `up --fake-secret-cli`, which puts the e2e fake `secret` first on
 the Host's PATH so Secret Catalog never reaches a real vault). `attach "<repo file>"` hands a fixture
 such as `tooling/dshx/e2e/fixtures/attachments/red.png` to the composer's file
@@ -120,7 +123,7 @@ A red journey is drift or a regression: triage it with `maintain-verify-dsh`.
   load (e.g. `/api/dshx-9ca8a5fa/list`): the chip and sidebar see an
   owner-missing error and stop polling. Load multi-host or discount it.
 - No provider is configured, so turns end immediately. `up --bundle
-  dsh-our-free-model` loads the web profile's keyless free-model bundle (its
+dsh-our-free-model` loads the web profile's keyless free-model bundle (its
   "Kilo Auto Free" route answers; the OpenCode Zen routes refuse outside
   OpenCode); otherwise use a credential (see Safety) or the `tool-call-thread`
   seed's fake provider.
