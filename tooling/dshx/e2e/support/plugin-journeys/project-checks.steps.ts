@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { After, Then, When } from '../bdd.js'
 import { fakeCommandCodeFor } from '../fake-command-code.js'
 import { finishJourneyAssertions, profileFor, recordAssertion } from '../steps.js'
-import { createScratchDirectory, registerWorkspaceFolder, startThreadWithModel } from '../threads.js'
+import { createScratchDirectory, registerWorkspaceFolder, sendMessage, startThreadWithModel } from '../threads.js'
 
 /**
  * Trusted actions live only in the profile row, never in a settings form, so a journey writes them to the scratch
@@ -68,14 +68,7 @@ const trustActions = async (
     .join('\n')
   await appendFile(
     patch,
-    [
-      '- id: dshfiles-project-checks',
-      "  name: '@dshfiles/project-checks'",
-      '  config:',
-      '    actions:',
-      configuredActions,
-      '',
-    ].join('\n'),
+    ['- id: dshfiles-project-checks', "  name: '@dshfiles/project-checks'", '  config:', '    actions:', configuredActions, ''].join('\n'),
   )
 }
 
@@ -121,17 +114,15 @@ When('a thread is started in the {string} folder', async ({ page }: { page: Page
   await composer.fill(prompt)
   await composer.press('Enter')
   const sessionRow = page.getByRole('treeitem', { name: new RegExp(`project checks in the ${which}`) })
-  const workspaceName = which === 'sibling' ? 'trusted-sibling' : 'checked-project'
-  const blankSessionRow = page.getByRole('treeitem', { name: workspaceName, exact: true }).getByRole('treeitem', { name: 'New Session', exact: true })
-  await expect(sessionRow.or(blankSessionRow)).toBeVisible({ timeout: 60_000 })
-  if ((await sessionRow.count()) > 0) {
-    await sessionRow.click()
-    await expect(sessionRow).toHaveAttribute('aria-selected', 'true')
-    await expect(page.getByRole('status').filter({ hasText: /^(Completed|Failed|Stopped|Cancelled)$/ }).last()).toBeVisible({ timeout: 60_000 })
-  } else {
-    await blankSessionRow.click()
-    await expect(blankSessionRow).toHaveAttribute('aria-selected', 'true')
-  }
+  await expect(sessionRow).toBeVisible({ timeout: 60_000 })
+  await sessionRow.click()
+  await expect(sessionRow).toHaveAttribute('aria-selected', 'true')
+  await expect(
+    page
+      .getByRole('status')
+      .filter({ hasText: /^(Completed|Failed|Stopped|Cancelled)$/ })
+      .last(),
+  ).toBeVisible({ timeout: 60_000 })
   await expect(page.getByRole('textbox', { name: 'Message or run a task, / commands, @ files or sessions', exact: true })).toBeVisible()
   await expect(page.getByRole('dialog', { name: 'Add an API key to get started', exact: true })).toBeHidden()
 })
@@ -157,7 +148,12 @@ When('the fake model is sent a message while the completion check runs and the t
     const stop = page.getByRole('button', { name: /^Stop/ }).first()
     await expect(stop).toBeVisible({ timeout: 30_000 })
     await stop.click()
-    await expect(page.getByRole('status').filter({ hasText: /^(Stopped|Cancelled|Interrupted)$/ }).last()).toBeVisible({ timeout: 30_000 })
+    await expect(
+      page
+        .getByRole('status')
+        .filter({ hasText: /^(Stopped|Cancelled|Interrupted)$/ })
+        .last(),
+    ).toBeVisible({ timeout: 30_000 })
   })
 })
 
