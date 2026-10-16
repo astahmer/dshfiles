@@ -538,9 +538,10 @@ Then('Rebase moves main onto the work described {string}', async ({ page }: { pa
     await expect(rebasedToast).toContainText(description)
     await expect(rebaseButton(page)).toBeDisabled()
     expect(descriptionOf(repository, 'main')).toBe(description)
-    // One notice per thread: the newest completed Turn's tail carries it (the plugin renders it in that slot only).
     const notice = page.getByTestId('jj-thread-rebased-notice')
+    // The notice is the thread's, not the turn's: exactly one, whatever the conversation did.
     await expect(notice).toHaveCount(1)
+    await expect(notice).toBeVisible()
     await expect(notice).toContainText(`This thread was rebased onto main (${changeIdOf(repository, 'main')}).`)
     await expect(notice.getByRole('button', { name: 'Archive this rebased thread', exact: true })).toBeEnabled()
     await expect(rebasedToast).toContainText('main is now at')

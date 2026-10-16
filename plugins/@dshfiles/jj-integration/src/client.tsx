@@ -276,10 +276,12 @@ export default defineClient({
         </>
       )
     }
-    ctx.slots.inject('conversation.chat.turnTail', () =>
+    // The notice describes the thread, not a turn: `conversation.chat.turnTail` would repeat
+    // it after every turn, so it belongs in the dock, beside the other thread-level banners.
+    ctx.slots.inject('conversation.input.dock', () =>
       ctx.slots.register(
         {
-          name: 'conversation.chat.turnTail',
+          name: 'conversation.input.dock',
           id: 'dshfiles-jj-integration-rebased-notice',
           order: 1,
           inject: sessionId => ({ sessionId: SessionId(sessionId) }),
