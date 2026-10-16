@@ -181,7 +181,7 @@ export default defineClient({
               ? Promise.resolve([])
               : ctx.remote.fileReferences.list(session.sessionId, query.text, request.signal).then(result => (result.ok ? result.value : []))
           const threadLookup: Promise<readonly SessionReferenceMentionCandidate[]> =
-            query.scope === 'file' || quoted
+            query.scope === 'file'
               ? Promise.resolve([])
               : ctx.remote.sessionReferenceResolver.candidates(session.sessionId, query.text, request.signal).then(result => (result.ok ? result.value : []))
           return Promise.all([fileLookup, threadLookup])

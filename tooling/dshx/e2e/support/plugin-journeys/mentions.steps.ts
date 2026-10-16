@@ -56,6 +56,12 @@ Then('the first mention row is the thread {string} under the heading {string}', 
   })
 })
 
+Then('a mention row includes the thread {string}', async ({ page }: { page: Page }, title: string) => {
+  await recordAssertion(page, 'mentions-quoted-multiword-thread-search', async () => {
+    await expect(mentionRows(page).filter({ hasText: title })).toHaveCount(1)
+  })
+})
+
 Then('only thread rows are listed under the heading {string}', async ({ page }: { page: Page }, heading: string) => {
   await recordAssertion(page, 'mentions-thread-scope', async () => {
     await expect(page.getByText(heading, { exact: true })).toBeVisible()
