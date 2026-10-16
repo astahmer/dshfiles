@@ -256,10 +256,7 @@ export default defineClient({
                     title: translate('newThread'),
                     icon: <MessageSquarePlusIcon aria-hidden size={22} strokeWidth={1.5} />,
                     shortcut: shortcutOf('session.new'),
-                    pick: () => {
-                      pick(null)
-                      ctx.uiWorkspace.startSession()
-                    },
+                    pick: () => ctx.uiWorkspace.startSession(),
                   },
                 ],
               },

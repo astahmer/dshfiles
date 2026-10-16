@@ -286,13 +286,15 @@ describe('tabsMachine', () => {
     expect(tabs.set().activeTabId).toBe('thread:b')
   })
 
-  it('leaves no tab active on the New thread screen', () => {
+  it('does not restore the previous thread while a new thread is starting from the new-tab page', () => {
     const tabs = start({ preferences: { openMode: 'new' } })
     tabs.enable()
     tabs.host(thread('a'))
+    tabs.actor.send({ type: 'tab.new' })
     tabs.host(null)
     expect(tabs.set()).toMatchObject({ activeTabId: null })
     expect(tabs.ids()).toEqual(['thread:a'])
+    expect(tabs.navigated).toEqual([])
   })
 
   it('opens the new-tab page at the end of the strip without navigating, and focuses it when opened again', () => {
