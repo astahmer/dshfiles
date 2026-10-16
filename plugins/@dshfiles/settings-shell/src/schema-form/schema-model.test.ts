@@ -1,7 +1,7 @@
 import Schema from '@deepseek-ai/schemastery'
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
-import { choiceDisplay, hasValueAt, humanizeKey, jsonValueSchema, settingFields, unitOfKey, valueAt, type JsonValue } from './schema-model.js'
+import { jsonValueSchema, SettingsSchemaModel, type JsonValue } from './schema-model.js'
 
 const text = (value: JsonValue | undefined): string => z.string().catch('').parse(value)
 
@@ -27,7 +27,7 @@ const schema = jsonValueSchema.parse(
 )
 
 describe('settingFields', () => {
-  const fields = settingFields({ schema, secrets: [], text })
+  const fields = SettingsSchemaModel.settingFields({ schema, secrets: [], text })
   const byKey = new Map(fields.map(field => [field.key, field]))
 
   it('turns each visible setting into a titled field with the control its type calls for', () => {
@@ -57,35 +57,35 @@ describe('settingFields', () => {
     expect(byKey.get('dense')).toMatchObject({ path: ['layout', 'dense'], groups: ['Layout'] })
     expect(byKey.has('token')).toBe(false)
     expect(byKey.has('state')).toBe(false)
-    expect(settingFields({ schema, secrets: [{ path: ['layout'] }], text }).some(field => field.key === 'dense')).toBe(false)
+    expect(SettingsSchemaModel.settingFields({ schema, secrets: [{ path: ['layout'] }], text }).some(field => field.key === 'dense')).toBe(false)
   })
 
   it('reads nothing from an unreadable schema', () => {
-    expect(settingFields({ schema: { nope: true }, text })).toEqual([])
+    expect(SettingsSchemaModel.settingFields({ schema: { nope: true }, text })).toEqual([])
   })
 })
 
 describe('labels and units', () => {
   it('humanizes keys and reads units from their suffix', () => {
-    expect(humanizeKey('archiveUndoDurationSeconds')).toBe('Archive undo duration seconds')
-    expect(unitOfKey('archiveUndoDurationSeconds')).toBe('s')
-    expect(unitOfKey('pollMs')).toBe('ms')
-    expect(unitOfKey('maxTabs')).toBeUndefined()
+    expect(SettingsSchemaModel.humanizeKey('archiveUndoDurationSeconds')).toBe('Archive undo duration seconds')
+    expect(SettingsSchemaModel.unitOfKey('archiveUndoDurationSeconds')).toBe('s')
+    expect(SettingsSchemaModel.unitOfKey('pollMs')).toBe('ms')
+    expect(SettingsSchemaModel.unitOfKey('maxTabs')).toBeUndefined()
   })
 
   it('shows a few short choices as segments and the rest as a select', () => {
-    expect(choiceDisplay([{ value: 'a', label: 'A', detail: '' }])).toBe('segmented')
-    expect(choiceDisplay(['a', 'b', 'c', 'd', 'e'].map(value => ({ value, label: value, detail: '' })))).toBe('select')
+    expect(SettingsSchemaModel.choiceDisplay([{ value: 'a', label: 'A', detail: '' }])).toBe('segmented')
+    expect(SettingsSchemaModel.choiceDisplay(['a', 'b', 'c', 'd', 'e'].map(value => ({ value, label: value, detail: '' })))).toBe('select')
   })
 })
 
 describe('paths', () => {
   it('reads nested values and tells an override apart from a missing key', () => {
     const user = { layout: { dense: false }, tags: ['a'] }
-    expect(valueAt(user, ['layout', 'dense'])).toBe(false)
-    expect(valueAt(user, ['tags', '0'])).toBe('a')
-    expect(hasValueAt(user, ['layout', 'dense'])).toBe(true)
-    expect(hasValueAt(user, ['layout', 'wide'])).toBe(false)
-    expect(hasValueAt(undefined, ['enabled'])).toBe(false)
+    expect(SettingsSchemaModel.valueAt(user, ['layout', 'dense'])).toBe(false)
+    expect(SettingsSchemaModel.valueAt(user, ['tags', '0'])).toBe('a')
+    expect(SettingsSchemaModel.hasValueAt(user, ['layout', 'dense'])).toBe(true)
+    expect(SettingsSchemaModel.hasValueAt(user, ['layout', 'wide'])).toBe(false)
+    expect(SettingsSchemaModel.hasValueAt(undefined, ['enabled'])).toBe(false)
   })
 })

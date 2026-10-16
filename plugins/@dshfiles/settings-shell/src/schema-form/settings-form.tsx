@@ -12,12 +12,8 @@ import { Fragment, useEffect, useRef, useState, useSyncExternalStore, type React
 import { z } from 'zod'
 import type { ShellTranslate } from '../native/locales.js'
 import {
-  blankValue,
-  choiceDisplay,
-  hasValueAt,
   jsonValueSchema,
-  parseJsonDraft,
-  valueAt,
+  SettingsSchemaModel,
   type ChoiceOption,
   type JsonValue,
   type NumberControl,
@@ -97,7 +93,7 @@ const ChoiceInput = (props: {
     const option = props.options.find(candidate => choiceKey(candidate.value) === key)
     if (option !== undefined) props.onChange(option.value)
   }
-  if (choiceDisplay(props.options) === 'segmented') {
+  if (SettingsSchemaModel.choiceDisplay(props.options) === 'segmented') {
     return (
       <ToggleGroup aria-label={props.label} disabled={props.disabled} onValueChange={pick} size="sm" type="single" value={selected} variant="outline">
         {props.options.map(option => (
@@ -288,7 +284,7 @@ const ListInput = (props: {
       <Button
         className="dshx:self-start"
         disabled={props.disabled}
-        onClick={() => props.onChange([...items, blankValue(props.item)])}
+        onClick={() => props.onChange([...items, SettingsSchemaModel.blankValue(props.item)])}
         size="sm"
         type="button"
         variant="outline"
@@ -352,7 +348,7 @@ const RecordInput = (props: {
         <Button
           disabled={props.disabled || newKey.trim() === '' || entries.some(([key]) => key === newKey.trim())}
           onClick={() => {
-            write([...entries, [newKey.trim(), blankValue(props.valueControl)]])
+            write([...entries, [newKey.trim(), SettingsSchemaModel.blankValue(props.valueControl)]])
             setNewKey('')
           }}
           size="sm"
@@ -377,7 +373,7 @@ const JsonInput = (props: {
 }): JSX.Element => {
   const [invalid, setInvalid] = useState(false)
   const draft = useDraft(props.value === undefined ? '' : (JSON.stringify(props.value, null, 2) ?? ''), text => {
-    const value = parseJsonDraft(text)
+    const value = SettingsSchemaModel.parseJsonDraft(text)
     setInvalid(value === undefined)
     if (value !== undefined) props.onChange(value)
   })
@@ -410,8 +406,8 @@ const displayedValue = (input: {
   readonly base: JsonValue | undefined
 }): JsonValue | undefined => {
   if (input.edit?.kind === 'set') return input.edit.value
-  if (input.edit?.kind === 'reset') return valueAt(input.base, input.field.path) ?? input.field.defaultValue
-  return valueAt(input.values, input.field.path) ?? input.field.defaultValue
+  if (input.edit?.kind === 'reset') return SettingsSchemaModel.valueAt(input.base, input.field.path) ?? input.field.defaultValue
+  return SettingsSchemaModel.valueAt(input.values, input.field.path) ?? input.field.defaultValue
 }
 
 /** Wide controls sit under the description; single-value controls sit on the title row. */
@@ -591,7 +587,7 @@ export const SettingsForm = (props: {
               field={field}
               focused={focusKey === field.path.join('.')}
               highlight={props.highlight}
-              modified={edit === undefined ? user.success && hasValueAt(user.data, field.path) : edit.kind === 'set'}
+              modified={edit === undefined ? user.success && SettingsSchemaModel.hasValueAt(user.data, field.path) : edit.kind === 'set'}
               reset={reset}
               t={props.t}
               value={displayedValue({ edit, field, values: values.success ? values.data : undefined, base: base.success ? base.data : undefined })}

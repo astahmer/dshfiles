@@ -108,7 +108,7 @@ const resolve = (walk: Walk, reference: JsonValue | undefined): SchemaNode | und
 }
 
 /** `maxTabs` → "Max tabs", `archive-undo` → "Archive undo". */
-export const humanizeKey = (key: string): string => {
+const humanizeKey = (key: string): string => {
   const words = key
     .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
     .replace(/[-_.]+/g, ' ')
@@ -131,7 +131,7 @@ const UNIT_SUFFIXES: readonly (readonly [RegExp, string])[] = [
 ]
 
 /** The unit a numeric key spells out (`idleMinutes` → "min"), or undefined. */
-export const unitOfKey = (key: string): string | undefined => UNIT_SUFFIXES.find(([pattern]) => pattern.test(key))?.[1]
+const unitOfKey = (key: string): string | undefined => UNIT_SUFFIXES.find(([pattern]) => pattern.test(key))?.[1]
 
 const choiceOptions = (walk: Walk, node: SchemaNode): readonly ChoiceOption[] | undefined => {
   if (node.type === 'const') {
@@ -207,7 +207,7 @@ const collect = (walk: Walk, node: SchemaNode, path: readonly string[], groups: 
 }
 
 /** Every visible, non-secret setting of one namespace schema, in schema order; empty when the schema is unreadable. */
-export const settingFields = (input: {
+const settingFields = (input: {
   readonly schema: JsonValue
   readonly secrets?: readonly { readonly path: readonly string[] }[]
   readonly text: LocalizedTextReader
@@ -225,7 +225,7 @@ interface NamespaceText {
 }
 
 /** The namespace's own title and description, from its root node; empty strings when it declares none. */
-export const namespaceText = (input: { readonly schema: JsonValue; readonly text: LocalizedTextReader }): NamespaceText => {
+const namespaceText = (input: { readonly schema: JsonValue; readonly text: LocalizedTextReader }): NamespaceText => {
   const envelope = envelopeSchema.safeParse(input.schema)
   if (!envelope.success) return { title: '', description: '' }
   const root = resolve({ refs: envelope.data.refs, text: input.text, secrets: [] }, envelope.data.uid)
@@ -233,7 +233,7 @@ export const namespaceText = (input: { readonly schema: JsonValue; readonly text
 }
 
 /** Segmented buttons for a few short choices, a select otherwise. */
-export const choiceDisplay = (options: readonly ChoiceOption[]): 'segmented' | 'select' =>
+const choiceDisplay = (options: readonly ChoiceOption[]): 'segmented' | 'select' =>
   options.length <= MAX_SEGMENTED_OPTIONS && options.every(option => option.label.length <= MAX_SEGMENTED_LABEL) ? 'segmented' : 'select'
 
 const recordValueSchema = z.record(z.string(), jsonValueSchema)
@@ -254,11 +254,11 @@ const step = (value: JsonValue | undefined, segment: string): Step => {
 }
 
 /** The value at a settings path, or undefined when any segment is missing. */
-export const valueAt = (value: JsonValue | undefined, path: readonly string[]): JsonValue | undefined =>
+const valueAt = (value: JsonValue | undefined, path: readonly string[]): JsonValue | undefined =>
   path.reduce<JsonValue | undefined>((current, segment) => step(current, segment).value, value)
 
 /** Whether the path exists, independently of its value: an override that equals the default is still an override. */
-export const hasValueAt = (value: JsonValue | undefined, path: readonly string[]): boolean => {
+const hasValueAt = (value: JsonValue | undefined, path: readonly string[]): boolean => {
   let current = value
   for (const segment of path) {
     const next = step(current, segment)
@@ -269,7 +269,7 @@ export const hasValueAt = (value: JsonValue | undefined, path: readonly string[]
 }
 
 /** A JSON draft typed in the fallback editor, or undefined when it does not parse into a JSON value. */
-export const parseJsonDraft = (text: string): JsonValue | undefined => {
+const parseJsonDraft = (text: string): JsonValue | undefined => {
   let decoded: unknown
   try {
     decoded = JSON.parse(text)
@@ -281,7 +281,7 @@ export const parseJsonDraft = (text: string): JsonValue | undefined => {
 }
 
 /** The value a new list item or record entry starts with. */
-export const blankValue = (control: ScalarControl): JsonValue => {
+const blankValue = (control: ScalarControl): JsonValue => {
   switch (control.kind) {
     case 'boolean':
       return false
@@ -292,4 +292,16 @@ export const blankValue = (control: ScalarControl): JsonValue => {
     case 'text':
       return ''
   }
+}
+
+export class SettingsSchemaModel {
+  static readonly humanizeKey = humanizeKey
+  static readonly unitOfKey = unitOfKey
+  static readonly settingFields = settingFields
+  static readonly namespaceText = namespaceText
+  static readonly choiceDisplay = choiceDisplay
+  static readonly valueAt = valueAt
+  static readonly hasValueAt = hasValueAt
+  static readonly parseJsonDraft = parseJsonDraft
+  static readonly blankValue = blankValue
 }

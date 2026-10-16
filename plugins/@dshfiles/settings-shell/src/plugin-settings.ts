@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { humanizeKey, namespaceText, settingFields, type JsonValue, type LocalizedTextReader, type SettingField } from './schema-form/schema-model.js'
+import { SettingsSchemaModel, type JsonValue, type LocalizedTextReader, type SettingField } from './schema-form/schema-model.js'
 
 /** One settings namespace, as `settings.describe` reports it. */
 interface NamespaceDescription {
@@ -44,15 +44,15 @@ export class SettingsPluginPages {
   }): readonly PluginSettingsPage[] =>
     input.namespaces
       .flatMap(namespace => {
-        const fields = settingFields({ schema: namespace.schema, secrets: namespace.secrets ?? [], text: input.text })
+        const fields = SettingsSchemaModel.settingFields({ schema: namespace.schema, secrets: namespace.secrets ?? [], text: input.text })
         if (fields.length === 0) return []
-        const own = namespaceText({ schema: namespace.schema, text: input.text })
+        const own = SettingsSchemaModel.namespaceText({ schema: namespace.schema, text: input.text })
         const label = input.labels.get(namespace.ns)
         return [
           {
             pageId: SettingsPluginPages.pluginPageId(namespace.ns),
             ns: namespace.ns,
-            title: label?.title || own.title || humanizeKey(namespace.ns.replace(/^dshfiles-/u, '')),
+            title: label?.title || own.title || SettingsSchemaModel.humanizeKey(namespace.ns.replace(/^dshfiles-/u, '')),
             description: label?.description || own.description,
             group: namespace.autoGenerate ? ('plugins' as const) : ('more' as const),
             fields,
