@@ -38,26 +38,26 @@ backing verb; `host-gap` counts capabilities no verb can reach yet.
 | btw | 8 | 0 | 3 | 1 |
 | shortcuts | 4 | 0 | 2 | 1 |
 | jj-integration | 22 | 8 | 5 | 3 |
-| jujutsu | 28 | 0 | 28 | 3 |
+| jujutsu | 28 | 11 | 0 | 3 |
 | project-checks | 8 | 4 | 1 | 2 |
 | project-folder-picker / workspace-folder-picker | 9 | 0 | 4 | 2 |
 | workbench | 8 | 0 | 2 | 6 |
 | agent-communication | 10 | 14 | 0 | 0 |
 | agent-questions | 12 | 11 | 0 | 1 |
 | activity-timeline | 7 | 5 | 0 | 0 |
-| multi-host | 17 | 18 | 2 | 1 |
+| multi-host | 17 | 20 | 0 | 1 |
 | goal-stall-guard | 4 | 3 | 1 | 0 |
 | agent-toolkit | 9 | 1 | 6 | 3 |
 | tool-meta | 3 | 0 | 2 | 1 |
 | ai-accounts | 21 | 18 | 7 | 1 |
 | model-effort-picker | 3 | 0 | 1 | 0 |
-| usage | 5 | 0 | 4 | 1 |
+| usage | 5 | 2 (not installed) | 2 | 1 |
 | memory | 12 | 11 | 1 | 0 |
-| optmem | 6 | 0 (plugin not installed) | 6 | 0 |
-| editor | 7 | 0 | 6 | 2 |
+| optmem | 6 | 7 (plugin not installed) | 3 | 0 |
+| editor | 7 | 1 | 5 | 2 |
 | diff-viewed | 3 | 0 | 1 | 2 |
 | prompt-stash | 6 | 0 | 1 | 5 |
-| queue-reorder | 7 | 1 (not installed) | 6 | 1 |
+| queue-reorder | 7 | 2 (not installed) | 5 | 1 |
 | request-messages | 1 | 0 | 0 | 1 |
 | rich-composer | 2 | 0 | 0 | 2 |
 | send-after-upload | 2 | 0 | 1 | 1 |
@@ -166,17 +166,19 @@ Still missing:
 
 ### jujutsu
 
-The graph and Source Control actions are all client-side calls into the plugin's
-own API; none carries a `tool` binding, so every one is a missing tool:
-`jj_graph_load` (`load`), `jj_graph_page` (`graphPage`), `jj_graph_navigation`
-(`graphNavigation`), `jj_revision_relationship` (`revisionRelationship`),
-`jj_graph_slice` (`graphSlice`), `jj_describe`, `jj_revision_details`,
-`jj_edit`, `jj_new`, `jj_squash`, `jj_split`, `jj_duplicate`, `jj_revert`,
-`jj_rebase`, `jj_bookmark_set`, `jj_abandon`, `jj_bookmark_push`,
-`jj_bookmark_delete`, `jj_fetch`, `jj_push`, `jj_commit`, `jj_restore`,
-`jj_workspace_add`, `jj_register_repository`, `jj_repository_status`,
-`jj_settings`, `jj_working_copy_diff`, `jj_session_context` — all over
-`prepare` + `confirm` (`src/api.ts:229,233`) into `src/core.ts`.
+Bound now (sibling revision `feat(jujutsu): expose the revision graph and Source
+Control as agent tools`), with eleven tools covering all 28 capabilities: the nine
+read-only ones are `jj_register_repository`, `jj_load`, `jj_graph_page`,
+`jj_graph_navigation`, `jj_revision_relationship`, `jj_graph_slice`, `jj_details`,
+`jj_revision_files` and `jj_working_diff`.
+
+The writes keep the product's two-step shape rather than one tool per action:
+`jj_prepare_action` prepares one of the seventeen mutation kinds (describe, split,
+squash, rebase, bookmark-move/set/delete, fetch, push, workspace-add, edit, new,
+commit, duplicate, abandon, revert, restore) and returns its preview, and
+`jj_confirm_action` applies a `previewId`. Both say to act only when the user
+asked, so the plan a human would confirm in the UI is still shown first. Settings
+are not separate tools: `settings_set` writes the `dshfiles-jujutsu` namespace.
 
 ### project-checks
 
@@ -243,10 +245,9 @@ Deliberately untooled, pinned by a test:
 | `runtimeUpsert` / `hostUpsert` | Registration steps `multi_host_save_ssh_host` already performs |
 | `sessionCursor` | Internal polling cursor |
 
-Still missing, and needing a new API method rather than a binding: replying to and
-stopping a *remote* thread, which today ride the raw `runtimeCall`
-(`session/prompt` / `session/cancel`). A dedicated `threadReply` / `threadStop`
-method would make those safe to expose.
+Replying to and stopping a remote thread now have dedicated methods
+(`threadReply`, `threadStop`) and tools (`multi_host_thread_reply`,
+`multi_host_thread_stop`), so no Agent needs the raw `runtimeCall` for them.
 
 ### agent-toolkit
 
@@ -292,9 +293,9 @@ Still missing, because they write secrets or need a browser:
 
 - `model-effort-picker`: `session_models` (`session/modelCatalog`); model
   *selection* is already served by `thread_select_model`.
-- `usage`: `usage_requests` and `usage_report` are registered in code but the
-  plugin is not installed in the web profile, plus `usage_reindex` (`refresh`)
-  and `usage_status` (`status`).
+- `usage`: `usage_status` (read-only) and `usage_reindex` are now bound, as are the
+  existing `usage_requests` and `usage_report` — but the plugin is **not installed**
+  in the web profile, so all four are latent until it is.
 - `memory`: bound (sibling revision `feat(memory): expose note curation and
   memory inspection as agent tools`) — read-only `memory_projects`,
   `memory_start_block`, `memory_notes`, `memory_note_history`, `memory_threads`
@@ -305,24 +306,31 @@ Still missing, because they write secrets or need a browser:
   (duplicates `memory_read` and would distort the memory-tool counters),
   `memory_rate_citation` (an Agent must not rate its own citations), and the
   settings pair, retired by `settings_set` / `settings_unset`.
-- `optmem`: `optmem_project_view`, `optmem_project_search`,
-  `optmem_get_settings` / `optmem_set_settings`, `optmem_pause_summaries`,
-  `optmem_backfill`, `optmem_status` — plugin not installed.
+- `optmem`: bound (not installed, so latent): `optmem_projects`,
+  `optmem_project_for_path`, `optmem_project_view`, `optmem_project_zoom`,
+  `optmem_project_search`, `optmem_context_preview` and `optmem_pipeline`. Its
+  `overview`, `providers` and `backfill` methods are declared with TypeScript
+  types only, so they need schemas before they can publish tool schemas; settings
+  go through `settings_set`.
 
 ### editor, diff-viewed, queue-reorder, attachments, send-after-upload
 
-- `editor`: `editor_list_files` (`workspaceFiles.list`), `editor_write`
-  (existing `editor.write` RPC, no `tool` binding), `open_workspace_path`
+- `editor`: **`editor_write` is bound** (sibling revision `feat(editor): expose
+  the guarded save as an agent tool`) — the sha256-guarded save, with `sessionId`
+  defaulting to the calling thread. Still missing: `open_workspace_path`
   (`session/openWorkspacePath`), `editor_set_open_file_links`,
-  `editor_set_placement`; `editor_open_file` is a host-gap (no Host→Client
-  channel opens a tab).
+  `editor_set_placement`; `editor_list_files` has no plugin API of its own
+  (the core `workspaceFiles.list` verb, which an Agent reaches with glob/read);
+  `editor_open_file` is a host-gap (no Host→Client channel opens a tab).
 - `diff-viewed`: `changes_summary` (`api/changes.summary` fetch) — its per-file
   marks have no Host verb at all.
-- `queue-reorder`: `queue_move` already exists as a tool but the plugin is absent
-  from the web profile; `queue_remove`, `queue_steer`, `queue_move_to_thread`,
-  `queue_list_attachments`, `queue_reorder_set_preferences` are missing, and
-  `queue_edit` cannot preserve attachments because `QueueAction.edit` is
-  text-only.
+- `queue-reorder`: bound (not installed, so latent): `queue_describe` for the queued
+  rows, plus the existing `queue_move`. Still missing: `queue_remove`,
+  `queue_steer`, `queue_move_to_thread` and `queue_list_attachments` — those need
+  the Session controller, which this plugin does not hold, so they belong in the
+  plugin that does (`thread-sidebar`); `queue_reorder_set_preferences` is a
+  settings write. `queue_edit` cannot preserve attachments because
+  `QueueAction.edit` is text-only (a recorded Host gap).
 - `attachment-gallery`: `session_attach_file` (session attachment + upload),
   `session_read_attachment` (`session/attachment`).
 - `send-after-upload`: `session_queue_message` (queue-mode prompt).
@@ -547,15 +555,37 @@ A ninth, `feat(memory): expose note curation and memory inspection as agent
 tools`, makes the memory panel types schemas and binds eight tools, so an Agent
 can correct or forget a note the user asked about and inspect what memory holds.
 
+A tenth, `feat(editor): expose the guarded save as an agent tool`, binds
+`editor_write`: the one save in DSH that refuses to overwrite a file that changed
+on disk since it was read. It is the deliberate exception to the "only when the
+user asked" gate — saving a file *is* the task, so the sha256 guard, not a request
+gate, is what protects it; `overwrite: true` stays reserved for a user who asked
+to discard concurrent changes.
+
+Then the sweep closed the rest of the P1 list: jujutsu's eleven tools over its
+graph and Source Control actions (all 28 capabilities, writes still prepared and
+confirmed); `usage_status`/`usage_reindex`; `queue_describe`;
+optmem's seven explorer reads; and `multi_host_thread_reply` /
+`multi_host_thread_stop` on two new dedicated methods.
+
+One repo-health fix came out of the same pass: memory's two hand-written CSS rules
+lived in the file that emits the shared Tailwind sheet, so its compiled sheet hashed
+differently and the page loaded a second full Tailwind copy — the palette budget's
+"plugins share one stylesheet" scenario was red for it, including on main. Moving
+those rules to `memory-reference.css` made the sheet byte-identical again and the
+scenario passes.
+
 ## Backlog
 
-1. **P1 — bind tools to verbs that already exist.** What is left, in value
-   order: `editor` (`write`, `workspaceFiles.list`), `tool-meta` (2 — a settings
-   namespace `settings_set` already reaches), `queue-reorder` (5, not installed),
-   then `jujutsu` (28, large and already reachable through `bash jj`, so it is
-   deliberately last). Done: `thread-sidebar`, `jj-integration`,
-   `settings-shell`, `ai-accounts`, `multi-host`, `mcp-servers`,
-   `agent-communication`, `activity-timeline`, `project-checks`, `memory`.
+1. **P1 — bind tools to verbs that already exist.** Done for every owner except
+   the ones with a reason to wait: `tool-meta` (its namespace is reached by
+   `settings_set`), `queue-reorder`'s queue edits (need the Session controller, so
+   they belong in `thread-sidebar`), and `optmem`'s `overview`/`providers`/
+   `backfill` (need schemas; the plugin is not installed either). Bound so far:
+   `thread-sidebar`, `jj-integration`, `settings-shell`, `ai-accounts`,
+   `multi-host`, `mcp-servers`, `agent-communication`, `activity-timeline`,
+   `project-checks`, `memory`, `editor`, `jujutsu`, `usage`, `queue-reorder`,
+   `optmem`.
 2. **P2 — install the plugins that already ship tools.** `usage`, `optmem`,
    `queue-reorder` are written but absent from the web profile, so their tools
    are dead code today; decide per plugin whether it belongs in the seed.
