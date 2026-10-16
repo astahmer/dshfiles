@@ -1,10 +1,12 @@
 import { SettingsPageRendererModel, type SettingsPageRenderer, type SettingsPageRendererProps } from '../settings/page-renderer.js'
 import { ApiRuntimeModel } from '../api/runtime.js'
 import { ClientContributionModel } from './define.js'
+import { LocaleNamespaceModel } from './locale.js'
 
 export const defineClient = ClientContributionModel.defineClient
 export const defineSlot = ClientContributionModel.defineSlot
-export { declareLocaleNamespace, defineLocale } from './locale.js'
+export const declareLocaleNamespace = LocaleNamespaceModel.declareNamespace
+export const defineLocale = LocaleNamespaceModel.define
 export { CLIENT_SLOT_REFERENCES, findClientSlot, slotOwnerImports, type ClientSlotReference } from './slot-reference.js'
 export type {
   ClientConversationContribution,

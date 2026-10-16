@@ -11,7 +11,7 @@ import type {
   SlotContribution,
 } from './types.js'
 import { ClientContributionModel, type SlotRegistrationOptions } from './define.js'
-import { isLocaleDefinition, localeDefinitionParts } from './locale.js'
+import { LocaleNamespaceModel } from './locale.js'
 import { ConversationContributionModel } from '../conversation/define.js'
 import { ApiClientLifecycle } from '../api/client.js'
 import { createSettingsClientRuntime, provideSettingsContext } from '../settings/client.js'
@@ -114,7 +114,7 @@ function validateContribution(value: unknown, metadata: ClientPluginMetadata, in
     )
   }
   const locale = (parts.options as Record<string, unknown>).locale
-  if (locale !== undefined && !isLocaleDefinition(locale) && (typeof locale !== 'string' || locale.trim() === '' || locale !== locale.trim())) {
+  if (locale !== undefined && !LocaleNamespaceModel.isDefinition(locale) && (typeof locale !== 'string' || locale.trim() === '' || locale !== locale.trim())) {
     fail(
       'DSHX2202',
       `Client slot contribution at index ${index} has an invalid locale option.`,
@@ -126,7 +126,7 @@ function validateContribution(value: unknown, metadata: ClientPluginMetadata, in
 }
 
 function validateLocaleContribution(value: unknown, metadata: ClientPluginMetadata, index: number): LocaleDefinition {
-  if (!isLocaleDefinition(value)) {
+  if (!LocaleNamespaceModel.isDefinition(value)) {
     fail(
       'DSHX2401',
       `Client Locale contribution at index ${index} must be an object returned by defineLocale().`,
@@ -134,7 +134,7 @@ function validateLocaleContribution(value: unknown, metadata: ClientPluginMetada
       'Use defineLocale("namespace", { zh: { ... }, en: { ... } }) inside defineClient({ locales: [...] }).',
     )
   }
-  const { namespace, dictionaries } = localeDefinitionParts(value)
+  const { namespace, dictionaries } = LocaleNamespaceModel.parts(value)
   if (typeof namespace !== 'string' || namespace.trim() === '' || namespace !== namespace.trim()) {
     fail(
       'DSHX2402',
@@ -246,7 +246,7 @@ function validateDefinition(value: unknown, metadata: ClientPluginMetadata): Cli
     const namespaces = new Set<string>()
     source.locales.forEach((locale, index) => {
       const contribution = validateLocaleContribution(locale, metadata, index)
-      const namespace = localeDefinitionParts(contribution).namespace
+      const namespace = LocaleNamespaceModel.parts(contribution).namespace
       if (namespaces.has(namespace)) {
         fail(
           'DSHX2402',
@@ -289,13 +289,13 @@ function validateDefinition(value: unknown, metadata: ClientPluginMetadata): Cli
 type ComponentDecorator = ClientComponentDecorator
 
 function normalizedSlotOptions(options: SlotRegistrationOptions): SlotRegistrationOptions {
-  if (!isLocaleDefinition(options.locale)) return options
-  return { ...options, locale: localeDefinitionParts(options.locale).namespace }
+  if (!LocaleNamespaceModel.isDefinition(options.locale)) return options
+  return { ...options, locale: LocaleNamespaceModel.parts(options.locale).namespace }
 }
 
 function registerLocales(client: ClientRuntimeContext, definition: ClientDefinition): void {
   for (const locale of definition.locales ?? []) {
-    const { namespace, dictionaries } = localeDefinitionParts(locale)
+    const { namespace, dictionaries } = LocaleNamespaceModel.parts(locale)
     client.effect(() => client.locale.register(namespace, dictionaries))
   }
 }

@@ -34,7 +34,7 @@ type BalancedDictionaries<Dictionaries extends LocaleDictionaries> = Dictionarie
  * Calling it is the whole ceremony: the returned `defineLocale` definition is
  * still what the Client registers.
  */
-export function declareLocaleNamespace<const Namespace extends string, const Dictionaries extends LocaleDictionaries>(
+function declareLocaleNamespace<const Namespace extends string, const Dictionaries extends LocaleDictionaries>(
   namespace: Namespace & UnreservedNamespace<Namespace>,
   dictionaries: BalancedDictionaries<Dictionaries>,
 ): LocaleDefinition<Namespace, DictionaryKeys<Dictionaries>> {
@@ -77,7 +77,7 @@ type UnreservedNamespace<Namespace extends string> = Namespace extends ReservedL
  * claim one a shipped package already registers. The build repeats the check for
  * namespaces that are not literal at the type level.
  */
-export function defineLocale<Namespace extends string, const Dictionaries extends LocaleDictionaries>(
+function defineLocale<Namespace extends string, const Dictionaries extends LocaleDictionaries>(
   namespace: Namespace & UnreservedNamespace<Namespace>,
   dictionaries: BalancedDictionaries<Dictionaries>,
 ): LocaleDefinition<Namespace, DictionaryKeys<Dictionaries>> {
@@ -86,12 +86,19 @@ export function defineLocale<Namespace extends string, const Dictionaries extend
   return definition
 }
 
-export function isLocaleDefinition(value: unknown): value is LocaleDefinition {
+function isLocaleDefinition(value: unknown): value is LocaleDefinition {
   return typeof value === 'object' && value !== null && localeDefinitions.has(value)
 }
 
-export function localeDefinitionParts(value: LocaleDefinition): LocaleDefinitionParts {
+function localeDefinitionParts(value: LocaleDefinition): LocaleDefinitionParts {
   const parts = localeDefinitions.get(value)
   if (parts === undefined) throw new TypeError('Invalid Locale contribution; create it with defineLocale(namespace, dictionaries).')
   return parts
+}
+
+export class LocaleNamespaceModel {
+  static readonly declareNamespace = declareLocaleNamespace
+  static readonly define = defineLocale
+  static readonly isDefinition = isLocaleDefinition
+  static readonly parts = localeDefinitionParts
 }

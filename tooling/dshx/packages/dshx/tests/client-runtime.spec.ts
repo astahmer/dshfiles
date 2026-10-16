@@ -6,7 +6,7 @@ import type { ClientContext, LocaleDefinition, LocaleKeyOf, PropsLocaleOf } from
 import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { SessionStore } from '@deepseek-ai/dsh-session'
 import { ClientContributionModel } from '../src/client/define.js'
-import { localeDefinitionParts } from '../src/client/locale.js'
+import { LocaleNamespaceModel } from '../src/client/locale.js'
 import type { ClientConversationContribution } from '../src/client/types.js'
 import { defineConversation } from '../src/conversation/index.js'
 import { createClientModule, createClientPlugin } from '../src/client/runtime.js'
@@ -89,7 +89,7 @@ describe('defineClient', () => {
       zh: { title: '标题', body: '正文' },
       en: { title: 'Title', body: 'Body' },
     })
-    expect(localeDefinitionParts(copy)).toEqual({
+    expect(LocaleNamespaceModel.parts(copy)).toEqual({
       namespace: 'test.copy',
       dictionaries: {
         zh: { title: '标题', body: '正文' },
@@ -233,7 +233,7 @@ describe('Client runtime adapter', () => {
     plugin.apply(ctx)
     expect(effect.mock.invocationCallOrder[0]).toBeLessThan(registerLocale.mock.invocationCallOrder[0] ?? 0)
     expect(calls).toEqual(['locale:test.copy', 'inject:test.slot', 'slot:test.copy', 'setup'])
-    expect(registered[0]).toEqual({ namespace: 'test.copy', dictionaries: localeDefinitionParts(copy).dictionaries })
+    expect(registered[0]).toEqual({ namespace: 'test.copy', dictionaries: LocaleNamespaceModel.parts(copy).dictionaries })
     expect(registered[1]).toEqual({ options: { name: 'test.slot', id: 'localized', locale: 'test.copy' }, component })
     expect(dispose).not.toHaveBeenCalled()
   })
