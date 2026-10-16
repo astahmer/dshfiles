@@ -14,7 +14,7 @@ import {
   type QuotaRecoveryModelSelection,
 } from './api.js'
 import {
-  accountFilePath,
+  AccountStoreModel,
   buildAccountsFile,
   moveAccount,
   readAccountFile,
@@ -99,7 +99,7 @@ export const accountsHostApi = aiAccountsApi.host({
     await refreshRoutes(ctx)
     return accountsFile(ctx)
   },
-  filePath: () => accountFilePath(),
+  filePath: () => AccountStoreModel.filePath(),
   secretCatalogKeys: async ({ input, ctx }) => {
     const bridge = secretCatalogBridgeFor(ctx)
     if (bridge === undefined) return { available: false, items: [] }

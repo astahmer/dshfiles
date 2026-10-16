@@ -47,17 +47,16 @@ const storeFileSchema = accountsFileSchema.extend({
   accounts: z.array(accountDraftSchema).max(64),
 })
 
-/**
- * Read the stored profiles without blocking on I/O.
- *
- * Cordis activates a plugin synchronously, so the first read is the file's
- * cached bytes if they are already present and defaults otherwise. Every read
- * after that goes through {@link readAccountFile}, which re-reads from disk, so
- * an external edit is picked up on the next request.
- */
-/** Load the file into the cache so activation can read it synchronously. */
-export const accountFilePath = (): string => STORE_PATH
+export class AccountStoreModel {
+  static readonly filePath = (): string => STORE_PATH
+  static readonly codexLayoutFor = (profile: Pick<AccountDraft, 'homePath' | 'shadowHomePath' | 'instanceId'>, shadowRoot: string) =>
+    CodexHomeModel.resolveLayout({
+      homePath: profile.homePath,
+      shadowHomePath: profile.shadowHomePath.trim().length > 0 ? profile.shadowHomePath : join(shadowRoot.replace(/\/$/u, ''), profile.instanceId),
+    })
+}
 
+/** Load the file into the cache so activation can read it synchronously. */
 export const primeAccountFile = (): AccountStoreFile => {
   try {
     cachedRaw = readFileSync(STORE_PATH, 'utf8')
@@ -67,6 +66,14 @@ export const primeAccountFile = (): AccountStoreFile => {
   return readAccountFileSync()
 }
 
+/**
+ * Read the stored profiles without blocking on I/O.
+ *
+ * Cordis activates a plugin synchronously, so the first read is the file's
+ * cached bytes if they are already present and defaults otherwise. Every read
+ * after that goes through {@link readAccountFile}, which re-reads from disk, so
+ * an external edit is picked up on the next request.
+ */
 export const readAccountFileSync = (): AccountStoreFile => {
   if (cachedRaw === undefined) return emptyFile()
   const result = storeFileSchema.safeParse(parseJson(cachedRaw))
@@ -112,16 +119,7 @@ export const writeAccountFile = async (next: AccountStoreFile): Promise<AccountS
   return validated
 }
 
-const expandHome = (value: string): string => (value.startsWith('~/') ? join(homedir(), value.slice(2)) : value)
-
-/** Derive an account's Codex homes, defaulting the shadow under the root, exactly as its route does. */
-export const codexLayoutFor = (profile: Pick<AccountDraft, 'homePath' | 'shadowHomePath' | 'instanceId'>, shadowRoot: string) =>
-  CodexHomeModel.resolveLayout({
-    homePath: profile.homePath,
-    shadowHomePath: profile.shadowHomePath.trim().length > 0 ? profile.shadowHomePath : join(shadowRoot.replace(/\/$/, ''), profile.instanceId),
-  })
-
-const layoutFor = (profile: AccountDraft, file: AccountStoreFile) => codexLayoutFor(profile, file.shadowRoot)
+const layoutFor = (profile: AccountDraft, file: AccountStoreFile) => AccountStoreModel.codexLayoutFor(profile, file.shadowRoot)
 
 const defaultName = (draft: AccountDraft): string =>
   draft.displayName.trim().length > 0 ? draft.displayName.trim() : `${KIND_LABEL[draft.kind]} (${draft.instanceId})`
@@ -357,6 +355,3 @@ export const readAccountIdentity = async (
     signedIn: auth.signedIn,
   }
 }
-
-export const storePath = (): string => resolve(STORE_PATH)
-export const expandPath = expandHome

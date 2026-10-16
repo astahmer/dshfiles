@@ -62,7 +62,7 @@ describe('account store priming', () => {
 
     expect(primed.accounts).toHaveLength(1)
     expect(primed.accounts[0]?.instanceId).toBe('codex-test')
-    expect(store.accountFilePath()).toMatch(/\/plugins\/ai-accounts\/accounts\.json$/u)
+    expect(store.AccountStoreModel.filePath()).toMatch(/\/plugins\/ai-accounts\/accounts\.json$/u)
   })
 
   it('keeps the sync read stable across repeats without an async re-read', async () => {
