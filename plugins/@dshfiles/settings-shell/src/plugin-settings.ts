@@ -62,7 +62,8 @@ export class SettingsPluginPages {
       .sort((left, right) => left.title.localeCompare(right.title))
 
   /** Reads a schemastery description or manifest text in the active language, falling back to English. */
-  static localizedTextReader = (locale: string): LocalizedTextReader =>
+  static localizedTextReader =
+    (locale: string): LocalizedTextReader =>
     value => {
       const plain = z.string().safeParse(value)
       if (plain.success) return plain.data

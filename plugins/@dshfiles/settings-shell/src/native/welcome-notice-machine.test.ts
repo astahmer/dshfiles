@@ -23,7 +23,7 @@ const hostScope = (input: Partial<WelcomeNoticeScopeState> = {}): WelcomeNoticeS
   ...input,
 })
 
-const deferred = <Value,>() => {
+const deferred = <Value>() => {
   let resolve = (_value: Value): void => {}
   const promise = new Promise<Value>(onResolve => {
     resolve = onResolve

@@ -16,7 +16,11 @@ describe('pluginSettingsPages', () => {
   ]
 
   it('titles pages by manifest label, then by id, and files native-owned namespaces under More settings', () => {
-    const pages = SettingsPluginPages.pluginSettingsPages({ namespaces, labels: new Map([['thread-sidebar', { title: 'Thread Sidebar', description: 'Group threads.' }]]), text })
+    const pages = SettingsPluginPages.pluginSettingsPages({
+      namespaces,
+      labels: new Map([['thread-sidebar', { title: 'Thread Sidebar', description: 'Group threads.' }]]),
+      text,
+    })
     expect(pages.map(page => [page.title, page.group, page.fields.length])).toEqual([
       ['Main tabs', 'plugins', 1],
       ['Thread Sidebar', 'plugins', 1],

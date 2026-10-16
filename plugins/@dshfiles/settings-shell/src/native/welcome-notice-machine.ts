@@ -21,14 +21,12 @@ interface WelcomeNoticeInput extends PersistInput {
   readonly scope: WelcomeNoticeScopeState
 }
 
-type WelcomeNoticeEvent =
-  | { readonly type: 'scope.changed'; readonly scope: WelcomeNoticeScopeState }
-  | { readonly type: 'acknowledge' }
+type WelcomeNoticeEvent = { readonly type: 'scope.changed'; readonly scope: WelcomeNoticeScopeState } | { readonly type: 'acknowledge' }
 
 const unavailableMessage = 'welcome acknowledgement settings are unavailable'
 const persistenceMessage = 'the acknowledgement did not persist'
 
-const scopeForEvent = (event: WelcomeNoticeEvent) => event.type === 'scope.changed' ? event.scope : undefined
+const scopeForEvent = (event: WelcomeNoticeEvent) => (event.type === 'scope.changed' ? event.scope : undefined)
 
 export const welcomeNoticeMachine = setup({
   // SAFETY: XState uses these empty carriers for inference; the runtime reads the actual machine input and events.
