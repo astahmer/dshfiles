@@ -7,6 +7,8 @@ import { DEFAULT_COMMANDCODE_KEY_ENV, resolveCommandCodeBase } from './commandco
 import { readKeyFromEnv, type CredentialValueResolver } from './credentials.js'
 import { ProviderUsageModel, type UsageWindow } from './usage.js'
 
+type JsonValue = string | number | boolean | null | undefined | readonly JsonValue[] | { readonly [key: string]: JsonValue }
+
 /**
  * Command Code subscription quota.
  *
@@ -20,9 +22,16 @@ import { ProviderUsageModel, type UsageWindow } from './usage.js'
 
 const credentialRecordSchema = z.object({ type: z.string().optional(), key: z.string().optional(), access: z.string().optional() })
 
+type CommandCodeAuthValue =
+  | { readonly kind: 'key'; readonly key: string }
+  | { readonly kind: 'record'; readonly record: z.infer<typeof credentialRecordSchema> }
+
+const commandCodeKeySchema = z.string().transform((key): CommandCodeAuthValue => ({ kind: 'key', key }))
+const commandCodeRecordSchema = credentialRecordSchema.transform((record): CommandCodeAuthValue => ({ kind: 'record', record }))
+
 const authFileSchema = z.object({
   apiKey: z.string().optional(),
-  commandcode: z.union([z.string(), credentialRecordSchema]).optional(),
+  commandcode: z.union([commandCodeKeySchema, commandCodeRecordSchema]).optional(),
   'command-code': credentialRecordSchema.optional(),
 })
 
@@ -36,11 +45,12 @@ export const readCommandCodeKey = async (keyEnv: string, resolveCredential?: Cre
   try {
     const parsed = authFileSchema.safeParse(JSON.parse(await readFile(join(homedir(), '.commandcode', 'auth.json'), 'utf8')))
     if (!parsed.success) return ''
-    const direct = typeof parsed.data.commandcode === 'string' ? parsed.data.commandcode : undefined
+    const commandcode = parsed.data.commandcode
+    const direct = commandcode?.kind === 'key' ? commandcode.key : undefined
     return (
       parsed.data.apiKey ??
       direct ??
-      keyFromRecord(typeof parsed.data.commandcode === 'object' ? parsed.data.commandcode : undefined) ??
+      keyFromRecord(commandcode?.kind === 'record' ? commandcode.record : undefined) ??
       keyFromRecord(parsed.data['command-code']) ??
       ''
     ).trim()
@@ -71,29 +81,31 @@ const percentLeft = (limit: z.infer<typeof windowLimitSchema>): number => {
   return Math.max(0, Math.min(100, Math.round((1 - (limit.used ?? 0) / limit.cap) * 1000) / 10))
 }
 
-export const parseCommandCodeUsage = (input: { readonly credits: unknown; readonly whoami: unknown; readonly subscription: unknown }): UsageCard => {
-  const credits = creditsSchema.safeParse(input.credits)
-  if (!credits.success) return ProviderUsageModel.emptyUsage('error', 'Command Code returned an unsupported billing response.')
-  const windows: UsageWindow[] = []
-  for (const [key, label] of [
-    ['fiveHour', 'Current session'],
-    ['weekly', 'Weekly limit'],
-  ] as const) {
-    const limit = credits.data.windowLimits?.[key]
-    if (limit === undefined || limit === null) continue
-    windows.push({ label, percentRemaining: percentLeft(limit), resetsAt: limit.resetAt === undefined || limit.resetAt <= 0 ? null : limit.resetAt })
-  }
-  const whoami = whoamiSchema.safeParse(input.whoami)
-  const subscription = subscriptionSchema.safeParse(input.subscription)
-  const user = whoami.success ? whoami.data.user : undefined
-  return {
-    status: windows.length === 0 ? 'unsupported' : 'ok',
-    message: windows.length === 0 ? 'Command Code reported no window limits for this plan.' : null,
-    identity: user?.userName ?? user?.name ?? null,
-    plan: (subscription.success ? subscription.data.data?.planId : undefined) ?? credits.data.credits?.planId ?? null,
-    windows,
-    bankedResets: 0,
-    bankedResetExpiries: [],
+export class CommandCodeUsageModel {
+  static parseUsage = (input: { readonly credits: JsonValue; readonly whoami: JsonValue; readonly subscription: JsonValue }): UsageCard => {
+    const credits = creditsSchema.safeParse(input.credits)
+    if (!credits.success) return ProviderUsageModel.emptyUsage('error', 'Command Code returned an unsupported billing response.')
+    const windows: UsageWindow[] = []
+    for (const [key, label] of [
+      ['fiveHour', 'Current session'],
+      ['weekly', 'Weekly limit'],
+    ] as const) {
+      const limit = credits.data.windowLimits?.[key]
+      if (limit === undefined || limit === null) continue
+      windows.push({ label, percentRemaining: percentLeft(limit), resetsAt: limit.resetAt === undefined || limit.resetAt <= 0 ? null : limit.resetAt })
+    }
+    const whoami = whoamiSchema.safeParse(input.whoami)
+    const subscription = subscriptionSchema.safeParse(input.subscription)
+    const user = whoami.success ? whoami.data.user : undefined
+    return {
+      status: windows.length === 0 ? 'unsupported' : 'ok',
+      message: windows.length === 0 ? 'Command Code reported no window limits for this plan.' : null,
+      identity: user?.userName ?? user?.name ?? null,
+      plan: (subscription.success ? subscription.data.data?.planId : undefined) ?? credits.data.credits?.planId ?? null,
+      windows,
+      bankedResets: 0,
+      bankedResetExpiries: [],
+    }
   }
 }
 
@@ -113,7 +125,7 @@ export const readCommandCodeUsage = async (
     return ProviderUsageModel.emptyUsage('error', cause instanceof Error ? cause.message : 'Invalid Command Code base.')
   }
   const headers = { ...COMMAND_CODE_HEADERS, authorization: `Bearer ${key}` }
-  const getJson = async (path: string): Promise<{ readonly status: number; readonly body: unknown }> => {
+  const getJson = async (path: string): Promise<{ readonly status: number; readonly body: JsonValue }> => {
     const response = await fetch(`${base}${path}`, { headers, redirect: 'error', signal: ProviderUsageModel.usageSignal(signal) })
     return { status: response.status, body: response.ok ? await response.json() : undefined }
   }
@@ -125,7 +137,7 @@ export const readCommandCodeUsage = async (
     ])
     if (credits.status === 401 || credits.status === 403) return ProviderUsageModel.emptyUsage('unauthenticated', 'Command Code rejected this key.')
     if (credits.body === undefined) return ProviderUsageModel.emptyUsage('error', `Command Code returned ${String(credits.status)} for billing.`)
-    return parseCommandCodeUsage({ credits: credits.body, whoami: whoami.body, subscription: subscription.body })
+    return CommandCodeUsageModel.parseUsage({ credits: credits.body, whoami: whoami.body, subscription: subscription.body })
   } catch (cause) {
     return ProviderUsageModel.emptyUsage('error', cause instanceof Error ? cause.message : 'Command Code usage could not be read.')
   }

@@ -2,7 +2,7 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { ClaudeAccountModel } from './claude-account.js'
-import { parseCommandCodeUsage } from './commandcode-usage.js'
+import { CommandCodeUsageModel } from './commandcode-usage.js'
 import { CursorAccountModel } from './cursor-account.js'
 import { ProviderUsageModel } from './usage.js'
 
@@ -89,7 +89,7 @@ describe('Claude usage', () => {
 
 describe('Command Code usage', () => {
   it('reads the five-hour and weekly windows as used/cap with millisecond resets', () => {
-    const card = parseCommandCodeUsage({
+    const card = CommandCodeUsageModel.parseUsage({
       credits: {
         windowLimits: { fiveHour: { used: 0.75, cap: 3, resetAt: 1_900_000_000_000 }, weekly: { used: 10, cap: 10, exceeded: true, resetAt: 0 } },
         credits: { planId: 'go' },
@@ -107,7 +107,7 @@ describe('Command Code usage', () => {
   })
 
   it('says when a plan reports no window limits instead of inventing one', () => {
-    const card = parseCommandCodeUsage({ credits: { credits: { planId: 'payg' } }, whoami: undefined, subscription: { data: { planId: 'payg' } } })
+    const card = CommandCodeUsageModel.parseUsage({ credits: { credits: { planId: 'payg' } }, whoami: undefined, subscription: { data: { planId: 'payg' } } })
     expect(card.status).toBe('unsupported')
     expect(card.windows).toEqual([])
   })
