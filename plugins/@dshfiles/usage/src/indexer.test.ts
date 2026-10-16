@@ -153,7 +153,7 @@ describe('live side calls', () => {
     expect(store.requests({ ...everything, purposes: ['title'], sessionId: liveTitle.sessionId }).rows[0]?.input).toBe(812)
   })
 
-  it('counts an OptMem summary on its own, since no log records it', () => {
+  it('counts a live memory call on its own when no log row exists', () => {
     const store = openUsageStore(':memory:')
     store.insertLiveCall({ ...liveTitle, id: 'live:memory', purpose: 'memory' })
     expect(store.requests({ ...everything, purposes: ['memory'] }).rows.map(row => row.id)).toEqual(['live:memory'])

@@ -23,14 +23,14 @@ routes error-prone. pandwind's pattern: a pure `create…App()` Hono app plus a 
 - [ ] 10a. `chore(deps)`: add `hono` and `@hono/node-server` to the catalog, pinned (pandwind's versions), as dshx
       dev dependencies; knip must stay clean.
 - [ ] 10b. `test(e2e)`: `createFakeCommandCodeApp(state)` — routes, SSE through `streamSSE`, port 0. The chat
-      dispatch (summary / title / turn, `[[call]]`, `[[title …]]`) stays a pure function tested through
+      dispatch (title / turn, `[[call]]`, `[[title …]]`) stays a pure function tested through
       `app.request()` without a socket.
 - [ ] 10c. `test(e2e)`: the OAuth MCP fake as a Hono app (discovery, registration, PKCE, sign-in/out routes).
 - [ ] 10d. `test(e2e)`: the hub fake moves out of the step file into `support/fake-hub.ts` as a Hono app.
 - [ ] 10e. `docs(e2e)`: the fakes pattern in `docs/e2e-testing.md`.
 
 **Done when:** no fake routes on `url`/`pathname` comparisons; each fake has unit tests through `app.request()`;
-`pnpm check:e2e` for diff-viewed, tool-meta, optmem, memory, mcp-servers, plugin-marketplace and `dshx dev` seeds that
+`pnpm check:e2e` for diff-viewed, tool-meta, memory, mcp-servers, plugin-marketplace and `dshx dev` seeds that
 use the provider fake are green.
 
 ## Step 11 — `no-export-bag` lint rule (in emilint)

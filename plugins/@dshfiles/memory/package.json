@@ -24,7 +24,6 @@
     "test": "vitest run",
     "test:scale": "MEMORY_SCALE_TESTS=1 vitest run src/search-latency.scale.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "bench": "node bench/scale.mjs",
     "test:boot": "node ../../../tooling/dshx/scripts/boot-check-web.mjs --plugin",
     "test:e2e": "node ../../../tooling/dshx/scripts/run-e2e.mjs"
   },

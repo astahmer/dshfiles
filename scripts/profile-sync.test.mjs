@@ -132,17 +132,17 @@ test('waits for the DSH profile lock and takes it over from an exited holder', (
 test('the checked-in web seed links only owned bundles from this checkout', () => {
   const dryRunHome = join(root, 'web-home')
   writeJson(join(dryRunHome, 'profiles/web/package.json'), {
-    dependencies: { '@dshfiles/optmem': 'link:/elsewhere/optmem' },
-    dsh: { profile: { bundles: ['@dshfiles/optmem'] } },
+    dependencies: { '@dshfiles/stale-fixture': 'link:/elsewhere/stale-fixture' },
+    dsh: { profile: { bundles: ['@dshfiles/stale-fixture'] } },
   })
   const output = execFileSync(process.execPath, [script, '--profile', 'web', '--home', dryRunHome, '--dry-run'], { encoding: 'utf8' })
-  assert.match(output, /^ {2}- @dshfiles\/optmem$/m)
+  assert.match(output, /^ {2}- @dshfiles\/stale-fixture$/m)
   const added = output
     .split('\n')
     .filter(line => line.startsWith('  + '))
     .map(line => line.slice(4))
   assert.deepEqual(added, webSeed.dsh.profile.bundles)
-  assert.equal(readFileSync(join(dryRunHome, 'profiles/web/package.json'), 'utf8').includes('optmem'), true)
+  assert.equal(readFileSync(join(dryRunHome, 'profiles/web/package.json'), 'utf8').includes('stale-fixture'), true)
 })
 
 test('adds only the named bundle with --bundle', () => {

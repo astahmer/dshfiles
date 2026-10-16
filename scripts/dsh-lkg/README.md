@@ -70,7 +70,7 @@ snapshot's profile. It never touches `~/.dsh`, the repository, or the pnpm
 global install — which is what makes it work when those are broken.
 
 The recovery instance uses `~/.dsh-lkg/state/recover` as its `DSH_HOME`. That
-keeps the live OptMem database, sessions and plugin state untouched, and it means
+keeps live sessions, profile data and plugin state untouched, and it means
 **the recovery instance starts with no threads of its own**: it is a working DSH,
 not a copy of your history. Point `DSH_LKG_HOME` elsewhere for a different state
 directory, or `DSH_LKG_PORT` for a different port.
@@ -99,7 +99,7 @@ Session environment is detected, unless `DSH_LKG_ADMIN=1` is set.
 - The verify and recovery states are thawed after cloning: the snapshot payload
   is immutable, but a state the Host runs from must not be, or the Host cannot
   maintain its own profile and the state cannot be removed.
-- A snapshot captures the runtime, not your data. Sessions and OptMem memory are
+- A snapshot captures the runtime, not your data. Sessions and plugin data are
   deliberately excluded.
 - `clonefile` is APFS-only. On another filesystem the copy is real, and a
   snapshot then costs its full logical size (~4 GB here).

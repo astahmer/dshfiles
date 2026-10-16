@@ -36,7 +36,7 @@
         {
           "key": "cheapModels",
           "defaultValue": "codex: gpt-6-luna (low); claude: claude-haiku-* (low); opencode-go: deepseek-v4.1-flash, deepseek-v4-flash, glm-5.3-flash (off); commandcode: deepseek-v4.1-flash, deepseek-v4-flash, gpt-6-luna; deepseek: deepseek-flash",
-          "constraints": "Same routing rules as OptMem (optmem-core summary-routes).",
+          "constraints": "Uses the shared @dshfiles/optmem-core summary-routes resolver.",
           "coveredBy": ["memory.digest-model-fallback"]
         },
         {

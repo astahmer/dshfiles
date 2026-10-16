@@ -99,21 +99,20 @@ wait for the `memory` and `usage` plugins to land.
 Files other workspaces are changing; fix them, lower the cap, and promote the
 rule to `error` once those land.
 
-- **Nested ternary** (caps 12 + 3 tsx):
-  - `plugins/@dshfiles/optmem/src/host.ts` (7: lines 223–229, 412–416)
+- **Nested ternary** (caps 5 + 3 tsx):
   - `tooling/dshx/packages/dshx/src/compiler/host/build.ts` (5: lines 80–88)
   - `plugins/@dshfiles/editor/src/editor-panel.tsx:333`, `file-tree.tsx:52`
   - `plugins/@dshfiles/jj-integration/src/panel.tsx:21`
 - **`export *`**: `plugins/@dshfiles/optmem-core/src/index.ts`
-  (`export type * from './types.ts'`; optmem workspaces are changing
-  `types.ts`).
+  (`export type * from './types.ts'`; the shared core retains its public type barrel
+  pending a focused API review).
 - [x] 4. `refactor(plugin-ui)`: named `machine` exports (`export *` cap 1). `docs`: shared skills in
       `AGENTS.md`, link `actor-state-ownership` from `plugin-state`.
 - [x] 5. `chore(knip)`: `plugins/knip.jsonc`, report-only. `pnpm --dir plugins run knip`
       runs dshx's pinned knip 6.32.2 (no new lockfile entry); not in `check`.
       Findings at landing: 37 (22 unused files, 4 unused dependencies, 6
       unused devDependencies, 5 unlisted dependencies). Some unused files are
-      false positives (optmem bench and scripts run by hand, plugin-marketplace
+      false positives (usage scripts run by hand, plugin-marketplace
       `tests/`); step 8 adds those entries.
 - [x] 6. `chore(deps)`: single root, redone from `main`. (Landed: one root
       `pnpm-workspace.yaml` and lockfile for root, plugins, dshx and desktop.)
@@ -136,13 +135,13 @@ rule to `error` once those land.
       `zod` (home), `@testing-library/react` (2), `dsh-client-ui-session`
       (command-palette), dead `mcp-servers/src/confirmed-action.ts`; listed the
       unlisted `dsh-llm-retry` (ai-accounts), `jsdom` (2) and `react-dom`.
-      Entries for hand-run bench and scripts (memory, optmem, usage); fixtures
+      Entries for hand-run scripts (usage); fixtures
       ignored. Recorded, not fixed:
       - jujutsu `src/locales.ts`: a dictionary the client never registers.
       - devDependency copies of peers no code imports: activity-timeline
         `dsh-subprocess`, settings-shell `dsh-client-ui-plugin-manager`
         (editor/secret-catalog/settings-shell inject theirs by name).
-      - memory's `bench` script points at a missing `bench/scale.mjs`.
+      - 
       - `knip --production` still lists 26 test-support files (e2e support,
         `src/testing/*`, vite helpers) that need production ignores.
 - [x] 9. `chore(tsconfig)`: shared plugin base.

@@ -46,14 +46,7 @@
       "ignoreDependencies": ["@dshfiles/shared-runtime", "@deepseek-ai/dsh"],
     },
     "plugins/@dshfiles/memory": {
-      // Benchmarks run by hand.
-      "entry": ["dshx.config.ts", "src/{host,client,client-entry,index}.{ts,tsx}!", "bench/*.{ts,mjs}"],
-      "ignoreDependencies": ["@dshfiles/shared-runtime", "@deepseek-ai/dsh"],
-    },
-    "plugins/@dshfiles/optmem": {
-      // Benchmarks and scripts run by hand; bench scenarios load by path. Fixtures and the probe are project trees.
-      "entry": ["dshx.config.ts", "src/{host,client,client-entry,index}.{ts,tsx}!", "bench/*.mjs", "bench/scenarios/*.mjs", "scripts/*.mjs"],
-      "ignore": ["bench/fixtures/**", "bench/probe/**"],
+      "entry": ["dshx.config.ts", "src/{host,client,client-entry,index}.{ts,tsx}!"],
       "ignoreDependencies": ["@dshfiles/shared-runtime", "@deepseek-ai/dsh"],
     },
     "plugins/@dshfiles/usage": {

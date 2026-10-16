@@ -21,8 +21,6 @@ Checkboxes and receipts in a plan are history, not fresh verification.
 | [Multi-host](multi-host/README.md) | Durable supervision and upgrades of a remote host; a browser journey. |
 | [pulls.review-style thread review](pulls-review/README.md) | Host API, review panel, command and palette action, scratch-DSH verification. |
 | [Desktop shell](desktop-shell/README.md) | Relaunch on Host exit, lifecycle test, signing, updates. |
-| [OptMem remaining validation](optmem/README.md) | Quiet 100k-event benchmark and full acceptance gates. To be superseded by the new memory plugin. |
-| [OptMem real-world evaluation](optmem-realworld/README.md) | Long-conversation pilots and calibration. To be superseded by the new memory plugin. |
 
 ## Testing, research and housekeeping
 

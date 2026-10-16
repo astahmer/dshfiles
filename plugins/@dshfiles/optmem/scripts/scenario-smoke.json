@@ -1,5 +1,0 @@
-{
-  "conversations": [
-    { "name": "smoke", "prompts": ["Remember the codename 'teal-otter-42'. Reply in one sentence.", "Without tools: what codename did I give you?"] }
-  ]
-}

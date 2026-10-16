@@ -1,7 +1,6 @@
 # @dshfiles/memory
 
-Read [docs/findings.md](docs/findings.md) first: why memory exists, its design, and how it compares with native DSH
-and OptMem.
+Read [docs/findings.md](docs/findings.md) first: why memory exists, its design, and how it compares with native DSH.
 
 Cross-thread, cross-project memory for DSH that leaves the live context and the provider's KV cache alone.
 
@@ -9,8 +8,8 @@ Cross-thread, cross-project memory for DSH that leaves the live context and the 
   (60 s), its log is read once through DSH's `sessionQuery` service and turned into a **digest** with
   `digestSession` from `@dshfiles/dshx/platform/session-digest`: the user's requests in order, their corrections and
   decisions verbatim, goal, todos, jj revision descriptions, files changed and the final answer. No model call is made
-  unless the thread left no trail of its own; then one cheap call (OptMem's `cheapModels` routing, reasoning `off`)
-  writes it. Blank and trivial threads get no digest; identical digests and notes are stored once.
+  unless the thread left no trail of its own; then one cheap call uses the configured
+  `cheapModels` route with reasoning `off` to write it. Blank and trivial threads get no digest; identical digests and notes are stored once.
 - **One frozen start block.** At the first prompt assembly of every agent (subagents included), a byte-bounded block
   (`blockBytes`, 1,600) is appended to the end of the system prompt: a fixed instruction, notes, and thread pointers
   grouped by project and ranked by citations, then recency. It is frozen per thread (persisted, so a Host restart does
@@ -46,8 +45,6 @@ Optional: TypeSafe's Jev (`jevEnabled`, `TYPESAFE_API_KEY`) flags user messages 
 gates whether a new thread gets thread pointers at all. Any failure falls back to the heuristics.
 
 Out of scope: promoting facts into AGENTS.md or skills, reading `~/.agents`, mid-thread injection, thread handoff.
-
-`@dshfiles/memory` and `@dshfiles/optmem` both register `memory_search`; load one of them per profile.
 
 ## Retrieval: BM25 by default, hybrid with your own embedder
 
@@ -105,5 +102,5 @@ pnpm typecheck && pnpm test && pnpm build
 fnm exec --using=22.23.3 node -e "import('./dist/index.js')"
 ```
 
-`src/scale.test.ts` seeds 5,000 synthetic digests and notes and bounds search latency and block size. The benchmark
-against native DSH and OptMem is in [`docs/benchmark.md`](docs/benchmark.md).
+`src/scale.test.ts` seeds 5,000 synthetic digests and notes and bounds search latency and block size. The historical
+comparison with native DSH and the retired OptMem prototype is in [`docs/benchmark.md`](docs/benchmark.md).

@@ -1,5 +1,8 @@
 # @dshfiles/memory — benchmark 2026-10-14
 
+> Historical results. The comparative OptMem harness and its scenario runners are retired; these measurements cannot be
+> reproduced from the current checkout.
+
 Question: OptMem's compatibility mode bought cross-session recall (9/12 vs 0/12 native) at 1.8–3.2× native cost,
 because it summarizes every event and re-emits its memory view mid-context. Does `@dshfiles/memory` keep the recall
 for close to native cost?
@@ -14,7 +17,7 @@ for close to native cost?
 | summaries | memory digests and OptMem summaries on the thread's cheap route, DeepSeek V4.1 Flash with reasoning `off`                                                                |
 | arms      | **native** (neither plugin), **memory** (`@dshfiles/memory`, defaults, Jev off), **compat** (OptMem compatibility as on main)                                            |
 | scenarios | `support` (28 + 2 turns, 2 threads), `logs` (24 + 1, 2 threads), `infra-rollout` long (68 turns, 3 threads, acceptance tests); 2 repetitions each, seeds paired          |
-| harness   | OptMem's `bench/run-arm.mjs` with arm M. Between threads the harness waits for the previous digest (idleMs 60 s), as a pause between threads would                       |
+| harness   | Retired OptMem harness, arm M; between threads it waited for the previous digest (idleMs 60 s), as a pause between threads would                                  |
 | prices    | list prices: /bin/zsh.15 / /bin/zsh.003 cached / /bin/zsh.60 per M tokens                                                                                                |
 | load      | load average 15–60 (other agents and the embedding experiment); wall times are noisy                                                                                     |
 
@@ -79,7 +82,7 @@ Notes:
 
 ## Live check: the whole loop on a real model
 
-`bench/scenarios/live-check.json` (three threads, one project) through the OptMem harness, arm M:
+The three-thread, one-project live check used the retired OptMem harness, arm M:
 
 | thread | what happened                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -139,15 +142,12 @@ total, latency p50 199 ms and p90 242 ms.
 Jev costs nearly nothing, but the gate's single miss loses recall. That is why it stays opt-in, and why the end-to-end
 memory arm ran without it (Jev $0).
 
-## Reproduce
+## Current verification
+
+The captured end-to-end and Jev results above are historical; reproducing them would require the retired prototype's
+runner and evaluation corpus. Current Memory behavior is covered by its tests:
 
 ```sh
-# key through secret run, renamed to the scratch account's apiKeyEnv; never printed
-secret run -- sh -c 'OPENCODE_GO_PI_API_KEY="$OPENCODE_GO_PI" BENCH_PROVIDER=opencode-go-pi BENCH_ACCOUNTS=<accounts.json> \
-  node plugins/@dshfiles/optmem/bench/run-matrix.mjs --out <dir> --scenarios support,logs,infra-rollout --arms A,M,B \
-  --reps 2 --parallel 2 --variant long --drain-ms 600000'
-node plugins/@dshfiles/optmem/bench/report.mjs <dir> --json <dir>/summary.json
-node plugins/@dshfiles/memory/bench/compare.mjs <dir>/summary.json <dir>
-MEMORY_EMBEDDINGS_MODULE=<transformers.node.mjs> node plugins/@dshfiles/memory/bench/retrieval.ts --models bge,gemma
-TYPESAFE_API_KEY=... node plugins/@dshfiles/memory/bench/jev-eval.ts
+pnpm --dir plugins/@dshfiles/memory typecheck
+pnpm --dir plugins/@dshfiles/memory test
 ```

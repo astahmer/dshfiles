@@ -17,7 +17,7 @@
         {
           "kind": "not-applicable",
           "id": "request-messages.browser-journey",
-          "reason": "Host-only bundle with no UI; its effect is exercised by the unit tests and the OptMem runtime A/B in plugins/@dshfiles/optmem/docs/runtime-evidence.md."
+          "reason": "Host-only bundle with no UI; its effect is covered by the unit tests for dispatch, pass-through, cleanup and idempotence."
         },
         {
           "kind": "unit-test",

@@ -1,8 +1,0 @@
-[
-  {
-    "status": 200,
-    "nextPage": 1,
-    "done": true,
-    "records": [{ "externalId": "sensor-8", "title": "Fictional amber orchard sensor", "observedAt": "2027-04-12T08:00:00Z" }]
-  }
-]

@@ -3,21 +3,18 @@ import type { RequestPurpose, RequestRow, TokenUsage } from './fold.js'
 
 /**
  * Model calls outside the agent loop that the session log does not fully
- * record: OptMem summaries and memory digests are absent from it, and title generation keeps no
+ * record: memory digests are absent from it, and title generation keeps no
  * usage. Observed on `llm/stream` (read-only, every chunk passes through
  * unchanged). Agent-loop calls carry `toolHistory` and are left to the log,
  * which already records them with their message.
  */
 
-/**
- * System prompts of memory plugins' model calls, which share the `compaction` purpose with native compaction:
- * OptMem's summarizer and @dshfiles/memory's thread digest.
- */
-const MEMORY_SYSTEM_PREFIXES = ['You maintain the long-term memory', 'You write the digest of one finished']
+/** The digest call shares `compaction` purpose with native compaction. */
+const MEMORY_DIGEST_SYSTEM_PREFIX = 'You write the digest of one finished'
 
 export const livePurposeOf = (options: Pick<GenerateOptions, 'purpose' | 'system' | 'toolHistory'>): RequestPurpose | null => {
   if (options.purpose === 'session-title') return 'title'
-  if (options.purpose === 'compaction') return MEMORY_SYSTEM_PREFIXES.some(prefix => (options.system ?? '').startsWith(prefix)) ? 'memory' : 'compaction'
+  if (options.purpose === 'compaction') return (options.system ?? '').startsWith(MEMORY_DIGEST_SYSTEM_PREFIX) ? 'memory' : 'compaction'
   if (options.toolHistory !== undefined) return null
   return 'other'
 }

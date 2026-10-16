@@ -4,8 +4,8 @@ The page to read first about cross-thread memory in DSH. The details are in [ben
 
 ## Why memory exists
 
-OptMem ([findings](../../optmem/docs/findings.md)) proved one thing: native DSH forgets everything between threads
-(0/12 cross-session probes), and memory fixes that (9/12). It paid for it twice:
+The retired OptMem prototype exposed the gap: native DSH forgets everything between threads (0/12 cross-session
+probes), while the historical memory pilot recovered 9/12 (details in [benchmark.md](benchmark.md)). OptMem paid for it twice:
 
 - it summarized every event as it arrived, mostly into nodes nobody read;
 - it rewrote the live context, which broke the provider's prefix cache.

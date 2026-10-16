@@ -95,6 +95,10 @@ When('a thread on the fake model is started in the trusted project', async ({ pa
   await startThreadWithModel(page, { project: 'checked-project', model: 'commandcode_work/gpt-6-luna' })
 })
 
+When('{string} is sent to the fake model', async ({ page }: { page: Page }, text: string) => {
+  await sendMessage(page, text)
+})
+
 When('the project checks panel is opened', async ({ page }: { page: Page }) => {
   await openChecks(page)
 })

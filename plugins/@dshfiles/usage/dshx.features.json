@@ -5,7 +5,7 @@
     {
       "id": "usage-index",
       "title": "Incremental request index from session logs",
-      "summary": "Folds every session log into a SQLite ledger of model requests (agent, subagent, compaction, title, OptMem and other side calls) with route, tokens, cache reads, stop reason, duration and TTFT, reading only the Zstandard frames each log gained since the last pass. Costs join per-route, per-context-band list prices from the AI Accounts models.dev catalog at query time.",
+      "summary": "Folds every session log into a SQLite ledger of model requests (agent, subagent, compaction, title, memory and other side calls) with route, tokens, cache reads, stop reason, duration and TTFT, reading only the Zstandard frames each log gained since the last pass. Costs join per-route, per-context-band list prices from the AI Accounts models.dev catalog at query time.",
       "surfaces": ["host", "storage", "integration"],
       "configuration": [],
       "states": ["empty", "first-index", "incremental", "torn-frame", "unpriced-route", "catalog-refreshed"],
@@ -14,7 +14,7 @@
         "A stored fold state that no longer decodes restarts that log from its first byte; rows upsert by event sequence, so nothing doubles.",
         "Without the AI Accounts price cache every cost reads as unknown (\u2013) and the request still counts.",
         "Title generation keeps no usage in the log: its tokens come only from the live llm/stream observer, so titles generated while the plugin was not loaded show \u2013.",
-        "OptMem summaries are not in session logs at all; only those made while the plugin is loaded are counted."
+        "Memory-digest calls are not stored as session-log requests; they are counted only while the live observer is loaded."
       ],
       "externalDependencies": [
         {
@@ -57,13 +57,13 @@
           "kind": "unit-test",
           "id": "usage.live-memory",
           "file": "plugins/@dshfiles/usage/src/indexer.test.ts",
-          "testName": "counts an OptMem summary on its own, since no log records it"
+          "testName": "counts a live memory call on its own when no log row exists"
         },
         {
           "kind": "unit-test",
           "id": "usage.live-memory-purpose",
           "file": "plugins/@dshfiles/usage/src/live-calls.test.ts",
-          "testName": "tags OptMem summaries and memory digests as memory summaries, other compactions as compaction"
+          "testName": "tags memory digests as memory summaries, other compactions as compaction"
         },
         {
           "kind": "unit-test",

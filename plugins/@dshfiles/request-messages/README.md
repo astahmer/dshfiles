@@ -2,7 +2,7 @@
 
 Dispatches the `agent/request-messages` waterfall on stock DSH 0.2, so a plugin
 can change the messages one agent-loop model request sends without rewriting
-the session log. OptMem full mode and AI Accounts' image offload listen to it.
+the session log. AI Accounts' image offload listens to it.
 
 ## The seam
 
@@ -12,8 +12,8 @@ cannot pass a changed one on. The waterfall's innermost callback, though, reads
 `LlmRuntime.adapterStream` at call time and hands it the same options. This
 bundle wraps that method on the runtime instance:
 
-1. Requests the agent loop did not build (`isAgentLoopRequest` is false:
-   summaries, titles, compaction, OptMem's own summarizer) pass through.
+1. Requests the agent loop did not build (`isAgentLoopRequest` is false) pass
+   through unchanged; this includes titles, compaction and plugin-owned calls.
 2. For a loop request, it finds the agent by `options.sessionId`, reads the
    turn and step from the latest `step/start`, and runs
    `agent/request-messages` in that agent's scope (agent-scoped `agent.ctx.on`
@@ -23,8 +23,8 @@ bundle wraps that method on the runtime instance:
    prepared-call config check and every `llm/stream` listener still see the
    original request.
 
-Subagent requests are dispatched too; listeners decide whether to act on them
-(OptMem skips them, image offload does not). A listener that throws is logged and
+Subagent requests are dispatched too; listeners decide whether to act on them.
+A listener that throws is logged and
 the derived messages are sent, unless the request was cancelled.
 
 `adapterStream` is private in the published types. If a DSH runtime lacks it, the

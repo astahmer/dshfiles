@@ -35,7 +35,7 @@ the writer.
 | title       | `session/title-llm-request` → provider `session/title`; the log keeps no usage                                                                                                                                           |
 
 An `llm/stream` observer adds what the logs lack: the usage and TTFT of title
-calls (merged into the log row), OptMem summaries (`memory`) and other plugin
+calls (merged into the log row), memory digests (`memory`) and other plugin
 calls (`other`). It only sees calls made while the plugin is loaded.
 
 ## Cost

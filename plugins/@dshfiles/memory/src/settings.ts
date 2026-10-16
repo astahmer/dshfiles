@@ -50,7 +50,7 @@ export const memorySettings = defineSettings({
         { kind: 'commandcode', models: ['deepseek-v4.1-flash', 'deepseek-v4-flash', 'gpt-6-luna'], effort: '' },
         { kind: 'deepseek', models: ['deepseek-flash'], effort: '' },
       ])
-      .description("Same routing as OptMem: a digest that needs a model uses the thread's provider with the first cheap model it offers."),
+      .description("A digest that needs a model uses the thread's provider with the first configured cheap model it offers."),
     jevEnabled: Schema.boolean()
       .default(false)
       .description(

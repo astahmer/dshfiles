@@ -2,7 +2,7 @@
   "name": "@dshfiles/optmem-core",
   "version": "0.1.0",
   "private": true,
-  "description": "Harness-agnostic OptMem engine: append-only events, binary memory tree, persisted views, zoom, snapshots.",
+  "description": "Shared, DSH-independent memory primitives used by @dshfiles/memory.",
   "type": "module",
   "types": "./src/index.ts",
   "exports": {

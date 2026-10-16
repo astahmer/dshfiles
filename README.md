@@ -28,7 +28,6 @@ Every bundle directory under `plugins/@dshfiles/` is listed here; shared librari
 | [`model-effort-picker`](plugins/@dshfiles/model-effort-picker/README.md) | Search provider-grouped model catalogs and tune reasoning effort in the composer. |
 | [`memory`](plugins/@dshfiles/memory/README.md) | Cross-thread memory from DSH's session logs: thread digests, a frozen start block, memory tools and a Memory panel. In the `web` profile. |
 | [`multi-host`](plugins/@dshfiles/multi-host/README.md) | Run new threads on other machines over SSH: host chip, hosts dialog, remote thread view. |
-| [`optmem`](plugins/@dshfiles/optmem/README.md) | Persistent project memory with compact context views; superseded by `memory` in the `web` profile ([findings](plugins/@dshfiles/optmem/docs/findings.md)). |
 | [`plugin-marketplace`](plugins/@dshfiles/plugin-marketplace/README.md) | Find and install plugins from the Framework Hub catalog. |
 | [`project-checks`](plugins/@dshfiles/project-checks/README.md) | Run trusted project actions and inspect completion receipts. |
 | [`prompt-stash`](plugins/@dshfiles/prompt-stash/README.md) | Save reusable prompts and bounded composer drafts locally. |
@@ -51,8 +50,7 @@ Every bundle directory under `plugins/@dshfiles/` is listed here; shared librari
 |---|---|
 | [`plugin-ui`](plugins/@dshfiles/plugin-ui/README.md) | Shared UI components and Query, Table, Form, Machine, Chart, and Diff bindings. |
 | [`project-folder-picker`](plugins/@dshfiles/project-folder-picker/README.md) | Reusable picker for registered projects and Host folders. |
-| [`optmem-core`](plugins/@dshfiles/optmem-core/README.md) | Harness-agnostic append-only memory engine and tree model. |
-| [`optmem-sqlite`](plugins/@dshfiles/optmem-sqlite/README.md) | SQLite storage and FTS5 search for OptMem. |
+| [`optmem-core`](plugins/@dshfiles/optmem-core/README.md) | Shared DSH-independent memory primitives used by `memory`, including redaction, UTF-8 handling and summary routing. |
 
 Bundles are Cordis packages with a `cordis.patch.yml`. Shared libraries are
 imported by bundles and are not installed on their own.

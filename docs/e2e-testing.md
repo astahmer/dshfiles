@@ -60,8 +60,8 @@ cell and a native entry was still registered behind it.
   `createTestHost`/`createTestClient` stay for unit tests.
 - **Fake only what we do not own,** at its transport boundary: the LLM provider
   (`e2e/support/fake-command-code.ts`), MCP servers (`fake-mcp-server.mjs`),
-  the secret CLI (`fake-secret-cli.mjs`), a loopback Framework Hub, models.dev
-  pricing and the OptMem summarizer. Repositories, files, SQLite and commands
+  the secret CLI (`fake-secret-cli.mjs`), a loopback Framework Hub and a seeded
+  models.dev price cache. Repositories, files, SQLite and commands
   are real, in temporary directories. No routine test calls a paid API, uses
   real credentials, or touches a user project.
 - **Gherkin for journeys, plain specs for single assertions.** In a spec the
