@@ -35,7 +35,7 @@ export class CodexHomeError extends Error {}
  * The OS account's home, not `$HOME`: an isolated host (scratch `HOME`/`DSH_HOME`) must still reach the user's real
  * Codex logins, and the containment guard must not move with an environment variable.
  */
-export const codexAccountHome = (): string => userInfo().homedir
+const codexAccountHome = (): string => userInfo().homedir
 
 const expandHome = (value: string): string => (value.startsWith('~/') ? join(codexAccountHome(), value.slice(2)) : value)
 
@@ -49,7 +49,7 @@ const containedHome = (value: string): string => {
   return path
 }
 
-export const resolveCodexHomeLayout = (input: CodexHomeInput): CodexHomeLayout => {
+const resolveCodexHomeLayout = (input: CodexHomeInput): CodexHomeLayout => {
   const configured = input.homePath?.trim() ?? ''
   const shared = containedHome(configured.length > 0 ? configured : join(codexAccountHome(), '.codex'))
   const shadow = input.shadowHomePath?.trim() ?? ''
@@ -152,9 +152,9 @@ export const materializeCodexShadowHome = async (layout: CodexHomeLayout): Promi
 }
 
 /** The command that writes the next login for this instance. */
-export const codexLoginHint = (layout: CodexHomeLayout): string => `CODEX_HOME="${layout.effectiveHomePath}" codex login`
+const codexLoginHint = (layout: CodexHomeLayout): string => `CODEX_HOME="${layout.effectiveHomePath}" codex login`
 
-export const authJsonPath = (layout: CodexHomeLayout): string => join(layout.effectiveHomePath, 'auth.json')
+const authJsonPath = (layout: CodexHomeLayout): string => join(layout.effectiveHomePath, 'auth.json')
 
 export interface CodexAuthView {
   readonly path: string
@@ -165,7 +165,7 @@ export interface CodexAuthView {
   readonly error: string | undefined
 }
 
-export const decodeJwtPayload = (token: string): Record<string, unknown> | undefined => {
+const decodeJwtPayload = (token: string): Record<string, unknown> | undefined => {
   const segment = token.split('.')[1]
   if (segment === undefined) return undefined
   try {
@@ -173,6 +173,14 @@ export const decodeJwtPayload = (token: string): Record<string, unknown> | undef
   } catch {
     return undefined
   }
+}
+
+export class CodexHomeModel {
+  static readonly accountHome = codexAccountHome
+  static readonly resolveLayout = resolveCodexHomeLayout
+  static readonly loginHint = codexLoginHint
+  static readonly authJsonPath = authJsonPath
+  static readonly decodeJwtPayload = decodeJwtPayload
 }
 
 const readString = (value: unknown): string | undefined => (typeof value === 'string' && value.length > 0 ? value : undefined)

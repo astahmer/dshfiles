@@ -3,7 +3,7 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { z } from 'zod'
 import type { UsageCard } from './api.js'
-import { decodeJwtPayload } from './codex-home.js'
+import { CodexHomeModel } from './codex-home.js'
 import { CredentialModel, type CredentialValueResolver } from './credentials.js'
 import { readKeychainSecret } from './keychain.js'
 import { ProviderUsageModel } from './usage.js'
@@ -60,7 +60,7 @@ const cursorUsageSchema = z.object({
 export class CursorAccountModel {
   /** The dashboard cookie pairs the JWT subject's user id with the token. */
   static cursorSessionCookie = (token: string): string | undefined => {
-    const parsedSubject = z.string().min(1).safeParse(decodeJwtPayload(token)?.sub)
+    const parsedSubject = z.string().min(1).safeParse(CodexHomeModel.decodeJwtPayload(token)?.sub)
     if (!parsedSubject.success) return undefined
     const subject = parsedSubject.data
     const userId = subject.includes('|') ? subject.slice(subject.lastIndexOf('|') + 1) : subject

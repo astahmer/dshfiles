@@ -1,7 +1,7 @@
 import type { AiAccountsConfig, CodexAccountConfig } from './account-config.js'
 import { COMMANDCODE_KIND as CC_KIND, DEFAULT_COMMANDCODE_KEY_ENV } from './commandcode-provider.js'
 import { ClaudeAccountModel } from './claude-account.js'
-import { CodexHomeError, resolveCodexHomeLayout, type CodexHomeLayout } from './codex-home.js'
+import { CodexHomeError, CodexHomeModel, type CodexHomeLayout } from './codex-home.js'
 
 export const CODEX_KIND = 'codex'
 export const OPENCODE_KIND = 'opencode-go'
@@ -91,7 +91,7 @@ export class ProviderRoutes {
       const instanceId = ProviderRoutes.normalizeInstanceId(account.instanceId, CODEX_KIND)
       let layout: CodexHomeLayout
       try {
-        layout = resolveCodexHomeLayout({
+        layout = CodexHomeModel.resolveLayout({
           homePath: account.homePath,
           shadowHomePath: shadowHomeFor(account, instanceId, config.codexShadowRoot),
         })

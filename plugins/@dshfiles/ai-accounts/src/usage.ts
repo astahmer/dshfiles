@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { z } from 'zod'
 import type { UsageCard } from './api.js'
 import { readCodexResetCredits, type CodexResetCredits } from './codex-reset-credits.js'
-import { decodeJwtPayload } from './codex-home.js'
+import { CodexHomeModel } from './codex-home.js'
 
 type JsonValue = string | number | boolean | null | readonly JsonValue[] | { readonly [key: string]: JsonValue }
 
@@ -97,7 +97,7 @@ export const readCodexUsage = async (codexHome: string, signal?: AbortSignal): P
   } catch {
     return ProviderUsageModel.emptyUsage('unauthenticated')
   }
-  const claims = auth.tokens.id_token === undefined ? undefined : decodeJwtPayload(auth.tokens.id_token)
+  const claims = auth.tokens.id_token === undefined ? undefined : CodexHomeModel.decodeJwtPayload(auth.tokens.id_token)
   const authClaims = z.object({ chatgpt_account_id: z.string().optional() }).safeParse(claims?.['https://api.openai.com/auth'])
   const accountId = auth.tokens.account_id ?? (authClaims.success ? authClaims.data.chatgpt_account_id : undefined)
   if (accountId === undefined) return ProviderUsageModel.emptyUsage('error', 'The Codex account identifier was not found in its sign-in data.')

@@ -2,9 +2,9 @@ import { mkdtemp, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
-import { CodexHomeError, describeCodexAuth, resolveCodexHomeLayout } from './codex-home.js'
+import { CodexHomeError, CodexHomeModel, describeCodexAuth } from './codex-home.js'
 
-const layoutFor = (homePath: string) => resolveCodexHomeLayout({ homePath })
+const layoutFor = (homePath: string) => CodexHomeModel.resolveLayout({ homePath })
 
 /** A Codex home must sit inside the user home, so the fixture lives there. */
 const homeInUserHome = async (): Promise<string> => mkdtemp(join(homedir(), '.codex-home-test-'))
@@ -16,7 +16,7 @@ const authJsonWith = (claims: Record<string, unknown>): string => JSON.stringify
 
 describe('resolveCodexHomeLayout', () => {
   it('resolves homes inside the user home', () => {
-    expect(resolveCodexHomeLayout({ homePath: '~/.codex', shadowHomePath: '~/.codex-dshx/work' })).toEqual({
+    expect(CodexHomeModel.resolveLayout({ homePath: '~/.codex', shadowHomePath: '~/.codex-dshx/work' })).toEqual({
       mode: 'authOverlay',
       sharedHomePath: join(homedir(), '.codex'),
       effectiveHomePath: join(homedir(), '.codex-dshx', 'work'),
@@ -24,15 +24,15 @@ describe('resolveCodexHomeLayout', () => {
   })
 
   it.each(['/etc', '~/../../etc', homedir(), `${homedir()}-sibling/.codex`])('refuses %s', homePath => {
-    expect(() => resolveCodexHomeLayout({ homePath })).toThrow(CodexHomeError)
-    expect(() => resolveCodexHomeLayout({ shadowHomePath: homePath })).toThrow(CodexHomeError)
+    expect(() => CodexHomeModel.resolveLayout({ homePath })).toThrow(CodexHomeError)
+    expect(() => CodexHomeModel.resolveLayout({ shadowHomePath: homePath })).toThrow(CodexHomeError)
   })
 
   it('keeps the real account home when an isolated host overrides HOME', () => {
     const accountHome = homedir()
     vi.stubEnv('HOME', '/tmp/isolated-dsh-home')
     try {
-      expect(resolveCodexHomeLayout({ homePath: join(accountHome, '.codex'), shadowHomePath: '~/.codex-dshx/work' })).toEqual({
+      expect(CodexHomeModel.resolveLayout({ homePath: join(accountHome, '.codex'), shadowHomePath: '~/.codex-dshx/work' })).toEqual({
         mode: 'authOverlay',
         sharedHomePath: join(accountHome, '.codex'),
         effectiveHomePath: join(accountHome, '.codex-dshx', 'work'),
