@@ -18,7 +18,7 @@ import { aiAccountsApi, type AccountsFile, type UsageHistoryMeta } from './api.j
 import { FAILURE_KINDS, type FailureKind, type KindPolicy } from './failure-policy.js'
 import { pricingStatusLine } from './pricing-status.js'
 import { usePreferences } from './use-preferences.js'
-import { SHORT_NAME_MAX_LENGTH, stripShortName } from './usage-overview-model.js'
+import { SHORT_NAME_MAX_LENGTH, UsageOverviewModel } from './usage-overview-model.js'
 
 const DELAYS = [400, 800, 1_500, 3_000] as const
 const REFRESH_SECONDS = [15, 30, 60, 120, 300, 900] as const
@@ -481,7 +481,7 @@ const UsageAccountsPicker = (props: {
               <ShortNameInput
                 disabled={props.disabled || hidden.has(account.instanceId)}
                 name={account.displayName}
-                placeholder={stripShortName({ displayName: account.displayName, tag: account.badge, override: undefined })}
+                placeholder={UsageOverviewModel.stripShortName({ displayName: account.displayName, tag: account.badge, override: undefined })}
                 saved={props.shortNames[account.instanceId] ?? ''}
                 onSave={shortName => props.onShortNameChange(account.instanceId, shortName)}
               />

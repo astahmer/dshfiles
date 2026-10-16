@@ -3,7 +3,7 @@ import { ArrowDownIcon, ArrowLeftIcon, ArrowRightIcon, ArrowUpIcon, EyeIcon, Eye
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useState, type ReactNode } from 'react'
 import { usePreferences } from './use-preferences.js'
-import { moveAccount, type UsageLayout } from './usage-overview-model.js'
+import { UsageOverviewModel, type UsageLayout } from './usage-overview-model.js'
 
 const DRAG_TYPE = 'application/x-dshfiles-ai-accounts-usage'
 
@@ -19,7 +19,7 @@ export const useUsageLayout = () => {
     showAll: (): void => saveHidden([]),
     setShortNamesShown: (shown: boolean): void => void settings.set('usageShortNames', shown).catch(() => false),
     move: (input: { readonly shownIds: readonly string[]; readonly id: string; readonly toIndex: number }): void =>
-      void settings.set('usageOrder', moveAccount({ order: usageOrder, ...input })).catch(() => false),
+      void settings.set('usageOrder', UsageOverviewModel.moveAccount({ order: usageOrder, ...input })).catch(() => false),
   }
 }
 

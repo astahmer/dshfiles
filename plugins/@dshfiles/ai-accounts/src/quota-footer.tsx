@@ -14,7 +14,7 @@ import { ArrangeableAccount, useUsageLayout } from './usage-arrangement.js'
 import { useAccountsUsage } from './use-accounts-usage.js'
 import { usePreferences, type MeterLabel, type UsageWindowLayout } from './use-preferences.js'
 import { UsageOverview, useNow } from './usage-overview.js'
-import { formatResetShort, isExhausted, meterLines, mostCritical, stripItems, stripShortName, type QuotaSummaryItem } from './usage-overview-model.js'
+import { UsageOverviewModel, type QuotaSummaryItem } from './usage-overview-model.js'
 
 const RESET_UNIT = { now: 'now', minutes: 'min', hours: 'h', days: 'd', months: 'mo', years: 'y' } as const
 
@@ -26,7 +26,11 @@ const useShortNames = (): ((item: QuotaSummaryItem) => QuotaSummaryItem) => {
   const tags = new Map((file.data?.accounts ?? []).map(account => [account.instanceId, account.badge]))
   return item => ({
     ...item,
-    shortName: stripShortName({ displayName: item.displayName, tag: tags.get(item.instanceId) ?? '', override: usageShortNameOverrides[item.instanceId] }),
+    shortName: UsageOverviewModel.stripShortName({
+      displayName: item.displayName,
+      tag: tags.get(item.instanceId) ?? '',
+      override: usageShortNameOverrides[item.instanceId],
+    }),
   })
 }
 
@@ -42,7 +46,7 @@ const AccountUsageTooltip = (props: { readonly item: QuotaSummaryItem; readonly 
       <span className="dshx:font-semibold">{props.item.displayName}</span>
       {windows.map(window => (
         <span className="dshx:tabular-nums" key={window.label}>
-          {window.label}: {isExhausted(window.percentRemaining) ? 'limit reached' : `${String(Math.round(window.percentRemaining))}% left`}
+          {window.label}: {UsageOverviewModel.isExhausted(window.percentRemaining) ? 'limit reached' : `${String(Math.round(window.percentRemaining))}% left`}
         </span>
       ))}
       {resetIn === null || nextReset === undefined ? null : (
@@ -60,7 +64,7 @@ const describeItem = (item: QuotaSummaryItem, now: number, windowLayout: UsageWi
   const windows = windowLayout === 'binding' ? [accountWindows.find(window => window.label === item.windowLabel)] : accountWindows
   const descriptions = windows.flatMap(window => {
     if (window === undefined) return []
-    const reset = formatResetShort(window.resetsAt, now)
+    const reset = UsageOverviewModel.formatResetShort(window.resetsAt, now)
     const resetText = reset === null ? '' : reset === 'now' ? ', resetting now' : `, resets in ${reset}`
     const percent = Math.round(window.percentRemaining)
     const status = percent <= 0 ? 'limit reached' : `${String(percent)}% left`
@@ -77,7 +81,7 @@ const SummaryItem = (props: {
   readonly windowLayout?: UsageWindowLayout
   readonly showShortName: boolean
 }): JSX.Element => {
-  const lines = meterLines(props.item, props.now, props.label)
+  const lines = UsageOverviewModel.meterLines(props.item, props.now, props.label)
   const tone = props.item.exhausted ? 'critical' : quotaTone(props.item.percentRemaining)
   const windowLayout = props.windowLayout ?? 'binding'
   const windows = windowLayout === 'binding' ? [] : (props.item.windows ?? [])
@@ -185,7 +189,7 @@ export const QuotaStrip = (props: { readonly onOpenUsageHistory: () => void }): 
   const stripRef = useRef<HTMLDivElement>(null)
 
   if (!footerButton) return null
-  const items = stripItems(usage, arrangement.layout).map(withShortName)
+  const items = UsageOverviewModel.stripItems(usage, arrangement.layout).map(withShortName)
   const shownIds = items.map(item => item.instanceId)
   const label = items.length === 0 ? 'AI accounts usage' : `AI accounts usage. ${items.map(item => describeItem(item, now, usageWindowLayout)).join('. ')}`
 
@@ -255,9 +259,9 @@ const QuotaRailButton = (props: { readonly onOpenUsageHistory: () => void }): JS
   const { usage } = useAccountsUsage()
   const withShortName = useShortNames()
   const now = useNow()
-  const items = stripItems(usage, arrangement.layout).map(withShortName)
+  const items = UsageOverviewModel.stripItems(usage, arrangement.layout).map(withShortName)
   const label = items.length === 0 ? 'AI accounts usage' : `AI accounts usage. ${items.map(item => describeItem(item, now)).join('. ')}`
-  const critical = mostCritical(items)
+  const critical = UsageOverviewModel.mostCritical(items)
   return (
     <Popover onOpenChange={setOpen} open={open}>
       <PopoverTrigger asChild>

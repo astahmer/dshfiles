@@ -20,7 +20,7 @@ import { QuotaHistoryAnalysis } from './usage-history-analysis.js'
 import { QuotaMeter } from './panel-primitives.js'
 import { QuotaHistoryChart } from './quota-history-chart.js'
 import { QUOTA_TONE_TEXT, quotaTone } from './quota-tone.js'
-import { formatResetIn } from './usage-overview-model.js'
+import { UsageOverviewModel } from './usage-overview-model.js'
 import { useAccountsUsage } from './use-accounts-usage.js'
 import { usePreferences } from './use-preferences.js'
 
@@ -32,7 +32,7 @@ const BANK_EVENT_LIMIT = 100
 const formatTimestamp = (value: number | null | undefined): string =>
   value === null || value === undefined || !Number.isFinite(value) ? 'Not reported' : new Date(value).toLocaleString()
 
-const formatReset = (value: number | null): string => formatResetIn(value, Date.now())
+const formatReset = (value: number | null): string => UsageOverviewModel.formatResetIn(value, Date.now())
 
 const formatForecast = (forecast: ReturnType<typeof QuotaHistoryAnalysis.forecastQuotaWindow>): string => {
   switch (forecast.status) {

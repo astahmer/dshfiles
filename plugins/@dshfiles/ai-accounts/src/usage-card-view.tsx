@@ -1,6 +1,6 @@
 import type { UsageCard } from './api.js'
 import { QuotaMeter } from './panel-primitives.js'
-import { formatResetIn, sortWindows } from './usage-overview-model.js'
+import { UsageOverviewModel } from './usage-overview-model.js'
 
 export const UsageCardView = (props: { readonly usage: UsageCard | undefined }): JSX.Element | null => {
   const usage = props.usage
@@ -16,8 +16,8 @@ export const UsageCardView = (props: { readonly usage: UsageCard | undefined }):
   const earliestExpiry = usage.bankedResetExpiries.filter((expiresAt): expiresAt is number => expiresAt !== null).sort((left, right) => left - right)[0]
   return (
     <div className="dshx:grid dshx:gap-3 dshx:rounded-lg dshx:border dshx:bg-muted/30 dshx:p-3 dshx:md:grid-cols-2">
-      {sortWindows(usage.windows).map(window => (
-        <QuotaMeter detail={formatResetIn(window.resetsAt, now)} key={window.label} label={window.label} percent={window.percentRemaining} />
+      {UsageOverviewModel.sortWindows(usage.windows).map(window => (
+        <QuotaMeter detail={UsageOverviewModel.formatResetIn(window.resetsAt, now)} key={window.label} label={window.label} percent={window.percentRemaining} />
       ))}
       {usage.bankedResets > 0 ? (
         <p className="dshx:text-xs dshx:text-info dshx:md:col-span-2">

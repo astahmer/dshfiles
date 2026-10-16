@@ -9,7 +9,7 @@ import { useAccountsUsage } from './use-accounts-usage.js'
 import { usePreferences } from './use-preferences.js'
 import { UsageOverview } from './usage-overview.js'
 import { useUsageLayout } from './usage-arrangement.js'
-import { mostCritical, stripItems } from './usage-overview-model.js'
+import { UsageOverviewModel } from './usage-overview-model.js'
 
 /**
  * Draggable edge usage overlay.
@@ -95,8 +95,8 @@ export const EdgeUsageWidget = (props: { readonly onOpenUsageHistory: () => void
     return () => window.removeEventListener('resize', resize)
   }, [])
 
-  const items = stripItems(usage, layout)
-  const primary = mostCritical(items)?.percentRemaining
+  const items = UsageOverviewModel.stripItems(usage, layout)
+  const primary = UsageOverviewModel.mostCritical(items)?.percentRemaining
 
   if (!edgeWidget || items.length === 0) return null
 

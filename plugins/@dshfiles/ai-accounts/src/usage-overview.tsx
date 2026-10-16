@@ -11,18 +11,7 @@ import type { AccountsUsage } from './api.js'
 import { ProviderGlyph } from './provider-glyph.js'
 import { QUOTA_TONE_PROGRESS, QUOTA_TONE_TEXT, quotaTone } from './quota-tone.js'
 import { ArrangeableAccount, useUsageLayout, type UsageArrangement } from './usage-arrangement.js'
-import {
-  bankedExpiries,
-  formatAge,
-  formatResetIn,
-  isCardLimited,
-  isExhausted,
-  overviewProviders,
-  overviewSections,
-  reserveInUse,
-  type OverviewCard,
-  type ProviderTab,
-} from './usage-overview-model.js'
+import { UsageOverviewModel, type OverviewCard, type ProviderTab } from './usage-overview-model.js'
 
 /** Ticks every second while the page is visible; a hidden tab stops re-rendering and catches up on return. */
 export const useNow = (): number => {
@@ -47,7 +36,7 @@ export const useNow = (): number => {
 }
 
 const BankedResets = (props: { readonly count: number; readonly expiries: readonly (number | null)[] }): JSX.Element => {
-  const ordered = bankedExpiries(props.expiries)
+  const ordered = UsageOverviewModel.bankedExpiries(props.expiries)
   const earliest = ordered[0]
   return (
     <Collapsible>
@@ -76,8 +65,8 @@ const BankedResets = (props: { readonly count: number; readonly expiries: readon
 
 const AccountUsageCard = (props: { readonly card: OverviewCard; readonly hostName: string; readonly readAt: number; readonly now: number }): JSX.Element => {
   const usage = props.card.usage
-  const limited = usage.status === 'ok' && isCardLimited(usage.windows)
-  const onReserve = usage.status === 'ok' && reserveInUse(usage.windows) !== undefined
+  const limited = usage.status === 'ok' && UsageOverviewModel.isCardLimited(usage.windows)
+  const onReserve = usage.status === 'ok' && UsageOverviewModel.reserveInUse(usage.windows) !== undefined
   return (
     <article
       className={cn(
@@ -107,7 +96,7 @@ const AccountUsageCard = (props: { readonly card: OverviewCard; readonly hostNam
       </header>
       {usage.windows.map(window => {
         const tone = quotaTone(window.percentRemaining)
-        const spent = isExhausted(window.percentRemaining)
+        const spent = UsageOverviewModel.isExhausted(window.percentRemaining)
         const resetLabel = window.reserve === true ? 'Reserve refills' : null
         return (
           <div className="dshx:flex dshx:flex-col dshx:gap-1" key={window.label}>
@@ -127,9 +116,11 @@ const AccountUsageCard = (props: { readonly card: OverviewCard; readonly hostNam
                 className={spent ? 'dshx:font-semibold dshx:text-destructive' : undefined}
                 title={window.resetsAt === null ? undefined : new Date(window.resetsAt).toLocaleString()}
               >
-                {resetLabel === null ? formatResetIn(window.resetsAt, props.now) : `${resetLabel} · ${formatResetIn(window.resetsAt, props.now)}`}
+                {resetLabel === null
+                  ? UsageOverviewModel.formatResetIn(window.resetsAt, props.now)
+                  : `${resetLabel} · ${UsageOverviewModel.formatResetIn(window.resetsAt, props.now)}`}
               </span>
-              <span title="Age of this usage snapshot">Age {formatAge(props.readAt, props.now)}</span>
+              <span title="Age of this usage snapshot">Age {UsageOverviewModel.formatAge(props.readAt, props.now)}</span>
             </div>
           </div>
         )
@@ -212,10 +203,10 @@ export const UsageOverview = (props: {
 }): JSX.Element => {
   const [tab, setTab] = useState<ProviderTab>('all')
   const now = useNow()
-  const providers = overviewProviders(props.usage)
+  const providers = UsageOverviewModel.overviewProviders(props.usage)
   const activeTab = tab !== 'all' && !providers.includes(tab) ? 'all' : tab
   const arrangement = useUsageLayout()
-  const sections = overviewSections(props.usage, activeTab, arrangement.layout)
+  const sections = UsageOverviewModel.overviewSections(props.usage, activeTab, arrangement.layout)
   const shownIds = sections.cards.map(card => card.instanceId)
   return (
     <section aria-label="AI account usage" className="dshx-root dshx:flex dshx:max-h-[min(640px,75vh)] dshx:min-h-0 dshx:flex-col">
