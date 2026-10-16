@@ -12,7 +12,7 @@ import {
   clientUsesLocales,
   clientUsesSettings,
 } from '../compiler/client/capabilities.js'
-import { buildLocaleNamespaceOwnership, findLocaleNamespaceConflict } from '../compiler/client/locale-ownership.js'
+import { LocaleNamespaceOwnershipModel } from '../compiler/client/locale-ownership.js'
 import type { ResolvedDshxConfig } from '../config/types.js'
 import type { DshxDiagnostic, DshxDiagnosticSeverity } from '../diagnostics.js'
 import { projectHostProvidedDependencyDiagnostics } from '../compat/index.js'
@@ -231,8 +231,8 @@ function checkClient(diagnostics: DshxDiagnostic[], config: ResolvedDshxConfig, 
     )
   }
   if (locales !== undefined) {
-    const ownership = buildLocaleNamespaceOwnership(config.packageId)
-    const conflict = findLocaleNamespaceConflict(ownership, locales)
+    const ownership = LocaleNamespaceOwnershipModel.build(config.packageId)
+    const conflict = LocaleNamespaceOwnershipModel.findConflict(ownership, locales)
     if (conflict !== undefined) {
       diagnostics.push(
         issue(

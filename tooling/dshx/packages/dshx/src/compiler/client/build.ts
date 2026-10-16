@@ -20,7 +20,7 @@ import {
   clientUsesLocales,
 } from './capabilities.js'
 import { installedLocaleNamespaces } from './installed.js'
-import { buildLocaleNamespaceOwnership, claimLocaleNamespaces, findLocaleNamespaceConflict } from './locale-ownership.js'
+import { LocaleNamespaceOwnershipModel } from './locale-ownership.js'
 import { profilePackages } from './profile-scan.js'
 import { clientGuardPlugin, singleClientChunkPlugin } from './guards.js'
 import { clientSlotRegistrations, slotOccupancyConflicts } from './slot-occupancy.js'
@@ -395,9 +395,9 @@ async function validateLocaleNamespaceOwnership(
 ): Promise<void> {
   const claimed = await clientLocaleNamespaces(paths.entry, paths.root)
   if (claimed === undefined || claimed.length === 0) return
-  const ownership = buildLocaleNamespaceOwnership(options.packageId)
-  for (const [packageId, namespaces] of siblings) claimLocaleNamespaces(ownership, packageId, namespaces)
-  const conflict = findLocaleNamespaceConflict(ownership, claimed)
+  const ownership = LocaleNamespaceOwnershipModel.build(options.packageId)
+  for (const [packageId, namespaces] of siblings) LocaleNamespaceOwnershipModel.claim(ownership, packageId, namespaces)
+  const conflict = LocaleNamespaceOwnershipModel.findConflict(ownership, claimed)
   if (conflict === undefined) return
   throw new DshxError('DSHX2403', `Locale namespace ${JSON.stringify(conflict.namespace)} is already registered by ${conflict.owner}.`, {
     file: paths.entry,

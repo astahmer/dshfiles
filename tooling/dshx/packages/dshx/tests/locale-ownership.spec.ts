@@ -2,7 +2,7 @@ import { mkdtemp, rm, writeFile, mkdir } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { buildLocaleNamespaceOwnership, claimLocaleNamespaces, findLocaleNamespaceConflict } from '../src/compiler/client/locale-ownership.js'
+import { LocaleNamespaceOwnershipModel } from '../src/compiler/client/locale-ownership.js'
 import { clientLocaleNamespaces } from '../src/compiler/client/capabilities.js'
 import { buildClient } from '../src/compiler/index.js'
 
@@ -97,21 +97,21 @@ describe('locale namespace ownership', () => {
   })
 
   it('blocks a namespace a shipped package already registers', () => {
-    const ownership = buildLocaleNamespaceOwnership('@dshfiles/example')
-    const conflict = findLocaleNamespaceConflict(ownership, ['conversation'])
+    const ownership = LocaleNamespaceOwnershipModel.build('@dshfiles/example')
+    const conflict = LocaleNamespaceOwnershipModel.findConflict(ownership, ['conversation'])
     expect(conflict).toEqual({ namespace: 'conversation', owner: '@deepseek-ai/dsh-client-ui-conversation', reserved: true })
   })
 
   it('allows a namespace nobody owns', () => {
-    const ownership = buildLocaleNamespaceOwnership('@dshfiles/example')
-    expect(findLocaleNamespaceConflict(ownership, ['conversation.queueReorder'])).toBeUndefined()
+    const ownership = LocaleNamespaceOwnershipModel.build('@dshfiles/example')
+    expect(LocaleNamespaceOwnershipModel.findConflict(ownership, ['conversation.queueReorder'])).toBeUndefined()
   })
 
   it('blocks a sibling plugin claim only once that sibling is installed', () => {
-    const ownership = buildLocaleNamespaceOwnership('@dshfiles/example')
-    expect(findLocaleNamespaceConflict(ownership, ['shared.panel'])).toBeUndefined()
-    claimLocaleNamespaces(ownership, '@dshfiles/sibling', ['shared.panel'])
-    expect(findLocaleNamespaceConflict(ownership, ['shared.panel'])).toEqual({
+    const ownership = LocaleNamespaceOwnershipModel.build('@dshfiles/example')
+    expect(LocaleNamespaceOwnershipModel.findConflict(ownership, ['shared.panel'])).toBeUndefined()
+    LocaleNamespaceOwnershipModel.claim(ownership, '@dshfiles/sibling', ['shared.panel'])
+    expect(LocaleNamespaceOwnershipModel.findConflict(ownership, ['shared.panel'])).toEqual({
       namespace: 'shared.panel',
       owner: '@dshfiles/sibling',
       reserved: false,
@@ -119,15 +119,15 @@ describe('locale namespace ownership', () => {
   })
 
   it('never lets a sibling shadow a shipped namespace', () => {
-    const ownership = buildLocaleNamespaceOwnership('@dshfiles/example')
-    claimLocaleNamespaces(ownership, '@dshfiles/sibling', ['conversation'])
-    expect(findLocaleNamespaceConflict(ownership, ['conversation'])?.owner).toBe('@deepseek-ai/dsh-client-ui-conversation')
+    const ownership = LocaleNamespaceOwnershipModel.build('@dshfiles/example')
+    LocaleNamespaceOwnershipModel.claim(ownership, '@dshfiles/sibling', ['conversation'])
+    expect(LocaleNamespaceOwnershipModel.findConflict(ownership, ['conversation'])?.owner).toBe('@deepseek-ai/dsh-client-ui-conversation')
   })
 
   it('never conflicts with its own claims', () => {
-    const ownership = buildLocaleNamespaceOwnership('@dshfiles/example')
-    claimLocaleNamespaces(ownership, '@dshfiles/example', ['shared.panel'])
-    expect(findLocaleNamespaceConflict(ownership, ['shared.panel'])).toBeUndefined()
+    const ownership = LocaleNamespaceOwnershipModel.build('@dshfiles/example')
+    LocaleNamespaceOwnershipModel.claim(ownership, '@dshfiles/example', ['shared.panel'])
+    expect(LocaleNamespaceOwnershipModel.findConflict(ownership, ['shared.panel'])).toBeUndefined()
   })
 
   it('fails a build that claims a shipped namespace', async () => {

@@ -16,7 +16,7 @@
  */
 
 /** Namespaces registered by shipped packages. No profile may reassign these. */
-export const RESERVED_LOCALE_NAMESPACES: Readonly<Record<string, readonly string[]>> = {
+const RESERVED_LOCALE_NAMESPACES: Readonly<Record<string, readonly string[]>> = {
   '@deepseek-ai/dsh-client-ui-conversation': ['conversation'],
   '@deepseek-ai/dsh-client-ui-settings': ['settings'],
 }
@@ -37,7 +37,7 @@ export interface LocaleNamespaceOwnership {
   readonly owners: Map<string, string>
 }
 
-export function buildLocaleNamespaceOwnership(packageId: string): LocaleNamespaceOwnership {
+const buildLocaleNamespaceOwnership = (packageId: string): LocaleNamespaceOwnership => {
   const owners = new Map<string, string>()
   for (const [owner, namespaces] of Object.entries(RESERVED_LOCALE_NAMESPACES)) {
     for (const namespace of namespaces) owners.set(namespace, owner)
@@ -50,7 +50,7 @@ export function buildLocaleNamespaceOwnership(packageId: string): LocaleNamespac
  * A shipped owner is never overwritten, so a sibling cannot shadow a platform
  * namespace.
  */
-export function claimLocaleNamespaces(ownership: LocaleNamespaceOwnership, packageId: string, namespaces: readonly string[]): void {
+const claimLocaleNamespaces = (ownership: LocaleNamespaceOwnership, packageId: string, namespaces: readonly string[]): void => {
   if (packageId === ownership.packageId) return
   for (const namespace of namespaces) {
     if (ownership.owners.has(namespace)) continue
@@ -59,11 +59,18 @@ export function claimLocaleNamespaces(ownership: LocaleNamespaceOwnership, packa
 }
 
 /** First owner that blocks a claim, or undefined when every namespace is free. */
-export function findLocaleNamespaceConflict(ownership: LocaleNamespaceOwnership, claimed: readonly string[]): LocaleNamespaceConflict | undefined {
+const findLocaleNamespaceConflict = (ownership: LocaleNamespaceOwnership, claimed: readonly string[]): LocaleNamespaceConflict | undefined => {
   for (const namespace of claimed) {
     const owner = ownership.owners.get(namespace)
     if (owner === undefined || owner === ownership.packageId) continue
     return { namespace, owner, reserved: RESERVED_LOCALE_NAMESPACES[owner] !== undefined }
   }
   return undefined
+}
+
+export class LocaleNamespaceOwnershipModel {
+  static readonly reservedNamespaces = RESERVED_LOCALE_NAMESPACES
+  static readonly build = buildLocaleNamespaceOwnership
+  static readonly claim = claimLocaleNamespaces
+  static readonly findConflict = findLocaleNamespaceConflict
 }
