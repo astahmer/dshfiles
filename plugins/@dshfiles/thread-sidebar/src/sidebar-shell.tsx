@@ -65,17 +65,7 @@ import {
   type OrderedSidebarEntry,
   type SidebarPreferences,
 } from './organization.js'
-import {
-  canStep,
-  currentLocation,
-  emptyNavigationHistory,
-  jumpHistory,
-  NAVIGATION_EVENT,
-  sameLocation,
-  visitLocation,
-  type NavigationHistory,
-  type NavigationLocation,
-} from './navigation-history.js'
+import { NAVIGATION_EVENT, ThreadNavigationHistoryModel, type NavigationHistory, type NavigationLocation } from './navigation-history.js'
 import { PaletteApi, type PaletteAction } from '@dshfiles/command-palette/api'
 import { formatChord, isMacPlatform, matchesChord, parseChord, sameAsHostBinding } from './keyboard-shortcuts.js'
 import { SidebarStateProvider, useSidebarState } from './sidebar-state.js'
@@ -456,7 +446,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   const activePanelId = props.usePanelInfo(info => info.activePanelId)
   const hostShortcuts = props.useShortcuts(entries => entries)
   const { preferences, updatePreferences, openPalette, selectedThreadId, threadTitle } = useSidebarState()
-  const [history, setHistory] = useState<NavigationHistory<SidebarLocation>>(emptyNavigationHistory)
+  const [history, setHistory] = useState<NavigationHistory<SidebarLocation>>(ThreadNavigationHistoryModel.emptyNavigationHistory)
   const pendingStep = useRef<{ target: SidebarLocation; until: number } | null>(null)
   const [historyOpen, setHistoryOpen] = useState(false)
   const historyGroupRef = useRef<HTMLDivElement>(null)
@@ -642,11 +632,11 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   }, [props.readFooterSnapshot, props.subscribeFooterSnapshot])
 
   useEffect(() => {
-    const location = currentLocation({ panelId: activePanelId, threadId: selectedThreadId })
+    const location = ThreadNavigationHistoryModel.currentLocation({ panelId: activePanelId, threadId: selectedThreadId })
     if (location === null) return
     const pending = pendingStep.current
     if (pending !== null) {
-      if (sameLocation(pending.target, location)) {
+      if (ThreadNavigationHistoryModel.sameLocation(pending.target, location)) {
         pendingStep.current = null
         return
       }
@@ -654,11 +644,11 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
       if (Date.now() < pending.until) return
       pendingStep.current = null
     }
-    setHistory(current => visitLocation(current, location))
+    setHistory(current => ThreadNavigationHistoryModel.visitLocation(current, location))
   }, [activePanelId, selectedThreadId])
 
   const goToHistoryEntry = (index: number): void => {
-    const step = jumpHistory(history, index)
+    const step = ThreadNavigationHistoryModel.jumpHistory(history, index)
     if (step === null) return
     pendingStep.current = { target: step.target, until: Date.now() + NAVIGATION_SETTLE_MS }
     setHistory(step.history)
@@ -911,7 +901,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
         label: text(props.t, 'threadSidebarBack'),
         aliases: ['history', 'previous'],
         icon: <ArrowLeftIcon className="dshx:size-4" />,
-        isAvailable: () => canStep(history, -1),
+        isAvailable: () => ThreadNavigationHistoryModel.canStep(history, -1),
         run: () => latestStepNavigation.current(-1),
       },
       {
@@ -920,7 +910,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
         label: text(props.t, 'threadSidebarForward'),
         aliases: ['history', 'next'],
         icon: <ArrowRightIcon className="dshx:size-4" />,
-        isAvailable: () => canStep(history, 1),
+        isAvailable: () => ThreadNavigationHistoryModel.canStep(history, 1),
         run: () => latestStepNavigation.current(1),
       },
       ...(restartAvailable
@@ -1102,7 +1092,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
                           className="dshx:text-muted-foreground"
                           aria-label={label}
                           title={`${withChordHint(label, direction === -1 ? preferences.backChord : preferences.forwardChord)}\n${text(props.t, 'threadSidebarHistoryHint')}`}
-                          disabled={!canStep(history, direction)}
+                          disabled={!ThreadNavigationHistoryModel.canStep(history, direction)}
                           onPointerDown={event => {
                             if (event.button !== 0) return
                             window.clearTimeout(historyHold.current.timer)
