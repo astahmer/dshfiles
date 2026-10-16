@@ -48,63 +48,78 @@ export type MemoryEffectiveness = {
   readonly citations: { readonly total: number; readonly agentCorrected: number; readonly userCorrected: number; readonly up: number; readonly down: number }
 }
 
-export type MemoryCitation = {
-  readonly id: number
-  readonly at: number
-  readonly thread: string
-  readonly ref: string
-  readonly target: string | null
-  readonly rating: 'up' | 'down' | null
-  readonly agentCorrected: boolean
-  readonly userCorrected: boolean
-}
+export type MemoryCitation = z.infer<typeof memoryCitationSchema>
 
-export type MemoryNoteType = 'user' | 'feedback' | 'project' | 'reference'
+export type MemoryNoteType = z.infer<typeof memoryNoteTypeSchema>
 
-export type PanelNote = {
-  readonly id: number
-  readonly project: string
-  readonly type: MemoryNoteType
-  readonly scope: string
-  readonly confidence: 'stated' | 'inferred'
-  readonly text: string
-  readonly sourceThread: string | null
-  /** Event sequence of the user message the note came from, when known. */
-  readonly sourceSeq: number | null
-  readonly origin: 'user-requested' | 'agent' | 'panel'
-  /** When the first version of the note was written. */
-  readonly createdAt: number
-  /** When this version was written. */
-  readonly updatedAt: number
-  readonly citations: number
-  readonly status: 'valid' | 'superseded' | 'forgotten'
-  readonly supersedes: number | null
-  readonly supersededBy: number | null
-  readonly reason: string | null
-}
+export type PanelNote = z.infer<typeof panelNoteSchema>
 
-export type PanelThread = {
-  readonly id: string
-  readonly project: string
-  readonly title: string
-  readonly decision: string
-  readonly digest: string
-  readonly source: 'trail' | 'model'
-  /** The thread's last event. */
-  readonly updatedAt: number
-  readonly digestedAt: number
-  readonly lastSeq: number
-  readonly citations: number
-}
+export type PanelThread = z.infer<typeof panelThreadSchema>
 
 /** Every field is sent; an empty string means "any". The API payload cannot carry `undefined`. */
-export type NotesFilter = {
-  readonly project: string
-  readonly scope: string
-  readonly type: MemoryNoteType | ''
-  readonly query: string
-  readonly includeInvalid: boolean
-}
+export type NotesFilter = z.infer<typeof notesFilterSchema>
+
+export const memoryNoteTypeSchema = z.enum(['user', 'feedback', 'project', 'reference'])
+
+/** One stored note as the panel shows it. */
+export const panelNoteSchema = z.object({
+  id: z.number().int(),
+  project: z.string(),
+  type: memoryNoteTypeSchema,
+  scope: z.string(),
+  confidence: z.enum(['stated', 'inferred']),
+  text: z.string(),
+  sourceThread: z.string().nullable(),
+  sourceSeq: z.number().int().nullable(),
+  origin: z.enum(['user-requested', 'agent', 'panel']),
+  createdAt: z.number(),
+  updatedAt: z.number(),
+  citations: z.number().int(),
+  status: z.enum(['valid', 'superseded', 'forgotten']),
+  supersedes: z.number().int().nullable(),
+  supersededBy: z.number().int().nullable(),
+  reason: z.string().nullable(),
+})
+
+/** One digested thread as the panel lists it. */
+export const panelThreadSchema = z.object({
+  id: z.string(),
+  project: z.string(),
+  title: z.string(),
+  decision: z.string(),
+  digest: z.string(),
+  source: z.enum(['trail', 'model']),
+  updatedAt: z.number(),
+  digestedAt: z.number(),
+  lastSeq: z.number().int(),
+  citations: z.number().int(),
+})
+
+/** Every field is sent; an empty string means "any". */
+export const notesFilterSchema = z
+  .object({
+    project: z.string(),
+    scope: z.string(),
+    type: memoryNoteTypeSchema.or(z.literal('')),
+    query: z.string(),
+    includeInvalid: z.boolean(),
+  })
+  .strict()
+
+/** One recorded citation of memory, with its correction flags and rating. */
+export const memoryCitationSchema = z.object({
+  id: z.number().int(),
+  at: z.number(),
+  thread: z.string(),
+  ref: z.string(),
+  target: z.string().nullable(),
+  rating: z.enum(['up', 'down']).nullable(),
+  agentCorrected: z.boolean(),
+  userCorrected: z.boolean(),
+})
+
+/** Model-facing text for a structured tool result. */
+const compactJson = <Output>(output: Output): string => JSON.stringify(output)
 
 const toolOutput = z.object({ summary: z.string() }).strict()
 
@@ -173,31 +188,72 @@ export const memoryApi = defineApi({
       description: MemoryGuidance.noteDescription,
       tool: { name: 'memory_note', render: output => output.summary },
     }),
-    projects: method<void, readonly { readonly project: string; readonly threads: number; readonly notes: number }[]>(),
+    projects: method({
+      input: z.void(),
+      output: z.array(z.object({ project: z.string(), threads: z.number().int(), notes: z.number().int() })),
+      description: 'Every project memory is filed under, with how many thread digests and notes it holds. Read-only.',
+      tool: { name: 'memory_projects', readOnly: true, render: compactJson },
+    }),
     startBlock: method({
       input: z.object({ cwd: z.string().min(1).max(4_096) }).strict(),
-      output: z.custom<{ readonly project: string; readonly text: string }>(),
+      output: z.object({ project: z.string(), text: z.string() }),
       description:
-        'The memory block a new thread started in this folder gets now, and the project it is filed under. Empty when memory is off or has nothing for the project.',
-    }),
-    notes: method<NotesFilter, readonly PanelNote[]>(),
-    noteHistory: method<{ readonly id: number }, readonly PanelNote[]>(),
-    editNote: method<
-      {
-        readonly id: number
-        readonly text: string
-        readonly type: MemoryNoteType
-        readonly scope: string
-        /** Empty: "edited in the Memory panel". */
-        readonly reason: string
+        'The memory block a new thread started in this folder gets now, and the project it is filed under. Empty when memory is off or has nothing for the project. Read-only.',
+      tool: {
+        name: 'memory_start_block',
+        readOnly: true,
+        render: output =>
+          output.text.length === 0
+            ? `No memory block for ${output.project}.`
+            : `${output.project}:
+${output.text}`,
       },
-      PanelNote
-    >(),
-    forgetNote: method<{ readonly id: number; readonly reason: string }, { readonly forgotten: boolean }>(),
-    threads: method<{ readonly project: string }, readonly PanelThread[]>(),
+    }),
+    notes: method({
+      input: notesFilterSchema,
+      output: z.array(panelNoteSchema),
+      description:
+        'Browse stored notes by project, scope, type and text, optionally including superseded and forgotten ones. Read-only; every filter field is required, and an empty string means any.',
+      tool: { name: 'memory_notes', readOnly: true, render: compactJson },
+    }),
+    noteHistory: method({
+      input: z.object({ id: z.number().int() }).strict(),
+      output: z.array(panelNoteSchema),
+      description: 'Every version of one note, oldest first, so a superseded or forgotten note can be traced. Read-only.',
+      tool: { name: 'memory_note_history', readOnly: true, render: compactJson },
+    }),
+    editNote: method({
+      input: z
+        .object({
+          id: z.number().int(),
+          text: z.string(),
+          type: memoryNoteTypeSchema,
+          scope: z.string(),
+          reason: z.string().describe('Empty: "edited in the Memory panel".'),
+        })
+        .strict(),
+      output: panelNoteSchema,
+      description:
+        'Replace one note with a new version, keeping its history. Give the reason for the change. Call only when the user asked to correct that note.',
+      tool: { name: 'memory_edit_note', render: compactJson },
+    }),
+    forgetNote: method({
+      input: z.object({ id: z.number().int(), reason: z.string() }).strict(),
+      output: z.object({ forgotten: z.boolean() }),
+      description: 'Forget one note, keeping it in the history as forgotten, with the reason recorded. Call only when the user asked to forget that note.',
+      tool: { name: 'memory_forget_note', render: compactJson },
+    }),
+    threads: method({
+      input: z.object({ project: z.string() }).strict(),
+      output: z.array(panelThreadSchema),
+      description: 'Thread digests filed under one project, with their decisions, source and citation counts. Read-only.',
+      tool: { name: 'memory_threads', readOnly: true, render: compactJson },
+    }),
     citations: method({
-      output: z.custom<readonly MemoryCitation[]>(),
-      description: 'The 100 most recent citations of memory (`memory: <id>` in a reply), with heuristic correction flags and ratings.',
+      input: z.void(),
+      output: z.array(memoryCitationSchema),
+      description: 'The 100 most recent citations of memory (`memory: <id>` in a reply), with heuristic correction flags and ratings. Read-only.',
+      tool: { name: 'memory_citations', readOnly: true, render: compactJson },
     }),
     /** 👍/👎 on one cited memory; null clears the rating. */
     rateCitation: method<{ readonly id: number; readonly rating: 'up' | 'down' | null }, { readonly rated: boolean }>(),

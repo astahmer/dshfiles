@@ -348,7 +348,7 @@ const panelApi = memoryApi.host({
   usage: () => usage(),
   projects: async () => {
     await projectNormalization
-    return requireStore().projects()
+    return [...requireStore().projects()]
   },
   startBlock: ({ input }) => {
     if (!runtime) throw new Error('Memory is not active in this DSH host (setting dshfiles-memory.enabled, or the plugin failed to start).')
@@ -357,7 +357,7 @@ const panelApi = memoryApi.host({
   notes: async ({ input }) => {
     await projectNormalization
     const filter = notesFilter.parse(input)
-    return requireStore()
+    const notes = requireStore()
       .listNotes({
         project: filter.project,
         scope: filter.scope,
@@ -367,8 +367,9 @@ const panelApi = memoryApi.host({
         limit: 500,
       })
       .map(panelNote)
+    return [...notes]
   },
-  noteHistory: ({ input }) => requireStore().noteHistory(noteId.parse(input.id)).map(panelNote),
+  noteHistory: ({ input }) => [...requireStore().noteHistory(noteId.parse(input.id)).map(panelNote)],
   editNote: ({ input }) => {
     const parsed = z
       .object({ id: noteId, text: z.string().trim().min(1).max(2_000), type: noteType.optional(), scope: z.string().trim().min(1).max(256).optional(), reason })
@@ -394,7 +395,7 @@ const panelApi = memoryApi.host({
     const parsed = z.object({ id: noteId, reason }).parse(input)
     return { forgotten: requireStore().forgetNote({ id: parsed.id, reason: parsed.reason || 'removed in the Memory panel' }) }
   },
-  citations: () => requireStore().recentCitations(100),
+  citations: () => [...requireStore().recentCitations(100)],
   rateCitation: ({ input }) => {
     const parsed = z.object({ id: noteId, rating: z.enum(['up', 'down']).nullable() }).parse(input)
     return { rated: requireStore().rateCitation(parsed) }
@@ -402,7 +403,7 @@ const panelApi = memoryApi.host({
   threads: async ({ input }) => {
     await projectNormalization
     const project = anyWhenEmpty(4_096).parse(input.project)
-    return requireStore().listThreads({ project, limit: 300 }).map(panelThread)
+    return [...requireStore().listThreads({ project, limit: 300 }).map(panelThread)]
   },
 })
 
