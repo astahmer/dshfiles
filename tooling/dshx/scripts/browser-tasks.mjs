@@ -78,7 +78,8 @@ export const cucumberExpressionPattern = expression => {
   return new RegExp(`^${pattern}$`)
 }
 
-const unescapeStringLiteral = text => text.replace(/\\(.)/g, (_, escaped) => (escaped === '\\' ? '\\' : escaped === "'" || escaped === '"' ? escaped : `\\${escaped}`))
+const unescapeStringLiteral = text =>
+  text.replace(/\\(.)/g, (_, escaped) => (escaped === '\\' ? '\\' : escaped === "'" || escaped === '"' ? escaped : `\\${escaped}`))
 
 /** Step definitions in one support file: the expression and the source text up to the next definition. */
 export const parseStepDefinitions = source => {
@@ -190,14 +191,18 @@ export const writeDistDigests = async () => {
 const rootAnchored = paths => [...new Set(paths)].sort().map(path => `$TURBO_ROOT$/${path}`)
 
 const relativeImports = (source, fromFile) =>
-  [...source.matchAll(/from\s+['"](\.{1,2}\/[^'"]+)['"]/g)].map(match => relative(workspaceRoot, resolve(workspaceRoot, dirname(fromFile), match[1].replace(/\.js$/, '.ts'))))
+  [...source.matchAll(/from\s+['"](\.{1,2}\/[^'"]+)['"]/g)].map(match =>
+    relative(workspaceRoot, resolve(workspaceRoot, dirname(fromFile), match[1].replace(/\.js$/, '.ts'))),
+  )
 
 /** Everything a cached browser task needs, derived from the feature files, step files and package manifests. */
 export const planBrowserTasks = async () => {
   const packages = await listWorkspacePackages()
   const bundleNames = [...packages.values()].filter(workspacePackage => workspacePackage.isBundle).map(workspacePackage => workspacePackage.name)
   const supportFiles = [
-    ...(await readdir(resolve(workspaceRoot, supportDir))).filter(name => name.endsWith('.ts') && !name.endsWith('.test.ts')).map(name => `${supportDir}/${name}`),
+    ...(await readdir(resolve(workspaceRoot, supportDir)))
+      .filter(name => name.endsWith('.ts') && !name.endsWith('.test.ts'))
+      .map(name => `${supportDir}/${name}`),
     ...(await readdir(resolve(workspaceRoot, journeysDir))).filter(name => name.endsWith('.ts')).map(name => `${journeysDir}/${name}`),
   ]
   const sources = new Map()
@@ -227,7 +232,9 @@ export const planBrowserTasks = async () => {
       for (const imported of relativeImports(sources.get(file), file)) if (journeyFiles.includes(imported)) usedJourneyFiles.add(imported)
     }
     const bootsEveryBundle = unmatched || usedDefinitions.some(definition => /\bbootProfile\(/.test(definition.body))
-    const mentioned = [source, ...usedDefinitions.map(definition => definition.body)].flatMap(text => [...text.matchAll(/@dshfiles\/[a-z0-9-]+/g)].map(match => match[0]))
+    const mentioned = [source, ...usedDefinitions.map(definition => definition.body)].flatMap(text =>
+      [...text.matchAll(/@dshfiles\/[a-z0-9-]+/g)].map(match => match[0]),
+    )
     const booted = bootsEveryBundle ? bundleNames : mentioned.filter(name => packages.get(name)?.isBundle === true)
 
     const owner = owners.get(ownerName) ?? { name: ownerName, features: [], smokeFeatures: [], booted: new Set(), journeyFiles: new Set(), unmatchedSteps: [] }
@@ -242,12 +249,13 @@ export const planBrowserTasks = async () => {
     owners.set(ownerName, owner)
   }
 
+  const fixtureInputsByFeature = new Map([['multi-host', ['scripts/profile-sync.ts']]])
   const e2eTask = owner => ({
     dependsOn: [],
     inputs: rootAnchored([
       ...sharedInputs,
       ...journeyInputs,
-      ...owner.features.map(feature => `${featuresDir}/${feature}.feature`),
+      ...owner.features.flatMap(feature => [`${featuresDir}/${feature}.feature`, ...(fixtureInputsByFeature.get(feature) ?? [])]),
       ...owner.journeyFiles,
       ...builtPackageInputs([...owner.booted, '@dshfiles/dshx'], packages),
     ]),
@@ -286,8 +294,7 @@ export const planBrowserTasks = async () => {
   return { owners, configs }
 }
 
-const renderTurboConfig = tasks =>
-  `${generatedNotice}\n${JSON.stringify({ $schema: 'https://turborepo.dev/schema.json', extends: ['//'], tasks }, null, 2)}\n`
+const renderTurboConfig = tasks => `${generatedNotice}\n${JSON.stringify({ $schema: 'https://turborepo.dev/schema.json', extends: ['//'], tasks }, null, 2)}\n`
 
 const parseTurboConfig = source => JSON.parse(source.replace(/^\s*\/\/.*$/gm, ''))
 

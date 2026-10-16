@@ -54,6 +54,7 @@
         "$TURBO_ROOT$/plugins/@dshfiles/shared-runtime/package.json",
         "$TURBO_ROOT$/pnpm-lock.yaml",
         "$TURBO_ROOT$/profiles/web/**",
+        "$TURBO_ROOT$/scripts/profile-sync.ts",
         "$TURBO_ROOT$/tooling/dshx/e2e/features/multi-host.feature",
         "$TURBO_ROOT$/tooling/dshx/e2e/fixtures/**",
         "$TURBO_ROOT$/tooling/dshx/e2e/support/*",

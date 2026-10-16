@@ -20,7 +20,7 @@ const findExecutable = async name => {
   }
 }
 
-const reserveLoopbackPort = async () =>
+export const reserveLoopbackPort = async () =>
   new Promise((resolvePort, reject) => {
     const server = createServer()
     server.once('error', reject)
@@ -210,6 +210,7 @@ export const startLoopbackSshd = async () => {
         const wrapperDirectory = join(homeRoot, 'bin')
         const configPath = join(sshDirectory, 'config')
         const wrapperInvocationLogPath = join(scratchRoot, 'ssh-wrapper-invocations.log')
+        const tunnelProcessLogPath = join(scratchRoot, 'ssh-tunnel-processes.log')
         const quote = value => `'${value.replaceAll("'", "'\\''")}'`
         await Promise.all([mkdir(sshDirectory, { recursive: true, mode: 0o700 }), mkdir(wrapperDirectory, { recursive: true, mode: 0o700 })])
         await writeFile(
@@ -230,12 +231,25 @@ export const startLoopbackSshd = async () => {
           ].join('\n') + '\n',
           { mode: 0o600 },
         )
-        await writeFile(
-          join(wrapperDirectory, 'ssh'),
-          `#!/bin/sh\nprintf '%s\\n' invoked >> ${quote(wrapperInvocationLogPath)}\nexec ${quote(sshPath)} -F ${quote(configPath)} "$@"\n`,
-          { mode: 0o700 },
-        )
-        return { hostPathPrefix: wrapperDirectory, wrapperInvocationLogPath }
+        const wrapperScript =
+          [
+            '#!/bin/sh',
+            `printf '%s\\n' invoked >> ${quote(wrapperInvocationLogPath)}`,
+            'tunnel_process=',
+            'tunnel_forward=',
+            'for argument in "$@"; do',
+            '  case "$argument" in',
+            '    -N) tunnel_process=yes ;;',
+            '    -L) tunnel_forward=yes ;;',
+            '  esac',
+            'done',
+            'if [ "$tunnel_process" = yes ] && [ "$tunnel_forward" = yes ]; then',
+            `  printf 'persistent-forward %s\\n' "$$" >> ${quote(tunnelProcessLogPath)}`,
+            'fi',
+            `exec ${quote(sshPath)} -F ${quote(configPath)} "$@"`,
+          ].join('\n') + '\n'
+        await writeFile(join(wrapperDirectory, 'ssh'), wrapperScript, { mode: 0o700 })
+        return { hostPathPrefix: wrapperDirectory, wrapperInvocationLogPath, tunnelProcessLogPath }
       },
       async stop() {
         if (serverProcess === undefined) return

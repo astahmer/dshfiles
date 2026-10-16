@@ -1,11 +1,19 @@
 import { expect, type Page } from '@playwright/test'
-import { readFile } from 'node:fs/promises'
+import { randomBytes } from 'node:crypto'
+import { spawnSync } from 'node:child_process'
+import { existsSync } from 'node:fs'
+import { chmod, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
+import { basename, dirname, join } from 'node:path'
+import { setTimeout as delay } from 'node:timers/promises'
+import { z } from 'zod'
 import { After, Given, Then, When } from '../bdd.js'
 import { bootComposedPluginProfile, type BootedProfile } from '../boot.js'
-import { startLoopbackSshd } from '../loopback-sshd.mjs'
+import { startMutationResponseProxy } from '../mutation-response-proxy.mjs'
+import { reserveLoopbackPort, startLoopbackSshd } from '../loopback-sshd.mjs'
 import { finishJourneyAssertions, recordAssertion, visitIsolatedPluginProfile } from '../steps.js'
 import { connectDshxApi } from '../../../packages/dshx/src/platform/dshx-api.js'
-import { z } from 'zod'
+import { DSHFILES_ROOT } from '../../../packages/dshx/src/project/local-bundles.js'
+import { launchFilePaths, parseRuntimeLaunch } from '../../../../../plugins/@dshfiles/multi-host/src/launch-file.js'
 
 const multiHostPackageId = '@dshfiles/multi-host'
 const jjIntegrationPackageId = '@dshfiles/jj-integration'
@@ -20,6 +28,21 @@ const nativeCreateSchema = z.discriminatedUnion('ok', [
 const nativeSessionListSchema = z.discriminatedUnion('ok', [
   z.object({ ok: z.literal(true), value: z.object({ items: z.array(z.object({ sessionId: z.string() }).passthrough()) }).passthrough() }),
   z.object({ ok: z.literal(false), code: z.string(), message: z.string() }),
+])
+
+const runtimePingSchema = z.discriminatedUnion('ok', [
+  z.object({ ok: z.literal(true), ms: z.number().int().nonnegative() }),
+  z.object({ ok: z.literal(false), code: z.string(), message: z.string() }),
+])
+
+const runtimeReconnectSchema = z.discriminatedUnion('ok', [
+  z.object({ ok: z.literal(true) }),
+  z.object({ ok: z.literal(false), code: z.string(), message: z.string() }),
+])
+
+const connectionTestSchema = z.discriminatedUnion('ok', [
+  z.object({ ok: z.literal(true) }).passthrough(),
+  z.object({ ok: z.literal(false), code: z.string(), message: z.string() }).passthrough(),
 ])
 
 const transcriptSchema = z.discriminatedUnion('ok', [
@@ -37,6 +60,7 @@ type MultiHostScratchPair = {
   readonly remote: BootedProfile
   readonly manager: BootedProfile
   readonly wrapperInvocationLogPath: string
+  readonly tunnelProcessLogPath: string
 }
 
 const pairs = new WeakMap<Page, MultiHostScratchPair>()
@@ -51,9 +75,63 @@ type JourneyObservation = {
   readonly remoteHome: string
   readonly sessionId: string
   readonly transcriptCwd: string
+  readonly tunnelReconnected?: boolean
+  readonly staleLaunchRejected?: boolean
+  readonly profileSyncFailureCleaned?: boolean
+  readonly mutationReconciled?: boolean
+  readonly remoteReadyAfterMutation?: boolean
+  readonly remoteCrashCleaned?: boolean
 }
 
 const observations = new WeakMap<Page, JourneyObservation>()
+
+const updateObservation = (page: Page, update: Partial<JourneyObservation>): void => {
+  const previous = observations.get(page)
+  if (previous === undefined) throw new Error('The remote thread journey did not produce an observation.')
+  observations.set(page, { ...previous, ...update })
+}
+
+const tunnelProcessRecordSchema = z.object({ marker: z.literal('persistent-forward'), processId: z.number().int().positive() })
+const tunnelProcessRecordsSchema = z.array(tunnelProcessRecordSchema)
+const processDetailsSchema = z.object({
+  parentProcessId: z.number().int().positive(),
+  processGroupId: z.number().int().positive(),
+  commandName: z.string().min(1),
+})
+
+const readTunnelProcessRecords = async (path: string) => {
+  const log = (await readFile(path, 'utf8')).trim()
+  if (log === '') return []
+  return tunnelProcessRecordsSchema.parse(
+    log.split(/\r?\n/).map(line => {
+      const [marker, processId] = line.split(' ')
+      return { marker, processId: Number(processId) }
+    }),
+  )
+}
+
+const readProcessDetails = (processId: number) => {
+  const result = spawnSync('ps', ['-o', 'ppid=', '-o', 'pgid=', '-o', 'comm=', '-p', String(processId)], { encoding: 'utf8', timeout: 5_000 })
+  if (result.error !== undefined || result.status !== 0) throw new Error('Could not inspect the scratch tunnel process.')
+  const [parentProcessId, processGroupId, ...commandName] = result.stdout.trim().split(/\s+/)
+  if (parentProcessId === undefined || processGroupId === undefined || commandName.length === 0) {
+    throw new Error('The scratch tunnel process is no longer listed.')
+  }
+  return processDetailsSchema.parse({
+    parentProcessId: Number(parentProcessId),
+    processGroupId: Number(processGroupId),
+    commandName: basename(commandName.join(' ')),
+  })
+}
+
+const isProcessRunning = (processId: number): boolean => {
+  try {
+    process.kill(processId, 0)
+    return true
+  } catch {
+    return false
+  }
+}
 
 const hostApi = async (profile: BootedProfile) => connectDshxApi({ url: profile.url, packageId: multiHostPackageId, apiId: multiHostApiId, version: 1 })
 
@@ -64,17 +142,21 @@ Given('a loopback SSH DSH pair is booted', async ({ page }: { readonly page: Pag
   try {
     remote = await bootComposedPluginProfile({ packageIds: [multiHostPackageId], profileLabel: 'multi-host-remote' })
     let wrapperInvocationLogPath: string | undefined
+    let tunnelProcessLogPath: string | undefined
     manager = await bootComposedPluginProfile({
       packageIds: [multiHostPackageId, jjIntegrationPackageId],
       profileLabel: 'multi-host-manager',
       seedHome: async homeRoot => {
         const seeded = await sshd.seedClientHome(homeRoot)
         wrapperInvocationLogPath = seeded.wrapperInvocationLogPath
+        tunnelProcessLogPath = seeded.tunnelProcessLogPath
         return { hostPathPrefix: seeded.hostPathPrefix }
       },
     })
-    if (wrapperInvocationLogPath === undefined) throw new Error('The scratch SSH wrapper was not seeded for the manager DSH.')
-    pairs.set(page, { sshd, remote, manager, wrapperInvocationLogPath })
+    if (wrapperInvocationLogPath === undefined || tunnelProcessLogPath === undefined) {
+      throw new Error('The scratch SSH wrapper was not seeded for the manager DSH.')
+    }
+    pairs.set(page, { sshd, remote, manager, wrapperInvocationLogPath, tunnelProcessLogPath })
     await visitIsolatedPluginProfile(page, manager)
   } catch (error) {
     try {
@@ -137,22 +219,243 @@ When('a remote thread is created and read over SSH', async ({ page }: { readonly
   observations.set(page, { runtimeId: runtime.id, remoteHome: runtime.remoteHome, sessionId, transcriptCwd: transcript.cwd })
 })
 
-Then('the second scratch DSH is ready and the remote thread round-trips', async ({ page }: { readonly page: Page }) => {
+When('the SSH tunnel drops and reconnects', async ({ page }: { readonly page: Page }) => {
   const pair = pairFor(page)
   const observation = observations.get(page)
   if (observation === undefined) throw new Error('The remote thread journey did not produce an observation.')
   const call = await hostApi(pair.manager)
-  const ping = z
-    .discriminatedUnion('ok', [
-      z.object({ ok: z.literal(true), ms: z.number().int().nonnegative() }),
-      z.object({ ok: z.literal(false), code: z.string(), message: z.string() }),
-    ])
-    .parse(await call('runtimePing', { runtimeId: observation.runtimeId }))
-  expect(ping.ok).toBe(true)
+  const readyBeforeDrop = runtimePingSchema.parse(await call('runtimePing', { runtimeId: observation.runtimeId }))
+  if (!readyBeforeDrop.ok) throw new Error(`The scratch runtime was not ready before tunnel loss: ${readyBeforeDrop.code}.`)
+  const tunnelProcessRecordsBeforeDrop = await readTunnelProcessRecords(pair.tunnelProcessLogPath)
+  const tunnelProcessRecord = tunnelProcessRecordsBeforeDrop.at(-1)
+  const managerProcessId = pair.manager.host.pid
+  if (managerProcessId === undefined || !isProcessRunning(managerProcessId)) {
+    throw new Error('The manager DSH process was not running for tunnel ownership validation.')
+  }
+  if (tunnelProcessRecord === undefined) throw new Error('The persistent SSH forward was not recorded by the manager wrapper.')
+  const tunnelProcessId = tunnelProcessRecord.processId
+  if (!isProcessRunning(tunnelProcessId)) throw new Error('The recorded persistent SSH forward was not running.')
+  const tunnelProcessDetails = readProcessDetails(tunnelProcessId)
+  if (
+    tunnelProcessRecord.marker !== 'persistent-forward' ||
+    tunnelProcessDetails.commandName !== 'ssh' ||
+    tunnelProcessDetails.parentProcessId !== managerProcessId ||
+    tunnelProcessDetails.processGroupId !== managerProcessId ||
+    !isProcessRunning(tunnelProcessId)
+  ) {
+    throw new Error('Refusing to signal a process not owned by the manager DSH tunnel fixture.')
+  }
+  process.kill(tunnelProcessId, 'SIGKILL')
+  for (let attempt = 0; attempt < 100 && isProcessRunning(tunnelProcessId); attempt += 1) await delay(25)
+  expect(isProcessRunning(tunnelProcessId)).toBe(false)
+
+  const readyAfterDrop = runtimePingSchema.parse(await call('runtimePing', { runtimeId: observation.runtimeId }))
+  if (!readyAfterDrop.ok) throw new Error(`The scratch tunnel did not recover after loss: ${readyAfterDrop.code}.`)
+  const tunnelProcessRecordsAfterDrop = await readTunnelProcessRecords(pair.tunnelProcessLogPath)
+  expect(tunnelProcessRecordsAfterDrop.length).toBeGreaterThan(tunnelProcessRecordsBeforeDrop.length)
+  const recoveredTunnelProcessRecord = tunnelProcessRecordsAfterDrop.at(-1)
+  if (recoveredTunnelProcessRecord === undefined || recoveredTunnelProcessRecord.processId === tunnelProcessId) {
+    throw new Error('The SSH tunnel did not start a new process after loss.')
+  }
+  const recoveredTunnelProcessDetails = readProcessDetails(recoveredTunnelProcessRecord.processId)
+  if (
+    recoveredTunnelProcessRecord.marker !== 'persistent-forward' ||
+    recoveredTunnelProcessDetails.commandName !== 'ssh' ||
+    recoveredTunnelProcessDetails.parentProcessId !== managerProcessId ||
+    recoveredTunnelProcessDetails.processGroupId !== managerProcessId ||
+    !isProcessRunning(recoveredTunnelProcessRecord.processId)
+  ) {
+    throw new Error('The restarted SSH tunnel process was not owned by the manager DSH.')
+  }
+
+  const reconnect = runtimeReconnectSchema.parse(await call('runtimeReconnect', { runtimeId: observation.runtimeId }))
+  if (!reconnect.ok) throw new Error(`The scratch SSH tunnel did not reconnect: ${reconnect.code}.`)
+  const pingAfterReconnect = runtimePingSchema.parse(await call('runtimePing', { runtimeId: observation.runtimeId }))
+  expect(pingAfterReconnect.ok).toBe(true)
+  updateObservation(page, { tunnelReconnected: true })
+})
+
+When('stale SSH launch metadata is rejected', async ({ page }: { readonly page: Page }) => {
+  const pair = pairFor(page)
+  const staleHome = join(pair.sshd.scratchRoot, 'stale-dsh-home')
+  const [staleLaunchPath] = launchFilePaths(staleHome)
+  const stalePort = await reserveLoopbackPort()
+  const processId = pair.remote.host.pid
+  if (processId === undefined) throw new Error('The scratch DSH process did not expose its pid.')
+  const staleLaunchUrl = new URL(`http://127.0.0.1:${stalePort}/`)
+  staleLaunchUrl.searchParams.set('token', randomBytes(32).toString('base64url'))
+  await mkdir(dirname(staleLaunchPath), { recursive: true, mode: 0o700 })
+  try {
+    await writeFile(staleLaunchPath, `${JSON.stringify({ schemaVersion: 1, launchUrl: staleLaunchUrl.toString(), pid: processId })}\n`, { mode: 0o600 })
+    await chmod(staleLaunchPath, 0o600)
+    expect((await stat(staleLaunchPath)).mode & 0o777).toBe(0o600)
+    const call = await hostApi(pair.manager)
+    const result = connectionTestSchema.parse(
+      await call('testConnection', { name: 'Stale scratch runtime', sshTarget: pair.sshd.targetAlias, remoteHome: staleHome }),
+    )
+    if (result.ok) throw new Error('The manager accepted a launch URL with no DSH listener.')
+    expect(result.code).toBe('runtime-not-running')
+  } finally {
+    await rm(staleHome, { recursive: true, force: true })
+  }
+  updateObservation(page, { staleLaunchRejected: true })
+})
+
+When('a failed scratch profile sync is cleaned without starting DSH', async ({ page }: { readonly page: Page }) => {
+  let failedHomeRoot: string | undefined
+  await expect(
+    bootComposedPluginProfile({
+      packageIds: [multiHostPackageId],
+      profileLabel: 'multi-host-sync-failure',
+      seedHome: async homeRoot => {
+        failedHomeRoot = homeRoot
+        const seedDirectory = join(homeRoot, 'invalid-profile-seed')
+        await mkdir(seedDirectory, { recursive: true, mode: 0o700 })
+        await writeFile(join(seedDirectory, 'package.json'), '{', { mode: 0o600 })
+        const syncResult = spawnSync(
+          process.execPath,
+          [
+            '--experimental-strip-types',
+            join(DSHFILES_ROOT, 'scripts/profile-sync.ts'),
+            '--profile',
+            'multi-host-sync-failure',
+            '--home',
+            homeRoot,
+            '--seed',
+            seedDirectory,
+          ],
+          {
+            cwd: DSHFILES_ROOT,
+            encoding: 'utf8',
+            timeout: 30_000,
+            env: { DSH_HOME: homeRoot, HOME: homeRoot, PATH: process.env.PATH ?? '', TMPDIR: process.env.TMPDIR ?? '' },
+          },
+        )
+        if (syncResult.error !== undefined) throw syncResult.error
+        expect(syncResult.status).toBe(1)
+        expect(syncResult.stderr).toContain('profile-sync:')
+        throw new Error('Injected profile-sync failure.')
+      },
+    }),
+  ).rejects.toThrow('Injected profile-sync failure.')
+  if (failedHomeRoot === undefined) throw new Error('The profile-sync failure did not create a scratch home.')
+  expect(existsSync(failedHomeRoot)).toBe(false)
+  updateObservation(page, { profileSyncFailureCleaned: true })
+})
+
+When('a lost mutation response is reconciled without replay', async ({ page }: { readonly page: Page }) => {
+  const pair = pairFor(page)
+  const observation = observations.get(page)
+  if (observation === undefined) throw new Error('The remote thread journey did not produce an observation.')
+  const [launchFilePath] = launchFilePaths(pair.remote.homeRoot)
+  const originalLaunchContents = await readFile(launchFilePath, 'utf8')
+  const originalLaunch = parseRuntimeLaunch(originalLaunchContents)
+  if (originalLaunch === undefined) throw new Error('The remote DSH launch metadata could not be parsed.')
+  expect(originalLaunch.port).toBe(pair.remote.port)
+  expect((await stat(launchFilePath)).mode & 0o777).toBe(0o600)
+  const processId = pair.remote.host.pid
+  if (processId === undefined) throw new Error('The scratch DSH process did not expose its pid.')
+  const call = await hostApi(pair.manager)
+  const sessionsBeforeMutation = nativeSessionListSchema.parse(
+    await call('runtimeCall', {
+      runtimeId: observation.runtimeId,
+      request: { namespace: 'session', method: 'list', args: { _request: {} } },
+    }),
+  )
+  if (!sessionsBeforeMutation.ok) throw new Error(`The existing remote sessions could not be listed: ${sessionsBeforeMutation.code}.`)
+  const existingSessionIds = new Set(sessionsBeforeMutation.value.items.map(item => item.sessionId))
+  const proxy = await startMutationResponseProxy({ upstreamPort: pair.remote.port })
+  try {
+    const proxyLaunchUrl = new URL(`http://127.0.0.1:${proxy.port}/`)
+    proxyLaunchUrl.searchParams.set('token', originalLaunch.token)
+    const proxyLaunch = { schemaVersion: 1, launchUrl: proxyLaunchUrl.toString(), pid: processId }
+    const parsedProxyLaunch = parseRuntimeLaunch(JSON.stringify(proxyLaunch))
+    if (parsedProxyLaunch === undefined || parsedProxyLaunch.port !== proxy.port) {
+      throw new Error('The scratch mutation proxy launch metadata did not validate.')
+    }
+    await writeFile(launchFilePath, `${JSON.stringify(proxyLaunch)}\n`, { mode: 0o600 })
+    await chmod(launchFilePath, 0o600)
+    expect((await stat(launchFilePath)).mode & 0o777).toBe(0o600)
+
+    const reconnect = runtimeReconnectSchema.parse(await call('runtimeReconnect', { runtimeId: observation.runtimeId }))
+    if (!reconnect.ok) throw new Error(`The scratch runtime did not reconnect through the local proxy: ${reconnect.code}.`)
+    const mutation = nativeCreateSchema.parse(
+      await call('runtimeCall', {
+        runtimeId: observation.runtimeId,
+        request: { namespace: 'session', method: 'create', args: { request: { cwd: pair.remote.homeRoot } } },
+      }),
+    )
+    if (mutation.ok) throw new Error('The admitted remote create returned a response instead of an unknown outcome.')
+    expect(mutation.code).toBe('unknown-mutation-outcome')
+    const firstProxyState = proxy.state()
+    expect(firstProxyState.mutationRequests).toBe(1)
+    expect(firstProxyState.droppedResponses).toBe(1)
+    expect(firstProxyState.committedSessionIds).toHaveLength(1)
+    const admittedSessionId = firstProxyState.committedSessionIds[0]
+    if (admittedSessionId === undefined) throw new Error('The remote DSH did not commit the lost-response session.')
+    const sessions = nativeSessionListSchema.parse(
+      await call('runtimeCall', {
+        runtimeId: observation.runtimeId,
+        request: { namespace: 'session', method: 'list', args: { _request: {} } },
+      }),
+    )
+    if (!sessions.ok) throw new Error(`The committed remote session could not be reconciled: ${sessions.code}.`)
+    expect(sessions.value.items.some(item => item.sessionId === admittedSessionId)).toBe(true)
+    const newlyObservedSessionIds = sessions.value.items.map(item => item.sessionId).filter(sessionId => !existingSessionIds.has(sessionId))
+    expect(newlyObservedSessionIds).toEqual([admittedSessionId])
+    expect(proxy.state().mutationRequests).toBe(1)
+    expect(proxy.state().committedSessionIds).toHaveLength(1)
+  } finally {
+    try {
+      await writeFile(launchFilePath, originalLaunchContents, { mode: 0o600 })
+    } finally {
+      try {
+        await chmod(launchFilePath, 0o600)
+      } finally {
+        await proxy.close()
+      }
+    }
+  }
+  const actualReconnect = runtimeReconnectSchema.parse(await call('runtimeReconnect', { runtimeId: observation.runtimeId }))
+  if (!actualReconnect.ok) throw new Error(`The scratch DSH did not reconnect after proxy cleanup: ${actualReconnect.code}.`)
+  const pingAfterProxyCleanup = runtimePingSchema.parse(await call('runtimePing', { runtimeId: observation.runtimeId }))
+  if (!pingAfterProxyCleanup.ok) throw new Error(`The scratch DSH was not ready after proxy cleanup: ${pingAfterProxyCleanup.code}.`)
+  updateObservation(page, { mutationReconciled: true, remoteReadyAfterMutation: true })
+})
+
+When('the remote DSH crashes and its scratch home is cleaned', async ({ page }: { readonly page: Page }) => {
+  const pair = pairFor(page)
+  const processId = pair.remote.host.pid
+  if (processId === undefined) throw new Error('The scratch DSH process did not expose its pid.')
+  if (pair.remote.host.exitCode !== null || pair.remote.host.signalCode !== null) throw new Error('The scratch DSH exited before the crash-cleanup check.')
+  process.kill(-processId, 'SIGKILL')
+  for (let attempt = 0; attempt < 100 && pair.remote.host.exitCode === null && pair.remote.host.signalCode === null; attempt += 1) await delay(25)
+  expect(pair.remote.host.signalCode).toBe('SIGKILL')
+  await pair.remote.close()
+  expect(existsSync(pair.remote.homeRoot)).toBe(false)
+  updateObservation(page, { remoteCrashCleaned: true })
+})
+
+Then('the scratch DSH readiness and recovery checks pass', async ({ page }: { readonly page: Page }) => {
+  const pair = pairFor(page)
+  const observation = observations.get(page)
+  if (observation === undefined) throw new Error('The remote thread journey did not produce an observation.')
   expect(observation.remoteHome).toBe(pair.remote.homeRoot)
   expect(observation.sessionId).not.toBe('')
-  await recordAssertion(page, 'multi-host-scratch-ready', async () => expect(ping.ok).toBe(true))
+  expect(observation.transcriptCwd).toBe(pair.remote.homeRoot)
+  expect(observation.tunnelReconnected).toBe(true)
+  expect(observation.staleLaunchRejected).toBe(true)
+  expect(observation.profileSyncFailureCleaned).toBe(true)
+  expect(observation.mutationReconciled).toBe(true)
+  expect(observation.remoteReadyAfterMutation).toBe(true)
+  expect(observation.remoteCrashCleaned).toBe(true)
+  await recordAssertion(page, 'multi-host-scratch-ready', async () => expect(observation.remoteReadyAfterMutation).toBe(true))
   await recordAssertion(page, 'multi-host-thread-roundtrip', async () => expect(observation.transcriptCwd).toBe(pair.remote.homeRoot))
+  await recordAssertion(page, 'multi-host-ssh-reconnect', async () => expect(observation.tunnelReconnected).toBe(true))
+  await recordAssertion(page, 'multi-host-stale-launch-rejected', async () => expect(observation.staleLaunchRejected).toBe(true))
+  await recordAssertion(page, 'multi-host-profile-sync-cleanup', async () => expect(observation.profileSyncFailureCleaned).toBe(true))
+  await recordAssertion(page, 'multi-host-mutation-no-replay', async () => expect(observation.mutationReconciled).toBe(true))
+  await recordAssertion(page, 'multi-host-crash-cleanup', async () => expect(observation.remoteCrashCleaned).toBe(true))
   await finishJourneyAssertions(page)
 })
 
@@ -161,13 +464,15 @@ After(async ({ page }: { readonly page: Page }) => {
   const pair = pairs.get(page)
   if (pair === undefined) return
   pairs.delete(page)
-  try {
-    await pair.manager.close()
-  } finally {
+  let cleanupSucceeded = true
+  for (const close of [() => pair.manager.close(), () => pair.remote.close(), () => pair.sshd.close()]) {
     try {
-      await pair.remote.close()
-    } finally {
-      await pair.sshd.close()
+      await close()
+    } catch {
+      cleanupSucceeded = false
     }
   }
+  expect(cleanupSucceeded).toBe(true)
+  const remainingScratchRoots = [pair.manager.homeRoot, pair.remote.homeRoot, pair.sshd.scratchRoot].filter(existsSync)
+  expect(remainingScratchRoots).toEqual([])
 })
