@@ -4,7 +4,7 @@ import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useSyncExternalStore, type ReactElement } from 'react'
 import type { ToolMetaTranslate } from './locales.js'
 import { toolMetaSettings } from './settings.js'
-import { describeTiming, toolTimingOf } from './timing.js'
+import { ToolTimingModel } from './timing.js'
 import { warnOnce } from './warn-once.js'
 
 /** One shared one-second clock for every live line, running only while one is mounted. */
@@ -44,7 +44,7 @@ export const ToolMetaLine = ({ owner, t }: ToolMetaLineProps): ReactElement | nu
   const settings = useSettings(toolMetaSettings)
   const enabled = settings.value?.enabled ?? true
   const format = settings.value?.timeFormat ?? 'absolute'
-  const timing = toolTimingOf(owner)
+  const timing = ToolTimingModel.toolTimingOf(owner)
   const live = enabled && (timing?.kind === 'running' || (timing !== null && timing !== undefined && format === 'relative'))
   const now = useSyncExternalStore(live ? clock.subscribe : subscribeNever, clock.now)
   if (timing === undefined) {
@@ -52,7 +52,7 @@ export const ToolMetaLine = ({ owner, t }: ToolMetaLineProps): ReactElement | nu
     return null
   }
   if (timing === null || !enabled) return null
-  const { text, label } = describeTiming({ timing, now, format, t })
+  const { text, label } = ToolTimingModel.describeTiming({ timing, now, format, t })
   return (
     <span
       role={timing.kind === 'running' ? 'timer' : 'note'}

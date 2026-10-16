@@ -21,55 +21,68 @@ const toolCallOwnerSchema = z.discriminatedUnion('phase', [
 /** What this plugin needs of a `ToolCallOwnerProps`; the native owner satisfies it. */
 export type ToolCallTimes = z.input<typeof toolCallOwnerSchema>
 
-/**
- * `null` while the model is still writing the arguments; `undefined` when the owner no longer has the shape read here.
- * The owner comes from another package at runtime, so its declared type is checked rather than trusted.
- */
-export const toolTimingOf = (owner: ToolCallTimes): ToolTiming | null | undefined => {
-  const parsed = toolCallOwnerSchema.safeParse(owner)
-  if (!parsed.success) return undefined
-  const call = parsed.data
-  if (call.phase === 'preparing') return null
-  if (call.phase === 'start') return { kind: 'running', startedAt: call.block.time }
-  if (call.block.callTime === null) return { kind: 'ended', endedAt: call.block.time }
-  return { kind: 'finished', startedAt: call.block.callTime, endedAt: call.block.time }
-}
+export class ToolTimingModel {
+  private static readonly clockFormat = new Intl.DateTimeFormat(undefined, {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
+  })
 
-/** A finished call keeps tenths under ten seconds; a running counter ticks in whole seconds. */
-export const formatDuration = (input: { readonly ms: number; readonly live: boolean; readonly t: ToolMetaTranslate }): string => {
-  const ms = Math.max(0, input.ms)
-  if (ms < 10_000 && !input.live) return input.t('seconds', { n: (Math.round(ms / 100) / 10).toFixed(1) })
-  const totalSeconds = Math.floor(ms / 1000)
-  if (totalSeconds < 60) return input.t('seconds', { n: String(totalSeconds) })
-  const totalMinutes = Math.floor(totalSeconds / 60)
-  if (totalMinutes < 60) return input.t('minutes', { m: String(totalMinutes), s: String(totalSeconds % 60) })
-  return input.t('hours', { h: String(Math.floor(totalMinutes / 60)), m: String(totalMinutes % 60) })
-}
+  private static readonly dayFormat = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' })
 
-const clockFormat = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' })
-const dayFormat = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' })
-
-export const formatMoment = (input: { readonly at: number; readonly now: number; readonly format: TimeFormat; readonly t: ToolMetaTranslate }): string => {
-  if (input.format === 'absolute') {
-    const clock = clockFormat.format(input.at)
-    return new Date(input.at).toDateString() === new Date(input.now).toDateString() ? clock : `${dayFormat.format(input.at)} ${clock}`
+  /**
+   * `null` while the model is still writing the arguments; `undefined` when the owner no longer has the shape read here.
+   * The owner comes from another package at runtime, so its declared type is checked rather than trusted.
+   */
+  static readonly toolTimingOf = (owner: ToolCallTimes): ToolTiming | null | undefined => {
+    const parsed = toolCallOwnerSchema.safeParse(owner)
+    if (!parsed.success) return undefined
+    const call = parsed.data
+    if (call.phase === 'preparing') return null
+    if (call.phase === 'start') return { kind: 'running', startedAt: call.block.time }
+    if (call.block.callTime === null) return { kind: 'ended', endedAt: call.block.time }
+    return { kind: 'finished', startedAt: call.block.callTime, endedAt: call.block.time }
   }
-  const seconds = Math.max(0, Math.floor((input.now - input.at) / 1000))
-  if (seconds < 60) return input.t('secondsAgo', { n: String(seconds) })
-  if (seconds < 3_600) return input.t('minutesAgo', { n: String(Math.floor(seconds / 60)) })
-  if (seconds < 86_400) return input.t('hoursAgo', { n: String(Math.floor(seconds / 3_600)) })
-  return input.t('daysAgo', { n: String(Math.floor(seconds / 86_400)) })
-}
 
-/** The visible line ("1.2 s · 14:02:11") and its spoken label. */
-export const describeTiming = (input: { readonly timing: ToolTiming; readonly now: number; readonly format: TimeFormat; readonly t: ToolMetaTranslate }) => {
-  const { timing, now, format, t } = input
-  if (timing.kind === 'ended') {
-    const end = formatMoment({ at: timing.endedAt, now, format, t })
-    return { text: t('ended', { end }), label: t('endedLabel', { end }) }
+  /** A finished call keeps tenths under ten seconds; a running counter ticks in whole seconds. */
+  static readonly formatDuration = (input: { readonly ms: number; readonly live: boolean; readonly t: ToolMetaTranslate }): string => {
+    const ms = Math.max(0, input.ms)
+    if (ms < 10_000 && !input.live) return input.t('seconds', { n: (Math.round(ms / 100) / 10).toFixed(1) })
+    const totalSeconds = Math.floor(ms / 1000)
+    if (totalSeconds < 60) return input.t('seconds', { n: String(totalSeconds) })
+    const totalMinutes = Math.floor(totalSeconds / 60)
+    if (totalMinutes < 60) return input.t('minutes', { m: String(totalMinutes), s: String(totalSeconds % 60) })
+    return input.t('hours', { h: String(Math.floor(totalMinutes / 60)), m: String(totalMinutes % 60) })
   }
-  const live = timing.kind === 'running'
-  const duration = formatDuration({ ms: (live ? now : timing.endedAt) - timing.startedAt, live, t })
-  const start = formatMoment({ at: timing.startedAt, now, format, t })
-  return { text: `${duration} · ${start}`, label: t(live ? 'runningLabel' : 'finishedLabel', { duration, start }) }
+
+  static readonly formatMoment = (input: { readonly at: number; readonly now: number; readonly format: TimeFormat; readonly t: ToolMetaTranslate }): string => {
+    if (input.format === 'absolute') {
+      const clock = ToolTimingModel.clockFormat.format(input.at)
+      return new Date(input.at).toDateString() === new Date(input.now).toDateString() ? clock : `${ToolTimingModel.dayFormat.format(input.at)} ${clock}`
+    }
+    const seconds = Math.max(0, Math.floor((input.now - input.at) / 1000))
+    if (seconds < 60) return input.t('secondsAgo', { n: String(seconds) })
+    if (seconds < 3_600) return input.t('minutesAgo', { n: String(Math.floor(seconds / 60)) })
+    if (seconds < 86_400) return input.t('hoursAgo', { n: String(Math.floor(seconds / 3_600)) })
+    return input.t('daysAgo', { n: String(Math.floor(seconds / 86_400)) })
+  }
+
+  /** The visible line ("1.2 s · 14:02:11") and its spoken label. */
+  static readonly describeTiming = (input: {
+    readonly timing: ToolTiming
+    readonly now: number
+    readonly format: TimeFormat
+    readonly t: ToolMetaTranslate
+  }) => {
+    const { timing, now, format, t } = input
+    if (timing.kind === 'ended') {
+      const end = ToolTimingModel.formatMoment({ at: timing.endedAt, now, format, t })
+      return { text: t('ended', { end }), label: t('endedLabel', { end }) }
+    }
+    const live = timing.kind === 'running'
+    const duration = ToolTimingModel.formatDuration({ ms: (live ? now : timing.endedAt) - timing.startedAt, live, t })
+    const start = ToolTimingModel.formatMoment({ at: timing.startedAt, now, format, t })
+    return { text: `${duration} · ${start}`, label: t(live ? 'runningLabel' : 'finishedLabel', { duration, start }) }
+  }
 }
