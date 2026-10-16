@@ -1,4 +1,4 @@
-import { adaptHostSetup, unwrapRowConfig } from './setup.js'
+import { SdkSetupRuntime } from './setup.js'
 import { HOST_CAPABILITY_INJECTIONS } from 'create-dshx/runtime-capabilities'
 import type { Context, Effect } from '@deepseek-ai/cordis'
 import type { CommandRuntime } from '@deepseek-ai/dsh-commands'
@@ -111,9 +111,10 @@ export function definePlugin<const Uses extends readonly HostCapability[] = read
     ...(Config === undefined ? {} : { Config: redactConfigSchema(Config) }),
     name: name ?? id,
     inject: [...new Set([...(definition.inject ?? []), ...uses.flatMap(capability => HOST_CAPABILITY_INJECTIONS[capability])])],
-    setup: adaptHostSetup(
+    setup: SdkSetupRuntime.adaptHost(
       ctx => setup?.(createPluginApi<Uses, PluginConfig<Config>>(ctx, uses, id)),
-      (ctx, rowConfig, metadata) => setup?.(createPluginApi<Uses, PluginConfig<Config>>(ctx, uses, metadata.packageId, unwrapRowConfig(rowConfig))),
+      (ctx, rowConfig, metadata) =>
+        setup?.(createPluginApi<Uses, PluginConfig<Config>>(ctx, uses, metadata.packageId, SdkSetupRuntime.unwrapRowConfig(rowConfig))),
     ),
   }
 }

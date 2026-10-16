@@ -1,4 +1,4 @@
-import { invokeClientSetup } from '../sdk/setup.js'
+import { SdkSetupRuntime } from '../sdk/setup.js'
 import type { Context } from '@deepseek-ai/cordis'
 import { DshxError } from '../diagnostics.js'
 import type {
@@ -364,7 +364,7 @@ export function createClientPlugin(value: unknown, metadata: ClientPluginMetadat
         const decorate = ((component: unknown): unknown =>
           settings === undefined ? component : provideSettingsContext(component as any, settings)) as ComponentDecorator
         registerContributions(client, definition, decorate)
-        return invokeClientSetup(definition.setup, client, decorate, metadata)
+        return SdkSetupRuntime.invokeClient(definition.setup, client, decorate, metadata)
       }
       const apiClient = ApiClientLifecycle.create(ctx, metadata.packageId)
       // The decorator returns a context-providing wrapper, which is a different
@@ -376,7 +376,7 @@ export function createClientPlugin(value: unknown, metadata: ClientPluginMetadat
         return settings === undefined ? apiComponent : provideSettingsContext(apiComponent, settings)
       }) as ComponentDecorator
       registerContributions(client, definition, decorate)
-      return invokeClientSetup(definition.setup, client, decorate, metadata)
+      return SdkSetupRuntime.invokeClient(definition.setup, client, decorate, metadata)
     },
   }
 }

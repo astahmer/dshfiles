@@ -12,7 +12,7 @@ type ClientDefinitionSetup = NonNullable<ClientDefinition['setup']>
 const hosts = new WeakMap<Setup, HostSetup>()
 const clients = new WeakMap<ClientDefinitionSetup, ClientSetup>()
 
-export function adaptHostSetup(fallback: Setup, setup: HostSetup): Setup {
+const adaptHostSetup = (fallback: Setup, setup: HostSetup): Setup => {
   hosts.set(fallback, setup)
   return fallback
 }
@@ -23,7 +23,7 @@ export function adaptHostSetup(fallback: Setup, setup: HostSetup): Setup {
  * Schemastery passes resolver objects whose fields are getters. Resolve those
  * fields once before exposing the config to Host setup code.
  */
-export function unwrapRowConfig(config: unknown): Record<string, unknown> {
+const unwrapRowConfig = (config: unknown): Record<string, unknown> => {
   if (config === null || config === undefined || typeof config !== 'object') return {}
   const resolved = config as Record<string, unknown>
   const output: Record<string, unknown> = {}
@@ -33,24 +33,34 @@ export function unwrapRowConfig(config: unknown): Record<string, unknown> {
   return output
 }
 
-export function adaptClientSetup(fallback: ClientDefinitionSetup, setup: ClientSetup): ClientDefinitionSetup {
+const adaptClientSetup = (fallback: ClientDefinitionSetup, setup: ClientSetup): ClientDefinitionSetup => {
   clients.set(fallback, setup)
   return fallback
 }
-export function invokeHostSetup(setup: Setup | undefined, ctx: Context, config: unknown, metadata: Metadata): void | Effect<void> {
+
+const invokeHostSetup = (setup: Setup | undefined, ctx: Context, config: unknown, metadata: Metadata): void | Effect<void> => {
   if (setup === undefined) return undefined
   const adapted = hosts.get(setup)
   if (adapted !== undefined) return adapted(ctx, config, metadata)
   return setup(ctx, unwrapRowConfig(config))
 }
-export function invokeClientSetup(
+
+const invokeClientSetup = (
   setup: ClientDefinitionSetup | undefined,
   ctx: ClientContext,
   decorate: ComponentDecorator,
   metadata: Metadata,
-): void | Effect<void> {
+): void | Effect<void> => {
   if (setup === undefined) return undefined
   const adapted = clients.get(setup)
   if (adapted !== undefined) return adapted(ctx, decorate, metadata)
   return setup(ctx, decorate, metadata)
+}
+
+export class SdkSetupRuntime {
+  static readonly adaptHost = adaptHostSetup
+  static readonly unwrapRowConfig = unwrapRowConfig
+  static readonly adaptClient = adaptClientSetup
+  static readonly invokeHost = invokeHostSetup
+  static readonly invokeClient = invokeClientSetup
 }

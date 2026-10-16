@@ -1,4 +1,4 @@
-import { adaptClientSetup } from './setup.js'
+import { SdkSetupRuntime } from './setup.js'
 import { CLIENT_CAPABILITY_INJECTIONS } from 'create-dshx/runtime-capabilities'
 import type { Effect } from '@deepseek-ai/cordis'
 import { createElement } from 'react'
@@ -180,7 +180,7 @@ export function defineClientPlugin<const Uses extends readonly ClientCapability[
     ...contributions,
     name: name ?? id,
     inject: [...new Set([...(definition.inject ?? []), ...uses.flatMap(capability => CLIENT_CAPABILITY_INJECTIONS[capability])])],
-    setup: adaptClientSetup(
+    setup: SdkSetupRuntime.adaptClient(
       ctx => setup?.(createClientPluginApi<Uses>(ctx, uses, id)),
       (ctx, decorate, metadata) => setup?.(createClientPluginApi<Uses>(ctx, uses, metadata.packageId, decorate)),
     ),

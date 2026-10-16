@@ -1,4 +1,4 @@
-import { invokeHostSetup } from '../sdk/setup.js'
+import { SdkSetupRuntime } from '../sdk/setup.js'
 import type { Context, Inject } from '@deepseek-ai/cordis'
 import type { StandardSchemaV1 } from '@standard-schema/spec'
 import process from 'node:process'
@@ -376,11 +376,11 @@ export function createHostPlugin(value: unknown, metadata: HostPluginMetadata): 
         else ctx.systemPrompt.context(contribution.value)
       }
       for (const setting of definition.settings ?? []) registerSettings(ctx, setting)
-      if (apis.length === 0) return withRuntime(ctx, invokeHostSetup(definition.setup, ctx, config, metadata), metadata)
+      if (apis.length === 0) return withRuntime(ctx, SdkSetupRuntime.invokeHost(definition.setup, ctx, config, metadata), metadata)
       const apiSetup = Promise.all(apis.map(api => registerApi(ctx, metadata.packageId, api)))
       return withRuntime(
         ctx,
-        apiSetup.then(() => invokeHostSetup(definition.setup, ctx, config, metadata)),
+        apiSetup.then(() => SdkSetupRuntime.invokeHost(definition.setup, ctx, config, metadata)),
         metadata,
       )
     },
