@@ -4,7 +4,7 @@ import { LlmError, type FileBlock } from '@deepseek-ai/dsh-llm'
 import { MAX_QUEUE_FILE_BYTES, queueApi } from './api.js'
 import { queueReorderSettings } from './settings.js'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
-import { describeInbox, isDirection, moveWithinInbox, QueueItemMissingError, type QueueMoveRequest, type QueuePosition } from './queue-order.js'
+import { QueueOrderModel, QueueItemMissingError, type QueueMoveRequest, type QueuePosition } from './queue-order.js'
 import '@deepseek-ai/dsh-agent'
 
 /**
@@ -28,8 +28,8 @@ const liveAgent = (ctx: Context, sessionId: string) => {
 }
 
 /** Move one pending item by exactly one position. */
-export const moveQueueItem = async (ctx: Context, request: QueueMoveRequest): Promise<QueuePosition> => {
-  if (!isDirection(request.direction)) {
+const moveQueueItem = async (ctx: Context, request: QueueMoveRequest): Promise<QueuePosition> => {
+  if (!QueueOrderModel.isDirection(request.direction)) {
     throw new LlmError('queue move direction must be "up" or "down"', 'INVALID_ARGUMENT')
   }
   const agent = liveAgent(ctx, request.sessionId)
@@ -37,7 +37,7 @@ export const moveQueueItem = async (ctx: Context, request: QueueMoveRequest): Pr
     throw new LlmError(`Session ${request.sessionId} has no live agent, so nothing is waiting to be reordered.`, 'NOT_FOUND')
   }
   try {
-    return moveWithinInbox(agent.inbox, request)
+    return QueueOrderModel.moveWithinInbox(agent.inbox, request)
   } catch (error) {
     if (error instanceof QueueItemMissingError) throw new LlmError(error.message, 'NOT_FOUND')
     throw error
@@ -45,9 +45,9 @@ export const moveQueueItem = async (ctx: Context, request: QueueMoveRequest): Pr
 }
 
 /** Pending ids per list, for rendering which affordances are available. */
-export const describeQueueOrder = (ctx: Context, sessionId: string) => {
+const describeQueueOrder = (ctx: Context, sessionId: string) => {
   const agent = liveAgent(ctx, sessionId)
-  return agent === undefined ? [] : describeInbox(agent.inbox)
+  return agent === undefined ? [] : QueueOrderModel.describeInbox(agent.inbox)
 }
 
 type FileAttachmentRef = FileBlock['attachment']
@@ -137,7 +137,7 @@ const moveTool = defineTool({
       throw new LlmError('queue-reorder is not active yet', 'MISSING_SERVICE')
     }
     const direction = args.direction
-    if (!isDirection(direction)) throw new LlmError('queue move direction must be "up" or "down"', 'INVALID_ARGUMENT')
+    if (!QueueOrderModel.isDirection(direction)) throw new LlmError('queue move direction must be "up" or "down"', 'INVALID_ARGUMENT')
     return moveQueueItem(hostContext, { sessionId: args.sessionId, itemId: args.itemId, direction })
   },
 })

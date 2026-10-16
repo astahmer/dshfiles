@@ -2,7 +2,7 @@ import type { InboxTarget } from '@deepseek-ai/dsh-agent/types'
 
 export type Direction = 'up' | 'down'
 
-export const isDirection = (value: unknown): value is Direction => value === 'up' || value === 'down'
+const isDirection = (value: unknown): value is Direction => value === 'up' || value === 'down'
 
 export interface QueuePosition {
   readonly sessionId: string
@@ -40,7 +40,7 @@ export interface QueueMoveRequest {
  * Both are durable inbox splices, so the log holds the new order rather than a
  * deletion paired with an unrelated re-queue.
  */
-export const moveWithinInbox = <Message extends { readonly id: string }>(inbox: QueueInbox<Message>, request: QueueMoveRequest): QueuePosition => {
+const moveWithinInbox = <Message extends { readonly id: string }>(inbox: QueueInbox<Message>, request: QueueMoveRequest): QueuePosition => {
   for (const [target, list] of INBOX_LISTS) {
     const pending = inbox[list]
     const index = pending.findIndex(message => message.id === request.itemId)
@@ -66,5 +66,11 @@ export const moveWithinInbox = <Message extends { readonly id: string }>(inbox: 
 }
 
 /** Pending ids per list, for rendering which affordances are available. */
-export const describeInbox = <Message extends { readonly id: string }>(inbox: QueueInbox<Message>) =>
+const describeInbox = <Message extends { readonly id: string }>(inbox: QueueInbox<Message>) =>
   INBOX_LISTS.map(([target, list]) => ({ target, items: inbox[list].map(message => message.id) }))
+
+export class QueueOrderModel {
+  static readonly isDirection = isDirection
+  static readonly moveWithinInbox = moveWithinInbox
+  static readonly describeInbox = describeInbox
+}

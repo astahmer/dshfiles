@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { InboxTarget } from '@deepseek-ai/dsh-agent/types'
-import { describeInbox, moveWithinInbox, QueueItemMissingError, type QueueInbox } from './queue-order.js'
+import { QueueOrderModel, QueueItemMissingError, type QueueInbox } from './queue-order.js'
 
 interface QueuedMessage {
   readonly id: string
@@ -37,10 +37,19 @@ const memoryInbox = (nextTurnIds: readonly string[], nextStepIds: readonly strin
 
 const ids = (messages: readonly QueuedMessage[]) => messages.map(message => message.id)
 
+describe('queue direction', () => {
+  it('accepts only up or down values', () => {
+    expect(QueueOrderModel.isDirection('up')).toBe(true)
+    expect(QueueOrderModel.isDirection('down')).toBe(true)
+    expect(QueueOrderModel.isDirection('sideways')).toBe(false)
+    expect(QueueOrderModel.isDirection(null)).toBe(false)
+  })
+})
+
 describe('moveWithinInbox', () => {
   it('moves an item one position as a remove plus an insert, keeping its identity', () => {
     const { inbox, splices } = memoryInbox(['a', 'b', 'c'])
-    const position = moveWithinInbox(inbox, { sessionId: 's', itemId: 'c', direction: 'up' })
+    const position = QueueOrderModel.moveWithinInbox(inbox, { sessionId: 's', itemId: 'c', direction: 'up' })
     expect(ids(inbox.nextTurn)).toEqual(['a', 'c', 'b'])
     expect(position).toEqual({ sessionId: 's', itemId: 'c', index: 1, total: 3, target: 'next-turn', first: false, last: false })
     expect(splices).toEqual([
@@ -51,27 +60,27 @@ describe('moveWithinInbox', () => {
 
   it('leaves an item at either end in place without splicing', () => {
     const { inbox, splices } = memoryInbox(['a', 'b'])
-    expect(moveWithinInbox(inbox, { sessionId: 's', itemId: 'a', direction: 'up' })).toMatchObject({ index: 0, first: true })
-    expect(moveWithinInbox(inbox, { sessionId: 's', itemId: 'b', direction: 'down' })).toMatchObject({ index: 1, last: true })
+    expect(QueueOrderModel.moveWithinInbox(inbox, { sessionId: 's', itemId: 'a', direction: 'up' })).toMatchObject({ index: 0, first: true })
+    expect(QueueOrderModel.moveWithinInbox(inbox, { sessionId: 's', itemId: 'b', direction: 'down' })).toMatchObject({ index: 1, last: true })
     expect(splices).toEqual([])
   })
 
   it('finds an item in the next-step list', () => {
     const { inbox } = memoryInbox(['a'], ['x', 'y'])
-    expect(moveWithinInbox(inbox, { sessionId: 's', itemId: 'x', direction: 'down' })).toMatchObject({ target: 'next-step', index: 1 })
+    expect(QueueOrderModel.moveWithinInbox(inbox, { sessionId: 's', itemId: 'x', direction: 'down' })).toMatchObject({ target: 'next-step', index: 1 })
     expect(ids(inbox.nextStep)).toEqual(['y', 'x'])
   })
 
   it('reports an item that is no longer pending', () => {
     const { inbox } = memoryInbox(['a'])
-    expect(() => moveWithinInbox(inbox, { sessionId: 's', itemId: 'gone', direction: 'up' })).toThrow(QueueItemMissingError)
+    expect(() => QueueOrderModel.moveWithinInbox(inbox, { sessionId: 's', itemId: 'gone', direction: 'up' })).toThrow(QueueItemMissingError)
   })
 })
 
 describe('describeInbox', () => {
   it('lists pending ids per list', () => {
     const { inbox } = memoryInbox(['a', 'b'], ['x'])
-    expect(describeInbox(inbox)).toEqual([
+    expect(QueueOrderModel.describeInbox(inbox)).toEqual([
       { target: 'next-turn', items: ['a', 'b'] },
       { target: 'next-step', items: ['x'] },
     ])
