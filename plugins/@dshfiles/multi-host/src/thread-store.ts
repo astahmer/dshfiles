@@ -55,19 +55,25 @@ const update = <Result>(change: (threads: RemoteThread[]) => { readonly next: Re
   return operation
 }
 
-export const listRemoteThreads = async (): Promise<readonly RemoteThread[]> => {
+const listRemoteThreads = async (): Promise<readonly RemoteThread[]> => {
   await writeTail
   return readThreads()
 }
 
-export const recordRemoteThread = (thread: RemoteThread): Promise<RemoteThread> =>
+const recordRemoteThread = (thread: RemoteThread): Promise<RemoteThread> =>
   update(threads => ({
     next: [...threads.filter(item => !(item.runtimeId === thread.runtimeId && item.sessionId === thread.sessionId)), remoteThreadSchema.parse(thread)],
     result: thread,
   }))
 
-export const forgetRemoteThreads = (match: { readonly runtimeId: string; readonly sessionId?: string | undefined }): Promise<number> =>
+const forgetRemoteThreads = (match: { readonly runtimeId: string; readonly sessionId?: string | undefined }): Promise<number> =>
   update(threads => {
     const next = threads.filter(item => item.runtimeId !== match.runtimeId || (match.sessionId !== undefined && item.sessionId !== match.sessionId))
     return { next, result: threads.length - next.length }
   })
+
+export class RemoteThreadStore {
+  static readonly list = listRemoteThreads
+  static readonly record = recordRemoteThread
+  static readonly forget = forgetRemoteThreads
+}
