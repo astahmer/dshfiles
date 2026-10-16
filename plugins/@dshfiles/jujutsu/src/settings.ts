@@ -25,7 +25,6 @@ export const jujutsuSettings = defineSettings({
     graphDensity: Schema.union([Schema.const('comfortable').description('Comfortable'), Schema.const('compact').description('Compact')])
       .default('comfortable')
       .description('Row height and lane spacing of the revision graph.'),
-    revisionLimit: Schema.natural().min(50).max(500).default(300).description('Revisions loaded into the graph.'),
     refreshMode: Schema.union([Schema.const('interval').description('Every interval'), Schema.const('manual').description('Manual only')])
       .default('interval')
       .description('How the revision graph and Source Control reload repository data.'),

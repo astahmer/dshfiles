@@ -111,6 +111,7 @@ export const fileChangeSchema = fileStatSchema.extend({
 export const stateSchema = z.object({
   root: z.string().max(2048),
   revisions: z.array(revisionSchema).max(500),
+  graphHasMore: z.boolean().default(false),
   status: z.string().max(80_000),
   changedPaths: z.array(z.string().max(2048)).max(1000),
   remoteNames: z.array(z.string().max(128)).max(64),
@@ -180,9 +181,18 @@ export const jujutsuApi = defineApi({
       description: 'Resolve a folder to its jj repository and return the repoId the other jujutsu methods take.',
     }),
     load: method({
-      input: z.object({ repoId: repoIdSchema, limit: z.number().int().min(20).max(500).default(300) }),
+      input: z.object({ repoId: repoIdSchema, limit: z.number().int().min(20).max(500).default(100) }),
       output: z.union([stateSchema, readFailureSchema]),
-      description: 'Repository status: the revision graph, working-copy revision, bookmarks and conflicts, or a read failure.',
+      description: 'Repository status and the first page of the revision graph.',
+    }),
+    graphPage: method({
+      input: z.object({
+        repoId: repoIdSchema,
+        query: z.string().max(256).default(''),
+        excludeCommitIds: z.array(commitIdSchema).max(10_000),
+      }),
+      output: z.union([z.object({ revisions: z.array(revisionSchema).max(100), hasMore: z.boolean() }), readFailureSchema]),
+      description: 'Load the next revision graph page or search all visible revisions.',
     }),
     graphNavigation: method({
       input: z.object({ repoId: repoIdSchema }),

@@ -68,6 +68,7 @@ import {
 import { PatchView, type PatchLayout } from '@dshfiles/plugin-ui/diff'
 import { defaultRangeExtractor, useVirtualizer } from '@dshfiles/plugin-ui/virtual'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
+import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useMachine } from '@dshfiles/plugin-ui/machine'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
@@ -87,7 +88,7 @@ import { revisionActionMachine, type ActionPreview, type DropPresentation, type 
 import { BOOKMARK_MIME, BOOKMARK_SOURCE_MIME, resolveBookmarkDrop, resolveRevisionDrop, REVISION_MIME } from './revision-drop.js'
 import { repositoryLoadingState } from './repository-loading.js'
 import { JUJUTSU_QUERY_GC_TIME, JUJUTSU_QUERY_STALE_TIME, jujutsuQueryKeys } from './repository-query-cache.js'
-import { ANCESTOR_COUNT_OPTIONS, REVISION_LIMIT_OPTIONS, usePreferences, type GraphDensity } from './preferences.js'
+import { ANCESTOR_COUNT_OPTIONS, usePreferences, type GraphDensity } from './preferences.js'
 import { isFileReviewed, readReviewStore, reviewProgress, toggleFileReview, type ReviewFile, type ReviewStore } from './review-progress.js'
 import { descendantCommitIds, emptyAncestorCandidates } from './source-control.js'
 import { SourceControlView } from './source-control-view.js'
@@ -134,6 +135,8 @@ const storedRepoHistory = createStoredValue({ key: REPO_HISTORY_KEY, schema: z.a
 const storedRepoPath = createStoredValue({ key: SELECTED_REPO_KEY, schema: z.string(), fallback: '' })
 
 const REPOSITORY_ID_LIMIT = 32
+const INITIAL_GRAPH_PAGE_SIZE = 100
+const EMPTY_REVISIONS: readonly Revision[] = []
 const REPOSITORY_QUERY_CACHE = { staleTime: JUJUTSU_QUERY_STALE_TIME, gcTime: JUJUTSU_QUERY_GC_TIME }
 
 const throwReadFailure = <Output extends object>(result: Output | ReadFailure): Output => {
@@ -282,13 +285,43 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   })
 
   const stateQuery = useQuery({
-    queryKey: jujutsuQueryKeys.state(path, preferences.revisionLimit),
-    queryFn: async ({ signal }) => throwReadFailure(await api.load({ repoId: repoId ?? '', limit: preferences.revisionLimit }, { signal })),
+    queryKey: jujutsuQueryKeys.state(path, INITIAL_GRAPH_PAGE_SIZE),
+    queryFn: async ({ signal }) => throwReadFailure(await api.load({ repoId: repoId ?? '', limit: INITIAL_GRAPH_PAGE_SIZE }, { signal })),
     ...REPOSITORY_QUERY_CACHE,
     enabled: repoId !== null,
     ...autoRefresh.queryOptions,
   })
   const state = stateQuery.data
+  const debouncedSearch = useDebouncedValue({ value: textFilter.trim(), delayMs: 250 })
+  const debouncedSearchRef = useRef(debouncedSearch)
+  debouncedSearchRef.current = debouncedSearch
+  const [graphPageState, setGraphPageState] = useState<{
+    readonly repoId: string | null
+    readonly query: string
+    readonly revisions: readonly Revision[]
+    readonly hasMore: boolean
+  }>({ repoId: null, query: '', revisions: [], hasMore: false })
+  const graphPageMutation = useMutation({
+    mutationFn: async (input: { readonly repoId: string; readonly query: string; readonly excludeCommitIds: readonly string[] }) =>
+      throwReadFailure(await api.graphPage({ ...input, excludeCommitIds: [...input.excludeCommitIds] }, {})),
+    onSuccess: (page, input) => {
+      if (input.repoId !== repoId || input.query !== debouncedSearchRef.current) return
+      setGraphPageState(current => {
+        const samePageSet = current.repoId === input.repoId && current.query === input.query
+        return {
+          repoId: input.repoId,
+          query: input.query,
+          revisions: [...(samePageSet ? current.revisions : []), ...page.revisions],
+          hasMore: page.hasMore,
+        }
+      })
+    },
+  })
+  const { mutate: requestGraphPage } = graphPageMutation
+  useEffect(() => {
+    setGraphPageState({ repoId, query: debouncedSearch, revisions: [], hasMore: debouncedSearch.length > 0 || (state?.graphHasMore ?? false) })
+    if (repoId !== null && debouncedSearch.length > 0) requestGraphPage({ repoId, query: debouncedSearch, excludeCommitIds: [] })
+  }, [repoId, debouncedSearch, state?.graphHasMore, requestGraphPage])
 
   const navigation = useGraphNavigation({
     repoId,
@@ -298,7 +331,13 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     comparison: comparisonSelection ?? undefined,
     revisions: state?.revisions ?? [],
   })
-  const allRevisions = useMemo(() => mergeGraphRevisions(navigation.extraRevisions, state?.revisions ?? []), [navigation.extraRevisions, state])
+  const graphPageIsCurrent = graphPageState.repoId === repoId && graphPageState.query === debouncedSearch
+  const graphPageRevisions = useMemo(() => (graphPageIsCurrent ? graphPageState.revisions : EMPTY_REVISIONS), [graphPageIsCurrent, graphPageState.revisions])
+  const graphRowsInput = useMemo(
+    () => (debouncedSearch.length > 0 ? graphPageRevisions : [...(state?.revisions ?? []), ...graphPageRevisions]),
+    [debouncedSearch, graphPageRevisions, state?.revisions],
+  )
+  const allRevisions = useMemo(() => mergeGraphRevisions(navigation.extraRevisions, graphRowsInput), [navigation.extraRevisions, graphRowsInput])
   const selectedRevision = navigation.selectedRevision
   const [locateRequest, setLocateRequest] = useState<Revision | null>(null)
   const [pendingLocateId, setPendingLocateId] = useState<string | null>(null)
@@ -479,6 +518,18 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   })
   const virtualItems = listVirtualizer.getVirtualItems()
   const stickyDayIndex = activeDayIndex(listItems, listVirtualizer.range?.startIndex ?? 0)
+  const graphHasMore = graphPageIsCurrent ? graphPageState.hasMore : debouncedSearch.length > 0 || (state?.graphHasMore ?? false)
+  const loadMoreGraphRevisions = (): void => {
+    if (repoId === null || !graphHasMore || graphPageMutation.isPending) return
+    graphPageMutation.mutate({
+      repoId,
+      query: debouncedSearch,
+      excludeCommitIds: [
+        ...(debouncedSearch.length === 0 ? (state?.revisions.map(revision => revision.commitId) ?? []) : []),
+        ...graphPageRevisions.map(revision => revision.commitId),
+      ],
+    })
+  }
 
   const locateRevision = (revision: Revision): void => {
     setLocateRequest(null)
@@ -564,6 +615,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
 
   const errorMessages = [
     stateQuery.error && errorMessage(stateQuery.error, 'Could not load this repository.'),
+    graphPageMutation.error && errorMessage(graphPageMutation.error, 'Could not load revision results.'),
     registerMutation.error && errorMessage(registerMutation.error, 'Could not register this repository.'),
     actionSnapshot.context.error,
     launchMutation.error && errorMessage(launchMutation.error, 'Workspace Session could not be opened.'),
@@ -1017,6 +1069,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
                 <InputGroupInput
                   aria-label="Search revisions"
                   autoFocus={sidePanel}
+                  maxLength={256}
                   className="dshx:text-xs dshx:md:text-xs"
                   onChange={event => setTextFilter(event.target.value)}
                   placeholder={sidePanel ? 'Search revisions…' : 'Search descriptions, IDs, bookmarks, tags, workspaces'}
@@ -1120,6 +1173,10 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
           className="dshx:min-h-0 dshx:flex-1 dshx:overflow-auto dshx:overscroll-contain"
           onDragEnd={endDrag}
           onKeyDown={moveRowFocus}
+          onScroll={event => {
+            const element = event.currentTarget
+            if (element.scrollHeight - element.scrollTop - element.clientHeight < 600) loadMoreGraphRevisions()
+          }}
           ref={listScrollRef}
           role="region"
         >
@@ -1226,7 +1283,13 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
               )
             })}
           </div>
-          {visibleRevisions.length === 0 && (
+          {graphPageMutation.isPending && (
+            <div className="dshx:flex dshx:items-center dshx:justify-center dshx:gap-2 dshx:p-3 dshx:text-xs dshx:text-muted-foreground" role="status">
+              <Spinner className="dshx:size-3" />
+              {debouncedSearch.length > 0 ? 'Searching all revisions…' : 'Loading older revisions…'}
+            </div>
+          )}
+          {visibleRevisions.length === 0 && !graphPageMutation.isPending && (
             <Empty className="dshx:gap-2 dshx:p-6 dshx:md:p-6">
               <EmptyHeader>
                 <EmptyTitle className="dshx:text-sm">No revisions match these filters.</EmptyTitle>
@@ -1636,18 +1699,6 @@ const PreferencesMenu = (): JSX.Element => {
           <DropdownMenuSubContent className="dshx-root">
             <DropdownMenuRadioGroup onValueChange={value => setPreference('ancestorCount', Number(value))} value={String(preferences.ancestorCount)}>
               {ANCESTOR_COUNT_OPTIONS.map(option => (
-                <DropdownMenuRadioItem className="dshx:text-xs" key={option} value={String(option)}>
-                  {option}
-                </DropdownMenuRadioItem>
-              ))}
-            </DropdownMenuRadioGroup>
-          </DropdownMenuSubContent>
-        </DropdownMenuSub>
-        <DropdownMenuSub>
-          <DropdownMenuSubTrigger className="dshx:text-xs">Revisions loaded ({preferences.revisionLimit})</DropdownMenuSubTrigger>
-          <DropdownMenuSubContent className="dshx-root">
-            <DropdownMenuRadioGroup onValueChange={value => setPreference('revisionLimit', Number(value))} value={String(preferences.revisionLimit)}>
-              {REVISION_LIMIT_OPTIONS.map(option => (
                 <DropdownMenuRadioItem className="dshx:text-xs" key={option} value={String(option)}>
                   {option}
                 </DropdownMenuRadioItem>

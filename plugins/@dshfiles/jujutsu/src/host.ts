@@ -23,6 +23,8 @@ import { readGraphNavigation, readGraphSlice, readRevisionRelationship } from '.
 import { composerContextHost } from './composer-context-host.js'
 import { jujutsuSettings } from './settings.js'
 import { resolveWorkspaceDestination, sameWorkspaceParent } from './workspace-path.js'
+import { graphPageRevset } from './graph-page.js'
+import { matchesRevisionSearch } from './graph.js'
 
 const MAX_OUTPUT = 1_160_000
 const MAX_STDERR = 64_000
@@ -30,6 +32,8 @@ const COMMAND_TIMEOUT = 30_000
 const NETWORK_TIMEOUT = 120_000
 const PREVIEW_TTL = 5 * 60_000
 const MAX_REVISIONS = 500
+const INITIAL_GRAPH_PAGE_SIZE = 100
+const MAX_WORKSPACE_HEAD_CANDIDATES = 32
 
 interface RegisteredRepo {
   readonly id: string
@@ -208,16 +212,56 @@ const repoRun =
   (args, options) =>
     runAt(ctx, repo.root, repo.identity, args, signal, options)
 
-const readRevisions = async (ctx: Context, repo: RegisteredRepo, limit: number, signal: AbortSignal | undefined): Promise<Revision[]> => {
+const readRevisions = async (
+  ctx: Context,
+  repo: RegisteredRepo,
+  limit: number,
+  signal: AbortSignal | undefined,
+): Promise<{ readonly revisions: Revision[]; readonly hasMore: boolean }> => {
   const result = await runAt(
     ctx,
     repo.root,
     repo.identity,
-    [RevisionReads.ignoreWorkingCopy, 'log', '--no-graph', '--limit', String(limit), '--revisions', 'all()', '--template', REVISION_TEMPLATE],
+    [RevisionReads.ignoreWorkingCopy, 'log', '--no-graph', '--limit', String(limit + 1), '--revisions', 'all()', '--template', REVISION_TEMPLATE],
     signal,
   )
   if (result.truncated) throw new Error('Revision graph exceeded the bounded output limit.')
-  return parseJsonLines(result.stdout, value => revisionSchema.parse(value))
+  const revisions = parseJsonLines(result.stdout, value => revisionSchema.parse(value))
+  return { revisions: revisions.slice(0, limit), hasMore: revisions.length > limit }
+}
+
+const readGraphPage = async (
+  ctx: Context,
+  repo: RegisteredRepo,
+  query: string,
+  excludeCommitIds: readonly string[],
+  signal: AbortSignal | undefined,
+): Promise<{ readonly revisions: Revision[]; readonly hasMore: boolean }> => {
+  const result = await runAt(
+    ctx,
+    repo.root,
+    repo.identity,
+    [
+      RevisionReads.ignoreWorkingCopy,
+      'log',
+      '--no-graph',
+      '--limit',
+      String(INITIAL_GRAPH_PAGE_SIZE + MAX_WORKSPACE_HEAD_CANDIDATES + 1),
+      '--revisions',
+      graphPageRevset({ query, excludeCommitIds }),
+      '--template',
+      REVISION_TEMPLATE,
+    ],
+    signal,
+  )
+  if (result.truncated) throw new Error('Revision graph exceeded the bounded output limit.')
+  const revisions = parseJsonLines(result.stdout, value => revisionSchema.parse(value)).filter(revision => matchesRevisionSearch(revision, query))
+  const page = revisions.slice(0, INITIAL_GRAPH_PAGE_SIZE)
+  const evolution = await readEvolvedCommitIds(ctx, repo, page, signal)
+  return {
+    revisions: page.map(revision => ({ ...revision, evolved: evolution.commitIds.has(revision.commitId) })),
+    hasMore: revisions.length > INITIAL_GRAPH_PAGE_SIZE,
+  }
 }
 
 const readEvolvedCommitIds = async (
@@ -239,7 +283,7 @@ const readEvolvedCommitIds = async (
         '--revisions',
         revisions.map(revision => revision.commitId).join('|'),
         '--limit',
-        '1500',
+        '100',
         '--template',
         EVOLUTION_TEMPLATE,
       ],
@@ -261,7 +305,7 @@ const readEvolvedCommitIds = async (
     })
     return {
       commitIds: new Set(rows.filter(row => row.predecessors.length > 0).map(row => row.commitId)),
-      truncated: result.truncated || rows.length >= 1500,
+      truncated: result.truncated || rows.length >= 100,
     }
   } catch {
     if (signal?.aborted === true) throw new Error('Jujutsu request was cancelled.')
@@ -326,18 +370,19 @@ const readLastPush = async (
 const snapshot = async (ctx: Context, repo: RegisteredRepo, limit: number, signal: AbortSignal | undefined): Promise<Snapshot> => {
   // `status` is the only working-copy snapshot; every later read ignores the working copy so it sees that same `@`.
   const status = await runAt(ctx, repo.root, repo.identity, ['status'], signal, { outputLimit: 78_000 })
-  const [revisions, changedPaths, remotes, lastPush] = await Promise.all([
+  const [revisionPage, changedPaths, remotes, lastPush] = await Promise.all([
     readRevisions(ctx, repo, limit, signal),
     RevisionReads.paths(repoRun(ctx, repo, signal), '@'),
     readRemotes(ctx, repo, signal),
     readLastPush(ctx, repo, signal),
   ])
-  const evolution = await readEvolvedCommitIds(ctx, repo, revisions, signal)
-  const graphRevisions = revisions.map(revision => ({ ...revision, evolved: evolution.commitIds.has(revision.commitId) }))
+  const evolution = await readEvolvedCommitIds(ctx, repo, revisionPage.revisions, signal)
+  const graphRevisions = revisionPage.revisions.map(revision => ({ ...revision, evolved: evolution.commitIds.has(revision.commitId) }))
   await assertRepoIdentity(repo)
   const state: JujutsuState = {
     root: repo.root,
     revisions: graphRevisions,
+    graphHasMore: revisionPage.hasMore,
     status: status.truncated ? status.stdout + '\n[status output truncated]' : status.stdout,
     changedPaths,
     remoteNames: remotes.names,
@@ -642,6 +687,14 @@ const jujutsuHostApi = jujutsuApi.host({
       return (await snapshot(ctx, repo, input.limit, signal)).state
     } catch (error) {
       return RevisionReads.failure(error, 'Could not load this repository.')
+    }
+  },
+  graphPage: async ({ input, ctx, signal }) => {
+    try {
+      const repo = await resolveRepo(ctx, input.repoId, signal)
+      return await readGraphPage(ctx, repo, input.query, input.excludeCommitIds, signal)
+    } catch (error) {
+      return RevisionReads.failure(error, 'Could not read the next revision graph page.')
     }
   },
   graphNavigation: async ({ input, ctx, signal }) => {

@@ -86,12 +86,6 @@
           "coveredBy": ["jujutsu.graph-filters"]
         },
         {
-          "key": "revisionLimit",
-          "defaultValue": "300",
-          "constraints": "Integer from 50 to 500 revisions.",
-          "coveredBy": ["jujutsu.graph-filters"]
-        },
-        {
           "key": "refreshMode",
           "defaultValue": "interval",
           "constraints": "One of interval or manual.",

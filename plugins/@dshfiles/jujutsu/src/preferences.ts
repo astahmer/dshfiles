@@ -15,7 +15,6 @@ const preferencesSchema = z.object({
   mineOnly: z.boolean().catch(false),
   dateHeadings: z.boolean().catch(false),
   graphDensity: z.enum(['comfortable', 'compact']).catch('comfortable'),
-  revisionLimit: z.number().int().min(50).max(500).catch(300),
   refreshMode: z.enum(['interval', 'manual']).catch('interval'),
   refreshIntervalSeconds: z.number().int().min(10).catch(60),
   refreshOnVisible: z.boolean().catch(true),
@@ -29,7 +28,6 @@ export type JujutsuPreferences = z.infer<typeof preferencesSchema>
 export type GraphDensity = JujutsuPreferences['graphDensity']
 
 export const ANCESTOR_COUNT_OPTIONS = [1, 2, 3, 5, 8, 10, 15, 20] as const
-export const REVISION_LIMIT_OPTIONS = [100, 200, 300, 500] as const
 
 const DEFAULT_PREFERENCES = preferencesSchema.parse({})
 
