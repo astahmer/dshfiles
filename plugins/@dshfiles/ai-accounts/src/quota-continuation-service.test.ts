@@ -82,14 +82,15 @@ describe('quota continuation service', () => {
         schedule: scheduler.schedule,
         now,
       })
-      await firstService.recordFailure(agent, 'codex_work', true)
+      await firstService.recordFailure(agent, 'codex_work', true, { provider: 'codex_work', model: 'gpt-6-luna' })
       const [record] = (await firstService.list()).continuations
       expect(record).toBeDefined()
       if (record === undefined) throw new Error('Quota continuation was not stored.')
-      expect(scheduler.requests[0]?.after_seconds).toBe(60)
+      expect(record).toMatchObject({ failedProvider: 'codex_work', failedModel: 'gpt-6-luna' })
+      expect(scheduler.requests[0]?.after_seconds).toBe(120)
 
       await firstService.snooze(record.continuationId, 'one-hour')
-      expect(scheduler.requests[1]?.after_seconds).toBe(3_600)
+      expect(scheduler.requests[1]?.after_seconds).toBe(3_660)
       expect(scheduler.rows.get(sessionId)).toHaveLength(1)
 
       await firstService.close()
@@ -123,7 +124,7 @@ describe('quota continuation service', () => {
         ],
       })
       expect(scheduler.requests).toHaveLength(3)
-      expect(scheduler.requests[2]?.after_seconds).toBe(3_600)
+      expect(scheduler.requests[2]?.after_seconds).toBe(3_660)
       expect(scheduler.rows.get(sessionId)).toHaveLength(1)
     } finally {
       stopSecond?.()
@@ -156,7 +157,7 @@ describe('quota continuation service', () => {
 
       await expect(service.setAutoRetry(initial.continuationId, sessionId, true)).resolves.toEqual({ updated: true })
       expect((await service.list()).continuations[0]).toMatchObject({ autoRetry: true, scheduled: true })
-      expect(scheduler.requests[0]?.after_seconds).toBe(90)
+      expect(scheduler.requests[0]?.after_seconds).toBe(150)
 
       await expect(service.setAutoRetry(initial.continuationId, sessionId, false)).resolves.toEqual({ updated: true })
       expect((await service.list()).continuations[0]).toMatchObject({ autoRetry: false, scheduled: false })
@@ -173,9 +174,14 @@ describe('quota continuation service', () => {
     const now = () => 2_000_000
     const sessionId = SessionId('quota-manual-session')
     const prompts: SessionPromptRequest[] = []
+    const selectedModels: Parameters<SessionController['selectModel']>[0][] = []
     const scheduler = createScheduleFixture(now)
     const sessionController = {
       inspect: async () => ({ events: [] }),
+      selectModel: async (request: Parameters<SessionController['selectModel']>[0]) => {
+        selectedModels.push(request)
+        return { selected: request }
+      },
       prompt: async (request: SessionPromptRequest) => {
         prompts.push(request)
         return { accepted: true as const }
@@ -201,8 +207,11 @@ describe('quota continuation service', () => {
       expect(scheduler.requests).toHaveLength(0)
       await expect(service.setAutoRetry(record.continuationId, sessionId, true)).resolves.toEqual({ updated: false })
 
+      await expect(service.resume(record.continuationId, { provider: 'codex_alt', model: 'gpt-6-luna', reasoningEffort: 'high' })).resolves.toEqual({
+        accepted: true,
+      })
       await expect(service.resume(record.continuationId)).resolves.toEqual({ accepted: true })
-      await expect(service.resume(record.continuationId)).resolves.toEqual({ accepted: true })
+      expect(selectedModels).toEqual([{ sessionId, provider: 'codex_alt', model: 'gpt-6-luna', reasoningEffort: 'high' }])
       expect(prompts).toHaveLength(1)
       expect(prompts[0]).toMatchObject({
         requestId: record.continuationId,

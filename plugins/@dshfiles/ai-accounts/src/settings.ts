@@ -53,7 +53,7 @@ export const aiAccountsSettings = defineSettings({
     modelsPageAccounts: Schema.boolean().default(true),
     /** Send a Codex account's requests to Luna Reserve while its weekly limit is spent and the reserve lasts. */
     codexLunaReserve: Schema.boolean().default(true),
-    /** Default for retrying a quota-blocked turn automatically when its known reset arrives. */
+    /** Default for resuming a quota-blocked turn one minute after its known reset. */
     autoRetryQuotaDefault: Schema.boolean().default(false),
     /** Show a per-turn automatic-retry checkbox beside exhausted-limit errors. */
     showQuotaRetryChoice: Schema.boolean().default(true),

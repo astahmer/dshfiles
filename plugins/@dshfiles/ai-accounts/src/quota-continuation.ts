@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent, PreStepDecision } from '@deepseek-ai/dsh-agent'
-import type { SessionController, SessionRequestId } from '@deepseek-ai/dsh-api-session-controller'
+import type { ModelSelection, SessionController, SessionRequestId } from '@deepseek-ai/dsh-api-session-controller'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import { ScheduleId, type ScheduleRecord } from '@deepseek-ai/dsh-schedule'
 import type { Domain } from '@deepseek-ai/dsh-storage-domain'
@@ -21,6 +21,7 @@ import { continuationIdOf, promptFor, userActivityForMessage, type UserActivityI
 
 const MAX_CONTINUATIONS = 500
 const CONTINUATION_RETENTION_MS = 30 * 24 * 60 * 60_000
+const AUTO_RESUME_DELAY_MS = 60_000
 const SNOOZE_MS = {
   'one-hour': 60 * 60_000,
   'four-hours': 4 * 60 * 60_000,
@@ -37,6 +38,7 @@ type SessionControllerPort = {
     signal?: Parameters<SessionControllerService['inspect']>[1],
   ) => Promise<{ readonly events: SessionInspectionEvents }>
   prompt: SessionControllerService['prompt']
+  selectModel?: SessionControllerService['selectModel']
 }
 type AgentUserMessage = Agent['inbox']['nextTurn'][number]
 type QuotaFailureAgent = {
@@ -61,8 +63,8 @@ type QuotaContinuationService = {
   start(): () => void
   close(): Promise<void>
   list(): Promise<{ scheduleAvailable: boolean; continuations: QuotaContinuationSummary[] }>
-  recordFailure(agent: QuotaFailureAgent, accountId: string, autoRetry: boolean): Promise<void>
-  resume(continuationId: string): Promise<{ accepted: boolean }>
+  recordFailure(agent: QuotaFailureAgent, accountId: string, autoRetry: boolean, failedSelection?: Pick<ModelSelection, 'provider' | 'model'>): Promise<void>
+  resume(continuationId: string, selection?: ModelSelection): Promise<{ accepted: boolean }>
   setAutoRetry(continuationId: string, sessionId: string, enabled: boolean): Promise<{ updated: boolean }>
   snooze(continuationId: string, duration: SnoozeDuration): Promise<{ updated: boolean }>
 }
@@ -207,7 +209,7 @@ const createQuotaContinuationService = ({
         return
       }
 
-      const dueAt = Math.max(record.resetAt, record.snoozedUntil ?? 0)
+      const dueAt = Math.max(record.resetAt, record.snoozedUntil ?? 0) + AUTO_RESUME_DELAY_MS
       const afterSeconds = Math.max(1, Math.ceil((dueAt - now()) / 1_000))
       const created = await scheduler.create(SessionId(record.sessionId), {
         title: 'Quota recovery',
@@ -232,18 +234,23 @@ const createQuotaContinuationService = ({
     await cancelScheduled(record)
   }
 
-  const summary = (record: QuotaContinuationRecord, now: number, scheduleAvailable: boolean): QuotaContinuationSummary => ({
-    continuationId: record.continuationId,
-    sessionId: record.sessionId,
-    accountId: record.accountId,
-    failedAt: record.failedAt,
-    resetAt: record.resetAt,
-    autoRetry: record.autoRetry,
-    snoozedUntil: record.snoozedUntil,
-    state: record.state === 'queued' ? 'queued' : 'waiting',
-    scheduled: scheduleAvailable && record.scheduleId !== null,
-    ready: isReady(record, now),
-  })
+  const summary = (record: QuotaContinuationRecord, now: number, scheduleAvailable: boolean): QuotaContinuationSummary => {
+    const value: QuotaContinuationSummary = {
+      continuationId: record.continuationId,
+      sessionId: record.sessionId,
+      accountId: record.accountId,
+      failedAt: record.failedAt,
+      resetAt: record.resetAt,
+      autoRetry: record.autoRetry,
+      snoozedUntil: record.snoozedUntil,
+      state: record.state === 'queued' ? 'queued' : 'waiting',
+      scheduled: scheduleAvailable && record.scheduleId !== null,
+      ready: isReady(record, now),
+    }
+    if (record.failedProvider !== undefined) value.failedProvider = record.failedProvider
+    if (record.failedModel !== undefined) value.failedModel = record.failedModel
+    return value
+  }
 
   const activeForSession = async (sessionId: string): Promise<QuotaContinuationRecord[]> =>
     (await allRecords()).filter(record => record.sessionId === sessionId && isActive(record))
@@ -434,7 +441,12 @@ const createQuotaContinuationService = ({
     }
   }
 
-  const recordFailure = async (agent: QuotaFailureAgent, accountId: string, autoRetry: boolean): Promise<void> => {
+  const recordFailure = async (
+    agent: QuotaFailureAgent,
+    accountId: string,
+    autoRetry: boolean,
+    failedSelection?: Pick<ModelSelection, 'provider' | 'model'>,
+  ): Promise<void> => {
     try {
       const resetAt = await readResetAt(accountId).catch(() => null)
       await serialize(agent.id, async () => {
@@ -451,10 +463,12 @@ const createQuotaContinuationService = ({
 
         const continuationId = randomUUID()
         const hasQueuedWork = isQueuedExternalWork(agent)
+        const failedRouteFields = failedSelection === undefined ? {} : { failedProvider: failedSelection.provider, failedModel: failedSelection.model }
         const record = quotaContinuationDomain.tables.continuations.valueSchema.parse({
           continuationId,
           sessionId: agent.id,
           accountId,
+          ...failedRouteFields,
           failedSeq: agent.session.seq,
           failedAt: nowAtFailure,
           resetAt,
@@ -483,7 +497,7 @@ const createQuotaContinuationService = ({
     return { scheduleAvailable, continuations }
   }
 
-  const resume = async (continuationId: string): Promise<{ accepted: boolean }> => {
+  const resume = async (continuationId: string, selection?: ModelSelection): Promise<{ accepted: boolean }> => {
     const storage = await table()
     const record = storage.get(continuationId)
     if (record === undefined || !isActive(record)) return { accepted: false }
@@ -494,7 +508,7 @@ const createQuotaContinuationService = ({
       if (current === undefined || !isActive(current)) return { accepted: false }
       if (current.state === 'queued') return { accepted: true }
       const controller = sessionController()
-      if (controller === undefined) return { accepted: false }
+      if (controller === undefined || (selection !== undefined && controller.selectModel === undefined)) return { accepted: false }
 
       try {
         const inspected = await controller.inspect(SessionId(current.sessionId), AbortSignal.timeout(15_000))
@@ -504,6 +518,9 @@ const createQuotaContinuationService = ({
         if (hasNewerUserWork(current, activities)) {
           await invalidate(current)
           return { accepted: false }
+        }
+        if (selection !== undefined) {
+          await controller.selectModel?.({ sessionId: SessionId(current.sessionId), ...selection })
         }
         await storage.put(continuationId, { ...current, state: 'queued', scheduleId: null, queueSource: 'manual', snoozedUntil: null })
         await cancelScheduled(current)

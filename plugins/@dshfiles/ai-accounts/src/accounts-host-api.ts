@@ -1,9 +1,18 @@
 import type { Context } from '@deepseek-ai/cordis'
+import type { ModelCatalog, ModelCatalogModel, ModelSelection } from '@deepseek-ai/dsh-api-session-controller'
 import type { SecretCatalogCredentialBridge } from '@dshfiles/secret-catalog/credential-bridge-contract'
 import { accountRuntime } from './account-runtime.js'
 import { configFromAccountsFile } from './account-config.js'
 import { hostname } from 'node:os'
-import { aiAccountsApi, baseModelName, isKeyEnvName, type AccountsFile, type AccountsUsage } from './api.js'
+import {
+  aiAccountsApi,
+  baseModelName,
+  isKeyEnvName,
+  type AccountsFile,
+  type AccountsUsage,
+  type QuotaRecoveryModelCatalog,
+  type QuotaRecoveryModelSelection,
+} from './api.js'
 import {
   accountFilePath,
   buildAccountsFile,
@@ -28,6 +37,32 @@ import { readCopilotCredential } from './copilot-credentials.js'
  * pool's live health and each home's observed login, so the page and the agent's
  * `ai_accounts` tool can never describe different state.
  */
+const quotaRecoveryModelForClient = (model: ModelCatalogModel): QuotaRecoveryModelCatalog['groups'][number]['models'][number] => {
+  const result: QuotaRecoveryModelCatalog['groups'][number]['models'][number] = { id: model.id, name: model.name }
+  if (model.description !== undefined) result.description = model.description
+  if (model.reasoning !== undefined) {
+    const reasoning: NonNullable<typeof result.reasoning> = {
+      efforts: model.reasoning.efforts.map(effort => ({ id: effort.id, name: effort.name })),
+    }
+    if (model.reasoning.defaultEffort !== undefined) reasoning.defaultEffort = model.reasoning.defaultEffort
+    result.reasoning = reasoning
+  }
+  return result
+}
+
+const quotaRecoveryCatalogForClient = (catalog: ModelCatalog): QuotaRecoveryModelCatalog => ({
+  default: catalog.default,
+  routableProviders: [...catalog.routableProviders],
+  groups: catalog.groups.map(group => ({ id: group.id, name: group.name, models: group.models.map(quotaRecoveryModelForClient) })),
+  failures: catalog.failures.map(failure => ({ id: failure.id, name: failure.name, message: failure.message })),
+})
+
+const selectionForContinuation = (selection: QuotaRecoveryModelSelection | undefined): ModelSelection | undefined => {
+  if (selection === undefined) return undefined
+  if (selection.reasoningEffort === undefined) return { provider: selection.provider, model: selection.model }
+  return { provider: selection.provider, model: selection.model, reasoningEffort: selection.reasoningEffort }
+}
+
 export const accountsFile = async (ctx: Context): Promise<AccountsFile> =>
   buildAccountsFile(
     await readAccountFile(),
@@ -180,7 +215,14 @@ export const accountsHostApi = aiAccountsApi.host({
     }
   },
   quotaContinuations: async ({ ctx }) => quotaContinuationServiceFor(ctx).list(),
-  resumeQuotaContinuation: async ({ input, ctx }) => quotaContinuationServiceFor(ctx).resume(input.continuationId),
+  quotaRecoveryModelCatalog: async ({ ctx }) => {
+    const controller = ctx.get('sessionController')
+    if (controller === undefined) throw new Error('Session model selection is unavailable.')
+    return quotaRecoveryCatalogForClient(await controller.modelCatalog())
+  },
+  resumeQuotaContinuation: async ({ input, ctx }) => {
+    return quotaContinuationServiceFor(ctx).resume(input.continuationId, selectionForContinuation(input.selection))
+  },
   setQuotaContinuationAutoRetry: async ({ input, ctx }) => quotaContinuationServiceFor(ctx).setAutoRetry(input.continuationId, input.sessionId, input.enabled),
   snoozeQuotaContinuation: async ({ input, ctx }) => quotaContinuationServiceFor(ctx).snooze(input.continuationId, input.duration),
 })

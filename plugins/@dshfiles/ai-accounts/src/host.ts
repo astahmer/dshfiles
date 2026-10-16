@@ -629,11 +629,13 @@ export default definePlugin({
                 if (action.kind === 'pass') return next()
                 if (action.kind === 'give-up') {
                   const decision = action.then === 'dsh' ? await next() : undefined
+                  const requestConfig = agent.session.requestHeader()?.config
+                  const failedSelection = requestConfig === undefined ? undefined : { provider: requestConfig.provider, model: requestConfig.model }
                   if (decision === undefined && action.failureKind === 'rateLimit') {
-                    await quotaContinuations.recordFailure(agent, action.account, true)
+                    await quotaContinuations.recordFailure(agent, action.account, true, failedSelection)
                   }
                   if (decision === undefined && action.failureKind === 'exhausted' && !readRecoverySettings().policy.exhausted.failover) {
-                    await quotaContinuations.recordFailure(agent, action.account, readQuotaRetrySettings().autoRetryDefault)
+                    await quotaContinuations.recordFailure(agent, action.account, readQuotaRetrySettings().autoRetryDefault, failedSelection)
                   }
                   return decision
                 }

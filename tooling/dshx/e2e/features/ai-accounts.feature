@@ -79,3 +79,9 @@ Feature: AI Accounts
     When a rate-limited and a healthy Command Code account share a local fake provider
     And a new thread asks the first account's model a question
     Then the healthy account answers and the rate-limited one cools down
+
+  @scenario:ai-accounts.quota-recovery-route
+  Scenario: Recover an exhausted turn on another route
+    Given the isolated plugin profile "@dshfiles/ai-accounts" is booted
+    When an exhausted Command Code account fails a turn with failover off
+    Then the exhausted turn offers an inline route switch and one-minute auto-resume

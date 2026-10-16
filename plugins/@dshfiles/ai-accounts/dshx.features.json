@@ -401,7 +401,7 @@
     {
       "id": "quota-auto-retry",
       "title": "Retry exhausted quota when its reset arrives",
-      "summary": "Explain exhausted provider limits inline and let each eligible turn opt into retrying at its known reset, with global default and visibility preferences.",
+      "summary": "Explain exhausted provider limits inline, let the user resume with another available provider/account/model/reasoning effort (defaulting to the same model on another provider), and optionally auto-resume one minute after a known reset.",
       "surfaces": ["client", "host", "settings", "storage"],
       "configuration": [
         {
@@ -419,11 +419,13 @@
           "coveredBy": ["ai-accounts.quota-retry-settings"]
         }
       ],
-      "states": ["quota-exhausted", "retry-choice-visible", "waiting-for-reset", "retry-queued", "reset-unknown"],
+      "states": ["quota-exhausted", "route-selection", "waiting-for-reset", "resume-queued", "reset-unknown"],
       "failureModes": [
-        "Automatic retry stays off by default and cannot be enabled without a known reset time.",
+        "Automatic retry stays off by default and cannot be enabled without a known reset time; it queues one minute after reset.",
         "Changing one turn's choice creates or removes only that turn's scheduled recovery.",
-        "The inline choice is absent while automatic exhausted-limit failover is enabled."
+        "The inline choice is absent while automatic exhausted-limit failover is enabled.",
+        "The notice re-reads this turn's recovery when it appears, so a page of continuations cached before the failure cannot hide the controls.",
+        "A manual route switch accepts only a currently catalogued provider/model and applies the reasoning effort before queuing the saved request."
       ],
       "externalDependencies": [],
       "verification": [
@@ -434,8 +436,19 @@
           "testName": "lets one waiting continuation opt into and out of retry-at-reset"
         },
         {
+          "kind": "unit-test",
+          "id": "ai-accounts.quota-recovery-route-default",
+          "file": "plugins/@dshfiles/ai-accounts/src/quota-recovery-selection.test.ts",
+          "testName": "defaults to the same model on another provider and carries that route default effort"
+        },
+        {
           "kind": "gherkin",
           "id": "ai-accounts.quota-retry-settings",
+          "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "ai-accounts.quota-recovery-route",
           "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature"
         }
       ]

@@ -144,6 +144,16 @@ pending recovery, so an old continuation never runs over newer work. Records liv
 in Host storage, so they survive a restart; finished ones are pruned after 30
 days, and at most 500 are kept.
 
+The exhausted-limit turn itself carries an inline notice, shown while
+exhausted-limit failover is off. It dates the reset and offers **Automatically
+resume 1 minute after reset**, which schedules the saved request for one minute
+past the reset instead of at the reset instant. **Resume with another model**
+opens the currently available provider/account, model, and reasoning-effort
+selects, defaulting to the same model on another provider when one offers it;
+**Resume with this selection** applies that route to the Session and then queues
+the saved request. The notice re-reads this turn's recovery when it appears, so
+a continuations page cached before the failure never hides these controls.
+
 When a turn ends with an authentication failure (including an invalid API key
 or a missing credential), an inline **Add or fix credentials** action opens the
 AI Accounts panel. Use the account's **Set up key…** action there to store a key

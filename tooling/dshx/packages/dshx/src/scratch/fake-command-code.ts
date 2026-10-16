@@ -99,12 +99,14 @@ export const startFakeCommandCode = async (): Promise<FakeCommandCode> => {
         }
         if (request.url === '/alpha/billing/credits') {
           if (key.endsWith('-BROKEN')) return reply(503, JSON.stringify({ error: 'billing unavailable' }))
+          // A `-EXHAUSTED` account also reports a fully spent window, so its recovery has a known reset.
+          const weeklyUsed = key.endsWith('-EXHAUSTED') ? 100 : 90
           return reply(
             200,
             JSON.stringify({
               windowLimits: {
                 fiveHour: { used: 25, cap: 100, resetAt: Date.now() + HOUR_MS },
-                weekly: { used: 90, cap: 100, resetAt: Date.now() + 72 * HOUR_MS },
+                weekly: { used: weeklyUsed, cap: 100, resetAt: Date.now() + 72 * HOUR_MS },
               },
               credits: { planId: 'individual-pro' },
             }),
@@ -136,6 +138,14 @@ export const startFakeCommandCode = async (): Promise<FakeCommandCode> => {
           return streamAnswer(response, { content: named?.[1] ?? 'Fake thread title' })
         }
         if (key.endsWith('-LIMITED')) return reply(429, JSON.stringify({ error: { message: 'Rate limit reached', type: 'rate_limit_error' } }))
+        // Terminal quota exhaustion, not a transient 429: the wording and code both
+        // classify as `exhausted` on the Host and render the inline recovery notice.
+        if (key.endsWith('-EXHAUSTED')) {
+          return reply(
+            400,
+            JSON.stringify({ error: { message: 'Usage limit reached for this account.', type: 'insufficient_quota', code: 'USAGE_LIMIT_REACHED' } }),
+          )
+        }
         // DSH appends its runtime-context snapshot after the user's message.
         const last = messages.filter(message => !message.text.startsWith(RUNTIME_CONTEXT)).at(-1)
         if (last?.role === 'tool') return streamAnswer(response, { content: 'Tool finished.' })

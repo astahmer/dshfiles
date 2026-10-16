@@ -150,7 +150,7 @@ Then('the exhausted-limit retry default is off and the inline choice is on', asy
     const failover = exhausted.getByRole('switch', { name: 'Fail over to the next account' })
     await failover.click()
     await expect(page.getByRole('heading', { name: 'Quota retry', exact: true })).toBeVisible()
-    await expect(page.getByRole('switch', { name: 'Automatically retry after reset by default' })).not.toBeChecked()
+    await expect(page.getByRole('switch', { name: 'Automatically resume after reset by default' })).not.toBeChecked()
     await expect(page.getByRole('switch', { name: 'Show the per-turn choice' })).toBeChecked()
     await failover.click()
     await expect(page.getByRole('heading', { name: 'Quota retry', exact: true })).toHaveCount(0)
@@ -312,6 +312,43 @@ Then('the healthy account answers and the rate-limited one cools down', async ({
   await recordAssertion(page, 'ai-accounts-rate-limited-account-is-cooling-down', async () => {
     await expect(providerAccounts(page).getByRole('button', { name: 'Command Code 1 Rate limited', exact: true })).toBeVisible()
     await expect(providerAccounts(page).getByRole('button', { name: 'Command Code 2 Authenticated', exact: true })).toBeVisible()
+  })
+  await finishJourneyAssertions(page)
+})
+
+When('an exhausted Command Code account fails a turn with failover off', async ({ page }: { page: Page }) => {
+  await startFakeCommandCode(page)
+  await openAccountsPanel(page)
+  await addCommandCodeAccount(page, { name: 'Command Code 1', key: 'e2e-fake-key-EXHAUSTED' })
+  // The inline recovery choice exists only while automatic exhausted-limit failover is off.
+  await page.getByRole('button', { name: 'Settings', exact: true }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'AI Accounts', exact: true }).click()
+  const exhausted = page.getByRole('group', { name: /Usage exhausted/ })
+  const failover = exhausted.getByRole('switch', { name: 'Fail over to the next account' })
+  await failover.click()
+  await expect(failover).not.toBeChecked()
+  await page.keyboard.press('Escape')
+  await page.getByRole('treeitem', { name: 'New Session', exact: true }).click()
+  await page.getByRole('button', { name: /^Select model/ }).click()
+  await page.getByRole('menuitem', { name: /^Model / }).click()
+  await page.getByRole('menuitemradio', { name: 'commandcode_work/gpt-6-luna', exact: true }).click()
+  const composer = page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })
+  await composer.fill('Recover this turn on another available route.')
+  await composer.press('Enter')
+})
+
+Then('the exhausted turn offers an inline route switch and one-minute auto-resume', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'ai-accounts-exhausted-inline-recovery', async () => {
+    await expect(page.getByText("Your current account's usage limit is exhausted", { exact: false })).toBeVisible({ timeout: 30_000 })
+    // A known reset both dates the notice and enables the one-minute auto-resume opt-in.
+    await expect(page.getByRole('checkbox', { name: 'Automatically resume 1 minute after reset' })).toBeEnabled()
+    // The route switch renders only once the Host stored this turn's recovery.
+    const expand = page.getByRole('button', { name: 'Resume with another model', exact: true })
+    await expect(expand).toBeEnabled({ timeout: 30_000 })
+    await expand.click()
+    await expect(page.getByRole('combobox', { name: 'Provider or account', exact: true })).toBeVisible()
+    await expect(page.getByRole('combobox', { name: 'Model', exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Resume with this selection', exact: true })).toBeVisible()
   })
   await finishJourneyAssertions(page)
 })

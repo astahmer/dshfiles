@@ -284,8 +284,11 @@ export const AiAccountsSettingsSection = (props: { readonly close: () => void; r
 
       <FailureRecoveryGroup readOnly={readOnly} write={write} />
       {!preferences.failureRecovery.exhausted.failover ? (
-        <Group description="For exhausted limits when automatic account failover is off. Automatic retry needs a known provider reset." title="Quota retry">
-          <Row hint="Pre-check the per-turn choice. The default is off." label="Automatically retry after reset by default">
+        <Group
+          description="For exhausted limits when automatic account failover is off. Automatic resume needs a known provider reset and queues one minute later."
+          title="Quota retry"
+        >
+          <Row hint="Pre-check the per-turn choice. The default is off." label="Automatically resume after reset by default">
             {id => (
               <Switch
                 checked={preferences.autoRetryQuotaDefault}

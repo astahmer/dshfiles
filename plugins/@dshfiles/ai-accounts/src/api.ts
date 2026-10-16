@@ -51,6 +51,43 @@ export const isAllowedCommandCodeBase = (value: string): boolean => {
 
 const isPlainHomePath = (path: string): boolean => (path.startsWith('/') || path.startsWith('~/')) && !path.includes('\0') && !path.split('/').includes('..')
 
+const modelSelectionSchema = z.object({
+  provider: z.string().min(1).max(200),
+  model: z.string().min(1).max(200),
+  reasoningEffort: z.string().max(64).optional(),
+})
+const modelCatalogSchema = z.object({
+  default: modelSelectionSchema,
+  routableProviders: z.array(z.string().min(1).max(200)).max(200),
+  groups: z
+    .array(
+      z.object({
+        id: z.string().min(1).max(200),
+        name: z.string().min(1).max(200),
+        models: z
+          .array(
+            z.object({
+              id: z.string().min(1).max(200),
+              name: z.string().min(1).max(200),
+              description: z.string().max(500).optional(),
+              reasoning: z
+                .object({
+                  efforts: z.array(z.object({ id: z.string().min(1).max(64), name: z.string().min(1).max(100) })).max(24),
+                  defaultEffort: z.string().max(64).optional(),
+                })
+                .optional(),
+            }),
+          )
+          .max(500),
+      }),
+    )
+    .max(200),
+  failures: z.array(z.object({ id: z.string().max(200), name: z.string().max(200), message: z.string().max(500) })).max(200),
+})
+
+export type QuotaRecoveryModelSelection = z.infer<typeof modelSelectionSchema>
+export type QuotaRecoveryModelCatalog = z.infer<typeof modelCatalogSchema>
+
 const homePathSchema = z
   .string()
   .trim()
@@ -436,9 +473,11 @@ export const aiAccountsApi = defineApi({
         continuations: z.array(quotaContinuationSummarySchema).max(500),
       }),
     }),
-    /** Queue the exact stored continuation through the native Session Controller. */
+    /** Models currently available for an inline quota-recovery route switch. */
+    quotaRecoveryModelCatalog: method({ input: z.void(), output: modelCatalogSchema }),
+    /** Queue the exact stored continuation, optionally with a Session-local model selection. */
     resumeQuotaContinuation: method({
-      input: z.object({ continuationId: z.string().uuid() }),
+      input: z.object({ continuationId: z.string().uuid(), selection: modelSelectionSchema.optional() }),
       output: z.object({ accepted: z.boolean() }),
     }),
     /** Change whether a waiting quota-blocked turn resumes automatically at its known reset. */
