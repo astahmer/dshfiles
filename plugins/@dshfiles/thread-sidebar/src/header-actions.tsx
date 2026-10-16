@@ -22,7 +22,7 @@ import { isSessionMuted, muteOptionLabelKeys, muteSessions, muteUntil, THREAD_MU
 import { threadActionTargetIds } from './thread-children.js'
 import { usePreferences } from './sidebar-state.js'
 import { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
-import { workspaceForLineage, workspaceForSessions } from './organization.js'
+import { SidebarOrganization, workspaceForSessions } from './organization.js'
 import { buildThreadUrl } from './thread-url.js'
 
 interface HeaderThreadActionsInjected {
@@ -105,7 +105,7 @@ export const HeaderThreadActions = ({
     threads: actionThreads,
     cascadeToChildren: preferences.applyActionsToChildThreads,
   })
-  const workspaceId = workspaceForLineage(session, sessionState.byId, workspaceForSessions(workspaceState.items))
+  const workspaceId = SidebarOrganization.workspaceForLineage(session, sessionState.byId, workspaceForSessions(workspaceState.items))
   const updateParked = (): void => {
     if (session.running) return
     const parkedIds = new Set(preferences.parkedSessionIds)
