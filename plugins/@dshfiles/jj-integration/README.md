@@ -82,13 +82,30 @@ modal.
 
 ## Finding a thread workspace
 
-The **Thread workspaces** page is available from the left panel and as a tab in
-the conversation's right side panel, beside Jujutsu and other tools. Its rows
-show the linked conversation titles. Choose a title to open that conversation;
-**Preview** loads the latest three user/assistant text messages on demand. Hover
-the current thread workspace chip in the conversation header to load a compact
-revision graph for the thread, configured bookmark and origin ref, and default
-workspace.
+The **Thread integration** page is available from the left panel and as a tab in
+the conversation's right side panel, beside Jujutsu and other tools. It is the
+integration control center: a tab per state with live counts, a banner with the
+primary **Integrate all (n)** action while work is ready, and one compact row per
+workspace grouped into **Conflicts**, **Ready to integrate**, **Waiting** and
+**Up to date**.
+
+Each row keeps the workspace id, the linked conversation title, when it was last
+active, how many user messages the thread holds, how many revisions are pending,
+a branch diagram with how far it sits behind the bookmark, its status chip and
+the blocker that keeps it out of the ready group. The message count rides the
+Host's `turnOutline` projection, which the client asks for per thread session, so
+it costs no log read and no conversation opening. **View details** expands the
+revision list, the thread's sessions, and **Preview**, which loads the latest
+three user/assistant text messages on demand. Hover the current thread workspace
+chip in the conversation header to load a compact revision graph for the thread,
+configured bookmark and origin ref, and default workspace.
+
+Rows in the ready group carry a checkbox; the banner then offers **Integrate
+selected (n)**, and the queue runs those workspaces one after another on the Host,
+reporting queued, validating and rebasing phases as they happen. Behind-only work
+and revisions already integrated are never offered again. Workspaces whose
+Sessions are all archived stay out of the counts until the **Inactive** filter is
+on.
 
 ## Integrating into main
 

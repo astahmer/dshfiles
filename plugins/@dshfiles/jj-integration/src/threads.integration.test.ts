@@ -181,7 +181,9 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
     jj(repo, 'commit', '-m', 'other work')
     jj(repo, 'bookmark', 'set', 'main', '-r', '@-')
 
-    const outcome = await threads.land(thread.path)
+    const phases: string[] = []
+    const outcome = await threads.land(thread.path, { onProgress: phase => phases.push(phase) })
+    expect(phases).toEqual(['queued', 'validating', 'rebasing'])
     expect(outcome).toMatchObject({
       status: 'landed',
       revisions: [{ description: 'feat: add feature', conflict: false }],

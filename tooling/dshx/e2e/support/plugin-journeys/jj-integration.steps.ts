@@ -257,7 +257,7 @@ Then('the current thread header identifies its jj workspace', async ({ page }: {
   await indicator.click()
   await expect(rebaseButton(page)).toBeVisible()
   await page.getByRole('button', { name: 'Open thread workspaces in side panel', exact: true }).click()
-  await expect(page.getByRole('heading', { name: 'Thread workspaces', exact: true }).last()).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Thread integration', exact: true }).last()).toBeVisible()
   await expect(indicator).toBeVisible()
 })
 
@@ -604,26 +604,35 @@ Then('the thread appears in the Archived sidebar section', async ({ page }: { pa
 })
 
 When('the Thread workspaces panel is opened', async ({ page }: { page: Page }) => {
-  await page.getByRole('button', { name: 'Thread workspaces', exact: true }).click()
-  await expect(page.getByRole('heading', { name: 'Thread workspaces', exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Thread integration', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Thread integration', exact: true })).toBeVisible()
 })
 
-Then('the thread row offers Rebase for its 1 revision to rebase', async ({ page }: { page: Page }) => {
-  await recordAssertion(page, 'jj-integration-panel-offers-rebase-only-with-work', async () => {
-    await expect(threadRow(page).getByText('1 pending integration', { exact: true })).toBeVisible()
+Then('the thread row offers Integrate for its 1 revision', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'jj-integration-panel-offers-integrate-only-for-valid-work', async () => {
+    await expect(threadRow(page).getByText('1 revision(s)', { exact: true })).toBeVisible()
     await expect(threadRow(page).getByRole('button', { name: 'Integrate', exact: true })).toBeVisible()
     await expect(threadRow(page).getByRole('button', { name: 'Discard', exact: true })).toHaveCount(0)
   })
 })
 
-When('Rebase is clicked in the thread workspace row', async ({ page }: { page: Page }) => {
-  await threadRow(page).getByRole('button', { name: 'Integrate', exact: true }).click()
-  await expect(threadRow(page).getByText('Integrating…', { exact: true }).first()).toBeVisible({ timeout: 1_000 })
+When('a ready workspace is selected for batch integration', async ({ page }: { page: Page }) => {
+  await threadRow(page)
+    .getByRole('checkbox', { name: /^Select workspace /u })
+    .check()
 })
 
-Then('the thread workspace row immediately shows that it is up to date', async ({ page }: { page: Page }) => {
+Then('Integrate selected is enabled', async ({ page }: { page: Page }) => {
+  await expect(page.getByRole('button', { name: 'Integrate selected (1)', exact: true })).toBeEnabled()
+})
+
+When('Integrate selected is clicked', async ({ page }: { page: Page }) => {
+  await page.getByRole('button', { name: 'Integrate selected (1)', exact: true }).click()
+})
+
+Then('the thread workspace row immediately shows that it is integrated', async ({ page }: { page: Page }) => {
   const row = threadRow(page)
-  await expect(row.getByText('Nothing to integrate', { exact: true })).toBeVisible()
+  await expect(row.getByText('Integrated', { exact: true })).toBeVisible()
   await expect(row.getByRole('button', { name: 'Integrate', exact: true })).toHaveCount(0)
 })
 
@@ -638,7 +647,7 @@ When('the conversation is opened from its workspace row', async ({ page }: { pag
 When('the Thread workspaces side panel is opened', async ({ page }: { page: Page }) => {
   await openWorkspaceMenu(page)
   await page.getByRole('button', { name: 'Open thread workspaces in side panel', exact: true }).click()
-  await expect(page.getByRole('heading', { name: 'Thread workspaces', exact: true }).last()).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Thread integration', exact: true }).last()).toBeVisible()
 })
 
 Then('the thread header offers Rebase for its 1 revision', async ({ page }: { page: Page }) => {
@@ -674,7 +683,8 @@ Then('the session log downloads from the thread workspace menu', async ({ page }
 
 Then('its Preview shows the latest message', async ({ page }: { page: Page }) => {
   const row = threadRow(page)
-  await row.getByRole('button', { name: 'Preview', exact: true }).first().click()
+  await row.getByRole('button', { name: 'View details', exact: true }).click()
+  await row.getByRole('button', { name: 'Preview', exact: true }).click()
   await expect(row).toContainText('jj integration rebase e2e thread')
 })
 

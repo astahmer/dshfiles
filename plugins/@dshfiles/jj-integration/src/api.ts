@@ -14,6 +14,8 @@ const threadSchema = z
     canRebase: z.boolean().optional(),
     missing: z.boolean(),
     behind: z.boolean(),
+    /** Absent from a Host older than this field. */
+    behindCount: z.number().int().nonnegative().optional(),
     rebasedAt: z.number().int().nonnegative().optional(),
     rebasedTipChangeId: z.string().min(1).max(128).optional(),
     unlanded: z.array(revisionSchema),
@@ -23,6 +25,8 @@ export type ThreadView = z.infer<typeof threadSchema>
 
 const repositorySchema = z.object({ repoRoot: z.string(), title: z.string(), workspaceId: z.string().nullable(), threads: z.array(threadSchema) }).strict()
 export type RepositoryView = z.infer<typeof repositorySchema>
+
+const integrationProgressSchema = z.object({ phase: z.enum(['queued', 'validating', 'rebasing']), updatedAt: z.number().int().nonnegative() }).strict()
 
 const landResultSchema = z
   .object({
@@ -191,6 +195,11 @@ export const jjIntegrationApi = defineApi({
       output: landResultSchema,
       description:
         'Rebase the thread at a path: move its described revisions onto the target bookmark and advance the bookmark. Never pushes. Refuses while any thread session is running or waiting for input; the calling agent may rebase its own thread once it resolved a handed-back problem.',
+    }),
+    integrationProgress: method({
+      input: z.object({ path: z.string().min(1) }).strict(),
+      output: z.object({ progress: integrationProgressSchema.nullable() }).strict(),
+      description: 'Read the current phase of a UI-triggered thread integration operation.',
     }),
     threadStatus: method({
       input: threadPathInput,

@@ -49,6 +49,8 @@ export interface ThreadStatus {
   readonly unlanded: readonly ThreadRevision[]
   /** The target bookmark moved since this thread last rebased. */
   readonly behind: boolean
+  /** Revisions the target bookmark has that this workspace lacks. */
+  readonly behindCount: number
   /** Timestamp of the latest successful land, persisted beside the thread workspaces. */
   readonly rebasedAt?: number
   /** Change ID of the bookmark tip when this thread last landed. */
@@ -199,13 +201,16 @@ export const createThreads = (options: {
       const path = join(directory, name)
       const present = existsSync(join(path, '.jj'))
       if (!present && !name.startsWith('thread-')) continue
+      const unlanded = await revisions(unlandedRevset(name), repoRoot, true)
+      const behind = await revisions(`${name}@ ~ ${options.bookmark()}::`, repoRoot, true)
       const status = {
         name,
         path,
         repoRoot,
         missing: !present,
-        unlanded: await revisions(unlandedRevset(name), repoRoot, true),
-        behind: (await revisions(`${name}@ ~ ${options.bookmark()}::`, repoRoot, true)).length > 0,
+        unlanded,
+        behind: behind.length > 0,
+        behindCount: behind.length,
       }
       threads.push(withRebaseMetadata(status, rebaseMetadata[name]))
     }
@@ -220,7 +225,7 @@ export const createThreads = (options: {
       revisions(`@ ~ ${bookmark}::`, path, true),
       readRebaseMetadata(repoRoot),
     ])
-    const threadStatus = { name, path, repoRoot, missing: !existsSync(join(path, '.jj')), unlanded, behind: behind.length > 0 }
+    const threadStatus = { name, path, repoRoot, missing: !existsSync(join(path, '.jj')), unlanded, behind: behind.length > 0, behindCount: behind.length }
     return withRebaseMetadata(threadStatus, rebaseMetadata[name])
   }
 
@@ -235,13 +240,24 @@ export const createThreads = (options: {
       return { name, path }
     })
 
-  const landAt = (thread: ThreadLocation & { readonly threadName: string }, signal?: AbortSignal): Promise<LandOutcome> =>
-    serialized(thread.repoRoot, async () => {
+  const landAt = async (
+    thread: ThreadLocation & { readonly threadName: string },
+    input: {
+      readonly signal?: AbortSignal
+      readonly validate?: () => Promise<void>
+      readonly onProgress?: (phase: 'queued' | 'validating' | 'rebasing') => void
+    } = {},
+  ): Promise<LandOutcome> => {
+    input.onProgress?.('queued')
+    return serialized(thread.repoRoot, async () => {
+      input.onProgress?.('validating')
+      await input.validate?.()
       const cwd = thread.workspaceRoot
       const bookmark = options.bookmark()
 
       for (let attempt = 1; ; attempt++) {
-        await jj(['rebase', '-b', '@', '-d', bookmark, '--skip-emptied'], cwd, signal)
+        input.onProgress?.('rebasing')
+        await jj(['rebase', '-b', '@', '-d', bookmark, '--skip-emptied'], cwd, input.signal)
         const postRebase = await landRevisions(
           `((${bookmark}..@) ~ empty()) | (((${bookmark}..@) & empty()) ~ @ ~ merges() ~ working_copies()) | (@ & empty())`,
           cwd,
@@ -249,7 +265,7 @@ export const createThreads = (options: {
         )
         const leftovers = postRebase.filter(item => item.empty && !item.currentWorkingCopy).map(item => item.revision)
         if (leftovers.length > 0) {
-          await jj(['abandon', ...leftovers.map(revision => revision.commitId)], cwd, signal)
+          await jj(['abandon', ...leftovers.map(revision => revision.commitId)], cwd, input.signal)
           continue
         }
         const rebased = postRebase.filter(item => !item.empty).map(item => item.revision)
@@ -273,7 +289,7 @@ export const createThreads = (options: {
         // A bookmark only moves forward; if another writer advanced it meanwhile, rebase again onto the new tip.
         const moved = await options.executor({ args: ['bookmark', 'set', bookmark, '-r', target], cwd })
         if (moved.exitCode === 0) {
-          if (!workingCopyEmpty) await jj(['new', bookmark], cwd, signal)
+          if (!workingCopyEmpty) await jj(['new', bookmark], cwd, input.signal)
           const head = rebased[0]
           await writeRebaseMetadata(thread.repoRoot, thread.threadName, head?.changeId).catch(() => undefined)
           return { status: 'landed', revisions: rebased, head }
@@ -281,8 +297,16 @@ export const createThreads = (options: {
         if (attempt >= LAND_ATTEMPTS) throw new ThreadError('jj-failed', `Could not move ${bookmark}: ${moved.stderr.trim().slice(0, 400)}`)
       }
     })
+  }
 
-  const land = async (path: string, signal?: AbortSignal): Promise<LandOutcome> => landAt(await requireThread(path), signal)
+  const land = async (
+    path: string,
+    input: {
+      readonly signal?: AbortSignal
+      readonly validate?: () => Promise<void>
+      readonly onProgress?: (phase: 'queued' | 'validating' | 'rebasing') => void
+    } = {},
+  ): Promise<LandOutcome> => landAt(await requireThread(path), input)
 
   const discard = (input: { readonly repoRoot: string; readonly name: string; readonly force: boolean }): Promise<DiscardOutcome> =>
     serialized(input.repoRoot, async () => {

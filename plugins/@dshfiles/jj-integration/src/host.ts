@@ -44,6 +44,33 @@ const SWEEP_GRACE_MS = 15 * 60_000
 const SWEEP_INTERVAL_MS = 10 * 60_000
 /** Installs and plugin rebuilds after a large rebase take minutes. */
 const SYNC_TIMEOUT_MS = 30 * 60_000
+const INTEGRATION_PROGRESS_TTL_MS = 10 * 60_000
+const MAX_INTEGRATION_PROGRESS_ENTRIES = 256
+
+type IntegrationProgressPhase = 'queued' | 'validating' | 'rebasing'
+type IntegrationProgress = { readonly phase: IntegrationProgressPhase; readonly updatedAt: number }
+
+const integrationProgressByPath = new Map<string, IntegrationProgress>()
+const recordIntegrationProgress = (path: string, phase: IntegrationProgressPhase): void => {
+  const now = Date.now()
+  for (const [progressPath, progress] of integrationProgressByPath)
+    if (now - progress.updatedAt > INTEGRATION_PROGRESS_TTL_MS) integrationProgressByPath.delete(progressPath)
+  integrationProgressByPath.set(path, { phase, updatedAt: now })
+  while (integrationProgressByPath.size > MAX_INTEGRATION_PROGRESS_ENTRIES) {
+    const oldest = integrationProgressByPath.keys().next().value
+    if (oldest === undefined) return
+    integrationProgressByPath.delete(oldest)
+  }
+}
+
+const readIntegrationProgress = (path: string): IntegrationProgress | null => {
+  const progress = integrationProgressByPath.get(path)
+  if (progress === undefined || Date.now() - progress.updatedAt > INTEGRATION_PROGRESS_TTL_MS) {
+    integrationProgressByPath.delete(path)
+    return null
+  }
+  return progress
+}
 
 const defaultSettings: JjIntegrationSettings = jjIntegrationSettings.schema({})
 let settingsScope: SettingsScope<JjIntegrationSettings> | undefined
@@ -169,6 +196,7 @@ const threadView = (
     finished: isFinished(sessionIds, archived),
     missing: status.missing,
     behind: status.behind,
+    behindCount: status.behindCount,
     unlanded: [...status.unlanded],
   }
   const withEligibility: ThreadView = canRebase === undefined ? view : { ...view, canRebase }
@@ -361,11 +389,13 @@ const landThread = async (input: {
   readonly fromAgent: boolean
   readonly signal?: AbortSignal
 }): Promise<LandResult> => {
+  recordIntegrationProgress(input.path, 'queued')
   const bookmark = readSettings().bookmark
-  const location = await requireThreads().locate(input.path)
-  if (location.threadName !== undefined) {
-    const registry = registryOf()
-    const workspace = await registry.resolveByPath(location.workspaceRoot)
+  const activeThreads = requireThreads()
+  const location = await activeThreads.locate(input.path)
+  const validate = async (): Promise<void> => {
+    if (location.threadName === undefined) return
+    const workspace = await registryOf().resolveByPath(location.workspaceRoot)
     if (workspace === undefined) throw new PluginApiError('Could not verify thread activity before rebasing.', { code: 'thread-activity-unknown' })
     const activity = await readSessionActivity()
     const eligible = threadRebaseEligibility({
@@ -385,7 +415,11 @@ const landThread = async (input: {
   }
   const threadName = location.threadName
   if (threadName === undefined) throw new PluginApiError('This workspace is not a thread.', { code: 'not-a-thread' })
-  const outcome = await requireThreads().landAt({ ...location, threadName }, input.signal)
+  const onProgress = (phase: IntegrationProgressPhase): void => recordIntegrationProgress(input.path, phase)
+  const outcome = await activeThreads.landAt(
+    { ...location, threadName },
+    input.signal === undefined ? { validate, onProgress } : { signal: input.signal, validate, onProgress },
+  )
   const result: LandResult = {
     status: outcome.status,
     revisions: outcome.status === 'nothing-to-land' ? [] : [...outcome.revisions],
@@ -598,6 +632,7 @@ const api = jjIntegrationApi.host({
   },
   revisionGraph: async ({ input }) => ({ graph: await requireThreads().revisionGraph(input.path) }),
   land: ({ input }) => landThread({ path: input.path, sessionId: input.sessionId, fromAgent: false }),
+  integrationProgress: ({ input }) => ({ progress: readIntegrationProgress(input.path) }),
   threadStatus: async ({ input, caller }) => {
     const location = await requireThreads().locate(threadPath(input, caller))
     const found = await findThread({

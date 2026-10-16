@@ -95,8 +95,8 @@ Then('the resume list appears below the chat composer', async ({ page }: { page:
 Then('the work to rebase opens the Thread workspaces panel', async ({ page }: { page: Page }) => {
   await page.getByRole('button', { name: '1 thread has work to rebase', exact: true }).click()
   await recordAssertion(page, 'home-work-to-rebase-opens-thread-workspaces', async () => {
-    await expect(page.getByRole('heading', { name: 'Thread workspaces', exact: true })).toBeVisible()
-    await expect(page.getByText('1 to rebase', { exact: true })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Thread integration', exact: true })).toBeVisible()
+    await expect(page.getByText('1 revision(s)', { exact: true })).toBeVisible()
   })
   await finishJourneyAssertions(page)
 })

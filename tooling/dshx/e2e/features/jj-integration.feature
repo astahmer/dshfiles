@@ -160,9 +160,11 @@ Feature: jj thread workspaces
     And a message is sent in the thread workspace
     And the thread workspace gains a revision described "Panel rebase"
     And the Thread workspaces panel is opened
-    Then the thread row offers Rebase for its 1 revision to rebase
-    When Rebase is clicked in the thread workspace row
-    Then the thread workspace row immediately shows that it is up to date
+    Then the thread row offers Integrate for its 1 revision
+    When a ready workspace is selected for batch integration
+    Then Integrate selected is enabled
+    When Integrate selected is clicked
+    Then the thread workspace row immediately shows that it is integrated
 
   @scenario:jj-integration.discard-browser-journey
   Scenario: Remove a thread workspace and explicitly abandon its work
@@ -172,7 +174,7 @@ Feature: jj thread workspaces
     And a message is sent in the thread workspace
     And the thread workspace gains a revision described "Work nobody wants"
     And the Thread workspaces panel is opened
-    Then the thread row offers Rebase for its 1 revision to rebase
+    Then the thread row offers Integrate for its 1 revision
     When the conversation is opened from its workspace row
     And the Thread workspaces side panel is opened
     Then its Preview shows the latest message
