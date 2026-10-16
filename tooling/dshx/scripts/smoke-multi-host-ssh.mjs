@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
 import { once } from 'node:events'
-import { access, mkdtemp, mkdir, rm, stat } from 'node:fs/promises'
+import { access, mkdtemp, rm, stat } from 'node:fs/promises'
 import { createConnection } from 'node:net'
 import { tmpdir, homedir } from 'node:os'
 import { join } from 'node:path'
@@ -123,17 +123,18 @@ const openTunnel = async remoteListenPort => {
   })
   const stderr = []
   server.stderr.on('data', chunk => stderr.push(String(chunk)))
-  const localPort = await new Promise((resolve, reject) => {
+  await new Promise((resolve, reject) => {
     const probe = setInterval(() => {
       const socket = createConnection({ host: tunnelHost, port: localSpecPort })
       socket.once('connect', () => {
         clearInterval(probe)
+        clearTimeout(timeout)
         socket.destroy()
-        resolve(localSpecPort)
+        resolve()
       })
       socket.once('error', () => socket.destroy())
     }, 200)
-    setTimeout(() => {
+    const timeout = setTimeout(() => {
       clearInterval(probe)
       reject(new Error(redact(`tunnel did not open: ${stderr.join('')}`)))
     }, 15_000)
@@ -278,7 +279,6 @@ try {
 
   note('remote platform attach')
   const platform = await connectDshPlatformClient({ url: `http://${tunnelHost}:${tunnel.localPort}/?token=${new URL(remoteUrl).searchParams.get('token')}` })
-  const remoteSessionsBefore = await platform.sessions.list()
   const remoteSession = await platform.sessions.create({ cwd: remoteWorkspace })
   await platform.sessions.rename(remoteSession.sessionId, 'Remote proof')
   const remoteSessions = await platform.sessions.list()
@@ -365,20 +365,19 @@ try {
   const stateList = await gateway.run('terminal', 'list', { sessionId: remoteSession.sessionId })
   assert.equal(stateList[0]?.state, 'exited')
   checks.push('remote PTY: workspace placement file written only through the remote shell, resize ownership enforced, exit state reported')
-  assert.rejects(access(`${process.cwd()}/${markerName}`, undefined))
+  await assert.rejects(access(`${process.cwd()}/${markerName}`), { code: 'ENOENT' })
   await remote(`test -f ${quoteRemoteArgument(markerRemotePath)} && rm -f ${quoteRemoteArgument(markerRemotePath)}`)
   checks.push('marker exists on the remote filesystem only')
 
-  const wrongToken = await gateway.runSafe('session', 'list', {})
-  assert.ok(wrongToken.ok !== undefined)
+  const authenticatedProbe = await gateway.runSafe('session', 'list', {})
+  assert.equal(authenticatedProbe.ok, true)
 
   await tunnel.close()
   tunnels.delete(tunnel)
   await assert.rejects(platform.sessions.list(), { code: 'rpc-unreachable' })
-  const refreshedCookie = cookie
   const rebuilt = await openTunnel(remoteListenPort)
   tunnels.add(rebuilt)
-  const rebuiltGateway = makeGateway({ localPort: rebuilt.localPort, cookie: refreshedCookie })
+  const rebuiltGateway = makeGateway({ localPort: rebuilt.localPort, cookie })
   const persisted = await rebuiltGateway.runSafe('session', 'list', { _request: {} })
   assert.ok(persisted.ok, 'the same runtime cookie keeps authenticating after the tunnel is rebuilt')
   checks.push('tunnel loss leaves the runtime and durable session identity intact; reconnect restores native access')
@@ -432,14 +431,14 @@ try {
   assert.equal(stale.ok, true, `the pre-restart cookie stays valid because DSH keeps a durable signed-cookie authority: ${stale.message}`)
   checks.push('pre-restart cookie remains authenticated across restart (durable signing authority); wrong tokens still fail closed')
 
-  wrong: {
+  {
     const badUrl = new URL(`http://${tunnelHost}:39335/`)
     badUrl.searchParams.set('token', 'definitely-wrong')
     await assert.rejects(connectDshPlatformClient({ url: badUrl.toString() }), { code: 'authentication-failed' })
     checks.push('wrong launch token is rejected by the native runtime')
   }
 
-  unreachable: {
+  {
     const stopping = new WebSocket('ws://127.0.0.1:39335/api/remote.mux', { handshakeTimeout: 5000 })
     await new Promise(resolve => {
       stopping.on('error', () => resolve())
