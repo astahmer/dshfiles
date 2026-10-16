@@ -162,6 +162,11 @@ export const memoryApi = defineApi({
       description: MemoryGuidance.readDescription,
       tool: { name: 'memory_read', readOnly: true, render: output => output.summary },
     }),
+    preview: method({
+      input: readInput,
+      output: toolOutput,
+      description: 'Read one digest, note or bounded thread excerpt for a UI preview without counting it as an agent memory-tool call.',
+    }),
     note: method({
       input: noteInput,
       output: toolOutput,

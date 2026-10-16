@@ -343,6 +343,7 @@ const withRuntime = async (body: (active: MemoryRuntime) => Promise<string>): Pr
 const panelApi = memoryApi.host({
   search: ({ input, caller }) => withRuntime(active => active.search(callerOf(caller), input)),
   read: ({ input, caller }) => withRuntime(active => active.read(callerOf(caller), input)),
+  preview: ({ input }) => withRuntime(active => active.preview(input)),
   note: ({ input, caller }) => withRuntime(active => active.note(callerOf(caller), input)),
   usage: () => usage(),
   projects: async () => {

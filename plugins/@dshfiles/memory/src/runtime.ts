@@ -425,11 +425,15 @@ export const createMemoryRuntime = (options: {
     ].join('\n')
   }
 
-  const read = async (caller: Caller, args: { readonly id: string; readonly range?: string | undefined }): Promise<string> => {
+  const readMemory = async (args: { readonly id: string; readonly range?: string | undefined }, caller?: Caller): Promise<string> => {
+    const recordRead = (results: number, ids: readonly string[]): void => {
+      if (caller === undefined) return
+      store.recordToolCall({ thread: caller.id, tool: 'memory_read', results, ids })
+    }
     const id = args.id.trim().replace(/^`|`$/g, '')
     if (/^n:\d+$/i.test(id)) {
       const note = store.note(Number(id.slice(2)))
-      store.recordToolCall({ thread: caller.id, tool: 'memory_read', results: note === undefined ? 0 : 1, ids: [id.toLowerCase()] })
+      recordRead(note === undefined ? 0 : 1, [id.toLowerCase()])
       if (!note) return `No valid note ${id} (it may have been updated or forgotten; search for its topic).`
       return `${id} [${note.category}, ${note.scope}, ${note.confidence}] ${day(note.createdAt)}${note.sourceThread === null ? '' : ` from t:${shortId(note.sourceThread)}`}${note.supersedes === null ? '' : `, supersedes n:${note.supersedes}`}\n${note.text}`
     }
@@ -438,7 +442,7 @@ export const createMemoryRuntime = (options: {
     const sessionId = thread?.id ?? (threadKey.startsWith('session-') ? threadKey : undefined)
     const ids = [`t:${shortId(sessionId ?? threadKey)}`]
     if (args.range === undefined || args.range.trim().length === 0) {
-      store.recordToolCall({ thread: caller.id, tool: 'memory_read', results: thread === undefined ? 0 : 1, ids })
+      recordRead(thread === undefined ? 0 : 1, ids)
       if (!thread) return `No digest for ${id}. It may still be running, trivial, or past retention; memory_search finds its messages.`
       return `${ids[0]} digest (${day(thread.updatedAt)}, ${basename(thread.project)}, ${thread.source === 'model' ? 'written by a model' : 'from the thread record'}). ${MemoryGuidance.untrusted}\n${thread.digest}`
     }
@@ -479,11 +483,14 @@ export const createMemoryRuntime = (options: {
       lines.push(clipped)
       bytes += Utf8.byteLength(clipped)
     }
-    store.recordToolCall({ thread: caller.id, tool: 'memory_read', results: lines.length, ids })
+    recordRead(lines.length, ids)
     return lines.length === 0
       ? `No messages in ${ids[0]} between #${from} and #${to}.`
       : [`${ids[0]} #${from}-#${to}. ${MemoryGuidance.untrusted}`, ...lines].join('\n')
   }
+
+  const read = (caller: Caller, args: { readonly id: string; readonly range?: string | undefined }): Promise<string> => readMemory(args, caller)
+  const preview = (args: { readonly id: string; readonly range?: string | undefined }): Promise<string> => readMemory(args)
 
   const note = async (
     caller: Caller,
@@ -561,6 +568,7 @@ export const createMemoryRuntime = (options: {
     catchUp,
     search,
     read,
+    preview,
     note,
     projectOf,
     stop: (): void => {

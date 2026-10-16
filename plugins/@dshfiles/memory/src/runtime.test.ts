@@ -172,6 +172,9 @@ describe('memory runtime', () => {
     expect(digest).toContain('INC-20931')
     const excerpt = await runtime.read(reader, { id: 't:11111111', range: '0-4' })
     expect(excerpt).toContain('#1 user: Our biggest customer is Northwind Freight')
+    const usageBeforePreview = store.usage().tools
+    expect(await runtime.preview({ id: 't:11111111' })).toContain('INC-20931')
+    expect(store.usage().tools).toEqual(usageBeforePreview)
     runtime.onSessionEvent({ id: 'session-reader' }, {
       type: 'assistant/message',
       seq: 9,
@@ -180,6 +183,24 @@ describe('memory runtime', () => {
     } as never)
     expect(store.usage().tools.find(tool => tool.tool === 'memory_search')?.used).toBe(1)
     expect(store.thread('11111111')?.uses).toBe(1)
+  })
+
+  it('previews a note without recording an agent memory-tool call', async () => {
+    const { runtime, store } = setup()
+    store.addNote({
+      project: root,
+      text: 'Deploys need the ops approval label.',
+      category: 'project',
+      scope: 'repo',
+      confidence: 'stated',
+      sourceThread: null,
+      sourceSeq: null,
+      origin: 'agent',
+    })
+
+    const usage = store.usage().tools
+    expect(await runtime.preview({ id: 'n:1' })).toContain('Deploys need the ops approval label.')
+    expect(store.usage().tools).toEqual(usage)
   })
 
   it.skipIf(!jjAvailable)('shares project notes between a jj checkout and its thread workspace', async () => {

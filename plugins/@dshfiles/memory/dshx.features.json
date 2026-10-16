@@ -210,7 +210,7 @@
     {
       "id": "memory-tools",
       "title": "Search, read and note memory from any agent",
-      "summary": "memory_search ranks (BM25, or hybrid with a configured local embedding provider) digests, valid notes and indexed messages (porter words plus trigram identifiers, BM25 fused by reciprocal rank, recency decay, project and note-type boosts); memory_read opens a digest, a note or a bounded raw excerpt; memory_note adds, supersedes (with a reason) or forgets (with a reason) notes typed user, feedback, project or reference. A `memory: <id>` citation in a reply counts as use. The three tools are dshx API methods (dshfiles-memory search, read, note) opted into the agent registry, so other plugins and Clients call the same code.",
+      "summary": "memory_search ranks (BM25, or hybrid with a configured local embedding provider) digests, valid notes and indexed messages (porter words plus trigram identifiers, BM25 fused by reciprocal rank, recency decay, project and note-type boosts); memory_read opens a digest, a note or a bounded raw excerpt; memory_note adds, supersedes (with a reason) or forgets (with a reason) notes typed user, feedback, project or reference. A `memory: <id>` citation in a reply counts as use and becomes an inline preview link. The three tools are dshx API methods (dshfiles-memory search, read, note) opted into the agent registry, and `preview` serves the link UI without logging a tool call.",
       "surfaces": ["host", "tool", "storage", "api"],
       "configuration": [
         {
@@ -297,6 +297,47 @@
         }
       ],
       "reach": ["click button \"Memory\"", "expect tab \"Notes\""]
+    },
+    {
+      "id": "memory-reference-preview",
+      "title": "Preview cited memory inline",
+      "summary": "Memory citations in conversation messages are clickable links that show the relevant note, thread digest or bounded message excerpt inline; preview reads do not create synthetic memory-tool usage records.",
+      "surfaces": ["client", "api"],
+      "configuration": [],
+      "states": ["idle", "loading", "note", "digest", "excerpt", "unavailable"],
+      "failureModes": [
+        "A missing or stale reference shows an inline error without failing the conversation.",
+        "Opening a preview does not record another agent memory-tool call."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "memory.reference-preview",
+          "featureFile": "tooling/dshx/e2e/features/memory.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "memory.reference-syntax",
+          "file": "plugins/@dshfiles/memory/src/memory-reference.test.ts",
+          "testName": "extracts note, digest and message references only from memory citations"
+        },
+        {
+          "kind": "unit-test",
+          "id": "memory.preview-no-usage",
+          "file": "plugins/@dshfiles/memory/src/runtime.test.ts",
+          "testName": "previews a note without recording an agent memory-tool call"
+        }
+      ],
+      "reach": [
+        "click button \"New thread\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"memory: n:1\"",
+        "press Enter",
+        "expect link \"Preview memory n:1\"",
+        "click link \"Preview memory n:1\"",
+        "expect text \"Memory · n:1\"",
+        "expect text \"No valid note n:1*\""
+      ]
     },
     {
       "id": "usage-telemetry",

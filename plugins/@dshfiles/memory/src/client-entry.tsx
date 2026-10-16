@@ -6,6 +6,8 @@ import { defineClient } from '@dshfiles/dshx/client'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 
 import { MemoryPanel } from './memory-panel.tsx'
+import { installMemoryReferenceLinks } from './memory-reference-links.ts'
+import { MemoryReferenceOverlay } from './memory-reference-overlay.tsx'
 import './client.css'
 
 const PANEL_ID = 'dshfiles-memory-panel'
@@ -14,6 +16,7 @@ export default defineClient({
   name: '@dshfiles/memory',
   inject: ['slots', 'sessions', 'uiWorkspace'],
   setup(ctx, decorate) {
+    ctx.effect(() => installMemoryReferenceLinks(), 'memory reference links')
     const PanelView = (): JSX.Element => (
       <PluginQueryProvider>
         <MemoryPanel
@@ -24,8 +27,16 @@ export default defineClient({
         />
       </PluginQueryProvider>
     )
+    const ReferenceOverlay = (): JSX.Element => (
+      <PluginQueryProvider>
+        <MemoryReferenceOverlay />
+      </PluginQueryProvider>
+    )
     ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 4, label: 'Memory' }, PanelGlyph))
     ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: PANEL_ID }, decorate(PanelView)))
+    ctx.slots.inject('shell.overlay', () =>
+      ctx.slots.register({ name: 'shell.overlay', id: 'dshfiles-memory-reference-preview', order: 120 }, decorate(ReferenceOverlay)),
+    )
   },
 })
 

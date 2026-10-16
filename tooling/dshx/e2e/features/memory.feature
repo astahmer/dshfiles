@@ -1,7 +1,8 @@
 Feature: Thread memory panel
 
   The Memory panel shows what @dshfiles/memory keeps: notes by type with their
-  history, thread digests, and whether agents use and cite memory.
+  history, thread digests, and whether agents use and cite memory. Conversation
+  citations open their referenced note or digest inline.
 
   @scenario:memory.panel-notes
   Scenario: Edit a note with a reason, read its history, then forget it
@@ -17,3 +18,10 @@ Feature: Thread memory panel
     Given the isolated plugin profile "@dshfiles/memory" is booted
     When the Memory panel is opened
     Then the Usage tab shows the memory counters and the usage per day
+
+  @scenario:memory.reference-preview
+  Scenario: Open a cited note inline from a conversation
+    Given the isolated plugin profile "@dshfiles/memory" is booted
+    And memory holds the project note "Deploys need the ops approval label."
+    When a fresh thread cites memory "n:1"
+    Then the inline memory preview shows "Deploys need the ops approval label."

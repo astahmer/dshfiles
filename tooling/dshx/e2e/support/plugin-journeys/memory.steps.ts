@@ -28,6 +28,25 @@ When('the Memory panel is opened', async ({ page }: { page: Page }) => {
   await expect(page.getByRole('tablist', { name: 'Memory views' })).toBeVisible()
 })
 
+When('a fresh thread cites memory {string}', async ({ page }: { page: Page }, id: string) => {
+  await page.getByRole('button', { name: /^New (thread|session)$/i }).filter({ visible: true }).first().click()
+  const composer = page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })
+  await expect(composer).toBeVisible()
+  await composer.fill(`memory: ${id}`)
+  await composer.press('Enter')
+  await expect(page.getByRole('textbox', { name: 'Message or run a task, / commands, @ files or sessions', exact: true })).toBeVisible()
+})
+
+Then('the inline memory preview shows {string}', async ({ page }: { page: Page }, text: string) => {
+  await recordAssertion(page, 'memory-reference-inline-preview', async () => {
+    const reference = page.locator('[data-dshfiles-memory-reference="n:1"]')
+    await expect(reference).toBeVisible()
+    await reference.click()
+    await expect(page.getByRole('dialog')).toContainText(text)
+  })
+  await finishJourneyAssertions(page)
+})
+
 Then('the note {string} is listed under Project', async ({ page }: { page: Page }, text: string) => {
   await recordAssertion(page, 'memory-panel-lists-note-by-type', async () => {
     await expect(page.getByRole('heading', { name: /^Project/ })).toBeVisible()

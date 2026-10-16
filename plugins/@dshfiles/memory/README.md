@@ -23,12 +23,15 @@ Cross-thread, cross-project memory for DSH that leaves the live context and the 
   bounded raw excerpt read back from the session log), `memory_note` (add, update with a reason — the old row stays as
   superseded history — or forget with a reason). Note types follow Claude Code: `user`, `feedback`, `project`,
   `reference`, with `scope`, `confidence` and the source thread and message.
-- **One registry.** The tools are `dshfiles-memory` API methods (`search`, `read`, `note`) opted into dshx's agent
-  registry, so the agent, other Host plugins and Clients call the same handlers; `usage` and `citations` serve memory's
-  statistics the same way, and `startBlock({ cwd })` previews the block a new thread in a folder would get (the Agent
-  toolkit page shows it). Other plugins import the contract from `@dshfiles/memory/api`.
+- **One registry.** The agent tools are `dshfiles-memory` API methods (`search`, `read`, `note`) opted into dshx's
+  agent registry, so the agent, other Host plugins and Clients call the same handlers; `preview` serves the UI without
+  recording a tool call, while `usage` and `citations` expose memory's statistics. `startBlock({ cwd })` previews the
+  block a new thread in a folder would get (the Agent toolkit page shows it). Other plugins import the contract from
+  `@dshfiles/memory/api`.
 - **Citations as usage.** The block asks agents to cite memory they used as `memory: <id>`. A citation marks the tool
-  call that returned the id as used and ranks the cited item higher in later blocks.
+  call that returned the id as used and ranks the cited item higher in later blocks. In conversation replies, citations
+  are clickable links that open an inline preview of the note, digest or bounded message excerpt. The UI uses the
+  `preview` API method, which does not create a synthetic memory-tool usage record.
 - **Memory panel** (sidebar → Memory): notes by type with their source (project, thread, message, who wrote it,
   created and updated), inline edit and forget, superseded history, markdown preview through DSH's own
   `MarkdownText`; thread digests by project; usage: cost per day, start-block size and the requests that carried
