@@ -4,7 +4,7 @@ import { LocateFixedIcon, XIcon } from '@dshfiles/plugin-ui/icons'
 import { errorMessage } from '@dshfiles/plugin-ui/query'
 import { useState } from 'react'
 import type { Revision } from './api.js'
-import { matchesRevisionSearch } from './graph.js'
+import { RevisionGraphModel } from './graph.js'
 import { GraphNavigationModel } from './graph-navigation.js'
 import type { useGraphNavigation } from './use-graph-navigation.js'
 
@@ -61,7 +61,7 @@ export const RelationshipInspector = ({ navigation, selected, revisions, onLocat
   const [search, setSearch] = useState('')
   const relationship = navigation.relationshipQuery.data
   const subjectLabel = selected.workingCopy ? 'Current' : selected.shortestChangeId
-  const candidates = revisions.filter(revision => matchesRevisionSearch(revision, search)).slice(0, 50)
+  const candidates = revisions.filter(revision => RevisionGraphModel.matchesRevisionSearch(revision, search)).slice(0, 50)
   const target = relationship?.revisions.find(revision => revision.commitId === relationship.targetCommitId)
   const unavailableLandmark =
     navigation.targetKey !== 'revision' && navigation.comparisonTarget !== undefined && navigation.comparisonTarget.status !== 'resolved'

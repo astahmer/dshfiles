@@ -49,10 +49,10 @@ export interface GraphParentLink {
 }
 
 /** Ignore JJ's canonical trailing newline when comparing the editable description. */
-export const describeDraftChanged = (draft: string, current: string): boolean => draft.replace(/\n+$/, '') !== current.replace(/\n+$/, '')
+const describeDraftChanged = (draft: string, current: string): boolean => draft.replace(/\n+$/, '') !== current.replace(/\n+$/, '')
 
 /** Search full IDs and the user-visible revision labels. */
-export const matchesRevisionSearch = (revision: SearchableRevision, query: string): boolean => {
+const matchesRevisionSearch = (revision: SearchableRevision, query: string): boolean => {
   const needle = query.trim().toLocaleLowerCase()
   if (needle.length === 0) return true
   return [
@@ -70,7 +70,7 @@ export const matchesRevisionSearch = (revision: SearchableRevision, query: strin
 }
 
 /** Collapse hidden parents into explicit links to the nearest visible ancestors. */
-export const graphParentLinks = (
+const graphParentLinks = (
   revision: ParentRevision,
   revisionsById: ReadonlyMap<string, ParentRevision>,
   hideImmutable: boolean,
@@ -259,7 +259,7 @@ const orderBranches = (input: {
  * whose run and turns cross no other lane, and are reused only once a branch has ended. Returns the rows in
  * display order; a parent outside the loaded graph ends in a stub.
  */
-export const layoutRevisionGraph = (
+const layoutRevisionGraph = (
   revisions: readonly LayoutRevision[],
   revisionsById: ReadonlyMap<string, ParentRevision>,
   hideImmutable: boolean,
@@ -443,4 +443,11 @@ export const layoutRevisionGraph = (
       ],
     }
   })
+}
+
+export class RevisionGraphModel {
+  static readonly describeDraftChanged = describeDraftChanged
+  static readonly matchesRevisionSearch = matchesRevisionSearch
+  static readonly graphParentLinks = graphParentLinks
+  static readonly layoutRevisionGraph = layoutRevisionGraph
 }

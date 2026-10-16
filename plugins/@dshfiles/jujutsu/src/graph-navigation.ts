@@ -1,5 +1,5 @@
 import type { Revision } from './api.js'
-import { matchesRevisionSearch } from './graph.js'
+import { RevisionGraphModel } from './graph.js'
 
 export interface GraphViewFilter {
   readonly kind: 'history' | 'difference' | 'connection'
@@ -46,7 +46,7 @@ export class GraphNavigationModel {
       if (filters.mineOnly && !revision.mine && !revision.workingCopy) return false
       if (filters.hideImmutable && revision.immutable) return false
       if (filters.author && !revision.author.toLocaleLowerCase().includes(filters.author.toLocaleLowerCase())) return false
-      if (!matchesRevisionSearch(revision, filters.text)) return false
+      if (!RevisionGraphModel.matchesRevisionSearch(revision, filters.text)) return false
       const timestamp = Date.parse(revision.authorTime)
       if (filters.fromDate && Number.isFinite(timestamp) && timestamp < Date.parse(filters.fromDate + 'T00:00:00')) return false
       if (filters.toDate && Number.isFinite(timestamp) && timestamp > Date.parse(filters.toDate + 'T23:59:59')) return false

@@ -80,7 +80,7 @@ import type { GraphLandmark, Mutation, ReadFailure, Revision } from './api.js'
 import { resolveChatReference } from './chat-reference.js'
 import { ChangedFiles, FileViewToggle, LineCounts } from './changed-files.js'
 import { FullDiffDialog } from './full-diff-dialog.js'
-import { describeDraftChanged, layoutRevisionGraph, type GraphLane, type RevisionGraphRow } from './graph.js'
+import { RevisionGraphModel, type GraphLane, type RevisionGraphRow } from './graph.js'
 import { jujutsuApi } from './api.js'
 import { useAutoRefresh } from './auto-refresh.js'
 import { openInEditor } from './open-in-editor.js'
@@ -511,7 +511,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
       hidden: navigation.hidden,
       revealed: new Set(navigation.revealed.map(row => row.commitId)),
     })
-    return layoutRevisionGraph(graphRevisions, revisionsByCommitId, false)
+    return RevisionGraphModel.layoutRevisionGraph(graphRevisions, revisionsByCommitId, false)
   }, [
     allRevisions,
     revisionsByCommitId,
@@ -965,7 +965,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     const parent = revisionsByCommitId.get(revision.parents[0] ?? '')
     const visibleFiles = details?.files.filter(file => !hideReviewedFiles || !isFileReviewed(reviewStore, repositoryRoot, revision.commitId, file)) ?? []
     const describeText = describeDrafts[revision.commitId] ?? editableDescription(revision.description)
-    const describeChanged = describeDraftChanged(describeText, revision.description)
+    const describeChanged = RevisionGraphModel.describeDraftChanged(describeText, revision.description)
     const editing = editingDescription === revision.commitId && !revision.immutable
     return (
       <div className="dshx:flex dshx:flex-col dshx:gap-2 dshx:py-2 dshx:pr-3 dshx:text-xs">

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import type { Revision } from './api.ts'
-import { layoutRevisionGraph, type GraphLink, type RevisionGraphRow } from './graph.ts'
+import { RevisionGraphModel, type GraphLink, type RevisionGraphRow } from './graph.ts'
 
 type FixtureRevision = Pick<Revision, 'commitId' | 'parents' | 'shortestChangeId' | 'immutable' | 'bookmarks'>
 
@@ -21,7 +21,7 @@ const chain = (prefix: string, count: number, base: string | undefined, options:
   })
 
 const layout = (revisions: readonly FixtureRevision[], hideImmutable = false, all: readonly FixtureRevision[] = revisions): readonly RevisionGraphRow[] =>
-  layoutRevisionGraph(revisions, new Map(all.map(row => [row.commitId, row])), hideImmutable)
+  RevisionGraphModel.layoutRevisionGraph(revisions, new Map(all.map(row => [row.commitId, row])), hideImmutable)
 
 const ids = (rows: readonly RevisionGraphRow[]): string[] => rows.map(row => row.commitId)
 
@@ -206,7 +206,7 @@ describe('lane allocation', () => {
     const feature = revision('feature', ['foreign'])
     const foreign = revision('foreign', ['trunk'])
     const trunkRow = revision('trunk', [], { bookmarks: ['main'], immutable: true })
-    const rows = layoutRevisionGraph([feature, trunkRow], new Map([feature, foreign, trunkRow].map(row => [row.commitId, row])), false)
+    const rows = RevisionGraphModel.layoutRevisionGraph([feature, trunkRow], new Map([feature, foreign, trunkRow].map(row => [row.commitId, row])), false)
     expect(rowOf(rows, 'feature').outgoing).toEqual([{ fromLane: 1, toLane: 0, color: rowOf(rows, 'feature').color, dashed: true, terminal: false }])
   })
 

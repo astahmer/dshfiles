@@ -27,7 +27,7 @@ import { useApi } from '@dshfiles/dshx/client'
 import { useMemo, useState, type ReactNode } from 'react'
 import { jujutsuApi, type FileStat, type Mutation, type Revision } from './api.js'
 import { ChangedFiles, FileViewToggle, type FileView } from './changed-files.js'
-import { describeDraftChanged } from './graph.js'
+import { RevisionGraphModel } from './graph.js'
 import type { refreshQueryOptions } from './auto-refresh.js'
 import { ANCESTOR_COUNT_OPTIONS } from './preferences.js'
 import { SourceControlModel } from './source-control.js'
@@ -101,7 +101,7 @@ export const SourceControlView = (props: SourceControlViewProps): JSX.Element =>
 
   const message =
     workingCopy === undefined ? '' : messageDraft?.commitId === workingCopy.commitId ? messageDraft.text : workingCopy.description.replace(/\n+$/, '')
-  const messageChanged = workingCopy !== undefined && describeDraftChanged(message, workingCopy.description)
+  const messageChanged = workingCopy !== undefined && RevisionGraphModel.describeDraftChanged(message, workingCopy.description)
   const commitMessage = message.trim()
 
   const commit = (): void => {
@@ -288,7 +288,7 @@ export const SourceControlView = (props: SourceControlViewProps): JSX.Element =>
                       Cancel
                     </Button>
                     <Button
-                      disabled={props.busy || !describeDraftChanged(describeText, revision.description)}
+                      disabled={props.busy || !RevisionGraphModel.describeDraftChanged(describeText, revision.description)}
                       onClick={() => {
                         props.onAction({ kind: 'describe', commitId: revision.commitId, message: describeText })
                         setDescribing(null)

@@ -12,7 +12,7 @@ import {
   rootFileFileset,
   validatedRepositoryPath,
 } from './core.ts'
-import { describeDraftChanged, graphParentLinks, matchesRevisionSearch } from './graph.ts'
+import { RevisionGraphModel } from './graph.ts'
 
 const id = 'a'.repeat(40)
 const otherId = 'b'.repeat(40)
@@ -80,15 +80,15 @@ test('revision text search includes full IDs and all requested labels', () => {
     tags: ['v1.0'],
     workspaces: ['feature-workspace'],
   }
-  assert.equal(matchesRevisionSearch(revision, 'd'.repeat(40)), true)
-  assert.equal(matchesRevisionSearch(revision, 'c'.repeat(40)), true)
-  assert.equal(matchesRevisionSearch(revision, 'feature-workspace'), true)
-  assert.equal(matchesRevisionSearch(revision, 'unmatched'), false)
+  assert.equal(RevisionGraphModel.matchesRevisionSearch(revision, 'd'.repeat(40)), true)
+  assert.equal(RevisionGraphModel.matchesRevisionSearch(revision, 'c'.repeat(40)), true)
+  assert.equal(RevisionGraphModel.matchesRevisionSearch(revision, 'feature-workspace'), true)
+  assert.equal(RevisionGraphModel.matchesRevisionSearch(revision, 'unmatched'), false)
 })
 
 test('JJ canonical trailing newlines do not leave describe action permanently dirty', () => {
-  assert.equal(describeDraftChanged('updated description', 'updated description\n'), false)
-  assert.equal(describeDraftChanged('changed description', 'updated description\n'), true)
+  assert.equal(RevisionGraphModel.describeDraftChanged('updated description', 'updated description\n'), false)
+  assert.equal(RevisionGraphModel.describeDraftChanged('changed description', 'updated description\n'), true)
 })
 
 test('hiding immutable revisions retains explicit ancestry links to visible parents', () => {
@@ -101,8 +101,8 @@ test('hiding immutable revisions retains explicit ancestry links to visible pare
     [otherId, middle],
     [topId, top],
   ])
-  assert.deepEqual(graphParentLinks(top, byId, true), [{ commitId: id, label: 'base', hiddenParentCount: 1, terminal: false }])
-  assert.deepEqual(graphParentLinks(top, byId, false), [{ commitId: otherId, label: 'middle', hiddenParentCount: 0, terminal: false }])
+  assert.deepEqual(RevisionGraphModel.graphParentLinks(top, byId, true), [{ commitId: id, label: 'base', hiddenParentCount: 1, terminal: false }])
+  assert.deepEqual(RevisionGraphModel.graphParentLinks(top, byId, false), [{ commitId: otherId, label: 'middle', hiddenParentCount: 0, terminal: false }])
 })
 
 test('diff parser counts patch lines, skips headers, and maps file names', () => {

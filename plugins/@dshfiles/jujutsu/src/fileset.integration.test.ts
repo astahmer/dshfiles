@@ -8,7 +8,7 @@ import { z } from 'zod'
 import { buildMutationArgv, fileStatusLetter, parseJsonLines, parsePatchStats, rootFileFileset } from './core.ts'
 import { revisionSchema, type Mutation } from './api.ts'
 import { EVOLUTION_TEMPLATE, FILE_STATS_TEMPLATE, REVISION_TEMPLATE } from './jj-templates.ts'
-import { describeDraftChanged } from './graph.ts'
+import { RevisionGraphModel } from './graph.ts'
 
 const runJj = (cwd: string, home: string, argv: readonly string[]): string => {
   const result = spawnSync(process.env.JJ_TEST_EXECUTABLE ?? 'jj', [...argv], {
@@ -81,7 +81,7 @@ test('literal root-file filesets select and split exact space, Unicode, and meta
   const described = revisions().find(revision => revision.workingCopy)
   assert.ok(described)
   assert.equal(described.description, 'description smoke\n')
-  assert.equal(describeDraftChanged('description smoke', described.description), false)
+  assert.equal(RevisionGraphModel.describeDraftChanged('description smoke', described.description), false)
 
   const evolution = parseJsonLines(
     runJj(repo, home, ['evolog', '--no-graph', '--revisions', described.commitId, '--limit', '30', '--template', EVOLUTION_TEMPLATE]),
