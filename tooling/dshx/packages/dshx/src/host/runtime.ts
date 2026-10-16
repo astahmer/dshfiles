@@ -25,14 +25,7 @@ import { registerApi } from '../api/host-runtime.js'
 import { apiRegistry } from '../api/registry.js'
 import { apiHostRegistrationParts, isApiHostRegistration } from '../api/define.js'
 import type { SettingsContract, SettingsContribution, SettingsHostContribution } from '../settings/types.js'
-import {
-  isSettingsContract,
-  isSettingsHostContribution,
-  settingsContributionContract,
-  settingsHostContributionParts,
-  settingsSchemaContainsSecret,
-  settingsSchemaHasUnsafeSecretPath,
-} from '../settings/define.js'
+import { SettingsDefinitionModel } from '../settings/define.js'
 import { promptContributionKind, promptContributionParts } from './define.js'
 
 const HOST_DEFINITION_KEYS = new Set(['name', 'inject', 'tools', 'commands', 'prompts', 'Config', 'settings', 'apis', 'setup'])
@@ -88,7 +81,7 @@ export function isStandardSchema(value: unknown): value is StandardSchemaV1 {
 }
 
 function settingsContract(contribution: SettingsContribution): SettingsContract<any, any> {
-  return settingsContributionContract(contribution)
+  return SettingsDefinitionModel.contributionContract(contribution)
 }
 
 function validateSettingsContract(value: unknown, metadata: HostPluginMetadata, index: number): SettingsContract<any, any> {
@@ -96,7 +89,7 @@ function validateSettingsContract(value: unknown, metadata: HostPluginMetadata, 
   const keys = ['namespace', 'schema', 'applies', 'client', 'host']
   if (
     source === undefined ||
-    !isSettingsContract(value) ||
+    !SettingsDefinitionModel.isContract(value) ||
     typeof source.namespace !== 'string' ||
     typeof source.schema !== 'function' ||
     (source.applies !== 'live' && source.applies !== 'restart') ||
@@ -119,7 +112,7 @@ function validateSettingsContract(value: unknown, metadata: HostPluginMetadata, 
       'Use client: { decode(value) { ... } } or remove client when the Host and Client values are identical.',
     )
   }
-  if (settingsSchemaContainsSecret(source.schema as SettingsContract['schema']) && client?.decode === undefined) {
+  if (SettingsDefinitionModel.schemaContainsSecret(source.schema as SettingsContract['schema']) && client?.decode === undefined) {
     fail(
       'DSHX2002',
       `Host Settings ${JSON.stringify(source.namespace)} contains secret fields without a Client decoder.`,
@@ -127,7 +120,7 @@ function validateSettingsContract(value: unknown, metadata: HostPluginMetadata, 
       'Provide client: { decode(redactedValue) { ... } } and return a Client-safe value with secret fields removed.',
     )
   }
-  if (settingsSchemaHasUnsafeSecretPath(source.schema as SettingsContract['schema'])) {
+  if (SettingsDefinitionModel.schemaHasUnsafeSecretPath(source.schema as SettingsContract['schema'])) {
     fail(
       'DSHX2002',
       `Host Settings ${JSON.stringify(source.namespace)} contains a secret reachable through a union, intersection, transform, or unsupported schema path.`,
@@ -147,8 +140,8 @@ function validateSettingsContract(value: unknown, metadata: HostPluginMetadata, 
 }
 
 function validateSettingsContribution(value: unknown, metadata: HostPluginMetadata, index: number): SettingsContribution {
-  if (isSettingsContract(value)) return validateSettingsContract(value, metadata, index)
-  if (!isSettingsHostContribution(value)) {
+  if (SettingsDefinitionModel.isContract(value)) return validateSettingsContract(value, metadata, index)
+  if (!SettingsDefinitionModel.isHostContribution(value)) {
     fail(
       'DSHX2002',
       `Host definition settings contains a malformed Settings contribution at index ${index}.`,
@@ -156,7 +149,7 @@ function validateSettingsContribution(value: unknown, metadata: HostPluginMetada
       'Use settings: [contract] or settings: [contract.host({ base, validate, setup })].',
     )
   }
-  const contribution = settingsHostContributionParts(value)
+  const contribution = SettingsDefinitionModel.hostContributionParts(value)
   validateSettingsContract(contribution.contract, metadata, index)
   const options = record(contribution.options)
   if (
@@ -187,7 +180,7 @@ function validateSettingsContribution(value: unknown, metadata: HostPluginMetada
 /** Protocol 2 derives its editable form from Config; this registers only page policy and cleanup. */
 function registerSettings(ctx: Context, contribution: SettingsContribution): void {
   const contract = settingsContract(contribution)
-  const options = isSettingsHostContribution(contribution) ? settingsHostContributionParts(contribution).options : undefined
+  const options = SettingsDefinitionModel.isHostContribution(contribution) ? SettingsDefinitionModel.hostContributionParts(contribution).options : undefined
   const namespace = contract.namespace as SettingsNamespace
   const scope: SettingsScope = {
     namespace: contract.namespace,

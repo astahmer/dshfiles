@@ -57,7 +57,7 @@ function secretAnalysis(schema: z<any, object>): { readonly contains: boolean; r
   return visit(String(json.data.uid))
 }
 
-export function settingsSchemaContainsSecret(schema: z<any, object>): boolean {
+function settingsSchemaContainsSecret(schema: z<any, object>): boolean {
   try {
     return secretAnalysis(schema).contains
   } catch {
@@ -65,7 +65,7 @@ export function settingsSchemaContainsSecret(schema: z<any, object>): boolean {
   }
 }
 
-export function settingsSchemaHasUnsafeSecretPath(schema: z<any, object>): boolean {
+function settingsSchemaHasUnsafeSecretPath(schema: z<any, object>): boolean {
   try {
     return secretAnalysis(schema).unsafe
   } catch {
@@ -81,33 +81,33 @@ export interface SettingsDefinition<Schema extends z<any, object>, ClientValue e
   readonly client?: SettingsClientOptions<ClientValue>
 }
 
-export function isSettingsContract(value: unknown): value is SettingsContract {
+function isSettingsContract(value: unknown): value is SettingsContract {
   return typeof value === 'object' && value !== null && settingsContracts.has(value)
 }
 
-export function isSettingsHostContribution(value: unknown): value is SettingsHostContribution {
+function isSettingsHostContribution(value: unknown): value is SettingsHostContribution {
   return typeof value === 'object' && value !== null && settingsHostContributions.has(value)
 }
 
-export function settingsHostContributionParts(value: SettingsHostContribution): SettingsHostContributionParts {
+function settingsHostContributionParts(value: SettingsHostContribution): SettingsHostContributionParts {
   const parts = settingsHostContributions.get(value)
   if (parts === undefined) throw new TypeError('Invalid Settings Host contribution; create it with contract.host({ ...options }).')
   return parts
 }
 
-export function settingsContributionContract(value: SettingsContribution): SettingsContract<z<any, object>, any> {
+function settingsContributionContract(value: SettingsContribution): SettingsContract<z<any, object>, any> {
   return isSettingsContract(value) ? value : settingsHostContributionParts(value).contract
 }
 
-export function defineSettings<const Schema extends z<any, object>>(
+function defineSettings<const Schema extends z<any, object>>(
   definition: Omit<SettingsDefinition<Schema, SettingsValue<Schema>>, 'client'> & { readonly client?: undefined },
 ): SettingsContract<Schema, SettingsValue<Schema>>
-export function defineSettings<const Schema extends z<any, object>, const Decoder extends (value: unknown) => object>(
+function defineSettings<const Schema extends z<any, object>, const Decoder extends (value: unknown) => object>(
   definition: Omit<SettingsDefinition<Schema, ReturnType<Decoder>>, 'client'> & {
     readonly client: { readonly decode: Decoder & ((value: unknown) => Exclude<ReturnType<Decoder>, undefined>) }
   },
 ): SettingsContract<Schema, ReturnType<Decoder>>
-export function defineSettings<const Schema extends z<any, object>>(definition: any): SettingsContract<Schema, any> {
+function defineSettings<const Schema extends z<any, object>>(definition: any): SettingsContract<Schema, any> {
   if (!NAMESPACE_PATTERN.test(definition.namespace)) {
     throw new TypeError(`Settings namespace ${JSON.stringify(definition.namespace)} must match ${String(NAMESPACE_PATTERN)}.`)
   }
@@ -143,4 +143,14 @@ export function defineSettings<const Schema extends z<any, object>>(definition: 
   } as SettingsContract<Schema, any>
   settingsContracts.add(contract)
   return contract
+}
+
+export class SettingsDefinitionModel {
+  static readonly schemaContainsSecret = settingsSchemaContainsSecret
+  static readonly schemaHasUnsafeSecretPath = settingsSchemaHasUnsafeSecretPath
+  static readonly isContract = isSettingsContract
+  static readonly isHostContribution = isSettingsHostContribution
+  static readonly hostContributionParts = settingsHostContributionParts
+  static readonly contributionContract = settingsContributionContract
+  static readonly define = defineSettings
 }

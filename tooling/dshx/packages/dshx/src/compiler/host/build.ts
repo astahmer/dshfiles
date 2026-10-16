@@ -120,7 +120,11 @@ function hostEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, opti
         ].join('\n')
       }
       if (id === `${VIRTUAL_HOST_PUBLIC}-settings`) {
-        return `export { defineSettings } from ${JSON.stringify(SETTINGS_DEFINE_PATH)}\n`
+        return [
+          `import { SettingsDefinitionModel } from ${JSON.stringify(SETTINGS_DEFINE_PATH)}`,
+          'export const defineSettings = SettingsDefinitionModel.define',
+          '',
+        ].join('\n')
       }
       if (id === VIRTUAL_HOST_COMMUNICATION_PUBLIC) {
         return `export * from ${JSON.stringify(COMMUNICATION_RUNTIME_PATH)}\n`

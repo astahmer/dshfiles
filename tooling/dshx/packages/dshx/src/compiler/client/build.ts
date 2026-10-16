@@ -177,7 +177,11 @@ function clientEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, op
         ].join('\n')
       }
       if (id === `${VIRTUAL_CLIENT_PUBLIC}-settings`) {
-        return `export { defineSettings } from ${JSON.stringify(SETTINGS_DEFINE_PATH)}\n`
+        return [
+          `import { SettingsDefinitionModel } from ${JSON.stringify(SETTINGS_DEFINE_PATH)}`,
+          'export const defineSettings = SettingsDefinitionModel.define',
+          '',
+        ].join('\n')
       }
       if (id === `${VIRTUAL_CLIENT_PUBLIC}-conversation`) {
         return [

@@ -1,4 +1,6 @@
-export { defineSettings } from './define.js'
+import { SettingsDefinitionModel } from './define.js'
+
+export const defineSettings = SettingsDefinitionModel.define
 export type { SettingsDefinition } from './define.js'
 export type {
   SettingsClientOptions,
