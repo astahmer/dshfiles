@@ -42,9 +42,9 @@ backing verb; `host-gap` counts capabilities no verb can reach yet.
 | project-checks | 8 | 0 | 5 | 2 |
 | project-folder-picker / workspace-folder-picker | 9 | 0 | 4 | 2 |
 | workbench | 8 | 0 | 2 | 6 |
-| agent-communication | 10 | 11 | 3 | 0 |
+| agent-communication | 10 | 14 | 0 | 0 |
 | agent-questions | 12 | 11 | 0 | 1 |
-| activity-timeline | 7 | 4 | 1 | 0 |
+| activity-timeline | 7 | 5 | 0 | 0 |
 | multi-host | 17 | 18 | 2 | 1 |
 | goal-stall-guard | 4 | 3 | 1 | 0 |
 | agent-toolkit | 9 | 1 | 6 | 3 |
@@ -64,7 +64,7 @@ backing verb; `host-gap` counts capabilities no verb can reach yet.
 | attachment-gallery | 5 | 0 | 2 | 3 |
 | Native session / workspace / model | 46 | 15 (partly) | 31 | 7 |
 | Native platform / admin | 40 | 3 | 30 | 11 |
-| settings-shell, plugin-marketplace, mcp-servers, secret-catalog, privacy-controls (+ `plugin-ui`, `shared-runtime`, `shared-streams`: no surface) | 52 | 6 (`secret_list`, `secret_get`, `mcp__*`, `settings_list`, `settings_set`, `settings_unset`) | 28 | 5 |
+| settings-shell, plugin-marketplace, mcp-servers, secret-catalog, privacy-controls (+ `plugin-ui`, `shared-runtime`, `shared-streams`: no surface) | 52 | 15 (`secret_list`, `secret_get`, `mcp__*`, `settings_list`, `settings_set`, `settings_unset`, 9 `mcp_*`) | 19 | 5 |
 
 ## Missing tools
 
@@ -204,13 +204,18 @@ need a Host half somewhere that owns them.
 
 ### agent-communication
 
-Methods with no tool binding: `dshx_comm_browse` (`browseMessages`),
-`dshx_comm_recipients` (`messageRecipients`), `dshx_comm_diagnostics`
-(`diagnostics`). Everything else is already tool-served.
+Bound now (sibling revision `feat(activity-timeline,agent-communication): expose
+retained reads as agent tools`): read-only `dshx_comm_browse` (`browseMessages`),
+`dshx_comm_recipients` (`messageRecipients`) and `dshx_comm_diagnostics`
+(`diagnostics`). Everything else is already tool-served, including the message
+write verbs through the `dshx_comm_*` tools `host.ts` registers — binding
+`postMessage`/`setSubscription`/`unsubscribe`/`acknowledge` on the API would only
+duplicate them.
 
 ### activity-timeline
 
-`activity_timeline_event` — the event detail drawer (`activity-timeline.event`).
+Bound now: `activity_timeline_event` — the event detail drawer (`activity-timeline.event`),
+read-only. All five timeline reads now have tools.
 
 ### multi-host
 
@@ -384,12 +389,13 @@ now `settings_set` with that namespace, not a tool per plugin.
 | `settings_shell_upstream` | settings-shell | `settings-shell.upstream` |
 | `marketplace_search_plugins` | plugin-marketplace | `plugin-marketplace.list` |
 | `marketplace_install_plugin` | plugin-marketplace | `plugin-marketplace.install` (writes the profile; keep explicit consent) |
-| `mcp_list_servers` / `mcp_refresh_servers` | mcp-servers | `mcp-servers.list`, `mcp-servers.refresh` |
-| `mcp_search_registry` | mcp-servers | `mcp-servers.searchRegistry` |
-| `mcp_save_server` / `mcp_remove_server` | mcp-servers | `mcp-servers.save`, `mcp-servers.remove` (+ `configEditor.edit`) |
-| `mcp_set_server_enabled` / `mcp_set_connection` | mcp-servers | `mcp-servers.setEnabled`, `mcp-servers.setConnection` |
-| `mcp_authorize_server` / `mcp_sign_out_server` | mcp-servers | `mcp-servers.authorize`, `mcp-servers.signOut` (sign-in needs a browser tab) |
-| `mcp_set_preferences` | mcp-servers | `mcp-servers.setPreferences` |
+| ~~`mcp_list_servers` / `mcp_refresh_servers`~~ | mcp-servers | Bound: `mcp-servers.list`, `mcp-servers.refresh` |
+| ~~`mcp_search_registry`~~ | mcp-servers | Bound: `mcp-servers.searchRegistry` |
+| ~~`mcp_save_server` / `mcp_remove_server`~~ | mcp-servers | Bound: `mcp-servers.save`, `mcp-servers.remove` |
+| ~~`mcp_set_server_enabled` / `mcp_set_connection`~~ | mcp-servers | Bound: `mcp-servers.setEnabled`, `mcp-servers.setConnection` |
+| `mcp_authorize_server` | mcp-servers | `mcp-servers.authorize` — deliberately unbound: it needs the browser origin for its redirect and a human consent step |
+| ~~`mcp_sign_out_server`~~ | mcp-servers | Bound: `mcp-servers.signOut` |
+| ~~`mcp_set_preferences`~~ | mcp-servers | Bound: `mcp-servers.setPreferences` |
 | `privacy_controls_read` / `privacy_controls_set_feature` / `privacy_controls_set_all` | privacy-controls | `privacy-controls.read`, `setFeature`, `setAll` |
 | `secret_copy` / `secret_create` | secret-catalog | `secret-catalog.copy`, `create` (a written plaintext must stay on the Host) |
 | `secret_update` / `secret_remove_alias` / `secret_delete_item` | secret-catalog | `secret-catalog.update`, `removeAlias`, `deleteItem` (vault deletion is irreversible) |
@@ -515,16 +521,26 @@ threads and forgetting their local records. The raw native/plugin RPC escape
 hatches stay untooled, and remote thread *reply* and *stop* wait for dedicated
 methods.
 
+A sixth, `feat(mcp-servers): expose MCP server management as agent tools`, binds
+nine: the server list and registry search read-only, plus refresh, save,
+enable/disable, connect/disconnect, remove, sign-out and the four manager
+preferences. `authorize` stays untooled because its redirect needs the browser
+origin and a human consent step.
+
+A seventh, `feat(activity-timeline,agent-communication): expose retained reads as
+agent tools`, closes both read-only gaps: `activity_timeline_event` and
+`dshx_comm_browse` / `dshx_comm_recipients` / `dshx_comm_diagnostics`.
+
 ## Backlog
 
 1. **P1 — bind tools to verbs that already exist.** Remaining cheap wins, in
-   this order: `jujutsu` (28), `mcp-servers` (11), `memory` (9 — needs schemas
-   for the panel methods, which are declared with TypeScript types only),
-   `project-checks` (5), `queue-reorder` (5, not installed),
-   `agent-communication` (3), `activity-timeline` (1), `editor`
-   (`write`, `workspaceFiles.list`), `tool-meta` (2). Most are a `tool:` field
-   plus a `render` on an existing dshx method. Done so far: `thread-sidebar`,
-   `jj-integration`, `settings-shell`, `ai-accounts`, `multi-host`.
+   this order: `project-checks` (5), `memory` (9 — needs schemas for the panel
+   methods, which are declared with TypeScript types only), `editor` (`write`,
+   `workspaceFiles.list`), `tool-meta` (2), `queue-reorder` (5, not installed),
+   then `jujutsu` (28, large and already reachable through `bash jj`). Most are a
+   `tool:` field plus a `render` on an existing dshx method. Done so far:
+   `thread-sidebar`, `jj-integration`, `settings-shell`, `ai-accounts`,
+   `multi-host`, `mcp-servers`, `agent-communication`, `activity-timeline`.
 2. **P2 — install the plugins that already ship tools.** `usage`, `optmem`,
    `queue-reorder` are written but absent from the web profile, so their tools
    are dead code today; decide per plugin whether it belongs in the seed.
