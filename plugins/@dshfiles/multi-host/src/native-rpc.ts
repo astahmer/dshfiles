@@ -5,10 +5,10 @@ import type { Gateway } from './connectors/gateway.js'
 const isMutation = (request: NativeRpcRequest): boolean =>
   request.namespace === 'session' ? ['create', 'fork', 'cancel', 'rename', 'prompt'].includes(request.method) : true
 
-export const mayHaveReachedRuntime = (code: string): boolean =>
+const mayHaveReachedRuntime = (code: string): boolean =>
   ['cancelled', 'gateway-unreachable', 'authentication-expired', 'invalid-response', 'gateway-http-error'].includes(code)
 
-export const callNativeRpc = async (gateway: Gateway, request: NativeRpcRequest, signal?: AbortSignal): Promise<NativeRpcResult> => {
+const callNativeRpc = async (gateway: Gateway, request: NativeRpcRequest, signal?: AbortSignal): Promise<NativeRpcResult> => {
   const args = jsonValueSchema.parse(request.args)
   const safeArgs = z.record(z.string(), jsonValueSchema).parse(args)
   try {
@@ -41,4 +41,9 @@ export const callNativeRpc = async (gateway: Gateway, request: NativeRpcRequest,
         }
       : { ok: false, code: 'gateway-request-failed', message: 'The runtime request failed before a usable result arrived.' }
   }
+}
+
+export class NativeRpcModel {
+  static readonly mayHaveReachedRuntime = mayHaveReachedRuntime
+  static readonly call = callNativeRpc
 }

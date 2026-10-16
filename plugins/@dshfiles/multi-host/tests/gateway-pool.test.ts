@@ -4,7 +4,7 @@ import { createServer, type Server } from 'node:http'
 import { z } from 'zod'
 import { connectGateway, GatewayUnavailableError } from '../src/connectors/gateway.js'
 import { createGatewayPool } from '../src/gateway-pool.js'
-import { callNativeRpc } from '../src/native-rpc.js'
+import { NativeRpcModel } from '../src/native-rpc.js'
 
 const fakeGateway = () => {
   let close = (): void => {}
@@ -177,7 +177,7 @@ describe('gateway pool against a loopback runtime', () => {
       runtime.state.dropNext = 1
       const result = await pool.run(
         'runtime',
-        gateway => callNativeRpc(gateway, { namespace: 'session', method: 'create', args: { request: { cwd: '/tmp/fixture' } } }),
+        gateway => NativeRpcModel.call(gateway, { namespace: 'session', method: 'create', args: { request: { cwd: '/tmp/fixture' } } }),
         { mutation: true, broken: outcome => !outcome.ok && outcome.code === 'unknown-mutation-outcome' },
       )
       expect(result).toMatchObject({ ok: false, code: 'unknown-mutation-outcome' })

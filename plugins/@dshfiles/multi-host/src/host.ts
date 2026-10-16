@@ -10,7 +10,7 @@ import { GatewayUnavailableError, type Gateway } from './connectors/gateway.js'
 import { createGatewayPool, type PooledGateway } from './gateway-pool.js'
 import { readOrCreateRuntimeIdentity, RuntimeIdentityError } from './identity.js'
 import { RuntimeLaunchFile } from './launch-file.js'
-import { callNativeRpc, mayHaveReachedRuntime } from './native-rpc.js'
+import { NativeRpcModel } from './native-rpc.js'
 import {
   hostConnectorSchema,
   runtimeIdentitySchema,
@@ -613,7 +613,7 @@ const multiHostHandlers = multiHostApi.host({
       return { ok: true as const, value }
     } catch (error) {
       const failure = safeFailure(error)
-      if (mutation && mayHaveReachedRuntime(failure.code)) {
+      if (mutation && NativeRpcModel.mayHaveReachedRuntime(failure.code)) {
         return {
           ok: false as const,
           code: 'unknown-mutation-outcome',
@@ -631,7 +631,7 @@ const multiHostHandlers = multiHostApi.host({
       return await withRuntime(
         runtime.id,
         async gateway => {
-          const created = await callNativeRpc(gateway, {
+          const created = await NativeRpcModel.call(gateway, {
             namespace: 'session',
             method: 'create',
             args: { request: { cwd: input.cwd, ...(input.agentPreset === undefined ? {} : { agentPreset: input.agentPreset }) } },
@@ -646,7 +646,7 @@ const multiHostHandlers = multiHostApi.host({
               return { ok: false as const, code: selected.code, message: `The thread was created but its model was refused: ${selected.message}`, sessionId }
           }
           await recordRemoteThread({ runtimeId: runtime.id, sessionId, cwd: input.cwd, title: input.text.slice(0, 80), createdAt: new Date().toISOString() })
-          const prompted = await callNativeRpc(gateway, {
+          const prompted = await NativeRpcModel.call(gateway, {
             namespace: 'session',
             method: 'prompt',
             args: { request: { requestId: randomUUID(), sessionId, mode: 'queue', content: [{ type: 'text', text: input.text }] } },
@@ -760,7 +760,7 @@ const multiHostHandlers = multiHostApi.host({
   runtimeCall: async ({ input, signal }) => {
     const mutation = input.request.namespace !== 'session' || ['create', 'fork', 'cancel', 'rename', 'prompt'].includes(input.request.method)
     try {
-      return await withRuntime(input.runtimeId, gateway => callNativeRpc(gateway, input.request, signal), { mutation, broken: brokenRpc })
+      return await withRuntime(input.runtimeId, gateway => NativeRpcModel.call(gateway, input.request, signal), { mutation, broken: brokenRpc })
     } catch (error) {
       return { ok: false as const, ...safeFailure(error) }
     }

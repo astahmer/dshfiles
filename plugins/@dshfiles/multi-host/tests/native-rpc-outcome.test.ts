@@ -3,7 +3,7 @@ import { describe, expect, test } from 'vitest'
 import { z } from 'zod'
 import type { NativeRpcRequest } from '../src/api.js'
 import { connectGateway } from '../src/connectors/gateway.js'
-import { callNativeRpc } from '../src/native-rpc.js'
+import { NativeRpcModel } from '../src/native-rpc.js'
 
 describe('native mutation outcome recovery', () => {
   const requestEnvelopeSchema = z.object({ rpcId: z.string() }).passthrough()
@@ -66,7 +66,7 @@ describe('native mutation outcome recovery', () => {
         method: 'create',
         args: { request: { cwd: '/tmp/multi-host-outcome-fixture' } },
       }
-      const result = await callNativeRpc(gateway, createRequest)
+      const result = await NativeRpcModel.call(gateway, createRequest)
       expect(result).toEqual({
         ok: false,
         code: 'unknown-mutation-outcome',
