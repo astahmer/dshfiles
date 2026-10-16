@@ -11,6 +11,8 @@ export const selectTurnFinishedRows = <Session extends TurnFinishedSession>(opti
   readonly completionAt: Readonly<Record<string, number>>
   readonly mutedSessionIds: ReadonlySet<string>
   readonly archivedSessionIds: ReadonlySet<string>
+  /** Threads a sibling group already lists, so one thread never claims two groups. */
+  readonly excludedSessionIds: ReadonlySet<Session['id']>
   readonly matchesWorkspace: (session: Session) => boolean
 }): Session[] =>
   options.sessions
@@ -21,6 +23,7 @@ export const selectTurnFinishedRows = <Session extends TurnFinishedSession>(opti
         session.id !== options.selectedSessionId &&
         !options.inputNeededSessionIds.has(session.id) &&
         !options.approvalNeededSessionIds.has(session.id) &&
+        !options.excludedSessionIds.has(session.id) &&
         options.completionAt[session.id] !== undefined &&
         !options.mutedSessionIds.has(session.id) &&
         !options.archivedSessionIds.has(session.id) &&

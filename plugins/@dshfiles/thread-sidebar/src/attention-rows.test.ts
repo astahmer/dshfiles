@@ -27,6 +27,25 @@ test('keeps an unresolved continued question out of Turn finished', () => {
     completionAt: { [continuedQuestion.id]: 1, [finishedSession.id]: 2 },
     mutedSessionIds: new Set<string>(),
     archivedSessionIds: new Set<string>(),
+    excludedSessionIds: new Set<ReturnType<typeof SessionId>>(),
+    matchesWorkspace: () => true,
+  })
+
+  assert.deepEqual(rows, [finishedSession])
+})
+
+test('keeps a thread another group already lists out of Turn finished', () => {
+  const groupedElsewhere = { id: SessionId('grouped-elsewhere'), blank: false, running: false, updatedAt: 10 }
+  const finishedSession = { id: SessionId('finished'), blank: false, running: false, updatedAt: 20 }
+  const rows = selectTurnFinishedRows({
+    sessions: [groupedElsewhere, finishedSession],
+    selectedSessionId: undefined,
+    inputNeededSessionIds: new Set<ReturnType<typeof SessionId>>(),
+    approvalNeededSessionIds: new Set<ReturnType<typeof SessionId>>(),
+    completionAt: { [groupedElsewhere.id]: 1, [finishedSession.id]: 2 },
+    mutedSessionIds: new Set<string>(),
+    archivedSessionIds: new Set<string>(),
+    excludedSessionIds: new Set([groupedElsewhere.id]),
     matchesWorkspace: () => true,
   })
 

@@ -392,6 +392,18 @@
           "testName": "moves a rate-limited conversation to the next healthy account and cools the spent one"
         },
         {
+          "kind": "unit-test",
+          "id": "ai-accounts.spent-plan-wording",
+          "file": "plugins/@dshfiles/ai-accounts/src/failure-recovery.test.ts",
+          "testName": "treats a spent plan as exhausted even without the upstream exceeded wording"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.give-up-records-recovery",
+          "file": "plugins/@dshfiles/ai-accounts/src/failure-recovery.test.ts",
+          "testName": "records a spent plan even though fail-over is on by default"
+        },
+        {
           "kind": "gherkin",
           "id": "ai-accounts.failure-recovery",
           "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature"

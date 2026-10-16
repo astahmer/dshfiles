@@ -28,6 +28,7 @@
   },
   "dependencies": {
     "@deepseek-ai/schemastery": "catalog:",
+    "@dshfiles/ai-accounts": "workspace:*",
     "@dshfiles/command-palette": "workspace:*",
     "@dshfiles/input-trigger": "workspace:*",
     "@dshfiles/jj-integration": "workspace:*",

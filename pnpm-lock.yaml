@@ -3588,6 +3588,9 @@ importers:
       '@deepseek-ai/schemastery':
         specifier: 'catalog:'
         version: 3.18.4
+      '@dshfiles/ai-accounts':
+        specifier: workspace:*
+        version: link:../ai-accounts
       '@dshfiles/command-palette':
         specifier: workspace:*
         version: link:../command-palette

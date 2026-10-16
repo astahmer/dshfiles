@@ -10,6 +10,7 @@ import type { archivedViewMachine } from './archived-view-machine.js'
 import { useApi, useApiQuery } from '@dshfiles/dshx/client'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { isApiOwnerMissing } from '@dshfiles/dshx/api'
+import { aiAccountsApi } from '@dshfiles/ai-accounts/api'
 import { threadSidebarPendingQuestionsApi } from './pending-questions-api.js'
 import {
   IconArchiveOutlineRegular,
@@ -107,6 +108,8 @@ import { archivedOpenFailureNotice, scheduleSuccessNoticeDismissal, SidebarNotic
 import { threadSidebarMachineApi } from './machine-api.js'
 import { threadSidebarRecoveryApi } from './recovery-api.js'
 import { selectRestartRecoveryRows } from './restart-recovery-rows.js'
+import { selectUsageLimitRows, type QuotaContinuation } from './usage-limit-rows.js'
+import { UsageLimitSection, type UsageLimitSnooze } from './usage-limit-section.js'
 import { groupThreadChildren, partitionFinishedChildren, shouldOpenChildThreadList, threadActionTargetIds, visibleChildren } from './thread-children.js'
 import { buildThreadUrl, clearThreadUrl, readThreadUrl } from './thread-url.js'
 import { workingThreadIds } from './working-threads.js'
@@ -277,6 +280,9 @@ const toggleSetMember = (values: ReadonlySet<string>, value: string): ReadonlySe
 }
 
 const restartRecoveryQueryKey = ['thread-sidebar', 'restart-recovery', 'pending'] as const
+const usageLimitQueryKey = ['thread-sidebar', 'usage-limit', 'recoveries'] as const
+/** Stable empty list, so a loading query never hands the selector a fresh array. */
+const EMPTY_CONTINUATIONS: readonly QuotaContinuation[] = []
 
 const sessionsForAutoArchive = (ids: readonly SessionSummary['id'][], byId: Readonly<Record<string, SessionSummary>>): SessionSummary[] =>
   ids.flatMap(sessionId => {
@@ -890,6 +896,15 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const recoverySessionIds = useMemo(() => new Set(recoveryQuery.data?.sessionIds ?? []), [recoveryQuery.data?.sessionIds])
   const [resumeBusySessionIds, setResumeBusySessionIds] = useState<ReadonlySet<string>>(() => new Set())
   const [resumeAllBusy, setResumeAllBusy] = useState(false)
+  const accountsApi = useApi(aiAccountsApi)
+  const usageLimitQuery = useQuery({
+    queryKey: usageLimitQueryKey,
+    queryFn: ({ signal }) => accountsApi.quotaContinuations(undefined, { signal }),
+    refetchInterval: query => (isApiOwnerMissing(query.state.error) ? false : 15_000),
+    retry: false,
+  })
+  const [usageLimitBusyIds, setUsageLimitBusyIds] = useState<ReadonlySet<string>>(() => new Set())
+  const [usageLimitResumeAllBusy, setUsageLimitResumeAllBusy] = useState(false)
   const machine = useApiQuery(threadSidebarMachineApi, 'name', { enabled: preferences.threadRowMachine }).data?.name
   const jjRepositories = useApiQuery(jjIntegrationApi, 'repositories', { input: {} })
   const refetchJjRepositories = jjRepositories.refetch
@@ -1054,6 +1069,120 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       workspaceBySession,
     ],
   )
+  const usageLimitRows = useMemo(
+    () =>
+      selectUsageLimitRows({
+        sessions,
+        continuations: usageLimitQuery.data?.continuations ?? EMPTY_CONTINUATIONS,
+        mutedSessionIds,
+        archivedSessionIds,
+        matchesWorkspace: session =>
+          preferences.workspaceFilter === null || (workspaceForLineage(session, sessionState.byId, workspaceBySession) ?? '') === preferences.workspaceFilter,
+        matchesSource: session => matchesThreadSourceFilter(session, threadView.sourceFilter),
+      }),
+    [
+      archivedSessionIds,
+      mutedSessionIds,
+      preferences.workspaceFilter,
+      sessionState.byId,
+      sessions,
+      threadView.sourceFilter,
+      usageLimitQuery.data?.continuations,
+      workspaceBySession,
+    ],
+  )
+  const usageLimitSessionIds = useMemo(() => new Set(usageLimitRows.map(row => row.session.id)), [usageLimitRows])
+  const resumeUsageLimitThread = async (input: { readonly continuationId: string; readonly sessionId: string }): Promise<boolean> => {
+    if (usageLimitBusyIds.has(input.continuationId)) return false
+    setUsageLimitBusyIds(current => new Set(current).add(input.continuationId))
+    try {
+      const result = await accountsApi.resumeQuotaContinuation({ continuationId: input.continuationId })
+      if (!result.accepted) {
+        setNotice({ tone: 'warning', message: props.tSidebar('threadSidebarUsageLimitSuperseded') })
+        await queryClient.invalidateQueries({ queryKey: usageLimitQueryKey })
+        return false
+      }
+      setNotice({ tone: 'success', message: props.tSidebar('threadSidebarResumeSent', { count: 1 }) })
+      await queryClient.invalidateQueries({ queryKey: usageLimitQueryKey })
+      return true
+    } catch {
+      setNotice({ tone: 'danger', message: props.tSidebar('threadSidebarActionFailure') })
+      return false
+    } finally {
+      setUsageLimitBusyIds(current => {
+        const next = new Set(current)
+        next.delete(input.continuationId)
+        return next
+      })
+    }
+  }
+  const changeUsageLimitRecovery = async (input: {
+    readonly continuationId: string
+    readonly duration?: UsageLimitSnooze
+    readonly sessionId?: string
+    readonly enabled?: boolean
+  }): Promise<void> => {
+    setUsageLimitBusyIds(current => new Set(current).add(input.continuationId))
+    try {
+      if (input.duration !== undefined) await accountsApi.snoozeQuotaContinuation({ continuationId: input.continuationId, duration: input.duration })
+      if (input.enabled !== undefined && input.sessionId !== undefined) {
+        await accountsApi.setQuotaContinuationAutoRetry({
+          continuationId: input.continuationId,
+          sessionId: input.sessionId,
+          enabled: input.enabled,
+        })
+      }
+      await queryClient.invalidateQueries({ queryKey: usageLimitQueryKey })
+    } catch {
+      setNotice({ tone: 'danger', message: props.tSidebar('threadSidebarActionFailure') })
+    } finally {
+      setUsageLimitBusyIds(current => {
+        const next = new Set(current)
+        next.delete(input.continuationId)
+        return next
+      })
+    }
+  }
+  const resumeAllUsageLimits = async (): Promise<void> => {
+    if (usageLimitResumeAllBusy) return
+    const pending = usageLimitRows.filter(row => !usageLimitBusyIds.has(row.continuation.continuationId))
+    if (pending.length === 0) return
+    setUsageLimitResumeAllBusy(true)
+    setUsageLimitBusyIds(current => new Set([...current, ...pending.map(row => row.continuation.continuationId)]))
+    let nextIndex = 0
+    let sent = 0
+    let failed = 0
+    const worker = async (): Promise<void> => {
+      while (nextIndex < pending.length) {
+        const row = pending[nextIndex]
+        nextIndex += 1
+        if (row === undefined) continue
+        try {
+          const result = await accountsApi.resumeQuotaContinuation({ continuationId: row.continuation.continuationId })
+          if (result.accepted) sent += 1
+          else failed += 1
+        } catch {
+          failed += 1
+        }
+      }
+    }
+    try {
+      await Promise.all(Array.from({ length: Math.min(3, pending.length) }, worker))
+      await queryClient.invalidateQueries({ queryKey: usageLimitQueryKey })
+      setNotice(
+        failed === 0
+          ? { tone: 'success', message: props.tSidebar('threadSidebarResumeSent', { count: sent }) }
+          : { tone: 'warning', message: props.tSidebar('threadSidebarResumePartial', { sent, failed }) },
+      )
+    } finally {
+      setUsageLimitBusyIds(current => {
+        const next = new Set(current)
+        for (const row of pending) next.delete(row.continuation.continuationId)
+        return next
+      })
+      setUsageLimitResumeAllBusy(false)
+    }
+  }
   const resumeAllRecoveries = async (): Promise<void> => {
     if (resumeAllBusy) return
     const sessionIds = needsResumeRows.filter(session => !resumeBusySessionIds.has(session.id)).map(session => session.id)
@@ -1646,6 +1775,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         completionAt: notificationPreferences.needsYouAt,
         mutedSessionIds,
         archivedSessionIds,
+        excludedSessionIds: usageLimitSessionIds,
         matchesWorkspace: session =>
           preferences.workspaceFilter === null || (workspaceForLineage(session, sessionState.byId, workspaceBySession) ?? '') === preferences.workspaceFilter,
       }),
@@ -1659,13 +1789,14 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       preferences.workspaceFilter,
       selectedSession?.id,
       sessionState.byId,
+      usageLimitSessionIds,
       workspaceBySession,
     ],
   )
   const waitingSessionIds = useMemo(() => new Set([...approvalNeededRows, ...needsInputRows].map(session => session.id)), [approvalNeededRows, needsInputRows])
   const attentionSessionIds = useMemo(
-    () => new Set([...approvalNeededRows, ...needsInputRows, ...turnFinishedRows, ...needsResumeRows].map(session => session.id)),
-    [approvalNeededRows, needsInputRows, needsResumeRows, turnFinishedRows],
+    () => new Set([...approvalNeededRows, ...needsInputRows, ...turnFinishedRows, ...needsResumeRows, ...usageLimitRows.map(row => row.session.id)]),
+    [approvalNeededRows, needsInputRows, needsResumeRows, turnFinishedRows, usageLimitRows],
   )
   const attentionRootIds = useMemo(() => {
     const ids = new Set(attentionSessionIds)
@@ -1734,11 +1865,15 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const attentionIds = useMemo(
     () =>
       new Set(
-        [...groupedAttentionRows.approvalNeeded, ...groupedAttentionRows.inputNeeded, ...groupedAttentionRows.turnFinished, ...needsResumeRows].map(
-          session => session.id,
-        ),
+        [
+          ...groupedAttentionRows.approvalNeeded,
+          ...groupedAttentionRows.inputNeeded,
+          ...groupedAttentionRows.turnFinished,
+          ...needsResumeRows,
+          ...usageLimitRows.map(row => row.session),
+        ].map(session => session.id),
       ),
-    [groupedAttentionRows, needsResumeRows],
+    [groupedAttentionRows, needsResumeRows, usageLimitRows],
   )
   const inlineAttentionLabels = useMemo(() => {
     const labels = new Map<SessionSummary['id'], ThreadAttentionLabel>()
@@ -2593,6 +2728,18 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
               {needsResumeRows.map(session => renderThreadRow(session, 'threadSidebarNeedsResume'))}
             </section>
           ) : null}
+          <UsageLimitSection
+            busyIds={usageLimitBusyIds}
+            now={now}
+            onAutoRetry={input => void changeUsageLimitRecovery(input)}
+            onResume={input => void resumeUsageLimitThread(input)}
+            onResumeAll={() => void resumeAllUsageLimits()}
+            onSnooze={input => void changeUsageLimitRecovery(input)}
+            open={openThread}
+            resumeAllBusy={usageLimitResumeAllBusy}
+            rows={usageLimitRows}
+            translate={props.tSidebar}
+          />
           {groupedAttentionRows.approvalNeeded.length > 0 ? (
             <section className="dshx:mt-1" aria-label={props.tSidebar('threadSidebarApprovalNeeded')}>
               <div className={cn(stickyHeaderClass, 'dshx:flex dshx:h-8 dshx:items-center dshx:gap-2 dshx:px-2.5 dshx:text-sm')}>

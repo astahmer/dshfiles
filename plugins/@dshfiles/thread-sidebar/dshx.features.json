@@ -1183,6 +1183,51 @@
           "testName": "routes a selected skill through the existing slash invocation"
         }
       ]
+    },
+    {
+      "id": "usage-limit-group",
+      "title": "Group provider-blocked threads under Usage limit",
+      "summary": "Threads whose last turn the provider refused for quota or a rate limit appear together with their reset countdown, a resume action, snooze choices and the auto-retry switch, reading the durable recoveries @dshfiles/ai-accounts owns.",
+      "surfaces": ["client", "integration"],
+      "configuration": [],
+      "states": ["hidden", "waiting", "ready", "snoozed", "unknown-reset"],
+      "failureModes": [
+        "Without the AI Accounts Host the group stays hidden and polling stops instead of retrying a missing owner.",
+        "A recovery already queued, a thread running again, and a muted or archived thread stay out of the group."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.usage-limit-unit-visible-rows",
+          "file": "plugins/@dshfiles/thread-sidebar/src/usage-limit-rows.test.ts",
+          "testName": "keeps only stored recoveries that are still waiting on an idle, visible thread"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.usage-limit-unit-ready-first",
+          "file": "plugins/@dshfiles/thread-sidebar/src/usage-limit-rows.test.ts",
+          "testName": "leads with the resets that already passed, then the most recent failure"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.usage-limit-unit-timing",
+          "file": "plugins/@dshfiles/thread-sidebar/src/usage-limit-rows.test.ts",
+          "testName": "names the wait, the reset that passed, and the one nobody knows"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.usage-limit-unit-countdown",
+          "file": "plugins/@dshfiles/thread-sidebar/src/usage-limit-rows.test.ts",
+          "testName": "counts down in the largest useful unit"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.usage-limit-unit-section",
+          "file": "plugins/@dshfiles/thread-sidebar/src/usage-limit-section.client.test.tsx",
+          "testName": "resumes one thread, resumes all of them, and opens the thread behind a row"
+        }
+      ]
     }
   ],
   "kind": "bundle"
