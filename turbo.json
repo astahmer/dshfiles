@@ -1,7 +1,10 @@
 {
   "$schema": "https://turborepo.dev/schema.json",
   "cacheDir": ".turbo/cache",
+  "cacheMaxSize": "20GB",
+  "cacheMaxAge": "30d",
   "concurrency": "4",
+  "noUpdateNotifier": true,
   "remoteCache": {
     "enabled": false
   },
