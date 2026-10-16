@@ -8,6 +8,7 @@ import { useState } from 'react'
 import { aiAccountsKeys } from './accounts-queries.js'
 import { aiAccountsApi, type QuotaRecoveryModelCatalog, type QuotaRecoveryModelSelection } from './api.js'
 import { suggestedQuotaRecoverySelection } from './quota-recovery-selection.js'
+import { showsQuotaRecoveryNotice } from './quota-recovery-notice.js'
 import { usePreferences } from './use-preferences.js'
 
 const EXHAUSTED_CODES: ReadonlySet<string> = new Set([
@@ -98,8 +99,12 @@ const QuotaRetryMessageContent = (props: { readonly sessionId: string }): JSX.El
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: aiAccountsKeys.quotaContinuations }),
   })
-  const showChoice = preferences.showQuotaRetryChoice && !preferences.failureRecovery.exhausted.failover
-  if (!showChoice) return null
+  const showNotice = showsQuotaRecoveryNotice({
+    showChoice: preferences.showQuotaRetryChoice,
+    failoverEnabled: preferences.failureRecovery.exhausted.failover,
+    hasRecovery: continuation !== undefined,
+  })
+  if (!showNotice) return null
 
   const knownReset = continuation !== undefined && continuation.resetAt !== null
   const exhaustedStatus = knownReset

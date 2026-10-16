@@ -423,7 +423,8 @@
       "failureModes": [
         "Automatic retry stays off by default and cannot be enabled without a known reset time; it queues one minute after reset.",
         "Changing one turn's choice creates or removes only that turn's scheduled recovery.",
-        "The inline choice is absent while automatic exhausted-limit failover is enabled.",
+        "The inline choice is absent while automatic exhausted-limit failover is enabled and the ladder stored no recovery for the turn.",
+        "A recovery recorded with exhausted-limit failover enabled, because no other account could take the request, still shows its controls inline.",
         "The notice re-reads this turn's recovery when it appears, so a page of continuations cached before the failure cannot hide the controls.",
         "A manual route switch accepts only a currently catalogued provider/model and applies the reasoning effort before queuing the saved request."
       ],
@@ -440,6 +441,12 @@
           "id": "ai-accounts.quota-recovery-route-default",
           "file": "plugins/@dshfiles/ai-accounts/src/quota-recovery-selection.test.ts",
           "testName": "defaults to the same model on another provider and carries that route default effort"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.quota-recovery-notice-visibility",
+          "file": "plugins/@dshfiles/ai-accounts/src/quota-recovery-notice.test.ts",
+          "testName": "appears with failover on only when the ladder still stored a recovery to act on"
         },
         {
           "kind": "gherkin",

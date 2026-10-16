@@ -144,8 +144,10 @@ pending recovery, so an old continuation never runs over newer work. Records liv
 in Host storage, so they survive a restart; finished ones are pruned after 30
 days, and at most 500 are kept.
 
-The exhausted-limit turn itself carries an inline notice, shown while
-exhausted-limit failover is off. It dates the reset and offers **Automatically
+The exhausted-limit turn itself carries an inline notice. It shows while
+exhausted-limit failover is off, and also when failover is on and the ladder
+still stored a recovery for the turn — which happens when no other account
+could take the request. It dates the reset and offers **Automatically
 resume 1 minute after reset**, which schedules the saved request for one minute
 past the reset instead of at the reset instant. **Resume with another model**
 opens the currently available provider/account, model, and reasoning-effort
