@@ -623,7 +623,10 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                 )}
               </button>
             ) : null}
-            <div className="dshx:absolute dshx:top-1 dshx:right-1.5 dshx:flex dshx:gap-0.5 dshx:rounded-md dshx:border dshx:bg-popover dshx:p-0.5 dshx:opacity-0 dshx:shadow-xs dshx:transition-opacity dshx:group-hover/row:opacity-100 dshx:focus-within:opacity-100">
+            <div
+              data-testid="thread-row-actions"
+              className="dshx:pointer-events-none dshx:absolute dshx:top-1 dshx:right-1.5 dshx:flex dshx:gap-0.5 dshx:rounded-md dshx:border dshx:bg-popover dshx:p-0.5 dshx:opacity-0 dshx:shadow-xs dshx:transition-opacity dshx:group-hover/row:pointer-events-auto dshx:group-hover/row:opacity-100 dshx:focus-within:pointer-events-auto dshx:focus-within:opacity-100"
+            >
               {!archived ? (
                 <>
                   {withTooltip(
@@ -2246,7 +2249,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
           </div>
         ) : null}
 
-        <div data-testid="thread-sidebar-scroll" className="dshx:min-h-0 dshx:flex-1 dshx:overflow-auto dshx:px-2 dshx:pb-3">
+        <div data-testid="thread-sidebar-scroll" className="dshx:min-h-0 dshx:flex-1 dshx:overflow-auto dshx:overscroll-y-contain dshx:px-2 dshx:pb-3">
           {sessionState.phase !== 'ready' || workspaceState.phase !== 'ready' ? (
             <div className="dshx:flex dshx:items-center dshx:justify-center dshx:gap-2 dshx:py-6 dshx:text-sm dshx:text-muted-foreground">
               <Spinner />
