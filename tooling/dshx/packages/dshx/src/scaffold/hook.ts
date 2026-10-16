@@ -1,6 +1,6 @@
 import { dirname, relative, resolve } from 'node:path'
 import type { Program, ObjectProperty } from 'oxc-parser'
-import { parseSource, visitSource, defaultCall, objectProperty, propertyName, stringValue, lastImportEnd } from '../project/syntax.js'
+import { SourceSyntax } from '../project/syntax.js'
 import type { ResolvedDshxConfig } from '../config/types.js'
 import type { DshxDiagnostic } from '../diagnostics.js'
 import { checkProjectManifest } from '../project/index.js'
@@ -61,14 +61,14 @@ function sourceForHook(event: string): string {
 
 const hasHookRegistration = (program: Program, event: string): boolean => {
   let found = false
-  visitSource({
+  SourceSyntax.visit({
     program,
     visitor: {
       CallExpression(node) {
         const callee = node.callee
-        if (callee.type !== 'MemberExpression' || propertyName(callee.property) !== 'on') return
+        if (callee.type !== 'MemberExpression' || SourceSyntax.propertyName(callee.property) !== 'on') return
         const argument = node.arguments[0]
-        if (argument !== undefined && argument.type !== 'SpreadElement' && stringValue(argument) === event) found = true
+        if (argument !== undefined && argument.type !== 'SpreadElement' && SourceSyntax.stringValue(argument) === event) found = true
       },
     },
   })
@@ -83,13 +83,13 @@ const findSetupBody = (setup: ObjectProperty) => {
 }
 
 function modifyHost(source: string, hostFile: string, hookFile: string, event: string): { source?: string; duplicate: boolean; invalidSetup: boolean } {
-  const sourceFile = parseSource({ file: hostFile, source })
+  const sourceFile = SourceSyntax.parse({ file: hostFile, source })
   if (hasHookRegistration(sourceFile, event)) return { duplicate: true, invalidSetup: false }
-  const call = defaultCall({ program: sourceFile, name: 'defineHost' })
+  const call = SourceSyntax.defaultCall({ program: sourceFile, name: 'defineHost' })
   const argument = call?.arguments[0]
   if (call === undefined || call.arguments.length !== 1 || argument === undefined || argument.type !== 'ObjectExpression')
     return { duplicate: false, invalidSetup: false }
-  const setup = objectProperty({ expression: argument, name: 'setup' })
+  const setup = SourceSyntax.objectProperty({ expression: argument, name: 'setup' })
   const edits: Array<{ start: number; end: number; text: string }> = []
   const name = registerName(event)
   if (setup === undefined) {
@@ -114,7 +114,7 @@ function modifyHost(source: string, hostFile: string, hookFile: string, event: s
     const indent = /\n([ \t]*)[^\s]/.exec(existing)?.[1] ?? '  '
     edits.push({ start, end: start, text: `\n${indent}${name}(${contextName})\n` })
   }
-  const importEnd = lastImportEnd(sourceFile)
+  const importEnd = SourceSyntax.lastImportEnd(sourceFile)
   edits.push({
     start: importEnd,
     end: importEnd,
@@ -189,7 +189,7 @@ export async function createHookScaffold(options: AddHookOptions, dependencies: 
   }
   const existingHook = await readOptionalFile(hookFile)
   if (existingHook !== undefined) {
-    const ast = parseSource({ file: hookFile, source: existingHook })
+    const ast = SourceSyntax.parse({ file: hookFile, source: existingHook })
     if (hasHookRegistration(ast, options.event))
       return makeResult(
         project,

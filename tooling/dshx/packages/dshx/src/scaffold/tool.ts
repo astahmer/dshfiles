@@ -1,6 +1,6 @@
 import { dirname, relative, resolve } from 'node:path'
 import type { Program } from 'oxc-parser'
-import { parseSource, visitSource, defaultCall, objectProperty, stringValue, lastImportEnd } from '../project/syntax.js'
+import { SourceSyntax } from '../project/syntax.js'
 import type { ResolvedDshxConfig } from '../config/types.js'
 import type { DshxDiagnostic } from '../diagnostics.js'
 import { checkProjectManifest } from '../project/index.js'
@@ -55,15 +55,15 @@ function sourceForTool(name: string, description: string): string {
 
 const hasTool = (program: Program, name: string): boolean => {
   let found = false
-  visitSource({
+  SourceSyntax.visit({
     program,
     visitor: {
       CallExpression(node) {
         if (node.callee.type !== 'Identifier' || node.callee.name !== 'defineTool') return
         const argument = node.arguments[0]
         if (argument === undefined || argument.type === 'SpreadElement') return
-        const property = objectProperty({ expression: argument, name: 'name' })
-        if (property !== undefined && stringValue(property.value) === name) found = true
+        const property = SourceSyntax.objectProperty({ expression: argument, name: 'name' })
+        if (property !== undefined && SourceSyntax.stringValue(property.value) === name) found = true
       },
     },
   })
@@ -71,19 +71,19 @@ const hasTool = (program: Program, name: string): boolean => {
 }
 
 function modifyHost(source: string, hostFile: string, toolFile: string, name: string): { source?: string; duplicate: boolean; invalidTools: boolean } {
-  const sourceFile = parseSource({ file: hostFile, source })
+  const sourceFile = SourceSyntax.parse({ file: hostFile, source })
   if (hasTool(sourceFile, name)) return { duplicate: true, invalidTools: false }
-  const call = defaultCall({ program: sourceFile, name: 'defineHost' })
+  const call = SourceSyntax.defaultCall({ program: sourceFile, name: 'defineHost' })
   const argument = call?.arguments[0]
   if (call === undefined || call.arguments.length !== 1 || argument === undefined || argument.type !== 'ObjectExpression')
     return { duplicate: false, invalidTools: false }
-  const tools = objectProperty({ expression: argument, name: 'tools' })
+  const tools = SourceSyntax.objectProperty({ expression: argument, name: 'tools' })
   if (tools !== undefined && tools.value.type !== 'ArrayExpression') return { duplicate: false, invalidTools: true }
   const identifier = toolIdentifier(name)
   let importPath = relative(dirname(hostFile), toolFile).replaceAll('\\', '/')
   if (!importPath.startsWith('.')) importPath = `./${importPath}`
   importPath = importPath.replace(/\.ts$/, '.js')
-  const importEnd = lastImportEnd(sourceFile)
+  const importEnd = SourceSyntax.lastImportEnd(sourceFile)
   const edits: Array<{ start: number; end: number; text: string }> = [
     {
       start: importEnd,
@@ -174,7 +174,7 @@ export async function createToolScaffold(options: AddToolOptions, dependencies: 
   }
   const existingToolFile = await readOptionalFile(toolFile)
   if (existingToolFile !== undefined) {
-    const ast = parseSource({ file: toolFile, source: existingToolFile })
+    const ast = SourceSyntax.parse({ file: toolFile, source: existingToolFile })
     if (hasTool(ast, options.name))
       return result(
         project,

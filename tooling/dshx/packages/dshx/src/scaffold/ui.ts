@@ -2,7 +2,7 @@ import { createRequire } from 'node:module'
 import { access, mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises'
 import { dirname, relative, resolve, sep } from 'node:path'
 import type { Program } from 'oxc-parser'
-import { parseSource, visitSource, defaultCall, objectProperty, propertyName, stringValue, lastImportEnd } from '../project/syntax.js'
+import { SourceSyntax } from '../project/syntax.js'
 import { DEFAULT_COMPATIBILITY } from '../compat/index.js'
 import type { DshCompatibility } from '../compat/types.js'
 import type { ResolvedDshxConfig } from '../config/types.js'
@@ -267,13 +267,13 @@ function relativeImport(fromFile: string, targetFile: string): string {
 
 const hasSlotRegistration = (program: Program, slotName: string): boolean => {
   let found = false
-  visitSource({
+  SourceSyntax.visit({
     program,
     visitor: {
       CallExpression(node) {
         if (node.callee.type !== 'Identifier' || node.callee.name !== 'defineSlot') return
         const argument = node.arguments[0]
-        if (argument !== undefined && argument.type !== 'SpreadElement' && stringValue(argument) === slotName) found = true
+        if (argument !== undefined && argument.type !== 'SpreadElement' && SourceSyntax.stringValue(argument) === slotName) found = true
       },
     },
   })
@@ -281,20 +281,20 @@ const hasSlotRegistration = (program: Program, slotName: string): boolean => {
 }
 
 function modifyClientSource(source: string, file: string, contributionFile: string, slotName: string): { source: string | undefined; duplicate: boolean } {
-  const sourceFile = parseSource({ file, source })
+  const sourceFile = SourceSyntax.parse({ file, source })
   if (hasSlotRegistration(sourceFile, slotName)) return { source: undefined, duplicate: true }
-  const call = defaultCall({ program: sourceFile, name: 'defineClient' })
+  const call = SourceSyntax.defaultCall({ program: sourceFile, name: 'defineClient' })
   const argument = call?.arguments[0]
   if (call === undefined || call.arguments.length !== 1 || argument === undefined || argument.type !== 'ObjectExpression')
     return { source: undefined, duplicate: false }
-  const slots = objectProperty({ expression: argument, name: 'slots' })
-  const slotProperty = argument.properties.find(property => property.type === 'Property' && propertyName(property.key) === 'slots')
+  const slots = SourceSyntax.objectProperty({ expression: argument, name: 'slots' })
+  const slotProperty = argument.properties.find(property => property.type === 'Property' && SourceSyntax.propertyName(property.key) === 'slots')
   if (slotProperty !== undefined && (slots === undefined || slots.value.type !== 'ArrayExpression')) return { source: undefined, duplicate: false }
   const importPath = relativeImport(file, contributionFile)
   const identifier = contributionIdentifier(slotName)
   const importLine = `import { generatedSlot as ${identifier} } from ${JSON.stringify(importPath)}\n`
   const edits: Array<{ start: number; end: number; text: string }> = []
-  const importEnd = lastImportEnd(sourceFile)
+  const importEnd = SourceSyntax.lastImportEnd(sourceFile)
   edits.push({ start: importEnd, end: importEnd, text: `${importEnd === 0 ? '' : '\n'}${importLine}` })
   if (slots !== undefined && slots.value.type === 'ArrayExpression') {
     const array = slots.value
@@ -600,7 +600,7 @@ export async function createUiScaffold(options: AddUiOptions, dependencies: AddU
   }
   const existingGenerated = await readExisting(fs, targetFile)
   if (existingGenerated !== undefined) {
-    const generatedAst = parseSource({ file: targetFile, source: existingGenerated })
+    const generatedAst = SourceSyntax.parse({ file: targetFile, source: existingGenerated })
     if (hasSlotRegistration(generatedAst, slot.name)) {
       const item = diagnostic(
         'DSHX6109',

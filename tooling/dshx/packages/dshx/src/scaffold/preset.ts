@@ -1,7 +1,7 @@
 import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises'
 import { dirname, relative, resolve } from 'node:path'
 import type { ArrayExpression, Expression, ObjectExpression, Program } from 'oxc-parser'
-import { parseSource, defaultCall, objectProperty, stringValue, lastImportEnd, unwrapExpression } from '../project/syntax.js'
+import { SourceSyntax } from '../project/syntax.js'
 import { CLIENT_CAPABILITIES, DSH_PROTOCOL_2, HOST_CAPABILITIES, SDK_RUNTIME_DEPENDENCIES } from 'create-dshx/capabilities'
 import type { ResolvedDshxConfig } from '../config/types.js'
 import type { DshxDiagnostic } from '../diagnostics.js'
@@ -170,21 +170,21 @@ const toFilePlan = (file: PlannedFile) => ({
 
 const parse = (source: string, file: string): Program | undefined => {
   try {
-    return parseSource({ file, source })
+    return SourceSyntax.parse({ file, source })
   } catch {
     return undefined
   }
 }
 
 const defaultDefinition = (program: Program, name: 'defineClientPlugin' | 'definePlugin'): ObjectExpression | undefined => {
-  const call = defaultCall({ program, name })
+  const call = SourceSyntax.defaultCall({ program, name })
   const argument = call?.arguments[0]
   if (call === undefined || call.arguments.length !== 1 || argument === undefined || argument.type !== 'ObjectExpression') return undefined
   return argument
 }
 /** The setup body's brace position, when setup is a literal function with a block body. */
 const setupBodyOpenBrace = (propertyValue: Expression): { open: number; close: number } | undefined => {
-  const value = unwrapExpression(propertyValue)
+  const value = SourceSyntax.unwrapExpression(propertyValue)
   if (value.type !== 'ArrowFunctionExpression' && value.type !== 'FunctionExpression') return undefined
   const body = value.body
   if (body === null || body.type !== 'BlockStatement') return undefined
@@ -265,7 +265,7 @@ export async function createPresetScaffold(options: AddPresetOptions, dependenci
     const hostSource = await readExisting(fs, project.hostEntry)
     const hostProgram = hostSource === undefined ? undefined : parse(hostSource, project.hostEntry)
     const hostObject = hostProgram === undefined ? undefined : defaultDefinition(hostProgram, 'definePlugin')
-    clientRpc = hostObject !== undefined && objectProperty({ expression: hostObject, name: 'apis' }) !== undefined
+    clientRpc = hostObject !== undefined && SourceSyntax.objectProperty({ expression: hostObject, name: 'apis' }) !== undefined
   }
   const updatedManifest = updateManifestForPreset(packageManifest, preset, clientRpc)
   if (updatedManifest === undefined) {
@@ -314,7 +314,7 @@ export async function createPresetScaffold(options: AddPresetOptions, dependenci
         )
       }
       const configProgram = parse(configBefore, configFile)
-      const configCall = configProgram === undefined ? undefined : defaultCall({ program: configProgram, name: 'defineConfig' })
+      const configCall = configProgram === undefined ? undefined : SourceSyntax.defaultCall({ program: configProgram, name: 'defineConfig' })
       const configArgument = configCall?.arguments[0]
       if (
         configCall === undefined ||
@@ -332,7 +332,7 @@ export async function createPresetScaffold(options: AddPresetOptions, dependenci
           ),
         )
       }
-      if (objectProperty({ expression: configArgument, name: 'client' }) !== undefined) {
+      if (SourceSyntax.objectProperty({ expression: configArgument, name: 'client' }) !== undefined) {
         return refuse(
           diagnostic(
             'DSHX6301',
@@ -379,7 +379,7 @@ export async function createPresetScaffold(options: AddPresetOptions, dependenci
           ),
         )
       }
-      const setup = objectProperty({ expression: object, name: 'setup' })
+      const setup = SourceSyntax.objectProperty({ expression: object, name: 'setup' })
       if (setup === undefined) {
         return refuse(
           diagnostic(
@@ -413,7 +413,7 @@ export async function createPresetScaffold(options: AddPresetOptions, dependenci
             'warning',
           ),
         )
-      const usesProperty = objectProperty({ expression: object, name: 'uses' })
+      const usesProperty = SourceSyntax.objectProperty({ expression: object, name: 'uses' })
       const hasPanelsCapability = usesProperty !== undefined && usesLiteralIncludes(usesProperty.value, 'panels')
       const edits: { start: number; end: number; text: string }[] = []
       if (usesProperty !== undefined && !hasPanelsCapability) {
@@ -432,7 +432,7 @@ export async function createPresetScaffold(options: AddPresetOptions, dependenci
       } else if (usesProperty === undefined) {
         insertObjectProperty(edits, clientBefore, object, "  uses: ['panels'],")
       }
-      const importEnd = lastImportEnd(program)
+      const importEnd = SourceSyntax.lastImportEnd(program)
       const hasLayoutTypeImport = clientBefore.includes('@deepseek-ai/dsh-client-ui-layout/client')
       const importPath = relativeImport(project.clientEntry, resolve(project.root, `src/${symbols.stem}-panel.tsx`))
       edits.push({
@@ -499,9 +499,9 @@ export async function createPresetScaffold(options: AddPresetOptions, dependenci
     }
     const importPath = relativeImport(project.hostEntry, resolve(project.root, `src/${symbols.stem}-host.ts`))
     const importText = `import { ${symbol} } from '${importPath}'`
-    const importEnd = lastImportEnd(program)
+    const importEnd = SourceSyntax.lastImportEnd(program)
     const apiImportEdit = { start: importEnd, end: importEnd, text: `\n${importText}${hostBefore[importEnd] === '\n' ? '' : '\n'}` }
-    const apis = objectProperty({ expression: object, name: 'apis' })
+    const apis = SourceSyntax.objectProperty({ expression: object, name: 'apis' })
     if (apis === undefined) {
       const edits: { start: number; end: number; text: string }[] = [apiImportEdit]
       insertObjectProperty(edits, hostBefore, object, `  apis: [${symbol}],`)
@@ -577,11 +577,13 @@ const usesLiteralIncludes = (expression: Expression, literal: string): boolean =
   const array = usesArray(expression)
   return (
     array !== undefined &&
-    array.elements.some(element => element !== null && element.type !== 'SpreadElement' && stringValue(unwrapExpression(element)) === literal)
+    array.elements.some(
+      element => element !== null && element.type !== 'SpreadElement' && SourceSyntax.stringValue(SourceSyntax.unwrapExpression(element)) === literal,
+    )
   )
 }
 
 const usesArray = (expression: Expression): ArrayExpression | undefined => {
-  const value = unwrapExpression(expression)
+  const value = SourceSyntax.unwrapExpression(expression)
   return value.type === 'ArrayExpression' ? value : undefined
 }

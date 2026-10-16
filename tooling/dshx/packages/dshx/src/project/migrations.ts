@@ -3,13 +3,13 @@ import { extname, resolve, sep } from 'node:path'
 import type { ObjectExpression } from 'oxc-parser'
 import type { ResolvedDshxConfig } from '../config/types.js'
 import type { DshxDiagnostic } from '../diagnostics.js'
-import { parseSource, propertyName, stringValue, visitSource } from './syntax.js'
+import { SourceSyntax } from './syntax.js'
 
 const sourceExtensions = new Set(['.ts', '.tsx', '.mts', '.cts', '.js', '.jsx', '.mjs', '.cjs'])
 
 const analyzeSource = ({ file, source }: { file: string; source: string }): DshxDiagnostic[] => {
   const diagnostics: DshxDiagnostic[] = []
-  const program = parseSource({ file, source })
+  const program = SourceSyntax.parse({ file, source })
   const bindings = {
     host: new Set<string>(),
     client: new Set<string>(),
@@ -27,7 +27,7 @@ const analyzeSource = ({ file, source }: { file: string; source: string }): Dshx
     if (request === '@dshfiles/dshx') {
       const removed = statement.specifiers
         .filter(specifier => specifier.type === 'ImportSpecifier')
-        .map(specifier => propertyName(specifier.imported))
+        .map(specifier => SourceSyntax.propertyName(specifier.imported))
         .filter(name => name !== 'defineConfig' && name !== 'DshxConfig')
       if (removed.length > 0) issue(`The root entry no longer exports ${removed.join(', ')}.`, 'Import each author API from its dedicated stable subpath.')
     }
@@ -42,7 +42,7 @@ const analyzeSource = ({ file, source }: { file: string; source: string }): Dshx
     }
     for (const specifier of statement.specifiers) {
       if (specifier.type !== 'ImportSpecifier') continue
-      const imported = propertyName(specifier.imported)
+      const imported = SourceSyntax.propertyName(specifier.imported)
       const local = specifier.local.name
       if (request === '@dshfiles/dshx/host' && imported === 'defineHost') bindings.host.add(local)
       if (request === '@dshfiles/dshx/client' && imported === 'defineClient') bindings.client.add(local)
@@ -59,7 +59,7 @@ const analyzeSource = ({ file, source }: { file: string; source: string }): Dshx
         )
     }
   }
-  visitSource({
+  SourceSyntax.visit({
     program,
     visitor: {
       VariableDeclarator(node) {
@@ -76,13 +76,13 @@ const analyzeSource = ({ file, source }: { file: string; source: string }): Dshx
   const checkConfig = (object: ObjectExpression): void => {
     for (const property of object.properties) {
       if (property.type !== 'Property') continue
-      const name = propertyName(property.key)
-      const value = stringValue(property.value)
+      const name = SourceSyntax.propertyName(property.key)
+      const value = SourceSyntax.stringValue(property.value)
       if ((name === 'host' || name === 'client') && value !== undefined)
         issue(`String shorthand for config.${name} was removed.`, `Use ${name}: { entry: ${JSON.stringify(value)} }.`)
     }
   }
-  visitSource({
+  SourceSyntax.visit({
     program,
     visitor: {
       CallExpression(node) {
@@ -93,7 +93,7 @@ const analyzeSource = ({ file, source }: { file: string; source: string }): Dshx
             if (bindings.config.has(callee.name)) checkConfig(argument)
             for (const property of argument.properties) {
               if (property.type !== 'Property') continue
-              const name = propertyName(property.key)
+              const name = SourceSyntax.propertyName(property.key)
               if (bindings.host.has(callee.name) && name === 'api') issue('defineHost({ api }) was removed.', 'Use defineHost({ apis: [contract.host(...)] }).')
               if (bindings.client.has(callee.name)) {
                 if (name === 'api' || name === 'apis')
@@ -112,14 +112,14 @@ const analyzeSource = ({ file, source }: { file: string; source: string }): Dshx
             bindings.slot.has(callee.name) &&
             argument !== undefined &&
             argument.type !== 'SpreadElement' &&
-            stringValue(argument) === 'conversation.chat.node'
+            SourceSyntax.stringValue(argument) === 'conversation.chat.node'
           )
             issue(
               'A separate conversation.chat.node renderer Slot is no longer required.',
               'Pass the React component to lifecycle.render(Component) and register the result in defineClient({ conversations }).',
             )
         }
-        if (callee.type === 'MemberExpression' && !callee.computed && propertyName(callee.property) === 'component') {
+        if (callee.type === 'MemberExpression' && !callee.computed && SourceSyntax.propertyName(callee.property) === 'component') {
           const object = callee.object
           if (
             (object.type === 'Identifier' && lifecycles.has(object.name)) ||

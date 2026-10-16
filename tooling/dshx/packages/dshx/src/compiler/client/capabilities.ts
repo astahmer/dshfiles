@@ -3,7 +3,7 @@ import { extname, resolve } from 'node:path'
 import type { Program, Expression, ObjectProperty, Function, ArrowFunctionExpression, ParamPattern } from 'oxc-parser'
 import { CLIENT_CAPABILITIES, CLIENT_SERVICES } from 'create-dshx/capabilities'
 import { CLIENT_DEFAULT_SERVICES } from 'create-dshx/runtime-capabilities'
-import { parseSource, visitSource, propertyName, stringValue, unwrapExpression } from '../../project/syntax.js'
+import { SourceSyntax } from '../../project/syntax.js'
 
 const CLIENT_PUBLIC = '@dshfiles/dshx/client'
 const SOURCE_EXTENSIONS = ['.ts', '.tsx', '.mts', '.js', '.jsx', '.mjs'] as const
@@ -66,12 +66,12 @@ async function sourceFile(specifier: string, importer: string): Promise<string |
 }
 
 const nameOf = (property: ObjectProperty): string | undefined =>
-  property.computed && property.key.type === 'Identifier' ? undefined : propertyName(property.key)
+  property.computed && property.key.type === 'Identifier' ? undefined : SourceSyntax.propertyName(property.key)
 
 type SetupFunction = Function | ArrowFunctionExpression
 
 const sourceBindings = ({ source, file }: { source: string; file: string }) => {
-  const program = parseSource({ source, file })
+  const program = SourceSyntax.parse({ source, file })
   const named = new Map<string, string>()
   const namespaces = new Set<string>()
   const initializers = new Map<string, Expression>()
@@ -88,7 +88,7 @@ const sourceBindings = ({ source, file }: { source: string; file: string }) => {
         for (const specifier of statement.specifiers) {
           if (specifier.type === 'ImportNamespaceSpecifier') namespaces.add(specifier.local.name)
           if (specifier.type === 'ImportSpecifier') {
-            const imported = propertyName(specifier.imported)
+            const imported = SourceSyntax.propertyName(specifier.imported)
             if (imported !== undefined) named.set(specifier.local.name, imported)
           }
         }
@@ -101,11 +101,11 @@ const sourceBindings = ({ source, file }: { source: string; file: string }) => {
     if (statement.type === 'ExportNamedDeclaration') {
       if (statement.source?.value.startsWith('.')) imports.push(statement.source.value)
       for (const specifier of statement.specifiers) {
-        if (propertyName(specifier.exported) !== 'default') continue
+        if (SourceSyntax.propertyName(specifier.exported) !== 'default') continue
         if (statement.source !== null) {
-          if (propertyName(specifier.local) === 'default') reexports.push(statement.source.value)
+          if (SourceSyntax.propertyName(specifier.local) === 'default') reexports.push(statement.source.value)
           else unknownReexport = true
-        } else defaultLocal = propertyName(specifier.local)
+        } else defaultLocal = SourceSyntax.propertyName(specifier.local)
       }
     }
     const declaration = statement.type === 'ExportNamedDeclaration' ? statement.declaration : statement
@@ -119,11 +119,11 @@ const sourceBindings = ({ source, file }: { source: string; file: string }) => {
   const importedName = (expression: Expression): string | undefined => {
     if (expression.type === 'Identifier') return named.get(expression.name)
     if (expression.type === 'MemberExpression' && !expression.computed && expression.object.type === 'Identifier' && namespaces.has(expression.object.name))
-      return propertyName(expression.property)
+      return SourceSyntax.propertyName(expression.property)
     return undefined
   }
   const resolveExpression = (input: Expression, seen = new Set<string>()): Expression | undefined => {
-    const expression = unwrapExpression(input)
+    const expression = SourceSyntax.unwrapExpression(input)
     if (expression.type !== 'Identifier') return expression
     if (seen.has(expression.name)) return undefined
     const initializer = initializers.get(expression.name)
@@ -133,7 +133,7 @@ const sourceBindings = ({ source, file }: { source: string; file: string }) => {
     return resolveExpression(initializer, next)
   }
   const resolveFunction = (input: Expression, seen = new Set<string>()): SetupFunction | undefined => {
-    const expression = unwrapExpression(input)
+    const expression = SourceSyntax.unwrapExpression(input)
     if (expression.type === 'ArrowFunctionExpression' || expression.type === 'FunctionExpression') return expression
     if (expression.type !== 'Identifier' || seen.has(expression.name)) return undefined
     const declaration = functions.get(expression.name)
@@ -151,7 +151,7 @@ const sourceCapabilities = (source: string, file: string): SourceCapabilityAnaly
   const bindings = sourceBindings({ source, file })
   let settings = false
   let api = false
-  visitSource({
+  SourceSyntax.visit({
     program: bindings.program,
     visitor: {
       CallExpression(node) {
@@ -168,7 +168,7 @@ const sourceCapabilities = (source: string, file: string): SourceCapabilityAnaly
 const declarativeClientDefinition = (source: string, file: string, field: 'conversations' | 'locales'): ConversationDefinitionAnalysis => {
   const bindings = sourceBindings({ source, file })
   const inspect = (input: Expression, seen = new Set<string>()): boolean => {
-    const expression = unwrapExpression(input)
+    const expression = SourceSyntax.unwrapExpression(input)
     if (expression.type === 'Identifier') {
       if (seen.has(expression.name)) return true
       const initializer = bindings.initializers.get(expression.name)
@@ -192,7 +192,7 @@ const declarativeClientDefinition = (source: string, file: string, field: 'conve
       const name = nameOf(property)
       if (name === undefined && property.computed && field === 'conversations') return true
       if (name !== field) continue
-      const value = unwrapExpression(property.value)
+      const value = SourceSyntax.unwrapExpression(property.value)
       if (value.type === 'ArrayExpression' && value.elements.length === 0) continue
       return true
     }
@@ -203,7 +203,7 @@ const declarativeClientDefinition = (source: string, file: string, field: 'conve
 
 const destructuresService = (parameter: ParamPattern, service: string): boolean => {
   if (parameter.type !== 'ObjectPattern') return false
-  return parameter.properties.some(property => property.type === 'Property' && propertyName(property.key) === service)
+  return parameter.properties.some(property => property.type === 'Property' && SourceSyntax.propertyName(property.key) === service)
 }
 
 const functionUsesSetupService = ({
@@ -232,7 +232,7 @@ const functionUsesSetupService = ({
   const leave = (): void => {
     activeScopes.pop()
   }
-  visitSource({
+  SourceSyntax.visit({
     program,
     visitor: {
       FunctionDeclaration: enter,
@@ -244,14 +244,14 @@ const functionUsesSetupService = ({
       MemberExpression(node) {
         if (!activeScopes.at(-1) || node.object.type !== 'Identifier' || node.object.name !== contextName) return
         if (
-          (!node.computed && propertyName(node.property) === service) ||
+          (!node.computed && SourceSyntax.propertyName(node.property) === service) ||
           (node.computed && node.property.type === 'Literal' && node.property.value === service)
         )
           used = true
       },
       VariableDeclarator(node) {
         if (!activeScopes.at(-1) || node.init === null) return
-        const initializer = unwrapExpression(node.init)
+        const initializer = SourceSyntax.unwrapExpression(node.init)
         if (initializer.type === 'Identifier' && initializer.name === contextName && destructuresService(node.id, service)) used = true
       },
     },
@@ -295,7 +295,7 @@ const clientSetupServicesInSource = (source: string, file: string): ClientDefini
     const values: string[] = []
     for (const element of value.elements) {
       if (element === null || element.type === 'SpreadElement') return undefined
-      const text = stringValue(element)
+      const text = SourceSyntax.stringValue(element)
       if (text === undefined) return undefined
       values.push(text)
     }
@@ -468,7 +468,7 @@ const localeNamespace = ({ expression, bindings }: { expression: Expression; bin
   if (factory !== 'defineLocale' && factory !== 'declareLocaleNamespace') return undefined
   const argument = call.arguments[0]
   if (argument === undefined || argument.type === 'SpreadElement') return undefined
-  return stringValue(bindings.resolveExpression(argument) ?? argument)
+  return SourceSyntax.stringValue(bindings.resolveExpression(argument) ?? argument)
 }
 
 export const clientLocaleNamespaces = async (entry: string, root: string): Promise<readonly string[] | undefined> => {

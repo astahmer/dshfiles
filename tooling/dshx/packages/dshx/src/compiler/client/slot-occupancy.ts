@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import { extname, resolve } from 'node:path'
 import type { Expression } from 'oxc-parser'
-import { parseSource, visitSource, propertyName, stringValue, unwrapExpression } from '../../project/syntax.js'
+import { SourceSyntax } from '../../project/syntax.js'
 import { CLIENT_SLOT_REFERENCES } from '../../client/slot-reference.js'
 
 const SOURCE_EXTENSIONS = ['.ts', '.tsx', '.mts', '.js', '.jsx', '.mjs'] as const
@@ -44,7 +44,7 @@ export interface SlotRegistration {
 function numericValue(expression: Expression): number | undefined {
   if (expression.type === 'Literal') return typeof expression.value === 'number' ? expression.value : undefined
   if (expression.type !== 'UnaryExpression') return undefined
-  const operand = unwrapExpression(expression.argument)
+  const operand = SourceSyntax.unwrapExpression(expression.argument)
   if (operand.type !== 'Literal' || typeof operand.value !== 'number') return undefined
   if (expression.operator === '-') return -operand.value
   if (expression.operator === '+') return operand.value
@@ -52,20 +52,20 @@ function numericValue(expression: Expression): number | undefined {
 }
 
 const memberPath = (expression: Expression): string | undefined => {
-  const value = unwrapExpression(expression)
+  const value = SourceSyntax.unwrapExpression(expression)
   if (value.type === 'Identifier') return value.name
   if (value.type !== 'MemberExpression') return undefined
   const object = memberPath(value.object)
-  const property = propertyName(value.property)
+  const property = SourceSyntax.propertyName(value.property)
   return object === undefined || property === undefined ? undefined : `${object}.${property}`
 }
 
 const objectValue = (expression: Expression | undefined, name: string): Expression | undefined => {
   if (expression === undefined) return undefined
-  const value = unwrapExpression(expression)
+  const value = SourceSyntax.unwrapExpression(expression)
   if (value.type !== 'ObjectExpression') return undefined
   for (const property of value.properties) {
-    if (property.type === 'Property' && propertyName(property.key) === name) return unwrapExpression(property.value)
+    if (property.type === 'Property' && SourceSyntax.propertyName(property.key) === name) return SourceSyntax.unwrapExpression(property.value)
   }
   return undefined
 }
@@ -73,9 +73,9 @@ const objectValue = (expression: Expression | undefined, name: string): Expressi
 const objectString = (expression: Expression | undefined, name: string, strings: ReadonlyMap<string, string>): string | undefined => {
   const value = objectValue(expression, name)
   if (value === undefined) return undefined
-  const unwrapped = unwrapExpression(value)
+  const unwrapped = SourceSyntax.unwrapExpression(value)
   if (unwrapped.type === 'Identifier') return strings.get(unwrapped.name)
-  return stringValue(unwrapped)
+  return SourceSyntax.stringValue(unwrapped)
 }
 
 const objectPriority = (expression: Expression | undefined): number | undefined => {
@@ -95,7 +95,7 @@ const sourceLocation = (source: string, offset: number): { readonly line: number
 }
 
 const registrationsIn = (source: string, file: string): SlotRegistration[] => {
-  const program = parseSource({ source, file })
+  const program = SourceSyntax.parse({ source, file })
   const defineSlotNames = new Set(['defineSlot'])
   const strings = new Map<string, string>()
   for (const statement of program.body) {
@@ -110,7 +110,7 @@ const registrationsIn = (source: string, file: string): SlotRegistration[] => {
     if (declaration?.type !== 'VariableDeclaration' || declaration.kind !== 'const') continue
     for (const variable of declaration.declarations) {
       if (variable.id.type !== 'Identifier' || variable.init === null) continue
-      const value = stringValue(unwrapExpression(variable.init))
+      const value = SourceSyntax.stringValue(SourceSyntax.unwrapExpression(variable.init))
       if (value !== undefined) strings.set(variable.id.name, value)
     }
   }
@@ -146,14 +146,14 @@ const registrationsIn = (source: string, file: string): SlotRegistration[] => {
     })
   }
 
-  visitSource({
+  SourceSyntax.visit({
     program,
     visitor: {
       CallExpression(current) {
         const name = memberPath(current.callee)
         if (name === undefined) return
         const first = current.arguments[0]
-        const firstValue = first === undefined || first.type === 'SpreadElement' ? undefined : unwrapExpression(first)
+        const firstValue = first === undefined || first.type === 'SpreadElement' ? undefined : SourceSyntax.unwrapExpression(first)
         const knownRegister =
           name.endsWith('.slots.register') || name.endsWith('.ui.register') || name.endsWith('.panels.register') || name.endsWith('.sidebar.register')
         if (knownRegister && firstValue !== undefined) {
@@ -181,11 +181,11 @@ const registrationsIn = (source: string, file: string): SlotRegistration[] => {
           })
           return
         }
-        const callee = unwrapExpression(current.callee)
+        const callee = SourceSyntax.unwrapExpression(current.callee)
         if (callee.type !== 'Identifier' || !defineSlotNames.has(callee.name)) return
-        const slot = stringValue(firstValue)
+        const slot = SourceSyntax.stringValue(firstValue)
         const options = current.arguments[1]
-        const optionsValue = options === undefined || options.type === 'SpreadElement' ? undefined : unwrapExpression(options)
+        const optionsValue = options === undefined || options.type === 'SpreadElement' ? undefined : SourceSyntax.unwrapExpression(options)
         record({
           slot,
           id: objectString(optionsValue, 'id', strings),
@@ -215,7 +215,7 @@ export async function clientSlotRegistrations(entry: string, root: string): Prom
     } catch {
       continue
     }
-    const parsed = parseSource({ source, file })
+    const parsed = SourceSyntax.parse({ source, file })
     found.push(...registrationsIn(source, file))
     for (const statement of parsed.body) {
       if (statement.type !== 'ImportDeclaration' || !statement.source.value.startsWith('.')) continue
