@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { buildFileTree, splitFilePath } from './file-tree.ts'
 import { refreshesOnReturn, refreshQueryOptions } from './auto-refresh.ts'
 import { decodePreferences, legacyPreferences } from './preferences.ts'
-import { descendantCommitIds, emptyAncestorCandidates, sourceControlGroups } from './source-control.ts'
+import { SourceControlModel } from './source-control.ts'
 
 const commit = (letter: string): string => letter.repeat(40)
 
@@ -103,7 +103,7 @@ describe('source control groups', () => {
   ]
 
   it('walks @ through @-N with parent and child links', () => {
-    const groups = sourceControlGroups(revisions, 2)
+    const groups = SourceControlModel.sourceControlGroups(revisions, 2)
     expect(groups.map(group => [group.depth, group.revision.commitId])).toEqual([
       [0, commit('d')],
       [1, commit('c')],
@@ -115,11 +115,11 @@ describe('source control groups', () => {
   })
 
   it('only offers undescribed mutable empty ancestors for cleanup', () => {
-    expect(emptyAncestorCandidates(revisions).map(row => row.commitId)).toEqual([commit('c')])
+    expect(SourceControlModel.emptyAncestorCandidates(revisions).map(row => row.commitId)).toEqual([commit('c')])
   })
 
   it('moves a revision together with its descendants', () => {
-    expect([...descendantCommitIds(revisions, commit('b'))].sort()).toEqual([commit('b'), commit('c'), commit('d')])
+    expect([...SourceControlModel.descendantCommitIds(revisions, commit('b'))].sort()).toEqual([commit('b'), commit('c'), commit('d')])
   })
 })
 

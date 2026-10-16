@@ -1,6 +1,6 @@
 import type { Revision, Mutation } from './api.js'
 import type { DropPresentation } from './revision-action-machine.js'
-import { descendantCommitIds } from './source-control.js'
+import { SourceControlModel } from './source-control.js'
 
 export const REVISION_MIME = 'application/x-jujutsu-revision'
 export const BOOKMARK_MIME = 'application/x-jujutsu-bookmark'
@@ -26,7 +26,7 @@ export const resolveRevisionDrop = (input: {
   const source = input.revisions.find(revision => revision.commitId === input.sourceRevisionId)
   if (source === undefined || source.commitId === input.target.commitId) return { kind: 'noop' }
   if (source.immutable) return { kind: 'invalid', message: 'Immutable revisions cannot be rebased.' }
-  if (descendantCommitIds(input.revisions, source.commitId).has(input.target.commitId)) {
+  if (SourceControlModel.descendantCommitIds(input.revisions, source.commitId).has(input.target.commitId)) {
     return { kind: 'invalid', message: 'A branch cannot be rebased onto one of its own revisions.' }
   }
   return {

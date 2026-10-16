@@ -30,7 +30,7 @@ import { ChangedFiles, FileViewToggle, type FileView } from './changed-files.js'
 import { describeDraftChanged } from './graph.js'
 import type { refreshQueryOptions } from './auto-refresh.js'
 import { ANCESTOR_COUNT_OPTIONS } from './preferences.js'
-import { sourceControlGroups } from './source-control.js'
+import { SourceControlModel } from './source-control.js'
 import { openInEditor } from './open-in-editor.js'
 import { JUJUTSU_QUERY_GC_TIME, JUJUTSU_QUERY_STALE_TIME, jujutsuQueryKeys } from './repository-query-cache.js'
 
@@ -81,7 +81,7 @@ const IconAction = (props: {
 /** jj-view style Source Control: a describe box for @, then the working copy and @-1 … @-N groups. */
 export const SourceControlView = (props: SourceControlViewProps): JSX.Element => {
   const api = useApi(jujutsuApi)
-  const groups = useMemo(() => sourceControlGroups(props.revisions, props.ancestorCount), [props.revisions, props.ancestorCount])
+  const groups = useMemo(() => SourceControlModel.sourceControlGroups(props.revisions, props.ancestorCount), [props.revisions, props.ancestorCount])
   const commitIds = groups.map(group => group.revision.commitId)
   const filesQuery = useQuery({
     queryKey: jujutsuQueryKeys.revisionFiles(props.repositoryRoot, commitIds),
