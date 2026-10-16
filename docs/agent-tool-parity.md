@@ -39,7 +39,7 @@ backing verb; `host-gap` counts capabilities no verb can reach yet.
 | shortcuts | 4 | 0 | 2 | 1 |
 | jj-integration | 22 | 8 | 5 | 3 |
 | jujutsu | 28 | 0 | 28 | 3 |
-| project-checks | 8 | 0 | 5 | 2 |
+| project-checks | 8 | 4 | 1 | 2 |
 | project-folder-picker / workspace-folder-picker | 9 | 0 | 4 | 2 |
 | workbench | 8 | 0 | 2 | 6 |
 | agent-communication | 10 | 14 | 0 | 0 |
@@ -52,7 +52,7 @@ backing verb; `host-gap` counts capabilities no verb can reach yet.
 | ai-accounts | 21 | 18 | 7 | 1 |
 | model-effort-picker | 3 | 0 | 1 | 0 |
 | usage | 5 | 0 | 4 | 1 |
-| memory | 12 | 3 | 9 | 0 |
+| memory | 12 | 11 | 1 | 0 |
 | optmem | 6 | 0 (plugin not installed) | 6 | 0 |
 | editor | 7 | 0 | 6 | 2 |
 | diff-viewed | 3 | 0 | 1 | 2 |
@@ -180,13 +180,15 @@ own API; none carries a `tool` binding, so every one is a missing tool:
 
 ### project-checks
 
-| Proposed tool | Capability | Backing verb |
-| --- | --- | --- |
-| `project_checks_actions` | List trusted project actions | `actions` (`src/api.ts:53`) |
-| `project_checks_run` | Run a trusted action | `run` (`src/api.ts:65`) |
-| `project_checks_receipts` | Recent receipts with working-copy freshness | `receipts` (`src/api.ts:57`) |
-| `project_checks_hook_events` | Native hook invoked/result records | `hookEvents` (`src/api.ts:61`) |
-| `project_checks_verify` | Verify configured actions before a turn closes | `agent/turn-stopping` hook |
+Bound now (sibling revision `feat(project-checks): expose trusted actions and
+receipts as agent tools`): read-only `project_checks_actions`,
+`project_checks_receipts` and `project_checks_hook_events`, plus
+`project_checks_run`. `sessionId` became optional so each tool defaults to the
+calling thread, and a request that names neither a session nor an Agent caller is
+refused.
+
+Still missing: `project_checks_verify` is not a tool at all — verification fires
+from the `agent/turn-stopping` hook, not from a user action.
 
 ### project-folder-picker / workspace-folder-picker
 
@@ -293,10 +295,16 @@ Still missing, because they write secrets or need a browser:
 - `usage`: `usage_requests` and `usage_report` are registered in code but the
   plugin is not installed in the web profile, plus `usage_reindex` (`refresh`)
   and `usage_status` (`status`).
-- `memory`: `memory_notes`, `memory_note_edit`, `memory_note_forget`,
-  `memory_note_history`, `memory_threads`, `memory_usage`,
-  `memory_rate_citation`, `memory_projects`, `memory_preview`,
-  `memory_start_block`, `memory_get_settings` / `memory_set_settings`.
+- `memory`: bound (sibling revision `feat(memory): expose note curation and
+  memory inspection as agent tools`) — read-only `memory_projects`,
+  `memory_start_block`, `memory_notes`, `memory_note_history`, `memory_threads`
+  and `memory_citations`, plus `memory_edit_note` and `memory_forget_note`. Their
+  panel types are now schemas (`panelNote`, `panelThread`, `notesFilter`,
+  `memoryCitation`) with the public types derived from them. Left out on purpose:
+  `memory_usage` (needs the full `MemoryUsage` schema), `memory_preview`
+  (duplicates `memory_read` and would distort the memory-tool counters),
+  `memory_rate_citation` (an Agent must not rate its own citations), and the
+  settings pair, retired by `settings_set` / `settings_unset`.
 - `optmem`: `optmem_project_view`, `optmem_project_search`,
   `optmem_get_settings` / `optmem_set_settings`, `optmem_pause_summaries`,
   `optmem_backfill`, `optmem_status` — plugin not installed.
@@ -531,16 +539,23 @@ A seventh, `feat(activity-timeline,agent-communication): expose retained reads a
 agent tools`, closes both read-only gaps: `activity_timeline_event` and
 `dshx_comm_browse` / `dshx_comm_recipients` / `dshx_comm_diagnostics`.
 
+An eighth, `feat(project-checks): expose trusted actions and receipts as agent
+tools`, binds the four project-check actions, receipts, hook events and the run
+verb, defaulting the target to the calling thread.
+
+A ninth, `feat(memory): expose note curation and memory inspection as agent
+tools`, makes the memory panel types schemas and binds eight tools, so an Agent
+can correct or forget a note the user asked about and inspect what memory holds.
+
 ## Backlog
 
-1. **P1 — bind tools to verbs that already exist.** Remaining cheap wins, in
-   this order: `project-checks` (5), `memory` (9 — needs schemas for the panel
-   methods, which are declared with TypeScript types only), `editor` (`write`,
-   `workspaceFiles.list`), `tool-meta` (2), `queue-reorder` (5, not installed),
-   then `jujutsu` (28, large and already reachable through `bash jj`). Most are a
-   `tool:` field plus a `render` on an existing dshx method. Done so far:
-   `thread-sidebar`, `jj-integration`, `settings-shell`, `ai-accounts`,
-   `multi-host`, `mcp-servers`, `agent-communication`, `activity-timeline`.
+1. **P1 — bind tools to verbs that already exist.** What is left, in value
+   order: `editor` (`write`, `workspaceFiles.list`), `tool-meta` (2 — a settings
+   namespace `settings_set` already reaches), `queue-reorder` (5, not installed),
+   then `jujutsu` (28, large and already reachable through `bash jj`, so it is
+   deliberately last). Done: `thread-sidebar`, `jj-integration`,
+   `settings-shell`, `ai-accounts`, `multi-host`, `mcp-servers`,
+   `agent-communication`, `activity-timeline`, `project-checks`, `memory`.
 2. **P2 — install the plugins that already ship tools.** `usage`, `optmem`,
    `queue-reorder` are written but absent from the web profile, so their tools
    are dead code today; decide per plugin whether it belongs in the seed.
