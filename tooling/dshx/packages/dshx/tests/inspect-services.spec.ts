@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { inspectProjectComposition, normalizeEvents, normalizeServices } from '../src/inspect/index.js'
+import { inspectProjectComposition, ProviderInspectionModel } from '../src/inspect/index.js'
 import type { ResolvedDshxConfig } from '../src/config/types.js'
 import { PROTOCOL_2_COMPATIBILITY } from '../src/compat/index.js'
 
@@ -39,21 +39,21 @@ function linked(value: ResolvedDshxConfig) {
 
 describe('services and events inspect normalization', () => {
   it('normalizes summaries and preserves metadata', () => {
-    expect(normalizeServices([{ name: 'logger', provider: 'core', scope: 'global', version: '1' }])).toEqual([
+    expect(ProviderInspectionModel.normalizeServices([{ name: 'logger', provider: 'core', scope: 'global', version: '1' }])).toEqual([
       { name: 'logger', provider: 'core', scope: 'global', metadata: { version: '1' } },
     ])
-    expect(normalizeServices([{ name: 'logger', metadata: { description: 'structured' }, version: '1' }])).toEqual([
+    expect(ProviderInspectionModel.normalizeServices([{ name: 'logger', metadata: { description: 'structured' }, version: '1' }])).toEqual([
       { name: 'logger', metadata: { description: 'structured', version: '1' } },
     ])
-    expect(normalizeEvents([{ name: 'agent.ready', provider: 'agent', payload: { type: 'object' } }])).toEqual([
+    expect(ProviderInspectionModel.normalizeEvents([{ name: 'agent.ready', provider: 'agent', payload: { type: 'object' } }])).toEqual([
       { name: 'agent.ready', provider: 'agent', metadata: { payload: { type: 'object' } } },
     ])
   })
 
   it('rejects malformed summaries', () => {
-    expect(() => normalizeServices([{ name: '', scope: 'global' }])).toThrow('non-empty string name')
-    expect(() => normalizeServices([{ name: 'logger', scope: 1 }])).toThrow('must be a string')
-    expect(() => normalizeEvents('bad')).toThrow('must be an array')
+    expect(() => ProviderInspectionModel.normalizeServices([{ name: '', scope: 'global' }])).toThrow('non-empty string name')
+    expect(() => ProviderInspectionModel.normalizeServices([{ name: 'logger', scope: 1 }])).toThrow('must be a string')
+    expect(() => ProviderInspectionModel.normalizeEvents('bad')).toThrow('must be an array')
   })
 
   it('queries injected services and events providers without mutation', async () => {

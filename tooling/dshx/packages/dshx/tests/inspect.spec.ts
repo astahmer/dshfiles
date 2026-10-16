@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { inspectProjectComposition, normalizeSlots, normalizeTools } from '../src/inspect/index.js'
+import { inspectProjectComposition, ProviderInspectionModel } from '../src/inspect/index.js'
 import type { ResolvedDshxConfig } from '../src/config/types.js'
 import { PROTOCOL_2_COMPATIBILITY } from '../src/compat/index.js'
 
@@ -36,22 +36,22 @@ function installation() {
 
 describe('runtime inspect normalization', () => {
   it('normalizes official slot and tool fields while preserving unknown metadata', () => {
-    expect(normalizeSlots([{ name: 'sidebar.footer', provider: 'sidebar', kind: 'action', scope: 'global', order: 10 }])).toEqual([
+    expect(ProviderInspectionModel.normalizeSlots([{ name: 'sidebar.footer', provider: 'sidebar', kind: 'action', scope: 'global', order: 10 }])).toEqual([
       { name: 'sidebar.footer', provider: 'sidebar', kind: 'action', scope: 'global', metadata: { order: 10 } },
     ])
-    expect(normalizeSlots([{ name: 'ui.root', type: 'factory', scope: 'root', children: [] }])).toEqual([
+    expect(ProviderInspectionModel.normalizeSlots([{ name: 'ui.root', type: 'factory', scope: 'root', children: [] }])).toEqual([
       { name: 'ui.root', type: 'factory', scope: 'root', metadata: { children: [] } },
     ])
-    expect(normalizeTools([{ name: 'status', provider: 'fixture', description: 'Show status', input: { type: 'object' } }])).toEqual([
+    expect(ProviderInspectionModel.normalizeTools([{ name: 'status', provider: 'fixture', description: 'Show status', input: { type: 'object' } }])).toEqual([
       { name: 'status', provider: 'fixture', description: 'Show status', metadata: { input: { type: 'object' } } },
     ])
   })
 
   it('rejects malformed provider DTOs', () => {
-    expect(() => normalizeSlots([{ name: '' }])).toThrow('non-empty string name')
-    expect(() => normalizeSlots([{ name: 'slot', scope: 42 }])).toThrow('must be a string')
-    expect(() => normalizeSlots([{ name: 'slot', type: 'unknown' }])).toThrow('must be "slot" or "factory"')
-    expect(() => normalizeTools('not-an-array')).toThrow('must be an array')
+    expect(() => ProviderInspectionModel.normalizeSlots([{ name: '' }])).toThrow('non-empty string name')
+    expect(() => ProviderInspectionModel.normalizeSlots([{ name: 'slot', scope: 42 }])).toThrow('must be a string')
+    expect(() => ProviderInspectionModel.normalizeSlots([{ name: 'slot', type: 'unknown' }])).toThrow('must be "slot" or "factory"')
+    expect(() => ProviderInspectionModel.normalizeTools('not-an-array')).toThrow('must be an array')
   })
 })
 

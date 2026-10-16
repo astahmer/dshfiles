@@ -85,7 +85,7 @@ function metadata(record: Record<string, unknown>, known: readonly string[]): Re
   return Object.keys(merged).length === 0 ? undefined : merged
 }
 
-export function normalizeSlots(value: unknown): readonly SlotSummary[] {
+const normalizeSlots = (value: unknown): readonly SlotSummary[] => {
   if (!Array.isArray(value)) throw new Error('Slot Inspect output must be an array.')
   return value.map((entry, index) => {
     if (!isRecord(entry) || typeof entry.name !== 'string' || entry.name.trim() === '')
@@ -109,7 +109,7 @@ export function normalizeSlots(value: unknown): readonly SlotSummary[] {
   })
 }
 
-export function normalizeTools(value: unknown): readonly ToolSummary[] {
+const normalizeTools = (value: unknown): readonly ToolSummary[] => {
   if (!Array.isArray(value)) throw new Error('Tool Inspect output must be an array.')
   return value.map((entry, index) => {
     if (!isRecord(entry) || typeof entry.name !== 'string' || entry.name.trim() === '')
@@ -127,7 +127,7 @@ export function normalizeTools(value: unknown): readonly ToolSummary[] {
   })
 }
 
-export function normalizeServices(value: unknown): readonly ServiceSummary[] {
+const normalizeServices = (value: unknown): readonly ServiceSummary[] => {
   if (!Array.isArray(value)) throw new Error('Service Inspect output must be an array.')
   return value.map((entry, index) => {
     if (!isRecord(entry) || typeof entry.name !== 'string' || entry.name.trim() === '')
@@ -145,7 +145,7 @@ export function normalizeServices(value: unknown): readonly ServiceSummary[] {
   })
 }
 
-export function normalizeEvents(value: unknown): readonly EventSummary[] {
+const normalizeEvents = (value: unknown): readonly EventSummary[] => {
   if (!Array.isArray(value)) throw new Error('Event Inspect output must be an array.')
   return value.map((entry, index) => {
     if (!isRecord(entry) || typeof entry.name !== 'string' || entry.name.trim() === '')
@@ -159,6 +159,13 @@ export function normalizeEvents(value: unknown): readonly EventSummary[] {
       ...(extra === undefined ? {} : { metadata: extra }),
     }
   })
+}
+
+export class ProviderInspectionModel {
+  static readonly normalizeSlots = normalizeSlots
+  static readonly normalizeTools = normalizeTools
+  static readonly normalizeServices = normalizeServices
+  static readonly normalizeEvents = normalizeEvents
 }
 
 function profileOptions(options: InspectOptions): ProfileOrchestratorOptions {
@@ -275,7 +282,12 @@ export async function inspectProjectComposition(project: ResolvedDshxConfig, tar
     }
     let items: readonly SlotSummary[] | readonly ToolSummary[] | readonly ServiceSummary[] | readonly EventSummary[]
     try {
-      items = { slots: normalizeSlots, tools: normalizeTools, services: normalizeServices, events: normalizeEvents }[target](raw)
+      items = {
+        slots: ProviderInspectionModel.normalizeSlots,
+        tools: ProviderInspectionModel.normalizeTools,
+        services: ProviderInspectionModel.normalizeServices,
+        events: ProviderInspectionModel.normalizeEvents,
+      }[target](raw)
     } catch (error) {
       return {
         profile: project.profile,
