@@ -62,8 +62,10 @@ The checked-in web profile lives in `profiles/web/` and contains the package
 manifest ([installed composition](profiles/web/package.json)), Cordis patch, pnpm workspace policy, and portable AI-account metadata
 (`ai-accounts.json`). Nixfiles seeds writable runtime copies, reconciles managed
 plugin declarations, and copies account metadata only when the runtime account
-store is absent. Credentials, provider auth, lockfiles, sessions, and other
-runtime state stay local and are not copied.
+store is absent. The profile pins upstream [`dsh-context@0.72.0`](https://github.com/bowenliang123/dsh-context)
+(Apache-2.0) for Context Insights; review compatibility and external requests in
+scratch before changing the pin. Credentials, provider auth, lockfiles, sessions,
+and other runtime state stay local and are not copied.
 
 ### Toolchain
 
