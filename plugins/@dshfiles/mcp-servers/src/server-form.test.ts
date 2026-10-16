@@ -9,7 +9,7 @@ import {
   uniqueServerName,
   type ServerFormValues,
 } from './server-form.js'
-import { publicServerView } from './server-state.js'
+import { McpServerStateModel } from './server-state.js'
 
 const issueFields = (values: Parameters<typeof parseServerForm>[0]): readonly (string | undefined)[] => {
   const parsed = parseServerForm(values)
@@ -63,8 +63,8 @@ describe('server editor form', () => {
 
   it('edits a saved server through reference names only, never resolved values', () => {
     const secret = 'resolved-secret-value'
-    const view = publicServerView(
-      Object.assign(
+    const view = McpServerStateModel.publicServerView({
+      server: Object.assign(
         {
           id: 'one',
           name: 'Remote',
@@ -77,8 +77,8 @@ describe('server editor form', () => {
         },
         { resolvedValue: secret },
       ),
-      new Map([['REMOTE_TOKEN', true]]),
-    )
+      availability: new Map([['REMOTE_TOKEN', true]]),
+    })
     const values = serverFormFromView(view)
     expect(values).toMatchObject({ id: 'one', enabled: false, localStart: true, startCwd: '/srv' })
     expect(JSON.parse(values.headerRefs)).toEqual({ Authorization: 'REMOTE_TOKEN' })
@@ -143,10 +143,25 @@ describe('catalog drafts and OAuth', () => {
       headerRefs: {},
       auth: 'oauth' as const,
     }
-    const pending = publicServerView(stored, new Map(), 'inactive', 0, 'not-configured', false)
+    const pending = McpServerStateModel.publicServerView({
+      server: stored,
+      availability: new Map(),
+      clientLifecycle: 'inactive',
+      localProcess: 'not-configured',
+      signedIn: false,
+    })
     expect(pending.oauth).toBe('needs-sign-in')
     expect(pending.configuration).toBe('needs-credentials')
-    expect(publicServerView(stored, new Map(), 'loaded', 2, 'not-configured', true)).toMatchObject({ oauth: 'signed-in', configuration: 'ready' })
+    expect(
+      McpServerStateModel.publicServerView({
+        server: stored,
+        availability: new Map(),
+        clientLifecycle: 'loaded',
+        registeredToolCount: 2,
+        localProcess: 'not-configured',
+        signedIn: true,
+      }),
+    ).toMatchObject({ oauth: 'signed-in', configuration: 'ready' })
     const values = serverFormFromView(pending)
     expect(values.oauth).toBe(true)
     const parsed = parseServerForm(values)

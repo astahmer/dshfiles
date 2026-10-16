@@ -6,7 +6,7 @@ import { PROVIDERS, filterProviders, searchOfficialRegistry } from './catalog.js
 import { ManagedLocalCommand } from './local-process.js'
 import { ClientReconciler } from './reconcile.js'
 import { redactText, redactingLogger } from './redaction.js'
-import { publicServerView, removeServer, saveServer, setServerEnabled } from './server-state.js'
+import { McpServerStateModel } from './server-state.js'
 import { createQuickPanelContribution, SessionQuickPanels } from './quick-panel.js'
 
 type StoredStdioServer = Extract<StoredServer, { readonly transport: 'stdio' }>
@@ -28,23 +28,28 @@ describe('MCP manager state', () => {
   it('creates, edits, toggles, and removes only the addressed server', () => {
     const first = server()
     const second = server({ id: 'two', name: 'Other', serverName: 'other', envRefs: {} })
-    const created = saveServer([first], second)
+    const created = McpServerStateModel.saveServer({ current: [first], candidate: second })
     expect(created).toEqual([first, second])
-    const edited = saveServer(created, { ...second, name: 'Edited' })
+    const edited = McpServerStateModel.saveServer({ current: created, candidate: { ...second, name: 'Edited' } })
     expect(edited.map(row => row.name)).toEqual(['Local tools', 'Edited'])
-    const disabled = setServerEnabled(edited, 'one', false)
+    const disabled = McpServerStateModel.setServerEnabled({ current: edited, id: 'one', enabled: false })
     expect(disabled[0]?.enabled).toBe(false)
-    expect(removeServer(disabled, 'two')).toEqual([disabled[0]])
+    expect(McpServerStateModel.removeServer({ current: disabled, id: 'two' })).toEqual([disabled[0]])
   })
 
   it('rejects duplicate native tool namespaces', () => {
-    expect(() => saveServer([server()], server({ id: 'two' }))).toThrow(/unique/)
+    expect(() => McpServerStateModel.saveServer({ current: [server()], candidate: server({ id: 'two' }) })).toThrow(/unique/)
   })
 
   it('does not serialize unknown runtime fields or credential values to the client view', () => {
     const secret = 'never-render-this-value'
     const runtimeObject: StoredServer = Object.assign(server(), { secretValue: secret })
-    const view = publicServerView(runtimeObject, new Map([['LOCAL_TOOLS_TOKEN', true]]), 'loaded', 3)
+    const view = McpServerStateModel.publicServerView({
+      server: runtimeObject,
+      availability: new Map([['LOCAL_TOOLS_TOKEN', true]]),
+      clientLifecycle: 'loaded',
+      registeredToolCount: 3,
+    })
     expect(view.credentialReferences).toEqual([{ target: 'environment:API_TOKEN', reference: 'LOCAL_TOOLS_TOKEN', configured: true }])
     expect(JSON.stringify(view)).not.toContain(secret)
     expect(view.connectionHealth).toBe('not-reported')

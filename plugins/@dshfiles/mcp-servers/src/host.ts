@@ -40,7 +40,7 @@ import {
 } from './oauth.js'
 import { redactingLogger } from './redaction.js'
 import { ClientReconciler, type ClientTarget } from './reconcile.js'
-import { publicServerView, removeServer, saveServer, setServerEnabled } from './server-state.js'
+import { McpServerStateModel } from './server-state.js'
 
 const ENTRY_ID = 'mcp-servers'
 const PACKAGE_NAME = '@dshfiles/mcp-servers'
@@ -169,7 +169,7 @@ const projectServer = async (ctx: Context, server: StoredServer, localProcess: L
       }),
     ),
   )
-  return publicServerView(server, availability, 'inactive', 0, localProcess, signedIn)
+  return McpServerStateModel.publicServerView({ server, availability, clientLifecycle: 'inactive', localProcess, signedIn })
 }
 
 const snapshot = async (ctx: Context, servers = serversFor(ctx), runtime?: ManagerRuntime): Promise<ManagerSnapshot> => {
@@ -521,11 +521,11 @@ const hostApi = mcpServersApi.host({
     const draft = serverDraftSchema.parse(input.server)
     const candidate = storedDraft(draft)
     const servers = serversFor(ctx)
-    return persist(ctx, saveServer(servers, candidate, MAX_SERVERS))
+    return persist(ctx, McpServerStateModel.saveServer({ current: servers, candidate, max: MAX_SERVERS }))
   },
   setEnabled: async ({ ctx, input }) => {
     const servers = serversFor(ctx)
-    return persist(ctx, setServerEnabled(servers, input.id, input.enabled))
+    return persist(ctx, McpServerStateModel.setServerEnabled({ current: servers, id: input.id, enabled: input.enabled }))
   },
   setConnection: async ({ ctx, input }) => {
     const live = currentContext(ctx)
@@ -538,7 +538,7 @@ const hostApi = mcpServersApi.host({
   remove: async ({ ctx, input }) => {
     const servers = serversFor(ctx)
     const removed = servers.find(server => server.id === input.id)
-    const next = await persist(ctx, removeServer(servers, input.id))
+    const next = await persist(ctx, McpServerStateModel.removeServer({ current: servers, id: input.id }))
     if (removed !== undefined && usesOAuth(removed)) await ctx.credentials.deleteRecord(grantKey(removed)).catch(() => undefined)
     return next
   },
