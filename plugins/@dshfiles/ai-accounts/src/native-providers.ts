@@ -1,7 +1,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { readFile, rename, stat, writeFile } from 'node:fs/promises'
 import type { NativeProviders } from './api.js'
-import { isPatchRowId, managedDisabledRows, withRowDisabled, withRowEnabled } from './native-provider-patch.js'
+import { NativeProviderPatch } from './native-provider-patch.js'
 
 /**
  * Native provider rows on the Models page — DeepSeek, DeepSeek Account, a
@@ -46,7 +46,7 @@ export const readNativeProviders = async (ctx: Context): Promise<NativeProviders
   const loader = ctx.get('loader')
   if (patchPath === undefined || loader === undefined)
     return unavailable('This Host runs without a profile patch, so native providers cannot be switched here.')
-  const managed = managedDisabledRows(await readPatch(patchPath))
+  const managed = NativeProviderPatch.managedDisabledRows(await readPatch(patchPath))
   const rows = new Map([...loader.entries()].map(entry => [entry.options.id, entry] as const))
 
   const routes = new Map<string, string[]>()
@@ -85,11 +85,13 @@ export const setNativeProviderEnabled = async (ctx: Context, input: { readonly e
   if (!current.available || patchPath === undefined) return current
   const target = current.providers.find(provider => provider.entryId === input.entryId)
   // Only rows this page lists may be switched, so the method cannot disable an arbitrary plugin.
-  if (target === undefined || !isPatchRowId(input.entryId)) throw new Error(`'${input.entryId}' is not a native provider row.`)
+  if (target === undefined || !NativeProviderPatch.isPatchRowId(input.entryId)) throw new Error(`'${input.entryId}' is not a native provider row.`)
   if (target.lockedReason !== null) throw new Error(target.lockedReason)
   const apply = async (): Promise<void> => {
     const text = await readPatch(patchPath)
-    const next = input.enabled ? withRowEnabled(text, input.entryId) : withRowDisabled(text, { id: input.entryId, label: target.label })
+    const next = input.enabled
+      ? NativeProviderPatch.withRowEnabled(text, input.entryId)
+      : NativeProviderPatch.withRowDisabled(text, { id: input.entryId, label: target.label })
     if (next !== text) await writePatch(patchPath, next)
     if (input.enabled) {
       const returning = reenabling.get(ctx.root) ?? new Map<string, string>()
