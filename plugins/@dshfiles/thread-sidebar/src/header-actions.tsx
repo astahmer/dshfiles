@@ -23,7 +23,7 @@ import { threadActionTargetIds } from './thread-children.js'
 import { usePreferences } from './sidebar-state.js'
 import { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
 import { SidebarOrganization, workspaceForSessions } from './organization.js'
-import { buildThreadUrl } from './thread-url.js'
+import { ThreadUrlModel } from './thread-url.js'
 
 interface HeaderThreadActionsInjected {
   archiveSession: (sessionId: SessionSummary['id']) => Promise<void>
@@ -229,7 +229,9 @@ export const HeaderThreadActions = ({
               <CopyIcon aria-hidden="true" />
               {t('threadSidebarCopyId')}
             </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => void copy(buildThreadUrl(window.location.href, sessionId, workspaceId), 'threadSidebarLinkCopied')}>
+            <DropdownMenuItem
+              onSelect={() => void copy(ThreadUrlModel.buildThreadUrl(window.location.href, sessionId, workspaceId), 'threadSidebarLinkCopied')}
+            >
               <CopyIcon aria-hidden="true" />
               {t('threadSidebarCopyLink')}
             </DropdownMenuItem>
