@@ -11,14 +11,7 @@ import { CompilerKernel } from '../kernel.js'
 import type { BuildReport, BuildWatcher, ViteExtensionOptions } from '../types.js'
 import { clientCssPlugin } from './css.js'
 import { SharedRuntime } from './shared-runtime.js'
-import {
-  CLIENT_SDK_PROVIDERS,
-  CLIENT_SETUP_SERVICE_CAPABILITIES,
-  clientLocaleNamespaces,
-  clientSetupServices,
-  clientUsesConversationComponents,
-  clientUsesLocales,
-} from './capabilities.js'
+import { CLIENT_SDK_PROVIDERS, CLIENT_SETUP_SERVICE_CAPABILITIES, ClientCapabilityAnalysis } from './capabilities.js'
 import { installedLocaleNamespaces } from './installed.js'
 import { LocaleNamespaceOwnershipModel } from './locale-ownership.js'
 import { profilePackages } from './profile-scan.js'
@@ -238,7 +231,7 @@ function clientCapabilitiesPlugin(options: BuildClientOptions): Plugin {
 }
 
 async function validateConversationProviderEdges(paths: Awaited<ReturnType<typeof resolveOptions>>, options: BuildClientOptions): Promise<void> {
-  if (!(await clientUsesConversationComponents(paths.entry, paths.root))) return
+  if (!(await ClientCapabilityAnalysis.usesConversationComponents(paths.entry, paths.root))) return
   const missing = CONVERSATION_PROVIDER_PACKAGES.filter(packageName => !(options.inject ?? []).includes(packageName))
   if (missing.length === 0) return
   throw new DshxError('DSHX1203', 'Conversation components require the official Conversation UI package edge.', {
@@ -248,7 +241,7 @@ async function validateConversationProviderEdges(paths: Awaited<ReturnType<typeo
 }
 
 async function validateLocaleProviderEdge(paths: Awaited<ReturnType<typeof resolveOptions>>, options: BuildClientOptions): Promise<void> {
-  if (!(await clientUsesLocales(paths.entry, paths.root)) || (options.inject ?? []).includes(LOCALE_PROVIDER_PACKAGE)) return
+  if (!(await ClientCapabilityAnalysis.usesLocales(paths.entry, paths.root)) || (options.inject ?? []).includes(LOCALE_PROVIDER_PACKAGE)) return
   throw new DshxError('DSHX1203', 'defineLocale() contributions require the official Locale provider package edge.', {
     file: paths.entry,
     hint: `Add ${JSON.stringify(LOCALE_PROVIDER_PACKAGE)} to package.json dsh.client.inject, then rebuild.`,
@@ -344,7 +337,7 @@ async function validateSlotOccupancy(paths: Awaited<ReturnType<typeof resolveOpt
 }
 
 async function validateSetupServiceEdges(paths: Awaited<ReturnType<typeof resolveOptions>>, options: BuildClientOptions): Promise<void> {
-  const analysis = await clientSetupServices(paths.entry, paths.root)
+  const analysis = await ClientCapabilityAnalysis.setupServices(paths.entry, paths.root)
   for (const capability of analysis.sdk?.uses ?? []) {
     if (!Object.hasOwn(CLIENT_SDK_PROVIDERS, capability))
       throw new DshxError('DSHX1205', `Unknown Client SDK capability ${JSON.stringify(capability)}.`, {
@@ -393,7 +386,7 @@ async function validateLocaleNamespaceOwnership(
   options: BuildClientOptions,
   siblings: ReadonlyMap<string, readonly string[]>,
 ): Promise<void> {
-  const claimed = await clientLocaleNamespaces(paths.entry, paths.root)
+  const claimed = await ClientCapabilityAnalysis.localeNamespaces(paths.entry, paths.root)
   if (claimed === undefined || claimed.length === 0) return
   const ownership = LocaleNamespaceOwnershipModel.build(options.packageId)
   for (const [packageId, namespaces] of siblings) LocaleNamespaceOwnershipModel.claim(ownership, packageId, namespaces)

@@ -3,15 +3,7 @@ import { isAbsolute, relative, resolve, sep } from 'node:path'
 import { parse } from 'yaml'
 import { DEFAULT_COMPATIBILITY } from '../compat/index.js'
 import type { DshCompatibility } from '../compat/types.js'
-import {
-  CLIENT_SETUP_SERVICE_CAPABILITIES,
-  CLIENT_SDK_PROVIDERS,
-  clientSetupServices,
-  clientUsesApi,
-  clientUsesConversationComponents,
-  clientUsesLocales,
-  clientUsesSettings,
-} from '../compiler/client/capabilities.js'
+import { CLIENT_SETUP_SERVICE_CAPABILITIES, CLIENT_SDK_PROVIDERS, ClientCapabilityAnalysis } from '../compiler/client/capabilities.js'
 import { LocaleNamespaceOwnershipModel } from '../compiler/client/locale-ownership.js'
 import type { ResolvedDshxConfig } from '../config/types.js'
 import type { DshxDiagnostic, DshxDiagnosticSeverity } from '../diagnostics.js'
@@ -287,7 +279,7 @@ function checkClient(diagnostics: DshxDiagnostic[], config: ResolvedDshxConfig, 
 }
 
 async function checkSettingsCapability(diagnostics: DshxDiagnostic[], config: ResolvedDshxConfig, manifest: Record<string, unknown>): Promise<void> {
-  if (config.clientEntry === undefined || !(await clientUsesSettings(config.clientEntry, config.root))) return
+  if (config.clientEntry === undefined || !(await ClientCapabilityAnalysis.usesSettings(config.clientEntry, config.root))) return
   const dsh = isObject(manifest.dsh) ? manifest.dsh : undefined
   const client = isObject(dsh?.client) ? dsh.client : undefined
   const inject = Array.isArray(client?.inject) ? client.inject : []
@@ -304,7 +296,7 @@ async function checkSettingsCapability(diagnostics: DshxDiagnostic[], config: Re
 }
 
 async function checkApiCapability(diagnostics: DshxDiagnostic[], config: ResolvedDshxConfig, manifest: Record<string, unknown>): Promise<void> {
-  if (config.clientEntry === undefined || !(await clientUsesApi(config.clientEntry, config.root))) return
+  if (config.clientEntry === undefined || !(await ClientCapabilityAnalysis.usesApi(config.clientEntry, config.root))) return
   const dsh = isObject(manifest.dsh) ? manifest.dsh : undefined
   const client = isObject(dsh?.client) ? dsh.client : undefined
   const inject = Array.isArray(client?.inject) ? client.inject : []
@@ -321,7 +313,7 @@ async function checkApiCapability(diagnostics: DshxDiagnostic[], config: Resolve
 }
 
 async function checkConversationCapability(diagnostics: DshxDiagnostic[], config: ResolvedDshxConfig, manifest: Record<string, unknown>): Promise<void> {
-  if (config.clientEntry === undefined || !(await clientUsesConversationComponents(config.clientEntry, config.root))) return
+  if (config.clientEntry === undefined || !(await ClientCapabilityAnalysis.usesConversationComponents(config.clientEntry, config.root))) return
   const dsh = isObject(manifest.dsh) ? manifest.dsh : undefined
   const client = isObject(dsh?.client) ? dsh.client : undefined
   const inject = Array.isArray(client?.inject) ? client.inject : []
@@ -340,7 +332,7 @@ async function checkConversationCapability(diagnostics: DshxDiagnostic[], config
 }
 
 async function checkLocaleCapability(diagnostics: DshxDiagnostic[], config: ResolvedDshxConfig, manifest: Record<string, unknown>): Promise<void> {
-  if (config.clientEntry === undefined || !(await clientUsesLocales(config.clientEntry, config.root))) return
+  if (config.clientEntry === undefined || !(await ClientCapabilityAnalysis.usesLocales(config.clientEntry, config.root))) return
   const dsh = isObject(manifest.dsh) ? manifest.dsh : undefined
   const client = isObject(dsh?.client) ? dsh.client : undefined
   const inject = Array.isArray(client?.inject) ? client.inject : []
@@ -358,7 +350,7 @@ async function checkLocaleCapability(diagnostics: DshxDiagnostic[], config: Reso
 
 async function checkSetupServiceCapabilities(diagnostics: DshxDiagnostic[], config: ResolvedDshxConfig, manifest: Record<string, unknown>): Promise<void> {
   if (config.clientEntry === undefined) return
-  const analysis = await clientSetupServices(config.clientEntry, config.root)
+  const analysis = await ClientCapabilityAnalysis.setupServices(config.clientEntry, config.root)
   const dsh = isObject(manifest.dsh) ? manifest.dsh : undefined
   const client = isObject(dsh?.client) ? dsh.client : undefined
   const packageInject = Array.isArray(client?.inject) ? client.inject : []

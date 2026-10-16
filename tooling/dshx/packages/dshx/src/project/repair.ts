@@ -1,15 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { DEFAULT_COMPATIBILITY } from '../compat/index.js'
-import {
-  CLIENT_SETUP_SERVICE_CAPABILITIES,
-  CLIENT_SDK_PROVIDERS,
-  clientLocaleNamespaces,
-  clientSetupServices,
-  clientUsesApi,
-  clientUsesLocales,
-  clientUsesSettings,
-} from '../compiler/client/capabilities.js'
+import { CLIENT_SETUP_SERVICE_CAPABILITIES, CLIENT_SDK_PROVIDERS, ClientCapabilityAnalysis } from '../compiler/client/capabilities.js'
 import type { DshCompatibility } from '../compat/types.js'
 import type { ResolvedDshxConfig } from '../config/types.js'
 import { DshxError } from '../diagnostics.js'
@@ -218,7 +210,7 @@ export async function createManifestRepairPlan(config: ResolvedDshxConfig, optio
     changed = addMissing(client, 'inject', []) || changed
     changed = addMissing(client, 'external', []) || changed
     changed = addMissing(client, 'immediately', false) || changed
-    const analysis = await clientSetupServices(config.clientEntry, config.root)
+    const analysis = await ClientCapabilityAnalysis.setupServices(config.clientEntry, config.root)
     const providers = new Set(
       (analysis.sdk?.uses ?? []).flatMap(capability => (Object.hasOwn(CLIENT_SDK_PROVIDERS, capability) ? CLIENT_SDK_PROVIDERS[capability]! : [])),
     )
@@ -226,10 +218,10 @@ export async function createManifestRepairPlan(config: ResolvedDshxConfig, optio
       const descriptor = CLIENT_SETUP_SERVICE_CAPABILITIES[service]
       if (descriptor.availability === 'optional' && !analysis.autoInject.includes(service)) providers.add(descriptor.packageName)
     }
-    if (await clientUsesApi(config.clientEntry, config.root)) providers.add('@deepseek-ai/dsh-client-connection')
-    if (await clientUsesSettings(config.clientEntry, config.root)) providers.add('@deepseek-ai/dsh-client-ui-settings')
-    if (await clientUsesLocales(config.clientEntry, config.root)) providers.add('@deepseek-ai/dsh-client-locale')
-    const localeNamespaces = await clientLocaleNamespaces(config.clientEntry, config.root)
+    if (await ClientCapabilityAnalysis.usesApi(config.clientEntry, config.root)) providers.add('@deepseek-ai/dsh-client-connection')
+    if (await ClientCapabilityAnalysis.usesSettings(config.clientEntry, config.root)) providers.add('@deepseek-ai/dsh-client-ui-settings')
+    if (await ClientCapabilityAnalysis.usesLocales(config.clientEntry, config.root)) providers.add('@deepseek-ai/dsh-client-locale')
+    const localeNamespaces = await ClientCapabilityAnalysis.localeNamespaces(config.clientEntry, config.root)
     if (localeNamespaces !== undefined && localeNamespaces.length > 0) {
       const declared = new Set(Array.isArray(client.locales) ? client.locales.filter((value): value is string => typeof value === 'string') : [])
       if (!localeNamespaces.every(namespace => declared.has(namespace))) {

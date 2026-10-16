@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { LocaleNamespaceOwnershipModel } from '../src/compiler/client/locale-ownership.js'
-import { clientLocaleNamespaces } from '../src/compiler/client/capabilities.js'
+import { ClientCapabilityAnalysis } from '../src/compiler/client/capabilities.js'
 import { buildClient } from '../src/compiler/index.js'
 
 const directories: string[] = []
@@ -44,7 +44,7 @@ const localeProjectFor = (namespace: string): Promise<string> =>
 describe('locale namespace ownership', () => {
   it('reads the literal namespaces a definition claims', async () => {
     const root = await localeProjectFor('queueReorder.panel')
-    expect(await clientLocaleNamespaces(resolve(root, 'src/client.tsx'), root)).toEqual(['queueReorder.panel'])
+    expect(await ClientCapabilityAnalysis.localeNamespaces(resolve(root, 'src/client.tsx'), root)).toEqual(['queueReorder.panel'])
   })
 
   it('reads a namespace declared through an exported const', async () => {
@@ -59,7 +59,7 @@ describe('locale namespace ownership', () => {
         '',
       ].join('\n'),
     )
-    expect(await clientLocaleNamespaces(resolve(root, 'src/client.tsx'), root)).toEqual(['queueReorder.exported'])
+    expect(await ClientCapabilityAnalysis.localeNamespaces(resolve(root, 'src/client.tsx'), root)).toEqual(['queueReorder.exported'])
   })
 
   it('reads several claimed namespaces', async () => {
@@ -74,7 +74,7 @@ describe('locale namespace ownership', () => {
         '',
       ].join('\n'),
     )
-    expect(await clientLocaleNamespaces(resolve(root, 'src/client.tsx'), root)).toEqual(['queueReorder.a', 'queueReorder.b'])
+    expect(await ClientCapabilityAnalysis.localeNamespaces(resolve(root, 'src/client.tsx'), root)).toEqual(['queueReorder.a', 'queueReorder.b'])
   })
 
   it('stays unknown when a namespace is not a literal', async () => {
@@ -88,12 +88,12 @@ describe('locale namespace ownership', () => {
         '',
       ].join('\n'),
     )
-    expect(await clientLocaleNamespaces(resolve(root, 'src/client.tsx'), root)).toBeUndefined()
+    expect(await ClientCapabilityAnalysis.localeNamespaces(resolve(root, 'src/client.tsx'), root)).toBeUndefined()
   })
 
   it('reports no namespaces for a definition that declares none', async () => {
     const root = await localeProject(["import { defineClient } from '@dshfiles/dshx/client'", 'export default defineClient({ setup() {} })', ''].join('\n'))
-    expect(await clientLocaleNamespaces(resolve(root, 'src/client.tsx'), root)).toEqual([])
+    expect(await ClientCapabilityAnalysis.localeNamespaces(resolve(root, 'src/client.tsx'), root)).toEqual([])
   })
 
   it('blocks a namespace a shipped package already registers', () => {

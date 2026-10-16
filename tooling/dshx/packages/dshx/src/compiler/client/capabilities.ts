@@ -342,7 +342,7 @@ const clientSetupServicesInSource = (source: string, file: string): ClientDefini
 }
 
 /** Conservative source-level capability preview; the post-tree-shake build check is authoritative. */
-export async function clientUsesSettings(entry: string, root: string): Promise<boolean> {
+const clientUsesSettings = async (entry: string, root: string): Promise<boolean> => {
   const pending = [resolve(root, entry)]
   const visited = new Set<string>()
   while (pending.length > 0) {
@@ -366,7 +366,7 @@ export async function clientUsesSettings(entry: string, root: string): Promise<b
 }
 
 /** Conservative source-level preview for retained API hook capability. */
-export async function clientUsesApi(entry: string, root: string): Promise<boolean> {
+const clientUsesApi = async (entry: string, root: string): Promise<boolean> => {
   const pending = [resolve(root, entry)]
   const visited = new Set<string>()
   while (pending.length > 0) {
@@ -390,7 +390,7 @@ export async function clientUsesApi(entry: string, root: string): Promise<boolea
 }
 
 /** Conservative preview of an explicit defineClient({ conversations }) contribution. */
-export async function clientUsesConversationComponents(entry: string, root: string): Promise<boolean> {
+const clientUsesConversationComponents = async (entry: string, root: string): Promise<boolean> => {
   const pending = [resolve(root, entry)]
   const visited = new Set<string>()
   while (pending.length > 0) {
@@ -414,7 +414,7 @@ export async function clientUsesConversationComponents(entry: string, root: stri
 }
 
 /** Conservative preview of an explicit defineClient({ locales }) contribution. */
-export async function clientUsesLocales(entry: string, root: string): Promise<boolean> {
+const clientUsesLocales = async (entry: string, root: string): Promise<boolean> => {
   const pending = [resolve(root, entry)]
   const visited = new Set<string>()
   while (pending.length > 0) {
@@ -438,7 +438,7 @@ export async function clientUsesLocales(entry: string, root: string): Promise<bo
 }
 
 /** Inspect direct optional Cordis-service use in defineClient({ setup(ctx) }). */
-export async function clientSetupServices(entry: string, root: string): Promise<ClientSetupServiceAnalysis> {
+const clientSetupServices = async (entry: string, root: string): Promise<ClientSetupServiceAnalysis> => {
   const pending = [resolve(root, entry)]
   const visited = new Set<string>()
   while (pending.length > 0) {
@@ -471,7 +471,7 @@ const localeNamespace = ({ expression, bindings }: { expression: Expression; bin
   return SourceSyntax.stringValue(bindings.resolveExpression(argument) ?? argument)
 }
 
-export const clientLocaleNamespaces = async (entry: string, root: string): Promise<readonly string[] | undefined> => {
+const clientLocaleNamespaces = async (entry: string, root: string): Promise<readonly string[] | undefined> => {
   const analysis = await clientSetupServices(entry, root)
   if (analysis.localeNamespaces !== undefined) return analysis.localeNamespaces
   const pending = [resolve(root, entry)]
@@ -495,4 +495,13 @@ export const clientLocaleNamespaces = async (entry: string, root: string): Promi
     }
   }
   return undefined
+}
+
+export class ClientCapabilityAnalysis {
+  static readonly usesSettings = clientUsesSettings
+  static readonly usesApi = clientUsesApi
+  static readonly usesConversationComponents = clientUsesConversationComponents
+  static readonly usesLocales = clientUsesLocales
+  static readonly setupServices = clientSetupServices
+  static readonly localeNamespaces = clientLocaleNamespaces
 }
