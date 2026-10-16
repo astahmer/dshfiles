@@ -18,11 +18,14 @@ export const ATTENTION_COLOR_OPTIONS = ['muted', 'primary', 'info', 'success', '
 export type AttentionColor = (typeof ATTENTION_COLOR_OPTIONS)[number]
 export type AttentionColorKey = 'approvalNeeded' | 'inputNeeded' | 'turnFinished'
 export type AttentionColors = Record<AttentionColorKey, AttentionColor>
+export const REBASED_THREAD_ARCHIVE_DELAYS = ['disabled', 'immediately', 'after-1-hour', 'after-1-day', 'after-1-week'] as const
+export type RebasedThreadArchiveDelay = (typeof REBASED_THREAD_ARCHIVE_DELAYS)[number]
 
 export interface SidebarPreferences {
   archiveUndoEnabled: boolean
   archiveUndoDurationSeconds: number
   autoArchiveEnabled: boolean
+  rebasedThreadArchiveDelay: RebasedThreadArchiveDelay
   idleMinutes: number
   scanIntervalMinutes: number
   excludedWorkspaceIds: string[]
@@ -76,6 +79,7 @@ export const DEFAULT_PREFERENCES: SidebarPreferences = {
   archiveUndoEnabled: true,
   archiveUndoDurationSeconds: 5,
   autoArchiveEnabled: false,
+  rebasedThreadArchiveDelay: 'disabled',
   idleMinutes: 120,
   scanIntervalMinutes: 10,
   excludedWorkspaceIds: [],

@@ -1,6 +1,6 @@
 import Schema from '@deepseek-ai/schemastery'
 import { defineSettings } from '@dshfiles/dshx/settings'
-import { ATTENTION_COLOR_OPTIONS, DEFAULT_PREFERENCES } from './organization.js'
+import { ATTENTION_COLOR_OPTIONS, DEFAULT_PREFERENCES, REBASED_THREAD_ARCHIVE_DELAYS } from './organization.js'
 
 const ids = (): Schema<string[]> => Schema.array(Schema.string()).default([]).hidden()
 
@@ -75,6 +75,9 @@ export const threadSidebarSettings = defineSettings({
       .default(DEFAULT_PREFERENCES.archiveUndoDurationSeconds)
       .description('How long the manual archive undo notice stays visible, in seconds.'),
     autoArchiveEnabled: Schema.boolean().default(DEFAULT_PREFERENCES.autoArchiveEnabled).description('Archive idle threads automatically.'),
+    rebasedThreadArchiveDelay: Schema.union(REBASED_THREAD_ARCHIVE_DELAYS)
+      .default(DEFAULT_PREFERENCES.rebasedThreadArchiveDelay)
+      .description('Archive successfully rebased threads immediately or after a delay. Running or waiting threads are never archived.'),
     idleMinutes: Schema.natural()
       .min(15)
       .max(10080)

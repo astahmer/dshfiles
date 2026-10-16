@@ -1,7 +1,7 @@
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import { z } from 'zod'
 import { threadMutesSchema } from './thread-mute.js'
-import { ATTENTION_COLOR_OPTIONS, DEFAULT_PREFERENCES, type SidebarPreferences, type SidebarSection } from './organization.js'
+import { ATTENTION_COLOR_OPTIONS, DEFAULT_PREFERENCES, REBASED_THREAD_ARCHIVE_DELAYS, type SidebarPreferences, type SidebarSection } from './organization.js'
 
 export const PREFERENCES_STORAGE_KEY = 'dshfiles.thread-sidebar.v1'
 
@@ -13,6 +13,7 @@ const preferencesSchema = z
     archiveUndoEnabled: z.boolean().default(DEFAULT_PREFERENCES.archiveUndoEnabled),
     archiveUndoDurationSeconds: z.number().int().min(1).max(30).default(DEFAULT_PREFERENCES.archiveUndoDurationSeconds),
     autoArchiveEnabled: z.boolean(),
+    rebasedThreadArchiveDelay: z.enum(REBASED_THREAD_ARCHIVE_DELAYS).default(DEFAULT_PREFERENCES.rebasedThreadArchiveDelay),
     idleMinutes: z.number().int().min(15).max(10080),
     scanIntervalMinutes: z.number().int().min(1).max(120),
     excludedWorkspaceIds: z.array(z.string().min(1).max(256)).max(500),

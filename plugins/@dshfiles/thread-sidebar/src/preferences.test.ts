@@ -23,6 +23,14 @@ test('older preferences gain attention modes and default child-thread actions to
   assert.equal(decodePreferences({ ...DEFAULT_PREFERENCES, turnFinishedDisplay: 'section' }), null)
 })
 
+test('older preferences default rebase-triggered auto-archive to disabled', () => {
+  const { rebasedThreadArchiveDelay, ...older } = DEFAULT_PREFERENCES
+  assert.equal(rebasedThreadArchiveDelay, 'disabled')
+  assert.equal(decodePreferences(older)?.rebasedThreadArchiveDelay, 'disabled')
+  assert.equal(decodePreferences({ ...DEFAULT_PREFERENCES, rebasedThreadArchiveDelay: 'after-1-day' })?.rebasedThreadArchiveDelay, 'after-1-day')
+  assert.equal(decodePreferences({ ...DEFAULT_PREFERENCES, rebasedThreadArchiveDelay: 'after-5-minutes' }), null)
+})
+
 test('archive undo defaults on and rejects durations outside one through thirty seconds', () => {
   const { archiveUndoEnabled, archiveUndoDurationSeconds, ...older } = DEFAULT_PREFERENCES
   const parsed = decodePreferences(older)

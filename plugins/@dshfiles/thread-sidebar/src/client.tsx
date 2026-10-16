@@ -1,7 +1,9 @@
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
+import { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { WorkspaceBrowserProps } from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
+import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
 import { RemoteThreadsSection } from './remote-threads-section.js'
 import type { ActorRefFrom } from '@dshfiles/plugin-ui/machine'
 import type { archivedViewMachine } from './archived-view-machine.js'
@@ -19,6 +21,7 @@ import {
   writeClipboard,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { Alert } from '@dshfiles/plugin-ui/components/ui/alert'
+import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Checkbox } from '@dshfiles/plugin-ui/components/ui/checkbox'
 import {
@@ -62,12 +65,14 @@ import {
   Settings2Icon,
 } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { memo, useEffect, useId, useMemo, useRef, useState, type ReactElement, type ReactNode } from 'react'
+import { memo, useCallback, useEffect, useId, useMemo, useRef, useState, type ReactElement, type ReactNode } from 'react'
 import { z } from 'zod'
 import {
   autoArchiveOverrideForSession,
   isAutoArchiveCandidate,
   isAttentionSessionIncluded,
+  REBASED_THREAD_ARCHIVE_DELAYS,
+  type RebasedThreadArchiveDelay,
   nextIdleTransitionAt,
   parseSessionIds,
   sessionLineage,
@@ -97,6 +102,7 @@ import { threadSidebarMachineApi } from './machine-api.js'
 import { groupThreadChildren, partitionFinishedChildren, shouldOpenChildThreadList, threadActionTargetIds, visibleChildren } from './thread-children.js'
 import { buildThreadUrl, clearThreadUrl, readThreadUrl } from './thread-url.js'
 import { workingThreadIds } from './working-threads.js'
+import { indexRebasedThreadSessions, rebasedThreadArchiveDelayMs } from './rebased-threads.js'
 import {
   groupThreadEntries,
   isSideChat,
@@ -185,6 +191,16 @@ const attentionPreferenceRows: readonly {
 ]
 
 const attentionColorOptions: readonly AttentionColor[] = ['muted', 'primary', 'info', 'success', 'warning', 'danger']
+
+const rebasedArchiveDelayLabelKeys = {
+  disabled: 'threadSidebarRebasedArchiveDisabled',
+  immediately: 'threadSidebarRebasedArchiveImmediate',
+  'after-1-hour': 'threadSidebarRebasedArchiveHour',
+  'after-1-day': 'threadSidebarRebasedArchiveDay',
+  'after-1-week': 'threadSidebarRebasedArchiveWeek',
+} satisfies Record<RebasedThreadArchiveDelay, Parameters<ThreadSidebarTranslate>[0]>
+
+const rebasedArchiveDelayFromValue = (value: string): RebasedThreadArchiveDelay | undefined => REBASED_THREAD_ARCHIVE_DELAYS.find(option => option === value)
 
 const attentionColorLabelKeys = {
   muted: 'threadSidebarColorMuted',
@@ -316,6 +332,7 @@ interface ThreadRowProps {
   /** Set only while the thread is muted or snoozed. */
   readonly mute: ThreadMute | undefined
   readonly attentionLabel: ThreadAttentionLabel | undefined
+  readonly rebasedAt: number | undefined
   readonly childAttentionLabels: ReadonlyMap<SessionSummary['id'], ThreadAttentionLabel>
   readonly rowStyle: RowStyle
   readonly childThreads: readonly SessionSummary[]
@@ -490,7 +507,7 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
   const showMachine = rowStyle.machine && props.machine !== undefined
   const showPath = rowStyle.path && session.cwd !== undefined && session.cwd.length > 0
   const metaLine = showProject || showMachine || showPath || childCount > 0
-  const headLine = rowStyle.title || rowStyle.time || rowStyle.statusDot
+  const headLine = rowStyle.title || rowStyle.time || rowStyle.statusDot || props.rebasedAt !== undefined
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
@@ -536,6 +553,11 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                     <span className={cn('dshx:shrink-0 dshx:text-xs dshx:font-medium', attentionLabelClass(props.attentionLabel, rowStyle.attentionColors))}>
                       {t(props.attentionLabel)}
                     </span>
+                  )}
+                  {props.rebasedAt === undefined ? null : (
+                    <Badge variant="success" title={new Date(props.rebasedAt).toLocaleString()} data-testid="thread-sidebar-rebased-tag">
+                      {t('threadSidebarRebased')}
+                    </Badge>
                   )}
                   {rowStyle.time ? (
                     <span
@@ -805,6 +827,12 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
   const { preferences, updatePreferences, storageWarning, setSelectedThreadId, threadTitle } = useSidebarState()
   const notificationPreferences = threadNotificationPreferences.useValue() ?? DEFAULT_THREAD_NOTIFICATION_PREFERENCES
   const machine = useApiQuery(threadSidebarMachineApi, 'name', { enabled: preferences.threadRowMachine }).data?.name
+  const jjRepositories = useApiQuery(jjIntegrationApi, 'repositories', { input: {} })
+  const refetchJjRepositories = jjRepositories.refetch
+  useEffect(() => {
+    const timer = window.setInterval(refetchJjRepositories, 30_000)
+    return () => window.clearInterval(timer)
+  }, [refetchJjRepositories])
   const [childrenOpenOverrides, setChildrenOpenOverrides] = useState<ReadonlyMap<string, boolean>>(() => new Map())
   const [expandedParents, setExpandedParents] = useState<ReadonlySet<string>>(() => new Set())
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -831,10 +859,12 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
     sessions: SessionSummary[]
     workspaceBySession: Map<string, string>
     preferences: SidebarPreferences
+    dueRebasedSessionIds: readonly string[]
     archived: ReadonlySet<string>
     pinned: ReadonlySet<string>
     archive: ThreadSidebarProps['archiveSession']
     announce: (notice: SidebarNotice) => void
+    archiveFailureMessage: string
   } | null>(null)
 
   const workspaceBySession = useMemo(() => workspaceForSessions(workspaceState.items), [workspaceState.items])
@@ -849,6 +879,28 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
     [props.tSidebar, workspaceState.items],
   )
   const sessions = useMemo(() => sessionsForAutoArchive(sessionState.ids, sessionState.byId), [sessionState.byId, sessionState.ids])
+  const rebasedIndex = useMemo(
+    () =>
+      indexRebasedThreadSessions({
+        threads: (jjRepositories.data?.repositories ?? []).flatMap(repository => repository.threads),
+        sessions: new Map(
+          sessions.map(session => [
+            session.id,
+            {
+              id: session.id,
+              running: session.running,
+              pendingInteraction: sessionStatus.get(session.id) === undefined ? undefined : sessionStatus.get(session.id)?.pendingInteraction !== undefined,
+              updatedAt: session.updatedAt,
+            },
+          ]),
+        ),
+        archivedSessionIds,
+        pinnedSessionIds,
+        now,
+        delayMs: rebasedThreadArchiveDelayMs(preferences.rebasedThreadArchiveDelay),
+      }),
+    [archivedSessionIds, jjRepositories.data, now, pinnedSessionIds, preferences.rebasedThreadArchiveDelay, sessionStatus, sessions],
+  )
   const parkedSessionIds = useMemo(() => setIncludes(preferences.parkedSessionIds), [preferences.parkedSessionIds])
   const mutedThreads = preferences.mutedThreads
   const mutedSessionIds = useMemo(
@@ -1180,14 +1232,36 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
     if (failed) latest.announce({ tone: 'danger', message: props.tSidebar('threadSidebarArchiveFailure') })
   }
 
+  const runRebasedAutoArchive = useCallback(async (): Promise<void> => {
+    const latest = latestAutoArchive.current
+    if (archiveInFlight.current || latest === null || latest.dueRebasedSessionIds.length === 0) return
+    archiveInFlight.current = true
+    let failed = false
+    try {
+      for (const sessionId of latest.dueRebasedSessionIds) {
+        if (latest.archived.has(sessionId) || latest.pinned.has(sessionId)) continue
+        try {
+          await latest.archive(SessionId(sessionId))
+        } catch {
+          failed = true
+        }
+      }
+    } finally {
+      archiveInFlight.current = false
+    }
+    if (failed) latest.announce({ tone: 'danger', message: latest.archiveFailureMessage })
+  }, [])
+
   latestAutoArchive.current = {
     sessions,
     workspaceBySession,
     preferences,
+    dueRebasedSessionIds: rebasedIndex.dueSessionIds,
     archived: archivedSessionIds,
     pinned: pinnedSessionIds,
     archive: props.archiveSession,
     announce: setNotice,
+    archiveFailureMessage: props.tSidebar('threadSidebarArchiveFailure'),
   }
 
   useEffect(() => {
@@ -1201,6 +1275,21 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
     preferences.autoArchiveDisabledSessionIds,
     preferences.autoArchiveSessionIds,
     preferences.scanIntervalMinutes,
+    sessionState.phase,
+    workspaceState.phase,
+  ])
+
+  useEffect(() => {
+    if (preferences.rebasedThreadArchiveDelay === 'disabled' || jjRepositories.data === undefined) return
+    if (sessionState.phase !== 'ready' || workspaceState.phase !== 'ready') return
+    void runRebasedAutoArchive()
+    const timer = window.setInterval(() => void runRebasedAutoArchive(), preferences.scanIntervalMinutes * 60_000)
+    return () => window.clearInterval(timer)
+  }, [
+    jjRepositories.data,
+    preferences.rebasedThreadArchiveDelay,
+    preferences.scanIntervalMinutes,
+    runRebasedAutoArchive,
     sessionState.phase,
     workspaceState.phase,
   ])
@@ -1793,6 +1882,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
         age={formatAge(session.updatedAt)}
         mute={mutedSessionIds.has(session.id) ? mutedThreads[session.id] : undefined}
         attentionLabel={rowAttentionLabel}
+        rebasedAt={rebasedIndex.rebasedAtBySessionId.get(session.id)}
         childAttentionLabels={inlineAttentionLabels}
         rowStyle={rowStyle}
         childThreads={childThreads}
@@ -2083,6 +2173,32 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
               <Checkbox checked={preferences.autoArchiveEnabled} onCheckedChange={checked => changePreferences({ autoArchiveEnabled: checked === true })} />
               {props.tSidebar('threadSidebarAutoArchive')}
             </Label>
+            <div className="dshx:grid dshx:min-w-0 dshx:gap-1" role="group" aria-label={props.tSidebar('threadSidebarArchiveRebased')}>
+              <span className="dshx:text-xs">{props.tSidebar('threadSidebarArchiveRebased')}</span>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button size="sm" variant="outline" className="dshx:min-w-0 dshx:justify-start">
+                    {props.tSidebar(rebasedArchiveDelayLabelKeys[preferences.rebasedThreadArchiveDelay])}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start">
+                  <DropdownMenuRadioGroup
+                    value={preferences.rebasedThreadArchiveDelay}
+                    onValueChange={value => {
+                      const delay = rebasedArchiveDelayFromValue(value)
+                      if (delay !== undefined) changePreferences({ rebasedThreadArchiveDelay: delay })
+                    }}
+                  >
+                    {REBASED_THREAD_ARCHIVE_DELAYS.map(delay => (
+                      <DropdownMenuRadioItem key={delay} value={delay}>
+                        {props.tSidebar(rebasedArchiveDelayLabelKeys[delay])}
+                      </DropdownMenuRadioItem>
+                    ))}
+                  </DropdownMenuRadioGroup>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <p className="dshx:text-xs dshx:text-muted-foreground">{props.tSidebar('threadSidebarArchiveRebasedHint')}</p>
+            </div>
             <Label className="dshx:font-normal dshx:leading-snug">
               <Checkbox
                 checked={preferences.applyActionsToChildThreads}
