@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { PassThrough } from 'node:stream'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { planRebuild } from '../src/checkout/rebuild.js'
+import { CheckoutRebuild } from '../src/checkout/rebuild.js'
 import { syncCheckout } from '../src/checkout/sync.js'
 import { runCli } from '../src/cli/run.js'
 
@@ -302,12 +302,12 @@ describe('checkout rebuild selection', () => {
 
   it('selects missing bundle outputs without rebuilding dependants', () => {
     rmSync(join(root, 'plugins/@dshfiles/panel/dist/client.js'))
-    const plan = planRebuild({ root, changedFiles: [] })
+    const plan = CheckoutRebuild.plan({ root, changedFiles: [] })
     expect(plan.plugins).toEqual([{ name: '@dshfiles/panel', host: false, client: true }])
   })
 
   it('picks changed plugins, their dependants and plugins bundling changed dshx runtime code', () => {
-    const plan = planRebuild({
+    const plan = CheckoutRebuild.plan({
       root,
       changedFiles: [
         'plugins/@dshfiles/plugin-ui/src/button.tsx',
@@ -331,7 +331,7 @@ describe('checkout rebuild selection', () => {
   })
 
   it('predicts a restart for Host sources, manifests and sources the last build never saw', () => {
-    const plan = planRebuild({
+    const plan = CheckoutRebuild.plan({
       root,
       changedFiles: [
         'plugins/@dshfiles/panel/src/host.ts',
