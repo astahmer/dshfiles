@@ -214,6 +214,27 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
     expect(readFileSync(join(repo, '.secret.json'), 'utf8')).toBe('local\n')
   })
 
+  it('rebases a located thread without resolving its workspace a second time', async () => {
+    const thread = await threads.provision(repo)
+    writeFileSync(join(thread.path, 'feature.txt'), 'feature\n')
+    jj(thread.path, 'describe', '-m', 'feat: add feature')
+    const invocations: string[][] = []
+    const observedThreads = createThreads({
+      executor: async input => {
+        invocations.push([...input.args])
+        return executor(input)
+      },
+      bookmark: () => 'main',
+      threadsDirectory: defaultThreadsDirectory,
+    })
+    const location = await threads.locate(thread.path)
+    const threadName = location.threadName
+    if (threadName === undefined) throw new Error('Expected a thread workspace.')
+
+    expect(await observedThreads.landAt({ ...location, threadName })).toMatchObject({ status: 'landed' })
+    expect(invocations.some(args => args.includes('root'))).toBe(false)
+  })
+
   it('requires a description before rebasing placeholder work', async () => {
     const thread = await threads.provision(repo)
     writeFileSync(join(thread.path, 'feature.txt'), 'feature\n')

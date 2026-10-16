@@ -20,7 +20,7 @@ import { Skeleton } from '@dshfiles/plugin-ui/components/ui/skeleton'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { EllipsisIcon, RefreshCwIcon } from '@dshfiles/plugin-ui/icons'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
-import { errorMessage, useIsMutating, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
+import { errorMessage, useIsMutating, useMutation, useMutationState, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useApi } from '@dshfiles/dshx/client'
 import { useCallback, useEffect, useId, useMemo, useState, useSyncExternalStore } from 'react'
 import { jjIntegrationApi, type ThreadView, type WorkspaceSyncView } from './api.js'
@@ -173,6 +173,7 @@ const ThreadRow = (props: {
   readonly t: JjIntegrationTranslate
   readonly bookmark: string
   readonly busy: boolean
+  readonly rebasing: boolean
   readonly onRebase: () => void
   readonly onDiscard: () => void
 }): JSX.Element => {
@@ -214,6 +215,7 @@ const ThreadRow = (props: {
         <Badge variant="secondary">{t('sessions', { count: thread.sessionIds.length })}</Badge>
         {thread.unlanded.length === 0 ? <Badge variant="outline">{t('upToDate')}</Badge> : <Badge>{t('toRebase', { count: thread.unlanded.length })}</Badge>}
         {thread.behind ? <Badge variant="outline">{t('behind', { bookmark: props.bookmark })}</Badge> : null}
+        {props.rebasing ? <Badge variant="secondary">{t('rebasing')}</Badge> : null}
         {thread.rebasedAt === undefined ? null : (
           <Badge variant="secondary" title={new Date(thread.rebasedAt).toLocaleString()}>
             {t('rebasedTag')}
@@ -225,8 +227,8 @@ const ThreadRow = (props: {
         <span className="dshx:ml-auto dshx:flex dshx:items-center dshx:gap-2">
           {thread.unlanded.length > 0 ? (
             <Button size="sm" disabled={props.busy || thread.missing || !canRebase} onClick={props.onRebase} title={canRebase ? undefined : blockedReason}>
-              {props.busy ? <Spinner /> : null}
-              {props.busy ? t('rebasing') : t('rebase')}
+              {props.rebasing ? <Spinner /> : null}
+              {props.rebasing ? t('rebasing') : t('rebase')}
             </Button>
           ) : null}
           <DropdownMenu>
@@ -355,6 +357,10 @@ export const ThreadWorkspacesPanel = (props: {
   const api = useApi(jjIntegrationApi)
   const queryClient = useQueryClient()
   const rebasesPending = useIsMutating({ mutationKey: threadRebaseMutationKey }) > 0
+  const rebasingPaths = useMutationState({
+    filters: { mutationKey: threadRebaseMutationKey, status: 'pending' },
+    select: mutation => mutation.state.variables,
+  })
   const toast = useToast()
   const [notice, setNotice] = useState<{ readonly tone: 'default' | 'destructive'; readonly text: string } | null>(null)
   const repositories = useQuery({
@@ -445,6 +451,7 @@ export const ThreadWorkspacesPanel = (props: {
                   t={t}
                   bookmark={props.bookmark}
                   busy={rebasesPending}
+                  rebasing={rebasingPaths.includes(thread.path)}
                   onRebase={() => rebase.mutate(thread.path)}
                   onDiscard={() => discard.request({ path: thread.path, name: thread.name, unlandedCount: thread.unlanded.length })}
                 />

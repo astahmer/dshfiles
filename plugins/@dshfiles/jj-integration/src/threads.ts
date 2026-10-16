@@ -217,9 +217,8 @@ export const createThreads = (options: {
       return { name, path }
     })
 
-  const land = async (path: string, signal?: AbortSignal): Promise<LandOutcome> => {
-    const thread = await requireThread(path)
-    return serialized(thread.repoRoot, async () => {
+  const landAt = (thread: ThreadLocation & { readonly threadName: string }, signal?: AbortSignal): Promise<LandOutcome> =>
+    serialized(thread.repoRoot, async () => {
       const cwd = thread.workspaceRoot
       const bookmark = options.bookmark()
       const leftovers = await revisions(`((${bookmark}..@) & empty()) ~ @ ~ merges() ~ working_copies()`, cwd)
@@ -234,7 +233,7 @@ export const createThreads = (options: {
 
       for (let attempt = 1; ; attempt++) {
         await jj(['rebase', '-b', '@', '-d', bookmark], cwd, signal)
-        const rebased = await revisions(`(${bookmark}..@) ~ empty()`, cwd)
+        const [rebased, emptyWorkingCopies] = await Promise.all([revisions(`(${bookmark}..@) ~ empty()`, cwd, true), revisions('@ & empty()', cwd, true)])
         const conflicted = rebased.filter(revision => revision.conflict)
         if (conflicted.length > 0) {
           const files = new Set<string>()
@@ -247,20 +246,21 @@ export const createThreads = (options: {
           }
           return { status: 'conflicted', revisions: conflicted, files: [...files].slice(0, MAX_CONFLICT_FILES) }
         }
-        const workingCopyEmpty = (await revisions('@ & empty()', cwd)).length > 0
+        const workingCopyEmpty = emptyWorkingCopies.length > 0
         const target = workingCopyEmpty ? '@-' : '@'
         // A bookmark only moves forward; if another writer advanced it meanwhile, rebase again onto the new tip.
         const moved = await options.executor({ args: ['bookmark', 'set', bookmark, '-r', target], cwd })
         if (moved.exitCode === 0) {
           if (!workingCopyEmpty) await jj(['new', bookmark], cwd, signal)
-          const [head] = await revisions(bookmark, cwd)
+          const head = rebased[0]
           await writeRebaseMetadata(thread.repoRoot, thread.threadName, head?.changeId).catch(() => undefined)
           return { status: 'landed', revisions: rebased, head }
         }
         if (attempt >= LAND_ATTEMPTS) throw new ThreadError('jj-failed', `Could not move ${bookmark}: ${moved.stderr.trim().slice(0, 400)}`)
       }
     })
-  }
+
+  const land = async (path: string, signal?: AbortSignal): Promise<LandOutcome> => landAt(await requireThread(path), signal)
 
   const discard = (input: { readonly repoRoot: string; readonly name: string; readonly force: boolean }): Promise<DiscardOutcome> =>
     serialized(input.repoRoot, async () => {
@@ -336,7 +336,7 @@ export const createThreads = (options: {
     return (await readAtOperation(['log', '--no-pager', '--color=never', '--limit', '20', '-r', revset, '-T', template])).trimEnd()
   }
 
-  return { locate, list, status, provision, land, discard, bookmarks, workingCopyCommitId, revisionGraph }
+  return { locate, list, status, provision, land, landAt, discard, bookmarks, workingCopyCommitId, revisionGraph }
 }
 
 export type Threads = ReturnType<typeof createThreads>

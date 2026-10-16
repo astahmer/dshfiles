@@ -383,7 +383,9 @@ const landThread = async (input: {
       })
     }
   }
-  const outcome = await requireThreads().land(input.path, input.signal)
+  const threadName = location.threadName
+  if (threadName === undefined) throw new PluginApiError('This workspace is not a thread.', { code: 'not-a-thread' })
+  const outcome = await requireThreads().landAt({ ...location, threadName }, input.signal)
   const result: LandResult = {
     status: outcome.status,
     revisions: outcome.status === 'nothing-to-land' ? [] : [...outcome.revisions],
