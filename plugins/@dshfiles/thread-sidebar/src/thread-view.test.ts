@@ -87,7 +87,10 @@ describe('thread view filters', () => {
     expect(matchesThreadStatusFilter({ filters: ['working', 'attention'], running: false, needsAttention: false, archived: false, muted: false })).toBe(false)
   })
 
-  it('filters completed and attention-needed threads but excludes archived and muted threads', () => {
+  it('includes stopped input-needed and usage-limit threads in Not working', () => {
+    for (const status of ['input-needed', 'usage-limit']) {
+      expect(matchesThreadStatusFilter({ filters: ['not-working'], running: false, needsAttention: true, archived: false, muted: false }), status).toBe(true)
+    }
     expect(matchesThreadStatusFilter({ filters: ['not-working'], running: false, needsAttention: false, archived: false, muted: false })).toBe(true)
     expect(matchesThreadStatusFilter({ filters: ['not-working'], running: true, needsAttention: true, archived: false, muted: false })).toBe(true)
     expect(matchesThreadStatusFilter({ filters: ['not-working'], running: true, needsAttention: false, archived: false, muted: false })).toBe(false)

@@ -1953,18 +1953,44 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     threadView.statusFilters,
     turnFinishedRows,
   ])
+  const statusFilteredNeedsResumeRows = useMemo(
+    () =>
+      needsResumeRows.filter(session =>
+        matchesThreadStatusFilter({
+          filters: threadView.statusFilters,
+          running: threadView.sourceFilter === 'subagents' ? session.running : currentWorkingThreadIds.has(session.id),
+          needsAttention: true,
+          archived: archivedSessionIds.has(session.id),
+          muted: mutedSessionIds.has(session.id),
+        }),
+      ),
+    [archivedSessionIds, currentWorkingThreadIds, mutedSessionIds, needsResumeRows, threadView.sourceFilter, threadView.statusFilters],
+  )
+  const statusFilteredUsageLimitRows = useMemo(
+    () =>
+      usageLimitRows.filter(row =>
+        matchesThreadStatusFilter({
+          filters: threadView.statusFilters,
+          running: threadView.sourceFilter === 'subagents' ? row.session.running : currentWorkingThreadIds.has(row.session.id),
+          needsAttention: true,
+          archived: archivedSessionIds.has(row.session.id),
+          muted: mutedSessionIds.has(row.session.id),
+        }),
+      ),
+    [archivedSessionIds, currentWorkingThreadIds, mutedSessionIds, threadView.sourceFilter, threadView.statusFilters, usageLimitRows],
+  )
+  const statusFilteredRecoveryRows = useMemo(
+    () => [...statusFilteredNeedsResumeRows, ...statusFilteredUsageLimitRows.map(row => row.session)],
+    [statusFilteredNeedsResumeRows, statusFilteredUsageLimitRows],
+  )
   const attentionIds = useMemo(
     () =>
       new Set(
-        [
-          ...groupedAttentionRows.approvalNeeded,
-          ...groupedAttentionRows.inputNeeded,
-          ...groupedAttentionRows.turnFinished,
-          ...needsResumeRows,
-          ...usageLimitRows.map(row => row.session),
-        ].map(session => session.id),
+        [...groupedAttentionRows.approvalNeeded, ...groupedAttentionRows.inputNeeded, ...groupedAttentionRows.turnFinished, ...statusFilteredRecoveryRows].map(
+          session => session.id,
+        ),
       ),
-    [groupedAttentionRows, needsResumeRows, usageLimitRows],
+    [groupedAttentionRows, statusFilteredRecoveryRows],
   )
   const inlineAttentionLabels = useMemo(() => {
     const labels = new Map<SessionSummary['id'], ThreadAttentionLabel>()
@@ -2772,20 +2798,20 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
               {props.tSidebar('threadSidebarLoading')}
             </div>
           ) : null}
-          {needsResumeRows.length > 0 ? (
+          {statusFilteredNeedsResumeRows.length > 0 ? (
             <section className="dshx:mt-1" aria-label={props.tSidebar('threadSidebarNeedsResume')}>
               <div className={cn(stickyHeaderClass, 'dshx:flex dshx:h-8 dshx:items-center dshx:gap-2 dshx:px-2.5 dshx:text-sm')}>
                 <span className={cn('dshx:whitespace-nowrap dshx:font-medium', attentionLabelClass('threadSidebarNeedsResume', preferences.attentionColors))}>
                   {props.tSidebar('threadSidebarNeedsResume')}
                 </span>
-                <span className="dshx:text-xs dshx:tabular-nums">({needsResumeRows.length})</span>
+                <span className="dshx:text-xs dshx:tabular-nums">({statusFilteredNeedsResumeRows.length})</span>
                 <span className="dshx:h-px dshx:flex-1 dshx:bg-border" aria-hidden="true" />
                 <Button type="button" size="xs" variant="outline" disabled={resumeAllBusy} onClick={() => void resumeAllRecoveries()}>
                   {resumeAllBusy ? <Spinner className="dshx:size-3" /> : null}
                   {props.tSidebar('threadSidebarResumeAll')}
                 </Button>
               </div>
-              {needsResumeRows.map(session => renderThreadRow(session, 'threadSidebarNeedsResume'))}
+              {statusFilteredNeedsResumeRows.map(session => renderThreadRow(session, 'threadSidebarNeedsResume'))}
             </section>
           ) : null}
           <UsageLimitSection
@@ -2797,7 +2823,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
             onSnooze={input => void changeUsageLimitRecovery(input)}
             open={openThread}
             resumeAllBusy={usageLimitResumeAllBusy}
-            rows={usageLimitRows}
+            rows={statusFilteredUsageLimitRows}
             translate={props.tSidebar}
           />
           {groupedAttentionRows.approvalNeeded.length > 0 ? (
