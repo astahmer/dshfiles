@@ -6,7 +6,7 @@ import { useQuery } from '@dshfiles/plugin-ui/query'
 import { useEffect, useMemo, useRef } from 'react'
 import { aiAccountsQueries } from './accounts-queries.js'
 import { aiAccountsApi } from './api.js'
-import { SESSION_COST_PROJECTION_KEY, estimateCost, formatUsd, routeKey, sessionCostViewSchema, type CostEstimate, type RouteQuote } from './cost-estimate.js'
+import { CostEstimateModel, SESSION_COST_PROJECTION_KEY, sessionCostViewSchema, type CostEstimate, type RouteQuote } from './cost-estimate.js'
 import { fetchedAgo } from './pricing-status.js'
 import { SessionCostDisplay, sessionCostDockScope } from './session-cost-display.js'
 import { usePreferences } from './use-preferences.js'
@@ -25,7 +25,7 @@ const MATCH_LABEL: Readonly<Record<RouteQuote['match'], string>> = {
   none: 'no price',
 }
 
-const amountText = (estimate: CostEstimate): string => `${estimate.partial ? '≥' : '≈'}${formatUsd(estimate.cost.total)}`
+const amountText = (estimate: CostEstimate): string => `${estimate.partial ? '≥' : '≈'}${CostEstimateModel.formatUsd(estimate.cost.total)}`
 
 /**
  * The estimated session cost beside the composer's own token stats.
@@ -51,15 +51,15 @@ const SessionCostReadout = (props: { readonly useProjection: ProjectionHook }): 
     return parsed.success ? parsed.data : null
   }, [raw])
   const routes = useMemo(() => {
-    const unique = new Map((view?.groups ?? []).map(group => [routeKey(group), { provider: group.provider, model: group.model }]))
+    const unique = new Map((view?.groups ?? []).map(group => [CostEstimateModel.routeKey(group), { provider: group.provider, model: group.model }]))
     return [...unique.entries()].sort(([left], [right]) => left.localeCompare(right)).map(([, route]) => route)
   }, [view])
   const quotesQuery = useQuery({ ...aiAccountsQueries.routeQuotes(accounts, { routes, overrides: pricingOverrides }), enabled: routes.length > 0 })
   const quotes = quotesQuery.data
-  const quoteMap = useMemo(() => new Map((quotes?.quotes ?? []).map(quote => [routeKey(quote), quote])), [quotes])
+  const quoteMap = useMemo(() => new Map((quotes?.quotes ?? []).map(quote => [CostEstimateModel.routeKey(quote), quote])), [quotes])
 
-  const session = view === null || quotes === undefined || quotes === null ? null : estimateCost({ groups: view.groups, quotes: quoteMap })
-  const turn = session === null || view === null || view.turn === null ? null : estimateCost({ groups: view.turn.groups, quotes: quoteMap })
+  const session = view === null || quotes === undefined || quotes === null ? null : CostEstimateModel.estimateCost({ groups: view.groups, quotes: quoteMap })
+  const turn = session === null || view === null || view.turn === null ? null : CostEstimateModel.estimateCost({ groups: view.turn.groups, quotes: quoteMap })
   const inlineValue =
     session === null || !session.priced
       ? undefined
@@ -70,10 +70,12 @@ const SessionCostReadout = (props: { readonly useProjection: ProjectionHook }): 
             ...(session.tokens.uncachedInputTokens + session.tokens.cacheReadTokens + session.tokens.cacheWriteTokens > 0
               ? [{ tokens: undefined, amount: undefined }]
               : []),
-            { tokens: session.tokens.uncachedInputTokens, amount: formatUsd(session.cost.input) },
-            { tokens: session.tokens.cacheReadTokens, amount: formatUsd(session.cost.cacheRead) },
-            ...(session.tokens.cacheWriteTokens > 0 ? [{ tokens: session.tokens.cacheWriteTokens, amount: formatUsd(session.cost.cacheWrite) }] : []),
-            { tokens: session.tokens.outputTokens, amount: formatUsd(session.cost.output) },
+            { tokens: session.tokens.uncachedInputTokens, amount: CostEstimateModel.formatUsd(session.cost.input) },
+            { tokens: session.tokens.cacheReadTokens, amount: CostEstimateModel.formatUsd(session.cost.cacheRead) },
+            ...(session.tokens.cacheWriteTokens > 0
+              ? [{ tokens: session.tokens.cacheWriteTokens, amount: CostEstimateModel.formatUsd(session.cost.cacheWrite) }]
+              : []),
+            { tokens: session.tokens.outputTokens, amount: CostEstimateModel.formatUsd(session.cost.output) },
           ],
         }
   const hasInlineValue = inlineValue !== undefined
@@ -128,7 +130,7 @@ const SessionCostReadout = (props: { readonly useProjection: ProjectionHook }): 
               <div className="dshx:contents" key={label}>
                 <dt className="dshx:text-muted-foreground">{label}</dt>
                 <dd className="dshx:text-right dshx:text-muted-foreground">{compactTokens(tokens)} tok</dd>
-                <dd className="dshx:text-right">{formatUsd(cost)}</dd>
+                <dd className="dshx:text-right">{CostEstimateModel.formatUsd(cost)}</dd>
               </div>
             ))}
           {turn === null || !turn.priced ? null : (
@@ -141,7 +143,7 @@ const SessionCostReadout = (props: { readonly useProjection: ProjectionHook }): 
         </dl>
         <ul className="dshx:flex dshx:flex-col dshx:gap-1 dshx:border-t dshx:border-border dshx:pt-2">
           {session.routes.map(route => (
-            <li className="dshx:flex dshx:items-baseline dshx:justify-between dshx:gap-2" key={routeKey(route)}>
+            <li className="dshx:flex dshx:items-baseline dshx:justify-between dshx:gap-2" key={CostEstimateModel.routeKey(route)}>
               <span className="dshx:min-w-0 dshx:truncate" title={route.modelsDevId ?? undefined}>
                 {route.provider}/{route.model}
                 <span className="dshx:text-muted-foreground">
@@ -149,7 +151,7 @@ const SessionCostReadout = (props: { readonly useProjection: ProjectionHook }): 
                   {route.free ? 'free' : MATCH_LABEL[route.match]}
                 </span>
               </span>
-              <span className="dshx:shrink-0 dshx:tabular-nums">{route.cost === null ? '—' : formatUsd(route.cost.total)}</span>
+              <span className="dshx:shrink-0 dshx:tabular-nums">{route.cost === null ? '—' : CostEstimateModel.formatUsd(route.cost.total)}</span>
             </li>
           ))}
         </ul>

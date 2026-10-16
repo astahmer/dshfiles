@@ -2,7 +2,7 @@ import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { z } from 'zod'
-import { isFreePrice, modelPriceSchema, routeKey, type ModelPrice, type RouteQuote } from './cost-estimate.js'
+import { CostEstimateModel, modelPriceSchema, type ModelPrice, type RouteQuote } from './cost-estimate.js'
 
 /**
  * Model prices from models.dev, cached on disk so a cold or offline Host still
@@ -212,7 +212,7 @@ const quoteFrom = (input: {
   model: input.route.model,
   modelsDevId: input.modelsDevId,
   match: input.match,
-  free: input.price !== null && isFreePrice(input.price),
+  free: input.price !== null && CostEstimateModel.isFreePrice(input.price),
   price: input.price,
 })
 
@@ -238,7 +238,7 @@ export const resolveRouteQuote = (input: {
 }): RouteQuote => {
   const { route, cache } = input
   const none = quoteFrom({ route, match: 'none', modelsDevId: null, price: null })
-  const overrideValue = input.overrides[routeKey(route)] ?? input.overrides[`${route.provider}/*`]
+  const overrideValue = input.overrides[CostEstimateModel.routeKey(route)] ?? input.overrides[`${route.provider}/*`]
   const override = overrideValue === undefined ? undefined : parsePricingOverride(overrideValue)
   if (override?.kind === 'price') return quoteFrom({ route, match: 'override', modelsDevId: null, price: override.price })
   if (cache === null) return none

@@ -17,12 +17,6 @@ export const SESSION_COST_PROJECTION_KEY = 'aiAccountsCost'
 /** Every context-tier size models.dev publishes, normalized to "prompt exceeds N". */
 export const CONTEXT_BANDS = [0, 32_000, 100_000, 128_000, 200_000, 256_000, 262_144, 272_000, 512_000, 524_288, 1_000_000] as const
 
-export const contextBand = (contextTokens: number): number => {
-  let band = 0
-  for (const candidate of CONTEXT_BANDS) if (contextTokens > candidate) band = candidate
-  return band
-}
-
 const rateShape = {
   input: z.number().min(0),
   output: z.number().min(0),
@@ -81,27 +75,6 @@ export const routeQuoteSchema = z.object({
 
 export type RouteQuote = z.infer<typeof routeQuoteSchema>
 
-export const routeKey = (route: { readonly provider: string; readonly model: string }): string => `${route.provider}/${route.model}`
-
-export const isFreePrice = (price: ModelPrice): boolean =>
-  price.input === 0 &&
-  price.output === 0 &&
-  (price.cacheRead ?? 0) === 0 &&
-  (price.cacheWrite ?? 0) === 0 &&
-  (price.tiers ?? []).every(tier => tier.input === 0 && tier.output === 0)
-
-const ratesForBand = (price: ModelPrice, band: number): ModelRates => {
-  let rates: ModelRates = price
-  let reached = -1
-  for (const tier of price.tiers ?? []) {
-    if (tier.above <= band && tier.above > reached) {
-      rates = tier
-      reached = tier.above
-    }
-  }
-  return rates
-}
-
 export interface CostBreakdown {
   readonly input: number
   readonly output: number
@@ -109,37 +82,6 @@ export interface CostBreakdown {
   readonly cacheWrite: number
   readonly total: number
 }
-
-const ZERO_COST: CostBreakdown = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 }
-
-/**
- * Cost of one bucket of tokens. A missing cache rate bills those tokens as
- * plain input: models.dev omits it for providers that do not discount or
- * surcharge cache traffic.
- */
-export const costOfTokens = (input: { readonly tokens: TokenBuckets; readonly price: ModelPrice; readonly band: number }): CostBreakdown => {
-  const rates = ratesForBand(input.price, input.band)
-  const perUnit = (tokens: number, rate: number): number => (tokens * rate) / TOKENS_PER_RATE_UNIT
-  const inputCost = perUnit(input.tokens.uncachedInputTokens, rates.input)
-  const outputCost = perUnit(input.tokens.outputTokens, rates.output)
-  const cacheReadCost = perUnit(input.tokens.cacheReadTokens, rates.cacheRead ?? rates.input)
-  const cacheWriteCost = perUnit(input.tokens.cacheWriteTokens, rates.cacheWrite ?? rates.input)
-  return {
-    input: inputCost,
-    output: outputCost,
-    cacheRead: cacheReadCost,
-    cacheWrite: cacheWriteCost,
-    total: inputCost + outputCost + cacheReadCost + cacheWriteCost,
-  }
-}
-
-const addCost = (left: CostBreakdown, right: CostBreakdown): CostBreakdown => ({
-  input: left.input + right.input,
-  output: left.output + right.output,
-  cacheRead: left.cacheRead + right.cacheRead,
-  cacheWrite: left.cacheWrite + right.cacheWrite,
-  total: left.total + right.total,
-})
 
 export interface RouteCost {
   readonly provider: string
@@ -162,51 +104,111 @@ export interface CostEstimate {
   readonly routes: readonly RouteCost[]
 }
 
+const ZERO_COST: CostBreakdown = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 }
 const ZERO_TOKENS: TokenBuckets = { uncachedInputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 }
 
-const addTokens = (left: TokenBuckets, right: TokenBuckets): TokenBuckets => ({
-  uncachedInputTokens: left.uncachedInputTokens + right.uncachedInputTokens,
-  outputTokens: left.outputTokens + right.outputTokens,
-  cacheReadTokens: left.cacheReadTokens + right.cacheReadTokens,
-  cacheWriteTokens: left.cacheWriteTokens + right.cacheWriteTokens,
-})
-
-/** Price every group with its route's quote; groups of one route are merged for the breakdown. */
-export const estimateCost = (input: { readonly groups: readonly CostGroup[]; readonly quotes: ReadonlyMap<string, RouteQuote> }): CostEstimate => {
-  const routes = new Map<string, RouteCost>()
-  let cost = ZERO_COST
-  let tokens = ZERO_TOKENS
-  let partial = false
-  let priced = false
-  for (const group of input.groups) {
-    const key = routeKey(group)
-    const quote = input.quotes.get(key)
-    const groupCost = quote === undefined || quote.price === null ? null : costOfTokens({ tokens: group.tokens, price: quote.price, band: group.band })
-    const free = quote?.free === true
-    if (groupCost === null) partial = true
-    else cost = addCost(cost, groupCost)
-    if (groupCost !== null && !free) priced = true
-    tokens = addTokens(tokens, group.tokens)
-    const previous = routes.get(key)
-    routes.set(key, {
-      provider: group.provider,
-      model: group.model,
-      modelsDevId: quote?.modelsDevId ?? null,
-      match: quote?.match ?? 'none',
-      requests: (previous?.requests ?? 0) + group.requests,
-      tokens: addTokens(previous?.tokens ?? ZERO_TOKENS, group.tokens),
-      cost: groupCost === null ? (previous?.cost ?? null) : addCost(previous?.cost ?? ZERO_COST, groupCost),
-      free,
-    })
+export class CostEstimateModel {
+  static contextBand = (contextTokens: number): number => {
+    let band = 0
+    for (const candidate of CONTEXT_BANDS) if (contextTokens > candidate) band = candidate
+    return band
   }
-  return { cost, tokens, partial, priced, routes: [...routes.values()] }
-}
 
-/** `$0.42`, `$0.0031` below a cent, `<$0.0001` for a session that has barely started. */
-export const formatUsd = (amount: number): string => {
-  if (!Number.isFinite(amount) || amount <= 0) return '$0.00'
-  if (amount < 0.0001) return '<$0.0001'
-  if (amount < 0.01) return `$${amount.toFixed(4)}`
-  if (amount < 100) return `$${amount.toFixed(2)}`
-  return `$${Math.round(amount).toLocaleString('en-US')}`
+  static routeKey = (route: { readonly provider: string; readonly model: string }): string => `${route.provider}/${route.model}`
+
+  static isFreePrice = (price: ModelPrice): boolean =>
+    price.input === 0 &&
+    price.output === 0 &&
+    (price.cacheRead ?? 0) === 0 &&
+    (price.cacheWrite ?? 0) === 0 &&
+    (price.tiers ?? []).every(tier => tier.input === 0 && tier.output === 0)
+
+  private static ratesForBand = (price: ModelPrice, band: number): ModelRates => {
+    let rates: ModelRates = price
+    let reached = -1
+    for (const tier of price.tiers ?? []) {
+      if (tier.above <= band && tier.above > reached) {
+        rates = tier
+        reached = tier.above
+      }
+    }
+    return rates
+  }
+
+  /**
+   * Cost of one bucket of tokens. A missing cache rate bills those tokens as
+   * plain input: models.dev omits it for providers that do not discount or
+   * surcharge cache traffic.
+   */
+  static costOfTokens = (input: { readonly tokens: TokenBuckets; readonly price: ModelPrice; readonly band: number }): CostBreakdown => {
+    const rates = CostEstimateModel.ratesForBand(input.price, input.band)
+    const perUnit = (tokens: number, rate: number): number => (tokens * rate) / TOKENS_PER_RATE_UNIT
+    const inputCost = perUnit(input.tokens.uncachedInputTokens, rates.input)
+    const outputCost = perUnit(input.tokens.outputTokens, rates.output)
+    const cacheReadCost = perUnit(input.tokens.cacheReadTokens, rates.cacheRead ?? rates.input)
+    const cacheWriteCost = perUnit(input.tokens.cacheWriteTokens, rates.cacheWrite ?? rates.input)
+    return {
+      input: inputCost,
+      output: outputCost,
+      cacheRead: cacheReadCost,
+      cacheWrite: cacheWriteCost,
+      total: inputCost + outputCost + cacheReadCost + cacheWriteCost,
+    }
+  }
+
+  private static addCost = (left: CostBreakdown, right: CostBreakdown): CostBreakdown => ({
+    input: left.input + right.input,
+    output: left.output + right.output,
+    cacheRead: left.cacheRead + right.cacheRead,
+    cacheWrite: left.cacheWrite + right.cacheWrite,
+    total: left.total + right.total,
+  })
+
+  private static addTokens = (left: TokenBuckets, right: TokenBuckets): TokenBuckets => ({
+    uncachedInputTokens: left.uncachedInputTokens + right.uncachedInputTokens,
+    outputTokens: left.outputTokens + right.outputTokens,
+    cacheReadTokens: left.cacheReadTokens + right.cacheReadTokens,
+    cacheWriteTokens: left.cacheWriteTokens + right.cacheWriteTokens,
+  })
+
+  /** Price every group with its route's quote; groups of one route are merged for the breakdown. */
+  static estimateCost = (input: { readonly groups: readonly CostGroup[]; readonly quotes: ReadonlyMap<string, RouteQuote> }): CostEstimate => {
+    const routes = new Map<string, RouteCost>()
+    let cost = ZERO_COST
+    let tokens = ZERO_TOKENS
+    let partial = false
+    let priced = false
+    for (const group of input.groups) {
+      const key = CostEstimateModel.routeKey(group)
+      const quote = input.quotes.get(key)
+      const groupCost =
+        quote === undefined || quote.price === null ? null : CostEstimateModel.costOfTokens({ tokens: group.tokens, price: quote.price, band: group.band })
+      const free = quote?.free === true
+      if (groupCost === null) partial = true
+      else cost = CostEstimateModel.addCost(cost, groupCost)
+      if (groupCost !== null && !free) priced = true
+      tokens = CostEstimateModel.addTokens(tokens, group.tokens)
+      const previous = routes.get(key)
+      routes.set(key, {
+        provider: group.provider,
+        model: group.model,
+        modelsDevId: quote?.modelsDevId ?? null,
+        match: quote?.match ?? 'none',
+        requests: (previous?.requests ?? 0) + group.requests,
+        tokens: CostEstimateModel.addTokens(previous?.tokens ?? ZERO_TOKENS, group.tokens),
+        cost: groupCost === null ? (previous?.cost ?? null) : CostEstimateModel.addCost(previous?.cost ?? ZERO_COST, groupCost),
+        free,
+      })
+    }
+    return { cost, tokens, partial, priced, routes: [...routes.values()] }
+  }
+
+  /** `$0.42`, `$0.0031` below a cent, `<$0.0001` for a session that has barely started. */
+  static formatUsd = (amount: number): string => {
+    if (!Number.isFinite(amount) || amount <= 0) return '$0.00'
+    if (amount < 0.0001) return '<$0.0001'
+    if (amount < 0.01) return `$${amount.toFixed(4)}`
+    if (amount < 100) return `$${amount.toFixed(2)}`
+    return `$${Math.round(amount).toLocaleString('en-US')}`
+  }
 }

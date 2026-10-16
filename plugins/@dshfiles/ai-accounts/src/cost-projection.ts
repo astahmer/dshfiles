@@ -2,7 +2,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import { z } from 'zod'
 import {
   SESSION_COST_PROJECTION_KEY,
-  contextBand,
+  CostEstimateModel,
   costGroupSchema,
   sessionCostViewSchema,
   type CostGroup,
@@ -130,7 +130,7 @@ export const applyCostEvent = (state: CostState, event: ProjectionEvent): CostSt
   const group: CostGroup = {
     provider: state.selection?.provider ?? '',
     model: state.selection?.model ?? '',
-    band: contextBand(tokens.uncachedInputTokens + tokens.cacheReadTokens + tokens.cacheWriteTokens),
+    band: CostEstimateModel.contextBand(tokens.uncachedInputTokens + tokens.cacheReadTokens + tokens.cacheWriteTokens),
     requests: 1,
     tokens,
   }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { contextBand, costOfTokens, estimateCost, formatUsd, type CostGroup, type ModelPrice, type RouteQuote } from './cost-estimate.js'
+import { CostEstimateModel, type CostGroup, type ModelPrice, type RouteQuote } from './cost-estimate.js'
 
 const tokens = (input: Partial<CostGroup['tokens']>): CostGroup['tokens'] => ({
   uncachedInputTokens: 0,
@@ -28,16 +28,16 @@ const luna: ModelPrice = {
 
 describe('contextBand', () => {
   it('records the widest published tier size the prompt exceeds', () => {
-    expect(contextBand(10_000)).toBe(0)
-    expect(contextBand(200_000)).toBe(128_000)
-    expect(contextBand(200_001)).toBe(200_000)
-    expect(contextBand(300_000)).toBe(272_000)
+    expect(CostEstimateModel.contextBand(10_000)).toBe(0)
+    expect(CostEstimateModel.contextBand(200_000)).toBe(128_000)
+    expect(CostEstimateModel.contextBand(200_001)).toBe(200_000)
+    expect(CostEstimateModel.contextBand(300_000)).toBe(272_000)
   })
 })
 
 describe('costOfTokens', () => {
   it('bills each bucket at its own rate per million tokens', () => {
-    const cost = costOfTokens({
+    const cost = CostEstimateModel.costOfTokens({
       tokens: tokens({ uncachedInputTokens: 1_000_000, outputTokens: 2_000_000, cacheReadTokens: 10_000_000, cacheWriteTokens: 1_000_000 }),
       price: luna,
       band: 0,
@@ -50,12 +50,16 @@ describe('costOfTokens', () => {
   })
 
   it('switches to the tier rates once the prompt exceeds the tier size', () => {
-    expect(costOfTokens({ tokens: tokens({ outputTokens: 1_000_000 }), price: luna, band: 272_000 }).total).toBe(0.75)
-    expect(costOfTokens({ tokens: tokens({ outputTokens: 1_000_000 }), price: luna, band: 256_000 }).total).toBe(0.5)
+    expect(CostEstimateModel.costOfTokens({ tokens: tokens({ outputTokens: 1_000_000 }), price: luna, band: 272_000 }).total).toBe(0.75)
+    expect(CostEstimateModel.costOfTokens({ tokens: tokens({ outputTokens: 1_000_000 }), price: luna, band: 256_000 }).total).toBe(0.5)
   })
 
   it('bills cache traffic as input when the model publishes no cache rate', () => {
-    const cost = costOfTokens({ tokens: tokens({ cacheReadTokens: 1_000_000, cacheWriteTokens: 1_000_000 }), price: { input: 2, output: 8 }, band: 0 })
+    const cost = CostEstimateModel.costOfTokens({
+      tokens: tokens({ cacheReadTokens: 1_000_000, cacheWriteTokens: 1_000_000 }),
+      price: { input: 2, output: 8 },
+      band: 0,
+    })
     expect(cost.cacheRead).toBe(2)
     expect(cost.cacheWrite).toBe(2)
   })
@@ -69,7 +73,7 @@ describe('estimateCost', () => {
   ]
 
   it('sums priced routes and flags unpriced usage as a lower bound', () => {
-    const estimate = estimateCost({
+    const estimate = CostEstimateModel.estimateCost({
       groups,
       quotes: new Map([['codex-emialex/gpt-6-luna', quote('codex-emialex', 'gpt-6-luna', luna)]]),
     })
@@ -85,7 +89,7 @@ describe('estimateCost', () => {
   })
 
   it('is not priced when every known route is free', () => {
-    const estimate = estimateCost({
+    const estimate = CostEstimateModel.estimateCost({
       groups: [groups[2]!],
       quotes: new Map([['commandcode/stealth/space-bunny-alpha', quote('commandcode', 'stealth/space-bunny-alpha', { input: 0, output: 0 }, true)]]),
     })
@@ -96,10 +100,10 @@ describe('estimateCost', () => {
 
 describe('formatUsd', () => {
   it('keeps small session totals readable', () => {
-    expect(formatUsd(0)).toBe('$0.00')
-    expect(formatUsd(0.00004)).toBe('<$0.0001')
-    expect(formatUsd(0.0031)).toBe('$0.0031')
-    expect(formatUsd(0.4234)).toBe('$0.42')
-    expect(formatUsd(1234.5)).toBe('$1,235')
+    expect(CostEstimateModel.formatUsd(0)).toBe('$0.00')
+    expect(CostEstimateModel.formatUsd(0.00004)).toBe('<$0.0001')
+    expect(CostEstimateModel.formatUsd(0.0031)).toBe('$0.0031')
+    expect(CostEstimateModel.formatUsd(0.4234)).toBe('$0.42')
+    expect(CostEstimateModel.formatUsd(1234.5)).toBe('$1,235')
   })
 })
