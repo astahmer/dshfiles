@@ -6,9 +6,10 @@
  * them as package-level `turbo.json` files plus the package scripts that run them.
  *
  * Inputs are the built `dist` of every bundle a task boots and of dshx itself, never the build task's hash and never
- * the sources behind it: plugin-ui's build reads every plugin's sources for the shared stylesheet, so build hashes all
- * move together while most bundles' output does not, and a dshx source edit that compiles to the same JavaScript must
- * leave the browser tasks cached.
+ * the sources behind it: source maps and declarations stay out, so a formatting-only edit that keeps a bundle's
+ * JavaScript byte-identical leaves its tasks cached, and a dshx source edit that compiles to the same JavaScript must
+ * leave them cached too. A new utility class in any plugin is the opposite case: the shared stylesheet recompiles,
+ * every consumer bundle embeds its new hash, and those digests move with it (see plans/shared-plugin-stylesheet.md).
  * Turbo drops gitignored files under the task's own package directory even from a `$TURBO_ROOT$` glob (a package
  * would not see its own `dist`, and the `plugins` workspace no bundle's), so `writeDistDigests` records each
  * package's runtime `dist` (no source maps or declarations) under the root `.turbo/browser-dist/`, and tasks key on

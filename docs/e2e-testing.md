@@ -154,8 +154,13 @@ feature, then regenerate.
 
 A task's key is what it actually runs, never a build hash and never the sources
 behind the built artifact: plugin-ui's build reads every plugin's sources for
-the shared stylesheet, so every build hash moves together while most bundles'
-`dist` does not. The inputs are:
+the shared stylesheet, so every build hash moves together, and the digest leaves
+`*.map` and `*.d.ts` out so a formatting-only edit that keeps a bundle's
+JavaScript byte-identical does not move its `dist`. A class change is the
+opposite case: it recompiles the union sheet and every consumer bundle embeds
+the new sheet hash, so 29 of the 37 built bundles move and their tasks rerun
+(measured, and the subject of the
+[shared stylesheet plan](../plans/shared-plugin-stylesheet.md)). The inputs are:
 
 - a digest of the runtime `dist`, the `package.json` and the
   `cordis.patch.yml` of every bundle the package's journeys boot (the packages
