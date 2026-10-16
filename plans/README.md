@@ -29,6 +29,7 @@ Checkboxes and receipts in a plan are history, not fresh verification.
 | Plan | Open work |
 |---|---|
 | [Plugin E2E coverage](plugin-e2e-coverage.md) | Run journeys in CI, a fresh baseline, Host egress, catalog scaffolding. |
+| [Shared plugin stylesheet](shared-plugin-stylesheet.md) | Stop the per-bundle CSS-hash fan-out: hash-free consumer bundles first, then one sheet owner. A Host-served sheet is a [gap](dsh-host-gaps.md), not available on stock DSH. |
 | [Guardrails](guardrails.md) | Lint ratchets, ast-grep rules, knip, exact pins, a shared plugin tsconfig, XState and namespace-class refactors. |
 | [Guardrails: refactors](guardrails-refactors.md) | Steps 10–12: Hono e2e fakes, the `no-export-bag` rule in emilint, XState and namespace classes per plugin. |
 | [Host gaps](dsh-host-gaps.md) | Behaviors our plugins cannot build until DSH exposes a capability. A standing list, not a task plan. |
