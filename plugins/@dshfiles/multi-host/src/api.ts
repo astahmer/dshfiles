@@ -338,6 +338,35 @@ export const multiHostApi = defineApi({
         'Forget the local records of remote threads (one Session, or every thread on a runtime). The remote threads keep running. Call only when the user asked to forget them.',
       tool: { name: 'multi_host_forget_thread', render: compactJson },
     }),
+    /** Reply on one remote thread. Steer when it is running, otherwise queue. */
+    threadReply: method({
+      input: z
+        .object({
+          runtimeId: idSchema,
+          sessionId: sessionIdSchema,
+          text: z.string().trim().min(1).max(100_000),
+          steer: z.boolean().default(false),
+        })
+        .strict(),
+      output: z.discriminatedUnion('ok', [z.object({ ok: z.literal(true) }), failedSchema]),
+      description:
+        'Send a message to one thread running on another machine: it queues the message, or steers the running turn when steer is true. Call only when the user asked to reply on that thread.',
+      tool: {
+        name: 'multi_host_thread_reply',
+        render: output => (output.ok ? 'Sent to the remote thread.' : `Failed: ${output.message}`),
+      },
+    }),
+    /** Stop one remote thread through the same cancel path the local Stop uses. */
+    threadStop: method({
+      input: z.object({ runtimeId: idSchema, sessionId: sessionIdSchema }).strict(),
+      output: z.discriminatedUnion('ok', [z.object({ ok: z.literal(true) }), failedSchema]),
+      description:
+        'Stop the running turn of one thread on another machine, through the same cancel path its Stop button uses. Call only when the user asked to stop that thread.',
+      tool: {
+        name: 'multi_host_thread_stop',
+        render: output => (output.ok ? 'Asked the remote thread to stop.' : `Failed: ${output.message}`),
+      },
+    }),
     runtimeCall: method({
       input: z.object({ runtimeId: idSchema, request: nativeRpcSchema }).strict(),
       output: nativeRpcResultSchema,

@@ -717,6 +717,46 @@ const multiHostHandlers = multiHostApi.host({
     }
   },
   threadForget: async ({ input }) => ({ removed: await forgetRemoteThreads(input) }),
+  threadReply: async ({ input, signal }) => {
+    try {
+      await withRuntime(
+        input.runtimeId,
+        gateway =>
+          callNativeRpc(
+            gateway,
+            {
+              namespace: 'session',
+              method: 'prompt',
+              args: {
+                request: {
+                  requestId: randomUUID(),
+                  sessionId: input.sessionId,
+                  mode: input.steer ? 'steer' : 'queue',
+                  content: [{ type: 'text', text: input.text }],
+                },
+              },
+            },
+            signal,
+          ),
+        { mutation: true, broken: brokenRpc },
+      )
+      return { ok: true as const }
+    } catch (error) {
+      return { ok: false as const, ...safeFailure(error) }
+    }
+  },
+  threadStop: async ({ input, signal }) => {
+    try {
+      await withRuntime(
+        input.runtimeId,
+        gateway => callNativeRpc(gateway, { namespace: 'session', method: 'cancel', args: { request: { sessionId: input.sessionId } } }, signal),
+        { mutation: true, broken: brokenRpc },
+      )
+      return { ok: true as const }
+    } catch (error) {
+      return { ok: false as const, ...safeFailure(error) }
+    }
+  },
   runtimeCall: async ({ input, signal }) => {
     const mutation = input.request.namespace !== 'session' || ['create', 'fork', 'cancel', 'rename', 'prompt'].includes(input.request.method)
     try {
