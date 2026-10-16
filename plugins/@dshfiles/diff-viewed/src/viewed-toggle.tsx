@@ -1,6 +1,6 @@
 import type { Translate } from '@deepseek-ai/dsh-client-ui-slots'
 import { useSyncExternalStore } from 'react'
-import { changesSummaryUrl, parseChangesSummaryFiles, parseReviewCoordinates, type ChangesSummaryFiles } from './review-file.js'
+import { ReviewFileModel, type ChangesSummaryFiles } from './review-file.js'
 import { viewedKey, type ViewedMarks } from './viewed-marks.js'
 import { Checkbox } from '@dshfiles/plugin-ui/components/ui/checkbox'
 import { useQuery } from '@dshfiles/plugin-ui/query'
@@ -16,7 +16,7 @@ const useSummaryFiles = (summaryUrl: string | undefined): ChangesSummaryFiles | 
     queryKey: ['diff-viewed', 'summary', summaryUrl],
     queryFn: async ({ signal }) => {
       const response = await fetch(summaryUrl ?? '', { signal })
-      return response.ok ? (parseChangesSummaryFiles(await response.json()) ?? null) : null
+      return response.ok ? (ReviewFileModel.parseChangesSummaryFiles(await response.json()) ?? null) : null
     },
     enabled: summaryUrl !== undefined,
     retry: false,
@@ -46,8 +46,8 @@ const ProgressRing = (props: { readonly viewed: number; readonly total: number }
 
 /** The review tab's file-action entry: a viewed toggle for the selected file and the turn's progress. */
 export const ViewedToggle = (props: ViewedToggleProps): JSX.Element | null => {
-  const coordinates = parseReviewCoordinates(props.actionUrl)
-  const files = useSummaryFiles(coordinates === undefined ? undefined : changesSummaryUrl(coordinates))
+  const coordinates = ReviewFileModel.parseReviewCoordinates(props.actionUrl)
+  const files = useSummaryFiles(coordinates === undefined ? undefined : ReviewFileModel.changesSummaryUrl(coordinates))
   const viewed = useSyncExternalStore(props.marks.subscribe, props.marks.getSnapshot)
   const file = coordinates === undefined ? undefined : files?.[coordinates.index]
   if (coordinates === undefined || files === undefined || file === undefined) return null
