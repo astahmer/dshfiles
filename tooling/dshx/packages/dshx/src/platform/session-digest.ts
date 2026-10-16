@@ -235,7 +235,7 @@ const describeToolCall = (name: string, args: Readonly<Record<string, unknown>>,
 }
 
 /** Returns a describer that remembers tool calls so later results can name them. */
-export const createSessionEventDescriber = (): ((
+const createSessionEventDescriber = (): ((
   record: JsonValue,
 ) => { readonly seq: number; readonly time?: number; readonly type: string; readonly summary: string } | undefined) => {
   const calls = new Map<string, { readonly name: string; readonly time?: number }>()
@@ -317,7 +317,7 @@ export const createSessionEventDescriber = (): ((
 }
 
 /** Keeps records matching the requested types (exact or `prefix/…`); without types, keeps everything except bookkeeping noise. */
-export const sessionEventFilter =
+const sessionEventFilter =
   (types: readonly string[] | undefined): ((record: JsonValue) => boolean) =>
   record => {
     const event = decodeEvent(record)
@@ -326,7 +326,7 @@ export const sessionEventFilter =
     return types.some(type => event.type === type || event.type.startsWith(`${type}/`))
   }
 
-export const isNoiseSessionEvent = (record: JsonValue): boolean => {
+const isNoiseSessionEvent = (record: JsonValue): boolean => {
   const event = decodeEvent(record)
   if (event === undefined) return false
   if (noiseEventTypes.has(event.type)) return true
@@ -338,7 +338,7 @@ const mostFrequent = (counts: ReadonlyMap<string, number>): string | undefined =
   [...counts.entries()].reduce<[string, number] | undefined>((best, entry) => (best === undefined || entry[1] > best[1] ? entry : best), undefined)?.[0]
 
 /** Folds a Session's event history into what a supervisor needs: state, plan, recent actions, changes, and failures. */
-export const digestSession = (input: {
+const digestSession = (input: {
   readonly summary: SessionSummary
   readonly records: readonly SessionDigestRecord[]
   readonly now: number
@@ -605,7 +605,7 @@ const formatAge = (ms: number): string => {
   return `${(ms / 3_600_000).toFixed(1)}h`
 }
 
-export const formatEventClock = (time: number | undefined): string => {
+const formatEventClock = (time: number | undefined): string => {
   if (time === undefined) return '--:--:--'
   const date = new Date(time)
   return [date.getHours(), date.getMinutes(), date.getSeconds()].map(part => String(part).padStart(2, '0')).join(':')
@@ -614,7 +614,7 @@ export const formatEventClock = (time: number | undefined): string => {
 const todoMarks: Readonly<Record<string, string>> = { completed: 'x', in_progress: '>', pending: ' ', cancelled: '-' }
 
 /** Renders a digest for a terminal; aims to answer "what is it doing, is it stuck, what changed" in about 60 lines. */
-export const renderSessionDigest = (digest: SessionDigest, now: number): string => {
+const renderSessionDigest = (digest: SessionDigest, now: number): string => {
   const lines: string[] = []
   const ago = (time: number | undefined): string => (time === undefined ? '' : `, ${formatAge(now - time)} ago`)
   lines.push(`${digest.sessionId}${digest.title === undefined ? '' : ` · ${digest.title}`}`)
@@ -698,4 +698,13 @@ export const renderSessionDigest = (digest: SessionDigest, now: number): string 
   for (const failure of digest.failures.recent) lines.push(`  #${failure.seq} ${oneLine(failure.summary, 70)} → ${oneLine(failure.error, 90)}`)
   if (digest.subagents.length > 0) lines.push(`Subagents: ${digest.subagents.map(item => `${item.label ?? '?'} (${item.id.slice(0, 8)})`).join(', ')}`)
   return lines.join('\n')
+}
+
+export class SessionDigestModel {
+  static readonly createEventDescriber = createSessionEventDescriber
+  static readonly eventFilter = sessionEventFilter
+  static readonly isNoiseEvent = isNoiseSessionEvent
+  static readonly digest = digestSession
+  static readonly formatEventClock = formatEventClock
+  static readonly render = renderSessionDigest
 }

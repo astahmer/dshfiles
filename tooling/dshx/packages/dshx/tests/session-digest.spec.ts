@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { runCli } from '../src/cli/run.js'
 import { createDshPlatformClientFromTransport } from '../src/platform/client.js'
 import type { DshPlatformClient, JsonValue, SessionSummary } from '../src/platform/client.js'
-import { createSessionEventDescriber, digestSession, isNoiseSessionEvent, renderSessionDigest } from '../src/platform/session-digest.js'
+import { SessionDigestModel } from '../src/platform/session-digest.js'
 
 const fixtureSchema = z.object({
   summary: z.object({
@@ -71,7 +71,7 @@ describe('sessions digest', () => {
   it('shows a running agent waiting on its slow check, its plan, its describe, and the edit that silently failed', () => {
     const fixture = loadFixture('relay-running')
     const now = lastTime(fixture.records) + 5_000
-    const digest = digestSession({ ...fixture, now })
+    const digest = SessionDigestModel.digest({ ...fixture, now })
 
     expect(digest.running).toBe(true)
     expect(digest.todos).toEqual([
@@ -93,14 +93,14 @@ describe('sessions digest', () => {
 
   it('flags a long wait on a pending tool call', () => {
     const fixture = loadFixture('relay-running')
-    const digest = digestSession({ ...fixture, now: lastTime(fixture.records) + 5 * 60_000 })
+    const digest = SessionDigestModel.digest({ ...fixture, now: lastTime(fixture.records) + 5 * 60_000 })
 
     expect(digest.attention).toEqual([expect.stringMatching(/^waiting 5m on #\d+ bash: sleep 25/)])
   })
 
   it('flags an agent that keeps answering goal rounds without doing anything', () => {
     const fixture = loadFixture('goal-loop')
-    const digest = digestSession({ ...fixture, now: lastTime(fixture.records) + 1_000 })
+    const digest = SessionDigestModel.digest({ ...fixture, now: lastTime(fixture.records) + 1_000 })
 
     expect(digest.attention).toContainEqual(expect.stringMatching(/^\d+ turns since the last tool call \(#111\); latest reply: Nothing left to do\.$/))
     expect(digest.goal?.objective).toBe('Ship a tested greeting module in the scratch app and describe it as one jj revision.')
@@ -121,7 +121,7 @@ describe('sessions digest', () => {
 
   it('reports compaction, the last reply, and a todo the finished agent left open', () => {
     const fixture = loadFixture('relay-done')
-    const digest = digestSession({ ...fixture, now: lastTime(fixture.records) + 1_000 })
+    const digest = SessionDigestModel.digest({ ...fixture, now: lastTime(fixture.records) + 1_000 })
 
     expect(digest.running).toBe(false)
     expect(digest.compactions).toBe(1)
@@ -135,7 +135,7 @@ describe('sessions digest', () => {
     for (const name of ['relay-running', 'goal-loop', 'relay-done']) {
       const fixture = loadFixture(name)
       const now = lastTime(fixture.records)
-      const text = renderSessionDigest(digestSession({ ...fixture, now }), now)
+      const text = SessionDigestModel.render(SessionDigestModel.digest({ ...fixture, now }), now)
       expect(text.split('\n').length).toBeLessThanOrEqual(60)
       expect(text).toContain('Recent actions')
     }
@@ -145,8 +145,8 @@ describe('sessions digest', () => {
 describe('sessions tail', () => {
   it('names the tool behind each result and hides per-step bookkeeping', () => {
     const fixture = loadFixture('relay-done')
-    const describe = createSessionEventDescriber()
-    const lines = fixture.records.filter(record => !isNoiseSessionEvent(record)).flatMap(record => describe(record) ?? [])
+    const describe = SessionDigestModel.createEventDescriber()
+    const lines = fixture.records.filter(record => !SessionDigestModel.isNoiseEvent(record)).flatMap(record => describe(record) ?? [])
 
     expect(lines.some(line => line.type === 'step/start' || line.type === 'request/context')).toBe(false)
     expect(lines.find(line => line.type === 'tool/result' && line.summary.includes('integration ok'))?.summary).toMatch(/^↳ bash ok \d+\.\ds: integration ok$/)

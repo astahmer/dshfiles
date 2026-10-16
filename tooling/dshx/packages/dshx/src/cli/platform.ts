@@ -12,14 +12,7 @@ import type { BundleSummary, DshPlatformClient, DshPlatformTransport, JsonValue,
 import type { CommunicationClient, ConnectCommunicationClientOptions } from '../communication/bridge.js'
 import { runCommunicationCommand } from '../communication/cli.js'
 import { connectMultiHost, nativeRpcRequestSchema, type MultiHost, type RuntimeStatusValue } from '../platform/dshx-channel.js'
-import {
-  createSessionEventDescriber,
-  digestSession,
-  formatEventClock,
-  isNoiseSessionEvent,
-  renderSessionDigest,
-  sessionEventFilter,
-} from '../platform/session-digest.js'
+import { SessionDigestModel } from '../platform/session-digest.js'
 
 const runFile = promisify(execFile)
 const engineRange = '^22.19.0 || >=24.0.0'
@@ -795,7 +788,7 @@ async function runPlatformAction(args: CliArgs, runtime: PlatformCliRuntime): Pr
           records: await client.sessions.export(sessionId, {
             ...(args.sinceSeq === undefined ? {} : { afterSeq: args.sinceSeq }),
             ...(args.tail === undefined ? {} : { newest: args.tail }),
-            ...(args.types === undefined ? {} : { keep: sessionEventFilter(args.types) }),
+            ...(args.types === undefined ? {} : { keep: SessionDigestModel.eventFilter(args.types) }),
           }),
         }
         if (args.output !== undefined) {
@@ -821,18 +814,18 @@ async function runPlatformAction(args: CliArgs, runtime: PlatformCliRuntime): Pr
       if (!summary) throw new DshPlatformError('not-found', `No DSH Session named ${JSON.stringify(sessionId)} exists.`)
       const records = await client.sessions.export(sessionId)
       const now = Date.now()
-      const digest = digestSession({ summary, records, now, ...(args.limit === undefined ? {} : { actionLimit: args.limit }) })
-      emitSessionResult(digest, renderSessionDigest(digest, now))
+      const digest = SessionDigestModel.digest({ summary, records, now, ...(args.limit === undefined ? {} : { actionLimit: args.limit }) })
+      emitSessionResult(digest, SessionDigestModel.render(digest, now))
       return 0
     }
 
     if (args.command === 'sessions' && action === 'tail') {
       const sessionId = parameters[0] ?? ''
-      const keep = args.types === undefined ? (record: JsonValue) => !isNoiseSessionEvent(record) : sessionEventFilter(args.types)
-      const describe = createSessionEventDescriber()
+      const keep = args.types === undefined ? (record: JsonValue) => !SessionDigestModel.isNoiseEvent(record) : SessionDigestModel.eventFilter(args.types)
+      const describe = SessionDigestModel.createEventDescriber()
       const describeAll = (records: readonly JsonValue[]) => records.flatMap(record => describe(record) ?? [])
       const line = (item: NonNullable<ReturnType<typeof describe>>): string =>
-        `#${item.seq} ${formatEventClock(item.time)} ${item.type.padEnd(17)} ${item.summary}`
+        `#${item.seq} ${SessionDigestModel.formatEventClock(item.time)} ${item.type.padEnd(17)} ${item.summary}`
       const throughSeq = await client.sessions.cursor(sessionId)
       const initialRange = {
         throughSeq,
