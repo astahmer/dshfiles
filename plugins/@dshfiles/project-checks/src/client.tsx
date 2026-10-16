@@ -104,8 +104,21 @@ const formatTime = (timestamp: number): string => new Date(timestamp).toLocaleTi
 const freshnessLabel = (receipt: ProjectCheckReceipt): string => {
   if (receipt.freshness === 'stale') return 'Stale: working copy changed after this check.'
   if (receipt.freshness === 'unknown') return 'Working-copy revision could not be checked.'
-  return receipt.sourceRevision === null ? 'Revision not recorded.' : `Working copy ${receipt.sourceRevision.slice(0, 12)}`
+  const revision = receipt.sourceRevisionAfter === undefined ? receipt.sourceRevision : receipt.sourceRevisionAfter
+  return revision === null ? 'Revision not recorded.' : `Working copy ${revision.slice(0, 12)}`
 }
+
+const revisionEvidenceLabel = (receipt: ProjectCheckReceipt): string => {
+  const before = receipt.sourceRevisionBefore?.slice(0, 12) ?? 'not recorded'
+  const afterRevision = receipt.sourceRevisionAfter === undefined ? receipt.sourceRevision : receipt.sourceRevisionAfter
+  const after = afterRevision?.slice(0, 12) ?? 'not recorded'
+  return `Recorded revisions · before ${before} · after ${after}`
+}
+
+const executionModeLabel = (receipt: ProjectCheckReceipt): string =>
+  receipt.automatic
+    ? `Automatic · attempt ${receipt.attempt} · turn ${receipt.verificationTurn ?? 'unknown'}`
+    : 'Manual'
 
 function ProjectChecksPanel(props: { readonly sessionId: string; readonly panel: SessionPanel }): JSX.Element | null {
   const api = useApi(projectChecksApi)
@@ -231,6 +244,9 @@ function ProjectChecksPanel(props: { readonly sessionId: string; readonly panel:
                 <ItemDescription className="dshx:line-clamp-none dshx:font-mono dshx:text-xs">
                   {formatTime(receipt.finishedAt)} · {receipt.durationMs} ms{receipt.exitCode === null ? '' : ` · exit ${receipt.exitCode}`}
                 </ItemDescription>
+                <ItemDescription className="dshx:text-xs">{executionModeLabel(receipt)}</ItemDescription>
+                <ItemDescription className="dshx:text-xs">{revisionEvidenceLabel(receipt)}</ItemDescription>
+                <ItemDescription className="dshx:text-xs">Action configuration equivalence: {receipt.configurationFreshness ?? 'unknown'}</ItemDescription>
                 <ItemDescription className={receipt.freshness === 'stale' ? 'dshx:text-xs dshx:text-warning' : 'dshx:text-xs'}>
                   {freshnessLabel(receipt)}
                 </ItemDescription>

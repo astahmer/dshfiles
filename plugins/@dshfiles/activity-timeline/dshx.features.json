@@ -141,6 +141,62 @@
           "testName": "maps adapters with authoritative levels"
         }
       ]
+    },
+    {
+      "id": "verification-receipts",
+      "title": "Inspect verification receipts in the Activity Timeline",
+      "summary": "Project Checks publishes a strict, bounded receipt summary after persistence; the timeline deduplicates replay, marks failures and timeouts for attention, and opens only a currently listed Session.",
+      "reach": [
+        "seed tool-call-thread",
+        "click button \"Activity\"",
+        "click button \"Agent*\"",
+        "expect button \"Open Session\""
+      ],
+      "surfaces": ["client", "host", "integration", "storage"],
+      "configuration": [],
+      "states": ["passed", "failed", "timed-out", "cancelled", "backfilled", "deduplicated", "session-opened"],
+      "failureModes": [
+        "Unknown schema versions and extra payload fields are rejected before the timeline stores an event.",
+        "An archived or missing Session is reported unavailable without being revived or mutated.",
+        "A missing Activity Timeline does not prevent Project Checks from persisting its authoritative receipt.",
+        "Historical revisions are not presented as current source freshness, and configuration equivalence remains unknown."
+      ],
+      "externalDependencies": [
+        {
+          "id": "@dshfiles/project-checks",
+          "boundary": "Versioned safe receipt summaries over the shared Activity event and bounded backfill events; Timeline never reads Project Checks storage.",
+          "deterministicFake": "Exercise schema, safe mapping, replay dedupe, and persistence ordering with fixed unit inputs and the scratch browser journey."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "activity-timeline.verification-receipts",
+          "featureFile": "tooling/dshx/e2e/features/verification-evidence.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "activity-timeline.verification-retry",
+          "featureFile": "tooling/dshx/e2e/features/project-checks.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "activity-timeline.verification-cancelled",
+          "featureFile": "tooling/dshx/e2e/features/project-checks.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "activity-timeline.receipts-versioned-envelope",
+          "file": "plugins/@dshfiles/activity-timeline/src/receipt-activity.test.ts",
+          "testName": "accepts only the current version and exact bounded fields"
+        },
+        {
+          "kind": "unit-test",
+          "id": "activity-timeline.receipts-safe-status-and-dedupe",
+          "file": "plugins/@dshfiles/activity-timeline/src/receipt-activity.test.ts",
+          "testName": "maps failure and cancellation truthfully and deduplicates receipt replay"
+        }
+      ]
     }
   ]
 }

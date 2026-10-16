@@ -43,6 +43,9 @@ const en = {
   events: 'events',
   routineHidden: 'Routine events are condensed; switch on Detailed to inspect every retained event.',
   emptyDetail: 'Select an event to inspect its metadata and correlated activity.',
+  openSession: 'Open Session',
+  sessionUnavailable: 'This Session is archived or unavailable and cannot be opened.',
+  sessionNavigationFailed: 'Could not open this Session. It was not changed.',
 } as const
 
 const zh = {
@@ -85,6 +88,9 @@ const zh = {
   events: '个事件',
   routineHidden: '常规事件已压缩；开启“详细”可查看全部保留事件。',
   emptyDetail: '选择一个事件以查看其元数据与相关活动。',
+  openSession: '打开会话',
+  sessionUnavailable: '此会话已归档或不可用，无法打开。',
+  sessionNavigationFailed: '无法打开此会话。会话未被更改。',
 } as const
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {

@@ -145,6 +145,67 @@
           "testName": "accepts fractional durations recorded by the native Hook Protocol"
         }
       ]
+    },
+    {
+      "id": "activity-projection",
+      "title": "Project check receipts appear safely in the Activity Timeline",
+      "summary": "Persist authoritative verification receipts before emitting a strict v1 safe summary, replay a bounded recent window when Activity Timeline starts, and keep Project Checks useful when Timeline is absent.",
+      "surfaces": ["host", "storage", "integration", "client"],
+      "configuration": [],
+      "states": ["persisted", "published", "backfilled", "deduplicated", "timeline-absent", "configuration-unknown"],
+      "failureModes": [
+        "A timeline ingestion failure cannot fail a check after its receipt is durable.",
+        "A legacy receipt without revision fields remains readable and backfillable.",
+        "Backfill is bounded to retained receipts and repeated delivery converges by receipt id.",
+        "Current source freshness is recalculated by the Project Checks API; configuration equivalence remains unknown."
+      ],
+      "externalDependencies": [
+        {
+          "id": "@dshfiles/activity-timeline",
+          "boundary": "Optional versioned Activity event projection and backfill trigger; Project Checks owns receipt storage and never requires Timeline availability.",
+          "deterministicFake": "Exercise the callback ordering, strict summary, legacy records, bounded replay, and timeline-absent scratch composition."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "project-checks.activity-projection",
+          "featureFile": "tooling/dshx/e2e/features/verification-evidence.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "project-checks.timeline-absent",
+          "featureFile": "tooling/dshx/e2e/features/project-checks.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "project-checks.activity-retry-projection",
+          "featureFile": "tooling/dshx/e2e/features/project-checks.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "project-checks.activity-cancel-projection",
+          "featureFile": "tooling/dshx/e2e/features/project-checks.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "project-checks.activity-projection-safe-v1",
+          "file": "plugins/@dshfiles/project-checks/src/receipt-activity.test.ts",
+          "testName": "publishes only the bounded, versioned receipt facts"
+        },
+        {
+          "kind": "unit-test",
+          "id": "project-checks.activity-projection-persist-before-emit",
+          "file": "plugins/@dshfiles/project-checks/src/receipt-activity.test.ts",
+          "testName": "waits for durable receipt persistence before publishing and keeps projection failures optional"
+        },
+        {
+          "kind": "unit-test",
+          "id": "project-checks.activity-projection-legacy-and-bounded-backfill",
+          "file": "plugins/@dshfiles/project-checks/src/core.test.ts",
+          "testName": "reads legacy receipts and bounds newer-first backfill to retained evidence"
+        }
+      ]
     }
   ],
   "kind": "bundle"

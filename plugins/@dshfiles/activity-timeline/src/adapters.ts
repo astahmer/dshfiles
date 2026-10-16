@@ -1,4 +1,4 @@
-import type { ActivityIngest, ActivityLevel, ActivityReference } from './types.js'
+import type { ActivityIngest, ActivityLevel, ActivityReference, VerificationReceiptSummary } from './types.js'
 
 const clamp = (value: string, max: number): string => (value.length <= max ? value : `${value.slice(0, max - 1)}…`)
 
@@ -188,6 +188,46 @@ export const workspaceActivity = (input: {
     detail: input.detail === null ? null : clamp(input.detail, 2000),
     metadata: { workspaceId: input.workspaceId, workspaceName: input.workspaceName },
     references,
+    provenance: 'observed',
+  }
+}
+
+export const verificationReceiptActivity = (receipt: VerificationReceiptSummary): ActivityIngest => {
+  const statusLabel = receipt.status === 'timed-out' ? 'timed out' : receipt.status
+  const modeLabel = receipt.automatic
+    ? `automatic · attempt ${receipt.attempt} · verification turn ${receipt.verificationTurn ?? 'unknown'}`
+    : 'manual'
+  const revisionLabel = (revision: string | null): string => (revision === null ? 'unavailable' : revision)
+  const level: ActivityLevel =
+    receipt.status === 'failed' || receipt.status === 'timed-out' ? 'attention' : receipt.status === 'cancelled' ? 'notable' : 'routine'
+
+  return {
+    id: `verification:${receipt.receiptId}`,
+    at: receipt.finishedAt,
+    source: 'integration',
+    type: `verification.${receipt.status}`,
+    level,
+    sessionId: receipt.sessionId,
+    correlationId: receipt.receiptId,
+    summary: `${receipt.label} ${statusLabel} · ${modeLabel} · ${receipt.durationMs} ms`,
+    detail: `Recorded source revision before ${revisionLabel(receipt.sourceRevisionBefore)} and after ${revisionLabel(receipt.sourceRevisionAfter)}. Current source freshness is not asserted here; action-configuration equivalence is unknown. This bounded Project Checks receipt may have expired, so this Activity item is only a historical summary. Open the Session and Project Checks for current freshness.`,
+    metadata: {
+      receiptId: receipt.receiptId,
+      actionId: receipt.actionId,
+      status: receipt.status,
+      failure: receipt.failure,
+      startedAt: receipt.startedAt,
+      finishedAt: receipt.finishedAt,
+      durationMs: receipt.durationMs,
+      exitCode: receipt.exitCode,
+      automatic: receipt.automatic,
+      verificationTurn: receipt.verificationTurn,
+      attempt: receipt.attempt,
+      sourceRevisionBefore: receipt.sourceRevisionBefore,
+      sourceRevisionAfter: receipt.sourceRevisionAfter,
+      configurationFreshness: 'unknown',
+    },
+    references: [{ kind: 'session', id: receipt.sessionId, label: null }],
     provenance: 'observed',
   }
 }

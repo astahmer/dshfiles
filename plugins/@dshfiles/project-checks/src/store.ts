@@ -2,7 +2,7 @@ import { defineDomain } from '@deepseek-ai/dsh-storage-domain'
 import { z } from 'zod'
 import { receiptSchema } from './api.js'
 
-const storedReceiptSchema = receiptSchema.omit({ freshness: true })
+export const storedReceiptSchema = receiptSchema.omit({ freshness: true, configurationFreshness: true })
 
 export const projectChecksDomain = defineDomain({
   name: 'project_checks',
@@ -16,6 +16,22 @@ export type StoredReceipt = z.infer<typeof storedReceiptSchema>
 
 export const receiptKey = (receipt: StoredReceipt): string =>
   `${encodeURIComponent(receipt.sessionId)}:${String(receipt.finishedAt).padStart(16, '0')}:${receipt.id}`
+
+export const MAX_RECEIPTS_TOTAL = 2_000
+
+export const receiptsAfter = (
+  entries: readonly (readonly [string, StoredReceipt])[],
+  since: number,
+  requestedLimit: number,
+): readonly StoredReceipt[] => {
+  const limit = Math.max(0, Math.min(MAX_RECEIPTS_TOTAL, Math.trunc(requestedLimit)))
+  if (limit === 0) return []
+  return entries
+    .map(([, receipt]) => receipt)
+    .filter(receipt => receipt.finishedAt > since)
+    .sort((left, right) => left.finishedAt - right.finishedAt || left.id.localeCompare(right.id))
+    .slice(-limit)
+}
 
 export const trimReceiptRows = (
   entries: readonly (readonly [string, StoredReceipt])[],

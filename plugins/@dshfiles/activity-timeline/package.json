@@ -39,6 +39,7 @@
     "@deepseek-ai/dsh-client-ui-layout": "catalog:",
     "@deepseek-ai/dsh-client-ui-sidebar": "catalog:",
     "@deepseek-ai/dsh-client-ui-slots": "catalog:",
+    "@deepseek-ai/dsh-client-ui-workspace": "catalog:",
     "@deepseek-ai/dsh-subprocess": "catalog:",
     "@deepseek-ai/dsh-tools": "catalog:",
     "@dshfiles/dshx": "workspace:*",
@@ -60,6 +61,7 @@
     "@deepseek-ai/dsh-client-ui-layout": ">=0.2.0-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-client-ui-sidebar": ">=0.2.0-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-client-ui-slots": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-client-ui-workspace": ">=0.2.0-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-subprocess": ">=0.2.0-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-tools": ">=0.2.0-rc.1 <0.3.0-0"
   },
@@ -77,7 +79,8 @@
         "@deepseek-ai/dsh-api-gateway",
         "@deepseek-ai/dsh-api-remotes",
         "@deepseek-ai/dsh-client-locale",
-        "@deepseek-ai/dsh-api-session-controller"
+        "@deepseek-ai/dsh-api-session-controller",
+        "@deepseek-ai/dsh-client-ui-workspace"
       ],
       "locales": [
         "dshfiles.activityTimeline"

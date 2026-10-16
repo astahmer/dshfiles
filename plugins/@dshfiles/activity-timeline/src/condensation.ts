@@ -16,6 +16,7 @@ const ALWAYS_INDIVIDUAL = new Set([
   'integration.stale',
   'integration.already_integrated',
   'integration.cancelled',
+  'verification.cancelled',
   'workspace.ready',
   'workspace.missing',
 ])
@@ -37,6 +38,10 @@ const TYPE_LABELS: Readonly<Record<string, string>> = {
   'integration.stale': 'integration stale',
   'integration.already_integrated': 'already integrated',
   'integration.cancelled': 'integration cancelled',
+  'verification.passed': 'verification passed',
+  'verification.failed': 'verification failed',
+  'verification.timed-out': 'verification timed out',
+  'verification.cancelled': 'verification cancelled',
   'workspace.created': 'workspace registered',
   'workspace.ready': 'workspace ready',
   'workspace.missing': 'workspace missing',

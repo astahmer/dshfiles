@@ -8,6 +8,7 @@ import { RefreshCwIcon, SearchIcon } from '@dshfiles/plugin-ui/icons'
 import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
 import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
 import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
+import type { UiWorkspace } from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { errorMessage, useMutation, useQuery } from '@dshfiles/plugin-ui/query'
 import { useApi } from '@dshfiles/dshx/client'
 import type { ActivityEvent, ActivityLevel, ActivitySource, CondensedItem } from './types.js'
@@ -72,7 +73,11 @@ const ActivityRow = (props: {
   </button>
 )
 
-export const ActivityTimelinePanel = (props: { readonly sessions: ISessions; readonly t: ActivityTimelineTranslate }): JSX.Element => {
+export const ActivityTimelinePanel = (props: {
+  readonly sessions: ISessions
+  readonly uiWorkspace: UiWorkspace
+  readonly t: ActivityTimelineTranslate
+}): JSX.Element => {
   const api = useApi(activityTimelineApi)
   const sessionLabel = EntityLabels.useSessionLabel(props.sessions)
   const t = props.t
@@ -84,6 +89,7 @@ export const ActivityTimelinePanel = (props: { readonly sessions: ISessions; rea
   const [cursor, setCursor] = useState<string | null>(null)
   const [selected, setSelected] = useState<CondensedItem | null>(null)
   const [pendingNew, setPendingNew] = useState(0)
+  const [navigationError, setNavigationError] = useState('')
   const scrollRef = useRef<HTMLDivElement>(null)
   const nearBottomRef = useRef(true)
   const debouncedSearch = useDebouncedValue({ value: search.trim(), delayMs: 200 })
@@ -176,6 +182,10 @@ export const ActivityTimelinePanel = (props: { readonly sessions: ISessions; rea
   const newestId = items.length === 0 ? null : (items[items.length - 1]?.id ?? null)
 
   useEffect(() => {
+    setNavigationError('')
+  }, [selected?.id])
+
+  useEffect(() => {
     setOlder([])
     setCursor(null)
   }, [filterKey])
@@ -200,6 +210,25 @@ export const ActivityTimelinePanel = (props: { readonly sessions: ISessions; rea
     setPendingNew(0)
   }
   const selectedEvent: ActivityEvent | undefined = detailQuery.data
+  const openOwningSession = (sessionId: string): void => {
+    const sessionList = props.sessions.list.getSnapshot()
+    const availableId = sessionList.ids.find(candidate => candidate === sessionId)
+    const session = availableId === undefined ? undefined : sessionList.byId[availableId]
+    if (session === undefined) {
+      setNavigationError(t('sessionUnavailable'))
+      return
+    }
+    try {
+      props.uiWorkspace.openSession(session.id)
+      setNavigationError('')
+    } catch {
+      setNavigationError(t('sessionNavigationFailed'))
+    }
+  }
+  const openEventSession = (event: ActivityEvent): void => {
+    if (event.sessionId === null) return
+    openOwningSession(event.sessionId)
+  }
 
   return (
     <div className="dshx-root dshx:@container">
@@ -215,6 +244,9 @@ export const ActivityTimelinePanel = (props: { readonly sessions: ISessions; rea
             </Badge>
             <Badge variant={statsQuery.data !== undefined && statsQuery.data.attention > 0 ? 'destructive' : 'outline'}>
               {statsQuery.data?.attention ?? 0} {t('attention')}
+            </Badge>
+            <Badge variant="outline">
+              {statsQuery.data?.duplicates ?? 0} {t('duplicates')}
             </Badge>
             <Button variant="outline" size="sm" disabled={feedQuery.isFetching} onClick={() => void feedQuery.refetch()}>
               <RefreshCwIcon aria-hidden /> {t('refresh')}
@@ -326,6 +358,16 @@ export const ActivityTimelinePanel = (props: { readonly sessions: ISessions; rea
                     {selectedEvent.type} · {formatTime(selectedEvent.at)} · {formatExact(selectedEvent.at)}
                   </p>
                   {selectedEvent.detail === null ? null : <p className="dshx:break-words dshx:text-xs">{selectedEvent.detail}</p>}
+                  {selectedEvent.sessionId === null ? null : (
+                    <Button size="sm" variant="outline" onClick={() => openEventSession(selectedEvent)}>
+                      {t('openSession')}
+                    </Button>
+                  )}
+                  {navigationError.length === 0 ? null : (
+                    <Alert variant="destructive">
+                      <AlertDescription>{navigationError}</AlertDescription>
+                    </Alert>
+                  )}
                   <Separator />
                   <p className="dshx:text-xs dshx:font-semibold">{t('metadata')}</p>
                   <pre className="dshx:overflow-x-auto dshx:rounded dshx:bg-muted/60 dshx:p-2 dshx:text-[11px]">

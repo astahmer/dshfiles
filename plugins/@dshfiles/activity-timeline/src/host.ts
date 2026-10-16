@@ -1,14 +1,16 @@
 import type { Context, Effect } from '@deepseek-ai/cordis'
 import { defineHost } from '@dshfiles/dshx/host'
 import { z } from 'zod'
-import { communicationActivity, communicationMessage, integrationActivity, sessionActivity, workspaceActivity } from './adapters.js'
+import { communicationActivity, communicationMessage, integrationActivity, sessionActivity, verificationReceiptActivity, workspaceActivity } from './adapters.js'
 import { activityTimelineApi } from './api.js'
+import { verificationReceiptEventSchema } from './types.js'
 import { createActivityTimelineService, type ActivityTimelineService } from './service.js'
 
 declare module '@deepseek-ai/cordis' {
   interface Events {
     'dshfiles/activity/event'(payload: unknown): void
     'dshfiles/activity/backfill'(payload: { readonly since?: number }): void
+    'dshfiles/activity/source-ready'(payload: { readonly source: 'project-checks-receipts'; readonly version: 1 }): void
   }
 }
 
@@ -26,6 +28,22 @@ const api = activityTimelineApi.host({
   event: ({ input }) => requireService().event(input.eventId),
   related: async ({ input }) => ({ events: [...(await requireService().related(input.eventId, input.limit ?? 50))] }),
 })
+
+const BACKFILL_WINDOW_MS = 7 * 24 * 60 * 60 * 1000
+
+const activityEventPayloadSchema = z.discriminatedUnion('kind', [
+  z
+    .object({
+      kind: z.enum(['communication-activity', 'communication-message', 'integration', 'workspace']),
+      value: z.unknown(),
+    })
+    .strict(),
+  verificationReceiptEventSchema,
+])
+
+const projectChecksReadySchema = z
+  .object({ source: z.literal('project-checks-receipts'), version: z.literal(1) })
+  .strict()
 
 const describeError = (error: unknown): string => (error instanceof Error ? error.message : String(error)).slice(0, 2000)
 
@@ -52,26 +70,31 @@ const setupHost = (context: Context): Effect<void> => {
     void active.ingest(sessionActivity({ kind: 'input', at: Date.now(), sessionId: agent.id }))
     return undefined
   })
+  context.on('dshfiles/activity/source-ready', payload => {
+    if (!projectChecksReadySchema.safeParse(payload).success) return undefined
+    context.emit('dshfiles/activity/backfill', { since: Date.now() - BACKFILL_WINDOW_MS })
+    return undefined
+  })
   context.on('dshfiles/activity/event', payload => {
-    const parsed = z
-      .object({
-        kind: z.enum(['communication-activity', 'communication-message', 'integration', 'workspace']),
-        value: z.unknown(),
-      })
-      .strict()
-      .safeParse(payload)
+    const parsed = activityEventPayloadSchema.safeParse(payload)
     if (!parsed.success) return undefined
+    if (parsed.data.kind === 'verification-receipt') {
+      void active.ingest(verificationReceiptActivity(parsed.data.value)).catch(() => undefined)
+      return undefined
+    }
     if (parsed.data.kind === 'communication-activity')
-      void active.ingest(communicationActivity(parsed.data.value as Parameters<typeof communicationActivity>[0]))
-    if (parsed.data.kind === 'communication-message') void active.ingest(communicationMessageSafe(parsed.data.value))
-    if (parsed.data.kind === 'integration') void active.ingest(integrationActivity(parsed.data.value as Parameters<typeof integrationActivity>[0]))
-    if (parsed.data.kind === 'workspace') void active.ingest(workspaceActivity(parsed.data.value as Parameters<typeof workspaceActivity>[0]))
+      void active.ingest(communicationActivity(parsed.data.value as Parameters<typeof communicationActivity>[0])).catch(() => undefined)
+    if (parsed.data.kind === 'communication-message') void active.ingest(communicationMessageSafe(parsed.data.value)).catch(() => undefined)
+    if (parsed.data.kind === 'integration')
+      void active.ingest(integrationActivity(parsed.data.value as Parameters<typeof integrationActivity>[0])).catch(() => undefined)
+    if (parsed.data.kind === 'workspace')
+      void active.ingest(workspaceActivity(parsed.data.value as Parameters<typeof workspaceActivity>[0])).catch(() => undefined)
     return undefined
   })
   return {
     async *[Symbol.asyncIterator]() {
       try {
-        context.emit('dshfiles/activity/backfill', { since: Date.now() - 7 * 24 * 60 * 60 * 1000 })
+        context.emit('dshfiles/activity/backfill', { since: Date.now() - BACKFILL_WINDOW_MS })
         yield async () => {
           if (service === active) service = undefined
         }

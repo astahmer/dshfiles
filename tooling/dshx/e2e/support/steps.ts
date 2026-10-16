@@ -166,19 +166,32 @@ const readProfileOutcome = (page: Page, profile: BootedProfile) =>
     consoleMessages: browserDiagnosticsFor(page),
   })
 
-const visitScratchProfile = async (page: Page, profile: BootedProfile): Promise<void> => {
+const visitScratchProfile = async (page: Page, profile: BootedProfile, url = profile.url): Promise<void> => {
   const allowedOrigins = allowedBrowserOrigins.get(page)
   if (allowedOrigins === undefined) throw new Error('the browser network boundary was not initialized')
-  allowedOrigins.add(browserOriginKey(new URL(profile.url)))
+  allowedOrigins.add(browserOriginKey(new URL(url)))
   try {
-    await page.goto(profile.url, { waitUntil: 'domcontentloaded' })
+    await page.goto(url, { waitUntil: 'domcontentloaded' })
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     throw new Error(`Could not open the ${profile.profile} scratch profile: ${message.replaceAll(PRIVATE_URL, '<private-url>')}`)
   }
 }
 
-export const visitIsolatedPluginProfile = async (page: Page, profile: BootedProfile): Promise<void> => {
+export const restartScratchProfileInBrowser = async (page: Page): Promise<string> => {
+  const profile = profileFor(page)
+  await page.goto('about:blank')
+  const freshUrl = await profile.restart()
+  if (freshUrl !== profile.url) throw new Error('The scratch Host restart returned a stale URL.')
+  await visitScratchProfile(page, profile, freshUrl)
+  const previewNotice = page.getByRole('dialog', { name: 'Preview Notice', exact: true })
+  if (await previewNotice.isVisible()) await previewNotice.getByRole('button', { name: 'Continue', exact: true }).click()
+  await dismissProviderSetupDuringStartup(page)
+  assertClientBootReady(await readProfileOutcome(page, profile), profile, 'The restarted scratch profile did not boot cleanly.')
+  return freshUrl
+}
+
+export const visitIsolatedPluginProfile = async (page: Page, profile: BootedProfile): Promise<void> =>
   profiles.set(page, profile)
   try {
     await visitScratchProfile(page, profile)

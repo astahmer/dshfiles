@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test'
 import { spawnSync } from 'node:child_process'
-import { appendFile, mkdir, rm, writeFile } from 'node:fs/promises'
+import { appendFile, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { After, Then, When } from '../bdd.js'
 import { fakeCommandCodeFor } from '../fake-command-code.js'
@@ -41,12 +41,31 @@ const openChecks = async (page: Page): Promise<void> => {
   await expect(checksPanel(page)).toBeVisible()
 }
 
-const trustAction = async (
+const trustActions = async (
   page: Page,
-  action: { readonly id: string; readonly label: string; readonly script: string; readonly verify: boolean },
+  actions: readonly {
+    readonly id: string
+    readonly label: string
+    readonly script: string
+    readonly verify: boolean
+    readonly timeoutMs?: number
+  }[],
 ): Promise<void> => {
   const profile = profileFor(page)
   const patch = join(profile.homeRoot, 'profiles', profile.profile, 'cordis.patch.yml')
+  const configuredActions = actions
+    .map(action =>
+      [
+        `      - id: ${JSON.stringify(action.id)}`,
+        `        label: ${JSON.stringify(action.label)}`,
+        '        command: /bin/sh',
+        `        args: ['-c', ${JSON.stringify(action.script)}]`,
+        `        root: ${JSON.stringify(fixtureFor(page).trustedRoot)}`,
+        ...(action.timeoutMs === undefined ? [] : [`        timeoutMs: ${String(action.timeoutMs)}`]),
+        `        verifyBeforeComplete: ${String(action.verify)}`,
+      ].join('\n'),
+    )
+    .join('\n')
   await appendFile(
     patch,
     [
@@ -54,16 +73,16 @@ const trustAction = async (
       "  name: '@dshfiles/project-checks'",
       '  config:',
       '    actions:',
-      `      - id: ${action.id}`,
-      `        label: ${action.label}`,
-      '        command: /bin/sh',
-      `        args: ['-c', ${JSON.stringify(action.script)}]`,
-      `        root: ${JSON.stringify(fixtureFor(page).trustedRoot)}`,
-      `        verifyBeforeComplete: ${String(action.verify)}`,
+      configuredActions,
       '',
     ].join('\n'),
   )
 }
+
+const trustAction = async (
+  page: Page,
+  action: { readonly id: string; readonly label: string; readonly script: string; readonly verify: boolean },
+): Promise<void> => trustActions(page, [action])
 
 When('a trusted root holds a jj project and a sibling folder sits outside it', async ({ page }: { page: Page }) => {
   const root = await createScratchDirectory('dshx-project-checks-e2e-')
@@ -84,6 +103,14 @@ When('the profile trusts the completion check {string} that runs {string}', asyn
   await trustAction(page, { id: 'completion-check', label, script, verify: true })
 })
 
+When('the profile trusts the Activity Timeline manual evidence actions', async ({ page }: { page: Page }) => {
+  await trustActions(page, [
+    { id: 'manual-pass', label: 'Manual pass', script: 'printf PRIVATE_EVIDENCE_SENTINEL', verify: false },
+    { id: 'manual-failure', label: 'Manual failure', script: 'exit 7', verify: false },
+    { id: 'manual-timeout', label: 'Manual timeout', script: 'sleep 3', verify: false, timeoutMs: 1_000 },
+  ])
+})
+
 When('a thread is started in the {string} folder', async ({ page }: { page: Page }, which: string) => {
   const fixture = fixtureFor(page)
   await registerWorkspaceFolder(page, which === 'sibling' ? fixture.sibling : fixture.project)
@@ -97,6 +124,22 @@ When('a thread on the fake model is started in the trusted project', async ({ pa
 
 When('{string} is sent to the fake model', async ({ page }: { page: Page }, text: string) => {
   await sendMessage(page, text)
+})
+
+When('the fake model is sent a message while the completion check runs and the turn is cancelled', async ({ page }: { page: Page }) => {
+  const markerPath = join(fixtureFor(page).project, '.verification-started')
+  const composer = page
+    .getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })
+    .or(page.getByRole('textbox', { name: 'Message or run a task, / commands, @ files or sessions', exact: true }))
+  await composer.fill('finish the task')
+  await composer.press('Enter')
+  await recordAssertion(page, 'project-checks-cancel-aborts-running-verification', async () => {
+    await expect.poll(() => readFile(markerPath, 'utf8').catch(() => ''), { timeout: 30_000 }).toBe('started')
+    const stop = page.getByRole('button', { name: /^Stop/ }).first()
+    await expect(stop).toBeVisible({ timeout: 30_000 })
+    await stop.click()
+    await expect(page.getByRole('status').filter({ hasText: /^(Stopped|Cancelled|Interrupted)$/ }).last()).toBeVisible({ timeout: 30_000 })
+  })
 })
 
 When('the project checks panel is opened', async ({ page }: { page: Page }) => {
@@ -125,6 +168,16 @@ Then('the action ran in the trusted project and left a passed receipt', async ({
     await expect(receipts(page).first()).toContainText('passed')
     await expect(receipts(page).first()).toContainText('exit 0')
   })
+})
+
+Then('the receipt is available without Activity Timeline', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'verification-evidence-project-checks-works-without-timeline', async () => {
+    expect(profileFor(page).expectedClientEntries).not.toContain('@dshfiles/activity-timeline')
+    await expect(receipts(page)).toHaveCount(1)
+    await expect(receipts(page).first()).toContainText('Manual pass')
+    await expect(receipts(page).first()).toContainText('passed')
+  })
+  await finishJourneyAssertions(page)
 })
 
 Then('the sibling folder offers no trusted action', async ({ page }: { page: Page }) => {
@@ -173,7 +226,18 @@ Then('the failing check asks the agent to fix it once, then stops the turn', asy
         .some(request => request.messages.some(message => message.text.includes('Attempt 2 of 2'))),
     ).toBe(false)
   })
-  await finishJourneyAssertions(page)
+})
+
+Then('the cancelled check remains available in Project Checks', async ({ page }: { page: Page }) => {
+  await openChecks(page)
+  await recordAssertion(page, 'project-checks-cancellation-persists-a-cancelled-receipt', async () => {
+    await expect(async () => {
+      await checksPanel(page).getByRole('button', { name: 'Refresh project checks', exact: true }).click()
+      await expect(receipts(page)).toHaveCount(1, { timeout: 2_000 })
+      await expect(receipts(page).first()).toContainText('cancelled')
+    }).toPass({ timeout: 30_000 })
+    await expect(receipts(page).first()).not.toContainText('failed')
+  })
 })
 
 After(async ({ page }: { page: Page }) => {

@@ -7,7 +7,7 @@ const feedRows = (page: Page) => page.getByRole('button', { name: /^(Agent|Commu
 const rowTitles = async (page: Page): Promise<readonly string[]> =>
   (await feedRows(page).allInnerTexts()).map(text => text.split('\n')[1] ?? '').filter(title => title.length > 0)
 
-const openActivity = async (page: Page): Promise<void> => {
+export const openActivity = async (page: Page): Promise<void> => {
   await page.getByRole('navigation', { name: 'Global panels', exact: true }).getByRole('button', { name: 'Activity', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Activity', exact: true, level: 1 })).toBeVisible()
 }

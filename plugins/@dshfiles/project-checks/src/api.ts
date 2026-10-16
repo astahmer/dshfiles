@@ -27,6 +27,17 @@ export const receiptSchema = z.object({
     .string()
     .regex(/^[a-f0-9]{40,64}$/)
     .nullable(),
+  sourceRevisionBefore: z
+    .string()
+    .regex(/^[a-f0-9]{40,64}$/)
+    .nullable()
+    .optional(),
+  sourceRevisionAfter: z
+    .string()
+    .regex(/^[a-f0-9]{40,64}$/)
+    .nullable()
+    .optional(),
+  configurationFreshness: z.literal('unknown').optional(),
   verificationTurn: z.number().int().nonnegative().nullable(),
   automatic: z.boolean(),
   attempt: z.number().int().min(0).max(2),

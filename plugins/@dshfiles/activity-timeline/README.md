@@ -7,26 +7,32 @@ only: it never activates, messages, or steers an Agent.
 ## Data flow
 
 ```
-core agent events ─┐
-communication ─────┼─► cordis 'dshfiles/activity/event' ─► normalize + dedupe ─► durable store ─► condense ─► page API ─► Activity panel
-jj integration ────┘            (backfill on startup)
+core agent events ──────┐
+communication ───────────┤
+jj integration + workspaces ─┤
+Project Checks receipt ─────┴─► cordis 'dshfiles/activity/event' ─► validate + dedupe ─► durable store ─► condense ─► page API ─► Activity panel
+Project Checks startup replay ◄── bounded receipt backfill
 ```
 
-Sources are decoupled: the timeline listens on one cordis event name and never
-reads another plugin's state file or service. `@dshfiles/jj-integration` and
-`@dshfiles/agent-communication` emit their structured events; core
-`agent/created|disposed|status|error|inbox/inserted` are mapped directly. When
-the timeline starts it emits `dshfiles/activity/backfill`, and supporting
-sources replay their recent bounded history.
+Sources are decoupled: the timeline listens on Cordis events and never reads
+another plugin's state file or service. `@dshfiles/jj-integration` and
+`@dshfiles/agent-communication` emit structured events; core
+`agent/created|disposed|status|error|inbox/inserted` are mapped directly.
+Project Checks emits only a strict v1 receipt summary after persistence and
+answers a bounded backfill from its own receipt store. Timeline requests replay
+on startup and after `dshfiles/activity/source-ready`, so either plugin boot
+order works; receipt-derived event IDs dedupe overlapping replay.
 
 ## Normalized event
 
 `{ id, at, source: session|communication|integration|system, type, level:
 routine|notable|attention, sessionId, workspaceId, taskId, correlationId,
 causationId, summary, detail, metadata, references[{kind,id,label}],
-provenance: observed|reported }`. Ids come from the source (message id, call id,
-integration event id) so duplicate delivery dedupes; revisions are referenced,
-never copied. Missing optional metadata is normalized to `null`.
+provenance: observed|reported }`. IDs come from the source (message ID, call ID,
+integration event ID, or receipt-derived ID) so duplicate delivery dedupes.
+Verification metadata carries only recorded before/after revision facts; current
+freshness is not inferred from a historical event. Missing optional metadata is
+normalized to `null`.
 
 ## Persistence and replay
 
@@ -42,8 +48,8 @@ Deterministic, no LLM. Routine runs of the same type and session within ten
 minutes collapse into a traceable group (`N× label for <session>`); consecutive
 notable events sharing a correlation id collapse into a related group. Attention
 events and named milestones (`session.error`, `session.input`,
-`communication.message`, all `integration.*`, `workspace.ready|missing`) are
-always individual. Every group carries the ids of its members, and the
+`communication.message`, all `integration.*`, `verification.cancelled`, and
+`workspace.ready|missing`) are always individual. Every group carries the ids of its members, and the
 `detailed` filter expands every retained event.
 
 ## UI
@@ -52,7 +58,12 @@ Activity panel in `main` with a compact toolbar (search, source toggles,
 attention-only, detailed), a chronological feed (oldest top, newest bottom),
 auto-scroll only when already near the bottom, a new-events indicator, jump to
 latest, "load older" cursor pagination, and a detail drawer with metadata,
-references, provenance, and correlated events.
+references, provenance, and correlated events. When an event names a Session,
+"Open Session" navigates through the public Client workspace API only if that
+Session is in the current Host list. Missing or archived Sessions show an
+unavailable message without being revived or changed. Verification detail is a
+historical summary; open Project Checks for live source freshness and the full
+bounded receipt. Configuration equivalence is explicitly unknown.
 
 ## Agent tools
 
@@ -66,6 +77,13 @@ references, provenance, and correlated events.
   ready but that source is deferred.
 - The panel polls the newest page every 5s; a push/stream subscription is the
   next step (the page API is already incremental via cursor).
-- Thread/workspace deep navigation is rendered as reference badges; wiring the
-  existing sidebar routing into the panel is deferred.
-- No Playwright journey yet; behavior is verified by host-side tests.
+- Thread/workspace references remain badges. Session navigation checks current
+  Host-list membership before calling `uiWorkspace.openSession`; archived/missing
+  Session feedback remains a final acceptance check.
+- Scratch journeys cover the feed, condensation, manual and automatic verification
+  projection, retry attempts, cancellation as notable/non-failure, revision
+  privacy, Session navigation, restart/backfill dedupe, and Project Checks
+  operation without Timeline. Manual and retry/cancellation journeys exercise
+  both plugin boot orders.
+- Run `pnpm check:e2e @dshfiles/activity-timeline` and
+  `pnpm check:e2e @dshfiles/project-checks` from the repository root.

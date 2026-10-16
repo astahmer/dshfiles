@@ -5,6 +5,7 @@ import { DSHFILES_ROOT, buildPlugin, findFreePort, listLocalBootBundles, resolve
 import { compositionFailures, readProfileComposition } from '../../packages/dshx/src/project/profile-composition.js'
 import { spawnOwnedProcess, stopOwnedProcess } from '../../packages/dshx/src/project/owned-process.js'
 import { isolatedHostEnvironment, redactHostOutput } from './scratch-profile.js'
+import { createScratchHostLifecycle, type ScratchHostInstance } from './scratch-host-lifecycle.js'
 
 // Registry dependencies come from the checked-in seed, not the live ~/.dsh profile, so a journey (and its cached
 // Turbo result) depends only on the repository.
@@ -21,6 +22,8 @@ export interface BootedProfile {
   readonly host: ChildProcess
   /** Startup output with tokenized URLs removed. */
   output(): string
+  /** Restart only this fixture-owned process and return its fresh tokenized URL. */
+  restart(): Promise<string>
   close(): Promise<void>
 }
 
@@ -73,50 +76,60 @@ export const startScratchProfile = async (
   })
   const missingBundles = compositionFailures(dump, prepared.expectedBundles)
   if (missingBundles.length > 0) throw new Error(`The scratch profile did not compose expected bundles: ${missingBundles.join(', ')}.`)
-  const port = await findFreePort()
-  const scratchEnvironment = isolatedHostEnvironment(prepared.homeRoot, prepared.profileRoot)
-  const hostPath = pathPrefix === undefined ? scratchEnvironment.PATH : [pathPrefix, scratchEnvironment.PATH].filter(Boolean).join(delimiter)
-  const hostEnvironment = hostPath === undefined ? scratchEnvironment : { ...scratchEnvironment, PATH: hostPath }
-  const host = spawnOwnedProcess('dsh', ['--profile', prepared.profile, '--port', String(port), '--no-open'], {
-    cwd: DSHFILES_ROOT,
-    // directory-picker-auto mounts the OS chooser on a darwin/win32 loopback Host, which a browser cannot drive; an SSH
-    // launch is its documented signal for the in-app browse picker, so folder journeys behave the same on every platform.
-    env: { ...hostEnvironment, SSH_CONNECTION: '127.0.0.1 0 127.0.0.1 0' },
-    stdio: ['ignore', 'pipe', 'pipe'],
-  })
-  let output = ''
-  const collect = (chunk: Buffer): void => {
-    output = `${output}${chunk.toString('utf8')}`.slice(-32_768)
+
+  const start = async (port: number): Promise<ScratchHostInstance> => {
+    const scratchEnvironment = isolatedHostEnvironment(prepared.homeRoot, prepared.profileRoot)
+    const hostPath = pathPrefix === undefined ? scratchEnvironment.PATH : [pathPrefix, scratchEnvironment.PATH].filter(Boolean).join(delimiter)
+    const hostEnvironment = hostPath === undefined ? scratchEnvironment : { ...scratchEnvironment, PATH: hostPath }
+    const host = spawnOwnedProcess('dsh', ['--profile', prepared.profile, '--port', String(port), '--no-open'], {
+      cwd: DSHFILES_ROOT,
+      // directory-picker-auto mounts the OS chooser on a darwin/win32 loopback Host, which a browser cannot drive; an SSH
+      // launch is its documented signal for the in-app browse picker, so folder journeys behave the same on every platform.
+      env: { ...hostEnvironment, SSH_CONNECTION: '127.0.0.1 0 127.0.0.1 0' },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
+    let output = ''
+    const collect = (chunk: Buffer): void => {
+      output = `${output}${chunk.toString('utf8')}`.slice(-32_768)
+    }
+    host.stdout?.on('data', collect)
+    host.stderr?.on('data', collect)
+    try {
+      const url = await waitForHostUrl(host, () => output, profileLabel, timeoutMs)
+      return { host, port, url, output: () => redactHostOutput(output) }
+    } catch (error) {
+      try {
+        if (host.exitCode === null && host.signalCode === null) await stopOwnedProcess(host)
+      } catch {
+        await prepared.dispose()
+      }
+      const message = error instanceof Error ? error.message : String(error)
+      throw new Error(redactHostOutput(message))
+    }
   }
-  host.stdout?.on('data', collect)
-  host.stderr?.on('data', collect)
+
   try {
-    const url = await waitForHostUrl(host, () => output, profileLabel, timeoutMs)
-    let disposed = false
+    const initial = await start(await findFreePort())
+    const lifecycle = createScratchHostLifecycle({ initial, start, dispose: () => prepared.dispose() })
     return {
-      url,
+      get url() {
+        return lifecycle.url
+      },
       profile: prepared.profile,
       homeRoot: prepared.homeRoot,
-      port,
-      expectedClientEntries,
-      host,
-      output: () => redactHostOutput(output),
-      async close(): Promise<void> {
-        if (disposed) return
-        disposed = true
-        try {
-          await stopOwnedProcess(host)
-        } finally {
-          await prepared.dispose()
-        }
+      get port() {
+        return lifecycle.port
       },
+      expectedClientEntries,
+      get host() {
+        return lifecycle.host
+      },
+      output: () => lifecycle.output(),
+      restart: () => lifecycle.restart(),
+      close: () => lifecycle.close(),
     }
   } catch (error) {
-    try {
-      await stopOwnedProcess(host)
-    } finally {
-      await prepared.dispose()
-    }
+    await prepared.dispose()
     const message = error instanceof Error ? error.message : String(error)
     throw new Error(redactHostOutput(message))
   }

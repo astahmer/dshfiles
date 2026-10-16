@@ -10,17 +10,26 @@ import { SessionId } from '@deepseek-ai/dsh-session'
 import { waitForManagedExit } from '@dshfiles/dshx/host'
 import { defineHost } from '@dshfiles/dshx/host'
 import { randomUUID } from 'node:crypto'
+import { z } from 'zod'
 import { realpath } from 'node:fs/promises'
 import { isAbsolute, normalize } from 'node:path'
 import { projectChecksApi, type ProjectHookEvent } from './api.js'
 import { PluginApiError, type ApiCaller } from '@dshfiles/dshx/api'
 import { isWithinRoot, projectChecksConfigSchema, receiptFreshness, verificationPrompt, type ProjectAction } from './core.js'
-import { projectChecksDomain, receiptKey, trimReceiptRows, type StoredReceipt } from './store.js'
+import { emitProjectChecksActivity, persistReceiptAndEmitActivity } from './receipt-activity.js'
+import { MAX_RECEIPTS_TOTAL, projectChecksDomain, receiptKey, receiptsAfter, trimReceiptRows, type StoredReceipt } from './store.js'
+
+declare module '@deepseek-ai/cordis' {
+  interface Events {
+    'dshfiles/activity/event'(payload: unknown): void
+    'dshfiles/activity/backfill'(payload: { readonly since?: number }): void
+    'dshfiles/activity/source-ready'(payload: { readonly source: 'project-checks-receipts'; readonly version: 1 }): void
+  }
+}
 
 const ENTRY_ID = 'dshfiles-project-checks'
 const PACKAGE_NAME = '@dshfiles/project-checks'
 const MAX_RECEIPTS_PER_SESSION = 30
-const MAX_RECEIPTS_TOTAL = 2_000
 const MAX_HOOK_EVENTS = 12
 const REVISION_TIMEOUT_MS = 10_000
 const REVISION_PATTERN = /^[a-f0-9]{40,64}$/
@@ -140,6 +149,12 @@ const readStoredReceipts = async (ctx: Context, sessionId: string): Promise<Stor
     .sort((left, right) => right.finishedAt - left.finishedAt)
     .slice(0, MAX_RECEIPTS_PER_SESSION)
 }
+
+const readStoredReceiptsAfter = async (ctx: Context, since: number): Promise<readonly StoredReceipt[]> =>
+  receiptsAfter(Array.from((await storageFor(ctx)).table('receipts').entries()), since, MAX_RECEIPTS_TOTAL)
+
+const emitReceiptActivity = (ctx: Context, receipt: StoredReceipt): void =>
+  emitProjectChecksActivity(receipt, event => ctx.emit('dshfiles/activity/event', event))
 
 const persistReceipt = async (ctx: Context, receipt: StoredReceipt): Promise<void> => {
   const table = (await storageFor(ctx)).table('receipts')
@@ -268,12 +283,18 @@ const runAction = async (ctx: Context, sessionId: string, action: ProjectAction,
       durationMs: Math.max(0, finishedAt - startedAt),
       exitCode,
       sourceRevision: afterRevision,
+      sourceRevisionBefore: beforeRevision,
+      sourceRevisionAfter: afterRevision,
       verificationTurn: options.verificationTurn,
       automatic: options.automatic,
       attempt: options.attempt,
     }
     stage = 'persist-receipt'
-    await persistReceipt(ctx, receipt)
+    await persistReceiptAndEmitActivity({
+      receipt,
+      persist: () => persistReceipt(ctx, receipt),
+      emit: event => ctx.emit('dshfiles/activity/event', event),
+    })
     return receipt
   } catch (cause) {
     reportApiFailure(options.automatic ? 'verification-run' : 'manual-run', diagnosticId, stage, cause)
@@ -312,7 +333,7 @@ const apiReceipts = async (ctx: Context, sessionId: string) => {
     return await Promise.all(
       receipts.map(async receipt => {
         const action = actions.find(candidate => candidate.id === receipt.actionId)
-        if (action === undefined) return { ...receipt, freshness: 'unknown' as const }
+        if (action === undefined) return { ...receipt, configurationFreshness: 'unknown' as const, freshness: 'unknown' as const }
         let revision = revisions.get(action.root)
         if (revision === undefined) {
           revision = (async () => {
@@ -324,7 +345,8 @@ const apiReceipts = async (ctx: Context, sessionId: string) => {
           })()
           revisions.set(action.root, revision)
         }
-        return { ...receipt, freshness: receiptFreshness(receipt.sourceRevision, await revision) }
+        const receiptRevision = receipt.sourceRevisionAfter === undefined ? receipt.sourceRevision : receipt.sourceRevisionAfter
+        return { ...receipt, configurationFreshness: 'unknown' as const, freshness: receiptFreshness(receiptRevision, await revision) }
       }),
     )
   } catch (cause) {
@@ -398,8 +420,9 @@ const hostApi = projectChecksApi.host({
       signal,
       requireRevision: false,
     })
+    const receiptRevision = receipt.sourceRevisionAfter === undefined ? receipt.sourceRevision : receipt.sourceRevisionAfter
     const freshness = receiptFreshness(
-      receipt.sourceRevision,
+      receiptRevision,
       await (async () => {
         try {
           return await sourceRevision(ctx, (await sessionPaths(ctx, sessionId, action)).cwd)
@@ -408,7 +431,7 @@ const hostApi = projectChecksApi.host({
         }
       })(),
     )
-    return { ...receipt, freshness }
+    return { ...receipt, configurationFreshness: 'unknown' as const, freshness }
   },
 })
 
@@ -420,6 +443,17 @@ export default defineHost({
   setup: ctx => {
     const config = configFor(ctx)
     ctx.effect(() => async () => closeProjectChecksDomain(ctx), 'Project Checks receipt domain')
+    ctx.on('dshfiles/activity/backfill', payload => {
+      const parsed = z.object({ since: z.number().int().nonnegative().optional() }).strict().safeParse(payload)
+      if (!parsed.success) return undefined
+      void readStoredReceiptsAfter(ctx, parsed.data.since ?? 0)
+        .then(receipts => {
+          for (const receipt of receipts) emitReceiptActivity(ctx, receipt)
+        })
+        .catch(() => undefined)
+      return undefined
+    })
+    ctx.emit('dshfiles/activity/source-ready', { source: 'project-checks-receipts', version: 1 })
     if (!config.actions.some(action => action.verifyBeforeComplete)) return
 
     ctx.on('agent/turn-stopping', async ({ agent, turn, signal }) => {

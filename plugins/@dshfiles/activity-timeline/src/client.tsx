@@ -3,6 +3,7 @@ import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
+import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { defineClient } from '@dshfiles/dshx/client'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { ActivityTimelinePanel } from './panel.js'
@@ -20,7 +21,7 @@ const PanelGlyph = (props: { readonly size?: number }): JSX.Element => (
 export default defineClient({
   name: '@dshfiles/activity-timeline',
   locales: [activityTimelineLocale],
-  inject: ['slots', 'sessions'],
+  inject: ['slots', 'sessions', 'uiWorkspace'],
   setup(ctx, decorate) {
     const translate = ctx.locale.bind(ACTIVITY_TIMELINE_LOCALE_NAMESPACE)
     const label = (): string => translate('title')
@@ -32,7 +33,7 @@ export default defineClient({
         { name: 'main', key: PANEL_ID, locale: ACTIVITY_TIMELINE_LOCALE_NAMESPACE },
         decorate(props => (
           <PluginQueryProvider>
-            <ActivityTimelinePanel sessions={ctx.sessions} t={props.t} />
+            <ActivityTimelinePanel sessions={ctx.sessions} uiWorkspace={ctx.uiWorkspace} t={props.t} />
           </PluginQueryProvider>
         )),
       ),
