@@ -48,7 +48,7 @@ export const ScratchStateSchema = z
     fakeSecretCli: z.string().optional(),
     /** Seeds `dshx dev open` already applied to this instance, with the checkout file one changed for `down` to restore. */
     seeds: z.array(z.object({ seed: z.enum(REACH_SEEDS), changedFile: z.string().optional() }).strict()).optional(),
-    /** The loopback model provider the `tool-call-thread` seed started; `down` stops it. */
+    /** The loopback model provider started by `tool-call-thread` or `credential-recovery`; `down` stops it. */
     fakeProvider: ownedProcessSchema.optional(),
   })
   .strict()

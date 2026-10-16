@@ -54,6 +54,16 @@ test('Command Code routes use explicit paths and pure chat dispatch', async () =
   assert.match(stream, /"finish_reason":"tool_calls"/)
   assert.match(stream, /data: \[DONE\]/)
   assert.equal(state.requests[0]?.kind, 'turn')
+
+  const missingCredential = await app.request(`${origin}/provider/v1/chat/completions`, {
+    method: 'POST',
+    headers: { authorization: 'Bearer dshx-dev-fake-MISSING', 'content-type': 'application/json' },
+    body: JSON.stringify({ messages: [{ role: 'user', content: 'Reproduce missing credential recovery.' }] }),
+  })
+  assert.equal(missingCredential.status, 401)
+  assert.deepEqual(await missingCredential.json(), {
+    error: { code: 'MISSING_CREDENTIAL', message: 'The fake account has no usable credential.', type: 'authentication_error' },
+  })
 })
 
 test('Framework Hub routes filter, sort, fail and serve install detail', async () => {

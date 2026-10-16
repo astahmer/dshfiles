@@ -73,15 +73,16 @@ Notice and "Add an API key" dialogs, then runs the feature's "reach" steps:
   click <role|text|label|title> "<name>"       fill <role|label> "<name>" "<value>"
   rightclick <role|text|label|title> "<name>"  press <key>
   hover <role|text|label|title> "<name>"       (leaves the pointer there, for hover-only UI)
-  expect <role|text|label|title> "<name>"      seed <rebase-ready-thread|pending-restart|tool-call-thread|fake-secret-cli>
+  expect <role|text|label|title> "<name>"      seed <rebase-ready-thread|pending-restart|tool-call-thread|credential-recovery|fake-secret-cli>
   attach "<file>"                              (a repository file, to the page's file input)
 Names match exactly; "name*" matches a case-insensitive substring. "text" without "*" is exact too.
 Seed steps come first and run once per instance: rebase-ready-thread starts a thread in its own jj
 workspace through the New thread screen and describes a revision there; pending-restart changes
 thread-sidebar's Host entry on disk, as a rebuild would ("down" restores it); tool-call-thread
 points an AI Accounts Command Code account at a loopback fake provider ("down" stops it) and runs a
-thread whose model calls bash for three seconds (needs @dshfiles/ai-accounts); fake-secret-cli
-resets the synthetic aliases of a Host started with "up --fake-secret-cli".
+thread whose model calls bash for three seconds; credential-recovery configures a Command Code
+account whose loopback provider rejects the next turn with HTTP 401 (both need @dshfiles/ai-accounts);
+fake-secret-cli resets the synthetic aliases of a Host started with "up --fake-secret-cli".
 A failing step stops the walk, saves a screenshot and exits 1: fix the catalog when the UI path
 moved, report a regression when the feature broke (skill maintain-verify-dsh).
 
