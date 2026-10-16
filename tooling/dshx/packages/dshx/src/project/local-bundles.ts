@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { z } from 'zod'
 import type { BootProfileBundle } from './boot-profile.js'
 import { spawnOwnedProcess, stopOwnedProcess } from './owned-process.js'
-import { redactHostOutput } from './scratch-profile.js'
+import { ScratchProfileRuntime } from './scratch-profile.js'
 
 /** The dshfiles checkout this package was built in; the same depth from `src/project` and `dist/project`. */
 export const DSHFILES_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../../../../')
@@ -146,7 +146,7 @@ export const buildPlugin = async (projectRoot: string, packageId: string): Promi
       child.once('error', handleError)
       child.once('close', handleClose)
     })
-    if (status !== 0) throw new Error(`${packageId} build exited with code ${String(status)}:\n${redactHostOutput(output)}`)
+    if (status !== 0) throw new Error(`${packageId} build exited with code ${String(status)}:\n${ScratchProfileRuntime.redactHostOutput(output)}`)
   } finally {
     await stopOwnedProcess(child)
   }

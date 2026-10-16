@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { prepareComposedBootProfile } from '../project/boot-profile.js'
 import { DSHFILES_ROOT, buildPlugin, findFreePort, listLocalBootBundles, resolveLocalBundles, withSharedStylesheet } from '../project/local-bundles.js'
 import { compositionFailures, readProfileComposition } from '../project/profile-composition.js'
-import { isolatedHostEnvironment } from '../project/scratch-profile.js'
+import { ScratchProfileRuntime } from '../project/scratch-profile.js'
 import { installFakeSecretCli, seedSampleProject } from './seed.js'
 import {
   LIVE_DSH_HOME,
@@ -166,7 +166,11 @@ export const scratchUp = async (options: ScratchUpOptions): Promise<ScratchState
     const port = options.port ?? (await findFreePort())
     options.onProgress(`starting dsh on 127.0.0.1:${port}`)
     const hostArgs = ['--profile', prepared.profile, '--port', String(port), '--no-open']
-    hostPid = spawnDetached('dsh', hostArgs, { cwd: DSHFILES_ROOT, env: isolatedHostEnvironment(home, prepared.profileRoot, hostSource), log: hostLog })
+    hostPid = spawnDetached('dsh', hostArgs, {
+      cwd: DSHFILES_ROOT,
+      env: ScratchProfileRuntime.hostEnvironment(home, prepared.profileRoot, hostSource),
+      log: hostLog,
+    })
     const launchUrl = await waitFor(
       async () => {
         if (ownedProcessStatus({ pid: hostPid ?? 0, signature: ['--port'] }) === 'gone')
