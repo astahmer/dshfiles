@@ -33,8 +33,10 @@ export const jujutsuSettings = defineSettings({
     composerBar: Schema.boolean().default(true).description('Show the changed-files bar above the composer when the Session folder is a JJ workspace.'),
     composerChips: Schema.boolean().default(true).description('Show workspace, folder and working-copy chips below the composer.'),
     headerToggle: Schema.boolean()
-      .default(true)
-      .description('Show a button in the conversation header that toggles the Jujutsu side panel on the Session repository.'),
+      .default(false)
+      .description(
+        'Show a button in the conversation header that toggles the Jujutsu side panel on the Session repository. Off keeps the header for thread state; the side panel opens from its own rail.',
+      ),
     chatReferenceLinks: Schema.boolean()
       .default(true)
       .description('Link explicit Jujutsu references in chat (`jj:main`, a revision id, or a repository bookmark) to the Jujutsu panel.'),

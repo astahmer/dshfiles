@@ -310,7 +310,7 @@
       "configuration": [
         {
           "key": "headerToggle",
-          "defaultValue": "true",
+          "defaultValue": "false",
           "constraints": "Boolean; show the panel header toggle.",
           "choices": ["true", "false"],
           "coveredBy": ["jujutsu.workspace-session"]

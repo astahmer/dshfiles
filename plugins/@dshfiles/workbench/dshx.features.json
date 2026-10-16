@@ -10,7 +10,7 @@
       "configuration": [
         {
           "key": "headerToggle",
-          "defaultValue": "true",
+          "defaultValue": "false",
           "constraints": "Boolean; show the workbench header toggle.",
           "choices": ["true", "false"],
           "coveredBy": ["workbench.surface-layouts"]

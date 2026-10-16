@@ -18,6 +18,16 @@ const openWorkbench = async (page: Page): Promise<void> => {
 const regionNames = (page: Page): Promise<readonly (string | null)[]> =>
   page.getByRole('region').evaluateAll(regions => regions.map(region => region.getAttribute('aria-label')))
 
+/**
+ * The workbench header toggle is off by default, so the side panel opens the way the rail does: from its own guide page.
+ * The rail is collapsed until something opens it, which is also the state a fresh journey context starts in.
+ */
+const openWorkbenchSidePanel = async (page: Page): Promise<void> => {
+  const entry = page.locator('[data-slot="rightbar.session"] [data-slot="sidebar.right.tab.guide.entry"]').getByRole('button', { name: 'Workbench' })
+  if (!(await entry.isVisible())) await page.getByRole('button', { name: 'Open right sidebar', exact: true }).click()
+  await entry.click()
+}
+
 const setPluginEnabled = async (page: Page, packageId: string, enabled: boolean): Promise<void> => {
   await globalPanel(page, 'Plugins').click()
   const toggle = page.getByRole('switch', { name: `Enable ${packageId}`, exact: true })
@@ -63,7 +73,7 @@ When('the editor plugin is enabled again', async ({ page }: { page: Page }) => {
 When('a thread opens the Workbench side panel and closes its Editor', async ({ page }: { page: Page }) => {
   await page.getByRole('button', { name: 'New session', exact: true }).first().click()
   await sendMessage(page, 'workbench side panel thread')
-  await page.getByRole('button', { name: 'Toggle the workbench side panel', exact: true }).click()
+  await openWorkbenchSidePanel(page)
   await expect(page.getByRole('tab', { name: 'Workbench Close', exact: true })).toBeVisible()
   await expect(page.getByRole('region', { name: 'Editor', exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'Close Editor', exact: true }).click()
