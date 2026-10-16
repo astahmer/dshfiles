@@ -96,6 +96,7 @@ export default defineClient({
     }
     const composerServices: ComposerJujutsuServices = {
       sessions: ctx.sessions,
+      workspaces: ctx.workspaces,
       toggleJujutsu,
     }
     const composerSlot = (Component: (props: ComposerSlotProps) => JSX.Element | null) =>

@@ -226,16 +226,17 @@ Then('the workspace {string} exists and a session opens in it only when asked', 
 When('the repository is registered and a thread is started in it', async ({ page }: { page: Page }) => {
   const repository = repositoryFor(page)
   await registerWorkspaceFolder(page, repository.path)
+  await page.getByRole('checkbox', { name: 'workspace', exact: true }).check()
   await sendMessage(page, 'jujutsu composer context thread')
 })
 
-Then('the composer dock shows one repository, workspace and bookmark chip', async ({ page }: { page: Page }) => {
-  const chip = page.getByRole('button', { name: 'repo (default / main+)', exact: true })
+Then('the composer dock names the project, thread workspace and bookmark in one chip', async ({ page }: { page: Page }) => {
+  const chip = page.getByRole('button', { name: /^repo \(thread-[0-9a-f]{6} \/ main\+\)$/ })
   const viewport = page.viewportSize()
   await recordAssertion(page, 'jujutsu-composer-dock-has-one-context-chip', async () => {
     await expect(chip).toBeVisible()
     await expect(page.getByRole('button', { name: 'repo', exact: true })).toHaveCount(0)
-    await expect(page.getByRole('button', { name: 'default', exact: true })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: /^thread-[0-9a-f]{6}$/ })).toHaveCount(0)
     await expect(page.getByRole('button', { name: /^@ \w+ · main\+$/ })).toHaveCount(0)
   })
   for (const width of [360, 480, 768, 1024]) {

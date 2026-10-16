@@ -1,5 +1,8 @@
 import type { ISessions, SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
+import type { IWorkspaces } from '@deepseek-ai/dsh-api-workspace-controller/client'
+import { isApiOwnerMissing } from '@dshfiles/dshx/api'
 import { useApi, useSettings } from '@dshfiles/dshx/client'
+import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import {
   DropdownMenu,
@@ -13,6 +16,7 @@ import {
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import { ChevronDownIcon, FileCodeIcon, FileDiffIcon, FolderIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
+import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { useQuery } from '@dshfiles/plugin-ui/query'
 import { useCallback, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react'
 import { z } from 'zod'
@@ -26,6 +30,7 @@ import { jujutsuSettings } from './settings.js'
 
 export interface ComposerJujutsuServices {
   readonly sessions: ISessions
+  readonly workspaces: IWorkspaces
   /** Open the right panel on the repository holding `path`, or collapse it when it already shows that repository. */
   readonly toggleJujutsu: (path: string) => void
 }
@@ -56,6 +61,16 @@ const useSessionCwd = (sessions: ISessions, sessionId: SessionSummary['id']): st
   const read = useCallback(() => sessions.list.getSnapshot().byId[sessionId]?.cwd ?? null, [sessions, sessionId])
   const cwd = useSyncExternalStore(subscribe, read, noCwd)
   return cwd === null || cwd.length === 0 ? null : cwd
+}
+
+type WorkspaceItems = ReturnType<IWorkspaces['list']['getSnapshot']>['items']
+const emptyWorkspaceItems: WorkspaceItems = []
+const noWorkspaceItems = (): WorkspaceItems => emptyWorkspaceItems
+
+const useWorkspaceItems = (workspaces: IWorkspaces): WorkspaceItems => {
+  const subscribe = useCallback((listener: () => void) => workspaces.list.subscribe(listener), [workspaces])
+  const read = useCallback(() => workspaces.list.getSnapshot().items, [workspaces])
+  return useSyncExternalStore(subscribe, read, noWorkspaceItems)
 }
 
 const composerKeys = {
@@ -296,13 +311,32 @@ const Chip = (props: { readonly title: string; readonly onClick: () => void; rea
 export const ComposerChips = (props: ComposerSlotProps): JSX.Element | null => {
   const context = useComposerContext(props, 'composerChips')
   const repository = context.repository
+  const workspaces = useWorkspaceItems(props.jujutsu.workspaces)
+  const currentWorkspace = workspaces.find(workspace => workspace.sessionIds.includes(props.sessionId))
+  const workspaceId = currentWorkspace?.workspaceId
+  const api = useApi(jjIntegrationApi)
+  const destination = useQuery({
+    queryKey: ['jujutsu', 'composer-project', workspaceId ?? ''],
+    enabled: repository !== null && workspaceId !== undefined,
+    retry: false,
+    queryFn: ({ signal }) =>
+      runHostRequest({
+        signal,
+        timeoutMs: 15_000,
+        request: hostSignal => api.destination({ workspaceId: workspaceId ?? '' }, { signal: hostSignal }),
+      }).catch(error => {
+        if (isApiOwnerMissing(error)) return null
+        throw error
+      }),
+  })
   if (repository === null) return null
   const toggle = (): void => props.jujutsu.toggleJujutsu(repository.root)
 
   const ownBookmark = repository.bookmarks[0]
   const nearestBookmark = repository.nearestBookmarks[0]
   const bookmark = ownBookmark ?? nearestBookmark
-  const project = basename(repository.root)
+  const project =
+    workspaces.find(workspace => workspace.workspaceId === destination.data?.projectWorkspaceId)?.title ?? currentWorkspace?.title ?? basename(repository.root)
   const workspace = repository.workspace === project ? undefined : repository.workspace
   const location = [workspace, bookmark === undefined ? undefined : bookmark + (ownBookmark === undefined ? '+' : '')]
     .filter((value): value is string => value !== undefined)

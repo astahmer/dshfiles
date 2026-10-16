@@ -201,6 +201,55 @@
       ]
     },
     {
+      "id": "composer-context",
+      "title": "See project and Jujutsu workspace context in the composer",
+      "summary": "The dock names the active DSH project, JJ workspace and nearest bookmark; clicking opens its Jujutsu panel.",
+      "reach": ["seed rebase-ready-thread", "expect button \"sample (thread-*\"", "expect text \"main+*\""],
+      "surfaces": ["client", "host", "settings", "integration"],
+      "configuration": [
+        {
+          "key": "composerBar",
+          "defaultValue": "true",
+          "constraints": "Boolean; show the composer change bar.",
+          "choices": ["true", "false"],
+          "coveredBy": ["jujutsu.composer-context"]
+        },
+        {
+          "key": "composerChips",
+          "defaultValue": "true",
+          "constraints": "Boolean; show the project, JJ workspace and bookmark chip.",
+          "choices": ["true", "false"],
+          "coveredBy": ["jujutsu.composer-context"]
+        },
+        {
+          "key": "composerBarBase",
+          "defaultValue": "parent",
+          "constraints": "One of parent, trunk, or bookmark; invalid revset input falls back to parent.",
+          "choices": ["parent", "trunk", "bookmark"],
+          "coveredBy": ["jujutsu.composer-context"]
+        }
+      ],
+      "states": ["project-name", "default-workspace", "thread-workspace", "bookmark-ancestry"],
+      "failureModes": [
+        "Isolated JJ thread workspaces retain the owning DSH project's name.",
+        "An unavailable JJ integration falls back to the registered workspace title; the repository path remains in the tooltip."
+      ],
+      "externalDependencies": [
+        {
+          "id": "jj-repository",
+          "boundary": "Local JJ context and the Host's workspace ownership registry.",
+          "deterministicFake": "Seed the scratch sample project with a real isolated thread workspace and main bookmark."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "jujutsu.composer-context",
+          "featureFile": "tooling/dshx/e2e/features/jujutsu.feature"
+        }
+      ]
+    },
+    {
       "id": "previewed-revision-mutations",
       "title": "Preview and confirm repository mutations",
       "summary": "Create, squash, duplicate, revert, rebase, set bookmarks, restore, split, and abandon changes only after a single-use preview bound to exact repository state.",
@@ -216,29 +265,7 @@
         "expect button \"Confirm and run\""
       ],
       "surfaces": ["client", "host", "settings", "integration"],
-      "configuration": [
-        {
-          "key": "composerBar",
-          "defaultValue": "true",
-          "constraints": "Boolean; show the composer change bar.",
-          "choices": ["true", "false"],
-          "coveredBy": ["jujutsu.composer-context"]
-        },
-        {
-          "key": "composerChips",
-          "defaultValue": "true",
-          "constraints": "Boolean; show base/context chips.",
-          "choices": ["true", "false"],
-          "coveredBy": ["jujutsu.composer-context"]
-        },
-        {
-          "key": "composerBarBase",
-          "defaultValue": "parent",
-          "constraints": "One of parent, trunk, or bookmark; invalid revset input falls back to parent.",
-          "choices": ["parent", "trunk", "bookmark"],
-          "coveredBy": ["jujutsu.composer-context"]
-        }
-      ],
+      "configuration": [],
       "states": ["previewed", "confirmed", "cancelled", "expired", "stale", "failed"],
       "failureModes": [
         "Changed repository state, expired preview, or unsafe fileset rejects confirmation.",
@@ -255,11 +282,6 @@
         {
           "kind": "gherkin",
           "id": "jujutsu.preview-confirm",
-          "featureFile": "tooling/dshx/e2e/features/jujutsu.feature"
-        },
-        {
-          "kind": "gherkin",
-          "id": "jujutsu.composer-context",
           "featureFile": "tooling/dshx/e2e/features/jujutsu.feature"
         },
         {

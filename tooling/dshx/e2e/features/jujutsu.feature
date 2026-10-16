@@ -66,10 +66,10 @@ Feature: Jujutsu revision interactions
 
   @scenario:jujutsu.composer-context
   Scenario: One composer chip summarizes the thread's repository context
-    Given the isolated plugin composition "@dshfiles/jujutsu" and "@dshfiles/workspace-folder-picker" is booted
+    Given the isolated plugin composition of "@dshfiles/jujutsu, @dshfiles/workspace-folder-picker, @dshfiles/jj-integration" is booted
     When a disposable Jujutsu repository with two authors is opened in the Jujutsu panel
     And the repository is registered and a thread is started in it
-    Then the composer dock shows one repository, workspace and bookmark chip
+    Then the composer dock names the project, thread workspace and bookmark in one chip
 
   @scenario:jujutsu.workspace-session
   Scenario: Provision a workspace at a revision and open a session there on request
