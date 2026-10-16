@@ -25,7 +25,7 @@ import {
 } from './account-store.js'
 import { readAccountUsage } from './account-usage.js'
 import { resolveKeyFromContext } from './credentials.js'
-import { readUsageHistory, readUsageHistorySettings, saveUsageHistorySettings } from './usage-recorder.js'
+import { createUsageHistoryService } from './usage-recorder.js'
 import { knownQuotaResetAt } from './quota-reset.js'
 import { readNativeProviders, setNativeProviderEnabled } from './native-providers.js'
 import { PricingCatalogModel } from './pricing-catalog.js'
@@ -195,10 +195,10 @@ export const accountsHostApi = aiAccountsApi.host({
   refreshUsage: async ({ ctx }) => accountRuntime(ctx)?.usageCache?.refresh() ?? readAccountsUsage(ctx),
   history: async ({ input, ctx }) => ({
     instanceId: input.instanceId,
-    points: [...(await readUsageHistory(ctx, input.instanceId, Date.now() - input.days * 24 * 60 * 60_000))],
+    points: [...(await createUsageHistoryService(ctx).read(input.instanceId, Date.now() - input.days * 24 * 60 * 60_000))],
   }),
-  historySettings: async ({ ctx }) => readUsageHistorySettings(ctx),
-  saveHistorySettings: async ({ input, ctx }) => saveUsageHistorySettings(ctx, input),
+  historySettings: async ({ ctx }) => createUsageHistoryService(ctx).readSettings(),
+  saveHistorySettings: async ({ input, ctx }) => createUsageHistoryService(ctx).saveSettings(input),
   collectUsage: async ({ ctx }) => ({ recorded: (await accountRuntime(ctx)?.scheduler?.collectNow()) ?? 0 }),
   pricingStatus: async ({ ctx }) => pricingFor(ctx).status(),
   refreshPricing: async ({ ctx }) => pricingFor(ctx).refresh(),

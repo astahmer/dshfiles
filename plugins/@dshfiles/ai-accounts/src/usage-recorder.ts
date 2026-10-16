@@ -58,7 +58,7 @@ const usageDomain = (ctx: Context): Promise<UsageDomain> | undefined => {
   return opening
 }
 
-export const closeUsageDomain = async (ctx: Context): Promise<void> => {
+const closeUsageDomain = async (ctx: Context): Promise<void> => {
   const facility = facilityOf(ctx)
   if (facility === undefined) return
   const opening = openedDomains.get(facility)
@@ -69,14 +69,14 @@ export const closeUsageDomain = async (ctx: Context): Promise<void> => {
 
 const defaultUsageMeta = (): UsageMeta => usageMetaSchema.parse({})
 
-export const readUsageHistorySettings = async (ctx: Context): Promise<UsageMeta> => {
+const readUsageHistorySettings = async (ctx: Context): Promise<UsageMeta> => {
   const opening = usageDomain(ctx)
   if (opening === undefined) return defaultUsageMeta()
   const domain = await opening
   return domain.global.get()
 }
 
-export const saveUsageHistorySettings = async (ctx: Context, settings: UsageHistorySettings): Promise<UsageMeta> => {
+const saveUsageHistorySettings = async (ctx: Context, settings: UsageHistorySettings): Promise<UsageMeta> => {
   const opening = usageDomain(ctx)
   if (opening === undefined) throw new Error('Usage history storage is unavailable.')
   const domain = await opening
@@ -92,12 +92,7 @@ export const saveUsageHistorySettings = async (ctx: Context, settings: UsageHist
  * Exported so the API can offer a manual refresh, which uses the same path and
  * therefore cannot diverge from the scheduled one.
  */
-export const collectUsageHistory = async (
-  ctx: Context,
-  accounts: readonly AccountProfile[],
-  readUsage: AccountUsageReader,
-  signal?: AbortSignal,
-): Promise<number> => {
+const collectUsageHistory = async (ctx: Context, accounts: readonly AccountProfile[], readUsage: AccountUsageReader, signal?: AbortSignal): Promise<number> => {
   const opening = usageDomain(ctx)
   if (opening === undefined) return 0
   const domain = await opening
@@ -157,7 +152,7 @@ export const collectUsageHistory = async (
 }
 
 /** Oldest snapshot worth keeping, given the configured retention. */
-export const pruneUsageHistory = async (ctx: Context, retentionDays: number): Promise<number> => {
+const pruneUsageHistory = async (ctx: Context, retentionDays: number): Promise<number> => {
   const opening = usageDomain(ctx)
   if (opening === undefined) return 0
   const domain = await opening
@@ -174,7 +169,7 @@ export const pruneUsageHistory = async (ctx: Context, retentionDays: number): Pr
 }
 
 /** Readings for one account, oldest first, so a chart reads left to right. */
-export const readUsageHistory = async (ctx: Context, instanceId: string, sinceMs: number): Promise<readonly QuotaSnapshot[]> => {
+const readUsageHistory = async (ctx: Context, instanceId: string, sinceMs: number): Promise<readonly QuotaSnapshot[]> => {
   const opening = usageDomain(ctx)
   if (opening === undefined) return []
   const domain = await opening
@@ -191,7 +186,7 @@ export interface UsageHistoryScheduler {
 }
 
 /** Share one in-flight collection between the manual action and host timer. */
-export const createUsageHistoryScheduler = (
+const createUsageHistoryScheduler = (
   ctx: Context,
   readAccounts: () => Promise<AccountsForCollection>,
   options: {
@@ -255,5 +250,15 @@ export const createUsageHistoryScheduler = (
     },
   }
 }
+
+export const createUsageHistoryService = (ctx: Context) => ({
+  close: closeUsageDomain.bind(null, ctx),
+  readSettings: readUsageHistorySettings.bind(null, ctx),
+  saveSettings: saveUsageHistorySettings.bind(null, ctx),
+  collect: collectUsageHistory.bind(null, ctx),
+  prune: pruneUsageHistory.bind(null, ctx),
+  read: readUsageHistory.bind(null, ctx),
+  createScheduler: createUsageHistoryScheduler.bind(null, ctx),
+})
 
 export { USAGE_HISTORY_DOMAIN }

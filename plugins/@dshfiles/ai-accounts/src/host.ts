@@ -15,7 +15,7 @@ import { installCostProjection } from './cost-projection.js'
 export { accountsSnapshot } from './accounts-host-api.js'
 import { primeAccountFile, readAccountFile, readAccountFileSync } from './account-store.js'
 import { aiAccountsTool } from './accounts-tool.js'
-import { closeUsageDomain, createUsageHistoryScheduler } from './usage-recorder.js'
+import { createUsageHistoryService } from './usage-recorder.js'
 import { CommandCodeCapabilities } from './commandcode-capabilities.js'
 import { fetchCommandCodeCatalog, createCommandCodeProvider } from './commandcode-provider.js'
 import { CredentialModel, resolveKeyFromContext } from './credentials.js'
@@ -88,8 +88,8 @@ export default definePlugin({
     const ctx = api.raw.ctx
     const resolveCredential = resolveKeyFromContext(ctx)
     const runtime = activateAccountRuntime(ctx)
-    runtime.scheduler = createUsageHistoryScheduler(
-      ctx,
+    const usageHistory = createUsageHistoryService(ctx)
+    runtime.scheduler = usageHistory.createScheduler(
       async () => {
         const file = await AccountsHostApiModel.accountsFile(ctx)
         return { accounts: file.accounts, shadowRoot: file.shadowRoot }
@@ -100,7 +100,7 @@ export default definePlugin({
     // short enough that a manual reload still feels live.
     ctx.effect(() => () => {
       runtime.scheduler?.dispose()
-      void closeUsageDomain(ctx).catch(() => ctx.logger.warn('ai-accounts: usage history storage could not close cleanly'))
+      void usageHistory.close().catch(() => ctx.logger.warn('ai-accounts: usage history storage could not close cleanly'))
     })
     runtime.usageCache = createUsageCache({ ttlMs: 30_000, read: () => AccountsHostApiModel.readAccountsUsage(ctx) })
     ctx.on('credentials/reference-updated', ref => {

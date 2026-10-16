@@ -8,16 +8,7 @@ import * as StorageJson from '@deepseek-ai/dsh-storage-json'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { AccountProfile, UsageCard } from './api.js'
 import { usageHistoryDomain } from './usage-history.js'
-import {
-  closeUsageDomain,
-  collectUsageHistory,
-  createUsageHistoryScheduler,
-  pruneUsageHistory,
-  readUsageHistory,
-  readUsageHistorySettings,
-  saveUsageHistorySettings,
-  type AccountUsageReader,
-} from './usage-recorder.js'
+import { createUsageHistoryService, type AccountUsageReader } from './usage-recorder.js'
 
 const profile = (instanceId: string, kind: AccountProfile['kind'], enabled = true): AccountProfile => ({
   instanceId,
@@ -74,7 +65,7 @@ const openContext = async (): Promise<Context> => {
 
 afterEach(async () => {
   for (const context of contexts.splice(0)) {
-    await closeUsageDomain(context)
+    await createUsageHistoryService(context).close()
     await context.fiber.dispose()
   }
   for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true })
@@ -106,18 +97,18 @@ describe('usage history collection', () => {
       profile('broken', 'opencode-go'),
     ]
 
-    expect(await collectUsageHistory(ctx, accounts, reader)).toBe(3)
+    expect(await createUsageHistoryService(ctx).collect(accounts, reader)).toBe(3)
     expect(read).not.toContain('opencode_off')
 
-    const codex = await readUsageHistory(ctx, 'codex_a', 0)
+    const codex = await createUsageHistoryService(ctx).read('codex_a', 0)
     expect(codex).toHaveLength(1)
     expect(codex[0]?.windows).toEqual({ 'Current session': 42, 'Weekly limit': 80 })
     expect(codex[0]?.resetsAt['Current session']).toBe(resetsAt)
     expect(codex[0]?.bankedResets).toBe(2)
     expect(codex[0]?.bankedResetExpiries).toEqual([resetsAt, resetsAt + 1])
-    expect(await readUsageHistory(ctx, 'cursor_a', 0)).toEqual([])
+    expect(await createUsageHistoryService(ctx).read('cursor_a', 0)).toEqual([])
 
-    const meta = await readUsageHistorySettings(ctx)
+    const meta = await createUsageHistoryService(ctx).readSettings()
     expect(meta.lastReadAt).not.toBeNull()
     expect(meta.lastAttemptAt).toBe(meta.lastReadAt)
   })
@@ -127,10 +118,10 @@ describe('usage history collection', () => {
     const resetsAt = Date.now() + 3_600_000
     let remaining = 70
     const reader: AccountUsageReader = async () => okCard(remaining, resetsAt)
-    await collectUsageHistory(ctx, [profile('codex_a', 'codex')], reader)
+    await createUsageHistoryService(ctx).collect([profile('codex_a', 'codex')], reader)
     remaining = 65
-    await collectUsageHistory(ctx, [profile('codex_a', 'codex')], reader)
-    const rows = await readUsageHistory(ctx, 'codex_a', 0)
+    await createUsageHistoryService(ctx).collect([profile('codex_a', 'codex')], reader)
+    const rows = await createUsageHistoryService(ctx).read('codex_a', 0)
     expect(rows).toHaveLength(1)
     expect(rows[0]?.windows['Current session']).toBe(65)
   })
@@ -138,21 +129,21 @@ describe('usage history collection', () => {
   it('keeps a settings change saved while a sweep was reading', async () => {
     const ctx = await openContext()
     const reader: AccountUsageReader = async () => {
-      await saveUsageHistorySettings(ctx, { intervalMinutes: 15 })
+      await createUsageHistoryService(ctx).saveSettings({ intervalMinutes: 15 })
       return okCard(50, Date.now() + 60_000)
     }
-    await collectUsageHistory(ctx, [profile('codex_a', 'codex')], reader)
-    expect((await readUsageHistorySettings(ctx)).intervalMinutes).toBe(15)
+    await createUsageHistoryService(ctx).collect([profile('codex_a', 'codex')], reader)
+    expect((await createUsageHistoryService(ctx).readSettings()).intervalMinutes).toBe(15)
   })
 
   it('prunes snapshots older than the retention window', async () => {
     const ctx = await openContext()
     const old = Date.now() - 10 * 86_400_000
-    await collectUsageHistory(ctx, [profile('codex_a', 'codex')], async () => okCard(50, Date.now() + 60_000))
+    await createUsageHistoryService(ctx).collect([profile('codex_a', 'codex')], async () => okCard(50, Date.now() + 60_000))
     const domain = ctx.get('storageDomain')?.get(usageHistoryDomain.name)
     await domain?.table('quota').put('v2:codex_a:5:1', { at: old, instanceId: 'codex_a', windows: { 'Weekly limit': 10 }, resetsAt: {}, bankedResets: 0 })
-    expect(await pruneUsageHistory(ctx, 7)).toBe(1)
-    const rows = await readUsageHistory(ctx, 'codex_a', 0)
+    expect(await createUsageHistoryService(ctx).prune(7)).toBe(1)
+    const rows = await createUsageHistoryService(ctx).read('codex_a', 0)
     expect(rows).toHaveLength(1)
     expect(rows[0]?.at).toBeGreaterThan(old)
   })
@@ -167,7 +158,7 @@ describe('usage history scheduler', () => {
       release = resolve
     })
     let clock = Date.now()
-    const scheduler = createUsageHistoryScheduler(ctx, async () => ({ accounts: [profile('codex_a', 'codex')], shadowRoot: '' }), {
+    const scheduler = createUsageHistoryService(ctx).createScheduler(async () => ({ accounts: [profile('codex_a', 'codex')], shadowRoot: '' }), {
       now: () => clock,
       readUsage: async () => {
         calls += 1
@@ -183,7 +174,7 @@ describe('usage history scheduler', () => {
       expect(calls).toBe(1)
 
       // Within the interval the next manual call reads again, but the timer would not.
-      const meta = await readUsageHistorySettings(ctx)
+      const meta = await createUsageHistoryService(ctx).readSettings()
       expect(clock - (meta.lastAttemptAt ?? 0)).toBeLessThan(meta.intervalMinutes * 60_000)
       clock += meta.intervalMinutes * 60_000
       expect(await scheduler.collectNow()).toBe(1)
