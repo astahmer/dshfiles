@@ -11,7 +11,7 @@ import type {
   ApiQueryOptions,
   ApiQueryResult,
 } from './types.js'
-import { ApiClientRuntimeModel, isApiError } from './runtime.js'
+import { apiConnectionAvailable, createApiClient, isApiError, subscribeApiConnection } from './runtime.js'
 
 type ReactRuntime = typeof import('react')
 declare const require: ((name: string) => ReactRuntime) | undefined
@@ -47,7 +47,7 @@ export function createApiClientRuntime(ctx: ContextLike, packageId: string): Api
     client<const Methods extends Record<string, AnyApiMethodDefinition>>(contract: ApiContract<Methods>): ApiClient<Methods> {
       const existing = clients.get(contract)
       if (existing !== undefined) return existing as ApiClient<Methods>
-      const created = ApiClientRuntimeModel.create(ctx, contract, packageId)
+      const created = createApiClient(ctx, contract, packageId)
       clients.set(contract, created)
       return created
     },
@@ -186,8 +186,8 @@ export function useApiQuery<const Methods extends Record<string, AnyApiMethodDef
     }
     let manualPending = manuallyRequested
     return startApiQueryEffect<ApiClientOutput<Methods[K]>>({
-      available: () => ApiClientRuntimeModel.connectionAvailable(api),
-      subscribe: listener => ApiClientRuntimeModel.subscribeConnection(api, listener),
+      available: () => apiConnectionAvailable(api),
+      subscribe: listener => subscribeApiConnection(api, listener),
       ...(options?.signal === undefined ? {} : { signal: options.signal }),
       onPending: fetchStatus =>
         setState(previous => {
