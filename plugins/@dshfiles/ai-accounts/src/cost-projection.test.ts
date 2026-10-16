@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { applyCostEvent, initialCostState } from './cost-projection.js'
+import { CostProjectionModel } from './cost-projection.js'
 
 const header = (provider: string, model: string) => ({ type: 'request/header', data: { header: { config: { provider, model } }, reason: 'change' } })
 const message = (turn: number, step: number, usage: Record<string, number>) => ({
   type: 'assistant/message',
   data: { turn, step, message: {}, stream: [], usage },
 })
-const fold = (events: readonly { readonly type: string; readonly data?: unknown }[]) => events.reduce(applyCostEvent, initialCostState())
+const fold = (events: readonly { readonly type: string; readonly data?: unknown }[]) =>
+  events.reduce(CostProjectionModel.applyEvent, CostProjectionModel.initialState())
 
 describe('applyCostEvent', () => {
   it('groups usage by the route that served each request', () => {
@@ -67,14 +68,14 @@ describe('applyCostEvent', () => {
 
   it('keeps the view reference when only the route selection changes', () => {
     const before = fold([header('codex', 'gpt-6-luna'), message(0, 0, { inputTokens: 1, outputTokens: 1 })])
-    const after = applyCostEvent(before, header('claude', 'claude-opus-5-5'))
+    const after = CostProjectionModel.applyEvent(before, header('claude', 'claude-opus-5-5'))
     expect(after).not.toBe(before)
     expect(after.view).toBe(before.view)
   })
 
   it('ignores events it does not price and samples without usage', () => {
     const state = fold([header('codex', 'gpt-6-luna')])
-    expect(applyCostEvent(state, { type: 'tool/call', data: {} })).toBe(state)
-    expect(applyCostEvent(state, { type: 'assistant/message', data: { turn: 0, step: 0, message: {}, stream: [] } })).toBe(state)
+    expect(CostProjectionModel.applyEvent(state, { type: 'tool/call', data: {} })).toBe(state)
+    expect(CostProjectionModel.applyEvent(state, { type: 'assistant/message', data: { turn: 0, step: 0, message: {}, stream: [] } })).toBe(state)
   })
 })

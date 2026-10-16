@@ -100,9 +100,9 @@ const applyDelta = (groups: readonly CostGroup[], group: CostGroup, sign: 1 | -1
 const replaceSample = (groups: readonly CostGroup[], previous: CostGroup | undefined, group: CostGroup): CostGroup[] =>
   applyDelta(previous === undefined ? groups : applyDelta(groups, previous, -1), group, 1)
 
-export const initialCostState = (): CostState => ({ selection: null, last: null, view: { groups: [], turn: null } })
+const initialCostState = (): CostState => ({ selection: null, last: null, view: { groups: [], turn: null } })
 
-export const applyCostEvent = (state: CostState, event: ProjectionEvent): CostState => {
+const applyCostEvent = (state: CostState, event: ProjectionEvent): CostState => {
   if (event.type === 'request/header') {
     const parsed = headerSchema.safeParse(event.data)
     if (!parsed.success) return state
@@ -144,6 +144,11 @@ export const applyCostEvent = (state: CostState, event: ProjectionEvent): CostSt
   return { ...state, last: { turn, step, group }, view }
 }
 
+export class CostProjectionModel {
+  static readonly initialState = initialCostState
+  static readonly applyEvent = applyCostEvent
+}
+
 /** Bump whenever the state shape or fold semantics change, so stale checkpoints refold. */
 const STATE_VERSION = 1
 
@@ -151,8 +156,8 @@ const costProjectionDefinition = {
   key: SESSION_COST_PROJECTION_KEY,
   stateVersion: STATE_VERSION,
   stateSchema,
-  init: initialCostState,
-  apply: applyCostEvent,
+  init: CostProjectionModel.initialState,
+  apply: CostProjectionModel.applyEvent,
   wire: {
     viewSchema: sessionCostViewSchema,
     // The state keeps the view object, so a selection-only change publishes nothing.
