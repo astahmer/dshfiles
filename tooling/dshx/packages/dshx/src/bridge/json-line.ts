@@ -43,7 +43,7 @@ class JsonLineReader {
   }
 }
 
-export const acceptJsonLine = (socket: Socket, maxBytes: number, callbacks: JsonLineReaderCallbacks): void => {
+const acceptJsonLine = (socket: Socket, maxBytes: number, callbacks: JsonLineReaderCallbacks): void => {
   const reader = new JsonLineReader(maxBytes, callbacks)
   socket.on('data', chunk => reader.push(chunk))
 }
@@ -54,7 +54,7 @@ export interface JsonLineRequestOptions {
   readonly timeoutMs: number
 }
 
-export const requestJsonLine = async (socketPath: string, payload: string, options: JsonLineRequestOptions): Promise<unknown> => {
+const requestJsonLine = async (socketPath: string, payload: string, options: JsonLineRequestOptions): Promise<unknown> => {
   if (Buffer.byteLength(payload) > options.maxRequestBytes) {
     throw new JsonLineTransportError('request-too-large', 'JSON-line request exceeds the size limit.')
   }
@@ -93,7 +93,7 @@ export interface JsonLineWriteOptions {
   readonly onTooLarge?: () => unknown
 }
 
-export const writeJsonLine = (socket: Socket, value: unknown, options: JsonLineWriteOptions = {}): void => {
+const writeJsonLine = (socket: Socket, value: unknown, options: JsonLineWriteOptions = {}): void => {
   const text = JSON.stringify(value)
   if (text === undefined) throw new Error('JSON-line response could not be serialized.')
   if (options.maxBytes !== undefined && Buffer.byteLength(text) > options.maxBytes) {
@@ -106,4 +106,10 @@ export const writeJsonLine = (socket: Socket, value: unknown, options: JsonLineW
     return
   }
   socket.end(`${text}\n`)
+}
+
+export class JsonLineTransport {
+  static readonly accept = acceptJsonLine
+  static readonly request = requestJsonLine
+  static readonly write = writeJsonLine
 }

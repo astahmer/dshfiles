@@ -3,7 +3,7 @@ import { access, readFile } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
 import { isAbsolute, join, resolve } from 'node:path'
 import { z } from 'zod'
-import { JsonLineTransportError, requestJsonLine } from '../bridge/json-line.js'
+import { JsonLineTransport, JsonLineTransportError } from '../bridge/json-line.js'
 import { DshxError } from '../diagnostics.js'
 import type { DshxDiagnostic } from '../diagnostics.js'
 import type { ResolvedDshxConfig } from '../config/types.js'
@@ -360,7 +360,7 @@ const request = async <Item>({
   const requestId = `inspect-${randomUUID()}`
   const payload =
     JSON.stringify({ version: PROTOCOL_VERSION, requestId, token: metadata.token, operation: 'list', target, ...(input === undefined ? {} : { input }) }) + '\n'
-  const value = await requestJsonLine(paths.socketPath, payload, {
+  const value = await JsonLineTransport.request(paths.socketPath, payload, {
     maxRequestBytes: MAX_MESSAGE_BYTES,
     maxResponseBytes: MAX_MESSAGE_BYTES,
     timeoutMs: options.timeoutMs ?? DEFAULT_TIMEOUT_MS,

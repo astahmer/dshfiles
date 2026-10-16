@@ -4,7 +4,7 @@ import { homedir, tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { createServer, type Server, type Socket } from 'node:net'
 import { z } from 'zod'
-import { acceptJsonLine, JsonLineTransportError, requestJsonLine, writeJsonLine } from '../bridge/json-line.js'
+import { JsonLineTransport, JsonLineTransportError } from '../bridge/json-line.js'
 import { CommunicationError, CommunicationService } from './service.js'
 import {
   communicationAgentSchema,
@@ -250,7 +250,7 @@ const dispatch = async (
 }
 
 const writeResponse = (socket: Socket, requestId: string, value: unknown): void => {
-  writeJsonLine(
+  JsonLineTransport.write(
     socket,
     { version: PROTOCOL_VERSION, requestId, ok: true, result: value },
     {
@@ -303,9 +303,9 @@ export const startHostCommunicationBridge = async (
     socket.setTimeout(REQUEST_TIMEOUT_MS)
     sockets.add(socket)
     socket.once('close', () => sockets.delete(socket))
-    socket.once('timeout', () => writeJsonLine(socket, responseError('unknown', 'timeout', 'Communication bridge request timed out.')))
-    acceptJsonLine(socket, MAX_REQUEST_BYTES, {
-      onTooLarge: () => writeJsonLine(socket, responseError('unknown', 'request-too-large', 'Communication request exceeds the size limit.')),
+    socket.once('timeout', () => JsonLineTransport.write(socket, responseError('unknown', 'timeout', 'Communication bridge request timed out.')))
+    JsonLineTransport.accept(socket, MAX_REQUEST_BYTES, {
+      onTooLarge: () => JsonLineTransport.write(socket, responseError('unknown', 'request-too-large', 'Communication request exceeds the size limit.')),
       onLine: text => {
         let requestId = 'unknown'
         try {
@@ -316,7 +316,7 @@ export const startHostCommunicationBridge = async (
           void dispatch(service, options.listAgents, request)
             .then(result => writeResponse(socket, requestId, result))
             .catch(error =>
-              writeJsonLine(
+              JsonLineTransport.write(
                 socket,
                 responseError(
                   requestId,
@@ -328,7 +328,7 @@ export const startHostCommunicationBridge = async (
         } catch (error) {
           const code = error instanceof CommunicationError ? error.code : 'invalid-request'
           const message = error instanceof Error ? error.message : 'Communication bridge received an invalid request.'
-          writeJsonLine(socket, responseError(requestId, code, message))
+          JsonLineTransport.write(socket, responseError(requestId, code, message))
         }
       },
     })
@@ -382,7 +382,7 @@ export const connectCommunicationClient = async (options: ConnectCommunicationCl
   const request = async (operation: z.infer<typeof operationSchema>, input?: unknown): Promise<unknown> => {
     const requestId = randomUUID()
     const body = `${JSON.stringify({ version: PROTOCOL_VERSION, requestId, token: metadata.token, operation, principal, ...(input === undefined ? {} : { input }) })}\n`
-    const value = await requestJsonLine(metadata.socketPath, body, {
+    const value = await JsonLineTransport.request(metadata.socketPath, body, {
       maxRequestBytes: MAX_REQUEST_BYTES,
       maxResponseBytes: MAX_RESPONSE_BYTES,
       timeoutMs: REQUEST_TIMEOUT_MS,
