@@ -1,3 +1,4 @@
+import { readdir, stat } from 'node:fs/promises'
 import type { Context, Effect } from '@deepseek-ai/cordis'
 import { dshHomePath } from '@deepseek-ai/dsh-home-paths'
 import type {} from '@deepseek-ai/dsh-llm'
@@ -5,12 +6,14 @@ import { aiAccountsApi } from '@dshfiles/ai-accounts/api'
 import { createHostApiClient, defineHost } from '@dshfiles/dshx/host'
 import { z } from 'zod'
 import { usageApi } from './api.js'
-import { indexSessionLogs } from './indexer.js'
+import { createUsageIndexService } from './indexer.js'
+import { readLogFrom } from './session-log.js'
 import { observeLiveCall } from './live-calls.js'
 import { createRatePricer } from './pricing.js'
 import { openUsageStore, type UsageStore } from './store.js'
 
 const INDEX_INTERVAL_MS = 30_000
+const usageIndexService = createUsageIndexService({ fileSystem: { readdir, stat }, readLogFrom })
 
 const persistenceConfigSchema = z.object({ config: z.object({ root: z.string().min(1) }) })
 
@@ -40,7 +43,7 @@ const runPass = (active: UsageRuntime): Promise<void> => {
   if (active.pass !== null) return active.pass
   const pass = (async () => {
     try {
-      await indexSessionLogs(active.store, active.root)
+      await usageIndexService.indexSessionLogs({ store: active.store, root: active.root })
       active.store.reconcileLiveCalls(Date.now())
       await active.pricer.update()
       active.lastIndexedAt = Date.now()

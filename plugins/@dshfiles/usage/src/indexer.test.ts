@@ -1,9 +1,12 @@
-import { appendFile, copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { appendFile, copyFile, mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { indexSessionLog, indexSessionLogs } from './indexer.js'
+import { createUsageIndexService } from './indexer.js'
+import { readLogFrom } from './session-log.js'
 import { openUsageStore, type UsageStore } from './store.js'
+
+const usageIndexService = createUsageIndexService({ fileSystem: { readdir, stat }, readLogFrom })
 
 const FIXTURES = new URL('../fixtures/sessions', import.meta.url).pathname
 const SUBAGENT_LOG = join(FIXTURES, '-home-user-dev-sample/557dd85e-cb22-4b10-a70e-39dabec1bfde/session.v4.jsonl.zstd')
@@ -26,7 +29,7 @@ const snapshot = (store: UsageStore) => store.requests(everything).rows.map(row 
 describe('indexSessionLogs', () => {
   it('turns real session logs into requests with purpose, status, tokens and timings', async () => {
     const store = openUsageStore(':memory:')
-    expect(await indexSessionLogs(store, FIXTURES)).toEqual({ files: 3, rows: 238 })
+    expect(await usageIndexService.indexSessionLogs({ store, root: FIXTURES })).toEqual({ files: 3, rows: 238 })
 
     const page = store.requests(everything)
     expect(page.statusCounts).toEqual({ all: 235, ok: 232, aborted: 2, failed: 1 })
@@ -70,7 +73,7 @@ describe('indexSessionLogs', () => {
 
   it('searches by model, provider or project and counts every status for the chips', async () => {
     const store = openUsageStore(':memory:')
-    await indexSessionLogs(store, FIXTURES)
+    await usageIndexService.indexSessionLogs({ store, root: FIXTURES })
     const other = store.requests({ ...everything, search: 'OTHER' })
     expect(new Set(other.rows.map(row => row.project))).toEqual(new Set(['other']))
     const failedOnly = store.requests({ ...everything, search: 'other', status: 'failed' })
@@ -87,23 +90,23 @@ describe('indexSessionLogs', () => {
     await writeFile(target, bytes.subarray(0, cut))
 
     const store = openUsageStore(':memory:')
-    const firstRows = await indexSessionLog(store, target)
+    const firstRows = await usageIndexService.indexSessionLog({ store, path: target })
     expect(firstRows).toBeGreaterThan(0)
     const cursor = store.fileCursor(target)
     expect(cursor?.offset).toBeLessThan(cut)
     expect(cursor?.size).toBe(cut)
 
-    expect(await indexSessionLog(store, target)).toBe(0)
+    expect(await usageIndexService.indexSessionLog({ store, path: target })).toBe(0)
 
     await appendFile(target, bytes.subarray(cut))
-    await indexSessionLog(store, target)
+    await usageIndexService.indexSessionLog({ store, path: target })
     expect(store.fileCursor(target)?.offset).toBe(bytes.length)
 
     const oneShot = openUsageStore(':memory:')
     const oneShotTarget = join(root, 'copy', 'session-x', 'session.v4.jsonl.zstd')
     await mkdir(dirname(oneShotTarget), { recursive: true })
     await copyFile(SUBAGENT_LOG, oneShotTarget)
-    await indexSessionLog(oneShot, oneShotTarget)
+    await usageIndexService.indexSessionLog({ store: oneShot, path: oneShotTarget })
     expect(snapshot(store)).toEqual(snapshot(oneShot))
   })
 
@@ -114,7 +117,7 @@ describe('indexSessionLogs', () => {
     await copyFile(SUBAGENT_LOG, join(sessionDir, 'session.v4.jsonl.zstd'))
     await copyFile(SUBAGENT_LOG, join(sessionDir, 'session.v5.jsonl.zstd'))
     const store = openUsageStore(':memory:')
-    expect((await indexSessionLogs(store, root)).files).toBe(1)
+    expect((await usageIndexService.indexSessionLogs({ store, root })).files).toBe(1)
     expect(store.fileCursor(join(sessionDir, 'session.v4.jsonl.zstd'))).toBeUndefined()
   })
 })
@@ -143,13 +146,13 @@ describe('live side calls', () => {
   it('gives a title row the usage the log never kept, and counts the call once', async () => {
     const store = openUsageStore(':memory:')
     store.insertLiveCall(liveTitle)
-    await indexSessionLogs(store, FIXTURES)
+    await usageIndexService.indexSessionLogs({ store, root: FIXTURES })
     expect(store.reconcileLiveCalls(liveTitle.startedAt + 1_000)).toBe(1)
     const titles = store.requests({ ...everything, purposes: ['title'], sessionId: liveTitle.sessionId }).rows
     expect(titles).toHaveLength(1)
     expect(titles[0]).toMatchObject({ id: '557dd85e-cb22-4b10-a70e-39dabec1bfde#19', input: 812, output: 9, ttftMs: 900 })
 
-    await indexSessionLogs(store, FIXTURES)
+    await usageIndexService.indexSessionLogs({ store, root: FIXTURES })
     expect(store.requests({ ...everything, purposes: ['title'], sessionId: liveTitle.sessionId }).rows[0]?.input).toBe(812)
   })
 
