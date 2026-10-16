@@ -8,7 +8,7 @@ import { renderProjectTemplate } from '../../create-dshx/src/templates.js'
 import { resolveDshxConfig } from '../src/config/resolve.js'
 import { checkPackageTargets, checkProjectManifest } from '../src/project/index.js'
 import { buildClient, buildHost } from '../src/compiler/index.js'
-import { applyManifestRepairPlan, createManifestRepairPlan } from '../src/project/repair.js'
+import { ManifestRepairService } from '../src/project/repair.js'
 import { typecheckProject } from '../src/project/typecheck.js'
 import { testProject } from '../src/toolchain/index.js'
 
@@ -45,11 +45,11 @@ describe('SDK-first templates', () => {
         }
         await writeFile(config.packageFile, JSON.stringify(manifest))
         expect(await checkProjectManifest(config)).toContainEqual(expect.objectContaining({ code: 'DSHX4222' }))
-        const plan = await createManifestRepairPlan(config)
+        const plan = await ManifestRepairService.createPlan(config)
         expect(plan.changedFiles).toEqual([config.packageFile])
-        await applyManifestRepairPlan(plan)
+        await ManifestRepairService.applyPlan(plan)
         expect(await checkProjectManifest(config)).toEqual([])
-        expect((await createManifestRepairPlan(config)).changedFiles).toEqual([])
+        expect((await ManifestRepairService.createPlan(config)).changedFiles).toEqual([])
       }
       await buildHost({
         root,

@@ -42,7 +42,7 @@ function addMissing(record: Record<string, unknown>, key: string, value: unknown
 }
 
 /** Build a plan for fields whose desired value is completely determined by the adapter. */
-export async function createManifestRepairPlan(config: ResolvedDshxConfig, options: ManifestRepairOptions = {}): Promise<ManifestRepairPlan> {
+const createManifestRepairPlan = async (config: ResolvedDshxConfig, options: ManifestRepairOptions = {}): Promise<ManifestRepairPlan> => {
   const compatibility = options.compatibility ?? DEFAULT_COMPATIBILITY
   let source: string
   try {
@@ -274,7 +274,7 @@ export async function createManifestRepairPlan(config: ResolvedDshxConfig, optio
 }
 
 /** Apply a previously reviewed repair plan using the shared atomic file transaction. */
-export async function applyManifestRepairPlan(plan: ManifestRepairPlan): Promise<void> {
+const applyManifestRepairPlan = async (plan: ManifestRepairPlan): Promise<void> => {
   if (plan.files.length === 0) return
   if (plan.diagnostics.some(item => item.severity === 'error')) {
     throw new DshxError('DSHX4144', 'The manifest repair plan contains errors and cannot be applied.', {
@@ -286,6 +286,12 @@ export async function applyManifestRepairPlan(plan: ManifestRepairPlan): Promise
 }
 
 /** Restore the exact pre-repair contents after a post-write validation failure. */
-export async function rollbackManifestRepairPlan(plan: ManifestRepairPlan): Promise<void> {
+const rollbackManifestRepairPlan = async (plan: ManifestRepairPlan): Promise<void> => {
   await ScaffoldFilePlan.rollbackFilePlan(plan.files)
+}
+
+export class ManifestRepairService {
+  static readonly createPlan = createManifestRepairPlan
+  static readonly applyPlan = applyManifestRepairPlan
+  static readonly rollbackPlan = rollbackManifestRepairPlan
 }

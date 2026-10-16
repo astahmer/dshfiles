@@ -14,15 +14,7 @@ import { packageTargets } from '../project/package-targets.js'
 import { DshxError } from '../diagnostics.js'
 import { ProfileOrchestrator } from '../profile/index.js'
 import type { PreparedProjectProfile, ProjectProfileLink, ResolvedDshInstallation } from '../profile/types.js'
-import {
-  applyManifestRepairPlan,
-  checkMigrationDiagnostics,
-  checkPackageTargets,
-  checkProjectManifest,
-  createManifestRepairPlan,
-  rollbackManifestRepairPlan,
-  typecheckProject,
-} from '../project/index.js'
+import { checkMigrationDiagnostics, checkPackageTargets, checkProjectManifest, ManifestRepairService, typecheckProject } from '../project/index.js'
 import type { ProjectTypecheckResult } from '../project/index.js'
 import type { ResolvedDshxConfig } from '../config/types.js'
 import { inspectProjectComposition } from '../inspect/index.js'
@@ -83,9 +75,9 @@ export interface CliRuntime {
   readonly inspectComposition?: typeof inspectProjectComposition
   readonly inspectRuntimePlugins?: typeof inspectRuntimePlugins
   readonly inspectBridgeStatus?: typeof inspectBridgeStatus
-  readonly createRepairPlan?: typeof createManifestRepairPlan
-  readonly applyRepairPlan?: typeof applyManifestRepairPlan
-  readonly rollbackRepairPlan?: typeof rollbackManifestRepairPlan
+  readonly createRepairPlan?: typeof ManifestRepairService.createPlan
+  readonly applyRepairPlan?: typeof ManifestRepairService.applyPlan
+  readonly rollbackRepairPlan?: typeof ManifestRepairService.rollbackPlan
   readonly addUi?: (options: AddUiOptions) => Promise<AddUiResult>
   readonly addTool?: (options: AddToolOptions) => Promise<AddToolResult>
   readonly addCommand?: (options: AddCommandOptions) => Promise<AddCommandResult>
@@ -576,7 +568,7 @@ async function runCheck(args: CliArgs, options: CliRunOptions, project: Resolved
 
   if (args.fix) {
     const compatibility = result.compatibility.compatibility
-    const plan = await (runtime.createRepairPlan ?? createManifestRepairPlan)(project, { compatibility })
+    const plan = await (runtime.createRepairPlan ?? ManifestRepairService.createPlan)(project, { compatibility })
     const fixDiagnostics: DshxDiagnostic[] = [...plan.diagnostics]
     if (plan.diagnostics.some(item => item.severity === 'error')) {
       fixDiagnostics.push({
@@ -590,7 +582,7 @@ async function runCheck(args: CliArgs, options: CliRunOptions, project: Resolved
     let applied = false
     if (!args.dryRun && plan.files.length > 0 && !plan.diagnostics.some(item => item.severity === 'error')) {
       try {
-        await (runtime.applyRepairPlan ?? applyManifestRepairPlan)(plan)
+        await (runtime.applyRepairPlan ?? ManifestRepairService.applyPlan)(plan)
         applied = true
       } catch (error) {
         if (error instanceof DshxError && error.code === 'DSHX4144') fixDiagnostics.push(diagnosticFromError(error, project.packageFile))
@@ -610,7 +602,7 @@ async function runCheck(args: CliArgs, options: CliRunOptions, project: Resolved
           })
           const manifestDiagnostics = await (runtime.checkManifest ?? checkProjectManifest)(refreshed, { compatibility })
           if (manifestDiagnostics.some(item => item.severity === 'error')) {
-            await (runtime.rollbackRepairPlan ?? rollbackManifestRepairPlan)(plan)
+            await (runtime.rollbackRepairPlan ?? ManifestRepairService.rollbackPlan)(plan)
             applied = false
             fixDiagnostics.push({
               code: 'DSHX4146',
@@ -624,7 +616,7 @@ async function runCheck(args: CliArgs, options: CliRunOptions, project: Resolved
             result = await collectCheck(options, refreshed, args.runtime)
           }
         } catch (error) {
-          await (runtime.rollbackRepairPlan ?? rollbackManifestRepairPlan)(plan)
+          await (runtime.rollbackRepairPlan ?? ManifestRepairService.rollbackPlan)(plan)
           applied = false
           fixDiagnostics.push({
             code: 'DSHX4146',

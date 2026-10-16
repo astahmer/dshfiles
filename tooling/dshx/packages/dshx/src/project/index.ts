@@ -1,7 +1,7 @@
 export { checkProjectManifest } from './manifest.js'
 export { checkPluginBoot } from './boot-check.js'
 export type { BootCheckOptions, BootCheckResult } from './boot-check.js'
-export { applyManifestRepairPlan, createManifestRepairPlan, rollbackManifestRepairPlan } from './repair.js'
+export { ManifestRepairService } from './repair.js'
 export type { ManifestRepairOptions, ManifestRepairPlan } from './repair.js'
 export { checkMigrationDiagnostics } from './migrations.js'
 export { checkPackageTargets } from './package-targets.js'
