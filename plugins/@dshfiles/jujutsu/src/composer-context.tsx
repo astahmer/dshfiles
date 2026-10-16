@@ -24,6 +24,7 @@ import { useAutoRefresh } from './auto-refresh.js'
 import { openInEditor } from './open-in-editor.js'
 import { composerContextApi, type ComposerBase, type ComposerRepository } from './composer-context-api.js'
 import { composerBaseFromSetting, composerBaseSetting } from './composer-context-core.js'
+import { composerSessionCwd } from './composer-context-session.js'
 import { FullDiffDialog } from './full-diff-dialog.js'
 import { decodePreferences } from './preferences.js'
 import { jujutsuSettings } from './settings.js'
@@ -56,13 +57,6 @@ const storedBases = createStoredValue({ key: 'dshfiles.jujutsu.composer-base.v1'
 
 const noCwd = (): null => null
 
-const useSessionCwd = (sessions: ISessions, sessionId: SessionSummary['id']): string | null => {
-  const subscribe = useCallback((listener: () => void) => sessions.list.subscribe(listener), [sessions])
-  const read = useCallback(() => sessions.list.getSnapshot().byId[sessionId]?.cwd ?? null, [sessions, sessionId])
-  const cwd = useSyncExternalStore(subscribe, read, noCwd)
-  return cwd === null || cwd.length === 0 ? null : cwd
-}
-
 type WorkspaceItems = ReturnType<IWorkspaces['list']['getSnapshot']>['items']
 const emptyWorkspaceItems: WorkspaceItems = []
 const noWorkspaceItems = (): WorkspaceItems => emptyWorkspaceItems
@@ -71,6 +65,16 @@ const useWorkspaceItems = (workspaces: IWorkspaces): WorkspaceItems => {
   const subscribe = useCallback((listener: () => void) => workspaces.list.subscribe(listener), [workspaces])
   const read = useCallback(() => workspaces.list.getSnapshot().items, [workspaces])
   return useSyncExternalStore(subscribe, read, noWorkspaceItems)
+}
+
+const useSessionCwd = (sessions: ISessions, workspaces: WorkspaceItems, sessionId: SessionSummary['id']): string | null => {
+  const subscribe = useCallback((listener: () => void) => sessions.list.subscribe(listener), [sessions])
+  const read = useCallback(() => {
+    const sessionCwd = sessions.list.getSnapshot().byId[sessionId]?.cwd
+    return composerSessionCwd(sessionId, sessionCwd, workspaces)
+  }, [sessionId, sessions, workspaces])
+  const cwd = useSyncExternalStore(subscribe, read, noCwd)
+  return cwd === null || cwd.length === 0 ? null : cwd
 }
 
 const composerKeys = {
@@ -83,7 +87,8 @@ const useComposerContext = (props: ComposerSlotProps, surface: 'composerBar' | '
   const settings = useSettings(jujutsuSettings)
   // Keys added after the Host started are absent until a DSH restart; field-wise defaults keep the slots on.
   const preferences = decodePreferences(settings.value ?? {})
-  const cwd = useSessionCwd(props.jujutsu.sessions, props.sessionId)
+  const workspaces = useWorkspaceItems(props.jujutsu.workspaces)
+  const cwd = useSessionCwd(props.jujutsu.sessions, workspaces, props.sessionId)
   const bases = storedBases.useValue()
   const base: ComposerBase = composerBaseFromSetting((cwd === null ? undefined : bases[cwd]) ?? preferences.composerBarBase)
   const baseKey = composerBaseSetting(base)
