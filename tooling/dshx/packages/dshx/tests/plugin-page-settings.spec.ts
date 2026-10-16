@@ -2,7 +2,7 @@ import Schema from '@deepseek-ai/schemastery'
 import { createElement } from 'react'
 import { createRequire } from 'node:module'
 import { afterEach, describe, expect, it } from 'vitest'
-import { provideSettingsPageRenderer } from '../src/settings/page-renderer.js'
+import { provideSettingsPageRenderer } from '../src/client/index.js'
 import { registerPluginPageSettings } from '../src/settings/plugin-page.js'
 
 interface CapturedSpec {

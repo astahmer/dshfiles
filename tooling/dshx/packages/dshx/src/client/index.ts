@@ -1,4 +1,4 @@
-import { provideSettingsPageRenderer, type SettingsPageRenderer, type SettingsPageRendererProps } from '../settings/page-renderer.js'
+import { SettingsPageRendererModel, type SettingsPageRenderer, type SettingsPageRendererProps } from '../settings/page-renderer.js'
 import { ApiRuntimeModel } from '../api/runtime.js'
 
 export { defineClient, defineSlot } from './define.js'
@@ -38,5 +38,5 @@ export type {
   PanelIconProps,
 } from '../sdk/client.js'
 
-export { provideSettingsPageRenderer }
+export const provideSettingsPageRenderer = SettingsPageRendererModel.provide
 export type { SettingsPageRenderer, SettingsPageRendererProps }

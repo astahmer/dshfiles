@@ -30,7 +30,7 @@ const seat = (): RendererSeat => {
 }
 
 /** Draw every package's Plugins-page settings with `renderer` until the returned disposer runs. */
-export const provideSettingsPageRenderer = (renderer: SettingsPageRenderer): (() => void) => {
+const provideSettingsPageRenderer = (renderer: SettingsPageRenderer): (() => void) => {
   const current = seat()
   current.renderer = renderer
   current.listeners.forEach(listener => listener())
@@ -41,12 +41,18 @@ export const provideSettingsPageRenderer = (renderer: SettingsPageRenderer): (()
   }
 }
 
-export const settingsPageRenderer = (): SettingsPageRenderer | undefined => seat().renderer
+const settingsPageRenderer = (): SettingsPageRenderer | undefined => seat().renderer
 
-export const subscribeSettingsPageRenderer = (listener: () => void): (() => void) => {
+const subscribeSettingsPageRenderer = (listener: () => void): (() => void) => {
   const current = seat()
   current.listeners.add(listener)
   return () => {
     current.listeners.delete(listener)
   }
+}
+
+export class SettingsPageRendererModel {
+  static readonly provide = provideSettingsPageRenderer
+  static readonly current = settingsPageRenderer
+  static readonly subscribe = subscribeSettingsPageRenderer
 }

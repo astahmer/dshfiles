@@ -11,7 +11,7 @@
  * schema service, or the primitives module simply shows nothing.
  */
 import type { ReactNode } from 'react'
-import { settingsPageRenderer, subscribeSettingsPageRenderer } from './page-renderer.js'
+import { SettingsPageRendererModel } from './page-renderer.js'
 
 type ReactRuntime = typeof import('react')
 declare const require: ((name: string) => unknown) | undefined
@@ -384,7 +384,7 @@ const createPluginPage = (react: ReactRuntime, primitives: Primitives): ((props:
 
   return (props: PageProps): ReactNode => {
     const views = props.useDescribe(snapshot => snapshot.view?.namespaces)
-    const renderer = react.useSyncExternalStore(subscribeSettingsPageRenderer, settingsPageRenderer, settingsPageRenderer)
+    const renderer = react.useSyncExternalStore(SettingsPageRendererModel.subscribe, SettingsPageRendererModel.current, SettingsPageRendererModel.current)
     react.useEffect(() => {
       void props.forms.describe().ensure?.()
     }, [props.forms])
