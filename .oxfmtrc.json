@@ -10,6 +10,8 @@
     "tooling/antislop/index.mjs",
     "output/**",
     "plugins/@dshfiles/optmem/bench/fixtures/coding/**",
-    "plugins/@dshfiles/optmem/bench/results/**"
+    "plugins/@dshfiles/optmem/bench/results/**",
+    "plugins/@dshfiles/rich-composer/src/native/**",
+    "plugins/@dshfiles/rich-composer/src/submission-settings.ts"
   ]
 }

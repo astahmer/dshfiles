@@ -50,7 +50,9 @@
     "**/dist/**",
     "**/node_modules/**",
     "tooling/antislop/index.mjs",
-    "output/**"
+    "output/**",
+    "plugins/@dshfiles/rich-composer/src/native/**",
+    "plugins/@dshfiles/rich-composer/src/submission-settings.ts"
   ],
   "overrides": [
     {

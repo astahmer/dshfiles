@@ -7,6 +7,9 @@ const lintRoots = ['tooling/dshx/packages', 'plugins', 'scripts', 'apps/desktop/
 // Deliberate public re-export boundaries, exempt from the ast-grep forwarding rules.
 const astGrepBoundaries = ['tooling/dshx/packages/dshx/client/index.d.ts', 'plugins/@dshfiles/plugin-ui/src/icons.ts']
 
+// Vendored upstream source: kept byte-comparable to its pinned revision, so this repository's rules do not apply.
+const astGrepVendored = ['plugins/@dshfiles/rich-composer/src/native/**']
+
 const ruleCapsSchema = z.record(z.string(), z.number().int().nonnegative())
 const capsSchema = z.object({ oxlint: ruleCapsSchema, 'ast-grep': ruleCapsSchema })
 
@@ -54,7 +57,7 @@ const readFindings = (): ReadonlyArray<Finding> => {
       }
     })
   }
-  const output = run(['ast-grep', 'scan', ...lintRoots, '--json=stream', ...astGrepBoundaries.map(path => `--globs=!${path}`)])
+  const output = run(['ast-grep', 'scan', ...lintRoots, '--json=stream', ...[...astGrepBoundaries, ...astGrepVendored].map(path => `--globs=!${path}`)])
   return output
     .split('\n')
     .filter(Boolean)

@@ -18,3 +18,13 @@ Use DSH core as the baseline, but own product-specific divergence in a dshfiles 
 6. **Verify without restarting the live instance.** Run plugin build, typecheck, unit tests, Host import check, and `pnpm check:e2e <plugin>`; use `probe` or `verify-dsh` for runtime evidence. A profile composition change requires a user-controlled restart. Report source validation, profile seed status, and runtime rollout separately.
 
 The `@dshfiles/attachment-gallery` plugin is the reference example: it disables native Loader row `ui-attachment`, fills the four attachment/image Slots, retains the MIT notice and upstream provenance, and owns the gallery navigation behavior.
+
+## When the whole native package must be forked
+
+A Slot replacement only works when the native owner's injected state is reachable from a supported API. `@deepseek-ai/dsh-client-ui-conversation` is the counter-example: its composer bar receives a package-private `ComposerBarInjected` callback (keyboard, uploads, notices, hooks, session input) created inside the plugin, so a third-party occupant cannot rebuild the bar's props. `@dshfiles/rich-composer` therefore forks that one package.
+
+- Vendor the upstream client source under `src/native`, keeping the upstream relative layout and file contents byte-identical wherever possible; a rebase then starts from a real `diff` against the next pinned revision.
+- Confine local edits to a handful of files and record the exact delta in the plugin README (file, and why), so an upstream update is a re-read of those files, not a re-derivation of the fork.
+- The vendored directory is excluded from Oxlint, Oxfmt and the ast-grep ratchet (`.oxlintrc.json`, `.oxfmtrc.json`, `scripts/lint-ratchet.ts`, the `sg` script) because upstream code does not follow this repository's style; the plugin's own files stay fully linted. Keep the exclusion as narrow as the vendored path.
+- `dsh.client.external` may only name a package the browser roster can materialize: a `dsh.client` row with `exports["./client"]`, or a static platform seed word. The native plugin's other imports (for example `@deepseek-ai/dsh-util-values`) are inlined by its own bundler, so declare them under `client.bundleDependencies` in `dshx.config.ts` instead; externalizing them fails at boot with `require("…") missed the module table`.
+- Disable the stock Loader row in the owned bundle's `cordis.patch.yml` and insert the fork, exactly as a slot replacement does.
