@@ -19,6 +19,7 @@ Checkboxes and receipts in a plan are history, not fresh verification.
 | [Agent session observability](agent-session-observability/README.md) | Wider history access, JJ change associations, orchestration writes, a scratch check. |
 | [Async Agent questions](async-agent-questions.md) | Cross-thread inbox Host gap, root timed acceptance, real-provider child run, element anchors. |
 | [Multi-host](multi-host/README.md) | Durable supervision and upgrades of a remote host; a browser journey. |
+| [pulls.review-style thread review](pulls-review/README.md) | Host API, review panel, command and palette action, scratch-DSH verification. |
 | [Desktop shell](desktop-shell/README.md) | Relaunch on Host exit, lifecycle test, signing, updates. |
 | [OptMem remaining validation](optmem/README.md) | Quiet 100k-event benchmark and full acceptance gates. To be superseded by the new memory plugin. |
 | [OptMem real-world evaluation](optmem-realworld/README.md) | Long-conversation pilots and calibration. To be superseded by the new memory plugin. |

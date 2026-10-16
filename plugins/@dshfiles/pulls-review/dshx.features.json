@@ -1,0 +1,73 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "thread-review-scopes",
+      "title": "Group a thread workspace's changes into review scopes",
+      "summary": "Read the current thread workspace's jj diff against its base bookmark, group the changed files with pulls.review's deterministic rules, and review one scope at a time with locally persisted progress.",
+      "surfaces": ["client", "host"],
+      "configuration": [],
+      "states": ["no-thread", "no-folder", "loading", "empty-diff", "scoped", "reviewed", "truncated", "failed"],
+      "failureModes": [
+        "A missing workspace, a workspace without a jj repository, no resolvable base bookmark, or a missing jj binary is reported with its own reason instead of an empty diff.",
+        "jj stderr never reaches the client; a failed command is classified, not quoted.",
+        "A patch larger than the Host cap is flagged as truncated rather than silently shortened."
+      ],
+      "externalDependencies": [
+        {
+          "id": "jujutsu",
+          "boundary": "The jj CLI in the resolved thread workspace.",
+          "deterministicFake": "The e2e journey provisions a disposable jj repository; unit tests inject a scripted jj runner and check the real CLI output separately."
+        }
+      ],
+      "reach": [
+        "seed rebase-ready-thread",
+        "click button \"pulls.review\"",
+        "expect heading \"pulls.review\"",
+        "expect text \"main..@\"",
+        "expect text \"1 file\"",
+        "expect text \"seeded-work.md*\"",
+        "click button \"Mark reviewed\"",
+        "expect text \"1/1 reviewed\""
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "pulls-review.thread-scopes",
+          "featureFile": "tooling/dshx/e2e/features/pulls-review.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "pulls-review.thread-review-scopes-unit-rules",
+          "file": "plugins/@dshfiles/pulls-review/tests/scopes.spec.ts",
+          "testName": "groups changed files with pulls.review rule-based scopes and exact stats"
+        },
+        {
+          "kind": "unit-test",
+          "id": "pulls-review.thread-review-scopes-unit-base",
+          "file": "plugins/@dshfiles/pulls-review/tests/review.spec.ts",
+          "testName": "reads the first resolvable base bookmark and groups the diff"
+        },
+        {
+          "kind": "unit-test",
+          "id": "pulls-review.thread-review-scopes-unit-failures",
+          "file": "plugins/@dshfiles/pulls-review/tests/review.spec.ts",
+          "testName": "reports a missing base, a missing workspace and a missing jj without leaking command output"
+        },
+        {
+          "kind": "unit-test",
+          "id": "pulls-review.thread-review-scopes-unit-real-jj",
+          "file": "plugins/@dshfiles/pulls-review/tests/jj-output.spec.ts",
+          "testName": "groups a real `jj diff --git --from main --to @` into scopes"
+        },
+        {
+          "kind": "unit-test",
+          "id": "pulls-review.thread-review-scopes-unit-reviewed-key",
+          "file": "plugins/@dshfiles/pulls-review/tests/reviewed.spec.ts",
+          "testName": "separates the same path across workspaces and revisions"
+        }
+      ]
+    }
+  ]
+}
