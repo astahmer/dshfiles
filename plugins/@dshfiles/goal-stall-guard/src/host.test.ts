@@ -15,6 +15,7 @@ const roundPrompt = (round: number): string => `<goal_round>\nObjective: "restyl
 
 interface Harness {
   readonly pause: ReturnType<typeof vi.fn>
+  readonly registeredToolNames: string[]
   readonly dispatch: (event: { type: string; data?: unknown }) => void
 }
 
@@ -42,7 +43,7 @@ const bindableContext = (listeners: Map<string, (session: unknown, event: unknow
   }
   // `get` is what dshx's optional inspect bridge probes; without it the bridge
   // logs a warning on every activation even though the plugin needs no service.
-  return { on, once: on, emit: on, parallel: on, serial: on, bail: on, waterfall: on, effect: () => {}, get: () => undefined }
+  return { on, once: on, emit: on, parallel: on, serial: on, bail: on, waterfall: on, effect: () => {}, get: () => undefined, tools: { register: () => {} } }
 }
 
 const startHarness = (plugin: BuiltPlugin, config: Record<string, unknown> = {}): Harness => {
@@ -54,9 +55,15 @@ const startHarness = (plugin: BuiltPlugin, config: Record<string, unknown> = {})
   const agent = { id: 'agent-1', session: { id: 'session-1' } }
   const goal = { id: 'goal-1', revision: 4, phase: 'active' as const }
   const listeners = new Map<string, (session: unknown, event: unknown) => void>()
+  const registeredToolNames: string[] = []
 
   const ctx = {
     ...bindableContext(listeners),
+    tools: {
+      register: (definition: { readonly name: string }): void => {
+        registeredToolNames.push(definition.name)
+      },
+    },
     agents: { get: vi.fn(() => agent) },
     goals: { get: vi.fn(() => goal), pause },
     logger: { warn: vi.fn() },
@@ -73,10 +80,17 @@ const startHarness = (plugin: BuiltPlugin, config: Record<string, unknown> = {})
       publishing = false
     }
   }
-  return { pause, dispatch }
+  return { pause, registeredToolNames, dispatch }
 }
 
 describe('goal-stall-guard wiring', () => {
+  it('registers the supplemental continuation tools', async () => {
+    const plugin = await loadPlugin()
+    const { registeredToolNames } = startHarness(plugin)
+
+    expect(registeredToolNames).toEqual(['extend_goal_budget', 'complete_blocked_goal'])
+  })
+
   it('pauses the goal on the third consecutive empty round', async () => {
     const plugin = await loadPlugin()
     const { pause, dispatch } = startHarness(plugin)

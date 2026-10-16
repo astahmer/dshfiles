@@ -8,7 +8,7 @@ import { z } from 'zod'
  *
  * The key decides the account: `-LIMITED` keys are rate limited on chat, `-BROKEN` keys fail the billing read, and
  * every other key reports a 75%-left session window and a 10%-left weekly window. A turn answers `Answered by <key
- * suffix>` unless its latest message carries a directive: `[[call TOOL {json}]]` calls any tool (several in one turn when repeated), `[[read PATH]]` calls the read tool and
+ * suffix>` unless its latest message carries a directive: `[[call TOOL {json}]]` calls any tool (several in one turn when repeated), `[[once call TOOL {json}]]` calls only on its first match, `[[read PATH]]` calls the read tool and
  * `[[memory_search QUERY]]` or `[[memory_search QUERY in SCOPE]]` calls the memory search tool, `[[empty]]` settles with reasoning and no answer (a stalled round), and `[[hold]]`
  * keeps the turn running until `releaseHeldTurns`; `[[title NAME]]` names the thread NAME; the turn after a tool
  * result answers `Tool finished.`. OptMem summary calls answer, fail or hang as `summaries` says.
@@ -86,6 +86,7 @@ export const startFakeCommandCode = async (): Promise<FakeCommandCode> => {
   const requests: FakeChatRequest[] = []
   const hanging = new Set<ServerResponse>()
   const held = new Set<ServerResponse>()
+  const oneShotCalls = new Set<string>()
   const server = createServer((request, response) => {
     // Billing and model reads have no body; only a chat completion is decoded below.
     void json(request)
@@ -143,10 +144,16 @@ export const startFakeCommandCode = async (): Promise<FakeCommandCode> => {
           held.add(response)
           return
         }
-        const calls = [...(last?.text ?? '').matchAll(/\[\[call (\w+) (\{.*?\})\]\]/g)].map(match => ({
-          name: match[1] ?? '',
-          argumentsJson: match[2] ?? '{}',
-        }))
+        const calls = [...(last?.text ?? '').matchAll(/\[\[(once )?call (\w+) (\{.*?\})\]\]/g)].flatMap(match => {
+          const directive = match[0] ?? ''
+          if (match[1] !== undefined) {
+            if (oneShotCalls.has(directive)) return []
+            oneShotCalls.add(directive)
+          }
+          const rawArguments = match[3] ?? '{}'
+          const argumentsJson = rawArguments.startsWith(String.raw`{\"`) ? z.string().parse(JSON.parse(`"${rawArguments}"`)) : rawArguments
+          return [{ name: match[2] ?? '', argumentsJson }]
+        })
         if (calls.length > 0) return streamAnswer(response, toolCalls(calls))
         const read = /\[\[read ([^\]]+)\]\]/.exec(last?.text ?? '')
         if (read?.[1] !== undefined) return streamAnswer(response, toolCall('read', JSON.stringify({ file_path: read[1] })))

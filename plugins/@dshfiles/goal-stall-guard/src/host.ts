@@ -6,6 +6,7 @@ import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { definePlugin } from '@dshfiles/dshx/host'
 import { z } from 'zod'
 import { DEFAULT_STALL_POLICY, StallDetector } from './stall.js'
+import { registerGoalContinuationTools } from './goal-continuation.js'
 
 const rowConfig = z.object({
   /**
@@ -59,10 +60,11 @@ export default definePlugin({
   id: 'goal-stall-guard',
   name: '@dshfiles/goal-stall-guard',
   Config,
-  inject: ['agents', 'goals', 'sessions'],
+  inject: ['agents', 'goals', 'sessions', 'sessionProjections', 'tools'],
   setup: api => {
     const ctx: Context = api.raw.ctx
     const { stallThreshold } = Config.parse(api.config)
+    registerGoalContinuationTools(ctx)
     const detector = StallDetector({ threshold: stallThreshold })
 
     ctx.on('session/event', (session, event) => {

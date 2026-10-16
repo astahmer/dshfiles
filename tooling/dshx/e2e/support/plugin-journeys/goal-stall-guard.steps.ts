@@ -68,3 +68,35 @@ Then('the guard pauses the goal after its third empty round', async ({ page }: {
   })
   await finishJourneyAssertions(page)
 })
+
+When('a one-round goal is started with a one-shot extension request', async ({ page }: { page: Page }) => {
+  await page.keyboard.press('Escape')
+  await page.getByRole('treeitem', { name: 'New Session', exact: true }).click()
+  await page.getByRole('button', { name: /^Select model/ }).click()
+  await page.getByRole('menuitem', { name: /^Model / }).click()
+  await page.getByRole('menuitemradio', { name: 'commandcode_work/gpt-6-luna', exact: true }).click()
+  const encodedObjective = String.raw`Finish handoff [[once call extend_goal_budget \u007b\u0022additional_rounds\u0022:1,\u0022progress\u0022:\u0022Primary handoff completed and verified.\u0022,\u0022remaining_work\u0022:\u0022One final result check remains.\u0022,\u0022justification\u0022:\u0022The original request authorizes this monitoring window.\u0022\u007d]]`
+  const composer = page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })
+  await composer.fill(`[[call create_goal {"objective":"${encodedObjective}","max_goal_rounds":1}]]`)
+  await composer.press('Enter')
+})
+
+Then('the extension is applied and the goal blocks at its new limit', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'goal-stall-guard-final-round-extension', async () => {
+    await expect(page.getByText('Blocked Goal', { exact: true })).toBeVisible({ timeout: 60_000 })
+    await expect(page.getByTitle('Goal reached its configured limit of 2 rounds.', { exact: true })).toBeVisible()
+  })
+})
+
+When('completion evidence is delivered to the round-limited goal', async ({ page }: { page: Page }) => {
+  const composer = page.getByRole('textbox', { name: /^(Describe what you want to build|Message or run a task), \/ commands, @ files or sessions$/ })
+  await composer.fill('[[call complete_blocked_goal {"evidence":"All requirements passed review; final output was produced and verified."}]]')
+  await composer.press('Enter')
+})
+
+Then('the round-limited goal is marked complete', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'goal-stall-guard-round-limit-completion', async () => {
+    await expect(page.getByText('Blocked Goal', { exact: true })).toHaveCount(0, { timeout: 60_000 })
+  })
+  await finishJourneyAssertions(page)
+})

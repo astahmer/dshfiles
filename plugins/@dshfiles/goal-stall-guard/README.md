@@ -4,7 +4,10 @@ A goal round that produces no assistant content used to complete silently. The
 round driver saw an active goal with rounds still in budget, spliced the next
 round, and did it again.
 
-This bundle pauses the goal instead, so a human decides what happens next.
+This bundle pauses a no-progress goal instead of letting it burn its budget. It
+also adds narrowly scoped tools for justified round extension and evidence-based
+completion after a round-limit block. Native DSH goal tools remain enabled and
+unchanged.
 
 ## The failure it exists for
 
@@ -36,6 +39,24 @@ the message that opened the goal, not a continuation of one.
 
 A tool-only round counts as progress. The round did work even without prose.
 
+## Bounded continuation and completion
+
+The plugin registers two additional Host tools through the public `goals` and
+`tools` services; it does not replace or fork `@deepseek-ai/dsh-tool-goal`.
+
+- `extend_goal_budget` works only for the exact active goal round at its current
+  final limit. It requires concrete progress, remaining work, and a reason that
+  continuation is still within the original human authorization. It adds 1–32
+  rounds per call and never raises the total above DSH's standard 256-round
+  default. It cannot change the objective. The model must not use it merely to
+  poll unchanged work that is waiting on a human.
+- `complete_blocked_goal` works only for a goal blocked with `round-limit`, and
+  requires evidence that all objective requirements are now satisfied. It does
+  not close other blocked states or excuse an unresolved human decision.
+
+The native `update_goal` guard remains authoritative for its own actions. These
+tools cover only the two narrow cases above.
+
 ## Configuration
 
 ```yaml
@@ -61,13 +82,13 @@ resume runs one more empty round, and the third pauses the goal.
 
 ## Verification
 
-28 tests. `src/stall.test.ts` covers the detector, including a replay of the
-recorded 164-round sequence that stops at round 56. `src/host.test.ts` drives
+`src/stall.test.ts` covers the detector, including a replay of the recorded
+164-round sequence that stops at round 56. `src/host.test.ts` drives
 the built bundle's `apply` against the real session-event shapes (a session
 that refuses a reentrant append, a runtime-context snapshot after the round
 prompt), with controls for a speaking round, a tool-only round, a non-goal empty
-turn, an agent with no goal, a goal that is not active, and a `pause` that
-throws. `tooling/dshx/e2e/features/goal-stall-guard.feature` drives it in the
+turn, an agent with no goal, a goal that is not active, a `pause` that throws,
+and registration of both supplemental tools. `tooling/dshx/e2e/features/goal-stall-guard.feature` drives it in the
 browser against a loopback Command Code fake.
 
 Boot-verified on a second instance (`dsh --profile probe --port 3199`), never on

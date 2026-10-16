@@ -22,3 +22,12 @@ Feature: Goal stall guard
     When a Command Code account backed by a local fake provider is added
     And three messages that come back empty are sent in a new thread without a goal
     Then each turn fails on its own and no goal appears
+
+  @scenario:goal-stall-guard.continuation
+  Scenario: A justified final round extends a goal and new evidence closes it after the round limit
+    Given the isolated plugin composition "@dshfiles/goal-stall-guard" and "@dshfiles/ai-accounts" is booted
+    When a Command Code account backed by a local fake provider is added
+    And a one-round goal is started with a one-shot extension request
+    Then the extension is applied and the goal blocks at its new limit
+    When completion evidence is delivered to the round-limited goal
+    Then the round-limited goal is marked complete

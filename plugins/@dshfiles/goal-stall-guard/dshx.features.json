@@ -88,6 +88,33 @@
           "testName": "a pause rejection is logged, not thrown at the session loop"
         }
       ]
+    },
+    {
+      "id": "bounded-goal-continuation",
+      "title": "Extend or close goals within bounded policy",
+      "summary": "Add a narrowly scoped Host tool to extend an active goal on its exact final round and complete a round-limit-blocked goal only with evidence.",
+      "surfaces": ["host", "integration"],
+      "configuration": [],
+      "states": ["active-final-round", "extended", "round-limit-blocked", "complete"],
+      "failureModes": [
+        "Extensions outside the exact final active goal round are rejected.",
+        "Each extension adds at most 32 rounds and total budget cannot exceed 256.",
+        "Blocked completion is limited to round-limit goals and requires concrete evidence."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "goal-stall-guard.continuation",
+          "featureFile": "tooling/dshx/e2e/features/goal-stall-guard.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "goal-stall-guard.continuation-tool-registration",
+          "file": "plugins/@dshfiles/goal-stall-guard/src/host.test.ts",
+          "testName": "registers the supplemental continuation tools"
+        }
+      ]
     }
   ],
   "kind": "bundle"
