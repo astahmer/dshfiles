@@ -410,6 +410,7 @@ const discardThread = async (input: { readonly path: string; readonly force: boo
       if (workspace.path === found.thread.path) isolatedSessionWorkspaces.delete(sessionId)
     }
     emitActivity({ type: 'workspace.discarded', summary: `Removed thread workspace ${found.thread.name}`, path: input.path })
+    queueWorkspaceSync(found.repoRoot)
   }
   return { status: outcome.status, revisions: outcome.status === 'has-work' ? [...outcome.revisions] : [] }
 }
@@ -462,8 +463,7 @@ const isolateSession = async (caller: ApiCaller) => {
   }
 
   const activeThreads = requireThreads()
-  const base = await activeThreads.workingCopyCommitId(location.workspaceRoot)
-  const thread = await activeThreads.provision(location.repoRoot, base)
+  const thread = await activeThreads.provision(location.repoRoot)
   const registry = registryOf()
   const project = await registry.resolveByPath(location.repoRoot)
   const registered = await registry.resolveByPath(thread.path)
@@ -564,7 +564,7 @@ const api = jjIntegrationApi.host({
         return location !== undefined && isSecondaryWorkspace(location)
       },
     })
-    return { projects }
+    return { projects: [...projects] }
   },
   noFolder: async () => {
     const registry = registryOf()

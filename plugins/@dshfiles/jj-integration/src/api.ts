@@ -123,7 +123,7 @@ export const jjIntegrationApi = defineApi({
       input: z.object({}).strict(),
       output: isolatedWorkspaceSchema,
       description:
-        'Before the first code edit, call when this task needs code changes and the current Session is not already in a dedicated thread workspace. Creates one from the current working-copy revision. The Session cwd does not change: use the returned absolute path for every subsequent file operation and shell workdir. No commit or rebase occurs.',
+        'Before the first code edit, call when this task needs code changes and the current Session is not already in a dedicated thread workspace. Creates one from the configured bookmark, independently of local checkout commits. The Session cwd does not change: use the returned absolute path for every subsequent file operation and shell workdir. No commit or rebase occurs.',
       tool: {
         name: 'jj_thread_isolate',
         render: output =>

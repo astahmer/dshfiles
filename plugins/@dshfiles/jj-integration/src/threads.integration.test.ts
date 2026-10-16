@@ -72,7 +72,7 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
     expect((await threads.locate(thread.path)).threadName).toBe('thread-c0ffee')
   })
 
-  it('can isolate from the current working-copy revision before the first edit', async () => {
+  it('can isolate from the current working-copy revision when explicitly requested', async () => {
     writeFileSync(join(repo, 'local-context.txt'), 'existing context\n')
     const base = await threads.workingCopyCommitId(repo)
     const thread = await threads.provision(repo, base)
@@ -80,6 +80,18 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
     expect(readFileSync(join(thread.path, 'local-context.txt'), 'utf8')).toBe('existing context\n')
     expect(readFileSync(join(repo, 'local-context.txt'), 'utf8')).toBe('existing context\n')
     expect((await threads.locate(thread.path)).threadName).toBe(thread.name)
+  })
+
+  it('starts a new isolated thread from the configured bookmark, not local checkout commits', async () => {
+    writeFileSync(join(repo, 'local-context.txt'), 'checkout only\n')
+    jj(repo, 'commit', '-m', 'feat: local checkout context')
+
+    const thread = await threads.provision(repo)
+
+    expect(() => readFileSync(join(thread.path, 'local-context.txt'), 'utf8')).toThrow()
+    expect(jj(thread.path, '--ignore-working-copy', 'log', '--no-graph', '-r', '@-', '-T', 'commit_id')).toBe(
+      jj(repo, '--ignore-working-copy', 'log', '--no-graph', '-r', 'main', '-T', 'commit_id'),
+    )
   })
 
   it('reads one thread status from its workspace without listing siblings', async () => {
