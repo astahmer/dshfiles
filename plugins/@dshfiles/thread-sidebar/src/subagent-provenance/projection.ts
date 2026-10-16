@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import type { ProjectionDefinition } from '@deepseek-ai/dsh-session-projection'
-import { providerModelLabel } from './route-label.js'
+import { SubagentRouteLabelModel } from './route-label.js'
 import type { ThreadSidebarModelRoute } from './projection-types.js'
 
 const routeLabelSchema = z.string().max(193).nullable()
@@ -20,7 +20,7 @@ const assistantRouteEventSchema = z.object({
 export const routeLabelFromAssistantEvent = (event: { readonly type: string; readonly data: object }): ThreadSidebarModelRoute | undefined => {
   const parsed = assistantRouteEventSchema.safeParse(event)
   if (!parsed.success) return undefined
-  return providerModelLabel(parsed.data.data.message.source.provider, parsed.data.data.message.source.model) ?? null
+  return SubagentRouteLabelModel.providerModelLabel(parsed.data.data.message.source.provider, parsed.data.data.message.source.model) ?? null
 }
 
 export const threadSidebarModelRouteProjection = {

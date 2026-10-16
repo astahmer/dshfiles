@@ -12,7 +12,7 @@ import {
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale, PropsRuntime, TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import { NS } from './locales.js'
-import { displayedAgentRouteLabel } from './route-label.js'
+import { SubagentRouteLabelModel } from './route-label.js'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-token-meter/client'
 import css from './SubagentHeaderLineage.module.css'
@@ -228,7 +228,10 @@ function CatalogRows({
         const mode = entry.mode === 'unknown' ? t('mode.unknown') : entry.mode === 'one-shot' ? t('mode.oneShot') : t('mode.continuable')
         const completed = entry.activity === 'inactive' && summary?.projectionValues?.subagentTiming?.lastTurnCompleted === true
         const activity = entry.activity === 'running' ? t('activity.running') : completed ? t('activity.completed') : t('activity.inactive')
-        const agentRoute = displayedAgentRouteLabel(summary?.projectionValues?.threadSidebarModelRoute, summary?.projectionValues?.subagent)
+        const agentRoute = SubagentRouteLabelModel.displayedAgentRouteLabel(
+          summary?.projectionValues?.threadSidebarModelRoute,
+          summary?.projectionValues?.subagent,
+        )
         const secondary = [summary?.title, mode, agentRoute, activity].filter(value => value !== undefined).join(' · ')
         const totalTokens = tokenTotal(summary?.projectionValues?.tokenUsage)
         const durationMs = activityDuration(summary, entry.activity, now)
@@ -752,7 +755,7 @@ export function SubagentHeaderLineage({
   t,
 }: SubagentHeaderLineageProps) {
   const address = useSession(session => session.subagent?.address)
-  const agentLabel = displayedAgentRouteLabel(useProjection('threadSidebarModelRoute'), useProjection('subagent'))
+  const agentLabel = SubagentRouteLabelModel.displayedAgentRouteLabel(useProjection('threadSidebarModelRoute'), useProjection('subagent'))
   const parentId = useSessions(state => {
     if (address?.childSessionId === lineageSessionId) return address.parentSessionId
     for (const [parentId, snapshot] of Object.entries(state.projectionsBySession)) {
