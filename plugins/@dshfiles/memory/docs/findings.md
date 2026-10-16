@@ -1,6 +1,7 @@
 # @dshfiles/memory: what we learned (2026-10-14)
 
-The page to read first about cross-thread memory in DSH. The details are in [benchmark.md](benchmark.md).
+The page to read first about cross-thread memory in DSH. The details are in [benchmark.md](benchmark.md); the
+plain-language version of digests is in [digests.md](digests.md).
 
 ## Why memory exists
 
