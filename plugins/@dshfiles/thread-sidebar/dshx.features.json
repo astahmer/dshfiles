@@ -221,13 +221,16 @@
     {
       "id": "thread-list-views",
       "title": "Configure saved thread views",
-      "summary": "Group and filter thread rows by activity, attention, muted, or archived status; create named tabs with saved presets, reorder or disable views, and hide quick controls.",
+      "summary": "Group thread rows by activity and filter by any combination of status, source, or attention; create named tabs with saved presets, reorder or disable views, and hide quick controls.",
       "reach": [
         "expect group \"Thread list view\"",
         "click button \"All threads\"",
         "expect button \"All threads\"",
-        "click button \"Filter: None\"",
-        "expect menuitemradio \"Not working\""
+        "click button \"Sidebar settings\"",
+        "click button \"Manage views\"",
+        "click button \"Add view\"",
+        "expect checkbox \"Working\"",
+        "expect checkbox \"Archived\""
       ],
       "surfaces": ["client", "storage"],
       "configuration": [
@@ -239,10 +242,9 @@
           "coveredBy": ["thread-sidebar.view-controls"]
         },
         {
-          "key": "statusFilter",
-          "defaultValue": "all",
-          "constraints": "Browser-local view preference: all, working, not working, attention, muted, or archived.",
-          "choices": ["all", "working", "not-working", "attention", "muted", "archived"],
+          "key": "statusFilters",
+          "defaultValue": "[]",
+          "constraints": "Browser-local view preference: an empty list for all statuses, or any combination of working, not working, attention, muted, and archived.",
           "coveredBy": ["thread-sidebar.view-controls"]
         },
         {
@@ -254,7 +256,7 @@
         },
         {
           "key": "views",
-          "defaultValue": "[{\"id\":\"all-threads\",\"name\":null,\"groupBy\":\"status\",\"statusFilter\":\"all\",\"sourceFilter\":\"all\",\"enabled\":true},{\"id\":\"working\",\"name\":null,\"groupBy\":\"status\",\"statusFilter\":\"working\",\"sourceFilter\":\"all\",\"enabled\":true}]",
+          "defaultValue": "[{\"id\":\"all-threads\",\"name\":null,\"groupBy\":\"status\",\"statusFilters\":[],\"sourceFilter\":\"all\",\"enabled\":true},{\"id\":\"working\",\"name\":null,\"groupBy\":\"status\",\"statusFilters\":[\"working\"],\"sourceFilter\":\"all\",\"enabled\":true}]",
           "constraints": "Browser-local saved views: 1–12 items, unique IDs and names, at least one enabled; each preset stores group, status, and source filters.",
           "coveredBy": ["thread-sidebar.custom-views"]
         },
@@ -280,7 +282,7 @@
         },
         {
           "key": "viewPresets",
-          "defaultValue": "[{\"id\":\"all-threads\",\"name\":null,\"groupBy\":\"status\",\"statusFilter\":\"all\",\"sourceFilter\":\"all\",\"enabled\":true},{\"id\":\"working\",\"name\":null,\"groupBy\":\"status\",\"statusFilter\":\"working\",\"sourceFilter\":\"all\",\"enabled\":true}]",
+          "defaultValue": "[{\"id\":\"all-threads\",\"name\":null,\"groupBy\":\"status\",\"statusFilters\":[],\"sourceFilter\":\"all\",\"enabled\":true},{\"id\":\"working\",\"name\":null,\"groupBy\":\"status\",\"statusFilters\":[\"working\"],\"sourceFilter\":\"all\",\"enabled\":true}]",
           "constraints": "Browser-local saved views: 1–12 items, unique IDs and names, at least one enabled; each preset stores group, status, and source filters.",
           "coveredBy": ["thread-sidebar.custom-views"]
         }

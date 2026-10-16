@@ -50,7 +50,24 @@ const openSidebarSettings = async (page: Page): Promise<void> => {
   await expect(sidebarSettings(page)).toBeVisible()
 }
 
+const statusFilterLabels: readonly string[] = ['All threads', 'Working', 'Not working', 'Needs attention', 'Muted', 'Archived']
+
+const setThreadStatusFilters = async (page: Page, triggerName: string, selectedLabels: readonly string[]): Promise<void> => {
+  await threadSidebar(page).getByRole('button', { name: triggerName, exact: true }).click()
+  for (const label of statusFilterLabels) {
+    const item = page.getByRole('menuitemcheckbox', { name: label, exact: true })
+    const shouldBeChecked = label === 'All threads' ? selectedLabels.length === 0 : selectedLabels.includes(label)
+    if ((await item.getAttribute('aria-checked')) === String(shouldBeChecked)) continue
+    await item.click()
+  }
+  await page.keyboard.press('Escape')
+}
+
 const selectThreadViewValue = async (page: Page, triggerName: string, value: string): Promise<void> => {
+  if (statusFilterLabels.includes(value)) {
+    await setThreadStatusFilters(page, triggerName, value === 'All threads' ? [] : [value])
+    return
+  }
   await threadSidebar(page).getByRole('button', { name: triggerName, exact: true }).click()
   await page.getByRole('menuitemradio', { name: value, exact: true }).click()
 }
@@ -416,6 +433,10 @@ When('a Host thread is archived and the view is grouped and filtered', async ({ 
   await selectThreadViewValue(page, 'Filter: Archived', 'Main threads')
   await expect(targetRow).toBeVisible()
   await expect(threadSidebar(page).getByRole('region', { name: 'Today', exact: true })).toContainText(displayTitle)
+  await setThreadStatusFilters(page, 'Filter: Archived · Main threads', ['Working', 'Archived'])
+  await expect(threadSidebar(page).getByRole('button', { name: 'Filter: Working · Archived · Main threads', exact: true })).toBeVisible()
+  await expect(targetRow).toBeVisible()
+  await setThreadStatusFilters(page, 'Filter: Working · Archived · Main threads', ['Archived'])
 
   await selectThreadViewValue(page, 'Filter: Archived · Main threads', 'Working')
   await expect(targetRow).toHaveCount(0)
@@ -439,8 +460,9 @@ Then('only matching rows remain visible after reload', async ({ page }: { page: 
     await expect(targetRow).toBeVisible()
     await expect(threadSidebar(page).getByRole('region', { name: 'Today', exact: true })).toContainText(displayTitle)
     await threadSidebar(page).getByRole('button', { name: 'Filter: Archived · Main threads', exact: true }).click()
-    await expect(page.getByRole('menuitemradio', { name: 'Archived', exact: true })).toHaveAttribute('aria-checked', 'true')
+    await expect(page.getByRole('menuitemcheckbox', { name: 'Archived', exact: true })).toHaveAttribute('aria-checked', 'true')
     await expect(page.getByRole('menuitemradio', { name: 'Main threads', exact: true })).toHaveAttribute('aria-checked', 'true')
+    await page.keyboard.press('Escape')
   })
   await finishJourneyAssertions(page)
 })

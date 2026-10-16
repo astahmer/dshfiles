@@ -72,6 +72,7 @@ interface ThreadViewEditorProps {
 }
 
 const ThreadViewEditor = (props: ThreadViewEditorProps): JSX.Element => {
+  const translate = props.t
   const existingNames = useMemo(
     () => props.settings.views.filter(view => view.id !== props.view.id).map(view => threadViewPresetLabel(view, props.t).trim().toLowerCase()),
     [props.settings.views, props.t, props.view.id],
@@ -83,22 +84,22 @@ const ThreadViewEditor = (props: ThreadViewEditorProps): JSX.Element => {
           name: z
             .string()
             .trim()
-            .min(1, props.t('threadSidebarViewNameRequired'))
-            .max(32, props.t('threadSidebarViewNameTooLong'))
-            .refine(name => !existingNames.includes(name.toLowerCase()), props.t('threadSidebarViewNameExists')),
+            .min(1, translate('threadSidebarViewNameRequired'))
+            .max(32, translate('threadSidebarViewNameTooLong'))
+            .refine(name => !existingNames.includes(name.toLowerCase()), translate('threadSidebarViewNameExists')),
           groupBy: z.enum(THREAD_GROUP_BY_OPTIONS),
-          statusFilter: z.enum(THREAD_STATUS_FILTER_OPTIONS),
+          statusFilters: z.array(z.enum(THREAD_STATUS_FILTER_OPTIONS.filter(value => value !== 'all'))),
           sourceFilter: z.enum(THREAD_SOURCE_FILTER_OPTIONS),
         })
         .strict(),
-    [existingNames, props.t],
+    [existingNames, translate],
   )
   const [saveWarning, setSaveWarning] = useState(false)
   const form = useAppForm({
     defaultValues: {
       name: props.view.name ?? threadViewPresetLabel(props.view, props.t),
       groupBy: props.view.groupBy,
-      statusFilter: props.view.statusFilter,
+      statusFilters: props.view.statusFilters,
       sourceFilter: props.view.sourceFilter,
     },
     validationLogic: revalidateLogic(),
@@ -142,12 +143,26 @@ const ThreadViewEditor = (props: ThreadViewEditorProps): JSX.Element => {
             />
           )}
         </form.AppField>
-        <form.AppField name="statusFilter">
+        <form.AppField name="statusFilters">
           {field => (
-            <field.SelectField
-              label={props.t('threadSidebarViewStatus')}
-              options={THREAD_STATUS_FILTER_OPTIONS.map(value => ({ value, label: props.t(statusLabelKeys[value]) }))}
-            />
+            <fieldset className="dshx:grid dshx:gap-2">
+              <legend className="dshx:text-sm dshx:font-medium">{props.t('threadSidebarViewStatus')}</legend>
+              <Label className="dshx:font-normal">
+                <Checkbox checked={field.state.value.length === 0} onCheckedChange={checked => checked === true && field.handleChange([])} />
+                {props.t('threadSidebarAllThreads')}
+              </Label>
+              {THREAD_STATUS_FILTER_OPTIONS.filter(value => value !== 'all').map(value => (
+                <Label className="dshx:font-normal" key={value}>
+                  <Checkbox
+                    checked={field.state.value.includes(value)}
+                    onCheckedChange={checked =>
+                      field.handleChange(checked === true ? [...field.state.value, value] : field.state.value.filter(selected => selected !== value))
+                    }
+                  />
+                  {props.t(statusLabelKeys[value])}
+                </Label>
+              ))}
+            </fieldset>
           )}
         </form.AppField>
         <form.AppField name="sourceFilter">
@@ -188,7 +203,7 @@ export const ThreadViewManager = (props: ThreadViewManagerProps): JSX.Element =>
       name: '',
       enabled: true,
       groupBy: 'status',
-      statusFilter: 'all',
+      statusFilters: [],
       sourceFilter: 'all',
     })
   }
@@ -229,7 +244,10 @@ export const ThreadViewManager = (props: ThreadViewManagerProps): JSX.Element =>
               {props.settings.views.map((view, index) => {
                 const label = threadViewPresetLabel(view, props.t)
                 const groupLabel = props.t(groupLabelKeys[view.groupBy])
-                const statusLabel = props.t(statusLabelKeys[view.statusFilter])
+                const statusLabel =
+                  view.statusFilters.length === 0
+                    ? props.t('threadSidebarAllThreads')
+                    : view.statusFilters.map(status => props.t(statusLabelKeys[status])).join(', ')
                 const sourceLabel = props.t(sourceLabelKeys[view.sourceFilter])
                 return (
                   <div className="dshx:grid dshx:min-w-0 dshx:gap-1.5 dshx:rounded-md dshx:border dshx:p-2.5" key={view.id} role="listitem">

@@ -20,7 +20,7 @@ const attentionView: ThreadViewPreset = {
   name: 'Needs attention',
   enabled: true,
   groupBy: 'date',
-  statusFilter: 'attention',
+  statusFilters: ['attention'],
   sourceFilter: 'main',
 }
 
@@ -28,8 +28,8 @@ describe('thread view preferences', () => {
   it('keeps the existing All threads and Working defaults', () => {
     expect(DEFAULT_THREAD_VIEW_SETTINGS).toMatchObject({
       views: [
-        { id: ALL_THREADS_VIEW_ID, name: null, groupBy: 'status', statusFilter: 'all', sourceFilter: 'all', enabled: true },
-        { id: WORKING_VIEW_ID, name: null, groupBy: 'status', statusFilter: 'working', sourceFilter: 'all', enabled: true },
+        { id: ALL_THREADS_VIEW_ID, name: null, groupBy: 'status', statusFilters: [], sourceFilter: 'all', enabled: true },
+        { id: WORKING_VIEW_ID, name: null, groupBy: 'status', statusFilters: ['working'], sourceFilter: 'all', enabled: true },
       ],
       activeViewId: ALL_THREADS_VIEW_ID,
       showGroupControl: true,
@@ -40,12 +40,12 @@ describe('thread view preferences', () => {
   it('decodes individual group and filter presets', () => {
     expect(decodeThreadViewPreferences({ groupBy: 'date' })).toEqual({
       groupBy: 'date',
-      statusFilter: 'all',
+      statusFilters: [],
       sourceFilter: 'all',
     })
-    expect(decodeThreadViewPreferences({ statusFilter: 'not-working' })).toEqual({
+    expect(decodeThreadViewPreferences({ statusFilters: ['not-working', 'attention'] })).toEqual({
       groupBy: 'status',
-      statusFilter: 'not-working',
+      statusFilters: ['not-working', 'attention'],
       sourceFilter: 'all',
     })
     expect(decodeThreadViewPreferences({ groupBy: 'model' })).toBeNull()
@@ -55,14 +55,33 @@ describe('thread view preferences', () => {
   it('migrates legacy preferences without losing the active grouping and filters', () => {
     expect(decodeThreadViewSettings({ groupBy: 'date', statusFilter: 'archived', sourceFilter: 'main' })).toMatchObject({
       views: [
-        { id: ALL_THREADS_VIEW_ID, groupBy: 'status', statusFilter: 'all', sourceFilter: 'all' },
-        { id: WORKING_VIEW_ID, groupBy: 'status', statusFilter: 'working', sourceFilter: 'all' },
-        { id: LEGACY_CURRENT_VIEW_ID, name: null, groupBy: 'date', statusFilter: 'archived', sourceFilter: 'main', enabled: true },
+        { id: ALL_THREADS_VIEW_ID, groupBy: 'status', statusFilters: [], sourceFilter: 'all' },
+        { id: WORKING_VIEW_ID, groupBy: 'status', statusFilters: ['working'], sourceFilter: 'all' },
+        { id: LEGACY_CURRENT_VIEW_ID, name: null, groupBy: 'date', statusFilters: ['archived'], sourceFilter: 'main', enabled: true },
       ],
       activeViewId: LEGACY_CURRENT_VIEW_ID,
       showGroupControl: true,
       showFilterControl: true,
     })
+  })
+
+  it('migrates saved presets with single statuses to status sets', () => {
+    const legacySettings = {
+      views: [
+        { id: ALL_THREADS_VIEW_ID, name: null, groupBy: 'status', statusFilter: 'all', sourceFilter: 'all', enabled: true },
+        { id: WORKING_VIEW_ID, name: null, groupBy: 'status', statusFilter: 'working', sourceFilter: 'all', enabled: true },
+        {
+          id: attentionView.id,
+          name: attentionView.name,
+          enabled: true,
+          groupBy: attentionView.groupBy,
+          statusFilter: 'attention',
+          sourceFilter: attentionView.sourceFilter,
+        },
+      ],
+      activeViewId: attentionView.id,
+    }
+    expect(decodeThreadViewSettings(legacySettings)?.views).toEqual([DEFAULT_THREAD_VIEW_PRESETS[0], DEFAULT_THREAD_VIEW_PRESETS[1], { ...attentionView }])
   })
 
   it('maps an unchanged legacy default to its matching default tab', () => {

@@ -4,7 +4,8 @@ export const THREAD_GROUP_BY_OPTIONS = ['project', 'date', 'status', 'none'] as 
 export type ThreadGroupBy = (typeof THREAD_GROUP_BY_OPTIONS)[number]
 
 export const THREAD_STATUS_FILTER_OPTIONS = ['all', 'working', 'not-working', 'attention', 'muted', 'archived'] as const
-export type ThreadStatusFilter = (typeof THREAD_STATUS_FILTER_OPTIONS)[number]
+export type ThreadStatusFilter = Exclude<(typeof THREAD_STATUS_FILTER_OPTIONS)[number], 'all'>
+export type ThreadStatusFilters = readonly ThreadStatusFilter[]
 
 export const THREAD_SOURCE_FILTER_OPTIONS = ['all', 'main', 'subagents'] as const
 export type ThreadSourceFilter = (typeof THREAD_SOURCE_FILTER_OPTIONS)[number]
@@ -13,7 +14,7 @@ export type ThreadDateGroup = 'today' | 'yesterday' | 'lastSevenDays' | 'older'
 
 export interface ThreadViewPreferences {
   readonly groupBy: ThreadGroupBy
-  readonly statusFilter: ThreadStatusFilter
+  readonly statusFilters: ThreadStatusFilters
   readonly sourceFilter: ThreadSourceFilter
 }
 
@@ -43,19 +44,20 @@ export const matchesThreadSourceFilter = (thread: Partial<Pick<SessionSummary, '
 }
 
 export const matchesThreadStatusFilter = (options: {
-  readonly filter: ThreadStatusFilter
+  readonly filters: ThreadStatusFilters
   readonly running: boolean
   readonly needsAttention: boolean
   readonly archived: boolean
   readonly muted: boolean
 }): boolean => {
-  if (options.filter === 'all') return true
-  if (options.filter === 'muted') return options.muted
-  if (options.filter === 'working') return options.running
-  if (options.filter === 'not-working') return !options.archived && !options.muted && (!options.running || options.needsAttention)
-  if (options.filter === 'attention') return options.needsAttention
-  if (options.filter === 'archived') return options.archived
-  return false
+  if (options.filters.length === 0) return true
+  return options.filters.some(filter => {
+    if (filter === 'muted') return options.muted
+    if (filter === 'working') return options.running
+    if (filter === 'not-working') return !options.archived && !options.muted && (!options.running || options.needsAttention)
+    if (filter === 'attention') return options.needsAttention
+    return options.archived
+  })
 }
 
 export const threadDateGroup = (updatedAt: number, now: number): ThreadDateGroup => {

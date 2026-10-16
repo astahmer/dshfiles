@@ -107,7 +107,6 @@ import {
   THREAD_STATUS_FILTER_OPTIONS,
   type ThreadGroupBy,
   type ThreadSourceFilter,
-  type ThreadStatusFilter,
   type ThreadViewPreferences,
 } from './thread-view.js'
 import {
@@ -172,7 +171,7 @@ const emptyThreadsMessage = {
   attention: 'threadSidebarNoAttentionThreads',
   muted: 'threadSidebarNoMutedThreads',
   archived: 'threadSidebarNoArchivedThreads',
-} as const satisfies Record<ThreadStatusFilter, string>
+} as const satisfies Record<(typeof THREAD_STATUS_FILTER_OPTIONS)[number], string>
 type AttentionDisplayPreferenceKey = 'approvalNeededDisplay' | 'inputNeededDisplay' | 'turnFinishedDisplay'
 
 const attentionPreferenceRows: readonly {
@@ -210,7 +209,7 @@ const threadStatusFilterLabelKeys = {
   attention: 'threadSidebarFilterAttention',
   muted: 'threadSidebarFilterMuted',
   archived: 'threadSidebarArchived',
-} satisfies Record<ThreadStatusFilter, Parameters<ThreadSidebarTranslate>[0]>
+} satisfies Record<(typeof THREAD_STATUS_FILTER_OPTIONS)[number], Parameters<ThreadSidebarTranslate>[0]>
 
 const threadSourceFilterLabelKeys = {
   all: 'threadSidebarFilterAllSources',
@@ -1403,7 +1402,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
     () =>
       sourceFilteredThreadEntries.filter(entry =>
         matchesThreadStatusFilter({
-          filter: threadView.statusFilter,
+          filters: threadView.statusFilters,
           running: threadView.sourceFilter === 'subagents' ? entry.activity.running : currentWorkingThreadIds.has(entry.session.id),
           needsAttention: threadView.sourceFilter === 'subagents' ? attentionSessionIds.has(entry.session.id) : attentionRootIds.has(entry.session.id),
           archived: archivedSessionIds.has(entry.session.id),
@@ -1418,7 +1417,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
       mutedSessionIds,
       sourceFilteredThreadEntries,
       threadView.sourceFilter,
-      threadView.statusFilter,
+      threadView.statusFilters,
     ],
   )
   const groupedAttentionRows = useMemo(() => {
@@ -1428,7 +1427,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
         session =>
           sourceFilteredThreadIds.has(session.id) &&
           matchesThreadStatusFilter({
-            filter: threadView.statusFilter,
+            filters: threadView.statusFilters,
             running: threadView.sourceFilter === 'subagents' ? session.running : currentWorkingThreadIds.has(session.id),
             needsAttention: true,
             archived: archivedSessionIds.has(session.id),
@@ -1453,7 +1452,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
     sourceFilteredThreadIds,
     threadView.groupBy,
     threadView.sourceFilter,
-    threadView.statusFilter,
+    threadView.statusFilters,
     turnFinishedRows,
   ])
   const attentionIds = useMemo(
@@ -1596,32 +1595,34 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
   const selectThreadGroupBy = (value: string): void => {
     const decoded = decodeThreadViewPreferences({
       groupBy: value,
-      statusFilter: threadView.statusFilter,
+      statusFilters: threadView.statusFilters,
       sourceFilter: threadView.sourceFilter,
     })
     if (decoded === null) return
     updateThreadView({ groupBy: decoded.groupBy })
   }
-  const selectThreadStatusFilter = (value: string): void => {
-    const decoded = decodeThreadViewPreferences({
-      groupBy: threadView.groupBy,
-      statusFilter: value,
-      sourceFilter: threadView.sourceFilter,
-    })
-    if (decoded === null) return
-    updateThreadView({ statusFilter: decoded.statusFilter })
+  const selectThreadStatusFilter = (value: string, checked: boolean): void => {
+    if (value === 'all') {
+      if (checked) updateThreadView({ statusFilters: [] })
+      return
+    }
+    const filter = THREAD_STATUS_FILTER_OPTIONS.find(candidate => candidate === value)
+    if (filter === undefined || filter === 'all') return
+    const selectedFilters = checked ? [...new Set([...threadView.statusFilters, filter])] : threadView.statusFilters.filter(selected => selected !== filter)
+    const statusFilters = selectedFilters.sort((left, right) => THREAD_STATUS_FILTER_OPTIONS.indexOf(left) - THREAD_STATUS_FILTER_OPTIONS.indexOf(right))
+    updateThreadView({ statusFilters })
   }
   const selectThreadSourceFilter = (value: string): void => {
     const decoded = decodeThreadViewPreferences({
       groupBy: threadView.groupBy,
-      statusFilter: threadView.statusFilter,
+      statusFilters: threadView.statusFilters,
       sourceFilter: value,
     })
     if (decoded === null) return
     updateThreadView({ sourceFilter: decoded.sourceFilter })
   }
   const activeFilterLabels = [
-    ...(threadView.statusFilter === 'all' ? [] : [props.tSidebar(threadStatusFilterLabelKeys[threadView.statusFilter])]),
+    ...threadView.statusFilters.map(filter => props.tSidebar(threadStatusFilterLabelKeys[filter])),
     ...(threadView.sourceFilter === 'all' ? [] : [props.tSidebar(threadSourceFilterLabelKeys[threadView.sourceFilter])]),
   ]
   const activeFilterSummary = activeFilterLabels.length === 0 ? props.tSidebar('threadSidebarFilterNone') : activeFilterLabels.join(' · ')
@@ -1759,7 +1760,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
             child =>
               !(threadView.groupBy === 'status' && attentionIds.has(child.id)) &&
               matchesThreadStatusFilter({
-                filter: threadView.statusFilter,
+                filters: threadView.statusFilters,
                 running: child.running,
                 needsAttention: attentionSessionIds.has(child.id),
                 archived: archivedSessionIds.has(child.id),
@@ -1968,7 +1969,9 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
                   onClick={() => selectThreadViewPreset(view.id)}
                 >
                   <span className="dshx:truncate">{threadViewPresetLabel(view, props.tSidebar)}</span>
-                  {view.statusFilter === 'working' ? <span className="dshx:shrink-0">({workingThreadCountsBySource[view.sourceFilter]})</span> : null}
+                  {view.statusFilters.length === 1 && view.statusFilters[0] === 'working' ? (
+                    <span className="dshx:shrink-0">({workingThreadCountsBySource[view.sourceFilter]})</span>
+                  ) : null}
                 </Button>
               ))}
           </div>
@@ -2023,13 +2026,16 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="dshx-root dshx:min-w-52">
                     <DropdownMenuLabel>{props.tSidebar('threadSidebarFilterStatus')}</DropdownMenuLabel>
-                    <DropdownMenuRadioGroup value={threadView.statusFilter} onValueChange={selectThreadStatusFilter}>
-                      {THREAD_STATUS_FILTER_OPTIONS.map(filter => (
-                        <DropdownMenuRadioItem key={filter} value={filter}>
-                          {props.tSidebar(threadStatusFilterLabelKeys[filter])}
-                        </DropdownMenuRadioItem>
-                      ))}
-                    </DropdownMenuRadioGroup>
+                    {THREAD_STATUS_FILTER_OPTIONS.map(filter => (
+                      <DropdownMenuCheckboxItem
+                        checked={filter === 'all' ? threadView.statusFilters.length === 0 : threadView.statusFilters.includes(filter)}
+                        key={filter}
+                        onCheckedChange={checked => selectThreadStatusFilter(filter, checked)}
+                        onSelect={event => event.preventDefault()}
+                      >
+                        {props.tSidebar(threadStatusFilterLabelKeys[filter])}
+                      </DropdownMenuCheckboxItem>
+                    ))}
                     <DropdownMenuSeparator />
                     <DropdownMenuLabel>{props.tSidebar('threadSidebarFilterSource')}</DropdownMenuLabel>
                     <DropdownMenuRadioGroup value={threadView.sourceFilter} onValueChange={selectThreadSourceFilter}>
@@ -2348,7 +2354,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
             : groupedThreadEntries.every(group => group.threads.length === 0)) ? (
             <Empty className="dshx:gap-2 dshx:p-6 dshx:md:p-6">
               <EmptyTitle className="dshx:text-sm dshx:font-normal dshx:text-muted-foreground">
-                {props.tSidebar(emptyThreadsMessage[threadView.statusFilter])}
+                {props.tSidebar(emptyThreadsMessage[threadView.statusFilters.length === 1 ? (threadView.statusFilters[0] ?? 'all') : 'all'])}
               </EmptyTitle>
             </Empty>
           ) : null}

@@ -1,6 +1,12 @@
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import { z } from 'zod'
-import { THREAD_GROUP_BY_OPTIONS, THREAD_SOURCE_FILTER_OPTIONS, THREAD_STATUS_FILTER_OPTIONS, type ThreadViewPreferences } from './thread-view.js'
+import {
+  THREAD_GROUP_BY_OPTIONS,
+  THREAD_SOURCE_FILTER_OPTIONS,
+  THREAD_STATUS_FILTER_OPTIONS,
+  type ThreadStatusFilter,
+  type ThreadViewPreferences,
+} from './thread-view.js'
 
 export const ALL_THREADS_VIEW_ID = 'all-threads'
 export const WORKING_VIEW_ID = 'working'
@@ -25,7 +31,7 @@ export const DEFAULT_THREAD_VIEW_PRESETS = [
     id: ALL_THREADS_VIEW_ID,
     name: null,
     groupBy: 'status',
-    statusFilter: 'all',
+    statusFilters: [],
     sourceFilter: 'all',
     enabled: true,
   },
@@ -33,7 +39,7 @@ export const DEFAULT_THREAD_VIEW_PRESETS = [
     id: WORKING_VIEW_ID,
     name: null,
     groupBy: 'status',
-    statusFilter: 'working',
+    statusFilters: ['working'],
     sourceFilter: 'all',
     enabled: true,
   },
@@ -48,13 +54,34 @@ export const DEFAULT_THREAD_VIEW_SETTINGS: ThreadViewSettings = {
 
 const groupBySchema = z.enum(THREAD_GROUP_BY_OPTIONS)
 const statusFilterSchema = z.enum(THREAD_STATUS_FILTER_OPTIONS)
+const selectedStatusFilterSchema = z.enum(THREAD_STATUS_FILTER_OPTIONS.filter(value => value !== 'all'))
+const statusFiltersSchema = z.array(selectedStatusFilterSchema)
 const sourceFilterSchema = z.enum(THREAD_SOURCE_FILTER_OPTIONS)
 
-const singleThreadViewPreferencesSchema = z
+const legacyThreadViewPreferencesSchema = z
   .object({
     groupBy: groupBySchema.default('status'),
     statusFilter: statusFilterSchema.default('all'),
     sourceFilter: sourceFilterSchema.default('all'),
+  })
+  .strict()
+
+const threadViewPreferencesSchema = z
+  .object({
+    groupBy: groupBySchema.default('status'),
+    statusFilters: statusFiltersSchema.default([]),
+    sourceFilter: sourceFilterSchema.default('all'),
+  })
+  .strict()
+
+const legacyThreadViewPresetSchema = z
+  .object({
+    id: z.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/u),
+    name: z.string().trim().min(1).max(32).nullable(),
+    enabled: z.boolean(),
+    groupBy: groupBySchema,
+    statusFilter: statusFilterSchema,
+    sourceFilter: sourceFilterSchema,
   })
   .strict()
 
@@ -64,7 +91,7 @@ const threadViewPresetSchema = z
     name: z.string().trim().min(1).max(32).nullable(),
     enabled: z.boolean(),
     groupBy: groupBySchema,
-    statusFilter: statusFilterSchema,
+    statusFilters: statusFiltersSchema,
     sourceFilter: sourceFilterSchema,
   })
   .strict()
@@ -107,7 +134,24 @@ const threadViewSettingsSchema = z
     return { ...settings, activeViewId: activeView?.id ?? ALL_THREADS_VIEW_ID }
   })
 
-const migrateLegacyPreferences = (legacy: ThreadViewPreferences): ThreadViewSettings => {
+const migrateStatusFilter = (statusFilter: (typeof THREAD_STATUS_FILTER_OPTIONS)[number]): readonly ThreadStatusFilter[] =>
+  statusFilter === 'all' ? [] : [statusFilter]
+
+const legacyThreadViewSettingsSchema = z
+  .object({
+    views: z.array(legacyThreadViewPresetSchema).min(1).max(MAX_THREAD_VIEWS),
+    activeViewId: z.string().min(1).max(64),
+    showGroupControl: z.boolean().default(true),
+    showFilterControl: z.boolean().default(true),
+  })
+  .strict()
+
+const migrateLegacySettings = (legacy: z.infer<typeof legacyThreadViewSettingsSchema>): ThreadViewSettings => ({
+  ...legacy,
+  views: legacy.views.map(({ statusFilter, ...view }) => ({ ...view, statusFilters: migrateStatusFilter(statusFilter) })),
+})
+
+const migrateLegacyPreferences = (legacy: z.infer<typeof legacyThreadViewPreferencesSchema>): ThreadViewSettings => {
   const isDefaultView = legacy.groupBy === 'status' && legacy.sourceFilter === 'all' && (legacy.statusFilter === 'all' || legacy.statusFilter === 'working')
   if (isDefaultView) {
     return {
@@ -120,7 +164,9 @@ const migrateLegacyPreferences = (legacy: ThreadViewPreferences): ThreadViewSett
     id: LEGACY_CURRENT_VIEW_ID,
     name: null,
     enabled: true,
-    ...legacy,
+    groupBy: legacy.groupBy,
+    statusFilters: migrateStatusFilter(legacy.statusFilter),
+    sourceFilter: legacy.sourceFilter,
   }
   return {
     ...DEFAULT_THREAD_VIEW_SETTINGS,
@@ -132,12 +178,14 @@ const migrateLegacyPreferences = (legacy: ThreadViewPreferences): ThreadViewSett
 const storedThreadViewSettingsSchema = z.preprocess(value => {
   const current = threadViewSettingsSchema.safeParse(value)
   if (current.success) return current.data
-  const legacy = singleThreadViewPreferencesSchema.safeParse(value)
-  return legacy.success ? migrateLegacyPreferences(legacy.data) : value
+  const legacySettings = legacyThreadViewSettingsSchema.safeParse(value)
+  if (legacySettings.success) return migrateLegacySettings(legacySettings.data)
+  const legacyPreferences = legacyThreadViewPreferencesSchema.safeParse(value)
+  return legacyPreferences.success ? migrateLegacyPreferences(legacyPreferences.data) : value
 }, threadViewSettingsSchema)
 
 export const decodeThreadViewPreferences = (value: unknown): ThreadViewPreferences | null => {
-  const result = singleThreadViewPreferencesSchema.safeParse(value)
+  const result = threadViewPreferencesSchema.safeParse(value)
   return result.success ? result.data : null
 }
 
@@ -201,8 +249,12 @@ export const threadViewPreferences = createStoredValue({
 export const updateThreadViewPreferences = (patch: Partial<ThreadViewPreferences>): boolean => {
   const current = threadViewPreferences.get() ?? DEFAULT_THREAD_VIEW_SETTINGS
   const active = activeThreadView(current)
-  const views = current.views.map(view => (view.id === active.id ? { ...view, ...patch } : view))
+  const views = current.views.map(view => {
+    if (view.id !== active.id) return { ...view, statusFilters: [...view.statusFilters] }
+    return { ...view, ...patch, statusFilters: [...(patch.statusFilters ?? view.statusFilters)] }
+  })
   return threadViewPreferences.set({ ...current, views })
 }
 
-export const updateThreadViewSettings = (settings: ThreadViewSettings): boolean => threadViewPreferences.set({ ...settings, views: [...settings.views] })
+export const updateThreadViewSettings = (settings: ThreadViewSettings): boolean =>
+  threadViewPreferences.set({ ...settings, views: settings.views.map(view => ({ ...view, statusFilters: [...view.statusFilters] })) })

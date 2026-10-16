@@ -19,6 +19,14 @@ const selectViewOption = async (page: Page, label: string, value: string): Promi
   await page.getByRole('option', { name: value, exact: true }).click()
 }
 
+const selectViewStatuses = async (page: Page, labels: readonly string[]): Promise<void> => {
+  const dialog = viewManager(page)
+  for (const label of labels) {
+    const checkbox = dialog.getByRole('checkbox', { name: label, exact: true })
+    if (!(await checkbox.isChecked())) await checkbox.click()
+  }
+}
+
 When('saved thread views are created, edited, reordered, disabled, and removed', async ({ page }: { page: Page }) => {
   await openSidebarSettings(page)
   await sidebarSettings(page).getByRole('button', { name: 'Manage views', exact: true }).click()
@@ -28,10 +36,11 @@ When('saved thread views are created, edited, reordered, disabled, and removed',
   await dialog.getByRole('button', { name: 'Add view', exact: true }).click()
   await dialog.getByLabel('View name').fill('Needs focus')
   await selectViewOption(page, 'Group by', 'Date')
-  await selectViewOption(page, 'Status', 'Needs attention')
+  await selectViewStatuses(page, ['Needs attention', 'Archived'])
   await selectViewOption(page, 'Source', 'Main threads')
   await dialog.getByRole('button', { name: 'Save view', exact: true }).click()
   await expect(dialog.getByRole('button', { name: 'Edit view Needs focus', exact: true })).toBeVisible()
+  await expect(dialog.getByRole('listitem').filter({ hasText: 'Needs focus' })).toContainText('Needs attention, Archived')
 
   await dialog.getByRole('button', { name: 'Move view up Needs focus', exact: true }).click()
   await dialog.getByRole('button', { name: 'Move view up Needs focus', exact: true }).click()
@@ -52,13 +61,13 @@ When('saved thread views are created, edited, reordered, disabled, and removed',
   await expect(tabs.getByRole('button').nth(1)).toHaveText('Everything')
   await tabs.getByRole('button', { name: 'Needs focus', exact: true }).click()
   await expect(sidebar.getByRole('button', { name: 'Group: Date', exact: true })).toBeVisible()
-  await expect(sidebar.getByRole('button', { name: 'Filter: Needs attention · Main threads', exact: true })).toBeVisible()
+  await expect(sidebar.getByRole('button', { name: 'Filter: Needs attention · Archived · Main threads', exact: true })).toBeVisible()
 
   await openSidebarSettings(page)
   await sidebarSettings(page).getByRole('checkbox', { name: 'Show group button', exact: true }).click()
   await sidebarSettings(page).getByRole('checkbox', { name: 'Show filter button', exact: true }).click()
   await expect(sidebar.getByRole('button', { name: 'Group: Date', exact: true })).toHaveCount(0)
-  await expect(sidebar.getByRole('button', { name: 'Filter: Needs attention · Main threads', exact: true })).toHaveCount(0)
+  await expect(sidebar.getByRole('button', { name: 'Filter: Needs attention · Archived · Main threads', exact: true })).toHaveCount(0)
 })
 
 Then('the custom tabs and hidden controls survive reload', async ({ page }: { page: Page }) => {

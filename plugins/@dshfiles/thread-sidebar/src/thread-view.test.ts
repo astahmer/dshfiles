@@ -76,21 +76,23 @@ describe('thread view filters', () => {
   })
 
   it('filters supported activity states', () => {
-    expect(matchesThreadStatusFilter({ filter: 'all', running: false, needsAttention: false, archived: false, muted: false })).toBe(true)
-    expect(matchesThreadStatusFilter({ filter: 'working', running: true, needsAttention: false, archived: false, muted: false })).toBe(true)
-    expect(matchesThreadStatusFilter({ filter: 'working', running: false, needsAttention: false, archived: false, muted: false })).toBe(false)
-    expect(matchesThreadStatusFilter({ filter: 'attention', running: false, needsAttention: true, archived: false, muted: false })).toBe(true)
-    expect(matchesThreadStatusFilter({ filter: 'archived', running: false, needsAttention: false, archived: true, muted: false })).toBe(true)
-    expect(matchesThreadStatusFilter({ filter: 'muted', running: true, needsAttention: false, archived: false, muted: true })).toBe(true)
-    expect(matchesThreadStatusFilter({ filter: 'muted', running: true, needsAttention: false, archived: false, muted: false })).toBe(false)
+    expect(matchesThreadStatusFilter({ filters: [], running: false, needsAttention: false, archived: false, muted: false })).toBe(true)
+    expect(matchesThreadStatusFilter({ filters: ['working'], running: true, needsAttention: false, archived: false, muted: false })).toBe(true)
+    expect(matchesThreadStatusFilter({ filters: ['working'], running: false, needsAttention: false, archived: false, muted: false })).toBe(false)
+    expect(matchesThreadStatusFilter({ filters: ['attention'], running: false, needsAttention: true, archived: false, muted: false })).toBe(true)
+    expect(matchesThreadStatusFilter({ filters: ['archived'], running: false, needsAttention: false, archived: true, muted: false })).toBe(true)
+    expect(matchesThreadStatusFilter({ filters: ['muted'], running: true, needsAttention: false, archived: false, muted: true })).toBe(true)
+    expect(matchesThreadStatusFilter({ filters: ['muted'], running: true, needsAttention: false, archived: false, muted: false })).toBe(false)
+    expect(matchesThreadStatusFilter({ filters: ['working', 'attention'], running: false, needsAttention: true, archived: false, muted: false })).toBe(true)
+    expect(matchesThreadStatusFilter({ filters: ['working', 'attention'], running: false, needsAttention: false, archived: false, muted: false })).toBe(false)
   })
 
   it('filters completed and attention-needed threads but excludes archived and muted threads', () => {
-    expect(matchesThreadStatusFilter({ filter: 'not-working', running: false, needsAttention: false, archived: false, muted: false })).toBe(true)
-    expect(matchesThreadStatusFilter({ filter: 'not-working', running: true, needsAttention: true, archived: false, muted: false })).toBe(true)
-    expect(matchesThreadStatusFilter({ filter: 'not-working', running: true, needsAttention: false, archived: false, muted: false })).toBe(false)
-    expect(matchesThreadStatusFilter({ filter: 'not-working', running: false, needsAttention: false, archived: true, muted: false })).toBe(false)
-    expect(matchesThreadStatusFilter({ filter: 'not-working', running: false, needsAttention: false, archived: false, muted: true })).toBe(false)
+    expect(matchesThreadStatusFilter({ filters: ['not-working'], running: false, needsAttention: false, archived: false, muted: false })).toBe(true)
+    expect(matchesThreadStatusFilter({ filters: ['not-working'], running: true, needsAttention: true, archived: false, muted: false })).toBe(true)
+    expect(matchesThreadStatusFilter({ filters: ['not-working'], running: true, needsAttention: false, archived: false, muted: false })).toBe(false)
+    expect(matchesThreadStatusFilter({ filters: ['not-working'], running: false, needsAttention: false, archived: true, muted: false })).toBe(false)
+    expect(matchesThreadStatusFilter({ filters: ['not-working'], running: false, needsAttention: false, archived: false, muted: true })).toBe(false)
   })
 
   it('filters main and subagent sources using Host lineage metadata', () => {
