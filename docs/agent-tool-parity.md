@@ -49,7 +49,7 @@ backing verb; `host-gap` counts capabilities no verb can reach yet.
 | goal-stall-guard | 4 | 3 | 1 | 0 |
 | agent-toolkit | 9 | 1 | 6 | 3 |
 | tool-meta | 3 | 0 | 2 | 1 |
-| ai-accounts | 21 | 2 | 19 | 1 |
+| ai-accounts | 21 | 18 | 7 | 1 |
 | model-effort-picker | 3 | 0 | 1 | 0 |
 | usage | 5 | 0 | 4 | 1 |
 | memory | 12 | 3 | 9 | 0 |
@@ -244,22 +244,29 @@ clear action.
 
 ### ai-accounts
 
-Nineteen capabilities have verbs but no tool: `ai_accounts_save_profile` and
-`ai_accounts_update_profile` (`save`), `ai_accounts_remove_profile` (`remove`),
-`ai_accounts_move_account` (`moveAccount`), `ai_accounts_set_distribution`
-(`setDistribution`), `ai_accounts_refresh_usage` (`refreshUsage`),
-`ai_accounts_file_path` (`filePath`), `ai_accounts_import_secret`
-(`importSecretCatalogKey`), `ai_accounts_identity` (`identity`),
-`ai_accounts_copilot_login` (`beginCopilotLogin`/`cancelCopilotLogin`/`signOutCopilot`),
-`ai_accounts_set_native_provider` (`setNativeProviderEnabled`),
-`ai_accounts_usage_history` (`history`/`collectUsage`/`saveHistorySettings`),
-`ai_accounts_refresh_pricing` (`pricingStatus`/`refreshPricing`),
-`ai_accounts_quote_routes` (`quoteRoutes`), `ai_accounts_resume_quota`
-(`quotaContinuations`/`resumeQuotaContinuation`/`snoozeQuotaContinuation`),
-`ai_accounts_quota_retry` (`setQuotaContinuationAutoRetry`),
-`ai_accounts_get_settings` / `ai_accounts_set_settings`,
-`ai_accounts_set_failure_policy`, `ai_accounts_set_history_schedule`
-(settings namespace `ai-accounts`).
+Bound now (sibling revision `feat(ai-accounts): expose account and quota control
+as agent tools`): read-only `ai_accounts_identity`, `ai_accounts_catalog`,
+`ai_accounts_history`, `ai_accounts_continuations`,
+`ai_accounts_pricing_status`, `ai_accounts_native_providers` (plus the existing
+`ai_accounts` and `ai_accounts_quota`), and the writes
+`ai_accounts_refresh_quota`, `ai_accounts_collect_usage`,
+`ai_accounts_set_distribution`, `ai_accounts_move_account`,
+`ai_accounts_resume_continuation`, `ai_accounts_snooze_continuation`,
+`ai_accounts_set_auto_retry`, `ai_accounts_set_native_provider` and
+`ai_accounts_refresh_pricing`.
+
+Still missing, because they write secrets or need a browser:
+
+| Proposed tool | Capability | Backing verb |
+| --- | --- | --- |
+| `ai_accounts_save_profile` / `ai_accounts_update_profile` | Add or edit an account profile, route slug, model curation | `save` |
+| `ai_accounts_remove_profile` | Remove an account profile | `remove` |
+| `ai_accounts_import_secret` | Store an API key for an account from the Secret Catalog | `importSecretCatalogKey` + `credentials.set` (the plaintext must stay on the Host) |
+| `ai_accounts_copilot_login` | GitHub Copilot device sign-in, cancel, sign-out | `beginCopilotLogin`/`cancelCopilotLogin`/`signOutCopilot` (sign-in needs a browser tab) |
+| `ai_accounts_file_path` | The accounts file path | `filePath` |
+| `ai_accounts_quote_routes` | Price the routes a Session used | `quoteRoutes` |
+| `ai_accounts_set_history_schedule` | Usage-history interval and retention | `saveHistorySettings` |
+| ~~`ai_accounts_get_settings` / `ai_accounts_set_settings` / `ai_accounts_set_failure_policy`~~ | Per-plugin settings | Retired: `settings_set` / `settings_unset` write the `ai-accounts` namespace |
 
 ### model-effort-picker, usage, memory, optmem
 
@@ -479,6 +486,13 @@ A third, `feat(settings-shell): expose settings read, merge and reset as agent
 tools`, binds `settings_list` (read-only), `settings_set` and `settings_unset`
 over the Host settings service, which covers every namespace — so the per-plugin
 `*_settings_update` proposals are retired rather than built.
+
+A fourth, `feat(ai-accounts): expose account and quota control as agent tools`,
+binds sixteen account and quota verbs, including every read of live quota,
+stored history, price cache, native provider rows and the quota-blocked
+continuations an Agent can resume, snooze or arm for automatic retry. Account
+profiles, credential import and the Copilot device flow stay untooled because
+they write secrets or need a browser.
 
 ## Backlog
 
