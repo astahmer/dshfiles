@@ -55,6 +55,9 @@ export const postMessageReceiptSchema = z
   })
   .strict()
 
+/** Model-facing text for a structured tool result. */
+const compactJson = <Output>(output: Output): string => JSON.stringify(output)
+
 export const agentCommunicationApi = defineApi({
   id: 'agent-communication',
   version: 1,
@@ -62,12 +65,23 @@ export const agentCommunicationApi = defineApi({
     diagnostics: method({
       input: z.object({ limit: z.number().int().min(1).max(100).optional() }).strict(),
       output: communicationDiagnosticsSchema,
+      description:
+        'Communication diagnostics: the live Agents, their workspace topic, whether a subscription is missing, and recent communication tool activity. Read-only.',
+      tool: { name: 'dshx_comm_diagnostics', readOnly: true, render: compactJson },
     }),
-    browseMessages: method({ input: browseMessagesInputSchema, output: communicationMessagePageSchema }),
+    browseMessages: method({
+      input: browseMessagesInputSchema,
+      output: communicationMessagePageSchema,
+      description:
+        'Browse one channel or direct conversation as a bounded page, newest or oldest first with a continuation cursor. Read-only; it never activates or messages an Agent.',
+      tool: { name: 'dshx_comm_browse', readOnly: true, render: compactJson },
+    }),
     postMessage: method({ input: postMessageInputSchema, output: postMessageReceiptSchema }),
     messageRecipients: method({
       input: z.object({ messageId: messageIdSchema }).strict(),
       output: communicationMessageRecipientsSchema,
+      description: 'Per-recipient read and acknowledgement status of one stored message. Read-only.',
+      tool: { name: 'dshx_comm_recipients', readOnly: true, render: compactJson },
     }),
     revealMessageBody: method({
       input: z.object({ messageId: messageIdSchema }).strict(),

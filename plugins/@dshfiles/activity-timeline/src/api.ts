@@ -55,7 +55,8 @@ export const activityTimelineApi = defineApi({
     event: method({
       input: z.object({ eventId: z.string().min(1).max(256) }).strict(),
       output: activityEventSchema,
-      description: 'Read one retained activity event by id.',
+      description: 'Read one retained activity event by id: its source, level, summary, bounded detail and references. Read-only.',
+      tool: { name: 'activity_timeline_event', readOnly: true, render: compactJson },
     }),
     related: method({
       input: z
