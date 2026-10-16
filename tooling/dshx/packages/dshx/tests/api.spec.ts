@@ -5,7 +5,8 @@ import { z } from 'zod'
 import { ApiClientLifecycle } from '../src/api/client.js'
 import { defineApi, method } from '../src/api/define.js'
 import * as publicApi from '../src/api/index.js'
-import { apiChannel, apiConnectionAvailable, createApiClient, subscribeApiConnection } from '../src/api/runtime.js'
+import { apiChannel } from '../src/api/common.js'
+import { ApiRuntimeModel } from '../src/api/runtime.js'
 import { registerApi } from '../src/api/host-runtime.js'
 
 function schema<Input, Output>(validate: (value: unknown) => StandardSchemaV1.Result<Output>): StandardSchemaV1<Input, Output> {
@@ -136,7 +137,7 @@ describe('generic API runtime', () => {
     const fixture = connectionFixture()
     const owned = defineApi({ id: 'status', version: 1, owner: '@scope/owner', methods: { get: method<void, { value: string }>() } })
     await registerApi(fixture.context as never, '@scope/owner', owned.host({ get: async () => ({ value: 'from owner' }) }))
-    await expect(createApiClient(fixture.context, owned, '@scope/caller').get()).resolves.toEqual({ value: 'from owner' })
+    await expect(ApiRuntimeModel.createClient(fixture.context, owned, '@scope/caller').get()).resolves.toEqual({ value: 'from owner' })
     await expect(registerApi(fixture.context as never, '@scope/caller', owned.host({ get: async () => ({ value: 'impostor' }) }))).rejects.toThrow(
       'owned by @scope/owner',
     )
@@ -154,7 +155,7 @@ describe('generic API runtime', () => {
         value: { version: 1, output: { value: endpoint.split('/').at(-1) } },
       }),
     )
-    const client = createApiClient(
+    const client = ApiRuntimeModel.createClient(
       {
         get(name: string) {
           return name === 'connection' ? { rpc: { call } } : undefined
@@ -207,7 +208,7 @@ describe('generic API runtime', () => {
       ok: true,
       value: { version: 1, output: { value: 'ready' } },
     }))
-    const client = createApiClient(
+    const client = ApiRuntimeModel.createClient(
       {
         get(name: string) {
           return name === 'connection' ? { rpc: { call } } : undefined
@@ -246,7 +247,7 @@ describe('generic API runtime', () => {
         },
       }),
     )
-    const client = createApiClient(context as never, contract, '@scope/plugin')
+    const client = ApiRuntimeModel.createClient(context as never, contract, '@scope/plugin')
     await expect(client.prepare({ secret: 'input-value' })).rejects.toMatchObject({
       kind: 'remote',
       remoteCode: 'internal',
@@ -276,7 +277,7 @@ describe('generic API runtime', () => {
         },
       }),
     )
-    const client = createApiClient(fixture.context as never, clientContract, '@scope/plugin')
+    const client = ApiRuntimeModel.createClient(fixture.context as never, clientContract, '@scope/plugin')
     await expect(client.get()).rejects.toMatchObject({ kind: 'contract', remoteCode: 'DSHX6401', retryable: false })
   })
 
@@ -342,7 +343,7 @@ describe('generic API runtime', () => {
       },
     })
     await registerApi(fixture.context as never, '@scope/plugin', contract.host({ get: () => ({ value: 'ready' }) }))
-    const client = createApiClient(fixture.context as never, contract, '@scope/plugin')
+    const client = ApiRuntimeModel.createClient(fixture.context as never, contract, '@scope/plugin')
     await expect(client.get({})).rejects.toMatchObject({ kind: 'contract', retryable: false })
     expect(validateInput).toHaveBeenCalledOnce()
   })
@@ -350,7 +351,7 @@ describe('generic API runtime', () => {
   it('exposes the official Host description lifecycle to query adapters', () => {
     let connected = false
     const listeners = new Set<() => void>()
-    const client = createApiClient(
+    const client = ApiRuntimeModel.createClient(
       {
         get(name: string) {
           return name === 'connection'
@@ -371,12 +372,12 @@ describe('generic API runtime', () => {
       '@scope/plugin',
     )
     const listener = vi.fn()
-    const dispose = subscribeApiConnection(client, listener)
-    expect(apiConnectionAvailable(client)).toBe(false)
+    const dispose = ApiRuntimeModel.subscribeConnection(client, listener)
+    expect(ApiRuntimeModel.connectionAvailable(client)).toBe(false)
     connected = true
     for (const callback of listeners) callback()
     expect(listener).toHaveBeenCalledOnce()
-    expect(apiConnectionAvailable(client)).toBe(true)
+    expect(ApiRuntimeModel.connectionAvailable(client)).toBe(true)
     dispose()
     expect(listeners).toHaveLength(0)
   })
@@ -454,7 +455,7 @@ describe('generic API runtime', () => {
         return { count: hostInput.parsed }
       },
     })
-    const client = createApiClient(undefined, contract)
+    const client = ApiRuntimeModel.createClient(undefined, contract)
     expectTypeOf(client.convert).parameter(0).toEqualTypeOf<{ raw: string }>()
     expectTypeOf(client.convert).returns.resolves.toEqualTypeOf<{ text: string }>()
     expect(() => contract.host({ convert: () => ({ count: 1 }), extra: () => 1 } as never)).toThrow('unexpected')

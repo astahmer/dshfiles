@@ -1,5 +1,5 @@
 export { defineApi, DSHX_REGISTRY_OWNER, dshxRegistryApi, method } from './define.js'
-export { isApiError, isApiOwnerMissing, PluginApiError } from './runtime.js'
+export { isApiError, isApiOwnerMissing, PluginApiError } from './common.js'
 export type {
   AnyApiMethodDefinition,
   ApiCaller,

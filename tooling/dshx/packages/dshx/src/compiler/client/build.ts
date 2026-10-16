@@ -39,6 +39,7 @@ const CLIENT_LOCALE_PATH = fileURLToPath(new URL('../../client/locale.js', impor
 const CLIENT_API_PATH = fileURLToPath(new URL('../../api/client.js', import.meta.url))
 const API_DEFINE_PATH = fileURLToPath(new URL('../../api/define.js', import.meta.url))
 const API_RUNTIME_PATH = fileURLToPath(new URL('../../api/runtime.js', import.meta.url))
+const API_COMMON_PATH = fileURLToPath(new URL('../../api/common.js', import.meta.url))
 const SETTINGS_DEFINE_PATH = fileURLToPath(new URL('../../settings/define.js', import.meta.url))
 const SETTINGS_CLIENT_PATH = fileURLToPath(new URL('../../settings/client.js', import.meta.url))
 const SETTINGS_PAGE_RENDERER_PATH = fileURLToPath(new URL('../../settings/page-renderer.js', import.meta.url))
@@ -142,7 +143,8 @@ function clientEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, op
           `export { defineClientPlugin } from ${JSON.stringify(CLIENT_SDK_PATH)}`,
           `export { declareLocaleNamespace, defineLocale } from ${JSON.stringify(CLIENT_LOCALE_PATH)}`,
           `export { useApi, useApiQuery } from ${JSON.stringify(VIRTUAL_CLIENT_API_HOOKS)}`,
-          `export { createApiClient } from ${JSON.stringify(API_RUNTIME_PATH)}`,
+          `import { ApiRuntimeModel } from ${JSON.stringify(API_RUNTIME_PATH)}`,
+          'export const createApiClient = ApiRuntimeModel.createClient',
           `export { useSettings } from ${JSON.stringify(VIRTUAL_CLIENT_SETTINGS_HOOK)}`,
           `export { provideSettingsPageRenderer } from ${JSON.stringify(SETTINGS_PAGE_RENDERER_PATH)}`,
           '',
@@ -165,7 +167,7 @@ function clientEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, op
       if (id === `${VIRTUAL_CLIENT_PUBLIC}-api`) {
         return [
           `export { defineApi, DSHX_REGISTRY_OWNER, dshxRegistryApi, method } from ${JSON.stringify(API_DEFINE_PATH)}`,
-          `export { isApiError, isApiOwnerMissing, PluginApiError } from ${JSON.stringify(API_RUNTIME_PATH)}`,
+          `export { isApiError, isApiOwnerMissing, PluginApiError } from ${JSON.stringify(API_COMMON_PATH)}`,
           '',
         ].join('\n')
       }

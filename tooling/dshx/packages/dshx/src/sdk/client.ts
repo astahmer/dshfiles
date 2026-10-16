@@ -10,7 +10,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-chat/client'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import type { ModelDirectoryResolver } from '@deepseek-ai/dsh-client-ui-model-selection/client'
 import type { AnyApiMethodDefinition, ApiClient, ApiContract } from '../api/types.js'
-import { createApiClient } from '../api/runtime.js'
+import { ApiRuntimeModel } from '../api/runtime.js'
 import type { ClientContext, ClientDefinition } from '../client/types.js'
 import { assertPluginId, createBaseApi, type BasePluginApi } from './lifecycle.js'
 
@@ -159,7 +159,7 @@ export function createClientPluginApi<Uses extends readonly ClientCapability[]>(
         break
       case 'rpc':
         capabilities.rpc = {
-          use: contract => createApiClient(ctx, contract, packageId),
+          use: contract => ApiRuntimeModel.createClient(ctx, contract, packageId),
         }
         break
       default:

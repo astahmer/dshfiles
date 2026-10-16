@@ -31,7 +31,7 @@ const HOST_PROCESS_PATH = fileURLToPath(new URL('../../host/process.js', import.
 const HOST_SDK_PATH = fileURLToPath(new URL('../../sdk/host.js', import.meta.url))
 const API_DEFINE_PATH = fileURLToPath(new URL('../../api/define.js', import.meta.url))
 const API_HOST_CLIENT_PATH = fileURLToPath(new URL('../../api/host-client.js', import.meta.url))
-const API_RUNTIME_PATH = fileURLToPath(new URL('../../api/runtime.js', import.meta.url))
+const API_COMMON_PATH = fileURLToPath(new URL('../../api/common.js', import.meta.url))
 const SETTINGS_DEFINE_PATH = fileURLToPath(new URL('../../settings/define.js', import.meta.url))
 const COMMUNICATION_RUNTIME_PATH = fileURLToPath(new URL('../../communication/index.js', import.meta.url))
 const COMMUNICATION_TYPES_PATH = fileURLToPath(new URL('../../communication/types.js', import.meta.url))
@@ -112,7 +112,7 @@ function hostEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, opti
       if (id === `${VIRTUAL_HOST_PUBLIC}-api`) {
         return [
           `export { defineApi, DSHX_REGISTRY_OWNER, dshxRegistryApi, method } from ${JSON.stringify(API_DEFINE_PATH)}`,
-          `export { isApiError, isApiOwnerMissing, PluginApiError } from ${JSON.stringify(API_RUNTIME_PATH)}`,
+          `export { isApiError, isApiOwnerMissing, PluginApiError } from ${JSON.stringify(API_COMMON_PATH)}`,
           '',
         ].join('\n')
       }

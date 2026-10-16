@@ -3,8 +3,6 @@ import type { ClientConnectionRpc } from '@deepseek-ai/dsh-client-connection/cli
 import type { AnyApiMethodDefinition, ApiCallOptions, ApiClient, ApiContract, ApiError } from './types.js'
 import { aborted, apiChannel, ContractViolation, error, isApiError, jsonBytes, ownerMissing, throwIfAborted } from './common.js'
 
-export { apiChannel, isApiError, isApiOwnerMissing, PluginApiError } from './common.js'
-
 type RpcResult =
   | { readonly ok: true; readonly value: unknown }
   | {
@@ -16,7 +14,7 @@ interface ClientConnectionLike {
   readonly rpc?: Pick<ClientConnectionRpc, 'call'>
 }
 
-interface ContextLike {
+export interface ContextLike {
   get(name: string): unknown
 }
 
@@ -31,7 +29,7 @@ interface ConnectionLifecycleLike {
 
 const clientConnections = new WeakMap<object, ConnectionLifecycleLike | undefined>()
 
-export function errorFromRemote(result: Extract<RpcResult, { readonly ok: false }>, apiId: string, method: string): ApiError {
+function errorFromRemote(result: Extract<RpcResult, { readonly ok: false }>, apiId: string, method: string): ApiError {
   const code = result.error?.code
   const message = result.error?.message ?? `API method ${method} failed.`
   if (code === 'DSHX6401' || code === 'contract' || code === 'bad-request') {
@@ -41,7 +39,7 @@ export function errorFromRemote(result: Extract<RpcResult, { readonly ok: false 
   return error('remote', message, apiId, method, false, undefined, code)
 }
 
-export function createApiClient<const Methods extends Record<string, AnyApiMethodDefinition>>(
+function createApiClient<const Methods extends Record<string, AnyApiMethodDefinition>>(
   context: ContextLike | Context | undefined,
   contract: ApiContract<Methods>,
   packageId = 'plugin',
@@ -94,16 +92,20 @@ export function createApiClient<const Methods extends Record<string, AnyApiMetho
 }
 
 /** Internal lifecycle seam used by the React query adapter. */
-export function subscribeApiConnection<const Methods extends Record<string, AnyApiMethodDefinition>>(
-  client: ApiClient<Methods>,
-  listener: () => void,
-): () => void {
+function subscribeApiConnection<const Methods extends Record<string, AnyApiMethodDefinition>>(client: ApiClient<Methods>, listener: () => void): () => void {
   const source = clientConnections.get(client)?.hostDescription
   return typeof source?.subscribe === 'function' ? source.subscribe(listener) : () => undefined
 }
 
 /** Internal snapshot helper; unavailable while the Host generation is down. */
-export function apiConnectionAvailable<const Methods extends Record<string, AnyApiMethodDefinition>>(client: ApiClient<Methods>): boolean {
+function apiConnectionAvailable<const Methods extends Record<string, AnyApiMethodDefinition>>(client: ApiClient<Methods>): boolean {
   const source = clientConnections.get(client)?.hostDescription
   return typeof source?.getSnapshot !== 'function' || source.getSnapshot() !== undefined
+}
+
+export class ApiRuntimeModel {
+  static readonly errorFromRemote = errorFromRemote
+  static readonly createClient = createApiClient
+  static readonly subscribeConnection = subscribeApiConnection
+  static readonly connectionAvailable = apiConnectionAvailable
 }

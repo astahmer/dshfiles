@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { z } from 'zod'
-import { apiChannel } from '../api/runtime.js'
+import { apiChannel } from '../api/common.js'
 import type { JsonValue } from './client.js'
 import { DshPlatformError, loopbackLaunchUrl, resolveLaunchUrl } from './client.js'
 

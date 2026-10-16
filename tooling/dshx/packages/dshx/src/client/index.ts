@@ -1,4 +1,5 @@
 import { provideSettingsPageRenderer, type SettingsPageRenderer, type SettingsPageRendererProps } from '../settings/page-renderer.js'
+import { ApiRuntimeModel } from '../api/runtime.js'
 
 export { defineClient, defineSlot } from './define.js'
 export { declareLocaleNamespace, defineLocale } from './locale.js'
@@ -16,7 +17,7 @@ export type {
   SlotOptions,
 } from './types.js'
 export { useApi, useApiQuery } from '../api/client.js'
-export { createApiClient } from '../api/runtime.js'
+export const createApiClient = ApiRuntimeModel.createClient
 export { useSettings } from '../settings/client.js'
 export type { SettingsMutationState, SettingsReadError, SettingsState } from '../settings/types.js'
 export type { HandleOf } from '@deepseek-ai/dsh-client-ui-slots'
