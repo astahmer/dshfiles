@@ -102,6 +102,22 @@ export const jjIntegrationApi = defineApi({
     destination: method({
       input: z.object({ workspaceId: z.string().min(1), sessionId: z.string().min(1).optional() }).strict(),
       output: destinationSchema,
+      description:
+        'The jj destination of one project or thread workspace: whether it is in a jj repository, whether it is an isolated thread workspace, its owning project, the target bookmark and every available bookmark. Read-only.',
+      tool: {
+        name: 'jj_thread_destination',
+        readOnly: true,
+        render: output =>
+          [
+            output.vcs === 'jj' ? 'Jujutsu repository' : 'No jj repository',
+            output.isolated ? 'isolated thread workspace' : undefined,
+            `bookmark ${output.bookmark ?? 'none'}`,
+            output.bookmarks.length === 0 ? undefined : `available: ${output.bookmarks.join(', ')}`,
+            output.ownedByAnotherSession === true ? 'owned by another thread' : undefined,
+          ]
+            .filter(part => part !== undefined)
+            .join(' · '),
+      },
     }),
     classifyWorkspaces: method({
       input: z.object({ workspaceIds: z.array(z.string().min(1).max(256)).max(256) }).strict(),
@@ -111,9 +127,43 @@ export const jjIntegrationApi = defineApi({
     projects: method({
       input: z.object({}).strict(),
       output: z.object({ projects: z.array(z.object({ workspaceId: z.string(), title: z.string(), path: z.string() }).strict()) }).strict(),
+      description:
+        'List registered projects (DSH Workspaces) that are real checkouts rather than thread workspaces, with their workspace id, title and path. Read-only.',
+      tool: {
+        name: 'jj_thread_projects',
+        readOnly: true,
+        render: output => output.projects.map(project => `${project.workspaceId} · ${project.title} · ${project.path}`).join('\n') || 'No registered projects.',
+      },
     }),
     noFolder: method({ input: z.object({}).strict(), output: z.object({ workspaceId: z.string() }).strict() }),
-    repositories: method({ input: z.object({}).strict(), output: z.object({ repositories: z.array(repositorySchema) }).strict() }),
+    repositories: method({
+      input: z.object({}).strict(),
+      output: z.object({ repositories: z.array(repositorySchema) }).strict(),
+      description:
+        'List jj repositories and their thread workspaces: each thread workspace’s name, path, owning Sessions, finished state, unlanded revisions, and whether it can be rebased. Read-only.',
+      tool: {
+        name: 'jj_thread_repositories',
+        readOnly: true,
+        render: output =>
+          output.repositories
+            .map(repository =>
+              [
+                `${repository.title} (${repository.repoRoot})${repository.workspaceId === null ? '' : ` · project ${repository.workspaceId}`}`,
+                ...repository.threads.map(thread => {
+                  const flags = [
+                    thread.finished ? 'finished' : undefined,
+                    thread.missing ? 'missing' : undefined,
+                    thread.behind ? 'behind' : undefined,
+                    thread.canRebase === true ? 'can rebase' : undefined,
+                    thread.unlanded.length === 0 ? undefined : `${String(thread.unlanded.length)} unlanded`,
+                  ].filter(flag => flag !== undefined)
+                  return `  ${thread.name} · ${thread.path}${thread.sessionIds.length === 0 ? '' : ` · ${thread.sessionIds.join(', ')}`}${flags.length === 0 ? '' : ` · ${flags.join(' · ')}`}`
+                }),
+              ].join('\n'),
+            )
+            .join('\n') || 'No jj repositories with thread workspaces.',
+      },
+    }),
     threadAt: method({
       input: z.object({ path: z.string().min(1) }).strict(),
       output: z.object({ thread: threadSchema.nullable() }).strict(),
@@ -166,11 +216,40 @@ export const jjIntegrationApi = defineApi({
     workspaceSync: method({
       input: z.object({}).strict(),
       output: z.object({ sync: workspaceSyncSchema.nullable() }).strict(),
-      description: 'State of the last sync of the DSH checkout onto main after rebasing: status, rebuilt plugins, and whether a restart is needed.',
+      description:
+        'State of the last sync of the DSH checkout onto main after a rebase: running, done or failed, which plugins were rebuilt, conflicts, and whether DSH needs a restart. Read-only.',
+      tool: {
+        name: 'jj_thread_workspace_sync',
+        readOnly: true,
+        render: output =>
+          output.sync === null
+            ? 'No checkout sync has run yet.'
+            : [
+                `checkout sync ${output.sync.state}`,
+                output.sync.status === null ? undefined : output.sync.status,
+                output.sync.pluginsRebuilt.length === 0 ? undefined : `rebuilt ${output.sync.pluginsRebuilt.join(', ')}`,
+                output.sync.conflicts.length === 0 ? undefined : `conflicts ${output.sync.conflicts.join(', ')}`,
+                output.sync.restartNeeded ? 'DSH restart needed' : 'no restart needed',
+                output.sync.message ?? undefined,
+              ]
+                .filter(part => part !== undefined)
+                .join(' · '),
+      },
     }),
     discard: method({
       input: z.object({ path: z.string().min(1), force: z.boolean() }).strict(),
       output: z.object({ status: z.enum(['discarded', 'has-work']), revisions: z.array(revisionSchema) }).strict(),
+      description:
+        'Remove one thread workspace: forget its jj workspace and its DSH project registration. Unlanded revisions are kept unless force is true, which abandons them. Call only when the user asked to remove that thread workspace.',
+      tool: {
+        name: 'jj_thread_discard',
+        render: output =>
+          output.status === 'discarded'
+            ? 'Removed that thread workspace and its project registration.'
+            : `Refused: ${String(output.revisions.length)} unlanded revision(s) remain (${output.revisions
+                .map(revision => revision.description || revision.changeId)
+                .join('; ')}). Ask the user before passing force: true.`,
+      },
     }),
   },
 })
