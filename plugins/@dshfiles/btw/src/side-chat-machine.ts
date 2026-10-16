@@ -35,7 +35,7 @@ export const SIDE_CHAT_TITLE_PREFIX = 'btw · '
 
 const TITLE_LENGTH = 80
 
-export const sideChatTitle = (question: string): string => {
+const sideChatTitle = (question: string): string => {
   const oneLine = question.replace(/\s+/gu, ' ').trim()
   return `${SIDE_CHAT_TITLE_PREFIX}${oneLine.length > TITLE_LENGTH ? `${oneLine.slice(0, TITLE_LENGTH - 1)}…` : oneLine}`
 }
@@ -119,8 +119,13 @@ export const startSideChat = (input: SideChatInput): SideChatActor => createActo
 export type SideChatStart = { readonly ok: true } | { readonly ok: false; readonly reason: string }
 
 /** Waits for the fork only: a refusal is reported to whoever asked, while the answer itself streams into the tab. */
-export const sideChatStarted = async (actor: SideChatActor): Promise<SideChatStart> => {
+const sideChatStarted = async (actor: SideChatActor): Promise<SideChatStart> => {
   const settled = await waitFor(actor, snapshot => !snapshot.matches('forking') && !snapshot.matches('configuring'))
   if (settled.matches('asking') || settled.matches('open')) return { ok: true }
   return { ok: false, reason: settled.context.error ?? 'unknown' }
+}
+
+export class SideChatModel {
+  static readonly title = sideChatTitle
+  static readonly started = sideChatStarted
 }

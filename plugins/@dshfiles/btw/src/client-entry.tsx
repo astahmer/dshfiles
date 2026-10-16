@@ -21,7 +21,7 @@ import { z } from 'zod'
 import { BTW_LOCALE_NAMESPACE, btwLocale, type BtwKey } from './locales.js'
 import { mainViewThreadId } from './main-view-thread.js'
 import { PrefixCache } from './prefix-cache.js'
-import { sideChatStarted, startSideChat, type ModelRoute, type SideChatActor } from './side-chat-machine.js'
+import { SideChatModel, startSideChat, type ModelRoute, type SideChatActor } from './side-chat-machine.js'
 import { SideQuestionDialog } from './side-question-dialog.js'
 
 const TAB_ID = '@dshfiles/btw'
@@ -178,7 +178,7 @@ export default defineClient({
       submit: async args => {
         const question = args.trim()
         if (question === '') return { kind: 'error', text: t('empty') }
-        const started = await sideChatStarted(startBtw(sessionId, question))
+        const started = await SideChatModel.started(startBtw(sessionId, question))
         return started.ok ? { kind: 'success' } : { kind: 'error', text: t('failed', { reason: started.reason }) }
       },
     })
@@ -218,7 +218,7 @@ export default defineClient({
                     t={t}
                     onClose={() => askTarget.set(null)}
                     ask={async question => {
-                      const started = await sideChatStarted(startBtw(target, question))
+                      const started = await SideChatModel.started(startBtw(target, question))
                       if (!started.ok) throw new Error(t('failed', { reason: started.reason }))
                     }}
                   />
