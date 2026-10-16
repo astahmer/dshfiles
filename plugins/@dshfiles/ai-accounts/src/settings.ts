@@ -133,10 +133,10 @@ const readLiveSettings = (): object => {
 }
 
 /** Live pricing preferences; defaults when the namespace is not registered on this Host. */
-export const readPricingSettings = (): PricingSettings => pricingSettingsSchema.parse(readLiveSettings())
+const readPricingSettings = (): PricingSettings => pricingSettingsSchema.parse(readLiveSettings())
 
 /** Live Luna Reserve routing; on when the namespace is not registered on this Host. */
-export const readLunaReserveRouting = (): boolean =>
+const readLunaReserveRouting = (): boolean =>
   z
     .object({ codexLunaReserve: z.boolean().catch(true) })
     .catch({ codexLunaReserve: true })
@@ -149,7 +149,7 @@ const recoverySettingsSchema = z.object({
 })
 
 /** Live failure policy plus the account order and hidden list a fail-over respects; defaults when unregistered. */
-export const readRecoverySettings = (): {
+const readRecoverySettings = (): {
   readonly policy: RecoveryPolicy
   readonly usageOrder: readonly string[]
   readonly hiddenUsageAccounts: readonly string[]
@@ -164,10 +164,17 @@ const quotaRetrySettingsSchema = z.object({
 })
 
 /** Quota retry defaults; old or unregistered Hosts remain opted out and show the turn-level option. */
-export const readQuotaRetrySettings = (): {
+const readQuotaRetrySettings = (): {
   readonly autoRetryDefault: boolean
   readonly showChoice: boolean
 } => {
   const parsed = quotaRetrySettingsSchema.parse(readLiveSettings())
   return { autoRetryDefault: parsed.autoRetryQuotaDefault, showChoice: parsed.showQuotaRetryChoice }
+}
+
+export class AccountSettingsModel {
+  static readonly readPricingSettings = readPricingSettings
+  static readonly readLunaReserveRouting = readLunaReserveRouting
+  static readonly readRecoverySettings = readRecoverySettings
+  static readonly readQuotaRetrySettings = readQuotaRetrySettings
 }
