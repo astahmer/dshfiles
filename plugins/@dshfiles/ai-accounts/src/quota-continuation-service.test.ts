@@ -12,7 +12,7 @@ import type { SessionController } from '@deepseek-ai/dsh-api-session-controller'
 import { Session, SessionId } from '@deepseek-ai/dsh-session'
 import { describe, expect, it } from 'vitest'
 import { createQuotaContinuationService, type QuotaFailureAgent } from './quota-continuation.js'
-import { promptFor } from './quota-continuation-message.js'
+import { QuotaContinuationMessage } from './quota-continuation-message.js'
 
 type SchedulePort = Pick<NonNullable<Context['schedule']>, 'create' | 'delete' | 'list'>
 type ScheduleCreateRequest = Parameters<NonNullable<Context['schedule']>['create']>[1]
@@ -217,7 +217,7 @@ describe('quota continuation service', () => {
         requestId: record.continuationId,
         sessionId,
         mode: 'queue',
-        content: [{ type: 'text', text: promptFor(record.continuationId) }],
+        content: [{ type: 'text', text: QuotaContinuationMessage.promptFor(record.continuationId) }],
       })
       expect((await service.list()).continuations[0]?.state).toBe('queued')
     } finally {

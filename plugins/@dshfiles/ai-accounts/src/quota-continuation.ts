@@ -17,7 +17,7 @@ import {
   type QuotaContinuationSummary,
   type QuotaContinuationTable,
 } from './quota-continuation-store.js'
-import { continuationIdOf, promptFor, userActivityForMessage, type UserActivityIdentity } from './quota-continuation-message.js'
+import { QuotaContinuationMessage, type UserActivityIdentity } from './quota-continuation-message.js'
 
 const MAX_CONTINUATIONS = 500
 const CONTINUATION_RETENTION_MS = 30 * 24 * 60 * 60_000
@@ -171,7 +171,7 @@ const createQuotaContinuationService = ({
     const scheduler = schedule()
     if (scheduler === undefined) return []
     const tasks = await scheduler.list({ sessionId: SessionId(record.sessionId) })
-    return tasks.filter(task => task.prompt === promptFor(record.continuationId))
+    return tasks.filter(task => task.prompt === QuotaContinuationMessage.promptFor(record.continuationId))
   }
 
   const cancelScheduled = async (record: QuotaContinuationRecord): Promise<void> => {
@@ -213,7 +213,7 @@ const createQuotaContinuationService = ({
       const afterSeconds = Math.max(1, Math.ceil((dueAt - now()) / 1_000))
       const created = await scheduler.create(SessionId(record.sessionId), {
         title: 'Quota recovery',
-        prompt: promptFor(record.continuationId),
+        prompt: QuotaContinuationMessage.promptFor(record.continuationId),
         after_seconds: afterSeconds,
       })
       const storage = await table()
@@ -256,24 +256,28 @@ const createQuotaContinuationService = ({
     (await allRecords()).filter(record => record.sessionId === sessionId && isActive(record))
 
   const isQueuedExternalWork = (agent: Pick<QuotaFailureAgent, 'inbox'>): boolean =>
-    [...agent.inbox.nextTurn, ...agent.inbox.nextStep].some(message => continuationIdOf(message) === null)
+    [...agent.inbox.nextTurn, ...agent.inbox.nextStep].some(message => QuotaContinuationMessage.continuationIdOf(message) === null)
 
   const reconcileAgent = async (agent: Agent): Promise<void> => {
     const sessionId = agent.id
     await serialize(sessionId, async () => {
       const records = await activeForSession(sessionId)
       const events = agent.session.ownEvents()
-      const activities = collectUserActivities(events, event => (event.type === 'user/message' ? userActivityForMessage(event.data) : undefined))
+      const activities = collectUserActivities(events, event =>
+        event.type === 'user/message' ? QuotaContinuationMessage.userActivityForMessage(event.data) : undefined,
+      )
       for (const record of records) {
         if (hasNewerUserWork(record, activities) || isQueuedExternalWork(agent)) {
           await invalidate(record)
           for (const message of [...agent.inbox.nextTurn, ...agent.inbox.nextStep]) {
-            if (continuationIdOf(message) === record.continuationId) agent.inbox.remove(message.id)
+            if (QuotaContinuationMessage.continuationIdOf(message) === record.continuationId) agent.inbox.remove(message.id)
           }
           continue
         }
 
-        const pending = [...agent.inbox.nextTurn, ...agent.inbox.nextStep].filter(message => continuationIdOf(message) === record.continuationId)
+        const pending = [...agent.inbox.nextTurn, ...agent.inbox.nextStep].filter(
+          message => QuotaContinuationMessage.continuationIdOf(message) === record.continuationId,
+        )
         for (const message of pending) {
           if (record.queueSource === 'manual' && String(message.source.kind) === 'schedule') agent.inbox.remove(message.id)
         }
@@ -288,7 +292,7 @@ const createQuotaContinuationService = ({
                   ...current,
                   state: 'queued',
                   scheduleId: null,
-                  queueSource: queuedMessage === undefined ? null : userActivityForMessage(queuedMessage).queueSource,
+                  queueSource: queuedMessage === undefined ? null : QuotaContinuationMessage.userActivityForMessage(queuedMessage).queueSource,
                 }
               : current,
           )
@@ -318,7 +322,7 @@ const createQuotaContinuationService = ({
   const handleInserted = (agent: Agent, message: AgentUserMessage): void => {
     void serialize(agent.id, async () => {
       const records = await activeForSession(agent.id)
-      const continuationId = continuationIdOf(message)
+      const continuationId = QuotaContinuationMessage.continuationIdOf(message)
       if (continuationId !== null) {
         const record = records.find(item => item.continuationId === continuationId)
         const isScheduledMessage = String(message.source.kind) === 'schedule'
@@ -327,7 +331,7 @@ const createQuotaContinuationService = ({
           return
         }
         const activities = collectUserActivities(agent.session.ownEvents(), event =>
-          event.type === 'user/message' ? userActivityForMessage(event.data) : undefined,
+          event.type === 'user/message' ? QuotaContinuationMessage.userActivityForMessage(event.data) : undefined,
         )
         if (hasNewerUserWork(record, activities)) {
           await invalidate(record)
@@ -360,7 +364,7 @@ const createQuotaContinuationService = ({
       for (const record of records) {
         await invalidate(record)
         for (const pending of [...agent.inbox.nextTurn, ...agent.inbox.nextStep]) {
-          if (continuationIdOf(pending) === record.continuationId) agent.inbox.remove(pending.id)
+          if (QuotaContinuationMessage.continuationIdOf(pending) === record.continuationId) agent.inbox.remove(pending.id)
         }
       }
     }).catch(() => context.logger.warn('ai-accounts: quota recovery could not reconcile new Session work'))
@@ -371,15 +375,15 @@ const createQuotaContinuationService = ({
     if (decision.kind !== 'enter') return decision
     const originalIds = new Map<AgentUserMessage['id'], string>()
     for (const message of messages) {
-      const continuationId = continuationIdOf(message)
+      const continuationId = QuotaContinuationMessage.continuationIdOf(message)
       if (continuationId !== null) originalIds.set(message.id, continuationId)
     }
     if (originalIds.size === 0) return decision
 
     const kept: AgentUserMessage[] = []
-    const competingWork = isQueuedExternalWork(agent) || decision.messages.some(message => continuationIdOf(message) === null)
+    const competingWork = isQueuedExternalWork(agent) || decision.messages.some(message => QuotaContinuationMessage.continuationIdOf(message) === null)
     for (const message of decision.messages) {
-      const continuationId = originalIds.get(message.id) ?? continuationIdOf(message)
+      const continuationId = originalIds.get(message.id) ?? QuotaContinuationMessage.continuationIdOf(message)
       if (continuationId === null) {
         kept.push(message)
         continue
@@ -392,7 +396,7 @@ const createQuotaContinuationService = ({
         if (record === undefined || record.sessionId !== agent.id || !isActive(record)) continue
 
         const activities = collectUserActivities(agent.session.ownEvents(), event =>
-          event.type === 'user/message' ? userActivityForMessage(event.data) : undefined,
+          event.type === 'user/message' ? QuotaContinuationMessage.userActivityForMessage(event.data) : undefined,
         )
         const newerWork = competingWork || hasNewerUserWork(record, activities)
         const notReady = isScheduleMessage && !isReady(record, now())
@@ -513,7 +517,7 @@ const createQuotaContinuationService = ({
       try {
         const inspected = await controller.inspect(SessionId(current.sessionId), AbortSignal.timeout(15_000))
         const activities = collectUserActivities<SessionInspectionEvents[number]>(inspected.events, event =>
-          event.type === 'user/message' ? userActivityForMessage(event.data) : undefined,
+          event.type === 'user/message' ? QuotaContinuationMessage.userActivityForMessage(event.data) : undefined,
         )
         if (hasNewerUserWork(current, activities)) {
           await invalidate(current)
@@ -529,7 +533,7 @@ const createQuotaContinuationService = ({
             requestId: requestIdFor(continuationId),
             sessionId: SessionId(current.sessionId),
             mode: 'queue',
-            content: [{ type: 'text', text: promptFor(continuationId) }],
+            content: [{ type: 'text', text: QuotaContinuationMessage.promptFor(continuationId) }],
           },
           AbortSignal.timeout(15_000),
         )
