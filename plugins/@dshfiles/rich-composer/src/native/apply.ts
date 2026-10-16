@@ -6,7 +6,7 @@ import type { ISessions, SessionBinding } from '@deepseek-ai/dsh-api-session-con
 import { IconPaperclipOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
 import { createSnapshotStore, type BoundActions } from '@deepseek-ai/dsh-client-store'
 import { resolveSlotLabel } from '@deepseek-ai/dsh-client-ui-slots'
-import type { SessionId } from '@deepseek-ai/dsh-session/types'
+import { SessionId } from '@deepseek-ai/dsh-session/types'
 // Type-only service and declaration merges used by this assembly.
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
@@ -29,6 +29,7 @@ import type { IConversation } from './service.ts'
 import { ComposerBlockRegistry } from './input/blocks.ts'
 import type { ComposerBlock } from './contract/composer-blocks.ts'
 import { InputHub } from './input/hub.ts'
+import { transferComposerDraft } from '../composer-draft-handoff.ts'
 import { ComposerSubmissionPolicy } from './input/submission-policy.ts'
 import { queueDockEntry } from './queue/QueueDock.tsx'
 import { EnterBehaviorRow } from './settings/EnterBehaviorRow.tsx'
@@ -327,26 +328,25 @@ export function apply(ctx: Context, config: Config = Config({})): void {
       hooks: {
         composerBlock: sessionId === undefined ? ABSENT_BLOCK : composerBlocks.storeFor(sessionId),
       },
-      selectWorkspace: workspaceId => workspaceNavigation.openWorkspace(workspaceId, (nextId) => {
-        if (sessionId !== undefined && nextId !== sessionId) {
-          const from = inputHub.shell(sessionId)
-          const draft = from.snapshot.draft
-          const attachmentIds = from.snapshot.attachmentIds
-          const next = inputHub.shell(nextId)
-          if (attachmentIds.length === 0 || next.addAttachments(attachmentIds)) {
-            if (sessions.binding(nextId) === undefined) {
-              throw new Error(`ui-conversation: session "${nextId}" resolved no binding`)
-            }
-            concreteConversation(ctx).rebindDraftFiles(nextId, attachmentIds)
-            if (draft !== '') {
-              next.setDraft(draft)
-              from.setDraft('')
-            }
-            if (attachmentIds.length > 0) {
-              for (const id of attachmentIds) from.removeAttachment(id)
-            }
-          }
+      selectWorkspace: workspaceId => workspaceNavigation.openWorkspace(workspaceId, nextId => {
+        if (sessionId === undefined || nextId === sessionId) return
+        const from = inputHub.shell(sessionId)
+        const destinationSessionReady = sessions.binding(nextId) !== undefined
+        if (!destinationSessionReady) {
+          from.notify('error', t('workspace.draftTransferRefused'))
+          throw new Error('Composer draft handoff refused; source draft remains unchanged.')
         }
+        const next = inputHub.shell(nextId)
+        transferComposerDraft({
+          source: from,
+          destination: next,
+          sourceSessionId: sessionId,
+          destinationSessionId: nextId,
+          destinationSessionReady,
+          rebindAttachments: (targetSessionId, attachmentIds) =>
+            concreteConversation(ctx).rebindDraftFiles(SessionId(targetSessionId), attachmentIds),
+          onRefused: () => from.notify('error', t('workspace.draftTransferRefused')),
+        })
       }),
     }),
   }, ConversationContent)
