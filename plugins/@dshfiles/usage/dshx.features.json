@@ -96,7 +96,7 @@
       "title": "Request log",
       "summary": "A Usage analytics main panel with a sortable table of model requests (model and provider, when, project, input, cache read, output, cost, duration, TTFT, status with stop reason), status chips with counts, search by model, provider, project or thread title, a purpose filter and a date range. Each row opens the thread that made the request.",
       "reach": [
-        "click button \"New Session*\"",
+        "click button \"New thread\"",
         "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Seed a usage request\"",
         "press Enter",
         "click button \"Usage analytics\"",

@@ -41,6 +41,7 @@ Every bundle directory under `plugins/@dshfiles/` is listed here; shared librari
 | [`shortcuts`](plugins/@dshfiles/shortcuts/README.md) | Claim keyboard shortcuts before browser defaults. |
 | [`sidebar-commands`](plugins/@dshfiles/sidebar-commands/README.md) | Use `/goto` to open a sidebar panel or recent session. |
 | [`thread-sidebar`](plugins/@dshfiles/thread-sidebar/README.md) | Group project threads and customize DSH navigation. |
+| [`usage`](plugins/@dshfiles/usage/README.md) | Inspect request-level model usage, costs, tokens, cache, timings and failures; in the `web` profile. |
 | [`workbench`](plugins/@dshfiles/workbench/README.md) | Persisted docking workbench for registered panels. |
 | [`workspace-folder-picker`](plugins/@dshfiles/workspace-folder-picker/README.md) | Open Add Workspace directly in a Host-backed folder browser. |
 
@@ -62,7 +63,8 @@ The checked-in web profile lives in `profiles/web/` and contains the package
 manifest ([installed composition](profiles/web/package.json)), Cordis patch, pnpm workspace policy, and portable AI-account metadata
 (`ai-accounts.json`). Nixfiles seeds writable runtime copies, reconciles managed
 plugin declarations, and copies account metadata only when the runtime account
-store is absent. The profile pins upstream [`dsh-context@0.72.0`](https://github.com/bowenliang123/dsh-context)
+store is absent. The profile includes [`usage`](plugins/@dshfiles/usage/README.md) for request-level
+model analytics and pins upstream [`dsh-context@0.72.0`](https://github.com/bowenliang123/dsh-context)
 (Apache-2.0) for Context Insights; review compatibility and external requests in
 scratch before changing the pin. Credentials, provider auth, lockfiles, sessions,
 and other runtime state stay local and are not copied.
