@@ -45,7 +45,7 @@ backing verb; `host-gap` counts capabilities no verb can reach yet.
 | agent-communication | 10 | 11 | 3 | 0 |
 | agent-questions | 12 | 11 | 0 | 1 |
 | activity-timeline | 7 | 4 | 1 | 0 |
-| multi-host | 17 | 1 | 16 | 1 |
+| multi-host | 17 | 18 | 2 | 1 |
 | goal-stall-guard | 4 | 3 | 1 | 0 |
 | agent-toolkit | 9 | 1 | 6 | 3 |
 | tool-meta | 3 | 0 | 2 | 1 |
@@ -214,19 +214,32 @@ Methods with no tool binding: `dshx_comm_browse` (`browseMessages`),
 
 ### multi-host
 
-No `tool` bindings anywhere except the read-only directory: `multi_host_status`
-(`runtimeStatus`), `multi_host_add` (`saveSshHost`/`hostUpsert`),
-`multi_host_ssh_hosts` (`sshConfigHosts`), `multi_host_find_homes`
-(`discoverHomes`), `multi_host_test` (`testConnection`), `multi_host_reconnect`
-(`runtimeReconnect`), `multi_host_remove` (`hostRemove`), `multi_host_browse`
-(`runtimeBrowse`), `multi_host_mkdir` (`runtimeCreateDirectory`),
-`multi_host_plugin_call` (`runtimePluginCall`), `multi_host_start_thread`
-(`threadStart`), `multi_host_thread_transcript` (`threadTranscript`),
-`multi_host_thread_reply` (`runtimeCall session/prompt`),
-`multi_host_thread_stop` (`runtimeCall session/cancel`),
-`multi_host_open_host_ui` (`runtimeOpenView`), `multi_host_threads`
-(`threadList`). Remote writes belong behind the same "only when the user asked"
-gate as local ones.
+Bound now (sibling revision `feat(multi-host): expose remote hosts and threads as
+agent tools`): read-only `multi_host_identity`, `multi_host_status`,
+`multi_host_ssh_hosts`, `multi_host_browse`, `multi_host_models`,
+`multi_host_thread_transcript` and `multi_host_threads` (plus the existing
+`multi_host_list`), and the writes `multi_host_save_ssh_host`,
+`multi_host_remove_host`, `multi_host_remove_runtime`, `multi_host_reconnect`,
+`multi_host_find_homes`, `multi_host_test`, `multi_host_mkdir`,
+`multi_host_open_folder`, `multi_host_start_thread` and
+`multi_host_forget_thread`. Every write names the user request it needs.
+
+Deliberately untooled, pinned by a test:
+
+| Verb | Why no tool |
+| --- | --- |
+| `runtimeCall` | Speaks native RPC on the remote Host; an Agent uses the specific verbs instead |
+| `runtimePluginCall` | Reaches arbitrary allowlisted remote plugin methods — the same escape hatch |
+| `runtimePing` | `multi_host_status` already reports connection state; ping is the chip menu's latency probe |
+| `runtimeOpenView` / `runtimeCloseView` | Client presentation: a launch URL and its lease |
+| `listDirectory` / `createDirectory` | The local runtime's own folder verbs; `multi_host_browse` / `multi_host_mkdir` cover the remote case |
+| `runtimeUpsert` / `hostUpsert` | Registration steps `multi_host_save_ssh_host` already performs |
+| `sessionCursor` | Internal polling cursor |
+
+Still missing, and needing a new API method rather than a binding: replying to and
+stopping a *remote* thread, which today ride the raw `runtimeCall`
+(`session/prompt` / `session/cancel`). A dedicated `threadReply` / `threadStop`
+method would make those safe to expose.
 
 ### agent-toolkit
 
@@ -494,14 +507,24 @@ continuations an Agent can resume, snooze or arm for automatic retry. Account
 profiles, credential import and the Copilot device flow stay untooled because
 they write secrets or need a browser.
 
+A fifth, `feat(multi-host): expose remote hosts and threads as agent tools`,
+binds seventeen host and remote-thread verbs — host records, connection state and
+reconnects, remote folder browsing and creation, remote model catalogs, starting
+a thread on another machine, reading its transcript, listing this DSH's remote
+threads and forgetting their local records. The raw native/plugin RPC escape
+hatches stay untooled, and remote thread *reply* and *stop* wait for dedicated
+methods.
+
 ## Backlog
 
-1. **P1 — bind tools to verbs that already exist.** The cheapest parity wins, in
-   this order: `jujutsu` (28), `multi-host` (16), `ai-accounts` (19), `editor`
-   (`write`, `workspaceFiles.list`), `agent-communication` (3),
-   `activity-timeline` (1), `queue-reorder` (5), `project-checks` (5), `memory`
-   (9), `tool-meta` (2). Most are a `tool:` field plus a `render` on an existing
-   dshx method. (`jj-integration` and `thread-sidebar` are done.)
+1. **P1 — bind tools to verbs that already exist.** Remaining cheap wins, in
+   this order: `jujutsu` (28), `mcp-servers` (11), `memory` (9 — needs schemas
+   for the panel methods, which are declared with TypeScript types only),
+   `project-checks` (5), `queue-reorder` (5, not installed),
+   `agent-communication` (3), `activity-timeline` (1), `editor`
+   (`write`, `workspaceFiles.list`), `tool-meta` (2). Most are a `tool:` field
+   plus a `render` on an existing dshx method. Done so far: `thread-sidebar`,
+   `jj-integration`, `settings-shell`, `ai-accounts`, `multi-host`.
 2. **P2 — install the plugins that already ship tools.** `usage`, `optmem`,
    `queue-reorder` are written but absent from the web profile, so their tools
    are dead code today; decide per plugin whether it belongs in the seed.
