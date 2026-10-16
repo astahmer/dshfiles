@@ -55,7 +55,10 @@ With a host chosen:
 3. The runtime writes `$DSH_HOME/plugins/multi-host/launch.json` (0600, in a
    0700 directory) with its tokenized loopback URL and removes it when it
    exits. A DSH started through the nixfiles `dsh-web` supervisor also records
-   `$DSH_HOME/runtime/web-url`, which is read as a fallback.
+   `$DSH_HOME/runtime/web-url`, which is read as a fallback. The current
+   supervisor still needs to enforce private permissions on pre-existing paths
+   and redact launch URLs from service logs; do not rely on that fallback for a
+   durable deployment until its owner fixes and verifies both.
 4. Add the host from the chip. Nothing is installed on the host by this
    plugin; provisioning stays with whoever manages that machine.
 
@@ -114,8 +117,24 @@ title}` for threads started here, so the sidebar and view can list them.
 ## Checks
 
 `pnpm build`, `pnpm test`, `pnpm typecheck` from this package. The live SSH
-suite runs when `MULTI_HOST_SSH_TARGET` and `MULTI_HOST_SSH_HOME` point at a
-host running DSH with this plugin. Runtime evidence is in
+suite runs only when `MULTI_HOST_SSH_TARGET` and `MULTI_HOST_SSH_HOME` point at
+a host running DSH with this plugin.
+
+The manual [SSH smoke](../../../tooling/dshx/scripts/smoke-multi-host-ssh.mjs)
+creates remote sessions/files and restarts its selected user service. It has no
+host defaults and requires `MH_DISPOSABLE_TARGET=1`,
+`MH_ALLOW_REMOTE_MUTATIONS=1`, `MH_SSH_TARGET`, private `MH_SSH_KEY`, a
+`MH_KNOWN_HOSTS` file not writable by group/other, `MH_UNIT`, `MH_WS`, and
+`MH_REMOTE_HOME`; optional `MH_SSH_PORT` is a TCP port from 1 to 65535 and
+defaults to 22. It rejects unknown host keys and reads launch metadata from
+files, never the journal. It ignores per-user SSH config, so `MH_SSH_TARGET`
+must be a literal host/IP that matches the supplied known_hosts entry. Run it
+only against a disposable Linux service.
+Tests cover fail-closed configuration, individual opt-ins, port bounds,
+known_hosts permissions, shell-safe paths, and launch-URL redaction without
+starting DSH. A separate test validates the strict SSH options against an
+ephemeral high-port loopback-only sshd, always stopping its owned process group;
+it does not contact a remote host or prove DSH lifecycle behavior. Runtime evidence is in
 [docs/validation.md](docs/validation.md); why runtimes are federated rather
 than proxied, and the rules that follow, are in [docs/design.md](docs/design.md).
 Durable supervision of a remote host is still open:

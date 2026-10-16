@@ -1,51 +1,124 @@
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
 import { once } from 'node:events'
-import { mkdtemp, mkdir, rm, access } from 'node:fs/promises'
+import { access, mkdtemp, mkdir, rm, stat } from 'node:fs/promises'
 import { createConnection } from 'node:net'
 import { tmpdir, homedir } from 'node:os'
 import { join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
+import { z } from 'zod'
+import { buildSshOptions, quoteRemoteArgument, redactLaunchSecrets as redact } from './smoke-multi-host-ssh-utils.mjs'
 import WebSocket from 'ws'
 import { connectDshPlatformClient } from '../packages/dshx/src/platform/client.ts'
 
-const sshTarget = process.env.MH_SSH_TARGET ?? 'deploy@100.90.142.88'
-const sshUnit = process.env.MH_UNIT ?? 'dsh-mh-a'
-const remoteWorkspace = process.env.MH_WS ?? '/home/deploy/dsh-mh/workspace'
-const remoteHome = process.env.MH_REMOTE_HOME ?? '/home/deploy/dsh-mh/runtime-a-home'
+const absolutePathSchema = z
+  .string()
+  .trim()
+  .regex(/^\/[^\0\r\n]+$/)
+  .refine(path => !path.split('/').includes('..'))
+const sshPortSchema = z
+  .string()
+  .regex(/^[1-9]\d{0,4}$/)
+  .default('22')
+  .transform(Number)
+  .refine(port => port <= 65_535)
+const smokeConfigSchema = z.object({
+  sshTarget: z
+    .string()
+    .trim()
+    .min(1)
+    .regex(/^[^-\s][^\s]*$/),
+  sshKey: absolutePathSchema,
+  knownHosts: absolutePathSchema,
+  sshPort: sshPortSchema,
+  sshUnit: z
+    .string()
+    .trim()
+    .regex(/^[A-Za-z0-9_.@:-]+$/),
+  remoteWorkspace: absolutePathSchema,
+  remoteHome: absolutePathSchema,
+  disposableTarget: z.literal('1'),
+  allowRemoteMutations: z.literal('1'),
+})
+const smokeConfig = smokeConfigSchema.safeParse({
+  sshTarget: process.env.MH_SSH_TARGET,
+  sshKey: process.env.MH_SSH_KEY,
+  knownHosts: process.env.MH_KNOWN_HOSTS,
+  sshPort: process.env.MH_SSH_PORT ?? '22',
+  sshUnit: process.env.MH_UNIT,
+  remoteWorkspace: process.env.MH_WS,
+  remoteHome: process.env.MH_REMOTE_HOME,
+  disposableTarget: process.env.MH_DISPOSABLE_TARGET,
+  allowRemoteMutations: process.env.MH_ALLOW_REMOTE_MUTATIONS,
+})
+if (!smokeConfig.success) {
+  throw new Error(
+    'SSH smoke requires explicit MH_SSH_TARGET, private MH_SSH_KEY, MH_KNOWN_HOSTS, MH_UNIT, absolute MH_WS and MH_REMOTE_HOME, plus MH_DISPOSABLE_TARGET=1 and MH_ALLOW_REMOTE_MUTATIONS=1. MH_SSH_PORT is an optional TCP port from 1 to 65535 (default 22). Use only a disposable remote service.',
+  )
+}
+const { sshTarget, sshKey, knownHosts, sshPort, sshUnit, remoteWorkspace, remoteHome } = smokeConfig.data
+try {
+  const [keyInfo, knownHostsInfo] = await Promise.all([stat(sshKey), stat(knownHosts)])
+  if (!keyInfo.isFile() || (keyInfo.mode & 0o077) !== 0 || !knownHostsInfo.isFile() || (knownHostsInfo.mode & 0o022) !== 0) {
+    throw new Error()
+  }
+} catch {
+  throw new Error('SSH smoke requires a private key with private permissions and an existing known_hosts file that is not group/other-writable.')
+}
+
+const sshOptions = buildSshOptions({ sshKey, knownHosts, sshPort })
+const launchUrlSchema = z
+  .string()
+  .regex(/^http:\/\/127\.0\.0\.1:(\d{1,5})\/\?token=[A-Za-z0-9._~-]{8,512}$/)
+  .refine(value => {
+    const port = Number(/127\.0\.0\.1:(\d{1,5})\//.exec(value)?.[1])
+    return Number.isInteger(port) && port >= 1 && port <= 65_535
+  })
+const launchRecordSchema = z.object({ launchUrl: launchUrlSchema })
 const tunnelHost = '127.0.0.1'
 const observationLimit = 1200
 
 const checks = []
-const redact = value => String(value).replace(/token=[A-Za-z0-9_-]+/g, 'token=<redacted>')
 const note = line => process.stdout.write(`${redact(line)}\n`)
 
 const ssh = async args => {
-  const child = spawn('ssh', ['-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=accept-new', '-o', 'ConnectTimeout=15', sshTarget, ...args], {
-    stdio: ['ignore', 'pipe', 'pipe'],
-  })
+  const child = spawn('ssh', [...sshOptions, sshTarget, ...args], { stdio: ['ignore', 'pipe', 'pipe'] })
   const stdout = []
   const stderr = []
   child.stdout.on('data', chunk => stdout.push(String(chunk)))
   child.stderr.on('data', chunk => stderr.push(String(chunk)))
   const [code] = await once(child, 'exit')
-  if (code !== 0) throw new Error(redact(`ssh ${args.join(' ')} failed (${code}): ${stderr.join('')}${stdout.join('')}`))
+  if (code !== 0) throw new Error(redact(`ssh remote command failed (${code}): ${stderr.join('')}`))
   return stdout.join('')
 }
 
 const remote = async command => ssh([command])
 
-const remoteLaunchUrl = async () => {
-  const url = (await remote(`journalctl --user -u ${sshUnit} --no-pager -o cat | grep -o "http://127.0.0.1:[0-9]*/?token=[A-Za-z0-9_-]*" | tail -1`)).trim()
-  assert.match(url, /^http:\/\/127\.0\.0\.1:\d+\/\?token=/, 'remote runtime must advertise its authenticated launch URL')
-  return url
+const readLaunchUrl = content => {
+  let record
+  try {
+    record = launchRecordSchema.safeParse(JSON.parse(content))
+  } catch {
+    record = undefined
+  }
+  if (record?.success) return record.data.launchUrl
+  const line = launchUrlSchema.safeParse(content.split('\n', 1)[0]?.trim() ?? '')
+  return line.success ? line.data : undefined
 }
 
-const remotePort = async () => Number(new URL(await remoteLaunchUrl()).port)
+const remoteLaunchUrl = async () => {
+  const home = remoteHome.replace(/\/+$/, '')
+  const launchFile = quoteRemoteArgument(`${home}/plugins/multi-host/launch.json`)
+  const webUrlFile = quoteRemoteArgument(`${home}/runtime/web-url`)
+  const content = await remote(`if test -f ${launchFile}; then cat -- ${launchFile}; elif test -f ${webUrlFile}; then cat -- ${webUrlFile}; else exit 1; fi`)
+  const launchUrl = readLaunchUrl(content)
+  if (launchUrl === undefined) throw new Error('Remote DSH launch metadata is missing or invalid.')
+  return launchUrl
+}
 
 const openTunnel = async remoteListenPort => {
   const localSpecPort = 39335
-  const server = spawn('ssh', ['-o', 'BatchMode=yes', '-o', 'ExitOnForwardFailure=yes', '-N', '-L', `127.0.0.1:39335:${tunnelHost}:${remoteListenPort}`, sshTarget], {
+  const server = spawn('ssh', [...sshOptions, '-N', '-L', `127.0.0.1:39335:${tunnelHost}:${remoteListenPort}`, sshTarget], {
     stdio: ['ignore', 'pipe', 'pipe'],
   })
   const stderr = []
@@ -53,10 +126,17 @@ const openTunnel = async remoteListenPort => {
   const localPort = await new Promise((resolve, reject) => {
     const probe = setInterval(() => {
       const socket = createConnection({ host: tunnelHost, port: localSpecPort })
-      socket.once('connect', () => { clearInterval(probe); socket.destroy(); resolve(localSpecPort) })
+      socket.once('connect', () => {
+        clearInterval(probe)
+        socket.destroy()
+        resolve(localSpecPort)
+      })
       socket.once('error', () => socket.destroy())
     }, 200)
-    setTimeout(() => { clearInterval(probe); reject(new Error(redact(`tunnel did not open: ${stderr.join('')}`))) }, 15_000)
+    setTimeout(() => {
+      clearInterval(probe)
+      reject(new Error(redact(`tunnel did not open: ${stderr.join('')}`)))
+    }, 15_000)
   })
   const close = async () => {
     if (server.exitCode !== null || server.signalCode !== null) return
@@ -78,11 +158,15 @@ const exchangeCookie = async launchUrl => {
   let exchange
   try {
     exchange = await fetch(launchUrl, { redirect: 'manual' })
-  } catch (error) {
-    throw new Error(redact(`launch exchange through the tunnel failed: ${error.message}`))
+  } catch {
+    throw new Error('Launch exchange through the tunnel failed.')
   }
   assert.equal(exchange.status, 303, `expected the token launch exchange to authenticate, got HTTP ${exchange.status}`)
-  const cookie = exchange.headers.getSetCookie().map(item => item.split(';', 1)[0]).filter(Boolean).join('; ')
+  const cookie = exchange.headers
+    .getSetCookie()
+    .map(item => item.split(';', 1)[0])
+    .filter(Boolean)
+    .join('; ')
   assert.ok(cookie, 'the runtime must issue its authenticated cookie')
   return cookie
 }
@@ -100,7 +184,8 @@ const makeGateway = ({ localPort, cookie }) => {
     if (!response.ok) throw Object.assign(new Error(`HTTP ${response.status} for ${namespace}/${method}`), { code: 'rpc-http-error' })
     const envelope = JSON.parse(await response.text())
     if (envelope.type !== 'server-response' || envelope.rpcId === undefined) throw Object.assign(new Error('invalid envelope'), { code: 'invalid-response' })
-    if (!envelope.result.ok) throw Object.assign(new Error(envelope.result.error?.message ?? 'remote error'), { code: envelope.result.error?.code ?? 'remote-error' })
+    if (!envelope.result.ok)
+      throw Object.assign(new Error(envelope.result.error?.message ?? 'remote error'), { code: envelope.result.error?.code ?? 'remote-error' })
     return envelope.result.value
   }
   const runSafe = async (...input) => {
@@ -120,7 +205,11 @@ const makeGateway = ({ localPort, cookie }) => {
     socket.on('message', data => {
       const text = Buffer.isBuffer(data) ? data.toString('utf8') : String(data)
       let frame
-      try { frame = JSON.parse(text) } catch { return }
+      try {
+        frame = JSON.parse(text)
+      } catch {
+        return
+      }
       if (frame.streamId !== streamId) return
       frames.push(text)
     })
@@ -151,8 +240,12 @@ const startLocalRuntime = async home => {
     stdio: ['ignore', 'pipe', 'pipe'],
   })
   let output = ''
-  child.stdout.on('data', chunk => { output += String(chunk) })
-  child.stderr.on('data', chunk => { output += String(chunk) })
+  child.stdout.on('data', chunk => {
+    output += String(chunk)
+  })
+  child.stderr.on('data', chunk => {
+    output += String(chunk)
+  })
   const deadline = Date.now() + 45_000
   while (Date.now() < deadline) {
     if (child.exitCode !== null) break
@@ -172,7 +265,7 @@ const tunnels = new Set()
 
 try {
   note('remote unit health check')
-  const unitState = (await remote(`systemctl --user is-active ${sshUnit} || true`)).trim()
+  const unitState = (await remote(`systemctl --user is-active ${quoteRemoteArgument(sshUnit)} || true`)).trim()
   assert.equal(unitState, 'active', `the disposable remote runtime unit must be active before the smoke can run (got ${unitState})`)
 
   const remoteUrl = await remoteLaunchUrl()
@@ -201,7 +294,9 @@ try {
     const localSession = await local.sessions.create({ cwd: process.env.HOME ?? homedir() })
     await local.sessions.rename(localSession.sessionId, 'Local proof')
     const localRows = await local.sessions.list()
-    const remoteRows = await (await connectDshPlatformClient({ url: `http://${tunnelHost}:39335/?token=${new URL(remoteUrl).searchParams.get('token')}` })).sessions.list()
+    const remoteRows = await (
+      await connectDshPlatformClient({ url: `http://${tunnelHost}:39335/?token=${new URL(remoteUrl).searchParams.get('token')}` })
+    ).sessions.list()
     assert.ok(localRows.some(row => row.sessionId === localSession.sessionId))
     assert.ok(remoteRows.some(row => row.sessionId === remoteSession.sessionId))
     assert.ok(!remoteRows.some(row => row.sessionId === localSession.sessionId))
@@ -217,21 +312,49 @@ try {
   firstScreen.open({ args: { agentId: remoteSession.sessionId, id: terminal.value.id, attachmentId: firstAttachment } })
   await firstScreen.waitFrames(1)
   assert.ok(firstScreen.frames.some(frame => frame.includes('"snapshot"')))
-  const sameAttachment = await gateway.runSafe('terminal', 'write', { agentId: remoteSession.sessionId, id: terminal.value.id, attachmentId: firstAttachment, data: `echo ${markerName}\n` })
+  const sameAttachment = await gateway.runSafe('terminal', 'write', {
+    agentId: remoteSession.sessionId,
+    id: terminal.value.id,
+    attachmentId: firstAttachment,
+    data: `echo ${markerName}\n`,
+  })
   assert.ok(sameAttachment.ok, redact(`same-attachment write must be accepted: ${sameAttachment.message}`))
-  const refused = await gateway.runSafe('terminal', 'resize', { agentId: remoteSession.sessionId, id: terminal.value.id, attachmentId: crypto.randomUUID(), cols: 100, rows: 30 })
+  const refused = await gateway.runSafe('terminal', 'resize', {
+    agentId: remoteSession.sessionId,
+    id: terminal.value.id,
+    attachmentId: crypto.randomUUID(),
+    cols: 100,
+    rows: 30,
+  })
   assert.equal(refused.ok, false, 'a foreign attachment must not control the PTY while another attachment owns input')
   await firstScreen.stop()
   const second = await gateway.follow('terminal/follow')
   const secondAttachment = crypto.randomUUID()
   second.open({ args: { agentId: remoteSession.sessionId, id: terminal.value.id, attachmentId: secondAttachment } })
   await second.waitFrames(1)
-  assert.ok(second.frames.some(frame => frame.includes('"snapshot"')), 'reattachment recovers the retention screen snapshot')
-  const resized = await gateway.runSafe('terminal', 'resize', { agentId: remoteSession.sessionId, id: terminal.value.id, attachmentId: secondAttachment, cols: 111, rows: 33 })
+  assert.ok(
+    second.frames.some(frame => frame.includes('"snapshot"')),
+    'reattachment recovers the retention screen snapshot',
+  )
+  const resized = await gateway.runSafe('terminal', 'resize', {
+    agentId: remoteSession.sessionId,
+    id: terminal.value.id,
+    attachmentId: secondAttachment,
+    cols: 111,
+    rows: 33,
+  })
   assert.ok(resized.ok, redact(`owning-attachment resize must be accepted: ${resized.message}`))
-  await gateway.runSafe('terminal', 'write', { agentId: remoteSession.sessionId, id: terminal.value.id, attachmentId: secondAttachment, data: `echo written > ${markerRemotePath.replace(/ /g, '\\ ')} && cat ${markerRemotePath.replace(/ /g, '\\ ')}\n` })
+  await gateway.runSafe('terminal', 'write', {
+    agentId: remoteSession.sessionId,
+    id: terminal.value.id,
+    attachmentId: secondAttachment,
+    data: `echo written > ${quoteRemoteArgument(markerRemotePath)} && cat ${quoteRemoteArgument(markerRemotePath)}\n`,
+  })
   await delay(1500)
-  assert.ok(second.frames.some(frame => redact(frame).includes(markerName)), 'PTY screen content confirms remote workspace placement')
+  assert.ok(
+    second.frames.some(frame => redact(frame).includes(markerName)),
+    'PTY screen content confirms remote workspace placement',
+  )
   await second.stop()
   const exits = await gateway.follow('terminal/follow')
   const exitAttachment = crypto.randomUUID()
@@ -243,7 +366,7 @@ try {
   assert.equal(stateList[0]?.state, 'exited')
   checks.push('remote PTY: workspace placement file written only through the remote shell, resize ownership enforced, exit state reported')
   assert.rejects(access(`${process.cwd()}/${markerName}`, undefined))
-  await remote(`test -f ${markerRemotePath.replace(/ /g, '\\ ')} && rm -f ${markerRemotePath.replace(/ /g, '\\ ')}`)
+  await remote(`test -f ${quoteRemoteArgument(markerRemotePath)} && rm -f ${quoteRemoteArgument(markerRemotePath)}`)
   checks.push('marker exists on the remote filesystem only')
 
   const wrongToken = await gateway.runSafe('session', 'list', {})
@@ -262,10 +385,12 @@ try {
   await rebuiltGateway.runSafe('session', 'rename', { request: { sessionId: remoteSession.sessionId, title: 'Remote proof' } })
 
   note('restarting the disposable remote runtime; identity must persist')
-  await remote(`systemctl --user restart ${sshUnit} && for i in 1 2 3 4 5 6 7 8 9 10 11 12; do test "$(systemctl --user is-active ${sshUnit})" = active && break; sleep 1; done`)
+  await remote(
+    `systemctl --user restart ${quoteRemoteArgument(sshUnit)} && for i in 1 2 3 4 5 6 7 8 9 10 11 12; do test "$(systemctl --user is-active ${quoteRemoteArgument(sshUnit)})" = active && break; sleep 1; done`,
+  )
   const waitUntilActive = await (async () => {
     for (let attempt = 0; attempt < 12; attempt += 1) {
-      const state = (await remote(`systemctl --user is-active ${sshUnit} || true`)).trim()
+      const state = (await remote(`systemctl --user is-active ${quoteRemoteArgument(sshUnit)} || true`)).trim()
       if (state === 'active') return state
       await delay(1000)
     }
@@ -316,12 +441,32 @@ try {
 
   unreachable: {
     const stopping = new WebSocket('ws://127.0.0.1:39335/api/remote.mux', { handshakeTimeout: 5000 })
-    await new Promise(resolve => { stopping.on('error', () => resolve()); stopping.on('open', () => { stopping.close(); resolve() }) })
+    await new Promise(resolve => {
+      stopping.on('error', () => resolve())
+      stopping.on('open', () => {
+        stopping.close()
+        resolve()
+      })
+    })
     await assert.rejects(connectDshPlatformClient({ url: 'http://127.0.0.1:39999/?token=anything' }), { code: 'connection-failed' })
     checks.push('a closed forwarded endpoint fails closed as connection-failed')
   }
 
-  note(JSON.stringify({ ok: true, checks, limitations: observationLimit ? ['Model/agent turn, MCP call, LSP and browser UI gates remain', 'One remote host; simultaneous multi-host failure isolation comes with the Pi'] : [] }, null, 2))
+  note(
+    JSON.stringify(
+      {
+        ok: true,
+        checks,
+        limitations: observationLimit
+          ? ['Model/agent turn, MCP call, LSP and browser UI gates remain', 'One remote host; simultaneous multi-host failure isolation comes with the Pi']
+          : [],
+      },
+      null,
+      2,
+    ),
+  )
+} catch (error) {
+  throw new Error(redact(error instanceof Error ? error.message : 'SSH smoke failed.'))
 } finally {
   for (const tunnel of tunnels) await tunnel.close().catch(() => undefined)
   tunnels.clear()

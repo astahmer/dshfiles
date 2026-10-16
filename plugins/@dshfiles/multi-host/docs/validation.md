@@ -141,3 +141,12 @@ browser was headless Chromium (Playwright 1.56) driving the scratch UI.
 The Pi scratch release used the 2026-10-06 ai-accounts build: the current
 ai-accounts needs a newer `@earendil-works/pi-ai` than the Pi's runtime
 dependencies carry.
+
+## Repository-side durability checks (2026-10-16)
+
+- `pnpm --dir plugins/@dshfiles/multi-host exec vitest run tests/launch-file.test.ts`: 4 passed. Tests cover fresh and pre-existing path permissions, replacing stale contents, cleanup ownership, and failed-write temporary-file cleanup.
+- `pnpm --dir tooling/dshx run test:ssh-smoke-safety`: 10 passed. Nine smoke tests cover missing configuration, each opt-in independently, invalid port, group/other-writable known_hosts, strict SSH options, default port 22, shell-safe remote paths, and launch-token redaction.
+- The additional loopback fixture test uses generated scratch host/client keys and a generated known_hosts file, validates only its temporary config with `sshd -T -f`, starts sshd on `127.0.0.1` at a high port, and runs the shared strict SSH option builder against it. It validates the owned process group exits before removing the scratch directory. It uses no system SSH keys/config and contacts no remote host. No DSH service is started by this fixture.
+- No live `:3080` runtime or physical host was touched.
+
+These checks cover repository-owned launch metadata, smoke safety, and isolated SSH transport only. They do not prove a selected Linux service owner, a second-scratch-DSH lifecycle, real service startup/upgrade/rollback, or the planned remote thread/reconnect lifecycle E2E.

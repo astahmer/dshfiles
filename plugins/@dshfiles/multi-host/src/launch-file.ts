@@ -48,11 +48,16 @@ export const writeLaunchFile = async ({ dshHome, launchUrl }: { readonly dshHome
   const temporary = `${path}.${process.pid}.${randomUUID()}.tmp`
   const file = await open(temporary, 'wx', 0o600)
   try {
-    await file.writeFile(`${JSON.stringify(record)}\n`, 'utf8')
-  } finally {
-    await file.close()
+    try {
+      await file.writeFile(`${JSON.stringify(record)}\n`, 'utf8')
+    } finally {
+      await file.close()
+    }
+    await rename(temporary, path)
+  } catch (error) {
+    await rm(temporary, { force: true }).catch(() => undefined)
+    throw error
   }
-  await rename(temporary, path)
   return path
 }
 
