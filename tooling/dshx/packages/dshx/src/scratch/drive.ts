@@ -39,7 +39,7 @@ const catalogFeatures = async (): Promise<CatalogFeature[]> => {
 }
 
 /** `<feature-id>`, `<plugin>/<feature-id>` or `@dshfiles/<plugin>#<feature-id>`. */
-export const findCatalogFeature = async (reference: string): Promise<CatalogFeature> => {
+const findCatalogFeature = async (reference: string): Promise<CatalogFeature> => {
   const features = await catalogFeatures()
   const match = /^(?:@dshfiles\/)?(?:([a-z0-9-]+)[/#])?([a-z0-9][a-z0-9-]*)$/.exec(reference)
   const plugin = match?.[1]
@@ -107,7 +107,7 @@ export interface OpenResult {
 }
 
 export const scratchOpen = async (state: ScratchState, reference: string, timeoutMs: number): Promise<OpenResult> => {
-  const feature = await findCatalogFeature(reference)
+  const feature = await ScratchFeatureCatalog.find(reference)
   if (feature.reach === undefined) {
     throw new ScratchError(
       'no-reach',
@@ -286,4 +286,9 @@ export const scratchShot = async (state: ScratchState, label: string, outDir: st
   }
   await writeFile(summaryFile, `${JSON.stringify({ ...result, events: errorEvents }, null, 2)}\n`)
   return result
+}
+
+export class ScratchFeatureCatalog {
+  static readonly list = catalogFeatures
+  static readonly find = findCatalogFeature
 }
