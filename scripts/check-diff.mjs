@@ -3,6 +3,7 @@ import { execFileSync, spawnSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
 
 const lintRoots = ['plugins', 'tooling/dshx/packages']
+const lintExtensions = ['.js', '.jsx', '.mjs', '.cjs', '.ts', '.tsx', '.mts', '.cts', '.vue', '.astro', '.svelte']
 
 const flag = (name, fallback) => {
   const index = process.argv.indexOf(name)
@@ -24,6 +25,8 @@ const changed = execFileSync('jj', ['diff', '--from', from, '--to', to, '--name-
   .filter(Boolean)
 
 const targets = changed.filter(path => lintRoots.some(root => path === root || path.startsWith(`${root}/`)) && existsSync(path))
+// Oxlint exits non-zero when a path list holds nothing it can parse, which a manifest-only change under a lint root is.
+const lintTargets = targets.filter(path => lintExtensions.some(extension => path.endsWith(extension)))
 
 if (targets.length === 0) {
   console.log(`check:diff: no changed lintable paths in ${from}..${to}`)
@@ -31,6 +34,6 @@ if (targets.length === 0) {
 }
 
 console.log(`check:diff: ${from}..${to} touches ${targets.length} lintable path(s)`)
-run('oxlint', [...targets, '--config', '.oxlintrc.json'])
+if (lintTargets.length > 0) run('oxlint', [...lintTargets, '--config', '.oxlintrc.json'])
 run('oxfmt', ['--check', ...targets, '--config', '.oxfmtrc.json'])
 console.log('check:diff: clean')
