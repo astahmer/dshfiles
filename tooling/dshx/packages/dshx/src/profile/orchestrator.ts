@@ -78,7 +78,7 @@ async function runDsh(project: ProfileProject, args: readonly string[], timeoutM
 }
 
 /** Detect the project-local DSH CLI and select the compatibility adapter. */
-export async function resolveDshInstallation(project: ProfileProject, options: ProfileOrchestratorOptions = {}): Promise<ResolvedDshInstallation> {
+const resolveDshInstallation = async (project: ProfileProject, options: ProfileOrchestratorOptions = {}): Promise<ResolvedDshInstallation> => {
   const result = await runDsh(project, ['--version'], VERSION_TIMEOUT_MS, options)
   if (result.exitCode !== 0) {
     if (isDshMissing(result)) {
@@ -332,7 +332,7 @@ async function parseDependencies(project: ProfileProject, source: string): Promi
 }
 
 /** Inspect whether this exact package id and real project path are linked. */
-export async function inspectProjectProfile(project: ProfileProject, options: ProfileOrchestratorOptions = {}): Promise<ProjectProfileLink> {
+const inspectProjectProfile = async (project: ProfileProject, options: ProfileOrchestratorOptions = {}): Promise<ProjectProfileLink> => {
   validateProfileName(project)
   const compatibility = options.compatibility ?? DEFAULT_COMPATIBILITY
   if (compatibility.profile.listCommand !== 'plugin-list-json') {
@@ -387,7 +387,7 @@ export async function inspectProjectProfile(project: ProfileProject, options: Pr
  * re-inspection afterwards is what proves the link rather than trusting the
  * install's exit code.
  */
-export async function ensureProjectProfile(project: ProfileProject, options: ProfileOrchestratorOptions = {}): Promise<PreparedProjectProfile> {
+const ensureProjectProfile = async (project: ProfileProject, options: ProfileOrchestratorOptions = {}): Promise<PreparedProjectProfile> => {
   validateProfileName(project)
   const dsh = await resolveDshInstallation(project, options)
   const existing = await inspectProjectProfile(project, {
@@ -475,4 +475,10 @@ export async function ensureProjectProfile(project: ProfileProject, options: Pro
     link: 'added',
     diagnostics: dsh.diagnostics,
   }
+}
+
+export class ProfileOrchestrator {
+  static readonly resolveDshInstallation = resolveDshInstallation
+  static readonly inspectProjectProfile = inspectProjectProfile
+  static readonly ensureProjectProfile = ensureProjectProfile
 }

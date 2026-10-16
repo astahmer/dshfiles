@@ -1,7 +1,7 @@
 import type { ResolvedDshxConfig } from '../config/types.js'
 import { DshxError } from '../diagnostics.js'
 import type { DshxDiagnostic } from '../diagnostics.js'
-import { inspectProjectProfile, resolveDshInstallation } from '../profile/orchestrator.js'
+import { ProfileOrchestrator } from '../profile/orchestrator.js'
 import type { ProfileOrchestratorOptions, ProjectProfileLink, ResolvedDshInstallation } from '../profile/types.js'
 import type { EventSummary, InspectOptions, InspectResult, InspectTarget, ServiceSummary, SlotSummary, ToolSummary } from './types.js'
 import { DshInspectBridgeProvider } from './bridge.js'
@@ -182,7 +182,7 @@ export async function inspectProjectComposition(project: ResolvedDshxConfig, tar
   let dsh: ResolvedDshInstallation | undefined
   let profileLink: ProjectProfileLink | undefined
   try {
-    dsh = await (options.resolveDsh ?? resolveDshInstallation)(project, profileOptions(options))
+    dsh = await (options.resolveDsh ?? ProfileOrchestrator.resolveDshInstallation)(project, profileOptions(options))
     diagnostics.push(...dsh.diagnostics)
     if (dsh.compatibility.inspect !== undefined && !dsh.compatibility.inspect.targets.includes(target)) {
       return {
@@ -194,7 +194,7 @@ export async function inspectProjectComposition(project: ResolvedDshxConfig, tar
         dsh,
       }
     }
-    profileLink = await (options.inspectProfile ?? inspectProjectProfile)(project, {
+    profileLink = await (options.inspectProfile ?? ProfileOrchestrator.inspectProjectProfile)(project, {
       ...profileOptions(options),
       compatibility: dsh.compatibility,
       ...(dsh.executable === undefined ? {} : { executable: dsh.executable }),

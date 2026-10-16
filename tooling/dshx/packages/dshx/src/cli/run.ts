@@ -12,7 +12,7 @@ import { relative as relativePath } from 'node:path'
 import { packageProject, testProject } from '../toolchain/index.js'
 import { packageTargets } from '../project/package-targets.js'
 import { DshxError } from '../diagnostics.js'
-import { ensureProjectProfile, inspectProjectProfile, resolveDshInstallation } from '../profile/index.js'
+import { ProfileOrchestrator } from '../profile/index.js'
 import type { PreparedProjectProfile, ProjectProfileLink, ResolvedDshInstallation } from '../profile/types.js'
 import {
   applyManifestRepairPlan,
@@ -73,9 +73,9 @@ export interface CliRuntime {
   readonly checkMigrations?: typeof checkMigrationDiagnostics
   readonly checkPackageTargets?: typeof checkPackageTargets
   readonly typecheckProject?: typeof typecheckProject
-  readonly resolveDsh?: typeof resolveDshInstallation
-  readonly inspectProfile?: typeof inspectProjectProfile
-  readonly ensureProfile?: typeof ensureProjectProfile
+  readonly resolveDsh?: typeof ProfileOrchestrator.resolveDshInstallation
+  readonly inspectProfile?: typeof ProfileOrchestrator.inspectProjectProfile
+  readonly ensureProfile?: typeof ProfileOrchestrator.ensureProjectProfile
   readonly buildHost?: typeof buildHost
   readonly buildClient?: typeof buildClient
   readonly buildModule?: typeof buildModule
@@ -479,9 +479,9 @@ async function collectCheck(options: CliRunOptions, project: ResolvedDshxConfig,
   let bridge: InspectBridgeStatus = { state: 'disabled', diagnostics: [] }
   if (requireRuntime) {
     try {
-      dsh = await (runtime.resolveDsh ?? resolveDshInstallation)(project)
+      dsh = await (runtime.resolveDsh ?? ProfileOrchestrator.resolveDshInstallation)(project)
       runtimeDiagnostics.push(...dsh.diagnostics)
-      profile = await (runtime.inspectProfile ?? inspectProjectProfile)(project)
+      profile = await (runtime.inspectProfile ?? ProfileOrchestrator.inspectProjectProfile)(project)
       if (profile.state === 'absent')
         runtimeDiagnostics.push({
           code: 'DSHX4305',
@@ -1383,7 +1383,7 @@ async function runDev(args: CliArgs, options: CliRunOptions, project: ResolvedDs
   }
   let profile: PreparedProjectProfile
   try {
-    profile = await (runtime.ensureProfile ?? ensureProjectProfile)(project)
+    profile = await (runtime.ensureProfile ?? ProfileOrchestrator.ensureProjectProfile)(project)
   } catch (error) {
     const item = diagnosticFromError(error, project.packageFile)
     printDiagnostic(io, item)

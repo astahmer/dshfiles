@@ -1,5 +1,5 @@
 export { runProjectDsh } from './command.js'
-export { ensureProjectProfile, inspectProjectProfile, resolveDshInstallation } from './orchestrator.js'
+export { ProfileOrchestrator } from './orchestrator.js'
 export type {
   DshCommandResult,
   DshCommandRunner,

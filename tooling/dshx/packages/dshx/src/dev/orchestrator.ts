@@ -7,7 +7,7 @@ import { watchHost } from '../compiler/host/build.js'
 import { DshxError } from '../diagnostics.js'
 import type { DshxDiagnostic } from '../diagnostics.js'
 import { resolveDshxConfig } from '../config/resolve.js'
-import { ensureProjectProfile } from '../profile/orchestrator.js'
+import { ProfileOrchestrator } from '../profile/orchestrator.js'
 import { watchProjectFiles } from './project-watcher.js'
 import type { DevBuildEvent, DevChildProcess, DevEvent, DevProjectWatcher, DevSession, DevSessionOptions, DevState, DevWatcher } from './types.js'
 import type { ResolvedDshxConfig } from '../config/types.js'
@@ -130,7 +130,7 @@ function projectInputs(project: ResolvedDshxConfig): readonly string[] {
 export async function startDevSession(project: ResolvedDshxConfig, options: DevSessionOptions = {}): Promise<DevSession> {
   const environment = { ...process.env, ...options.profile?.env, ...options.env }
   const profileOptions = { ...options.profile, env: environment }
-  const ensureProfile = options.ensureProfile ?? ensureProjectProfile
+  const ensureProfile = options.ensureProfile ?? ProfileOrchestrator.ensureProjectProfile
   let activeProject = project
   let activeProfile = options.preparedProfile ?? (await ensureProfile(project, profileOptions))
   const initialBuildPaths = buildOptions(project, activeProfile.dsh.compatibility)
