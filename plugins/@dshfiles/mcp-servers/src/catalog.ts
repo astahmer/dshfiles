@@ -1,6 +1,7 @@
+import { z } from 'zod'
 import type { RegistryEntry } from './api.js'
 
-export const PROVIDERS = [
+const providers = [
   {
     id: 'figma',
     name: 'Figma',
@@ -83,30 +84,37 @@ export const PROVIDERS = [
   readonly docsUrl: string
 }[]
 
-/** Endpoint identity for duplicate detection: host plus path without a trailing slash. */
-export const endpointKey = (value: string): string => {
-  try {
-    const url = new URL(value)
-    return `${url.host.toLocaleLowerCase()}${url.pathname.replace(/\/+$/, '')}`
-  } catch {
-    return value.trim().toLocaleLowerCase()
-  }
-}
-
-export const filterProviders = <T extends { name: string; category: string; description: string }>(rows: readonly T[], query: string): T[] => {
-  const needle = query.trim().toLocaleLowerCase()
-  return needle.length === 0 ? [...rows] : rows.filter(row => `${row.name} ${row.category} ${row.description}`.toLocaleLowerCase().includes(needle))
-}
-
 const REGISTRY_ENDPOINT = 'https://registry.modelcontextprotocol.io/v0.1/servers'
 const MAX_REGISTRY_BYTES = 1_000_000
 
-const object = (value: unknown): Record<string, unknown> | undefined => {
-  return typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : undefined
-}
+const categoryValueSchema = z.union([z.string(), z.array(z.string().catch(''))])
+const registryMetadataSchema = z.object({
+  category: categoryValueSchema.optional().catch(undefined),
+  documentationUrl: z.string().optional().catch(undefined),
+})
 
-const safeHttps = (value: unknown): string | null => {
-  if (typeof value !== 'string' || value.length > 2048) return null
+const registryRemoteSchema = z.object({
+  type: z.string().optional().catch(undefined),
+  transport: z.string().optional().catch(undefined),
+  url: z.string().optional().catch(undefined),
+})
+
+const registryServerSchema = z.object({
+  name: z.string().max(200),
+  title: z.string().catch(''),
+  category: categoryValueSchema.optional().catch(undefined),
+  description: z.string().catch(''),
+  version: z.string().catch(''),
+  documentationUrl: z.string().optional().catch(undefined),
+  websiteUrl: z.string().optional().catch(undefined),
+  _meta: z.record(z.string(), registryMetadataSchema.catch({})).catch({}),
+  remotes: z.array(registryRemoteSchema.catch({})).catch([]),
+})
+
+type RegistryServer = z.infer<typeof registryServerSchema>
+
+const safeHttps = (value: string | undefined): string | null => {
+  if (value === undefined || value.length > 2048) return null
   try {
     const url = new URL(value)
     return url.protocol === 'https:' && url.username === '' && url.password === '' && url.search === '' && url.hash === '' ? url.href : null
@@ -115,37 +123,57 @@ const safeHttps = (value: unknown): string | null => {
   }
 }
 
-const publisherMetadata = (item: Record<string, unknown>): Record<string, unknown>[] => {
-  const root = object(item._meta)
-  if (root === undefined) return []
-  return Object.values(root)
-    .map(object)
-    .filter((value): value is Record<string, unknown> => value !== undefined)
-}
-
-const categoryOf = (item: Record<string, unknown>): string => {
-  for (const metadata of publisherMetadata(item)) {
+const categoryOf = (item: RegistryServer): string => {
+  for (const metadata of Object.values(item._meta)) {
     const category = metadata.category
-    if (typeof category === 'string' && category.trim().length > 0) return category.trim().slice(0, 80)
     if (Array.isArray(category)) {
-      const first = category.find(value => typeof value === 'string' && value.trim().length > 0)
-      if (typeof first === 'string') return first.trim().slice(0, 80)
+      const first = category.find(value => value.trim().length > 0)
+      if (first !== undefined) return first.trim().slice(0, 80)
     }
+    if (category !== undefined && !Array.isArray(category) && category.trim().length > 0) return category.trim().slice(0, 80)
   }
   return 'Uncategorized'
 }
 
-const documentationOf = (item: Record<string, unknown>): string | null => {
+const documentationOf = (item: RegistryServer): string | null => {
   const direct = safeHttps(item.documentationUrl) ?? safeHttps(item.websiteUrl)
   if (direct !== null) return direct
-  for (const metadata of publisherMetadata(item)) {
+  for (const metadata of Object.values(item._meta)) {
     const url = safeHttps(metadata.documentationUrl)
     if (url !== null) return url
   }
   return null
 }
 
-const readBoundedJson = async (response: Response): Promise<unknown> => {
+const registryEntrySchema = z
+  .union([
+    z
+      .object({ server: registryServerSchema })
+      .transform(input => input.server),
+    registryServerSchema,
+  ])
+  .transform((item): RegistryEntry => {
+    const endpoint = item.remotes.find(
+      remote => (remote.type === 'streamable-http' || remote.transport === 'streamable-http') && safeHttps(remote.url) !== null,
+    )
+    return {
+      name: item.name,
+      title: item.title.slice(0, 120),
+      category: categoryOf(item),
+      description: item.description.slice(0, 500),
+      version: item.version.slice(0, 80),
+      endpoint: endpoint === undefined ? null : safeHttps(endpoint.url),
+      docsUrl: documentationOf(item),
+    }
+  })
+const registryRowSchema = z.union([registryEntrySchema, z.undefined()]).catch(undefined)
+
+const registryPayloadSchema = z
+  .object({ servers: z.array(registryRowSchema).catch([]) })
+  .catch({ servers: [] })
+type RegistryPayload = z.infer<typeof registryPayloadSchema>
+
+const readBoundedJson = async (response: Response): Promise<RegistryPayload> => {
   if (response.body === null) throw new Error('Registry response has no body.')
   const reader = response.body.getReader()
   const chunks: Uint8Array[] = []
@@ -170,47 +198,51 @@ const readBoundedJson = async (response: Response): Promise<unknown> => {
     bytes.set(chunk, offset)
     offset += chunk.byteLength
   }
-  return JSON.parse(new TextDecoder().decode(bytes)) as unknown
+  const payload: unknown = JSON.parse(new TextDecoder().decode(bytes))
+  return registryPayloadSchema.parse(payload)
 }
 
-const registryRow = (value: unknown): RegistryEntry | undefined => {
-  const wrapped = object(value)
-  const item = object(wrapped?.server) ?? wrapped
-  if (item === undefined || typeof item.name !== 'string' || item.name.length > 200) return undefined
+type RegistrySearchFetcher = (input: URL, init: RequestInit) => Promise<Response>
+type RegistrySearchService = { readonly search: (input: { readonly query: string }) => Promise<RegistryEntry[]> }
 
-  const remotes = Array.isArray(item.remotes) ? item.remotes : []
-  const endpoint = remotes
-    .map(object)
-    .find(remote => remote !== undefined && (remote.type === 'streamable-http' || remote.transport === 'streamable-http') && safeHttps(remote.url) !== null)
-  const documentation = documentationOf(item)
-  const version = typeof item.version === 'string' ? item.version.slice(0, 80) : ''
-  const description = typeof item.description === 'string' ? item.description.slice(0, 500) : ''
-  return {
-    name: item.name,
-    title: typeof item.title === 'string' ? item.title.slice(0, 120) : '',
-    category: categoryOf(item),
-    description,
-    version,
-    endpoint: endpoint === undefined ? null : safeHttps(endpoint.url),
-    docsUrl: documentation,
+export class McpCatalogModel {
+  static readonly providers = providers
+
+  /** Endpoint identity for duplicate detection: host plus path without a trailing slash. */
+  static readonly endpointKey = (value: string): string => {
+    try {
+      const url = new URL(value)
+      return `${url.host.toLocaleLowerCase()}${url.pathname.replace(/\/+$/, '')}`
+    } catch {
+      return value.trim().toLocaleLowerCase()
+    }
   }
-}
 
-export const searchOfficialRegistry = async (query: string): Promise<RegistryEntry[]> => {
-  const url = new URL(REGISTRY_ENDPOINT)
-  url.searchParams.set('search', query)
-  url.searchParams.set('version', 'latest')
-  url.searchParams.set('limit', '20')
-  const response = await fetch(url, {
-    headers: { accept: 'application/json' },
-    signal: AbortSignal.timeout(8_000),
-    redirect: 'error',
-  })
-  if (!response.ok) throw new Error('Registry request failed.')
-  const payload = object(await readBoundedJson(response))
-  const rows = Array.isArray(payload?.servers) ? payload.servers : []
-  return rows.slice(0, 20).flatMap(row => {
-    const result = registryRow(row)
-    return result === undefined ? [] : [result]
+  static readonly filterProviders = <T extends { name: string; category: string; description: string }>({
+    rows,
+    query,
+  }: {
+    readonly rows: readonly T[]
+    readonly query: string
+  }): T[] => {
+    const needle = query.trim().toLocaleLowerCase()
+    return needle.length === 0 ? [...rows] : rows.filter(row => `${row.name} ${row.category} ${row.description}`.toLocaleLowerCase().includes(needle))
+  }
+
+  static readonly createRegistrySearchService = ({ fetch }: { readonly fetch: RegistrySearchFetcher }): RegistrySearchService => ({
+    search: async ({ query }) => {
+      const url = new URL(REGISTRY_ENDPOINT)
+      url.searchParams.set('search', query)
+      url.searchParams.set('version', 'latest')
+      url.searchParams.set('limit', '20')
+      const response = await fetch(url, {
+        headers: { accept: 'application/json' },
+        signal: AbortSignal.timeout(8_000),
+        redirect: 'error',
+      })
+      if (!response.ok) throw new Error('Registry request failed.')
+      const payload = await readBoundedJson(response)
+      return payload.servers.slice(0, 20).flatMap(row => (row === undefined ? [] : [row]))
+    },
   })
 }

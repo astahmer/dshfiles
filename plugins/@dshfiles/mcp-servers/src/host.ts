@@ -21,7 +21,7 @@ import {
   type ServerView,
   type StoredServer,
 } from './api.js'
-import { PROVIDERS, searchOfficialRegistry } from './catalog.js'
+import { McpCatalogModel } from './catalog.js'
 import { McpCommandLineModel } from './command-line.js'
 import { ManagedLocalCommand, type LocalProcessStatus } from './local-process.js'
 import {
@@ -41,6 +41,8 @@ import {
 import { redactingLogger } from './redaction.js'
 import { ClientReconciler, type ClientTarget } from './reconcile.js'
 import { McpServerStateModel } from './server-state.js'
+
+const registrySearchService = McpCatalogModel.createRegistrySearchService({ fetch: (input, init) => globalThis.fetch(input, init) })
 
 const ENTRY_ID = 'mcp-servers'
 const PACKAGE_NAME = '@dshfiles/mcp-servers'
@@ -187,7 +189,7 @@ const snapshot = async (ctx: Context, servers = serversFor(ctx), runtime?: Manag
   )
   return {
     servers: rows,
-    providers: [...PROVIDERS],
+    providers: [...McpCatalogModel.providers],
     connectionHealth: 'not-reported',
     registrySearch: preferencesFor(ctx).registrySearch,
     preferences: preferencesFor(ctx),
@@ -579,7 +581,7 @@ const hostApi = mcpServersApi.host({
   },
   searchRegistry: async ({ ctx, input }) => {
     if (!preferencesFor(ctx).registrySearch) throw new Error('Public MCP Registry search is turned off in Settings.')
-    return searchOfficialRegistry(input.query)
+    return registrySearchService.search({ query: input.query })
   },
 })
 

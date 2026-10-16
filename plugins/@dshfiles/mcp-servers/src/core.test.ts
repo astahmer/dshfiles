@@ -2,7 +2,7 @@ import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { describe, expect, it, vi } from 'vitest'
 import { McpCommandLineModel } from './command-line.js'
 import { serverDraftSchema, type StoredServer } from './api.js'
-import { PROVIDERS, filterProviders, searchOfficialRegistry } from './catalog.js'
+import { McpCatalogModel } from './catalog.js'
 import { ManagedLocalCommand } from './local-process.js'
 import { ClientReconciler } from './reconcile.js'
 import { redactText, redactingLogger } from './redaction.js'
@@ -121,57 +121,57 @@ describe('MCP manager state', () => {
 
 describe('catalog search', () => {
   it('filters curated providers by name, category, and description', () => {
-    expect(filterProviders(PROVIDERS, 'project management').map(row => row.name)).toEqual(['Linear'])
-    expect(filterProviders(PROVIDERS, '').length).toBe(PROVIDERS.length)
+    expect(McpCatalogModel.filterProviders({ rows: McpCatalogModel.providers, query: 'project management' }).map(row => row.name)).toEqual(['Linear'])
+    expect(McpCatalogModel.filterProviders({ rows: McpCatalogModel.providers, query: '' }).length).toBe(McpCatalogModel.providers.length)
   })
 
   it('queries the official Registry and maps only safe streamable HTTP endpoints', async () => {
     let requestUrl = ''
-    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
-      requestUrl = String(input)
-      return new Response(
-        JSON.stringify({
-          servers: [
-            {
-              server: {
-                name: 'io.example/weather',
-                title: 'Weather',
-                description: 'Forecast tools',
-                version: '1.2.0',
-                _meta: { 'com.example': { category: ['weather', 'development'], documentationUrl: 'https://docs.example.com/weather' } },
-                remotes: [
-                  { type: 'streamable-http', url: 'https://api.example.com/mcp?token=do-not-return' },
-                  { type: 'streamable-http', url: 'https://api.example.com/mcp' },
-                ],
+    const registrySearch = McpCatalogModel.createRegistrySearchService({
+      fetch: async (input, init) => {
+        requestUrl = String(input)
+        expect(init.headers).toEqual({ accept: 'application/json' })
+        expect(init.redirect).toBe('error')
+        return new Response(
+          JSON.stringify({
+            servers: [
+              { server: { name: 123, remotes: [] } },
+              {
+                server: {
+                  name: 'io.example/weather',
+                  title: 'Weather',
+                  description: 'Forecast tools',
+                  version: '1.2.0',
+                  _meta: { 'com.example': { category: ['weather', 'development'], documentationUrl: 'https://docs.example.com/weather' } },
+                  remotes: [
+                    { type: 'streamable-http', url: 'https://api.example.com/mcp?token=do-not-return' },
+                    { type: 'streamable-http', url: 'https://api.example.com/mcp' },
+                  ],
+                },
               },
-            },
-          ],
-        }),
-        { status: 200, headers: { 'content-type': 'application/json' } },
-      )
+            ],
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        )
+      },
     })
-    vi.stubGlobal('fetch', fetchMock)
-    try {
-      const rows = await searchOfficialRegistry('weather')
-      expect(rows).toEqual([
-        {
-          name: 'io.example/weather',
-          title: 'Weather',
-          category: 'weather',
-          description: 'Forecast tools',
-          version: '1.2.0',
-          endpoint: 'https://api.example.com/mcp',
-          docsUrl: 'https://docs.example.com/weather',
-        },
-      ])
-      const request = new URL(requestUrl)
-      expect(request.searchParams.get('search')).toBe('weather')
-      expect(request.searchParams.get('version')).toBe('latest')
-      expect(request.searchParams.get('limit')).toBe('20')
-      expect(JSON.stringify(rows)).not.toContain('do-not-return')
-    } finally {
-      vi.unstubAllGlobals()
-    }
+    const rows = await registrySearch.search({ query: 'weather' })
+    expect(rows).toEqual([
+      {
+        name: 'io.example/weather',
+        title: 'Weather',
+        category: 'weather',
+        description: 'Forecast tools',
+        version: '1.2.0',
+        endpoint: 'https://api.example.com/mcp',
+        docsUrl: 'https://docs.example.com/weather',
+      },
+    ])
+    const request = new URL(requestUrl)
+    expect(request.searchParams.get('search')).toBe('weather')
+    expect(request.searchParams.get('version')).toBe('latest')
+    expect(request.searchParams.get('limit')).toBe('20')
+    expect(JSON.stringify(rows)).not.toContain('do-not-return')
   })
 })
 

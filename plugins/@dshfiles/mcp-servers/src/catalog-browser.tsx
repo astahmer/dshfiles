@@ -9,7 +9,7 @@ import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
 import { useState, type ReactNode } from 'react'
 import type { ManagerSnapshot } from './api.js'
-import { endpointKey, filterProviders } from './catalog.js'
+import { McpCatalogModel } from './catalog.js'
 import type { McpServersTranslate } from './locales.js'
 import { providerIcons } from './provider-icons.js'
 import { McpServerFormModel, type ServerFormValues } from './server-form.js'
@@ -106,13 +106,13 @@ export const CatalogBrowser = (props: {
   const registry = useRegistrySearch(registryQuery, props.open && registryEnabled)
 
   const servers = props.snapshot?.servers ?? []
-  const registered = new Set(servers.flatMap(server => (server.transport === 'stdio' ? [] : [endpointKey(server.url)])))
-  const providers = filterProviders(props.snapshot?.providers ?? [], search)
-  const providerKeys = new Set(providers.map(provider => endpointKey(provider.url)))
+  const registered = new Set(servers.flatMap(server => (server.transport === 'stdio' ? [] : [McpCatalogModel.endpointKey(server.url)])))
+  const providers = McpCatalogModel.filterProviders({ rows: props.snapshot?.providers ?? [], query: search })
+  const providerKeys = new Set(providers.map(provider => McpCatalogModel.endpointKey(provider.url)))
   const registryRows =
     registryQuery === trimmed && registry.isSuccess
       ? registry.data.flatMap(entry =>
-          entry.endpoint === null || providerKeys.has(endpointKey(entry.endpoint)) ? [] : [{ ...entry, endpoint: entry.endpoint }],
+          entry.endpoint === null || providerKeys.has(McpCatalogModel.endpointKey(entry.endpoint)) ? [] : [{ ...entry, endpoint: entry.endpoint }],
         )
       : []
   const showCustom = trimmed === '' || 'custom mcp add your own'.includes(trimmed.toLocaleLowerCase())
@@ -140,7 +140,7 @@ export const CatalogBrowser = (props: {
   }
 
   const addButton = (url: string, onClick: () => void): JSX.Element => {
-    const already = registered.has(endpointKey(url))
+    const already = registered.has(McpCatalogModel.endpointKey(url))
     return (
       <Button disabled={already || pendingUrl !== null || props.actions.isPending} onClick={onClick} size="sm">
         {already ? t('added') : pendingUrl === url ? t('adding') : t('addCatalog')}

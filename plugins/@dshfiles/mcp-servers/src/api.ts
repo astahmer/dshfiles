@@ -1,6 +1,6 @@
 import { defineApi, method } from '@dshfiles/dshx/api'
 import { z } from 'zod'
-import { PROVIDERS } from './catalog.js'
+import { McpCatalogModel } from './catalog.js'
 
 export const referenceNameSchema = z
   .string()
@@ -206,7 +206,7 @@ export const snapshotSchema = z.object({
  */
 const compatibleSnapshotSchema = z.object({
   servers: z.array(serverViewSchema).catch([]),
-  providers: z.array(providerSchema).catch(() => [...PROVIDERS]),
+  providers: z.array(providerSchema).catch(() => [...McpCatalogModel.providers]),
   connectionHealth: z.literal('not-reported').catch('not-reported'),
   registrySearch: z.boolean().catch(true),
   preferences: preferencesSchema.catch(() => preferencesSchema.parse({})),
