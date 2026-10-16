@@ -128,6 +128,40 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
     expect((await threads.bookmarks(thread.path)).current).toBe('feature')
   })
 
+  it('renders a compact graph of the thread, configured bookmark, origin bookmark, and default workspace', async () => {
+    const thread = await threads.provision(repo)
+    writeFileSync(join(thread.path, 'feature.txt'), 'feature\n')
+    jj(thread.path, 'describe', '-m', 'feat: graph preview')
+    jj(repo, 'git', 'remote', 'add', 'origin', join(repo, '.git'))
+    jj(repo, 'git', 'fetch', '--remote', 'origin')
+    const operationBefore = jj(thread.path, '--ignore-working-copy', 'op', 'log', '--limit', '1', '--no-graph', '-T', 'id').trim()
+
+    const graph = await threads.revisionGraph(thread.path)
+    const operationAfter = jj(thread.path, '--ignore-working-copy', 'op', 'log', '--limit', '1', '--no-graph', '-T', 'id').trim()
+
+    expect(graph).toContain('feat: graph preview')
+    expect(graph).toContain('main')
+    expect(graph).toContain('main@origin')
+    expect(graph).toContain('default@')
+    expect(graph.split('\n').some(line => line.startsWith('@ '))).toBe(true)
+    expect(graph.split('\n').length).toBeLessThan(24)
+    expect(operationAfter).toBe(operationBefore)
+  })
+
+  it('refuses to show a graph for the shared checkout', async () => {
+    await expect(threads.revisionGraph(repo)).rejects.toMatchObject({ code: 'not-a-thread' })
+  })
+
+  it('renders the graph when no origin bookmark exists', async () => {
+    const thread = await threads.provision(repo)
+
+    const graph = await threads.revisionGraph(thread.path)
+
+    expect(graph).toContain('main')
+    expect(graph).toContain('default@')
+    expect(graph).not.toContain('main@origin')
+  })
+
   it('reads legacy rebase timestamps without a stored tip revision', async () => {
     const thread = await threads.provision(repo)
     const rebasedAt = Date.now()

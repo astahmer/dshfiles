@@ -15,6 +15,7 @@ import { jjIntegrationApi } from './api.js'
 import type { JjIntegrationTranslate } from './locales.js'
 import { announceRepositoryChange, describeLandResult } from './land-feedback.js'
 import { threadQueryKeys, threadRebaseMutationKey } from './panel.js'
+import { RevisionGraphHoverCard, revisionGraphQueryKey } from './revision-graph-hover-card.js'
 import { SessionLogDownloadRow, type SessionLogDownloadPort } from './session-log-download.js'
 import { canRebaseFromClientSnapshot, canRebaseThread, hasPendingUserQuestion } from './thread-rebase-eligibility.js'
 import { useToast } from './toast.js'
@@ -63,6 +64,7 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
     onSettled: async (result, _error, path) => {
       announceRepositoryChange()
       await queryClient.invalidateQueries({ queryKey: threadQueryKeys.threadAt(path) })
+      await queryClient.invalidateQueries({ queryKey: revisionGraphQueryKey(path) })
       if (result !== undefined && result !== null) toast.show({ text: describeLandResult(props.t, result), success: result.status === 'landed' })
     },
   })
@@ -146,7 +148,11 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
     <>
       <span className="dshx-root dshx:inline-flex dshx:min-w-0 dshx:items-center dshx:gap-1">
         <Popover>
-          <PopoverTrigger asChild>{trigger}</PopoverTrigger>
+          {current === null || current === undefined ? (
+            <PopoverTrigger asChild>{trigger}</PopoverTrigger>
+          ) : (
+            <RevisionGraphHoverCard path={current.path} bookmark={props.bookmark} t={props.t} trigger={<PopoverTrigger asChild>{trigger}</PopoverTrigger>} />
+          )}
           <PopoverContent align="end" className="dshx-root dshx:w-80 dshx:gap-0 dshx:p-0">
             <div className="dshx:flex dshx:flex-col dshx:gap-1 dshx:px-3 dshx:pt-3">
               <div className="dshx:flex dshx:items-center dshx:gap-2">

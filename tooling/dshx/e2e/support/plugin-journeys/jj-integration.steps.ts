@@ -268,6 +268,21 @@ Then('the thread header names the shared project checkout', async ({ page }: { p
   await expect(workspaceMenu(page)).toContainText('This thread works in the project checkout')
 })
 
+When('the current thread workspace chip is hovered', async ({ page }: { page: Page }) => {
+  await page.getByRole('button', { name: `Current thread workspace: ${provisionedThreadName(page)}`, exact: true }).hover()
+})
+
+Then('the revision graph preview shows the thread and configured landmarks', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'jj-integration-revision-graph-hover-preview', async () => {
+    await expect(page.getByRole('heading', { name: 'Revision graph', exact: true })).toBeVisible()
+    const graph = page.locator('pre[aria-label="Revision graph"]')
+    await expect(graph).toBeVisible()
+    await expect(graph).toContainText('@')
+    await expect(graph).toContainText('main')
+    await expect(graph).toContainText('default@')
+  })
+  await finishJourneyAssertions(page)
+})
 When('a message is sent in the shared checkout', async ({ page }: { page: Page }) => {
   const composer = newThreadComposer(page)
   await composer.fill('jj integration shared checkout rebase e2e')
@@ -537,10 +552,10 @@ Then('Rebase moves main onto the work described {string}', async ({ page }: { pa
     const rebasedToast = page.getByRole('alert').filter({ hasText: 'Rebased 1 revision(s) onto main:' })
     await expect(rebasedToast).toContainText(description)
     await expect(rebaseButton(page)).toBeDisabled()
-    expect(descriptionOf(repository, 'main')).toBe(description)
     const notice = page.getByTestId('jj-thread-rebased-notice')
-    // The notice is the thread's, not the turn's: exactly one, whatever the conversation did.
     await expect(notice).toHaveCount(1)
+    expect(descriptionOf(repository, 'main')).toBe(description)
+
     await expect(notice).toBeVisible()
     await expect(notice).toContainText(`This thread was rebased onto main (${changeIdOf(repository, 'main')}).`)
     await expect(notice.getByRole('button', { name: 'Archive this rebased thread', exact: true })).toBeEnabled()

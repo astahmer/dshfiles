@@ -106,7 +106,9 @@ Feature: jj thread workspaces
     Then the current thread header identifies its jj workspace
     And Rebase is disabled before there are revisions to rebase
     When the thread workspace gains a revision described "wip"
-    Then Rebase refuses the placeholder description and leaves main in place
+    And the current thread workspace chip is hovered
+    Then the revision graph preview shows the thread and configured landmarks
+    And Rebase refuses the placeholder description and leaves main in place
     When the thread workspace gains a revision described "Add the feature"
     Then Rebase moves main onto the work described "Add the feature"
     When the thread workspace gains a revision described "Follow-up after a steer"

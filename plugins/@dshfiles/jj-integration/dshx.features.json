@@ -308,9 +308,12 @@
     {
       "id": "rebase",
       "title": "Rebase a thread onto the bookmark",
-      "summary": "One conversation-header control names the current thread's jj workspace, how many revisions are ready to rebase, and whether rebasing is blocked; its menu holds Rebase, the Thread workspaces side panel, and Download session log. Rebase a thread's described work onto the target bookmark and advance it from that menu, the panel, or `/rebase` composer command. The in-chat notice shows the tip change ID and offers Archive for the current thread. The command refuses non-thread workspaces and Rebase is disabled while any thread session is working or waiting for input; an agent handed back conflicts or descriptions may rebase its own thread once they are fixed, while every other session of that thread must still be idle. Afterwards the checkout running DSH follows the bookmark in the background through `dshx checkout sync`, with a panel line saying what was rebuilt and whether to restart.",
+      "summary": "One conversation-header control names the current thread's jj workspace, how many revisions are ready to rebase, and whether rebasing is blocked; its menu holds Rebase, the Thread workspaces side panel, and Download session log. Hovering the current-thread workspace chip lazily previews a bounded revision graph of thread work, the configured bookmark and its origin ref, plus the default workspace. Rebase a thread's described work onto the target bookmark and advance it from that menu, the panel, or `/rebase` composer command. The in-chat notice shows the tip change ID and offers Archive for the current thread. The command refuses non-thread workspaces and Rebase is disabled while any thread session is working or waiting for input; an agent handed back conflicts or descriptions may rebase its own thread once they are fixed, while every other session of that thread must still be idle. Afterwards the checkout running DSH follows the bookmark in the background through `dshx checkout sync`, with a panel line saying what was rebuilt and whether to restart.",
       "reach": [
         "seed rebase-ready-thread",
+        "hover button \"Current thread workspace: thread-*\"",
+        "expect heading \"Revision graph\"",
+        "press Escape",
         "click button \"Current thread workspace: thread-*\"",
         "expect button \"Rebase this thread onto main\"",
         "expect text \"1 to rebase\"",

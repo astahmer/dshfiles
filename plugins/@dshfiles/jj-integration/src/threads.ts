@@ -293,7 +293,50 @@ export const createThreads = (options: {
     return { current: candidates.includes(preferred) ? preferred : (candidates[0] ?? null), names: [...new Set(names)] }
   }
 
-  return { locate, list, status, provision, land, discard, bookmarks, workingCopyCommitId }
+  const revisionGraph = async (path: string): Promise<string> => {
+    const thread = await requireThread(path)
+    const operationId = (await jj(['--ignore-working-copy', 'op', 'log', '--limit', '1', '--no-graph', '-T', 'id'], thread.workspaceRoot)).trim()
+    if (operationId.length === 0) throw new ThreadError('jj-failed', 'Could not read the current jj operation.')
+
+    const readAtOperation = (args: readonly string[]): Promise<string> =>
+      jj(['--ignore-working-copy', '--at-operation', operationId, ...args], thread.workspaceRoot)
+    const workspaceNames = (await readAtOperation(['workspace', 'list', '-T', 'name ++ "\\n"'])).split('\n')
+    const hasDefaultWorkspace = workspaceNames.includes('default')
+    const commitIdSchema = z.string().regex(/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u)
+    const defaultCommitId = hasDefaultWorkspace
+      ? commitIdSchema.safeParse((await readAtOperation(['log', '--no-graph', '-r', 'default@', '-T', 'commit_id.short(64)'])).trim())
+      : undefined
+    if (defaultCommitId !== undefined && !defaultCommitId.success) {
+      throw new ThreadError('jj-failed', 'Could not resolve the default workspace revision.')
+    }
+    const defaultWorkspaceLabel = defaultCommitId === undefined ? '""' : `if(commit_id.short(64) == "${defaultCommitId.data}", "default@", "")`
+    const bookmark = options.bookmark()
+    const bookmarkLiteral = JSON.stringify(bookmark)
+    const threadRevisionLimit = 16
+    const threadRevisionLines = (
+      await readAtOperation(['log', '--no-graph', '--limit', String(threadRevisionLimit), '-r', `::@ ~ ::${bookmark}`, '-T', 'commit_id ++ "\\n"'])
+    )
+      .split('\n')
+      .filter(line => line.length > 0)
+    const threadRevisionIds = z.array(commitIdSchema).max(threadRevisionLimit).safeParse(threadRevisionLines)
+    if (!threadRevisionIds.success) throw new ThreadError('jj-failed', 'Could not read thread revision IDs for the graph.')
+    const revset = ['@', ...threadRevisionIds.data, bookmark, `present(${bookmark}@origin)`, ...(hasDefaultWorkspace ? ['default@'] : [])].join(' | ')
+    const template = [
+      'change_id.short(8)',
+      '" "',
+      `local_bookmarks.filter(|bookmark| bookmark.name() == ${bookmarkLiteral}).map(|bookmark| bookmark.name()).join(",")`,
+      '" "',
+      `remote_bookmarks.filter(|bookmark| bookmark.name() == ${bookmarkLiteral} && bookmark.remote() == "origin").map(|bookmark| bookmark.name() ++ "@" ++ bookmark.remote()).join(",")`,
+      '" "',
+      defaultWorkspaceLabel,
+      '" "',
+      'description.first_line().substr(0, 64)',
+      '"\\n"',
+    ].join(' ++ ')
+    return (await readAtOperation(['log', '--no-pager', '--color=never', '--limit', '20', '-r', revset, '-T', template])).trimEnd()
+  }
+
+  return { locate, list, status, provision, land, discard, bookmarks, workingCopyCommitId, revisionGraph }
 }
 
 export type Threads = ReturnType<typeof createThreads>

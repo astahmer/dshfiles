@@ -589,6 +589,7 @@ const api = jjIntegrationApi.host({
     const found = location === undefined ? undefined : await findThread({ location, includeActivity: false })
     return { thread: found?.thread ?? null }
   },
+  revisionGraph: async ({ input }) => ({ graph: await requireThreads().revisionGraph(input.path) }),
   land: ({ input }) => landThread({ path: input.path, sessionId: input.sessionId, fromAgent: false }),
   threadStatus: async ({ input, caller }) => {
     const location = await requireThreads().locate(threadPath(input, caller))

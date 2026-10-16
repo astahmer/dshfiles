@@ -120,6 +120,11 @@ export const jjIntegrationApi = defineApi({
       description:
         'The thread workspace at a path (revisions not yet on the bookmark, conflicts, whether main moved, and whether it is safe to rebase), or null when the path is not a thread.',
     }),
+    revisionGraph: method({
+      input: z.object({ path: z.string().min(1) }).strict(),
+      output: z.object({ graph: z.string().max(16_000) }).strict(),
+      description: 'A bounded jj revision graph for the thread, configured bookmark, origin bookmark, and default workspace.',
+    }),
     isolate: method({
       input: z.object({}).strict(),
       output: isolatedWorkspaceSchema,

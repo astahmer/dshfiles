@@ -83,7 +83,10 @@ modal.
 The **Thread workspaces** page is available from the left panel and as a tab in
 the conversation's right side panel, beside Jujutsu and other tools. Its rows
 show the linked conversation titles. Choose a title to open that conversation;
-**Preview** loads the latest three user/assistant text messages on demand.
+**Preview** loads the latest three user/assistant text messages on demand. Hover
+the current thread workspace chip in the conversation header to load a compact
+revision graph for the thread, configured bookmark and origin ref, and default
+workspace.
 
 ## Rebasing
 
