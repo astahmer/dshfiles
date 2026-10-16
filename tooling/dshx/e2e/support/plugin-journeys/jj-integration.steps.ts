@@ -618,6 +618,7 @@ Then('the thread row offers Rebase for its 1 revision to rebase', async ({ page 
 
 When('Rebase is clicked in the thread workspace row', async ({ page }: { page: Page }) => {
   await threadRow(page).getByRole('button', { name: 'Rebase', exact: true }).click()
+  await expect(threadRow(page).getByText('Rebasing…', { exact: true }).first()).toBeVisible({ timeout: 1_000 })
 })
 
 Then('the thread workspace row immediately shows that it is up to date', async ({ page }: { page: Page }) => {
