@@ -1,6 +1,16 @@
+import type { InputState } from '@deepseek-ai/dsh-client-ui-conversation/client'
+
+export type ComposerReferenceHandoff = Pick<InputState, 'draft' | 'occurrences'>
+
 export const createComposerWorkspaceNavigation = (input: {
   readonly selectedWorkspace: () => string | undefined
   readonly subscribe: (listener: () => void) => () => void
+  readonly captureReferences: () => ComposerReferenceHandoff | undefined
+  readonly restoreReferences: (input: {
+    readonly workspaceId: string
+    readonly handoff: ComposerReferenceHandoff
+    readonly signal: AbortSignal
+  }) => Promise<void>
 }) => {
   let pick: ((workspaceId: string) => void) | undefined
 
@@ -14,6 +24,7 @@ export const createComposerWorkspaceNavigation = (input: {
   const open = (workspaceId: string, signal: AbortSignal): Promise<void> => {
     signal.throwIfAborted()
     if (input.selectedWorkspace() === workspaceId) return Promise.resolve()
+    const handoff = input.captureReferences()
     // oxlint-disable-next-line antislop/no-passthrough-variable -- Snapshot the initiating composer; navigation remounts and replaces its binding.
     const select = pick
     if (select === undefined) return Promise.reject(new Error('The new-thread composer is no longer mounted.'))
@@ -27,10 +38,20 @@ export const createComposerWorkspaceNavigation = (input: {
         cleanup()
         reject(lifetime.reason)
       }
+      let resolving = false
       const changed = () => {
-        if (input.selectedWorkspace() !== workspaceId) return
+        if (input.selectedWorkspace() !== workspaceId || resolving) return
+        resolving = true
         cleanup()
-        resolve()
+        if (handoff === undefined) {
+          resolve()
+          return
+        }
+        try {
+          void input.restoreReferences({ workspaceId, handoff, signal: lifetime }).then(resolve, reject)
+        } catch (error) {
+          reject(error)
+        }
       }
       const unsubscribe = input.subscribe(changed)
       lifetime.addEventListener('abort', abort, { once: true })

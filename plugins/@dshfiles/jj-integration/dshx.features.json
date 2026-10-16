@@ -5,7 +5,7 @@
     {
       "id": "thread-destination",
       "title": "New thread destination and workspace isolation",
-      "summary": "Above a new thread's composer: pick the folder (or none), the jj bookmark it starts from, and whether it gets its own jj workspace beside the repository; unsent text and attachments follow workspace changes.",
+      "summary": "Above a new thread's composer: pick the folder (or none), the jj bookmark it starts from, and whether it gets its own jj workspace beside the repository; unsent drafts, attachments, and structured references follow workspace changes.",
       "reach": [
         "click button \"New thread\"",
         "click button \"Choose workspace\"",
@@ -87,6 +87,11 @@
           "featureFile": "tooling/dshx/e2e/features/jj-integration.feature"
         },
         {
+          "kind": "gherkin",
+          "id": "jj-integration.structured-reference-handoff-browser-journey",
+          "featureFile": "tooling/dshx/e2e/features/jj-integration.feature"
+        },
+        {
           "kind": "unit-test",
           "id": "jj-integration.provision",
           "file": "plugins/@dshfiles/jj-integration/src/threads.integration.test.ts",
@@ -128,7 +133,7 @@
       "configuration": [],
       "states": ["opening", "preparing", "switching", "settled"],
       "failureModes": [
-        "The composer stays editable during preparation; a submitted message is held until the destination Session opens, and native-picker navigation moves its draft and attachments without leaving a stale source copy.",
+        "The composer stays editable during preparation; a submitted message is held until the destination Session opens, and native-picker navigation moves its draft, attachments, and structured references without leaving a stale source copy.",
         "Each New-thread screen is moved at most once; a manual toggle afterwards is never undone."
       ],
       "externalDependencies": [],

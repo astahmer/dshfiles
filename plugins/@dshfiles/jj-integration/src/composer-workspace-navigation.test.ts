@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { createComposerWorkspaceNavigation } from './composer-workspace-navigation.js'
+import { createComposerWorkspaceNavigation, type ComposerReferenceHandoff } from './composer-workspace-navigation.js'
 
-const navigationFixture = () => {
+type ComposerWorkspaceNavigationInput = Parameters<typeof createComposerWorkspaceNavigation>[0]
+
+const navigationFixture = (callbacks: Partial<Pick<ComposerWorkspaceNavigationInput, 'captureReferences' | 'restoreReferences'>> = {}) => {
   let selected = 'project'
   const listeners = new Set<() => void>()
   const navigation = createComposerWorkspaceNavigation({
@@ -10,6 +12,8 @@ const navigationFixture = () => {
       listeners.add(listener)
       return () => listeners.delete(listener)
     },
+    captureReferences: callbacks.captureReferences ?? (() => undefined),
+    restoreReferences: callbacks.restoreReferences ?? (() => Promise.resolve()),
   })
   const arrive = (workspaceId: string) => {
     selected = workspaceId
@@ -28,6 +32,51 @@ describe('composer-owned workspace navigation', () => {
     expect(fixture.listeners.size).toBe(1)
     fixture.arrive('thread')
     await opened
+    expect(fixture.listeners.size).toBe(0)
+  })
+
+  it('restores structured references before navigation resolves', async () => {
+    const handoff: ComposerReferenceHandoff = {
+      draft: '@Mention target',
+      occurrences: [
+        {
+          occurrenceId: 1,
+          source: 'mentions',
+          ref: 'session-id',
+          offset: 0,
+          length: '@Mention target'.length,
+          label: 'Mention target',
+          appearance: 'session',
+          clipboardText: '@Mention target',
+        },
+      ],
+    }
+    let releaseRestoration: (() => void) | undefined
+    const restored: string[] = []
+    const fixture = navigationFixture({
+      captureReferences: () => handoff,
+      restoreReferences: ({ workspaceId }) => {
+        restored.push(workspaceId)
+        return new Promise<void>(resolve => {
+          releaseRestoration = resolve
+        })
+      },
+    })
+    fixture.navigation.bind(fixture.arrive)
+    const opened = fixture.navigation.open('thread', new AbortController().signal)
+    fixture.arrive('thread')
+
+    expect(restored).toEqual(['thread'])
+    let resolved = false
+    void opened.then(() => {
+      resolved = true
+    })
+    await Promise.resolve()
+    expect(resolved).toBe(false)
+    if (releaseRestoration === undefined) throw new Error('Reference restoration did not start.')
+    releaseRestoration()
+    await opened
+    expect(resolved).toBe(true)
     expect(fixture.listeners.size).toBe(0)
   })
 

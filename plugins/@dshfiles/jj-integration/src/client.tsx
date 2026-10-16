@@ -15,14 +15,14 @@ import { PluginQueryProvider, pluginQueryClient, useQuery } from '@dshfiles/plug
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { createWorkspacePickerPorts } from '@dshfiles/project-folder-picker'
 import { startWorkspaceToggle, type DestinationBarServices } from './destination-bar.js'
-import { createComposerWorkspaceNavigation } from './composer-workspace-navigation.js'
+import { createComposerWorkspaceNavigation, type ComposerReferenceHandoff } from './composer-workspace-navigation.js'
 import { jjIntegrationApi } from './api.js'
 import { HeroWorkspacePicker } from './hero-workspace-picker.js'
 import { LandButton } from './land-button.js'
 import { JJ_INTEGRATION_LOCALE_NAMESPACE, jjIntegrationLocale } from './locales.js'
 import { ThreadWorkspacesPanel } from './panel.js'
 import { prepareRemoteFolder } from './remote-destination.js'
-import { deferWorkspaceSubmit, type WorkspaceComposer } from './workspace-submit.js'
+import { deferWorkspaceSubmit } from './workspace-submit.js'
 import { jjIntegrationSettings } from './settings.js'
 import './client.css'
 
@@ -189,6 +189,8 @@ export default defineClient({
           unsubscribeWorkspaces()
         }
       },
+      captureReferences: () => captureComposerReferences(),
+      restoreReferences: input => restoreComposerReferences(input),
     })
     const destinationServices: DestinationBarServices = {
       workspaces: ctx.workspaces,
@@ -259,7 +261,7 @@ export default defineClient({
       queryClient: pluginQueryClient(),
     })
     const pendingSubmissions = new Map<SessionSummary['id'], AbortController>()
-    const workspaceComposerFor = (sessionId?: SessionSummary['id']): WorkspaceComposer | undefined => {
+    const workspaceComposerFor = (sessionId?: SessionSummary['id']) => {
       const sessions = ctx.sessions.list.getSnapshot()
       const currentId = sessions.ids.find(id => (sessions.byId[id]?.retainedBy.mainView ?? 0) > 0)
       if (currentId === undefined || (sessionId !== undefined && currentId !== sessionId)) return undefined
@@ -269,6 +271,125 @@ export default defineClient({
       if (session === undefined || workspace === undefined || scoped === undefined) return undefined
       return { sessionId: currentId, workspaceId: workspace.workspaceId, blank: session.blank, input: ctx.conversation.input.for(scoped) }
     }
+    const captureComposerReferences = (): ComposerReferenceHandoff | undefined => {
+      const composer = workspaceComposerFor()
+      if (composer === undefined || !composer.blank) return undefined
+      const state = composer.input.state.getSnapshot()
+      if (state.occurrences.length === 0) return undefined
+      return { draft: state.draft, occurrences: state.occurrences.map(occurrence => ({ ...occurrence })) }
+    }
+    const restoreComposerReferences = (input: {
+      readonly workspaceId: string
+      readonly handoff: ComposerReferenceHandoff
+      readonly signal: AbortSignal
+    }): Promise<void> =>
+      new Promise<void>((resolve, reject) => {
+        if (input.signal.aborted) {
+          reject(input.signal.reason)
+          return
+        }
+        let unsubscribeSessions = (): void => undefined
+        let unsubscribeWorkspaces = (): void => undefined
+        let unsubscribeInput: (() => void) | undefined
+        let subscribed = false
+        let checking = false
+        let settled = false
+        const cleanup = (): void => {
+          if (settled) return
+          settled = true
+          unsubscribeSessions()
+          unsubscribeWorkspaces()
+          unsubscribeInput?.()
+          input.signal.removeEventListener('abort', abort)
+        }
+        const finish = (): void => {
+          cleanup()
+          resolve()
+        }
+        const abort = (): void => {
+          cleanup()
+          reject(input.signal.reason)
+        }
+        const changed = (): void => {
+          if (!subscribed || checking || settled) return
+          checking = true
+          try {
+            const composer = workspaceComposerFor()
+            if (composer === undefined || !composer.blank || composer.workspaceId !== input.workspaceId) {
+              unsubscribeInput?.()
+              unsubscribeInput = undefined
+              return
+            }
+            unsubscribeInput ??= composer.input.state.subscribe(changed)
+            const snapshot = composer.input.state.getSnapshot()
+            if (snapshot.draft === '') return
+            if (snapshot.draft !== input.handoff.draft) {
+              composer.input.notify('error', translate('workspaceReferenceRestoreFailed'))
+              finish()
+              return
+            }
+            for (const occurrence of input.handoff.occurrences.toReversed()) {
+              const current = composer.input.state.getSnapshot()
+              const alreadyPresent = current.occurrences.some(
+                candidate =>
+                  candidate.offset === occurrence.offset &&
+                  candidate.source === occurrence.source &&
+                  candidate.ref === occurrence.ref &&
+                  candidate.clipboardText === occurrence.clipboardText,
+              )
+              if (alreadyPresent) continue
+              const text = current.draft.slice(occurrence.offset, occurrence.offset + occurrence.length)
+              if (text !== occurrence.clipboardText) {
+                composer.input.notify('error', translate('workspaceReferenceRestoreFailed'))
+                finish()
+                return
+              }
+              // Clipboard offsets expand earlier chips; editor spans count each existing chip as one position.
+              const collapsedPrefixLength = current.occurrences
+                .filter(candidate => candidate.offset < occurrence.offset)
+                .reduce((total, candidate) => total + candidate.length - 1, 0)
+              const detectOffset = occurrence.offset - collapsedPrefixLength
+              const reference =
+                occurrence.appearance === undefined
+                  ? {
+                      source: occurrence.source,
+                      ref: occurrence.ref,
+                      label: occurrence.label,
+                      clipboardText: occurrence.clipboardText,
+                    }
+                  : {
+                      source: occurrence.source,
+                      ref: occurrence.ref,
+                      label: occurrence.label,
+                      appearance: occurrence.appearance,
+                      clipboardText: occurrence.clipboardText,
+                    }
+              const inserted = composer.input.insertReference(reference, {
+                start: detectOffset,
+                end: detectOffset + occurrence.length,
+                draftRev: current.draftRev,
+              })
+              if (!inserted) {
+                composer.input.notify('error', translate('workspaceReferenceRestoreFailed'))
+                finish()
+                return
+              }
+            }
+            finish()
+          } catch (error) {
+            cleanup()
+            reject(error)
+          } finally {
+            checking = false
+          }
+        }
+        unsubscribeSessions = ctx.sessions.list.subscribe(changed)
+        unsubscribeWorkspaces = ctx.workspaces.list.subscribe(changed)
+        input.signal.addEventListener('abort', abort, { once: true })
+        subscribed = true
+        if (input.signal.aborted) abort()
+        else changed()
+      })
     const stopSubmit = (event: Event): void => {
       event.preventDefault()
       event.stopImmediatePropagation()

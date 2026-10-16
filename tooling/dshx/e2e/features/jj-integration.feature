@@ -65,6 +65,18 @@ Feature: jj thread workspaces
     And New thread is clicked in the sidebar
     Then the New thread composer is empty and no consumed draft remains stored
 
+  @scenario:jj-integration.structured-reference-handoff-browser-journey
+  Scenario: Switching the thread destination preserves structured composer references
+    Given the isolated plugin composition of "@dshfiles/jj-integration, @dshfiles/mentions, @dshfiles/workspace-folder-picker, @dshfiles/home, @dshfiles/thread-sidebar, @dshfiles/multi-host" is booted
+    When a disposable jj repository is chosen as the New thread project
+    And threads named "Mention target" and "Second thread" are started
+    And a new thread composer types "@t:Mention"
+    And the highlighted mention row is picked with the keyboard
+    And the composer appends a reference to thread "Second thread"
+    And the New thread workspace toggle is turned on
+    And the New thread workspace toggle is turned off
+    Then the composer holds two native reference chips
+
   @scenario:jj-integration.rebase-browser-journey
   Scenario: Rebase a thread's described work onto main
     Given the isolated plugin composition of "@dshfiles/jj-integration, @dshfiles/workspace-folder-picker, @dshfiles/multi-host" is booted

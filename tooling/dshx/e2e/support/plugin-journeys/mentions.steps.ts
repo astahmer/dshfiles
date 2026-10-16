@@ -77,6 +77,21 @@ When('the highlighted mention row is picked with the keyboard', async ({ page }:
   await newThreadComposer(page).press('Enter')
 })
 
+When('the composer appends a reference to thread {string}', async ({ page }: { page: Page }, title: string) => {
+  const composer = newThreadComposer(page)
+  await composer.pressSequentially(` and @t:${title.split(' ')[0] ?? ''}`)
+  const row = mentionRows(page).filter({ hasText: title }).first()
+  await expect(row).toBeVisible()
+  await row.click()
+})
+
+Then('the composer holds two native reference chips', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'mentions-two-native-chips', async () => {
+    await expect(page.locator('[data-composer-card] [data-composer-chip="reference"]')).toHaveCount(2)
+  })
+  await finishJourneyAssertions(page)
+})
+
 Then('the composer holds a native reference chip', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'mentions-native-chip', async () => {
     await expect(page.locator('[data-composer-card] [data-composer-chip="reference"]')).toHaveCount(1)
