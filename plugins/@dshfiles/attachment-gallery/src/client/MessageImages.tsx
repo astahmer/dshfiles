@@ -1,7 +1,7 @@
 import type { MessageImagesProps } from '@deepseek-ai/dsh-client-ui-chat/client'
 import { ImageGallery } from '../MessageImage.js'
 import type { ImageLightboxLabels } from '../ImageLightbox.js'
-import { messageImageLabels } from './labels.js'
+import { AttachmentGalleryLabelsModel } from './labels.js'
 
 export function MessageImages({
   images,
@@ -14,5 +14,14 @@ export function MessageImages({
 }: MessageImagesProps & {
   galleryLabels: ImageLightboxLabels
 }) {
-  return <ImageGallery images={images} load={loadImage} align={align} compact={compact} thumbnail={thumbnail} labels={messageImageLabels(t, galleryLabels)} />
+  return (
+    <ImageGallery
+      images={images}
+      load={loadImage}
+      align={align}
+      compact={compact}
+      thumbnail={thumbnail}
+      labels={AttachmentGalleryLabelsModel.messageImageLabels(t, galleryLabels)}
+    />
+  )
 }

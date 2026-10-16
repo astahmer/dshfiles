@@ -7,7 +7,7 @@ import { DropOverlay } from '../DropOverlay.js'
 import { FileCard } from '../FileCard.js'
 import { ImageLightbox } from '../ImageLightbox.js'
 import type { ImageLightboxLabels } from '../ImageLightbox.js'
-import { attachmentRailLabels, dropOverlayLabels, fileCardLabels } from './labels.js'
+import { AttachmentGalleryLabelsModel } from './labels.js'
 import { installDocumentDropEvents } from './drop-events.js'
 import styles from './ComposerAttachments.module.css'
 
@@ -61,12 +61,12 @@ export function ComposerAttachments({
 
   return (
     <>
-      {dragActive && <DropOverlay disabled={!canAcceptDrop} labels={dropOverlayLabels(t, canAcceptDrop, dropLimits)} />}
+      {dragActive && <DropOverlay disabled={!canAcceptDrop} labels={AttachmentGalleryLabelsModel.dropOverlayLabels(t, canAcceptDrop, dropLimits)} />}
       {railItems.length > 0 && (
         <div className={`${styles.rail} dshx-root`}>
           <AttachmentRail
             items={railItems}
-            labels={attachmentRailLabels(t)}
+            labels={AttachmentGalleryLabelsModel.attachmentRailLabels(t)}
             renderItem={item => {
               const attachment = item.attachment
               if (attachment.kind === 'file') {
@@ -77,7 +77,7 @@ export function ComposerAttachments({
                     bytes={attachment.file.size}
                     state={upload === undefined || upload.status === 'uploading' ? 'uploading' : upload.status === 'ready' ? 'ready' : 'error'}
                     {...(upload?.status === 'uploading' && upload.total !== undefined && upload.total > 0 ? { progress: upload.loaded / upload.total } : {})}
-                    labels={fileCardLabels(t, attachment.file.name)}
+                    labels={AttachmentGalleryLabelsModel.fileCardLabels(t, attachment.file.name)}
                     onRemove={() => {
                       onRemoveAttachment(attachment.id)
                     }}

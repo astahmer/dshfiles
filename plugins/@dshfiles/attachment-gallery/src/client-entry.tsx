@@ -9,7 +9,7 @@ import { ComposerAttachments } from './client/ComposerAttachments.js'
 import type { ComposerAttachmentsProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { MessageImages } from './client/MessageImages.js'
 import type { MessageImagesProps } from '@deepseek-ai/dsh-client-ui-chat/client'
-import { imageLightboxLabels } from './client/labels.js'
+import { AttachmentGalleryLabelsModel } from './client/labels.js'
 import { ATTACHMENT_GALLERY_LOCALE_NAMESPACE, attachmentGalleryLocale } from './locales.js'
 
 export default defineClient({
@@ -18,8 +18,10 @@ export default defineClient({
   inject: ['slots'],
   setup(ctx, decorate) {
     const translate = ctx.locale.bind(ATTACHMENT_GALLERY_LOCALE_NAMESPACE)
-    const ComposerSlot = (props: ComposerAttachmentsProps) => <ComposerAttachments {...props} galleryLabels={imageLightboxLabels(translate)} />
-    const MessageSlot = (props: MessageImagesProps) => <MessageImages {...props} galleryLabels={imageLightboxLabels(translate)} />
+    const ComposerSlot = (props: ComposerAttachmentsProps) => (
+      <ComposerAttachments {...props} galleryLabels={AttachmentGalleryLabelsModel.imageLightboxLabels(translate)} />
+    )
+    const MessageSlot = (props: MessageImagesProps) => <MessageImages {...props} galleryLabels={AttachmentGalleryLabelsModel.imageLightboxLabels(translate)} />
 
     ctx.slots.inject('conversation.input.attachments', () =>
       ctx.slots.register(
