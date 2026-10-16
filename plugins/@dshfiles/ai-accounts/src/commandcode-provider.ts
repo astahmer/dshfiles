@@ -88,12 +88,19 @@ const subscriptionSchema = z.object({ data: z.object({ planId: z.string().nullis
 
 export class CommandCodeConfigError extends Error {}
 
-export const resolveCommandCodeBase = (baseUrl: string | undefined): string => {
-  const base = baseUrl === undefined || baseUrl.trim() === '' ? DEFAULT_COMMANDCODE_BASE_URL : baseUrl.trim()
-  if (!AccountsRules.isAllowedCommandCodeBase(base)) {
-    throw new CommandCodeConfigError(`Refusing Command Code base '${base}': use https on commandcode.ai, or a loopback address.`)
+export class CommandCodeProviderModel {
+  static readonly resolveBase = (baseUrl: string | undefined): string => {
+    const base = baseUrl === undefined || baseUrl.trim() === '' ? DEFAULT_COMMANDCODE_BASE_URL : baseUrl.trim()
+    if (!AccountsRules.isAllowedCommandCodeBase(base)) {
+      throw new CommandCodeConfigError(`Refusing Command Code base '${base}': use https on commandcode.ai, or a loopback address.`)
+    }
+    return base.replace(/\/$/, '')
   }
-  return base.replace(/\/$/, '')
+
+  static readonly explainFailure = (message: string): string =>
+    /^404\b/.test(message)
+      ? `${message} — Command Code has no such route; check the account's API base URL (expected ${DEFAULT_COMMANDCODE_BASE_URL}).`
+      : message
 }
 
 const resolveKeyEnv = (keyEnv: string | undefined): string => {
@@ -121,7 +128,7 @@ const messagesOnlyById = (id: string): boolean => id.startsWith('anthropic/') ||
  * fallback signal for which Provider API shape a model needs.
  */
 export const fetchCommandCodeCatalog = async (options: CommandCodeCatalogOptions): Promise<readonly CatalogEntry[]> => {
-  const base = resolveCommandCodeBase(options.baseUrl)
+  const base = CommandCodeProviderModel.resolveBase(options.baseUrl)
   if (options.apiKey.length === 0) return FALLBACK
   const response = await fetch(`${base}/provider/v1/models`, {
     headers: { authorization: `Bearer ${options.apiKey}`, accept: 'application/json' },
@@ -179,13 +186,9 @@ const settleEmptyAsFailure = (event: AssistantMessageEvent): AssistantMessageEve
 
 const GO_PLAN_REFUSAL = /upgrade_required|plan doesn't include API access/i
 
-/** A 404 almost always means a mistyped base URL, so the message says where to look. */
-export const explainCommandCodeFailure = (message: string): string =>
-  /^404\b/.test(message) ? `${message} — Command Code has no such route; check the account's API base URL (expected ${DEFAULT_COMMANDCODE_BASE_URL}).` : message
-
 const explainEvent = (event: AssistantMessageEvent): AssistantMessageEvent =>
   event.type === 'error' && event.error.errorMessage !== undefined
-    ? { ...event, error: { ...event.error, errorMessage: explainCommandCodeFailure(event.error.errorMessage) } }
+    ? { ...event, error: { ...event.error, errorMessage: CommandCodeProviderModel.explainFailure(event.error.errorMessage) } }
     : event
 
 type Transport = 'cli' | 'provider'
@@ -197,7 +200,7 @@ const PLAN_TTL_MS = 300_000
 const PROVIDER_API_PLAN = /^(individual-(goat|pro|provider|max|ultra)|teams-)/i
 
 export const createCommandCodeProvider = (options: CommandCodeProviderOptions = {}) => {
-  const root = resolveCommandCodeBase(options.baseUrl)
+  const root = CommandCodeProviderModel.resolveBase(options.baseUrl)
   const keyEnv = resolveKeyEnv(options.keyEnv)
   const shapes = new Map<string, ProviderApiShape>()
   const transports = new Map<string, { readonly transport: Promise<Transport>; readonly at: number }>()

@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { AddressInfo } from 'node:net'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { CommandCodeConfigError, createCommandCodeProvider, fetchCommandCodeCatalog } from './commandcode-provider.js'
+import { CommandCodeConfigError, CommandCodeProviderModel, createCommandCodeProvider, fetchCommandCodeCatalog } from './commandcode-provider.js'
 import { readCommandCodeKey } from './commandcode-usage.js'
 import { CommandCodeCapabilities } from './commandcode-capabilities.js'
 
@@ -26,6 +26,15 @@ beforeAll(async () => {
 })
 
 afterAll(() => new Promise<void>(resolve => server.close(() => resolve())))
+
+describe('CommandCodeProviderModel', () => {
+  it('normalizes safe bases and explains missing routes', () => {
+    expect(CommandCodeProviderModel.resolveBase(undefined)).toBe('https://api.commandcode.ai')
+    expect(CommandCodeProviderModel.resolveBase(`${baseUrl}/`)).toBe(baseUrl)
+    expect(CommandCodeProviderModel.explainFailure('404 Not Found')).toContain("check the account's API base URL")
+    expect(CommandCodeProviderModel.explainFailure('401 Unauthorized')).toBe('401 Unauthorized')
+  })
+})
 
 describe('fetchCommandCodeCatalog', () => {
   it('sends the key value as the bearer token', async () => {

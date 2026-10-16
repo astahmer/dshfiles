@@ -3,7 +3,7 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { z } from 'zod'
 import type { UsageCard } from './api.js'
-import { DEFAULT_COMMANDCODE_KEY_ENV, resolveCommandCodeBase } from './commandcode-provider.js'
+import { CommandCodeProviderModel, DEFAULT_COMMANDCODE_KEY_ENV } from './commandcode-provider.js'
 import { CredentialModel, type CredentialValueResolver } from './credentials.js'
 import { ProviderUsageModel, type UsageWindow } from './usage.js'
 
@@ -120,7 +120,7 @@ export const readCommandCodeUsage = async (
   if (key.length === 0) return ProviderUsageModel.emptyUsage('unauthenticated', 'Export the account key variable or run `cmd login`.')
   let base: string
   try {
-    base = resolveCommandCodeBase(input.apiBaseUrl)
+    base = CommandCodeProviderModel.resolveBase(input.apiBaseUrl)
   } catch (cause) {
     return ProviderUsageModel.emptyUsage('error', cause instanceof Error ? cause.message : 'Invalid Command Code base.')
   }
