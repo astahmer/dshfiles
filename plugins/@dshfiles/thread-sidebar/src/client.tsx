@@ -97,7 +97,7 @@ import {
   workspaceForLineage,
   workspaceForSessions,
 } from './organization.js'
-import { attentionColorDotClass, attentionDotClass, attentionLabelClass, type ThreadAttentionLabel } from './attention-presentation.js'
+import { ThreadAttentionPresentationModel, type ThreadAttentionLabel } from './attention-presentation.js'
 import { attentionColorSchema, toggleCollapsedSection } from './preferences.js'
 import { selectInputNeededRows, selectTurnFinishedRows } from './attention-rows.js'
 import { registerPaletteAction, setPaletteRecentLimit, type PaletteAction } from '@dshfiles/command-palette/api'
@@ -424,7 +424,7 @@ const StatusDot = (props: {
   readonly attentionColors: AttentionColors
 }): JSX.Element => {
   const unread = props.unread
-  const dotClass = attentionDotClass({
+  const dotClass = ThreadAttentionPresentationModel.attentionDotClass({
     attentionLabel: props.attentionLabel,
     attentionColors: props.attentionColors,
     unread,
@@ -487,7 +487,12 @@ const ChildThreadList = (props: {
             {child.displayTitle}
           </span>
           {attentionLabel === undefined ? null : (
-            <span className={cn('dshx:shrink-0 dshx:text-[10px] dshx:font-medium', attentionLabelClass(attentionLabel, props.rowStyle.attentionColors))}>
+            <span
+              className={cn(
+                'dshx:shrink-0 dshx:text-[10px] dshx:font-medium',
+                ThreadAttentionPresentationModel.attentionLabelClass(attentionLabel, props.rowStyle.attentionColors),
+              )}
+            >
               {t(attentionLabel)}
             </span>
           )}
@@ -584,7 +589,12 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                     {rowStyle.title ? session.displayTitle : null}
                   </span>
                   {props.attentionLabel === undefined ? null : (
-                    <span className={cn('dshx:shrink-0 dshx:text-xs dshx:font-medium', attentionLabelClass(props.attentionLabel, rowStyle.attentionColors))}>
+                    <span
+                      className={cn(
+                        'dshx:shrink-0 dshx:text-xs dshx:font-medium',
+                        ThreadAttentionPresentationModel.attentionLabelClass(props.attentionLabel, rowStyle.attentionColors),
+                      )}
+                    >
                       {t(props.attentionLabel)}
                     </span>
                   )}
@@ -659,7 +669,7 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                         key={child.id}
                         className={cn(
                           'dshx:size-2 dshx:rounded-full dshx:ring-1 dshx:ring-background',
-                          attentionDotClass({
+                          ThreadAttentionPresentationModel.attentionDotClass({
                             attentionLabel,
                             attentionColors: rowStyle.attentionColors,
                             unread: props.unreadSessionIds.has(child.id),
@@ -1410,7 +1420,10 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                 className="dshx:min-w-0 dshx:flex-1 dshx:justify-start dshx:gap-1.5"
                 aria-label={`${props.tSidebar(label)}: ${props.tSidebar('threadSidebarAttentionColor')} ${colorLabel}`}
               >
-                <span className={cn('dshx:size-2 dshx:shrink-0 dshx:rounded-full', attentionColorDotClass(color))} aria-hidden="true" />
+                <span
+                  className={cn('dshx:size-2 dshx:shrink-0 dshx:rounded-full', ThreadAttentionPresentationModel.attentionColorDotClass(color))}
+                  aria-hidden="true"
+                />
                 <span className="dshx:truncate">{colorLabel}</span>
               </Button>
             </DropdownMenuTrigger>
@@ -1425,7 +1438,10 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
               >
                 {attentionColorOptions.map(option => (
                   <DropdownMenuRadioItem key={option} value={option}>
-                    <span className={cn('dshx:size-2 dshx:shrink-0 dshx:rounded-full', attentionColorDotClass(option))} aria-hidden="true" />
+                    <span
+                      className={cn('dshx:size-2 dshx:shrink-0 dshx:rounded-full', ThreadAttentionPresentationModel.attentionColorDotClass(option))}
+                      aria-hidden="true"
+                    />
                     {props.tSidebar(attentionColorLabelKeys[option])}
                   </DropdownMenuRadioItem>
                 ))}
@@ -2869,7 +2885,10 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
             <section className="dshx:mt-1" aria-label={props.tSidebar('threadSidebarApprovalNeeded')}>
               <div className={cn(stickyHeaderClass, 'dshx:flex dshx:h-8 dshx:items-center dshx:gap-2 dshx:px-2.5 dshx:text-sm')}>
                 <span
-                  className={cn('dshx:whitespace-nowrap dshx:font-medium', attentionLabelClass('threadSidebarApprovalNeeded', preferences.attentionColors))}
+                  className={cn(
+                    'dshx:whitespace-nowrap dshx:font-medium',
+                    ThreadAttentionPresentationModel.attentionLabelClass('threadSidebarApprovalNeeded', preferences.attentionColors),
+                  )}
                 >
                   {props.tSidebar('threadSidebarApprovalNeeded')}
                 </span>
@@ -2882,7 +2901,12 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           {groupedAttentionRows.inputNeeded.length > 0 ? (
             <section className="dshx:mt-1" aria-label={props.tSidebar('threadSidebarInputNeeded')}>
               <div className={cn(stickyHeaderClass, 'dshx:flex dshx:h-8 dshx:items-center dshx:gap-2 dshx:px-2.5 dshx:text-sm')}>
-                <span className={cn('dshx:whitespace-nowrap dshx:font-medium', attentionLabelClass('threadSidebarInputNeeded', preferences.attentionColors))}>
+                <span
+                  className={cn(
+                    'dshx:whitespace-nowrap dshx:font-medium',
+                    ThreadAttentionPresentationModel.attentionLabelClass('threadSidebarInputNeeded', preferences.attentionColors),
+                  )}
+                >
                   {props.tSidebar('threadSidebarInputNeeded')}
                 </span>
                 <span className="dshx:text-xs dshx:tabular-nums">({groupedAttentionRows.inputNeeded.length})</span>
@@ -2894,7 +2918,12 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           {groupedAttentionRows.turnFinished.length > 0 ? (
             <section className="dshx:mt-1" aria-label={props.tSidebar('threadSidebarTurnFinished')}>
               <div className={cn(stickyHeaderClass, 'dshx:flex dshx:h-8 dshx:items-center dshx:gap-2 dshx:px-2.5 dshx:text-sm')}>
-                <span className={cn('dshx:whitespace-nowrap dshx:font-medium', attentionLabelClass('threadSidebarTurnFinished', preferences.attentionColors))}>
+                <span
+                  className={cn(
+                    'dshx:whitespace-nowrap dshx:font-medium',
+                    ThreadAttentionPresentationModel.attentionLabelClass('threadSidebarTurnFinished', preferences.attentionColors),
+                  )}
+                >
                   {props.tSidebar('threadSidebarTurnFinished')}
                 </span>
                 <span className="dshx:text-xs dshx:tabular-nums">({groupedAttentionRows.turnFinished.length})</span>
