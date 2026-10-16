@@ -462,7 +462,7 @@ const validateOptionScopes = (options: Readonly<Record<string, unknown>>, contex
   }
 }
 
-export const cliArgsForContext = (context: CliOptionContext): ArgsDef => {
+const cliArgsForContext = (context: CliOptionContext): ArgsDef => {
   const args: ArgsDef = {}
   for (const [name, definition] of Object.entries(sharedArgs)) {
     const scope = optionScopes[name]
@@ -474,7 +474,7 @@ export const cliArgsForContext = (context: CliOptionContext): ArgsDef => {
   return args
 }
 
-export const cliArgsCommonToContexts = (contexts: readonly CliOptionContext[]): ArgsDef => {
+const cliArgsCommonToContexts = (contexts: readonly CliOptionContext[]): ArgsDef => {
   const [firstContext, ...remainingContexts] = contexts
   if (firstContext === undefined) return {}
   const firstArgs = cliArgsForContext(firstContext)
@@ -919,4 +919,10 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
     ...(types === undefined ? {} : { types }),
     ...(follow ? { follow } : {}),
   }
+}
+
+export class CliOptionMetadata {
+  static readonly commandMetadata = cliCommandMetadata
+  static readonly argsForContext = cliArgsForContext
+  static readonly commonArgsToContexts = cliArgsCommonToContexts
 }

@@ -1,6 +1,6 @@
 import { defineCommand, renderUsage } from 'citty'
 import type { ArgsDef, CommandDef, PositionalArgDef } from 'citty'
-import { cliArgsCommonToContexts, cliArgsForContext, cliCommandMetadata, type CliArgs, type CliCommand, type CliOptionContext } from './args.js'
+import { CliOptionMetadata, type CliArgs, type CliCommand, type CliOptionContext } from './args.js'
 
 interface HelpCommandSpec {
   readonly description: string
@@ -34,7 +34,7 @@ const optionContext = (
 const helpCommand = (name: string, description: string, context: CliOptionContext, positionals: ArgsDef = {}): CommandDef =>
   defineCommand({
     meta: { name, description },
-    args: { ...cliArgsForContext(context), ...positionals },
+    args: { ...CliOptionMetadata.argsForContext(context), ...positionals },
   })
 
 const actionHelpGroup = (command: CliCommand, actions: HelpCommandSpecs): CommandDef => {
@@ -46,8 +46,8 @@ const actionHelpGroup = (command: CliCommand, actions: HelpCommandSpecs): Comman
     helpActionCommands.set(`${command}:${action}`, actionCommand)
   }
   return defineCommand({
-    meta: { name: command, description: cliCommandMetadata[command] },
-    args: cliArgsCommonToContexts(actionContexts),
+    meta: { name: command, description: CliOptionMetadata.commandMetadata[command] },
+    args: CliOptionMetadata.commonArgsToContexts(actionContexts),
     subCommands,
   })
 }
@@ -64,8 +64,8 @@ const targetHelpGroup = (
     helpActionCommands.set(`${command}:${target}`, targetCommand)
   }
   return defineCommand({
-    meta: { name: command, description: cliCommandMetadata[command] },
-    args: cliArgsCommonToContexts(contexts),
+    meta: { name: command, description: CliOptionMetadata.commandMetadata[command] },
+    args: CliOptionMetadata.commonArgsToContexts(contexts),
     subCommands,
   })
 }
@@ -432,7 +432,7 @@ const addHelp = targetHelpGroup('add', {
 const simpleHelpCommand = (command: CliCommand, details: Partial<Pick<CliOptionContext, 'boot' | 'fix'>> = {}): CommandDef =>
   helpCommand(
     command,
-    cliCommandMetadata[command],
+    CliOptionMetadata.commandMetadata[command],
     optionContext(command, undefined, {
       inspectTarget: undefined,
       addTarget: undefined,
@@ -473,7 +473,7 @@ const dshxHelpCommand = defineCommand({
     name: 'dshx',
     description: 'Build DSH plugins and inspect or control a running DSH installation.',
   },
-  args: cliArgsForContext(optionContext(undefined)),
+  args: CliOptionMetadata.argsForContext(optionContext(undefined)),
   subCommands: helpCommands,
 })
 
