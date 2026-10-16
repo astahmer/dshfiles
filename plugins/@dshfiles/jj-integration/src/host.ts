@@ -384,7 +384,7 @@ const landThread = async (input: {
     message !== undefined && !input.fromAgent && readSettings().askAgentToFixLanding
       ? await askAgent(input.path, input.sessionId, message).catch(() => false)
       : false
-  if (outcome.status === 'landed') queueWorkspaceSync((await requireThreads().locate(input.path)).repoRoot)
+  if (outcome.status === 'landed') queueWorkspaceSync(location.repoRoot)
   emitActivity({
     type: `workspace.rebase_${outcome.status.replaceAll('-', '_')}`,
     level: outcome.status === 'landed' || outcome.status === 'nothing-to-land' ? 'notable' : 'attention',
