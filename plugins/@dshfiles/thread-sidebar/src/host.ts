@@ -22,6 +22,7 @@ import { activeRestartSessionIds, createRestartRecoveryStore } from './restart-r
 import { createRestartController, readLaunchUrl } from './restart.js'
 import { threadSidebarSettings } from './settings.js'
 import { threadSidebarModelRouteProjection } from './subagent-provenance/projection.js'
+import { setThreadActionsContext, threadActionsHost } from './thread-actions-host.js'
 
 const restartRecoveryStore = createRestartRecoveryStore()
 
@@ -159,11 +160,32 @@ interface ClientModuleRegistrySurface {
 export default defineHost({
   name: '@dshfiles/thread-sidebar',
   settings: [threadSidebarSettings],
-  inject: ['connection', 'sessionProjections', 'sessionQuery', 'agents', 'sessionController', 'sessionPersistence', 'storageDomain', 'workspaces'],
-  apis: [restartApi, recoveryApi, machineApi, pluginUpdatesApi, pendingQuestionsApi, threadAttentionApiHost, sessionArchiveApi],
+  inject: [
+    'connection',
+    'sessionProjections',
+    'sessionQuery',
+    'agents',
+    'sessionController',
+    'sessionPersistence',
+    'storageDomain',
+    'workspaces',
+    'workspaceController',
+    'workspaceRegistry',
+  ],
+  apis: [
+    restartApi,
+    recoveryApi,
+    machineApi,
+    pluginUpdatesApi,
+    pendingQuestionsApi,
+    threadAttentionApiHost,
+    sessionArchiveApi,
+    threadActionsHost,
+  ],
   // The web Host's client module registry knows where every loaded plugin package lives; Hosts without it
   // (desktop shells, older builds) simply report no pending updates.
   setup: ctx => {
+    setThreadActionsContext(ctx)
     ctx.sessionProjections.register(threadSidebarModelRouteProjection)
     // One durable attention record per session, written where the turn actually ends, so every browser,
     // plugin and CLI reads the same unacknowledged-thread state instead of each tab guessing from its own memory.

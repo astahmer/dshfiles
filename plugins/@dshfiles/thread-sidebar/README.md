@@ -260,6 +260,28 @@ available header size, and the 0 key restores the content-sized default. The han
 is hidden when the Host collapses the sidebar to its narrow rail, where the
 thread region is not rendered.
 
+## Agent tools
+
+One dshx API (`thread-actions`, owner `@dshfiles/thread-sidebar`, defined in
+`src/thread-actions-api.ts`) exposes the sidebar's thread and project actions to
+the Agent as sixteen native tools: `thread_list`, `thread_archive`,
+`thread_unarchive`, `thread_pin`, `thread_unpin`, `thread_rename`,
+`thread_fork`, `thread_create`, `thread_stop`, `thread_select_model`,
+`project_list`, `project_register`, `project_rename`, `project_delete`,
+`project_reorder`, and `thread_move`. `src/thread-actions.ts` holds the
+decoded logic over plain ids and `src/thread-actions-host.ts` resolves the live
+Host services on each call (`sessionController`, `workspaceController`,
+`workspaceRegistry`, `sessionQuery`).
+
+Every write tool's description says it may run only when the user asked for that
+change. `thread_archive` never stops running work on its own: without
+`stopActivity` the Host refuses with `workspace/session-active` and the tool
+returns the running families, so the Agent must confirm with the user before
+calling again with `stopActivity: true` — the sidebar's stop-and-archive
+confirmation. Actions default to the calling thread when `sessionId` is
+omitted; archiving the calling thread with `stopActivity: true` ends its turn.
+Because this is Host code, the tools reach a running DSH only after a restart.
+
 ## Installed DSH 0.2.0-rc.2 sidebar contract
 
 The installed `@deepseek-ai/dsh-client-ui-sidebar` contract exposes a
