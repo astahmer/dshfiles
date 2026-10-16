@@ -3,7 +3,7 @@ import { spawn, type ChildProcess } from 'node:child_process'
 import { hostConnectorSchema } from '../records.js'
 import { connectGateway, GatewayUnavailableError, type Gateway } from './gateway.js'
 import { reserveLoopbackEndpoint } from './loopback.js'
-import { launchFilePaths, parseRuntimeLaunch, type RuntimeLaunch } from '../launch-file.js'
+import { RuntimeLaunchFile, type RuntimeLaunch } from '../launch-file.js'
 
 const outputLimit = 128 * 1024
 
@@ -136,13 +136,13 @@ const remoteLaunch = async ({
   readonly remoteHome: string
   readonly signal?: AbortSignal | undefined
 }): Promise<RuntimeLaunch> => {
-  const [launchFile, webUrlFile] = launchFilePaths(remoteHome)
+  const [launchFile, webUrlFile] = RuntimeLaunchFile.launchFilePaths(remoteHome)
   const content = await runSshCommand({
     sshTarget,
     command: `cat -- ${shellQuote(launchFile)} 2>/dev/null || cat -- ${shellQuote(webUrlFile)} 2>/dev/null || true`,
     signal,
   })
-  const launch = parseRuntimeLaunch(content)
+  const launch = RuntimeLaunchFile.parseRuntimeLaunch(content)
   if (launch === undefined) {
     throw new GatewayUnavailableError(
       'runtime-not-running',

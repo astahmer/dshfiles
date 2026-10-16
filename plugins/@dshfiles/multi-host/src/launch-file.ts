@@ -9,7 +9,7 @@ import { z } from 'zod'
  * the runtime's own multi-host Host. `runtime/web-url` is the same fact written by the dsh-web supervisor, read when
  * the runtime has no multi-host plugin. Replaces scraping the systemd journal, so any Unix host with SSH works.
  */
-export const launchFilePaths = (dshHome: string): readonly [string, string] => [
+const launchFilePaths = (dshHome: string): readonly [string, string] => [
   join(dshHome, 'plugins', 'multi-host', 'launch.json'),
   join(dshHome, 'runtime', 'web-url'),
 ]
@@ -23,7 +23,7 @@ const launchRecordSchema = z.object({ schemaVersion: z.literal(1), launchUrl: la
 export type RuntimeLaunch = { readonly port: number; readonly token: string }
 
 /** Decode either launch file: the JSON record or a bare URL line. Anything else reads as no launch. */
-export const parseRuntimeLaunch = (content: string): RuntimeLaunch | undefined => {
+const parseRuntimeLaunch = (content: string): RuntimeLaunch | undefined => {
   let url: string | undefined
   try {
     const record = launchRecordSchema.safeParse(JSON.parse(content))
@@ -40,7 +40,7 @@ export const parseRuntimeLaunch = (content: string): RuntimeLaunch | undefined =
   return { port, token }
 }
 
-export const writeLaunchFile = async ({ dshHome, launchUrl }: { readonly dshHome: string; readonly launchUrl: string }): Promise<string> => {
+const writeLaunchFile = async ({ dshHome, launchUrl }: { readonly dshHome: string; readonly launchUrl: string }): Promise<string> => {
   const [path] = launchFilePaths(dshHome)
   const record = { schemaVersion: 1, launchUrl: launchUrlSchema.parse(launchUrl), pid: process.pid, writtenAt: new Date().toISOString() }
   await mkdir(dirname(path), { recursive: true, mode: 0o700 })
@@ -62,7 +62,7 @@ export const writeLaunchFile = async ({ dshHome, launchUrl }: { readonly dshHome
 }
 
 /** Remove the launch file only while it still names this process, so a newer runtime's record survives. */
-export const removeLaunchFile = async (path: string): Promise<void> => {
+const removeLaunchFile = async (path: string): Promise<void> => {
   const content = await readFile(path, 'utf8').catch(() => '')
   try {
     const record = launchRecordSchema.safeParse(JSON.parse(content))
@@ -72,11 +72,19 @@ export const removeLaunchFile = async (path: string): Promise<void> => {
   }
 }
 
-export const removeLaunchFileSync = (path: string): void => {
+const removeLaunchFileSync = (path: string): void => {
   try {
     const record = launchRecordSchema.safeParse(JSON.parse(readFileSync(path, 'utf8')))
     if (record.success && record.data.pid === process.pid) rmSync(path, { force: true })
   } catch {
     // Not ours to remove.
   }
+}
+
+export class RuntimeLaunchFile {
+  static readonly launchFilePaths = launchFilePaths
+  static readonly parseRuntimeLaunch = parseRuntimeLaunch
+  static readonly writeLaunchFile = writeLaunchFile
+  static readonly removeLaunchFile = removeLaunchFile
+  static readonly removeLaunchFileSync = removeLaunchFileSync
 }

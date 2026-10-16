@@ -9,7 +9,7 @@ import { connectSsh, discoverRemoteHomes, probeSsh } from './connectors/ssh.js'
 import { GatewayUnavailableError, type Gateway } from './connectors/gateway.js'
 import { createGatewayPool, type PooledGateway } from './gateway-pool.js'
 import { readOrCreateRuntimeIdentity, RuntimeIdentityError } from './identity.js'
-import { removeLaunchFile, removeLaunchFileSync, writeLaunchFile } from './launch-file.js'
+import { RuntimeLaunchFile } from './launch-file.js'
 import { callNativeRpc, mayHaveReachedRuntime } from './native-rpc.js'
 import {
   hostConnectorSchema,
@@ -840,14 +840,14 @@ export default defineHost({
           const connection: ConnectionSurface | undefined = scoped.get('connection')
           const launchUrl = connection?.authenticatedUrl?.(`http://127.0.0.1:${webServer.success ? webServer.data.port : 0}`)
           if (disposed || !webServer.success || typeof launchUrl !== 'string') return
-          const written = await writeLaunchFile({ dshHome: process.env.DSH_HOME ?? join(homedir(), '.dsh'), launchUrl })
+          const written = await RuntimeLaunchFile.writeLaunchFile({ dshHome: process.env.DSH_HOME ?? join(homedir(), '.dsh'), launchUrl })
           launchPath = written
           // DSH can exit on a signal without disposing plugins; a stale launch file would point managers at a dead port.
-          process.once('exit', () => removeLaunchFileSync(written))
+          process.once('exit', () => RuntimeLaunchFile.removeLaunchFileSync(written))
         })().catch(() => undefined)
         return () => {
           disposed = true
-          if (launchPath !== undefined) void removeLaunchFile(launchPath)
+          if (launchPath !== undefined) void RuntimeLaunchFile.removeLaunchFile(launchPath)
         }
       }, 'multi-host: launch file')
     })
