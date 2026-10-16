@@ -3,7 +3,7 @@ import { basename, join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { connectDshPlatformClient } from '../platform/client.js'
 import { ScratchSeedRuntime } from './seed.js'
-import { LIVE_DSH_HOME, LIVE_DSH_PORT, isWithin, ownedProcessStatus, redactUrls, removeScratchStateFile, type ScratchState } from './state.js'
+import { LIVE_DSH_HOME, LIVE_DSH_PORT, ScratchStateRuntime, type ScratchState } from './state.js'
 
 export interface DoctorCheck {
   readonly id: string
@@ -17,21 +17,21 @@ const HOST_ERROR_LINE = /did not activate|\berror\b|\bfailed\b|EADDRINUSE|unhand
 /** Read-only: never restarts, navigates or writes anything. */
 export const scratchDoctor = async (state: ScratchState): Promise<readonly DoctorCheck[]> => {
   const checks: DoctorCheck[] = []
-  const isolated = state.port !== LIVE_DSH_PORT && !isWithin(LIVE_DSH_HOME, state.home)
+  const isolated = state.port !== LIVE_DSH_PORT && !ScratchStateRuntime.isWithin(LIVE_DSH_HOME, state.home)
   checks.push({
     id: 'isolated',
     ok: isolated,
     detail: isolated ? `port ${state.port}, home ${state.home}` : 'state points at the live DSH port or home',
     ...(isolated ? {} : { fix: 'Do not use this state; run "dshx dev down --dry-run" and inspect it by hand.' }),
   })
-  const host = ownedProcessStatus(state.host)
+  const host = ScratchStateRuntime.ownedProcessStatus(state.host)
   checks.push({
     id: 'host-process',
     ok: host === 'running',
     detail: `pid ${state.host.pid} ${host}`,
     ...(host === 'running' ? {} : { fix: 'Run "dshx dev down" then "dshx dev up".' }),
   })
-  const browser = ownedProcessStatus(state.browser)
+  const browser = ScratchStateRuntime.ownedProcessStatus(state.browser)
   checks.push({
     id: 'browser-process',
     ok: browser === 'running',
@@ -48,7 +48,7 @@ export const scratchDoctor = async (state: ScratchState): Promise<readonly Docto
     checks.push({
       id: 'url',
       ok: false,
-      detail: redactUrls(error instanceof Error ? error.message : String(error)),
+      detail: ScratchStateRuntime.redactUrls(error instanceof Error ? error.message : String(error)),
       fix: 'Read the host log; if dsh exited, run "dshx dev down" then "dshx dev up".',
     })
   }
@@ -74,7 +74,7 @@ export const scratchDoctor = async (state: ScratchState): Promise<readonly Docto
   const hostErrors = (await readFile(state.hostLog, 'utf8').catch(() => ''))
     .split('\n')
     .filter(line => HOST_ERROR_LINE.test(line))
-    .map(line => redactUrls(line).slice(0, 300))
+    .map(line => ScratchStateRuntime.redactUrls(line).slice(0, 300))
   checks.push({
     id: 'host-log',
     ok: hostErrors.length === 0,
@@ -91,7 +91,7 @@ export interface DownAction {
 }
 
 const scratchHomeIsOurs = (home: string): boolean =>
-  isWithin(tmpdir(), home) && basename(home).startsWith('dshx-boot-profile-') && !isWithin(LIVE_DSH_HOME, home)
+  ScratchStateRuntime.isWithin(tmpdir(), home) && basename(home).startsWith('dshx-boot-profile-') && !ScratchStateRuntime.isWithin(LIVE_DSH_HOME, home)
 
 const stopGroup = async (pid: number): Promise<boolean> => {
   const alive = (): boolean => {
@@ -131,7 +131,7 @@ export const scratchDown = async (
     ['dsh', state.host],
     ...(state.fakeProvider === undefined ? [] : ([['fake model provider', state.fakeProvider]] as const)),
   ] as const) {
-    const status = ownedProcessStatus(owned)
+    const status = ScratchStateRuntime.ownedProcessStatus(owned)
     if (status === 'gone') {
       actions.push({ action: 'skip', target: `${label} pid ${owned.pid}`, reason: 'already exited' })
       continue
@@ -168,7 +168,7 @@ export const scratchDown = async (
         rm(file, { force: true }),
       ),
     )
-    await removeScratchStateFile(state.stateDir)
+    await ScratchStateRuntime.remove(state.stateDir)
   }
   if (!state.project.ownedByScratch) actions.push({ action: 'keep', target: state.project.path, reason: 'project passed with --project' })
   actions.push({ action: 'keep', target: state.evidenceDir, reason: 'evidence' })

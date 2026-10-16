@@ -1,7 +1,7 @@
 import { appendFileSync, writeFileSync } from 'node:fs'
 import { parseArgs } from 'node:util'
 import type { Page } from 'playwright'
-import { redactUrls } from './state.js'
+import { ScratchStateRuntime } from './state.js'
 
 /**
  * Long-lived headless Chromium for one scratch DSH. `dshx dev open` and `shot` attach over CDP, so the page and its
@@ -25,7 +25,9 @@ if (cdpPort === undefined || userDataDir === undefined || eventsFile === undefin
 }
 
 const record = (kind: string, detail: string): void => {
-  appendFileSync(eventsFile, `${JSON.stringify({ at: new Date().toISOString(), kind, detail: redactUrls(detail).slice(0, 2_000) })}\n`, { mode: 0o600 })
+  appendFileSync(eventsFile, `${JSON.stringify({ at: new Date().toISOString(), kind, detail: ScratchStateRuntime.redactUrls(detail).slice(0, 2_000) })}\n`, {
+    mode: 0o600,
+  })
 }
 
 const pathOf = (url: string): string => {

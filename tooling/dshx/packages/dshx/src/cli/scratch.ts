@@ -1,6 +1,6 @@
 import { parseArgs } from 'node:util'
 import type { Writable } from 'node:stream'
-import { ScratchError, publicState, readScratchState, resolveStateDir, scratchNameSchema } from '../scratch/state.js'
+import { ScratchError, ScratchStateRuntime, scratchNameSchema } from '../scratch/state.js'
 
 export const SCRATCH_ACTIONS: ReadonlySet<string> = new Set(['up', 'doctor', 'open', 'shot', 'down'])
 
@@ -195,7 +195,10 @@ export const runScratchCli = async (argv: readonly string[], io: { readonly stdo
       ? parsed
       : new ScratchError('usage', `--${option} requires a positive integer.`, `Run "dshx dev ${action} --help".`)
   }
-  const stateDir = resolveStateDir({ name: name.data, ...(typeof values['state-dir'] === 'string' ? { stateDir: values['state-dir'] } : {}) })
+  const stateDir = ScratchStateRuntime.resolveStateDir({
+    name: name.data,
+    ...(typeof values['state-dir'] === 'string' ? { stateDir: values['state-dir'] } : {}),
+  })
 
   try {
     if (action === 'up') {
@@ -216,13 +219,13 @@ export const runScratchCli = async (argv: readonly string[], io: { readonly stdo
         timeoutMs,
         onProgress: message => write(io.stderr, `dshx dev up: ${message}\n`),
       })
-      const shown = publicState(state)
+      const shown = ScratchStateRuntime.publicState(state)
       return succeed(
         shown,
         `Scratch DSH "${shown.name}" up at ${shown.origin} (dsh pid ${shown.hostPid}, chromium pid ${shown.browserPid}).\n  home     ${shown.home}\n  project  ${shown.project}\n  state    ${shown.stateDir}\nNext: dshx dev doctor\n`,
       )
     }
-    const state = await readScratchState(stateDir, name.data)
+    const state = await ScratchStateRuntime.read(stateDir, name.data)
     if (action === 'doctor') {
       const { scratchDoctor } = await import('../scratch/lifecycle.js')
       const checks = await scratchDoctor(state)

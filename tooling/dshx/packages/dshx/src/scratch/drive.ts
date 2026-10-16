@@ -5,7 +5,7 @@ import { DshxFeatureCatalogSchema, parseReachStep } from '../project/features.js
 import { DSHFILES_ROOT } from '../project/local-bundles.js'
 import { StartupDialogs } from '../project/startup-dialogs.js'
 import { ScratchSeedRuntime } from './seed.js'
-import { ScratchError, ownedProcessStatus, redactUrls, writeScratchState, type ScratchState } from './state.js'
+import { ScratchError, ScratchStateRuntime, type ScratchState } from './state.js'
 
 export interface CatalogFeature {
   readonly packageId: string
@@ -58,7 +58,7 @@ const findCatalogFeature = async (reference: string): Promise<CatalogFeature> =>
 }
 
 const connect = async (state: ScratchState): Promise<{ readonly browser: Browser; readonly page: Page }> => {
-  if (ownedProcessStatus(state.browser) !== 'running') {
+  if (ScratchStateRuntime.ownedProcessStatus(state.browser) !== 'running') {
     throw new ScratchError('browser-down', 'The scratch Chromium is not running.', 'Run "dshx dev down" then "dshx dev up".')
   }
   const { chromium } = await import('playwright')
@@ -151,7 +151,7 @@ export const scratchOpen = async (state: ScratchState, reference: string, timeou
             seeded = [...seeded, applied]
             const next: ScratchState = { ...state, seeds: seeded }
             if (fakeProvider !== undefined) next.fakeProvider = fakeProvider
-            await writeScratchState(next)
+            await ScratchStateRuntime.write(next)
           }
           if (feature.reach[index + 1]?.startsWith('seed ') !== true) await openAppRoot()
         } else if (parsed.action === 'attach')
@@ -200,7 +200,7 @@ export const scratchOpen = async (state: ScratchState, reference: string, timeou
           step,
           ok: false,
           ms: Date.now() - startedAt,
-          error: redactUrls(error instanceof Error ? (error.message.split('\n')[0] ?? error.message) : String(error)),
+          error: ScratchStateRuntime.redactUrls(error instanceof Error ? (error.message.split('\n')[0] ?? error.message) : String(error)),
         })
         break
       }

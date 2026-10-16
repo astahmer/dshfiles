@@ -57,12 +57,12 @@ export type ScratchState = z.infer<typeof ScratchStateSchema>
 
 export const scratchNameSchema = z.string().regex(/^[a-z0-9][a-z0-9-]{0,31}$/, 'use 1-32 lowercase letters, digits or hyphens')
 
-export const resolveStateDir = (options: { readonly name: string; readonly stateDir?: string }): string =>
+const resolveStateDir = (options: { readonly name: string; readonly stateDir?: string }): string =>
   resolve(options.stateDir ?? join(process.env.DSHX_DEV_STATE_ROOT ?? join(tmpdir(), 'dshx-dev'), options.name))
 
 const stateFile = (stateDir: string): string => join(stateDir, 'state.json')
 
-export const readScratchState = async (stateDir: string, name: string): Promise<ScratchState> => {
+const readScratchState = async (stateDir: string, name: string): Promise<ScratchState> => {
   const source = await readFile(stateFile(stateDir), 'utf8').catch(() => undefined)
   if (source === undefined) {
     throw new ScratchError(
@@ -82,15 +82,15 @@ export const readScratchState = async (stateDir: string, name: string): Promise<
   return parsed.data
 }
 
-export const writeScratchState = async (state: ScratchState): Promise<void> => {
+const writeScratchState = async (state: ScratchState): Promise<void> => {
   await mkdir(state.stateDir, { recursive: true, mode: 0o700 })
   await writeFile(stateFile(state.stateDir), `${JSON.stringify(state, null, 2)}\n`, { mode: 0o600 })
 }
 
-export const removeScratchStateFile = (stateDir: string): Promise<void> => rm(stateFile(stateDir), { force: true })
+const removeScratchStateFile = (stateDir: string): Promise<void> => rm(stateFile(stateDir), { force: true })
 
 /** The state minus the launch token, safe to print. */
-export const publicState = (state: ScratchState) => ({
+const publicState = (state: ScratchState) => ({
   name: state.name,
   origin: state.origin,
   port: state.port,
@@ -105,25 +105,24 @@ export const publicState = (state: ScratchState) => ({
   evidenceDir: state.evidenceDir,
 })
 
-export const isWithin = (root: string, target: string): boolean => {
+const isWithin = (root: string, target: string): boolean => {
   const normalizedRoot = resolve(root)
   const normalizedTarget = resolve(target)
   return normalizedTarget === normalizedRoot || normalizedTarget.startsWith(`${normalizedRoot}${sep}`)
 }
 
 /** Running, and still the process we started: its command line carries every signature fragment. */
-export const ownedProcessStatus = (owned: { readonly pid: number; readonly signature: readonly string[] }): 'running' | 'gone' | 'foreign' => {
+const ownedProcessStatus = (owned: { readonly pid: number; readonly signature: readonly string[] }): 'running' | 'gone' | 'foreign' => {
   const result = spawnSync('ps', ['-o', 'command=', '-p', String(owned.pid)], { encoding: 'utf8' })
   const command = result.stdout.trim()
   if (result.status !== 0 || command === '') return 'gone'
   return owned.signature.every(fragment => command.includes(fragment)) ? 'running' : 'foreign'
 }
 
-export const redactUrls = (text: string): string =>
-  text.replace(/https?:\/\/(127\.0\.0\.1|localhost):\d+\/[^\s"']*/g, match => `${new URL(match).origin}/[redacted]`)
+const redactUrls = (text: string): string => text.replace(/https?:\/\/(127\.0\.0\.1|localhost):\d+\/[^\s"']*/g, match => `${new URL(match).origin}/[redacted]`)
 
 /** Start a process in its own group, logging to `log`, so `down` can stop it and everything it spawned. */
-export const spawnDetached = (
+const spawnDetached = (
   command: string,
   args: readonly string[],
   options: { readonly cwd: string; readonly env: NodeJS.ProcessEnv; readonly log: string },
@@ -138,4 +137,16 @@ export const spawnDetached = (
   } finally {
     closeSync(output)
   }
+}
+
+export class ScratchStateRuntime {
+  static readonly resolveStateDir = resolveStateDir
+  static readonly read = readScratchState
+  static readonly write = writeScratchState
+  static readonly remove = removeScratchStateFile
+  static readonly publicState = publicState
+  static readonly isWithin = isWithin
+  static readonly ownedProcessStatus = ownedProcessStatus
+  static readonly redactUrls = redactUrls
+  static readonly spawnDetached = spawnDetached
 }
