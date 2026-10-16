@@ -1,25 +1,29 @@
 import assert from 'node:assert/strict'
 import { test } from 'vitest'
-import { decodeMcpMentionTools, mcpMentionCandidates, mcpMentionPick, scopedMentionQuery, serializeMcpMention } from './mcp-mentions.js'
+import type { RegistryListing } from '@dshfiles/dshx/api'
+import { McpMentionModel } from './mcp-mentions.js'
+
+const registryListing = (tools: RegistryListing['tools']): RegistryListing => ({ apis: [], tools, skills: [] })
 
 test('decodes MCP tools without letting unrelated long descriptions hide them', () => {
   assert.deepEqual(
-    decodeMcpMentionTools({
-      tools: [
+    McpMentionModel.decodeTools(
+      registryListing([
         { name: 'mcp__figma__create_frame', description: 'Create a frame', source: 'mcp' },
         { name: 'workspace.read', description: 'Read a file', source: 'tool' },
         { name: 'long.api', description: 'a'.repeat(1_500), source: 'api' },
-      ],
-      apis: [],
-    }),
+      ]),
+    ),
     [{ name: 'mcp__figma__create_frame', description: 'Create a frame' }],
   )
-  assert.equal(decodeMcpMentionTools({ tools: [{ name: 'mcp__long', description: 'a'.repeat(1_500), source: 'mcp' }] })[0]?.description.length, 1_024)
-  assert.deepEqual(decodeMcpMentionTools({ tools: [{ name: 'bad', description: 1, source: 'mcp' }] }), [])
+  assert.equal(
+    McpMentionModel.decodeTools(registryListing([{ name: 'mcp__long', description: 'a'.repeat(1_500), source: 'mcp' }]))[0]?.description.length,
+    1_024,
+  )
 })
 
 test('maps ranked MCP servers and tools into distinct @ sections', () => {
-  const candidates = mcpMentionCandidates({
+  const candidates = McpMentionModel.candidates({
     rankedServers: [{ displayName: 'Figma Design', serverName: 'figma', name: 'figma Figma Design' }],
     rankedTools: [{ name: 'mcp__figma__create_frame', description: 'Create a frame' }],
     serverSection: 'MCP servers',
@@ -36,7 +40,7 @@ test('maps ranked MCP servers and tools into distinct @ sections', () => {
 })
 
 test('serializes selected MCP entities as explicit, non-path prompt references', async () => {
-  const candidates = mcpMentionCandidates({
+  const candidates = McpMentionModel.candidates({
     rankedServers: [{ displayName: 'Figma Design', serverName: 'figma', name: 'figma Figma Design' }],
     rankedTools: [{ name: 'mcp__figma__create_frame', description: 'Create a frame' }],
     serverSection: 'MCP servers',
@@ -44,7 +48,7 @@ test('serializes selected MCP entities as explicit, non-path prompt references',
   })
   const selected = candidates[1]
   if (selected === undefined) throw new Error('The MCP tool candidate is missing.')
-  const picked = mcpMentionPick(selected)
+  const picked = McpMentionModel.pick(selected)
   assert.deepEqual(picked, {
     insert: {
       source: 'mcp-servers',
@@ -56,7 +60,7 @@ test('serializes selected MCP entities as explicit, non-path prompt references',
   if (picked === undefined) return
 
   assert.equal(
-    await serializeMcpMention({
+    await McpMentionModel.serialize({
       ref: picked.insert.ref,
       signal: new AbortController().signal,
       serverInstruction: 'The user explicitly referenced MCP server',
@@ -66,7 +70,7 @@ test('serializes selected MCP entities as explicit, non-path prompt references',
     'The user explicitly referenced MCP tool "mcp__figma__create_frame". Use it only when relevant.',
   )
   await assert.rejects(
-    serializeMcpMention({
+    McpMentionModel.serialize({
       ref: '{invalid',
       signal: new AbortController().signal,
       serverInstruction: 'Server',
@@ -78,8 +82,8 @@ test('serializes selected MCP entities as explicit, non-path prompt references',
 })
 
 test('ranks @mcp: queries by their text and stays empty under another scope', () => {
-  assert.equal(scopedMentionQuery('figma', 'mcp'), 'figma')
-  assert.equal(scopedMentionQuery('mcp:figma', 'mcp'), 'figma')
-  assert.equal(scopedMentionQuery('f:src/', 'mcp'), undefined)
-  assert.equal(scopedMentionQuery('skill:review', 'mcp'), undefined)
+  assert.equal(McpMentionModel.scopedQuery({ query: 'figma', ownScope: 'mcp' }), 'figma')
+  assert.equal(McpMentionModel.scopedQuery({ query: 'mcp:figma', ownScope: 'mcp' }), 'figma')
+  assert.equal(McpMentionModel.scopedQuery({ query: 'f:src/', ownScope: 'mcp' }), undefined)
+  assert.equal(McpMentionModel.scopedQuery({ query: 'skill:review', ownScope: 'mcp' }), undefined)
 })

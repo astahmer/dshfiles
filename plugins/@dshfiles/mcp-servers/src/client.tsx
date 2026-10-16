@@ -12,7 +12,7 @@ import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { MCP_LOCALE_NAMESPACE, mcpServersLocale, type McpServersTranslate } from './locales.js'
 import { mcpServersApi } from './api.js'
 import { ManagerView } from './manager-view.js'
-import { createMcpMentionSource, decodeMcpMentionTools } from './mcp-mentions.js'
+import { McpMentionModel, createMcpMentionSource } from './mcp-mentions.js'
 import { McpQuickPanel } from './mcp-quick-panel.js'
 import { createQuickPanelContribution, SessionQuickPanels, type QuickPanelState } from './quick-panel.js'
 
@@ -45,7 +45,7 @@ export default defineClientPlugin({
   locales: [mcpServersLocale],
   setup(api) {
     const ctx = api.raw.ctx
-    const translate = ctx.locale.bind(MCP_LOCALE_NAMESPACE) as McpServersTranslate
+    const translate: McpServersTranslate = ctx.locale.bind(MCP_LOCALE_NAMESPACE)
     const panels = new SessionQuickPanels()
     const mcpApi = api.rpc.use(mcpServersApi)
     const registryApi = api.rpc.use(dshxRegistryApi)
@@ -59,7 +59,7 @@ export default defineClientPlugin({
             : []
         return {
           servers,
-          tools: registryResult.status === 'fulfilled' ? decodeMcpMentionTools(registryResult.value) : [],
+          tools: registryResult.status === 'fulfilled' ? McpMentionModel.decodeTools(registryResult.value) : [],
         }
       },
       serverSection: translate('mentionServersSection'),
@@ -82,6 +82,7 @@ export default defineClientPlugin({
         <ManagerView t={translate} />
       </PluginQueryProvider>
     )
+    // SAFETY: This literal is registered as the main panel below before the quick-panel callback can run.
     const openManager = (): void => ctx.layout.selectPanel(PANEL_ID as MainPanelId)
     const RootQuickPanel = ({ panel }: { readonly panel: QuickPanelState }): JSX.Element => (
       <PluginQueryProvider>
