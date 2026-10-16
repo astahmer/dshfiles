@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { describe, expect, it, vi } from 'vitest'
 import { defineApi, dshxRegistryApi, isApiOwnerMissing, method, type ApiCaller, type RegistryListing } from '../src/api/index.js'
 import { publishedJsonSchema, toToolSchema } from '../src/api/json-schema.js'
-import { createApiClient } from '../src/api/runtime.js'
+import { ApiClientRuntimeModel } from '../src/api/runtime.js'
 import { createHostApiClient, defineHost, isApiServed, listApis } from '../src/host/index.js'
 import { createTestHost } from '../src/testing/index.js'
 
@@ -224,7 +224,7 @@ describe('API registry', () => {
     const call = vi.fn(async () => {
       throw new Error('Connection request failed: HTTP 404')
     })
-    const client = createApiClient({ get: name => (name === 'connection' ? { rpc: { call } } : undefined) }, threads, '@test/caller')
+    const client = ApiClientRuntimeModel.create({ get: name => (name === 'connection' ? { rpc: { call } } : undefined) }, threads, '@test/caller')
     const result = await client.safe.status({})
     expect(!result.ok && isApiOwnerMissing(result.error)).toBe(true)
     expect(!result.ok && result.error.message).toBe('@test/threads is not loaded, so threads.status is unavailable.')

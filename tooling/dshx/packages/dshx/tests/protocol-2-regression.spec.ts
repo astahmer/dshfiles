@@ -4,7 +4,7 @@ import { createHostPlugin } from '../src/host/runtime.js'
 import { createClientPlugin } from '../src/client/runtime.js'
 import { defineSettings } from '../src/settings/index.js'
 import { defineApi, method } from '../src/api/index.js'
-import { createApiClient } from '../src/api/runtime.js'
+import { ApiClientRuntimeModel } from '../src/api/runtime.js'
 import { PROTOCOL_2_COMPATIBILITY } from '../src/compat/index.js'
 
 describe('installed protocol-2 contract regressions', () => {
@@ -59,7 +59,7 @@ describe('installed protocol-2 contract regressions', () => {
       version: 1,
       methods: { ping: method<unknown, null>() },
     })
-    const client = createApiClient(
+    const client = ApiClientRuntimeModel.create(
       {
         get: () => ({
           rpc: {

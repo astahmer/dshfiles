@@ -2,7 +2,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { AnyApiMethodDefinition, ApiCallOptions, ApiCallResult, ApiClient, ApiContract, RegistryApiView } from './types.js'
 import { aborted, error, isApiError, jsonBytes, ownerMissing, throwIfAborted, ContractViolation } from './common.js'
 import { apiKey, apiRegistry, type ApiPayload } from './registry.js'
-import { errorFromRemote } from './runtime.js'
+import { ApiClientRuntimeModel } from './runtime.js'
 
 import { describeApis } from './host-runtime.js'
 
@@ -35,7 +35,7 @@ export function createHostApiClient<const Methods extends Record<string, AnyApiM
         undefined,
       )
       throwIfAborted(options?.signal, contract.id, name)
-      if (!result.ok) throw errorFromRemote(result, contract.id, name)
+      if (!result.ok) throw ApiClientRuntimeModel.errorFromRemote(result, contract.id, name)
       return structuredClone(result.value.output)
     } catch (cause) {
       if (isApiError(cause)) throw cause
