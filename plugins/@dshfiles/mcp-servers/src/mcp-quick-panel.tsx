@@ -13,7 +13,7 @@ import type { QuickPanelState } from './quick-panel.js'
 import { ServerEditorDialog } from './server-editor.js'
 import { McpServerFormModel, type ServerFormValues } from './server-form.js'
 import { useServerActions, useServerSnapshot, type ServerActions } from './server-queries.js'
-import { isClientActive, isConnectionToggleBlocked, lifecycleDotClassName, lifecycleText, localProcessText, matchesServerSearch } from './server-status.js'
+import { McpServerStatusModel } from './server-status.js'
 
 interface QuickPanelEditor {
   readonly key: number
@@ -105,7 +105,7 @@ const QuickPanelContent = ({ t, actions, ...props }: QuickPanelContentProps): JS
   }, [onClose])
   const servers = snapshot.data?.servers ?? []
   const enabledCount = servers.filter(server => server.enabled).length
-  const matchingServers = servers.filter(server => matchesServerSearch(server, search))
+  const matchingServers = servers.filter(server => McpServerStatusModel.matchesServerSearch({ server, search }))
   const emptyText = servers.length === 0 ? t('empty') : matchingServers.length === 0 ? t('quickPanelNoResults') : null
 
   return (
@@ -160,7 +160,7 @@ const QuickPanelContent = ({ t, actions, ...props }: QuickPanelContentProps): JS
         ) : (
           <ul className="dshx:divide-y dshx:px-3">
             {matchingServers.map(server => {
-              const processText = localProcessText(server, t)
+              const processText = McpServerStatusModel.localProcessText({ server, t })
               return (
                 <li className="dshx:flex dshx:items-center dshx:gap-3 dshx:py-2.5" key={server.id}>
                   <span className="dshx:flex dshx:size-8 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-lg dshx:bg-muted dshx:text-muted-foreground">
@@ -169,11 +169,11 @@ const QuickPanelContent = ({ t, actions, ...props }: QuickPanelContentProps): JS
                   <div className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col">
                     <p className="dshx:truncate dshx:text-sm dshx:font-medium">{server.name}</p>
                     <p className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5 dshx:text-xs dshx:text-muted-foreground">
-                      <span aria-hidden className={cn('dshx:size-1.5 dshx:shrink-0 dshx:rounded-full', lifecycleDotClassName(server))} />
+                      <span aria-hidden className={cn('dshx:size-1.5 dshx:shrink-0 dshx:rounded-full', McpServerStatusModel.lifecycleDotClassName(server))} />
                       <span className="dshx:truncate">
                         {server.oauth === 'needs-sign-in'
                           ? t('signInRequired')
-                          : `${lifecycleText(server, t)} · ${server.registeredToolCount} ${t('registeredTools')}`}
+                          : `${McpServerStatusModel.lifecycleText({ server, t })} · ${server.registeredToolCount} ${t('registeredTools')}`}
                       </span>
                     </p>
                     {processText ? <p className="dshx:truncate dshx:text-xs dshx:text-muted-foreground">{processText}</p> : null}
@@ -193,12 +193,12 @@ const QuickPanelContent = ({ t, actions, ...props }: QuickPanelContentProps): JS
                     </Button>
                   ) : (
                     <Button
-                      disabled={actions.isPending || isConnectionToggleBlocked(server)}
+                      disabled={actions.isPending || McpServerStatusModel.isConnectionToggleBlocked(server)}
                       onClick={() => actions.toggleConnection(server)}
                       size="sm"
-                      variant={isClientActive(server) ? 'ghost' : 'outline'}
+                      variant={McpServerStatusModel.isClientActive(server) ? 'ghost' : 'outline'}
                     >
-                      {isClientActive(server) ? t('disconnect') : t('connect')}
+                      {McpServerStatusModel.isClientActive(server) ? t('disconnect') : t('connect')}
                     </Button>
                   )}
                   <Switch

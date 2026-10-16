@@ -23,14 +23,7 @@ import { ServerEditor, ServerEditorDialog } from './server-editor.js'
 import { McpServerFormModel, type ServerFormValues } from './server-form.js'
 import { useServerActions, useServerSnapshot } from './server-queries.js'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import {
-  credentialReferenceSummary,
-  isClientActive,
-  isConnectionToggleBlocked,
-  lifecycleDotClassName,
-  lifecycleText,
-  localProcessText,
-} from './server-status.js'
+import { McpServerStatusModel } from './server-status.js'
 
 interface EditorState {
   readonly key: number
@@ -203,7 +196,7 @@ interface ServerItemProps {
 }
 
 const ServerItem = ({ t, server, ...props }: ServerItemProps): JSX.Element => {
-  const processText = localProcessText(server, t)
+  const processText = McpServerStatusModel.localProcessText({ server, t })
   return (
     <Item role="listitem">
       <ItemMedia className="dshx:size-10 dshx:rounded-lg dshx:border-0 dshx:text-muted-foreground" variant="icon">
@@ -221,14 +214,14 @@ const ServerItem = ({ t, server, ...props }: ServerItemProps): JSX.Element => {
           {server.transport === 'stdio' ? server.commandLine : server.url}
         </ItemDescription>
         <p className="dshx:flex dshx:items-center dshx:gap-1.5 dshx:text-xs dshx:text-muted-foreground">
-          <span aria-hidden className={cn('dshx:size-1.5 dshx:shrink-0 dshx:rounded-full', lifecycleDotClassName(server))} />
-          {lifecycleText(server, t)} · {server.registeredToolCount} {t('registeredTools')}
+          <span aria-hidden className={cn('dshx:size-1.5 dshx:shrink-0 dshx:rounded-full', McpServerStatusModel.lifecycleDotClassName(server))} />
+          {McpServerStatusModel.lifecycleText({ server, t })} · {server.registeredToolCount} {t('registeredTools')}
           {processText ? ` · ${processText}` : null}
         </p>
         <p className="dshx:text-xs dshx:text-muted-foreground">{t('connectionUnknown')}</p>
         {server.credentialReferences.length > 0 ? (
           <p className="dshx:truncate dshx:font-mono dshx:text-xs dshx:text-muted-foreground">
-            {t('references')}: {credentialReferenceSummary(server)}
+            {t('references')}: {McpServerStatusModel.credentialReferenceSummary(server)}
           </p>
         ) : null}
       </ItemContent>
@@ -241,8 +234,13 @@ const ServerItem = ({ t, server, ...props }: ServerItemProps): JSX.Element => {
             {t('signIn')}
           </Button>
         ) : (
-          <Button disabled={props.busy || isConnectionToggleBlocked(server)} onClick={props.onToggleConnection} size="sm" variant="outline">
-            {isClientActive(server) ? t('disconnect') : t('connect')}
+          <Button
+            disabled={props.busy || McpServerStatusModel.isConnectionToggleBlocked(server)}
+            onClick={props.onToggleConnection}
+            size="sm"
+            variant="outline"
+          >
+            {McpServerStatusModel.isClientActive(server) ? t('disconnect') : t('connect')}
           </Button>
         )}
         {server.oauth === 'signed-in' ? (

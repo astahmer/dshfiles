@@ -2,7 +2,7 @@ import { useApi } from '@dshfiles/dshx/client'
 import { useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useState } from 'react'
 import { decodeSnapshot, mcpServersApi, type ManagerPreferences, type ManagerSnapshot, type ServerDraft, type ServerView } from './api.js'
-import { isClientActive } from './server-status.js'
+import { McpServerStatusModel } from './server-status.js'
 
 const snapshotQueryKey = ['mcp-servers', 'snapshot'] as const
 
@@ -30,7 +30,7 @@ export const useServerActions = () => {
   const save = useMutation({ mutationFn: (server: ServerDraft) => api.save({ server }), onSuccess })
   const toggleEnabled = useMutation({ mutationFn: (server: ServerView) => api.setEnabled({ id: server.id, enabled: !server.enabled }), onSuccess })
   const toggleConnection = useMutation({
-    mutationFn: (server: ServerView) => api.setConnection({ id: server.id, connected: !isClientActive(server) }),
+    mutationFn: (server: ServerView) => api.setConnection({ id: server.id, connected: !McpServerStatusModel.isClientActive(server) }),
     onSuccess,
   })
   const remove = useMutation({ mutationFn: (server: ServerView) => api.remove({ id: server.id }), onSuccess })
