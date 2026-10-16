@@ -105,7 +105,10 @@ function hostEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, opti
           // only way to reach them is a private import the guard would refuse.
           `export { waitForManagedExit, terminateManagedProcess } from ${JSON.stringify(HOST_PROCESS_PATH)}`,
           "export { defineTool } from '@deepseek-ai/dsh-tools'",
-          `export { createHostApiClient, isApiServed, listApis } from ${JSON.stringify(API_HOST_CLIENT_PATH)}`,
+          `import { HostApiClientModel } from ${JSON.stringify(API_HOST_CLIENT_PATH)}`,
+          'export const createHostApiClient = HostApiClientModel.create',
+          'export const isApiServed = HostApiClientModel.isServed',
+          'export const listApis = HostApiClientModel.list',
           '',
         ].join('\n')
       }

@@ -12,7 +12,7 @@ import { describeApis } from './host-runtime.js'
  * and handler as a Client call. When the owner is not loaded every call fails
  * with an `unavailable` ApiError that `isApiOwnerMissing` recognizes.
  */
-export function createHostApiClient<const Methods extends Record<string, AnyApiMethodDefinition>>(
+function createHostApiClient<const Methods extends Record<string, AnyApiMethodDefinition>>(
   ctx: Context,
   contract: ApiContract<Methods>,
   callerPackageId = 'plugin',
@@ -64,11 +64,17 @@ export function createHostApiClient<const Methods extends Record<string, AnyApiM
 }
 
 /** Whether the owner of `contract` currently serves it in this DSH process. */
-export function isApiServed(ctx: Context, contract: Pick<ApiContract, 'id' | 'owner'>, callerPackageId = 'plugin'): boolean {
+function isApiServed(ctx: Context, contract: Pick<ApiContract, 'id' | 'owner'>, callerPackageId = 'plugin'): boolean {
   return apiRegistry(ctx).apis.has(apiKey(contract.owner ?? callerPackageId, contract.id))
 }
 
 /** Every API served in this DSH process, with method descriptions and agent-tool names. */
-export function listApis(ctx: Context): RegistryApiView[] {
+function listApis(ctx: Context): RegistryApiView[] {
   return describeApis(apiRegistry(ctx), {})
+}
+
+export class HostApiClientModel {
+  static readonly create = createHostApiClient
+  static readonly isServed = isApiServed
+  static readonly list = listApis
 }

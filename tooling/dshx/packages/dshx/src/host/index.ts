@@ -1,6 +1,10 @@
 export { defineCommand, defineHost, definePromptContext, definePromptSection } from './define.js'
 export { defineTool } from '@deepseek-ai/dsh-tools'
-export { createHostApiClient, isApiServed, listApis } from '../api/host-client.js'
+import { HostApiClientModel } from '../api/host-client.js'
+
+export const createHostApiClient = HostApiClientModel.create
+export const isApiServed = HostApiClientModel.isServed
+export const listApis = HostApiClientModel.list
 export type { HostDefinition, PromptContextContribution, PromptContribution, PromptSectionContribution } from './types.js'
 export type { CommandDefinition, CommandInvocation } from '@deepseek-ai/dsh-commands'
 export type { CommandResult } from '@deepseek-ai/dsh-commands/types'
