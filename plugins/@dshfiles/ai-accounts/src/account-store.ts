@@ -8,7 +8,7 @@ import { codexAccountHome, describeCodexAuth, materializeCodexShadowHome, CodexH
 import { DEFAULT_DISTRIBUTION, type AccountStatus } from './account-pool.js'
 import { readKeyFromEnv, type CredentialValueResolver } from './credentials.js'
 import { KIND_LABEL } from './account-labels.js'
-import { claudeLoginHint, describeClaudeAuth, resolveClaudeConfigDir } from './claude-account.js'
+import { ClaudeAccountModel, claudeAccountService } from './claude-account.js'
 import { DEFAULT_COMMANDCODE_KEY_ENV } from './commandcode-provider.js'
 import { readCommandCodeKey } from './commandcode-usage.js'
 import { CURSOR_LOGIN_HINT, readCursorToken } from './cursor-account.js'
@@ -186,14 +186,14 @@ const observe = async (
     })
   }
   if (draft.kind === 'claude') {
-    const configDir = resolveClaudeConfigDir(draft.homePath)
-    const auth = await describeClaudeAuth({ configDir, keyEnv: draft.apiKeyEnv, now: Date.now(), resolveCredential })
+    const configDir = ClaudeAccountModel.resolveClaudeConfigDir(draft.homePath)
+    const auth = await claudeAccountService.describeAuth({ configDir, keyEnv: draft.apiKeyEnv, now: Date.now(), resolveCredential })
     return observed(draft, {
       cooling,
       signedIn: auth.signedIn,
       identity: auth.identity ?? null,
       plan: auth.plan ?? null,
-      loginHint: claudeLoginHint(configDir),
+      loginHint: ClaudeAccountModel.claudeLoginHint(configDir),
       detail: auth.detail ?? null,
     })
   }

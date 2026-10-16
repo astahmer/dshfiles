@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { describeClaudeAuth, resolveClaudeInferenceToken } from './claude-account.js'
+import { claudeAccountService } from './claude-account.js'
 
 describe('Claude Code login', () => {
   let configDir: string
@@ -17,7 +17,7 @@ describe('Claude Code login', () => {
   it('tells a signed-out Claude Code apart from a missing login', async () => {
     login('')
     const request = { configDir, keyEnv: '', now: Date.now(), resolveCredential: async () => '' }
-    await expect(resolveClaudeInferenceToken(request)).rejects.toThrow('Claude Code is signed out on this machine')
-    expect(await describeClaudeAuth(request)).toMatchObject({ signedIn: false, detail: expect.stringContaining('claude auth login') })
+    await expect(claudeAccountService.resolveInferenceToken(request)).rejects.toThrow('Claude Code is signed out on this machine')
+    expect(await claudeAccountService.describeAuth(request)).toMatchObject({ signedIn: false, detail: expect.stringContaining('claude auth login') })
   })
 })

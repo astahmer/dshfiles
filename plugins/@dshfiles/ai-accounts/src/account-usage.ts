@@ -1,5 +1,5 @@
 import type { AccountProfile, UsageCard } from './api.js'
-import { readClaudeUsage, resolveClaudeConfigDir } from './claude-account.js'
+import { ClaudeAccountModel, claudeAccountService } from './claude-account.js'
 import { codexLayoutFor } from './account-store.js'
 import { readCommandCodeUsage } from './commandcode-usage.js'
 import { readKeyFromEnv, type CredentialValueResolver } from './credentials.js'
@@ -30,7 +30,7 @@ export const readAccountUsage = async (input: {
       return readCodexUsage(home, signal)
     }
     case 'claude':
-      return readClaudeUsage(resolveClaudeConfigDir(account.homePath), signal)
+      return claudeAccountService.readUsage(ClaudeAccountModel.resolveClaudeConfigDir(account.homePath), signal)
     case 'commandcode':
       return readCommandCodeUsage({ keyEnv: account.apiKeyEnv, apiBaseUrl: account.apiBaseUrl, resolveCredential: input.resolveCredential }, signal)
     case 'github-copilot':

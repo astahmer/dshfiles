@@ -1,6 +1,6 @@
 import type { AiAccountsConfig, CodexAccountConfig } from './account-config.js'
 import { COMMANDCODE_KIND as CC_KIND, DEFAULT_COMMANDCODE_KEY_ENV } from './commandcode-provider.js'
-import { resolveClaudeConfigDir } from './claude-account.js'
+import { ClaudeAccountModel } from './claude-account.js'
 import { CodexHomeError, resolveCodexHomeLayout, type CodexHomeLayout } from './codex-home.js'
 
 export const CODEX_KIND = 'codex'
@@ -126,7 +126,7 @@ export class ProviderRoutes {
         kind: CLAUDE_KIND,
         instanceId,
         displayName: displayNameFor(account.displayName, CLAUDE_KIND, instanceId),
-        configDir: resolveClaudeConfigDir(account.configDir),
+        configDir: ClaudeAccountModel.resolveClaudeConfigDir(account.configDir),
         apiKeyEnv: account.apiKeyEnv,
         enabled: account.enabled,
       })

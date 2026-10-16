@@ -6,7 +6,7 @@ import type {} from '@dshfiles/dshx/client'
 import { accountsFile, accountsHostApi, readAccountsUsage, readQuotaResetAt } from './accounts-host-api.js'
 import { createUsageCache } from './account-usage.js'
 import { createCopilotLoginService } from './copilot-login.js'
-import { resolveClaudeInferenceToken } from './claude-account.js'
+import { claudeAccountService } from './claude-account.js'
 import { readCommandCodeKey } from './commandcode-usage.js'
 import { aiAccountsHostSettings, readLunaReserveRouting, readPricingSettings, readQuotaRetrySettings, readRecoverySettings } from './settings.js'
 import { shouldUseLunaReserve, withLunaReserve } from './codex-luna-reserve.js'
@@ -347,7 +347,7 @@ export default definePlugin({
           if (route.kind === GITHUB_COPILOT_KIND) return undefined
           if (route.kind === CLAUDE_KIND) {
             try {
-              return await resolveClaudeInferenceToken({
+              return await claudeAccountService.resolveInferenceToken({
                 configDir: route.configDir,
                 keyEnv: route.apiKeyEnv,
                 now: Date.now(),

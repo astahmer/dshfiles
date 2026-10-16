@@ -1,7 +1,7 @@
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { claudeKeychainService, parseClaudeUsage, resolveClaudeConfigDir } from './claude-account.js'
+import { ClaudeAccountModel } from './claude-account.js'
 import { parseCommandCodeUsage } from './commandcode-usage.js'
 import { CursorAccountModel } from './cursor-account.js'
 import { ProviderUsageModel } from './usage.js'
@@ -61,7 +61,7 @@ describe('OpenCode Go usage', () => {
 
 describe('Claude usage', () => {
   it('maps utilization to percent left and drops unmetered windows', () => {
-    const card = parseClaudeUsage(
+    const card = ClaudeAccountModel.parseClaudeUsage(
       {
         five_hour: { utilization: 31, resets_at: '2026-10-08T15:00:00Z' },
         seven_day: { utilization: 58.5, resets_at: null },
@@ -79,9 +79,11 @@ describe('Claude usage', () => {
   })
 
   it('finds the login of a non-default config dir under its hashed keychain item', () => {
-    expect(resolveClaudeConfigDir('')).toBe(join(homedir(), '.claude'))
-    expect(claudeKeychainService(resolveClaudeConfigDir('~/.claude'))).toBe('Claude Code-credentials')
-    expect(claudeKeychainService(resolveClaudeConfigDir('~/.claude-work'))).toMatch(/^Claude Code-credentials-[0-9a-f]{8}$/)
+    expect(ClaudeAccountModel.resolveClaudeConfigDir('')).toBe(join(homedir(), '.claude'))
+    expect(ClaudeAccountModel.claudeKeychainService(ClaudeAccountModel.resolveClaudeConfigDir('~/.claude'))).toBe('Claude Code-credentials')
+    expect(ClaudeAccountModel.claudeKeychainService(ClaudeAccountModel.resolveClaudeConfigDir('~/.claude-work'))).toMatch(
+      /^Claude Code-credentials-[0-9a-f]{8}$/,
+    )
   })
 })
 
