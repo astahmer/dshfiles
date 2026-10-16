@@ -231,7 +231,9 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
     const threadName = location.threadName
     if (threadName === undefined) throw new Error('Expected a thread workspace.')
 
-    expect(await observedThreads.landAt({ ...location, threadName })).toMatchObject({ status: 'landed' })
+    const outcome = await observedThreads.landAt({ ...location, threadName })
+    expect(outcome).toMatchObject({ status: 'landed' })
+    expect(invocations).toHaveLength(4)
     expect(invocations.some(args => args.includes('root'))).toBe(false)
   })
 

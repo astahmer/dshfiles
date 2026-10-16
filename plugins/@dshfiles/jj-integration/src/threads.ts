@@ -64,6 +64,8 @@ export type LandOutcome =
 export type DiscardOutcome = { readonly status: 'discarded' } | { readonly status: 'has-work'; readonly revisions: readonly ThreadRevision[] }
 
 const REVISION_TEMPLATE = 'change_id.short(12) ++ "\\t" ++ commit_id ++ "\\t" ++ conflict ++ "\\t" ++ description.first_line() ++ "\\n"'
+const LAND_REVISION_TEMPLATE =
+  'change_id.short(12) ++ "\\t" ++ commit_id ++ "\\t" ++ conflict ++ "\\t" ++ empty ++ "\\t" ++ current_working_copy ++ "\\t" ++ description.first_line() ++ "\\n"'
 const PLACEHOLDER_DESCRIPTIONS = new Set(['', 'wip'])
 const MAX_CONFLICT_FILES = 50
 const LAND_ATTEMPTS = 3
@@ -80,6 +82,19 @@ const parseRevisions = (stdout: string): readonly ThreadRevision[] =>
     .map(line => {
       const [changeId = '', commitId = '', conflict = 'false', ...description] = line.split('\t')
       return { changeId, commitId, conflict: conflict === 'true', description: description.join('\t').trim() }
+    })
+
+const parseLandRevisions = (stdout: string): readonly { readonly revision: ThreadRevision; readonly empty: boolean; readonly currentWorkingCopy: boolean }[] =>
+  stdout
+    .split('\n')
+    .filter(line => line.includes('\t'))
+    .map(line => {
+      const [changeId = '', commitId = '', conflict = 'false', empty = 'false', currentWorkingCopy = 'false', ...description] = line.split('\t')
+      return {
+        revision: { changeId, commitId, conflict: conflict === 'true', description: description.join('\t').trim() },
+        empty: empty === 'true',
+        currentWorkingCopy: currentWorkingCopy === 'true',
+      }
     })
 
 /** `<root>/.jj/repo` is the store in the owning checkout and a pointer file in every other workspace. */
@@ -115,6 +130,9 @@ export const createThreads = (options: {
 
   const revisions = async (revset: string, cwd: string, observe = false): Promise<readonly ThreadRevision[]> =>
     parseRevisions(await jj([...(observe ? ['--ignore-working-copy'] : []), 'log', '--no-graph', '-r', revset, '-T', REVISION_TEMPLATE], cwd))
+
+  const landRevisions = async (revset: string, cwd: string, observe = false) =>
+    parseLandRevisions(await jj([...(observe ? ['--ignore-working-copy'] : []), 'log', '--no-graph', '-r', revset, '-T', LAND_REVISION_TEMPLATE], cwd))
 
   const locate = async (path: string): Promise<ThreadLocation> => {
     const result = await options.executor({ args: ['--ignore-working-copy', 'root'], cwd: path })
@@ -221,19 +239,23 @@ export const createThreads = (options: {
     serialized(thread.repoRoot, async () => {
       const cwd = thread.workspaceRoot
       const bookmark = options.bookmark()
-      const leftovers = await revisions(`((${bookmark}..@) & empty()) ~ @ ~ merges() ~ working_copies()`, cwd)
-      if (leftovers.length > 0) await jj(['abandon', ...leftovers.map(revision => revision.commitId)], cwd, signal)
-      const work = await revisions(`(${bookmark}..@) ~ empty()`, cwd)
-      if (work.length === 0) {
-        await jj(['rebase', '-b', '@', '-d', bookmark], cwd, signal)
-        return { status: 'nothing-to-land' }
-      }
-      const undescribed = work.filter(revision => PLACEHOLDER_DESCRIPTIONS.has(revision.description.toLowerCase()))
-      if (undescribed.length > 0) return { status: 'needs-description', revisions: undescribed }
 
       for (let attempt = 1; ; attempt++) {
-        await jj(['rebase', '-b', '@', '-d', bookmark], cwd, signal)
-        const [rebased, emptyWorkingCopies] = await Promise.all([revisions(`(${bookmark}..@) ~ empty()`, cwd, true), revisions('@ & empty()', cwd, true)])
+        await jj(['rebase', '-b', '@', '-d', bookmark, '--skip-emptied'], cwd, signal)
+        const postRebase = await landRevisions(
+          `((${bookmark}..@) ~ empty()) | (((${bookmark}..@) & empty()) ~ @ ~ merges() ~ working_copies()) | (@ & empty())`,
+          cwd,
+          true,
+        )
+        const leftovers = postRebase.filter(item => item.empty && !item.currentWorkingCopy).map(item => item.revision)
+        if (leftovers.length > 0) {
+          await jj(['abandon', ...leftovers.map(revision => revision.commitId)], cwd, signal)
+          continue
+        }
+        const rebased = postRebase.filter(item => !item.empty).map(item => item.revision)
+        if (rebased.length === 0) return { status: 'nothing-to-land' }
+        const undescribed = rebased.filter(revision => PLACEHOLDER_DESCRIPTIONS.has(revision.description.toLowerCase()))
+        if (undescribed.length > 0) return { status: 'needs-description', revisions: undescribed }
         const conflicted = rebased.filter(revision => revision.conflict)
         if (conflicted.length > 0) {
           const files = new Set<string>()
@@ -246,7 +268,7 @@ export const createThreads = (options: {
           }
           return { status: 'conflicted', revisions: conflicted, files: [...files].slice(0, MAX_CONFLICT_FILES) }
         }
-        const workingCopyEmpty = emptyWorkingCopies.length > 0
+        const workingCopyEmpty = postRebase.some(item => item.empty && item.currentWorkingCopy)
         const target = workingCopyEmpty ? '@-' : '@'
         // A bookmark only moves forward; if another writer advanced it meanwhile, rebase again onto the new tip.
         const moved = await options.executor({ args: ['bookmark', 'set', bookmark, '-r', target], cwd })
