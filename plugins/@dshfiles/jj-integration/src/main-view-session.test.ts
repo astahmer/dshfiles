@@ -15,11 +15,11 @@ describe('mainViewSessionId', () => {
     expect(mainViewSessionId(sessions)).toBe('new')
   })
 
-  it('ignores blank Sessions that are not retained in the main view', () => {
-    expect(mainViewSessionId({ ids: ['previous', 'hidden'], byId: sessions.byId })).toBe('previous')
+  it('does not mistake the previous conversation for a new-thread composer', () => {
+    expect(mainViewSessionId({ ids: ['previous', 'hidden'], byId: sessions.byId })).toBeUndefined()
   })
 
-  it('returns undefined when no Session is retained in the main view', () => {
+  it('returns undefined when no blank Session is retained in the main view', () => {
     expect(mainViewSessionId({ ids: ['hidden'], byId: sessions.byId })).toBeUndefined()
   })
 })

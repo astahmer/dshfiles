@@ -11,6 +11,5 @@ export const mainViewSessionId = <SessionId extends string>(input: {
     const session = input.byId[id]
     return session?.blank === true && (session.retainedBy.mainView ?? 0) > 0
   })
-  if (blankSession !== undefined) return blankSession
-  return input.ids.find(id => (input.byId[id]?.retainedBy.mainView ?? 0) > 0)
+  return blankSession
 }
