@@ -1,5 +1,5 @@
 import type { AccountKind, AccountsUsage } from './api.js'
-import { badgeFromName } from './account-draft.js'
+import { AccountDraftModel } from './account-draft.js'
 import { KIND_GROUPS } from './account-labels.js'
 
 /**
@@ -105,7 +105,7 @@ export const SHORT_NAME_MAX_LENGTH = 6
 
 /** The name the usage strip shows beside an account's meter: its strip override, then its picker tag, then its initials. */
 export const stripShortName = (input: { readonly displayName: string; readonly tag: string; readonly override: string | undefined }): string =>
-  (input.override ?? '').trim().slice(0, SHORT_NAME_MAX_LENGTH) || input.tag.trim() || badgeFromName(input.displayName)
+  (input.override ?? '').trim().slice(0, SHORT_NAME_MAX_LENGTH) || input.tag.trim() || AccountDraftModel.badgeFromName(input.displayName)
 
 const resetOrder = (resetsAt: number | null): number => resetsAt ?? Number.POSITIVE_INFINITY
 
@@ -121,7 +121,7 @@ export const bindingWindow = (card: OverviewCard): QuotaSummaryItem | undefined 
     return {
       instanceId: card.instanceId,
       displayName: card.displayName,
-      shortName: badgeFromName(card.displayName),
+      shortName: AccountDraftModel.badgeFromName(card.displayName),
       kind: card.kind,
       windowLabel: reserve.label,
       percentRemaining: Math.max(0, reserve.percentRemaining),
@@ -143,7 +143,7 @@ export const bindingWindow = (card: OverviewCard): QuotaSummaryItem | undefined 
   return {
     instanceId: card.instanceId,
     displayName: card.displayName,
-    shortName: badgeFromName(card.displayName),
+    shortName: AccountDraftModel.badgeFromName(card.displayName),
     kind: card.kind,
     windowLabel: binding.label,
     percentRemaining: Math.max(0, binding.percentRemaining),

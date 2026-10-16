@@ -6,7 +6,7 @@ import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
 import { ChevronDownIcon, PlusIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useEffect, useState } from 'react'
-import { draftProblem, newAccountDraft, sameDraft, toDraft } from './account-draft.js'
+import { AccountDraftModel } from './account-draft.js'
 import { KIND_GROUPS, KIND_LABEL, STATE_LABEL } from './account-labels.js'
 import { aiAccountsApi, type AccountDraft, type AccountProfile, type AccountsFile } from './api.js'
 import { AutoSaveIndicator } from './auto-save-indicator.js'
@@ -28,15 +28,15 @@ const CREDENTIAL_FIELD = {
 const QuickEditor = (props: { readonly profile: AccountProfile; readonly onSaved: (file: AccountsFile) => void }): JSX.Element => {
   const accounts = useApi(aiAccountsApi)
   const preferences = usePreferences()
-  const [draft, setDraft] = useState<AccountDraft>(() => toDraft(props.profile))
+  const [draft, setDraft] = useState<AccountDraft>(() => AccountDraftModel.toDraft(props.profile))
   const { saver, status } = useAutoSaver<AccountDraft>({
     save: async next => props.onSaved(await accounts.save({ draft: next })),
-    equals: sameDraft,
+    equals: AccountDraftModel.sameDraft,
     delayMs: preferences.autoSaveDelayMs,
   })
-  const saved = toDraft(props.profile)
-  const dirty = !sameDraft(saved, draft)
-  const problem = draftProblem(draft)
+  const saved = AccountDraftModel.toDraft(props.profile)
+  const dirty = !AccountDraftModel.sameDraft(saved, draft)
+  const problem = AccountDraftModel.draftProblem(draft)
   const field = CREDENTIAL_FIELD[draft.kind]
 
   useEffect(() => {
@@ -122,7 +122,7 @@ export const ModelsPageAccounts = (): JSX.Element | null => {
   if (!preferences.modelsPageAccounts) return null
 
   const create = (kind: AccountDraft['kind']): void => {
-    const next = newAccountDraft({ kind, existing: file?.accounts ?? [] })
+    const next = AccountDraftModel.newAccountDraft({ kind, existing: file?.accounts ?? [] })
     void accounts
       .save({ draft: next })
       .then(saved => {
@@ -181,7 +181,7 @@ export const ModelsPageAccounts = (): JSX.Element | null => {
                   checked={profile.enabled}
                   onCheckedChange={enabled =>
                     void accounts
-                      .save({ draft: { ...toDraft(profile), enabled } })
+                      .save({ draft: { ...AccountDraftModel.toDraft(profile), enabled } })
                       .then(setFile)
                       .catch((cause: unknown) => setNotice(`Could not save: ${String(cause)}`))
                   }

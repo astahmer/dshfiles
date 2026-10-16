@@ -6,7 +6,7 @@ import type { WorkspacePickerPorts } from '@dshfiles/project-folder-picker'
 import { ApiKeySetupDialog } from './api-key-setup-dialog.js'
 import { AccountsRules, type AccountDraft } from './api.js'
 import { NumberedSection } from './panel-primitives.js'
-import { suggestedApiKeyRef } from './account-draft.js'
+import { AccountDraftModel } from './account-draft.js'
 import { shouldOfferCredentialSetup } from './credential-setup-model.js'
 import type { AccountsPanelState } from './use-accounts-panel-state.js'
 
@@ -155,13 +155,13 @@ export const RuntimePathsSection = (props: {
             onBlur={() => {
               if (props.state.dirty && props.state.problem === null) void save(draft)
             }}
-            placeholder={suggestedApiKeyRef(draft.instanceId)}
+            placeholder={AccountDraftModel.suggestedApiKeyRef(draft.instanceId)}
             value={draft.apiKeyEnv}
           />
           {!AccountsRules.isKeyEnvName(credentialRef) ? (
             <Button
               className="dshx:self-start"
-              onClick={() => setDraft({ ...draft, apiKeyEnv: suggestedApiKeyRef(draft.instanceId) })}
+              onClick={() => setDraft({ ...draft, apiKeyEnv: AccountDraftModel.suggestedApiKeyRef(draft.instanceId) })}
               size="sm"
               type="button"
               variant="outline"
@@ -174,7 +174,9 @@ export const RuntimePathsSection = (props: {
             {canConfigureKey ? (
               <Button
                 onClick={() => {
-                  const setupDraft = AccountsRules.isKeyEnvName(credentialRef) ? draft : { ...draft, apiKeyEnv: suggestedApiKeyRef(draft.instanceId) }
+                  const setupDraft = AccountsRules.isKeyEnvName(credentialRef)
+                    ? draft
+                    : { ...draft, apiKeyEnv: AccountDraftModel.suggestedApiKeyRef(draft.instanceId) }
                   setDraft(setupDraft)
                   if (!AccountsRules.isKeyEnvName(credentialRef) || props.state.dirty) {
                     void save(setupDraft).then(saved => saved && setConfigureOpen(true))

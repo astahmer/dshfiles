@@ -3,7 +3,7 @@ import { Item, ItemContent, ItemDescription, ItemGroup, ItemTitle } from '@dshfi
 import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
 import { ArrowDownIcon, ArrowUpIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { badgeFromName } from './account-draft.js'
+import { AccountDraftModel } from './account-draft.js'
 import { KIND_LABEL, STATE_LABEL, routedKind } from './account-labels.js'
 import type { AccountOrderDirection, AccountProfile } from './api.js'
 import { ProviderMark } from './panel-primitives.js'
@@ -42,7 +42,10 @@ export const AccountGroup = (props: {
                 onClick={() => props.onSelect(profile.instanceId)}
                 type="button"
               >
-                <ProviderMark badge={profile.badge === '' ? badgeFromName(profile.displayName).slice(0, 2) : profile.badge} color={profile.accentColor} />
+                <ProviderMark
+                  badge={profile.badge === '' ? AccountDraftModel.badgeFromName(profile.displayName).slice(0, 2) : profile.badge}
+                  color={profile.accentColor}
+                />
                 <ItemContent className="dshx:min-w-0 dshx:gap-0.5">
                   <ItemTitle className="dshx:block dshx:w-full dshx:truncate dshx:text-sm">{profile.displayName}</ItemTitle>
                   <ItemDescription className="dshx:line-clamp-1 dshx:text-xs">{profile.identity ?? STATE_LABEL[profile.state]}</ItemDescription>

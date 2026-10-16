@@ -2,7 +2,7 @@ import { writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
 import { useApi } from '@dshfiles/dshx/client'
 import { useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { draftProblem, newAccountDraft, sameDraft, toDraft } from './account-draft.js'
+import { AccountDraftModel } from './account-draft.js'
 import { useAutoSaver } from './auto-save.js'
 import { connectHintFor } from './account-labels.js'
 import { aiAccountsKeys, aiAccountsQueries } from './accounts-queries.js'
@@ -67,11 +67,15 @@ export const useAccountsPanelState = (credentialSetup?: CredentialSetupPort) => 
       setDraft(null)
       return
     }
-    setDraft(current => (current !== null && current.instanceId === selected.instanceId && !sameDraft(selected, current) ? current : toDraft(selected)))
+    setDraft(current =>
+      current !== null && current.instanceId === selected.instanceId && !AccountDraftModel.sameDraft(selected, current)
+        ? current
+        : AccountDraftModel.toDraft(selected),
+    )
   }, [selected])
 
-  const dirty = selected !== null && draft !== null && !sameDraft(selected, draft)
-  const problem = draft === null ? null : draftProblem(draft)
+  const dirty = selected !== null && draft !== null && !AccountDraftModel.sameDraft(selected, draft)
+  const problem = draft === null ? null : AccountDraftModel.draftProblem(draft)
   const credentialRefName = draft?.apiKeyEnv.trim() ?? ''
   const credentialInfoQuery = useQuery({
     queryKey: aiAccountsKeys.credential(credentialRefName),
@@ -82,7 +86,7 @@ export const useAccountsPanelState = (credentialSetup?: CredentialSetupPort) => 
   })
   const { saver, status: autoSave } = useAutoSaver<AccountDraft>({
     save: async next => setFile(await accounts.save({ draft: next })),
-    equals: sameDraft,
+    equals: AccountDraftModel.sameDraft,
     delayMs: preferences.autoSaveDelayMs,
   })
 
@@ -90,7 +94,7 @@ export const useAccountsPanelState = (credentialSetup?: CredentialSetupPort) => 
   // becomes a route; every other field saves itself after a pause.
   useEffect(() => {
     if (preferences.saveMode !== 'auto' || selected === null || draft === null) return
-    if (draft.instanceId !== selected.instanceId || sameDraft(selected, draft) || draftProblem(draft) !== null) return
+    if (draft.instanceId !== selected.instanceId || AccountDraftModel.sameDraft(selected, draft) || AccountDraftModel.draftProblem(draft) !== null) return
     saver.schedule(draft)
   }, [draft, selected, preferences.saveMode, saver])
 
@@ -194,7 +198,7 @@ export const useAccountsPanelState = (credentialSetup?: CredentialSetupPort) => 
   /** Commit a route-slug edit: in auto mode on blur, in manual mode with Save. */
   const commitRename = async () => {
     if (preferences.saveMode !== 'auto' || selected === null || draft === null || draft.instanceId === selected.instanceId) return
-    if (draftProblem(draft) !== null) return
+    if (AccountDraftModel.draftProblem(draft) !== null) return
     await save(draft)
   }
 
@@ -206,20 +210,20 @@ export const useAccountsPanelState = (credentialSetup?: CredentialSetupPort) => 
 
   const revert = () => {
     saver.cancel()
-    setDraft(selected === null ? null : toDraft(selected))
+    setDraft(selected === null ? null : AccountDraftModel.toDraft(selected))
   }
 
   /** Write straight through, for the toggles the reference page saves on click. */
   const persist = async (patch: Partial<AccountDraft>) => {
     if (selected === null) return
-    const next = { ...toDraft(selected), ...patch }
+    const next = { ...AccountDraftModel.toDraft(selected), ...patch }
     setDraft(current => (current === null ? next : { ...current, ...patch }))
     try {
       setFile(await accounts.save({ draft: next }))
       saver.markSaved(next)
     } catch (error) {
       setNotice(`Could not save: ${String(error)}`)
-      setDraft(toDraft(selected))
+      setDraft(AccountDraftModel.toDraft(selected))
     }
   }
 
@@ -228,7 +232,7 @@ export const useAccountsPanelState = (credentialSetup?: CredentialSetupPort) => 
   }
 
   const toggleEnabled = async (profile: AccountProfile) => {
-    setFile(await accounts.save({ draft: { ...toDraft(profile), enabled: !profile.enabled } }))
+    setFile(await accounts.save({ draft: { ...AccountDraftModel.toDraft(profile), enabled: !profile.enabled } }))
   }
 
   const remove = async (profile: AccountProfile) => {
@@ -242,7 +246,7 @@ export const useAccountsPanelState = (credentialSetup?: CredentialSetupPort) => 
    * identity and the card lights up when Codex writes the file.
    */
   const createAccount = async (kind: AccountProfile['kind']) => {
-    const next = newAccountDraft({ kind, existing: file?.accounts ?? [] })
+    const next = AccountDraftModel.newAccountDraft({ kind, existing: file?.accounts ?? [] })
     try {
       await saveMutation.mutateAsync({ draft: next })
       setNotice(`Added ${next.displayName}. ${connectHintFor(kind)}`)

@@ -2,7 +2,7 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
 import { RefreshCwIcon } from '@dshfiles/plugin-ui/icons'
-import { ROUTE_SLUG_HINT, badgeFromName } from './account-draft.js'
+import { AccountDraftModel, ROUTE_SLUG_HINT } from './account-draft.js'
 import { KIND_LABEL } from './account-labels.js'
 import { PROVIDER_ICONS, type AccountDraft } from './api.js'
 import { LabelledControl, NumberedSection } from './panel-primitives.js'
@@ -92,7 +92,7 @@ export const AccountIdentitySection = (props: { readonly state: AccountsPanelSta
               id={id}
               maxLength={3}
               onChange={event => setDraft({ ...draft, badge: event.target.value.toUpperCase() })}
-              placeholder={badgeFromName(draft.displayName)}
+              placeholder={AccountDraftModel.badgeFromName(draft.displayName)}
               value={draft.badge}
             />
           )}
