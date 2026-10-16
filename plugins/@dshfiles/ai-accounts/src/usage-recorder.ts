@@ -1,6 +1,6 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { readAccountUsage } from './account-usage.js'
-import { USAGE_HISTORY_DOMAIN, boundUsageHistoryPoints, parseUsageBucketKey, usageBucketKey, usageHistoryDomain, type QuotaSnapshot } from './usage-history.js'
+import { USAGE_HISTORY_DOMAIN, UsageHistoryModel, usageHistoryDomain, type QuotaSnapshot } from './usage-history.js'
 import { usageMetaSchema, type UsageMeta, type UsageHistorySettings } from './usage-history-model.js'
 import type { AccountProfile, UsageCard } from './api.js'
 import type { CredentialValueResolver } from './credentials.js'
@@ -139,7 +139,7 @@ export const collectUsageHistory = async (
         bankedResets: usage.bankedResets,
         bankedResetExpiries: usage.bankedResetExpiries,
       }
-      await quota.put(usageBucketKey(account.instanceId, at, settings.intervalMinutes), snapshot)
+      await quota.put(UsageHistoryModel.bucketKey(account.instanceId, at, settings.intervalMinutes), snapshot)
       written += 1
     }
   }
@@ -179,10 +179,10 @@ export const readUsageHistory = async (ctx: Context, instanceId: string, sinceMs
   if (opening === undefined) return []
   const domain = await opening
   const rows = [...domain.table('quota').entries()]
-    .filter(([key, value]) => parseUsageBucketKey(key)?.instanceId === instanceId && value.at >= sinceMs)
+    .filter(([key, value]) => UsageHistoryModel.parseBucketKey(key)?.instanceId === instanceId && value.at >= sinceMs)
     .map(([, value]) => value)
     .map(value => ({ ...value, bankedResetExpiries: value.bankedResetExpiries ?? [] }))
-  return boundUsageHistoryPoints(rows)
+  return UsageHistoryModel.boundPoints(rows)
 }
 
 export interface UsageHistoryScheduler {

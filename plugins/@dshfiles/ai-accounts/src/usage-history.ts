@@ -42,7 +42,7 @@ const spreadIndexes = (indexes: readonly number[], count: number): readonly numb
 }
 
 /** Keep history reads bounded while retaining the detail used by the page. */
-export const boundUsageHistoryPoints = (points: readonly QuotaSnapshot[]): readonly QuotaSnapshot[] => {
+const boundUsageHistoryPoints = (points: readonly QuotaSnapshot[]): readonly QuotaSnapshot[] => {
   const ordered = [...points].sort((left, right) => left.at - right.at)
   if (ordered.length <= MAX_USAGE_HISTORY_POINTS) return ordered
 
@@ -100,10 +100,10 @@ export const usageHistoryDomain = defineDomain({
 })
 
 /** Bucket a reading belongs to, so repeat polls in the configured interval collapse. */
-export const usageBucketKey = (instanceId: string, at: number, intervalMinutes: number): string =>
+const usageBucketKey = (instanceId: string, at: number, intervalMinutes: number): string =>
   `v2:${encodeURIComponent(instanceId)}:${String(intervalMinutes)}:${String(Math.floor(at / (intervalMinutes * MINUTE_MS)))}`
 
-export const parseUsageBucketKey = (key: string): { readonly instanceId: string; readonly bucket: number; readonly intervalMinutes: number } | null => {
+const parseUsageBucketKey = (key: string): { readonly instanceId: string; readonly bucket: number; readonly intervalMinutes: number } | null => {
   if (key.startsWith('v2:')) {
     const [, encodedId, intervalToken, bucketToken] = key.split(':')
     if (encodedId === undefined || intervalToken === undefined || bucketToken === undefined) return null
@@ -137,4 +137,10 @@ export const parseUsageBucketKey = (key: string): { readonly instanceId: string;
   const instanceId = key.slice(0, separator)
   if (instanceId.length === 0) return null
   return { instanceId, bucket, intervalMinutes: LEGACY_BUCKET_MS / MINUTE_MS }
+}
+
+export class UsageHistoryModel {
+  static readonly boundPoints = boundUsageHistoryPoints
+  static readonly bucketKey = usageBucketKey
+  static readonly parseBucketKey = parseUsageBucketKey
 }

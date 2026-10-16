@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { boundUsageHistoryPoints, parseUsageBucketKey, usageBucketKey } from './usage-history.js'
+import { UsageHistoryModel } from './usage-history.js'
 import { QuotaHistoryAnalysis } from './usage-history-analysis.js'
 import { MAX_USAGE_HISTORY_POINTS, type UsageHistoryPoint } from './usage-history-model.js'
 
@@ -14,18 +14,18 @@ const point = (at: number, remaining: number, resetsAt: number, bankedResets = 0
 describe('quota usage-history analysis', () => {
   it('keys snapshots by the configured interval and still recognizes legacy 15-minute buckets', () => {
     const at = 3_600_123
-    expect(usageBucketKey('codex:personal', at, 5)).toBe(`v2:codex%3Apersonal:5:${String(Math.floor(at / (5 * 60_000)))}`)
-    expect(parseUsageBucketKey('codex:personal:240')).toEqual({
+    expect(UsageHistoryModel.bucketKey('codex:personal', at, 5)).toBe(`v2:codex%3Apersonal:5:${String(Math.floor(at / (5 * 60_000)))}`)
+    expect(UsageHistoryModel.parseBucketKey('codex:personal:240')).toEqual({
       instanceId: 'codex:personal',
       bucket: 240,
       intervalMinutes: 15,
     })
-    expect(parseUsageBucketKey(usageBucketKey('codex:personal', at, 5))).toEqual({
+    expect(UsageHistoryModel.parseBucketKey(UsageHistoryModel.bucketKey('codex:personal', at, 5))).toEqual({
       instanceId: 'codex:personal',
       bucket: Math.floor(at / (5 * 60_000)),
       intervalMinutes: 5,
     })
-    expect(usageBucketKey('codex:personal', at, 5)).not.toBe(usageBucketKey('codex:personal', at, 15))
+    expect(UsageHistoryModel.bucketKey('codex:personal', at, 5)).not.toBe(UsageHistoryModel.bucketKey('codex:personal', at, 15))
   })
 
   it('bounds long history reads while preserving recent forecasts and reset-bank changes', () => {
@@ -33,7 +33,7 @@ describe('quota usage-history analysis', () => {
       ...point(index * 60_000, 100 - (index % 100), (Math.floor(index / 1_000) + 1) * 1_000_000, Math.floor(index / 200)),
       instanceId: 'codex',
     }))
-    const bounded = boundUsageHistoryPoints(snapshots)
+    const bounded = UsageHistoryModel.boundPoints(snapshots)
     const recordedTimes = new Set(bounded.map(snapshot => snapshot.at))
 
     expect(bounded).toHaveLength(MAX_USAGE_HISTORY_POINTS)
