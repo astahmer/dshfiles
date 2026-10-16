@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { access, chmod, mkdir, mkdtemp, rm, stat, writeFile } from 'node:fs/promises'
+import { createServer, type Server } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { checkClientBoot } from '../src/project/client-boot-check.js'
+import { checkClientBoot, waitForHostResponse } from '../src/project/client-boot-check.js'
 import { clientEntryFailures, compositionFailures, parseBootText } from '../src/project/client-boot-check.js'
 import {
   readClientBootOutcome,
@@ -304,5 +305,38 @@ describe('client boot outcome reader', () => {
     })
 
     expect(outcome.slotFailures).toEqual([{ slot: 'sidebar.workspaces', source: 'boundary' }])
+  })
+})
+
+describe('host response probe', () => {
+  const listenRandomPort = async (server: Server): Promise<{ readonly url: string; readonly close: () => Promise<void> }> => {
+    await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
+    const address = server.address()
+    if (address === null || typeof address === 'string') throw new Error('The fixture server did not bind a port.')
+    return {
+      url: `http://127.0.0.1:${String(address.port)}/`,
+      close: () => new Promise<void>(resolve => server.close(() => resolve())),
+    }
+  }
+
+  it('returns as soon as the Host answers rather than settling for a fixed window', async () => {
+    const fixture = await listenRandomPort(createServer((_request, response) => response.end('ok')))
+    try {
+      const startedAt = Date.now()
+      await waitForHostResponse(fixture.url, 5_000)
+      expect(Date.now() - startedAt).toBeLessThan(1_000)
+    } finally {
+      await fixture.close()
+    }
+  })
+
+  it('gives up at its deadline when the announced URL never answers', async () => {
+    const fixture = await listenRandomPort(createServer(() => {}))
+    await fixture.close()
+    const startedAt = Date.now()
+    await waitForHostResponse(fixture.url, 300)
+    const elapsed = Date.now() - startedAt
+    expect(elapsed).toBeGreaterThanOrEqual(250)
+    expect(elapsed).toBeLessThan(5_000)
   })
 })

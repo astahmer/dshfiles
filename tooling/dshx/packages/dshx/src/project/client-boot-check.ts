@@ -81,6 +81,8 @@ export interface ClientBootCheckResult {
 }
 
 const DEFAULT_TIMEOUT_MS = 90_000
+/** A Host that announced its URL but does not answer within this window is reported by the browser outcome instead. */
+const HOST_RESPONSE_TIMEOUT_MS = 10_000
 
 /** Time for the shell behind the first-run provider dialog to render, including its Slot entry crashes. */
 const SLOT_SETTLE_MS = 1_000
@@ -164,6 +166,24 @@ const waitForHostUrl = (
     child.once('close', handleClose)
   })
 
+/**
+ * The Host announces its URL once it is ready to serve, which is what the journey harness navigates on. Probing for
+ * the first answer replaces a fixed settle that cost two seconds on every check, and still waits when a Host
+ * announces before it accepts connections.
+ */
+export const waitForHostResponse = async (url: string, timeoutMs = HOST_RESPONSE_TIMEOUT_MS): Promise<void> => {
+  const deadline = Date.now() + timeoutMs
+  for (;;) {
+    try {
+      await fetch(url, { redirect: 'manual', signal: AbortSignal.timeout(1_000) })
+      return
+    } catch {
+      if (Date.now() >= deadline) return
+      await new Promise(resolve => setTimeout(resolve, 100))
+    }
+  }
+}
+
 export const checkClientBoot = async (options: ClientBootCheckOptions): Promise<ClientBootCheckResult> => {
   const executable = options.executable ?? 'dsh'
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS
@@ -222,7 +242,7 @@ export const checkClientBoot = async (options: ClientBootCheckOptions): Promise<
 
         if (launchUrl === undefined && processError === undefined && spawnError === undefined) timedOut = true
         if (launchUrl !== undefined) {
-          await new Promise(resolve => setTimeout(resolve, 2_000))
+          await waitForHostResponse(launchUrl)
           try {
             const { chromium, firefox, webkit } = (await import('playwright')) as typeof import('playwright')
             const engine = { chromium, firefox, webkit }[options.browserName ?? 'chromium']
