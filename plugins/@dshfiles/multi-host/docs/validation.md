@@ -27,14 +27,16 @@ owned code paths to preserve concurrent changes in this shared checkout.
 Repository warnings were not attributed to this change; the full checkout already
 contains other work. No package dependency or lockfile change was needed.
 
-The POC proves HTTP/session and WebSocket/history access through a real loopback
-byte forwarder, session namespace isolation, token rejection, state surviving
-tunnel loss, and history recovery after restarting a runtime with the same home.
-It does not exercise SSH cryptography/authentication, a second physical machine,
-agent/model turns, filesystem/process tools, native terminals, LSP, MCP, browser
-composition or supervised remote startup. The interrupted mutation test drops the
-connection before sending; admitted mutations with lost replies remain an open
-failure-injection acceptance gate.
+The original POC proves HTTP/session and WebSocket/history access through a real
+loopback byte forwarder, session namespace isolation, token rejection, state
+surviving tunnel loss, and history recovery after restarting a runtime with the
+same home. It does not exercise a second physical machine, agent/model turns,
+filesystem/process tools, native terminals, LSP, MCP, a full remote composer/agent
+turn, or supervised remote service startup. Its interrupted-mutation test drops
+the connection before sending. The repository-only journey added on 2026-10-16
+also exercises generated-key loopback SSH authentication, a second scratch DSH,
+an admitted create with its response lost, read-only list reconciliation, and no
+replay; it still does not prove physical-host SSH or persistent service ownership.
 
 ## P1 — real remote acceptance (2026-10-05, VPS)
 
@@ -144,9 +146,13 @@ dependencies carry.
 
 ## Repository-side durability checks (2026-10-16)
 
-- `pnpm --dir plugins/@dshfiles/multi-host exec vitest run tests/launch-file.test.ts`: 4 passed. Tests cover fresh and pre-existing path permissions, replacing stale contents, cleanup ownership, and failed-write temporary-file cleanup.
-- `pnpm --dir tooling/dshx run test:ssh-smoke-safety`: 10 passed. Nine smoke tests cover missing configuration, each opt-in independently, invalid port, group/other-writable known_hosts, strict SSH options, default port 22, shell-safe remote paths, and launch-token redaction.
-- The additional loopback fixture test uses generated scratch host/client keys and a generated known_hosts file, validates only its temporary config with `sshd -T -f`, starts sshd on `127.0.0.1` at a high port, and runs the shared strict SSH option builder against it. It validates the owned process group exits before removing the scratch directory. It uses no system SSH keys/config and contacts no remote host. No DSH service is started by this fixture.
-- No live `:3080` runtime or physical host was touched.
+The repository-only lifecycle journey boots two scratch DSH profiles: the manager loads `@dshfiles/multi-host` and `@dshfiles/jj-integration`, while the remote profile loads only `@dshfiles/multi-host`. Its SSH server binds to loopback with generated host/client keys and known_hosts; the manager uses an explicit scratch SSH wrapper/config, never the user's SSH config or keys. The response-loss proxy is test-only, binds to `127.0.0.1`, forwards to one validated `127.0.0.1` upstream port, and caps request/response bodies at 1 MiB/4 MiB. It counts create attempts before dispatch separately from committed session IDs, drops one successful create response, preserves the cookie on the gateway's `GET /?token=…` 302/303 handoff, strips every `Location` header, and rejects all other 3xx responses. Synthetic `.invalid` locations are tested with manual redirects; no external redirect is followed.
 
-These checks cover repository-owned launch metadata, smoke safety, and isolated SSH transport only. They do not prove a selected Linux service owner, a second-scratch-DSH lifecycle, real service startup/upgrade/rollback, or the planned remote thread/reconnect lifecycle E2E.
+- From `plugins/@dshfiles/multi-host`, `fnm exec --using=22.23.3 pnpm test`: 36 passed, 3 skipped across 11 files. `fnm exec --using=22.23.3 pnpm typecheck`, `fnm exec --using=22.23.3 pnpm build`, and `fnm exec --using=22.23.3 node -e "import('./dist/index.js')"` also passed.
+- `fnm exec --using=22.23.3 node --test tooling/dshx/e2e/support/loopback-sshd.test.mjs tooling/dshx/e2e/support/mutation-response-proxy.test.mjs`: 2 passed. These cover generated SSH alias/config and daemon restart, response loss, exact upstream create count, bounded bodies, origin rejection, and the redirect/cookie boundary above.
+- `fnm exec --using=22.23.3 pnpm --dir tooling/dshx run test:ssh-smoke-safety`: 10 passed. The smoke-safety tests cover missing configuration, independent opt-ins, port bounds, known_hosts permissions, strict SSH options, shell-safe remote paths, and launch-token redaction.
+- `fnm exec --using=22.23.3 pnpm --dir tooling/dshx run test:browser-tasks`: 7 passed. `features:check` validated 43 package catalogs and 190 Gherkin scenarios; `browser-tasks:check` found no config drift, and `test:e2e:gen` passed.
+- `fnm exec --using=22.23.3 pnpm check:e2e @dshfiles/multi-host --force`: 1/1 Chromium journey passed in 16 seconds without cache. It verifies SSH readiness, native remote session create/transcript/list, owned-tunnel loss and reconnect, stale launch rejection, failed profile-sync cleanup, lost create-response reconciliation with exactly one new session and no replay, and scratch crash cleanup.
+- Named scratch UI reach used `mhost-verify-20261016` for every operation: `dshx dev up --plugin @dshfiles/multi-host --plugin @dshfiles/jj-integration --name mhost-verify-20261016 --json`, `dshx dev doctor --name mhost-verify-20261016 --json`, `dshx dev open multi-host/runtime-directory --name mhost-verify-20261016 --json`, `dshx dev shot --name mhost-verify-20261016 --label multi-host-runtime-directory --json`, and `dshx dev down --name mhost-verify-20261016 --json`. All three bundles loaded, `doctor` reported no host errors, the Add host dialog opened, and the screenshot had zero console, page, request, or HTTP errors and zero warnings. `down` removed the scratch home and token-bearing state/logs with `leftRunning: []`; a process check found no scratch DSH processes. No live `:3080` runtime or physical host was touched by these local checks.
+
+**Physical release gate remains open by user choice.** In the separate authorized read-only audit, the VPS had an existing registered DSH home and HomeInfra-only Swarm services, but no DSH service or multi-host launch metadata in that home. The Pi's pinned host key was valid, but SSH with the configured identity was denied (`Permission denied (publickey)`); no alternate credential was tried. Nixfiles has macOS DSH Home Manager wiring and a Pi runner, but no Linux DSH service owner. No target or service owner was selected, and no Pi, VPS, or Swarm service was changed. No secret values or files were read or written. These local checks do not prove physical-host SSH, service ownership, persistent Linux startup, upgrade/rollback, or deployment acceptance; keep those release gates open.
