@@ -3,7 +3,7 @@ import { createAssistantMessage, createUserMessage, type LlmFailure, type Messag
 import { describe, expect, it } from 'vitest'
 import { createAccountPool } from './account-pool.js'
 import { DEFAULT_RECOVERY_POLICY, type RecoveryPolicy } from './failure-policy.js'
-import { classifyFailure, createFailureRecovery, offloadResentImages } from './failure-recovery.js'
+import { classifyFailure, createFailureRecovery, offloadResentImages, quotaRecoveryFor } from './failure-recovery.js'
 
 const NOW = 1_000_000
 
@@ -41,6 +41,11 @@ const codexRetryHint: LlmFailure = {
   code: 'PI_AI_ERROR',
 }
 const quota: LlmFailure = { message: 'You have hit your usage limit', code: 'QUOTA', status: 429 }
+const spentPlan: readonly LlmFailure[] = [
+  { message: 'You have hit your ChatGPT usage limit (plus plan). Try again in ~151 min.', code: 'PI_AI_ERROR' },
+  { message: "You've hit your limit · resets 3:00 PM", code: 'PI_AI_ERROR' },
+  { message: 'You have hit your weekly limit. Try again Monday.', code: 'PI_AI_ERROR' },
+]
 
 describe('classifyFailure', () => {
   it('sorts provider failures into the kinds the settings name', () => {
@@ -54,6 +59,34 @@ describe('classifyFailure', () => {
     expect(classifyFailure({ message: 'context too long', code: 'CONTEXT_WINDOW_EXCEEDED' })).toBe('oversized')
     expect(classifyFailure({ message: 'Request Entity Too Large', code: 'PI_AI_ERROR', status: 413 })).toBe('oversized')
     expect(classifyFailure({ message: 'images must be offloaded', code: 'IMAGE_OFFLOAD_REQUIRED' })).toBeUndefined()
+  })
+
+  it('treats a spent plan as exhausted even without the upstream exceeded wording', () => {
+    for (const failure of spentPlan) expect(classifyFailure(failure)).toBe('exhausted')
+  })
+
+  it('leaves warnings and unrelated wording alone', () => {
+    expect(classifyFailure({ message: 'You are approaching your usage limit', code: 'PI_AI_ERROR' })).toBeUndefined()
+    expect(classifyFailure({ message: 'You have hit your rate limit', code: 'PI_AI_ERROR' })).toBeUndefined()
+    expect(classifyFailure({ message: 'the limit was reached by the tool', code: 'PI_AI_ERROR' })).toBeUndefined()
+  })
+})
+
+describe('quotaRecoveryFor', () => {
+  it('records a spent plan even though fail-over is on by default', () => {
+    expect(quotaRecoveryFor({ failureKind: 'exhausted', rescued: false, autoRetryDefault: true })).toEqual({ autoRetry: true })
+    expect(quotaRecoveryFor({ failureKind: 'exhausted', rescued: false, autoRetryDefault: false })).toEqual({ autoRetry: false })
+  })
+
+  it('lets a rescued step stay with DSH and sets rate limits to retry themselves', () => {
+    expect(quotaRecoveryFor({ failureKind: 'exhausted', rescued: true, autoRetryDefault: false })).toBeUndefined()
+    expect(quotaRecoveryFor({ failureKind: 'rateLimit', rescued: false, autoRetryDefault: false })).toEqual({ autoRetry: true })
+  })
+
+  it('leaves kinds without a stored recovery alone', () => {
+    expect(quotaRecoveryFor({ failureKind: 'transport', rescued: false, autoRetryDefault: false })).toBeUndefined()
+    expect(quotaRecoveryFor({ failureKind: 'auth', rescued: false, autoRetryDefault: false })).toBeUndefined()
+    expect(quotaRecoveryFor({ failureKind: 'oversized', rescued: false, autoRetryDefault: false })).toBeUndefined()
   })
 })
 

@@ -15,6 +15,14 @@ const AUTH_CODES: ReadonlySet<string> = new Set(['AUTH', 'MISSING_CREDENTIAL', '
 const TRANSPORT_CODES: ReadonlySet<string> = new Set(['TRANSPORT', 'TIMEOUT', 'OVERLOADED', 'LLM_STREAM_IDLE_TIMEOUT'])
 const OPENAI_RETRY_HINT = /An error occurred while processing your request\.\s+You can retry your request\b/i
 const OVERSIZED_TEXT = /\b(?:request|payload|body)(?: entity)? (?:is )?too large\b/i
+/**
+ * Spent-plan wording that carries no `usage limit exceeded` phrase to match, e.g.
+ * ChatGPT's "You have hit your ChatGPT usage limit (plus plan). Try again in ~151 min."
+ * or Claude's "You've hit your limit · resets 3:00 PM". `isQuotaExceededError` needs the
+ * limit word followed by exceeded/exhausted/reached, so this lands as `PI_AI_ERROR` and
+ * a retry only spends another attempt on a plan that is already spent.
+ */
+const SPENT_PLAN_HINT = /\byou(?:'ve| have)\s+(?:hit|reached)\s+(?:your|the)\s+(?:(?:\w+\s+){0,2}(?:usage|weekly|daily|plan|message)\s+)?limits?\b/i
 
 /** `undefined` for failures this plugin leaves alone (image offload, empty responses, cancellations…). */
 export const classifyFailure = (failure: Pick<LlmFailure, 'code' | 'message' | 'status'>): FailureKind | undefined => {
@@ -26,7 +34,9 @@ export const classifyFailure = (failure: Pick<LlmFailure, 'code' | 'message' | '
   ) {
     return 'oversized'
   }
-  if (EXHAUSTED_CODES.has(failure.code) || isQuotaExceededError(`${failure.code} ${failure.message}`)) return 'exhausted'
+  if (EXHAUSTED_CODES.has(failure.code) || isQuotaExceededError(`${failure.code} ${failure.message}`) || SPENT_PLAN_HINT.test(failure.message)) {
+    return 'exhausted'
+  }
   if (RATE_LIMIT_CODES.has(failure.code) || failure.status === 429) return 'rateLimit'
   if (AUTH_CODES.has(failure.code) || failure.status === 401 || failure.status === 403) return 'auth'
   if (
@@ -52,6 +62,23 @@ export type RecoveryAction =
       readonly retryId: string
     }
   | { readonly kind: 'give-up'; readonly then: 'fail' | 'dsh'; readonly failureKind: FailureKind; readonly account: string }
+
+/**
+ * What to persist when a turn gives up: how it restarts, or `undefined` when
+ * DSH itself still rescued the step. A give-up already means the ladder ran out
+ * — fail-over is only skipped when no other account could take the request — so
+ * a spent plan ends the turn whether or not fail-over is switched on.
+ */
+export const quotaRecoveryFor = (input: {
+  readonly failureKind: FailureKind
+  readonly rescued: boolean
+  readonly autoRetryDefault: boolean
+}): { readonly autoRetry: boolean } | undefined => {
+  if (input.rescued) return undefined
+  if (input.failureKind === 'rateLimit') return { autoRetry: true }
+  if (input.failureKind === 'exhausted') return { autoRetry: input.autoRetryDefault }
+  return undefined
+}
 
 interface StepState {
   readonly turn: number

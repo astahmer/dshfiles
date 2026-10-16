@@ -35,7 +35,7 @@ import { LlmError, resolveImageAttachmentAccess, type LlmFailure } from '@deepse
 import type { ResolvedPiAiProviderProfile } from '@deepseek-ai/dsh-llm-pi-ai'
 import { createAccountPool, creditServedAttempt } from './account-pool.js'
 import { explainSilentRejections } from './silent-rejection.js'
-import { createFailureRecovery, offloadResentImages, type RecoveryAction } from './failure-recovery.js'
+import { createFailureRecovery, offloadResentImages, quotaRecoveryFor, type RecoveryAction } from './failure-recovery.js'
 import { failoverAccountIds, selectRequestAccount } from './request-account-routing.js'
 // Types the `llm/retry` rows this plugin writes, so a fail-over shows in the turn like DSH's own retries.
 import type { LlmRetryEventData, LlmRetryStartedEventData, RetryId } from '@deepseek-ai/dsh-llm-retry'
@@ -631,12 +631,12 @@ export default definePlugin({
                   const decision = action.then === 'dsh' ? await next() : undefined
                   const requestConfig = agent.session.requestHeader()?.config
                   const failedSelection = requestConfig === undefined ? undefined : { provider: requestConfig.provider, model: requestConfig.model }
-                  if (decision === undefined && action.failureKind === 'rateLimit') {
-                    await quotaContinuations.recordFailure(agent, action.account, true, failedSelection)
-                  }
-                  if (decision === undefined && action.failureKind === 'exhausted' && !readRecoverySettings().policy.exhausted.failover) {
-                    await quotaContinuations.recordFailure(agent, action.account, readQuotaRetrySettings().autoRetryDefault, failedSelection)
-                  }
+                  const recovery = quotaRecoveryFor({
+                    failureKind: action.failureKind,
+                    rescued: decision !== undefined,
+                    autoRetryDefault: readQuotaRetrySettings().autoRetryDefault,
+                  })
+                  if (recovery !== undefined) await quotaContinuations.recordFailure(agent, action.account, recovery.autoRetry, failedSelection)
                   return decision
                 }
                 const retryId = action.retryId
