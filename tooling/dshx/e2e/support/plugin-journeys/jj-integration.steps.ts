@@ -56,15 +56,7 @@ const commitIdAt = (repositoryPath: string, home: string, revset: string): strin
 const commitIdOf = (repository: ThreadRepository, revset: string): string => commitIdAt(repository.repositoryPath, repository.temporaryRoot, revset)
 
 const changeIdOf = (repository: ThreadRepository, revset: string): string =>
-  jjAt(repository.repositoryPath, repository.temporaryRoot, [
-    '--ignore-working-copy',
-    'log',
-    '--no-graph',
-    '-r',
-    revset,
-    '-T',
-    'change_id.short(12)',
-  ]).trim()
+  jjAt(repository.repositoryPath, repository.temporaryRoot, ['--ignore-working-copy', 'log', '--no-graph', '-r', revset, '-T', 'change_id.short(12)']).trim()
 
 const descriptionOf = (repository: ThreadRepository, revset: string): string =>
   jjAt(repository.repositoryPath, repository.temporaryRoot, [
@@ -131,6 +123,16 @@ const repositoryFor = (page: Page): ThreadRepository => {
 const projectButton = (page: Page) => page.getByRole('button', { name: 'Choose workspace', exact: true })
 const workspaceToggle = (page: Page) => page.getByRole('checkbox', { name: 'workspace', exact: true })
 const rebaseButton = (page: Page) => page.getByRole('button', { name: 'Rebase this thread onto main', exact: true })
+/** The one header control: it names a thread workspace, or the shared checkout the thread runs in. */
+const workspaceControl = (page: Page) => page.getByRole('button', { name: /^(?:Current thread workspace: |Workspace actions for )/ })
+const workspaceMenu = (page: Page) => page.locator('[data-slot="popover-content"]')
+
+/** The menu closes on every action, so a step that asserts inside it opens it first. */
+const openWorkspaceMenu = async (page: Page): Promise<void> => {
+  if (await page.getByRole('button', { name: 'Open thread workspaces in side panel', exact: true }).isVisible()) return
+  await workspaceControl(page).click()
+  await expect(page.getByRole('button', { name: 'Open thread workspaces in side panel', exact: true })).toBeVisible()
+}
 
 /**
  * The Host names a thread workspace `<repository> · <thread>`; the thread name is its directory under `repo-threads`.
@@ -253,8 +255,17 @@ Then('the current thread header identifies its jj workspace', async ({ page }: {
   await expect(indicator).toBeVisible()
   await expect(indicator).toHaveAttribute('title', join(repository.threadsPath, threadName))
   await indicator.click()
+  await expect(rebaseButton(page)).toBeVisible()
+  await page.getByRole('button', { name: 'Open thread workspaces in side panel', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Thread workspaces', exact: true }).last()).toBeVisible()
   await expect(indicator).toBeVisible()
+})
+
+Then('the thread header names the shared project checkout', async ({ page }: { page: Page }) => {
+  const indicator = page.getByRole('button', { name: /^Workspace actions for / })
+  await expect(indicator).toBeVisible()
+  await openWorkspaceMenu(page)
+  await expect(workspaceMenu(page)).toContainText('This thread works in the project checkout')
 })
 
 When('a message is sent in the shared checkout', async ({ page }: { page: Page }) => {
@@ -497,7 +508,9 @@ Then('the rebase command refuses the shared checkout without moving main', async
 })
 
 Then('Rebase is disabled before there are revisions to rebase', async ({ page }: { page: Page }) => {
+  await openWorkspaceMenu(page)
   await recordAssertion(page, 'jj-integration-rebase-is-disabled-without-work', async () => {
+    await expect(workspaceMenu(page)).toContainText('Nothing to rebase')
     await expect(rebaseButton(page)).toBeDisabled()
     await expect(rebaseButton(page)).toHaveAttribute('title', 'Rebase this thread onto main (0 to rebase)')
   })
@@ -505,7 +518,8 @@ Then('Rebase is disabled before there are revisions to rebase', async ({ page }:
 
 Then('Rebase refuses the placeholder description and leaves main in place', async ({ page }: { page: Page }) => {
   const repository = repositoryFor(page)
-  await expect(rebaseButton(page)).toHaveText('Rebase · 1', { timeout: 10_000 })
+  await openWorkspaceMenu(page)
+  await expect(workspaceMenu(page)).toContainText('1 to rebase', { timeout: 10_000 })
   await expect(rebaseButton(page)).toBeEnabled()
   await rebaseButton(page).click()
   await recordAssertion(page, 'jj-integration-rebase-asks-for-a-description', async () => {
@@ -516,7 +530,8 @@ Then('Rebase refuses the placeholder description and leaves main in place', asyn
 
 Then('Rebase moves main onto the work described {string}', async ({ page }: { page: Page }, description: string) => {
   const repository = repositoryFor(page)
-  await expect(rebaseButton(page)).toHaveText('Rebase · 1')
+  await openWorkspaceMenu(page)
+  await expect(workspaceMenu(page)).toContainText('1 to rebase')
   await rebaseButton(page).click()
   await recordAssertion(page, 'jj-integration-rebase-moves-the-bookmark', async () => {
     const rebasedToast = page.getByRole('alert').filter({ hasText: 'Rebased 1 revision(s) onto main:' })
@@ -536,8 +551,9 @@ Then('Rebase moves main onto the work described {string}', async ({ page }: { pa
 })
 
 Then('Rebase detects the follow-up revision without reloading', async ({ page }: { page: Page }) => {
+  await openWorkspaceMenu(page)
   await recordAssertion(page, 'jj-integration-rebase-refreshes-new-work-without-reload', async () => {
-    await expect(rebaseButton(page)).toHaveText('Rebase · 1', { timeout: 10_000 })
+    await expect(workspaceMenu(page)).toContainText('1 to rebase', { timeout: 10_000 })
     await expect(rebaseButton(page)).toBeEnabled()
   })
 })
@@ -552,8 +568,10 @@ When("the thread's work is rebased outside the UI", async ({ page }: { page: Pag
 
 Then('Rebase reflects the external rebase without reloading', async ({ page }: { page: Page }) => {
   const repository = repositoryFor(page)
+  await openWorkspaceMenu(page)
   await recordAssertion(page, 'jj-integration-rebase-refreshes-external-rebase-without-reload', async () => {
-    await expect(rebaseButton(page)).toBeDisabled({ timeout: 10_000 })
+    await expect(workspaceMenu(page)).toContainText('Nothing to rebase', { timeout: 10_000 })
+    await expect(rebaseButton(page)).toBeDisabled()
     await expect(rebaseButton(page)).toHaveAttribute('title', 'Rebase this thread onto main (0 to rebase)')
     expect(descriptionOf(repository, 'main')).toBe('Follow-up after a steer')
   })
@@ -601,8 +619,40 @@ When('the conversation is opened from its workspace row', async ({ page }: { pag
 })
 
 When('the Thread workspaces side panel is opened', async ({ page }: { page: Page }) => {
+  await openWorkspaceMenu(page)
   await page.getByRole('button', { name: 'Open thread workspaces in side panel', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Thread workspaces', exact: true }).last()).toBeVisible()
+})
+
+Then('the thread header offers Rebase for its 1 revision', async ({ page }: { page: Page }) => {
+  await openWorkspaceMenu(page)
+  await recordAssertion(page, 'jj-integration-header-offers-rebase-with-work', async () => {
+    await expect(workspaceMenu(page)).toContainText('1 to rebase', { timeout: 10_000 })
+    await expect(rebaseButton(page)).toBeEnabled()
+  })
+})
+
+Then('the thread header shows nothing to rebase without reloading', async ({ page }: { page: Page }) => {
+  await openWorkspaceMenu(page)
+  await recordAssertion(page, 'jj-integration-header-refreshes-external-rebase', async () => {
+    await expect(workspaceMenu(page)).toContainText('Nothing to rebase', { timeout: 10_000 })
+    await expect(rebaseButton(page)).toBeDisabled()
+  })
+})
+
+Then('the thread header has no native session-log menu', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'jj-integration-header-owns-the-session-log-menu', () =>
+    expect(page.getByRole('button', { name: 'More actions', exact: true })).toHaveCount(0),
+  )
+})
+
+Then('the session log downloads from the thread workspace menu', async ({ page }: { page: Page }) => {
+  await openWorkspaceMenu(page)
+  await recordAssertion(page, 'jj-integration-menu-downloads-the-session-log', async () => {
+    const row = page.getByRole('button', { name: 'Download session log', exact: true })
+    const [download] = await Promise.all([page.waitForEvent('download'), row.click()])
+    expect(download.suggestedFilename()).toMatch(/\.zip$/u)
+  })
 })
 
 Then('its Preview shows the latest message', async ({ page }: { page: Page }) => {

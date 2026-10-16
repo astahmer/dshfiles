@@ -26,9 +26,10 @@ import { useCallback, useEffect, useId, useMemo, useState, useSyncExternalStore 
 import { jjIntegrationApi, type ThreadView, type WorkspaceSyncView } from './api.js'
 import { sessionPreviewMessages } from './session-preview.js'
 import { useDiscardConfirmation } from './discard-machine.js'
-import { announceRepositoryChange, describeLandResult, useLandToast } from './land-feedback.js'
+import { announceRepositoryChange, describeLandResult } from './land-feedback.js'
 import type { JjIntegrationTranslate } from './locales.js'
 import { canRebaseThread, hasPendingUserQuestion } from './thread-rebase-eligibility.js'
+import { useToast } from './toast.js'
 
 export const threadQueryKeys = {
   repositories: ['jj-integration', 'repositories'] as const,
@@ -353,7 +354,7 @@ export const ThreadWorkspacesPanel = (props: {
   const api = useApi(jjIntegrationApi)
   const queryClient = useQueryClient()
   const rebasesPending = useIsMutating({ mutationKey: threadRebaseMutationKey }) > 0
-  const toast = useLandToast()
+  const toast = useToast()
   const [notice, setNotice] = useState<{ readonly tone: 'default' | 'destructive'; readonly text: string } | null>(null)
   const repositories = useQuery({
     queryKey: threadQueryKeys.repositories,

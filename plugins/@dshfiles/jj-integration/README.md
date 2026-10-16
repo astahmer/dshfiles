@@ -43,6 +43,41 @@ verify its command against current project instructions, and prepare only when
 its explicit conditions match; no note or unmet conditions means no setup. This
 keeps workspace allocation fast for docs-only and other non-code work.
 
+## The thread workspace control
+
+One control in the conversation header carries the workspace state:
+
+- It names the thread workspace (`thread-<id>`) with a badge for the revisions
+  waiting to rebase, or the shared project checkout when the thread runs beside
+  the other threads. It never disappears while the state loads, so the header
+  cannot lose the only way to the thread's workspace actions.
+- Its menu shows the workspace path, what the workspace state is (ready to
+  rebase, up to date, behind `main`, conflicted, shared checkout, or blocked),
+  **Rebase onto `main`** disabled with the reason when a session is running or a
+  question waits, **Open thread workspaces in side panel**, and **Download
+  session log**.
+
+### Session-log export
+
+DSH's `@deepseek-ai/dsh-session-log-export` (MIT, `0.2.0-rc.2`, upstream
+`packages/session-query/session-log-export`) draws its trigger and its progress
+modal inside one header cell, so a plugin cannot move the trigger without the
+modal. The slot ledger shadows a cell by priority, so this plugin registers the
+same `session-log-download` cell at `priority: -1`: its own row in the workspace
+menu is the only trigger, and the cell it shadows keeps reporting through the
+plugin's controller service (`ctx.sessionLogDownload`) as a toast instead of the
+modal.
+
+- The row appears only while that service exists, so a profile without the
+  export plugin keeps its own header and simply has no export row.
+- Both entry points report: the menu row and the `/export` composer command run
+  the same controller, and the shadowed cell turns each finished export
+  (success or error) into one toast.
+- Re-read the cell's contract when the pinned DSH version changes: if upstream
+  splits the trigger from its feedback, drop the shadow and the port.
+- The remaining gap (no way to keep a native modal while moving its trigger) is
+  recorded in [`plans/dsh-host-gaps.md`](../../../plans/dsh-host-gaps.md).
+
 ## Finding a thread workspace
 
 The **Thread workspaces** page is available from the left panel and as a tab in
@@ -52,7 +87,7 @@ show the linked conversation titles. Choose a title to open that conversation;
 
 ## Rebasing
 
-**Rebase** (thread header, the panel, `/rebase` in the thread composer, or the
+**Rebase** (the thread workspace control, the panel, `/rebase` in the composer, or the
 `jj_thread_rebase` tool) runs in the thread's own workspace, serialized per
 repository. The command accepts no arguments and refuses from any workspace
 that is not a managed thread workspace (including a shared checkout), where

@@ -8,6 +8,7 @@ import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
+import type {} from '@deepseek-ai/dsh-session-log-export/client'
 import { createApiClient, defineClient, useApi, useSettings } from '@dshfiles/dshx/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { ArchiveIcon } from '@dshfiles/plugin-ui/icons'
@@ -21,11 +22,12 @@ import { createComposerWorkspaceNavigation, type ComposerReferenceHandoff } from
 import { mainViewSessionId } from './main-view-session.js'
 import { jjIntegrationApi } from './api.js'
 import { HeroWorkspacePicker } from './hero-workspace-picker.js'
-import { LandButton } from './land-button.js'
-import { useLandToast } from './land-feedback.js'
 import { JJ_INTEGRATION_LOCALE_NAMESPACE, jjIntegrationLocale } from './locales.js'
 import { ThreadWorkspacesPanel } from './panel.js'
 import { prepareRemoteFolder } from './remote-destination.js'
+import { createSessionLogDownloadPort, SessionLogDownloadFeedback, type SessionLogDownloadService } from './session-log-download.js'
+import { ThreadWorkspaceControl } from './thread-workspace-control.js'
+import { useToast } from './toast.js'
 import { deferWorkspaceSubmit } from './workspace-submit.js'
 import { jjIntegrationSettings } from './settings.js'
 import './client.css'
@@ -33,6 +35,8 @@ import './client.css'
 const PANEL_ID = 'jj-integration'
 const RIGHT_PANE_ID = '@dshfiles/jj-integration/thread-workspaces'
 const RIGHT_PANE_KIND = 'dshfiles-jj-integration-thread-workspaces'
+// The export plugin registers its header cell at the default priority; a lower one shadows it (see SlotCore.register).
+const SESSION_LOG_SHADOW_PRIORITY = -1
 
 const PanelGlyph = (props: { readonly size?: number | undefined }): JSX.Element => (
   <svg aria-hidden width={props.size ?? 18} height={props.size ?? 18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
@@ -142,24 +146,6 @@ export default defineClient({
         )),
       ),
     )
-    ctx.slots.inject('conversation.session.header.utilities', () =>
-      ctx.slots.register(
-        { name: 'conversation.session.header.utilities', id: 'dshfiles-jj-integration-thread-workspaces', order: 38 },
-        decorate(() => (
-          <span className="dshx-root dshx:inline-flex">
-            <Button
-              size="icon-sm"
-              variant="ghost"
-              aria-label={translate('openSidePanel')}
-              title={translate('openSidePanel')}
-              onClick={() => ctx.sidebarRight.openTab(RIGHT_PANE_KIND, { revealIfOpened: true })}
-            >
-              <PanelGlyph size={16} />
-            </Button>
-          </span>
-        )),
-      ),
-    )
     // SAFETY: The multi-host panel id is registered by @dshfiles/multi-host.
     const openRemoteThreadPanel = (): void => ctx.layout.selectPanel(REMOTE_THREAD_PANEL as MainPanelId)
     const RemoteComposerBar = (): JSX.Element | null => {
@@ -242,7 +228,7 @@ export default defineClient({
         () => ctx.workspaces.list.getSnapshot().archivedSessionIds.includes(props.sessionId),
         () => false,
       )
-      const archiveToast = useLandToast()
+      const archiveToast = useToast()
       const archive = useMutation({
         mutationFn: () => ctx.workspaces.archiveSession(props.sessionId),
         onError: error => archiveToast.show({ text: errorMessage(error, translate('archiveFailed')), success: false }),
@@ -513,16 +499,45 @@ export default defineClient({
         )),
       ),
     )
+    // The export plugin draws its trigger and its progress modal in one header cell. A lower priority shadows that
+    // cell, so this plugin owns the trigger (a row in the workspace menu) and keeps the feedback the modal carried.
+    const sessionLog = createSessionLogDownloadPort()
+    ctx.inject(['sessionLogDownload'], scoped => {
+      const controller = scoped.sessionLogDownload
+      sessionLog.current = controller
+      scoped.effect(
+        () =>
+          scoped.slots.register(
+            {
+              name: 'conversation.session.header.utilities',
+              id: 'session-log-download',
+              priority: SESSION_LOG_SHADOW_PRIORITY,
+              inject: sessionId => ({ sessionId, controller }),
+            },
+            (props: { readonly sessionId: SessionId; readonly controller: SessionLogDownloadService }) => (
+              <SessionLogDownloadFeedback sessionId={props.sessionId} controller={props.controller} t={translate} />
+            ),
+          ),
+        'jj-integration: session log export feedback replaces the native header cell',
+      )
+      scoped.effect(
+        () => () => {
+          sessionLog.current = undefined
+        },
+        'jj-integration: session log download port',
+      )
+    })
     ctx.slots.inject('conversation.session.header.utilities', () =>
       ctx.slots.register(
-        { name: 'conversation.session.header.utilities', id: 'dshfiles-jj-integration-land', order: 39, inject: sessionId => ({ sessionId }) },
-        decorate((props: { readonly sessionId: Parameters<typeof LandButton>[0]['sessionId'] }) => (
+        { name: 'conversation.session.header.utilities', id: 'dshfiles-jj-integration-thread-workspace', order: 38, inject: sessionId => ({ sessionId }) },
+        decorate((props: { readonly sessionId: Parameters<typeof ThreadWorkspaceControl>[0]['sessionId'] }) => (
           <PluginQueryProvider>
-            <LandButton
+            <ThreadWorkspaceControl
               sessionId={props.sessionId}
               sessions={ctx.sessions}
               t={translate}
               bookmark={useBookmark()}
+              sessionLog={sessionLog}
               openThreadWorkspaces={() => ctx.sidebarRight.openTab(RIGHT_PANE_KIND, { revealIfOpened: true })}
             />
           </PluginQueryProvider>

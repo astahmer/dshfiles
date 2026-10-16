@@ -126,13 +126,27 @@ Feature: jj thread workspaces
     When the rebase command is submitted in the thread composer
     Then the rebase command advances main and reports success
 
+  @scenario:jj-integration.thread-workspace-menu-browser-journey
+  Scenario: One header control carries the thread's workspace
+    Given the isolated plugin composition of "@dshfiles/jj-integration, @dshfiles/workspace-folder-picker, @dshfiles/multi-host" is booted
+    When a disposable jj repository is chosen as the New thread project
+    And the New thread workspace toggle is turned on
+    And a message is sent in the thread workspace
+    And the thread workspace gains a revision described "Header work"
+    Then the thread header offers Rebase for its 1 revision
+    And the thread header has no native session-log menu
+    And the session log downloads from the thread workspace menu
+    When the thread's work is rebased outside the UI
+    Then the thread header shows nothing to rebase without reloading
+
   @scenario:jj-integration.rebase-command-shared-checkout-browser-journey
   Scenario: The rebase command refuses a shared checkout
     Given the isolated plugin composition of "@dshfiles/jj-integration, @dshfiles/workspace-folder-picker, @dshfiles/multi-host" is booted
     When a disposable jj repository is chosen as the New thread project
     And the New thread workspace is kept in the shared checkout
     And a message is sent in the shared checkout
-    Then the thread header has no Rebase button
+    Then the thread header names the shared project checkout
+    And the thread header has no Rebase button
     When the rebase command is submitted in the thread composer
     Then the rebase command refuses the shared checkout without moving main
 

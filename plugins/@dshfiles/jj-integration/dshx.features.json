@@ -263,13 +263,58 @@
       ]
     },
     {
-      "id": "rebase",
-      "title": "Rebase a thread onto the bookmark",
-      "summary": "The conversation header identifies the current thread's jj workspace and opens its workspace panel. Rebase a thread's described work onto the target bookmark and advance it from the thread header, panel, or `/rebase` composer command. The in-chat notice shows the tip change ID and offers Archive for the current thread. The command refuses non-thread workspaces and Rebase is disabled while any thread session is working or waiting for input; an agent handed back conflicts or descriptions may rebase its own thread once they are fixed, while every other session of that thread must still be idle. Afterwards the checkout running DSH follows the bookmark in the background through `dshx checkout sync`, with a panel line saying what was rebuilt and whether to restart.",
+      "id": "thread-workspace-menu",
+      "title": "Thread workspace control in the conversation header",
+      "summary": "One header control shows the thread's jj workspace name, a badge with the revisions ready to rebase, and a menu holding Rebase, the Thread workspaces side panel, and Download session log. A thread that works in the shared project checkout keeps the control and says so, instead of losing the only way to its workspace actions. The session-log row is the only trigger for that export: the export plugin's own header menu is shadowed at a lower priority, and its cell reports each finished export as a toast.",
       "reach": [
         "seed rebase-ready-thread",
+        "click button \"All threads\"",
+        "click text \"Seeded thread to rebase\"",
+        "expect button \"Current thread workspace: thread-*\"",
+        "click button \"Current thread workspace: thread-*\"",
+        "expect text \"Rebase onto main\"",
         "expect button \"Rebase this thread onto main\"",
-        "expect text \"Rebase · 1\"",
+        "expect button \"Open thread workspaces in side panel\"",
+        "expect button \"Download session log\""
+      ],
+      "surfaces": ["client"],
+      "configuration": [],
+      "states": ["thread-workspace", "shared-checkout", "to-rebase", "blocked", "session-log-in-menu"],
+      "failureModes": [
+        "The control stays mounted while the thread's workspace data loads, so the header never loses the entry point.",
+        "Rebase is disabled with the reason when a thread session is running or a user question waits.",
+        "Without the Session-log export plugin the menu has no export row and the header keeps that plugin's own cell."
+      ],
+      "externalDependencies": [
+        {
+          "id": "jj",
+          "boundary": "Read-only thread status through the jj-integration Host API.",
+          "deterministicFake": "The scratch seed creates a real thread workspace in a temporary jj repository."
+        },
+        {
+          "id": "session-log-export",
+          "boundary": "The export plugin's browser controller service (`ctx.sessionLogDownload`) downloads the Session ZIP; its header cell is shadowed at priority -1.",
+          "deterministicFake": "The journey downloads the real ZIP from the scratch Host's /api/session.export route."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "jj-integration.thread-workspace-menu-browser-journey",
+          "featureFile": "tooling/dshx/e2e/features/jj-integration.feature"
+        }
+      ]
+    },
+    {
+      "id": "rebase",
+      "title": "Rebase a thread onto the bookmark",
+      "summary": "One conversation-header control names the current thread's jj workspace, how many revisions are ready to rebase, and whether rebasing is blocked; its menu holds Rebase, the Thread workspaces side panel, and Download session log. Rebase a thread's described work onto the target bookmark and advance it from that menu, the panel, or `/rebase` composer command. The in-chat notice shows the tip change ID and offers Archive for the current thread. The command refuses non-thread workspaces and Rebase is disabled while any thread session is working or waiting for input; an agent handed back conflicts or descriptions may rebase its own thread once they are fixed, while every other session of that thread must still be idle. Afterwards the checkout running DSH follows the bookmark in the background through `dshx checkout sync`, with a panel line saying what was rebuilt and whether to restart.",
+      "reach": [
+        "seed rebase-ready-thread",
+        "click button \"Current thread workspace: thread-*\"",
+        "expect button \"Rebase this thread onto main\"",
+        "expect text \"1 to rebase\"",
+        "press Escape",
         "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"/rebase\"",
         "press Enter",
         "expect text \"Rebased 1 revision(s) onto main.\"",
@@ -388,6 +433,7 @@
       "summary": "Available from the left panel and conversation side panel beside Jujutsu. Rows show conversation titles with open links and lazy message previews; Rebase is disabled until every thread session is stopped and no user question is pending. A successful rebase immediately marks its row up to date while the refreshed repository data arrives. Removal confirms folder and registry effects and any revisions to abandon.",
       "reach": [
         "seed rebase-ready-thread",
+        "click button \"Current thread workspace: thread-*\"",
         "expect button \"Open thread workspaces in side panel\"",
         "click button \"Open thread workspaces in side panel\"",
         "expect heading \"Thread workspaces\"",
