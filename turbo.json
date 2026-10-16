@@ -58,18 +58,7 @@
       "dependsOn": ["build"],
       "outputs": [],
       "env": ["CI"],
-      "inputs": [
-        "$TURBO_DEFAULT$",
-        "$TURBO_ROOT$/tooling/dshx/e2e/support/**",
-        "$TURBO_ROOT$/tooling/dshx/scripts/**",
-        "$TURBO_ROOT$/tooling/dshx/scratch-pnpm-policy.yaml",
-        "$TURBO_ROOT$/profiles/web/**",
-        "!.turbo/**",
-        "!dist/**",
-        "!.cache/**",
-        "!node_modules/**",
-        "!.vite/**"
-      ]
+      "inputs": ["$TURBO_DEFAULT$", "!.turbo/**", "!dist/**", "!.cache/**", "!node_modules/**", "!.vite/**"]
     },
     "@dshfiles/dshx#test": {
       "cache": false
