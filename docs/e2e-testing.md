@@ -133,6 +133,19 @@ plugin (`mcp-servers`) or a feature-file name (`ai-accounts-copilot` runs its
 owner, `ai-accounts`). A fresh clone gets the pinned Chromium from
 `pnpm install:all` (`setup:browser`).
 
+### Provider credentials
+
+A journey that sends a message needs a working provider route, and the scratch
+profile defaults to `deepseek-official`. In an environment without
+`DEEPSEEK_API_KEY` (or an account row serving that route) every turn ends with
+*no API key for provider route "deepseek-official"*, and the message-sending
+journeys then sit out their full 300 s timeout while the journeys that only
+drive the UI pass — an environment failure that reads like a product
+regression. Check for that Failed turn in the failure snapshot before believing
+one. Run a single stack at a time for the same reason `check:e2e` uses
+`--concurrency=1`: parallel Hosts and Chromiums make the timing-sensitive
+journeys flaky.
+
 `pnpm check` runs `check:plugin-boot` and then `check:e2e:smoke`: the
 `@smoke` scenarios, about ten journeys spanning boot, the shared stylesheet and
 the most used plugins, so the harness and its shared steps cannot rot
