@@ -1,15 +1,14 @@
 import { type ChildProcess } from 'node:child_process'
-import { join } from 'node:path'
+import { delimiter, join } from 'node:path'
 import { prepareComposedBootProfile, type PreparedBootProfile } from '../../packages/dshx/src/project/boot-profile.js'
 import { DSHFILES_ROOT, buildPlugin, findFreePort, listLocalBootBundles, resolveLocalBundles, withSharedStylesheet } from '../../packages/dshx/src/project/local-bundles.js'
 import { compositionFailures, readProfileComposition } from '../../packages/dshx/src/project/profile-composition.js'
 import { spawnOwnedProcess, stopOwnedProcess } from '../../packages/dshx/src/project/owned-process.js'
 import { isolatedHostEnvironment, redactHostOutput } from './scratch-profile.js'
 
-const workspaceRoot = DSHFILES_ROOT
 // Registry dependencies come from the checked-in seed, not the live ~/.dsh profile, so a journey (and its cached
 // Turbo result) depends only on the repository.
-const sourceProfileRoot = join(workspaceRoot, 'profiles/web')
+const sourceProfileRoot = join(DSHFILES_ROOT, 'profiles/web')
 const URL_PATTERN = /http:\/\/127\.0\.0\.1:\d+\/\S*/
 
 export interface BootedProfile {
@@ -25,7 +24,13 @@ export interface BootedProfile {
   close(): Promise<void>
 }
 
-const sanitizeOutput = redactHostOutput
+type LocalBootBundle = Awaited<ReturnType<typeof listLocalBootBundles>>[number]
+
+const requireNonEmptyBundles = (bundles: readonly LocalBootBundle[], message: string): [LocalBootBundle, ...LocalBootBundle[]] => {
+  const [firstBundle, ...remainingBundles] = bundles
+  if (firstBundle === undefined) throw new Error(message)
+  return [firstBundle, ...remainingBundles]
+}
 
 const waitForHostUrl = (host: ChildProcess, output: () => string, profile: string, timeoutMs: number): Promise<string> =>
   new Promise<string>((resolveUrl, reject) => {
@@ -41,12 +46,12 @@ const waitForHostUrl = (host: ChildProcess, output: () => string, profile: strin
       if (Date.now() - startedAt > timeoutMs) {
         clearInterval(timer)
         host.off('exit', handleExit)
-        reject(new Error(`the ${profile} scratch profile did not announce a URL within ${String(timeoutMs)}ms:\n${sanitizeOutput(output())}`))
+        reject(new Error(`the ${profile} scratch profile did not announce a URL within ${String(timeoutMs)}ms:\n${redactHostOutput(output())}`))
       }
     }, 250)
     const handleExit = (code: number | null): void => {
       clearInterval(timer)
-      reject(new Error(`${profile} scratch profile exited with code ${String(code)} before announcing a URL:\n${sanitizeOutput(output())}`))
+      reject(new Error(`${profile} scratch profile exited with code ${String(code)} before announcing a URL:\n${redactHostOutput(output())}`))
     }
     host.once('exit', handleExit)
   })
@@ -56,9 +61,10 @@ export const startScratchProfile = async (
   profileLabel: string,
   expectedClientEntries: readonly string[],
   timeoutMs: number,
+  pathPrefix?: string,
 ): Promise<BootedProfile> => {
   const dump = await readProfileComposition({
-    projectRoot: workspaceRoot,
+    projectRoot: DSHFILES_ROOT,
     profile: prepared.profile,
     profileRoot: prepared.profileRoot,
     dshHome: prepared.homeRoot,
@@ -68,11 +74,14 @@ export const startScratchProfile = async (
   const missingBundles = compositionFailures(dump, prepared.expectedBundles)
   if (missingBundles.length > 0) throw new Error(`The scratch profile did not compose expected bundles: ${missingBundles.join(', ')}.`)
   const port = await findFreePort()
+  const scratchEnvironment = isolatedHostEnvironment(prepared.homeRoot, prepared.profileRoot)
+  const hostPath = pathPrefix === undefined ? scratchEnvironment.PATH : [pathPrefix, scratchEnvironment.PATH].filter(Boolean).join(delimiter)
+  const hostEnvironment = hostPath === undefined ? scratchEnvironment : { ...scratchEnvironment, PATH: hostPath }
   const host = spawnOwnedProcess('dsh', ['--profile', prepared.profile, '--port', String(port), '--no-open'], {
-    cwd: workspaceRoot,
+    cwd: DSHFILES_ROOT,
     // directory-picker-auto mounts the OS chooser on a darwin/win32 loopback Host, which a browser cannot drive; an SSH
     // launch is its documented signal for the in-app browse picker, so folder journeys behave the same on every platform.
-    env: { ...isolatedHostEnvironment(prepared.homeRoot, prepared.profileRoot), SSH_CONNECTION: '127.0.0.1 0 127.0.0.1 0' },
+    env: { ...hostEnvironment, SSH_CONNECTION: '127.0.0.1 0 127.0.0.1 0' },
     stdio: ['ignore', 'pipe', 'pipe'],
   })
   let output = ''
@@ -91,7 +100,7 @@ export const startScratchProfile = async (
       port,
       expectedClientEntries,
       host,
-      output: () => sanitizeOutput(output),
+      output: () => redactHostOutput(output),
       async close(): Promise<void> {
         if (disposed) return
         disposed = true
@@ -109,7 +118,7 @@ export const startScratchProfile = async (
       await prepared.dispose()
     }
     const message = error instanceof Error ? error.message : String(error)
-    throw new Error(sanitizeOutput(message))
+    throw new Error(redactHostOutput(message))
   }
 }
 
@@ -125,8 +134,7 @@ const buildBundleOnce = async (bundle: { readonly projectRoot: string; readonly 
 
 /** Boot a scratch composition of all owned bundles without touching the user's `web` profile. */
 export const bootProfile = async (profileLabel: string, timeoutMs = 90_000): Promise<BootedProfile> => {
-  const bundles = await listLocalBootBundles()
-  if (bundles.length === 0) throw new Error('No owned plugin bundles were found for the composed scratch profile.')
+  const bundles = requireNonEmptyBundles(await listLocalBootBundles(), 'No owned plugin bundles were found for the composed scratch profile.')
   for (const bundle of bundles) await buildBundleOnce(bundle)
   const prepared = await prepareComposedBootProfile(bundles, { sourceProfileRoot })
   const expectedClientEntries = bundles.filter(bundle => bundle.hasClient).map(bundle => bundle.packageId)
@@ -150,11 +158,14 @@ export const bootComposedPluginProfile = async ({
   readonly profileLabel: string
   readonly timeoutMs?: number
   readonly additionalBundleIds?: readonly string[]
-  readonly seedHome?: (homeRoot: string) => Promise<void>
+  readonly seedHome?: (homeRoot: string) => Promise<void | { readonly hostPathPrefix?: string }>
   readonly cordisPatch?: string
 }): Promise<BootedProfile> => {
   const available = await listLocalBootBundles()
-  const bundles = withSharedStylesheet(resolveLocalBundles(packageIds, available), available)
+  const bundles = requireNonEmptyBundles(
+    withSharedStylesheet(resolveLocalBundles(packageIds, available), available),
+    'No requested owned plugin bundles were found for the composed scratch profile.',
+  )
   for (const bundle of bundles) await buildBundleOnce(bundle)
   const prepared = await prepareComposedBootProfile(
     bundles,
@@ -162,8 +173,8 @@ export const bootComposedPluginProfile = async ({
   )
   const expectedClientEntries = bundles.filter(bundle => bundle.hasClient).map(bundle => bundle.packageId)
   try {
-    await seedHome?.(prepared.homeRoot)
-    return await startScratchProfile(prepared, profileLabel, expectedClientEntries, timeoutMs)
+    const seededHome = await seedHome?.(prepared.homeRoot)
+    return await startScratchProfile(prepared, profileLabel, expectedClientEntries, timeoutMs, seededHome?.hostPathPrefix)
   } catch (error) {
     await prepared.dispose()
     throw error

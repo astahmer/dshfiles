@@ -20,16 +20,18 @@
         "Corrupt or unsupported directory data is left intact and writes are refused."
       ],
       "externalDependencies": [],
+      "reach": ["click button \"Run on Local\"", "click text \"Add host…\"", "expect dialog \"Add host\""],
       "verification": [
         {
-          "kind": "not-applicable",
+          "kind": "gherkin",
           "id": "multi-host.identity-profile",
-          "reason": "Every multi-host flow starts from an SSH-managed runtime: hosts are added only as user@host targets, and discovery, identity pinning, routing and view leases run over the system ssh binary with StrictHostKeyChecking=yes against a second DSH. The e2e harness has neither an SSH server nor a second runtime behind one, so it is verified by the package tests in plugins/@dshfiles/multi-host/tests (store, identity, ssh.integration, gateway-pool, native-rpc-outcome)."
+          "featureFile": "tooling/dshx/e2e/features/multi-host.feature"
         },
         {
-          "kind": "not-applicable",
+          "kind": "unit-test",
           "id": "multi-host.directory-safety",
-          "reason": "Every multi-host flow starts from an SSH-managed runtime: hosts are added only as user@host targets, and discovery, identity pinning, routing and view leases run over the system ssh binary with StrictHostKeyChecking=yes against a second DSH. The e2e harness has neither an SSH server nor a second runtime behind one, so it is verified by the package tests in plugins/@dshfiles/multi-host/tests (store, identity, ssh.integration, gateway-pool, native-rpc-outcome)."
+          "file": "plugins/@dshfiles/multi-host/tests/store.test.ts",
+          "testName": "corrupt directory stays untouched and rejects writes instead of replacing user data"
         }
       ]
     },
@@ -53,14 +55,14 @@
       ],
       "verification": [
         {
-          "kind": "not-applicable",
+          "kind": "gherkin",
           "id": "multi-host.ssh-connect",
-          "reason": "Every multi-host flow starts from an SSH-managed runtime: hosts are added only as user@host targets, and discovery, identity pinning, routing and view leases run over the system ssh binary with StrictHostKeyChecking=yes against a second DSH. The e2e harness has neither an SSH server nor a second runtime behind one, so it is verified by the package tests in plugins/@dshfiles/multi-host/tests (store, identity, ssh.integration, gateway-pool, native-rpc-outcome)."
+          "featureFile": "tooling/dshx/e2e/features/multi-host.feature"
         },
         {
-          "kind": "not-applicable",
+          "kind": "gherkin",
           "id": "multi-host.ssh-identity-profile",
-          "reason": "Every multi-host flow starts from an SSH-managed runtime: hosts are added only as user@host targets, and discovery, identity pinning, routing and view leases run over the system ssh binary with StrictHostKeyChecking=yes against a second DSH. The e2e harness has neither an SSH server nor a second runtime behind one, so it is verified by the package tests in plugins/@dshfiles/multi-host/tests (store, identity, ssh.integration, gateway-pool, native-rpc-outcome)."
+          "featureFile": "tooling/dshx/e2e/features/multi-host.feature"
         }
       ]
     },
@@ -84,14 +86,15 @@
       ],
       "verification": [
         {
-          "kind": "not-applicable",
+          "kind": "gherkin",
           "id": "multi-host.session-routing",
-          "reason": "Every multi-host flow starts from an SSH-managed runtime: hosts are added only as user@host targets, and discovery, identity pinning, routing and view leases run over the system ssh binary with StrictHostKeyChecking=yes against a second DSH. The e2e harness has neither an SSH server nor a second runtime behind one, so it is verified by the package tests in plugins/@dshfiles/multi-host/tests (store, identity, ssh.integration, gateway-pool, native-rpc-outcome)."
+          "featureFile": "tooling/dshx/e2e/features/multi-host.feature"
         },
         {
-          "kind": "not-applicable",
+          "kind": "unit-test",
           "id": "multi-host.uncertain-mutation",
-          "reason": "Every multi-host flow starts from an SSH-managed runtime: hosts are added only as user@host targets, and discovery, identity pinning, routing and view leases run over the system ssh binary with StrictHostKeyChecking=yes against a second DSH. The e2e harness has neither an SSH server nor a second runtime behind one, so it is verified by the package tests in plugins/@dshfiles/multi-host/tests (store, identity, ssh.integration, gateway-pool, native-rpc-outcome)."
+          "file": "plugins/@dshfiles/multi-host/tests/native-rpc-outcome.test.ts",
+          "testName": "reports an admitted create as unknown after its reply is lost and reconciles without replay"
         }
       ]
     },
@@ -108,12 +111,19 @@
         {
           "kind": "not-applicable",
           "id": "multi-host.view-lease",
-          "reason": "Every multi-host flow starts from an SSH-managed runtime: hosts are added only as user@host targets, and discovery, identity pinning, routing and view leases run over the system ssh binary with StrictHostKeyChecking=yes against a second DSH. The e2e harness has neither an SSH server nor a second runtime behind one, so it is verified by the package tests in plugins/@dshfiles/multi-host/tests (store, identity, ssh.integration, gateway-pool, native-rpc-outcome)."
+          "reason": "The current scratch E2E proves an SSH connection to a second DSH and native session APIs, but does not open the remote DSH UI or verify tunnel-lease release/drop recovery. Keep the browser view lifecycle unverified until a dedicated remote-view journey covers it."
         },
         {
-          "kind": "not-applicable",
+          "kind": "unit-test",
           "id": "multi-host.view-directory-safety",
-          "reason": "Every multi-host flow starts from an SSH-managed runtime: hosts are added only as user@host targets, and discovery, identity pinning, routing and view leases run over the system ssh binary with StrictHostKeyChecking=yes against a second DSH. The e2e harness has neither an SSH server nor a second runtime behind one, so it is verified by the package tests in plugins/@dshfiles/multi-host/tests (store, identity, ssh.integration, gateway-pool, native-rpc-outcome)."
+          "file": "plugins/@dshfiles/multi-host/tests/directory-listing.test.ts",
+          "testName": "creates one child folder and refuses nested or empty names"
+        },
+        {
+          "kind": "unit-test",
+          "id": "multi-host.view-directory-listing",
+          "file": "plugins/@dshfiles/multi-host/tests/directory-listing.test.ts",
+          "testName": "lists folders and folder symlinks, hidden ones last, with crumbs; files are left out"
         }
       ]
     }
