@@ -93,3 +93,15 @@ State what the agent is doing, whether it is blocked or waiting for the user
 (e.g. `Thinking: … Requesting user input`), what it changed (revisions, files)
 and what is unverified. Do not infer "idle" from a `sleep` in its actions —
 check the goal, todos and the directory it works in.
+
+For user-facing reports:
+
+- Identify a conversation with its native rich session/thread reference, not a
+  code-formatted or abbreviated `session-…` / `thread-…` id. Pair it with its
+  title or a short purpose summary when useful. Use the `@thread` reference
+  flow when composing a message; do not substitute a typed id for the rich
+  reference.
+- Identify Jujutsu work with `jj:<revision-or-bookmark>` links. A `thread-…`
+  workspace name is not automatically a revision or bookmark: call it a
+  workspace, and link the actual revision only when known. Never manufacture
+  `jj:thread-…`.

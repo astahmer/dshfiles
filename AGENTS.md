@@ -87,6 +87,17 @@ A plugin's `dist/` keeps serving after its sources are gone, so a deleted source
 file looks harmless until the next rebuild. Confirm nothing serves a file before
 removing it; `jj file show -r <change> <path>` restores one from any revision.
 
+## References in chat
+
+- Refer to DSH conversations with their native session reference (the rich
+  thread/session reference), not a code-formatted or abbreviated `session-…`
+  or `thread-…` identifier. Include the conversation title or a short purpose
+  summary when it helps identify it.
+- Refer to Jujutsu revisions and bookmarks with the `jj:<name>` form, e.g.
+  `jj:main` or `jj:94526da8`. A `thread-<id>` workspace directory is not itself
+  a revision or bookmark: call it a JJ workspace in prose, and link its actual
+  revision with `jj:` when one is relevant. Never invent `jj:thread-<id>`.
+
 ## Version control
 
 This is a [Jujutsu](https://jj-vcs.github.io) repository colocated with git.
