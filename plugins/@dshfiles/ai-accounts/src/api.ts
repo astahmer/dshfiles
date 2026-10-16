@@ -17,6 +17,9 @@ import { MAX_USAGE_HISTORY_POINTS, usageHistoryPointSchema, usageMetaSchema } fr
 
 export const accountKindSchema = z.enum(['codex', 'claude', 'opencode-go', 'commandcode', 'github-copilot', 'cursor'])
 
+/** Model-facing text for a structured result the tools below return. */
+const compactJson = <Output>(output: Output): string => JSON.stringify(output)
+
 export const accountOrderDirectionSchema = z.enum(['earlier', 'later'])
 
 export const accountModeSchema = z.enum(['direct', 'authOverlay'])
@@ -361,11 +364,22 @@ export const aiAccountsApi = defineApi({
     moveAccount: method({
       input: z.object({ instanceId: z.string().min(1).max(64), direction: accountOrderDirectionSchema }),
       output: accountsFileSchema,
+      description: 'Move one account earlier or later within its provider group. Call only when the user asked for that order.',
+      tool: {
+        name: 'ai_accounts_move_account',
+        render: output => `Account order updated (${String(output.accounts.length)} account(s)).`,
+      },
     }),
     /** Change how requests are spread across compatible account routes. */
     setDistribution: method({
       input: z.object({ distribution: accountsFileSchema.shape.distribution }),
       output: accountsFileSchema,
+      description:
+        'Change how requests spread across compatible account routes (for example sticky-first or round-robin). Call only when the user asked for that routing policy.',
+      tool: {
+        name: 'ai_accounts_set_distribution',
+        render: output => `Request distribution is now ${output.distribution}.`,
+      },
     }),
     /**
      * Read the identity an account currently presents, creating its shadow home
@@ -374,6 +388,9 @@ export const aiAccountsApi = defineApi({
     identity: method({
       input: z.object({ instanceId: z.string().min(1).max(64) }),
       output: identityResultSchema,
+      description:
+        'The identity one account currently presents (its signed-in user, and the command that creates a login), creating its shadow home on first use. Read-only apart from that first-use home.',
+      tool: { name: 'ai_accounts_identity', readOnly: true, render: compactJson },
     }),
     /** Start the GitHub device-code flow for one saved Copilot account. */
     beginCopilotLogin: method({
@@ -413,6 +430,15 @@ export const aiAccountsApi = defineApi({
           }),
         ),
       }),
+      description: 'One account’s model catalog with the reasoning levels each model supports. Read-only.',
+      tool: {
+        name: 'ai_accounts_catalog',
+        readOnly: true,
+        render: output =>
+          output.models
+            .map(model => `${model.id} · ${model.name}${model.efforts.length === 0 ? '' : ` · effort ${model.efforts.map(effort => effort.id).join('/')}`}`)
+            .join('\n') || `${output.instanceId} exposes no models.`,
+      },
     }),
     /**
      * Stored quota readings for one account over a window, oldest first, so a
@@ -427,6 +453,15 @@ export const aiAccountsApi = defineApi({
         instanceId: z.string().min(1).max(64),
         points: z.array(usageHistoryPointSchema).max(MAX_USAGE_HISTORY_POINTS),
       }),
+      description: 'Stored quota readings for one account over a window, oldest first. Read-only.',
+      tool: {
+        name: 'ai_accounts_history',
+        readOnly: true,
+        render: output =>
+          output.points.length === 0
+            ? `No stored quota readings for ${output.instanceId} in that window.`
+            : `${String(output.points.length)} reading(s) for ${output.instanceId}: ${compactJson(output.points)}`,
+      },
     }),
     /** Schedule and retention are persisted with the history domain. */
     historySettings: method({ input: z.void(), output: usageMetaSchema }),
@@ -451,7 +486,12 @@ export const aiAccountsApi = defineApi({
       tool: { name: 'ai_accounts_quota', readOnly: true },
     }),
     /** Native DSH provider rows (DeepSeek, Command Code, …) and whether each is switched on. */
-    nativeProviders: method({ input: z.void(), output: nativeProvidersSchema }),
+    nativeProviders: method({
+      input: z.void(),
+      output: nativeProvidersSchema,
+      description: 'Native DSH provider rows (DeepSeek, Command Code, …) and whether each is switched on. Read-only.',
+      tool: { name: 'ai_accounts_native_providers', readOnly: true, render: compactJson },
+    }),
     /**
      * Switch one native provider row off or back on in the profile patch. Only
      * the row's `disabled` flag changes; its config and credentials stay.
@@ -459,12 +499,32 @@ export const aiAccountsApi = defineApi({
     setNativeProviderEnabled: method({
       input: z.object({ entryId: z.string().min(1).max(128), enabled: z.boolean() }),
       output: nativeProvidersSchema,
+      description:
+        'Switch one native DSH provider row off or back on in the profile patch; its config and credentials stay. Call only when the user asked to enable or disable that provider.',
+      tool: {
+        name: 'ai_accounts_set_native_provider',
+        render: output => compactJson(output),
+      },
     }),
     /** Bypass the shared short-lived sweep cache, for an explicit refresh. */
-    refreshUsage: method({ input: z.void(), output: accountsUsageSchema }),
+    refreshUsage: method({
+      input: z.void(),
+      output: accountsUsageSchema,
+      description: 'Read live subscription quota now, bypassing the shared short-lived cache. Call only when the user asked for a fresh reading.',
+      tool: { name: 'ai_accounts_refresh_quota', render: compactJson },
+    }),
 
     /** Read now and record, so a fresh chart does not wait for the next poll. */
-    collectUsage: method({ input: z.void(), output: z.object({ recorded: z.number() }) }),
+    collectUsage: method({
+      input: z.void(),
+      output: z.object({ recorded: z.number() }),
+      description:
+        'Read every account’s quota now and record one history point per account, so a chart does not wait for the next poll. Call only when the user asked to record a reading.',
+      tool: {
+        name: 'ai_accounts_collect_usage',
+        render: output => `Recorded ${String(output.recorded)} quota reading(s).`,
+      },
+    }),
     /** Durable quota-blocked Sessions that can be resumed or snoozed by the user. */
     quotaContinuations: method({
       input: z.void(),
@@ -472,6 +532,9 @@ export const aiAccountsApi = defineApi({
         scheduleAvailable: z.boolean(),
         continuations: z.array(quotaContinuationSummarySchema).max(500),
       }),
+      description:
+        'Durable quota-blocked Sessions that can be resumed or snoozed: each continuation, its Session, its reset evidence and whether automatic retry is on. Read-only.',
+      tool: { name: 'ai_accounts_continuations', readOnly: true, render: compactJson },
     }),
     /** Models currently available for an inline quota-recovery route switch. */
     quotaRecoveryModelCatalog: method({ input: z.void(), output: modelCatalogSchema }),
@@ -479,16 +542,38 @@ export const aiAccountsApi = defineApi({
     resumeQuotaContinuation: method({
       input: z.object({ continuationId: z.string().uuid(), selection: modelSelectionSchema.optional() }),
       output: z.object({ accepted: z.boolean() }),
+      description:
+        'Queue the exact stored continuation now, optionally with a Session-local model selection. Call only when the user asked to resume that blocked thread.',
+      tool: {
+        name: 'ai_accounts_resume_continuation',
+        render: output => (output.accepted ? 'Queued the stored continuation.' : 'The Host did not accept the continuation.'),
+      },
     }),
     /** Change whether a waiting quota-blocked turn resumes automatically at its known reset. */
     setQuotaContinuationAutoRetry: method({
       input: z.object({ continuationId: z.string().uuid(), sessionId: z.string().trim().min(1).max(256), enabled: z.boolean() }),
       output: z.object({ updated: z.boolean() }),
+      description: 'Change whether one quota-blocked turn resumes automatically at its known reset. Call only when the user asked for that.',
+      tool: {
+        name: 'ai_accounts_set_auto_retry',
+        render: output => (output.updated ? 'Updated automatic retry for that continuation.' : 'That continuation was not found.'),
+      },
     }),
     /** The cached models.dev price catalog: when it was fetched and how many models it prices. */
-    pricingStatus: method({ input: z.void(), output: pricingStatusSchema }),
+    pricingStatus: method({
+      input: z.void(),
+      output: pricingStatusSchema,
+      description: 'The cached models.dev price catalog: when it was fetched and how many models it prices. Read-only.',
+      tool: { name: 'ai_accounts_pricing_status', readOnly: true, render: compactJson },
+    }),
     /** Refetch models.dev now; a failure keeps the last catalog and reports why. */
-    refreshPricing: method({ input: z.void(), output: pricingStatusSchema }),
+    refreshPricing: method({
+      input: z.void(),
+      output: pricingStatusSchema,
+      description:
+        'Refetch the models.dev price catalog now; a failure keeps the last catalog and reports why. Call only when the user asked to refresh prices.',
+      tool: { name: 'ai_accounts_refresh_pricing', render: compactJson },
+    }),
     /** Price the routes a session used, after overrides and models.dev id mapping. */
     quoteRoutes: method({
       input: z.object({ routes: z.array(pricedRouteSchema).max(64) }),
@@ -501,6 +586,12 @@ export const aiAccountsApi = defineApi({
         duration: z.enum(['one-hour', 'four-hours', 'one-day', 'unsnooze']),
       }),
       output: z.object({ updated: z.boolean() }),
+      description:
+        'Snooze one continuation’s recovery timing, or unsnooze it. It does not change quota reset evidence. Call only when the user asked to snooze or unsnooze it.',
+      tool: {
+        name: 'ai_accounts_snooze_continuation',
+        render: output => (output.updated ? 'Updated the continuation snooze.' : 'That continuation was not found.'),
+      },
     }),
   },
 })
