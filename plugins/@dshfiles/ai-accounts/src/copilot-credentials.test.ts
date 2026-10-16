@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { CredentialRecord } from '@deepseek-ai/dsh-credentials'
-import { copilotCredentialKey, deleteCopilotCredential, modifyCopilotCredential, readCopilotCredential } from './copilot-credentials.js'
+import { CopilotCredentialModel, createCopilotCredentialsService } from './copilot-credentials.js'
 
 const credential = {
   type: 'oauth',
@@ -12,9 +12,9 @@ const credential = {
 
 describe('GitHub Copilot credential records', () => {
   it('encodes route slugs into valid, collision-free DSH credential keys', () => {
-    const underscored = copilotCredentialKey('github-copilot_work')
+    const underscored = CopilotCredentialModel.key('github-copilot_work')
     expect(String(underscored)).toMatch(/^ai-accounts\/github-copilot-[a-f0-9]+$/u)
-    expect(underscored).not.toEqual(copilotCredentialKey('github-copilot-work'))
+    expect(underscored).not.toEqual(CopilotCredentialModel.key('github-copilot-work'))
   })
 
   it('stores each subscription under an account-scoped DSH credential record', async () => {
@@ -31,14 +31,15 @@ describe('GitHub Copilot credential records', () => {
       },
     }
 
-    const stored = await modifyCopilotCredential(provider, 'copilot-personal', async () => credential)
+    const credentials = createCopilotCredentialsService(provider)
+    const stored = await credentials.modify({ instanceId: 'copilot-personal', mutate: async () => credential })
 
     expect(stored).toEqual(credential)
-    expect(records.get(String(copilotCredentialKey('copilot-personal')))).toEqual({ kind: 'grant', payload: credential })
-    expect(await readCopilotCredential(provider, 'copilot-personal')).toEqual(credential)
-    expect(await readCopilotCredential(provider, 'copilot-work')).toBeUndefined()
-    await deleteCopilotCredential(provider, 'copilot-personal')
-    expect(await readCopilotCredential(provider, 'copilot-personal')).toBeUndefined()
+    expect(records.get(String(CopilotCredentialModel.key('copilot-personal')))).toEqual({ kind: 'grant', payload: credential })
+    expect(await credentials.read('copilot-personal')).toEqual(credential)
+    expect(await credentials.read('copilot-work')).toBeUndefined()
+    await credentials.remove('copilot-personal')
+    expect(await credentials.read('copilot-personal')).toBeUndefined()
   })
 
   it('omits undefined optional SDK fields before writing a JSON-backed grant', async () => {
@@ -53,8 +54,9 @@ describe('GitHub Copilot credential records', () => {
     }
     const copilotCredential = { ...credential, enterpriseUrl: undefined }
 
-    const stored = await modifyCopilotCredential(provider, 'copilot-personal', async () => copilotCredential)
-    const record = records.get(String(copilotCredentialKey('copilot-personal')))
+    const credentials = createCopilotCredentialsService(provider)
+    const stored = await credentials.modify({ instanceId: 'copilot-personal', mutate: async () => copilotCredential })
+    const record = records.get(String(CopilotCredentialModel.key('copilot-personal')))
 
     expect(stored).toEqual(credential)
     expect(record).toEqual({ kind: 'grant', payload: credential })
@@ -64,9 +66,10 @@ describe('GitHub Copilot credential records', () => {
   })
 
   it('fails closed on a malformed grant without exposing it as a login', async () => {
-    const records = new Map<string, CredentialRecord>([[String(copilotCredentialKey('copilot-work')), { kind: 'grant', payload: { access: 'partial' } }]])
+    const records = new Map<string, CredentialRecord>([[String(CopilotCredentialModel.key('copilot-work')), { kind: 'grant', payload: { access: 'partial' } }]])
     const provider = { readRecord: async (key: { toString(): string }) => records.get(key.toString()) }
+    const credentials = createCopilotCredentialsService(provider)
 
-    expect(await readCopilotCredential(provider, 'copilot-work')).toBeUndefined()
+    expect(await credentials.read('copilot-work')).toBeUndefined()
   })
 })

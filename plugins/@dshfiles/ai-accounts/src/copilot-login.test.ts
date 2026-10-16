@@ -1,6 +1,6 @@
 import type { CredentialRecord } from '@deepseek-ai/dsh-credentials'
 import { describe, expect, it } from 'vitest'
-import { copilotCredentialKey } from './copilot-credentials.js'
+import { CopilotCredentialModel } from './copilot-credentials.js'
 import { createCopilotLoginService } from './copilot-login.js'
 
 const credential = {
@@ -47,11 +47,11 @@ describe('GitHub Copilot device sign-in', () => {
     await new Promise(resolve => setTimeout(resolve, 0))
 
     expect(service.state('copilot-personal')).toMatchObject({ status: 'complete', userCode: 'ABCD-EFGH' })
-    expect(records.get(String(copilotCredentialKey('copilot-personal')))).toEqual({ kind: 'grant', payload: credential })
+    expect(records.get(String(CopilotCredentialModel.key('copilot-personal')))).toEqual({ kind: 'grant', payload: credential })
     expect(JSON.stringify(service.state('copilot-personal'))).not.toContain('copilot-access-token')
     await service.signOut('copilot-personal')
     expect(service.state('copilot-personal').status).toBe('idle')
-    expect(records.has(String(copilotCredentialKey('copilot-personal')))).toBe(false)
+    expect(records.has(String(CopilotCredentialModel.key('copilot-personal')))).toBe(false)
     service.dispose()
   })
 

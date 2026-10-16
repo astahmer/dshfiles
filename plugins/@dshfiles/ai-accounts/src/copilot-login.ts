@@ -1,7 +1,7 @@
 import type { CredentialProvider } from '@deepseek-ai/dsh-credentials'
 import { githubCopilotProvider } from '@earendil-works/pi-ai/providers/github-copilot'
 import type { CopilotLoginState } from './api.js'
-import { deleteCopilotCredential, modifyCopilotCredential, readCopilotCredential } from './copilot-credentials.js'
+import { createCopilotCredentialsService } from './copilot-credentials.js'
 
 const copilotOAuth = githubCopilotProvider().auth.oauth
 
@@ -30,6 +30,7 @@ export const createCopilotLoginService = (input: {
   readonly isCopilotAccount: (instanceId: string) => boolean
   readonly onChange: () => void
 }) => {
+  const credentials = createCopilotCredentialsService(input.credentials)
   const states = new Map<string, CopilotLoginState>()
   const controllers = new Map<string, AbortController>()
   const tasks = new Map<string, Promise<void>>()
@@ -80,7 +81,7 @@ export const createCopilotLoginService = (input: {
       .then(async credential => {
         if (controller.signal.aborted) return
         phase = 'credential-storage'
-        await modifyCopilotCredential(input.credentials, instanceId, async () => credential)
+        await credentials.modify({ instanceId, mutate: async () => credential })
         states.set(instanceId, { ...state(instanceId), status: 'complete', message: 'GitHub Copilot is connected.' })
         input.onChange()
       })
@@ -105,7 +106,7 @@ export const createCopilotLoginService = (input: {
   const signOut = async (instanceId: string): Promise<void> => {
     if (!input.isCopilotAccount(instanceId)) throw new Error('This GitHub Copilot account is no longer available.')
     cancel(instanceId)
-    await deleteCopilotCredential(input.credentials, instanceId)
+    await credentials.remove(instanceId)
     states.set(instanceId, { ...initialState(instanceId), status: 'idle', message: 'GitHub Copilot was disconnected.' })
     input.onChange()
   }
@@ -121,7 +122,7 @@ export const createCopilotLoginService = (input: {
       tasks.clear()
       states.clear()
     },
-    isSignedIn: async (instanceId: string): Promise<boolean> => (await readCopilotCredential(input.credentials, instanceId)) !== undefined,
+    isSignedIn: async (instanceId: string): Promise<boolean> => (await credentials.read(instanceId)) !== undefined,
   }
 }
 

@@ -25,7 +25,7 @@ import { openaiCodexProvider } from '@earendil-works/pi-ai/providers/openai-code
 import { opencodeGoProvider } from '@earendil-works/pi-ai/providers/opencode-go'
 import { anthropicProvider } from '@earendil-works/pi-ai/providers/anthropic'
 import { githubCopilotProvider } from '@earendil-works/pi-ai/providers/github-copilot'
-import { deleteCopilotCredential, modifyCopilotCredential, readCopilotCredential } from './copilot-credentials.js'
+import { createCopilotCredentialsService } from './copilot-credentials.js'
 import { GITHUB_COPILOT_KIND } from './provider-routes.js'
 import type { AdapterRegistrationHandle, DirectoryRegistrationHandle, GenerateOptions, StreamChunk } from '@deepseek-ai/dsh-llm'
 // Value imports, not `import type {}`: an empty type-only import is elided and
@@ -333,6 +333,7 @@ export default definePlugin({
 
     const llm = ctx.get('llm')
     if (llm === undefined) return
+    const copilotCredentials = createCopilotCredentialsService(ctx.get('credentials'))
 
     const adapter = new EffortPinnedAdapter(
       {
@@ -373,7 +374,7 @@ export default definePlugin({
           credentials: {
             read: async provider => {
               const route = routes.get(provider)
-              if (route?.kind === GITHUB_COPILOT_KIND) return readCopilotCredential(ctx.get('credentials'), route.instanceId)
+              if (route?.kind === GITHUB_COPILOT_KIND) return copilotCredentials.read(route.instanceId)
               if (route === undefined || route.kind !== CODEX_KIND) return undefined
               await materializeCodexShadowHome(route.layout)
               return readCodexOAuthCredential(route.layout.effectiveHomePath)
@@ -385,10 +386,13 @@ export default definePlugin({
             modify: async (provider, mutate) => {
               const route = routes.get(provider)
               if (route?.kind === GITHUB_COPILOT_KIND) {
-                return modifyCopilotCredential(ctx.get('credentials'), route.instanceId, async current => {
-                  const next = await mutate(current)
-                  if (next !== undefined && next.type !== 'oauth') throw new LlmError('GitHub Copilot uses OAuth credentials.', 'UNSUPPORTED_OPERATION')
-                  return next
+                return copilotCredentials.modify({
+                  instanceId: route.instanceId,
+                  mutate: async current => {
+                    const next = await mutate(current)
+                    if (next !== undefined && next.type !== 'oauth') throw new LlmError('GitHub Copilot uses OAuth credentials.', 'UNSUPPORTED_OPERATION')
+                    return next
+                  },
                 })
               }
               if (route === undefined || route.kind !== CODEX_KIND) {
@@ -403,7 +407,7 @@ export default definePlugin({
             delete: async provider => {
               const route = routes.get(provider)
               if (route?.kind === GITHUB_COPILOT_KIND) {
-                await deleteCopilotCredential(ctx.get('credentials'), route.instanceId)
+                await copilotCredentials.remove(route.instanceId)
                 return
               }
               throw new LlmError('Codex credentials are owned by Codex CLI', 'UNSUPPORTED_OPERATION')
