@@ -4,6 +4,7 @@
   "dependencies": {
     "@dshfiles/activity-timeline": "link:../../plugins/@dshfiles/activity-timeline",
     "@dshfiles/attachment-gallery": "link:../../plugins/@dshfiles/attachment-gallery",
+    "@dshfiles/rich-composer": "link:../../plugins/@dshfiles/rich-composer",
     "@dshfiles/agent-communication": "link:../../plugins/@dshfiles/agent-communication",
     "@dshfiles/agent-questions": "link:../../plugins/@dshfiles/agent-questions",
     "@dshfiles/agent-toolkit": "link:../../plugins/@dshfiles/agent-toolkit",
@@ -54,6 +55,7 @@
         "@dshfiles/jj-integration",
         "@dshfiles/activity-timeline",
         "@dshfiles/attachment-gallery",
+        "@dshfiles/rich-composer",
         "@dshfiles/jujutsu",
         "@dshfiles/mcp-servers",
         "@dshfiles/secret-catalog",

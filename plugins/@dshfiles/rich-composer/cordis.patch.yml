@@ -1,0 +1,5 @@
+- id: ui-conversation
+  disabled: true
+- insert:
+    - id: dshfiles-rich-composer
+      name: '@dshfiles/rich-composer'

@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "paste-session-mentions",
+      "title": "Paste session mentions as reference chips",
+      "summary": "Pasted canonical thread mentions keep their structured label and reference behavior in the composer.",
+      "surfaces": ["client"],
+      "configuration": [],
+      "states": ["composer-ready", "mention-pasted", "reference-chip-visible"],
+      "failureModes": [
+        "Invalid or unsupported session-reference wire text remains ordinary editable text.",
+        "The original clipboard HTML is never inserted into the composer DOM."
+      ],
+      "externalDependencies": [],
+      "reach": ["click button \"New session\"", "expect textbox \"Describe what you want to build, / commands, @ files or sessions\""],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "rich-composer.paste-session-mention",
+          "featureFile": "tooling/dshx/e2e/features/rich-composer.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "rich-composer.paste-references",
+          "file": "plugins/@dshfiles/rich-composer/tests/paste-references.test.ts",
+          "testName": "turns canonical session mentions into structured references and preserves surrounding text"
+        }
+      ]
+    }
+  ]
+}
