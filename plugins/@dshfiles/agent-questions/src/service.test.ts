@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createParentQuestionService, type ParentQuestionAgent, type ParentQuestionRuntime } from './service.js'
 import type { ParentQuestionExpiryBehavior, ParentQuestionRecord, ParentQuestionTable } from './store.js'
-import { answerParentQuestion, askParentQuestion, reattachParentQuestion } from './tool-flow.js'
+import { ParentQuestionToolFlow } from './tool-flow.js'
 
 const createMemoryTable = (): ParentQuestionTable => {
   const records = new Map<string, ParentQuestionRecord>()
@@ -276,7 +276,7 @@ describe('parent question Host contract', () => {
     const table = createMemoryTable()
     const firstService = makeService(table)
     const input = requestInput({})
-    const waiting = askParentQuestion({ service: firstService, ...input })
+    const waiting = ParentQuestionToolFlow.ask({ service: firstService, ...input })
     await new Promise(resolve => setTimeout(resolve, 0))
 
     await firstService.close()
@@ -286,13 +286,13 @@ describe('parent question Host contract', () => {
     expect(Array.from(table.entries()).map(([, record]) => record.status)).toEqual(['pending'])
 
     const restartedService = makeService(table)
-    const answer = await answerParentQuestion({
+    const answer = await ParentQuestionToolFlow.answer({
       service: restartedService,
       agent: root,
       questionId: interrupted.questionId,
       answer: 'The durable wait can reattach after Host recreation.',
     })
-    const recovered = await reattachParentQuestion({
+    const recovered = await ParentQuestionToolFlow.reattach({
       service: restartedService,
       agent: firstChild,
       questionId: interrupted.questionId,

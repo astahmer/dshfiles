@@ -27,7 +27,7 @@ import {
   type RevisionedFeedbackRecord,
   type ParentQuestionRecord,
 } from './store.js'
-import { answerParentQuestion, askParentQuestion, reattachParentQuestion } from './tool-flow.js'
+import { ParentQuestionToolFlow } from './tool-flow.js'
 
 type ParentQuestionDomain = Domain<typeof parentQuestionDomain>
 
@@ -285,7 +285,7 @@ const askParentQuestionTool = defineTool({
     const input = askParentQuestionInputSchema.parse(args)
     let outcome: ParentQuestionOutcome
     if ('questionId' in input) {
-      outcome = await reattachParentQuestion({
+      outcome = await ParentQuestionToolFlow.reattach({
         service,
         agent,
         questionId: input.questionId,
@@ -303,7 +303,7 @@ const askParentQuestionTool = defineTool({
         timeoutMs: input.timeoutMs ?? 180_000,
         signal: execution.signal,
       }
-      outcome = await askParentQuestion(input.context === undefined ? questionRequest : { ...questionRequest, context: input.context })
+      outcome = await ParentQuestionToolFlow.ask(input.context === undefined ? questionRequest : { ...questionRequest, context: input.context })
     }
     switch (outcome.kind) {
       case 'answered':
@@ -349,7 +349,7 @@ const answerParentQuestionTool = defineTool({
   execute: async (args, execution) => {
     const agent = execution.agent
     if (agent === undefined) throw new Error('Parent answers require an active parent Agent.')
-    const outcome = await answerParentQuestion({
+    const outcome = await ParentQuestionToolFlow.answer({
       service: requireHostServices().parentQuestions,
       agent,
       questionId: args.questionId,
