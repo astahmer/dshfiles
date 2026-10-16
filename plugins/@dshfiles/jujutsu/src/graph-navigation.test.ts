@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Revision } from './api.js'
-import { filterGraphRevisions, mergeGraphRevisions, relationshipLabel, type GraphFilters } from './graph-navigation.js'
+import { GraphNavigationModel, type GraphFilters } from './graph-navigation.js'
 import { layoutRevisionGraph } from './graph.js'
 import { resolveGraphSelection } from './graph-selection.js'
 
@@ -42,7 +42,10 @@ const filters = (overrides: Partial<GraphFilters> = {}): GraphFilters => ({
 describe('graph navigation projection', () => {
   it('preserves shared merge ancestry when supplied exclusive history is hidden', () => {
     const revisions = [revision('a', ['shared']), revision('b', ['shared']), revision('shared', ['root']), revision('root')]
-    const result = filterGraphRevisions(revisions, filters({ hidden: [{ commitId: 'a', label: 'a', commitIds: ['a'], truncated: false }] }))
+    const result = GraphNavigationModel.filterGraphRevisions(
+      revisions,
+      filters({ hidden: [{ commitId: 'a', label: 'a', commitIds: ['a'], truncated: false }] }),
+    )
     expect(result.map(row => row.commitId)).toEqual(['b', 'shared', 'root'])
   })
   it('explicit temporary reveal overrides every filter without modifying filter intent', () => {
@@ -58,26 +61,26 @@ describe('graph navigation projection', () => {
       view: { kind: 'history', label: 'History', commitIds: new Set(), revisions: [], truncated: false },
       revealed: new Set(['target']),
     })
-    expect(filterGraphRevisions([target], intent)).toEqual([target])
-    expect(filterGraphRevisions([target], { ...intent, revealed: new Set() })).toEqual([])
+    expect(GraphNavigationModel.filterGraphRevisions([target], intent)).toEqual([target])
+    expect(GraphNavigationModel.filterGraphRevisions([target], { ...intent, revealed: new Set() })).toEqual([])
     expect(intent.mineOnly).toBe(true)
   })
   it('merges outside-page landmarks by exact commit ID without collapsing divergent copies', () => {
     const original = revision('one')
     const divergent = revision('two', [], { changeId: 'one' })
     const updated = { ...original, description: 'updated' }
-    expect(mergeGraphRevisions([original], [divergent, updated])).toEqual([updated, divergent])
+    expect(GraphNavigationModel.mergeGraphRevisions([original], [divergent, updated])).toEqual([updated, divergent])
   })
   it('filters search before layout so omitted parents become honest dashed bridges', () => {
     const revisions = [revision('tip', ['middle'], { description: 'match' }), revision('middle', ['root']), revision('root', [], { description: 'match' })]
-    const projection = filterGraphRevisions(revisions, filters({ text: 'match' }))
+    const projection = GraphNavigationModel.filterGraphRevisions(revisions, filters({ text: 'match' }))
     const rows = layoutRevisionGraph(projection, new Map(revisions.map(row => [row.commitId, row])), false)
     expect(rows.map(row => row.commitId)).toEqual(['tip', 'root'])
     expect(rows[0]?.outgoing.some(link => link.dashed)).toBe(true)
   })
   it('keeps all parents of a connection supplied by the Host, never first-parent only', () => {
     const revisions = [revision('merge', ['left', 'right']), revision('left', ['root']), revision('right', ['root']), revision('root'), revision('noise')]
-    const projection = filterGraphRevisions(
+    const projection = GraphNavigationModel.filterGraphRevisions(
       revisions,
       filters({ view: { kind: 'connection', label: 'Connection', commitIds: new Set(['merge', 'left', 'right', 'root']), revisions: [], truncated: false } }),
     )
@@ -95,13 +98,16 @@ describe('graph navigation projection', () => {
   it('keeps a zero selected-only view empty instead of adding target-side context', () => {
     const revisions = [revision('target', ['selected']), revision('selected')]
     expect(
-      filterGraphRevisions(revisions, filters({ view: { kind: 'difference', label: 'Selected-only', commitIds: new Set(), revisions, truncated: false } })),
+      GraphNavigationModel.filterGraphRevisions(
+        revisions,
+        filters({ view: { kind: 'difference', label: 'Selected-only', commitIds: new Set(), revisions, truncated: false } }),
+      ),
     ).toEqual([])
   })
   it('labels relationship direction explicitly', () => {
-    expect(relationshipLabel('ancestor')).toBe('Behind target')
-    expect(relationshipLabel('descendant')).toBe('Ahead of target')
-    expect(relationshipLabel('same')).toBe('Same revision')
-    expect(relationshipLabel('no-common-ancestor')).toBe('Unrelated histories')
+    expect(GraphNavigationModel.relationshipLabel('ancestor')).toBe('Behind target')
+    expect(GraphNavigationModel.relationshipLabel('descendant')).toBe('Ahead of target')
+    expect(GraphNavigationModel.relationshipLabel('same')).toBe('Same revision')
+    expect(GraphNavigationModel.relationshipLabel('no-common-ancestor')).toBe('Unrelated histories')
   })
 })

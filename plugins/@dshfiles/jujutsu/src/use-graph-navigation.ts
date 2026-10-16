@@ -2,7 +2,7 @@ import { useApi } from '@dshfiles/dshx/client'
 import { errorMessage, useMutation, useQuery } from '@dshfiles/plugin-ui/query'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { jujutsuApi, type GraphLandmark, type Revision, type RevisionRelationship } from './api.js'
-import { mergeGraphRevisions, type GraphViewFilter, type HiddenGraphHistory } from './graph-navigation.js'
+import { GraphNavigationModel, type GraphViewFilter, type HiddenGraphHistory } from './graph-navigation.js'
 import { resolveGraphSelection } from './graph-selection.js'
 import { JUJUTSU_QUERY_GC_TIME, JUJUTSU_QUERY_STALE_TIME } from './repository-query-cache.js'
 
@@ -58,7 +58,7 @@ export const useGraphNavigation = (input: GraphNavigationInput) => {
     gcTime: JUJUTSU_QUERY_GC_TIME,
     refetchOnWindowFocus: false,
   })
-  const extraRevisions = useMemo(() => mergeGraphRevisions(view?.revisions ?? [], revealed), [view, revealed])
+  const extraRevisions = useMemo(() => GraphNavigationModel.mergeGraphRevisions(view?.revisions ?? [], revealed), [view, revealed])
   const selectedRevision = resolveGraphSelection({ selection: input.selected, revisions: input.revisions, extraRevisions })
   const comparisonRevision = resolveGraphSelection({ selection: input.comparison, revisions: input.revisions, extraRevisions })
   const landmarks = landmarksQuery.data?.landmarks ?? []
@@ -229,7 +229,7 @@ export const useGraphNavigation = (input: GraphNavigationInput) => {
     clearLens: () => setLens(null),
     removeHidden: (commitId: string) => setHidden(current => current.filter(item => item.commitId !== commitId)),
     clearRevealed: () => setRevealed([]),
-    reveal: (revision: Revision) => setRevealed(current => mergeGraphRevisions(current, [revision])),
+    reveal: (revision: Revision) => setRevealed(current => GraphNavigationModel.mergeGraphRevisions(current, [revision])),
     extraRevisions,
   }
 }

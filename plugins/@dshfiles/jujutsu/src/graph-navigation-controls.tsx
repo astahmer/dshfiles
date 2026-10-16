@@ -5,7 +5,7 @@ import { errorMessage } from '@dshfiles/plugin-ui/query'
 import { useState } from 'react'
 import type { Revision } from './api.js'
 import { matchesRevisionSearch } from './graph.js'
-import { relationshipLabel } from './graph-navigation.js'
+import { GraphNavigationModel } from './graph-navigation.js'
 import type { useGraphNavigation } from './use-graph-navigation.js'
 
 type Navigation = ReturnType<typeof useGraphNavigation>
@@ -159,7 +159,7 @@ export const RelationshipInspector = ({ navigation, selected, revisions, onLocat
               className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-x-3 dshx:gap-y-1"
               title="Exact revision ancestry counts; not a file or patch comparison."
             >
-              <strong className="dshx:font-medium">{relationshipLabel(relationship.relation)}</strong>
+              <strong className="dshx:font-medium">{GraphNavigationModel.relationshipLabel(relationship.relation)}</strong>
               <span title={`Changes reachable only from ${subjectLabel}`}>
                 <strong>{relationship.selectedOnlyCount}</strong> only in {subjectLabel}
               </span>
