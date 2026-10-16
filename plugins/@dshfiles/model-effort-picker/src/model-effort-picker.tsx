@@ -9,7 +9,7 @@ import { ScrollArea } from '@dshfiles/plugin-ui/components/ui/scroll-area'
 import { Slider } from '@dshfiles/plugin-ui/components/ui/slider'
 import { CheckIcon, ChevronDownIcon, LoaderCircleIcon, RotateCcwIcon, SearchIcon, SparklesIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { effortName, filterModelGroups, selectionForEffort, selectionForModel } from './model-picker-model.js'
+import { ModelPickerModel } from './model-picker-model.js'
 
 type Props = ModelSelectInjected & { readonly locked: boolean }
 
@@ -21,7 +21,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select }
     onStoreChange => directory.subscribe(onStoreChange),
     () => directory.getSnapshot(),
   )
-  const filteredGroups = useMemo(() => filterModelGroups(state.groups, query), [state.groups, query])
+  const filteredGroups = useMemo(() => ModelPickerModel.filterGroups(state.groups, query), [state.groups, query])
   const current = state.current
   const selectedGroup = current === null ? undefined : state.groups.find(group => group.id === current.provider)
   const selectedModel = selectedGroup?.models.find(model => model.id === current?.model)
@@ -33,7 +33,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select }
   )
   const [sliderIndex, setSliderIndex] = useState(selectedEffortIndex)
   const busy = locked || state.status === 'selecting'
-  const effortLabel = selectedModel === undefined ? (state.retainedEffort ?? 'Default') : effortName(selectedModel, current)
+  const effortLabel = selectedModel === undefined ? (state.retainedEffort ?? 'Default') : ModelPickerModel.effortName(selectedModel, current)
   const triggerLabel = selectedModel?.name ?? current?.model ?? (state.status === 'loading' ? 'Loading models…' : 'Choose model')
 
   useEffect(() => {
@@ -133,7 +133,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select }
                         className={cn('dshx:w-full dshx:justify-start dshx:gap-2 dshx:text-left', active && 'dshx:bg-accent')}
                         disabled={busy}
                         key={`${group.id}:${model.id}`}
-                        onClick={() => void submitSelection(selectionForModel(group, model, current))}
+                        onClick={() => void submitSelection(ModelPickerModel.selectionForModel(group, model, current))}
                         size="sm"
                         variant="ghost"
                       >
@@ -184,7 +184,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select }
               <Button
                 aria-pressed={current.reasoningEffort === undefined}
                 disabled={busy}
-                onClick={() => void submitSelection(selectionForEffort(current, undefined))}
+                onClick={() => void submitSelection(ModelPickerModel.selectionForEffort(current, undefined))}
                 size="xs"
                 variant="ghost"
               >
@@ -212,7 +212,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select }
                     onValueChange={(values: number[]) => setSliderIndex(values[0] ?? 0)}
                     onValueCommit={(values: number[]) => {
                       const effort = efforts[values[0] ?? 0]
-                      if (effort !== undefined) void submitSelection(selectionForEffort(current, effort.id))
+                      if (effort !== undefined) void submitSelection(ModelPickerModel.selectionForEffort(current, effort.id))
                     }}
                     step={1}
                     value={[sliderIndex]}
@@ -243,7 +243,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select }
                     data-model-effort-option
                     disabled={busy}
                     key={effort.id}
-                    onClick={() => void submitSelection(selectionForEffort(current, effort.id))}
+                    onClick={() => void submitSelection(ModelPickerModel.selectionForEffort(current, effort.id))}
                     type="button"
                   >
                     {effort.name}
