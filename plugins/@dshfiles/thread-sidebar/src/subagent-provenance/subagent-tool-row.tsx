@@ -7,6 +7,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-chat/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { JsonText } from '../json-text.js'
+import { subagentName } from './subagent-name.js'
 import { providerModelLabel } from './route-label.js'
 
 const subagentArgumentsSchema = z
@@ -38,7 +39,8 @@ export const SubagentProvenanceToolRow = (props: SubagentToolRowProps) => {
   const args = useMemo(() => callArguments(argsRaw), [argsRaw])
   const routeLabel = providerModelLabel(args?.provider, args?.model)
   const output = resultText(props)
-  const title = routeLabel === undefined ? props.t('tool.title.subagent') : `${props.t('tool.title.subagent')} · ${routeLabel}`
+  const name = subagentName({ sessionId: props.sessionId, callId: props.callId })
+  const title = routeLabel === undefined ? `${props.t('tool.title.subagent')} · ${name}` : `${props.t('tool.title.subagent')} · ${name} · ${routeLabel}`
   const disclosure = props.useDisclosure()
   const prompt = args?.prompt?.trim()
   const expandable = (prompt !== undefined && prompt !== '') || output !== undefined
@@ -48,7 +50,6 @@ export const SubagentProvenanceToolRow = (props: SubagentToolRowProps) => {
       <DisclosureRow
         icon={<IconAgentPresetOutlineRegular />}
         title={title}
-        collapsedContent={prompt}
         open={disclosure.expanded}
         expandable={expandable}
         onToggle={disclosure.toggle}
