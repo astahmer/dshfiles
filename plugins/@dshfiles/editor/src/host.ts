@@ -1,7 +1,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-session'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
-import { PluginApiError } from '@dshfiles/dshx/api'
+import { PluginApiError, type ApiCaller } from '@dshfiles/dshx/api'
 import { defineHost } from '@dshfiles/dshx/host'
 import { z } from 'zod'
 import { editorApi, MAX_SAVE_BYTES } from './api.js'
@@ -34,11 +34,19 @@ const sessionRoot = async (ctx: Context, sessionId: string): Promise<string> => 
   return stored
 }
 
+/** The session a save targets: the named one, else the calling Agent's own session. */
+const targetSessionId = (requested: string | undefined, caller: ApiCaller): string => {
+  if (requested !== undefined) return requested
+  if (caller.kind === 'agent' && caller.sessionId !== undefined) return caller.sessionId
+  throw new PluginApiError('Pass sessionId: this tool cannot tell which thread workspace to save into.')
+}
+
 const editorHostApi = editorApi.host({
-  write: async ({ input, ctx }) => {
+  write: async ({ input, ctx, caller }) => {
+    const sessionId = targetSessionId(input.sessionId, caller)
     try {
       return await writeWorkspaceFile({
-        root: await sessionRoot(ctx, input.sessionId),
+        root: await sessionRoot(ctx, sessionId),
         path: input.path,
         text: input.text,
         expectedSha256: input.expectedSha256,
