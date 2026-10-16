@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 
 /**
- * Cached browser checks: builds every bundle once, then runs the per-package Turbo tasks one at a time, so a package
- * whose built bundles, journeys and harness did not change replays from the local Turbo cache.
+ * Cached browser checks: builds every bundle once, then runs the per-package Turbo tasks so a package whose built
+ * bundles, journeys and harness did not change replays from the local Turbo cache. Journeys run one at a time; the
+ * boot gate overlaps three checks off CI (`CHECK_BROWSER_CONCURRENCY` overrides either).
  *
  *   node scripts/check-browser.mjs e2e   [plugin|feature ...] [--force]   journeys      (pnpm check:e2e)
  *   node scripts/check-browser.mjs smoke [plugin|feature ...] [--force]   @smoke subset (pnpm check:e2e:smoke)
@@ -27,6 +28,9 @@ if (task === undefined) {
 }
 const force = rest.includes('--force')
 const names = rest.filter(argument => argument !== '--force')
+// Journeys stay serial (parallel Host plus Chromium boots make them flaky under load); the boot gate asserts a mount
+// and runs no journey, so three at a time measured ~2.7x faster on ten cores.
+const concurrency = process.env.CHECK_BROWSER_CONCURRENCY ?? (mode === 'boot' && process.env.CI === undefined ? '3' : '1')
 
 const { owners } = await planBrowserTasks()
 const packageFor = name => {
@@ -61,9 +65,10 @@ if (mode === 'boot') {
   const ignores = spawnSync(process.execPath, ['tooling/dshx/scripts/boot-check-web.mjs', '--validate-ignores'], { cwd: workspaceRoot, stdio: 'inherit' })
   if (ignores.status !== 0) process.exit(ignores.status ?? 1)
 }
-// One browser task at a time: each boots a Host and a Chromium, and parallel boots make journeys flaky under load.
-const status = await turbo([task, ...filters, '--concurrency=1', '--continue', '--output-logs=new-only', ...(force ? ['--force'] : [])], {
+const status = await turbo([task, ...filters, `--concurrency=${concurrency}`, '--continue', '--output-logs=new-only', ...(force ? ['--force'] : [])], {
   DSHX_TOOL_VERSIONS: toolVersions,
 })
-console.log(`check-browser ${mode}: ${status === 0 ? 'passed' : 'failed'} in ${String(Math.round((Date.now() - startedAt) / 1000))}s (cache ${turboCache})`)
+console.log(
+  `check-browser ${mode}: ${status === 0 ? 'passed' : 'failed'} in ${String(Math.round((Date.now() - startedAt) / 1000))}s (cache ${turboCache}, concurrency ${concurrency})`,
+)
 process.exitCode = status

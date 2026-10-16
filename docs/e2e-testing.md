@@ -123,12 +123,14 @@ pnpm run test:e2e:gen && pnpm exec playwright test --config=playwright.e2e.confi
 
 Root `pnpm check:e2e [plugin|feature ...] [--force]`, `pnpm check:e2e:smoke` and
 `pnpm check:plugin-boot` are the cached entry points (`scripts/check-browser.mjs`):
-they build every bundle once, then run per-package Turbo tasks one at a time
-(`--concurrency=1`: each boots a Host and a Chromium, and parallel boots make
-journeys flaky), headless, with `DSHX_E2E_PREBUILT=1`. Each task prints the
-journey summary (totals, wall time, one line per failure, slowest files). A
-filter is a plugin (`mcp-servers`) or a feature-file name (`ai-accounts-copilot`
-runs its owner, `ai-accounts`). A fresh clone gets the pinned Chromium from
+they build every bundle once, then run per-package Turbo tasks headless, with
+`DSHX_E2E_PREBUILT=1`. Journeys run one at a time (`--concurrency=1`: each boots
+a Host and a Chromium, and parallel journeys are flaky under load); the boot
+gate runs no journey, so it overlaps three checks off CI, and
+`CHECK_BROWSER_CONCURRENCY` overrides either. Each task prints the journey
+summary (totals, wall time, one line per failure, slowest files). A filter is a
+plugin (`mcp-servers`) or a feature-file name (`ai-accounts-copilot` runs its
+owner, `ai-accounts`). A fresh clone gets the pinned Chromium from
 `pnpm install:all` (`setup:browser`).
 
 `pnpm check` runs `check:plugin-boot` and then `check:e2e:smoke`: the
