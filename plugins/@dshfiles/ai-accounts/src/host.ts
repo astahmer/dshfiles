@@ -3,7 +3,7 @@ import { configFromAccountsFile } from './account-config.js'
 export { Config } from './account-config.js'
 // Brings in the CSS-module declarations a plugin would otherwise restate.
 import type {} from '@dshfiles/dshx/client'
-import { accountsFile, accountsHostApi, readAccountsUsage, readQuotaResetAt } from './accounts-host-api.js'
+import { AccountsHostApiModel, accountsHostApi } from './accounts-host-api.js'
 import { createUsageCache } from './account-usage.js'
 import { createCopilotLoginService } from './copilot-login.js'
 import { claudeAccountService } from './claude-account.js'
@@ -91,7 +91,7 @@ export default definePlugin({
     runtime.scheduler = createUsageHistoryScheduler(
       ctx,
       async () => {
-        const file = await accountsFile(ctx)
+        const file = await AccountsHostApiModel.accountsFile(ctx)
         return { accounts: file.accounts, shadowRoot: file.shadowRoot }
       },
       { resolveCredential },
@@ -102,7 +102,7 @@ export default definePlugin({
       runtime.scheduler?.dispose()
       void closeUsageDomain(ctx).catch(() => ctx.logger.warn('ai-accounts: usage history storage could not close cleanly'))
     })
-    runtime.usageCache = createUsageCache({ ttlMs: 30_000, read: () => readAccountsUsage(ctx) })
+    runtime.usageCache = createUsageCache({ ttlMs: 30_000, read: () => AccountsHostApiModel.readAccountsUsage(ctx) })
     ctx.on('credentials/reference-updated', ref => {
       if (readAccountFileSync().accounts.some(account => account.apiKeyEnv === ref)) runtime.usageCache?.invalidate()
     })
@@ -121,7 +121,7 @@ export default definePlugin({
       }
     })
     installCostProjection(ctx)
-    const quotaContinuations = createQuotaContinuationService({ context: ctx, readResetAt: accountId => readQuotaResetAt(ctx, accountId) })
+    const quotaContinuations = createQuotaContinuationService({ context: ctx, readResetAt: accountId => AccountsHostApiModel.readQuotaResetAt(ctx, accountId) })
     runtime.quotaContinuations = quotaContinuations
     ctx.effect(() => {
       const stopQuotaContinuations = quotaContinuations.start()
