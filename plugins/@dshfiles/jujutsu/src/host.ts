@@ -18,7 +18,7 @@ import {
 } from './core.js'
 import { EVOLUTION_TEMPLATE, OPERATION_TEMPLATE, REVISION_TEMPLATE } from './jj-templates.js'
 import { RevisionReads, type JjRun } from './revision-reads.js'
-import { readGraphNavigation, readGraphSlice, readRevisionRelationship } from './graph-navigation-reads.js'
+import { GraphNavigationReads } from './graph-navigation-reads.js'
 import { composerContextHost } from './composer-context-host.js'
 import { closeReviewProgress, jujutsuReviewProgressApiHost, reviewProgressFor } from './review-progress-host.js'
 import { jujutsuSettings } from './settings.js'
@@ -700,7 +700,7 @@ const jujutsuHostApi = jujutsuApi.host({
   graphNavigation: async ({ input, ctx, signal }) => {
     try {
       const repo = await resolveRepo(ctx, input.repoId, signal)
-      return await readGraphNavigation(repoRun(ctx, repo, signal))
+      return await GraphNavigationReads.readGraphNavigation(repoRun(ctx, repo, signal))
     } catch (error) {
       return RevisionReads.failure(error, 'Could not resolve graph landmarks.')
     }
@@ -708,7 +708,11 @@ const jujutsuHostApi = jujutsuApi.host({
   revisionRelationship: async ({ input, ctx, signal }) => {
     try {
       const repo = await resolveRepo(ctx, input.repoId, signal)
-      return await readRevisionRelationship({ run: repoRun(ctx, repo, signal), commitId: input.commitId, targetCommitId: input.targetCommitId })
+      return await GraphNavigationReads.readRevisionRelationship({
+        run: repoRun(ctx, repo, signal),
+        commitId: input.commitId,
+        targetCommitId: input.targetCommitId,
+      })
     } catch (error) {
       return RevisionReads.failure(error, 'Could not compare revisions.')
     }
@@ -716,7 +720,7 @@ const jujutsuHostApi = jujutsuApi.host({
   graphSlice: async ({ input, ctx, signal }) => {
     try {
       const repo = await resolveRepo(ctx, input.repoId, signal)
-      return await readGraphSlice({ run: repoRun(ctx, repo, signal), commitId: input.commitId, mode: input.mode })
+      return await GraphNavigationReads.readGraphSlice({ run: repoRun(ctx, repo, signal), commitId: input.commitId, mode: input.mode })
     } catch (error) {
       return RevisionReads.failure(error, 'Could not read revision history.')
     }

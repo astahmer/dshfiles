@@ -39,7 +39,7 @@ const pinned = async (run: JjRun) => {
   return { operationId, revisions, ids, count }
 }
 
-export const readGraphNavigation = async (run: JjRun): Promise<GraphNavigation> => {
+const readGraphNavigation = async (run: JjRun): Promise<GraphNavigation> => {
   const snapshot = await pinned(run)
   const landmarks: GraphNavigation['landmarks'] = []
   const definitions = [
@@ -75,7 +75,7 @@ const relationshipFromCounts = (input: {
   return 'diverged'
 }
 
-export const readRevisionRelationship = async (input: { run: JjRun; commitId: string; targetCommitId: string }): Promise<RevisionRelationship> => {
+const readRevisionRelationship = async (input: { run: JjRun; commitId: string; targetCommitId: string }): Promise<RevisionRelationship> => {
   const selected = commitIdSchema.parse(input.commitId)
   const target = commitIdSchema.parse(input.targetCommitId)
   const snapshot = await pinned(input.run)
@@ -109,10 +109,16 @@ export const readRevisionRelationship = async (input: { run: JjRun; commitId: st
   }
 }
 
-export const readGraphSlice = async (input: { run: JjRun; commitId: string; mode: 'history' | 'exclusive' }) => {
+const readGraphSlice = async (input: { run: JjRun; commitId: string; mode: 'history' | 'exclusive' }) => {
   const selected = commitIdSchema.parse(input.commitId)
   const snapshot = await pinned(input.run)
   const roots = `(heads(all()) | bookmarks() | remote_bookmarks() | working_copies()) ~ ${selected}`
   const result = await snapshot.revisions(input.mode === 'history' ? `::${selected}` : `::${selected} ~ ::(${roots})`)
   return { operationId: snapshot.operationId, ...result }
+}
+
+export class GraphNavigationReads {
+  static readonly readGraphNavigation = readGraphNavigation
+  static readonly readRevisionRelationship = readRevisionRelationship
+  static readonly readGraphSlice = readGraphSlice
 }
