@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { RevisionGraphRow } from './graph.ts'
-import { activeDayIndex, flattenRevisionGroups, remoteBookmarkRevision } from './revision-list.ts'
+import { RevisionListModel } from './revision-list.ts'
 
 const layout = (commitId: string, lane = 0): RevisionGraphRow => ({
   commitId,
@@ -21,14 +21,14 @@ describe('remoteBookmarkRevision', () => {
       { commitId: 'a', bookmarks: ['main@origin'] },
       { commitId: 'b', bookmarks: ['main@upstream'] },
     ]
-    expect(remoteBookmarkRevision({ revisions, bookmark: 'main', remote: 'origin' })?.commitId).toBe('a')
-    expect(remoteBookmarkRevision({ revisions, bookmark: 'feature', remote: 'origin' })).toBeUndefined()
+    expect(RevisionListModel.remoteBookmarkRevision({ revisions, bookmark: 'main', remote: 'origin' })?.commitId).toBe('a')
+    expect(RevisionListModel.remoteBookmarkRevision({ revisions, bookmark: 'feature', remote: 'origin' })).toBeUndefined()
   })
 })
 
 describe('flattenRevisionGroups', () => {
   it('interleaves day headings with their laid-out revisions', () => {
-    const items = flattenRevisionGroups({
+    const items = RevisionListModel.flattenRevisionGroups({
       groups: [
         { day: 'Today', rows: [{ commitId: 'a' }, { commitId: 'b' }] },
         { day: 'Yesterday', rows: [{ commitId: 'c' }] },
@@ -41,7 +41,7 @@ describe('flattenRevisionGroups', () => {
   })
 
   it('marks the remote bookmark revision as the pushed boundary', () => {
-    const items = flattenRevisionGroups({
+    const items = RevisionListModel.flattenRevisionGroups({
       groups: [{ day: 'Today', rows: [{ commitId: 'a' }, { commitId: 'b' }] }],
       collapsedDays: new Set(),
       layouts,
@@ -52,7 +52,7 @@ describe('flattenRevisionGroups', () => {
   })
 
   it('keeps a collapsed day heading and hides only its rows', () => {
-    const items = flattenRevisionGroups({
+    const items = RevisionListModel.flattenRevisionGroups({
       groups: [
         { day: 'Today', rows: [{ commitId: 'a' }] },
         { day: 'Yesterday', rows: [{ commitId: 'c' }] },
@@ -64,7 +64,7 @@ describe('flattenRevisionGroups', () => {
   })
 
   it('gives a day that heads several runs a distinct key per run', () => {
-    const items = flattenRevisionGroups({
+    const items = RevisionListModel.flattenRevisionGroups({
       groups: [
         { day: 'Today', rows: [{ commitId: 'a' }] },
         { day: 'Yesterday', rows: [{ commitId: 'b' }] },
@@ -77,7 +77,11 @@ describe('flattenRevisionGroups', () => {
   })
 
   it('omits headings without date grouping and skips rows missing from the graph', () => {
-    const items = flattenRevisionGroups({ groups: [{ day: '', rows: [{ commitId: 'a' }, { commitId: 'hidden' }] }], collapsedDays: new Set(), layouts })
+    const items = RevisionListModel.flattenRevisionGroups({
+      groups: [{ day: '', rows: [{ commitId: 'a' }, { commitId: 'hidden' }] }],
+      collapsedDays: new Set(),
+      layouts,
+    })
     expect(items.map(item => item.key)).toEqual(['a'])
   })
 })
@@ -86,13 +90,13 @@ describe('activeDayIndex', () => {
   const items = [{ kind: 'day' }, { kind: 'revision' }, { kind: 'revision' }, { kind: 'day' }, { kind: 'revision' }] as const
 
   it('picks the nearest heading at or above the first visible row', () => {
-    expect(activeDayIndex(items, 0)).toBe(0)
-    expect(activeDayIndex(items, 2)).toBe(0)
-    expect(activeDayIndex(items, 4)).toBe(3)
-    expect(activeDayIndex(items, 99)).toBe(3)
+    expect(RevisionListModel.activeDayIndex(items, 0)).toBe(0)
+    expect(RevisionListModel.activeDayIndex(items, 2)).toBe(0)
+    expect(RevisionListModel.activeDayIndex(items, 4)).toBe(3)
+    expect(RevisionListModel.activeDayIndex(items, 99)).toBe(3)
   })
 
   it('has no sticky heading without date grouping', () => {
-    expect(activeDayIndex([{ kind: 'revision' }], 0)).toBeNull()
+    expect(RevisionListModel.activeDayIndex([{ kind: 'revision' }], 0)).toBeNull()
   })
 })
