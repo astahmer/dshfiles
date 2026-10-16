@@ -11,16 +11,6 @@ export const GITHUB_COPILOT_KIND = 'github-copilot'
 
 const SLUG_PATTERN = /^[a-zA-Z][a-zA-Z0-9_-]{0,63}$/
 
-/** An empty instance id means "the driver's own default route". */
-export const normalizeInstanceId = (value: string, fallback: string): string => {
-  const trimmed = value.trim()
-  if (trimmed.length === 0) return fallback
-  if (!SLUG_PATTERN.test(trimmed)) {
-    throw new TypeError(`Instance id ${JSON.stringify(trimmed)} must start with a letter and use only letters, digits, '-' or '_' (max 64 characters).`)
-  }
-  return trimmed
-}
-
 const displayNameFor = (explicit: string, kind: string, instanceId: string): string => {
   const trimmed = explicit.trim()
   if (trimmed.length > 0) return trimmed
@@ -62,9 +52,6 @@ export interface ClaudeRoute {
 
 export type Route = CodexRoute | KeyedRoute | ClaudeRoute | GitHubCopilotRoute
 
-export const keyEnvFor = (route: KeyedRoute): string =>
-  route.apiKeyEnv.trim().length > 0 ? route.apiKeyEnv.trim() : route.kind === COMMANDCODE_KIND ? DEFAULT_COMMANDCODE_KEY_ENV : 'OPENCODE_API_KEY'
-
 const shadowHomeFor = (account: CodexAccountConfig, instanceId: string, root: string): string => {
   const explicit = account.shadowHomePath.trim()
   if (explicit.length > 0) return explicit
@@ -79,70 +66,85 @@ export interface BuiltRoutes {
   readonly rejected: readonly string[]
 }
 
-/**
- * `takenProviders` are provider ids another plugin already registered. DSH rejects a duplicate adapter for the whole
- * registration and fails the boot, so an enabled account on such an id is left out instead.
- */
-export const buildRoutes = (config: AiAccountsConfig, options: { readonly takenProviders?: ReadonlySet<string> } = {}): BuiltRoutes => {
-  const routes = new Map<string, Route>()
-  const rejected: string[] = []
-  for (const account of config.codexAccounts) {
-    const instanceId = normalizeInstanceId(account.instanceId, CODEX_KIND)
-    let layout: CodexHomeLayout
-    try {
-      layout = resolveCodexHomeLayout({
-        homePath: account.homePath,
-        shadowHomePath: shadowHomeFor(account, instanceId, config.codexShadowRoot),
-      })
-    } catch (error) {
-      if (!(error instanceof CodexHomeError)) throw error
-      rejected.push(`${instanceId}: ${error.message}`)
-      continue
+export class ProviderRoutes {
+  /** An empty instance id means "the driver's own default route". */
+  static normalizeInstanceId = (value: string, fallback: string): string => {
+    const trimmed = value.trim()
+    if (trimmed.length === 0) return fallback
+    if (!SLUG_PATTERN.test(trimmed)) {
+      throw new TypeError(`Instance id ${JSON.stringify(trimmed)} must start with a letter and use only letters, digits, '-' or '_' (max 64 characters).`)
     }
-    routes.set(instanceId, {
-      kind: CODEX_KIND,
-      instanceId,
-      displayName: displayNameFor(account.displayName, CODEX_KIND, instanceId),
-      enabled: account.enabled,
-      layout,
-    })
+    return trimmed
   }
-  for (const account of config.opencodeAccounts) {
-    const kind = account.kind === COMMANDCODE_KIND ? COMMANDCODE_KIND : OPENCODE_KIND
-    const instanceId = normalizeInstanceId(account.instanceId, kind)
-    routes.set(instanceId, {
-      kind,
-      instanceId,
-      displayName: displayNameFor(account.displayName, kind, instanceId),
-      apiKeyEnv: account.apiKeyEnv,
-      apiBaseUrl: account.apiBaseUrl,
-      enabled: account.enabled,
-    })
+
+  static keyEnvFor = (route: KeyedRoute): string =>
+    route.apiKeyEnv.trim().length > 0 ? route.apiKeyEnv.trim() : route.kind === COMMANDCODE_KIND ? DEFAULT_COMMANDCODE_KEY_ENV : 'OPENCODE_API_KEY'
+
+  /**
+   * `takenProviders` are provider ids another plugin already registered. DSH rejects a duplicate adapter for the whole
+   * registration and fails the boot, so an enabled account on such an id is left out instead.
+   */
+  static buildRoutes = (config: AiAccountsConfig, options: { readonly takenProviders?: ReadonlySet<string> } = {}): BuiltRoutes => {
+    const routes = new Map<string, Route>()
+    const rejected: string[] = []
+    for (const account of config.codexAccounts) {
+      const instanceId = ProviderRoutes.normalizeInstanceId(account.instanceId, CODEX_KIND)
+      let layout: CodexHomeLayout
+      try {
+        layout = resolveCodexHomeLayout({
+          homePath: account.homePath,
+          shadowHomePath: shadowHomeFor(account, instanceId, config.codexShadowRoot),
+        })
+      } catch (error) {
+        if (!(error instanceof CodexHomeError)) throw error
+        rejected.push(`${instanceId}: ${error.message}`)
+        continue
+      }
+      routes.set(instanceId, {
+        kind: CODEX_KIND,
+        instanceId,
+        displayName: displayNameFor(account.displayName, CODEX_KIND, instanceId),
+        enabled: account.enabled,
+        layout,
+      })
+    }
+    for (const account of config.opencodeAccounts) {
+      const kind = account.kind === COMMANDCODE_KIND ? COMMANDCODE_KIND : OPENCODE_KIND
+      const instanceId = ProviderRoutes.normalizeInstanceId(account.instanceId, kind)
+      routes.set(instanceId, {
+        kind,
+        instanceId,
+        displayName: displayNameFor(account.displayName, kind, instanceId),
+        apiKeyEnv: account.apiKeyEnv,
+        apiBaseUrl: account.apiBaseUrl,
+        enabled: account.enabled,
+      })
+    }
+    for (const account of config.claudeAccounts) {
+      const instanceId = ProviderRoutes.normalizeInstanceId(account.instanceId, CLAUDE_KIND)
+      routes.set(instanceId, {
+        kind: CLAUDE_KIND,
+        instanceId,
+        displayName: displayNameFor(account.displayName, CLAUDE_KIND, instanceId),
+        configDir: resolveClaudeConfigDir(account.configDir),
+        apiKeyEnv: account.apiKeyEnv,
+        enabled: account.enabled,
+      })
+    }
+    for (const account of config.githubCopilotAccounts) {
+      const instanceId = ProviderRoutes.normalizeInstanceId(account.instanceId, GITHUB_COPILOT_KIND)
+      routes.set(instanceId, {
+        kind: GITHUB_COPILOT_KIND,
+        instanceId,
+        displayName: displayNameFor(account.displayName, GITHUB_COPILOT_KIND, instanceId),
+        enabled: account.enabled,
+      })
+    }
+    for (const [instanceId, route] of routes) {
+      if (!route.enabled || options.takenProviders?.has(instanceId) !== true) continue
+      routes.delete(instanceId)
+      rejected.push(`${instanceId}: another plugin already serves provider "${instanceId}"`)
+    }
+    return { routes, rejected }
   }
-  for (const account of config.claudeAccounts) {
-    const instanceId = normalizeInstanceId(account.instanceId, CLAUDE_KIND)
-    routes.set(instanceId, {
-      kind: CLAUDE_KIND,
-      instanceId,
-      displayName: displayNameFor(account.displayName, CLAUDE_KIND, instanceId),
-      configDir: resolveClaudeConfigDir(account.configDir),
-      apiKeyEnv: account.apiKeyEnv,
-      enabled: account.enabled,
-    })
-  }
-  for (const account of config.githubCopilotAccounts) {
-    const instanceId = normalizeInstanceId(account.instanceId, GITHUB_COPILOT_KIND)
-    routes.set(instanceId, {
-      kind: GITHUB_COPILOT_KIND,
-      instanceId,
-      displayName: displayNameFor(account.displayName, GITHUB_COPILOT_KIND, instanceId),
-      enabled: account.enabled,
-    })
-  }
-  for (const [instanceId, route] of routes) {
-    if (!route.enabled || options.takenProviders?.has(instanceId) !== true) continue
-    routes.delete(instanceId)
-    rejected.push(`${instanceId}: another plugin already serves provider "${instanceId}"`)
-  }
-  return { routes, rejected }
 }

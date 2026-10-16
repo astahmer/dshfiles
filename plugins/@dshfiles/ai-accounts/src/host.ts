@@ -52,17 +52,7 @@ import { readCodexAccessToken } from './read-codex-token.js'
 import { persistCodexOAuthCredential, readCodexOAuthCredential } from './codex-credential.js'
 import { createQuotaContinuationService } from './quota-continuation.js'
 import { buildProfile, EffortPinnedAdapter } from './provider-profile.js'
-import {
-  CLAUDE_KIND,
-  COMMANDCODE_KIND,
-  CODEX_KIND,
-  OPENCODE_KIND,
-  buildRoutes,
-  keyEnvFor,
-  normalizeInstanceId,
-  type KeyedRoute,
-  type Route,
-} from './provider-routes.js'
+import { CLAUDE_KIND, COMMANDCODE_KIND, CODEX_KIND, OPENCODE_KIND, ProviderRoutes, type KeyedRoute, type Route } from './provider-routes.js'
 export { CODEX_KIND, OPENCODE_KIND, COMMANDCODE_KIND, CLAUDE_KIND } from './provider-routes.js'
 
 /**
@@ -147,7 +137,7 @@ export default definePlugin({
     primeAccountFile()
     const initialFile = readAccountFileSync()
     let config = configFromAccountsFile(initialFile)
-    let routes = buildRoutes(config).routes
+    let routes = ProviderRoutes.buildRoutes(config).routes
     const copilotLogin = createCopilotLoginService({
       credentials: ctx.credentials,
       isCopilotAccount: instanceId => routes.get(instanceId)?.kind === GITHUB_COPILOT_KIND,
@@ -241,7 +231,7 @@ export default definePlugin({
             reasoningDefaults: reasoningPins.find(([instanceId]) => instanceId === id)?.[1],
             ...(curation.find(([instanceId]) => instanceId === id)?.[1] ?? {}),
             additionalModelIds: [
-              ...(sourceFile.accounts.find(account => normalizeInstanceId(account.instanceId, account.kind) === id)?.additionalModelIds ?? []),
+              ...(sourceFile.accounts.find(account => ProviderRoutes.normalizeInstanceId(account.instanceId, account.kind) === id)?.additionalModelIds ?? []),
               ...(discoveredModelIds.get(id)?.modelIds ?? []),
             ],
           }),
@@ -369,7 +359,7 @@ export default definePlugin({
           }
           // Keyed providers read the variable their own account names, so several
           // subscriptions live in the vault without any value in the accounts file.
-          const named = keyEnvFor(route)
+          const named = ProviderRoutes.keyEnvFor(route)
           const namedKey = route.kind === COMMANDCODE_KIND ? await readCommandCodeKey(named, resolveCredential) : await resolveCredential(named)
           const key = namedKey || config.opencodeApiKey.trim()
           if (key.length === 0) {
@@ -441,7 +431,11 @@ export default definePlugin({
       const dispose = llm.registerModelDiscovery(`ai-accounts.${route.kind}.${id}`, async (request, signal) => {
         if (route.kind === COMMANDCODE_KIND) {
           const entries = await fetchCommandCodeCatalog({
-            ...discoveryCatalogOptions(request, { apiBaseUrl: route.apiBaseUrl, keyEnv: keyEnvFor(route) }, await resolveCredential(keyEnvFor(route))),
+            ...discoveryCatalogOptions(
+              request,
+              { apiBaseUrl: route.apiBaseUrl, keyEnv: ProviderRoutes.keyEnvFor(route) },
+              await resolveCredential(ProviderRoutes.keyEnvFor(route)),
+            ),
             signal,
           })
           return entries.map(entry => ({
@@ -466,7 +460,7 @@ export default definePlugin({
           .map(provider => provider.id)
           .filter(id => !registeredProviders.has(id)),
       )
-      const { routes: nextRoutes, rejected } = buildRoutes(nextConfig, { takenProviders })
+      const { routes: nextRoutes, rejected } = ProviderRoutes.buildRoutes(nextConfig, { takenProviders })
       for (const reason of rejected) ctx.logger.warn(`ai-accounts: skipped account ${reason}`)
       runtime.rejectedRoutes = rejected
       const enabled = [...nextRoutes].filter(([, route]) => route.enabled)

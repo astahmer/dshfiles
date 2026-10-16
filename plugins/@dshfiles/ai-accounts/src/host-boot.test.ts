@@ -64,11 +64,11 @@ describe('host boot against the account store', () => {
   it('routes every kind that serves models and leaves Cursor to its runtime driver', async () => {
     const { primeAccountFile, readAccountFileSync } = await import('./account-store.js')
     const { configFromAccountsFile } = await import('./account-config.js')
-    const { buildRoutes } = await import('./provider-routes.js')
+    const { ProviderRoutes } = await import('./provider-routes.js')
     primeAccountFile()
     const file = readAccountFileSync()
     expect(file.accounts.find(account => account.instanceId === 'codex')?.reasoningDefaults['gpt-6-luna']).toBe('low')
-    const { routes, rejected } = buildRoutes(configFromAccountsFile(file))
+    const { routes, rejected } = ProviderRoutes.buildRoutes(configFromAccountsFile(file))
     expect(rejected).toEqual([])
     expect([...routes.keys()].sort()).toEqual(['claude_work', 'codex', 'commandcode_a'])
     expect(routes.get('claude_work')?.kind).toBe('claude')
