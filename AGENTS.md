@@ -212,6 +212,18 @@ Docs: [authoring guide](tooling/dshx/docs/sdk/getting-started.md),
   contract script rejects ranges.
 - Owned plugins are Cordis bundles: `cordis.patch.yml` inserts the package row,
   `dist/index.js` is the Host half, `dist/client.js` the browser half.
+- **A capability the user has, the Agent gets.** Every user-facing capability a
+  plugin serves — a row action, a dialog verb, a settings write — carries an
+  agent tool too: bind the existing dshx method with
+  `tool: { name, readOnly, render }` rather than adding a second `defineTool`
+  that restates it. Reads set `readOnly: true`; write tools say in their
+  description that they may run only when the user asked; a destructive verb
+  takes an explicit opt-in argument with no default, so a bare request cannot
+  destroy work. Presentation-only state (tab layout, a lightbox, a draft) is not
+  a tool. When no Host verb exists, record the gap in
+  [`plans/dsh-host-gaps.md`](plans/dsh-host-gaps.md) instead of faking the action
+  client-side. The per-owner audit and backlog live in
+  [`docs/agent-tool-parity.md`](docs/agent-tool-parity.md).
 - Loader row ids share one namespace per profile: keep the scope in the id
   (`@dshfiles/shortcuts` → `dshfiles-shortcuts`). `defineSettings.namespace`
   must equal that row id, and one Host entry cannot declare both native

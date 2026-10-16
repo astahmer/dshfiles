@@ -37,7 +37,7 @@ backing verb; `host-gap` counts capabilities no verb can reach yet.
 | mentions | 8 | 1 (`skill`) | 1 | 0 |
 | btw | 8 | 0 | 3 | 1 |
 | shortcuts | 4 | 0 | 2 | 1 |
-| jj-integration | 22 | 3 | 15 | 3 |
+| jj-integration | 22 | 8 | 5 | 3 |
 | jujutsu | 28 | 0 | 28 | 3 |
 | project-checks | 8 | 0 | 5 | 2 |
 | project-folder-picker / workspace-folder-picker | 9 | 0 | 4 | 2 |
@@ -143,13 +143,18 @@ Already tool-served (this change): the 16 `thread_*` / `project_*` tools below.
 
 ### jj-integration
 
-Existing API methods that only need a `tool:` binding: `jj_thread_projects`
-(`projects`), `jj_thread_no_folder` (`noFolder`), `jj_thread_destination`
-(`destination`), `jj_thread_provision` (`provision`), `jj_thread_repositories`
-(`repositories`), `jj_thread_at` (`threadAt`), `jj_thread_land` (`land`),
-`jj_thread_discard` (`discard`), `jj_thread_workspace_sync` (`workspaceSync`),
-`jj_thread_settings` (settings scope), `jj_thread_classify_workspaces`
-(`classifyWorkspaces`).
+Bound now (sibling revision `feat(jj-integration): expose thread-workspace actions as agent tools`):
+`jj_thread_projects`, `jj_thread_repositories`, `jj_thread_destination` and
+`jj_thread_workspace_sync` read-only, plus `jj_thread_discard`, which requires an
+explicit `force` so unlanded revisions are never abandoned by a bare request.
+
+Deliberately not bound, because an existing tool already covers the decision or
+there is no model decision to make: `land` and `threadAt` (both accept an
+explicit path, and `jj_thread_rebase` / `jj_thread_status` already do),
+`provision` (`jj_thread_isolate` covers the agent path), `noFolder` (a picker
+selection), `classifyWorkspaces` (a client-picker helper).
+
+Still missing:
 
 | Proposed tool | Capability | Backing verb |
 | --- | --- | --- |
@@ -157,6 +162,7 @@ Existing API methods that only need a `tool:` binding: `jj_thread_projects`
 | `jj_thread_preview` | Preview a thread's last messages | `SessionController.inspect` / history `page` |
 | `jj_thread_sweep` | Sweep finished thread workspaces | existing internal `discardThread` |
 | `jj_thread_register_folder` | Register a browsed folder as a project | `WorkspaceController.create` |
+| `jj_thread_settings` | Read/write the plugin's settings scope | `settings.describe|update` on `dshfiles-jj-integration` |
 
 ### jujutsu
 
@@ -455,14 +461,20 @@ Semantics worth knowing:
 - These are Host-side tools: the running DSH keeps the old Host until the user
   restarts, so they appear only after a restart.
 
+A second sibling revision, `feat(jj-integration): expose thread-workspace
+actions as agent tools`, binds `jj_thread_projects`, `jj_thread_repositories`,
+`jj_thread_destination`, `jj_thread_workspace_sync` (read-only) and
+`jj_thread_discard` (explicit `force`) on the existing `jj-threads` API, so an
+Agent can see and remove thread workspaces, not only isolate and rebase its own.
+
 ## Backlog
 
 1. **P1 — bind tools to verbs that already exist.** The cheapest parity wins, in
-   this order: `jj-integration` (11 methods), `jujutsu` (28), `multi-host` (16),
-   `ai-accounts` (19), `editor` (`write`, `workspaceFiles.list`),
-   `agent-communication` (3), `activity-timeline` (1), `queue-reorder` (5),
-   `project-checks` (5), `memory` (9), `tool-meta` (2). Most are a `tool:` field
-   plus a `render` on an existing dshx method.
+   this order: `jujutsu` (28), `multi-host` (16), `ai-accounts` (19), `editor`
+   (`write`, `workspaceFiles.list`), `agent-communication` (3),
+   `activity-timeline` (1), `queue-reorder` (5), `project-checks` (5), `memory`
+   (9), `tool-meta` (2). Most are a `tool:` field plus a `render` on an existing
+   dshx method. (`jj-integration` and `thread-sidebar` are done.)
 2. **P2 — install the plugins that already ship tools.** `usage`, `optmem`,
    `queue-reorder` are written but absent from the web profile, so their tools
    are dead code today; decide per plugin whether it belongs in the seed.
@@ -472,6 +484,8 @@ Semantics worth knowing:
 4. **P3 — new Host-side wrapping for client-only packages** (`btw`,
    `project-folder-picker`, `workspace-folder-picker`, `diff-viewed`): give the
    owning plugin a Host half, then bind the verbs.
-5. **P3 — host-gap requests.** Record the union above in
+5. **P3 — host-gap requests.** The union above is recorded in
    [`plans/dsh-host-gaps.md`](../plans/dsh-host-gaps.md), starting with thread
    park/unread state, an open-surface action, and a Session delete verb.
+6. **Every change follows the parity rule in [`AGENTS.md`](../AGENTS.md):** a
+   user-facing capability ships with its agent tool, or its host gap is recorded.
