@@ -6,12 +6,12 @@ import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { errorMessage, useIsMutating, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useApi } from '@dshfiles/dshx/client'
-import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react'
+import { useCallback, useMemo, useSyncExternalStore } from 'react'
 import { jjIntegrationApi } from './api.js'
 import type { JjIntegrationTranslate } from './locales.js'
 import { announceRepositoryChange, describeLandResult, useLandToast } from './land-feedback.js'
 import { threadQueryKeys, threadRebaseMutationKey } from './panel.js'
-import { canRebaseThread, hasPendingUserQuestion } from './thread-rebase-eligibility.js'
+import { canRebaseFromClientSnapshot, canRebaseThread, hasPendingUserQuestion } from './thread-rebase-eligibility.js'
 
 export interface LandButtonProps {
   readonly sessionId: SessionSummary['id']
@@ -72,11 +72,11 @@ export const LandButton = (props: LandButtonProps): JSX.Element | null => {
   const sessionRunning = useSyncExternalStore(subscribe, readSessionRunning, () => true)
   const clientCanRebase = useSyncExternalStore(subscribe, readClientCanRebase, () => false)
   const sessionWaitingForInput = useSyncExternalStore(subscribe, readClientQuestionPending, () => true)
-  const canRebase = current?.canRebase === true && !sessionRunning && !sessionWaitingForInput
-  useEffect(() => {
-    if (current?.canRebase !== false || !clientCanRebase) return
-    void queryClient.invalidateQueries({ queryKey: threadQueryKeys.threadAt(current.path) })
-  }, [clientCanRebase, current?.canRebase, current?.path, queryClient])
+  const canRebase = canRebaseFromClientSnapshot({
+    threadSessionsEligible: clientCanRebase,
+    sessionRunning,
+    questionPending: sessionWaitingForInput,
+  })
   if (current === null || current === undefined) return toast.element
   const label = props.t('rebaseThread', { bookmark: props.bookmark })
   return (
@@ -95,7 +95,7 @@ export const LandButton = (props: LandButtonProps): JSX.Element | null => {
       </Button>
       <Button
         className="dshx-root"
-        disabled={rebasesPending || thread.isFetching || current.unlanded.length === 0 || !canRebase}
+        disabled={rebasesPending || current.unlanded.length === 0 || !canRebase}
         onClick={() => rebase.mutate(current.path)}
         size="sm"
         title={canRebase ? `${label} (${props.t('toRebase', { count: current.unlanded.length })})` : `${label} — ${props.t('rebaseBlocked')}`}

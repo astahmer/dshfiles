@@ -17,3 +17,18 @@ export const canRebaseThread = (sessionIds: readonly string[], getActivity: (ses
     const activity = getActivity(sessionId)
     return activity?.running === false && activity.pendingUserQuestion === false
   })
+
+export const canRebaseThreadIfKnown = (
+  sessionIds: readonly string[],
+  activity: ReadonlyMap<string, ThreadSessionActivity> | undefined,
+): boolean | undefined => {
+  if (sessionIds.length === 0) return true
+  if (activity === undefined) return undefined
+  return canRebaseThread(sessionIds, sessionId => activity.get(sessionId))
+}
+
+export const canRebaseFromClientSnapshot = (input: {
+  readonly threadSessionsEligible: boolean
+  readonly sessionRunning: boolean
+  readonly questionPending: boolean
+}): boolean => input.threadSessionsEligible && !input.sessionRunning && !input.questionPending

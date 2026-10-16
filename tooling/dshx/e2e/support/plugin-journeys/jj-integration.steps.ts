@@ -456,6 +456,7 @@ Then('Rebase is disabled before there are revisions to rebase', async ({ page }:
 Then('Rebase refuses the placeholder description and leaves main in place', async ({ page }: { page: Page }) => {
   const repository = repositoryFor(page)
   await expect(rebaseButton(page)).toHaveText('Rebase · 1', { timeout: 10_000 })
+  await expect(rebaseButton(page)).toBeEnabled()
   await rebaseButton(page).click()
   await recordAssertion(page, 'jj-integration-rebase-asks-for-a-description', async () => {
     await expect(page.getByRole('alert').filter({ hasText: /^Describe these revisions before rebasing: \w+\./ })).toBeVisible()

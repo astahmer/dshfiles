@@ -1,9 +1,26 @@
 import { describe, expect, it } from 'vitest'
-import { canRebaseThread, hasPendingUserQuestion } from './thread-rebase-eligibility.js'
+import { canRebaseFromClientSnapshot, canRebaseThread, canRebaseThreadIfKnown, hasPendingUserQuestion } from './thread-rebase-eligibility.js'
 
 describe('thread rebase eligibility', () => {
   it('allows a thread with no sessions', () => {
     expect(canRebaseThread([], () => undefined)).toBe(true)
+  })
+
+  it('allows header Rebase from a known-idle client snapshot before Host activity refreshes', () => {
+    expect(canRebaseFromClientSnapshot({ threadSessionsEligible: true, sessionRunning: false, questionPending: false })).toBe(true)
+  })
+
+  it('blocks header Rebase when the current client snapshot shows activity or is incomplete', () => {
+    expect(canRebaseFromClientSnapshot({ threadSessionsEligible: false, sessionRunning: false, questionPending: false })).toBe(false)
+    expect(canRebaseFromClientSnapshot({ threadSessionsEligible: true, sessionRunning: true, questionPending: false })).toBe(false)
+    expect(canRebaseFromClientSnapshot({ threadSessionsEligible: true, sessionRunning: false, questionPending: true })).toBe(false)
+  })
+
+  it('keeps a missing Host activity snapshot distinct from an ineligible thread', () => {
+    expect(canRebaseThreadIfKnown(['session'], undefined)).toBeUndefined()
+    expect(canRebaseThreadIfKnown(['session'], new Map([['session', { running: true, pendingUserQuestion: false }]]))).toBe(false)
+    expect(canRebaseThreadIfKnown(['session'], new Map([['session', { running: false, pendingUserQuestion: false }]]))).toBe(true)
+    expect(canRebaseThreadIfKnown([], undefined)).toBe(true)
   })
 
   it('allows a thread when every session is idle and has no pending question', () => {

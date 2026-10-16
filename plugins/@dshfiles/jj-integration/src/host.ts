@@ -15,7 +15,7 @@ import { z } from 'zod'
 import { jjIntegrationApi, type DestinationView, type LandResult, type RepositoryView, type ThreadView, type WorkspaceSyncView } from './api.js'
 import { JsonText } from './json-text.js'
 import { jjIntegrationSettings, type JjIntegrationSettings } from './settings.js'
-import { canRebaseThread, hasPendingUserQuestion, type ThreadSessionActivity } from './thread-rebase-eligibility.js'
+import { canRebaseThreadIfKnown, hasPendingUserQuestion, type ThreadSessionActivity } from './thread-rebase-eligibility.js'
 import { workspaceHasOtherSession } from './thread-session-ownership.js'
 import {
   checkoutSyncArgv,
@@ -152,7 +152,7 @@ const readSessionActivity = async (): Promise<ReadonlyMap<string, ThreadSessionA
 }
 
 const canRebaseWorkspace = (sessionIds: readonly string[], activity: ReadonlyMap<string, ThreadSessionActivity> | undefined): boolean =>
-  canRebaseThread(sessionIds, sessionId => activity?.get(sessionId))
+  canRebaseThreadIfKnown(sessionIds, activity) === true
 
 const threadView = (
   status: ThreadStatus,
@@ -161,19 +161,20 @@ const threadView = (
   activity: ReadonlyMap<string, ThreadSessionActivity> | undefined,
 ): ThreadView => {
   const sessionIds = [...new Set([...(workspace?.sessionIds ?? []), ...isolatedSessionIdsAt(status.path)])]
+  const canRebase = canRebaseThreadIfKnown(sessionIds, activity)
   const view: ThreadView = {
     name: status.name,
     path: status.path,
     workspaceId: workspace?.id ?? null,
     sessionIds,
     finished: isFinished(sessionIds, archived),
-    canRebase: canRebaseWorkspace(sessionIds, activity),
     missing: status.missing,
     behind: status.behind,
     unlanded: [...status.unlanded],
   }
-  if (status.rebasedAt === undefined) return view
-  return { ...view, rebasedAt: status.rebasedAt }
+  const withEligibility: ThreadView = canRebase === undefined ? view : { ...view, canRebase }
+  if (status.rebasedAt === undefined) return withEligibility
+  return { ...withEligibility, rebasedAt: status.rebasedAt }
 }
 
 /** Every registered project that is the owning checkout of a jj repository, with its thread workspaces. */
@@ -201,14 +202,19 @@ const listRepositories = async (): Promise<readonly RepositoryView[]> => {
   return [...repositories.values()]
 }
 
-const findThread = async (location: ThreadLocation): Promise<{ readonly repoRoot: string; readonly thread: ThreadView } | undefined> => {
+const findThread = async (input: {
+  readonly location: ThreadLocation
+  readonly includeActivity?: boolean
+}): Promise<{ readonly repoRoot: string; readonly thread: ThreadView } | undefined> => {
+  const location = input.location
   if (location.threadName === undefined) return undefined
   const active = requireThreads()
   const registry = registryOf()
   const workspace = await registry.resolveByPath(location.workspaceRoot)
+  const shouldReadActivity = input.includeActivity !== false && workspace !== undefined && workspace.sessionIds.length > 0
   const [threadStatus, activity] = await Promise.all([
     active.status(location.repoRoot, location.threadName),
-    workspace !== undefined && workspace.sessionIds.length > 0 ? readSessionActivity() : Promise.resolve(undefined),
+    shouldReadActivity ? readSessionActivity() : Promise.resolve(undefined),
   ])
   return {
     repoRoot: location.repoRoot,
@@ -394,7 +400,7 @@ const discardThread = async (input: { readonly path: string; readonly force: boo
   const location = await requireThreads()
     .locate(input.path)
     .catch(() => undefined)
-  const found = location === undefined ? undefined : await findThread(location)
+  const found = location === undefined ? undefined : await findThread({ location })
   if (found === undefined) throw new Error(`${input.path} is not a thread workspace.`)
   const outcome = await requireThreads().discard({ repoRoot: found.repoRoot, name: found.thread.name, force: input.force })
   if (outcome.status === 'discarded') {
@@ -570,13 +576,13 @@ const api = jjIntegrationApi.host({
     const location = await requireThreads()
       .locate(input.path)
       .catch(() => undefined)
-    const found = location === undefined ? undefined : await findThread(location)
+    const found = location === undefined ? undefined : await findThread({ location, includeActivity: false })
     return { thread: found?.thread ?? null }
   },
   land: ({ input }) => landThread({ path: input.path, sessionId: input.sessionId, fromAgent: false }),
   threadStatus: async ({ input, caller }) => {
     const location = await requireThreads().locate(threadPath(input, caller))
-    const found = await findThread(location)
+    const found = await findThread({ location })
     return { bookmark: readSettings().bookmark, thread: found?.thread ?? null }
   },
   landThread: async ({ input, caller }) => {
