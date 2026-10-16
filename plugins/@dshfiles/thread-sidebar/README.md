@@ -146,9 +146,11 @@ a while or for good. They answer different questions ("not now" vs "not
 noisy"), so they stay separate and combine freely. The sidebar separates **Approval needed**,
 **Input needed**, and **Turn finished**.
 Permission approvals and plan-review decisions use **Approval needed**;
-structured user-question requests use **Input needed**. Both use the Client's
-explicit Session pending-interaction status. Unknown interaction kinds and
-generic unstructured questions remain unclassified. **Turn finished**
+structured user-question requests use **Input needed**. Open questions use the
+Client's explicit Session pending-interaction status; the sidebar also checks
+active native question projections for continued forms, which can remain
+answerable after a timed wait lets the Agent keep working. Unknown interaction
+kinds and generic unstructured questions remain unclassified. **Turn finished**
 marks an eligible completed turn with a local attention marker; selecting that
 thread from any route acknowledges it. The sidebar keeps the same completion
 dismissed while its seen marker is active, even if Host still reports it unread.

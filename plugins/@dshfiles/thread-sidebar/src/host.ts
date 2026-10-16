@@ -1,9 +1,13 @@
+import type {} from '@deepseek-ai/dsh-session-query'
+import type {} from '@deepseek-ai/dsh-user-questions'
+import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { defineHost } from '@dshfiles/dshx/host'
 import { execFile } from 'node:child_process'
 import { hostname } from 'node:os'
 import { promisify } from 'node:util'
 import { z } from 'zod'
 import { threadSidebarMachineApi } from './machine-api.js'
+import { threadSidebarPendingQuestionsApi } from './pending-questions-api.js'
 import { threadSidebarPluginUpdatesApi } from './plugin-updates-api.js'
 import { createPluginUpdateWatch } from './plugin-updates.js'
 import { threadSidebarRestartApi } from './restart-api.js'
@@ -49,6 +53,27 @@ const pluginUpdatesApi = threadSidebarPluginUpdatesApi.host({
   pending: async () => ({ plugins: (await pluginUpdates?.pending()) ?? [] }),
 })
 
+const pendingQuestionsApi = threadSidebarPendingQuestionsApi.host({
+  active: async ({ ctx, input, signal }) => {
+    const activeSessionIds: string[] = []
+    for (let offset = 0; offset < input.sessionIds.length; offset += 8) {
+      const batch = input.sessionIds.slice(offset, offset + 8)
+      const results = await Promise.all(
+        batch.map(async sessionId => {
+          const observation = await ctx.sessionQuery.observeSession(SessionId(sessionId), { signal, projectionMode: 'all' })
+          try {
+            return observation.projections?.values.userQuestions?.active.length ? sessionId : undefined
+          } finally {
+            observation[Symbol.dispose]()
+          }
+        }),
+      )
+      activeSessionIds.push(...results.filter((sessionId): sessionId is string => sessionId !== undefined))
+    }
+    return { sessionIds: activeSessionIds }
+  },
+})
+
 // The slice of `@deepseek-ai/dsh-client-modules`' ClientModuleRegistry this plugin reads; older Hosts lack members.
 interface ClientModuleRegistrySurface {
   readonly graph?: () => { readonly entries: ReadonlyArray<{ readonly id: string }> }
@@ -59,8 +84,8 @@ interface ClientModuleRegistrySurface {
 export default defineHost({
   name: '@dshfiles/thread-sidebar',
   settings: [threadSidebarSettings],
-  inject: ['connection', 'sessionProjections'],
-  apis: [restartApi, machineApi, pluginUpdatesApi],
+  inject: ['connection', 'sessionProjections', 'sessionQuery'],
+  apis: [restartApi, machineApi, pluginUpdatesApi, pendingQuestionsApi],
   // The web Host's client module registry knows where every loaded plugin package lives; Hosts without it
   // (desktop shells, older builds) simply report no pending updates.
   setup: ctx => {

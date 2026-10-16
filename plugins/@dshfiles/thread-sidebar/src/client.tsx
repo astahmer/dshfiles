@@ -7,7 +7,9 @@ import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
 import { RemoteThreadsSection } from './remote-threads-section.js'
 import type { ActorRefFrom } from '@dshfiles/plugin-ui/machine'
 import type { archivedViewMachine } from './archived-view-machine.js'
-import { useApiQuery } from '@dshfiles/dshx/client'
+import { useApi, useApiQuery } from '@dshfiles/dshx/client'
+import { useQuery } from '@dshfiles/plugin-ui/query'
+import { threadSidebarPendingQuestionsApi } from './pending-questions-api.js'
 import {
   IconArchiveOutlineRegular,
   IconChevronDownOutlineRegular,
@@ -92,7 +94,7 @@ import {
 } from './organization.js'
 import { attentionColorDotClass, attentionDotClass, attentionLabelClass, type ThreadAttentionLabel } from './attention-presentation.js'
 import { attentionColorSchema, toggleCollapsedSection } from './preferences.js'
-import { selectInputNeededRows } from './attention-rows.js'
+import { selectInputNeededRows, selectTurnFinishedRows } from './attention-rows.js'
 import { registerPaletteAction, setPaletteRecentLimit, type PaletteAction } from '@dshfiles/command-palette/api'
 import { useSidebarState } from './sidebar-state.js'
 import { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
@@ -826,6 +828,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
   const workspaceState = props.useWorkspaces(state => state)
   const { preferences, updatePreferences, storageWarning, setSelectedThreadId, threadTitle } = useSidebarState()
   const notificationPreferences = threadNotificationPreferences.useValue() ?? DEFAULT_THREAD_NOTIFICATION_PREFERENCES
+  const pendingQuestionsApi = useApi(threadSidebarPendingQuestionsApi)
   const machine = useApiQuery(threadSidebarMachineApi, 'name', { enabled: preferences.threadRowMachine }).data?.name
   const jjRepositories = useApiQuery(jjIntegrationApi, 'repositories', { input: {} })
   const refetchJjRepositories = jjRepositories.refetch
@@ -901,6 +904,32 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
       }),
     [archivedSessionIds, jjRepositories.data, now, pinnedSessionIds, preferences.rebasedThreadArchiveDelay, sessionStatus, sessions],
   )
+  const questionCandidates = useMemo(
+    () =>
+      sessions
+        .filter(session => {
+          const status = sessionStatus.get(session.id)
+          return !session.blank && !session.running && status?.completionUnread === true && status.pendingInteraction?.kind !== 'question'
+        })
+        .map(session => session.id)
+        .sort(),
+    [sessionStatus, sessions],
+  )
+  const activeQuestionsQuery = useQuery({
+    queryKey: ['thread-sidebar', 'pending-questions', questionCandidates],
+    queryFn: async ({ signal }) => {
+      const activeSessionIds: string[] = []
+      for (let offset = 0; offset < questionCandidates.length; offset += 500) {
+        const result = await pendingQuestionsApi.active({ sessionIds: questionCandidates.slice(offset, offset + 500) }, { signal })
+        activeSessionIds.push(...result.sessionIds)
+      }
+      return { sessionIds: activeSessionIds }
+    },
+    enabled: questionCandidates.length > 0,
+    refetchInterval: questionCandidates.length > 0 ? 5_000 : false,
+    retry: false,
+  })
+  const continuedQuestionSessionIds = useMemo(() => new Set(activeQuestionsQuery.data?.sessionIds ?? []), [activeQuestionsQuery.data])
   const parkedSessionIds = useMemo(() => setIncludes(preferences.parkedSessionIds), [preferences.parkedSessionIds])
   const mutedThreads = preferences.mutedThreads
   const mutedSessionIds = useMemo(
@@ -1409,13 +1438,23 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
     () =>
       selectInputNeededRows({
         sessions: attentionSessions,
-        pendingInteractionKindFor: sessionId => sessionStatus.get(sessionId)?.pendingInteraction?.kind,
+        pendingInteractionKindFor: sessionId =>
+          sessionStatus.get(sessionId)?.pendingInteraction?.kind ?? (continuedQuestionSessionIds.has(sessionId) ? 'question' : undefined),
         mutedSessionIds,
         archivedSessionIds,
         matchesWorkspace: session =>
           preferences.workspaceFilter === null || (workspaceForLineage(session, sessionState.byId, workspaceBySession) ?? '') === preferences.workspaceFilter,
       }),
-    [archivedSessionIds, attentionSessions, mutedSessionIds, preferences.workspaceFilter, sessionState.byId, sessionStatus, workspaceBySession],
+    [
+      archivedSessionIds,
+      attentionSessions,
+      continuedQuestionSessionIds,
+      mutedSessionIds,
+      preferences.workspaceFilter,
+      sessionState.byId,
+      sessionStatus,
+      workspaceBySession,
+    ],
   )
   const needsInputIds = useMemo(() => new Set(needsInputRows.map(session => session.id)), [needsInputRows])
   const approvalNeededRows = useMemo(
@@ -1448,21 +1487,17 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
   const approvalNeededIds = useMemo(() => new Set(approvalNeededRows.map(session => session.id)), [approvalNeededRows])
   const turnFinishedRows = useMemo(
     () =>
-      attentionSessions
-        .filter(
-          session =>
-            !session.running &&
-            !session.blank &&
-            session.id !== selectedSession?.id &&
-            !needsInputIds.has(session.id) &&
-            !approvalNeededIds.has(session.id) &&
-            notificationPreferences.needsYouAt[session.id] !== undefined &&
-            !mutedSessionIds.has(session.id) &&
-            !archivedSessionIds.has(session.id) &&
-            (preferences.workspaceFilter === null ||
-              (workspaceForLineage(session, sessionState.byId, workspaceBySession) ?? '') === preferences.workspaceFilter),
-        )
-        .sort((left, right) => (notificationPreferences.needsYouAt[right.id] ?? 0) - (notificationPreferences.needsYouAt[left.id] ?? 0)),
+      selectTurnFinishedRows({
+        sessions: attentionSessions,
+        selectedSessionId: selectedSession?.id,
+        inputNeededSessionIds: needsInputIds,
+        approvalNeededSessionIds: approvalNeededIds,
+        completionAt: notificationPreferences.needsYouAt,
+        mutedSessionIds,
+        archivedSessionIds,
+        matchesWorkspace: session =>
+          preferences.workspaceFilter === null || (workspaceForLineage(session, sessionState.byId, workspaceBySession) ?? '') === preferences.workspaceFilter,
+      }),
     [
       approvalNeededIds,
       archivedSessionIds,

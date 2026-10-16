@@ -56,10 +56,11 @@ as unread, the sidebar keeps it dismissed instead of immediately adding it
 back. The seen marker clears when the Host reports the completion read. If a
 later completion then becomes newly unread, it can surface normally.
 
-> **Technical note:** Host owns running, pending-interaction, and
-> completion-unread status. The browser stores the manual unread marker, the
-> local Turn finished timestamp, and the seen-completion marker. The local seen
-> marker does not itself change Host status.
+> **Technical note:** Host owns running and completion-unread status. The
+> Client reports blocking pending interactions; the sidebar also queries the
+> Host's native question projection so continued forms remain **Input needed**.
+> The browser stores the manual unread marker, local Turn finished timestamp,
+> and seen-completion marker. The local seen marker does not change Host status.
 
 ## Groups and filters
 

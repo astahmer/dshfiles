@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { test } from 'vitest'
-import { selectInputNeededRows } from './attention-rows.js'
+import { selectInputNeededRows, selectTurnFinishedRows } from './attention-rows.js'
 
 test('shows the selected thread when it has an unanswered question', () => {
   const selectedSession = { id: SessionId('selected'), blank: false, updatedAt: 10 }
@@ -14,4 +14,21 @@ test('shows the selected thread when it has an unanswered question', () => {
   })
 
   assert.deepEqual(rows, [selectedSession])
+})
+
+test('keeps an unresolved continued question out of Turn finished', () => {
+  const continuedQuestion = { id: SessionId('continued-question'), blank: false, running: false, updatedAt: 10 }
+  const finishedSession = { id: SessionId('finished'), blank: false, running: false, updatedAt: 20 }
+  const rows = selectTurnFinishedRows({
+    sessions: [continuedQuestion, finishedSession],
+    selectedSessionId: undefined,
+    inputNeededSessionIds: new Set([continuedQuestion.id]),
+    approvalNeededSessionIds: new Set<ReturnType<typeof SessionId>>(),
+    completionAt: { [continuedQuestion.id]: 1, [finishedSession.id]: 2 },
+    mutedSessionIds: new Set<string>(),
+    archivedSessionIds: new Set<string>(),
+    matchesWorkspace: () => true,
+  })
+
+  assert.deepEqual(rows, [finishedSession])
 })
