@@ -170,7 +170,7 @@ describe('API registry', () => {
     await host.dispose()
   })
 
-  it('tags plugin tools with their package and read-only marker, and skills with how they can be invoked', async () => {
+  it('reports plugin tools and path-free skill provenance', async () => {
     const host = await createTestHost()
     const output = { schema: { description: 'text' }, render: () => [] }
     const toolHost = defineHost({
@@ -193,6 +193,7 @@ describe('API registry', () => {
           name: 'verify',
           description: 'Verify.',
           provider: 'filesystem',
+          source: 'project-agents',
           path: '/repo/.agents/skills/verify/SKILL.md',
           invocation: { modelInvocable: false, userInvocable: true },
         },
@@ -211,9 +212,9 @@ describe('API registry', () => {
         name: 'verify',
         description: 'Verify.',
         provider: 'filesystem',
+        source: 'project-agents',
         modelInvocable: false,
         userInvocable: true,
-        path: '/repo/.agents/skills/verify/SKILL.md',
       },
     ])
     await host.dispose()

@@ -89,16 +89,7 @@ describe('agent toolkit model', () => {
       ],
     }).skills
 
-    expect(skills.map(AgentToolkit.skillOrigin)).toEqual([
-      'project-agents',
-      'user-agents',
-      'project-dsh',
-      'user-dsh',
-      'runtime',
-      'custom',
-      'bundled',
-      'other',
-    ])
+    expect(skills.map(AgentToolkit.skillOrigin)).toEqual(['project-agents', 'user-agents', 'project-dsh', 'user-dsh', 'runtime', 'custom', 'bundled', 'other'])
     expect(skills[0]).not.toHaveProperty('path')
     expect(skills[1]).not.toHaveProperty('path')
     expect(skills.slice(4, 7).map(AgentToolkit.invocation)).toEqual(['model', 'user', 'model'])
