@@ -274,7 +274,7 @@ async function queryComposition(
 }
 
 /** Start the dshx-owned bridge inside the current Host Composition. */
-export async function startHostInspectBridge(ctx: Context, metadata: HostInspectBridgeMetadata): Promise<HostInspectBridgeHandle> {
+const startHostInspectBridge = async (ctx: Context, metadata: HostInspectBridgeMetadata): Promise<HostInspectBridgeHandle> => {
   const location = paths(metadata.packageId)
   const token = randomUUID()
   await mkdir(location.directory, { recursive: true, mode: 0o700 })
@@ -352,16 +352,23 @@ export async function startHostInspectBridge(ctx: Context, metadata: HostInspect
 }
 
 /** Register bridge cleanup with the Host Fiber. */
-export function ownHostInspectBridge(ctx: Context, bridge: HostInspectBridgeHandle): void {
+const ownHostInspectBridge = (ctx: Context, bridge: HostInspectBridgeHandle): void => {
   ctx.effect(() => () => bridge.close(), 'dshx.inspect-bridge')
 }
 
-export function inspectBridgeEnabled(): boolean {
+const inspectBridgeEnabled = (): boolean => {
   return runtimeProcess()?.env.DSHX_INSPECT_BRIDGE === '1'
 }
 
-export async function readBridgeMetadata(path: string): Promise<Record<string, unknown>> {
+const readBridgeMetadata = async (path: string): Promise<Record<string, unknown>> => {
   const value = JSON.parse(await readFile(path, 'utf8')) as unknown
   if (!isRecord(value)) throw new Error('Inspect bridge metadata must be an object.')
   return value
+}
+
+export class HostInspectBridge {
+  static readonly start = startHostInspectBridge
+  static readonly own = ownHostInspectBridge
+  static readonly isEnabled = inspectBridgeEnabled
+  static readonly readMetadata = readBridgeMetadata
 }

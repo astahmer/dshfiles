@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
-import { startHostInspectBridge } from '../src/host/inspect-bridge.js'
+import { HostInspectBridge } from '../src/host/inspect-bridge.js'
 import { DshInspectBridgeProvider, inspectBridgeStatus } from '../src/inspect/bridge.js'
 import type { ResolvedDshxConfig } from '../src/config/types.js'
 
@@ -271,7 +271,7 @@ describe('DshInspectBridgeProvider', () => {
       },
     })
     await context.provide('agents', { create: async () => ({ agent: {}, dispose: async () => undefined }) })
-    const bridge = await startHostInspectBridge(context, { packageId: project.packageId, root: project.root })
+    const bridge = await HostInspectBridge.start(context, { packageId: project.packageId, root: project.root })
     try {
       const provider = new DshInspectBridgeProvider(project, { env: { DSH_HOME: root } })
       await expect(provider.listSlots()).resolves.toEqual([

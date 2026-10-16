@@ -20,7 +20,7 @@ import { DshxError } from '../diagnostics.js'
 import type { HostDefinition } from './types.js'
 import type { DshCompatibility } from '../compat/types.js'
 import { loadRuntimePlugins } from './runtime-plugins.js'
-import { inspectBridgeEnabled, ownHostInspectBridge, startHostInspectBridge } from './inspect-bridge.js'
+import { HostInspectBridge } from './inspect-bridge.js'
 import { registerApi } from '../api/host-runtime.js'
 import { apiRegistry } from '../api/registry.js'
 import { apiHostRegistrationParts, isApiHostRegistration } from '../api/define.js'
@@ -67,14 +67,14 @@ function fallbackName(metadata: HostPluginMetadata): string {
 
 async function startHostRuntime(ctx: Context, metadata: HostPluginMetadata): Promise<void> {
   const runtimePlugins = await loadRuntimePlugins(ctx, metadata.compatibility)
-  if (!inspectBridgeEnabled()) return
-  const bridge = await startHostInspectBridge(ctx, {
+  if (!HostInspectBridge.isEnabled()) return
+  const bridge = await HostInspectBridge.start(ctx, {
     packageId: metadata.packageId,
     root: metadata.root ?? process.cwd(),
     ...(metadata.logicalName === undefined ? {} : { logicalName: metadata.logicalName }),
     runtimePlugins: runtimePlugins.plugins,
   })
-  ownHostInspectBridge(ctx, bridge)
+  HostInspectBridge.own(ctx, bridge)
 }
 
 function record(value: unknown): Record<string, unknown> | undefined {
@@ -216,7 +216,7 @@ function registerSettings(ctx: Context, contribution: SettingsContribution): voi
 }
 
 function withRuntime(ctx: Context, result: unknown, metadata: HostPluginMetadata): unknown {
-  if (!inspectBridgeEnabled() && (metadata.compatibility?.runtimePlugins?.length ?? 0) === 0) return result
+  if (!HostInspectBridge.isEnabled() && (metadata.compatibility?.runtimePlugins?.length ?? 0) === 0) return result
   return Promise.resolve(result).then(async value => {
     try {
       await startHostRuntime(ctx, metadata)
