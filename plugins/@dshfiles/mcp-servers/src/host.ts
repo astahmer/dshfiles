@@ -285,10 +285,14 @@ const desiredTargets = async (ctx: Context, servers: readonly StoredServer[], ma
 
 const storedDraft = (draft: ServerDraft): StoredServer => {
   const id = draft.id || randomUUID()
+  const withOAuth = (server: Extract<StoredServer, { transport: 'streamable-http' }>): Extract<StoredServer, { transport: 'streamable-http' }> => {
+    if (draft.transport !== 'streamable-http' || draft.auth !== 'oauth') return server
+    return { ...server, auth: 'oauth' }
+  }
   if (draft.transport === 'streamable-http') {
     const localStart = draft.startCommand
     if (localStart == null) {
-      return {
+      return withOAuth({
         id,
         name: draft.name,
         serverName: draft.serverName,
@@ -296,14 +300,13 @@ const storedDraft = (draft: ServerDraft): StoredServer => {
         transport: 'streamable-http',
         url: draft.url,
         headerRefs: draft.headerRefs,
-        ...(draft.auth === 'oauth' ? { auth: 'oauth' as const } : {}),
-      }
+      })
     }
     const [command, ...args] = McpCommandLineModel.parseCommandLine(localStart.commandLine)
     if (command === undefined) throw new TypeError('Enter a local start command.')
     if (McpCommandLineModel.hasInlineCredential([command, ...args])) throw new TypeError('Use credential references instead of inline command credentials.')
     if (McpCommandLineModel.hasUnexpandedTilde([command, ...args])) throw new TypeError(McpCommandLineModel.UNEXPANDED_TILDE_MESSAGE)
-    return {
+    return withOAuth({
       id,
       name: draft.name,
       serverName: draft.serverName,
@@ -311,9 +314,8 @@ const storedDraft = (draft: ServerDraft): StoredServer => {
       transport: 'streamable-http',
       url: draft.url,
       headerRefs: draft.headerRefs,
-      ...(draft.auth === 'oauth' ? { auth: 'oauth' as const } : {}),
       startCommand: { command, args, cwd: localStart.cwd, envRefs: localStart.envRefs },
-    }
+    })
   }
   const [command, ...args] = McpCommandLineModel.parseCommandLine(draft.commandLine)
   if (command === undefined) throw new TypeError('Enter a command.')
