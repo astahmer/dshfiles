@@ -7,10 +7,11 @@ import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, keepPreviousData, useQuery } from '@dshfiles/plugin-ui/query'
 import { useApi } from '@dshfiles/dshx/client'
+import { relativeTime } from '@deepseek-ai/dsh-client-ui-primitives'
 import { useState } from 'react'
 import { usageApi, type RequestQuery, type RequestView } from './api.js'
 import type { RequestPurpose, RequestStatus } from './fold.js'
-import { formatAgo, formatCost, formatCount, formatDuration, PURPOSE_LABELS, type OpenThread } from './format.js'
+import { UsageFormattingModel, type OpenThread } from './format.js'
 
 const PAGE_SIZE = 200
 
@@ -180,27 +181,27 @@ export const RequestLog = (props: {
                     <span className="dshx:truncate dshx:font-medium">{row.model.length === 0 ? 'unknown model' : row.model}</span>
                     <span className="dshx:truncate dshx:text-[11px] dshx:text-muted-foreground">
                       {row.provider}
-                      {row.purpose === 'agent' ? '' : ` · ${PURPOSE_LABELS[row.purpose]}`}
+                      {row.purpose === 'agent' ? '' : ` · ${UsageFormattingModel.purposeLabels[row.purpose]}`}
                     </span>
                   </button>
                 </TableCell>
                 <TableCell className="dshx:whitespace-nowrap" title={new Date(row.startedAt).toLocaleString()}>
-                  {formatAgo(row.startedAt, now)}
+                  {UsageFormattingModel.formatAgo(row.startedAt, now, relativeTime)}
                 </TableCell>
                 <TableCell className="dshx:max-w-32 dshx:truncate" title={row.cwd ?? undefined}>
                   {row.project ?? '–'}
                 </TableCell>
-                <TableCell className="dshx:text-right dshx:tabular-nums">{formatCount(row.input)}</TableCell>
-                <TableCell className="dshx:text-right dshx:tabular-nums">{formatCount(row.cacheRead)}</TableCell>
-                <TableCell className="dshx:text-right dshx:tabular-nums">{formatCount(row.output)}</TableCell>
+                <TableCell className="dshx:text-right dshx:tabular-nums">{UsageFormattingModel.formatCount(row.input)}</TableCell>
+                <TableCell className="dshx:text-right dshx:tabular-nums">{UsageFormattingModel.formatCount(row.cacheRead)}</TableCell>
+                <TableCell className="dshx:text-right dshx:tabular-nums">{UsageFormattingModel.formatCount(row.output)}</TableCell>
                 <TableCell
                   className="dshx:text-right dshx:tabular-nums"
                   title={row.cost === null && row.input !== null ? 'No catalog price for this route' : undefined}
                 >
-                  {formatCost(row.cost)}
+                  {UsageFormattingModel.formatCost(row.cost)}
                 </TableCell>
-                <TableCell className="dshx:text-right dshx:tabular-nums">{formatDuration(row.durationMs)}</TableCell>
-                <TableCell className="dshx:text-right dshx:tabular-nums">{formatDuration(row.ttftMs)}</TableCell>
+                <TableCell className="dshx:text-right dshx:tabular-nums">{UsageFormattingModel.formatDuration(row.durationMs)}</TableCell>
+                <TableCell className="dshx:text-right dshx:tabular-nums">{UsageFormattingModel.formatDuration(row.ttftMs)}</TableCell>
                 <TableCell>
                   <span className="dshx:flex dshx:flex-col">
                     <span className="dshx:flex dshx:items-center dshx:gap-1.5">

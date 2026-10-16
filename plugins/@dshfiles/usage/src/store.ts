@@ -2,7 +2,7 @@ import { chmodSync, existsSync, mkdirSync } from 'node:fs'
 import { basename, dirname } from 'node:path'
 import { DatabaseSync, type SQLInputValue, type StatementSync } from 'node:sqlite'
 import { z } from 'zod'
-import { contextBand } from '@dshfiles/ai-accounts/cost-estimate'
+import { CostEstimateModel } from '@dshfiles/ai-accounts/cost-estimate'
 import type { ChartQuery, ChartView, RequestPage, RequestQuery, RequestView } from './api.js'
 import { REQUEST_PURPOSES, REQUEST_STATUSES, type RequestRow, type SessionMeta } from './fold.js'
 
@@ -281,7 +281,7 @@ export const openUsageStore = (path: string) => {
       usage?.cacheWrite ?? null,
       usage?.output ?? null,
       usage?.reasoning ?? null,
-      usage === null ? 0 : contextBand(usage.input + usage.cacheRead + usage.cacheWrite),
+      usage === null ? 0 : CostEstimateModel.contextBand(usage.input + usage.cacheRead + usage.cacheWrite),
       row.status,
       row.stopReason,
       row.errorCode,

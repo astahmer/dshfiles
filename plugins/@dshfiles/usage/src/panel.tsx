@@ -7,12 +7,13 @@ import { RefreshCwIcon } from '@dshfiles/plugin-ui/icons'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useApi } from '@dshfiles/dshx/client'
+import { relativeTime } from '@deepseek-ai/dsh-client-ui-primitives'
 import { useState } from 'react'
 import { z } from 'zod'
 import { purposeSchema, usageApi } from './api.js'
 import { UsageCharts } from './charts.js'
 import { REQUEST_PURPOSES, type RequestPurpose } from './fold.js'
-import { formatAgo, PURPOSE_LABELS, type OpenThread } from './format.js'
+import { UsageFormattingModel, type OpenThread } from './format.js'
 import { RequestLog } from './request-log.js'
 
 const DAY_MS = 86_400_000
@@ -105,8 +106,10 @@ export const UsagePanel = (props: { readonly openThread: OpenThread }): JSX.Elem
           <h1 className="dshx:text-lg dshx:font-semibold">Usage analytics</h1>
           <p className="dshx:text-xs dshx:text-muted-foreground">
             Every model request from the session logs, side calls included. Costs are list-price estimates from the models.dev catalog AI Accounts keeps
-            {status?.pricingFetchedAt == null ? ' (no catalog cached yet)' : ` (updated ${formatAgo(status.pricingFetchedAt, Date.now())})`}; subscription
-            traffic is priced as if it were metered.
+            {status?.pricingFetchedAt == null
+              ? ' (no catalog cached yet)'
+              : ` (updated ${UsageFormattingModel.formatAgo(status.pricingFetchedAt, Date.now(), relativeTime)})`}
+            ; subscription traffic is priced as if it were metered.
           </p>
         </div>
         <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-xs dshx:text-muted-foreground">
@@ -115,7 +118,7 @@ export const UsagePanel = (props: { readonly openThread: OpenThread }): JSX.Elem
               ? 'Connecting…'
               : status.indexing
                 ? 'Indexing session logs…'
-                : `${status.indexedFiles.toLocaleString()} logs indexed${status.lastIndexedAt === null ? '' : ` · ${formatAgo(status.lastIndexedAt, Date.now())}`}`}
+                : `${status.indexedFiles.toLocaleString()} logs indexed${status.lastIndexedAt === null ? '' : ` · ${UsageFormattingModel.formatAgo(status.lastIndexedAt, Date.now(), relativeTime)}`}`}
           </span>
           <Button variant="outline" size="sm" onClick={() => refresh.mutate()} disabled={refresh.isPending} aria-label="Re-index session logs">
             <RefreshCwIcon className={refresh.isPending ? 'dshx:animate-spin' : undefined} /> Refresh
@@ -200,7 +203,7 @@ export const UsagePanel = (props: { readonly openThread: OpenThread }): JSX.Elem
             aria-pressed={preferences.purposes.includes(purpose)}
             onClick={() => togglePurpose(purpose)}
           >
-            {PURPOSE_LABELS[purpose]}
+            {UsageFormattingModel.purposeLabels[purpose]}
           </Button>
         ))}
       </div>

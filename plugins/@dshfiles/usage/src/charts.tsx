@@ -7,7 +7,7 @@ import { useApi } from '@dshfiles/dshx/client'
 import { useMemo, type ReactNode } from 'react'
 import { usageApi, type ChartQuery, type ChartView } from './api.js'
 import type { RequestPurpose } from './fold.js'
-import { cacheHitRatio, changeRatio, formatCost, formatCount, formatDuration, formatPercent, type OpenThread } from './format.js'
+import { UsageFormattingModel, type OpenThread } from './format.js'
 
 const HOUR_MS = 3_600_000
 const DAY_MS = 86_400_000
@@ -52,12 +52,12 @@ const Tile = (props: { readonly label: string; readonly value: string; readonly 
 )
 
 const Change = (props: { readonly current: number; readonly previous: number }): JSX.Element => {
-  const ratio = changeRatio(props.current, props.previous)
+  const ratio = UsageFormattingModel.changeRatio(props.current, props.previous)
   if (ratio === null) return <>no earlier usage to compare</>
   const up = ratio >= 0
   return (
     <span className={up ? 'dshx:text-warning' : 'dshx:text-success'}>
-      {up ? '▲' : '▼'} {Math.abs(ratio) >= 10 ? `${String(Math.round(ratio + 1))}×` : formatPercent(Math.abs(ratio))} vs previous period
+      {up ? '▲' : '▼'} {Math.abs(ratio) >= 10 ? `${String(Math.round(ratio + 1))}×` : UsageFormattingModel.formatPercent(Math.abs(ratio))} vs previous period
     </span>
   )
 }
@@ -85,7 +85,7 @@ const Breakdown = (props: {
                 <span className="dshx:flex dshx:justify-between dshx:gap-2 dshx:text-xs dshx:text-foreground">
                   <span className="dshx:truncate">{row.key}</span>
                   <span className="dshx:shrink-0 dshx:tabular-nums">
-                    {formatCost(row.cost)} · {row.requests.toLocaleString()} req
+                    {UsageFormattingModel.formatCost(row.cost)} · {row.requests.toLocaleString()} req
                   </span>
                 </span>
                 <span className="dshx:h-1.5 dshx:w-full dshx:rounded-full dshx:bg-muted">
@@ -167,7 +167,7 @@ export const UsageCharts = (props: {
     })
     tokens.push(...missing(tokens).map(label => ({ label, kind: 'Input', tokens: 0 })))
     const cache = [...totals.entries()].flatMap(([start, total]) => {
-      const ratio = cacheHitRatio(total)
+      const ratio = UsageFormattingModel.cacheHitRatio(total)
       return ratio === null ? [] : [{ label: labelOf.get(start) ?? '', percent: Math.round(ratio * 1000) / 10 }]
     })
     const requests = [...totals.entries()].flatMap(([start, total]) => [
@@ -202,9 +202,12 @@ export const UsageCharts = (props: {
     () =>
       defineChart({
         marks: [barY(series.cost, { x: 'label', y: 'cost', color: 'key' })],
-        scales: { x: xAxis, y: { scale: scaleLinear, grid: true, axis: { ticks: { count: 4, format: value => formatCost(Number(value)) } } } },
+        scales: {
+          x: xAxis,
+          y: { scale: scaleLinear, grid: true, axis: { ticks: { count: 4, format: value => UsageFormattingModel.formatCost(Number(value)) } } },
+        },
         color: { domain: view?.keys ?? [], legend: colorLegend({ placement: 'bottom' }) },
-        tooltip: { use: tooltip, format: point => `${point.datum.label} · ${point.datum.key}: ${formatCost(point.datum.cost)}` },
+        tooltip: { use: tooltip, format: point => `${point.datum.label} · ${point.datum.key}: ${UsageFormattingModel.formatCost(point.datum.cost)}` },
       }),
     [series.cost, xAxis, view?.keys],
   )
@@ -212,9 +215,12 @@ export const UsageCharts = (props: {
     () =>
       defineChart({
         marks: [barY(series.tokens, { x: 'label', y: 'tokens', color: 'kind' })],
-        scales: { x: xAxis, y: { scale: scaleLinear, grid: true, axis: { ticks: { count: 4, format: value => formatCount(Number(value)) } } } },
+        scales: {
+          x: xAxis,
+          y: { scale: scaleLinear, grid: true, axis: { ticks: { count: 4, format: value => UsageFormattingModel.formatCount(Number(value)) } } },
+        },
         color: { domain: [...TOKEN_KINDS], legend: colorLegend({ placement: 'bottom' }) },
-        tooltip: { use: tooltip, format: point => `${point.datum.label} · ${point.datum.kind}: ${formatCount(point.datum.tokens)}` },
+        tooltip: { use: tooltip, format: point => `${point.datum.label} · ${point.datum.kind}: ${UsageFormattingModel.formatCount(point.datum.tokens)}` },
       }),
     [series.tokens, xAxis],
   )
@@ -241,9 +247,12 @@ export const UsageCharts = (props: {
     () =>
       defineChart({
         marks: [lineY(series.latency, { x: 'label', y: 'ms', z: 'metric', color: 'metric', points: true, strokeWidth: 1.5 })],
-        scales: { x: pointAxis, y: { scale: scaleLinear, grid: true, axis: { ticks: { count: 4, format: value => formatDuration(Number(value)) } } } },
+        scales: {
+          x: pointAxis,
+          y: { scale: scaleLinear, grid: true, axis: { ticks: { count: 4, format: value => UsageFormattingModel.formatDuration(Number(value)) } } },
+        },
         color: { domain: ['TTFT p50', 'TTFT p90', 'Duration p50', 'Duration p90'], legend: colorLegend({ placement: 'bottom' }) },
-        tooltip: { use: tooltip, format: point => `${point.datum.label} · ${point.datum.metric}: ${formatDuration(point.datum.ms)}` },
+        tooltip: { use: tooltip, format: point => `${point.datum.label} · ${point.datum.metric}: ${UsageFormattingModel.formatDuration(point.datum.ms)}` },
       }),
     [series.latency, pointAxis],
   )
@@ -258,20 +267,28 @@ export const UsageCharts = (props: {
   return (
     <div className="dshx:flex dshx:flex-col dshx:gap-3">
       <div className="dshx:grid dshx:grid-cols-2 dshx:gap-2 dshx:md:grid-cols-3 dshx:xl:grid-cols-6">
-        <Tile label="Cost (estimate)" value={formatCost(summary.cost)} detail={<Change current={summary.cost} previous={summary.previous.cost} />} />
+        <Tile
+          label="Cost (estimate)"
+          value={UsageFormattingModel.formatCost(summary.cost)}
+          detail={<Change current={summary.cost} previous={summary.previous.cost} />}
+        />
         <Tile
           label="Per day"
-          value={formatCost(summary.cost / days)}
+          value={UsageFormattingModel.formatCost(summary.cost / days)}
           detail={summary.unpriced === 0 ? 'all routes priced' : `${summary.unpriced.toLocaleString()} requests unpriced`}
         />
         <Tile label="Requests" value={summary.requests.toLocaleString()} detail={<Change current={summary.requests} previous={summary.previous.requests} />} />
         <Tile
           label="Failed / aborted"
           value={`${summary.failed.toLocaleString()} / ${summary.aborted.toLocaleString()}`}
-          detail={formatPercent(summary.requests === 0 ? null : summary.failed / summary.requests)}
+          detail={UsageFormattingModel.formatPercent(summary.requests === 0 ? null : summary.failed / summary.requests)}
         />
-        <Tile label="Tokens" value={formatCount(tokens)} detail={<Change current={tokens} previous={summary.previous.tokens} />} />
-        <Tile label="Cache hit" value={formatPercent(cacheHitRatio(summary))} detail={`${formatCount(summary.cacheRead)} cached prompt tokens`} />
+        <Tile label="Tokens" value={UsageFormattingModel.formatCount(tokens)} detail={<Change current={tokens} previous={summary.previous.tokens} />} />
+        <Tile
+          label="Cache hit"
+          value={UsageFormattingModel.formatPercent(UsageFormattingModel.cacheHitRatio(summary))}
+          detail={`${UsageFormattingModel.formatCount(summary.cacheRead)} cached prompt tokens`}
+        />
       </div>
 
       <Panel title="Cost over time" description="List-price estimate, stacked by the largest series.">
@@ -351,7 +368,7 @@ export const UsageCharts = (props: {
                     {thread.project === null ? null : <span className="dshx:text-muted-foreground"> · {thread.project}</span>}
                   </span>
                   <span className="dshx:shrink-0 dshx:tabular-nums">
-                    {formatCost(thread.cost)} · {thread.requests.toLocaleString()} req
+                    {UsageFormattingModel.formatCost(thread.cost)} · {thread.requests.toLocaleString()} req
                   </span>
                 </button>
               </li>

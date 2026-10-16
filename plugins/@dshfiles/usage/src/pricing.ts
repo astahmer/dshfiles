@@ -1,6 +1,6 @@
 import { stat } from 'node:fs/promises'
-import { costOfTokens, routeKey } from '@dshfiles/ai-accounts/cost-estimate'
-import { createPricingCatalog, DEFAULT_PRICING_PATH, resolveRouteQuote, type PricingCache } from '@dshfiles/ai-accounts/pricing-catalog'
+import { CostEstimateModel } from '@dshfiles/ai-accounts/cost-estimate'
+import { createPricingCatalog, DEFAULT_PRICING_PATH, PricingCatalogModel, type PricingCache } from '@dshfiles/ai-accounts/pricing-catalog'
 import type { Rates, RouteBand, UsageStore } from './store.js'
 
 /**
@@ -13,9 +13,9 @@ import type { Rates, RouteBand, UsageStore } from './store.js'
 const PER_MILLION = 1_000_000
 
 /** USD per million tokens for one route at one context band, tiers included. */
-export const ratesAt = (input: { readonly price: Parameters<typeof costOfTokens>[0]['price']; readonly band: number }): Rates => {
+export const ratesAt = (input: { readonly price: Parameters<typeof CostEstimateModel.costOfTokens>[0]['price']; readonly band: number }): Rates => {
   const unit = (bucket: 'uncachedInputTokens' | 'outputTokens' | 'cacheReadTokens' | 'cacheWriteTokens') =>
-    costOfTokens({
+    CostEstimateModel.costOfTokens({
       tokens: { uncachedInputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, [bucket]: PER_MILLION },
       price: input.price,
       band: input.band,
@@ -31,14 +31,14 @@ const ratesFor = (input: {
   const rates = new Map<string, { readonly route: RouteBand; readonly rates: Rates }>()
   for (const route of input.routes) {
     const kind = input.kinds.get(route.provider)
-    const quote = resolveRouteQuote({
+    const quote = PricingCatalogModel.resolveRouteQuote({
       route: { provider: route.provider, model: route.model },
       cache: input.cache,
       ...(kind === undefined ? {} : { accountKind: kind }),
       overrides: {},
     })
     if (quote.price === null) continue
-    rates.set(`${routeKey(route)}@${String(route.band)}`, { route, rates: ratesAt({ price: quote.price, band: route.band }) })
+    rates.set(`${CostEstimateModel.routeKey(route)}@${String(route.band)}`, { route, rates: ratesAt({ price: quote.price, band: route.band }) })
   }
   return rates
 }
