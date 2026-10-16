@@ -64,7 +64,7 @@ backing verb; `host-gap` counts capabilities no verb can reach yet.
 | attachment-gallery | 5 | 0 | 2 | 3 |
 | Native session / workspace / model | 46 | 15 (partly) | 31 | 7 |
 | Native platform / admin | 40 | 3 | 30 | 11 |
-| settings-shell, plugin-marketplace, mcp-servers, secret-catalog, privacy-controls (+ `plugin-ui`, `shared-runtime`, `shared-streams`: no surface) | 52 | 3 (`secret_list`, `secret_get`, `mcp__*`) | 31 | 5 |
+| settings-shell, plugin-marketplace, mcp-servers, secret-catalog, privacy-controls (+ `plugin-ui`, `shared-runtime`, `shared-streams`: no surface) | 52 | 6 (`secret_list`, `secret_get`, `mcp__*`, `settings_list`, `settings_set`, `settings_unset`) | 28 | 5 |
 
 ## Missing tools
 
@@ -349,9 +349,17 @@ plumbing shim whose only controls are the Loader row and a localStorage switch.
 Every remaining capability here is writable through `settings.describe|update|mutate`
 or the plugin's own Host API, so only the tool registration is missing.
 
+Bound now (sibling revision `feat(settings-shell): expose settings read, merge and
+reset as agent tools`): `settings_list` (read-only — every namespace with its
+revision and secret-field count, or one namespace's redacted JSON value),
+`settings_set` (merge a JSON patch) and `settings_unset` (reset one path). They
+read the namespace revision in the same call, so a lost race is a readable
+`settings-conflict`, and a read-only profile refuses before any write. That
+retires the one-off `*_settings_update` proposals below: a namespace write is
+now `settings_set` with that namespace, not a tool per plugin.
+
 | Proposed tool | Owner | Backing verb |
 | --- | --- | --- |
-| `settings_describe` / `settings_set` / `settings_reset` / `settings_search` | settings-shell | `settings.describe` (`dsh-settings`), `settings.mutate` via `remote.settings.mutate` |
 | `settings_document_path` / `settings_open_document` | settings-shell | `settings.openSettingsDocument`, `settings-shell.documentPath`, `session.openWorkspacePath` |
 | `settings_shell_upstream` | settings-shell | `settings-shell.upstream` |
 | `marketplace_search_plugins` | plugin-marketplace | `plugin-marketplace.list` |
@@ -367,7 +375,7 @@ or the plugin's own Host API, so only the tool registration is missing.
 | `secret_update` / `secret_remove_alias` / `secret_delete_item` | secret-catalog | `secret-catalog.update`, `removeAlias`, `deleteItem` (vault deletion is irreversible) |
 | `secret_machine` | secret-catalog | `secret-catalog.machine` |
 | `secret_import_credential` | secret-catalog | `secretCatalogCredentials.listKeys/importKey` + `credentials.set` |
-| `settings_update` (per-plugin namespaces) | plugin-marketplace, secret-catalog, privacy-controls, ai-accounts, home, main-tabs, tool-meta, workbench | `settings.update` on `dshx-plugin-marketplace`, `secret-catalog`, `ai-accounts`, `dshfiles-home`, `dshfiles-main-tabs`, `thread-sidebar`, … |
+| ~~`settings_update` (per-plugin namespaces)~~ | plugin-marketplace, secret-catalog, privacy-controls, ai-accounts, home, main-tabs, tool-meta, workbench | Retired: `settings_set` / `settings_unset` write any namespace (`dshx-plugin-marketplace`, `secret-catalog`, `ai-accounts`, `dshfiles-home`, `dshfiles-main-tabs`, `thread-sidebar`, …) |
 
 Already callable here: `secret_list`, `secret_get`, and a connected server's own
 `mcp__<serverName>__*` tools.
@@ -467,6 +475,11 @@ actions as agent tools`, binds `jj_thread_projects`, `jj_thread_repositories`,
 `jj_thread_discard` (explicit `force`) on the existing `jj-threads` API, so an
 Agent can see and remove thread workspaces, not only isolate and rebase its own.
 
+A third, `feat(settings-shell): expose settings read, merge and reset as agent
+tools`, binds `settings_list` (read-only), `settings_set` and `settings_unset`
+over the Host settings service, which covers every namespace — so the per-plugin
+`*_settings_update` proposals are retired rather than built.
+
 ## Backlog
 
 1. **P1 — bind tools to verbs that already exist.** The cheapest parity wins, in
@@ -478,9 +491,10 @@ Agent can see and remove thread workspaces, not only isolate and rebase its own.
 2. **P2 — install the plugins that already ship tools.** `usage`, `optmem`,
    `queue-reorder` are written but absent from the web profile, so their tools
    are dead code today; decide per plugin whether it belongs in the seed.
-3. **P2 — core settings and admin tools.** `settings_get`/`settings_set` unlock
-   the whole settings namespace surface (theme, agent loop, privacy, per-plugin
-   namespaces) and would retire most one-off `*_settings_update` proposals.
+3. **P2 — remaining settings and admin tools.** `settings_list`/`settings_set`/
+   `settings_unset` are done and retire the per-plugin namespace writes; still
+   open are the marketplace install, the MCP server lifecycle and the settings
+   document actions.
 4. **P3 — new Host-side wrapping for client-only packages** (`btw`,
    `project-folder-picker`, `workspace-folder-picker`, `diff-viewed`): give the
    owning plugin a Host half, then bind the verbs.
