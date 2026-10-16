@@ -10,7 +10,7 @@
       "configuration": [],
       "states": ["closed", "browsing", "selected", "busy"],
       "failureModes": [
-        "Directory listing and workspace creation stay behind the Host Remote APIs.",
+        "Directory listing and folder creation use an authenticated Host API; workspace registration stays behind the workspace Remote API.",
         "The add flow does not expose registered project choices or project registration actions."
       ],
       "externalDependencies": [],

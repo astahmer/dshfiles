@@ -2,11 +2,11 @@
 
 Replaces the Add workspace directory flow in the header workspace menu and the
 sidebar browser with the shared `ProjectFolderPicker` opened directly in
-directory-browsing mode. Its bundle configures the adaptive Host picker to use
-the hybrid backend when available, so Add Workspace can list the Host home
-directory and navigate folders. If the running Host cannot list folders, an
-absolute path can still be submitted directly to the workspace owner's existing
-registration callback; other flows keep native picking available.
+directory-browsing mode. Its Host API uses DSH's official browse backend in a
+private Cordis context, so this flow can list and create folders without
+replacing the global `directoryPicker` service or removing the native chooser
+from other consumers. Absolute paths can still be submitted directly to the
+workspace owner's existing registration callback.
 
 The chooser intentionally does not show registered projects or the
 "Register project" action: this entry point adds a workspace rather than
@@ -15,25 +15,27 @@ unchanged.
 
 ## Runtime support
 
-The `hybrid` picker backend is a DSH core change that stock 0.2.0-rc.2 does not
-ship. Folder browsing and folder creation therefore require a Host release with
-that backend. On older Hosts, operators can still enter an absolute path and
-submit it directly; the workspace owner validates and canonicalizes it during
-registration.
+The plugin builds against the published
+`@deepseek-ai/dsh-host-directory-picker-browse@0.2.0-rc.2` backend, provided by
+the DSH Host through peer dependencies, and exposes it through its own
+authenticated Host API. It does not depend on the unshipped `hybrid` mode or
+require a DSH Core patch.
 
 ## Boundaries
 
 - The header and sidebar workspace owners retain open/busy state and workspace
   creation.
-- The bundle's profile patch selects the `hybrid` mode on the adaptive Host
-  picker; Add Workspace uses the installed `directoryPicker` browse Remote when
-  available, while direct path submission and workspace registration remain the
-  workspace owner's responsibility.
+- Add Workspace calls the official browse backend through this plugin's Host
+  API. An isolated Cordis context keeps that browse capability from replacing
+  the global `directoryPicker` service, so other consumers retain native picking.
 - The shared picker defaults to project mode for its other consumers. This
   bundle opts into directory-only mode without duplicating the explorer UI.
 - Host browsing follows the DSH process user's filesystem access; it is not
   confined to the current workspace or home directory, and symlinked directories
   remain navigable. This broader capability is enabled here only for Add Workspace.
+- The Host API lists directory names only, caps each level at 1,000 directories,
+  and creates a single child directory only after an explicit user action. It
+  does not read file contents or restrict paths to the current workspace.
 
 ## Checks
 
@@ -41,4 +43,6 @@ registration.
 pnpm typecheck
 pnpm test
 pnpm build
+pnpm test:boot
+pnpm test:e2e
 ```
