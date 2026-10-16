@@ -12,7 +12,7 @@ import type { ManagerSnapshot } from './api.js'
 import { endpointKey, filterProviders } from './catalog.js'
 import type { McpServersTranslate } from './locales.js'
 import { providerIcons } from './provider-icons.js'
-import { blankServerForm, catalogServerDraft, type ServerFormValues } from './server-form.js'
+import { McpServerFormModel, type ServerFormValues } from './server-form.js'
 import { useRegistrySearch, type ServerActions } from './server-queries.js'
 
 const REGISTRY_URL = 'https://registry.modelcontextprotocol.io/'
@@ -119,7 +119,7 @@ export const CatalogBrowser = (props: {
 
   const add = async (input: { readonly name: string; readonly url: string; readonly oauth: boolean }): Promise<void> => {
     setPendingUrl(input.url)
-    const added = await props.actions.addHosted(catalogServerDraft({ ...input, taken: servers.map(server => server.serverName) }))
+    const added = await props.actions.addHosted(McpServerFormModel.catalogServerDraft({ ...input, taken: servers.map(server => server.serverName) }))
     setPendingUrl(null)
     if (added) props.onClose()
   }
@@ -127,7 +127,7 @@ export const CatalogBrowser = (props: {
   const addProvider = (provider: Provider): void => {
     if (provider.auth === 'token') {
       props.onCustom({
-        values: blankServerForm({
+        values: McpServerFormModel.blankServerForm({
           name: provider.name,
           endpoint: provider.url,
           headerRefs: { Authorization: `${provider.id.toUpperCase().replace(/-/g, '_')}_MCP_AUTHORIZATION` },
@@ -192,7 +192,7 @@ export const CatalogBrowser = (props: {
             {showCustom ? (
               <button
                 className="dshx:flex dshx:min-h-24 dshx:items-center dshx:gap-3 dshx:rounded-lg dshx:border dshx:bg-card dshx:p-2.5 dshx:text-left dshx:transition-colors dshx:outline-none dshx:hover:bg-accent/50 dshx:focus-visible:ring-[3px] dshx:focus-visible:ring-ring/50"
-                onClick={() => props.onCustom({ values: blankServerForm(), hint: undefined })}
+                onClick={() => props.onCustom({ values: McpServerFormModel.blankServerForm(), hint: undefined })}
                 type="button"
               >
                 <span className="dshx:flex dshx:size-9 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-lg dshx:bg-muted">

@@ -3,7 +3,7 @@ import { serverDraftSchema, type ServerDraft, type ServerView } from './api.js'
 import { McpCommandLineModel } from './command-line.js'
 import { jsonTextSchema } from './json-text.js'
 
-export const serverTransports = ['streamable-http', 'stdio'] as const
+const serverTransports = ['streamable-http', 'stdio'] as const
 
 const serverFormValuesSchema = z.object({
   id: z.string(),
@@ -59,63 +59,6 @@ const referencesForPrefix = (server: ServerView, prefix: string): string =>
     2,
   )
 
-export const serverNameFromTitle = (value: string): string =>
-  value
-    .toLowerCase()
-    .replace(/[^a-z0-9_-]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 32) || 'mcp-server'
-
-/** A tool namespace derived from the title that no other configured server uses. */
-export const uniqueServerName = (title: string, taken: readonly string[]): string => {
-  const base = serverNameFromTitle(title)
-  if (!taken.includes(base)) return base
-  for (let index = 2; ; index += 1) {
-    const suffix = `-${index}`
-    const candidate = `${base.slice(0, 32 - suffix.length)}${suffix}`
-    if (!taken.includes(candidate)) return candidate
-  }
-}
-
-export const blankServerForm = (
-  input: { readonly name?: string; readonly endpoint?: string; readonly oauth?: boolean; readonly headerRefs?: Record<string, string> } = {},
-): ServerFormValues => ({
-  id: '',
-  name: input.name ?? '',
-  serverName: serverNameFromTitle(input.name ?? ''),
-  enabled: true,
-  transport: 'streamable-http',
-  url: input.endpoint ?? '',
-  headerRefs: input.headerRefs === undefined ? '{}' : JSON.stringify(input.headerRefs, null, 2),
-  oauth: input.oauth ?? false,
-  localStart: false,
-  startCommandLine: '',
-  startCwd: '',
-  startEnvRefs: '{}',
-  commandLine: '',
-  cwd: '',
-  envRefs: '{}',
-})
-
-/** Edit values for a saved server: credential reference names only, never resolved values. */
-export const serverFormFromView = (server: ServerView): ServerFormValues => {
-  const base = { ...blankServerForm(), id: server.id, name: server.name, serverName: server.serverName, enabled: server.enabled }
-  if (server.transport === 'stdio') {
-    return { ...base, transport: 'stdio', commandLine: server.commandLine, cwd: server.cwd, envRefs: referencesForPrefix(server, 'environment:') }
-  }
-  return {
-    ...base,
-    url: server.url,
-    headerRefs: referencesForPrefix(server, 'header:'),
-    oauth: server.oauth !== 'not-used',
-    localStart: server.startCommand !== undefined,
-    startCommandLine: server.startCommand?.commandLine ?? '',
-    startCwd: server.startCommand?.cwd ?? '',
-    startEnvRefs: referencesForPrefix(server, 'local-environment:'),
-  }
-}
-
-/** Incomplete quoting is reported as a field issue instead of throwing out of schema validation. */
 const commandArgv = (commandLine: string, issues: ServerFormIssue[]): readonly string[] => {
   try {
     return McpCommandLineModel.parseCommandLine(commandLine)
@@ -125,60 +68,119 @@ const commandArgv = (commandLine: string, issues: ServerFormIssue[]): readonly s
   }
 }
 
-/** A local command with no working directory runs in the DSH Host directory, so relative paths resolve there instead. */
-export const inheritsHostWorkingDirectory = (values: ServerFormValues): boolean => values.transport === 'stdio' && values.cwd.trim() === ''
+export class McpServerFormModel {
+  static readonly serverTransports = serverTransports
 
-/** Builds the API draft for the active transport only, so fields of the other transport never block saving. */
-export const parseServerForm = (values: ServerFormValues): ParsedServerForm => {
-  const issues: ServerFormIssue[] = []
-  const parseReferences = (field: ServerFormField): Record<string, string> => {
-    const result = referenceTextSchema.safeParse(values[field])
-    if (result.success) return result.data
-    issues.push(...result.error.issues.map(issue => ({ field, message: issue.message })))
-    return {}
+  static readonly serverNameFromTitle = (value: string): string =>
+    value
+      .toLowerCase()
+      .replace(/[^a-z0-9_-]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 32) || 'mcp-server'
+
+  /** A tool namespace derived from the title that no other configured server uses. */
+  static readonly uniqueServerName = ({ title, taken }: { readonly title: string; readonly taken: readonly string[] }): string => {
+    const base = McpServerFormModel.serverNameFromTitle(title)
+    if (!taken.includes(base)) return base
+    for (let index = 2; ; index += 1) {
+      const suffix = `-${index}`
+      const candidate = `${base.slice(0, 32 - suffix.length)}${suffix}`
+      if (!taken.includes(candidate)) return candidate
+    }
   }
-  const base = { id: values.id, name: values.name, serverName: values.serverName, enabled: values.enabled }
-  if (values.transport === 'stdio') {
-    const argv = commandArgv(values.commandLine, issues)
-    if (McpCommandLineModel.hasUnexpandedTilde(argv)) issues.push({ field: 'commandLine', message: McpCommandLineModel.UNEXPANDED_TILDE_MESSAGE })
+
+  static readonly blankServerForm = (
+    input: { readonly name?: string; readonly endpoint?: string; readonly oauth?: boolean; readonly headerRefs?: Record<string, string> } = {},
+  ): ServerFormValues => ({
+    id: '',
+    name: input.name ?? '',
+    serverName: McpServerFormModel.serverNameFromTitle(input.name ?? ''),
+    enabled: true,
+    transport: 'streamable-http',
+    url: input.endpoint ?? '',
+    headerRefs: input.headerRefs === undefined ? '{}' : JSON.stringify(input.headerRefs, null, 2),
+    oauth: input.oauth ?? false,
+    localStart: false,
+    startCommandLine: '',
+    startCwd: '',
+    startEnvRefs: '{}',
+    commandLine: '',
+    cwd: '',
+    envRefs: '{}',
+  })
+
+  /** Edit values for a saved server: credential reference names only, never resolved values. */
+  static readonly serverFormFromView = (server: ServerView): ServerFormValues => {
+    const base = { ...McpServerFormModel.blankServerForm(), id: server.id, name: server.name, serverName: server.serverName, enabled: server.enabled }
+    if (server.transport === 'stdio') {
+      return { ...base, transport: 'stdio', commandLine: server.commandLine, cwd: server.cwd, envRefs: referencesForPrefix(server, 'environment:') }
+    }
+    return {
+      ...base,
+      url: server.url,
+      headerRefs: referencesForPrefix(server, 'header:'),
+      oauth: server.oauth !== 'not-used',
+      localStart: server.startCommand !== undefined,
+      startCommandLine: server.startCommand?.commandLine ?? '',
+      startCwd: server.startCommand?.cwd ?? '',
+      startEnvRefs: referencesForPrefix(server, 'local-environment:'),
+    }
   }
-  const candidate =
-    values.transport === 'stdio'
-      ? { ...base, transport: values.transport, commandLine: values.commandLine, cwd: values.cwd, envRefs: parseReferences('envRefs') }
-      : {
-          ...base,
-          transport: values.transport,
-          url: values.url,
-          headerRefs: parseReferences('headerRefs'),
-          auth: values.oauth ? ('oauth' as const) : ('none' as const),
-          startCommand: values.localStart ? { commandLine: values.startCommandLine, cwd: values.startCwd, envRefs: parseReferences('startEnvRefs') } : null,
-        }
-  const result = serverDraftSchema.safeParse(candidate)
-  if (!result.success) issues.push(...result.error.issues.map(issue => ({ field: formFieldForDraftPath(issue.path), message: issue.message })))
-  if (result.success && issues.length === 0) return { success: true, draft: result.data }
-  return { success: false, issues }
+
+  static readonly inheritsHostWorkingDirectory = (values: ServerFormValues): boolean => values.transport === 'stdio' && values.cwd.trim() === ''
+
+  /** Builds the API draft for the active transport only, so fields of the other transport never block saving. */
+  static readonly parseServerForm = (values: ServerFormValues): ParsedServerForm => {
+    const issues: ServerFormIssue[] = []
+    const parseReferences = (field: ServerFormField): Record<string, string> => {
+      const result = referenceTextSchema.safeParse(values[field])
+      if (result.success) return result.data
+      issues.push(...result.error.issues.map(issue => ({ field, message: issue.message })))
+      return {}
+    }
+    const base = { id: values.id, name: values.name, serverName: values.serverName, enabled: values.enabled }
+    if (values.transport === 'stdio') {
+      const argv = commandArgv(values.commandLine, issues)
+      if (McpCommandLineModel.hasUnexpandedTilde(argv)) issues.push({ field: 'commandLine', message: McpCommandLineModel.UNEXPANDED_TILDE_MESSAGE })
+    }
+    const candidate =
+      values.transport === 'stdio'
+        ? { ...base, transport: values.transport, commandLine: values.commandLine, cwd: values.cwd, envRefs: parseReferences('envRefs') }
+        : {
+            ...base,
+            transport: values.transport,
+            url: values.url,
+            headerRefs: parseReferences('headerRefs'),
+            auth: values.oauth ? ('oauth' as const) : ('none' as const),
+            startCommand: values.localStart ? { commandLine: values.startCommandLine, cwd: values.startCwd, envRefs: parseReferences('startEnvRefs') } : null,
+          }
+    const result = serverDraftSchema.safeParse(candidate)
+    if (!result.success) issues.push(...result.error.issues.map(issue => ({ field: formFieldForDraftPath(issue.path), message: issue.message })))
+    if (result.success && issues.length === 0) return { success: true, draft: result.data }
+    return { success: false, issues }
+  }
+
+  static readonly serverFormSchema = serverFormValuesSchema.superRefine((values, context) => {
+    const parsed = McpServerFormModel.parseServerForm(values)
+    if (parsed.success) return
+    for (const issue of parsed.issues) context.addIssue({ code: 'custom', message: issue.message, path: issue.field === undefined ? [] : [issue.field] })
+  })
+
+  /** One-click draft for a hosted endpoint from the provider catalog or the public Registry. */
+  static readonly catalogServerDraft = (input: {
+    readonly name: string
+    readonly url: string
+    readonly oauth: boolean
+    readonly taken: readonly string[]
+  }): ServerDraft => ({
+    id: '',
+    name: input.name,
+    serverName: McpServerFormModel.uniqueServerName({ title: input.name, taken: input.taken }),
+    enabled: true,
+    transport: 'streamable-http',
+    url: input.url,
+    headerRefs: {},
+    auth: input.oauth ? 'oauth' : 'none',
+    startCommand: null,
+  })
 }
-
-export const serverFormSchema = serverFormValuesSchema.superRefine((values, context) => {
-  const parsed = parseServerForm(values)
-  if (parsed.success) return
-  for (const issue of parsed.issues) context.addIssue({ code: 'custom', message: issue.message, path: issue.field === undefined ? [] : [issue.field] })
-})
-
-/** One-click draft for a hosted endpoint from the provider catalog or the public Registry. */
-export const catalogServerDraft = (input: {
-  readonly name: string
-  readonly url: string
-  readonly oauth: boolean
-  readonly taken: readonly string[]
-}): ServerDraft => ({
-  id: '',
-  name: input.name,
-  serverName: uniqueServerName(input.name, input.taken),
-  enabled: true,
-  transport: 'streamable-http',
-  url: input.url,
-  headerRefs: {},
-  auth: input.oauth ? 'oauth' : 'none',
-  startCommand: null,
-})

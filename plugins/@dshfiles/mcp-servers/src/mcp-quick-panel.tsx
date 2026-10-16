@@ -11,7 +11,7 @@ import { CatalogBrowser, SignInNotice } from './catalog-browser.js'
 import type { McpServersTranslate } from './locales.js'
 import type { QuickPanelState } from './quick-panel.js'
 import { ServerEditorDialog } from './server-editor.js'
-import { serverFormFromView, type ServerFormValues } from './server-form.js'
+import { McpServerFormModel, type ServerFormValues } from './server-form.js'
 import { useServerActions, useServerSnapshot, type ServerActions } from './server-queries.js'
 import { isClientActive, isConnectionToggleBlocked, lifecycleDotClassName, lifecycleText, localProcessText, matchesServerSearch } from './server-status.js'
 
@@ -43,7 +43,7 @@ export const McpQuickPanel = (props: { readonly t: McpServersTranslate; readonly
             setBrowsing(true)
           }}
           onClose={() => props.panel.close()}
-          onEdit={server => openEditor('edit', serverFormFromView(server), undefined)}
+          onEdit={server => openEditor('edit', McpServerFormModel.serverFormFromView(server), undefined)}
           onManage={() => {
             props.panel.close()
             props.onManage()

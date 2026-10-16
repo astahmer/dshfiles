@@ -10,12 +10,12 @@ import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import type { ReactNode } from 'react'
 import type { ServerDraft } from './api.js'
 import type { McpServersTranslate } from './locales.js'
-import { inheritsHostWorkingDirectory, parseServerForm, serverFormSchema, serverNameFromTitle, serverTransports, type ServerFormValues } from './server-form.js'
+import { McpServerFormModel, type ServerFormValues } from './server-form.js'
 
 export interface ServerEditorProps {
   readonly t: McpServersTranslate
   readonly defaultValues: ServerFormValues
-  readonly onSave: (draft: ServerDraft) => Promise<unknown>
+  readonly onSave: (draft: ServerDraft) => Promise<void>
   readonly onCancel: (() => void) | undefined
   readonly hint?: string
   /** Renders the fields without the surrounding card, for the custom-server dialog. */
@@ -44,9 +44,9 @@ export const ServerEditor = (props: ServerEditorProps): JSX.Element => {
   const form = useAppForm({
     defaultValues: values,
     validationLogic: revalidateLogic(),
-    validators: { onDynamic: serverFormSchema },
+    validators: { onDynamic: McpServerFormModel.serverFormSchema },
     onSubmit: async ({ value }) => {
-      const parsed = parseServerForm(value)
+      const parsed = McpServerFormModel.parseServerForm(value)
       if (parsed.success) await props.onSave(parsed.draft)
     },
   })
@@ -54,7 +54,7 @@ export const ServerEditor = (props: ServerEditorProps): JSX.Element => {
   const nameListeners = {
     onChange: ({ value }: { readonly value: string }): void => {
       if (isEdit || form.getFieldMeta('serverName')?.isDirty === true) return
-      form.setFieldValue('serverName', serverNameFromTitle(value), { dontUpdateMeta: true })
+      form.setFieldValue('serverName', McpServerFormModel.serverNameFromTitle(value), { dontUpdateMeta: true })
     },
   }
   const serverNameField = (
@@ -66,7 +66,7 @@ export const ServerEditor = (props: ServerEditorProps): JSX.Element => {
         <Select
           name={field.name}
           onValueChange={value => {
-            const next = serverTransports.find(transport => transport === value)
+            const next = McpServerFormModel.serverTransports.find(transport => transport === value)
             if (next !== undefined) field.handleChange(next)
           }}
           value={field.state.value}
@@ -75,7 +75,7 @@ export const ServerEditor = (props: ServerEditorProps): JSX.Element => {
             <SelectValue />
           </SelectTrigger>
           <SelectContent align="end" position="popper">
-            {serverTransports.map(transport => (
+            {McpServerFormModel.serverTransports.map(transport => (
               <SelectItem key={transport} value={transport}>
                 {transportLabels[transport]}
               </SelectItem>
@@ -154,7 +154,7 @@ export const ServerEditor = (props: ServerEditorProps): JSX.Element => {
                   {field => <field.TextAreaField label={t('envRefs')} monospace placeholder={'{\n  "API_TOKEN": "EXAMPLE_TOKEN"\n}'} />}
                 </form.AppField>
               </Disclosure>
-              <form.Subscribe selector={state => inheritsHostWorkingDirectory(state.values)}>
+              <form.Subscribe selector={state => McpServerFormModel.inheritsHostWorkingDirectory(state.values)}>
                 {inherits =>
                   inherits ? (
                     <Alert variant="warning">
@@ -224,7 +224,7 @@ export const ServerEditorDialog = (props: {
   readonly values: ServerFormValues
   readonly hint: string | undefined
   readonly onClose: () => void
-  readonly onSave: (draft: ServerDraft) => Promise<unknown>
+  readonly onSave: (draft: ServerDraft) => Promise<void>
   readonly title?: string
   readonly description?: string
 }): JSX.Element => (

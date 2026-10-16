@@ -20,7 +20,7 @@ import type { ServerDraft, ServerView } from './api.js'
 import type { McpServersTranslate } from './locales.js'
 import { PreferencesForm } from './preferences-form.js'
 import { ServerEditor, ServerEditorDialog } from './server-editor.js'
-import { blankServerForm, serverFormFromView, type ServerFormValues } from './server-form.js'
+import { McpServerFormModel, type ServerFormValues } from './server-form.js'
 import { useServerActions, useServerSnapshot } from './server-queries.js'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import {
@@ -41,7 +41,7 @@ interface EditorState {
 export const ManagerView = ({ t }: { readonly t: McpServersTranslate }): JSX.Element => {
   const snapshot = useServerSnapshot()
   const actions = useServerActions()
-  const [editor, setEditor] = useState<EditorState>({ key: 0, values: blankServerForm(), opened: false })
+  const [editor, setEditor] = useState<EditorState>({ key: 0, values: McpServerFormModel.blankServerForm(), opened: false })
   const editorRef = useRef<HTMLDivElement>(null)
   const [pendingRemoval, setPendingRemoval] = useState<ServerView | null>(null)
   const [browsing, setBrowsing] = useState(false)
@@ -57,7 +57,7 @@ export const ManagerView = ({ t }: { readonly t: McpServersTranslate }): JSX.Ele
     actions.resetErrors()
     setEditor(current => ({ key: current.key + 1, values, opened: true }))
   }
-  const resetEditor = (): void => setEditor(current => ({ key: current.key + 1, values: blankServerForm(), opened: false }))
+  const resetEditor = (): void => setEditor(current => ({ key: current.key + 1, values: McpServerFormModel.blankServerForm(), opened: false }))
   const save = async (draft: ServerDraft): Promise<void> => {
     if (await actions.save(draft)) resetEditor()
   }
@@ -112,7 +112,7 @@ export const ManagerView = ({ t }: { readonly t: McpServersTranslate }): JSX.Ele
                     {index > 0 ? <ItemSeparator /> : null}
                     <ServerItem
                       busy={actions.isPending}
-                      onEdit={() => openEditor(serverFormFromView(server))}
+                      onEdit={() => openEditor(McpServerFormModel.serverFormFromView(server))}
                       onRemove={() => setPendingRemoval(server)}
                       onSignIn={() => actions.signIn(server)}
                       onSignOut={() => actions.signOut(server)}
