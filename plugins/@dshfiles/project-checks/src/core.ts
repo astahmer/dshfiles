@@ -34,13 +34,13 @@ export const projectChecksConfigSchema = z
 export type ProjectAction = z.infer<typeof projectActionSchema>
 export type ProjectChecksConfig = z.infer<typeof projectChecksConfigSchema>
 
-export const isWithinRoot = (root: string, cwd: string): boolean => {
+const isWithinRoot = (root: string, cwd: string): boolean => {
   if (!isAbsolute(root) || !isAbsolute(cwd)) return false
   const pathFromRoot = relative(root, cwd)
   return pathFromRoot === '' || (pathFromRoot !== '..' && !pathFromRoot.startsWith(`..${sep}`) && !isAbsolute(pathFromRoot))
 }
 
-export const receiptFreshness = (receiptRevision: string | null, currentRevision: string | null): 'current' | 'stale' | 'unknown' => {
+const receiptFreshness = (receiptRevision: string | null, currentRevision: string | null): 'current' | 'stale' | 'unknown' => {
   if (receiptRevision === null || currentRevision === null) return 'unknown'
   return receiptRevision === currentRevision ? 'current' : 'stale'
 }
@@ -52,11 +52,17 @@ export interface VerificationFailure {
   readonly failure: string | null
 }
 
-export const verificationPrompt = (failures: readonly VerificationFailure[], attempt: number, maxAttempts: number): string => {
+const verificationPrompt = (failures: readonly VerificationFailure[], attempt: number, maxAttempts: number): string => {
   const failed = failures
     .slice(0, 6)
     .map(item => `${item.label} (${item.status}${item.exitCode === null ? '' : `, exit ${item.exitCode}`}${item.failure === null ? '' : `, ${item.failure}`})`)
     .join(', ')
   const extra = failures.length > 6 ? `, and ${failures.length - 6} more` : ''
   return `Project checks failed (${failed}${extra}). Fix the reported checks, then stop again for verification. Attempt ${attempt} of ${maxAttempts}. Do not claim completion while these checks fail.`
+}
+
+export class ProjectChecksModel {
+  static readonly isWithinRoot = isWithinRoot
+  static readonly receiptFreshness = receiptFreshness
+  static readonly verificationPrompt = verificationPrompt
 }
