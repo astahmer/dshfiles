@@ -1,6 +1,6 @@
 ---
 name: plugin-ui
-description: Build and style DSH plugin UI with @dshfiles/plugin-ui (shadcn/ui on Tailwind v4, `dshx:` prefix), add shadcn registry components to the kit, and rebuild every UI plugin after class changes. Use when writing or restyling any client component under plugins/@dshfiles/*, touching plugin-ui, or debugging plugin CSS (lost variants, wrong z-index, wrong font).
+description: Build and style DSH plugin UI with @dshfiles/plugin-ui (shadcn/ui on Tailwind v4, `dshx:` prefix), add shadcn registry components to the kit, and rebuild the shared-sheet owner after class changes. Use when writing or restyling any client component under plugins/@dshfiles/*, touching plugin-ui, or debugging plugin CSS (lost variants, wrong z-index, wrong font).
 ---
 
 # Plugin UI kit
@@ -60,20 +60,23 @@ Plugin surfaces render in 360–480 px panes, split layouts and the composer, so
   never truncates.
 - Check 360, 480, 768 and 1024 px plus a split layout (see `verify-dsh`).
 
-## Rebuild every UI plugin after any class change
+## Rebuild the sheet owner after any class change
 
-Each plugin injects its own copy of the Tailwind sheet. dshx dedupes them by **content hash**
-(`tooling/dshx/packages/dshx/src/compiler/client/css.ts`), and `styles.css` scans every owned plugin
-(`@source '../..'`) so the copies are byte-identical. Change a class in one plugin and rebuild only that one → the
-hashes diverge, several sheets load, and same-specificity rules resolve by sheet order (e.g. a later `max-w-[…]`
-beats an earlier `sm:max-w-2xl`). So after any class change anywhere:
+`@dshfiles/ui-styles` is the one bundle that compiles and injects the Tailwind sheet: its `src/client.css` imports
+`@dshfiles/plugin-ui/styles.css`, whose `@source '../..'` scans every owned plugin, so the union of all plugin classes
+exists in exactly one ordered rule set. Every other plugin dropped the sheet import, so it ships no stylesheet of its
+own; `jujutsu` and `memory` keep a `src/client.css` with only their extra rules. A class change is in that union, so
+rebuild the owner — its `dist` carries the sheet — plus the plugin you changed, whose own JavaScript moved:
 
 ```sh
 # from the repository root
-for dir in $(grep -l '"@dshfiles/plugin-ui"' plugins/@dshfiles/*/package.json | xargs -n1 dirname | grep -v '/plugin-ui$'); do
-  pnpm --dir "$dir" build || { echo "FAILED: $dir"; break; }
-done
+pnpm --dir plugins/@dshfiles/ui-styles build
+pnpm --dir plugins/@dshfiles/<changed> build
 ```
+
+No other plugin needs rebuilding: the owner is the only sheet-derived byte any of them read. Two divergent sheets in
+the DOM remain the regression — same-specificity rules resolve by sheet order (a later `max-w-[…]` beats an earlier
+`sm:max-w-2xl`) — which is why the union is compiled once instead of per plugin.
 
 Budget: `tooling/dshx/e2e/features/palette-performance.feature` asserts exactly one shared plugin stylesheet.
 
@@ -93,4 +96,4 @@ Then fix what the CLI gets wrong:
    see `button.tsx`.
 5. If install fails on a fresh release, pnpm's `minimumReleaseAge` is refusing it: pin an older version.
 6. `pnpm --dir plugins/@dshfiles/plugin-ui typecheck && pnpm --dir plugins/@dshfiles/plugin-ui test`, update the
-   README component list, then rebuild all UI plugins (above).
+   README component list, then rebuild the sheet owner and this package (above).

@@ -209,8 +209,8 @@ Client UI uses `@dshfiles/plugin-ui` (shadcn/ui on Tailwind v4); skills
 
 - Every utility is `dshx:`-prefixed, a complete static string, merged with
   `cn`; `dshx-root` on each surface root; semantic colors only.
-- After **any** class change in **any** plugin, rebuild every plugin that
-  depends on plugin-ui, or the shared stylesheet stops deduping.
+- `@dshfiles/ui-styles` is the only bundle that compiles the shared sheet;
+  after **any** class change, rebuild it and the plugin you changed.
 - Host/async data → `/query`, multi-field forms → `/form`, tangled flows →
   `/machine`, localStorage → `createStoredValue`.
 - Prefer Host utilities (`relativeTime`, `writeClipboard`, `rankByName` from

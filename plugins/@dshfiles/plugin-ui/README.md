@@ -14,13 +14,11 @@ import { pluginUiVite } from '@dshfiles/plugin-ui/vite'
 export default defineConfig({ client: { entry: 'src/client.tsx', vite: { plugins: [pluginUiVite()] } } })
 ```
 
-```css
-/* src/client.css — imported once from the client entry: import './client.css' */
-@import '@dshfiles/plugin-ui/styles.css';
-@source './';
-```
-
-Depend on `"@dshfiles/plugin-ui": "link:../plugin-ui"`. Do not add Tailwind, Radix, or TanStack packages to a plugin directly — this package pins them.
+A consumer needs no stylesheet of its own: `@dshfiles/ui-styles` is the one bundle that imports this package's
+`styles.css`, compiles the union of every owned plugin's classes and injects the sheet once. A plugin that needs extra
+rules of its own keeps a `src/client.css` holding only those rules — imported once from the client entry, never
+importing the shared sheet again — as `jujutsu` and `memory` do. Depend on `"@dshfiles/plugin-ui": "link:../plugin-ui"`.
+Do not add Tailwind, Radix, or TanStack packages to a plugin directly — this package pins them.
 
 ## Use
 
@@ -120,9 +118,10 @@ The Host ships one unlayered `button, input, select, textarea { font-family: inh
 
 ## Shared stylesheet and stacking
 
-- Every plugin injects its own copy of the Tailwind sheet, and same-specificity rules resolve by sheet order.
-  `styles.css` therefore scans every owned plugin (`@source '../..'`) so all copies are identical; otherwise a
-  later plugin's base rule (`max-w-[…]`) overrides an earlier plugin's variant (`sm:max-w-2xl`). When you add
-  classes to one plugin, rebuild all plugins (or at least the ones loaded after it) so the copies stay equal.
+- `@dshfiles/ui-styles` is the only bundle that compiles the shared Tailwind sheet: its `src/client.css` imports
+  `plugin-ui/styles.css`, whose `@source '../..'` scans every owned plugin, and it injects the result once. Same-specificity
+  rules resolve by sheet order, so the sheet must stay one ordered rule set — that is why the union is compiled once
+  instead of per plugin; a later plugin's base rule (`max-w-[…]`) would otherwise override an earlier plugin's variant
+  (`sm:max-w-2xl`). Consumers ship nothing; after a class change rebuild the owner and the changed plugin.
 - Host modals sit at `z-index: 1000`. Kit dialogs/sheets use 1050 and floating layers (select, popover, menus,
   tooltip, hover card) 1100, so they open above Host Settings and above our own dialogs.

@@ -10,7 +10,7 @@
  * JavaScript byte-identical leaves its tasks cached, and a dshx source edit that compiles to the same JavaScript must
  * leave them cached too. A new utility class in any plugin is the opposite case: it changes that plugin's own
  * JavaScript and the union sheet that only @dshfiles/ui-styles compiles, so the owner's digest and the owning
- * plugin's digest move while every other consumer bundle stays byte-identical (see plans/shared-plugin-stylesheet.md).
+ * plugin's digest move while every other consumer bundle stays byte-identical.
  * A journey that boots a plugin-ui consumer also reads the owner's digest, because a sheet change can change what it
  * asserts, while the per-bundle boot check stays isolated and never reads it.
  * Turbo drops gitignored files under the task's own package directory even from a `$TURBO_ROOT$` glob (a package

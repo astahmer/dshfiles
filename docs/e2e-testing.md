@@ -153,22 +153,31 @@ generates those scripts and each package's `turbo.json` from the feature files;
 feature, then regenerate.
 
 A task's key is what it actually runs, never a build hash and never the sources
-behind the built artifact: plugin-ui's build reads every plugin's sources for
-the shared stylesheet, so every build hash moves together, and the digest leaves
-`*.map` and `*.d.ts` out so a formatting-only edit that keeps a bundle's
-JavaScript byte-identical does not move its `dist`. A class change is the
-opposite case: it recompiles the union sheet and every consumer bundle embeds
-the new sheet hash, so 29 of the 37 built bundles move and their tasks rerun
-(measured, and the subject of the
-[shared stylesheet plan](../plans/shared-plugin-stylesheet.md)). The inputs are:
+behind the built artifact. `@dshfiles/ui-styles` is the only bundle that
+compiles the shared stylesheet — its `@dshfiles/ui-styles#build` fingerprint
+carries the `$TURBO_ROOT$/plugins/@dshfiles/**` all-plugins scan — so a class
+change moves the owner's digest, not every consumer's: only the owner's build
+re-runs (plus the changed plugin's), and only the boot tasks that boot the owner
+or the changed bundle re-run — the composed web-profile boot and the changed
+plugin's own — while the per-bundle isolation checks stay cached. Measured on
+this machine, adding one class (`dshx:contrast-125` in `tool-meta`) went from 46
+build tasks in ~1m43s followed by 43/43 boot tasks missing to 47 tasks with 45
+cached in 2.4s and 3/44 boot tasks missing (the edited plugin, the owner, the
+composed profile), the other 37 bundles byte-identical; a no-change re-run of
+that 44-task boot gate replays FULL TURBO in 5s. The digest also leaves `*.map`
+and `*.d.ts` out, so a formatting-only edit that keeps a bundle's JavaScript
+byte-identical does not move its `dist`. The inputs are:
 
 - a digest of the runtime `dist`, the `package.json` and the
   `cordis.patch.yml` of every bundle the package's journeys boot (the packages
   their Given steps name, every bundle for a step that boots the web profile)
-  and of their workspace dependencies, dshx included. The digest leaves out
-  `*.map` and `*.d.ts`: a formatting-only change to plugin-ui rewrites the
-  source maps of every bundle that inlines it while their JavaScript stays
-  byte-identical, so hashing maps would rerun all their journeys for nothing.
+  and of their workspace dependencies, dshx included. A journey that boots a
+  plugin-ui consumer also reads the owner's digest, because a sheet change can
+  change what it asserts; the per-bundle boot check stays isolated and never
+  reads it. Maps and declarations stay out because a formatting-only change to
+  plugin-ui rewrites the source maps of every bundle that inlines it while their
+  JavaScript stays byte-identical, so hashing maps would rerun all their
+  journeys for nothing.
   A dshx source edit that compiles to the same JavaScript therefore keeps the
   browser tasks cached, while one that changes the boot check invalidates them
   through the rebuilt digest;

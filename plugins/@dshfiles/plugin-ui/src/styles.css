@@ -1,15 +1,15 @@
 /*
  * shadcn on Tailwind v4 for DSH plugins: `dshx:` prefix, no global Preflight (dshx contract).
  * shadcn's semantic colors resolve straight to the Host `--dsw-*` theme, so light/dark follow DSH.
- * Each plugin's client stylesheet imports this file and adds `@source` for its own sources.
+ * `@dshfiles/ui-styles` is the only client stylesheet that imports this file; it adds its own `@source`.
  */
 @layer theme, base, components, utilities;
 
 @import 'tailwindcss/theme.css' layer(theme) prefix(dshx);
 @import 'tailwindcss/utilities.css' layer(utilities) source(none) prefix(dshx);
 /*
- * Every plugin injects its own copy of this sheet, and same-specificity rules resolve by sheet order.
- * Scanning every owned plugin makes all copies identical, so a later plugin's base rule can never
+ * `@dshfiles/ui-styles` compiles this sheet once and injects it once, and the `@source` globs scan every owned plugin,
+ * so the union of all plugin classes exists in exactly one ordered rule set: a later plugin's base rule can never
  * override an earlier plugin's responsive/state variant (e.g. `max-w-[…]` beating `sm:max-w-2xl`).
  */
 @source './';

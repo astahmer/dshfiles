@@ -30,7 +30,7 @@ fnm exec --using=22.23.3 node -e "import('./dist/index.js')"   # 22.23.3 = .node
 ```
 
 An import failure here is exactly what shows up at boot as "did not activate". `dist/` is not versioned.
-Changed classes? Rebuild every UI plugin (skill `plugin-ui`).
+Changed classes? Rebuild `@dshfiles/ui-styles` too (skill `plugin-ui`).
 
 ## 2. HMR or restart?
 
