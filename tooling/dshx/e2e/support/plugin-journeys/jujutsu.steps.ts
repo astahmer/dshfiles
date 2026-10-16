@@ -8,7 +8,7 @@ import { finishJourneyAssertions, recordAssertion } from '../steps.js'
 interface JujutsuFixture {
   readonly temporaryRoot: string
   readonly repositoryPath: string
-  readonly changeId: string
+  readonly revisionId: string
   readonly commitId: string
   readonly sourceDescription: string
   readonly childDescription: string
@@ -87,14 +87,14 @@ const createFixture = async (page: Page): Promise<JujutsuFixture> => {
       '--revisions',
       sourceCommitId,
       '--template',
-      'self.change_id().normal_hex() ++ "|" ++ self.commit_id().short(64)',
+      'self.change_id().short(64) ++ "|" ++ self.commit_id().short(64)',
     ])
       .trim()
       .split('|')
-    const changeId = ids[0]
+    const revisionId = ids[0]
     const commitId = ids[1]
-    if (changeId === undefined || commitId === undefined) throw new Error('JJ did not return both fixture revision IDs.')
-    const fixture = { temporaryRoot, repositoryPath, changeId, commitId, sourceDescription, childDescription, targetDescription }
+    if (revisionId === undefined || commitId === undefined) throw new Error('JJ did not return both fixture revision IDs.')
+    const fixture = { temporaryRoot, repositoryPath, revisionId, commitId, sourceDescription, childDescription, targetDescription }
     fixtures.set(page, fixture)
     return fixture
   } catch (error) {
@@ -224,24 +224,18 @@ Then('revision and bookmark moves preview in the target context without changing
   await finishJourneyAssertions(page)
 })
 
-Then('the revision context menu copies the exact change ID and commit ID', async ({ page }: { page: Page }) => {
+Then('the revision context menu copies the displayed revision ID', async ({ page }: { page: Page }) => {
   const fixture = fixtureFor(page)
   const origin = new URL(page.url()).origin
   await page.context().grantPermissions(['clipboard-read', 'clipboard-write'], { origin })
   const sourceButton = revisionRow(page, fixture.sourceDescription).getByRole('button').first()
 
   await sourceButton.click({ button: 'right' })
-  await page.getByRole('menuitem', { name: 'Copy full change ID', exact: true }).click()
-  await recordAssertion(page, 'jujutsu-copy-change-id-uses-full-change-id', async () => {
-    await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(fixture.changeId)
-    await expect(page.getByText('Full change ID copied.', { exact: true })).toBeVisible()
-  })
-
-  await sourceButton.click({ button: 'right' })
-  await page.getByRole('menuitem', { name: 'Copy commit ID (this revision)', exact: true }).click()
-  await recordAssertion(page, 'jujutsu-copy-commit-id-uses-this-revision-commit-id', async () => {
-    await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(fixture.commitId)
-    await expect(page.getByText('Commit ID for this revision copied.', { exact: true })).toBeVisible()
+  await expect(page.getByRole('menuitem', { name: /^Copy/ })).toHaveCount(1)
+  await page.getByRole('menuitem', { name: 'Copy revision ID', exact: true }).click()
+  await recordAssertion(page, 'jujutsu-copy-revision-id-matches-visible-change-id', async () => {
+    await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe(fixture.revisionId)
+    await expect(page.getByText('Revision ID copied.', { exact: true })).toBeVisible()
   })
   await finishJourneyAssertions(page)
 })

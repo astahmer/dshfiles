@@ -41,7 +41,7 @@ contracts.
   "N unmodified lines" separators, rendered from `jj diff --git`.
 - Right-click a revision for full diff, describe, edit, new change, squash,
   duplicate, revert onto @, rebase onto main, set or move a bookmark, create a
-  workspace there, copy IDs, and abandon; right-click a local bookmark to push or delete it.
+  workspace there, copy the full displayed revision ID, and abandon; right-click a local bookmark to push or delete it.
 - A Source Control view modelled on jj-view: a message box that describes or
   commits @, then Working Copy and `@-1 … @-N` groups with per-file open diff,
   discard (`jj restore`), move to parent/child (`jj squash` with literal

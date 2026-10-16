@@ -752,8 +752,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
         )}
         <ContextMenuItem onSelect={() => setBookmarkDraft({ commitId: revision.commitId, name: '' })}>Set bookmark…</ContextMenuItem>
         <ContextMenuSeparator />
-        <ContextMenuItem onSelect={() => void copyText(revision.changeId, 'Full change ID')}>Copy full change ID</ContextMenuItem>
-        <ContextMenuItem onSelect={() => void copyText(revision.commitId, 'Commit ID for this revision')}>Copy commit ID (this revision)</ContextMenuItem>
+        <ContextMenuItem onSelect={() => void copyText(fullRevisionId(revision), 'Revision ID')}>Copy revision ID</ContextMenuItem>
         {!revision.immutable && (
           <>
             <ContextMenuSeparator />
@@ -1915,6 +1914,11 @@ const RevisionGraphCell = (props: RevisionGraphCellProps): JSX.Element => {
 const reverseHexChangeId = (changeId: string, length: number): string =>
   [...changeId.slice(0, length)].map(digit => String.fromCharCode('z'.charCodeAt(0) - Number.parseInt(digit, 16))).join('')
 
+const fullRevisionId = (revision: Revision): string => {
+  const changeId = reverseHexChangeId(revision.changeId, revision.changeId.length)
+  return revision.divergent ? `${changeId}/${revision.changeOffset}` : changeId
+}
+
 interface InlineDropPreviewProps {
   readonly presentation: DropPresentation
   readonly sourceLabel: string
@@ -2145,7 +2149,7 @@ const RevisionRow = (props: RevisionRowProps): JSX.Element => {
               <span
                 aria-hidden
                 className="dshx:w-12 dshx:flex-none dshx:text-right"
-                title={reverseHexChangeId(revision.changeId, revision.changeId.length) + (revision.evolved ? ' · rewritten from an earlier commit' : '')}
+                title={fullRevisionId(revision) + (revision.evolved ? ' · rewritten from an earlier commit' : '')}
               >
                 <span className="dshx:rounded-sm dshx:bg-muted-foreground/15 dshx:px-1 dshx:py-px dshx:font-mono dshx:text-[10px]">
                   <span className={revision.immutable ? 'dshx:text-muted-foreground' : 'dshx:font-semibold dshx:text-foreground/85'}>

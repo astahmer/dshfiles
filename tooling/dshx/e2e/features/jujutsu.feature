@@ -23,10 +23,10 @@ Feature: Jujutsu revision interactions
     Then removing the selected repository offers a way to choose another
 
   @scenario:jujutsu.copy-ids
-  Scenario: revision context menu copies full IDs
+  Scenario: revision context menu copies the displayed revision ID
     Given the isolated plugin profile "@dshfiles/jujutsu" is booted
     When a disposable Jujutsu repository is selected
-    Then the revision context menu copies the exact change ID and commit ID
+    Then the revision context menu copies the displayed revision ID
 
   @scenario:jujutsu.graph-filters
   Scenario: Search, author and immutability filters narrow the revision graph
