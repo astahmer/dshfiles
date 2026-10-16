@@ -13,6 +13,7 @@ import { randomUUID } from 'node:crypto'
 import { realpath } from 'node:fs/promises'
 import { isAbsolute, normalize } from 'node:path'
 import { projectChecksApi, type ProjectHookEvent } from './api.js'
+import { PluginApiError, type ApiCaller } from '@dshfiles/dshx/api'
 import { isWithinRoot, projectChecksConfigSchema, receiptFreshness, verificationPrompt, type ProjectAction } from './core.js'
 import { projectChecksDomain, receiptKey, trimReceiptRows, type StoredReceipt } from './store.js'
 
@@ -373,16 +374,24 @@ const hookEvents = async (ctx: Context, sessionId: string): Promise<ProjectHookE
   return summaries.sort((left, right) => left.seq - right.seq).slice(-MAX_HOOK_EVENTS)
 }
 
+/** The session a check request targets: the named one, else the calling Agent's own session. */
+const targetSessionId = (requested: string | undefined, caller: ApiCaller): string => {
+  if (requested !== undefined) return requested
+  if (caller.kind === 'agent' && caller.sessionId !== undefined) return caller.sessionId
+  throw new PluginApiError('Pass sessionId: this tool cannot tell which thread to check.', { code: 'checks-target-unknown' })
+}
+
 const hostApi = projectChecksApi.host({
-  actions: async ({ input, ctx }) => apiActions(ctx, input.sessionId),
-  receipts: async ({ input, ctx }) => apiReceipts(ctx, input.sessionId),
-  hookEvents: async ({ input, ctx }) => hookEvents(ctx, input.sessionId),
-  run: async ({ input, ctx, signal }) => {
+  actions: async ({ input, ctx, caller }) => apiActions(ctx, targetSessionId(input.sessionId, caller)),
+  receipts: async ({ input, ctx, caller }) => apiReceipts(ctx, targetSessionId(input.sessionId, caller)),
+  hookEvents: async ({ input, ctx, caller }) => hookEvents(ctx, targetSessionId(input.sessionId, caller)),
+  run: async ({ input, ctx, caller, signal }) => {
+    const sessionId = targetSessionId(input.sessionId, caller)
     const action = configFor(ctx).actions.find(candidate => candidate.id === input.actionId)
     if (action === undefined) throw new Error('Project action is not configured.')
-    const isVisible = (await apiActions(ctx, input.sessionId)).some(candidate => candidate.id === action.id)
+    const isVisible = (await apiActions(ctx, sessionId)).some(candidate => candidate.id === action.id)
     if (!isVisible) throw new Error('Project action is not available in this session directory.')
-    const receipt = await runAction(ctx, input.sessionId, action, {
+    const receipt = await runAction(ctx, sessionId, action, {
       automatic: false,
       attempt: 0,
       verificationTurn: null,
@@ -393,7 +402,7 @@ const hostApi = projectChecksApi.host({
       receipt.sourceRevision,
       await (async () => {
         try {
-          return await sourceRevision(ctx, (await sessionPaths(ctx, input.sessionId, action)).cwd)
+          return await sourceRevision(ctx, (await sessionPaths(ctx, sessionId, action)).cwd)
         } catch {
           return null
         }

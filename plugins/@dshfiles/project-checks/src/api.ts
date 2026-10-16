@@ -46,25 +46,40 @@ export const hookEventSchema = z.object({
   stderrPresent: z.boolean(),
 })
 
+/** Model-facing text for a structured tool result. */
+const compactJson = <Output>(output: Output): string => JSON.stringify(output)
+
 export const projectChecksApi = defineApi({
   id: 'project-checks',
   version: 1,
   methods: {
     actions: method({
-      input: z.object({ sessionId: sessionIdSchema }),
+      input: z.object({ sessionId: sessionIdSchema.optional() }),
       output: z.array(actionViewSchema).max(32),
+      description:
+        'The trusted project actions configured for a thread directory, with each action command line and where it applies. Defaults to the calling thread. Read-only.',
+      tool: { name: 'project_checks_actions', readOnly: true, render: compactJson },
     }),
     receipts: method({
-      input: z.object({ sessionId: sessionIdSchema }),
+      input: z.object({ sessionId: sessionIdSchema.optional() }),
       output: z.array(receiptSchema).max(30),
+      description:
+        'Recent project-check receipts for a thread: what ran, its outcome, exit status, duration and whether it is still fresh against the working copy. Defaults to the calling thread. Read-only.',
+      tool: { name: 'project_checks_receipts', readOnly: true, render: compactJson },
     }),
     hookEvents: method({
-      input: z.object({ sessionId: sessionIdSchema }),
+      input: z.object({ sessionId: sessionIdSchema.optional() }),
       output: z.array(hookEventSchema).max(12),
+      description:
+        'The native hook invocations and results recorded for a thread, so a skipped or failing hook is visible. Defaults to the calling thread. Read-only.',
+      tool: { name: 'project_checks_hook_events', readOnly: true, render: compactJson },
     }),
     run: method({
-      input: z.object({ sessionId: sessionIdSchema, actionId: actionIdSchema }),
+      input: z.object({ sessionId: sessionIdSchema.optional(), actionId: actionIdSchema }),
       output: receiptSchema,
+      description:
+        'Run one configured project action in its thread directory and return the receipt. The action must be configured and visible for that directory. Defaults to the calling thread. Call only when the user asked to run that check.',
+      tool: { name: 'project_checks_run', render: compactJson },
     }),
   },
 })
