@@ -80,8 +80,8 @@ export class DirectoryStoreError extends Error {
 
 let writeTail: Promise<void> = Promise.resolve()
 
-export const pluginDataPath = (fileName: string): string => join(dataDirectory(), fileName)
-export const runtimeHomeLeaf = (): string => basename(process.env.DSH_HOME ?? join(homedir(), '.dsh'))
+const pluginDataPath = (fileName: string): string => join(dataDirectory(), fileName)
+const runtimeHomeLeaf = (): string => basename(process.env.DSH_HOME ?? join(homedir(), '.dsh'))
 
 const readDirectoryFromDisk = async (): Promise<HostDirectory> => {
   let raw: string
@@ -148,19 +148,19 @@ const readDirectoryFromDisk = async (): Promise<HostDirectory> => {
   throw new DirectoryStoreError('directory-version-unsupported', 'The multi-host directory has an unsupported schema and was left untouched.')
 }
 
-export const readDirectory = async (): Promise<HostDirectory> => {
+const readDirectory = async (): Promise<HostDirectory> => {
   await writeTail
   return readDirectoryFromDisk()
 }
 
-export const listHosts = async (): Promise<readonly HostRecord[]> => (await readDirectory()).hosts
-export const listRuntimes = async (hostId?: string): Promise<readonly RuntimeRecord[]> => {
+const listHosts = async (): Promise<readonly HostRecord[]> => (await readDirectory()).hosts
+const listRuntimes = async (hostId?: string): Promise<readonly RuntimeRecord[]> => {
   const runtimes = (await readDirectory()).runtimes
   return hostId === undefined ? runtimes : runtimes.filter(runtime => runtime.hostId === hostId)
 }
 
-export const findHost = async (id: string): Promise<HostRecord | undefined> => (await readDirectory()).hosts.find(host => host.id === id)
-export const findRuntime = async (id: string): Promise<RuntimeRecord | undefined> => (await readDirectory()).runtimes.find(runtime => runtime.id === id)
+const findHost = async (id: string): Promise<HostRecord | undefined> => (await readDirectory()).hosts.find(host => host.id === id)
+const findRuntime = async (id: string): Promise<RuntimeRecord | undefined> => (await readDirectory()).runtimes.find(runtime => runtime.id === id)
 
 const transact = async <Result>(update: (current: HostDirectory) => { readonly next: HostDirectory; readonly result: Result }): Promise<Result> => {
   const operation = writeTail.then(async () => {
@@ -176,7 +176,7 @@ const transact = async <Result>(update: (current: HostDirectory) => { readonly n
   return operation
 }
 
-export const upsertHost = async (input: HostRecord): Promise<HostRecord> => {
+const upsertHost = async (input: HostRecord): Promise<HostRecord> => {
   const record = hostRecordSchema.parse(input)
   return transact(current => {
     const hosts = current.hosts.filter(host => host.id !== record.id)
@@ -196,7 +196,7 @@ export const upsertHost = async (input: HostRecord): Promise<HostRecord> => {
   })
 }
 
-export const upsertRuntime = async (input: RuntimeRecord): Promise<RuntimeRecord> => {
+const upsertRuntime = async (input: RuntimeRecord): Promise<RuntimeRecord> => {
   const record = runtimeRecordSchema.parse(input)
   return transact(current => {
     const host = current.hosts.find(candidate => candidate.id === record.hostId)
@@ -226,17 +226,7 @@ export const upsertRuntime = async (input: RuntimeRecord): Promise<RuntimeRecord
   })
 }
 
-export const updateRuntimeLastSeen = async (id: string, lastSeenAt: string): Promise<void> => {
-  await transact(current => {
-    const runtime = current.runtimes.find(candidate => candidate.id === id)
-    if (runtime === undefined) throw new DirectoryStoreError('runtime-not-found', `No recorded runtime ${id}.`)
-    const runtimes = current.runtimes.map(candidate => (candidate.id === id ? { ...candidate, lastSeenAt } : candidate))
-    const next = hostDirectorySchema.parse({ schemaVersion: 2, hosts: current.hosts, runtimes })
-    return { next, result: undefined }
-  })
-}
-
-export const removeRuntime = async (id: string): Promise<boolean> =>
+const removeRuntime = async (id: string): Promise<boolean> =>
   transact(current => {
     const removed = current.runtimes.find(runtime => runtime.id === id)
     if (removed === undefined) return { next: current, result: false }
@@ -247,7 +237,7 @@ export const removeRuntime = async (id: string): Promise<boolean> =>
     return { next: { schemaVersion: 2, hosts: current.hosts, runtimes: current.runtimes.filter(runtime => runtime.id !== id), retiredPorts }, result: true }
   })
 
-export const removeHost = async (id: string, removeDirectory: boolean): Promise<boolean> =>
+const removeHost = async (id: string, removeDirectory: boolean): Promise<boolean> =>
   transact(current => {
     if (!current.hosts.some(host => host.id === id)) return { next: current, result: false }
     const runtimes = current.runtimes.filter(runtime => runtime.hostId === id)
@@ -295,4 +285,18 @@ const writeDirectory = async (next: HostDirectory): Promise<void> => {
     await rm(temporary, { force: true })
     throw new DirectoryStoreError('directory-write-failed', 'The multi-host directory could not be committed atomically.')
   }
+}
+
+export class HostDirectoryStore {
+  static readonly pluginDataPath = pluginDataPath
+  static readonly runtimeHomeLeaf = runtimeHomeLeaf
+  static readonly readDirectory = readDirectory
+  static readonly listHosts = listHosts
+  static readonly listRuntimes = listRuntimes
+  static readonly findHost = findHost
+  static readonly findRuntime = findRuntime
+  static readonly upsertHost = upsertHost
+  static readonly upsertRuntime = upsertRuntime
+  static readonly removeRuntime = removeRuntime
+  static readonly removeHost = removeHost
 }

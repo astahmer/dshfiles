@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { mkdir, open, readFile, rename } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import { z } from 'zod'
-import { pluginDataPath } from './store.js'
+import { HostDirectoryStore } from './store.js'
 
 /** A thread this manager started on another runtime: where it lives, so the local UI can list and reopen it. */
 const remoteThreadSchema = z
@@ -18,7 +18,7 @@ const threadFileSchema = z.object({ schemaVersion: z.literal(1), threads: z.arra
 
 export type RemoteThread = z.infer<typeof remoteThreadSchema>
 
-const threadsPath = (): string => pluginDataPath('threads.json')
+const threadsPath = (): string => HostDirectoryStore.pluginDataPath('threads.json')
 let writeTail: Promise<unknown> = Promise.resolve()
 
 const readThreads = async (): Promise<RemoteThread[]> => {

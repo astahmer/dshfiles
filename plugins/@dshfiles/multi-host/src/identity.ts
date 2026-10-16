@@ -4,7 +4,7 @@ import { createRequire } from 'node:module'
 import { chmod, link, lstat, mkdir, open, readFile, rm } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { z } from 'zod'
-import { pluginDataPath, runtimeHomeLeaf } from './store.js'
+import { HostDirectoryStore } from './store.js'
 import { runtimeIdentitySchema, type RuntimeIdentity } from './records.js'
 
 const persistedIdentitySchema = z
@@ -141,7 +141,7 @@ export const readOrCreateRuntimeIdentity = async (configuredProfile?: string): P
     throw new RuntimeIdentityError('profile-mismatch', 'The multi-host profile setting does not match the running DSH profile.')
   }
   const profile = profileSchema.parse(reportedProfile)
-  const path = pluginDataPath(join('runtime-identities', profile + '.json'))
+  const path = HostDirectoryStore.pluginDataPath(join('runtime-identities', profile + '.json'))
   let persisted = await readPersistedIdentity(path)
   if (persisted === undefined) {
     const proposed = { schemaVersion: 1 as const, runtimeId: randomUUID(), profile }
@@ -161,7 +161,7 @@ export const readOrCreateRuntimeIdentity = async (configuredProfile?: string): P
     protocolVersion: 1,
     runtimeId: persisted.runtimeId,
     profile: persisted.profile,
-    homeLeaf: runtimeHomeLeaf(),
+    homeLeaf: HostDirectoryStore.runtimeHomeLeaf(),
     dshVersion: dshVersion(),
     capabilities: ['workspace', 'session', 'agent'],
   })
