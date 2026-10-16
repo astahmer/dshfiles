@@ -86,6 +86,7 @@ import {
 } from './organization.js'
 import { attentionColorDotClass, attentionDotClass, attentionLabelClass, type ThreadAttentionLabel } from './attention-presentation.js'
 import { attentionColorSchema, toggleCollapsedSection } from './preferences.js'
+import { selectInputNeededRows } from './attention-rows.js'
 import { registerPaletteAction, setPaletteRecentLimit, type PaletteAction } from '@dshfiles/command-palette/api'
 import { useSidebarState } from './sidebar-state.js'
 import { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
@@ -1284,30 +1285,15 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => {
 
   const needsInputRows = useMemo(
     () =>
-      attentionSessions
-        .filter(session => {
-          const kind = sessionStatus.get(session.id)?.pendingInteraction?.kind
-          return (
-            !session.blank &&
-            session.id !== selectedSession?.id &&
-            kind === 'question' &&
-            !mutedSessionIds.has(session.id) &&
-            !archivedSessionIds.has(session.id) &&
-            (preferences.workspaceFilter === null ||
-              (workspaceForLineage(session, sessionState.byId, workspaceBySession) ?? '') === preferences.workspaceFilter)
-          )
-        })
-        .sort((left, right) => right.updatedAt - left.updatedAt),
-    [
-      archivedSessionIds,
-      attentionSessions,
-      mutedSessionIds,
-      preferences.workspaceFilter,
-      selectedSession?.id,
-      sessionState.byId,
-      sessionStatus,
-      workspaceBySession,
-    ],
+      selectInputNeededRows({
+        sessions: attentionSessions,
+        pendingInteractionKindFor: sessionId => sessionStatus.get(sessionId)?.pendingInteraction?.kind,
+        mutedSessionIds,
+        archivedSessionIds,
+        matchesWorkspace: session =>
+          preferences.workspaceFilter === null || (workspaceForLineage(session, sessionState.byId, workspaceBySession) ?? '') === preferences.workspaceFilter,
+      }),
+    [archivedSessionIds, attentionSessions, mutedSessionIds, preferences.workspaceFilter, sessionState.byId, sessionStatus, workspaceBySession],
   )
   const needsInputIds = useMemo(() => new Set(needsInputRows.map(session => session.id)), [needsInputRows])
   const approvalNeededRows = useMemo(
