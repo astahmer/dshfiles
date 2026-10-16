@@ -191,7 +191,7 @@ export const restartScratchProfileInBrowser = async (page: Page): Promise<string
   return freshUrl
 }
 
-export const visitIsolatedPluginProfile = async (page: Page, profile: BootedProfile): Promise<void> =>
+export const visitIsolatedPluginProfile = async (page: Page, profile: BootedProfile): Promise<void> => {
   profiles.set(page, profile)
   try {
     await visitScratchProfile(page, profile)

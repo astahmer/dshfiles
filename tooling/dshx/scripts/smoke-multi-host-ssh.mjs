@@ -9,7 +9,6 @@ import { setTimeout as delay } from 'node:timers/promises'
 import { z } from 'zod'
 import { buildSshOptions, quoteRemoteArgument, redactLaunchSecrets as redact } from './smoke-multi-host-ssh-utils.mjs'
 import WebSocket from 'ws'
-import { connectDshPlatformClient } from '../packages/dshx/src/platform/client.ts'
 
 const absolutePathSchema = z
   .string()
@@ -67,6 +66,7 @@ try {
 }
 
 const sshOptions = buildSshOptions({ sshKey, knownHosts, sshPort })
+const { connectDshPlatformClient } = await import('../packages/dshx/dist/platform/client.js')
 const launchUrlSchema = z
   .string()
   .regex(/^http:\/\/127\.0\.0\.1:(\d{1,5})\/\?token=[A-Za-z0-9._~-]{8,512}$/)
