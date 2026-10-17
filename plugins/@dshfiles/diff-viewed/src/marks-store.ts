@@ -21,12 +21,12 @@ export type ViewedMark = z.infer<typeof viewedMarkSchema>
 export type ViewedMarksTable = KvTable<string, ViewedMark>
 
 /** Monotone across Host restarts: a new mark always outranks every stored version. */
-export const nextMarkVersion = (current: number, now: number): number => Math.max(current + 1, now)
+const nextMarkVersion = (current: number, now: number): number => Math.max(current + 1, now)
 
 const byVersionAscending = (left: ViewedMark, right: ViewedMark): number => left.version - right.version
 
 /** Keys to drop once the store exceeds its bound; the least recently written marks go first. */
-export const markKeysToTrim = (marks: readonly ViewedMark[], limit = MAX_VIEWED_MARKS): readonly string[] =>
+const markKeysToTrim = (marks: readonly ViewedMark[], limit = MAX_VIEWED_MARKS): readonly string[] =>
   [...marks]
     .sort(byVersionAscending)
     .slice(0, Math.max(0, marks.length - limit))
@@ -38,7 +38,7 @@ export interface ViewedMarksStore {
   flush(): Promise<void>
 }
 
-export const createViewedMarksStore = ({
+const createViewedMarksStore = ({
   table,
   now = Date.now,
   reportError = error => console.error('Viewed marks write failed', { error: error instanceof Error ? error.message.slice(0, 200) : typeof error }),
@@ -94,4 +94,10 @@ export const createViewedMarksStore = ({
     },
     flush: () => writes,
   }
+}
+
+export class ViewedMarksModel {
+  static readonly nextVersion = nextMarkVersion
+  static readonly keysToTrim = markKeysToTrim
+  static readonly createStore = createViewedMarksStore
 }

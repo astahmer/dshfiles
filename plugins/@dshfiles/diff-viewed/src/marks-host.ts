@@ -1,7 +1,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-storage-domain'
 import { diffViewedApi } from './marks-api.js'
-import { createViewedMarksStore, viewedMarksDomain, type ViewedMarksStore } from './marks-store.js'
+import { ViewedMarksModel, viewedMarksDomain, type ViewedMarksStore } from './marks-store.js'
 
 interface OpenedViewedMarks {
   readonly store: ViewedMarksStore
@@ -19,7 +19,7 @@ const openViewedMarks = async (ctx: Context): Promise<OpenedViewedMarks> => {
   const storage = ctx.get('storageDomain')
   if (storage === undefined) throw new Error('Viewed marks storage is unavailable.')
   const domain = await storage.open(viewedMarksDomain)
-  return { store: createViewedMarksStore({ table: domain.table('marks') }), close: () => domain.close() }
+  return { store: ViewedMarksModel.createStore({ table: domain.table('marks') }), close: () => domain.close() }
 }
 
 export const viewedMarksFor = (ctx: Context): Promise<ViewedMarksStore> => {
