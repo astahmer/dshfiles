@@ -15,15 +15,15 @@ export interface CheckoutSyncResult {
   readonly bookmark: string
   readonly dryRun: boolean
   readonly status: CheckoutSyncStatus
-  /** The main the checkout was built on, and the main it moved to. */
+  /** The base commit this checkout was built on and the target commit it moved to. */
   readonly from: string | null
   readonly to: string
   readonly updatedStale: boolean
-  /** Undescribed (local) revisions carried onto main. */
+  /** Undescribed (local) revisions carried onto the target. */
   readonly kept: readonly SyncRevision[]
-  /** Described revisions whose changes main already holds; the rebase dropped them. */
+  /** Described revisions whose changes the target already holds; the rebase dropped them. */
   readonly absorbed: readonly SyncRevision[]
-  /** Described revisions main does not hold yet; the sync refuses to move them. */
+  /** Described revisions the target does not hold; the sync refuses to move them. */
   readonly unlanded: readonly SyncRevision[]
   readonly conflicts: readonly string[]
   readonly changedFiles: readonly string[]
@@ -46,6 +46,8 @@ interface Revision {
 const PLACEHOLDER_DESCRIPTIONS = new Set(['', 'wip'])
 const MAX_LISTED_FILES = 200
 const REVISION_TEMPLATE = 'change_id.short(12) ++ "\\t" ++ commit_id ++ "\\t" ++ conflict ++ "\\t" ++ empty ++ "\\t" ++ description.first_line() ++ "\\n"'
+const COMMIT_ID = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u
+const commitIdRevset = (commitId: string): string => `commit_id(${JSON.stringify(commitId)})`
 
 const isPlaceholder = (revision: Revision): boolean => PLACEHOLDER_DESCRIPTIONS.has(revision.description.trim().toLowerCase())
 const shown = (revision: Revision): SyncRevision => ({ changeId: revision.changeId, description: revision.description })
@@ -120,22 +122,30 @@ const syncWebProfile = async (input: {
 }
 
 /**
- * Brings the checkout of one jj workspace (the one running `dsh web`, `default` by default) onto the target bookmark,
- * keeping its local edits, then reinstalls and rebuilds what the move changed.
+ * Brings the checkout of one jj workspace (the one running `dsh web`, `default` by default) onto a bookmark tip or
+ * exact commit, keeping its local edits, then reinstalls and rebuilds what the move changed.
  *
- * Only undescribed (`wip`) revisions and described revisions main already holds move; described work main lacks is
- * refused, a conflict is undone, and a rebase that would rewrite another workspace's working copy is refused. Every
- * jj step runs in the workspace's own directory, so its files follow the rebase.
+ * Only undescribed (`wip`) revisions and described revisions the target already holds move; described work the target
+ * lacks is refused, a conflict is undone, and a rebase that would rewrite another workspace's working copy is refused.
+ * Every jj step runs in the workspace's own directory, so its files follow the rebase.
  */
 export const syncCheckout = async (options: {
   readonly cwd: string
   readonly workspace: string
   readonly bookmark: string
+  readonly revision?: string | undefined
   readonly dryRun: boolean
   readonly onProgress?: ((message: string) => void) | undefined
   readonly onOutput?: ((chunk: string) => void) | undefined
 }): Promise<CheckoutSyncResult> => {
   const { workspace, bookmark, dryRun } = options
+  const names = /^[A-Za-z0-9._-]+$/u
+  if (!names.test(workspace) || !names.test(bookmark)) {
+    throw new CheckoutSyncError('usage', '--workspace and --bookmark take a plain jj name.', 'Use e.g. --workspace default --bookmark main.')
+  }
+  if (options.revision !== undefined && !COMMIT_ID.test(options.revision)) {
+    throw new CheckoutSyncError('usage', '--revision must be a full lowercase hexadecimal commit id.', 'Pass a 40- or 64-character jj commit id.')
+  }
   const located = await runCommand({
     argv: ['jj', '--color=never', '--no-pager', '--ignore-working-copy', 'workspace', 'root', '--name', workspace],
     cwd: options.cwd,
@@ -152,9 +162,26 @@ export const syncCheckout = async (options: {
   }
   const path = located.output.trim()
   const jj = jjAt(path)
-  const target = (await jj.revisions(`present(${bookmark})`))[0]
-  if (target === undefined)
+  const bookmarkTarget = (await jj.revisions(`present(${bookmark})`)).find(revision => COMMIT_ID.test(revision.commitId))
+  if (bookmarkTarget === undefined)
     throw new CheckoutSyncError('no-bookmark', `The bookmark "${bookmark}" does not exist.`, 'Pass --bookmark <name> with an existing local bookmark.')
+  const target =
+    options.revision === undefined ? bookmarkTarget : (await jj.revisions(commitIdRevset(options.revision))).find(revision => COMMIT_ID.test(revision.commitId))
+  if (target === undefined)
+    throw new CheckoutSyncError(
+      'no-revision',
+      `The requested revision ${options.revision} does not exist.`,
+      'Pass a full commit id available in this repository.',
+    )
+  const targetRevset = commitIdRevset(target.commitId)
+  const targetLabel = options.revision === undefined ? bookmark : `revision ${target.commitId.slice(0, 12)}`
+  if (options.revision !== undefined && (await jj.revisions(`${targetRevset} & ::${bookmark}`)).length === 0) {
+    throw new CheckoutSyncError(
+      'revision-not-on-bookmark',
+      `The requested revision is no longer on bookmark "${bookmark}".`,
+      `Refresh ${bookmark} before syncing the checkout so it does not move onto a stale or unrelated commit.`,
+    )
+  }
 
   const base: Omit<CheckoutSyncResult, 'status'> = {
     workspace,
@@ -178,8 +205,8 @@ export const syncCheckout = async (options: {
   }
   // Dry runs leave the files alone; the real run snapshots the local edits first so they ride the rebase.
   const updatedStale = dryRun ? false : await updateIfStale(jj)
-  const alreadyOnBookmark = (await jj.revisions(`${bookmark} & ::@`)).length > 0
-  if (alreadyOnBookmark) {
+  const alreadyOnTarget = (await jj.revisions(`${targetRevset} & ::@`)).length > 0
+  if (alreadyOnTarget) {
     const plan = planRebuild({ root: path, changedFiles: [] })
     if (!plan.dshx && plan.plugins.length === 0) return { ...base, updatedStale, status: 'up-to-date' }
     const synced = { ...base, updatedStale }
@@ -206,13 +233,13 @@ export const syncCheckout = async (options: {
       hint:
         outcome.failure === null
           ? null
-          : `${workspace} is already on ${bookmark}, but "${outcome.failure.step}" failed. Fix it and rerun ${outcome.failure.command}.`,
+          : `${workspace} is already on ${targetLabel}, but "${outcome.failure.step}" failed. Fix it and rerun ${outcome.failure.command}.`,
       failure: outcome.failure,
     }
   }
 
-  const from = (await jj.revisions(`latest(heads(::@ & ::${bookmark}))`))[0]?.commitId ?? null
-  const stack = await jj.revisions(`::@ ~ ::${bookmark}`)
+  const from = (await jj.revisions(`latest(heads(::@ & ::${targetRevset}))`))[0]?.commitId ?? null
+  const stack = await jj.revisions(`::@ ~ ::${targetRevset}`)
   const lone = stack.length === 1 && (await jj.revisions('@:: ~ @')).length === 0
   if (!lone) {
     const others = (
@@ -221,7 +248,7 @@ export const syncCheckout = async (options: {
         'log',
         '--no-graph',
         '-r',
-        `(roots(::@ ~ ::${bookmark})::) & working_copies() ~ @`,
+        `(roots(::@ ~ ::${targetRevset})::) & working_copies() ~ @`,
         '-T',
         'working_copies.map(|w| w.name()).join(",") ++ "\\n"',
       ])
@@ -241,10 +268,10 @@ export const syncCheckout = async (options: {
   const preOperation = await jj.operation()
   const preWorkingCopy = (await jj.revisions('@'))[0]?.commitId
   const quiet = dryRun ? ['--ignore-working-copy'] : []
-  options.onProgress?.(`rebase ${workspace} onto ${bookmark}${dryRun ? ' (simulated)' : ''}`)
-  await jj.read([...quiet, 'rebase', lone ? '-r' : '-b', '@', '-d', bookmark, '--skip-emptied'])
+  options.onProgress?.(`rebase ${workspace} onto ${targetLabel}${dryRun ? ' (simulated)' : ''}`)
+  await jj.read([...quiet, 'rebase', lone ? '-r' : '-b', '@', '-d', targetRevset, '--skip-emptied'])
   const rebaseOperation = await jj.operation()
-  const after = await jj.revisions(`::@ ~ ::${bookmark}`)
+  const after = await jj.revisions(`::@ ~ ::${targetRevset}`)
 
   // Restore exactly when nothing else wrote since the rebase; otherwise revert only the rebase, so a concurrent
   // Rebase or agent operation is not undone with it.
@@ -272,7 +299,7 @@ export const syncCheckout = async (options: {
       updatedStale,
       status: 'refused',
       unlanded,
-      hint: `${workspace}@ carries described work ${bookmark} does not have yet. Rebase it onto ${bookmark} (or describe it "wip" if it is local-only), then sync again.`,
+      hint: `${workspace}@ carries described work that ${targetLabel} does not have yet. Rebase it onto ${targetLabel} (or describe it "wip" if it is local-only), then sync again.`,
     }
   }
   const conflicted = after.filter(revision => revision.conflict)
@@ -292,7 +319,7 @@ export const syncCheckout = async (options: {
       updatedStale,
       status: 'conflicted',
       conflicts: [...files].slice(0, MAX_LISTED_FILES),
-      hint: `Nothing changed. Resolve by hand in ${path}: "jj rebase ${lone ? '-r' : '-b'} @ -d ${bookmark}", fix the listed files, or move those local edits aside first.`,
+      hint: `Nothing changed. Resolve by hand in ${path}: "jj rebase ${lone ? '-r' : '-b'} @ -d ${target.commitId}", fix the listed files, or move those local edits aside first.`,
     }
   }
 
@@ -341,7 +368,7 @@ export const syncCheckout = async (options: {
     hint:
       outcome.failure === null
         ? null
-        : `${workspace} is on ${bookmark}, but "${outcome.failure.step}" failed. Fix it and rerun ${outcome.failure.command}${plan.plugins.length > 0 ? ` and "pnpm --dir plugins ${plan.plugins.map(plugin => `--filter ${plugin.name}`).join(' ')} run build"` : ''}.`,
+        : `${workspace} is on ${targetLabel}, but "${outcome.failure.step}" failed. Fix it and rerun ${outcome.failure.command}${plan.plugins.length > 0 ? ` and "pnpm --dir plugins ${plan.plugins.map(plugin => `--filter ${plugin.name}`).join(' ')} run build"` : ''}.`,
     failure: outcome.failure,
   }
 }

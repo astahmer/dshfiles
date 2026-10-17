@@ -19,6 +19,7 @@ It never restarts DSH.
 Options:
   --workspace <name>   jj workspace to sync (default "default").
   --bookmark <name>    Bookmark to move onto (default "main").
+  --revision <id>      Exact 40- or 64-character commit to sync to; it must remain on the bookmark.
   --cwd <dir>          Any directory inside the repository (default: the current directory).
   --dry-run            Report what would move, install and rebuild; files and the repository stay as they are.
   --json               Print one JSON envelope: { schemaVersion, command, ok, data | error: { code, message, hint } }.
@@ -86,6 +87,7 @@ export const runCheckoutCli = async (argv: readonly string[], io: { readonly std
       options: {
         workspace: { type: 'string', default: 'default' },
         bookmark: { type: 'string', default: 'main' },
+        revision: { type: 'string' },
         cwd: { type: 'string' },
         'dry-run': { type: 'boolean' },
         json: { type: 'boolean' },
@@ -97,15 +99,19 @@ export const runCheckoutCli = async (argv: readonly string[], io: { readonly std
   } catch (error) {
     return fail(new CheckoutSyncError('usage', error instanceof Error ? error.message : String(error), 'Run "dshx checkout sync --help".'))
   }
-  const names = /^[A-Za-z0-9._-]+$/
+  const names = /^[A-Za-z0-9._-]+$/u
+  const commitId = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u
   if (!names.test(values.workspace) || !names.test(values.bookmark))
     return fail(new CheckoutSyncError('usage', '--workspace and --bookmark take a plain jj name.', 'Use e.g. --workspace default --bookmark main.'))
+  if (values.revision !== undefined && !commitId.test(values.revision))
+    return fail(new CheckoutSyncError('usage', '--revision must be a full lowercase hexadecimal commit id.', 'Pass a 40- or 64-character jj commit id.'))
 
   try {
     const result = await syncCheckout({
       cwd: values.cwd ?? process.cwd(),
       workspace: values.workspace,
       bookmark: values.bookmark,
+      revision: values.revision,
       dryRun: values['dry-run'] === true,
       onProgress: message => write(io.stderr, `dshx checkout sync: ${message}\n`),
       onOutput: chunk => write(io.stderr, chunk),

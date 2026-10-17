@@ -26,7 +26,11 @@ describe.skipIf(!jjAvailable)('dshx checkout sync against real jj', () => {
   let root: string
   let checkout: string
   let lander: string
-  const sync = (dryRun = false) => syncCheckout({ cwd: lander, workspace: 'default', bookmark: 'main', dryRun })
+  const sync = (dryRun = false, revision?: string) => {
+    const input = { cwd: lander, workspace: 'default', bookmark: 'main', dryRun }
+    if (revision === undefined) return syncCheckout(input)
+    return syncCheckout({ ...input, revision })
+  }
   /** Another workspace lands work on main, the way jj-integration's Rebase action or an agent does. */
   const land = (file: string, content: string, message: string): void => {
     jj(lander, 'new', 'main')
@@ -65,6 +69,33 @@ describe.skipIf(!jjAvailable)('dshx checkout sync against real jj', () => {
     expect(readFileSync(join(checkout, 'feature.txt'), 'utf8')).toBe('feature\n')
     expect(jj(checkout, 'status')).toContain('.secret.json')
     expect(await sync()).toMatchObject({ status: 'up-to-date' })
+  })
+
+  it('syncs to the exact verified commit without following a bookmark that advanced later', async () => {
+    land('verified.txt', 'verified feature\n', 'feat: verified')
+    const verifiedCommitId = commitOf(lander, 'main')
+    land('later.txt', 'later work\n', 'feat: later work')
+    const latestMainCommitId = commitOf(lander, 'main')
+    expect(latestMainCommitId).not.toBe(verifiedCommitId)
+
+    const result = await sync(false, verifiedCommitId)
+
+    expect(result).toMatchObject({ status: 'synced', bookmark: 'main', to: verifiedCommitId, changedFiles: ['verified.txt'] })
+    expect(commitOf(checkout, '@-')).toBe(verifiedCommitId)
+    expect(commitOf(lander, 'main')).toBe(latestMainCommitId)
+    expect(readFileSync(join(checkout, 'verified.txt'), 'utf8')).toBe('verified feature\n')
+    expect(() => readFileSync(join(checkout, 'later.txt'))).toThrow()
+  })
+
+  it('refuses an exact commit that is no longer on the configured bookmark', async () => {
+    const originalMainCommitId = commitOf(lander, 'main')
+    land('verified.txt', 'verified feature\n', 'feat: verified')
+    const verifiedCommitId = commitOf(lander, 'main')
+    const checkoutBefore = commitOf(checkout, 'default@')
+    jj(lander, 'bookmark', 'set', '--allow-backwards', 'main', '-r', originalMainCommitId)
+
+    await expect(sync(false, verifiedCommitId)).rejects.toMatchObject({ code: 'revision-not-on-bookmark' })
+    expect(commitOf(checkout, 'default@')).toBe(checkoutBefore)
   })
 
   it('repairs missing plugin bundles when the checkout is already on main', async () => {
@@ -218,6 +249,15 @@ describe.skipIf(!jjAvailable)('dshx checkout sync against real jj', () => {
     expect(await run(['checkout', 'sync', '--cwd', lander, '--dry-run', '--json'])).toMatchObject({
       code: 0,
       envelope: { command: 'checkout sync', ok: true, data: { status: 'would-sync' } },
+    })
+    const revision = commitOf(lander, 'main')
+    expect(await run(['checkout', 'sync', '--cwd', lander, '--revision', revision, '--dry-run', '--json'])).toMatchObject({
+      code: 0,
+      envelope: { command: 'checkout sync', ok: true, data: { status: 'would-sync', to: revision } },
+    })
+    expect(await run(['checkout', 'sync', '--cwd', lander, '--revision', 'not-a-commit', '--json'])).toMatchObject({
+      code: 2,
+      envelope: { ok: false, error: { code: 'usage' } },
     })
     expect(await run(['checkout', 'sync', '--cwd', lander, '--workspace', 'missing', '--json'])).toMatchObject({
       code: 1,
