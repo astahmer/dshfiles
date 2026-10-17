@@ -502,11 +502,17 @@ const healthCheck = async (root, { keepState = false, turn } = {}) => {
       checks.push({ name: 'thread-load', ok: true, detail: 'no thread to load and this Host would not create one; the list endpoint answered instead' })
     } else {
       try {
-        const response = await rpc('session', 'page', { _request: { sessionId: threadId } })
+        const projections = await rpc('session', 'projections', { request: { sessionId: threadId } })
+        const asOfSeq = projections.status === 200 ? JSON.parse(projections.body)?.result?.value?.asOfSeq : undefined
+        const response = await rpc('session', 'page', {
+          request: { address: { kind: 'session', sessionId: threadId }, throughSeq: asOfSeq ?? 0, maxMessages: 20 },
+        })
+        const parsed = response.status === 200 ? JSON.parse(response.body) : undefined
+        const records = parsed?.result?.ok === false ? undefined : (parsed?.result?.value ?? parsed?.result)?.records
         checks.push({
           name: 'thread-load',
-          ok: response.status === 200,
-          detail: `${created ? 'created then loaded' : 'loaded'} ${threadId}: HTTP ${response.status}${response.status === 200 ? '' : ` ${response.body.slice(0, 160)}`}`,
+          ok: Array.isArray(records),
+          detail: `${created ? 'created then loaded' : 'loaded'} ${threadId}: ${Array.isArray(records) ? `${String(records.length)} record(s)` : `HTTP ${response.status} ${response.body.slice(0, 160)}`}`,
         })
       } catch (error) {
         checks.push({ name: 'thread-load', ok: false, detail: String(error).slice(0, 200) })
