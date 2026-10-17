@@ -112,15 +112,18 @@ const hostServices = (ctx: Context): MemoryServices => {
           : { sessionId: result.sessionId, title: undefined, updatedAt: undefined },
       )
     },
-    searchSessionContent: async request => {
-      const page = await sessionQuery().searchSessions({
-        query: request.query,
-        eventFilters: [
-          { kind: 'type', values: ['user/message', 'assistant/message'] },
-          { kind: 'surface', values: ['current'] },
-        ],
-        limit: request.limit,
-      })
+    searchSessionContent: async (request, signal) => {
+      const page = await sessionQuery().searchSessions(
+        {
+          query: request.query,
+          eventFilters: [
+            { kind: 'type', values: ['user/message', 'assistant/message'] },
+            { kind: 'surface', values: ['current'] },
+          ],
+          limit: request.limit,
+        },
+        signal === undefined ? undefined : { signal },
+      )
       return sessionContentHits(page)
     },
     readSession: async sessionId => {

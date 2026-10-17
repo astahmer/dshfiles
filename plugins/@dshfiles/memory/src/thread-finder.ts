@@ -159,6 +159,11 @@ export type ThreadFinderRetry = {
 
 export type ThreadFinderDeps = {
   readonly listSessions: (signal?: AbortSignal) => Promise<readonly ThreadFinderRecord[]>
+  /**
+   * Called when a content attempt missed its deadline, so the Host can reconcile the session-content index in
+   * the background without making this caller wait. One background pass makes later pages complete.
+   */
+  readonly warmContent?: ((query: string) => void) | undefined
   /** Raw full-text search over session content. Throws `SessionQueryError` with its own `code`. */
   readonly searchContent: (
     request: { readonly query: string; readonly limit: number },
@@ -169,12 +174,21 @@ export type ThreadFinderDeps = {
     signal?: AbortSignal,
   ) => Promise<readonly ThreadFinderMemoryHit[]>
   readonly readDigest: (sessionId: string) => Promise<string | null>
+  /**
+   * How long one session-content attempt may run before the finder degrades to title, workspace and memory
+   * hits. The installed SQLite backend reconciles the whole corpus before answering, which takes minutes on a
+   * large or cold history; a palette must never wait for that. `0` waits forever.
+   */
+  readonly contentDeadlineMs?: number | undefined
   readonly now?: (() => number) | undefined
   readonly correlationId?: (() => string) | undefined
   readonly logger?: ThreadFinderLogger | undefined
   readonly retry?: Partial<ThreadFinderRetry> | undefined
   readonly signal?: AbortSignal | undefined
 }
+
+/** A content search that has not answered by now is reconciling the corpus; the caller needs an answer. */
+const defaultContentDeadlineMs = 1_500
 
 const defaultRetry: ThreadFinderRetry = {
   attempts: 4,
@@ -334,14 +348,34 @@ export const createThreadFinder = (deps: ThreadFinderDeps) => {
     readonly failure: ThreadFinderDegradation | null
   }> => {
     const startedAt = now()
+    const deadlineMs = deps.contentDeadlineMs ?? defaultContentDeadlineMs
     for (let attempt = 0; attempt < retry.attempts; attempt += 1) {
       const wait = retry.delaysMs[Math.min(attempt, retry.delaysMs.length - 1)] ?? 0
       if (attempt > 0 && wait > 0) await retry.sleep(wait)
+      const deadline = new AbortController()
+      const timer = deadlineMs > 0 ? setTimeout(() => deadline.abort(), deadlineMs) : undefined
+      const signal = deps.signal === undefined ? deadline.signal : AbortSignal.any([deps.signal, deadline.signal])
       try {
-        const page = await deps.searchContent({ query, limit }, deps.signal)
+        const page = await deps.searchContent({ query, limit }, signal)
         return { hits: page.hits, attempts: attempt + 1, elapsedMs: now() - startedAt, failure: null }
       } catch (error) {
         if (deps.signal?.aborted) throw error
+        // A deadline miss means the index is reconciling the corpus: a retry would only buy another wait.
+        if (deadline.signal.aborted) {
+          deps.warmContent?.(query)
+          return {
+            hits: [],
+            attempts: attempt + 1,
+            elapsedMs: now() - startedAt,
+            failure: {
+              source: 'session-content',
+              code: 'SESSION_QUERY_TIMEOUT',
+              message: `Session content search was still reconciling the corpus after ${deadlineMs} ms; these hits come from titles, workspace paths and memory.`,
+              attempts: attempt + 1,
+              elapsedMs: now() - startedAt,
+            },
+          }
+        }
         if (!isTransientContentFailure(error) || attempt === retry.attempts - 1) {
           return {
             hits: [],
@@ -356,6 +390,8 @@ export const createThreadFinder = (deps: ThreadFinderDeps) => {
             },
           }
         }
+      } finally {
+        if (timer !== undefined) clearTimeout(timer)
       }
     }
     throw new ThreadFinderError('search-unavailable', 'Session content search could not be attempted.')

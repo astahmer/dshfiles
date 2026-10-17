@@ -107,6 +107,11 @@ repeated query returns the same page.
 attempts }]` and hits from the other three places; when nothing else matches, the call fails with the typed
   `search-unavailable` code and a message that says to retry or narrow the query. It never reports "no matches" for a
   search it could not run.
+- **One attempt is time-boxed, and the index warms in the background.** The installed backend reconciles every stored
+  log before it answers a content search, which takes minutes on a large history. An attempt that misses its deadline
+  (1.5 s) is aborted, the page comes back from titles, workspace paths and memory labeled `SESSION_QUERY_TIMEOUT`, and
+  that caller starts one background reconciliation per Host so later pages are complete. `contentDeadlineMs: 0` waits
+  instead of degrading.
 - **Related threads are a separate operation** (`relatedThreads`, tool `related_threads`): `explicit` holds real
   lineage (the session's `parentSessionId` and its children), `inferred` holds same-workspace and same-topic
   candidates, each labeled with the evidence that suggested it. Inferred precision is measured in the benchmark below.

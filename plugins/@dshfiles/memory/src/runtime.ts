@@ -34,10 +34,10 @@ export type MemoryServices = {
   /** Folded titles for the requested sessions; a per-session failure leaves that title absent instead of failing the batch. */
   readonly readSessionTitles: (sessionIds: readonly string[]) => Promise<readonly SessionTitleRead[]>
   /** Full-text search over Session content through the supported session-query backend. */
-  readonly searchSessionContent: (request: {
-    readonly query: string
-    readonly limit: number
-  }) => Promise<{ readonly hits: readonly { readonly sessionId: string; readonly snippet: string }[]; readonly hasMore: boolean }>
+  readonly searchSessionContent: (
+    request: { readonly query: string; readonly limit: number },
+    signal?: AbortSignal,
+  ) => Promise<{ readonly hits: readonly { readonly sessionId: string; readonly snippet: string }[]; readonly hasMore: boolean }>
   readonly readSession: (sessionId: string) => Promise<SessionLog>
   /** One cheap-model call on the thread's route (reasoning off by default); rejects when no route is offered. */
   readonly summarize: (request: { readonly conversationId: string; readonly system: string; readonly input: string }) => Promise<{
@@ -117,9 +117,19 @@ export const createMemoryRuntime = (options: {
     return pending
   }
 
-  /** Which projects a caller may search: its own, one named project, or every project when cross-project memory is on. */
-  const projectsFilterFor = (own: string, wanted: string | undefined): readonly string[] =>
-    wanted !== undefined && wanted.length > 0 && wanted !== 'all' ? [wanted === 'current' ? own : wanted] : options.settings().crossProject ? [] : [own]
+  /** A Client caller is the user's own UI; it has no project of its own to scope a search to. */
+  const isClientCaller = (caller: Caller): boolean => caller.id.startsWith('api:')
+
+  /**
+   * Which projects a caller may search. An Agent stays inside its own project unless cross-project memory is on;
+   * a Client caller (the user's own UI, `api:client`) has no project of its own, so an unscoped request from it
+   * covers every project the user can already open.
+   */
+  const projectsFilterFor = (own: string, wanted: string | undefined, clientCaller: boolean): readonly string[] => {
+    if (wanted !== undefined && wanted.length > 0 && wanted !== 'all' && wanted !== 'current') return [wanted]
+    if (wanted === 'current' && !clientCaller) return [own]
+    return clientCaller || options.settings().crossProject ? [] : [own]
+  }
 
   const readLog = async (sessionId: string): Promise<SessionLog> => {
     const cached = logCache.find(entry => entry.id === sessionId)
@@ -409,6 +419,7 @@ export const createMemoryRuntime = (options: {
     args: { readonly query: string; readonly project?: string | undefined; readonly limit?: number | undefined },
   ): Promise<string> => {
     const own = await projectOf(caller.session.header)
+    const clientCaller = isClientCaller(caller)
     const limit = Math.max(1, Math.min(args.limit ?? 6, 20))
     const { embedder } = await retrieval()
     const queryVector =
@@ -421,7 +432,7 @@ export const createMemoryRuntime = (options: {
     if (embedder !== undefined) void embedMissing()
     const hits = store.search({
       query: args.query,
-      projects: projectsFilterFor(own, args.project?.trim()),
+      projects: projectsFilterFor(own, args.project?.trim(), clientCaller),
       ownProject: own,
       limit,
       ranker: queryVector === undefined ? 'bm25' : 'hybrid',
@@ -564,11 +575,27 @@ export const createMemoryRuntime = (options: {
     }
   }
 
+  /** One background reconciliation per runtime: the caller that timed out starts it, later pages read the result. */
+  let warmingContent: Promise<void> | undefined
+  const warmSessionContent = (query: string): void => {
+    if (warmingContent !== undefined) return
+    const startedAt = Date.now()
+    warmingContent = services
+      .searchSessionContent({ query, limit: 1 })
+      .then(() => {
+        logger.info(`memory: session-content index reconciled in ${Date.now() - startedAt} ms`)
+      })
+      .catch((error: unknown) => {
+        logger.warn(`memory: session-content reconciliation failed after ${Date.now() - startedAt} ms: ${error instanceof Error ? error.message : String(error)}`)
+      })
+  }
+
   const finderFor = async (own: string): Promise<ThreadFinder> => {
     const records = await threadRecords()
     return createThreadFinder({
       listSessions: async () => records,
-      searchContent: request => services.searchSessionContent(request),
+      warmContent: warmSessionContent,
+      searchContent: (request, signal) => services.searchSessionContent(request, signal),
       searchMemory: request => finderMemoryHits(request, own),
       readDigest: async sessionId => store.thread(sessionId)?.digest ?? null,
       logger: { info: (message, fields) => logger.info(`memory: ${message} ${JSON.stringify(fields)}`) },
@@ -589,11 +616,12 @@ export const createMemoryRuntime = (options: {
     },
   ): Promise<ThreadFinderPage & { readonly project: string }> => {
     const own = await projectOf(caller.session.header)
+    const clientCaller = isClientCaller(caller)
     const finder = await finderFor(own)
     const page = await withFinderErrors(() =>
       finder.find({
         query: args.query,
-        projects: projectsFilterFor(own, args.project?.trim()),
+        projects: projectsFilterFor(own, args.project?.trim(), clientCaller),
         ownProject: own,
         limit: args.limit ?? 8,
         ...(args.cursor === undefined ? {} : { cursor: args.cursor }),
@@ -612,9 +640,10 @@ export const createMemoryRuntime = (options: {
     args: { readonly sessionId: string; readonly project?: string | undefined; readonly limit?: number | undefined },
   ): Promise<ThreadFinderRelations & { readonly project: string }> => {
     const own = await projectOf(caller.session.header)
+    const clientCaller = isClientCaller(caller)
     const finder = await finderFor(own)
     const relations = await withFinderErrors(() =>
-      finder.related({ sessionId: args.sessionId, projects: projectsFilterFor(own, args.project?.trim()), limit: args.limit ?? 8 }),
+      finder.related({ sessionId: args.sessionId, projects: projectsFilterFor(own, args.project?.trim(), clientCaller), limit: args.limit ?? 8 }),
     )
     store.recordToolCall({
       thread: caller.id,
