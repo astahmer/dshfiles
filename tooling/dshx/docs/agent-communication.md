@@ -36,11 +36,28 @@ principals; DSH Agent identities are taken from the Host tool execution.
   each one to `workspace/<sha256-prefix>` derived from its resolved Session
   working directory. The `agent/created` event uses the same idempotent path.
   The path itself is not stored in the topic or message.
-- Agents also get a private inbox for direct messages. Both automatic
-  subscriptions use passive delivery.
+- Automatic registration never fails on capacity. A topic holds at most 512
+  subscribers because a publish addresses one recipient per subscriber; a full
+  topic evicts its stalest subscribers (least recent communication activity,
+  then oldest row) so a new Session always starts. Only an explicit
+  `dshx_comm_subscribe` still reports `topic-full`.
+- Agents also get a private inbox for direct messages, and it stores no
+  subscription row: a direct message carries its recipient, and inbox reads
+  filter on the recipient. Every inbox row from an older schema is dropped on
+  the next write, so a permanent per-Agent row can no longer exhaust a topic.
 - Every arrival is a durable record only. It never appends a Session/user
   message, calls `Agent.followup()` or `Agent.steer()`, or replays a pending
   notification when an Agent appears. Completed turns remain completed.
+- With unread mail waiting, the Host appends one runtime-context line at prompt
+  assembly that names the count and the tool, carries no peer text, and orders
+  nothing. It is a dynamic context (a sourced user-role snapshot), never a
+  system-prompt section, so it appends after cached history instead of rewriting
+  the system prefix. At zero unread the context is empty and emits nothing.
+- `dshx_comm_send` resolves its recipient against the live Agent directory and
+  the persisted Session corpus before writing. An id that is neither is refused
+  with the closest known ids; a dormant Session, which is a legitimate
+  recipient, still accepts mail. The corpus listing is cached for one minute and
+  the service re-reads its state file only when the file revision changed.
 - `intent` (`notice`/`request`) records whether the sender shares information or
   asks for action. It is metadata: a `request` starts no turn. An optional
   sender-scoped `dedupeKey` makes a repeated publish/send return the stored

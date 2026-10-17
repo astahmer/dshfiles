@@ -1,5 +1,6 @@
 import type { Agent } from '@deepseek-ai/dsh-agent'
-import { defineHost, defineTool } from '@dshfiles/dshx/host'
+import type { SessionRecord } from '@deepseek-ai/dsh-session-query'
+import { defineHost, definePromptContext, defineTool, type AssembleContext } from '@dshfiles/dshx/host'
 import {
   CommunicationError,
   createCommunicationService,
@@ -13,10 +14,12 @@ import type { InferValue, ToolRunContext, ValueSchemaSpec } from '@deepseek-ai/d
 import { z } from 'zod'
 import { agentCommunicationApi } from './api.js'
 import { createAgentCommunicationOperations } from './api-operations.js'
-import { initializeCommunicationAgent } from './agent-lifecycle.js'
+import { registerCommunicationAgent } from './agent-lifecycle.js'
 import { LiveAgentDirectoryModel } from './live-agent-directory.js'
 import { formatInbox } from './messages.js'
+import { RecipientDirectoryModel } from './recipient-directory.js'
 import { SessionHistoryModel } from './session-history.js'
+import { UnreadNudgeRules } from './unread-nudge.js'
 
 declare module '@deepseek-ai/cordis' {
   interface Events {
@@ -251,7 +254,7 @@ const subscribeTool = defineTool({
   name: 'dshx_comm_subscribe',
   description: 'Subscribe this Agent to a topic. Messages are stored passively and never create or resume an Agent turn.',
   parameters: {
-    topic: { type: 'string', required: true, description: 'Topic name, or inbox for this Agent’s direct messages.' },
+    topic: { type: 'string', required: true, description: 'Broadcast topic name. The private inbox is always available and needs no subscription.' },
   },
   output: summaryOutput,
   execute: async (args, execution) =>
@@ -363,6 +366,7 @@ const sendTool = defineTool({
       operation: 'dshx_comm_send',
       run: async () => {
         const sender = principalForAgent(execution.agent)
+        const recipientStatus = await resolveRecipientId(args.toAgentId)
         const message = await requireService().send({
           sender,
           toAgentId: args.toAgentId,
@@ -385,7 +389,7 @@ const sendTool = defineTool({
             sessionId: sender.id,
           },
         })
-        const recipientLive = hostContext?.agents.list().some(agent => agent.id === args.toAgentId) === true
+        const recipientLive = recipientStatus === 'live'
         return {
           summary: `Sent ${message.id} to ${args.toAgentId} as ${message.intent}; durably stored in the recipient inbox (recipient ${recipientLive ? 'currently live' : 'not currently live; the message stays pending until that Session runs again'}).`,
         }
@@ -410,6 +414,7 @@ const inboxTool = defineTool({
         const limit = args.limit ?? 20
         const inboxInput = args.topic === undefined ? { principal, limit } : { principal, topic: args.topic, limit }
         const items = await requireService().inbox(inboxInput)
+        void refreshUnreadCounts()
         return { summary: formatInbox(items) }
       },
     }),
@@ -427,6 +432,7 @@ const acknowledgeTool = defineTool({
       run: async () => {
         const principal = principalForAgent(execution.agent)
         const result = await requireService().acknowledge(principal, args.messageId)
+        void refreshUnreadCounts()
         return { summary: result.acknowledged ? `Acknowledged ${args.messageId}.` : `Message ${args.messageId} was already acknowledged.` }
       },
     }),
@@ -449,6 +455,82 @@ const communicationOperations = createAgentCommunicationOperations({
       workspaceTopic: LiveAgentDirectoryModel.communicationWorkspaceTopic(agent.session.header.cwd) ?? null,
     })) ?? [],
 })
+
+/** Sending to a dormant Session must stay possible, so the whole persisted corpus is listed — but only on demand. */
+const durableSessionIdTtlMs = 60_000
+let durableSessionIds: { readonly at: number; readonly ids: readonly string[] } | undefined
+
+const knownDurableSessionIds = async (): Promise<readonly string[] | undefined> => {
+  const now = Date.now()
+  if (durableSessionIds !== undefined && now - durableSessionIds.at < durableSessionIdTtlMs) return durableSessionIds.ids
+  const sessionQuery = hostContext?.get('sessionQuery')
+  if (sessionQuery === undefined) return undefined
+  try {
+    const records: readonly SessionRecord[] = await sessionQuery.listSessions()
+    const ids = records.map(record => record.header.id)
+    durableSessionIds = { at: now, ids }
+    return ids
+  } catch {
+    return undefined
+  }
+}
+
+/** Refuses an id no Session can read: the phantom mailboxes recorded in the live store were all mistyped Session ids. */
+const resolveRecipientId = async (toAgentId: string): Promise<'live' | 'durable'> => {
+  const liveIds = hostContext?.agents.list().map(agent => agent.id) ?? []
+  if (RecipientDirectoryModel.resolve({ requestedId: toAgentId, liveIds, durableIds: [] }).status === 'live') return 'live'
+  const listed = await knownDurableSessionIds()
+  // Without a corpus listing there is nothing to check against, and a dormant recipient is legitimate: accept the id.
+  if (listed === undefined) return 'durable'
+  const resolution = RecipientDirectoryModel.resolve({ requestedId: toAgentId, liveIds, durableIds: listed })
+  if (resolution.status !== 'unknown') return resolution.status
+  const closest = resolution.suggestions.length === 0 ? '' : ` Closest known ids: ${resolution.suggestions.join(', ')}.`
+  throw new CommunicationError(
+    'unknown-recipient',
+    `No live Agent or persisted Session has the id "${toAgentId}"; nothing was stored. Call dshx_comm_agents for valid ids.${closest}`,
+  )
+}
+
+let unreadCounts = new Map<string, number>()
+let unreadRefresh: Promise<void> | undefined
+
+const unreadContext = definePromptContext({
+  name: UnreadNudgeRules.contextName,
+  order: UnreadNudgeRules.contextOrder,
+  interpolate: false,
+  text: (assembly: AssembleContext): string => UnreadNudgeRules.text({ count: unreadCounts.get(assembly.agent?.id ?? '') ?? 0 }),
+})
+
+/** A stale count is harmless; a failed refresh must never disturb a turn, so failures keep the previous map. */
+const refreshUnreadCounts = (): Promise<void> => {
+  unreadRefresh ??= (async () => {
+    try {
+      if (hostContext === undefined || communicationService === undefined) return
+      unreadCounts = await collectUnreadCounts({ context: hostContext, service: communicationService })
+    } finally {
+      unreadRefresh = undefined
+    }
+  })()
+  return unreadRefresh
+}
+
+const collectUnreadCounts = async (input: {
+  readonly context: Context
+  readonly service: ReturnType<typeof createCommunicationService>
+}): Promise<Map<string, number>> => {
+  const counts = new Map<string, number>()
+  await Promise.all(
+    input.context.agents.list().map(async agent => {
+      try {
+        const count = await input.service.unreadCount({ kind: 'agent', id: agent.id })
+        if (count > 0) counts.set(agent.id, count)
+      } catch {
+        return
+      }
+    }),
+  )
+  return counts
+}
 
 const api = agentCommunicationApi.host({
   diagnostics: ({ input }) => communicationOperations.diagnostics(input.limit),
@@ -508,7 +590,12 @@ const trackToolActivity = async <Value>(input: {
 }
 
 const initializeAgent = (agent: Agent): Promise<void> =>
-  initializeCommunicationAgent({ service: requireService(), agentId: agent.id, workspaceCwd: agent.session.header.cwd })
+  registerCommunicationAgent({
+    service: requireService,
+    agentId: agent.id,
+    workspaceCwd: agent.session.header.cwd,
+    onFailure: error => hostContext?.logger.warn('agent-communication: peer-message registration failed for %s; the Agent still starts: %o', agent.id, error),
+  })
 
 const setupHost = (context: Context): Effect<void> => {
   hostContext = context
@@ -542,6 +629,7 @@ const setupHost = (context: Context): Effect<void> => {
 
   context.on('agent/created', async ({ agent }) => {
     await initializeAgent(agent)
+    await refreshUnreadCounts()
     return undefined
   })
 
@@ -571,7 +659,10 @@ const setupHost = (context: Context): Effect<void> => {
           )
         }
         for (const agent of context.agents.list()) await initializeAgent(agent)
+        void refreshUnreadCounts()
+        const unreadTimer = setInterval(() => void refreshUnreadCounts(), UnreadNudgeRules.refreshIntervalMs)
         yield async () => {
+          clearInterval(unreadTimer)
           try {
             if (bridge !== undefined) await bridge.close()
           } finally {
@@ -594,6 +685,7 @@ const host = defineHost({
   name: 'agent-communication',
   inject: ['agents'],
   apis: [api],
+  prompts: [unreadContext],
   tools: [
     agentListTool,
     workspaceLookupTool,
