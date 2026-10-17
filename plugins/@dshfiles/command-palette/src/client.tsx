@@ -9,7 +9,9 @@ import type { ThemeSnapshot } from '@deepseek-ai/dsh-client-ui-theme/client'
 import type { SidebarRootComponentProps } from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type { PropsLocale, PropsRuntime, TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import type { WorkspaceBrowserProps } from '@deepseek-ai/dsh-client-ui-workspace/client'
-import { defineClient } from '@dshfiles/dshx/client'
+import { dshxRegistryApi } from '@dshfiles/dshx/api'
+import { createApiClient, createRegisteredApiClient, defineClient } from '@dshfiles/dshx/client'
+import { createThreadContentSearch } from './thread-content-source.js'
 import { useMemo, useSyncExternalStore } from 'react'
 import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
 import { CirclePlusIcon, FolderOpenIcon, MoonIcon, SunIcon, SunMoonIcon } from '@dshfiles/plugin-ui/icons'
@@ -184,12 +186,19 @@ export default defineClient({
     const translate = ctx.locale.bind(COMMAND_PALETTE_LOCALE_NAMESPACE)
     const themeStore = createSnapshotStore(ctx.theme.getTheme())
     ctx.on('theme/change', snapshot => themeStore.set(snapshot))
-    const searchContent = async (query: string, signal: AbortSignal) => {
-      if (typeof ctx.sessions.search !== 'function') throw new Error('Thread content search is unavailable.')
-      const result = await ctx.sessions.search(query, signal)
-      if (!result.ok) throw new Error('Thread content search failed.')
-      return result.value.items.map(item => ({ sessionId: item.sessionId, snippet: item.snippet }))
-    }
+    const searchContent = createThreadContentSearch({
+      listApis: async () => (await createApiClient(ctx, dshxRegistryApi).list({})).apis,
+      callFinder: async (api, input, signal) => {
+        const client = createRegisteredApiClient(ctx, { ...api, methods: ['findThreads'] })
+        return client.findThreads === undefined ? undefined : client.findThreads(input, { signal })
+      },
+      native: async (query, signal) => {
+        if (typeof ctx.sessions.search !== 'function') throw new Error('Thread content search is unavailable.')
+        const result = await ctx.sessions.search(query, signal)
+        if (!result.ok) throw new Error('Thread content search failed.')
+        return result.value.items.map(item => ({ sessionId: item.sessionId, snippet: item.snippet }))
+      },
+    })
     ctx.effect(
       () =>
         ctx.slots.inject('shell.overlay', () =>
