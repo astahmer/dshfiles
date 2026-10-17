@@ -1,6 +1,6 @@
 import { existsSync, realpathSync } from 'node:fs'
 import { join } from 'node:path'
-import { CheckoutSyncError, planRebuild, runCommand, runRebuild, type PluginEffect } from './rebuild.js'
+import { CheckoutRebuild, CheckoutSyncError, type PluginEffect } from './rebuild.js'
 
 export interface SyncRevision {
   readonly changeId: string
@@ -53,9 +53,9 @@ const isPlaceholder = (revision: Revision): boolean => PLACEHOLDER_DESCRIPTIONS.
 const shown = (revision: Revision): SyncRevision => ({ changeId: revision.changeId, description: revision.description })
 
 const jjAt = (cwd: string) => {
-  const run = (args: readonly string[]) => runCommand({ argv: ['jj', '--color=never', '--no-pager', ...args], cwd })
+  const run = (args: readonly string[]) => CheckoutRebuild.command({ argv: ['jj', '--color=never', '--no-pager', ...args], cwd })
   const read = async (args: readonly string[]): Promise<string> => {
-    const result = await runCommand({ argv: ['jj', '--color=never', '--no-pager', ...args], cwd })
+    const result = await CheckoutRebuild.command({ argv: ['jj', '--color=never', '--no-pager', ...args], cwd })
     if (result.exitCode !== 0)
       throw new CheckoutSyncError(
         'jj-failed',
@@ -111,7 +111,7 @@ const syncWebProfile = async (input: {
   if (running !== undefined && running.length > 0 && realPath(running) !== realPath(input.root))
     return `the profile seed changed here, but DSH runs from ${running}; its next start syncs from there`
   input.onProgress?.('sync the web profile: node scripts/profile-sync.ts --profile web')
-  const result = await runCommand({
+  const result = await CheckoutRebuild.command({
     argv: [process.execPath, join(input.root, 'scripts/profile-sync.ts'), '--profile', 'web'],
     cwd: input.root,
     onOutput: input.onOutput,
@@ -146,12 +146,12 @@ export const syncCheckout = async (options: {
   if (options.revision !== undefined && !COMMIT_ID.test(options.revision)) {
     throw new CheckoutSyncError('usage', '--revision must be a full lowercase hexadecimal commit id.', 'Pass a 40- or 64-character jj commit id.')
   }
-  const located = await runCommand({
+  const located = await CheckoutRebuild.command({
     argv: ['jj', '--color=never', '--no-pager', '--ignore-working-copy', 'workspace', 'root', '--name', workspace],
     cwd: options.cwd,
   })
   if (located.exitCode !== 0) {
-    const inRepository = (await runCommand({ argv: ['jj', '--ignore-working-copy', 'root'], cwd: options.cwd })).exitCode === 0
+    const inRepository = (await CheckoutRebuild.command({ argv: ['jj', '--ignore-working-copy', 'root'], cwd: options.cwd })).exitCode === 0
     throw inRepository
       ? new CheckoutSyncError(
           'no-workspace',
@@ -207,7 +207,7 @@ export const syncCheckout = async (options: {
   const updatedStale = dryRun ? false : await updateIfStale(jj)
   const alreadyOnTarget = (await jj.revisions(`${targetRevset} & ::@`)).length > 0
   if (alreadyOnTarget) {
-    const plan = planRebuild({ root: path, changedFiles: [] })
+    const plan = CheckoutRebuild.plan({ root: path, changedFiles: [] })
     if (!plan.dshx && plan.plugins.length === 0) return { ...base, updatedStale, status: 'up-to-date' }
     const synced = { ...base, updatedStale }
     if (dryRun) {
@@ -221,7 +221,7 @@ export const syncCheckout = async (options: {
         restart: { needed: reasons.length > 0, reasons },
       }
     }
-    const outcome = await runRebuild({ root: path, plan, changedFiles: [], onProgress: options.onProgress, onOutput: options.onOutput })
+    const outcome = await CheckoutRebuild.run({ root: path, plan, changedFiles: [], onProgress: options.onProgress, onOutput: options.onOutput })
     const reasons = restartReasons(outcome.plugins, null)
     return {
       ...synced,
@@ -326,7 +326,7 @@ export const syncCheckout = async (options: {
   const changedFiles = (await jj.read(['--ignore-working-copy', 'diff', '--from', from ?? 'root()', '--to', target.commitId, '--name-only']))
     .split('\n')
     .filter(line => line.length > 0)
-  const plan = planRebuild({ root: path, changedFiles })
+  const plan = CheckoutRebuild.plan({ root: path, changedFiles })
   const synced = { ...base, from, updatedStale, kept, absorbed, changedFiles: changedFiles.slice(0, MAX_LISTED_FILES) }
   if (dryRun) {
     await undo()
@@ -345,7 +345,7 @@ export const syncCheckout = async (options: {
   }
 
   await updateIfStale(jj)
-  const outcome = await runRebuild({
+  const outcome = await CheckoutRebuild.run({
     root: path,
     plan,
     changedFiles,
