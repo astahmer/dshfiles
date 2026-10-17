@@ -5,25 +5,30 @@ Owned fork of DSH's native Conversation client plugin. It preserves the full nat
 ## Upstream and license
 
 - Upstream: [`deepseek-ai/deepseek-harness`](https://github.com/deepseek-ai/deepseek-harness)
-- Package: `@deepseek-ai/dsh-client-ui-conversation@0.2.0-rc.2` (MIT)
+- Package: `@deepseek-ai/dsh-client-ui-conversation@0.2.1-rc.2` (MIT)
 - Client source: `packages/client/ui-conversation/src/client`
 - Shared settings source: `packages/client/ui-conversation/src/submission-settings.ts`
-- Pinned revision: [`c1b47e41fcd54d20a0f061df28683bfc29ee24e5`](https://github.com/deepseek-ai/deepseek-harness/commit/c1b47e41fcd54d20a0f061df28683bfc29ee24e5), `release(dsh): 0.2.0-rc.2`
+- Pinned revision: [`687f282e8625c6b8d11ff58211a90524be2e4317`](https://github.com/deepseek-ai/deepseek-harness/commit/687f282e8625c6b8d11ff58211a90524be2e4317), tag `dsh-v0.2.1-rc.2`
+- Previous pin: `c1b47e41fcd54d20a0f061df28683bfc29ee24e5` (`0.2.0-rc.2`); the 0.2.1 update was a three-way merge (`git merge-file`, base `dsh-v0.2.0-rc.2`) of the upstream delta onto this fork
 - The complete client source is vendored in [`src/native`](./src/native) (upstream `src/client`) plus [`src/submission-settings.ts`](./src/submission-settings.ts) (upstream `src/submission-settings.ts`), keeping the upstream relative layout.
 
 ### Local delta
 
 Every other vendored file is byte-identical to the pinned revision, so an upstream update starts from a real `diff`. The whole delta is:
 
-| File                                      | Change                                                                       |
-| ----------------------------------------- | ---------------------------------------------------------------------------- |
-| `src/native/contract/slots.ts`            | `ComposerBarInjected` gains `insertReference`                                |
-| `src/native/apply.ts`                     | injects that action from the session's `conversation.input` facade           |
-| `src/native/skeleton/InputBar.tsx`        | paste converts canonical mentions into reference chips, falling back to text |
-| `src/native/input/editor/keymap.ts`       | reads `text/html` when the clipboard has no plain text                       |
-| `src/native/input/editor/view-binding.ts` | routes the paste handler through the bar's live handler                      |
-| `src/paste-references.ts`                 | new: canonical wire-text parser and reference builder                        |
-| `src/clipboard-text.ts`                   | new: markup-free clipboard text and `dsh-session:` link conversion           |
+| File                                             | Change                                                                                     |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------ |
+| `src/native/contract/slots.ts`                   | `ComposerBarInjected` gains `insertReference`                                              |
+| `src/native/apply.ts`                            | injects that action; workspace switch hands the draft over through `transferComposerDraft` |
+| `src/native/locales.ts`                          | `workspace.draftTransferRefused` notice for a refused handoff                              |
+| `src/native/skeleton/InputBar.tsx`               | paste converts canonical mentions into reference chips, falling back to text               |
+| `src/native/input/editor/keymap.ts`              | reads `text/html` when the clipboard has no plain text                                     |
+| `src/native/input/editor/view-binding.ts`        | routes the paste handler through the bar's live handler                                    |
+| `src/native/input/editor/runtime.ts`             | logs the Lexical error stack before rethrowing                                             |
+| `src/native/user-text/session-reference-rule.ts` | imports and augments `../index.ts` instead of the package's own `/client` self-reference   |
+| `src/composer-draft-handoff.ts`                  | new: refusing, rollback-safe draft handoff carrying the semantic `DraftSnapshot`           |
+| `src/paste-references.ts`                        | new: canonical wire-text parser and reference builder                                      |
+| `src/clipboard-text.ts`                          | new: markup-free clipboard text and `dsh-session:` link conversion                         |
 
 `src/native` is excluded from Oxlint, Oxfmt and ast-grep (see [native plugin overrides](../../../docs/native-plugin-overrides.md)); the files above that live outside it are linted normally.
 

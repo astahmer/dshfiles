@@ -2,12 +2,21 @@ import { describe, expect, it } from 'vitest'
 import { transferComposerDraft, type DraftHandoffPort } from './composer-draft-handoff.js'
 
 type DraftSnapshot = DraftHandoffPort['snapshot']
+type DraftDocument = DraftHandoffPort['draftSnapshot']
 
-const draftPort = (initial: DraftSnapshot, acceptAttachments = true): DraftHandoffPort => {
+const draftPort = (
+  initial: DraftSnapshot,
+  acceptAttachments = true,
+  initialDocument: DraftDocument = { text: initial.draft, references: [] },
+): DraftHandoffPort & { readonly draftSnapshot: DraftDocument } => {
   let snapshot = initial
+  let document = initialDocument
   return {
     get snapshot() {
       return snapshot
+    },
+    get draftSnapshot() {
+      return document
     },
     addAttachments(ids) {
       if (!acceptAttachments || snapshot.phase !== 'plain') return false
@@ -20,7 +29,8 @@ const draftPort = (initial: DraftSnapshot, acceptAttachments = true): DraftHando
       return true
     },
     setDraft(draft) {
-      snapshot = { ...snapshot, draft }
+      document = draft === '' ? { text: '', references: [] } : draft
+      snapshot = { ...snapshot, draft: document.text }
     },
   }
 }
@@ -112,6 +122,31 @@ describe('composer draft handoff', () => {
     expect(source.snapshot).toEqual({ draft: '', attachmentIds: [], phase: 'plain' })
     expect(destination.snapshot).toEqual({ draft: 'keep me', attachmentIds: ['image', 'file'], phase: 'plain' })
     expect(rebound).toEqual([{ sessionId: 'destination', ids: ['image', 'file'] }])
+  })
+
+  it('carries reference chips and the command chip with the moved draft', () => {
+    const document: DraftDocument = {
+      text: '/goal see @[Plan](dsh-session:abc)',
+      references: [{ source: 'session', ref: 'abc', offset: 10, length: 24, label: 'Plan', clipboardText: '@[Plan](dsh-session:abc)' }],
+      command: { token: '/goal ' },
+    }
+    const source = draftPort({ draft: document.text, attachmentIds: [], phase: 'plain' }, true, document)
+    const destination = draftPort({ draft: '', attachmentIds: [], phase: 'plain' })
+
+    transferComposerDraft({
+      source,
+      destination,
+      sourceSessionId: 'source',
+      destinationSessionId: 'destination',
+      destinationSessionReady: true,
+      rebindAttachments: () => undefined,
+      onRefused: () => {
+        throw new Error('unexpected refusal')
+      },
+    })
+
+    expect(destination.draftSnapshot).toEqual(document)
+    expect(source.draftSnapshot).toEqual({ text: '', references: [] })
   })
 
   it('refuses to overwrite an existing destination draft', () => {

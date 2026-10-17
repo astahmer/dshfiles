@@ -1,3 +1,4 @@
+import type { DraftSnapshot as DraftDocument } from './native/contract/draft-editor.js'
 import type { InputState } from './native/contract/input.js'
 
 type DraftSnapshot<AttachmentId extends string> = Pick<InputState, 'draft' | 'phase'> & {
@@ -6,9 +7,10 @@ type DraftSnapshot<AttachmentId extends string> = Pick<InputState, 'draft' | 'ph
 
 export interface DraftHandoffPort<AttachmentId extends string = string> {
   readonly snapshot: DraftSnapshot<AttachmentId>
+  readonly draftSnapshot: DraftDocument
   readonly addAttachments: (ids: readonly AttachmentId[]) => boolean
   readonly removeAttachment: (id: AttachmentId) => boolean
-  readonly setDraft: (draft: string) => void
+  readonly setDraft: (draft: DraftDocument | '') => void
 }
 
 export const transferComposerDraft = <AttachmentId extends string>(input: {
@@ -47,8 +49,9 @@ export const transferComposerDraft = <AttachmentId extends string>(input: {
     throw error
   }
 
-  if (source.draft !== '') {
-    input.destination.setDraft(source.draft)
+  const document = input.source.draftSnapshot
+  if (document.text !== '') {
+    input.destination.setDraft(document)
     input.source.setDraft('')
   }
   for (const id of source.attachmentIds) input.source.removeAttachment(id)
