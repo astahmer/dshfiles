@@ -60,9 +60,30 @@ const baseLabel = (base: ComposerBase, targetBookmarks: readonly string[]): stri
   return '@-'
 }
 
+/** The composer bar re-reads its JJ context on every render burst; one read per argument set serves them all. */
+const COMPOSER_READ_TTL_MS = 2_000
+
 /** Read-only JJ context for the composer: one snapshotting read, then parallel reads that skip the working copy. */
-export const composerContextHost = (run: RunJj) =>
-  composerContextApi.host({
+export const composerContextHost = (directRun: RunJj) => {
+  const readResults = new Map<string, { readonly value: Awaited<ReturnType<RunJj>>; readonly at: number }>()
+  const readsInFlight = new Map<string, Promise<Awaited<ReturnType<RunJj>>>>()
+  const run: RunJj = (ctx, cwd, args, signal, options) => {
+    const key = `${cwd}\u0000${args.join('\u0000')}\u0000${String(options.outputLimit)}`
+    const cached = readResults.get(key)
+    if (cached !== undefined && Date.now() - cached.at < COMPOSER_READ_TTL_MS) return Promise.resolve(cached.value)
+    const inFlight = readsInFlight.get(key)
+    if (inFlight !== undefined) return inFlight
+    const read = directRun(ctx, cwd, args, signal, options).then(value => {
+      readResults.set(key, { value, at: Date.now() })
+      if (readResults.size > 64) for (const [candidate, entry] of readResults) if (Date.now() - entry.at > COMPOSER_READ_TTL_MS) readResults.delete(candidate)
+      return value
+    })
+    readsInFlight.set(key, read)
+    return read.finally(() => {
+      if (readsInFlight.get(key) === read) readsInFlight.delete(key)
+    })
+  }
+  return composerContextApi.host({
     context: async ({ input, ctx, signal }) => {
       const root = await workspaceRoot(ctx, run, input.cwd, signal)
       if (root === null) return { repository: null }
@@ -125,3 +146,4 @@ export const composerContextHost = (run: RunJj) =>
       }
     },
   })
+}
