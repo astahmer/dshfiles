@@ -12,7 +12,7 @@ import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { z } from 'zod'
 import { MAX_FILES, pullsReviewApi } from './api.js'
-import { recordReviewed, reviewedKeyOf, toggleReviewed } from './reviewed.js'
+import { ReviewedMarksModel } from './reviewed.js'
 import type { SessionFocus } from './session-focus.js'
 
 const NO_REVIEWED: Record<string, string[]> = {}
@@ -78,7 +78,7 @@ export const PullsReviewPanel = (props: PullsReviewPanelProps): ReactNode => {
   })
   const summarized = summarize.data
   const aiSummaries = summarized?.status === 'ok' ? summarized.summaries : undefined
-  const scopeKeyOf = cwd !== undefined && head !== undefined ? reviewedKeyOf(cwd, base ?? '', head) : undefined
+  const scopeKeyOf = cwd !== undefined && head !== undefined ? ReviewedMarksModel.keyOf(cwd, base ?? '', head) : undefined
   const reviewedPaths = useMemo(() => {
     const paths = scopeKeyOf === undefined ? undefined : reviewed[scopeKeyOf]
     return new Set(paths ?? [])
@@ -113,7 +113,7 @@ export const PullsReviewPanel = (props: PullsReviewPanelProps): ReactNode => {
 
   const markReviewed = (path: string): void => {
     if (scopeKeyOf === undefined) return
-    reviewedStore.set(recordReviewed(reviewed, scopeKeyOf, toggleReviewed(reviewed[scopeKeyOf] ?? [], path)))
+    reviewedStore.set(ReviewedMarksModel.record(reviewed, scopeKeyOf, ReviewedMarksModel.toggle(reviewed[scopeKeyOf] ?? [], path)))
   }
 
   const selectScope = (next: number): void => {
