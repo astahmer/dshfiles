@@ -49,6 +49,8 @@ export const threadAttentionMigrationEntrySchema = z
 export const threadSidebarAttentionApi = defineApi({
   id: 'thread-sidebar-attention',
   version: 1,
+  // Other plugins import this contract; without an owner each would derive its own channel.
+  owner: '@dshfiles/thread-sidebar',
   methods: {
     state: method({
       input: z.void(),
