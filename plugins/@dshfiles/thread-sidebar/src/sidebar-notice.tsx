@@ -8,6 +8,52 @@ export interface SidebarNotice {
   readonly durationMs?: number
 }
 
+export interface SidebarNoticeQueueState {
+  readonly current: SidebarNotice | null
+  readonly currentIsNotification: boolean
+  readonly pending: readonly SidebarNotice[]
+}
+
+export type SidebarNoticeQueueAction =
+  | { readonly type: 'enqueue-notification'; readonly notice: SidebarNotice }
+  | { readonly type: 'set'; readonly notice: SidebarNotice | null }
+  | { readonly type: 'update'; readonly update: (current: SidebarNotice | null) => SidebarNotice | null }
+
+export const MAX_PENDING_SIDEBAR_NOTICES = 5_000
+
+export const INITIAL_SIDEBAR_NOTICE_QUEUE_STATE: SidebarNoticeQueueState = {
+  current: null,
+  currentIsNotification: false,
+  pending: [],
+}
+
+export const enqueueSidebarNotice = (pending: readonly SidebarNotice[], notice: SidebarNotice): readonly SidebarNotice[] =>
+  [...pending, notice].slice(-MAX_PENDING_SIDEBAR_NOTICES)
+
+export const takeNextSidebarNotice = (pending: readonly SidebarNotice[]) => ({
+  notice: pending[0] ?? null,
+  pending: pending.slice(1),
+})
+
+export const sidebarNoticeQueueReducer = (state: SidebarNoticeQueueState, action: SidebarNoticeQueueAction): SidebarNoticeQueueState => {
+  if (action.type === 'enqueue-notification') {
+    if (state.current === null) return { current: action.notice, currentIsNotification: true, pending: state.pending }
+    return { ...state, pending: enqueueSidebarNotice(state.pending, action.notice) }
+  }
+
+  const nextNotice = action.type === 'update' ? action.update(state.current) : action.notice
+  if (nextNotice === null) {
+    const next = takeNextSidebarNotice(state.pending)
+    if (state.current === null && next.notice === null) return state
+    return { current: next.notice, currentIsNotification: next.notice !== null, pending: next.pending }
+  }
+  if (nextNotice === state.current) return state
+
+  const pending =
+    state.currentIsNotification && state.current !== null ? [state.current, ...state.pending].slice(0, MAX_PENDING_SIDEBAR_NOTICES) : state.pending
+  return { current: nextNotice, currentIsNotification: false, pending }
+}
+
 export const SUCCESS_NOTICE_DURATION_MS = 3_000
 
 /** The archived-open notice offers a recovery action, so it lasts longer than a confirmation but still clears itself. */

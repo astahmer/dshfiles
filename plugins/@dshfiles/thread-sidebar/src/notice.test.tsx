@@ -4,8 +4,11 @@ import { afterEach, test, vi } from 'vitest'
 import {
   ARCHIVED_OPEN_NOTICE_DURATION_MS,
   archivedOpenFailureNotice,
+  INITIAL_SIDEBAR_NOTICE_QUEUE_STATE,
+  MAX_PENDING_SIDEBAR_NOTICES,
   scheduleSuccessNoticeDismissal,
   SidebarNoticeMessage,
+  sidebarNoticeQueueReducer,
   SUCCESS_NOTICE_DURATION_MS,
   type SidebarNotice,
 } from './sidebar-notice.js'
@@ -104,6 +107,49 @@ test('the archived-open recovery notice dismisses after its own duration', () =>
   vi.advanceTimersByTime(1)
   assert.equal(state.current, null)
   dispose?.()
+})
+
+test('in-app notice bursts remain queued and display in arrival order', () => {
+  const firstNotice: SidebarNotice = { tone: 'warning', message: 'Question from one.' }
+  const secondNotice: SidebarNotice = { tone: 'success', message: 'Turn finished for two.', durationMs: 5_000 }
+  const firstState = sidebarNoticeQueueReducer(INITIAL_SIDEBAR_NOTICE_QUEUE_STATE, { type: 'enqueue-notification', notice: firstNotice })
+  const burstState = sidebarNoticeQueueReducer(firstState, { type: 'enqueue-notification', notice: secondNotice })
+
+  assert.equal(burstState.current, firstNotice)
+  assert.deepEqual(burstState.pending, [secondNotice])
+
+  const nextState = sidebarNoticeQueueReducer(burstState, { type: 'update', update: () => null })
+  assert.equal(nextState.current, secondNotice)
+  assert.deepEqual(nextState.pending, [])
+})
+
+test('replacing a visible in-app notice preserves it ahead of later queued notices', () => {
+  const firstNotice: SidebarNotice = { tone: 'warning', message: 'Question from one.' }
+  const secondNotice: SidebarNotice = { tone: 'success', message: 'Turn finished for two.' }
+  const replacementNotice: SidebarNotice = { tone: 'danger', message: 'Another action failed.' }
+  const firstState = sidebarNoticeQueueReducer(INITIAL_SIDEBAR_NOTICE_QUEUE_STATE, { type: 'enqueue-notification', notice: firstNotice })
+  const burstState = sidebarNoticeQueueReducer(firstState, { type: 'enqueue-notification', notice: secondNotice })
+  const replacedState = sidebarNoticeQueueReducer(burstState, { type: 'set', notice: replacementNotice })
+
+  assert.equal(replacedState.current, replacementNotice)
+  assert.deepEqual(replacedState.pending, [firstNotice, secondNotice])
+  const nextState = sidebarNoticeQueueReducer(replacedState, { type: 'set', notice: null })
+  assert.equal(nextState.current, firstNotice)
+  assert.deepEqual(nextState.pending, [secondNotice])
+})
+
+test('pending notice queue stays bounded', () => {
+  const notices = Array.from(
+    { length: MAX_PENDING_SIDEBAR_NOTICES + 2 },
+    (_, index) => ({ tone: 'success', message: `Notice ${index}` }) satisfies SidebarNotice,
+  )
+  const state = notices.reduce(
+    (current, notice) => sidebarNoticeQueueReducer(current, { type: 'enqueue-notification', notice }),
+    INITIAL_SIDEBAR_NOTICE_QUEUE_STATE,
+  )
+
+  assert.equal(state.pending.length, MAX_PENDING_SIDEBAR_NOTICES)
+  assert.equal(state.pending[0]?.message, 'Notice 2')
 })
 
 test('failure notices stay visible', () => {

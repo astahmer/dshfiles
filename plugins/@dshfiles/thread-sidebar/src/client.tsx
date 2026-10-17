@@ -72,7 +72,7 @@ import {
   XIcon,
 } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { memo, useCallback, useEffect, useId, useMemo, useRef, useState, type ReactElement, type ReactNode } from 'react'
+import { memo, useCallback, useEffect, useId, useMemo, useReducer, useRef, useState, type ReactElement, type ReactNode } from 'react'
 import { z } from 'zod'
 import {
   autoArchiveOverrideForSession,
@@ -104,7 +104,14 @@ import { registerPaletteAction, setPaletteRecentLimit, type PaletteAction } from
 import { useSidebarState } from './sidebar-state.js'
 import { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
 import { projectTextTone } from './project-tone.js'
-import { archivedOpenFailureNotice, scheduleSuccessNoticeDismissal, SidebarNoticeMessage, type SidebarNotice } from './sidebar-notice.js'
+import {
+  archivedOpenFailureNotice,
+  INITIAL_SIDEBAR_NOTICE_QUEUE_STATE,
+  scheduleSuccessNoticeDismissal,
+  SidebarNoticeMessage,
+  sidebarNoticeQueueReducer,
+  type SidebarNotice,
+} from './sidebar-notice.js'
 import { threadSidebarMachineApi } from './machine-api.js'
 import { threadSidebarRecoveryApi } from './recovery-api.js'
 import { selectRestartRecoveryRows } from './restart-recovery-rows.js'
@@ -928,7 +935,13 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const threadView = activeThreadView(threadViewSettings)
   const [now, setNow] = useState(() => Date.now())
   const settingsId = useId()
-  const [notice, setNotice] = useState<SidebarNotice | null>(null)
+  const [noticeQueueState, dispatchNoticeQueue] = useReducer(sidebarNoticeQueueReducer, INITIAL_SIDEBAR_NOTICE_QUEUE_STATE)
+  const notice = noticeQueueState.current
+  const setNotice = useCallback((notice: SidebarNotice | null): void => dispatchNoticeQueue({ type: 'set', notice }), [dispatchNoticeQueue])
+  const updateNotice = useCallback(
+    (update: (current: SidebarNotice | null) => SidebarNotice | null): void => dispatchNoticeQueue({ type: 'update', update }),
+    [dispatchNoticeQueue],
+  )
   const resumeRecoverySession = async (sessionId: SessionSummary['id']): Promise<boolean> => {
     if (resumeBusySessionIds.has(sessionId)) return false
     setResumeBusySessionIds(current => new Set(current).add(sessionId))
@@ -959,8 +972,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   }
   useEffect(() => {
     if (notice === null) return
-    return scheduleSuccessNoticeDismissal(notice, setNotice)
-  }, [notice])
+    return scheduleSuccessNoticeDismissal(notice, updateNotice)
+  }, [notice, updateNotice])
   const [routeRequest, setRouteRequest] = useState<string | null>(() =>
     typeof window === 'undefined' ? null : (readThreadUrl(window.location.href)?.sessionId ?? null),
   )
@@ -1335,7 +1348,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     if (openedRouteId.current === routeRequest) return
     openedRouteId.current = routeRequest
     props.open(target.id)
-  }, [props.open, props.tSidebar, routeRequest, sessions, sessionState.phase])
+  }, [props.open, props.tSidebar, routeRequest, sessions, sessionState.phase, setNotice])
 
   useEffect(() => {
     if (selectedSession === undefined || routeRequest !== null) return
@@ -1518,7 +1531,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       )
     })
     return () => subscription.unsubscribe()
-  }, [archivedView, reopenThread, tSidebar, unarchiveSession])
+  }, [archivedView, reopenThread, setNotice, tSidebar, unarchiveSession])
 
   const openThread = (sessionId: SessionSummary['id']): void => {
     const opened = attention.records.get(sessionId)
@@ -1551,12 +1564,15 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     if (!inApp && !system && !categoryPreferences.sound) return
     if (!claimThreadNotification(eventId)) return
     if (inApp) {
-      setNotice({
-        tone: category === 'failed' ? 'danger' : category === 'approval-needed' || category === 'input-needed' ? 'warning' : 'success',
-        message: `${title}: ${session.displayTitle ?? fallbackBody}`,
-        durationMs: 5_000,
-        actionLabel: props.tSidebar('threadSidebarNotificationOpenThread'),
-        onAction: () => openThread(sessionId),
+      dispatchNoticeQueue({
+        type: 'enqueue-notification',
+        notice: {
+          tone: category === 'failed' ? 'danger' : category === 'approval-needed' || category === 'input-needed' ? 'warning' : 'success',
+          message: `${title}: ${session.displayTitle ?? fallbackBody}`,
+          durationMs: 5_000,
+          actionLabel: props.tSidebar('threadSidebarNotificationOpenThread'),
+          onAction: () => openThread(sessionId),
+        },
       })
     }
     if (system) {
