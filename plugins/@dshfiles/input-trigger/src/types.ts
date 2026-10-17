@@ -8,7 +8,7 @@
  * through the provider plugin's own root context captured at registration.
  */
 import type { ComponentType } from 'react'
-import type { PickOutcome, ReferenceInsert, TokenSpan } from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type { CommandClaim, PickOutcome, ReferenceInsert, TokenSpan } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { IconProps } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 
@@ -185,6 +185,14 @@ export interface InputTriggerSource {
    * submission intact.
    */
   matchEnter?(session: ClientSessionContext, line: string, signal: AbortSignal, envelope: SubmitEnvelope): Promise<PickOutcome>
+  /**
+   * Restore-time claim resolution for a persisted command chip. Answers the
+   * claim `matchSpace` would make for `token` (e.g. '/goal') after awaiting
+   * the source's own warmup, and never acts: a token that would open a
+   * popup, run an action, or execute detached answers undefined. Rejects when
+   * the warmup fails or `signal` aborts.
+   */
+  matchClaim?(session: ClientSessionContext, token: string, signal: AbortSignal): Promise<CommandClaim | undefined>
   /**
    * Scope-birth prewarm hook (fire-and-forget): the per-session controller
    * calls it once when the session scope comes alive so sources can fetch

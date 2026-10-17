@@ -42,6 +42,32 @@
           "featureFile": "tooling/dshx/e2e/features/input-trigger.feature"
         }
       ]
+    },
+    {
+      "id": "command-chip-restore",
+      "title": "Restore a persisted command chip",
+      "summary": "The controller answers a persisted command chip's claim by polling each source's matchClaim in roster order (skipping sources without the hook and sources bound to another trigger) and aborting with the caller's reason when the restore signal is already aborted. The conversation input shell calls resolveClaim unguarded while seeding a draft whose leading token is a / command, so an engine without it throws inside a client-store subscriber and never rebuilds the chip.",
+      "surfaces": ["client"],
+      "configuration": [],
+      "states": ["polling", "claimed", "unclaimed", "aborted"],
+      "failureModes": [
+        "A missing resolveClaim throws inside the draft-seeding subscriber and the chip decays to literal text.",
+        "A source that acts on the token during the poll runs its action while nothing is being submitted."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "input-trigger.claim-restore",
+          "file": "plugins/@dshfiles/input-trigger/tests/resolve-claim.test.ts",
+          "testName": "claims the token through the first source that answers"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "input-trigger.claim-restore-browser",
+          "reason": "This package ships no / command source of its own, so a standalone browser journey would need another bundle's command and would test that bundle's copy as much as this one's; the restore path runs end to end in the btw journey btw.command-chip-restore (a persisted /btw chip across a reload) and the roster polling is covered by tests/resolve-claim.test.ts."
+        }
+      ]
     }
   ]
 }
