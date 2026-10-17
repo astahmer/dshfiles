@@ -109,7 +109,8 @@ export class RevisionReads {
   }
 
   /** The same user-written messages, thrown so the Client reads them; anything else stays a generic, Host-logged failure. */
-  static publicError(error: unknown): unknown {
-    return error instanceof Error && SAFE_FAILURE_MESSAGE.test(error.message) ? new PluginApiError(error.message, { cause: error }) : error
+  static publicError(error: unknown): Error {
+    if (error instanceof Error && SAFE_FAILURE_MESSAGE.test(error.message)) return new PluginApiError(error.message, { cause: error })
+    return new Error('Jujutsu request failed.', { cause: error })
   }
 }

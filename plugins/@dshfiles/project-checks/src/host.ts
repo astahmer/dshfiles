@@ -324,10 +324,10 @@ const runAction = async (ctx: Context, sessionId: string, action: ProjectAction,
       sourceRevisionBefore: beforeRevision,
       sourceRevisionAfter: afterRevision,
       verificationTurn: options.verificationTurn,
-      ...(options.verificationStage === undefined ? {} : { verificationStage: options.verificationStage }),
       automatic: options.automatic,
       attempt: options.attempt,
     }
+    if (options.verificationStage !== undefined) receipt.verificationStage = options.verificationStage
     stage = 'persist-receipt'
     await ProjectChecksActivityModel.persistAndEmit({
       receipt,

@@ -96,7 +96,9 @@ test('a stale preview reaches the Client as a PluginApiError while unexpected er
   assert.ok(stale instanceof PluginApiError)
   assert.equal(stale.message, 'Preview expired or repository state changed. Refresh and preview again.')
   const raw = new Error("ENOENT: no such file or directory, stat '/Users/someone/repo'")
-  assert.equal(RevisionReads.publicError(raw), raw)
+  const generic = RevisionReads.publicError(raw)
+  assert.equal(generic.message, 'Jujutsu request failed.')
+  assert.equal(generic.cause, raw)
 })
 
 test('changed-file stats and revision details mark the files a rebase left conflicted', async () => {

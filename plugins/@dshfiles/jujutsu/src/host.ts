@@ -645,18 +645,19 @@ const prepareMutation = async (
     }
   }
   if (detail.length > 7_800) detail = detail.slice(0, 7_760) + '\n[preview detail truncated]'
-  return {
+  const mutation: PreparedMutation = {
     root: repo.root,
     identity: current.identity,
     fingerprint: current.fingerprint,
     action: preparedAction,
-    ...(workspaceParentIdentity === undefined ? {} : { workspaceParentIdentity }),
     argv,
     title: preview.title,
     summary: preview.summary,
     detail,
     expiresAt: Date.now() + PREVIEW_TTL,
   }
+  if (workspaceParentIdentity !== undefined) return { ...mutation, workspaceParentIdentity }
+  return mutation
 }
 
 /** Hands the user-written failure messages to the Client; others stay generic and are logged on the Host. */
