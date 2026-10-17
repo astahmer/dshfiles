@@ -40,7 +40,7 @@ export const projectChecksActivityEventSchema = z
 
 export type ProjectChecksActivityEvent = z.infer<typeof projectChecksActivityEventSchema>
 
-export const projectChecksActivityEvent = (receipt: StoredReceipt): ProjectChecksActivityEvent =>
+const projectChecksActivityEvent = (receipt: StoredReceipt): ProjectChecksActivityEvent =>
   projectChecksActivityEventSchema.parse({
     kind: 'verification-receipt',
     version: 1,
@@ -68,7 +68,7 @@ export const projectChecksActivityEvent = (receipt: StoredReceipt): ProjectCheck
     },
   })
 
-export const emitProjectChecksActivity = (receipt: StoredReceipt, emit: (event: ProjectChecksActivityEvent) => void): void => {
+const emitProjectChecksActivity = (receipt: StoredReceipt, emit: (event: ProjectChecksActivityEvent) => void): void => {
   try {
     emit(projectChecksActivityEvent(receipt))
   } catch {
@@ -76,11 +76,17 @@ export const emitProjectChecksActivity = (receipt: StoredReceipt, emit: (event: 
   }
 }
 
-export const persistReceiptAndEmitActivity = async (input: {
+const persistReceiptAndEmitActivity = async (input: {
   readonly receipt: StoredReceipt
   readonly persist: () => Promise<void>
   readonly emit: (event: ProjectChecksActivityEvent) => void
 }): Promise<void> => {
   await input.persist()
   emitProjectChecksActivity(input.receipt, input.emit)
+}
+
+export class ProjectChecksActivityModel {
+  static readonly event = projectChecksActivityEvent
+  static readonly emit = emitProjectChecksActivity
+  static readonly persistAndEmit = persistReceiptAndEmitActivity
 }

@@ -17,8 +17,8 @@ import { PluginApiError, type ApiCaller } from '@dshfiles/dshx/api'
 import { mayVerifyCandidate, projectChecksApi, type CandidateVerificationInput, type ProjectHookEvent } from './api.js'
 import type { ProjectChecksVerifiedTurn } from './completion-event.js'
 import { projectChecksConfigSchema, ProjectChecksModel, type ProjectAction } from './core.js'
-import { emitProjectChecksActivity, persistReceiptAndEmitActivity, type ProjectChecksActivityEvent } from './receipt-activity.js'
-import { MAX_RECEIPTS_TOTAL, projectChecksDomain, receiptKey, receiptsAfter, trimReceiptRows, type StoredReceipt } from './store.js'
+import { ProjectChecksActivityModel, type ProjectChecksActivityEvent } from './receipt-activity.js'
+import { MAX_RECEIPTS_TOTAL, ProjectChecksReceiptModel, projectChecksDomain, type StoredReceipt } from './store.js'
 
 declare module '@deepseek-ai/cordis' {
   interface Events {
@@ -187,15 +187,15 @@ const readStoredReceipts = async (ctx: Context, sessionId: string): Promise<Stor
 }
 
 const readStoredReceiptsAfter = async (ctx: Context, since: number): Promise<readonly StoredReceipt[]> =>
-  receiptsAfter(Array.from((await storageFor(ctx)).table('receipts').entries()), since, MAX_RECEIPTS_TOTAL)
+  ProjectChecksReceiptModel.after(Array.from((await storageFor(ctx)).table('receipts').entries()), since, MAX_RECEIPTS_TOTAL)
 
 const emitReceiptActivity = (ctx: Context, receipt: StoredReceipt): void =>
-  emitProjectChecksActivity(receipt, event => ctx.emit('dshfiles/activity/event', event))
+  ProjectChecksActivityModel.emit(receipt, event => ctx.emit('dshfiles/activity/event', event))
 
 const persistReceipt = async (ctx: Context, receipt: StoredReceipt): Promise<void> => {
   const table = (await storageFor(ctx)).table('receipts')
-  await table.put(receiptKey(receipt), receipt)
-  const removals = trimReceiptRows(Array.from(table.entries()), receipt.sessionId, MAX_RECEIPTS_PER_SESSION, MAX_RECEIPTS_TOTAL)
+  await table.put(ProjectChecksReceiptModel.key(receipt), receipt)
+  const removals = ProjectChecksReceiptModel.trimRows(Array.from(table.entries()), receipt.sessionId, MAX_RECEIPTS_PER_SESSION, MAX_RECEIPTS_TOTAL)
   await Promise.all(removals.map(key => table.delete(key)))
 }
 
@@ -329,7 +329,7 @@ const runAction = async (ctx: Context, sessionId: string, action: ProjectAction,
       attempt: options.attempt,
     }
     stage = 'persist-receipt'
-    await persistReceiptAndEmitActivity({
+    await ProjectChecksActivityModel.persistAndEmit({
       receipt,
       persist: () => persistReceipt(ctx, receipt),
       emit: event => ctx.emit('dshfiles/activity/event', event),

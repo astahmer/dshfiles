@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { projectChecksConfigSchema, ProjectChecksModel } from './core.js'
-import { receiptsAfter, storedReceiptSchema, trimReceiptRows, type StoredReceipt } from './store.js'
+import { ProjectChecksReceiptModel, storedReceiptSchema, type StoredReceipt } from './store.js'
 
 describe('trusted project actions', () => {
   it('requires absolute trusted roots and unique action ids', () => {
@@ -38,7 +38,7 @@ describe('trusted project actions', () => {
       return [`key-${index}`, receipt]
     })
 
-    expect(trimReceiptRows(rows, 'session-a', 3, 10)).toEqual(['key-1', 'key-0'])
+    expect(ProjectChecksReceiptModel.trimRows(rows, 'session-a', 3, 10)).toEqual(['key-1', 'key-0'])
   })
 
   it('reads legacy receipts and bounds newer-first backfill to retained evidence', () => {
@@ -69,11 +69,11 @@ describe('trusted project actions', () => {
       }
       return [`key-${String(index)}`, receipt]
     })
-    const replay = receiptsAfter(rows, 0, 2_001)
+    const replay = ProjectChecksReceiptModel.after(rows, 0, 2_001)
     expect(replay).toHaveLength(2_000)
     expect(replay[0]?.finishedAt).toBe(1)
     expect(replay[replay.length - 1]?.finishedAt).toBe(2_000)
-    expect(receiptsAfter(rows, 2_000, 2_000)).toEqual([])
+    expect(ProjectChecksReceiptModel.after(rows, 2_000, 2_000)).toEqual([])
   })
 
   it('allows a session directory under its trusted root and rejects sibling traversal', () => {

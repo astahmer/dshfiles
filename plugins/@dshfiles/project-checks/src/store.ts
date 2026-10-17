@@ -14,12 +14,11 @@ export const projectChecksDomain = defineDomain({
 
 export type StoredReceipt = z.infer<typeof storedReceiptSchema>
 
-export const receiptKey = (receipt: StoredReceipt): string =>
-  `${encodeURIComponent(receipt.sessionId)}:${String(receipt.finishedAt).padStart(16, '0')}:${receipt.id}`
+const receiptKey = (receipt: StoredReceipt): string => `${encodeURIComponent(receipt.sessionId)}:${String(receipt.finishedAt).padStart(16, '0')}:${receipt.id}`
 
 export const MAX_RECEIPTS_TOTAL = 2_000
 
-export const receiptsAfter = (entries: readonly (readonly [string, StoredReceipt])[], since: number, requestedLimit: number): readonly StoredReceipt[] => {
+const receiptsAfter = (entries: readonly (readonly [string, StoredReceipt])[], since: number, requestedLimit: number): readonly StoredReceipt[] => {
   const limit = Math.max(0, Math.min(MAX_RECEIPTS_TOTAL, Math.trunc(requestedLimit)))
   if (limit === 0) return []
   return entries
@@ -29,7 +28,7 @@ export const receiptsAfter = (entries: readonly (readonly [string, StoredReceipt
     .slice(-limit)
 }
 
-export const trimReceiptRows = (
+const trimReceiptRows = (
   entries: readonly (readonly [string, StoredReceipt])[],
   sessionId: string,
   perSessionLimit: number,
@@ -54,4 +53,10 @@ export const trimReceiptRows = (
     remove.push(key)
   }
   return remove
+}
+
+export class ProjectChecksReceiptModel {
+  static readonly key = receiptKey
+  static readonly after = receiptsAfter
+  static readonly trimRows = trimReceiptRows
 }

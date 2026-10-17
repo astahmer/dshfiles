@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { emitProjectChecksActivity, persistReceiptAndEmitActivity, projectChecksActivityEvent, projectChecksActivityEventSchema } from './receipt-activity.js'
+import { ProjectChecksActivityModel, projectChecksActivityEventSchema } from './receipt-activity.js'
 import type { StoredReceipt } from './store.js'
 
 const revision = 'a'.repeat(40)
@@ -24,7 +24,7 @@ const receipt: StoredReceipt = {
 
 describe('Project Checks activity summary', () => {
   it('publishes only the bounded, versioned receipt facts', () => {
-    const event = projectChecksActivityEvent(receipt)
+    const event = ProjectChecksActivityModel.event(receipt)
     expect(event).toEqual({
       kind: 'verification-receipt',
       version: 1,
@@ -57,7 +57,7 @@ describe('Project Checks activity summary', () => {
       order.push('activity')
       expect(order).toEqual(['receipt'])
     })
-    await persistReceiptAndEmitActivity({
+    await ProjectChecksActivityModel.persistAndEmit({
       receipt,
       persist: async () => {
         order.push('receipt')
@@ -67,7 +67,7 @@ describe('Project Checks activity summary', () => {
     expect(publish).toHaveBeenCalledTimes(1)
 
     await expect(
-      persistReceiptAndEmitActivity({
+      ProjectChecksActivityModel.persistAndEmit({
         receipt,
         persist: async () => {
           throw new Error('storage unavailable')
@@ -78,7 +78,7 @@ describe('Project Checks activity summary', () => {
     expect(publish).toHaveBeenCalledTimes(1)
 
     expect(() =>
-      emitProjectChecksActivity(receipt, () => {
+      ProjectChecksActivityModel.emit(receipt, () => {
         throw new Error('timeline unavailable')
       }),
     ).not.toThrow()
