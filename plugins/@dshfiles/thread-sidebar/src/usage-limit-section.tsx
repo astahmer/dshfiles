@@ -52,6 +52,18 @@ const SNOOZES: readonly { readonly duration: UsageLimitSnooze; readonly labelKey
  */
 export const UsageLimitSection = <Thread extends UsageLimitThread>(props: UsageLimitSectionProps<Thread>): JSX.Element | null => {
   const t = props.translate
+  const statusText = (timing: ReturnType<typeof usageLimitTiming>): string => {
+    switch (timing.kind) {
+      case 'snoozed':
+        return t('threadSidebarUsageLimitSnoozed', { time: formatRemaining(timing.until, props.now) })
+      case 'ready':
+        return t('threadSidebarUsageLimitReady')
+      case 'waiting':
+        return t('threadSidebarUsageLimitResets', { time: formatRemaining(timing.resetAt, props.now) })
+      default:
+        return t('threadSidebarUsageLimitUnknown')
+    }
+  }
   if (props.rows.length === 0) return null
   const busyCount = props.rows.filter(row => props.busyIds.has(row.continuation.continuationId)).length
   const allBusy = busyCount === props.rows.length
@@ -71,14 +83,7 @@ export const UsageLimitSection = <Thread extends UsageLimitThread>(props: UsageL
         const busy = props.busyIds.has(row.continuation.continuationId)
         const timing = usageLimitTiming(row.continuation, props.now)
         const snoozed = timing.kind === 'snoozed'
-        const status =
-          timing.kind === 'snoozed'
-            ? t('threadSidebarUsageLimitSnoozed', { time: formatRemaining(timing.until, props.now) })
-            : timing.kind === 'ready'
-              ? t('threadSidebarUsageLimitReady')
-              : timing.kind === 'waiting'
-                ? t('threadSidebarUsageLimitResets', { time: formatRemaining(timing.resetAt, props.now) })
-                : t('threadSidebarUsageLimitUnknown')
+        const status = statusText(timing)
 
         return props.withThreadMenu(
           row.session,

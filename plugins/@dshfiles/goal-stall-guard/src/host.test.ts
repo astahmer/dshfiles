@@ -26,7 +26,8 @@ interface Harness {
  * context has to imitate; testing `apply` tests what actually runs.
  */
 interface BuiltPlugin {
-  readonly apply: (ctx: unknown, config?: unknown) => unknown
+  /** The harness only cares that activation ran; the returned disposable is ignored. */
+  readonly apply: (ctx: unknown, config?: unknown) => void
 }
 
 const builtEntry = new URL('../dist/index.js', import.meta.url).href

@@ -4,7 +4,7 @@
     "antislop(no-known-value-widening)": 162,
     "antislop(no-runtime-typeof)": 333,
     "antislop(no-unknown-parameters)": 194,
-    "antislop(no-unknown-returns)": 119,
+    "antislop(no-unknown-returns)": 118,
     "antislop(no-unsafe-dictionary-type)": 226,
     "antislop(require-safety-comment-for-type-assertion)": 336,
     "react-hooks(exhaustive-deps)": 16,
@@ -14,7 +14,7 @@
   "ast-grep": {
     "no-deeply-nested-ternary": 7,
     "no-deeply-nested-ternary-tsx": 3,
-    "no-direct-json-parse": 187,
+    "no-direct-json-parse": 185,
     "no-direct-json-parse-tsx": 1,
     "no-export-from": 172,
     "no-wildcard-export": 1

@@ -308,10 +308,13 @@ const scanRepositories = async (): Promise<readonly RepositoryView[]> => {
 }
 
 const listRepositories = async (): Promise<readonly RepositoryView[]> => {
+  // oxlint-disable-next-line antislop/no-passthrough-variable -- Snapshot before the await: a concurrent scan replaces the cache rather than mutating it.
   const cached = repositoryViews
   if (cached !== undefined && Date.now() - cached.at < REPOSITORY_VIEW_TTL_MS) return cached.value
+  // oxlint-disable-next-line antislop/no-passthrough-variable -- Join exactly the scan that was in flight when this caller arrived.
   const inFlight = repositoryScan
   if (inFlight !== undefined) return inFlight
+  // oxlint-disable-next-line antislop/no-passthrough-variable -- The scan may publish only while the generation it started from is still current.
   const generation = repositoryGeneration
   const scan = scanRepositories().then(result => {
     if (generation === repositoryGeneration) repositoryViews = { value: result, at: Date.now() }

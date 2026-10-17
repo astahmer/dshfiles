@@ -4,10 +4,10 @@ export type ThreadContentHit = {
   readonly sessionId: string
   readonly snippet: string
   /** The finder's own title and workspace, so a hit renders even when the client has not listed that thread. */
-  readonly title?: string
-  readonly project?: string
-  readonly cwd?: string
-  readonly updatedAt?: number
+  readonly title?: string | undefined
+  readonly project?: string | undefined
+  readonly cwd?: string | undefined
+  readonly updatedAt?: number | undefined
 }
 
 type RegistryApiView = {
@@ -71,10 +71,10 @@ export const createThreadContentSearch = (deps: ThreadContentSearchDeps) => {
         return answer.data.hits.map(hit => ({
           sessionId: hit.sessionId,
           snippet: hit.snippet,
-          ...(hit.title === undefined ? {} : { title: hit.title }),
-          ...(hit.project === undefined ? {} : { project: hit.project }),
-          ...(hit.cwd === undefined || hit.cwd === null ? {} : { cwd: hit.cwd }),
-          ...(hit.updatedAt === undefined ? {} : { updatedAt: hit.updatedAt }),
+          title: hit.title,
+          project: hit.project,
+          cwd: hit.cwd ?? undefined,
+          updatedAt: hit.updatedAt,
         }))
     }
     return deps.native(query, signal)

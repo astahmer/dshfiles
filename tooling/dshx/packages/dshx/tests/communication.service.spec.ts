@@ -2,6 +2,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
+import { z } from 'zod'
 import { createCommunicationService } from '../src/communication/service.js'
 import type { CommunicationPrincipal } from '../src/communication/types.js'
 
@@ -13,6 +14,35 @@ const statePath = async (): Promise<string> => {
   temporaryRoots.push(root)
   return join(root, 'state.json')
 }
+
+const persistedRecipientSchema = z.looseObject({ delivery: z.string(), readAt: z.number().nullable().optional() })
+
+/** The persisted file is a boundary this suite asserts on, so decode it instead of casting a parse result. */
+const persistedStateSchema = z.looseObject({
+  schemaVersion: z.number(),
+  messages: z.array(
+    z.looseObject({
+      id: z.string(),
+      intent: z.string().optional(),
+      correlationId: z.string().nullable().optional(),
+      dedupeKey: z.string().nullable().optional(),
+      recipients: z.array(persistedRecipientSchema),
+    }),
+  ),
+  subscriptions: z.array(
+    z.looseObject({
+      principal: z.looseObject({ kind: z.string(), id: z.string() }),
+      topic: z.string(),
+      delivery: z.string(),
+    }),
+  ),
+  notifications: z.array(z.looseObject({})).optional(),
+  activityStartedAt: z.number().nullable().optional(),
+  activityEvents: z.array(z.looseObject({})).optional(),
+})
+
+const readPersistedState = async (path: string): Promise<z.infer<typeof persistedStateSchema>> =>
+  persistedStateSchema.parse(JSON.parse(await readFile(path, 'utf8')))
 
 afterEach(async () => {
   await Promise.all(temporaryRoots.splice(0).map(root => rm(root, { recursive: true, force: true })))
@@ -194,7 +224,7 @@ describe('durable Agent communication', () => {
     expect(inbox).toMatchObject([{ id: messageId, recipients: [{ delivery: 'passive', readAt: now }] }])
     expect(await service.listTopics()).toEqual([{ topic: 'workspace/abc123', subscribers: 1 }])
 
-    const persisted: unknown = JSON.parse(await readFile(path, 'utf8'))
+    const persisted = await readPersistedState(path)
     expect(persisted).toMatchObject({
       schemaVersion: 4,
       messages: [{ id: messageId, recipients: [{ delivery: 'passive', readAt: now }] }],
@@ -234,7 +264,7 @@ describe('durable Agent communication', () => {
     const service = createCommunicationService({ statePath: path, now: () => now })
     const inbox = await service.inbox({ principal: recipient, topic: 'inbox' })
     expect(inbox).toMatchObject([{ id: messageId, recipients: [{ delivery: 'passive', readAt: now }] }])
-    const persisted: unknown = JSON.parse(await readFile(path, 'utf8'))
+    const persisted = await readPersistedState(path)
     expect(persisted).toMatchObject({
       schemaVersion: 4,
       messages: [{ id: messageId, recipients: [{ delivery: 'passive', readAt: now }] }],
@@ -324,7 +354,7 @@ describe('durable Agent communication', () => {
     expect(await service.inbox({ principal: recipient, topic: 'inbox' })).toMatchObject([
       { id: messageId, intent: 'notice', correlationId: null, dedupeKey: null },
     ])
-    const persisted: unknown = JSON.parse(await readFile(path, 'utf8'))
+    const persisted = await readPersistedState(path)
     expect(persisted).toMatchObject({
       schemaVersion: 4,
       messages: [{ id: messageId, intent: 'notice', correlationId: null, dedupeKey: null }],
@@ -384,7 +414,7 @@ describe('durable Agent communication', () => {
     await service.ensureSubscription({ kind: 'agent', id: 'session-new' }, { topic, delivery: 'passive' })
 
     expect(await service.listTopics()).toEqual([{ topic, subscribers: 512 }])
-    const persisted = JSON.parse(await readFile(path, 'utf8')) as { readonly subscriptions: readonly { readonly principal: { readonly id: string } }[] }
+    const persisted = await readPersistedState(path)
     const ids = persisted.subscriptions.map(entry => entry.principal.id)
     expect(ids).toContain('session-new')
     expect(ids).toContain('session-0')
@@ -399,7 +429,7 @@ describe('durable Agent communication', () => {
     await service.ensureSubscription(recipient, { topic: 'inbox', delivery: 'passive' })
     await service.send({ sender: { kind: 'agent', id: 'agent-sender' }, toAgentId: recipient.id, text: 'Still delivered.' })
 
-    const persisted = JSON.parse(await readFile(path, 'utf8')) as { readonly subscriptions: readonly unknown[] }
+    const persisted = await readPersistedState(path)
     expect(persisted.subscriptions).toEqual([])
     expect(await service.inbox({ principal: recipient })).toMatchObject([{ recipients: [{ delivery: 'passive', readAt: now }] }])
   })

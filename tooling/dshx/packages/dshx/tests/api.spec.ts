@@ -80,12 +80,13 @@ function connectionFixture() {
     const path = `${channel}/${endpoint}`
     const route = routes.get(path)
     if (route === undefined) return { ok: false as const, error: { code: 'not-found', message: 'Route not found.', details: {} } }
-    const request = new Request(`http://localhost${path}`, {
+    const requestInit: RequestInit = {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ type: 'client-request', rpcId: 'test-rpc', method: endpoint, payload }),
-      ...(signal === undefined ? {} : { signal }),
-    })
+    }
+    if (signal !== undefined) requestInit.signal = signal
+    const request = new Request(`http://localhost${path}`, requestInit)
     const response = await route.fetch(request)
     if (!response.ok) throw new Error(`HTTP ${response.status}`)
     return routeResponseSchema.parse(await response.json()).result

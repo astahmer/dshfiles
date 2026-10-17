@@ -9,7 +9,8 @@ import type { ThreadAttentionView } from './attention-api.js'
  */
 
 interface BuiltPlugin {
-  readonly apply: (ctx: unknown, config?: unknown) => unknown
+  /** The harness only cares that activation ran; the returned disposable is ignored. */
+  readonly apply: (ctx: unknown, config?: unknown) => void
 }
 
 const builtEntry = new URL('../dist/index.js', import.meta.url).href
@@ -45,7 +46,7 @@ const startHarness = async (): Promise<Harness> => {
   const plugin = (await import(builtEntry)) as BuiltPlugin
   const rows = new Map<string, ThreadAttentionView>()
   const listeners = new Map<string, SessionEventListener>()
-  const disposers: (() => unknown)[] = []
+  const disposers: (() => void)[] = []
   const on = (event: string, handler: SessionEventListener): void => {
     listeners.set(event, handler)
   }
@@ -59,7 +60,7 @@ const startHarness = async (): Promise<Harness> => {
     waterfall: on,
     effect: (callback: () => unknown) => {
       const disposer = callback()
-      if (typeof disposer === 'function') disposers.push(disposer as () => unknown)
+      if (typeof disposer === 'function') disposers.push(disposer as () => void)
     },
     get: (name: string) => (name === 'storageDomain' ? { open: async () => ({ table: () => table(rows), close: async () => undefined }) } : undefined),
     inject: () => undefined,

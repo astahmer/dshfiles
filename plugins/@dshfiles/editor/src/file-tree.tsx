@@ -48,9 +48,12 @@ const Directory = (props: TreeProps & { readonly path: string; readonly depth: n
   })
   if (listing.isPending) return <p className="dshx:px-2 dshx:py-1 dshx:text-xs dshx:text-muted-foreground">Loading…</p>
   if (listing.isError) return <p className="dshx:px-2 dshx:py-1 dshx:text-xs dshx:text-destructive">{listing.error.message}</p>
-  const entries = [...listing.data.entries].sort((left, right) =>
-    left.type === right.type ? left.name.localeCompare(right.name) : left.type === 'directory' ? -1 : right.type === 'directory' ? 1 : 0,
-  )
+  const entries = [...listing.data.entries].sort((left, right) => {
+    if (left.type === right.type) return left.name.localeCompare(right.name)
+    if (left.type === 'directory') return -1
+    if (right.type === 'directory') return 1
+    return 0
+  })
   return (
     <ul role="group">
       {entries.map(entry => {

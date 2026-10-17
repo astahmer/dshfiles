@@ -656,6 +656,7 @@ export const createThreads = (options: {
     let next = 0
     const worker = async (): Promise<void> => {
       for (;;) {
+        // oxlint-disable-next-line antislop/no-passthrough-variable -- The slot index is read again when the result is stored, so it is paired with its name before the shared cursor advances.
         const index = next
         next += 1
         const name = names[index]

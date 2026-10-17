@@ -19,10 +19,12 @@ export const readCodexAccessToken = async (codexHome: string): Promise<string> =
   }
   let auth: Record<string, unknown>
   try {
+    // SAFETY: the Codex login file is external JSON; every field is read through a `typeof` guard below.
     auth = JSON.parse(raw) as Record<string, unknown>
   } catch {
     throw new LlmError(`Codex login at ${path} is not valid JSON.`, 'INVALID_CREDENTIAL')
   }
+  // SAFETY: `tokens` is optional in a hand-written login file; a non-object value is treated as absent.
   const tokens = (auth.tokens ?? {}) as Record<string, unknown>
   const accessToken = typeof tokens.access_token === 'string' ? tokens.access_token : ''
   const apiKeyOnly = typeof auth.OPENAI_API_KEY === 'string' && auth.OPENAI_API_KEY.length > 0

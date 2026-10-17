@@ -41,7 +41,7 @@ function materializer(packageId: string, css: string, suppliedHash: string | und
 export function clientCssPlugin(options: {
   readonly packageId: string
   readonly outDir: string
-  readonly suppliedHash?: string
+  readonly suppliedHash?: string | undefined
   readonly onSheet?: (hash: string | undefined) => void
 }): Plugin {
   const { packageId, outDir } = options

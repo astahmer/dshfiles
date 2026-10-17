@@ -13,16 +13,12 @@ import type {
   ApiQueryResult,
 } from './types.js'
 import { ApiProtocolModel } from './common.js'
-import { ApiRuntimeModel } from './runtime.js'
+import { ApiRuntimeModel, type ContextLike } from './runtime.js'
 
 type ReactRuntime = typeof import('react')
 declare const require: ((name: string) => ReactRuntime) | undefined
 let react: ReactRuntime | undefined
 let apiContext: import('react').Context<ApiClientRuntime | undefined> | undefined
-
-interface ContextLike {
-  get(name: string): unknown
-}
 
 export interface ApiClientRuntime {
   client<const Methods extends Record<string, AnyApiMethodDefinition>>(contract: ApiClientContract<Methods>): ApiClient<Methods>

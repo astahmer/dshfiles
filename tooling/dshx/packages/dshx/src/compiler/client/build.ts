@@ -521,7 +521,7 @@ async function clientConfig(paths: Awaited<ReturnType<typeof resolveOptions>>, o
       clientCssPlugin({
         packageId: options.packageId,
         outDir: paths.outDir,
-        ...(supplier?.cssHash === undefined ? {} : { suppliedHash: supplier.cssHash }),
+        suppliedHash: supplier?.cssHash,
         onSheet: hash => {
           sheetHash = hash
         },
