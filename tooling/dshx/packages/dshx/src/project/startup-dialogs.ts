@@ -16,7 +16,7 @@ const appears = (page: Page, dialogName: string, timeoutMs: number): Promise<boo
     )
 
 /** Dismiss the "Add an API key" dialog whenever it covers an element this page acts on. */
-const registerProviderSetupDismissal = (page: Page): Promise<void> => {
+export const registerProviderSetupDismissal = (page: Page): Promise<void> => {
   const providerSetup = page.getByRole('dialog', { name: PROVIDER_SETUP_DIALOG, exact: true })
   // A dialog opened over it (a palette) blocks the click; the blocked action then fails on its own instead of the
   // handler rejecting after the page has closed and crashing the process.
@@ -46,7 +46,7 @@ export const dismissProviderSetupIfShown = async (page: Page): Promise<void> => 
  * A scratch DSH has no provider, so it opens "Add an API key" at startup; "Configure later" is the user's own way past
  * it. The handler keeps dismissing it if it comes back later in the same page.
  */
-const dismissProviderSetupDuringStartup = async (page: Page, timeoutMs = 5_000): Promise<boolean> => {
+export const dismissProviderSetupDuringStartup = async (page: Page, timeoutMs = 5_000): Promise<boolean> => {
   const appeared = await appears(page, PROVIDER_SETUP_DIALOG, timeoutMs)
   if (appeared) {
     const providerSetup = page.getByRole('dialog', { name: PROVIDER_SETUP_DIALOG, exact: true })
@@ -62,7 +62,7 @@ const dismissProviderSetupDuringStartup = async (page: Page, timeoutMs = 5_000):
  * dismisses it only once it blocks an action, and that dismissal also closes any menu the action had opened, so the
  * reload waits it out before the next interaction.
  */
-const reloadPastProviderSetup = async (page: Page, timeoutMs = 5_000): Promise<void> => {
+export const reloadPastProviderSetup = async (page: Page, timeoutMs = 5_000): Promise<void> => {
   await page.reload()
   if (!(await appears(page, PROVIDER_SETUP_DIALOG, timeoutMs))) return
   const providerSetup = page.getByRole('dialog', { name: PROVIDER_SETUP_DIALOG, exact: true })

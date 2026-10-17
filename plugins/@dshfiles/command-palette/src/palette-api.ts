@@ -147,14 +147,12 @@ export const setPaletteRecentLimit = (recentLimit: number): void => {
   current.recentLimit = parsed
   notify(current)
 }
-
-const openPalette = (mode: PaletteMode): void => {
+export const openPalette = (mode: PaletteMode): void => {
   const current = registry()
   current.mode = mode
   notify(current)
 }
-
-const closePalette = (): void => {
+export const closePalette = (): void => {
   const current = registry()
   current.mode = null
   notify(current)

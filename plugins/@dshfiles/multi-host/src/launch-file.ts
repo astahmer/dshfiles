@@ -9,7 +9,7 @@ import { z } from 'zod'
  * the runtime's own multi-host Host. `runtime/web-url` is the same fact written by the dsh-web supervisor, read when
  * the runtime has no multi-host plugin. Replaces scraping the systemd journal, so any Unix host with SSH works.
  */
-const launchFilePaths = (dshHome: string): readonly [string, string] => [
+export const launchFilePaths = (dshHome: string): readonly [string, string] => [
   join(dshHome, 'plugins', 'multi-host', 'launch.json'),
   join(dshHome, 'runtime', 'web-url'),
 ]
@@ -23,7 +23,7 @@ const launchRecordSchema = z.object({ schemaVersion: z.literal(1), launchUrl: la
 export type RuntimeLaunch = { readonly port: number; readonly token: string }
 
 /** Decode either launch file: the JSON record or a bare URL line. Anything else reads as no launch. */
-const parseRuntimeLaunch = (content: string): RuntimeLaunch | undefined => {
+export const parseRuntimeLaunch = (content: string): RuntimeLaunch | undefined => {
   let url: string | undefined
   try {
     const record = launchRecordSchema.safeParse(JSON.parse(content))

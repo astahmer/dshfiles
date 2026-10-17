@@ -262,3 +262,6 @@ export const updateThreadViewSettings = (settings: ThreadViewSettings): ThreadVi
   ...settings,
   views: settings.views.map(view => ({ ...view, statusFilters: [...view.statusFilters] })),
 })
+
+/** Model-shaped name main's view manager imports; the same functions live here as free exports. */
+export const ThreadViewPreferencesModel = { moveThreadView, removeThreadView, saveThreadView, setThreadViewEnabled }

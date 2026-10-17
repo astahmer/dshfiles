@@ -307,7 +307,7 @@ const fakeSecretStore = (project: string): string => {
  * Install the e2e fake `secret` CLI in the scratch home with a synthetic store for `project`, so a Host started with
  * the returned directory first on PATH never reaches a real vault. Returns that directory.
  */
-const installFakeSecretCli = async (input: { readonly home: string; readonly project: string }): Promise<string> => {
+export const installFakeSecretCli = async (input: { readonly home: string; readonly project: string }): Promise<string> => {
   const bin = join(input.home, 'fake-secret-cli')
   await mkdir(bin, { recursive: true })
   await copyFile(FAKE_SECRET_CLI, join(bin, 'secret'))
