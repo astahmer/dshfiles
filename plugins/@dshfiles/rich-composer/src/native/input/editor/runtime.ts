@@ -57,7 +57,10 @@ export class DraftEditorRuntime {
     this.editor = createEditor({
       namespace: 'dsh-composer',
       nodes: [ReferenceChipNode, TextRefNode],
-      onError: (error) => { throw error },
+      onError: (error) => {
+        console.error('[rich-composer diagnostic] Lexical editor error', error.stack)
+        throw error
+      },
     })
   }
 
@@ -247,6 +250,11 @@ export class DraftEditorRuntime {
    * @returns whether the range mapped and the edit applied.
    */
   insertReference(span: DetectSpan, ref: ReferenceInsert, tail: string): boolean {
+    console.error('[rich-composer diagnostic] reference insert context', {
+      editorUpdating: this.editor._updating,
+      start: span.start,
+      end: span.end,
+    })
     let applied = false
     this.applyEdit(() => {
       const nodes = tail === ' '
