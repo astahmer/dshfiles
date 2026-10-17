@@ -5,6 +5,11 @@ marketplace plugins, DSH-specific bundles, and the local toolchain that builds
 and verifies them. We adopt a maintained plugin when it covers the need; we own
 capabilities where the DSH APIs or product workflow need a focused extension.
 
+> **DSH broken?** Run `dsh lkg` and open <http://127.0.0.1:3099>: the last known
+> good DSH, with your accounts and threads. Then follow
+> [Recovering a broken DSH](docs/recovery.md). Upgrade DSH only through
+> `scripts/dsh-lkg/cli.mjs upgrade`.
+
 ## What it includes
 
 ### Owned DSH bundles

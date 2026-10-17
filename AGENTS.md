@@ -165,6 +165,12 @@ when the seed changed, so a seed change reaches the live profile on the next
 restart without `nixapply`. See
 [`docs/profile-installs.md`](docs/profile-installs.md#the-web-profile-reconciles-itself).
 
+A seed row outside the marked region never reaches an existing live profile.
+When a DSH release renames a service or a prompt variable and you fix a seed row
+for it, tell the user the live row needs the same edit — two 0.2.1 breakages
+(`webRuntime` → `webStartup`, the `{{cwd}}` persona suffix) were fixed in the seed
+and stayed broken live.
+
 Experiment in `probe` (or a disposable profile), never in `web`. `probe` is not
 Nix-managed, has its own `node_modules`, and gets its own port:
 
@@ -179,6 +185,14 @@ When `probe` has unrelated activation failures, isolate the target with the
 dshx E2E `bootPluginProfile('@dshfiles/<name>')` fixture, which boots a
 disposable home with the base web bundles plus the selected bundle. Promote on
 measured evidence; remove abandoned experiments from every profile they reached.
+
+## DSH upgrades and recovery
+
+Never upgrade the global `@deepseek-ai/dsh` in place; use
+`scripts/dsh-lkg/cli.mjs upgrade <version>`, which proves the new core against
+the live profile first. When DSH is broken, the user's way out is `dsh lkg`
+(port 3099, with their accounts and threads). The runbook is
+[`docs/recovery.md`](docs/recovery.md).
 
 ## Writing plugins
 
