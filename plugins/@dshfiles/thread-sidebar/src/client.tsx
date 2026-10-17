@@ -75,27 +75,16 @@ import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { createContext, memo, useCallback, useContext, useEffect, useId, useMemo, useReducer, useRef, useState, type ReactElement, type ReactNode } from 'react'
 import { z } from 'zod'
 import {
-  autoArchiveOverrideForSession,
-  isAutoArchiveCandidate,
-  isAttentionSessionIncluded,
   REBASED_THREAD_ARCHIVE_DELAYS,
-  type RebasedThreadArchiveDelay,
-  nextIdleTransitionAt,
-  parseSessionIds,
-  sessionLineage,
-  sectionForSession,
-  setAutoArchiveOverride as updateAutoArchiveOverride,
-  shouldScanForAutoArchive,
+  SidebarOrganization,
   type AutoArchiveOverride,
   type AttentionColor,
   type AttentionColorKey,
   type AttentionColors,
+  type RebasedThreadArchiveDelay,
   type SidebarPreferences,
   type SidebarSection,
   type ThreadRowDensity,
-  projectWorkspaces,
-  workspaceForLineage,
-  workspaceForSessions,
 } from './organization.js'
 import { ThreadAttentionPresentationModel, type ThreadAttentionLabel } from './attention-presentation.js'
 import { SidebarPreferencesModel, attentionColorSchema } from './preferences.js'
@@ -1031,12 +1020,12 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     archiveFailureMessage: string
   } | null>(null)
 
-  const workspaceBySession = useMemo(() => workspaceForSessions(workspaceState.items), [workspaceState.items])
+  const workspaceBySession = useMemo(() => SidebarOrganization.workspaceForSessions(workspaceState.items), [workspaceState.items])
   const archivedSessionIds = useMemo(() => setIncludes(workspaceState.archivedSessionIds), [workspaceState.archivedSessionIds])
   const pinnedSessionIds = useMemo(() => setIncludes(workspaceState.pinnedSessionIds), [workspaceState.pinnedSessionIds])
   const displayWorkspaces = useMemo(
     () =>
-      projectWorkspaces(workspaceState.items).map(workspace => ({
+      SidebarOrganization.projectWorkspaces(workspaceState.items).map(workspace => ({
         id: workspace.workspaceId,
         title: workspace.title.length > 0 ? workspace.title : props.tSidebar('threadSidebarDefaultProject'),
       })),
@@ -1100,7 +1089,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const selectedSession = useMemo(() => sessions.find(session => (session.retainedBy.mainView ?? 0) > 0), [sessions])
   const selectedSessionId = selectedSession?.id
   const attentionSessions = useMemo(
-    () => sessions.filter(session => isAttentionSessionIncluded(session, preferences.includeSubagentAttention)),
+    () => sessions.filter(session => SidebarOrganization.isAttentionSessionIncluded(session, preferences.includeSubagentAttention)),
     [preferences.includeSubagentAttention, sessions],
   )
   const needsResumeRows = useMemo(
@@ -1111,7 +1100,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         mutedSessionIds,
         archivedSessionIds,
         matchesWorkspace: session =>
-          preferences.workspaceFilter === null || (workspaceForLineage(session, sessionState.byId, workspaceBySession) ?? '') === preferences.workspaceFilter,
+          preferences.workspaceFilter === null ||
+          (SidebarOrganization.workspaceForLineage(session, sessionState.byId, workspaceBySession) ?? '') === preferences.workspaceFilter,
         matchesSource: session => ThreadViewModel.matchesSourceFilter(session, threadView.sourceFilter),
       }),
     [
@@ -1133,7 +1123,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         mutedSessionIds,
         archivedSessionIds,
         matchesWorkspace: session =>
-          preferences.workspaceFilter === null || (workspaceForLineage(session, sessionState.byId, workspaceBySession) ?? '') === preferences.workspaceFilter,
+          preferences.workspaceFilter === null ||
+          (SidebarOrganization.workspaceForLineage(session, sessionState.byId, workspaceBySession) ?? '') === preferences.workspaceFilter,
         matchesSource: session => ThreadViewModel.matchesSourceFilter(session, threadView.sourceFilter),
       }),
     [
@@ -1388,7 +1379,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     if (selectedSession === undefined || routeRequest !== null) return
     if (suppressUrlForSession.current === selectedSession.id) return
     suppressUrlForSession.current = null
-    const workspaceId = workspaceForLineage(selectedSession, sessionState.byId, workspaceBySession)
+    const workspaceId = SidebarOrganization.workspaceForLineage(selectedSession, sessionState.byId, workspaceBySession)
     const next = buildThreadUrl(window.location.href, selectedSession.id, workspaceId)
     if (next !== window.location.href) window.history.replaceState(window.history.state, '', next)
   }, [routeRequest, selectedSession, sessionState.byId, workspaceBySession])
@@ -1580,7 +1571,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     openedRouteId.current = sessionId
     suppressUrlForSession.current = null
     const session = sessionState.byId[sessionId]
-    const workspaceId = session === undefined ? undefined : workspaceForLineage(session, sessionState.byId, workspaceBySession)
+    const workspaceId = session === undefined ? undefined : SidebarOrganization.workspaceForLineage(session, sessionState.byId, workspaceBySession)
     window.history.replaceState(window.history.state, '', buildThreadUrl(window.location.href, sessionId, workspaceId))
     props.open(sessionId)
   }
@@ -1597,7 +1588,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     const categoryPreferences = preferences.notificationCategories[category]
     if (!threadNotificationHasOutput(categoryPreferences) || isMuteActive(mutedThreads[sessionId], Date.now())) return
     const session = sessionState.byId[sessionId]
-    if (session === undefined || !isAttentionSessionIncluded(session, preferences.includeSubagentAttention)) return
+    if (session === undefined || !SidebarOrganization.isAttentionSessionIncluded(session, preferences.includeSubagentAttention)) return
     const inApp = notificationRouteHasInApp(categoryPreferences.delivery)
     const systemRequested = notificationRouteHasSystem(categoryPreferences.delivery)
     const system = systemRequested && 'Notification' in window && window.Notification.permission === 'granted'
@@ -1653,14 +1644,14 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
 
   const runAutoArchive = async (): Promise<void> => {
     const latest = latestAutoArchive.current
-    if (archiveInFlight.current || latest === null || !shouldScanForAutoArchive(latest.preferences)) return
+    if (archiveInFlight.current || latest === null || !SidebarOrganization.shouldScanForAutoArchive(latest.preferences)) return
     archiveInFlight.current = true
     let failed = false
     try {
       const now = Date.now()
       for (const session of latest.sessions) {
         if (
-          !isAutoArchiveCandidate({
+          !SidebarOrganization.isAutoArchiveCandidate({
             session,
             workspaceId: latest.workspaceBySession.get(session.id),
             now,
@@ -1715,7 +1706,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   }
 
   useEffect(() => {
-    if (!shouldScanForAutoArchive(preferences)) return
+    if (!SidebarOrganization.shouldScanForAutoArchive(preferences)) return
     if (sessionState.phase !== 'ready' || workspaceState.phase !== 'ready') return
     void runAutoArchive()
     const timer = window.setInterval(() => void runAutoArchive(), preferences.scanIntervalMinutes * 60_000)
@@ -1749,7 +1740,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     for (const sessionId of sessionState.ids) {
       const session = sessionState.byId[sessionId]
       if (session === undefined || session.blank || ThreadViewModel.isSideChat(session)) continue
-      const workspaceId = workspaceForLineage(session, sessionState.byId, workspaceBySession)
+      const workspaceId = SidebarOrganization.workspaceForLineage(session, sessionState.byId, workspaceBySession)
       if (preferences.workspaceFilter !== null && (workspaceId ?? '') !== preferences.workspaceFilter) continue
       listed.push(session)
     }
@@ -1777,7 +1768,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     () =>
       threadTree.roots.map(session => ({
         session,
-        workspaceId: workspaceForLineage(session, sessionState.byId, workspaceBySession),
+        workspaceId: SidebarOrganization.workspaceForLineage(session, sessionState.byId, workspaceBySession),
         activity: {
           id: session.id,
           updatedAt: effectiveActivityAt(mutedThreads, session, now),
@@ -1792,7 +1783,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       Array.from(threadTree.childrenByRoot.values()).flatMap(children =>
         children.map(session => ({
           session,
-          workspaceId: workspaceForLineage(session, sessionState.byId, workspaceBySession),
+          workspaceId: SidebarOrganization.workspaceForLineage(session, sessionState.byId, workspaceBySession),
           activity: { id: session.id, updatedAt: effectiveActivityAt(mutedThreads, session, now), running: session.running },
         })),
       ),
@@ -1820,7 +1811,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const nextMuteWake = useMemo(() => nextMuteExpiry(mutedThreads, now), [mutedThreads, now])
   const nextIdleAt = useMemo(
     () =>
-      nextIdleTransitionAt(
+      SidebarOrganization.nextIdleTransitionAt(
         sectionEntries.map(entry => entry.activity),
         now,
         preferences.idleMinutes,
@@ -1881,7 +1872,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         mutedSessionIds,
         archivedSessionIds,
         matchesWorkspace: session =>
-          preferences.workspaceFilter === null || (workspaceForLineage(session, sessionState.byId, workspaceBySession) ?? '') === preferences.workspaceFilter,
+          preferences.workspaceFilter === null ||
+          (SidebarOrganization.workspaceForLineage(session, sessionState.byId, workspaceBySession) ?? '') === preferences.workspaceFilter,
       }),
     [
       archivedSessionIds,
@@ -1907,7 +1899,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
             !mutedSessionIds.has(session.id) &&
             !archivedSessionIds.has(session.id) &&
             (preferences.workspaceFilter === null ||
-              (workspaceForLineage(session, sessionState.byId, workspaceBySession) ?? '') === preferences.workspaceFilter)
+              (SidebarOrganization.workspaceForLineage(session, sessionState.byId, workspaceBySession) ?? '') === preferences.workspaceFilter)
           )
         })
         .sort((left, right) => right.updatedAt - left.updatedAt),
@@ -1935,7 +1927,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         archivedSessionIds,
         excludedSessionIds: usageLimitSessionIds,
         matchesWorkspace: session =>
-          preferences.workspaceFilter === null || (workspaceForLineage(session, sessionState.byId, workspaceBySession) ?? '') === preferences.workspaceFilter,
+          preferences.workspaceFilter === null ||
+          (SidebarOrganization.workspaceForLineage(session, sessionState.byId, workspaceBySession) ?? '') === preferences.workspaceFilter,
       }),
     [
       approvalNeededIds,
@@ -2086,7 +2079,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     const activityAt = new Map(visibleThreadEntries.map(entry => [entry.session.id, entry.activity.updatedAt]))
     for (const { session, activity } of visibleThreadEntries) {
       if (threadView.groupBy === 'status' && attentionIds.has(session.id)) continue
-      const section = sectionForSession({
+      const section = SidebarOrganization.sectionForSession({
         session: activity,
         archivedSessionIds,
         pinnedSessionIds,
@@ -2348,7 +2341,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       dismissRecovery: sessionId => void latestRowActions.current.dismissRecoverySession(sessionId),
       setAutoArchiveOverride: (sessionId, override) => {
         const current = latestRowActions.current
-        const next = updateAutoArchiveOverride(current.preferences, sessionId, override)
+        const next = SidebarOrganization.setAutoArchiveOverride(current.preferences, sessionId, override)
         current.changePreferences({
           autoArchiveSessionIds: next.autoArchiveSessionIds,
           autoArchiveDisabledSessionIds: next.autoArchiveDisabledSessionIds,
@@ -2359,8 +2352,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   }, [])
 
   const renderThreadRow = (session: SessionSummary, attentionLabel: ThreadRowProps['attentionLabel']): JSX.Element => {
-    const lineage = sessionLineage(session, sessionState.byId)
-    const workspaceId = workspaceForLineage(session, sessionState.byId, workspaceBySession)
+    const lineage = SidebarOrganization.sessionLineage(session, sessionState.byId)
+    const workspaceId = SidebarOrganization.workspaceForLineage(session, sessionState.byId, workspaceBySession)
     const listedChildThreads =
       threadView.sourceFilter === 'main'
         ? NO_CHILDREN
@@ -2388,7 +2381,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         key={session.id}
         session={session}
         unread={unreadSessionIds.has(session.id)}
-        autoArchiveOverride={autoArchiveOverrideForSession(preferences, session.id)}
+        autoArchiveOverride={SidebarOrganization.autoArchiveOverrideForSession(preferences, session.id)}
         unreadSessionIds={unreadSessionIds}
         archived={archivedSessionIds.has(session.id)}
         pinned={pinnedSessionIds.has(session.id)}
@@ -2841,7 +2834,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                 rows={3}
                 aria-describedby={`${settingsId}-sessions-hint`}
                 value={preferences.excludedSessionIds.join('\n')}
-                onChange={event => changePreferences({ excludedSessionIds: parseSessionIds(event.currentTarget.value) })}
+                onChange={event => changePreferences({ excludedSessionIds: SidebarOrganization.parseSessionIds(event.currentTarget.value) })}
               />
               <p id={`${settingsId}-sessions-hint`} className="dshx:text-xs dshx:text-muted-foreground">
                 {props.tSidebar('threadSidebarExclusionHint')}
@@ -2914,12 +2907,12 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                 key={session.id}
                 session={session}
                 unread={unreadSessionIds.has(session.id)}
-                autoArchiveOverride={autoArchiveOverrideForSession(preferences, session.id)}
+                autoArchiveOverride={SidebarOrganization.autoArchiveOverrideForSession(preferences, session.id)}
                 mute={mutedSessionIds.has(session.id) ? mutedThreads[session.id] : undefined}
                 archived={archivedSessionIds.has(session.id)}
                 pinned={pinnedSessionIds.has(session.id)}
                 parked={parkedSessionIds.has(session.id)}
-                workspaceId={workspaceForLineage(session, sessionState.byId, workspaceBySession)}
+                workspaceId={SidebarOrganization.workspaceForLineage(session, sessionState.byId, workspaceBySession)}
                 actions={rowActions}
               >
                 {row}

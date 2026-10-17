@@ -143,7 +143,7 @@ export interface OrderedSidebarEntry {
 
 export type SessionActivity = Pick<SessionSummary, 'id' | 'running' | 'updatedAt' | 'blank'>
 
-export const isAttentionSessionIncluded = (session: Pick<SessionSummary, 'origin' | 'parentId'>, includeSubagentAttention: boolean): boolean =>
+const isAttentionSessionIncluded = (session: Pick<SessionSummary, 'origin' | 'parentId'>, includeSubagentAttention: boolean): boolean =>
   includeSubagentAttention || (session.origin !== 'subagent' && session.parentId === undefined)
 
 export interface AutoArchiveContext {
@@ -157,13 +157,13 @@ export interface AutoArchiveContext {
 
 export type AutoArchiveOverride = 'inherit' | 'enabled' | 'disabled'
 
-export const autoArchiveOverrideForSession = (preferences: SidebarPreferences, sessionId: string): AutoArchiveOverride => {
+const autoArchiveOverrideForSession = (preferences: SidebarPreferences, sessionId: string): AutoArchiveOverride => {
   if (preferences.autoArchiveDisabledSessionIds.includes(sessionId)) return 'disabled'
   if (preferences.autoArchiveSessionIds.includes(sessionId)) return 'enabled'
   return 'inherit'
 }
 
-export const setAutoArchiveOverride = (preferences: SidebarPreferences, sessionId: string, override: AutoArchiveOverride): SidebarPreferences => ({
+const setAutoArchiveOverride = (preferences: SidebarPreferences, sessionId: string, override: AutoArchiveOverride): SidebarPreferences => ({
   ...preferences,
   autoArchiveSessionIds:
     override === 'enabled' ? [...new Set([...preferences.autoArchiveSessionIds, sessionId])] : preferences.autoArchiveSessionIds.filter(id => id !== sessionId),
@@ -173,8 +173,7 @@ export const setAutoArchiveOverride = (preferences: SidebarPreferences, sessionI
       : preferences.autoArchiveDisabledSessionIds.filter(id => id !== sessionId),
 })
 
-export const shouldScanForAutoArchive = (preferences: SidebarPreferences): boolean =>
-  preferences.autoArchiveEnabled || preferences.autoArchiveSessionIds.length > 0
+const shouldScanForAutoArchive = (preferences: SidebarPreferences): boolean => preferences.autoArchiveEnabled || preferences.autoArchiveSessionIds.length > 0
 
 export interface SessionLineage {
   /** Number of known direct-parent edges above the session. */
@@ -190,7 +189,7 @@ export interface SessionLineage {
  * chain. A visited set keeps corrupt cycles bounded; missing ancestors still
  * preserve the direct relationship and one level of indentation.
  */
-export const sessionLineage = (session: Pick<SessionSummary, 'id' | 'parentId'>, byId: Readonly<Record<string, SessionSummary>>): SessionLineage => {
+const sessionLineage = (session: Pick<SessionSummary, 'id' | 'parentId'>, byId: Readonly<Record<string, SessionSummary>>): SessionLineage => {
   if (session.parentId === undefined) return { depth: 0 }
 
   let depth = 0
@@ -218,7 +217,7 @@ const projectOfThreadWorkspace = (workspace: WorkspaceView, byPath: ReadonlyMap<
 }
 
 /** jj-integration's thread workspaces are attributed to their owning project workspace. */
-export const workspaceForSessions = (workspaces: readonly WorkspaceView[]): Map<string, string> => {
+const workspaceForSessions = (workspaces: readonly WorkspaceView[]): Map<string, string> => {
   const byPath = new Map(workspaces.map(workspace => [workspace.path, workspace]))
   const map = new Map<string, string>()
   for (const workspace of workspaces) {
@@ -228,13 +227,13 @@ export const workspaceForSessions = (workspaces: readonly WorkspaceView[]): Map<
   return map
 }
 
-export const projectWorkspaces = (workspaces: readonly WorkspaceView[]): readonly WorkspaceView[] => {
+const projectWorkspaces = (workspaces: readonly WorkspaceView[]): readonly WorkspaceView[] => {
   const byPath = new Map(workspaces.map(workspace => [workspace.path, workspace]))
   return workspaces.filter(workspace => projectOfThreadWorkspace(workspace, byPath) === undefined)
 }
 
 /** Resolve a workspace from the session or its nearest known ancestor. */
-export const workspaceForLineage = (
+const workspaceForLineage = (
   session: Pick<SessionSummary, 'id' | 'parentId'>,
   byId: Readonly<Record<string, SessionSummary>>,
   workspaceBySession: ReadonlyMap<string, string>,
@@ -250,7 +249,7 @@ export const workspaceForLineage = (
   return undefined
 }
 
-export const parseSessionIds = (value: string): string[] => [
+const parseSessionIds = (value: string): string[] => [
   ...new Set(
     value
       .split(/[\s,;]+/)
@@ -357,7 +356,7 @@ const archiveWithoutStopping = async <SessionId extends string>(
 const hasPassedIdleThreshold = (session: Pick<SessionActivity, 'updatedAt'>, now: number, idleMinutes: number): boolean =>
   Number.isFinite(session.updatedAt) && session.updatedAt <= now && now - session.updatedAt >= idleMinutes * 60_000
 
-export const nextIdleTransitionAt = (sessions: readonly Pick<SessionActivity, 'running' | 'updatedAt'>[], now: number, idleMinutes: number): number | null => {
+const nextIdleTransitionAt = (sessions: readonly Pick<SessionActivity, 'running' | 'updatedAt'>[], now: number, idleMinutes: number): number | null => {
   let next: number | null = null
   for (const session of sessions) {
     if (session.running || !Number.isFinite(session.updatedAt)) continue
@@ -367,7 +366,7 @@ export const nextIdleTransitionAt = (sessions: readonly Pick<SessionActivity, 'r
   return next
 }
 
-export const isAutoArchiveCandidate = ({ session, workspaceId, now, preferences, archivedSessionIds, pinnedSessionIds }: AutoArchiveContext): boolean => {
+const isAutoArchiveCandidate = ({ session, workspaceId, now, preferences, archivedSessionIds, pinnedSessionIds }: AutoArchiveContext): boolean => {
   if (session.running || session.blank) return false
   if (archivedSessionIds.has(session.id) || pinnedSessionIds.has(session.id)) return false
   if (preferences.parkedSessionIds.includes(session.id)) return false
@@ -380,7 +379,7 @@ export const isAutoArchiveCandidate = ({ session, workspaceId, now, preferences,
   return hasPassedIdleThreshold(session, now, preferences.idleMinutes)
 }
 
-export const sectionForSession = ({
+const sectionForSession = ({
   session,
   archivedSessionIds,
   pinnedSessionIds,
@@ -431,6 +430,8 @@ export class SidebarOrganization {
   static readonly setAutoArchiveOverride = setAutoArchiveOverride
   static readonly shouldScanForAutoArchive = shouldScanForAutoArchive
   static readonly sessionLineage = sessionLineage
+  static readonly workspaceForSessions = workspaceForSessions
+  static readonly projectWorkspaces = projectWorkspaces
   static readonly workspaceForLineage = workspaceForLineage
   static readonly parseSessionIds = parseSessionIds
   static readonly orderSidebarEntries = orderSidebarEntries
