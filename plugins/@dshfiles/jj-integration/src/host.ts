@@ -240,8 +240,50 @@ const threadView = (
   return { ...viewWithRebaseTimestamp, rebasedTipChangeId: status.rebasedTipChangeId }
 }
 
+/**
+ * A repository scan costs one `jj` process per workspace and two more per thread, while the sidebar
+ * polls it. Every layer is cached and every scan is single-flight: a poll storm shares one scan
+ * instead of pinning one browser connection per caller.
+ */
+const LOCATION_CACHE_TTL_MS = 5 * 60_000
+const THREAD_STATUS_CACHE_TTL_MS = 30_000
+const REPOSITORY_VIEW_TTL_MS = 15_000
+
+type Cached<Value> = { readonly value: Value; readonly at: number }
+
+const locationCache = new Map<string, Cached<ThreadLocation>>()
+const threadStatusCache = new Map<string, Cached<readonly ThreadStatus[]>>()
+let repositoryViews: Cached<readonly RepositoryView[]> | undefined
+let repositoryScan: Promise<readonly RepositoryView[]> | undefined
+let repositoryGeneration = 0
+
+/** A mutation makes every cached jj-derived value stale, including the scan that is still running. */
+const invalidateRepositories = (): void => {
+  repositoryGeneration += 1
+  repositoryViews = undefined
+  repositoryScan = undefined
+  threadStatusCache.clear()
+}
+
+const cachedLocation = async (threads: Threads, path: string): Promise<ThreadLocation | undefined> => {
+  const cached = locationCache.get(path)
+  if (cached !== undefined && Date.now() - cached.at < LOCATION_CACHE_TTL_MS) return cached.value
+  const location = await threads.locate(path).catch(() => undefined)
+  if (location === undefined) locationCache.delete(path)
+  else locationCache.set(path, { value: location, at: Date.now() })
+  return location
+}
+
+const cachedThreadStatuses = async (threads: Threads, repoRoot: string): Promise<readonly ThreadStatus[]> => {
+  const cached = threadStatusCache.get(repoRoot)
+  if (cached !== undefined && Date.now() - cached.at < THREAD_STATUS_CACHE_TTL_MS) return cached.value
+  const statuses = await threads.list(repoRoot)
+  threadStatusCache.set(repoRoot, { value: statuses, at: Date.now() })
+  return statuses
+}
+
 /** Every registered project that is the owning checkout of a jj repository, with its thread workspaces. */
-const listRepositories = async (): Promise<readonly RepositoryView[]> => {
+const scanRepositories = async (): Promise<readonly RepositoryView[]> => {
   const registry = registryOf()
   const active = requireThreads()
   const workspaces = registry.list()
@@ -251,10 +293,10 @@ const listRepositories = async (): Promise<readonly RepositoryView[]> => {
   const repositories = new Map<string, RepositoryView>()
   for (const workspace of workspaces) {
     if (!existsSync(workspace.path)) continue
-    const location = await active.locate(workspace.path).catch(() => undefined)
+    const location = await cachedLocation(active, workspace.path)
     if (location === undefined || repositories.has(location.repoRoot)) continue
     const owner = byPath.get(location.repoRoot)
-    const statuses = await active.list(location.repoRoot)
+    const statuses = await cachedThreadStatuses(active, location.repoRoot)
     repositories.set(location.repoRoot, {
       repoRoot: location.repoRoot,
       title: owner?.title ?? basename(location.repoRoot),
@@ -263,6 +305,24 @@ const listRepositories = async (): Promise<readonly RepositoryView[]> => {
     })
   }
   return [...repositories.values()]
+}
+
+const listRepositories = async (): Promise<readonly RepositoryView[]> => {
+  const cached = repositoryViews
+  if (cached !== undefined && Date.now() - cached.at < REPOSITORY_VIEW_TTL_MS) return cached.value
+  const inFlight = repositoryScan
+  if (inFlight !== undefined) return inFlight
+  const generation = repositoryGeneration
+  const scan = scanRepositories().then(result => {
+    if (generation === repositoryGeneration) repositoryViews = { value: result, at: Date.now() }
+    return result
+  })
+  repositoryScan = scan
+  try {
+    return await scan
+  } finally {
+    if (repositoryScan === scan) repositoryScan = undefined
+  }
 }
 
 const findThread = async (input: {
@@ -484,6 +544,7 @@ const landThread = async (input: {
     { ...location, threadName },
     input.signal === undefined ? { bookmark, validate, onProgress } : { bookmark, signal: input.signal, validate, onProgress },
   )
+  if (outcome.status === 'landed' || outcome.status === 'nothing-to-land') invalidateRepositories()
   const result: LandResult = {
     status: outcome.status,
     revisions: outcome.status === 'nothing-to-land' ? [] : [...outcome.revisions],
@@ -535,6 +596,7 @@ const discardThread = async (input: { readonly path: string; readonly force: boo
     const correlationId = randomUUID()
     emitActivity({ type: 'workspace.discarded', summary: `Removed thread workspace ${found.thread.name}`, path: input.path, correlationId })
     queueWorkspaceSync({ repoRoot: found.repoRoot, bookmark: readSettings().bookmark, correlationId })
+    invalidateRepositories()
   }
   return { status: outcome.status, revisions: outcome.status === 'has-work' ? [...outcome.revisions] : [] }
 }
@@ -595,6 +657,7 @@ const isolateSession = async (caller: ApiCaller) => {
 
   isolatedSessionWorkspaces.set(caller.sessionId, thread)
   emitActivity({ type: 'workspace.provisioned', summary: `New thread workspace ${thread.name}`, path: thread.path })
+  invalidateRepositories()
   return { ...thread, created: true }
 }
 
@@ -637,6 +700,7 @@ const api = jjIntegrationApi.host({
     const thread = await requireThreads().provision(location.repoRoot, input.base, input.name)
     const workspace = await registry.create(thread.path, `${project?.title ?? basename(location.repoRoot)} · ${thread.name}`)
     emitActivity({ type: 'workspace.provisioned', summary: `New thread workspace ${thread.name}`, path: thread.path })
+    invalidateRepositories()
     return { workspaceId: workspace.id, isolated: true, destination: await destinationAt(thread.path, true, project?.id ?? null) }
   },
   isolate: ({ caller }) => isolateSession(caller),
@@ -1011,6 +1075,8 @@ const setupHost = (context: Context): Effect<void> => {
         if (hostContext === context) {
           hostContext = undefined
           threads = undefined
+          locationCache.clear()
+          invalidateRepositories()
         }
       }
     },

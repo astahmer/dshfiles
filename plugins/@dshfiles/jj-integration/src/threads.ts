@@ -13,6 +13,9 @@ export interface JjResult {
   readonly stderr: string
 }
 
+/** Concurrent read-only `jj` processes per repository scan; higher values trade lock contention for latency. */
+const STATUS_READ_CONCURRENCY = 4
+
 export type JjExecutor = (input: { readonly args: readonly string[]; readonly cwd: string; readonly signal?: AbortSignal | undefined }) => Promise<JjResult>
 
 export class ThreadError extends Error {
@@ -648,25 +651,36 @@ export const createThreads = (options: {
     const directory = options.threadsDirectory(repoRoot)
     const names = (await jj(['--ignore-working-copy', 'workspace', 'list', '-T', 'name ++ "\\n"'], repoRoot)).split('\n').filter(name => name.length > 0)
     const rebaseMetadata = await readRebaseMetadata(repoRoot)
-    const threads: ThreadStatus[] = []
-    for (const name of names) {
-      const path = join(directory, name)
-      const present = existsSync(join(path, '.jj'))
-      if (!present && !name.startsWith('thread-')) continue
-      const unlanded = await revisions(unlandedRevset(name), repoRoot, true)
-      const behind = await revisions(`${name}@ ~ ${options.bookmark()}::`, repoRoot, true)
-      const status = {
-        name,
-        path,
-        repoRoot,
-        missing: !present,
-        unlanded,
-        behind: behind.length > 0,
-        behindCount: behind.length,
+    /** Two read-only `jj` calls per thread, run with bounded parallelism: a store with dozens of thread workspaces stays responsive. */
+    const statuses = new Array<ThreadStatus | undefined>(names.length)
+    let next = 0
+    const worker = async (): Promise<void> => {
+      for (;;) {
+        const index = next
+        next += 1
+        const name = names[index]
+        if (name === undefined) return
+        const path = join(directory, name)
+        const present = existsSync(join(path, '.jj'))
+        if (!present && !name.startsWith('thread-')) continue
+        const unlanded = await revisions(unlandedRevset(name), repoRoot, true)
+        const behind = await revisions(`${name}@ ~ ${options.bookmark()}::`, repoRoot, true)
+        statuses[index] = withRebaseMetadata(
+          {
+            name,
+            path,
+            repoRoot,
+            missing: !present,
+            unlanded,
+            behind: behind.length > 0,
+            behindCount: behind.length,
+          },
+          rebaseMetadata[name],
+        )
       }
-      threads.push(withRebaseMetadata(status, rebaseMetadata[name]))
     }
-    return threads
+    await Promise.all(Array.from({ length: Math.min(STATUS_READ_CONCURRENCY, names.length) }, () => worker()))
+    return statuses.filter((status): status is ThreadStatus => status !== undefined)
   }
 
   const status = async (repoRoot: string, name: string): Promise<ThreadStatus> => {
