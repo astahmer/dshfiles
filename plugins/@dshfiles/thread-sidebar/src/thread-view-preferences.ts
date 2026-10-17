@@ -185,31 +185,31 @@ const storedThreadViewSettingsSchema = z.preprocess(value => {
   return legacyPreferences.success ? migrateLegacyPreferences(legacyPreferences.data) : value
 }, threadViewSettingsSchema)
 
-export const decodeThreadViewPreferences = (value: unknown): ThreadViewPreferences | null => {
+const decodeThreadViewPreferences = (value: unknown): ThreadViewPreferences | null => {
   const result = threadViewPreferencesSchema.safeParse(value)
   return result.success ? result.data : null
 }
 
-export const decodeThreadViewSettings = (value: unknown): ThreadViewSettings | null => {
+const decodeThreadViewSettings = (value: unknown): ThreadViewSettings | null => {
   const result = storedThreadViewSettingsSchema.safeParse(value)
   return result.success ? result.data : null
 }
 
-export const activeThreadView = (settings: ThreadViewSettings): ThreadViewPreset =>
+const activeThreadView = (settings: ThreadViewSettings): ThreadViewPreset =>
   settings.views.find(view => view.id === settings.activeViewId && view.enabled) ?? settings.views.find(view => view.enabled) ?? DEFAULT_THREAD_VIEW_PRESETS[0]
 
-export const selectThreadView = (settings: ThreadViewSettings, viewId: string): ThreadViewSettings => {
+const selectThreadView = (settings: ThreadViewSettings, viewId: string): ThreadViewSettings => {
   const view = settings.views.find(candidate => candidate.id === viewId)
   return view?.enabled ? { ...settings, activeViewId: view.id } : settings
 }
 
-export const saveThreadView = (settings: ThreadViewSettings, view: ThreadViewPreset): ThreadViewSettings => {
+const saveThreadView = (settings: ThreadViewSettings, view: ThreadViewPreset): ThreadViewSettings => {
   const exists = settings.views.some(candidate => candidate.id === view.id)
   const views = exists ? settings.views.map(candidate => (candidate.id === view.id ? view : candidate)) : [...settings.views, view]
   return { ...settings, views }
 }
 
-export const moveThreadView = (settings: ThreadViewSettings, viewId: string, direction: -1 | 1): ThreadViewSettings => {
+const moveThreadView = (settings: ThreadViewSettings, viewId: string, direction: -1 | 1): ThreadViewSettings => {
   const index = settings.views.findIndex(view => view.id === viewId)
   const targetIndex = index + direction
   if (index < 0 || targetIndex < 0 || targetIndex >= settings.views.length) return settings
@@ -222,7 +222,7 @@ export const moveThreadView = (settings: ThreadViewSettings, viewId: string, dir
   return { ...settings, views }
 }
 
-export const setThreadViewEnabled = (settings: ThreadViewSettings, viewId: string, enabled: boolean): ThreadViewSettings => {
+const setThreadViewEnabled = (settings: ThreadViewSettings, viewId: string, enabled: boolean): ThreadViewSettings => {
   const view = settings.views.find(candidate => candidate.id === viewId)
   if (view === undefined || view.enabled === enabled) return settings
   if (!enabled && settings.views.filter(candidate => candidate.enabled).length === 1) return settings
@@ -232,7 +232,7 @@ export const setThreadViewEnabled = (settings: ThreadViewSettings, viewId: strin
   return { ...settings, views, activeViewId }
 }
 
-export const removeThreadView = (settings: ThreadViewSettings, viewId: string): ThreadViewSettings => {
+const removeThreadView = (settings: ThreadViewSettings, viewId: string): ThreadViewSettings => {
   const view = settings.views.find(candidate => candidate.id === viewId)
   if (settings.views.length === 1 || view === undefined) return settings
   if (view.enabled && settings.views.filter(candidate => candidate.enabled).length === 1) return settings
@@ -249,7 +249,7 @@ export const threadViewPreferences = createStoredValue({
 })
 
 /** Apply one view's group/filter change to the saved-view document. */
-export const updateThreadViewPreferences = (settings: ThreadViewSettings, patch: Partial<ThreadViewPreferences>): ThreadViewSettings => {
+const updateThreadViewPreferences = (settings: ThreadViewSettings, patch: Partial<ThreadViewPreferences>): ThreadViewSettings => {
   const active = activeThreadView(settings)
   const views = settings.views.map(view => {
     if (view.id !== active.id) return { ...view, statusFilters: [...view.statusFilters] }
@@ -258,10 +258,20 @@ export const updateThreadViewPreferences = (settings: ThreadViewSettings, patch:
   return { ...settings, views }
 }
 
-export const updateThreadViewSettings = (settings: ThreadViewSettings): ThreadViewSettings => ({
+const updateThreadViewSettings = (settings: ThreadViewSettings): ThreadViewSettings => ({
   ...settings,
   views: settings.views.map(view => ({ ...view, statusFilters: [...view.statusFilters] })),
 })
 
-/** Model-shaped name main's view manager imports; the same functions live here as free exports. */
-export const ThreadViewPreferencesModel = { moveThreadView, removeThreadView, saveThreadView, setThreadViewEnabled }
+export class ThreadViewPreferencesModel {
+  static readonly decodeThreadViewPreferences = decodeThreadViewPreferences
+  static readonly decodeThreadViewSettings = decodeThreadViewSettings
+  static readonly activeThreadView = activeThreadView
+  static readonly selectThreadView = selectThreadView
+  static readonly saveThreadView = saveThreadView
+  static readonly moveThreadView = moveThreadView
+  static readonly setThreadViewEnabled = setThreadViewEnabled
+  static readonly removeThreadView = removeThreadView
+  static readonly updateThreadViewPreferences = updateThreadViewPreferences
+  static readonly updateThreadViewSettings = updateThreadViewSettings
+}

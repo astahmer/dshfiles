@@ -133,16 +133,7 @@ import {
   type ThreadSourceFilter,
   type ThreadViewPreferences,
 } from './thread-view.js'
-import {
-  activeThreadView,
-  DEFAULT_THREAD_VIEW_SETTINGS,
-  decodeThreadViewPreferences,
-  selectThreadView,
-  threadViewPreferences,
-  updateThreadViewPreferences,
-  updateThreadViewSettings,
-  type ThreadViewSettings,
-} from './thread-view-preferences.js'
+import { DEFAULT_THREAD_VIEW_SETTINGS, ThreadViewPreferencesModel, threadViewPreferences, type ThreadViewSettings } from './thread-view-preferences.js'
 import { ThreadViewManager, threadViewPresetLabel } from './thread-view-manager.js'
 import { captureThreadMentionInsertion, requestThreadMentionInsertion } from './thread-mention.js'
 import {
@@ -978,7 +969,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const [viewsManagerOpen, setViewsManagerOpen] = useState(false)
   const [threadToScrollTo, setThreadToScrollTo] = useState<string | null>(null)
   const threadViewSettings = preferences.threadViews
-  const threadView = activeThreadView(threadViewSettings)
+  const threadView = ThreadViewPreferencesModel.activeThreadView(threadViewSettings)
   const [now, setNow] = useState(() => Date.now())
   const settingsId = useId()
   const [noticeQueueState, dispatchNoticeQueue] = useReducer(sidebarNoticeQueueReducer, INITIAL_SIDEBAR_NOTICE_QUEUE_STATE)
@@ -2189,11 +2180,11 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const projectFilterLabel = projectOptions.find(option => option.id === projectFilterValue)?.label ?? props.tSidebar('threadSidebarAllProjects')
 
   const updateThreadView = (patch: Partial<ThreadViewPreferences>): void => {
-    changePreferences({ threadViews: updateThreadViewPreferences(threadViewSettings, patch) })
+    changePreferences({ threadViews: ThreadViewPreferencesModel.updateThreadViewPreferences(threadViewSettings, patch) })
   }
   // The Settings write is asynchronous; a failure surfaces through the shared storage warning.
   const saveThreadViewSettings = (settings: ThreadViewSettings): boolean => {
-    changePreferences({ threadViews: updateThreadViewSettings(settings) })
+    changePreferences({ threadViews: ThreadViewPreferencesModel.updateThreadViewSettings(settings) })
     return true
   }
   const updateThreadViewControls = (patch: Partial<Pick<ThreadViewSettings, 'showGroupControl' | 'showFilterControl'>>): void => {
@@ -2201,10 +2192,10 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   }
   const selectThreadViewPreset = (viewId: string): void => {
     if (viewId === threadViewSettings.activeViewId) return
-    saveThreadViewSettings(selectThreadView(threadViewSettings, viewId))
+    saveThreadViewSettings(ThreadViewPreferencesModel.selectThreadView(threadViewSettings, viewId))
   }
   const selectThreadGroupBy = (value: string): void => {
-    const decoded = decodeThreadViewPreferences({
+    const decoded = ThreadViewPreferencesModel.decodeThreadViewPreferences({
       groupBy: value,
       statusFilters: threadView.statusFilters,
       sourceFilter: threadView.sourceFilter,
@@ -2224,7 +2215,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     updateThreadView({ statusFilters })
   }
   const selectThreadSourceFilter = (value: string): void => {
-    const decoded = decodeThreadViewPreferences({
+    const decoded = ThreadViewPreferencesModel.decodeThreadViewPreferences({
       groupBy: threadView.groupBy,
       statusFilters: threadView.statusFilters,
       sourceFilter: value,
