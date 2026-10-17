@@ -26,6 +26,7 @@ const copy: ThreadPaletteCopy = {
   clear: 'Clear search',
   back: 'Back',
   searchIn: 'Search in',
+  searchLabel: 'Search the command palette',
   sessionNotFound: 'Session {id} was not found.',
   unassigned: 'Unassigned',
   prefixHint: 'Type ? for prefixes',

@@ -144,6 +144,7 @@ const PaletteOverlay = (props: PaletteOverlayProps): JSX.Element | null => {
         clear: props.translate('commandPaletteClear'),
         back: props.translate('commandPaletteBack'),
         searchIn: props.translate('commandPaletteSearchIn'),
+        searchLabel: props.translate('commandPaletteSearchLabel'),
         sessionNotFound: props.translate('commandPaletteSessionNotFound'),
         unassigned: props.translate('commandPaletteUnassigned'),
         prefixHint: props.translate('commandPalettePrefixHint'),
@@ -181,7 +182,7 @@ const PaletteOverlay = (props: PaletteOverlayProps): JSX.Element | null => {
 export default defineClient({
   name: '@dshfiles/command-palette',
   locales: [commandPaletteLocale],
-  inject: ['slots', 'shortcuts', 'sessions', 'uiWorkspace', 'theme'],
+  inject: ['slots', 'shortcuts', 'sessions', 'uiWorkspace', 'theme', 'connection'],
   setup(ctx, decorate) {
     const translate = ctx.locale.bind(COMMAND_PALETTE_LOCALE_NAMESPACE)
     const themeStore = createSnapshotStore(ctx.theme.getTheme())

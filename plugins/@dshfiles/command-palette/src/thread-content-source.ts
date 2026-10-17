@@ -1,6 +1,14 @@
 import { z } from 'zod'
 
-export type ThreadContentHit = { readonly sessionId: string; readonly snippet: string }
+export type ThreadContentHit = {
+  readonly sessionId: string
+  readonly snippet: string
+  /** The finder's own title and workspace, so a hit renders even when the client has not listed that thread. */
+  readonly title?: string
+  readonly project?: string
+  readonly cwd?: string
+  readonly updatedAt?: number
+}
 
 type RegistryApiView = {
   readonly owner: string
@@ -26,7 +34,18 @@ export type ThreadContentSearchDeps = {
 
 const memoryOwner = '@dshfiles/memory'
 const memoryApiId = 'dshfiles-memory'
-const finderPage = z.object({ hits: z.array(z.object({ sessionId: z.string().min(1), snippet: z.string() })) })
+const finderPage = z.object({
+  hits: z.array(
+    z.object({
+      sessionId: z.string().min(1),
+      snippet: z.string(),
+      title: z.string().optional(),
+      project: z.string().optional(),
+      cwd: z.string().nullable().optional(),
+      updatedAt: z.number().optional(),
+    }),
+  ),
+})
 
 /**
  * Memory's finder answers from titles, workspace paths and its own digest/message index, so a `#` query shows
@@ -48,7 +67,15 @@ export const createThreadContentSearch = (deps: ThreadContentSearchDeps) => {
         .callFinder(discovered, { query, project: 'all', limit: 12 }, signal)
         .then(value => finderPage.safeParse(value))
         .catch(() => undefined)
-      if (answer?.success === true) return answer.data.hits
+      if (answer?.success === true)
+        return answer.data.hits.map(hit => ({
+          sessionId: hit.sessionId,
+          snippet: hit.snippet,
+          ...(hit.title === undefined ? {} : { title: hit.title }),
+          ...(hit.project === undefined ? {} : { project: hit.project }),
+          ...(hit.cwd === undefined || hit.cwd === null ? {} : { cwd: hit.cwd }),
+          ...(hit.updatedAt === undefined ? {} : { updatedAt: hit.updatedAt }),
+        }))
     }
     return deps.native(query, signal)
   }

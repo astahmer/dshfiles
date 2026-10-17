@@ -4,6 +4,7 @@ export const COMMAND_PALETTE_LOCALE_NAMESPACE = 'command-palette' as const
 
 const en = {
   commandPaletteTitle: 'Command palette',
+  commandPaletteSearchLabel: 'Search the command palette',
   commandPaletteThreadsPlaceholder: 'Search threads by title, project, or ID…',
   commandPaletteAllPlaceholder: 'Search threads, destinations, and commands…',
   commandPaletteFilesPlaceholder: 'Go to file in this thread’s workspace…',
@@ -54,6 +55,7 @@ const en = {
 
 const zh = {
   commandPaletteTitle: '命令面板',
+  commandPaletteSearchLabel: '搜索命令面板',
   commandPaletteThreadsPlaceholder: '按标题、项目或 ID 搜索会话…',
   commandPaletteAllPlaceholder: '搜索会话、页面和命令…',
   commandPaletteFilesPlaceholder: '转到此会话工作区中的文件…',

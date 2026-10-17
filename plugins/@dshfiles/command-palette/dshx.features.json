@@ -180,6 +180,11 @@
           "file": "plugins/@dshfiles/command-palette/src/palette.test.ts",
           "testName": "palette prefixes route to thread, command, content, and line views"
         }
+      ],
+      "reach": [
+        "click button \"Open command palette\"",
+        "fill combobox \"Search the command palette\" \"#retarget palette\"",
+        "expect option \"Retarget the palette finder*\""
       ]
     },
     {

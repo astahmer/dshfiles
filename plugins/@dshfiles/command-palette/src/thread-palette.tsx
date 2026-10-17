@@ -39,6 +39,8 @@ export interface ThreadPaletteCopy {
   readonly clear: string
   readonly back: string
   readonly searchIn: string
+  /** Accessible name of the search box; the dialog's description is only linked, not a name. */
+  readonly searchLabel: string
   readonly sessionNotFound: string
   readonly unassigned: string
   readonly prefixHint: string
@@ -194,7 +196,14 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
     if (view !== 'content') return []
     const threadsById = new Map(props.threads.map(thread => [thread.id, thread]))
     return content.hits.flatMap(hit => {
-      const thread = threadsById.get(hit.sessionId)
+      // A finder hit names its own thread, so content search still reaches a thread this client has not listed
+      // (a thread from another project, or one whose workspace is gone).
+      const known = threadsById.get(hit.sessionId)
+      const thread =
+        known ??
+        (hit.title === undefined
+          ? undefined
+          : { id: hit.sessionId, title: hit.title, project: hit.project ?? '', cwd: hit.cwd ?? '', updatedAt: hit.updatedAt ?? 0 })
       return thread === undefined ? [] : [{ thread, snippet: hit.snippet }]
     })
   }, [content.hits, props.threads, view])
@@ -397,6 +406,7 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
         >
           <CommandInput
             autoFocus
+            aria-label={props.copy.searchLabel}
             className="dshx:h-11"
             value={query}
             onValueChange={next => {

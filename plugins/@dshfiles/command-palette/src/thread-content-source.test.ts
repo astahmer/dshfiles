@@ -28,6 +28,35 @@ describe('the palette thread-content source', () => {
     expect(native).not.toHaveBeenCalled()
   })
 
+  it('carries the title and workspace a finder hit names, so an unlisted thread still renders', async () => {
+    const source = search({
+      apis: [memoryApi],
+      finder: async () => ({
+        hits: [
+          {
+            sessionId: 'session-b',
+            snippet: 'retarget the palette',
+            title: 'Retarget the palette finder',
+            project: '/dev/other',
+            cwd: '/dev/other',
+            updatedAt: 1_700_000_000_000,
+            extra: 'ignored',
+          },
+        ],
+      }),
+    })
+    expect(await source('retarget', signal)).toEqual([
+      {
+        sessionId: 'session-b',
+        snippet: 'retarget the palette',
+        title: 'Retarget the palette finder',
+        project: '/dev/other',
+        cwd: '/dev/other',
+        updatedAt: 1_700_000_000_000,
+      },
+    ])
+  })
+
   it('discovers the API once and keeps using it', async () => {
     const listApis = vi.fn(async () => [memoryApi])
     const callFinder = vi.fn(async () => ({ hits: [] }))

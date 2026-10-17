@@ -46,6 +46,11 @@ const parseLineNumber = (text: string): number | null => {
 export interface ContentHit {
   readonly sessionId: string
   readonly snippet: string
+  /** Present when the finder answered: a hit can name a thread the sidebar does not list yet. */
+  readonly title?: string
+  readonly project?: string
+  readonly cwd?: string
+  readonly updatedAt?: number
 }
 
 export interface ThreadCandidate {
