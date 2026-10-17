@@ -23,7 +23,7 @@ export interface PreparedMutation {
 }
 
 /** Reject relative paths and lexical aliases before passing a path as cwd. */
-export const validatedRepositoryPath = (value: string): string => {
+const validatedRepositoryPath = (value: string): string => {
   if (value.length > 2048 || value.includes('\0') || !isAbsolute(value)) {
     throw new Error('Choose an absolute repository path.')
   }
@@ -34,10 +34,10 @@ export const validatedRepositoryPath = (value: string): string => {
   return normalized
 }
 
-export const isCommitId = (value: string): boolean => /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(value)
+const isCommitId = (value: string): boolean => /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(value)
 
 /** Accept listed workspace-relative paths, including spaces and fileset metacharacters. */
-export const isSafeSplitPath = (value: string): boolean => {
+const isSafeSplitPath = (value: string): boolean => {
   if (value.length === 0 || value.length > 1024 || value.includes('\0') || value.includes('\n') || value.includes('\r') || value.startsWith('/')) return false
   const segments = value.split('/')
   return segments.every(segment => segment.length > 0 && segment !== '.' && segment !== '..')
@@ -57,7 +57,7 @@ const rootFileFileset = (value: string): string => {
 }
 
 /** Construct a fixed JJ command. Every user value remains one argv element. */
-export const buildMutationArgv = (action: Mutation): readonly string[] => {
+const buildMutationArgv = (action: Mutation): readonly string[] => {
   if ('message' in action && action.message !== undefined && (action.message.includes('\0') || action.message.length > 4000)) {
     throw new Error('Descriptions must fit the supported message limit and cannot contain null bytes.')
   }
@@ -148,7 +148,7 @@ const FILE_STATUS_LETTERS = new Map<string, FileStatus>([
 const fileStatusLetter = (status: string): FileStatus => FILE_STATUS_LETTERS.get(status) ?? 'M'
 
 /** Decode one JSON record per line; malformed or oversized rows fail closed. */
-export const parseJsonLines = <T>(text: string, decode: (value: unknown) => T): T[] => {
+const parseJsonLines = <T>(text: string, decode: (value: unknown) => T): T[] => {
   const rows: T[] = []
   for (const line of text.split(/\r?\n/)) {
     if (line.length === 0) continue
@@ -164,7 +164,7 @@ export const parseJsonLines = <T>(text: string, decode: (value: unknown) => T): 
 }
 
 /** Match JJ's recorded argv metadata, never a coincidental phrase in an operation description. */
-export const isRecordedJjGitPush = (attributes: string): boolean => {
+const isRecordedJjGitPush = (attributes: string): boolean => {
   const args = attributes.split(/\r?\n/).find(line => /^args\s*:/i.test(line))
   if (args === undefined) return false
   const command = args.replace(/^args\s*:\s*/i, '').trimStart()
@@ -196,7 +196,7 @@ const parsePatchStats = (patch: string, paths: readonly string[], truncated = fa
 }
 
 /** Remove likely credentials and URL userinfo before a remote preview reaches the browser. */
-export const redactRemoteOutput = (value: string, maxLength = 8000): string =>
+const redactRemoteOutput = (value: string, maxLength = 8000): string =>
   value
     .replace(/(https?:\/\/)[^/@\s]+@/gi, '$1[redacted]@')
     .replace(/([?&](?:access_token|token|password|secret|key)=)[^&\s]+/gi, '$1[redacted]')

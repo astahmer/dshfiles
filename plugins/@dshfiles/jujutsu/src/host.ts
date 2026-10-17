@@ -5,17 +5,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import { realpath, stat } from 'node:fs/promises'
 import { isAbsolute, join, normalize, relative } from 'node:path'
 import { jujutsuApi, revisionSchema, type JujutsuState, type Mutation, type Revision } from './api.js'
-import {
-  buildMutationArgv,
-  isCommitId,
-  isRecordedJjGitPush,
-  isSafeSplitPath,
-  parseJsonLines,
-  PreviewStore,
-  redactRemoteOutput,
-  validatedRepositoryPath,
-  type PreparedMutation,
-} from './core.js'
+import { JujutsuMutationModel, JujutsuOutputModel, JujutsuPathModel, PreviewStore, type PreparedMutation } from './core.js'
 import { EVOLUTION_TEMPLATE, OPERATION_TEMPLATE, REVISION_TEMPLATE } from './jj-templates.js'
 import { RevisionReads, type JjRun } from './revision-reads.js'
 import { GraphNavigationReads } from './graph-navigation-reads.js'
@@ -154,7 +144,7 @@ const runAt = async (
 }
 
 const registerRepo = async (ctx: Context, selectedPath: string, signal: AbortSignal | undefined): Promise<RegisteredRepo> => {
-  const selected = validatedRepositoryPath(selectedPath)
+  const selected = JujutsuPathModel.validatedRepositoryPath(selectedPath)
   let canonicalSelection: string
   try {
     canonicalSelection = await realpath(selected)
@@ -172,7 +162,7 @@ const registerRepo = async (ctx: Context, selectedPath: string, signal: AbortSig
   }
   let root: string
   try {
-    root = await realpath(validatedRepositoryPath(rootLine))
+    root = await realpath(JujutsuPathModel.validatedRepositoryPath(rootLine))
   } catch {
     throw new Error('Jujutsu returned an unavailable repository root.')
   }
@@ -226,7 +216,7 @@ const readRevisions = async (
     signal,
   )
   if (result.truncated) throw new Error('Revision graph exceeded the bounded output limit.')
-  const revisions = parseJsonLines(result.stdout, value => revisionSchema.parse(value))
+  const revisions = JujutsuOutputModel.parseJsonLines(result.stdout, value => revisionSchema.parse(value))
   return { revisions: revisions.slice(0, limit), hasMore: revisions.length > limit }
 }
 
@@ -255,7 +245,9 @@ const readGraphPage = async (
     signal,
   )
   if (result.truncated) throw new Error('Revision graph exceeded the bounded output limit.')
-  const revisions = parseJsonLines(result.stdout, value => revisionSchema.parse(value)).filter(revision => matchesRevisionSearch(revision, query))
+  const revisions = JujutsuOutputModel.parseJsonLines(result.stdout, value => revisionSchema.parse(value)).filter(revision =>
+    matchesRevisionSearch(revision, query),
+  )
   const page = revisions.slice(0, INITIAL_GRAPH_PAGE_SIZE)
   const evolution = await readEvolvedCommitIds(ctx, repo, page, signal)
   return {
@@ -291,13 +283,13 @@ const readEvolvedCommitIds = async (
       { outputLimit: 512_000 },
     )
     const completeOutput = result.truncated ? result.stdout.slice(0, result.stdout.lastIndexOf('\n') + 1) : result.stdout
-    const rows = parseJsonLines(completeOutput, value => {
+    const rows = JujutsuOutputModel.parseJsonLines(completeOutput, value => {
       if (typeof value !== 'object' || value === null) throw new Error('Invalid evolution record.')
       const row = value as { commitId?: unknown; predecessors?: unknown }
       if (
-        !isCommitId(String(row.commitId ?? '')) ||
+        !JujutsuMutationModel.isCommitId(String(row.commitId ?? '')) ||
         !Array.isArray(row.predecessors) ||
-        !row.predecessors.every(id => typeof id === 'string' && isCommitId(id))
+        !row.predecessors.every(id => typeof id === 'string' && JujutsuMutationModel.isCommitId(id))
       ) {
         throw new Error('Invalid evolution record.')
       }
@@ -350,13 +342,13 @@ const readLastPush = async (
       { outputLimit: 512_000 },
     )
     const completeOutput = result.truncated ? result.stdout.slice(0, result.stdout.lastIndexOf('\n') + 1) : result.stdout
-    const operations = parseJsonLines(completeOutput, value => {
+    const operations = JujutsuOutputModel.parseJsonLines(completeOutput, value => {
       if (typeof value !== 'object' || value === null) throw new Error('Invalid operation row.')
       const row = value as { description?: unknown; attributes?: unknown; time?: unknown }
       if (typeof row.description !== 'string' || typeof row.attributes !== 'string' || typeof row.time !== 'string') throw new Error('Invalid operation row.')
       return { attributes: row.attributes, time: row.time }
     })
-    const push = operations.find(row => isRecordedJjGitPush(row.attributes))
+    const push = operations.find(row => JujutsuOutputModel.isRecordedJjGitPush(row.attributes))
     return {
       at: push?.time ?? null,
       description: push === undefined ? null : 'Recorded JJ git push command invocation',
@@ -405,7 +397,7 @@ const snapshot = async (ctx: Context, repo: RegisteredRepo, limit: number, signa
 }
 
 const findRevision = (revisions: readonly Revision[], commitId: string): Revision => {
-  if (!isCommitId(commitId)) throw new Error('Invalid revision id.')
+  if (!JujutsuMutationModel.isCommitId(commitId)) throw new Error('Invalid revision id.')
   const row = revisions.find(revision => revision.commitId === commitId)
   if (row === undefined) throw new Error('Revision is no longer visible. Refresh and try again.')
   return row
@@ -597,7 +589,7 @@ const mutableRevision = (revisions: readonly Revision[], commitId: string): Revi
 }
 
 const assertListedPaths = (paths: readonly string[], listed: readonly string[]): void => {
-  if (!paths.every(path => isSafeSplitPath(path) && listed.includes(path))) {
+  if (!paths.every(path => JujutsuPathModel.isSafeSplitPath(path) && listed.includes(path))) {
     throw new Error('Selected files must be listed in this revision and use safe literal paths.')
   }
 }
@@ -626,7 +618,7 @@ const prepareMutation = async (
         : undefined
   const paths = pathsRevision === undefined ? current.state.changedPaths : await RevisionReads.paths(repoRun(ctx, repo, signal), pathsRevision)
   const preview = mutationPreview(preparedAction, current.state.revisions, paths, workspacePath)
-  const argv = buildMutationArgv(preparedAction)
+  const argv = JujutsuMutationModel.buildMutationArgv(preparedAction)
   let detail = preview.detail
   if (preparedAction.kind === 'fetch' || preparedAction.kind === 'push') {
     if (!current.state.remoteNames.includes(preparedAction.remote)) throw new Error('Remote is no longer configured. Refresh and select a listed remote.')
@@ -644,7 +636,9 @@ const prepareMutation = async (
         { timeoutMs: NETWORK_TIMEOUT },
       )
       detail +=
-        '\n\n' + (redactRemoteOutput(dryRun.stdout, 7000) || 'JJ reported no dry-run output.') + (dryRun.truncated ? '\n[dry-run output truncated]' : '')
+        '\n\n' +
+        (JujutsuOutputModel.redactRemoteOutput(dryRun.stdout, 7000) || 'JJ reported no dry-run output.') +
+        (dryRun.truncated ? '\n[dry-run output truncated]' : '')
     } catch {
       if (signal?.aborted === true) throw new Error('Jujutsu request was cancelled.')
       detail += '\n\nRemote dry-run unavailable. No push has occurred; the real push requires confirmation.'
@@ -774,7 +768,7 @@ const jujutsuHostApi = jujutsuApi.host({
       timeoutMs: prepared.action.kind === 'fetch' || prepared.action.kind === 'push' ? NETWORK_TIMEOUT : COMMAND_TIMEOUT,
     })
     await assertRepoIdentity(repo)
-    const output = redactRemoteOutput(result.stdout, 11_000)
+    const output = JujutsuOutputModel.redactRemoteOutput(result.stdout, 11_000)
     return {
       message: prepared.title + ' completed.',
       output: output + (result.truncated ? '\n[command output truncated]' : ''),
