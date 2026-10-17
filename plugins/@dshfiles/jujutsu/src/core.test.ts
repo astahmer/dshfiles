@@ -80,6 +80,7 @@ test('revision text search includes full IDs and all requested labels', () => {
   }
   assert.equal(RevisionGraphModel.matchesRevisionSearch(revision, 'd'.repeat(40)), true)
   assert.equal(RevisionGraphModel.matchesRevisionSearch(revision, 'c'.repeat(40)), true)
+  assert.equal(RevisionGraphModel.matchesRevisionSearch(revision, 'n'.repeat(40)), true)
   assert.equal(RevisionGraphModel.matchesRevisionSearch(revision, 'feature-workspace'), true)
   assert.equal(RevisionGraphModel.matchesRevisionSearch(revision, 'unmatched'), false)
 })

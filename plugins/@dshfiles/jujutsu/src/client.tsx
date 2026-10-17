@@ -80,7 +80,7 @@ import type { GraphLandmark, Mutation, ReadFailure, Revision } from './api.js'
 import { resolveChatReference } from './chat-reference.js'
 import { ChangedFiles, FileViewToggle, LineCounts } from './changed-files.js'
 import { FullDiffDialog } from './full-diff-dialog.js'
-import { RevisionGraphModel, type GraphLane, type RevisionGraphRow } from './graph.js'
+import { RevisionGraphModel, reverseHexChangeId, type GraphLane, type RevisionGraphRow } from './graph.js'
 import { jujutsuApi } from './api.js'
 import { useAutoRefresh } from './auto-refresh.js'
 import { openInEditor } from './open-in-editor.js'
@@ -1201,7 +1201,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
                   maxLength={256}
                   className="dshx:text-xs dshx:md:text-xs"
                   onChange={event => setTextFilter(event.target.value)}
-                  placeholder={sidePanel ? 'Search revisions…' : 'Search descriptions, IDs, bookmarks, tags, workspaces'}
+                  placeholder={sidePanel ? 'Search descriptions or IDs…' : 'Search descriptions, IDs, bookmarks, tags, workspaces'}
                   value={textFilter}
                 />
                 <InputGroupAddon>
@@ -2117,10 +2117,6 @@ const RevisionGraphCell = (props: RevisionGraphCellProps): JSX.Element => {
     </svg>
   )
 }
-
-/** jj prints change IDs in "reverse hex" (0-f → z-k); the API carries the normal hex form. */
-const reverseHexChangeId = (changeId: string, length: number): string =>
-  [...changeId.slice(0, length)].map(digit => String.fromCharCode('z'.charCodeAt(0) - Number.parseInt(digit, 16))).join('')
 
 const fullRevisionId = (revision: Revision): string => {
   const changeId = reverseHexChangeId(revision.changeId, revision.changeId.length)

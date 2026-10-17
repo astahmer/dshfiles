@@ -29,7 +29,7 @@ Feature: Jujutsu revision interactions
     Then the revision context menu copies the displayed revision ID
 
   @scenario:jujutsu.graph-filters
-  Scenario: Search, author and immutability filters narrow the revision graph
+  Scenario: Search by description and ID, then filter by author and immutability
     Given the isolated plugin profile "@dshfiles/jujutsu" is booted
     When a disposable Jujutsu repository with two authors is opened in the Jujutsu panel
     Then searching, filtering by author and hiding immutable revisions narrow the graph

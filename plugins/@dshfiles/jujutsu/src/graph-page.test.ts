@@ -86,6 +86,26 @@ test('graph pages exclude seen IDs and text search reaches history outside the l
   assert.ok(historicalMatch.includes(historicalMatchId))
 })
 
+test('graph pages find revisions by displayed and canonical IDs', async () => {
+  const { jj, commitId } = await fixture()
+  let targetCommitId = ''
+  for (let index = 0; index < 8; index += 1) {
+    jj(['new', '@', '-m', `revision ${index}`])
+    if (index === 2) targetCommitId = commitId()
+  }
+  const targetChangeId = jj(['--ignore-working-copy', 'log', '--no-graph', '-r', targetCommitId, '-T', 'change_id.normal_hex()'])
+  const targetFullChangeId = jj(['--ignore-working-copy', 'log', '--no-graph', '-r', targetCommitId, '-T', 'change_id.short(64)'])
+  const targetChangeIdPrefix = targetFullChangeId.slice(0, 8)
+  const matchesFor = (query: string): string[] =>
+    jj(['--ignore-working-copy', 'log', '--no-graph', '--revisions', graphPageRevset({ query, excludeCommitIds: [] }), '-T', 'commit_id ++ "\\n"'])
+      .split('\n')
+      .filter(Boolean)
+
+  for (const query of [targetChangeIdPrefix, targetChangeIdPrefix.toUpperCase(), targetFullChangeId, targetChangeId, targetCommitId]) {
+    assert.ok(matchesFor(query).includes(targetCommitId), `query ${query} should find its revision`)
+  }
+})
+
 test('graph search quotes user text before building a revset', async () => {
   const { jj, commitId } = await fixture()
   jj(['new', '@', '-m', 'literal needle") | all()'])
