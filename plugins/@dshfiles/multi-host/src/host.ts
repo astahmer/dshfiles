@@ -22,20 +22,9 @@ import {
 } from './records.js'
 import { createChildDirectory, listDirectory } from './directory-listing.js'
 import { listSshConfigHosts } from './ssh-config.js'
-import {
-  DirectoryStoreError,
-  findHost,
-  findRuntime,
-  listHosts,
-  listRuntimes,
-  readDirectory,
-  removeHost,
-  removeRuntime,
-  upsertHost,
-  upsertRuntime,
-} from './store.js'
+import { DirectoryStoreError, HostDirectoryStore } from './store.js'
 import { reduceTranscript } from './transcript.js'
-import { forgetRemoteThreads, listRemoteThreads, recordRemoteThread } from './thread-store.js'
+import { RemoteThreadStore } from './thread-store.js'
 import { reserveLoopbackEndpoint } from './connectors/loopback.js'
 import { callNativeRpc } from './native-rpc.js'
 
@@ -239,15 +228,15 @@ const failureCode = (error: unknown): string => safeFailure(error).code
 const pool = createGatewayPool({
   isTransportFailure: error => transportFailures.has(failureCode(error)),
   connect: async runtimeId => {
-    const runtime = await findRuntime(runtimeId)
+    const runtime = await HostDirectoryStore.findRuntime(runtimeId)
     if (runtime === undefined) throw new DirectoryStoreError('runtime-not-found', 'No recorded runtime has this id.')
-    const host = await findHost(runtime.hostId)
+    const host = await HostDirectoryStore.findHost(runtime.hostId)
     if (host === undefined) throw new DirectoryStoreError('host-not-found', 'The runtime has no recorded host.')
     // A stable origin port keeps the browser cookie of an opened remote view valid across reconnects.
     const gateway = await connectRuntime({ host, runtime, ...(runtime.originPort === undefined ? {} : { originPort: runtime.originPort }) })
     try {
       const identity = await verifyPinnedIdentity(gateway, runtime)
-      await upsertRuntime({ ...runtime, identity, lastSeenAt: new Date().toISOString() })
+      await HostDirectoryStore.upsertRuntime({ ...runtime, identity, lastSeenAt: new Date().toISOString() })
       connectionErrors.delete(runtimeId)
       return gateway
     } catch (error) {
@@ -378,7 +367,7 @@ const qualifyRuntime = async ({
 
 const register = async ({ host, locator, name, signal }: Parameters<typeof qualifyRuntime>[0]): Promise<RuntimeRecord> => {
   const { identity } = await qualifyRuntime({ host, locator, name, signal })
-  const directory = await readDirectory()
+  const directory = await HostDirectoryStore.readDirectory()
   const existing = directory.runtimes.find(runtime => runtime.id === identity.runtimeId)
   if (existing !== undefined && existing.hostId !== host.id) {
     throw new IdentityMismatchError('This runtime identity is already registered under a different host.')
@@ -390,7 +379,7 @@ const register = async ({ host, locator, name, signal }: Parameters<typeof quali
       ...directory.runtimes.flatMap(runtime => (runtime.originPort === undefined ? [] : [runtime.originPort])),
     ]))
   await pool.close(identity.runtimeId)
-  return upsertRuntime({
+  return HostDirectoryStore.upsertRuntime({
     schemaVersion: 2,
     id: identity.runtimeId,
     hostId: host.id,
@@ -412,7 +401,7 @@ const sshHostId = (sshTarget: string): string =>
 const multiHostHandlers = multiHostApi.host({
   identity: async () => readOrCreateRuntimeIdentity(configuredProfile),
   list: async () => {
-    const [hosts, runtimes] = await Promise.all([listHosts(), listRuntimes()])
+    const [hosts, runtimes] = await Promise.all([HostDirectoryStore.listHosts(), HostDirectoryStore.listRuntimes()])
     return { hosts: hosts.map(record => hostSummary(record, runtimes)), runtimes: runtimes.map(runtimeSummary) }
   },
   sshConfigHosts: async () => ({ hosts: await listSshConfigHosts(join(homedir(), '.ssh')) }),
@@ -437,7 +426,7 @@ const multiHostHandlers = multiHostApi.host({
   saveSshHost: async ({ input, signal }) => {
     try {
       const connector = hostConnectorSchema.parse({ kind: 'ssh', sshTarget: input.sshTarget })
-      const previous = input.hostId === undefined ? undefined : await findHost(input.hostId)
+      const previous = input.hostId === undefined ? undefined : await HostDirectoryStore.findHost(input.hostId)
       const host: HostRecord = {
         schemaVersion: 2,
         id: previous?.id ?? sshHostId(input.sshTarget),
@@ -446,11 +435,11 @@ const multiHostHandlers = multiHostApi.host({
         createdAt: previous?.createdAt ?? new Date().toISOString(),
       }
       const locator = runtimeLocatorSchema.parse({ kind: 'ssh', remoteHome: input.remoteHome })
-      await upsertHost(host)
+      await HostDirectoryStore.upsertHost(host)
       const runtime = await register({ host, locator, name: input.name.trim(), signal })
       // An edit that moved the host to another DSH home leaves the old runtime record behind.
-      for (const stale of (await listRuntimes(host.id)).filter(item => item.id !== runtime.id)) {
-        await removeRuntime(stale.id)
+      for (const stale of (await HostDirectoryStore.listRuntimes(host.id)).filter(item => item.id !== runtime.id)) {
+        await HostDirectoryStore.removeRuntime(stale.id)
         await pool.close(stale.id)
       }
       return { ok: true as const, runtime: runtimeSummary(runtime) }
@@ -460,7 +449,7 @@ const multiHostHandlers = multiHostApi.host({
   },
   hostUpsert: async ({ input }) => {
     const connector = hostConnectorSchema.parse(input.connector)
-    const previous = await findHost(input.id)
+    const previous = await HostDirectoryStore.findHost(input.id)
     const record: HostRecord = {
       schemaVersion: 2,
       id: input.id.trim(),
@@ -468,12 +457,12 @@ const multiHostHandlers = multiHostApi.host({
       connector,
       createdAt: previous?.createdAt ?? new Date().toISOString(),
     }
-    await upsertHost(record)
-    return hostSummary(record, await listRuntimes())
+    await HostDirectoryStore.upsertHost(record)
+    return hostSummary(record, await HostDirectoryStore.listRuntimes())
   },
   hostRemove: async ({ input }) => {
-    const runtimes = input.removeDirectory ? await listRuntimes(input.id) : []
-    const removed = await removeHost(input.id, input.removeDirectory)
+    const runtimes = input.removeDirectory ? await HostDirectoryStore.listRuntimes(input.id) : []
+    const removed = await HostDirectoryStore.removeHost(input.id, input.removeDirectory)
     if (removed) {
       for (const runtime of runtimes) {
         await closeRuntimeLeases(runtime.id)
@@ -484,7 +473,7 @@ const multiHostHandlers = multiHostApi.host({
   },
   runtimeUpsert: async ({ input, signal }) => {
     try {
-      const host = await findHost(input.hostId)
+      const host = await HostDirectoryStore.findHost(input.hostId)
       if (host === undefined) throw new DirectoryStoreError('host-not-found', 'Choose a recorded host before adding a runtime.')
       const locator = runtimeLocatorSchema.parse(input.locator)
       if (locator.kind !== host.connector.kind)
@@ -495,7 +484,7 @@ const multiHostHandlers = multiHostApi.host({
     }
   },
   runtimeStatus: async ({ input }): Promise<RuntimeStatus> => {
-    const runtime = await findRuntime(input.runtimeId)
+    const runtime = await HostDirectoryStore.findRuntime(input.runtimeId)
     if (runtime === undefined)
       return { ok: false, hostId: 'unknown', runtimeId: input.runtimeId, code: 'runtime-not-found', message: 'No recorded runtime has this id.', stale: true }
     try {
@@ -521,7 +510,7 @@ const multiHostHandlers = multiHostApi.host({
             title: item.title ?? item.path,
             sessionIds: item.sessionIds ?? [],
           }))
-          const refreshed = (await findRuntime(runtime.id)) ?? runtime
+          const refreshed = (await HostDirectoryStore.findRuntime(runtime.id)) ?? runtime
           return { ok: true as const, runtime: runtimeSummary(refreshed), workspaces, sessions }
         },
         { mutation: false },
@@ -625,7 +614,7 @@ const multiHostHandlers = multiHostApi.host({
     }
   },
   threadStart: async ({ input }) => {
-    const runtime = await findRuntime(input.runtimeId)
+    const runtime = await HostDirectoryStore.findRuntime(input.runtimeId)
     if (runtime === undefined) return { ok: false as const, code: 'runtime-not-found', message: 'This host is no longer recorded.' }
     let sessionId: string | undefined
     try {
@@ -646,7 +635,13 @@ const multiHostHandlers = multiHostApi.host({
             if (!selected.ok)
               return { ok: false as const, code: selected.code, message: `The thread was created but its model was refused: ${selected.message}`, sessionId }
           }
-          await recordRemoteThread({ runtimeId: runtime.id, sessionId, cwd: input.cwd, title: input.text.slice(0, 80), createdAt: new Date().toISOString() })
+          await RemoteThreadStore.record({
+            runtimeId: runtime.id,
+            sessionId,
+            cwd: input.cwd,
+            title: input.text.slice(0, 80),
+            createdAt: new Date().toISOString(),
+          })
           const prompted = await NativeRpcModel.call(gateway, {
             namespace: 'session',
             method: 'prompt',
@@ -708,7 +703,7 @@ const multiHostHandlers = multiHostApi.host({
     }
   },
   threadList: async () => {
-    const [threads, runtimes, hosts] = await Promise.all([listRemoteThreads(), listRuntimes(), listHosts()])
+    const [threads, runtimes, hosts] = await Promise.all([RemoteThreadStore.list(), HostDirectoryStore.listRuntimes(), HostDirectoryStore.listHosts()])
     return {
       threads: threads.flatMap(thread => {
         const runtime = runtimes.find(item => item.id === thread.runtimeId)
@@ -717,7 +712,7 @@ const multiHostHandlers = multiHostApi.host({
       }),
     }
   },
-  threadForget: async ({ input }) => ({ removed: await forgetRemoteThreads(input) }),
+  threadForget: async ({ input }) => ({ removed: await RemoteThreadStore.forget(input) }),
   threadReply: async ({ input, signal }) => {
     try {
       await withRuntime(
@@ -783,7 +778,7 @@ const multiHostHandlers = multiHostApi.host({
       { mutation: false },
     ),
   runtimeOpenView: async ({ input }) => {
-    const runtime = await findRuntime(input.runtimeId)
+    const runtime = await HostDirectoryStore.findRuntime(input.runtimeId)
     if (runtime === undefined) throw new DirectoryStoreError('runtime-not-found', 'Choose a recorded runtime before opening its native view.')
     if (runtime.originPort === undefined)
       throw new GatewayUnavailableError('runtime-origin-unavailable', 'This runtime has no stable browser origin. Re-register it before opening its view.')
@@ -805,7 +800,7 @@ const multiHostHandlers = multiHostApi.host({
   },
   runtimeCloseView: async ({ input }) => ({ closed: await closeLease(input.leaseId) }),
   runtimeRemove: async ({ input }) => {
-    const removed = await removeRuntime(input.runtimeId)
+    const removed = await HostDirectoryStore.removeRuntime(input.runtimeId)
     if (removed) {
       await closeRuntimeLeases(input.runtimeId)
       await pool.close(input.runtimeId)

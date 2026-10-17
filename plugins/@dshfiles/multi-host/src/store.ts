@@ -148,19 +148,19 @@ const readDirectoryFromDisk = async (): Promise<HostDirectory> => {
   throw new DirectoryStoreError('directory-version-unsupported', 'The multi-host directory has an unsupported schema and was left untouched.')
 }
 
-export const readDirectory = async (): Promise<HostDirectory> => {
+const readDirectory = async (): Promise<HostDirectory> => {
   await writeTail
   return readDirectoryFromDisk()
 }
 
-export const listHosts = async (): Promise<readonly HostRecord[]> => (await readDirectory()).hosts
-export const listRuntimes = async (hostId?: string): Promise<readonly RuntimeRecord[]> => {
+const listHosts = async (): Promise<readonly HostRecord[]> => (await readDirectory()).hosts
+const listRuntimes = async (hostId?: string): Promise<readonly RuntimeRecord[]> => {
   const runtimes = (await readDirectory()).runtimes
   return hostId === undefined ? runtimes : runtimes.filter(runtime => runtime.hostId === hostId)
 }
 
-export const findHost = async (id: string): Promise<HostRecord | undefined> => (await readDirectory()).hosts.find(host => host.id === id)
-export const findRuntime = async (id: string): Promise<RuntimeRecord | undefined> => (await readDirectory()).runtimes.find(runtime => runtime.id === id)
+const findHost = async (id: string): Promise<HostRecord | undefined> => (await readDirectory()).hosts.find(host => host.id === id)
+const findRuntime = async (id: string): Promise<RuntimeRecord | undefined> => (await readDirectory()).runtimes.find(runtime => runtime.id === id)
 
 const transact = async <Result>(update: (current: HostDirectory) => { readonly next: HostDirectory; readonly result: Result }): Promise<Result> => {
   const operation = writeTail.then(async () => {
@@ -176,7 +176,7 @@ const transact = async <Result>(update: (current: HostDirectory) => { readonly n
   return operation
 }
 
-export const upsertHost = async (input: HostRecord): Promise<HostRecord> => {
+const upsertHost = async (input: HostRecord): Promise<HostRecord> => {
   const record = hostRecordSchema.parse(input)
   return transact(current => {
     const hosts = current.hosts.filter(host => host.id !== record.id)
@@ -196,7 +196,7 @@ export const upsertHost = async (input: HostRecord): Promise<HostRecord> => {
   })
 }
 
-export const upsertRuntime = async (input: RuntimeRecord): Promise<RuntimeRecord> => {
+const upsertRuntime = async (input: RuntimeRecord): Promise<RuntimeRecord> => {
   const record = runtimeRecordSchema.parse(input)
   return transact(current => {
     const host = current.hosts.find(candidate => candidate.id === record.hostId)
@@ -226,7 +226,7 @@ export const upsertRuntime = async (input: RuntimeRecord): Promise<RuntimeRecord
   })
 }
 
-export const removeRuntime = async (id: string): Promise<boolean> =>
+const removeRuntime = async (id: string): Promise<boolean> =>
   transact(current => {
     const removed = current.runtimes.find(runtime => runtime.id === id)
     if (removed === undefined) return { next: current, result: false }
@@ -237,7 +237,7 @@ export const removeRuntime = async (id: string): Promise<boolean> =>
     return { next: { schemaVersion: 2, hosts: current.hosts, runtimes: current.runtimes.filter(runtime => runtime.id !== id), retiredPorts }, result: true }
   })
 
-export const removeHost = async (id: string, removeDirectory: boolean): Promise<boolean> =>
+const removeHost = async (id: string, removeDirectory: boolean): Promise<boolean> =>
   transact(current => {
     if (!current.hosts.some(host => host.id === id)) return { next: current, result: false }
     const runtimes = current.runtimes.filter(runtime => runtime.hostId === id)
