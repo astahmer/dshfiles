@@ -81,7 +81,7 @@ const startGeneration = async (options: { readonly generation: string; readonly 
     manifestUrl,
   })
   const root = new Context()
-  const fiber = root.plugin({ name: 'generation-manager', apply: (ctx, config) => manager.apply(ctx, config) })
+  const fiber = root.plugin({ name: 'generation-manager', apply: (ctx: Context, config?: unknown) => manager.apply(ctx, config) })
   await fiber
   return { fiber, events, publish }
 }

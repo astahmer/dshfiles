@@ -115,7 +115,14 @@ function rollupOutput(result: unknown, code: string): CompletedOutput {
 }
 
 /** Convert Vite/Rolldown output to the stable DSHX report surface. */
-export const buildReport = (result: unknown, face: 'host' | 'client', entryFile: string, outDir: string, declarations: boolean, errorCode: string): BuildReport => {
+export const buildReport = (
+  result: unknown,
+  face: 'host' | 'client',
+  entryFile: string,
+  outDir: string,
+  declarations: boolean,
+  errorCode: string,
+): BuildReport => {
   const built = rollupOutput(result, errorCode)
   const output: BuildArtifact[] = built.output.map(item => ({
     fileName: item.fileName,

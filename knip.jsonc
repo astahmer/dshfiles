@@ -4,7 +4,9 @@
   "include": ["files", "dependencies", "unlisted", "binaries", "unresolved", "catalog", "catalogReferences"],
   // playwright runs from tooling/dshx (`pnpm --dir tooling/dshx exec playwright`), where it is installed.
   // jujutsu's locales.ts is a dictionary its client does not register yet (plans/guardrails.md).
-  "ignore": ["plugins/@dshfiles/jujutsu/src/locales.ts"],
+  // .local holds machine-local scratch scripts (git-ignored); the rich-composer native skeleton is
+  // vendored for a platform the composer does not select yet.
+  "ignore": ["plugins/@dshfiles/jujutsu/src/locales.ts", ".local/**", "plugins/@dshfiles/rich-composer/src/native/skeleton/safari.ts"],
   "ignoreBinaries": ["dsh", "jj", "knip", "playwright"],
   "workspaces": {
     ".": {

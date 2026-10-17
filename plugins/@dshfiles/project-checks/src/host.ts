@@ -399,9 +399,7 @@ const verifyRebasedCandidate = async (ctx: Context, input: CandidateVerification
   }
   if (signal.aborted) return { status: 'cancelled' as const, prompt: null }
 
-  const failed = results.filter(
-    (receipt): receipt is StoredReceipt & { readonly status: 'failed' | 'cancelled' | 'timed-out' } => receipt.status !== 'passed',
-  )
+  const failed = results.filter((receipt): receipt is StoredReceipt & { readonly status: 'failed' | 'cancelled' | 'timed-out' } => receipt.status !== 'passed')
   if (failed.length > 0) {
     return {
       status: 'failed' as const,
@@ -609,9 +607,7 @@ export default defineHost({
       const previousAttempts = previous
         .filter(
           receipt =>
-            receipt.automatic &&
-            receipt.verificationTurn === turn &&
-            (receipt.verificationStage === undefined || receipt.verificationStage === 'completion'),
+            receipt.automatic && receipt.verificationTurn === turn && (receipt.verificationStage === undefined || receipt.verificationStage === 'completion'),
         )
         .map(receipt => receipt.attempt)
       const attempt = Math.max(0, ...previousAttempts) + 1

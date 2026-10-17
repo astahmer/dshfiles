@@ -131,6 +131,7 @@ const createDeferred = <Value>(): Deferred<Value> => {
   let resolve = (_value: Value): void => {
     throw new Error('Deferred resolve was used before initialization.')
   }
+  // oxlint-disable-next-line antislop/no-unknown-parameters -- The promise plumbing rejects with `unknown`; this placeholder only throws until the executor replaces it.
   let reject = (_error: unknown): void => {
     throw new Error('Deferred reject was used before initialization.')
   }

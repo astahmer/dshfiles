@@ -1,19 +1,20 @@
 {
   "oxlint": {
-    "antislop(no-conditional-empty-object-spread)": 492,
+    "antislop(no-conditional-empty-object-spread)": 494,
     "antislop(no-known-value-widening)": 162,
     "antislop(no-runtime-typeof)": 333,
     "antislop(no-unknown-parameters)": 194,
-    "antislop(no-unknown-returns)": 114,
+    "antislop(no-unknown-returns)": 119,
     "antislop(no-unsafe-dictionary-type)": 226,
-    "antislop(require-safety-comment-for-type-assertion)": 326,
-    "react-hooks(exhaustive-deps)": 24,
-    "react(purity)": 15
+    "antislop(require-safety-comment-for-type-assertion)": 336,
+    "react-hooks(exhaustive-deps)": 16,
+    "react(purity)": 13,
+    "antislop(no-export-bag)": 45
   },
   "ast-grep": {
     "no-deeply-nested-ternary": 7,
-    "no-deeply-nested-ternary-tsx": 2,
-    "no-direct-json-parse": 185,
+    "no-deeply-nested-ternary-tsx": 3,
+    "no-direct-json-parse": 187,
     "no-direct-json-parse-tsx": 1,
     "no-export-from": 172,
     "no-wildcard-export": 1

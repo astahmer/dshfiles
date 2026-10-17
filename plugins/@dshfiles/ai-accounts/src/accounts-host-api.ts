@@ -203,7 +203,12 @@ export const accountsHostApi = aiAccountsApi.host({
     return {
       fetchedAt: cache?.fetchedAt ?? null,
       quotes: input.routes.map(route =>
-        PricingCatalogModel.resolveRouteQuote({ route, cache, accountKind: typeof route.provider === 'string' ? kinds.get(route.provider) : undefined, overrides: settings.pricingOverrides }),
+        PricingCatalogModel.resolveRouteQuote({
+          route,
+          cache,
+          accountKind: typeof route.provider === 'string' ? kinds.get(route.provider) : undefined,
+          overrides: settings.pricingOverrides,
+        }),
       ),
     }
   },

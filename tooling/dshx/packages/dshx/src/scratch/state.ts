@@ -119,7 +119,8 @@ export const ownedProcessStatus = (owned: { readonly pid: number; readonly signa
   return owned.signature.every(fragment => command.includes(fragment)) ? 'running' : 'foreign'
 }
 
-export const redactUrls = (text: string): string => text.replace(/https?:\/\/(127\.0\.0\.1|localhost):\d+\/[^\s"']*/g, match => `${new URL(match).origin}/[redacted]`)
+export const redactUrls = (text: string): string =>
+  text.replace(/https?:\/\/(127\.0\.0\.1|localhost):\d+\/[^\s"']*/g, match => `${new URL(match).origin}/[redacted]`)
 
 /** Start a process in its own group, logging to `log`, so `down` can stop it and everything it spawned. */
 export const spawnDetached = (

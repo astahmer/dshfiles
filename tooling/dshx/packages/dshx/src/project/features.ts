@@ -39,7 +39,14 @@ const externalDependencySchema = z
  * reference, so the chat link is really rendered before the walk clicks it;
  * `fake-secret-cli` resets the synthetic store of a Host started with `up --fake-secret-cli`.
  */
-export const REACH_SEEDS = ['rebase-ready-thread', 'pending-restart', 'tool-call-thread', 'chat-reference-thread', 'credential-recovery', 'fake-secret-cli'] as const
+export const REACH_SEEDS = [
+  'rebase-ready-thread',
+  'pending-restart',
+  'tool-call-thread',
+  'chat-reference-thread',
+  'credential-recovery',
+  'fake-secret-cli',
+] as const
 export type ReachSeed = (typeof REACH_SEEDS)[number]
 
 /**

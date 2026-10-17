@@ -324,6 +324,7 @@ const clientSetupServicesInSource = (source: string, file: string): ClientDefini
   }
   const setupProperty = propertyAt('setup')
   const setup = setupProperty === undefined ? undefined : bindings.resolveFunction(setupProperty.value)
+  // SAFETY: Object.keys of this module-level const map yields exactly its declared keys.
   const services = (Object.keys(CLIENT_SETUP_SERVICE_CAPABILITIES) as Array<keyof typeof CLIENT_SETUP_SERVICE_CAPABILITIES>).filter(
     service => setup !== undefined && functionUsesSetupService({ program: bindings.program, declaration: setup, service }),
   )

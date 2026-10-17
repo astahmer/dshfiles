@@ -26,10 +26,10 @@
   },
   "devDependencies": {
     "@deepseek-ai/dsh": "0.2.0-rc.2",
-    "@hono/node-server": "2.1.5",
+    "@hono/node-server": "catalog:",
     "@playwright/test": "1.56.1",
     "@types/node": "catalog:",
-    "hono": "4.13.13",
+    "hono": "catalog:",
     "knip": "6.32.2",
     "playwright-bdd": "8.5.1",
     "typescript": "catalog:",

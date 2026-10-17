@@ -85,6 +85,7 @@ export const createViewedMarks = (options: { readonly storage: () => Pick<Storag
   const adopt = (next: ViewedMarksSnapshot): void => {
     if (host !== null && next.revision < host.revision) return
     const adopted = { revision: next.revision, marks: next.marks, set: new Set(next.marks) }
+    // oxlint-disable-next-line antislop/no-passthrough-variable -- `host` is replaced on the next line; `current` is the snapshot the optimistic check compares against.
     const current = host
     host = adopted
     // A click the Host has not answered yet owns the view; a poll that predates it must not flicker the box back.

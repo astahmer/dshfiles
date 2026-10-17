@@ -146,12 +146,7 @@ const documentationOf = (item: RegistryServer): string | null => {
 }
 
 const registryEntrySchema = z
-  .union([
-    z
-      .object({ server: registryServerSchema })
-      .transform(input => input.server),
-    registryServerSchema,
-  ])
+  .union([z.object({ server: registryServerSchema }).transform(input => input.server), registryServerSchema])
   .transform((item): RegistryEntry => {
     const endpoint = item.remotes.find(
       remote => (remote.type === 'streamable-http' || remote.transport === 'streamable-http') && safeHttps(remote.url) !== null,
@@ -168,9 +163,7 @@ const registryEntrySchema = z
   })
 const registryRowSchema = z.union([registryEntrySchema, z.undefined()]).catch(undefined)
 
-const registryPayloadSchema = z
-  .object({ servers: z.array(registryRowSchema).catch([]) })
-  .catch({ servers: [] })
+const registryPayloadSchema = z.object({ servers: z.array(registryRowSchema).catch([]) }).catch({ servers: [] })
 type RegistryPayload = z.infer<typeof registryPayloadSchema>
 
 const readBoundedJson = async (response: Response): Promise<RegistryPayload> => {

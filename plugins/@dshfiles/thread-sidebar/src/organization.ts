@@ -172,7 +172,8 @@ export const setAutoArchiveOverride = (preferences: SidebarPreferences, sessionI
       : preferences.autoArchiveDisabledSessionIds.filter(id => id !== sessionId),
 })
 
-export const shouldScanForAutoArchive = (preferences: SidebarPreferences): boolean => preferences.autoArchiveEnabled || preferences.autoArchiveSessionIds.length > 0
+export const shouldScanForAutoArchive = (preferences: SidebarPreferences): boolean =>
+  preferences.autoArchiveEnabled || preferences.autoArchiveSessionIds.length > 0
 
 export interface SessionLineage {
   /** Number of known direct-parent edges above the session. */
