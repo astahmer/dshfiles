@@ -4,6 +4,7 @@ import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import { Alert } from '@dshfiles/plugin-ui/components/ui/alert'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Field, FieldContent, FieldDescription, FieldGroup, FieldLabel, FieldLegend, FieldSet } from '@dshfiles/plugin-ui/components/ui/field'
+import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Kbd, KbdGroup } from '@dshfiles/plugin-ui/components/ui/kbd'
 import { useState, useSyncExternalStore } from 'react'
 import { DEFAULT_PREFERENCES } from './organization.js'
@@ -106,6 +107,59 @@ export const SettingsTab = (props: SettingsTabProps): JSX.Element => {
         onChange={notificationCategories => updatePreferences({ notificationCategories, desktopNotificationsEnabled: false })}
         t={props.t}
       />
+      <FieldSet>
+        <FieldLegend>{props.t('threadSidebarRowSection')}</FieldLegend>
+        <FieldGroup className="dshx:gap-4">
+          <Field orientation="horizontal" className="dshx:items-center">
+            <FieldContent>
+              <FieldLabel className="dshx:font-normal">{props.t('threadSidebarMaxChildren')}</FieldLabel>
+            </FieldContent>
+            <Input
+              type="number"
+              min={1}
+              max={50}
+              className="dshx:w-20"
+              value={preferences.maxChildren}
+              onChange={event => {
+                const next = Number(event.currentTarget.value)
+                if (Number.isFinite(next)) updatePreferences({ maxChildren: Math.min(50, Math.max(1, Math.trunc(next))) })
+              }}
+            />
+          </Field>
+          <Field orientation="horizontal" className="dshx:items-center">
+            <FieldContent>
+              <FieldLabel className="dshx:font-normal">{props.t('threadSidebarNavigationDensity')}</FieldLabel>
+            </FieldContent>
+            <div className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1.5">
+              {(['compact', 'comfortable'] as const).map(density => (
+                <Button
+                  key={density}
+                  size="sm"
+                  type="button"
+                  variant={preferences.navigationDensity === density ? 'default' : 'outline'}
+                  onClick={() => updatePreferences({ navigationDensity: density })}
+                >
+                  {props.t(density === 'compact' ? 'threadSidebarNavigationCompact' : 'threadSidebarNavigationComfortable')}
+                </Button>
+              ))}
+            </div>
+          </Field>
+          <Field orientation="horizontal" className="dshx:items-center">
+            <FieldContent>
+              <FieldLabel className="dshx:font-normal">{props.t('threadSidebarExcludedSessions')}</FieldLabel>
+            </FieldContent>
+            <Button
+              size="sm"
+              type="button"
+              variant="ghost"
+              disabled={preferences.excludedSessionIds.length === 0}
+              onClick={() => updatePreferences({ excludedSessionIds: [] })}
+            >
+              {props.t('threadSidebarClearSessionExclusions')}
+            </Button>
+          </Field>
+        </FieldGroup>
+      </FieldSet>
       <FieldSet>
         <FieldLegend>{props.t('threadSidebarKeyboardSection')}</FieldLegend>
         <FieldDescription>{props.t('threadSidebarChordHint')}</FieldDescription>
