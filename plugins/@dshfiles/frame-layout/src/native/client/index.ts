@@ -21,7 +21,7 @@ import type { ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client
 import { en, zh } from './shortcut-locales.ts'
 import { ThemePresenter } from './theme-presenter.ts'
 // Local delta (see README "Local delta"): upstream keeps every width in memory.
-import { persistFrameWidths, restoreFrameWidths } from '../../frame-widths.ts'
+import { FrameWidthsModel } from '../../frame-widths.ts'
 
 // Contract exports only (export-convergence rule: cross-package consumers
 // keep a symbol exported; test-only/package-internal symbols live off /src).
@@ -157,8 +157,8 @@ export function apply(ctx: ClientContext): void {
   ctx.effect(() => {
     const handle = createLayoutStore()
     const instance = handle.create()
-    restoreFrameWidths(instance)
-    const disposeFrameWidths = persistFrameWidths(instance)
+    FrameWidthsModel.restore(instance)
+    const disposeFrameWidths = FrameWidthsModel.persist(instance)
     const store: typeof handle = { ...handle, create: () => instance }
     const retainMainPanels = (): void => {
       instance.actions.retainMainPanels(ctx.slots.entries('main').flatMap(entry =>
