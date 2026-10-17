@@ -2,7 +2,7 @@
   "name": "@dshfiles/workspace-folder-picker",
   "version": "0.1.0",
   "private": true,
-  "description": "Open the workspace add flow directly in a Host-backed folder browser.",
+  "description": "Provide Host-backed folder browsing for workspace and project pickers.",
   "files": [
     "dist",
     "cordis.patch.yml"
@@ -17,6 +17,10 @@
     "./client": {
       "types": "./dist/client.d.ts",
       "default": "./dist/client.js"
+    },
+    "./directory-browser-api": {
+      "types": "./src/directory-browser-api.ts",
+      "default": "./dist/directory-browser-api.js"
     },
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./package.json": "./package.json"

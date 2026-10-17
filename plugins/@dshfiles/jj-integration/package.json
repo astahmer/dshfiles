@@ -38,6 +38,7 @@
     "@dshfiles/project-checks": "workspace:*",
     "@dshfiles/project-folder-picker": "workspace:*",
     "@dshfiles/shared-runtime": "workspace:*",
+    "@dshfiles/workspace-folder-picker": "workspace:*",
     "zod": "catalog:"
   },
   "devDependencies": {

@@ -2,11 +2,13 @@
 
 Replaces the Add workspace directory flow in the header workspace menu and the
 sidebar browser with the shared `ProjectFolderPicker` opened directly in
-directory-browsing mode. Its Host API uses DSH's official browse backend in a
-private Cordis context, so this flow can list and create folders without
-replacing the global `directoryPicker` service or removing the native chooser
-from other consumers. Absolute paths can still be submitted directly to the
-workspace owner's existing registration callback.
+directory-browsing mode. It also exports the same Host API for the New-thread
+project chooser, whose Host may only expose the native OS picker through DSH's
+global `directoryPicker` service. The API uses DSH's official browse backend in
+a private Cordis context, so these flows can list and create folders without
+replacing the global service or removing the native chooser from other
+consumers. Absolute paths can still be submitted directly to the workspace
+owner's existing registration callback.
 
 The chooser intentionally does not show registered projects or the
 "Register project" action: this entry point adds a workspace rather than

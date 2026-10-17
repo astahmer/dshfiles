@@ -1,8 +1,15 @@
 import type { EmptyWorkspaceOwnerProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { useQuery } from '@dshfiles/plugin-ui/query'
-import { ProjectFolderPicker, type ProjectFolderSelection, type RegisteredProject, type WorkspacePickerPorts } from '@dshfiles/project-folder-picker'
+import {
+  ProjectFolderPicker,
+  type DirectoryPickerPort,
+  type ProjectFolderSelection,
+  type RegisteredProject,
+  type WorkspacePickerPorts,
+} from '@dshfiles/project-folder-picker'
 import { useApi } from '@dshfiles/dshx/client'
+import { workspaceFolderBrowserApi } from '@dshfiles/workspace-folder-picker/directory-browser-api'
 import { hostDestination, multiHostApi, multiHostQueries } from '@dshfiles/multi-host/destination'
 import { useEffect, useLayoutEffect, useState } from 'react'
 import { jjIntegrationApi } from './api.js'
@@ -35,6 +42,12 @@ export const HeroWorkspacePicker = (
     [services, onPick],
   )
   const api = useApi(jjIntegrationApi)
+  const browserApi = useApi(workspaceFolderBrowserApi)
+  const directoryPicker: DirectoryPickerPort = {
+    pick: signal => props.ports.directoryPicker.pick(signal),
+    list: (path, signal) => browserApi.list(path === undefined ? {} : { path }, { signal }),
+    createDirectory: (path, name) => browserApi.createDirectory({ path, name }),
+  }
   const multiHost = useApi(multiHostApi)
   const destination = hostDestination.useValue()
   const [remotePickerOpen, setRemotePickerOpen] = useState(false)
@@ -95,7 +108,7 @@ export const HeroWorkspacePicker = (
       {bar}
       <ProjectFolderPicker
         projects={registered}
-        directoryPicker={props.ports.directoryPicker}
+        directoryPicker={directoryPicker}
         onRegisterWorkspace={props.ports.registerWorkspace}
         onSelect={selection => void choose(selection).catch(() => props.onClose())}
         onClose={props.onClose}

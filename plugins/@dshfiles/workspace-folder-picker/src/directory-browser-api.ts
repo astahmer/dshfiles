@@ -27,10 +27,17 @@ const directoryListingSchema = z
 export const workspaceFolderBrowserApi = defineApi({
   id: 'workspace-folder-picker.browser',
   version: 1,
+  owner: '@dshfiles/workspace-folder-picker',
   methods: {
     list: method({
       input: z.object({ path: z.string().min(1).max(MAX_PATH_LENGTH).optional() }).strict(),
       output: directoryListingSchema,
+      description: 'Browse one local directory for the user. Only call when the user asks to inspect local folders.',
+      tool: {
+        name: 'workspace_folder_browser_list',
+        readOnly: true,
+        render: listing => `${listing.entries.length} entries in ${listing.path}`,
+      },
     }),
     createDirectory: method({
       input: z
@@ -40,6 +47,11 @@ export const workspaceFolderBrowserApi = defineApi({
         })
         .strict(),
       output: z.string().min(1).max(MAX_PATH_LENGTH),
+      description: 'Create a child directory in an existing folder; only run when the user explicitly asks to create a folder.',
+      tool: {
+        name: 'workspace_folder_browser_create_directory',
+        render: path => `Created ${path}`,
+      },
     }),
   },
 })

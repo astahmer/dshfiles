@@ -121,6 +121,12 @@ const repositoryFor = (page: Page): ThreadRepository => {
 }
 
 const projectButton = (page: Page) => page.getByRole('button', { name: 'Choose workspace', exact: true })
+const dismissGetStartedDialog = async (page: Page): Promise<void> => {
+  const dialog = page.getByRole('dialog', { name: 'Get started', exact: true })
+  if (!await dialog.isVisible()) return
+  await dialog.getByRole('button', { name: 'Close', exact: true }).click()
+  await expect(dialog).toBeHidden()
+}
 const workspaceToggle = (page: Page) => page.getByRole('checkbox', { name: 'workspace', exact: true })
 const rebaseButton = (page: Page) => page.getByRole('button', { name: 'Integrate this thread into main', exact: true })
 /** The one header control: it names a thread workspace, or the shared checkout the thread runs in. */
@@ -151,6 +157,7 @@ const currentThreadName = async (page: Page): Promise<string> => {
 }
 
 const chooseProjectPath = async (page: Page, path: string): Promise<void> => {
+  await dismissGetStartedDialog(page)
   await projectButton(page).click()
   const picker = page.getByRole('dialog', { name: 'Choose a project', exact: true })
   const search = picker.getByRole('textbox', { name: 'Search projects or enter a folder path', exact: true })
@@ -168,12 +175,14 @@ When('a disposable jj repository is chosen as the New thread project', async ({ 
 })
 
 When('a disposable jj repository is chosen by its home-relative path', async ({ page }: { page: Page }) => {
+  await dismissGetStartedDialog(page)
   await projectButton(page).click()
   const picker = page.getByRole('dialog', { name: 'Choose a project', exact: true })
   const search = picker.getByRole('textbox', { name: 'Search projects or enter a folder path', exact: true })
   await search.fill('~')
   const homePathLabel = picker.locator('p').filter({ hasText: /^\// }).first()
   await expect(homePathLabel).toBeVisible()
+  await expect(picker.getByRole('alert')).toHaveCount(0)
   const homePath = (await homePathLabel.textContent())?.trim()
   if (!homePath) throw new Error('The project picker did not expose its Host home path.')
   const repository = await createRepository(page, homePath)
