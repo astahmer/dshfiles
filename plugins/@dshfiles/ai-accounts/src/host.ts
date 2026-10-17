@@ -435,7 +435,7 @@ export default definePlugin({
             ...CredentialModel.discoveryCatalogOptions(
               request,
               { apiBaseUrl: route.apiBaseUrl, keyEnv: ProviderRoutes.keyEnvFor(route) },
-              await resolveCredential(ProviderRoutes.keyEnvFor(route)),
+              await readCommandCodeKey(route.apiKeyEnv, resolveCredential),
             ),
             signal,
           })
@@ -543,6 +543,12 @@ export default definePlugin({
       }
     }
     runtime.refreshModelCatalog = refreshModelCatalog
+    // Discovered catalogs live in memory only, so without this every restart left
+    // keyed accounts on their floor catalog until their model list was opened.
+    for (const [instanceId, route] of routes) {
+      if (!route.enabled || (route.kind !== COMMANDCODE_KIND && route.kind !== OPENCODE_KIND)) continue
+      void refreshModelCatalog(instanceId).catch(() => ctx.logger.warn(`ai-accounts: startup catalog refresh failed for ${instanceId}`))
+    }
 
     const disposers: Array<() => void> = []
 
