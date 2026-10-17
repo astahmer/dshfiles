@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { createCommunicationService } from '@dshfiles/dshx/communication'
-import { initializeCommunicationAgent } from './agent-lifecycle.js'
+import { initializeCommunicationAgent, registerCommunicationAgent } from './agent-lifecycle.js'
 import { LiveAgentDirectoryModel } from './live-agent-directory.js'
 
 const temporaryRoots: string[] = []
@@ -34,7 +34,7 @@ describe('communication Agent initialization', () => {
     const report = await service.diagnostics({
       agents: agents.map(agent => ({ id: agent.id, status: 'idle', workspaceTopic })),
     })
-    expect(report.subscriptionCount).toBe(agents.length * 2)
+    expect(report.subscriptionCount).toBe(agents.length)
     expect(report.agents.every(agent => agent.workspaceSubscribed)).toBe(true)
     expect(report.topics).toEqual([{ topic: workspaceTopic, subscribers: agents.length }])
   })
@@ -48,8 +48,24 @@ describe('communication Agent initialization', () => {
 
     expect(await service.listTopics()).toEqual([])
     expect(await service.diagnostics({ agents: [{ id: 'session-no-cwd', workspaceTopic: null }] })).toMatchObject({
-      subscriptionCount: 1,
+      subscriptionCount: 0,
       agents: [{ workspaceTopic: null, workspaceSubscribed: false }],
     })
+  })
+
+  it('reports a registration failure instead of failing the Agent that is being created', async () => {
+    const failures: unknown[] = []
+
+    await registerCommunicationAgent({
+      service: () => {
+        throw new Error('communication state is unreadable')
+      },
+      agentId: 'session-broken',
+      workspaceCwd: undefined,
+      onFailure: error => failures.push(error),
+    })
+
+    expect(failures).toHaveLength(1)
+    expect(failures[0]).toBeInstanceOf(Error)
   })
 })

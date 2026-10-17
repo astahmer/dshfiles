@@ -198,7 +198,7 @@ describe('durable Agent communication', () => {
     expect(persisted).toMatchObject({
       schemaVersion: 4,
       messages: [{ id: messageId, recipients: [{ delivery: 'passive', readAt: now }] }],
-      subscriptions: [{ delivery: 'passive' }, { delivery: 'passive' }],
+      subscriptions: [{ principal: recipient, topic: 'workspace/abc123', delivery: 'passive' }],
     })
     expect(persisted).not.toHaveProperty('notifications')
   })
@@ -238,7 +238,7 @@ describe('durable Agent communication', () => {
     expect(persisted).toMatchObject({
       schemaVersion: 4,
       messages: [{ id: messageId, recipients: [{ delivery: 'passive', readAt: now }] }],
-      subscriptions: [{ delivery: 'passive' }],
+      subscriptions: [],
       activityStartedAt: null,
       activityEvents: [],
     })
@@ -341,5 +341,96 @@ describe('durable Agent communication', () => {
 
     expect(new Set(sent.map(message => message.id)).size).toBe(12)
     expect(inbox.map(message => message.id)).toEqual(sent.map(message => message.id))
+  })
+
+  it('registers a new Agent on a full topic by evicting the stalest subscriber', async () => {
+    const path = await statePath()
+    const topic = 'workspace/shared'
+    const subscribers = Array.from({ length: 512 }, (_, index) => ({
+      principal: { kind: 'agent', id: `session-${index}` },
+      topic,
+      delivery: 'passive',
+      createdAt: now + index,
+    }))
+    await writeFile(
+      path,
+      JSON.stringify({
+        schemaVersion: 4,
+        messages: [],
+        subscriptions: subscribers,
+        acknowledgements: [],
+        workspaceOptOuts: [],
+        activityStartedAt: null,
+        // `session-0` is the oldest row but the most recently active, so the next stalest row goes instead.
+        activityEvents: [
+          {
+            id: '9f1c0a3e-5d2b-4c47-9a1e-3b8f2d6c4e10',
+            principal: { kind: 'agent', id: 'session-0' },
+            operation: 'dshx_comm_inbox',
+            outcome: 'success',
+            occurredAt: now + 1_000,
+            durationMs: 4,
+            callId: 'inbox-call',
+            rootCallId: null,
+            errorCode: null,
+          },
+        ],
+      }),
+      { mode: 0o600 },
+    )
+
+    const service = createCommunicationService({ statePath: path, now: () => now })
+    await expect(service.subscribe({ kind: 'agent', id: 'session-explicit' }, { topic })).rejects.toMatchObject({ code: 'topic-full' })
+    await service.ensureSubscription({ kind: 'agent', id: 'session-new' }, { topic, delivery: 'passive' })
+
+    expect(await service.listTopics()).toEqual([{ topic, subscribers: 512 }])
+    const persisted = JSON.parse(await readFile(path, 'utf8')) as { readonly subscriptions: readonly { readonly principal: { readonly id: string } }[] }
+    const ids = persisted.subscriptions.map(entry => entry.principal.id)
+    expect(ids).toContain('session-new')
+    expect(ids).toContain('session-0')
+    expect(ids).not.toContain('session-1')
+  })
+
+  it('stores no subscription row for the private inbox', async () => {
+    const path = await statePath()
+    const service = createCommunicationService({ statePath: path, now: () => now })
+    const recipient: CommunicationPrincipal = { kind: 'agent', id: 'agent-recipient' }
+
+    await service.ensureSubscription(recipient, { topic: 'inbox', delivery: 'passive' })
+    await service.send({ sender: { kind: 'agent', id: 'agent-sender' }, toAgentId: recipient.id, text: 'Still delivered.' })
+
+    const persisted = JSON.parse(await readFile(path, 'utf8')) as { readonly subscriptions: readonly unknown[] }
+    expect(persisted.subscriptions).toEqual([])
+    expect(await service.inbox({ principal: recipient })).toMatchObject([{ recipients: [{ delivery: 'passive', readAt: now }] }])
+  })
+
+  it('counts only messages an inbox read has not already opened', async () => {
+    const service = createCommunicationService({ statePath: await statePath(), now: () => now })
+    const sender: CommunicationPrincipal = { kind: 'agent', id: 'agent-sender' }
+    const recipient: CommunicationPrincipal = { kind: 'agent', id: 'agent-recipient' }
+
+    const first = await service.send({ sender, toAgentId: recipient.id, text: 'First.' })
+    await service.send({ sender, toAgentId: recipient.id, text: 'Second.' })
+    expect(await service.unreadCount(recipient)).toBe(2)
+    expect(await service.unreadCount(sender)).toBe(0)
+
+    await service.inbox({ principal: recipient, limit: 1 })
+    expect(await service.unreadCount(recipient)).toBe(1)
+
+    await service.acknowledge(recipient, first.id)
+    expect(await service.unreadCount(recipient)).toBe(0)
+  })
+
+  it('re-reads state another process wrote instead of serving its cached copy', async () => {
+    const path = await statePath()
+    const service = createCommunicationService({ statePath: path, now: () => now })
+    const otherProcess = createCommunicationService({ statePath: path, now: () => now })
+
+    await service.ensureSubscription({ kind: 'agent', id: 'agent-first' }, { topic: 'workspace/shared', delivery: 'passive' })
+    expect(await service.listTopics()).toEqual([{ topic: 'workspace/shared', subscribers: 1 }])
+
+    await otherProcess.ensureSubscription({ kind: 'agent', id: 'agent-second' }, { topic: 'workspace/shared', delivery: 'passive' })
+
+    expect(await service.listTopics()).toEqual([{ topic: 'workspace/shared', subscribers: 2 }])
   })
 })

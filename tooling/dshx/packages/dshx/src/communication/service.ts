@@ -52,6 +52,10 @@ const MAX_ACTIVITY_EVENTS = 5_000
 const MAX_DIAGNOSTIC_ROWS = 100
 const MAX_STATE_BYTES = 16 * 1024 * 1024
 const MAX_SUBSCRIPTIONS = 5_000
+/** Bounds how long a cached read can serve state that retention would already have pruned. */
+const STATE_CACHE_TTL_MS = 30_000
+/** A publish fans out one recipient per subscriber, and a message carries at most 512 recipients. */
+const MAX_TOPIC_SUBSCRIBERS = 512
 const MAX_ACKNOWLEDGEMENTS = 100_000
 
 const topicSchema = z
@@ -186,7 +190,9 @@ const cleanState = (state: CommunicationState, now: number): CommunicationState 
   return {
     schemaVersion: 4,
     messages,
-    subscriptions: state.subscriptions.slice(-MAX_SUBSCRIPTIONS),
+    // The private inbox is implicit — a direct message carries its recipient — so an inbox row registers nothing and
+    // would otherwise leave one immortal row per Agent ever created, exhausting the topic cap for every new session.
+    subscriptions: state.subscriptions.filter(subscription => subscription.topic !== 'inbox').slice(-MAX_SUBSCRIPTIONS),
     acknowledgements: state.acknowledgements.filter(entry => survivingIds.has(entry.messageId)).slice(-MAX_ACKNOWLEDGEMENTS),
     workspaceOptOuts: [...new Set(state.workspaceOptOuts)].slice(-10_000),
     activityStartedAt: state.activityStartedAt,
@@ -243,10 +249,50 @@ const topicsForState = (state: CommunicationState): readonly CommunicationTopic[
     .sort((left, right) => left.topic.localeCompare(right.topic))
 }
 
+const subscriptionIdentity = (subscription: CommunicationSubscription): string => `${principalKey(subscription.principal)}|${subscription.topic}`
+
+/**
+ * Stalest subscribers first: a principal that never used a communication tool is the safest to drop, then the oldest
+ * row. Eviction only happens during automatic registration, so a dropped subscriber re-registers the next time it runs.
+ */
+const selectSubscriptionEvictions = (input: {
+  readonly state: CommunicationState
+  readonly topic: string
+  readonly keepPrincipal: string
+  readonly count: number
+}): readonly string[] => {
+  const lastActiveAt = new Map<string, number>()
+  for (const event of input.state.activityEvents) {
+    const key = principalKey(event.principal)
+    lastActiveAt.set(key, Math.max(lastActiveAt.get(key) ?? 0, event.occurredAt))
+  }
+  return input.state.subscriptions
+    .filter(subscription => principalKey(subscription.principal) !== input.keepPrincipal)
+    .map(subscription => {
+      const key = principalKey(subscription.principal)
+      return {
+        identity: subscriptionIdentity(subscription),
+        otherTopic: subscription.topic === input.topic ? 0 : 1,
+        lastActiveAt: lastActiveAt.get(key) ?? 0,
+        createdAt: subscription.createdAt,
+      }
+    })
+    .sort(
+      (left, right) =>
+        left.otherTopic - right.otherTopic ||
+        left.lastActiveAt - right.lastActiveAt ||
+        left.createdAt - right.createdAt ||
+        left.identity.localeCompare(right.identity),
+    )
+    .slice(0, input.count)
+    .map(candidate => candidate.identity)
+}
+
 export class CommunicationService {
   readonly #statePath: string
   readonly #now: () => number
   #writes: Promise<void> = Promise.resolve()
+  #cachedState: { readonly revision: string; readonly at: number; readonly state: CommunicationState } | undefined
 
   constructor(options: CommunicationServiceOptions = {}) {
     this.#statePath = options.statePath ?? defaultStatePath()
@@ -446,28 +492,11 @@ export class CommunicationService {
       throw new CommunicationError('invalid-topic', 'Only a DSH Agent can subscribe to its private inbox.')
     }
     const now = this.#now()
-    const subscription = communicationSubscriptionSchema.parse({
-      principal,
-      topic: parsed.topic,
-      delivery: 'passive',
-      createdAt: now,
-    })
-    await this.#updateState(state => {
-      const key = principalKey(principal)
-      const otherSubscribers = state.subscriptions.filter(item => item.topic === parsed.topic && principalKey(item.principal) !== key)
-      if (otherSubscribers.length >= 512) throw new CommunicationError('topic-full', 'A topic can have at most 512 subscribers.')
-      const alreadySubscribed = state.subscriptions.some(item => principalKey(item.principal) === key && item.topic === parsed.topic)
-      if (!alreadySubscribed && state.subscriptions.length >= MAX_SUBSCRIPTIONS) {
-        throw new CommunicationError('subscription-limit', 'Communication subscription capacity is full.')
-      }
-      const subscriptions = state.subscriptions.filter(item => !(principalKey(item.principal) === key && item.topic === parsed.topic))
-      subscriptions.push(subscription)
-      const workspaceOptOuts = parsed.topic.startsWith('workspace/')
-        ? state.workspaceOptOuts.filter(agentId => principal.kind !== 'agent' || agentId !== principal.id)
-        : state.workspaceOptOuts
-      return { state: { ...state, subscriptions, workspaceOptOuts }, value: undefined }
-    })
-    return subscription
+    // The private inbox is implicit: direct messages name their recipient, so subscribing registers nothing.
+    if (parsed.topic === 'inbox') {
+      return communicationSubscriptionSchema.parse({ principal, topic: parsed.topic, delivery: 'passive', createdAt: now })
+    }
+    return this.#writeSubscription({ principal, topic: parsed.topic, createdAt: now, evictStalest: false })
   }
 
   async ensureSubscription(
@@ -481,7 +510,70 @@ export class CommunicationService {
     if (principal.kind === 'agent' && topic.startsWith('workspace/') && state.workspaceOptOuts.includes(principal.id)) return undefined
     const current = state.subscriptions.find(item => principalKey(item.principal) === key && item.topic === topic)
     if (current !== undefined) return current
-    return this.subscribe(principal, input)
+    // Automatic registration must never fail on capacity: a full topic evicts its stalest subscribers instead, because
+    // this runs while an Agent is being created and a thrown error here fails the whole session.
+    return this.#writeSubscription({ principal, topic, createdAt: this.#now(), evictStalest: true })
+  }
+
+  async #writeSubscription(input: {
+    readonly principal: CommunicationPrincipal
+    readonly topic: string
+    readonly createdAt: number
+    readonly evictStalest: boolean
+  }): Promise<CommunicationSubscription> {
+    const key = principalKey(input.principal)
+    const subscription = communicationSubscriptionSchema.parse({
+      principal: input.principal,
+      topic: input.topic,
+      delivery: 'passive',
+      createdAt: input.createdAt,
+    })
+    await this.#updateState(state => {
+      const otherSubscribers = state.subscriptions.filter(item => item.topic === input.topic && principalKey(item.principal) !== key)
+      const alreadySubscribed = state.subscriptions.some(item => principalKey(item.principal) === key && item.topic === input.topic)
+      const topicOverflow = otherSubscribers.length >= MAX_TOPIC_SUBSCRIBERS
+      const totalOverflow = !alreadySubscribed && state.subscriptions.length >= MAX_SUBSCRIPTIONS
+      if ((topicOverflow || totalOverflow) && !input.evictStalest) {
+        if (topicOverflow) throw new CommunicationError('topic-full', `A topic can have at most ${MAX_TOPIC_SUBSCRIBERS} subscribers.`)
+        throw new CommunicationError('subscription-limit', 'Communication subscription capacity is full.')
+      }
+      const evictions = new Set(
+        topicOverflow || totalOverflow
+          ? selectSubscriptionEvictions({
+              state,
+              topic: input.topic,
+              keepPrincipal: key,
+              count: Math.max(
+                topicOverflow ? otherSubscribers.length - MAX_TOPIC_SUBSCRIBERS + 1 : 0,
+                totalOverflow ? state.subscriptions.length - MAX_SUBSCRIPTIONS + 1 : 0,
+              ),
+            })
+          : [],
+      )
+      const subscriptions = state.subscriptions
+        .filter(item => subscriptionIdentity(item) !== subscriptionIdentity(subscription))
+        .filter(item => !evictions.has(subscriptionIdentity(item)))
+      subscriptions.push(subscription)
+      const workspaceOptOuts = input.topic.startsWith('workspace/')
+        ? state.workspaceOptOuts.filter(agentId => input.principal.kind !== 'agent' || agentId !== input.principal.id)
+        : state.workspaceOptOuts
+      return { state: { ...state, subscriptions, workspaceOptOuts }, value: undefined }
+    })
+    return subscription
+  }
+
+  /**
+   * Unread, unacknowledged messages waiting for one principal. A message already opened by an inbox read stays
+   * unacknowledged until it is explicitly acknowledged, so it does not count as new here.
+   */
+  async unreadCount(principalInput: CommunicationPrincipal): Promise<number> {
+    const principal = communicationPrincipalSchema.parse(principalInput)
+    const key = principalKey(principal)
+    const state = await this.#readState()
+    const acknowledged = new Set(state.acknowledgements.filter(entry => principalKey(entry.principal) === key).map(entry => entry.messageId))
+    return state.messages.filter(
+      message => !acknowledged.has(message.id) && message.recipients.some(recipient => principalKey(recipient.principal) === key && recipient.readAt === null),
+    ).length
   }
 
   async unsubscribe(principalInput: CommunicationPrincipal, topicInput: string): Promise<{ readonly removed: boolean }> {
@@ -681,6 +773,11 @@ export class CommunicationService {
       throw new CommunicationError('state-owner', 'Communication state belongs to a different user.')
     }
     if (fileInfo.size > MAX_STATE_BYTES) throw new CommunicationError('state-too-large', 'Communication state exceeds its size limit.')
+    // Every write replaces the file atomically, so an unchanged (device, inode, size, mtime) triple means unchanged
+    // state. The per-step Agent tools and the unread nudge re-read this file often, and parsing it is the expensive part.
+    const revision = `${fileInfo.dev}:${fileInfo.ino}:${fileInfo.size}:${fileInfo.mtimeMs}`
+    const cached = this.#cachedState
+    if (cached?.revision === revision && this.#now() - cached.at < STATE_CACHE_TTL_MS) return cached.state
     let text: string
     try {
       text = await readFile(this.#statePath, 'utf8')
@@ -692,7 +789,9 @@ export class CommunicationService {
       const value: unknown = JSON.parse(text)
       const persistedState = persistedCommunicationStateSchema.parse(value)
       const state = persistedState.schemaVersion === 4 ? persistedState : migrateLegacyState(persistedState)
-      return cleanState(state, this.#now())
+      const cleaned = cleanState(state, this.#now())
+      this.#cachedState = { revision, at: this.#now(), state: cleaned }
+      return cleaned
     } catch {
       throw new CommunicationError('state-unreadable', 'Communication state is invalid or unreadable; it was left untouched.')
     }
@@ -719,6 +818,7 @@ export class CommunicationService {
       }
       await writeFileAtomic(this.#statePath, serialized, { mode: 0o600, fsync: true })
       await chmod(this.#statePath, 0o600)
+      this.#cachedState = undefined
       return updated.value
     })
     this.#writes = operation.then(
