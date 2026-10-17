@@ -434,8 +434,9 @@ const optionScopes: Readonly<Record<string, OptionScope>> = {
   priority: { allows: platformAction('comm', 'publish', 'send'), usage: '--priority is only valid with comm publish or send.' },
   topic: { allows: platformAction('comm', 'inbox'), usage: '--topic is only valid with comm inbox.' },
   limit: {
-    allows: context => platformAction('comm', 'inbox', 'report')(context) || platformAction('sessions', 'digest')(context),
-    usage: '--limit is only valid with comm inbox, comm report, or sessions digest.',
+    allows: context =>
+      platformAction('comm', 'inbox', 'report')(context) || platformAction('sessions', 'digest')(context) || platformAction('sessions', 'search')(context),
+    usage: '--limit is only valid with comm inbox, comm report, sessions digest, or sessions search.',
   },
   sinceSeq: { allows: platformAction('sessions', 'export', 'tail'), usage: '--since-seq is only valid with sessions export or sessions tail.' },
   tail: { allows: platformAction('sessions', 'export', 'tail'), usage: '--tail is only valid with sessions export or sessions tail.' },

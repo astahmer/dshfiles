@@ -121,7 +121,7 @@ dshx info [--json]
 dshx doctor [--url <launch-url>] [--json]
 
 dshx sessions list
-dshx sessions search <query...>
+dshx sessions search <query...> [--limit <count>]
 dshx sessions show <session-id>
 dshx sessions history <session-id> [--max <count>]
 dshx sessions create [--cwd <path>] [--agent-preset <id>]
@@ -195,7 +195,21 @@ Host version, Client build state, or declared plugin compatibility through the
 inspected Remote APIs; `doctor` labels those facts unknown.
 
 `sessions show` preserves Session metadata and projection hints returned by DSH.
-Search uses DSH's bounded content search and returns at most 20 snippets.
+Search prefers the composed finder from `@dshfiles/memory` when the installed
+Host serves it: titles, Session ids, cwd/workspace paths, message text, digests
+and notes in one ranked page with per-hit provenance (`[session-title+session-content:
+title-match, text-match]`), plus `--limit` (1–20) and a cursor line when more
+results exist. Without that plugin it falls back to DSH's bounded content search
+and returns at most 20 snippets.
+
+Both paths stay honest about an unavailable index. DSH's SQLite backend raises
+`SESSION_QUERY_PERSISTENCE_FAILED` while the corpus is still moving, so the
+fallback retries the transient failure and then prints a labeled
+title/metadata page instead of "No matching Sessions"; when that page is empty
+the command exits non-zero with `session-search-unavailable` and a retry hint.
+The finder path reports the same code, and its degraded pages say which source
+failed and after how many attempts.
+
 History reads a cursor-bounded page through `session/follow` and `session/page`;
 export walks all pages in event order. Rename uses DSH's durable Session API.
 Archive and unarchive call the reversible Workspace API. Archive does not stop

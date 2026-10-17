@@ -7,6 +7,7 @@ import { z } from 'zod'
 import type { CliArgs } from './args.js'
 import { renderCliUsage } from './usage.js'
 import { createDshPlatformClientFromTransport, DshPlatformError, connectDshPlatformClient } from '../platform/client.js'
+import { searchSessionsResilient } from '../platform/session-search.js'
 import type { BundleSummary, DshPlatformClient, DshPlatformTransport, JsonValue, PluginSummary, SessionSummary } from '../platform/client.js'
 import type { CommunicationClient, ConnectCommunicationClientOptions } from '../communication/bridge.js'
 import { runCommunicationCommand } from '../communication/cli.js'
@@ -476,6 +477,12 @@ const runtimeStatusText = (status: RuntimeStatusValue): string => {
   return `ONLINE ${status.runtime.id} (${status.runtime.name}) on ${status.host.name}\nProfile: ${status.identity.profile} · DSH ${status.identity.dshVersion}\nWorkspaces:\n${workspaces}\nSessions:\n${sessions}`
 }
 
+/** The finder reports `search-unavailable`; the CLI documents one code for "no Session content search" across both paths. */
+function finderFailure(error: unknown): unknown {
+  if (error instanceof DshPlatformError && error.code === 'search-unavailable') return new DshPlatformError('session-search-unavailable', error.message)
+  return error
+}
+
 async function runPlatformAction(args: CliArgs, runtime: PlatformCliRuntime): Promise<number> {
   const action = args.platformArgs?.[0]
   const parameters = args.platformArgs?.slice(1) ?? []
@@ -685,9 +692,38 @@ async function runPlatformAction(args: CliArgs, runtime: PlatformCliRuntime): Pr
       }
       if (action === 'search') {
         const query = parameters.join(' ')
-        const result = await client.sessions.search(query)
-        const message = result.items.length === 0 ? 'No matching Sessions.' : result.items.map(item => `${item.sessionId}\t${item.snippet}`).join('\n')
-        emitSessionResult({ query, ...result }, `${message}${result.hasMore ? '\nMore results are available.' : ''}`)
+        const attempt = await client.sessions.findThreads(args.limit === undefined ? { query } : { query, limit: args.limit })
+        if (attempt.kind === 'failed') throw finderFailure(attempt.error)
+        if (attempt.kind === 'page') {
+          const page = attempt.page
+          const lines =
+            page.hits.length === 0
+              ? ['No matching Sessions.']
+              : page.hits.map(
+                  hit =>
+                    `${hit.sessionId}\t${hit.title.length === 0 ? '(untitled)' : hit.title}\t${hit.snippet} [${hit.sources.join('+')}${hit.evidence.length === 0 ? '' : `: ${hit.evidence.join(', ')}`}]`,
+                )
+          const degraded = page.degraded.map(
+            entry =>
+              `Session content search is degraded (${entry.code} after ${entry.attempts} attempt(s)); these hits come from titles, metadata and memory only.`,
+          )
+          emitSessionResult(
+            { query, source: 'thread-finder', ...page },
+            [...lines, ...degraded, ...(page.nextCursor === null ? [] : [`More results are available (cursor: ${page.nextCursor}).`])].join('\n'),
+          )
+          return 0
+        }
+        const outcome = await searchSessionsResilient({ query, search: search => client.sessions.search(search), list: () => client.sessions.list() })
+        if (outcome.items.length === 0 && outcome.incomplete)
+          throw new DshPlatformError(
+            'session-search-unavailable',
+            `Session content search is unavailable (${outcome.failure?.code ?? 'unknown'} after ${outcome.attempts} attempt(s)) and no Session matched by title, identifier or cwd. Retry shortly while the Host is quieter.`,
+          )
+        const message = outcome.items.length === 0 ? 'No matching Sessions.' : outcome.items.map(item => `${item.sessionId}\t${item.snippet}`).join('\n')
+        const degraded = outcome.incomplete
+          ? `\nSession content search is degraded (${outcome.failure?.code ?? 'unknown'} after ${outcome.attempts} attempt(s)); these are title/metadata matches only.`
+          : ''
+        emitSessionResult({ query, ...outcome }, `${message}${degraded}${outcome.hasMore ? '\nMore results are available.' : ''}`)
         return 0
       }
       if (action === 'show') {

@@ -34,6 +34,72 @@ const sessionSearchSchema = z.object({
   hasMore: z.boolean(),
 })
 
+const threadFinderHitSchema = z
+  .object({
+    sessionId: z.string(),
+    title: z.string(),
+    createdAt: z.number(),
+    updatedAt: z.number(),
+    cwd: z.string().nullable(),
+    project: z.string(),
+    live: z.boolean(),
+    persisted: z.boolean(),
+    parentSessionId: z.string().nullable(),
+    snippet: z.string(),
+    sources: z.array(z.string()),
+    evidence: z.array(z.string()),
+    score: z.number(),
+  })
+  .loose()
+
+const threadFinderPageSchema = z
+  .object({
+    hits: z.array(threadFinderHitSchema),
+    notes: z.array(
+      z.object({ noteId: z.number(), project: z.string(), updatedAt: z.number(), sourceThread: z.string().nullable(), excerpt: z.string() }).loose(),
+    ),
+    nextCursor: z.string().nullable(),
+    degraded: z.array(z.object({ source: z.string(), code: z.string(), message: z.string(), attempts: z.number(), elapsedMs: z.number() }).loose()),
+    diagnostics: z
+      .object({
+        correlationId: z.string(),
+        elapsedMs: z.number(),
+        sources: z.array(z.string()),
+        attempts: z.number(),
+        scannedSessions: z.number(),
+        incomplete: z.boolean(),
+      })
+      .loose(),
+    project: z.string(),
+  })
+  .loose()
+
+export type ThreadFinderPageResult = z.infer<typeof threadFinderPageSchema>
+
+export type ThreadFinderCallInput = {
+  readonly query: string
+  readonly project?: string
+  readonly limit?: number
+  readonly cursor?: string
+  readonly availability?: readonly ('live' | 'persisted')[]
+  readonly createdFrom?: string
+  readonly createdTo?: string
+  readonly includeNotes?: boolean
+}
+
+/** What the platform client can say about the optional composed finder before it searches at all. */
+export type ThreadFinderAttempt =
+  | { readonly kind: 'absent' }
+  | { readonly kind: 'page'; readonly page: ThreadFinderPageResult }
+  | { readonly kind: 'failed'; readonly error: DshPlatformError }
+
+type DshxRegistryApi = {
+  readonly owner: string
+  readonly id: string
+  readonly version: number
+  readonly methods: readonly string[]
+}
+
 const agentPresetRowSchema = z.object({
   id: z.string(),
   isDefault: z.boolean(),
@@ -376,6 +442,8 @@ export interface DshPlatformTransport {
   rpc(namespace: string, method: string, args: Readonly<Record<string, JsonValue>>, signal?: AbortSignal): Promise<unknown>
   sessionCursor(sessionId: string): Promise<number>
   archivedSessionIds?(sessionIds: readonly string[]): Promise<readonly string[] | undefined>
+  /** Optional composed finder served by the installed Memory plugin; absent means an older Host. */
+  findThreads?(input: ThreadFinderCallInput): Promise<ThreadFinderAttempt>
 }
 
 export interface DshPlatformClient {
@@ -385,6 +453,8 @@ export interface DshPlatformClient {
       readonly items: readonly SessionSearchItem[]
       readonly hasMore: boolean
     }>
+    /** The composed finder when the installed Memory plugin serves it; see {@link ThreadFinderAttempt}. */
+    findThreads(input: ThreadFinderCallInput): Promise<ThreadFinderAttempt>
     create(input: { readonly cwd?: string; readonly agentPreset?: string }): Promise<{ readonly sessionId: string; readonly agentPreset?: string }>
     fork(sessionId: string, atSeq?: number): Promise<{ readonly sessionId: string }>
     cancel(sessionId: string): Promise<{ readonly accepted: true }>
@@ -703,9 +773,12 @@ function makeTypedClient(transport: DshPlatformTransport): DshPlatformClient {
 
   const describe = async (): Promise<SettingsDescription> => mapSettings(await transport.rpc('settings', 'describe', {}))
 
+  const findThreadsFor = async (input: ThreadFinderCallInput): Promise<ThreadFinderAttempt> => (await transport.findThreads?.(input)) ?? { kind: 'absent' }
+
   return {
     sessions: {
       list: listSessions,
+      findThreads: findThreadsFor,
       search: async query => {
         const result = sessionSearchSchema.parse(await transport.rpc('session', 'search', { request: { query } }))
         return { items: result.items, hasMore: result.hasMore }
@@ -949,50 +1022,75 @@ export async function connectDshPlatformClient(options: ConnectDshPlatformClient
     return envelope.data.result.value
   }
 
-  let archiveStatusCall: Promise<DshxApiCall | undefined> | undefined
+  let registryApis: Promise<readonly DshxRegistryApi[]> | undefined
+  const loadRegistryApis = async (): Promise<readonly DshxRegistryApi[]> => {
+    registryApis ??= (async () => {
+      const registryCall = createDshxApiCaller({
+        origin: parsed.origin,
+        cookie,
+        packageId: '@dshfiles/dshx',
+        apiId: 'registry',
+        version: 1,
+        fetch: request,
+      })
+      const registry = z
+        .object({
+          apis: z.array(
+            z.object({
+              owner: z.string(),
+              id: z.string(),
+              version: z.number().int().positive(),
+              methods: z.array(z.object({ name: z.string() })),
+            }),
+          ),
+        })
+        .parse(await registryCall('list'))
+      return registry.apis.map(api => ({ owner: api.owner, id: api.id, version: api.version, methods: api.methods.map(method => method.name) }))
+    })()
+    return registryApis
+  }
+
+  const pluginApi = async (owner: string, apiId: string, required: readonly string[]): Promise<DshxApiCall | undefined> => {
+    const api = (await loadRegistryApis()).find(
+      candidate => candidate.owner === owner && candidate.id === apiId && required.every(name => candidate.methods.includes(name)),
+    )
+    if (api === undefined) return undefined
+    return createDshxApiCaller({ origin: parsed.origin, cookie, packageId: api.owner, apiId: api.id, version: api.version, fetch: request })
+  }
+
   const archivedSessionIds = async (sessionIds: readonly string[]): Promise<readonly string[] | undefined> => {
     try {
-      archiveStatusCall ??= (async () => {
-        const registryCall = createDshxApiCaller({
-          origin: parsed.origin,
-          cookie,
-          packageId: '@dshfiles/dshx',
-          apiId: 'registry',
-          version: 1,
-          fetch: request,
-        })
-        const registry = z
-          .object({
-            apis: z.array(
-              z.object({
-                owner: z.string(),
-                id: z.string(),
-                version: z.number().int().positive(),
-                methods: z.array(z.object({ name: z.string() })),
-              }),
-            ),
-          })
-          .parse(await registryCall('list'))
-        const archiveApi = registry.apis.find(
-          api =>
-            api.owner === '@dshfiles/thread-sidebar' && api.id === 'thread-sidebar-session-archive' && api.methods.some(method => method.name === 'status'),
-        )
-        if (archiveApi === undefined) return undefined
-        return createDshxApiCaller({
-          origin: parsed.origin,
-          cookie,
-          packageId: archiveApi.owner,
-          apiId: archiveApi.id,
-          version: archiveApi.version,
-          fetch: request,
-        })
-      })()
-      const call = await archiveStatusCall
+      const call = await pluginApi('@dshfiles/thread-sidebar', 'thread-sidebar-session-archive', ['status'])
       if (call === undefined) return undefined
       return z.object({ archivedSessionIds: z.array(z.string().min(1).max(256)).max(10_000) }).parse(await call('status', { sessionIds: [...sessionIds] }))
         .archivedSessionIds
     } catch {
       return undefined
+    }
+  }
+
+  /**
+   * The composed finder when the installed Memory plugin serves it, `absent` when that plugin is older than the
+   * finder, and `failed` when it answered with an error the caller should report instead of searching again.
+   */
+  const findThreads = async (input: ThreadFinderCallInput): Promise<ThreadFinderAttempt> => {
+    let call: DshxApiCall | undefined
+    try {
+      call = await pluginApi('@dshfiles/memory', 'dshfiles-memory', ['findThreads'])
+    } catch {
+      return { kind: 'absent' }
+    }
+    if (call === undefined) return { kind: 'absent' }
+    try {
+      return { kind: 'page', page: threadFinderPageSchema.parse(await call('findThreads', input)) }
+    } catch (error) {
+      return {
+        kind: 'failed',
+        error:
+          error instanceof DshPlatformError
+            ? error
+            : new DshPlatformError('finder-failed', error instanceof Error ? error.message : 'The thread finder failed.'),
+      }
     }
   }
 
@@ -1069,5 +1167,5 @@ export async function connectDshPlatformClient(options: ConnectDshPlatformClient
       socket.once('close', () => finish(new DshPlatformError('stream-closed', 'DSH closed the session history stream before it returned a cursor.')))
     })
 
-  return makeTypedClient({ rpc, sessionCursor, archivedSessionIds })
+  return makeTypedClient({ rpc, sessionCursor, archivedSessionIds, findThreads })
 }
