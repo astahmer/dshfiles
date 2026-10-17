@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict'
-import { spawnSync } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { chmod, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { after, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
-import { buildSshOptions, quoteRemoteArgument, redactLaunchSecrets } from './smoke-multi-host-ssh-utils.mjs'
+import { buildSshOptions, quoteRemoteArgument, redactLaunchSecrets, reserveLoopbackPort, waitForSshLocalForward } from './smoke-multi-host-ssh-utils.mjs'
 
 const smokeScriptPath = fileURLToPath(new URL('./smoke-multi-host-ssh.mjs', import.meta.url))
 const environmentWithoutSmokeConfig = Object.fromEntries(Object.entries(process.env).filter(([name]) => !name.startsWith('MH_')))
@@ -130,4 +130,14 @@ test('log redaction removes complete launch URLs and supported token characters'
 
   assert.equal(output, 'launch=<launch-url-redacted> token=<redacted>')
   assert.doesNotMatch(output, /token\.With~mixed_Chars-123|another_secret/)
+})
+
+test('SSH local-forward readiness rejects a child that exits before reporting its bind', async () => {
+  const localPort = await reserveLoopbackPort()
+  const child = spawn(process.execPath, ['-e', 'process.stderr.write("child stopped before forwarding\\n")'], { stdio: ['ignore', 'ignore', 'pipe'] })
+
+  await assert.rejects(
+    waitForSshLocalForward({ child, localPort, timeoutMs: 1000 }),
+    /SSH exited before its local forward .* was ready/,
+  )
 })

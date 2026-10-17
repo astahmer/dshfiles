@@ -2,12 +2,11 @@ import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
 import { once } from 'node:events'
 import { access, mkdtemp, rm, stat } from 'node:fs/promises'
-import { createConnection } from 'node:net'
 import { tmpdir, homedir } from 'node:os'
 import { join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { z } from 'zod'
-import { buildSshOptions, quoteRemoteArgument, redactLaunchSecrets as redact } from './smoke-multi-host-ssh-utils.mjs'
+import { buildSshOptions, quoteRemoteArgument, redactLaunchSecrets as redact, reserveLoopbackPort, waitForSshLocalForward } from './smoke-multi-host-ssh-utils.mjs'
 import WebSocket from 'ws'
 
 const absolutePathSchema = z
@@ -117,30 +116,16 @@ const remoteLaunchUrl = async () => {
 }
 
 const openTunnel = async remoteListenPort => {
-  const localSpecPort = 39335
-  const server = spawn('ssh', [...sshOptions, '-N', '-L', `127.0.0.1:39335:${tunnelHost}:${remoteListenPort}`, sshTarget], {
+  const localPort = await reserveLoopbackPort()
+  const server = spawn('ssh', [...sshOptions, '-v', '-N', '-L', `127.0.0.1:${localPort}:${tunnelHost}:${remoteListenPort}`, sshTarget], {
     stdio: ['ignore', 'pipe', 'pipe'],
   })
-  const stderr = []
-  server.stderr.on('data', chunk => stderr.push(String(chunk)))
-  await new Promise((resolve, reject) => {
-    const probe = setInterval(() => {
-      const socket = createConnection({ host: tunnelHost, port: localSpecPort })
-      socket.once('connect', () => {
-        clearInterval(probe)
-        clearTimeout(timeout)
-        socket.destroy()
-        resolve()
-      })
-      socket.once('error', () => socket.destroy())
-    }, 200)
-    const timeout = setTimeout(() => {
-      clearInterval(probe)
-      reject(new Error(redact(`tunnel did not open: ${stderr.join('')}`)))
-    }, 15_000)
+  let tunnelDiagnostics = ''
+  server.stderr.on('data', chunk => {
+    tunnelDiagnostics = `${tunnelDiagnostics}${String(chunk)}`.slice(-16_384)
   })
   const close = async () => {
-    if (server.exitCode !== null || server.signalCode !== null) return
+    if (server.pid === undefined || server.exitCode !== null || server.signalCode !== null) return
     const exited = once(server, 'exit')
     server.kill('SIGTERM')
     const escalation = setTimeout(() => server.kill('SIGKILL'), 3000)
@@ -150,7 +135,19 @@ const openTunnel = async remoteListenPort => {
       clearTimeout(escalation)
     }
   }
-  const tunnel = { localPort: localSpecPort, close }
+  try {
+    // Port openness alone can belong to an unrelated process; require this SSH child's bind report.
+    await waitForSshLocalForward({ child: server, localPort })
+  } catch (error) {
+    await close()
+    const detail = error instanceof Error ? error.message : String(error)
+    throw new Error(redact(`tunnel did not open: ${detail}`))
+  }
+  if (server.exitCode !== null || server.signalCode !== null) {
+    await close()
+    throw new Error(redact(`tunnel exited immediately after opening local port ${localPort}: ${tunnelDiagnostics}`))
+  }
+  const tunnel = { localPort, close }
   server.once('exit', () => tunnels.delete(tunnel))
   return tunnel
 }
@@ -273,7 +270,7 @@ try {
   const remoteListenPort = Number(new URL(remoteUrl).port)
   const tunnel = await openTunnel(remoteListenPort)
   tunnels.add(tunnel)
-  const cookie = await exchangeCookie(`http://${tunnelHost}:39335/?token=${new URL(remoteUrl).searchParams.get('token')}`)
+  const cookie = await exchangeCookie(`http://${tunnelHost}:${tunnel.localPort}/?token=${new URL(remoteUrl).searchParams.get('token')}`)
   const gateway = makeGateway({ localPort: tunnel.localPort, cookie })
   checks.push('SSH forwards only the loopback web endpoint; token exchange authenticates end to end')
 
@@ -295,7 +292,7 @@ try {
     await local.sessions.rename(localSession.sessionId, 'Local proof')
     const localRows = await local.sessions.list()
     const remoteRows = await (
-      await connectDshPlatformClient({ url: `http://${tunnelHost}:39335/?token=${new URL(remoteUrl).searchParams.get('token')}` })
+      await connectDshPlatformClient({ url: `http://${tunnelHost}:${tunnel.localPort}/?token=${new URL(remoteUrl).searchParams.get('token')}` })
     ).sessions.list()
     assert.ok(localRows.some(row => row.sessionId === localSession.sessionId))
     assert.ok(remoteRows.some(row => row.sessionId === remoteSession.sessionId))
@@ -410,7 +407,7 @@ try {
   let restartedCookie
   for (let attempt = 0; attempt < 12; attempt += 1) {
     try {
-      restartedCookie = await exchangeCookie(`http://${tunnelHost}:39335/?token=${new URL(replayedLaunch).searchParams.get('token')}`)
+      restartedCookie = await exchangeCookie(`http://${tunnelHost}:${restartedTunnel.localPort}/?token=${new URL(replayedLaunch).searchParams.get('token')}`)
       break
     } catch (error) {
       if (attempt === 11) throw error
@@ -420,26 +417,27 @@ try {
   const restartedGateway = makeGateway({ localPort: restartedTunnel.localPort, cookie: restartedCookie })
   const restored = await restartedGateway.runSafe('session', 'list', { _request: {} })
   assert.ok(restored.ok, `a restarted runtime issues a fresh cookie: ${restored.message}`)
-  const restoredPlatform = await connectDshPlatformClient({ url: `http://${tunnelHost}:39335/?token=${new URL(replayedLaunch).searchParams.get('token')}` })
+  const restoredPlatform = await connectDshPlatformClient({ url: `http://${tunnelHost}:${restartedTunnel.localPort}/?token=${new URL(replayedLaunch).searchParams.get('token')}` })
   const restoredHistory = await restoredPlatform.sessions.history(remoteSession.sessionId)
   assert.ok(JSON.stringify(restoredHistory.records).includes('Remote proof'))
   const restoredSessions = await restoredPlatform.sessions.list()
   assert.ok(restoredSessions.some(row => row.sessionId === remoteSession.sessionId))
   checks.push('runtime restart under the same durable home preserves workspace/session identity and history; stale handles rebuilt')
 
-  const stale = await gateway.runSafe('session', 'list', { _request: {} })
+  const staleGateway = makeGateway({ localPort: restartedTunnel.localPort, cookie })
+  const stale = await staleGateway.runSafe('session', 'list', { _request: {} })
   assert.equal(stale.ok, true, `the pre-restart cookie stays valid because DSH keeps a durable signed-cookie authority: ${stale.message}`)
   checks.push('pre-restart cookie remains authenticated across restart (durable signing authority); wrong tokens still fail closed')
 
   {
-    const badUrl = new URL(`http://${tunnelHost}:39335/`)
+    const badUrl = new URL(`http://${tunnelHost}:${restartedTunnel.localPort}/`)
     badUrl.searchParams.set('token', 'definitely-wrong')
     await assert.rejects(connectDshPlatformClient({ url: badUrl.toString() }), { code: 'authentication-failed' })
     checks.push('wrong launch token is rejected by the native runtime')
   }
 
   {
-    const stopping = new WebSocket('ws://127.0.0.1:39335/api/remote.mux', { handshakeTimeout: 5000 })
+    const stopping = new WebSocket(`ws://${tunnelHost}:${restartedTunnel.localPort}/api/remote.mux`, { handshakeTimeout: 5000 })
     await new Promise(resolve => {
       stopping.on('error', () => resolve())
       stopping.on('open', () => {

@@ -8,22 +8,7 @@ import { tmpdir, userInfo } from 'node:os'
 import { delimiter, join, resolve, sep } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { test } from 'node:test'
-import { buildSshOptions } from './smoke-multi-host-ssh-utils.mjs'
-
-const reserveLoopbackPort = async () =>
-  new Promise((resolvePort, reject) => {
-    const server = createServer()
-    server.once('error', reject)
-    server.listen(0, '127.0.0.1', () => {
-      const address = server.address()
-      if (address === null || typeof address === 'string') {
-        server.close()
-        reject(new Error('Could not reserve a loopback port.'))
-        return
-      }
-      server.close(error => (error ? reject(error) : resolvePort(address.port)))
-    })
-  })
+import { buildSshOptions, reserveLoopbackPort, waitForSshLocalForward } from './smoke-multi-host-ssh-utils.mjs'
 
 const findExecutable = async name => {
   for (const directory of (process.env.PATH ?? '').split(delimiter)) {
@@ -121,7 +106,16 @@ const stopServer = async serverProcess => {
   assert.ok(killed && groupKilled, `OpenSSH process group ${processGroupId} did not stop after SIGKILL.`)
 }
 
-test('explicit loopback OpenSSH fixture uses only scratch keys and known_hosts', { timeout: 20_000 }, async context => {
+const stopSshClient = async clientProcess => {
+  if (clientProcess?.pid === undefined || clientProcess.exitCode !== null || clientProcess.signalCode !== null) return
+  const stopped = waitForProcessExit(clientProcess, 3000)
+  clientProcess.kill('SIGTERM')
+  if (await stopped) return
+  clientProcess.kill('SIGKILL')
+  assert.ok(await waitForProcessExit(clientProcess, 1000), `OpenSSH client ${clientProcess.pid} did not stop after SIGKILL.`)
+}
+
+test('loopback OpenSSH verifies its local forward with scratch keys and known_hosts', { timeout: 30_000 }, async context => {
   const scratchRoot = await mkdtemp(join(tmpdir(), 'dsh-loopback-sshd-'))
   const resolvedScratchRoot = resolve(scratchRoot)
   assert.equal(resolvedScratchRoot, scratchRoot)
@@ -207,6 +201,36 @@ test('explicit loopback OpenSSH fixture uses only scratch keys and known_hosts',
     assert.equal(connection.error, undefined, connection.stderr)
     assert.equal(connection.status, 0, connection.stderr)
     assert.equal(connection.stdout, 'fixture-ok')
+
+    const occupiedPort = await reserveLoopbackPort()
+    const occupiedServer = createServer()
+    await new Promise((resolveListen, reject) => {
+      occupiedServer.once('error', reject)
+      occupiedServer.listen(occupiedPort, '127.0.0.1', resolveListen)
+    })
+    try {
+      const localPort = await reserveLoopbackPort()
+      assert.notEqual(localPort, occupiedPort, 'the randomized SSH port must not reuse an already listening port')
+      const forward = spawn(
+        sshPath,
+        [...buildSshOptions({ sshKey: clientKeyPath, knownHosts: knownHostsPath, sshPort: port }), '-v', '-N', '-L', `127.0.0.1:${localPort}:127.0.0.1:${port}`, `${username}@127.0.0.1`],
+        { stdio: ['ignore', 'ignore', 'pipe'] },
+      )
+      let forwardDiagnostics = ''
+      forward.stderr.on('data', chunk => {
+        forwardDiagnostics = `${forwardDiagnostics}${String(chunk)}`.slice(-16_384)
+      })
+      try {
+        await waitForSshLocalForward({ child: forward, localPort, timeoutMs: 8000 })
+        assert.match(forwardDiagnostics, new RegExp(`^debug\\d+: Local forwarding listening on 127\\.0\\.0\\.1 port ${localPort}\\.$`, 'm'))
+        assert.equal(forward.exitCode, null)
+        assert.equal(forward.signalCode, null)
+      } finally {
+        await stopSshClient(forward)
+      }
+    } finally {
+      await new Promise((resolveClose, reject) => occupiedServer.close(error => (error ? reject(error) : resolveClose())))
+    }
   } finally {
     try {
       await stopServer(serverProcess)
