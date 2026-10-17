@@ -1,10 +1,10 @@
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { describe, expect, it } from 'vitest'
-import { groupThreadEntries, isSideChat, matchesThreadSourceFilter, matchesThreadStatusFilter, threadDateGroup } from './thread-view.js'
+import { ThreadViewModel } from './thread-view.js'
 
 describe('thread view grouping', () => {
   it('groups repositories alphabetically and keeps newest threads first', () => {
-    const groups = groupThreadEntries({
+    const groups = ThreadViewModel.groupEntries({
       groupBy: 'project',
       entries: [
         { thread: { id: 'older', updatedAt: 10 }, workspaceId: 'zeta' },
@@ -28,12 +28,12 @@ describe('thread view grouping', () => {
 
   it('groups activity by local calendar date and leaves none as one flat list', () => {
     const now = new Date(2025, 3, 10, 12).getTime()
-    expect(threadDateGroup(new Date(2025, 3, 10, 1).getTime(), now)).toBe('today')
-    expect(threadDateGroup(new Date(2025, 3, 9, 23).getTime(), now)).toBe('yesterday')
-    expect(threadDateGroup(new Date(2025, 3, 4, 12).getTime(), now)).toBe('lastSevenDays')
-    expect(threadDateGroup(new Date(2025, 3, 3, 12).getTime(), now)).toBe('older')
+    expect(ThreadViewModel.dateGroup(new Date(2025, 3, 10, 1).getTime(), now)).toBe('today')
+    expect(ThreadViewModel.dateGroup(new Date(2025, 3, 9, 23).getTime(), now)).toBe('yesterday')
+    expect(ThreadViewModel.dateGroup(new Date(2025, 3, 4, 12).getTime(), now)).toBe('lastSevenDays')
+    expect(ThreadViewModel.dateGroup(new Date(2025, 3, 3, 12).getTime(), now)).toBe('older')
     expect(
-      groupThreadEntries({
+      ThreadViewModel.groupEntries({
         groupBy: 'date',
         entries: [
           { thread: { id: 'older', updatedAt: new Date(2025, 3, 3, 12).getTime() }, workspaceId: undefined },
@@ -53,7 +53,7 @@ describe('thread view grouping', () => {
       { label: 'Older', threads: [{ id: 'older' }] },
     ])
     expect(
-      groupThreadEntries({
+      ThreadViewModel.groupEntries({
         groupBy: 'none',
         entries: [
           { thread: { id: 'older', updatedAt: 10 }, workspaceId: 'one' },
@@ -70,39 +70,46 @@ describe('thread view grouping', () => {
 
 describe('thread view filters', () => {
   it('hides /btw side chats by their title marker only', () => {
-    expect(isSideChat({ title: 'btw · why is the build slow?' })).toBe(true)
-    expect(isSideChat({ title: 'btw: notes' })).toBe(false)
-    expect(isSideChat({})).toBe(false)
+    expect(ThreadViewModel.isSideChat({ title: 'btw · why is the build slow?' })).toBe(true)
+    expect(ThreadViewModel.isSideChat({ title: 'btw: notes' })).toBe(false)
+    expect(ThreadViewModel.isSideChat({})).toBe(false)
   })
 
   it('filters supported activity states', () => {
-    expect(matchesThreadStatusFilter({ filters: [], running: false, needsAttention: false, archived: false, muted: false })).toBe(true)
-    expect(matchesThreadStatusFilter({ filters: ['working'], running: true, needsAttention: false, archived: false, muted: false })).toBe(true)
-    expect(matchesThreadStatusFilter({ filters: ['working'], running: false, needsAttention: false, archived: false, muted: false })).toBe(false)
-    expect(matchesThreadStatusFilter({ filters: ['attention'], running: false, needsAttention: true, archived: false, muted: false })).toBe(true)
-    expect(matchesThreadStatusFilter({ filters: ['archived'], running: false, needsAttention: false, archived: true, muted: false })).toBe(true)
-    expect(matchesThreadStatusFilter({ filters: ['muted'], running: true, needsAttention: false, archived: false, muted: true })).toBe(true)
-    expect(matchesThreadStatusFilter({ filters: ['muted'], running: true, needsAttention: false, archived: false, muted: false })).toBe(false)
-    expect(matchesThreadStatusFilter({ filters: ['working', 'attention'], running: false, needsAttention: true, archived: false, muted: false })).toBe(true)
-    expect(matchesThreadStatusFilter({ filters: ['working', 'attention'], running: false, needsAttention: false, archived: false, muted: false })).toBe(false)
+    expect(ThreadViewModel.matchesStatusFilter({ filters: [], running: false, needsAttention: false, archived: false, muted: false })).toBe(true)
+    expect(ThreadViewModel.matchesStatusFilter({ filters: ['working'], running: true, needsAttention: false, archived: false, muted: false })).toBe(true)
+    expect(ThreadViewModel.matchesStatusFilter({ filters: ['working'], running: false, needsAttention: false, archived: false, muted: false })).toBe(false)
+    expect(ThreadViewModel.matchesStatusFilter({ filters: ['attention'], running: false, needsAttention: true, archived: false, muted: false })).toBe(true)
+    expect(ThreadViewModel.matchesStatusFilter({ filters: ['archived'], running: false, needsAttention: false, archived: true, muted: false })).toBe(true)
+    expect(ThreadViewModel.matchesStatusFilter({ filters: ['muted'], running: true, needsAttention: false, archived: false, muted: true })).toBe(true)
+    expect(ThreadViewModel.matchesStatusFilter({ filters: ['muted'], running: true, needsAttention: false, archived: false, muted: false })).toBe(false)
+    expect(
+      ThreadViewModel.matchesStatusFilter({ filters: ['working', 'attention'], running: false, needsAttention: true, archived: false, muted: false }),
+    ).toBe(true)
+    expect(
+      ThreadViewModel.matchesStatusFilter({ filters: ['working', 'attention'], running: false, needsAttention: false, archived: false, muted: false }),
+    ).toBe(false)
   })
 
   it('includes stopped input-needed and usage-limit threads in Not working', () => {
     for (const status of ['input-needed', 'usage-limit']) {
-      expect(matchesThreadStatusFilter({ filters: ['not-working'], running: false, needsAttention: true, archived: false, muted: false }), status).toBe(true)
+      expect(
+        ThreadViewModel.matchesStatusFilter({ filters: ['not-working'], running: false, needsAttention: true, archived: false, muted: false }),
+        status,
+      ).toBe(true)
     }
-    expect(matchesThreadStatusFilter({ filters: ['not-working'], running: false, needsAttention: false, archived: false, muted: false })).toBe(true)
-    expect(matchesThreadStatusFilter({ filters: ['not-working'], running: true, needsAttention: true, archived: false, muted: false })).toBe(true)
-    expect(matchesThreadStatusFilter({ filters: ['not-working'], running: true, needsAttention: false, archived: false, muted: false })).toBe(false)
-    expect(matchesThreadStatusFilter({ filters: ['not-working'], running: false, needsAttention: false, archived: true, muted: false })).toBe(false)
-    expect(matchesThreadStatusFilter({ filters: ['not-working'], running: false, needsAttention: false, archived: false, muted: true })).toBe(false)
+    expect(ThreadViewModel.matchesStatusFilter({ filters: ['not-working'], running: false, needsAttention: false, archived: false, muted: false })).toBe(true)
+    expect(ThreadViewModel.matchesStatusFilter({ filters: ['not-working'], running: true, needsAttention: true, archived: false, muted: false })).toBe(true)
+    expect(ThreadViewModel.matchesStatusFilter({ filters: ['not-working'], running: true, needsAttention: false, archived: false, muted: false })).toBe(false)
+    expect(ThreadViewModel.matchesStatusFilter({ filters: ['not-working'], running: false, needsAttention: false, archived: true, muted: false })).toBe(false)
+    expect(ThreadViewModel.matchesStatusFilter({ filters: ['not-working'], running: false, needsAttention: false, archived: false, muted: true })).toBe(false)
   })
 
   it('filters main and subagent sources using Host lineage metadata', () => {
-    expect(matchesThreadSourceFilter({}, 'main')).toBe(true)
-    expect(matchesThreadSourceFilter({ origin: 'subagent' }, 'main')).toBe(false)
-    expect(matchesThreadSourceFilter({ parentId: SessionId('parent') }, 'subagents')).toBe(true)
-    expect(matchesThreadSourceFilter({ origin: 'subagent' }, 'subagents')).toBe(true)
-    expect(matchesThreadSourceFilter({}, 'all')).toBe(true)
+    expect(ThreadViewModel.matchesSourceFilter({}, 'main')).toBe(true)
+    expect(ThreadViewModel.matchesSourceFilter({ origin: 'subagent' }, 'main')).toBe(false)
+    expect(ThreadViewModel.matchesSourceFilter({ parentId: SessionId('parent') }, 'subagents')).toBe(true)
+    expect(ThreadViewModel.matchesSourceFilter({ origin: 'subagent' }, 'subagents')).toBe(true)
+    expect(ThreadViewModel.matchesSourceFilter({}, 'all')).toBe(true)
   })
 })

@@ -122,13 +122,10 @@ import { buildThreadUrl, clearThreadUrl, readThreadUrl } from './thread-url.js'
 import { workingThreadIds } from './working-threads.js'
 import { indexRebasedThreadSessions, rebasedThreadArchiveDelayMs } from './rebased-threads.js'
 import {
-  groupThreadEntries,
-  isSideChat,
-  matchesThreadSourceFilter,
-  matchesThreadStatusFilter,
   THREAD_GROUP_BY_OPTIONS,
   THREAD_SOURCE_FILTER_OPTIONS,
   THREAD_STATUS_FILTER_OPTIONS,
+  ThreadViewModel,
   type ThreadGroupBy,
   type ThreadSourceFilter,
   type ThreadViewPreferences,
@@ -1115,7 +1112,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         archivedSessionIds,
         matchesWorkspace: session =>
           preferences.workspaceFilter === null || (workspaceForLineage(session, sessionState.byId, workspaceBySession) ?? '') === preferences.workspaceFilter,
-        matchesSource: session => matchesThreadSourceFilter(session, threadView.sourceFilter),
+        matchesSource: session => ThreadViewModel.matchesSourceFilter(session, threadView.sourceFilter),
       }),
     [
       archivedSessionIds,
@@ -1137,7 +1134,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         archivedSessionIds,
         matchesWorkspace: session =>
           preferences.workspaceFilter === null || (workspaceForLineage(session, sessionState.byId, workspaceBySession) ?? '') === preferences.workspaceFilter,
-        matchesSource: session => matchesThreadSourceFilter(session, threadView.sourceFilter),
+        matchesSource: session => ThreadViewModel.matchesSourceFilter(session, threadView.sourceFilter),
       }),
     [
       archivedSessionIds,
@@ -1751,7 +1748,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     const listed: SessionSummary[] = []
     for (const sessionId of sessionState.ids) {
       const session = sessionState.byId[sessionId]
-      if (session === undefined || session.blank || isSideChat(session)) continue
+      if (session === undefined || session.blank || ThreadViewModel.isSideChat(session)) continue
       const workspaceId = workspaceForLineage(session, sessionState.byId, workspaceBySession)
       if (preferences.workspaceFilter !== null && (workspaceId ?? '') !== preferences.workspaceFilter) continue
       listed.push(session)
@@ -1803,9 +1800,9 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   )
   const sourceFilteredThreadEntries = useMemo(() => {
     if (threadView.sourceFilter === 'subagents') {
-      return [...childThreadEntries, ...sectionEntries.filter(entry => matchesThreadSourceFilter(entry.session, 'subagents'))]
+      return [...childThreadEntries, ...sectionEntries.filter(entry => ThreadViewModel.matchesSourceFilter(entry.session, 'subagents'))]
     }
-    if (threadView.sourceFilter === 'main') return sectionEntries.filter(entry => matchesThreadSourceFilter(entry.session, 'main'))
+    if (threadView.sourceFilter === 'main') return sectionEntries.filter(entry => ThreadViewModel.matchesSourceFilter(entry.session, 'main'))
     return sectionEntries
   }, [childThreadEntries, sectionEntries, threadView.sourceFilter])
   const sourceFilteredThreadIds = useMemo(() => new Set(sourceFilteredThreadEntries.map(entry => entry.session.id)), [sourceFilteredThreadEntries])
@@ -1813,8 +1810,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const workingThreadCountsBySource = useMemo(
     () => ({
       all: sectionEntries.filter(entry => entry.activity.running).length,
-      main: sectionEntries.filter(entry => entry.activity.running && matchesThreadSourceFilter(entry.session, 'main')).length,
-      subagents: [...childThreadEntries, ...sectionEntries.filter(entry => matchesThreadSourceFilter(entry.session, 'subagents'))].filter(
+      main: sectionEntries.filter(entry => entry.activity.running && ThreadViewModel.matchesSourceFilter(entry.session, 'main')).length,
+      subagents: [...childThreadEntries, ...sectionEntries.filter(entry => ThreadViewModel.matchesSourceFilter(entry.session, 'subagents'))].filter(
         entry => entry.activity.running,
       ).length,
     }),
@@ -1969,7 +1966,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const visibleThreadEntries = useMemo(
     () =>
       sourceFilteredThreadEntries.filter(entry =>
-        matchesThreadStatusFilter({
+        ThreadViewModel.matchesStatusFilter({
           filters: threadView.statusFilters,
           running: threadView.sourceFilter === 'subagents' ? entry.activity.running : currentWorkingThreadIds.has(entry.session.id),
           needsAttention: threadView.sourceFilter === 'subagents' ? attentionSessionIds.has(entry.session.id) : attentionRootIds.has(entry.session.id),
@@ -1994,7 +1991,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       return rows.filter(
         session =>
           sourceFilteredThreadIds.has(session.id) &&
-          matchesThreadStatusFilter({
+          ThreadViewModel.matchesStatusFilter({
             filters: threadView.statusFilters,
             running: threadView.sourceFilter === 'subagents' ? session.running : currentWorkingThreadIds.has(session.id),
             needsAttention: true,
@@ -2026,7 +2023,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const statusFilteredNeedsResumeRows = useMemo(
     () =>
       needsResumeRows.filter(session =>
-        matchesThreadStatusFilter({
+        ThreadViewModel.matchesStatusFilter({
           filters: threadView.statusFilters,
           running: threadView.sourceFilter === 'subagents' ? session.running : currentWorkingThreadIds.has(session.id),
           needsAttention: true,
@@ -2039,7 +2036,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const statusFilteredUsageLimitRows = useMemo(
     () =>
       usageLimitRows.filter(row =>
-        matchesThreadStatusFilter({
+        ThreadViewModel.matchesStatusFilter({
           filters: threadView.statusFilters,
           running: threadView.sourceFilter === 'subagents' ? row.session.running : currentWorkingThreadIds.has(row.session.id),
           needsAttention: true,
@@ -2119,7 +2116,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   ])
   const groupedThreadEntries = useMemo(() => {
     if (threadView.groupBy === 'status') return []
-    return groupThreadEntries({
+    return ThreadViewModel.groupEntries({
       groupBy: threadView.groupBy,
       entries: visibleThreadEntries.map(entry => ({ thread: entry.session, workspaceId: entry.workspaceId, activityAt: entry.activity.updatedAt })),
       workspaceTitles: new Map(displayWorkspaces.map(workspace => [workspace.id, workspace.title])),
@@ -2370,7 +2367,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         : (threadTree.childrenByRoot.get(session.id) ?? NO_CHILDREN).filter(
             child =>
               !(threadView.groupBy === 'status' && attentionIds.has(child.id)) &&
-              matchesThreadStatusFilter({
+              ThreadViewModel.matchesStatusFilter({
                 filters: threadView.statusFilters,
                 running: child.running,
                 needsAttention: attentionSessionIds.has(child.id),

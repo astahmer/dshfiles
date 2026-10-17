@@ -35,15 +35,15 @@ export interface ThreadViewGroup<Thread> {
 // @dshfiles/btw titles its forks with this prefix; they live in their right-sidebar tab, not in the thread list.
 const SIDE_CHAT_TITLE_PREFIX = 'btw · '
 
-export const isSideChat = (thread: Pick<SessionSummary, 'title'>): boolean => thread.title?.startsWith(SIDE_CHAT_TITLE_PREFIX) === true
+const isSideChat = (thread: Pick<SessionSummary, 'title'>): boolean => thread.title?.startsWith(SIDE_CHAT_TITLE_PREFIX) === true
 
-export const matchesThreadSourceFilter = (thread: Partial<Pick<SessionSummary, 'origin' | 'parentId'>>, sourceFilter: ThreadSourceFilter): boolean => {
+const matchesThreadSourceFilter = (thread: Partial<Pick<SessionSummary, 'origin' | 'parentId'>>, sourceFilter: ThreadSourceFilter): boolean => {
   if (sourceFilter === 'all') return true
   const isSubagent = thread.origin === 'subagent' || thread.parentId !== undefined
   return sourceFilter === 'subagents' ? isSubagent : !isSubagent
 }
 
-export const matchesThreadStatusFilter = (options: {
+const matchesThreadStatusFilter = (options: {
   readonly filters: ThreadStatusFilters
   readonly running: boolean
   readonly needsAttention: boolean
@@ -60,7 +60,7 @@ export const matchesThreadStatusFilter = (options: {
   })
 }
 
-export const threadDateGroup = (updatedAt: number, now: number): ThreadDateGroup => {
+const threadDateGroup = (updatedAt: number, now: number): ThreadDateGroup => {
   if (!Number.isFinite(updatedAt)) return 'older'
   const date = new Date(updatedAt)
   const today = new Date(now)
@@ -74,7 +74,7 @@ export const threadDateGroup = (updatedAt: number, now: number): ThreadDateGroup
   return 'older'
 }
 
-export const groupThreadEntries = <Thread extends Pick<SessionSummary, 'updatedAt'>>(options: {
+const groupThreadEntries = <Thread extends Pick<SessionSummary, 'updatedAt'>>(options: {
   readonly groupBy: Exclude<ThreadGroupBy, 'status'>
   readonly entries: readonly ThreadViewEntry<Thread>[]
   readonly workspaceTitles: ReadonlyMap<string, string>
@@ -116,4 +116,12 @@ export const groupThreadEntries = <Thread extends Pick<SessionSummary, 'updatedA
     showHeader: group.showHeader,
     threads: group.entries.sort((left, right) => right.activityAt - left.activityAt).map(entry => entry.thread),
   }))
+}
+
+export class ThreadViewModel {
+  static readonly isSideChat = isSideChat
+  static readonly matchesSourceFilter = matchesThreadSourceFilter
+  static readonly matchesStatusFilter = matchesThreadStatusFilter
+  static readonly dateGroup = threadDateGroup
+  static readonly groupEntries = groupThreadEntries
 }
