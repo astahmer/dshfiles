@@ -106,6 +106,43 @@ describe('Command Code usage', () => {
     ])
   })
 
+  it('adds the monthly allowance with the billing period end as its reset', () => {
+    const card = CommandCodeUsageModel.parseUsage({
+      credits: {
+        windowLimits: { weekly: { used: 4.14, cap: 6, resetAt: 1_900_000_000_000 } },
+        credits: { monthlyCredits: 3, purchasedCredits: 0, freeCredits: 0 },
+      },
+      whoami: undefined,
+      subscription: { data: { planId: 'individual-go-v1', currentPeriodEnd: '2026-11-04T08:01:16.000Z' } },
+    })
+    expect(card.windows.at(-1)).toEqual({ label: 'Monthly limit', percentRemaining: 30, resetsAt: Date.parse('2026-11-04T08:01:16.000Z') })
+  })
+
+  it('reports the monthly limit spent once too few credits are left to serve a turn, even with the windows open', () => {
+    const card = CommandCodeUsageModel.parseUsage({
+      credits: {
+        windowLimits: { fiveHour: { used: 0, cap: 3, resetAt: 0 }, weekly: { used: 4.14, cap: 6, resetAt: 1_900_000_000_000 } },
+        credits: { monthlyCredits: 0.0979, purchasedCredits: 0, freeCredits: 0 },
+      },
+      whoami: undefined,
+      subscription: { data: { planId: 'individual-go-v1', currentPeriodEnd: '2026-11-04T08:01:16.000Z' } },
+    })
+    expect(card.windows.map(window => [window.label, window.percentRemaining])).toEqual([
+      ['Current session', 100],
+      ['Weekly limit', 31],
+      ['Monthly limit', 0],
+    ])
+  })
+
+  it('keeps the monthly limit open while purchased credits can still pay', () => {
+    const card = CommandCodeUsageModel.parseUsage({
+      credits: { credits: { monthlyCredits: 0.05, purchasedCredits: 5, freeCredits: 0 } },
+      whoami: undefined,
+      subscription: { data: { planId: 'individual-go-v1', currentPeriodEnd: null } },
+    })
+    expect(card.windows).toEqual([{ label: 'Monthly limit', percentRemaining: 0.5, resetsAt: null }])
+  })
+
   it('says when a plan reports no window limits instead of inventing one', () => {
     const card = CommandCodeUsageModel.parseUsage({ credits: { credits: { planId: 'payg' } }, whoami: undefined, subscription: { data: { planId: 'payg' } } })
     expect(card.status).toBe('unsupported')

@@ -12,12 +12,12 @@ type JsonValue = string | number | boolean | null | undefined | readonly JsonVal
 /**
  * Command Code subscription quota.
  *
- * The same account endpoints the official CLI (and the community
- * `@mars-sea/dsh-commandcode-provider`) read: `/alpha/billing/credits` carries
- * the five-hour and weekly window limits as `used`/`cap` with a millisecond
- * `resetAt`, `/alpha/whoami` the user, and `/alpha/billing/subscriptions` the
- * plan. The key comes from the account's variable, falling back to the file
- * `cmd login` writes.
+ * The same account endpoints the official CLI reads: `/alpha/billing/credits`
+ * carries the five-hour and weekly window limits as `used`/`cap` with a
+ * millisecond `resetAt` plus the remaining monthly, purchased and free credits,
+ * `/alpha/whoami` the user, and `/alpha/billing/subscriptions` the plan and its
+ * billing period. The key comes from the account's variable, falling back to
+ * the file `cmd login` writes.
  */
 
 const credentialRecordSchema = z.object({ type: z.string().optional(), key: z.string().optional(), access: z.string().optional() })
@@ -68,12 +68,39 @@ const windowLimitSchema = z.object({
 
 const creditsSchema = z.object({
   windowLimits: z.object({ fiveHour: windowLimitSchema.nullish(), weekly: windowLimitSchema.nullish() }).nullish(),
-  credits: z.object({ planId: z.string().nullish() }).nullish(),
+  credits: z
+    .object({
+      planId: z.string().nullish(),
+      monthlyCredits: z.number().finite().nullish(),
+      purchasedCredits: z.number().finite().nullish(),
+      freeCredits: z.number().finite().nullish(),
+    })
+    .nullish(),
 })
 
 const whoamiSchema = z.object({ user: z.object({ userName: z.string().optional(), name: z.string().optional() }).nullish() })
 
-const subscriptionSchema = z.object({ data: z.object({ planId: z.string().nullish(), status: z.string().nullish() }).nullish() })
+const subscriptionSchema = z.object({
+  data: z.object({ planId: z.string().nullish(), status: z.string().nullish(), currentPeriodEnd: z.string().nullish() }).nullish(),
+})
+
+/** Monthly credit allowance per plan, as the official CLI 1.38.2 ships it; plan ids carry suffixes such as `-v1`. */
+const PLAN_MONTHLY_CREDITS: ReadonlyArray<readonly [string, number]> = [
+  ['individual-goat', 70],
+  ['individual-go', 10],
+  ['individual-pro-v1', 80],
+  ['individual-provider', 15],
+  ['individual-pro', 30],
+  ['individual-max', 150],
+  ['individual-ultra', 300],
+  ['teams-pro', 40],
+]
+
+/** Command Code refused every model with 0.098 credits left on a Go plan, so a balance under this cannot serve a turn. */
+const MIN_SPENDABLE_CREDITS = 0.25
+
+const monthlyAllowance = (planId: string): number | undefined =>
+  PLAN_MONTHLY_CREDITS.filter(([prefix]) => planId === prefix || planId.startsWith(`${prefix}-`)).sort(([left], [right]) => right.length - left.length)[0]?.[1]
 
 const percentLeft = (limit: z.infer<typeof windowLimitSchema>): number => {
   if (limit.exceeded === true) return 0
@@ -97,11 +124,24 @@ export class CommandCodeUsageModel {
     const whoami = whoamiSchema.safeParse(input.whoami)
     const subscription = subscriptionSchema.safeParse(input.subscription)
     const user = whoami.success ? whoami.data.user : undefined
+    const plan = (subscription.success ? subscription.data.data?.planId : undefined) ?? credits.data.credits?.planId ?? null
+    const allowance = plan === null ? undefined : monthlyAllowance(plan)
+    const monthly = credits.data.credits?.monthlyCredits
+    if (allowance !== undefined && monthly !== undefined && monthly !== null) {
+      const remaining = Math.max(0, monthly)
+      const spendable = remaining + Math.max(0, credits.data.credits?.purchasedCredits ?? 0) + Math.max(0, credits.data.credits?.freeCredits ?? 0)
+      const periodEnd = subscription.success ? Date.parse(subscription.data.data?.currentPeriodEnd ?? '') : Number.NaN
+      windows.push({
+        label: 'Monthly limit',
+        percentRemaining: spendable < MIN_SPENDABLE_CREDITS ? 0 : Math.min(100, Math.round((remaining / allowance) * 1000) / 10),
+        resetsAt: Number.isFinite(periodEnd) ? periodEnd : null,
+      })
+    }
     return {
       status: windows.length === 0 ? 'unsupported' : 'ok',
       message: windows.length === 0 ? 'Command Code reported no window limits for this plan.' : null,
       identity: user?.userName ?? user?.name ?? null,
-      plan: (subscription.success ? subscription.data.data?.planId : undefined) ?? credits.data.credits?.planId ?? null,
+      plan,
       windows,
       bankedResets: 0,
       bankedResetExpiries: [],
