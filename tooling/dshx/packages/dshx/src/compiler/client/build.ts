@@ -149,6 +149,7 @@ function clientEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, op
           `export { useApi, useApiQuery } from ${JSON.stringify(VIRTUAL_CLIENT_API_HOOKS)}`,
           `import { ApiRuntimeModel } from ${JSON.stringify(API_RUNTIME_PATH)}`,
           'export const createApiClient = ApiRuntimeModel.createClient',
+          'export const createRegisteredApiClient = ApiRuntimeModel.createRegisteredClient',
           `export { useSettings } from ${JSON.stringify(VIRTUAL_CLIENT_SETTINGS_HOOK)}`,
           `import { SettingsPageRendererModel } from ${JSON.stringify(SETTINGS_PAGE_RENDERER_PATH)}`,
           'export const provideSettingsPageRenderer = SettingsPageRendererModel.provide',

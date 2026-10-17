@@ -1,6 +1,6 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { ClientConnectionRpc } from '@deepseek-ai/dsh-client-connection/client'
-import type { AnyApiMethodDefinition, ApiCallOptions, ApiClient, ApiContract, ApiError } from './types.js'
+import type { AnyApiMethodDefinition, ApiCallOptions, ApiClient, ApiClientContract, ApiError } from './types.js'
 import { ApiProtocolModel, ContractViolation } from './common.js'
 
 type RpcResult =
@@ -41,7 +41,7 @@ function errorFromRemote(result: Extract<RpcResult, { readonly ok: false }>, api
 
 function createApiClient<const Methods extends Record<string, AnyApiMethodDefinition>>(
   context: ContextLike | Context | undefined,
-  contract: ApiContract<Methods>,
+  contract: ApiClientContract<Methods>,
   packageId = 'plugin',
 ): ApiClient<Methods> {
   const connection = context === undefined || typeof context.get !== 'function' ? undefined : (context.get('connection') as ClientConnectionLike | undefined)
@@ -92,6 +92,34 @@ function createApiClient<const Methods extends Record<string, AnyApiMethodDefini
   return client as ApiClient<Methods>
 }
 
+/**
+ * How to reach a dshx API discovered through the registry: the owning package, the API id, its version and the
+ * methods this caller needs. `dshxRegistryApi.list()` answers the first three, so a caller never imports the
+ * contract it calls.
+ */
+export interface RegisteredApiSpec {
+  readonly owner: string
+  readonly id: string
+  readonly version: number
+  readonly methods: readonly string[]
+}
+
+/**
+ * Call a registered API by identity instead of by contract. `command-palette` forced this: importing
+ * `@dshfiles/memory/api` for its finder would close a Turbo build cycle
+ * (command-palette → memory → ai-accounts → secret-catalog → jj-integration → command-palette), so it discovers
+ * the API through the registry and decodes the output at its own boundary. Method results are `unknown` on
+ * purpose; validate them where they cross into product state.
+ */
+function createRegisteredApiClient(context: ContextLike | Context | undefined, spec: RegisteredApiSpec): ApiClient<Record<string, AnyApiMethodDefinition>> {
+  return createApiClient(context, {
+    id: spec.id,
+    owner: spec.owner,
+    version: spec.version,
+    methods: Object.fromEntries(spec.methods.map(name => [name, {} as AnyApiMethodDefinition])),
+  })
+}
+
 /** Internal lifecycle seam used by the React query adapter. */
 function subscribeApiConnection<const Methods extends Record<string, AnyApiMethodDefinition>>(client: ApiClient<Methods>, listener: () => void): () => void {
   const source = clientConnections.get(client)?.hostDescription
@@ -107,6 +135,7 @@ function apiConnectionAvailable<const Methods extends Record<string, AnyApiMetho
 export class ApiRuntimeModel {
   static readonly errorFromRemote = errorFromRemote
   static readonly createClient = createApiClient
+  static readonly createRegisteredClient = createRegisteredApiClient
   static readonly subscribeConnection = subscribeApiConnection
   static readonly connectionAvailable = apiConnectionAvailable
 }

@@ -60,6 +60,15 @@ export interface ApiContract<Methods extends Record<string, AnyApiMethodDefiniti
   ) => ApiHostRegistration<Methods, Handlers>
 }
 
+/**
+ * What a caller needs to reach an API: identity, version and the methods it may call. A declared contract satisfies
+ * it, and so does one assembled from the registry ({@link RegisteredApiSpec}).
+ */
+export type ApiClientContract<Methods extends Record<string, AnyApiMethodDefinition> = Record<string, AnyApiMethodDefinition>> = Pick<
+  ApiContract<Methods>,
+  'id' | 'owner' | 'version' | 'methods'
+>
+
 export type ApiClientInput<M> = M extends ApiMethodDefinition<infer Input, any, any, any> ? Input : never
 export type ApiHostInput<M> = M extends ApiMethodDefinition<any, infer Input, any, any> ? Input : never
 export type ApiHostOutput<M> = M extends ApiMethodDefinition<any, any, infer Output, any> ? Output : never

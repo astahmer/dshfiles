@@ -22,6 +22,9 @@ export type {
 } from './types.js'
 export { useApi, useApiQuery } from '../api/client.js'
 export const createApiClient = ApiRuntimeModel.createClient
+/** Call a dshx API discovered through `dshxRegistryApi` without importing its contract. */
+export const createRegisteredApiClient = ApiRuntimeModel.createRegisteredClient
+export type { RegisteredApiSpec } from '../api/runtime.js'
 export { useSettings } from '../settings/client.js'
 export type { SettingsMutationState, SettingsReadError, SettingsState } from '../settings/types.js'
 export type { HandleOf } from '@deepseek-ai/dsh-client-ui-slots'

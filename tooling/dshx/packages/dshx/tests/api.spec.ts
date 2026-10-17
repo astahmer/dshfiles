@@ -29,6 +29,47 @@ const routeResponseSchema = z.object({
   ]),
 })
 
+describe('createRegisteredApiClient', () => {
+  const registeredContext = (call: (channel: string, endpoint: string, payload: unknown, signal?: AbortSignal) => Promise<unknown>) => ({
+    get: (name: string) => (name === 'connection' ? { rpc: { call } } : undefined),
+  })
+
+  it('calls an API discovered through the registry without importing its contract', async () => {
+    const call = vi.fn(async () => ({ ok: true as const, value: { version: 3, output: { hits: [{ sessionId: 'session-a', snippet: 'baseline' }] } } }))
+    const client = ApiRuntimeModel.createRegisteredClient(registeredContext(call), {
+      owner: '@dshfiles/memory',
+      id: 'dshfiles-memory',
+      version: 3,
+      methods: ['findThreads'],
+    })
+    expect(await client.findThreads?.({ query: 'baseline' })).toEqual({ hits: [{ sessionId: 'session-a', snippet: 'baseline' }] })
+    expect(call).toHaveBeenCalledWith('/api', expect.stringMatching(/\/findThreads$/u), { version: 3, input: { query: 'baseline' } }, undefined)
+  })
+
+  it('refuses a method the registry entry did not list', async () => {
+    const call = vi.fn()
+    const client = ApiRuntimeModel.createRegisteredClient(registeredContext(call), {
+      owner: '@dshfiles/memory',
+      id: 'dshfiles-memory',
+      version: 3,
+      methods: ['findThreads'],
+    })
+    expect(client.relatedThreads).toBeUndefined()
+    expect(call).not.toHaveBeenCalled()
+  })
+
+  it('reports a version mismatch instead of trusting the output', async () => {
+    const call = vi.fn(async () => ({ ok: true as const, value: { version: 2, output: { hits: [] } } }))
+    const client = ApiRuntimeModel.createRegisteredClient(registeredContext(call), {
+      owner: '@dshfiles/memory',
+      id: 'dshfiles-memory',
+      version: 3,
+      methods: ['findThreads'],
+    })
+    await expect(client.findThreads?.({ query: 'baseline' })).rejects.toMatchObject({ kind: 'contract' })
+  })
+})
+
 function connectionFixture() {
   const routes = new Map<string, ConnectionFetchRoute>()
   const removers: Array<() => Promise<void>> = []

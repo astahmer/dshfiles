@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import type {
   AnyApiMethodDefinition,
+  ApiClientContract,
   ApiCallOptions,
   ApiClient,
   ApiClientInput,
@@ -24,7 +25,7 @@ interface ContextLike {
 }
 
 export interface ApiClientRuntime {
-  client<const Methods extends Record<string, AnyApiMethodDefinition>>(contract: ApiContract<Methods>): ApiClient<Methods>
+  client<const Methods extends Record<string, AnyApiMethodDefinition>>(contract: ApiClientContract<Methods>): ApiClient<Methods>
 }
 
 function runtime(): ReactRuntime {
@@ -45,7 +46,7 @@ function context(): import('react').Context<ApiClientRuntime | undefined> {
 const createApiClientRuntime = (ctx: ContextLike, packageId: string): ApiClientRuntime => {
   const clients = new Map<object, ApiClient>()
   return {
-    client<const Methods extends Record<string, AnyApiMethodDefinition>>(contract: ApiContract<Methods>): ApiClient<Methods> {
+    client<const Methods extends Record<string, AnyApiMethodDefinition>>(contract: ApiClientContract<Methods>): ApiClient<Methods> {
       const existing = clients.get(contract)
       if (existing !== undefined) return existing as ApiClient<Methods>
       const created = ApiRuntimeModel.createClient(ctx, contract, packageId)
@@ -59,7 +60,7 @@ const provideApiContext = (component: (props: any) => ReactNode, client: ApiClie
   return (props: any) => runtime().createElement(context().Provider, { value: client }, runtime().createElement(component, props))
 }
 
-export function useApi<const Methods extends Record<string, AnyApiMethodDefinition>>(contract: ApiContract<Methods>): ApiClient<Methods> {
+export function useApi<const Methods extends Record<string, AnyApiMethodDefinition>>(contract: ApiClientContract<Methods>): ApiClient<Methods> {
   const client = runtime().useContext(context())
   if (client !== undefined) return client.client(contract)
   throw new Error(`API ${JSON.stringify(contract.id)} is unavailable outside a DSHX Client Slot component.`)
