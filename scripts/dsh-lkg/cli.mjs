@@ -14,10 +14,24 @@
  * is frozen with macOS immutable flags.
  */
 import { spawn, spawnSync } from 'node:child_process'
-import { randomUUID } from 'node:crypto'
-import { chmodSync, copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { createHash, randomUUID } from 'node:crypto'
+import {
+  chmodSync,
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  realpathSync,
+  renameSync,
+  rmSync,
+  statSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs'
+import { createRequire } from 'node:module'
 import { homedir } from 'node:os'
-import { basename, dirname, join, resolve } from 'node:path'
+import { basename, dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -28,6 +42,7 @@ const LOGS = join(STORE, 'logs')
 const CURRENT = join(STORE, 'current')
 const DEFAULT_KEEP = 3
 const HEALTH_TIMEOUT_MS = 90_000
+const CLIENT_SETTLE_MS = 45_000
 
 const fail = message => {
   process.stderr.write(`dsh-lkg: ${message}\n`)
@@ -119,6 +134,62 @@ const readlinkRelative = path => {
 
 const dshEntryOf = root => join(root, 'runtime', 'node_modules', '@deepseek-ai', 'dsh', 'lib', 'bin.js')
 
+/**
+ * The pnpm global store directory moves on every `pnpm add -g`, so the install
+ * root is resolved from the `dsh` shim on PATH: its target is the real package
+ * inside `<root>/node_modules/.pnpm/`, and `<root>/node_modules` is the tree
+ * DSH resolves.
+ */
+const installedGlobalRoot = () => {
+  const shim = run(['sh', '-c', 'command -v dsh']).stdout.trim()
+  if (shim.length === 0) fail('no dsh on PATH; set DSH_LKG_GLOBAL to the global install root')
+  const target = /cmd-shim-target=(.+)$/m.exec(readFileSync(shim, 'utf8'))?.[1]?.trim()
+  const packageDirectory = realpathSync(target === undefined ? shim : dirname(dirname(target)))
+  const marker = '/node_modules/.pnpm/'
+  const index = packageDirectory.indexOf(marker)
+  if (index === -1) fail(`cannot locate the global install root from ${packageDirectory}; set DSH_LKG_GLOBAL`)
+  return packageDirectory.slice(0, index)
+}
+
+const linkedPluginDirectories = profileSource => {
+  const linkedDir = join(profileSource, 'node_modules', '@dshfiles')
+  if (!existsSync(linkedDir)) return []
+  return readdirSync(linkedDir).flatMap(name => {
+    const real = run(['realpath', join(linkedDir, name)]).stdout.trim()
+    return real.length === 0 || !existsSync(real) ? [] : [{ name, real }]
+  })
+}
+
+/**
+ * What a snapshot would capture, cheaply: the core version, the profile's
+ * manifest and patch, and every linked plugin's built output (path, size,
+ * mtime). Two equal fingerprints mean a new snapshot would be the same runtime.
+ */
+const liveFingerprint = (profileSource, globalRoot) => {
+  const hash = createHash('sha256')
+  hash.update(readJson(join(globalRoot, 'node_modules', '@deepseek-ai', 'dsh', 'package.json'))?.version ?? 'unknown')
+  for (const file of ['package.json', 'cordis.patch.yml']) {
+    const path = join(profileSource, file)
+    if (existsSync(path)) hash.update(readFileSync(path))
+  }
+  const walk = directory => {
+    for (const entry of readdirSync(directory, { withFileTypes: true }).sort((left, right) => left.name.localeCompare(right.name))) {
+      const path = join(directory, entry.name)
+      if (entry.isDirectory()) walk(path)
+      else if (entry.isFile()) {
+        const stats = statSync(path)
+        hash.update(`${path}\0${String(stats.size)}\0${String(stats.mtimeMs)}\n`)
+      }
+    }
+  }
+  for (const plugin of linkedPluginDirectories(profileSource)) {
+    hash.update(plugin.name)
+    const dist = join(plugin.real, 'dist')
+    if (existsSync(dist)) walk(dist)
+  }
+  return hash.digest('hex')
+}
+
 const freePort = async () => {
   const { createServer } = await import('node:net')
   return await new Promise((resolvePort, reject) => {
@@ -133,6 +204,56 @@ const freePort = async () => {
 }
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
+
+/**
+ * The Host can boot cleanly while the browser half fails: a client plugin that
+ * throws in `apply` only shows up as the "Failed to load plugins" card. Load the
+ * real page in headless Chromium and refuse the snapshot when that card names
+ * entries that did not activate. Playwright comes from dshx's own dependencies.
+ */
+const clientBootCheck = async ({ origin, cookie }) => {
+  if (origin === undefined || cookie === undefined) return { name: 'client-boot', ok: false, detail: 'the page was never reachable' }
+  let chromium
+  try {
+    chromium = createRequire(join(HERE, '..', '..', 'tooling', 'dshx', 'packages', 'dshx', 'package.json'))('playwright').chromium
+  } catch (error) {
+    return { name: 'client-boot', ok: false, detail: `playwright is unavailable: ${String(error).slice(0, 160)}` }
+  }
+  const [pair] = cookie.split(';')
+  const separator = pair.indexOf('=')
+  const browser = await chromium.launch({ headless: true })
+  try {
+    const context = await browser.newContext()
+    await context.addCookies([{ name: pair.slice(0, separator), value: pair.slice(separator + 1), url: origin }])
+    const page = await context.newPage()
+    await page.goto(origin, { waitUntil: 'load', timeout: 60_000 })
+    // DSH publishes its own boot readiness promise; a failed entry still shows
+    // the "Failed to load plugins" card after that promise settles.
+    const outcome = await page.evaluate(async settleMs => {
+      const signal = window.__DSH_BOOT_READY__?.promise
+      const readiness =
+        signal === undefined
+          ? 'missing'
+          : await Promise.race([
+              Promise.resolve(signal).then(
+                () => 'resolved',
+                () => 'rejected',
+              ),
+              new Promise(resolve => setTimeout(() => resolve('timed out'), settleMs)),
+            ])
+      await new Promise(resolve => setTimeout(resolve, 2000))
+      return { readiness, text: document.body.innerText }
+    }, CLIENT_SETTLE_MS)
+    const failure = /Failed to load plugins[\s\S]{0,3000}/.exec(outcome.text)?.[0]
+    if (failure !== undefined) return { name: 'client-boot', ok: false, detail: failure.replace(/\s+/g, ' ').slice(0, 3000) }
+    if (outcome.readiness !== 'resolved') return { name: 'client-boot', ok: false, detail: `DSH client readiness ${outcome.readiness}` }
+    return { name: 'client-boot', ok: true, detail: 'DSH client readiness resolved with no failed entries' }
+  } catch (error) {
+    return { name: 'client-boot', ok: false, detail: String(error).slice(0, 200) }
+  } finally {
+    await browser.close()
+  }
+}
 
 /**
  * Boot one version on a private port with private state and require that it
@@ -175,7 +296,14 @@ const healthCheck = async (root, { keepState = false } = {}) => {
   // A skipped bundle is not an activation failure to DSH, but it means the
   // snapshot would start without its plugins — exactly what this check exists
   // to refuse.
-  const failures = output.split('\n').filter(line => /did not activate|failed to import|startup failed|skipping profile bundle/i.test(line))
+  const allowedSkips = (process.env.DSH_LKG_ALLOW_SKIPPED ?? '')
+    .split(',')
+    .map(name => name.trim())
+    .filter(name => name.length > 0)
+  const failures = output
+    .split('\n')
+    .filter(line => /did not activate|failed to import|startup failed|skipping profile bundle/i.test(line))
+    .filter(line => !allowedSkips.some(name => line.includes(`skipping profile bundle "${name}"`)))
   if (failures.length > 0) checks.push({ name: 'activation', ok: false, detail: failures.join(' | ').slice(0, 600) })
   else checks.push({ name: 'activation', ok: true, detail: 'no activation failures or skipped bundles reported' })
 
@@ -266,9 +394,12 @@ const healthCheck = async (root, { keepState = false } = {}) => {
     }
   }
 
+  checks.push(await clientBootCheck({ origin, cookie }))
+
   child.kill('SIGTERM')
   await sleep(1500)
   if (child.exitCode === null) child.kill('SIGKILL')
+  writeFileSync(join(LOGS, `health-${basename(root)}.log`), output.replace(/token=[A-Za-z0-9_-]+/g, 'token=<redacted>'))
   if (!keepState) rmSync(home, { recursive: true, force: true })
   const healthy = checks.every(check => check.ok)
   return { healthy, checks, url: url === undefined ? null : url.replace(/token=[A-Za-z0-9_-]+/, 'token=<redacted>') }
@@ -284,7 +415,7 @@ const writeLauncher = () => {
   return target
 }
 
-const snapshot = async label => {
+const snapshot = async ({ label, ifChanged = false } = {}) => {
   requireOperator()
   mkdirSync(VERSIONS, { recursive: true })
   mkdirSync(STATE, { recursive: true })
@@ -299,12 +430,18 @@ const snapshot = async label => {
   const staging = join(VERSIONS, `.${id}.staging`)
   const final = join(VERSIONS, id)
   rmSync(staging, { recursive: true, force: true })
-  log(`dsh-lkg: building ${id}${label === undefined ? '' : ` (${label})`}`)
 
   const profileSource = resolve(process.env.DSH_LKG_PROFILE?.trim() || join(homedir(), '.dsh', 'profiles', 'web'))
-  const globalRoot = resolve(process.env.DSH_LKG_GLOBAL?.trim() || join(homedir(), '.local', 'share', 'pnpm', 'global', 'v11', '1502-18da8e8f704b48b8-0'))
+  const globalRoot = resolve(process.env.DSH_LKG_GLOBAL?.trim() || installedGlobalRoot())
   if (!existsSync(globalRoot)) fail(`global install not found: ${globalRoot}`)
   if (!existsSync(profileSource)) fail(`web profile not found: ${profileSource}`)
+  const fingerprint = liveFingerprint(profileSource, globalRoot)
+  const currentId = currentVersionId()
+  if (ifChanged && currentId !== undefined && readJson(join(VERSIONS, currentId, 'manifest.json'))?.fingerprint === fingerprint) {
+    log(`dsh-lkg: ${currentId} already captures this installation; nothing to do`)
+    return currentId
+  }
+  log(`dsh-lkg: building ${id}${label === undefined ? '' : ` (${label})`}`)
 
   // 1. Core: the exact package tree the running dsh resolves, symlinks intact.
   cloneTree(join(globalRoot, 'node_modules'), join(staging, 'runtime', 'node_modules'))
@@ -316,23 +453,70 @@ const snapshot = async label => {
   //    node_modules links are relative to it.
   const linkedRoots = new Map()
   const linkedPackages = []
-  const linkedDir = join(profileSource, 'node_modules', '@dshfiles')
-  if (existsSync(linkedDir)) {
-    for (const name of readdirSync(linkedDir)) {
-      const link = join(linkedDir, name)
-      const real = run(['realpath', link]).stdout.trim()
-      if (real.length === 0 || !existsSync(real)) continue
-      const root = dirname(dirname(real))
-      if (!existsSync(join(root, 'node_modules'))) continue
-      if (!linkedRoots.has(root)) linkedRoots.set(root, `roots/${String(linkedRoots.size)}`)
-      linkedPackages.push({ name, real, relative: linkedRoots.get(root) })
+  // Packages resolve bare imports by walking up to the pnpm workspace root, so
+  // each workspace is captured with its layout intact: every node_modules from
+  // the workspace root down to the plugins directory, then the plugins.
+  const workspaceRootOf = directory => {
+    for (let current = directory; current !== dirname(current); current = dirname(current)) {
+      if (existsSync(join(current, 'pnpm-workspace.yaml'))) return current
     }
+    return directory
   }
-  for (const [root, relative] of linkedRoots) {
-    cloneTree(join(root, 'node_modules'), join(staging, relative, 'node_modules'))
+  const capturedModules = new Set()
+  for (const { name, real } of linkedPluginDirectories(profileSource)) {
+    const pluginsDirectory = dirname(dirname(real))
+    const workspace = workspaceRootOf(pluginsDirectory)
+    if (!linkedRoots.has(workspace)) linkedRoots.set(workspace, `roots/${String(linkedRoots.size)}`)
+    const workspaceTarget = linkedRoots.get(workspace)
+    for (let current = pluginsDirectory; ; current = dirname(current)) {
+      const modules = join(current, 'node_modules')
+      if (existsSync(modules) && !capturedModules.has(modules)) {
+        capturedModules.add(modules)
+        cloneTree(modules, join(staging, workspaceTarget, relative(workspace, current), 'node_modules'))
+      }
+      if (current === workspace || current === dirname(current)) break
+    }
+    linkedPackages.push({ name, real, relative: join(workspaceTarget, relative(workspace, pluginsDirectory)) })
   }
   for (const entry of linkedPackages) {
     cloneTree(entry.real, join(staging, entry.relative, '@dshfiles', entry.name))
+  }
+  // node_modules link workspace packages that live outside plugins/ (dshx under
+  // tooling/, for one) by relative symlink; capture each one at its own path so
+  // those links resolve inside the snapshot, then follow its node_modules too.
+  const capturedPackages = new Set(linkedPackages.map(entry => entry.real))
+  const pendingModules = [...capturedModules]
+  while (pendingModules.length > 0) {
+    const modules = pendingModules.pop()
+    const workspace = workspaceRootOf(modules)
+    const workspaceTarget = linkedRoots.get(workspace)
+    if (workspaceTarget === undefined) continue
+    const candidates = readdirSync(modules, { withFileTypes: true }).flatMap(entry =>
+      entry.name.startsWith('@') && entry.isDirectory()
+        ? readdirSync(join(modules, entry.name), { withFileTypes: true }).map(scoped => ({
+            path: join(modules, entry.name, scoped.name),
+            link: scoped.isSymbolicLink(),
+          }))
+        : [{ path: join(modules, entry.name), link: entry.isSymbolicLink() }],
+    )
+    for (const candidate of candidates) {
+      if (!candidate.link) continue
+      let real
+      try {
+        real = realpathSync(candidate.path)
+      } catch {
+        continue
+      }
+      const inside = relative(workspace, real)
+      if (inside.startsWith('..') || inside.split('/').includes('node_modules') || capturedPackages.has(real)) continue
+      capturedPackages.add(real)
+      cloneTree(real, join(staging, workspaceTarget, inside))
+      const nested = join(real, 'node_modules')
+      if (existsSync(nested) && !capturedModules.has(nested)) {
+        capturedModules.add(nested)
+        pendingModules.push(nested)
+      }
+    }
   }
 
   // 3. Profile, with every linked plugin rewritten into the snapshot. The
@@ -359,6 +543,7 @@ const snapshot = async label => {
     schema: 'dsh-lkg/version/v1',
     id,
     label: label ?? null,
+    fingerprint,
     createdAt: new Date().toISOString(),
     source: {
       profile: profileSource,
@@ -386,15 +571,16 @@ const snapshot = async label => {
   manifest.health = { healthy: health.healthy, checkedAt: new Date().toISOString(), checks: health.checks, url: health.url ?? null }
   if (!health.healthy) {
     thawed(final)
-    rmSync(final, { recursive: true, force: true })
-    fail('the candidate did not pass its health check; the previous known-good snapshot is still current')
+    if (process.env.DSH_LKG_KEEP_FAILED === '1') renameSync(final, join(VERSIONS, `.${id}.failed`))
+    else rmSync(final, { recursive: true, force: true })
+    fail(`the candidate did not pass its health check (host log: ${join(LOGS, `health-${id}.log`)}); the previous known-good snapshot is still current`)
   }
   const manifestPath = join(final, 'manifest.json')
   thawed(manifestPath)
   writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`)
 
   frozen(join(final, 'runtime'))
-  for (const relative of linkedRoots.values()) frozen(join(final, relative))
+  for (const target of linkedRoots.values()) frozen(join(final, target))
   frozen(join(final, 'profile'))
   const launcher = writeLauncher()
   const link = join(STORE, `.current.${randomUUID()}`)
@@ -482,7 +668,9 @@ const status = () => {
 const usage = () => {
   log(`dsh-lkg <command>
 
-  snapshot [--label <text>]   build, health-check and promote a new LKG
+  snapshot [--label <text>] [--if-changed]
+                              build, health-check and promote a new LKG;
+                              --if-changed skips when current already matches
   list                        versions, health and freeze state
   verify [<id>|current]       re-run the health check on a version
   reap [--keep <n>]           drop old versions (default ${DEFAULT_KEEP})
@@ -502,7 +690,7 @@ const main = async () => {
   }
   switch (command) {
     case 'snapshot':
-      await snapshot(flag('--label'))
+      await snapshot({ label: flag('--label'), ifChanged: rest.includes('--if-changed') })
       return
     case 'list':
       list()

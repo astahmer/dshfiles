@@ -32,7 +32,7 @@ snapshotting the 4.1 GB live runtime took ~21 s and a few MB of disk.
 ## Commands
 
 ```sh
-node ~/dev/dshfiles/scripts/dsh-lkg/cli.mjs snapshot [--label <text>]
+node ~/dev/dshfiles/scripts/dsh-lkg/cli.mjs snapshot [--label <text>] [--if-changed]
 node ~/dev/dshfiles/scripts/dsh-lkg/cli.mjs list
 node ~/dev/dshfiles/scripts/dsh-lkg/cli.mjs verify [<id>|current]
 node ~/dev/dshfiles/scripts/dsh-lkg/cli.mjs reap [--keep 3]
@@ -49,6 +49,7 @@ moves:
 | `node`                | the recorded interpreter is gone                                  |
 | `activation`          | any entry fails to activate, **or any profile bundle is skipped** |
 | `authenticated-index` | the tokenized URL never appears, or does not answer 200/303       |
+| `client-boot`         | headless Chromium never sees DSH's `__DSH_BOOT_READY__` resolve, or the page shows "Failed to load plugins" |
 
 `session-api` and `thread-load` exist because a launch URL that answers proves
 the shell boots, not that the Host works: they call the same authenticated RPC
@@ -56,8 +57,27 @@ the client does, and `thread-load` creates a thread in the throwaway verify
 state and loads it back, so a snapshot that serves a page but cannot answer its
 own sessions API is refused rather than promoted.
 
-A failed candidate is deleted and the previous known-good snapshot stays
-current. `reap` keeps the newest three plus whatever `current` points at.
+`client-boot` exists because the Host can boot cleanly while every client entry
+waits on a service nobody provides: that is the "Failed to load plugins" card,
+and only a real browser sees it.
+
+A bundle DSH skips (an `engines.dsh` mismatch) refuses the snapshot unless it is
+named in `DSH_LKG_ALLOW_SKIPPED` (comma-separated); the launcher sets the ones
+the live install already runs without.
+
+`--if-changed` compares a fingerprint of the core version, the profile's
+manifest and patch, and every linked plugin's `dist/` with the current
+snapshot's, and does nothing when they match. The `dsh web` supervisor runs it
+ten minutes into every run that is still up, so `current` follows the newest
+installation that actually booted.
+
+Plugins are captured with their pnpm workspace layout: every `node_modules`
+from the workspace root down to `plugins/`, plus any workspace package those
+link to (dshx under `tooling/`), so bare imports hoisted to the root resolve.
+
+A failed candidate is deleted (kept as `versions/.<id>.failed` with
+`DSH_LKG_KEEP_FAILED=1`) and its Host output is written to
+`logs/health-<id>.log`; the previous known-good snapshot stays current. `reap` keeps the newest three plus whatever `current` points at.
 
 ## Recovery
 
@@ -65,15 +85,18 @@ current. `reap` keeps the newest three plus whatever `current` points at.
 dsh-recover              # http://127.0.0.1:3099
 ```
 
-It reads only the store: the recorded node, the snapshot's own core, the
-snapshot's profile. It never touches `~/.dsh`, the repository, or the pnpm
-global install — which is what makes it work when those are broken.
+It runs only what the store holds: the recorded node, the snapshot's own core,
+the snapshot's profile. It never runs code from `~/.dsh`, the repository, or the
+pnpm global install — which is what makes it work when those are broken.
 
-The recovery instance uses `~/.dsh-lkg/state/recover` as its `DSH_HOME`. That
-keeps live sessions, profile data and plugin state untouched, and it means
-**the recovery instance starts with no threads of its own**: it is a working DSH,
-not a copy of your history. Point `DSH_LKG_HOME` elsewhere for a different state
-directory, or `DSH_LKG_PORT` for a different port.
+Every start rebuilds `~/.dsh-lkg/state/recover` from an APFS clone of the live
+`~/.dsh` (accounts, credentials, plugin storage, threads; not `profiles`, `logs`,
+`cache`, `runtime` or `jj-isolation`) plus the snapshot's profile, so your AI
+accounts and history are there. The live home is only read; what you do during
+a recovery stays in the recovery state, and the previous one is kept once as
+`state/recover.prev`. `DSH_LKG_CLEAN=1` starts without live data,
+`DSH_LKG_LIVE_HOME` picks another source, `DSH_LKG_HOME` another state
+directory, `DSH_LKG_PORT` another port.
 
 ## Immutability
 
@@ -99,7 +122,8 @@ Session environment is detected, unless `DSH_LKG_ADMIN=1` is set.
 - The verify and recovery states are thawed after cloning: the snapshot payload
   is immutable, but a state the Host runs from must not be, or the Host cannot
   maintain its own profile and the state cannot be removed.
-- A snapshot captures the runtime, not your data. Sessions and plugin data are
-  deliberately excluded.
+- A snapshot captures the runtime, not your data; recovery clones the live data
+  at start instead. Data written by a newer runtime is read by an older one in
+  that clone, never in place.
 - `clonefile` is APFS-only. On another filesystem the copy is real, and a
   snapshot then costs its full logical size (~4 GB here).

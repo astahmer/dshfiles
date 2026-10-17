@@ -1,13 +1,16 @@
 #!/bin/sh
 # dsh-recover — start the last known good DSH.
 #
-# Self-contained on purpose: it reads only the snapshot store, never the
-# repository, the pnpm global install, or the live ~/.dsh profile. That is what
-# makes it work after an agent breaks the main installation.
+# Self-contained on purpose: it runs only what the snapshot store holds, never
+# the repository, the pnpm global install, or the live ~/.dsh profile. That is
+# what makes it work after an agent breaks the main installation. Live data is
+# cloned in read-only so accounts and threads are there too.
 #
 #   DSH_LKG_ROOT   store location        (default ~/.dsh-lkg)
 #   DSH_LKG_PORT   listen port           (default 3099)
 #   DSH_LKG_HOME   writable runtime home (default <store>/state/recover)
+#   DSH_LKG_LIVE_HOME  live data to clone  (default ~/.dsh)
+#   DSH_LKG_CLEAN  1 starts with no live data
 set -eu
 
 ROOT="${DSH_LKG_ROOT:-$HOME/.dsh-lkg}"
@@ -46,17 +49,37 @@ if [ ! -f "$ENTRY" ]; then
 fi
 
 HOME_DIR="${DSH_LKG_HOME:-$ROOT/state/recover}"
-mkdir -p "$HOME_DIR/profiles"
-if [ ! -d "$HOME_DIR/profiles/web" ]; then
-  echo "dsh-recover: preparing writable state in $HOME_DIR (this never touches ~/.dsh)"
-  cp -R "$VERSION/profile" "$HOME_DIR/profiles/web"
-  # The snapshot is frozen on purpose; the state this instance runs from must be
-  # writable, or the Host cannot maintain its own profile.
-  chflags -R nouchg "$HOME_DIR/profiles/web" 2>/dev/null || true
+LIVE_HOME="${DSH_LKG_LIVE_HOME:-$HOME/.dsh}"
+
+# Every start rebuilds the state from the newest data: an APFS clone of the live
+# DSH_HOME (accounts, credentials, plugin storage, threads) minus the parts the
+# snapshot owns or that are disposable, plus the snapshot's own profile. The live
+# home is only read. The previous recovery state is kept once as <state>.prev, so
+# work done during a recovery survives the next start.
+rm -rf "$HOME_DIR.prev"
+if [ -d "$HOME_DIR" ]; then
+  chflags -R nouchg "$HOME_DIR" 2>/dev/null || true
+  mv "$HOME_DIR" "$HOME_DIR.prev"
 fi
+mkdir -p "$HOME_DIR/profiles"
+if [ "${DSH_LKG_CLEAN:-0}" != 1 ] && [ -d "$LIVE_HOME" ]; then
+  echo "dsh-recover: cloning live data from $LIVE_HOME (read only)"
+  for entry in "$LIVE_HOME"/* "$LIVE_HOME"/.[!.]*; do
+    [ -e "$entry" ] || continue
+    case "$(basename "$entry")" in
+      profiles | logs | cache | runtime | jj-isolation) continue ;;
+    esac
+    cp -c -R "$entry" "$HOME_DIR/" 2>/dev/null || cp -R "$entry" "$HOME_DIR/"
+  done
+  find "$HOME_DIR/sessions" -name session.lock -delete 2>/dev/null || true
+fi
+cp -R "$VERSION/profile" "$HOME_DIR/profiles/web"
+# The snapshot is frozen on purpose; the state this instance runs from must be
+# writable, or the Host cannot maintain its own profile.
+chflags -R nouchg "$HOME_DIR/profiles/web" 2>/dev/null || true
 
 echo "dsh-recover: last known good $(basename "$VERSION")"
-echo "dsh-recover: state $HOME_DIR"
-echo "dsh-recover: the live installation and its sessions are not used by this instance"
+echo "dsh-recover: state $HOME_DIR (DSH_LKG_CLEAN=1 starts without live data)"
+echo "dsh-recover: changes made here stay here; the live installation is untouched"
 
 exec env DSH_HOME="$HOME_DIR" DSH_LKG_RECOVER=1 "$NODE" "$ENTRY" web --port "$PORT" "$@"
