@@ -1,13 +1,13 @@
 import { expect, type Page } from '@playwright/test'
 import { Then, When } from '../bdd.js'
-import { finishJourneyAssertions, recordAssertion } from '../steps.js'
+import { finishJourneyAssertions, openSettingsDialog, recordAssertion } from '../steps.js'
 
 // The native hero names its headline only by a hashed CSS-module class; the home brand style keys on the same suffix.
 const heroHeadline = (page: Page) => page.locator('[class*="_headline"]').first()
 const settingsDialog = (page: Page) => page.getByRole('dialog', { name: 'Settings', exact: true })
 
 const openNewThreadSettings = async (page: Page): Promise<void> => {
-  await page.getByRole('button', { name: 'Settings', exact: true }).click()
+  await openSettingsDialog(page)
   await settingsDialog(page).getByRole('button', { name: 'New thread', exact: true }).click()
   await expect(settingsDialog(page).getByRole('textbox', { name: 'Headline', exact: true })).toBeVisible()
 }

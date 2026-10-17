@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { After, Then, When } from '../bdd.js'
-import { finishJourneyAssertions, recordAssertion } from '../steps.js'
+import { finishJourneyAssertions, openSettingsDialog, recordAssertion } from '../steps.js'
 
 interface ThreadRepository {
   readonly temporaryRoot: string
@@ -329,7 +329,7 @@ Then('the New thread composer is empty and no consumed draft remains stored', as
 })
 
 When('new threads start in the shared checkout by default', async ({ page }: { page: Page }) => {
-  await page.getByRole('button', { name: 'Settings', exact: true }).last().click()
+  await openSettingsDialog(page)
   await page.getByRole('dialog').getByText('New thread', { exact: true }).click()
   const isolateByDefault = page.getByRole('switch', { name: 'Own jj workspace by default', exact: true })
   if (await isolateByDefault.isChecked()) await isolateByDefault.click()
@@ -338,7 +338,7 @@ When('new threads start in the shared checkout by default', async ({ page }: { p
 })
 
 When('new threads start in their own jj workspace by default', async ({ page }: { page: Page }) => {
-  await page.getByRole('button', { name: 'Settings', exact: true }).last().click()
+  await openSettingsDialog(page)
   await page.getByRole('dialog').getByText('New thread', { exact: true }).click()
   const isolateByDefault = page.getByRole('switch', { name: 'Own jj workspace by default', exact: true })
   await isolateByDefault.click()

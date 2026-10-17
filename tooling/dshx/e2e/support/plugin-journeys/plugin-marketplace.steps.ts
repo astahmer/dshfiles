@@ -4,7 +4,7 @@ import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { card, startFakeHub, type FakeHub } from '../fake-hub.js'
 import { join } from 'node:path'
 import { After, Then, When } from '../bdd.js'
-import { finishJourneyAssertions, profileFor, recordAssertion } from '../steps.js'
+import { finishJourneyAssertions, openSettingsDialog, profileFor, recordAssertion } from '../steps.js'
 import { createScratchDirectory } from '../threads.js'
 
 /**
@@ -76,7 +76,7 @@ const settingsDialog = (page: Page) => page.getByRole('dialog', { name: 'Setting
 const pluginCards = (page: Page) => settingsDialog(page).getByRole('list', { name: 'Plugin list', exact: true }).getByRole('listitem')
 
 When('the Framework Hub tab is opened in Settings', async ({ page }: { page: Page }) => {
-  await page.getByRole('button', { name: 'Settings', exact: true }).click()
+  await openSettingsDialog(page)
   await settingsDialog(page).getByRole('button', { name: 'Built-in plugins', exact: true }).click()
   await settingsDialog(page).getByRole('tab', { name: 'Framework Hub', exact: true }).click()
   await expect(settingsDialog(page).getByText('Framework Hub plugins', { exact: true })).toBeVisible()

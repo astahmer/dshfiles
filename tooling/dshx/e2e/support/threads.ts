@@ -48,6 +48,7 @@ export const startThreadWithModel = async (page: Page, input: { readonly project
   }
   await expect(projectButton).toHaveText(input.project)
   // A just-added account publishes its route a moment later, so the picker is reopened until the model is listed.
+  // Models sit in the picker directly, one radio per route; the provider is the section label above them.
   await expect(async () => {
     await page.keyboard.press('Escape')
     await page.getByRole('button', { name: /^Select model/ }).click()

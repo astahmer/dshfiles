@@ -1,7 +1,7 @@
 import { expect, type Page, type Request, type Response, type Route } from '@playwright/test'
 import { Then, When } from '../bdd.js'
 import { z } from 'zod'
-import { finishJourneyAssertions, recordAssertion } from '../steps.js'
+import { finishJourneyAssertions, openSettingsDialog, recordAssertion } from '../steps.js'
 
 const settingsView = (page: Page) => page.locator('[data-settings-view]')
 const searchField = (page: Page) => page.getByRole('searchbox', { name: 'Search settings', exact: true })
@@ -9,7 +9,7 @@ const settingRow = (page: Page, path: string) => page.locator(`[data-setting-pat
 const primary = (): string => (process.platform === 'darwin' ? 'Meta' : 'Control')
 
 const openSettings = async (page: Page): Promise<void> => {
-  await page.getByRole('button', { name: 'Settings', exact: true }).click()
+  await openSettingsDialog(page)
   await expect(settingsView(page)).toBeVisible()
 }
 

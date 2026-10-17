@@ -77,6 +77,24 @@ export const recordAssertion = async (page: Page, assertionId: string, assertion
   recordEvidenceAssertion(run, assertionId, 'passed')
 }
 
+/** The sidebar launcher that opens the Account menu; Settings is one item of that menu. */
+const SETTINGS_LAUNCHER = '[data-slot="settings.launcher"] button'
+
+/**
+ * Open the Settings dialog. The shell exposes Settings as an item of the sidebar's Account menu, so
+ * clicking a bare `Settings` button resolves nothing: open the menu, then the item. The item carries
+ * its shortcut in the accessible name, so match its start.
+ */
+export const openSettingsDialog = async (page: Page): Promise<void> => {
+  const launcher = page.locator(SETTINGS_LAUNCHER).first()
+  if (!(await launcher.isVisible())) {
+    await page.getByRole('button', { name: 'Account menu', exact: true }).click()
+  } else {
+    await launcher.click()
+  }
+  await page.getByRole('menuitem', { name: /^Settings/ }).click()
+}
+
 export const finishJourneyAssertions = async (page: Page): Promise<void> => {
   const run = evidenceRunFor(page)
   completeEvidenceStep(run, 'assertion-complete')
@@ -384,7 +402,7 @@ After(async ({ page, $testInfo }) => {
           const rect = element.getBoundingClientRect()
           return style.display !== 'none' && style.visibility !== 'hidden' && rect.width > 0 && rect.height > 0
         }
-        const settingsButton = document.querySelector<HTMLButtonElement>('button[aria-label="Settings"]')
+        const settingsButton = document.querySelector<HTMLButtonElement>('[data-slot="settings.launcher"] button')
         const settingsTarget =
           settingsButton === null
             ? null
