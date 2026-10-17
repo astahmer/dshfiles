@@ -138,7 +138,21 @@ import {
 } from './thread-view-preferences.js'
 import { ThreadViewManager, threadViewPresetLabel } from './thread-view-manager.js'
 import { captureThreadMentionInsertion, requestThreadMentionInsertion } from './thread-mention.js'
-import { legacyAttentionEntries, legacyNotificationPreferences, threadInteractionTransitions, type ThreadInteractionStatus } from './thread-notifications.js'
+import {
+  categoriesForLegacyDesktopNotifications,
+  categoryForFinishReason,
+  claimThreadNotification,
+  legacyAttentionEntries,
+  legacyNotificationPreferences,
+  notificationCategoriesAreDefault,
+  notificationRouteHasInApp,
+  notificationRouteHasSystem,
+  threadInteractionTransitions,
+  threadNotificationHasOutput,
+  type ThreadInteractionStatus,
+  type ThreadNotificationCategory,
+} from './thread-notifications.js'
+import { playThreadNotificationSound } from './thread-notification-audio.js'
 import { useThreadAttention } from './attention-client.js'
 import type { ThreadAttentionView } from './attention-api.js'
 import {
@@ -1526,26 +1540,38 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     )
   }
 
-  const notifyThread = (sessionId: SessionSummary['id'], title: string, fallbackBody: string): void => {
-    if (
-      !preferences.desktopNotificationsEnabled ||
-      isMuteActive(mutedThreads[sessionId], Date.now()) ||
-      !('Notification' in window) ||
-      window.Notification.permission !== 'granted'
-    )
-      return
+  const notifyThread = (category: ThreadNotificationCategory, eventId: string, sessionId: SessionSummary['id'], title: string, fallbackBody: string): void => {
+    const categoryPreferences = preferences.notificationCategories[category]
+    if (!threadNotificationHasOutput(categoryPreferences) || isMuteActive(mutedThreads[sessionId], Date.now())) return
     const session = sessionState.byId[sessionId]
     if (session === undefined || !isAttentionSessionIncluded(session, preferences.includeSubagentAttention)) return
-    try {
-      const notification = new window.Notification(title, { body: session.displayTitle ?? fallbackBody })
-      notification.onclick = () => {
-        window.focus()
-        openThread(sessionId)
-        notification.close()
-      }
-    } catch {
-      setNotice({ tone: 'warning', message: props.tSidebar('threadSidebarNotificationsUnavailable') })
+    const inApp = notificationRouteHasInApp(categoryPreferences.delivery)
+    const systemRequested = notificationRouteHasSystem(categoryPreferences.delivery)
+    const system = systemRequested && 'Notification' in window && window.Notification.permission === 'granted'
+    if (!inApp && !system && !categoryPreferences.sound) return
+    if (!claimThreadNotification(eventId)) return
+    if (inApp) {
+      setNotice({
+        tone: category === 'failed' ? 'danger' : category === 'approval-needed' || category === 'input-needed' ? 'warning' : 'success',
+        message: `${title}: ${session.displayTitle ?? fallbackBody}`,
+        durationMs: 5_000,
+        actionLabel: props.tSidebar('threadSidebarNotificationOpenThread'),
+        onAction: () => openThread(sessionId),
+      })
     }
+    if (system) {
+      try {
+        const notification = new window.Notification(title, { body: fallbackBody })
+        notification.onclick = () => {
+          window.focus()
+          openThread(sessionId)
+          notification.close()
+        }
+      } catch {
+        setNotice({ tone: 'warning', message: props.tSidebar('threadSidebarNotificationsUnavailable') })
+      }
+    }
+    if (categoryPreferences.sound) playThreadNotificationSound(categoryPreferences.soundPreset, categoryPreferences.volume)
   }
 
   const toggleParked = (sessionId: SessionSummary['id']): void => {
@@ -1561,28 +1587,6 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     }
     changePreferences({ parkedSessionIds: [...next] })
     setNotice(null)
-  }
-
-  const changeDesktopNotifications = async (enabled: boolean): Promise<void> => {
-    if (!enabled) {
-      changePreferences({ desktopNotificationsEnabled: false })
-      return
-    }
-    if (!('Notification' in window)) {
-      setNotice({ tone: 'warning', message: props.tSidebar('threadSidebarNotificationsUnavailable') })
-      return
-    }
-    try {
-      const permission = window.Notification.permission === 'granted' ? 'granted' : await window.Notification.requestPermission()
-      if (permission !== 'granted') {
-        setNotice({ tone: 'warning', message: props.tSidebar('threadSidebarNotificationsPermission') })
-        return
-      }
-      changePreferences({ desktopNotificationsEnabled: true })
-      setNotice(null)
-    } catch {
-      setNotice({ tone: 'warning', message: props.tSidebar('threadSidebarNotificationsPermission') })
-    }
   }
 
   const toggleSection = (section: SidebarSection): void => {
@@ -1794,7 +1798,14 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       now: Date.now(),
     })
     if (Object.keys(migrated).length > 0) updatePreferences({ mutedThreads: { ...mutedThreads, ...migrated } })
-    if (legacy.enabled) updatePreferences({ desktopNotificationsEnabled: true })
+    if (legacy.enabled || preferences.desktopNotificationsEnabled) {
+      updatePreferences({
+        notificationCategories: notificationCategoriesAreDefault(preferences.notificationCategories)
+          ? categoriesForLegacyDesktopNotifications()
+          : preferences.notificationCategories,
+        desktopNotificationsEnabled: false,
+      })
+    }
     const entries = legacyAttentionEntries(legacy)
     // Keep the browser copy until the Host stored it, so a failed write is retried on the next load.
     if (entries.length === 0) legacyNotificationPreferences.remove()
@@ -1803,7 +1814,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         () => legacyNotificationPreferences.remove(),
         () => undefined,
       )
-  }, [attention, mutedThreads, sessionState.phase, sessions, updatePreferences])
+  }, [attention, mutedThreads, preferences.desktopNotificationsEnabled, preferences.notificationCategories, sessionState.phase, sessions, updatePreferences])
 
   const needsInputRows = useMemo(
     () =>
@@ -2365,34 +2376,51 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     previousStatus.current = currentStatus
     for (const sessionId of transitions.approvalNeeded) {
       if (selectedSession?.id === sessionId) continue
+      const interactionKey = sessionStatus.get(sessionId)?.pendingInteraction?.key
+      if (interactionKey === undefined) continue
       latestRowActions.current.notifyThread(
+        'approval-needed',
+        `approval:${sessionId}:${interactionKey}`,
         sessionId,
-        props.tSidebar('threadSidebarApprovalNotificationTitle'),
-        props.tSidebar('threadSidebarApprovalNotificationBody'),
+        tSidebar('threadSidebarApprovalNotificationTitle'),
+        tSidebar('threadSidebarApprovalNotificationBody'),
       )
     }
     for (const sessionId of transitions.inputNeeded) {
       if (selectedSession?.id === sessionId) continue
+      const interactionKey = sessionStatus.get(sessionId)?.pendingInteraction?.key
+      if (interactionKey === undefined) continue
       latestRowActions.current.notifyThread(
+        'input-needed',
+        `input:${sessionId}:${interactionKey}`,
         sessionId,
-        props.tSidebar('threadSidebarInputNotificationTitle'),
-        props.tSidebar('threadSidebarInputNotificationBody'),
+        tSidebar('threadSidebarInputNotificationTitle'),
+        tSidebar('threadSidebarInputNotificationBody'),
       )
     }
-  }, [props.tSidebar, selectedSession?.id, sessionStatus, sessionState.phase, sessions])
+  }, [tSidebar, selectedSession?.id, sessionStatus, sessionState.phase, sessions])
 
-  // A completion the user has not acknowledged yet is announced once per browser, from the shared record.
+  // Host attention records carry the latest finish reason and sequence, so an acknowledged row can still be deduped by event id.
   useEffect(() => {
     const previous = previousAttention.current
     previousAttention.current = attention.records
     if (previous === null) return
     for (const [sessionId, record] of attention.records) {
-      if (previous.has(sessionId) || record.finishedAt === null || selectedSession?.id === sessionId) continue
+      if (record.finishedAt === null || record.finishedSeq === null || selectedSession?.id === sessionId) continue
+      if (previous.get(sessionId)?.finishedSeq === record.finishedSeq || record.finishedReason === null) continue
       const session = sessions.find(candidate => candidate.id === sessionId)
-      if (session === undefined) continue
-      latestRowActions.current.notifyThread(session.id, props.tSidebar('threadSidebarNotificationTitle'), props.tSidebar('threadSidebarNotificationDone'))
+      if (session === undefined || sessionStatus.get(session.id)?.pendingInteraction !== undefined) continue
+      const category = categoryForFinishReason(record.finishedReason)
+      if (category === undefined) continue
+      latestRowActions.current.notifyThread(
+        category,
+        `finish:${sessionId}:${record.finishedSeq}`,
+        session.id,
+        tSidebar(category === 'failed' ? 'threadSidebarFailedNotificationTitle' : 'threadSidebarNotificationTitle'),
+        tSidebar(category === 'failed' ? 'threadSidebarFailedNotificationBody' : 'threadSidebarNotificationDone'),
+      )
     }
-  }, [attention.records, props.tSidebar, selectedSession?.id, sessions])
+  }, [attention.records, selectedSession?.id, sessionStatus, sessions, tSidebar])
 
   const isTransientNotice =
     notice !== null && (notice.tone === 'success' || notice.durationMs !== undefined || (notice.actionLabel !== undefined && notice.onAction !== undefined))
@@ -2678,11 +2706,6 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                 />
               </div>
             </div>
-            <Label className="dshx:font-normal dshx:leading-snug">
-              <Checkbox checked={preferences.desktopNotificationsEnabled} onCheckedChange={checked => void changeDesktopNotifications(checked === true)} />
-              {props.tSidebar('threadSidebarDesktopNotifications')}
-            </Label>
-            <p className="dshx:text-xs dshx:text-muted-foreground">{props.tSidebar('threadSidebarNotificationPrivacy')}</p>
             <fieldset className="dshx:grid dshx:min-w-0 dshx:gap-2 dshx:rounded-md dshx:border dshx:px-2.5 dshx:pt-1 dshx:pb-2.5">
               <legend className="dshx:px-1 dshx:text-xs dshx:text-muted-foreground">{props.tSidebar('threadSidebarAttentionPresentation')}</legend>
               <p className="dshx:text-xs dshx:text-muted-foreground">{props.tSidebar('threadSidebarAttentionPresentationHint')}</p>

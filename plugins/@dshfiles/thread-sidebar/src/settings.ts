@@ -62,9 +62,9 @@ export const threadSidebarSettings = defineSettings({
     includeSubagentAttention: Schema.boolean()
       .default(DEFAULT_PREFERENCES.includeSubagentAttention)
       .description('Include child session attention in groups, thread-row labels, and desktop alerts.'),
-    desktopNotificationsEnabled: Schema.boolean()
-      .default(DEFAULT_PREFERENCES.desktopNotificationsEnabled)
-      .description('Raise a desktop alert when a turn finishes or a thread needs input; the browser still asks for its own permission.'),
+    desktopNotificationsEnabled: Schema.boolean().default(DEFAULT_PREFERENCES.desktopNotificationsEnabled).hidden(),
+    // The client decodes this bounded nested structure with the shared Zod contract.
+    notificationCategories: Schema.any().default(DEFAULT_PREFERENCES.notificationCategories).hidden(),
     applyActionsToChildThreads: Schema.boolean()
       .default(DEFAULT_PREFERENCES.applyActionsToChildThreads)
       .description('Apply manual pin, park, archive, and restore actions to all child threads.'),

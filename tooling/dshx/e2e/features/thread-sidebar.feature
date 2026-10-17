@@ -91,6 +91,12 @@ Feature: Thread sidebar journeys
     When an attention status color is changed in Sidebar settings
     Then the selected attention color survives a browser reload
 
+  @scenario:thread-sidebar.notifications-settings
+  Scenario: Configure category-specific notification routes and sounds
+    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
+    When notification routes and sounds are configured in Settings
+    Then the notification settings survive a browser reload
+
   @scenario:thread-sidebar.navigation-layout
   Scenario: Header destinations can be reordered and hidden
     Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted

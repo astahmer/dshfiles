@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'vitest'
 import { DEFAULT_PREFERENCES } from './organization.js'
 import { decodePreferences, preferencesToMigrate } from './preferences.js'
+import { categoriesForLegacyDesktopNotifications } from './thread-notifications.js'
 
 test('older stored preferences default the header and thread split to natural height', () => {
   const stored = JSON.stringify({ ...DEFAULT_PREFERENCES, headerRegionHeight: undefined })
@@ -127,4 +128,28 @@ test('the saved thread views live in the Host-synced preferences', () => {
   assert.equal(decodePreferences({ ...DEFAULT_PREFERENCES, threadViews: custom })?.threadViews.activeViewId, 'working')
   assert.equal(decodePreferences({ ...DEFAULT_PREFERENCES, threadViews: { ...custom, views: [] } }), null)
   assert.equal(decodePreferences({ ...DEFAULT_PREFERENCES, threadViews: { views: [{ id: 'x' }], activeViewId: 'x' } }), null)
+})
+
+test('legacy desktop alerts migrate to per-category system delivery unless the new setting is customized', () => {
+  const { notificationCategories: _notificationCategories, ...legacyPreferences } = DEFAULT_PREFERENCES
+  const migrated = decodePreferences({ ...legacyPreferences, desktopNotificationsEnabled: true })
+  assert.deepEqual(migrated?.notificationCategories, categoriesForLegacyDesktopNotifications())
+  assert.equal(migrated?.desktopNotificationsEnabled, false)
+
+  const custom = {
+    ...DEFAULT_PREFERENCES,
+    desktopNotificationsEnabled: true,
+    notificationCategories: {
+      ...DEFAULT_PREFERENCES.notificationCategories,
+      'approval-needed': { ...DEFAULT_PREFERENCES.notificationCategories['approval-needed'], delivery: 'in-app' },
+    },
+  }
+  assert.deepEqual(decodePreferences(custom)?.notificationCategories, custom.notificationCategories)
+})
+
+test('legacy local alert settings migrate into Host preferences without overriding customized routes', () => {
+  const local = { ...DEFAULT_PREFERENCES, desktopNotificationsEnabled: true }
+  const migrated = preferencesToMigrate(local, DEFAULT_PREFERENCES)
+  assert.deepEqual(migrated.notificationCategories, categoriesForLegacyDesktopNotifications())
+  assert.equal(migrated.desktopNotificationsEnabled, false)
 })

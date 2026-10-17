@@ -3,13 +3,14 @@ import { z } from 'zod'
 import { threadMutesSchema } from './thread-mute.js'
 import { ATTENTION_COLOR_OPTIONS, DEFAULT_PREFERENCES, REBASED_THREAD_ARCHIVE_DELAYS, type SidebarPreferences, type SidebarSection } from './organization.js'
 import { threadViewSettingsSchema } from './thread-view-preferences.js'
+import { categoriesForLegacyDesktopNotifications, DEFAULT_THREAD_NOTIFICATION_CATEGORIES, threadNotificationCategoriesSchema } from './thread-notifications.js'
 
 export const PREFERENCES_STORAGE_KEY = 'dshfiles.thread-sidebar.v1'
 
 const sidebarSectionSchema = z.enum(['pinned', 'active', 'parked', 'inactive', 'archived'])
 export const attentionColorSchema = z.enum(ATTENTION_COLOR_OPTIONS)
 
-const preferencesSchema = z
+const preferencesInputSchema = z
   .object({
     archiveUndoEnabled: z.boolean().default(DEFAULT_PREFERENCES.archiveUndoEnabled),
     archiveUndoDurationSeconds: z.number().int().min(1).max(30).default(DEFAULT_PREFERENCES.archiveUndoDurationSeconds),
@@ -61,6 +62,7 @@ const preferencesSchema = z
       .default(DEFAULT_PREFERENCES.attentionColors),
     includeSubagentAttention: z.boolean().default(DEFAULT_PREFERENCES.includeSubagentAttention),
     desktopNotificationsEnabled: z.boolean().default(DEFAULT_PREFERENCES.desktopNotificationsEnabled),
+    notificationCategories: threadNotificationCategoriesSchema.optional(),
     applyActionsToChildThreads: z.boolean().default(DEFAULT_PREFERENCES.applyActionsToChildThreads),
     maxChildren: z.number().int().min(1).max(50).default(DEFAULT_PREFERENCES.maxChildren),
     finishedSubagents: z.enum(['show', 'collapse', 'hide']).default(DEFAULT_PREFERENCES.finishedSubagents),
@@ -68,10 +70,25 @@ const preferencesSchema = z
   })
   .strict()
 
+const preferencesSchema = preferencesInputSchema.extend({
+  notificationCategories: threadNotificationCategoriesSchema.default(DEFAULT_THREAD_NOTIFICATION_CATEGORIES),
+})
+
 /** Decode a Host settings value; null when it does not satisfy the sidebar contract. */
 export const decodePreferences = (value: unknown): SidebarPreferences | null => {
-  const checked = preferencesSchema.safeParse(value)
-  return checked.success ? checked.data : null
+  const checked = preferencesInputSchema.safeParse(value)
+  if (!checked.success) return null
+  const categoriesStillDefault =
+    checked.data.notificationCategories === undefined ||
+    JSON.stringify(checked.data.notificationCategories) === JSON.stringify(DEFAULT_THREAD_NOTIFICATION_CATEGORIES)
+  const migrateDesktopNotifications = checked.data.desktopNotificationsEnabled && categoriesStillDefault
+  return {
+    ...checked.data,
+    desktopNotificationsEnabled: migrateDesktopNotifications ? false : checked.data.desktopNotificationsEnabled,
+    notificationCategories: migrateDesktopNotifications
+      ? categoriesForLegacyDesktopNotifications()
+      : (checked.data.notificationCategories ?? DEFAULT_THREAD_NOTIFICATION_CATEGORIES),
+  }
 }
 
 /**
@@ -83,6 +100,12 @@ export const preferencesToMigrate = (local: SidebarPreferences, host: SidebarPre
   for (const key of Object.keys(DEFAULT_PREFERENCES).filter(isPreferenceKey)) {
     const same = (left: unknown, right: unknown): boolean => JSON.stringify(left) === JSON.stringify(right)
     if (same(host[key], DEFAULT_PREFERENCES[key]) && !same(local[key], host[key])) Object.assign(patch, { [key]: local[key] })
+  }
+  const legacyCategoriesUnchanged = JSON.stringify(local.notificationCategories) === JSON.stringify(DEFAULT_THREAD_NOTIFICATION_CATEGORIES)
+  const hostCategoriesUnchanged = JSON.stringify(host.notificationCategories) === JSON.stringify(DEFAULT_THREAD_NOTIFICATION_CATEGORIES)
+  if (local.desktopNotificationsEnabled && legacyCategoriesUnchanged && hostCategoriesUnchanged) {
+    patch.notificationCategories = categoriesForLegacyDesktopNotifications()
+    patch.desktopNotificationsEnabled = false
   }
   return patch
 }

@@ -48,12 +48,14 @@ bookkeeping) and `interrupted` (the turn continues in the next one) never do.
 The selected thread is not listed in these attention groups. Mutes, archives,
 the workspace filter, and—by default—the subagent setting can also keep a row
 out. **Turn finished** additionally requires that thread not to be running and
-not to be waiting on approval or input. Desktop notifications are a separate
-opt-in (`desktopNotificationsEnabled` in Host settings): turning them off
-disables system alerts, not the sidebar's attention state.
+not to be waiting on approval or input. Notification delivery is separate from
+sidebar attention: Host-synced per-category settings choose in-app, system, both,
+or off; browser permission is requested only by an explicit user action.
 
-A failed turn has a separate failure signal. It can also have **Turn finished**
-attention while its record is unacknowledged; failure and attention can overlap.
+A failed turn has a separate failure category. The same Host attention record
+contains its finish reason and sequence, so the client can distinguish completed
+and failed turns without a second outcome store. Aborted, blocked, interrupted,
+and max-token endings are not classified as failures or completed-turn alerts.
 
 ## Read state
 

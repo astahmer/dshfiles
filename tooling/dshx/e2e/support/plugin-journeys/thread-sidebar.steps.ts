@@ -250,9 +250,7 @@ When('an archived thread is opened from the Archived section', async ({ page }: 
 
   await threadSidebar(page).getByRole('button', { name: 'Archived (1)', exact: true }).click()
   await targetRow.click()
-  const restoreButton = threadSidebar(page)
-    .getByTestId('thread-sidebar-transient-notice')
-    .getByRole('button', { name: 'Restore and open', exact: true })
+  const restoreButton = threadSidebar(page).getByTestId('thread-sidebar-transient-notice').getByRole('button', { name: 'Restore and open', exact: true })
   await expect(restoreButton).toBeVisible({ timeout: 15_000 })
   archivedOpenJourneys.set(page, archivedThreadId)
 })
@@ -590,7 +588,13 @@ When('a thread finishes its turn and the browser hands its unfinished marker to 
     ([key, sessionId]) =>
       localStorage.setItem(
         key ?? '',
-        JSON.stringify({ enabled: false, needsYouAt: { [sessionId ?? '']: Date.now() }, mutedUntil: {}, manuallyUnreadSessionIds: [], seenCompletionSessionIds: [] }),
+        JSON.stringify({
+          enabled: false,
+          needsYouAt: { [sessionId ?? '']: Date.now() },
+          mutedUntil: {},
+          manuallyUnreadSessionIds: [],
+          seenCompletionSessionIds: [],
+        }),
       ),
     [LEGACY_NOTIFICATION_STORAGE_KEY, targetThreadId],
   )
@@ -674,6 +678,35 @@ When('an attention status color is changed in Sidebar settings', async ({ page }
 Then('the selected attention color survives a browser reload', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'thread-sidebar-attention-color-survives-reload', async () => {
     await expect(sidebarSettings(page).getByRole('button', { name: 'Approval needed: Color Danger', exact: true })).toBeVisible()
+  })
+  await finishJourneyAssertions(page)
+})
+
+When('notification routes and sounds are configured in Settings', async ({ page }: { page: Page }) => {
+  const settingsDialog = page.getByRole('dialog', { name: 'Settings', exact: true })
+  await page.getByRole('button', { name: 'Settings', exact: true }).click()
+  await settingsDialog.getByRole('button', { name: 'Built-in plugins', exact: true }).click()
+  await settingsDialog.getByRole('tab', { name: 'Thread sidebar', exact: true }).click()
+  const notificationSettings = settingsDialog.getByRole('group', { name: 'Thread notifications', exact: true })
+  await expect(notificationSettings).toBeVisible()
+  await notificationSettings.getByRole('button', { name: 'Approval needed: Off', exact: true }).click()
+  await page.getByRole('menuitemradio', { name: 'In-app', exact: true }).click()
+  await notificationSettings.getByRole('checkbox', { name: 'Approval needed: Play a sound', exact: true }).click()
+  await notificationSettings.getByRole('button', { name: 'Approval needed Sound: Soft', exact: true }).click()
+  await page.getByRole('menuitemradio', { name: 'Chime', exact: true }).click()
+})
+
+Then('the notification settings survive a browser reload', async ({ page }: { page: Page }) => {
+  const settingsDialog = page.getByRole('dialog', { name: 'Settings', exact: true })
+  await page.reload()
+  await page.getByRole('button', { name: 'Settings', exact: true }).click()
+  await settingsDialog.getByRole('button', { name: 'Built-in plugins', exact: true }).click()
+  await settingsDialog.getByRole('tab', { name: 'Thread sidebar', exact: true }).click()
+  const notificationSettings = settingsDialog.getByRole('group', { name: 'Thread notifications', exact: true })
+  await recordAssertion(page, 'thread-sidebar-notification-category-settings-survive-reload', async () => {
+    await expect(notificationSettings.getByRole('button', { name: 'Approval needed: In-app', exact: true })).toBeVisible()
+    await expect(notificationSettings.getByRole('checkbox', { name: 'Approval needed: Play a sound', exact: true })).toBeChecked()
+    await expect(notificationSettings.getByRole('button', { name: 'Approval needed Sound: Chime', exact: true })).toBeVisible()
   })
   await finishJourneyAssertions(page)
 })

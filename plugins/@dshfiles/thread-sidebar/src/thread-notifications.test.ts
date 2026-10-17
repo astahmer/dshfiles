@@ -1,6 +1,16 @@
 import assert from 'node:assert/strict'
 import { test } from 'vitest'
-import { legacyAttentionEntries, threadInteractionTransitions } from './thread-notifications.js'
+import {
+  categoryForFinishReason,
+  claimNotificationEvent,
+  DEFAULT_THREAD_NOTIFICATION_CATEGORIES,
+  legacyAttentionEntries,
+  notificationRouteHasInApp,
+  notificationRouteHasSystem,
+  threadInteractionTransitions,
+  threadNotificationCategoriesSchema,
+  threadNotificationHasOutput,
+} from './thread-notifications.js'
 
 test('a structured question becomes input-needed attention', () => {
   assert.deepEqual(
@@ -60,4 +70,60 @@ test('browser attention carries over its needs-you timestamps and manual marks',
       { sessionId: 'marked', finishedAt: null, manuallyUnread: true },
     ],
   )
+})
+
+test('notification categories default off and validate delivery, sound, and volume together', () => {
+  assert.deepEqual(threadNotificationCategoriesSchema.parse(undefined), DEFAULT_THREAD_NOTIFICATION_CATEGORIES)
+  assert.equal(threadNotificationCategoriesSchema.safeParse({ ...DEFAULT_THREAD_NOTIFICATION_CATEGORIES, failed: { delivery: 'popup' } }).success, false)
+  assert.equal(
+    threadNotificationCategoriesSchema.safeParse({
+      ...DEFAULT_THREAD_NOTIFICATION_CATEGORIES,
+      failed: { ...DEFAULT_THREAD_NOTIFICATION_CATEGORIES.failed, volume: 2 },
+    }).success,
+    false,
+  )
+  assert.equal(threadNotificationHasOutput(DEFAULT_THREAD_NOTIFICATION_CATEGORIES.failed), false)
+  assert.equal(threadNotificationHasOutput({ ...DEFAULT_THREAD_NOTIFICATION_CATEGORIES.failed, sound: true }), true)
+})
+
+test('delivery routing distinguishes in-app, system, both, and off', () => {
+  assert.deepEqual(
+    ['off', 'in-app', 'system', 'both'].map(delivery => {
+      const parsed = threadNotificationCategoriesSchema.parse({
+        ...DEFAULT_THREAD_NOTIFICATION_CATEGORIES,
+        'approval-needed': { ...DEFAULT_THREAD_NOTIFICATION_CATEGORIES['approval-needed'], delivery },
+      })
+      const route = parsed['approval-needed'].delivery
+      return [notificationRouteHasInApp(route), notificationRouteHasSystem(route)]
+    }),
+    [
+      [false, false],
+      [true, false],
+      [false, true],
+      [true, true],
+    ],
+  )
+})
+
+test('only completed and error endings notify; cancellation and interruption are not failures', () => {
+  assert.equal(categoryForFinishReason('completed'), 'turn-finished')
+  assert.equal(categoryForFinishReason('error'), 'failed')
+  assert.equal(categoryForFinishReason('aborted'), undefined)
+  assert.equal(categoryForFinishReason('blocked'), undefined)
+  assert.equal(categoryForFinishReason('max-tokens'), undefined)
+})
+
+test('event claims deduplicate ids and retain only the newest 5,000', () => {
+  const firstClaim = claimNotificationEvent([], 'approval:thread:key')
+  assert.deepEqual(firstClaim, { claimed: true, notificationIds: ['approval:thread:key'] })
+  assert.deepEqual(claimNotificationEvent(firstClaim.notificationIds, 'approval:thread:key'), {
+    claimed: false,
+    notificationIds: firstClaim.notificationIds,
+  })
+
+  const fullLedger = Array.from({ length: 5_000 }, (_value, index) => `event-${index}`)
+  const boundedClaim = claimNotificationEvent(fullLedger, 'new-event')
+  assert.equal(boundedClaim.notificationIds.length, 5_000)
+  assert.equal(boundedClaim.notificationIds[0], 'event-1')
+  assert.equal(boundedClaim.notificationIds.at(-1), 'new-event')
 })

@@ -674,6 +674,61 @@
       ]
     },
     {
+      "id": "notification-delivery",
+      "title": "Configure per-category thread notifications",
+      "summary": "Choose off, in-app, system, or both delivery for approval, input, completed-turn, and failed-turn events; configure per-category sounds and grant system permission explicitly.",
+      "reach": [
+        "click button \"Settings\"",
+        "click button \"Built-in plugins\"",
+        "click tab \"Thread sidebar\"",
+        "expect group \"Thread notifications\"",
+        "expect button \"Approval needed: Off\""
+      ],
+      "surfaces": ["client", "host", "settings", "storage"],
+      "configuration": [
+        {
+          "key": "notificationCategories",
+          "defaultValue": "all categories off; per-category sound disabled",
+          "constraints": "Host-synced category settings; each category selects off, in-app, system, or both, plus an optional sound preset and volume.",
+          "coveredBy": ["thread-sidebar.notifications-settings"]
+        }
+      ],
+      "states": ["off", "in-app", "system", "both", "permission-needed", "permission-granted"],
+      "failureModes": [
+        "System permission is requested only by the explicit Allow system notifications action; notification delivery never prompts on its own.",
+        "OS notification title and body are generic and omit thread titles, prompts, and raw error details; details stay inside DSH.",
+        "Muted, selected, excluded subagent, or already-delivered events do not notify; event claims are bounded to the most recent 5,000 per browser.",
+        "Only completed and error endings notify; aborted, blocked, interrupted, and max-token endings are not classified as completed or failed alerts.",
+        "The Host attention record already stores finish reason and sequence, so notification categories require no duplicate outcome store."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "thread-sidebar.notifications-settings",
+          "featureFile": "tooling/dshx/e2e/features/thread-sidebar.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.notifications-unit-legacy-migration",
+          "file": "plugins/@dshfiles/thread-sidebar/src/preferences.test.ts",
+          "testName": "legacy desktop alerts migrate to per-category system delivery unless the new setting is customized"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.notifications-unit-finish-classification",
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-notifications.test.ts",
+          "testName": "only completed and error endings notify; cancellation and interruption are not failures"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.notifications-unit-deduplication",
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-notifications.test.ts",
+          "testName": "event claims deduplicate ids and retain only the newest 5,000"
+        }
+      ]
+    },
+    {
       "id": "navigation-layout",
       "title": "Customize sidebar navigation and sections",
       "summary": "Switch compact/expanded header and density, reorder and hide header/footer entries, and expose overflow through the selected menu or scrolling behavior.",

@@ -10,6 +10,7 @@ import { DEFAULT_PREFERENCES } from './organization.js'
 import { chordFromEvent, formatChord, isMacPlatform, parseChord, sameAsHostBinding, serializeChord } from './keyboard-shortcuts.js'
 import type { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
 import { usePreferences } from './sidebar-state.js'
+import { ThreadNotificationSettings } from './thread-notification-settings.js'
 
 type Translate = TranslateNS<typeof THREAD_SIDEBAR_LOCALE_NAMESPACE>
 
@@ -98,8 +99,13 @@ export const SettingsTab = (props: SettingsTabProps): JSX.Element => {
   }
 
   return (
-    <div className="dshx-root dshx:flex dshx:min-h-0 dshx:flex-col dshx:gap-6 dshx:overflow-auto dshx:pb-6">
+    <div className="dshx-root dshx:@container dshx:flex dshx:min-h-0 dshx:flex-col dshx:gap-6 dshx:overflow-auto dshx:pb-6">
       {storageWarning ? <Alert variant="warning">{props.t('threadSidebarStorageFailure')}</Alert> : null}
+      <ThreadNotificationSettings
+        categories={preferences.notificationCategories}
+        onChange={notificationCategories => updatePreferences({ notificationCategories, desktopNotificationsEnabled: false })}
+        t={props.t}
+      />
       <FieldSet>
         <FieldLegend>{props.t('threadSidebarKeyboardSection')}</FieldLegend>
         <FieldDescription>{props.t('threadSidebarChordHint')}</FieldDescription>

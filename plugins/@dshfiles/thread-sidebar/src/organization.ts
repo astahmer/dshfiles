@@ -2,6 +2,7 @@ import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/cli
 import type { WorkspaceView } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { FinishedSubagentsMode } from './thread-children.js'
 import type { ThreadMutes } from './thread-mute.js'
+import { DEFAULT_THREAD_NOTIFICATION_CATEGORIES, type ThreadNotificationCategories } from './thread-notifications.js'
 import { DEFAULT_THREAD_VIEW_SETTINGS, type ThreadViewSettings } from './thread-view-preferences.js'
 
 export type SidebarSection = 'pinned' | 'active' | 'parked' | 'inactive' | 'archived'
@@ -68,8 +69,9 @@ export interface SidebarPreferences {
   turnFinishedDisplay: AttentionDisplayMode
   attentionColors: AttentionColors
   includeSubagentAttention: boolean
-  /** Desktop alerts for finished turns and pending interactions; the browser still owns its own permission. */
+  /** Kept only to migrate older Host/browser settings into per-category routes. */
   desktopNotificationsEnabled: boolean
+  notificationCategories: ThreadNotificationCategories
   applyActionsToChildThreads: boolean
   /** Child threads listed under a parent before the "N more…" line. */
   maxChildren: number
@@ -126,6 +128,7 @@ export const DEFAULT_PREFERENCES: SidebarPreferences = {
   attentionColors: { approvalNeeded: 'warning', inputNeeded: 'warning', turnFinished: 'success' },
   includeSubagentAttention: false,
   desktopNotificationsEnabled: false,
+  notificationCategories: DEFAULT_THREAD_NOTIFICATION_CATEGORIES,
   applyActionsToChildThreads: true,
   maxChildren: 3,
   finishedSubagents: 'collapse',

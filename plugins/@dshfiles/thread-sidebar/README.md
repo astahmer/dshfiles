@@ -147,10 +147,13 @@ marker before its title gives the time left in its tooltip; a snooze wakes on
 its own, and **Unmute** is always in the same menu. The **Muted** filter lists
 muted threads. Mutes follow child-thread action preferences and live in the
 Host-synced `mutedThreads` setting, so every browser stays quiet; mutes saved
-in this browser by older versions are copied there once. Desktop notifications
-are opt-in in Sidebar settings (the `desktopNotificationsEnabled` setting, so
-the choice follows the user rather than one browser) and show the thread title;
-the browser still asks for its own notification permission.
+in this browser by older versions are copied there once. **Thread notifications**
+are configured in Settings › Thread sidebar, separately for approval requests,
+questions, completed turns, and failed turns. Each category can be off, in-app,
+system, or both, with an optional sound preset and volume; settings follow the
+user through Host settings. System permission is requested only after an
+explicit action, and OS notification text stays generic (no prompt, thread title,
+or raw error details). Existing desktop-alert choices migrate to system delivery.
 
 **Park vs mute.** Park files a finished thread away: it moves to the Parked
 section, is skipped by auto-archive, and stays parked until unparked, but its
