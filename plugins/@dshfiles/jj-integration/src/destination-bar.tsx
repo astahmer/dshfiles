@@ -16,7 +16,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import { z } from 'zod'
 import { jjIntegrationApi, threadWorkspaceName } from './api.js'
 import type { JjIntegrationTranslate } from './locales.js'
-import { mainViewSessionId } from './main-view-session.js'
+import { mainViewSessionId, mainViewSessionVisitId } from './main-view-session.js'
 import { resolveNewThreadWorkspaceId } from './new-thread-workspace.js'
 import { workspaceHasOtherSession } from './thread-session-ownership.js'
 import { jjIntegrationSettings } from './settings.js'
@@ -169,11 +169,10 @@ const useComposerWorkspace = (services: DestinationBarServices, selectedWorkspac
   })
   if (workspaceId === undefined) return null
   const workspace = workspaces.items.find(item => item.workspaceId === workspaceId)
-  const completedSessionCount = sessions.ids.filter(id => sessions.byId[id]?.blank === false).length
   const occupied = session.blank && workspaceHasOtherSession({ sessionId: session.id, workspaceSessionIds: workspace?.sessionIds })
   return {
     sessionId: session.blank ? session.id : undefined,
-    visitId: `new-thread:${completedSessionCount}`,
+    visitId: mainViewSessionVisitId(session.id),
     workspaceId,
     occupied: session.blank ? occupied : true,
     path: workspace?.path ?? session.cwd,

@@ -13,3 +13,5 @@ export const mainViewSessionId = <SessionId extends string>(input: {
   })
   return blankSession
 }
+
+export const mainViewSessionVisitId = (sessionId: string): string => `new-thread:${sessionId}`
