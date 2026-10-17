@@ -13,8 +13,9 @@ import { randomUUID } from 'node:crypto'
 import { z } from 'zod'
 import { realpath } from 'node:fs/promises'
 import { isAbsolute, normalize } from 'node:path'
-import { projectChecksApi, type ProjectHookEvent } from './api.js'
 import { PluginApiError, type ApiCaller } from '@dshfiles/dshx/api'
+import { mayVerifyCandidate, projectChecksApi, type CandidateVerificationInput, type ProjectHookEvent } from './api.js'
+import type { ProjectChecksVerifiedTurn } from './completion-event.js'
 import { isWithinRoot, projectChecksConfigSchema, receiptFreshness, verificationPrompt, type ProjectAction } from './core.js'
 import { emitProjectChecksActivity, persistReceiptAndEmitActivity, type ProjectChecksActivityEvent } from './receipt-activity.js'
 import { MAX_RECEIPTS_TOTAL, projectChecksDomain, receiptKey, receiptsAfter, trimReceiptRows, type StoredReceipt } from './store.js'
@@ -80,8 +81,43 @@ interface ReceiptOptions {
   readonly automatic: boolean
   readonly attempt: number
   readonly verificationTurn: number | null
+  readonly verificationStage?: 'completion' | 'rebase'
+  readonly expectedRevision?: string
   readonly signal?: AbortSignal
   readonly requireRevision: boolean
+}
+
+interface CompletionVerificationPermit {
+  readonly turn: number
+  readonly sourceRevision: string
+  readonly signal: AbortSignal
+  readonly actionIds: readonly string[]
+}
+
+const completionPermits = new WeakMap<Context, Map<string, CompletionVerificationPermit>>()
+
+const completionPermitsFor = (ctx: Context): Map<string, CompletionVerificationPermit> => {
+  const existing = completionPermits.get(ctx)
+  if (existing !== undefined) return existing
+  const permits = new Map<string, CompletionVerificationPermit>()
+  completionPermits.set(ctx, permits)
+  return permits
+}
+
+const hasVerifiedCompletion = (
+  ctx: Context,
+  input: { readonly sessionId: string; readonly turn: number; readonly sourceRevision: string },
+  signal: AbortSignal,
+): boolean => {
+  const permit = completionPermits.get(ctx)?.get(input.sessionId)
+  return (
+    permit !== undefined &&
+    !signal.aborted &&
+    permit.signal === signal &&
+    permit.turn === input.turn &&
+    permit.sourceRevision === input.sourceRevision &&
+    permit.actionIds.length > 0
+  )
 }
 
 function entryFor(ctx: Context) {
@@ -252,6 +288,8 @@ const runAction = async (ctx: Context, sessionId: string, action: ProjectAction,
 
     if (options.requireRevision && beforeRevision === null) {
       failure = 'revision-unavailable'
+    } else if (options.expectedRevision !== undefined && beforeRevision !== options.expectedRevision) {
+      failure = 'source-changed'
     } else {
       stage = 'run-command'
       const result = await runManaged(ctx, action.command, action.args, paths.cwd, action.timeoutMs, options.signal)
@@ -286,6 +324,7 @@ const runAction = async (ctx: Context, sessionId: string, action: ProjectAction,
       sourceRevisionBefore: beforeRevision,
       sourceRevisionAfter: afterRevision,
       verificationTurn: options.verificationTurn,
+      ...(options.verificationStage === undefined ? {} : { verificationStage: options.verificationStage }),
       automatic: options.automatic,
       attempt: options.attempt,
     }
@@ -300,6 +339,94 @@ const runAction = async (ctx: Context, sessionId: string, action: ProjectAction,
     reportApiFailure(options.automatic ? 'verification-run' : 'manual-run', diagnosticId, stage, cause)
     throw cause
   }
+}
+
+const verifyRebasedCandidate = async (ctx: Context, input: CandidateVerificationInput, signal: AbortSignal) => {
+  if (signal.aborted) return { status: 'cancelled' as const, prompt: null }
+  if (!hasVerifiedCompletion(ctx, input, signal)) return { status: 'unavailable' as const, prompt: null }
+
+  const config = configFor(ctx)
+  const available: Array<{ readonly action: ProjectAction; readonly cwd: string }> = []
+  for (const action of config.actions.filter(candidate => candidate.verifyBeforeComplete)) {
+    try {
+      available.push({ action, cwd: (await sessionPaths(ctx, input.sessionId, action)).cwd })
+    } catch {
+      continue
+    }
+  }
+
+  const permit = completionPermits.get(ctx)?.get(input.sessionId)
+  if (permit === undefined || permit.actionIds.some(actionId => !available.some(candidate => candidate.action.id === actionId))) {
+    return { status: 'unavailable' as const, prompt: 'A completion check is no longer available for this thread directory.' }
+  }
+  const firstAvailable = available[0]
+  if (firstAvailable === undefined) return { status: 'unavailable' as const, prompt: 'No configured Project Checks are available for this thread directory.' }
+
+  const currentRevision = await sourceRevision(ctx, firstAvailable.cwd, signal)
+  if (currentRevision === null || currentRevision !== input.expectedRevision) {
+    return {
+      status: 'stale' as const,
+      prompt: 'The rebased working copy changed before Project Checks could verify it. The bookmark was not advanced; stop again for verification.',
+    }
+  }
+
+  const previous = await readStoredReceipts(ctx, input.sessionId)
+  const previousAttempts = previous
+    .filter(receipt => receipt.automatic && receipt.verificationTurn === input.turn && receipt.verificationStage === 'rebase')
+    .map(receipt => receipt.attempt)
+  const attempt = Math.max(0, ...previousAttempts) + 1
+  if (attempt > config.maxVerificationAttempts) {
+    return {
+      status: 'attempt-limit' as const,
+      prompt: `Automatic integration stopped after ${config.maxVerificationAttempts} post-rebase verification attempts for this turn. The bookmark was not advanced; review the receipts or retry in a new turn.`,
+    }
+  }
+
+  const results: StoredReceipt[] = []
+  for (const { action } of available) {
+    if (signal.aborted) return { status: 'cancelled' as const, prompt: null }
+    results.push(
+      await runAction(ctx, input.sessionId, action, {
+        automatic: true,
+        attempt,
+        verificationTurn: input.turn,
+        verificationStage: 'rebase',
+        expectedRevision: input.expectedRevision,
+        signal,
+        requireRevision: true,
+      }),
+    )
+  }
+  if (signal.aborted) return { status: 'cancelled' as const, prompt: null }
+
+  const failed = results.filter(
+    (receipt): receipt is StoredReceipt & { readonly status: 'failed' | 'cancelled' | 'timed-out' } => receipt.status !== 'passed',
+  )
+  if (failed.length > 0) {
+    return {
+      status: 'failed' as const,
+      prompt: verificationPrompt(
+        failed.map(receipt => ({
+          label: receipt.label,
+          status: receipt.status,
+          exitCode: receipt.exitCode,
+          failure: receipt.failure,
+        })),
+        attempt,
+        config.maxVerificationAttempts,
+      ),
+    }
+  }
+
+  const finalRevision = await sourceRevision(ctx, firstAvailable.cwd, signal)
+  if (signal.aborted) return { status: 'cancelled' as const, prompt: null }
+  if (finalRevision !== input.expectedRevision) {
+    return {
+      status: 'stale' as const,
+      prompt: 'The rebased working copy changed while Project Checks were running. The bookmark was not advanced; stop again for verification.',
+    }
+  }
+  return { status: 'passed' as const, prompt: null }
 }
 
 const apiActions = async (ctx: Context, sessionId: string) => {
@@ -433,6 +560,14 @@ const hostApi = projectChecksApi.host({
     )
     return { ...receipt, configurationFreshness: 'unknown' as const, freshness }
   },
+  assertVerifiedCompletion: async ({ input, ctx, signal, caller }) => {
+    if (!mayVerifyCandidate(caller)) throw new Error('Only jj-integration may verify a completed turn.')
+    return { status: hasVerifiedCompletion(ctx, input, signal) ? 'authorized' : 'unavailable' }
+  },
+  verifyCandidate: async ({ input, ctx, signal, caller }) => {
+    if (!mayVerifyCandidate(caller)) throw new Error('Only jj-integration may verify a rebased candidate.')
+    return verifyRebasedCandidate(ctx, input, signal)
+  },
 })
 
 export default defineHost({
@@ -471,7 +606,14 @@ export default defineHost({
       if (available.length === 0 || signal.aborted) return
 
       const previous = await readStoredReceipts(ctx, sessionId)
-      const previousAttempts = previous.filter(receipt => receipt.automatic && receipt.verificationTurn === turn).map(receipt => receipt.attempt)
+      const previousAttempts = previous
+        .filter(
+          receipt =>
+            receipt.automatic &&
+            receipt.verificationTurn === turn &&
+            (receipt.verificationStage === undefined || receipt.verificationStage === 'completion'),
+        )
+        .map(receipt => receipt.attempt)
       const attempt = Math.max(0, ...previousAttempts) + 1
       if (attempt > config.maxVerificationAttempts) throw new Error('Project verification attempt limit was exceeded.')
 
@@ -483,6 +625,7 @@ export default defineHost({
             automatic: true,
             attempt,
             verificationTurn: turn,
+            verificationStage: 'completion',
             signal,
             requireRevision: true,
           }),
@@ -493,31 +636,64 @@ export default defineHost({
       const failed = results.filter(
         (receipt): receipt is StoredReceipt & { readonly status: 'failed' | 'cancelled' | 'timed-out' } => receipt.status !== 'passed',
       )
-      if (failed.length === 0) return
-      if (attempt < config.maxVerificationAttempts) {
+      const verifiedRevision = results[0]?.sourceRevision
+      const allChecksShareRevision =
+        verifiedRevision !== undefined && verifiedRevision !== null && results.every(receipt => receipt.sourceRevision === verifiedRevision)
+      const requestAgentFix = (message: string): void => {
         agent.steer({
           id: MessageId(randomUUID()),
           role: 'user',
-          content: [
-            {
-              type: 'text',
-              text: verificationPrompt(
-                failed.map(receipt => ({
-                  label: receipt.label,
-                  status: receipt.status,
-                  exitCode: receipt.exitCode,
-                  failure: receipt.failure,
-                })),
-                attempt,
-                config.maxVerificationAttempts,
-              ),
-            },
-          ],
+          content: [{ type: 'text', text: message.slice(0, 4_000) }],
           source: { kind: 'dshfiles-project-checks' },
         })
+      }
+
+      if (failed.length === 0 && verifiedRevision !== undefined && verifiedRevision !== null && allChecksShareRevision) {
+        const permit: CompletionVerificationPermit = {
+          turn,
+          sourceRevision: verifiedRevision,
+          signal,
+          actionIds: results.map(receipt => receipt.actionId),
+        }
+        const permits = completionPermitsFor(ctx)
+        permits.set(sessionId, permit)
+        const verifiedTurn: ProjectChecksVerifiedTurn = {
+          sessionId: SessionId(sessionId),
+          turn,
+          sourceRevision: verifiedRevision,
+          signal,
+          requestAgentFix,
+        }
+        try {
+          await ctx.serial('dshfiles/project-checks/verified', verifiedTurn)
+        } finally {
+          if (permits.get(sessionId) === permit) permits.delete(sessionId)
+        }
         return
       }
-      throw new Error('Configured project checks failed; this turn cannot be marked complete.')
+
+      const failurePrompt =
+        failed.length === 0
+          ? 'Project checks did not verify one exact working-copy revision. Inspect the work and stop again so every check runs against the same revision.'
+          : verificationPrompt(
+              failed.map(receipt => ({
+                label: receipt.label,
+                status: receipt.status,
+                exitCode: receipt.exitCode,
+                failure: receipt.failure,
+              })),
+              attempt,
+              config.maxVerificationAttempts,
+            )
+      if (attempt < config.maxVerificationAttempts) {
+        requestAgentFix(failurePrompt)
+        return
+      }
+      throw new Error(
+        failed.length === 0
+          ? 'Project checks did not verify one exact working-copy revision; this turn cannot be marked complete.'
+          : 'Configured project checks failed; this turn cannot be marked complete.',
+      )
     })
   },
 })

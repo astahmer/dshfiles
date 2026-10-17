@@ -14,7 +14,15 @@
     ".": "./dist/index.js",
     "./package.json": "./package.json",
     "./cordis.patch.yml": "./cordis.patch.yml",
-    "./client": "./dist/client.js"
+    "./client": "./dist/client.js",
+    "./api": {
+      "types": "./src/api.ts",
+      "default": "./dist/api.js"
+    },
+    "./completion-event": {
+      "types": "./src/completion-event.ts",
+      "default": "./dist/completion-event.js"
+    }
   },
   "scripts": {
     "build": "dshx build",

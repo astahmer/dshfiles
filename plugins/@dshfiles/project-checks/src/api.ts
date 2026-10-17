@@ -1,8 +1,33 @@
-import { defineApi, method } from '@dshfiles/dshx/api'
+import { defineApi, method, type ApiCaller } from '@dshfiles/dshx/api'
 import { z } from 'zod'
 
 const sessionIdSchema = z.string().min(1).max(128)
 const actionIdSchema = z.string().regex(/^[a-z0-9][a-z0-9-]{0,31}$/)
+const revisionSchema = z.string().regex(/^[a-f0-9]{40,64}$/)
+
+export const verifiedCompletionInputSchema = z
+  .object({ sessionId: sessionIdSchema, turn: z.number().int().nonnegative().safe(), sourceRevision: revisionSchema })
+  .strict()
+
+export const completionAuthorizationResultSchema = z.object({ status: z.enum(['authorized', 'unavailable']) }).strict()
+
+export const candidateVerificationInputSchema = z
+  .object({
+    sessionId: sessionIdSchema,
+    turn: z.number().int().nonnegative().safe(),
+    sourceRevision: revisionSchema,
+    expectedRevision: revisionSchema,
+  })
+  .strict()
+
+export const candidateVerificationResultSchema = z
+  .object({
+    status: z.enum(['passed', 'failed', 'stale', 'cancelled', 'unavailable', 'attempt-limit']),
+    prompt: z.string().max(2_048).nullable(),
+  })
+  .strict()
+
+export const mayVerifyCandidate = (caller: ApiCaller): boolean => caller.kind === 'plugin' && caller.packageId === '@dshfiles/jj-integration'
 
 export const actionViewSchema = z.object({
   id: actionIdSchema,
@@ -39,6 +64,7 @@ export const receiptSchema = z.object({
     .optional(),
   configurationFreshness: z.literal('unknown').optional(),
   verificationTurn: z.number().int().nonnegative().nullable(),
+  verificationStage: z.enum(['manual', 'completion', 'rebase']).optional(),
   automatic: z.boolean(),
   attempt: z.number().int().min(0).max(2),
   freshness: z.enum(['current', 'stale', 'unknown']),
@@ -63,6 +89,7 @@ const compactJson = <Output>(output: Output): string => JSON.stringify(output)
 export const projectChecksApi = defineApi({
   id: 'project-checks',
   version: 1,
+  owner: '@dshfiles/project-checks',
   methods: {
     actions: method({
       input: z.object({ sessionId: sessionIdSchema.optional() }),
@@ -92,9 +119,21 @@ export const projectChecksApi = defineApi({
         'Run one configured project action in its thread directory and return the receipt. The action must be configured and visible for that directory. Defaults to the calling thread. Call only when the user asked to run that check.',
       tool: { name: 'project_checks_run', render: compactJson },
     }),
+    assertVerifiedCompletion: method({
+      input: verifiedCompletionInputSchema,
+      output: completionAuthorizationResultSchema,
+      description: 'Confirm a verified completion event is still active before jj-integration rebases its thread workspace.',
+    }),
+    verifyCandidate: method({
+      input: candidateVerificationInputSchema,
+      output: candidateVerificationResultSchema,
+      description: 'Rerun trusted completion checks on one exact rebased candidate before jj-integration advances its bookmark.',
+    }),
   },
 })
 
+export type CandidateVerificationInput = z.infer<typeof candidateVerificationInputSchema>
+export type CandidateVerificationResult = z.infer<typeof candidateVerificationResultSchema>
 export type ProjectActionView = z.infer<typeof actionViewSchema>
 export type ProjectCheckReceipt = z.infer<typeof receiptSchema>
 export type ProjectHookEvent = z.infer<typeof hookEventSchema>
