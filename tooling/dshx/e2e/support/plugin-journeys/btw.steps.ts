@@ -1,7 +1,7 @@
 import { expect, type Page } from '@playwright/test'
 import { Then, When } from '../bdd.js'
 import { fakeCommandCodeFor } from '../fake-command-code.js'
-import { finishJourneyAssertions, recordAssertion } from '../steps.js'
+import { finishJourneyAssertions, recordAssertion, browserDiagnosticsFor } from '../steps.js'
 import { sendMessage, startThreadWithModel } from '../threads.js'
 
 const FAKE_MODEL = 'commandcode_work/gpt-6-luna'
@@ -10,6 +10,8 @@ const sideChat = (page: Page) => page.locator('[data-dshfiles-btw]')
 const sideChatTab = (page: Page) => page.locator('[data-dockkit-tab]').filter({ hasText: 'btw ·' })
 const questionDialog = (page: Page) => page.getByRole('dialog', { name: 'Ask a side question', exact: true })
 const ASK_LABEL = 'Ask a side question (btw)'
+const threadComposer = (page: Page) => page.getByRole('textbox', { name: THREAD_COMPOSER, exact: true }).first()
+const commandChip = (page: Page) => page.locator('[data-composer-command="btw"]')
 
 When('a thread on the fake model is asked {string}', async ({ page }: { page: Page }, text: string) => {
   await startThreadWithModel(page, { project: 'Default workspace', model: FAKE_MODEL })
@@ -87,6 +89,37 @@ When('the side chat tab is closed', async ({ page }: { page: Page }) => {
 Then('the side chat tab is gone', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'btw-tab-closed', async () => {
     await expect(sideChatTab(page)).toHaveCount(0)
+  })
+  await finishJourneyAssertions(page)
+})
+
+When('{string} is typed in the thread composer without sending it', async ({ page }: { page: Page }, text: string) => {
+  const composer = threadComposer(page)
+  await composer.fill(text)
+  await composer.press('Enter')
+  // The trigger menu's Enter picks the row and leaves the command chip; typing then fills its arguments.
+  await expect(commandChip(page)).toHaveCount(1)
+  await composer.pressSequentially('what was my first question?')
+})
+
+Then('the thread composer holds the command chip', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'btw-command-chip-typed', async () => {
+    await expect(commandChip(page)).toHaveCount(1)
+    await expect(threadComposer(page)).toContainText('what was my first question?')
+  })
+})
+
+When('the page is reloaded', async ({ page }: { page: Page }) => {
+  await page.reload()
+  await threadComposer(page).waitFor({ state: 'visible' })
+})
+
+Then('the thread composer restores the command chip without an input error', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'btw-command-chip-restored', async () => {
+    // The persisted draft seeds a command chip, which the trigger pipeline rebuilds through resolveClaim.
+    await expect(commandChip(page)).toHaveCount(1)
+    await expect(threadComposer(page)).toContainText('what was my first question?')
+    expect(browserDiagnosticsFor(page).filter(line => line.includes('resolveClaim'))).toEqual([])
   })
   await finishJourneyAssertions(page)
 })

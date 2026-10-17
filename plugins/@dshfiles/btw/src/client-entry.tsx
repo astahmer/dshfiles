@@ -19,6 +19,7 @@ import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { useSyncExternalStore, type ReactNode } from 'react'
 import { z } from 'zod'
 import { BTW_LOCALE_NAMESPACE, btwLocale, type BtwKey } from './locales.js'
+import { createBtwSource } from './btw-source.js'
 import { mainViewThreadId } from './main-view-thread.js'
 import { PrefixCache } from './prefix-cache.js'
 import { SideChatModel, startSideChat, type ModelRoute, type SideChatActor } from './side-chat-machine.js'
@@ -310,17 +311,7 @@ export default defineClient({
       'dshfiles-btw: composer chip',
     )
 
-    const source: InputTriggerSource = {
-      trigger: '/',
-      name: 'btw',
-      async candidates(_session, request) {
-        return request.position === 'leading' && 'btw'.startsWith(request.query.toLowerCase()) ? [{ name: 'btw', description: t('description') }] : []
-      },
-      onPick: pick => ({ claim: claimFor(pick.session.sessionId) }),
-      async matchEnter(session, line) {
-        return line === '/btw' || line.startsWith('/btw ') ? { claim: claimFor(session.sessionId) } : undefined
-      },
-    }
+    const source: InputTriggerSource = createBtwSource({ description: t('description'), claimFor })
     ctx.effect(() => ctx.inputTriggers.registerSource(source), 'dshfiles-btw: /btw command')
 
     ctx.effect(

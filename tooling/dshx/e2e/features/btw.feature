@@ -27,3 +27,13 @@ Feature: /btw side chat
     Then a side chat tab answers on the thread's model while the thread keeps one message
     When the side chat tab is closed
     Then the side chat tab is gone
+
+  @scenario:btw.command-chip-restore
+  Scenario: A persisted /btw draft restores its command chip across a reload
+    Given the isolated plugin composition of "@dshfiles/btw, @dshfiles/ai-accounts" is booted
+    When a Command Code account backed by a local fake provider is added
+    And a thread on the fake model is asked "first question"
+    And "/btw" is typed in the thread composer without sending it
+    Then the thread composer holds the command chip
+    When the page is reloaded
+    Then the thread composer restores the command chip without an input error

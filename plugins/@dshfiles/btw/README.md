@@ -28,9 +28,13 @@ forks it exactly as `/btw` does and closes once the side panel opens:
   first request the provider served from its prefix cache:
   `cacheRead / (input + cacheRead + cacheWrite)` of the first
   `assistant/message` after `session/end-seed`, the share `@dshfiles/usage`
-  reports.
+  reports. The conversation sits in a flex column under that header: the
   embedded body sizes itself as a flex item, so a block wrapper would grow it
   past the pane, hide the composer and leave the transcript unscrollable.
+- **The command:** the `/btw` source (`btw-source.ts`) answers `matchEnter` for
+  `/btw` and `/btw <args>`, and `matchClaim` for a persisted `/btw` chip. The
+  claim is answered without acting, so restoring a draft after a reload rebuilds
+  the chip and its hint instead of running anything.
 - **Hidden and archived:** `@dshfiles/thread-sidebar` hides threads titled
   `btw · …`. Closing the tab archives the fork; a failure after the fork
   archives it too, and the composer shows why.
