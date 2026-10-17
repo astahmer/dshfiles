@@ -42,7 +42,7 @@ const sessionArchiveApi = threadSidebarSessionArchiveApi.host({
   status: ({ ctx, input }) => {
     const requestedSessionIds = new Set(input.sessionIds)
     return {
-      archivedSessionIds: ctx.workspaces.list.getSnapshot().archivedSessionIds.filter(sessionId => requestedSessionIds.has(sessionId)),
+      archivedSessionIds: ctx.workspaceRegistry.archivedSessionIds.filter(sessionId => requestedSessionIds.has(sessionId)),
     }
   },
 })
@@ -169,7 +169,6 @@ export default defineHost({
     'sessionController',
     'sessionPersistence',
     'storageDomain',
-    'workspaces',
     'workspaceController',
     'workspaceRegistry',
   ],

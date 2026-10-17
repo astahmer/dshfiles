@@ -21,12 +21,12 @@
     reasoningEffort: max
 
 # dsh-client-connection's rpc.register() calls owner.webServer.register(route),
-# but the row declares only webRuntime. Any plugin registering a Host API then
+# but the row declares only webStartup. Any plugin registering a Host API then
 # dies at boot with "cannot get property webServer without inject". Declaring
 # the missing edge here is the smallest fix until DSH ships it.
 - id: connection
   inject:
-    - webRuntime
+    - webStartup
     - webServer
 
 # Async questions: the shipped `tool-ask-user` row declares no config, so it
