@@ -64,6 +64,11 @@ const fill = (input: { readonly continuations: readonly QuotaContinuation[]; rea
         session: { id: item.sessionId, displayTitle: titles[index] ?? 'Blocked' },
       }))}
       translate={translate}
+      withThreadMenu={(thread, row) => (
+        <div data-thread-menu={thread.id} key={thread.id}>
+          {row}
+        </div>
+      )}
     />,
   )
   return { onResume, onResumeAll, open }
@@ -85,9 +90,17 @@ describe('usage limit section', () => {
         resumeAllBusy={false}
         rows={[]}
         translate={translate}
+        withThreadMenu={(_thread, row) => row}
       />,
     )
     expect(container.textContent).toBe('')
+  })
+
+  it('puts every row inside its own thread menu, so a right click offers the thread actions', () => {
+    fill({ continuations: [continuation(), continuation({ continuationId: 'bb', sessionId: 'other' })], titles: ['First', 'Second'] })
+
+    expect(screen.getByText('First').closest('[data-thread-menu]')?.getAttribute('data-thread-menu')).toBe('blocked')
+    expect(screen.getByText('Second').closest('[data-thread-menu]')?.getAttribute('data-thread-menu')).toBe('other')
   })
 
   it('names each blocked thread with its reset countdown and size', () => {

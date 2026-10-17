@@ -34,6 +34,8 @@ export interface UsageLimitSectionProps<Thread extends UsageLimitThread> {
   readonly onSnooze: (input: { readonly continuationId: string; readonly duration: UsageLimitSnooze }) => void
   readonly onAutoRetry: (input: { readonly continuationId: string; readonly sessionId: string; readonly enabled: boolean }) => void
   readonly onResumeAll: () => void
+  /** Wraps a row in the thread's own right-click menu. */
+  readonly withThreadMenu: (thread: Thread, row: JSX.Element) => JSX.Element
 }
 
 const SNOOZES: readonly { readonly duration: UsageLimitSnooze; readonly labelKey: ThreadSidebarLocaleKey }[] = [
@@ -78,7 +80,8 @@ export const UsageLimitSection = <Thread extends UsageLimitThread>(props: UsageL
                 ? t('threadSidebarUsageLimitResets', { time: formatRemaining(timing.resetAt, props.now) })
                 : t('threadSidebarUsageLimitUnknown')
 
-        return (
+        return props.withThreadMenu(
+          row.session,
           <div
             className="dshx:group/usage dshx:flex dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:px-2.5 dshx:py-1.5 dshx:hover:bg-accent/40"
             key={row.continuation.continuationId}
@@ -133,7 +136,7 @@ export const UsageLimitSection = <Thread extends UsageLimitThread>(props: UsageL
                 </DropdownMenuCheckboxItem>
               </DropdownMenuContent>
             </DropdownMenu>
-          </div>
+          </div>,
         )
       })}
     </section>
