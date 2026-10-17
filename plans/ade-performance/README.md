@@ -8,21 +8,86 @@ Measure what users actually see across the ADE; compare architecture options; pr
 
 | Track | Status | Evidence / next action |
 |---|---|---|
-| Runtime and ownership audit | Complete | DSH `0.2.1-rc.2`; React 18.3.1, TanStack Query 5.104.1 and Virtual 3.14.13. Host owns session history/follow; warm switches reuse only still-retained open sessions. |
-| Plugin hot-path audit | Complete | Sidebar, Activity Timeline, Agent Communication and Jujutsu code-shape findings; all performance claims remain hypotheses until measured. |
-| Framework/local-first comparison | In progress | Keep React + Query as baseline; validate alternatives and version/ownership constraints against official sources. |
-| Scratch browser and provider setup | In progress | Scratch `ade-speed-20261018a` passes doctor with 180 active entries and all 19 selected bundles. The `verification-receipts` seed currently times out at its stale `Settings` selector; inspect/fix harness or use the live AI Accounts path. |
-| Correct-content benchmark at 1/5/20+ active agents | Pending | Capture cold/warm visible-content paint proxies, p50/p95, long tasks, DOM and heap; distinguish rendered transcript content from titles or skeletons. |
-| Reversible prototype and comparison | Pending | Select only after baseline points to a concrete bottleneck; compare before/after in the same scratch profile and workload. |
-| Final audit and reversible roadmap | Pending | Separate verified runtime facts, static code shape, benchmark measurements and unknowns; state all limits. |
+| Runtime and ownership audit | Complete | Installed DSH `0.2.1-rc.2`; React 18.3.1, TanStack Query 5.104.1, Virtual 3.14.13. Host owns conversation/history; retained switches can reuse open sessions, and reopen/older-page requests cross Host boundary. |
+| Plugin hot-path audit | Complete (static) | Sidebar, Activity Timeline, Agent Communication and Jujutsu code-shape findings. Treat every cost as a hypothesis until the affected UI path is measured. |
+| Framework/local-first comparison | Complete | Keep React + TanStack Query. Host remains authoritative; no renderer/store replacement has DSH-specific evidence or a supported boundary. |
+| Scratch browser and provider setup | Complete | Fixed dshx scratch seeding/parser/ownership. Scratch `ade-speed-20261018g`: doctor and `activity-timeline/verification-receipts` passed; all 5 selected bundles loaded, browser reported zero console/page/request/HTTP errors, and `dev down` stopped Host/browser/provider. |
+| Correct-content benchmark at 1/5/20 active turns | Complete (warm path) | 40 conversation switches per load (20 each direction), 10 Activity and 10 AI Accounts panel samples per load; exact content plus two animation frames. See benchmark results. |
+| Long-history, streaming and remaining plugin workloads | Pending | Current held fake turns emit no token deltas and transcripts are short. Add a representative long transcript and streaming load; measure Jujutsu and Agent Communication navigation separately. |
+| Product-side prototype and comparison | Deferred pending evidence | Warm 1/5/20 paths show no long tasks and mostly sub-120 ms p95. Do not pick a product optimization blindly; use the richer workload to identify a bottleneck, then compare one reversible change if warranted. |
+| Final audit and reversible roadmap | In progress | Separate verified runtime facts, static code shape, measured results and unknowns; include explicit non-migration recommendation. |
 
-## Measurement rules
+## Current verified baseline
 
-- A sample counts only when the expected visible content is present in the transcript or target panel and has survived two animation-frame callbacks; titles, loading shells, stale content and DOM mutations alone do not count.
-- Report cold and warm states separately, with enough samples for p50 and p95. Record viewport, browser/runtime, thread/event counts, active-agent count, DOM nodes, JS heap where available, and long-task/frame-blocking evidence.
-- Label timings from `dshx dev open` as journey-step timings, not as correct-content paint.
-- Use scratch-only fake-provider data. Never copy launch tokens or raw authenticated URLs into artifacts.
+- Benchmark harness: [benchmark.mjs](plans/ade-performance/benchmark.mjs). Structured raw samples: [benchmark-results-20261018.json](plans/ade-performance/benchmark-results-20261018.json). Screenshots: [5 active turns](plans/ade-performance/evidence/benchmark-5-agents-older-session.png), [20 active turns](plans/ade-performance/evidence/benchmark-20-agents.png).
+- Runtime: installed DSH `0.2.1-rc.2`; React 18.3.1, TanStack Query 5.104.1, TanStack Virtual 3.14.13; Chromium 141.0.7390.37; viewport 1440×900; Node v22.23.3 on darwin/arm64, Apple M4, 10 logical CPUs. Five scratch bundles loaded: UI styles, shared runtime, Activity Timeline, AI Accounts, Project Checks.
+- Two fresh `dshx dev up` runs took 25.8 s and 14.6 s; build/cache conditions differed, and these are single CLI wall-clock samples, not startup p50/p95. Fresh `dshx dev open activity-timeline/verification-receipts` took 18.3 s total, including 13.2 s for `seed tool-call-thread`; Activity/event/open steps took 69/44/35 ms. These are journey timings, not paint measurements.
+- First synthetic held-turn content became visible after 126.3 ms. Across 20 agent-creation samples, p50/p95 were 113.2/137.0 ms (max 178.8 ms).
+
+### Correct content, conversation switching
+
+Each destination had 20 samples. p50/p95 below are split by destination rather than pooled across both directions.
+
+| Held turns | Destination | p50 / p95 (ms) |
+|---:|---|---:|
+| 1 | Completed `Fake thread title` | 81.9 / 98.1 |
+| 1 | Active 01 | 81.7 / 98.5 |
+| 5 | Active 05 | 97.9 / 99.0 |
+| 5 | Active 04 | 97.6 / 99.2 |
+| 20 | Active 20 | 81.7 / 98.1 |
+| 20 | Active 19 | 82.5 / 98.5 |
+
+### Plugin navigation and browser load
+
+Each panel path had 10 samples per load level. At `n=10`, p95 is the maximum and remains noisy.
+
+| Held turns | Activity open p50/p95 | AI Accounts open p50/p95 | Activity return p50/p95 |
+|---:|---:|---:|---:|
+| 1 | 65.3 / 66.2 ms | 98.5 / 101.7 ms | 64.7 / 65.2 ms |
+| 5 | 64.8 / 65.8 ms | 97.6 / 98.3 ms | 64.2 / 64.5 ms |
+| 20 | 78.2 / 112.4 ms | 97.8 / 193.8 ms | 64.8 / 131.9 ms |
+
+- Visible DOM nodes at 1/5/20 held turns: 608/716/1,099; after revealing the older completed session at 20, 1,122 nodes. Chromium reported ~76.6 MB used JS heap at every snapshot. No forced GC; identical heap samples are too coarse to conclude memory stays flat.
+- No long tasks appeared in measured interactions. Ordinary conversation/panel frame-gap maxima were 16.8 ms; the one older-session transcript path had a 33.3 ms gap. Twenty distinct held turns produced 20 visible `Running` rows and 20 provider hold requests.
+- At 20 turns, one `Show more sessions` click revealed the older completed row in 108.2 ms; opening its correct transcript took another 135.2 ms; total path to correct content was 246.2 ms.
+
+## Measurement rules and caveats
+
+- Samples require exact unique transcript text plus the ongoing-status indicator, or exact Activity/AI Accounts content, then two `requestAnimationFrame` callbacks. `contentVisibleMs` is a content-visible-after-two-frames proxy—not compositor paint, viewport-intersection, or occlusion proof. The 20-turn screenshot provides a visual spot-check; no title-only, skeleton, stale-content, or synthetic score counts.
+- Warm navigation p50/p95 is separate from scratch `up`/`open` journeys. No independent cold-Host-history versus retained-session distribution has been measured yet.
+- Frame gaps and long tasks come from page-local `PerformanceObserver`/rAF instrumentation. Negative rAF deltas are discarded because a frame may have started before measurement. Heap uses Chromium `performance.memory` without forced GC.
+- The 1/5/20 workload uses local fake-provider turns held at the pending state. It creates real DSH sessions and visible status, but emits no ongoing model-token deltas. Transcripts are short; this does not test 500-message history, 20 simultaneous streams, cross-host work, or provider latency.
+- Live panel timing covers Activity Timeline and AI Accounts only. Jujutsu and Agent Communication have static code-path audits, not real-browser timings. Event-count and Host/RPC-versus-render breakdowns were not captured.
+- All timings are bounded single-run evidence on one scratch profile and host, not universal SLOs. At 20, AI Accounts p95 and Activity-return p95 deserve follow-up, but 10 samples and no causal trace do not identify a bottleneck. Static history/reopen claims are separately labeled in the audit.
+- Scratch verification passed (`doctor`, feature reach, 5 bundles; zero browser console/page/request/HTTP errors) and all scratch Host/browser/fake-provider processes were stopped. No live `127.0.0.1:3080`, `~/.dsh`, or DSH core was touched.
+
+## Architecture decision
+
+Keep React 18 + TanStack Query as baseline. DSH owns Host services, RPC, plugin slots and lifecycle; Host remains canonical for sessions/history. Query is already the plugin UI's async-data cache, with Host-fed updates and optimistic mutation/rollback support; Virtual is already present for selected lists. A second authoritative store or renderer would add coordination and compatibility costs without DSH-specific evidence. See [Query setup](plugins/@dshfiles/plugin-ui/src/query.tsx#L8-L27), [state ownership](plugins/@dshfiles/plugin-ui/docs/state-ownership.md#L3-L11), and the [DSH extension boundary](tooling/dshx/docs/sdk/getting-started.md#L3-L35).
+
+| Candidate | Fit for this ADE | Recommendation |
+|---|---|---|
+| TanStack Query + React | Already integrated; Host stays source of truth; cache/prefetch and rollback are available. | Keep. If profiling isolates a query wait, test existing-query prefetch first ([Query optimistic updates](https://tanstack.com/query/latest/docs/framework/react/guides/optimistic-updates)). |
+| TanStack DB | Official README marks it beta and advertises sub-millisecond live queries; that is a vendor claim, not a DSH result. No DSH adapter or measured cross-view join bottleneck found. | Defer; consider only as a bounded read-only projection after evidence ([README](https://raw.githubusercontent.com/TanStack/db/main/README.md)). |
+| LiveStore | Docs say its local event log is source of truth and identify remote-server-primary systems as a non-fit. That conflicts with Host authority. | Reject for current ownership model ([fit guidance](https://docs.livestore.dev/overview/when-livestore/)). |
+| TinyBase | Can be an in-memory read model, but npm `10.0.1` declares optional React peer `^19.3.0`, outside this DSH React 18 range; another projection adds invalidation/normalization work. | Defer; no persistence/CRDT authority ([package metadata](https://registry.npmjs.org/tinybase/latest)). |
+| Preact/compat or Solid | Different rendering runtimes; DSH plugin slots rely on React context/hooks and do not expose a supported renderer replacement. Framework switch means rewrite, not local tuning. | Reject as performance-first migration ([Preact differences](https://preactjs.com/guide/v11/differences-to-react/), [Solid overview](https://docs.solidjs.com/)). |
+
+Installed DSH `0.2.1-rc.2` history code opens a Host follow with an opening snapshot; retained open-session switches can reuse it, while a released session and every `loadOlder` page cross the Host boundary. ChatView maps loaded conversation entries into seats; no transcript-row virtualization was found in the installed bundle. These are runtime/source facts, not measured causes. The upstream tagged sources are [Session](https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.1-rc.2/packages/api/session-controller/src/client/sessions/session.ts), [transport](https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.1-rc.2/packages/api/session-controller/src/client/transport.ts), and [ChatView](https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.1-rc.2/packages/client/ui-chat/src/client/chat/ChatView.tsx). Cold session-log full-read/copy cost remains a profiling hypothesis; no core patch is allowed. If that boundary proves insufficient, record concrete gap in `plans/dsh-host-gaps.md` and stop there.
+
+## Static plugin hot-path hypotheses
+
+These are source-shape findings only; none has measured as the cause of a user-visible delay.
+
+- [Activity Timeline ingestion](plugins/@dshfiles/activity-timeline/src/service.ts#L91-L139) serializes reads, dedupe/sort, and state writes per `ingest`; a batch method exists. Event adapters currently ingest individually. Profile a burst/backfill before wiring a batch change.
+- [Jujutsu graph search](plugins/@dshfiles/jujutsu/src/client.tsx#L379-L432) rebuilds filtered/layout input as text changes; [graph layout](plugins/@dshfiles/jujutsu/src/graph.ts#L262-L446) does branch/lane work over loaded revisions. Virtualization bounds mounted rows, not necessarily graph computation. Measure large/branchy graphs and search.
+- [Jujutsu workspace enumeration](plugins/@dshfiles/jj-integration/src/host.ts#L198-L266) walks projects/workspaces and performs multiple `jj` reads; finished-thread sweep and progress polling are additional possible costs. Profile many workspaces before changing concurrency.
+- [Agent Communication browse](tooling/dshx/packages/dshx/src/communication/service.ts#L260-L301) filters retained messages; tracked Host calls await durable activity recording before return ([host path](plugins/@dshfiles/agent-communication/src/host.ts#L466-L507)). Retention is bounded, but large histories/tool bursts still need real measurements.
+
+## Prototype gate and next steps
+
+No product-side prototype is justified by current evidence: warm conversation p95 stayed near 100 ms from 1 to 20 held turns, with no long-task signal. AI Accounts open p95 of 193.8 ms at 20 is a follow-up only: `n=10` makes p95 the maximum, and the benchmark has no Host/RPC timing to identify query wait versus rendering. If repeated cold/warm measurements show query wait, first candidate is idle-prefetch of the existing AI Accounts query/key through its existing QueryClient; compare request count, correct-content latency, memory and frame/task evidence. Do not add a second store.
 
 ## Resume here
 
-Finish validating the scratch AI Accounts route and fake-provider behavior; then measure correct transcript content for cold/warm navigation and command/panel interactions at 1, 5 and 20+ active agents. Choose a prototype from measured evidence, rerun the same workload, and write the final report. Clean up every scratch process and fake provider before closing.
+Add a representative long transcript and controlled simultaneous token streaming; separate first/cold Host reopen from retained warm switches; record Host/RPC timing versus content-visible time; and measure Jujutsu plus Agent Communication in the real browser. Then choose one small reversible product-side prototype only if that workload isolates a cost, and compare the same cold/warm 1/5/20+ workload. Keep React + TanStack Query unless DSH-specific evidence proves a supported boundary needs change. Finish with a recommendation and phased roadmap; do not implement a final migration.

@@ -87,6 +87,11 @@ const writeScratchState = async (state: ScratchState): Promise<void> => {
   await writeFile(stateFile(state.stateDir), `${JSON.stringify(state, null, 2)}\n`, { mode: 0o600 })
 }
 
+const trackFakeProvider = async (state: ScratchState, fakeProvider: NonNullable<ScratchState['fakeProvider']>): Promise<void> => {
+  const current = await readScratchState(state.stateDir, state.name)
+  await writeScratchState({ ...current, fakeProvider })
+}
+
 const removeScratchStateFile = (stateDir: string): Promise<void> => rm(stateFile(stateDir), { force: true })
 
 /** The state minus the launch token, safe to print. */
@@ -143,6 +148,7 @@ export class ScratchStateRuntime {
   static readonly resolveStateDir = resolveStateDir
   static readonly read = readScratchState
   static readonly write = writeScratchState
+  static readonly trackFakeProvider = trackFakeProvider
   static readonly remove = removeScratchStateFile
   static readonly publicState = publicState
   static readonly isWithin = isWithin

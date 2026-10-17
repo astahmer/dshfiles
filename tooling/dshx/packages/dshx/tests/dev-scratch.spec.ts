@@ -9,7 +9,7 @@ import { chromium } from 'playwright'
 import { runCli } from '../src/cli/run.js'
 import { StartupDialogs } from '../src/project/startup-dialogs.js'
 import { installFakeSecretCli, NEW_THREAD_START_BUTTON_NAME } from '../src/scratch/seed.js'
-import type { ScratchState } from '../src/scratch/state.js'
+import { ScratchStateRuntime, type ScratchState } from '../src/scratch/state.js'
 
 const run = async (argv: readonly string[]): Promise<{ readonly code: number; readonly stdout: string; readonly stderr: string }> => {
   const stdout = new PassThrough()
@@ -217,7 +217,7 @@ describe('dshx dev scratch commands', () => {
   })
 
   for (const seed of ['tool-call-thread', 'credential-recovery'] as const) {
-    it(`stops the fake model provider a ${seed} seed started`, async () => {
+    it(`tracks and stops the fake model provider during ${seed} setup`, async () => {
       const stateDir = await mkdtemp(join(tmpdir(), 'dshx-dev-spec-'))
       const home = await mkdtemp(join(tmpdir(), 'dshx-boot-profile-'))
       cleanups.push(
@@ -244,10 +244,13 @@ describe('dshx dev scratch commands', () => {
         browserLog: join(stateDir, 'browser.log'),
         browserEvents: join(stateDir, 'browser-events.jsonl'),
         evidenceDir: join(stateDir, 'evidence'),
-        seeds: [{ seed }],
-        fakeProvider: { pid: fakeProviderPid, signature: ['fake-provider-main.js', join(stateDir, 'fake-provider.ready')] },
       }
-      await writeFile(join(stateDir, 'state.json'), JSON.stringify(state), { mode: 0o600 })
+      await ScratchStateRuntime.write(state)
+      await ScratchStateRuntime.trackFakeProvider(state, {
+        pid: fakeProviderPid,
+        signature: ['fake-provider-main.js', join(stateDir, 'fake-provider.ready')],
+      })
+      expect((await ScratchStateRuntime.read(stateDir, state.name)).fakeProvider?.pid).toBe(fakeProviderPid)
 
       const dryRun = await run(['dev', 'down', '--dry-run', '--state-dir', stateDir, '--json'])
       expect(dryRun.stdout).toContain(`fake model provider pid ${String(fakeProviderPid)}`)

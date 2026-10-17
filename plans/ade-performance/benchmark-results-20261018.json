@@ -1,0 +1,3503 @@
+{
+  "schemaVersion": 1,
+  "capturedAt": "2026-10-18T00:38:48.603Z",
+  "scratchName": "ade-speed-20261018g",
+  "scratchPort": 53303,
+  "browserVersion": "141.0.7390.37",
+  "viewport": {
+    "width": 1440,
+    "height": 900,
+    "deviceScaleFactor": 1
+  },
+  "samplesPerDirection": 20,
+  "agentCreation": {
+    "summary": {
+      "count": 20,
+      "p50Ms": 113.2,
+      "p95Ms": 137,
+      "maxMs": 178.8,
+      "maxFrameGapMs": 33.4,
+      "longTaskCount": 0,
+      "maxLongTaskMs": null
+    },
+    "samples": [
+      {
+        "index": 1,
+        "title": "ADE Perf active 01",
+        "correctContentVisible": true,
+        "frameGapsMs": [
+          7.8,
+          16.7,
+          16.7,
+          16.6,
+          16.7,
+          16.6,
+          16.7,
+          16.7
+        ],
+        "longTaskMs": [],
+        "contentVisibleMs": 126.3
+      },
+      {
+        "index": 2,
+        "title": "ADE Perf active 02",
+        "correctContentVisible": true,
+        "frameGapsMs": [
+          10.5,
+          16.7,
+          16.7,
+          16.6,
+          16.6,
+          16.7
+        ],
+        "longTaskMs": [],
+        "contentVisibleMs": 94.8
+      },
+      {
+        "index": 3,
+        "title": "ADE Perf active 03",
+        "correctContentVisible": true,
+        "frameGapsMs": [
+          5.2,
+          16.6,
+          16.6,
+          16.8,
+          16.6,
+          16.7
+        ],
+        "longTaskMs": [],
+        "contentVisibleMs": 90.6
+      },
+      {
+        "index": 4,
+        "title": "ADE Perf active 04",
+        "correctContentVisible": true,
+        "frameGapsMs": [
+          3.6,
+          16.8,
+          16.6,
+          16.7,
+          16.6,
+          16.7,
+          16.6,
+          16.7
+        ],
+        "longTaskMs": [],
+        "contentVisibleMs": 122
+      },
+      {
+        "index": 5,
+        "title": "ADE Perf active 05",
+        "correctContentVisible": true,
+        "frameGapsMs": [
+          14.7,
+          16.6,
+          16.7,
+          16.6,
+          16.7,
+          16.6,
+          16.7
+        ],
+        "longTaskMs": [],
+        "contentVisibleMs": 115.8
+      },
+      {
+        "index": 6,
+        "title": "ADE Perf active 06",
+        "correctContentVisible": true,
+        "frameGapsMs": [
+          1.5,
+          16.6,
+          16.7,
+          16.7,
+          16.6,
+          16.7,
+          16.7,
+          16.7,
+          16.6
+        ],
+        "longTaskMs": [],
+        "contentVisibleMs": 137
+      },
+      {
+        "index": 7,
+        "title": "ADE Perf active 07",
+        "correctContentVisible": true,
+        "frameGapsMs": [
+          16.7,
+          16.7,
+          16.7,
+          16.6,
+          16.7,
+          16.7,
+          16.6
+        ],
+        "longTaskMs": [],
+        "contentVisibleMs": 118.7
+      },
+      {
+        "index": 8,
+        "title": "ADE Perf active 08",
+        "correctContentVisible": true,
+        "frameGapsMs": [
+          9.5,
+          16.7,
+          16.7,
+          16.7,
+          33.3,
+          16.6
+        ],
+        "longTaskMs": [],
+        "contentVisibleMs": 111.9
+      },
+      {
+        "index": 9,
+        "title": "ADE Perf active 09",
+        "correctContentVisible": true,
+        "frameGapsMs": [
+          10.6,
+          16.5,
+          16.8,
+          16.6,
+          33.4,
+          16.6
+        ],
+        "longTaskMs": [],
+        "contentVisibleMs": 113.2
+      },
+      {
+        "index": 10,
+        "title": "ADE Perf active 10",
+        "correctContentVisible": true,
+        "frameGapsMs": [
+          13,
+          16.7,
+          16.6,
+          16.7,
+          33.4,
+          16.6
+        ],
+        "longTaskMs": [],
+        "contentVisibleMs": 115.8
+      },
+      {
+        "index": 11,
+        "title": "ADE Perf active 11",
+        "correctContentVisible": true,
+        "frameGapsMs": [
+          7.8,
+          16.8,
+          16.6,
+          16.7,
+          33.3,
+          16.6
+        ],
+        "longTaskMs": [],
+        "contentVisibleMs": 110.8
+      },
+      {
+        "index": 12,
+        "title": "ADE Perf active 12",
+        "correctContentVisible": true,
+        "frameGapsMs": [
+          6.7,
+          16.6,
+          16.7,
+          16.7,
+          33.3,
+          16.7
+        ],
+        "longTaskMs": [],
+        "contentVisibleMs": 109.4
+      },
+      {
+        "index": 13,
+        "title": "ADE Perf active 13",
+        "correctContentVisible": true,
+        "frameGapsMs": [
+          9.1,
+          16.7,
+          16.7,
+          16.5,
+          16.7,
+          16.7,
+          16.7,
+          16.7
+        ],
+        "longTaskMs": [],
+        "contentVisibleMs": 129.3
+      },
+      {
+        "index": 14,
+        "title": "ADE Perf active 14",
+        "correctContentVisible": true,
+        "frameGapsMs": [
+          2.3,
+          16.6,
+          16.7,
+          16.7,
+          16.6,
+          16.7,
+          16.6
+        ],
+        "longTaskMs": [],
+        "contentVisibleMs": 103.8
+      },
+      {
+        "index": 15,
+        "title": "ADE Perf active 15",
+        "correctContentVisible": true,
+        "frameGapsMs": [
+          9.9,
+          16.7,
+          16.7,
+          16.6,
+          16.7,
+          16.7,
+          16.6,
+          16.7,
+          33.3,
+          16.7
+        ],
+        "longTaskMs": [],
+        "contentVisibleMs": 178.8
+      },
+      {
+        "index": 16,
+        "title": "ADE Perf active 16",
+        "correctContentVisible": true,
+        "frameGapsMs": [
+          8.2,
+          16.7,
+          16.6,
+          16.7,
+          16.7,
+          16.6,
+          16.7,
+          16.6
+        ],
+        "longTaskMs": [],
+        "contentVisibleMs": 127.4
+      },
+      {
+        "index": 17,
+        "title": "ADE Perf active 17",
+        "correctContentVisible": true,
+        "frameGapsMs": [
+          6.5,
+          16.7,
+          16.6,
+          16.7,
+          33.3,
+          16.7
+        ],
+        "longTaskMs": [],
+        "contentVisibleMs": 108.9
+      },
+      {
+        "index": 18,
+        "title": "ADE Perf active 18",
+        "correctContentVisible": true,
+        "frameGapsMs": [
+          12.1,
+          16.6,
+          16.7,
+          16.7,
+          33.3,
+          16.6
+        ],
+        "longTaskMs": [],
+        "contentVisibleMs": 114.5
+      },
+      {
+        "index": 19,
+        "title": "ADE Perf active 19",
+        "correctContentVisible": true,
+        "frameGapsMs": [
+          9.1,
+          16.7,
+          16.6,
+          16.6,
+          33.3,
+          16.7
+        ],
+        "longTaskMs": [],
+        "contentVisibleMs": 112.2
+      },
+      {
+        "index": 20,
+        "title": "ADE Perf active 20",
+        "correctContentVisible": true,
+        "frameGapsMs": [
+          4.6,
+          16.7,
+          16.7,
+          16.7,
+          33.3,
+          16.6
+        ],
+        "longTaskMs": [],
+        "contentVisibleMs": 106.9
+      }
+    ]
+  },
+  "observations": [
+    {
+      "activeAgentCount": 1,
+      "snapshot": {
+        "activeAgentCount": 1,
+        "runningSessionRows": 1,
+        "holdRequestAttempts": 1,
+        "sessionRows": 2,
+        "nodeCount": 608,
+        "usedHeapBytes": 76600000,
+        "totalHeapBytes": 148000000
+      },
+      "conversationTargets": [
+        {
+          "kind": "completed",
+          "title": "Fake thread title"
+        },
+        {
+          "kind": "active",
+          "title": "ADE Perf active 01"
+        }
+      ],
+      "conversationSwitch": {
+        "summary": {
+          "count": 40,
+          "p50Ms": 81.9,
+          "p95Ms": 98.5,
+          "maxMs": 99,
+          "maxFrameGapMs": 16.8,
+          "longTaskCount": 0,
+          "maxLongTaskMs": null
+        },
+        "samples": [
+          {
+            "target": "completed",
+            "title": "Fake thread title",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              8.4,
+              16.7,
+              16.7,
+              16.6,
+              16.7,
+              16.6
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 93.8
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 01",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              12.2,
+              16.7,
+              16.7,
+              16.6,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 81.2
+          },
+          {
+            "target": "completed",
+            "title": "Fake thread title",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              12.5,
+              16.7,
+              16.7,
+              16.6,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 80.3
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 01",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              14.1,
+              16.6,
+              16.7,
+              16.7,
+              16.7,
+              16.6
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 98.5
+          },
+          {
+            "target": "completed",
+            "title": "Fake thread title",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              14,
+              16.6,
+              16.7,
+              16.7,
+              16.6
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 81.9
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 01",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              13.8,
+              16.7,
+              16.7,
+              16.6,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 81.3
+          },
+          {
+            "target": "completed",
+            "title": "Fake thread title",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              14.3,
+              16.7,
+              16.7,
+              16.6,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 82.8
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 01",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              13.4,
+              16.6,
+              16.7,
+              16.7,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 82.1
+          },
+          {
+            "target": "completed",
+            "title": "Fake thread title",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              13.1,
+              16.7,
+              16.6,
+              16.7,
+              16.6
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 81.6
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 01",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              13.1,
+              16.7,
+              16.6,
+              16.7,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 81.2
+          },
+          {
+            "target": "completed",
+            "title": "Fake thread title",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              13.9,
+              16.6,
+              16.7,
+              16.6,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 82.3
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 01",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              13.5,
+              16.7,
+              16.6,
+              16.6,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 81.2
+          },
+          {
+            "target": "completed",
+            "title": "Fake thread title",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              14.2,
+              16.7,
+              16.7,
+              16.6,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 82.6
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 01",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              13.4,
+              16.7,
+              16.7,
+              16.7,
+              16.6
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 81.9
+          },
+          {
+            "target": "completed",
+            "title": "Fake thread title",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              13.4,
+              16.7,
+              16.7,
+              16.7,
+              16.6
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 81.8
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 01",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              13.4,
+              16.7,
+              16.6,
+              16.7,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 81.9
+          },
+          {
+            "target": "completed",
+            "title": "Fake thread title",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              13.4,
+              16.7,
+              16.7,
+              16.7,
+              16.6
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 81.8
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 01",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              13.7,
+              16.6,
+              16.7,
+              16.6,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 81.4
+          },
+          {
+            "target": "completed",
+            "title": "Fake thread title",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              14,
+              16.6,
+              16.7,
+              16.7,
+              16.6
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 82.5
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 01",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              13.4,
+              16.6,
+              16.8,
+              16.6,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 81.8
+          },
+          {
+            "target": "completed",
+            "title": "Fake thread title",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              13.5,
+              16.6,
+              16.7,
+              16.6,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 81.5
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 01",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              13.8,
+              16.6,
+              16.7,
+              16.7,
+              16.6
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 82.5
+          },
+          {
+            "target": "completed",
+            "title": "Fake thread title",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              13,
+              16.7,
+              16.6,
+              16.7,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 81.8
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 01",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              12.9,
+              16.7,
+              16.7,
+              16.6,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 80.8
+          },
+          {
+            "target": "completed",
+            "title": "Fake thread title",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              13.8,
+              16.6,
+              16.7,
+              16.7,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 82.3
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 01",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              13.3,
+              16.7,
+              16.6,
+              16.7,
+              16.6
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 81.7
+          },
+          {
+            "target": "completed",
+            "title": "Fake thread title",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              13.7,
+              16.6,
+              16.6,
+              16.8,
+              16.6
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 81.9
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 01",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              13.4,
+              16.7,
+              16.7,
+              16.7,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 81.9
+          },
+          {
+            "target": "completed",
+            "title": "Fake thread title",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              13.5,
+              16.6,
+              16.7,
+              16.7,
+              16.6,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 98.1
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 01",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              13.6,
+              16.7,
+              16.6,
+              16.7,
+              16.6
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 81.6
+          },
+          {
+            "target": "completed",
+            "title": "Fake thread title",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              13.9,
+              16.7,
+              16.6,
+              16.7,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 82.7
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 01",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              12.9,
+              16.7,
+              16.6,
+              16.7,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 81.2
+          },
+          {
+            "target": "completed",
+            "title": "Fake thread title",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              13.5,
+              16.7,
+              16.6,
+              16.7,
+              16.6
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 82
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 01",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              13.3,
+              16.7,
+              16.6,
+              16.7,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 81.9
+          },
+          {
+            "target": "completed",
+            "title": "Fake thread title",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              13.3,
+              16.7,
+              16.6,
+              16.7,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 81.8
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 01",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              13.4,
+              16.7,
+              16.6,
+              16.7,
+              16.6
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 81.9
+          },
+          {
+            "target": "completed",
+            "title": "Fake thread title",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              13.4,
+              16.7,
+              16.6,
+              16.7,
+              16.6
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 81.6
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 01",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              13.6,
+              16.7,
+              16.7,
+              16.6,
+              16.7,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 99
+          },
+          {
+            "target": "completed",
+            "title": "Fake thread title",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              12.9,
+              16.6,
+              16.6,
+              16.8,
+              16.6,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 98.6
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 01",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              12,
+              16.6,
+              16.8,
+              16.6,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 80.8
+          }
+        ],
+        "byTitle": {
+          "Fake thread title": {
+            "count": 20,
+            "p50Ms": 81.9,
+            "p95Ms": 98.1,
+            "maxMs": 98.6,
+            "maxFrameGapMs": 16.8,
+            "longTaskCount": 0,
+            "maxLongTaskMs": null
+          },
+          "ADE Perf active 01": {
+            "count": 20,
+            "p50Ms": 81.7,
+            "p95Ms": 98.5,
+            "maxMs": 99,
+            "maxFrameGapMs": 16.8,
+            "longTaskCount": 0,
+            "maxLongTaskMs": null
+          }
+        }
+      },
+      "pluginNavigation": {
+        "activityOpen": {
+          "summary": {
+            "count": 10,
+            "p50Ms": 65.3,
+            "p95Ms": 66.2,
+            "maxMs": 66.2,
+            "maxFrameGapMs": 16.8,
+            "longTaskCount": 0,
+            "maxLongTaskMs": null
+          },
+          "samples": [
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                12.9,
+                16.6,
+                16.6,
+                16.8
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 65.2
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                13.2,
+                16.7,
+                16.7,
+                16.6
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 65.6
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                12.8,
+                16.7,
+                16.7,
+                16.7
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 65.3
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                12.1,
+                16.7,
+                16.7,
+                16.6
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 63.3
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                13.7,
+                16.8,
+                16.6,
+                16.6
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 65.8
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                14.2,
+                16.7,
+                16.7,
+                16.6
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 66.2
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                12.9,
+                16.6,
+                16.8,
+                16.6
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 64.3
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                13,
+                16.7,
+                16.6,
+                16.7
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 65.4
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                13,
+                16.7,
+                16.6,
+                16.7
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 64.5
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                13.5,
+                16.7,
+                16.6,
+                16.7
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 65.6
+            }
+          ]
+        },
+        "aiAccountsOpen": {
+          "summary": {
+            "count": 10,
+            "p50Ms": 98.5,
+            "p95Ms": 101.7,
+            "maxMs": 101.7,
+            "maxFrameGapMs": 16.8,
+            "longTaskCount": 0,
+            "maxLongTaskMs": null
+          },
+          "samples": [
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                12.7,
+                16.6,
+                16.7,
+                16.7,
+                16.6,
+                16.8
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 101.7
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                12.6,
+                16.7,
+                16.6,
+                16.6,
+                16.7,
+                16.7
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 97.4
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                11.9,
+                16.7,
+                16.7,
+                16.6,
+                16.7,
+                16.6
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 96.8
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                13.9,
+                16.6,
+                16.7,
+                16.7,
+                16.7,
+                16.6
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 98.7
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                12.9,
+                16.7,
+                16.7,
+                16.6,
+                16.7,
+                16.7
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 98.5
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                13.3,
+                16.7,
+                16.6,
+                16.7,
+                16.7,
+                16.6
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 99
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                13.7,
+                16.7,
+                16.6,
+                16.7,
+                16.7,
+                16.7
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 99.3
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                12.6,
+                16.7,
+                16.6,
+                16.8,
+                16.6,
+                16.6
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 98.2
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                13.7,
+                16.7,
+                16.6,
+                16.7,
+                16.6,
+                16.7
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 99.3
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                11.4,
+                16.8,
+                16.6,
+                16.7,
+                16.7,
+                16.6
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 97
+            }
+          ]
+        },
+        "activityReturn": {
+          "summary": {
+            "count": 10,
+            "p50Ms": 64.7,
+            "p95Ms": 65.2,
+            "maxMs": 65.2,
+            "maxFrameGapMs": 16.7,
+            "longTaskCount": 0,
+            "maxLongTaskMs": null
+          },
+          "samples": [
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                8.5,
+                16.6,
+                16.7,
+                16.7
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 60.5
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                12.8,
+                16.7,
+                16.7,
+                16.7
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 65
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                12.9,
+                16.7,
+                16.7,
+                16.6
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 64.8
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                12.6,
+                16.6,
+                16.7,
+                16.6
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 64.7
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                12.6,
+                16.7,
+                16.7,
+                16.6
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 65.2
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                12.2,
+                16.7,
+                16.6,
+                16.7
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 63.3
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                12.7,
+                16.6,
+                16.7,
+                16.6
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 63.8
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                12.5,
+                16.7,
+                16.6,
+                16.7
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 64.7
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                12.6,
+                16.7,
+                16.6,
+                16.7
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 64
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                12.6,
+                16.6,
+                16.7,
+                16.6
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 64.8
+            }
+          ]
+        }
+      }
+    },
+    {
+      "activeAgentCount": 5,
+      "snapshot": {
+        "activeAgentCount": 5,
+        "runningSessionRows": 5,
+        "holdRequestAttempts": 5,
+        "sessionRows": 5,
+        "nodeCount": 716,
+        "usedHeapBytes": 76600000,
+        "totalHeapBytes": 148000000
+      },
+      "conversationTargets": [
+        {
+          "kind": "active",
+          "title": "ADE Perf active 05"
+        },
+        {
+          "kind": "active",
+          "title": "ADE Perf active 04"
+        }
+      ],
+      "conversationSwitch": {
+        "summary": {
+          "count": 40,
+          "p50Ms": 97.9,
+          "p95Ms": 99.2,
+          "maxMs": 164.3,
+          "maxFrameGapMs": 16.8,
+          "longTaskCount": 0,
+          "maxLongTaskMs": null
+        },
+        "samples": [
+          {
+            "target": "active",
+            "title": "ADE Perf active 05",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              7.4,
+              16.7,
+              16.6,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 59.2
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 04",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              12.2,
+              16.7,
+              16.7,
+              16.7,
+              16.7,
+              16.6,
+              16.6,
+              16.8,
+              16.6,
+              16.6
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 164.3
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 05",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              12.8,
+              16.7,
+              16.7,
+              16.6,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 81.7
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 04",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              12.6,
+              16.7,
+              16.7,
+              16.6,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 81.3
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 05",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              12.8,
+              16.7,
+              16.7,
+              16.6,
+              16.7,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 97.7
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 04",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              13.2,
+              16.6,
+              16.7,
+              16.7,
+              16.6,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 97.9
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 05",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              13.4,
+              16.7,
+              16.7,
+              16.6,
+              16.8
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 81.7
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 04",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              13.5,
+              16.6,
+              16.7,
+              16.7,
+              16.6,
+              16.8
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 99.2
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 05",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              12.2,
+              16.6,
+              16.7,
+              16.7,
+              16.7,
+              16.6
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 97.2
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 04",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              13.1,
+              16.7,
+              16.6,
+              16.7,
+              16.7,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 98.6
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 05",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              12.5,
+              16.6,
+              16.7,
+              16.7,
+              16.6,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 98.3
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 04",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              12.4,
+              16.6,
+              16.7,
+              16.7,
+              16.6,
+              16.8
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 98
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 05",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              12.4,
+              16.7,
+              16.6,
+              16.7,
+              16.6,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 97.8
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 04",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              12.2,
+              16.6,
+              16.7,
+              16.6,
+              16.7,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 97.5
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 05",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              12.9,
+              16.6,
+              16.7,
+              16.6,
+              16.8,
+              16.6
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 98.2
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 04",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              12.4,
+              16.6,
+              16.7,
+              16.7,
+              16.6,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 97.9
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 05",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              12.5,
+              16.7,
+              16.6,
+              16.8,
+              16.7,
+              16.6
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 98
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 04",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              12.4,
+              16.7,
+              16.7,
+              16.6,
+              16.8,
+              16.5
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 97.3
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 05",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              13.1,
+              16.7,
+              16.6,
+              16.6,
+              16.7,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 98.7
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 04",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              12.3,
+              16.7,
+              16.7,
+              16.6,
+              16.7,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 97.4
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 05",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              13.2,
+              16.6,
+              16.7,
+              16.6,
+              16.7,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 98.1
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 04",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              12.8,
+              16.7,
+              16.7,
+              16.6,
+              16.7,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 97.5
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 05",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              13.6,
+              16.6,
+              16.7,
+              16.7,
+              16.6,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 99
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 04",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              12.4,
+              16.6,
+              16.6,
+              16.8,
+              16.6,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 97.6
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 05",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              13.1,
+              16.6,
+              16.7,
+              16.6,
+              16.7,
+              16.6
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 97.9
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 04",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              13.6,
+              16.6,
+              16.8,
+              16.6,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 81.5
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 05",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              13.9,
+              16.6,
+              16.6,
+              16.7,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 81.7
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 04",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              13.9,
+              16.7,
+              16.6,
+              16.7,
+              16.6
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 81.7
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 05",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              13.8,
+              16.7,
+              16.6,
+              16.7,
+              16.7,
+              16.6
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 99.2
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 04",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              12.9,
+              16.6,
+              16.7,
+              16.7,
+              16.7,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 97.9
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 05",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              13.1,
+              16.7,
+              16.7,
+              16.6,
+              16.7,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 98.1
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 04",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              13.2,
+              16.6,
+              16.7,
+              16.7,
+              16.7,
+              16.6
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 98.5
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 05",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              12,
+              16.6,
+              16.8,
+              16.6,
+              16.7,
+              16.6
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 96.9
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 04",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              12.6,
+              16.6,
+              16.8,
+              16.6,
+              16.7,
+              16.6
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 97.5
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 05",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              13.4,
+              16.6,
+              16.7,
+              16.7,
+              16.6,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 98.5
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 04",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              12,
+              16.7,
+              16.7,
+              16.6,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 80.3
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 05",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              13.2,
+              16.6,
+              16.6,
+              16.7,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 81.7
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 04",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              13.1,
+              16.6,
+              16.7,
+              16.6,
+              16.7,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 98.5
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 05",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              12.9,
+              16.6,
+              16.6,
+              16.7,
+              16.7,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 98.4
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 04",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              12.5,
+              16.8,
+              16.5,
+              16.7,
+              16.7,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 98.4
+          }
+        ],
+        "byTitle": {
+          "ADE Perf active 05": {
+            "count": 20,
+            "p50Ms": 97.9,
+            "p95Ms": 99,
+            "maxMs": 99.2,
+            "maxFrameGapMs": 16.8,
+            "longTaskCount": 0,
+            "maxLongTaskMs": null
+          },
+          "ADE Perf active 04": {
+            "count": 20,
+            "p50Ms": 97.6,
+            "p95Ms": 99.2,
+            "maxMs": 164.3,
+            "maxFrameGapMs": 16.8,
+            "longTaskCount": 0,
+            "maxLongTaskMs": null
+          }
+        }
+      },
+      "pluginNavigation": {
+        "activityOpen": {
+          "summary": {
+            "count": 10,
+            "p50Ms": 64.8,
+            "p95Ms": 65.8,
+            "maxMs": 65.8,
+            "maxFrameGapMs": 16.8,
+            "longTaskCount": 0,
+            "maxLongTaskMs": null
+          },
+          "samples": [
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                9.9,
+                16.7,
+                16.7,
+                16.6
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 63
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                13,
+                16.6,
+                16.7,
+                16.6
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 64.8
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                13.3,
+                16.7,
+                16.7,
+                16.6
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 65.4
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                12.5,
+                16.6,
+                16.7,
+                16.7
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 64.6
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                12.8,
+                16.7,
+                16.7,
+                16.6
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 65.3
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                12.9,
+                16.6,
+                16.8,
+                16.6
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 65
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                12.7,
+                16.7,
+                16.6,
+                16.7
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 65.1
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                12.5,
+                16.7,
+                16.6,
+                16.7
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 64.7
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                12.5,
+                16.6,
+                16.7,
+                16.7
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 65.8
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                12.2,
+                16.7,
+                16.7,
+                16.6
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 64.5
+            }
+          ]
+        },
+        "aiAccountsOpen": {
+          "summary": {
+            "count": 10,
+            "p50Ms": 97.6,
+            "p95Ms": 98.3,
+            "maxMs": 98.3,
+            "maxFrameGapMs": 16.7,
+            "longTaskCount": 0,
+            "maxLongTaskMs": null
+          },
+          "samples": [
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                10.4,
+                16.6,
+                16.7,
+                16.7,
+                16.7,
+                16.7
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 95.6
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                13.1,
+                16.6,
+                16.7,
+                16.7,
+                16.6,
+                16.7
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 98.3
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                12.7,
+                16.7,
+                16.7,
+                16.6,
+                16.7,
+                16.6
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 98.3
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                12.5,
+                16.7,
+                16.7,
+                16.6,
+                16.7,
+                16.6
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 98
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                12.1,
+                16.6,
+                16.7,
+                16.7,
+                16.7,
+                16.7
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 97.6
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                12,
+                16.6,
+                16.7,
+                16.7,
+                16.6,
+                16.7
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 97.5
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                11.8,
+                16.7,
+                16.7,
+                16.6,
+                16.7,
+                16.7
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 97.5
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                12.2,
+                16.7,
+                16.6,
+                16.7,
+                16.7,
+                16.6
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 98.2
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                10.7,
+                16.6,
+                16.7,
+                16.6,
+                16.7,
+                16.7
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 96.4
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                12.3,
+                16.7,
+                16.6,
+                16.7,
+                16.7,
+                16.6
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 98.3
+            }
+          ]
+        },
+        "activityReturn": {
+          "summary": {
+            "count": 10,
+            "p50Ms": 64.2,
+            "p95Ms": 64.5,
+            "maxMs": 64.5,
+            "maxFrameGapMs": 16.8,
+            "longTaskCount": 0,
+            "maxLongTaskMs": null
+          },
+          "samples": [
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                12.3,
+                16.6,
+                16.7,
+                16.7
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 64.2
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                12.8,
+                16.7,
+                16.7,
+                16.6
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 64.5
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                12.1,
+                16.7,
+                16.6,
+                16.7
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 64.2
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                12.5,
+                16.8,
+                16.6,
+                16.7
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 64.3
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                12.4,
+                16.6,
+                16.6,
+                16.7
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 64.2
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                12.3,
+                16.6,
+                16.7,
+                16.7
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 64.3
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                11.8,
+                16.6,
+                16.7,
+                16.7
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 64.1
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                11.4,
+                16.7,
+                16.6,
+                16.7
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 63.5
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                12.1,
+                16.6,
+                16.7,
+                16.7
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 64.3
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                11.9,
+                16.7,
+                16.6,
+                16.7
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 64.1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "activeAgentCount": 20,
+      "snapshot": {
+        "activeAgentCount": 20,
+        "runningSessionRows": 20,
+        "holdRequestAttempts": 20,
+        "sessionRows": 20,
+        "nodeCount": 1099,
+        "usedHeapBytes": 76600000,
+        "totalHeapBytes": 148000000
+      },
+      "conversationTargets": [
+        {
+          "kind": "active",
+          "title": "ADE Perf active 20"
+        },
+        {
+          "kind": "active",
+          "title": "ADE Perf active 19"
+        }
+      ],
+      "conversationSwitch": {
+        "summary": {
+          "count": 40,
+          "p50Ms": 82.5,
+          "p95Ms": 98.4,
+          "maxMs": 114.6,
+          "maxFrameGapMs": 16.8,
+          "longTaskCount": 0,
+          "maxLongTaskMs": null
+        },
+        "samples": [
+          {
+            "target": "active",
+            "title": "ADE Perf active 20",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              9.9,
+              16.6,
+              16.7,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 62
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 19",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              12.6,
+              16.6,
+              16.7,
+              16.6,
+              16.8,
+              16.6
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 98
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 20",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              12.4,
+              16.6,
+              16.7,
+              16.6,
+              16.7,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 97.8
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 19",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              12.4,
+              16.8,
+              16.6,
+              16.7,
+              16.6,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 98.3
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 20",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              12,
+              16.7,
+              16.6,
+              16.7,
+              16.6,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 98
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 19",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              11.4,
+              16.8,
+              16.6,
+              16.7,
+              16.6,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 97.3
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 20",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              12,
+              16.6,
+              16.6,
+              16.8,
+              16.6,
+              16.6
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 97.4
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 19",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              12.3,
+              16.6,
+              16.6,
+              16.7,
+              16.7,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 98.5
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 20",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              11.2,
+              16.7,
+              16.7,
+              16.6,
+              16.7,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 97.3
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 19",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              11.2,
+              16.6,
+              16.7,
+              16.7,
+              16.6,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 96.8
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 20",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              12.3,
+              16.7,
+              16.7,
+              16.6,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 83.6
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 19",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              9,
+              16.7,
+              16.6,
+              16.6,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 78
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 20",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              12.4,
+              16.7,
+              16.7,
+              16.6,
+              16.6
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 81.2
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 19",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              12.7,
+              16.7,
+              16.6,
+              16.7,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 80.6
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 20",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              13.5,
+              16.7,
+              16.7,
+              16.6,
+              16.8
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 81.5
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 19",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              13.5,
+              16.8,
+              16.6,
+              16.7,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 82.5
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 20",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              11.5,
+              16.7,
+              16.7,
+              16.6,
+              16.7,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 97
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 19",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              12.2,
+              16.7,
+              16.7,
+              16.6,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 80.2
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 20",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              13.2,
+              16.7,
+              16.6,
+              16.6,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 81.3
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 19",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              13.3,
+              16.7,
+              16.6,
+              16.6,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 81.3
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 20",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              13.3,
+              16.6,
+              16.7,
+              16.7,
+              16.6
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 81.5
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 19",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              13.3,
+              16.7,
+              16.7,
+              16.7,
+              16.6
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 81.5
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 20",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              13.1,
+              16.6,
+              16.6,
+              16.8,
+              16.6
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 81.3
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 19",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              13.1,
+              16.6,
+              16.8,
+              16.6,
+              16.6
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 81.4
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 20",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              13.2,
+              16.7,
+              16.6,
+              16.7,
+              16.7,
+              16.6
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 98.1
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 19",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              11.6,
+              16.7,
+              16.7,
+              16.6,
+              16.6
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 79.9
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 20",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              13,
+              16.7,
+              16.7,
+              16.6,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 81.3
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 19",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              13.2,
+              16.6,
+              16.7,
+              16.7,
+              16.6
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 81.4
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 20",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              12.9,
+              16.7,
+              16.6,
+              16.7,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 81.4
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 19",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              12.8,
+              16.7,
+              16.7,
+              16.7,
+              16.6,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 97.6
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 20",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              13.3,
+              16.7,
+              16.7,
+              16.6,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 81.7
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 19",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              13,
+              16.6,
+              16.7,
+              16.7,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 81.4
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 20",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              12.6,
+              16.7,
+              16.6,
+              16.7,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 81
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 19",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              13,
+              16.7,
+              16.7,
+              16.6,
+              16.6,
+              16.7,
+              16.8
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 114.6
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 20",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              12.6,
+              16.8,
+              16.6,
+              16.7,
+              16.7,
+              16.6
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 97.7
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 19",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              12.8,
+              16.8,
+              16.6,
+              16.7,
+              16.7,
+              16.6
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 98.4
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 20",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              12.1,
+              16.6,
+              16.7,
+              16.7,
+              16.7,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 98.2
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 19",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              10.7,
+              16.7,
+              16.7,
+              16.6,
+              16.7,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 95.7
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 20",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              13.1,
+              16.6,
+              16.7,
+              16.7,
+              16.7,
+              16.6
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 98.1
+          },
+          {
+            "target": "active",
+            "title": "ADE Perf active 19",
+            "correctContentVisible": true,
+            "frameGapsMs": [
+              12.9,
+              16.6,
+              16.7,
+              16.7,
+              16.6,
+              16.7
+            ],
+            "longTaskMs": [],
+            "contentVisibleMs": 98.4
+          }
+        ],
+        "byTitle": {
+          "ADE Perf active 20": {
+            "count": 20,
+            "p50Ms": 81.7,
+            "p95Ms": 98.1,
+            "maxMs": 98.2,
+            "maxFrameGapMs": 16.8,
+            "longTaskCount": 0,
+            "maxLongTaskMs": null
+          },
+          "ADE Perf active 19": {
+            "count": 20,
+            "p50Ms": 82.5,
+            "p95Ms": 98.5,
+            "maxMs": 114.6,
+            "maxFrameGapMs": 16.8,
+            "longTaskCount": 0,
+            "maxLongTaskMs": null
+          }
+        }
+      },
+      "pluginNavigation": {
+        "activityOpen": {
+          "summary": {
+            "count": 10,
+            "p50Ms": 78.2,
+            "p95Ms": 112.4,
+            "maxMs": 112.4,
+            "maxFrameGapMs": 16.7,
+            "longTaskCount": 0,
+            "maxLongTaskMs": null
+          },
+          "samples": [
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                12.1,
+                16.6,
+                16.7,
+                16.6
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 66.1
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                10.4,
+                16.7,
+                16.7,
+                16.7
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 62.8
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                12.6,
+                16.7,
+                16.6,
+                16.7
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 64.8
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                11.5,
+                16.7,
+                16.6,
+                16.7
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 63.6
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                9.4,
+                16.6,
+                16.7,
+                16.7,
+                16.7
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 78.2
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                10.4,
+                16.6,
+                16.7,
+                16.6,
+                16.7
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 79.6
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                12.5,
+                16.7,
+                16.7,
+                16.6,
+                16.7
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 88.8
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                9.5,
+                16.6,
+                16.7,
+                16.6,
+                16.7
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 80.1
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                11.7,
+                16.7,
+                16.6,
+                16.7,
+                16.6
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 80.2
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                9.3,
+                16.6,
+                16.7,
+                16.6,
+                16.7,
+                16.7,
+                16.7
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 112.4
+            }
+          ]
+        },
+        "aiAccountsOpen": {
+          "summary": {
+            "count": 10,
+            "p50Ms": 97.8,
+            "p95Ms": 193.8,
+            "maxMs": 193.8,
+            "maxFrameGapMs": 16.8,
+            "longTaskCount": 0,
+            "maxLongTaskMs": null
+          },
+          "samples": [
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                7.8,
+                16.7,
+                16.7,
+                16.6,
+                16.7,
+                16.7,
+                16.6,
+                16.7,
+                16.6,
+                16.8,
+                16.6,
+                16.7
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 193.8
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                11.7,
+                16.7,
+                16.7,
+                16.6,
+                16.7,
+                16.7
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 97.5
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                10.9,
+                16.7,
+                16.7,
+                16.6,
+                16.6,
+                16.7
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 96.8
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                12,
+                16.6,
+                16.7,
+                16.6,
+                16.7,
+                16.6
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 97.8
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                8.6,
+                16.7,
+                16.7,
+                16.6,
+                16.6,
+                16.7,
+                16.7
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 111.2
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                9.8,
+                16.6,
+                16.6,
+                16.7,
+                16.7,
+                16.7
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 96.6
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                13,
+                16.6,
+                16.7,
+                16.6,
+                16.7,
+                16.7
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 99.5
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                9.3,
+                16.6,
+                16.8,
+                16.6,
+                16.7,
+                16.6
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 94.8
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                12.1,
+                16.7,
+                16.6,
+                16.7,
+                16.6,
+                16.8
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 100.8
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                8.2,
+                16.7,
+                16.7,
+                16.6,
+                16.7,
+                16.6,
+                16.7
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 110.6
+            }
+          ]
+        },
+        "activityReturn": {
+          "summary": {
+            "count": 10,
+            "p50Ms": 64.8,
+            "p95Ms": 131.9,
+            "maxMs": 131.9,
+            "maxFrameGapMs": 16.8,
+            "longTaskCount": 0,
+            "maxLongTaskMs": null
+          },
+          "samples": [
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                8.9,
+                16.7,
+                16.6,
+                16.7
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 62.8
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                11.9,
+                16.7,
+                16.6,
+                16.8
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 64.8
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                11.9,
+                16.6,
+                16.7,
+                16.7
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 64
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                10.7,
+                16.6,
+                16.7,
+                16.6
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 63.5
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                10.5,
+                16.7,
+                16.6,
+                16.6,
+                16.7
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 79.5
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                9.9,
+                16.7,
+                16.7,
+                16.6,
+                16.7
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 79.6
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                10,
+                16.7,
+                16.6,
+                16.7
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 62.9
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                12.5,
+                16.6,
+                16.8,
+                16.6
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 65.4
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                7.6,
+                16.6,
+                16.7,
+                16.7,
+                16.7
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 77
+            },
+            {
+              "correctContentVisible": true,
+              "frameGapsMs": [
+                12.4,
+                16.7,
+                16.6,
+                16.7,
+                16.6,
+                16.7,
+                16.6,
+                16.8
+              ],
+              "longTaskMs": [],
+              "contentVisibleMs": 131.9
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "olderSessionAccess": {
+    "revealClicks": 1,
+    "olderRowsVisibleMs": 108.2,
+    "transcriptSwitchMs": 135.2,
+    "totalCorrectContentMs": 246.2,
+    "correctContentVisible": true,
+    "revealFrameGapsMs": [
+      9.1,
+      16.6,
+      16.7,
+      16.6,
+      16.7,
+      16.7
+    ],
+    "revealLongTaskMs": [],
+    "transcriptFrameGapsMs": [
+      16.7,
+      16.7,
+      16.7,
+      16.6,
+      33.3,
+      16.7,
+      16.7
+    ],
+    "transcriptLongTaskMs": []
+  },
+  "finalSnapshot": {
+    "activeAgentCount": 20,
+    "runningSessionRows": 20,
+    "holdRequestAttempts": 20,
+    "sessionRows": 21,
+    "nodeCount": 1122,
+    "usedHeapBytes": 76600000,
+    "totalHeapBytes": 148000000
+  },
+  "assumptions": [
+    "Active agents are unique synthetic sessions held by the loopback fake provider; the visible Running row count verifies the expanded list, while provider request attempts are reported separately because a reconnect can retry a pending turn.",
+    "Correct-content latency is the exact target locator becoming visible after two requestAnimationFrame callbacks; it is a content-visible proxy, not compositor-paint or occlusion proof.",
+    "At higher session counts, recent rows stay visible while older rows require Show more; the older-session result includes expansion and transcript paint.",
+    "Conversation paint requires the expected transcript content plus two requestAnimationFrame callbacks after selection.",
+    "Long-task and frame-gap values come from a page-local PerformanceObserver and requestAnimationFrame sampler; the sampler itself adds a small measurement overhead.",
+    "Negative frame-gap deltas are excluded because a frame may have been scheduled before measurement start.",
+    "Startup timings are measured separately around dshx dev up; this script measures the first agent turn after the application is already booted."
+  ],
+  "runtime": {
+    "nodeVersion": "v22.23.3",
+    "platform": "darwin",
+    "architecture": "arm64",
+    "logicalCpuCount": 10,
+    "cpuModel": "Apple M4",
+    "bundles": [
+      "@dshfiles/ui-styles",
+      "@dshfiles/shared-runtime",
+      "@dshfiles/activity-timeline",
+      "@dshfiles/ai-accounts",
+      "@dshfiles/project-checks"
+    ]
+  }
+}
