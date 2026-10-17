@@ -20,7 +20,7 @@
         "Corrupt or unsupported directory data is left intact and writes are refused."
       ],
       "externalDependencies": [],
-      "reach": ["click button \"Run on Local\"", "click text \"Add host…\"", "expect dialog \"Add host\""],
+      "reach": ["click button \"New session\"", "click button \"Run on Local\"", "click text \"Add host…\"", "expect dialog \"Add host\""],
       "verification": [
         {
           "kind": "gherkin",
