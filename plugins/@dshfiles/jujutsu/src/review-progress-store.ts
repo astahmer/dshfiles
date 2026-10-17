@@ -1,6 +1,6 @@
 import { defineDomain, type KvTable } from '@deepseek-ai/dsh-storage-domain'
 import type { ReviewProgressSnapshot, ReviewProgressToggle } from './review-progress-api.js'
-import { boundedReviewMarks, reviewMarkSchema, reviewStoreSchema, type ReviewMark } from './review-progress.js'
+import { ReviewProgressModel, reviewMarkSchema, reviewStoreSchema, type ReviewMark } from './review-progress.js'
 
 export const reviewProgressDomain = defineDomain({
   name: 'jujutsu_review_progress',
@@ -52,7 +52,7 @@ export const createReviewProgressStore = ({
     return result
   }
 
-  const bounded = (): ReviewMark[] => boundedReviewMarks([...marks.values()].sort(byReviewedAtDescending))
+  const bounded = (): ReviewMark[] => ReviewProgressModel.boundedMarks([...marks.values()].sort(byReviewedAtDescending))
 
   const trim = (): void => {
     const kept = new Set(bounded().map(reviewMarkKey))

@@ -91,7 +91,7 @@ import { repositoryLoadingState } from './repository-loading.js'
 import { JUJUTSU_QUERY_GC_TIME, JUJUTSU_QUERY_STALE_TIME, jujutsuQueryKeys } from './repository-query-cache.js'
 import { ANCESTOR_COUNT_OPTIONS, usePreferences, type GraphDensity } from './preferences.js'
 import { jujutsuReviewProgressApi, type ReviewProgressSnapshot, type ReviewProgressToggle } from './review-progress-api.js'
-import { applyFileReviews, isFileReviewed, readReviewStore, reviewProgress, type ReviewChange, type ReviewStore } from './review-progress.js'
+import { ReviewProgressModel, type ReviewChange, type ReviewStore } from './review-progress.js'
 import { descendantCommitIds, emptyAncestorCandidates } from './source-control.js'
 import { SourceControlView } from './source-control-view.js'
 import { WorkspaceProvisionerDialog } from './workspace-provisioner.js'
@@ -149,9 +149,9 @@ const throwReadFailure = <Output extends object>(result: Output | ReadFailure): 
 
 const readLocalReviewStore = (): ReviewStore => {
   try {
-    return readReviewStore(localStorage.getItem(REVIEW_PROGRESS_KEY))
+    return ReviewProgressModel.readStore(localStorage.getItem(REVIEW_PROGRESS_KEY))
   } catch {
-    return readReviewStore(null)
+    return ReviewProgressModel.readStore(null)
   }
 }
 
@@ -281,7 +281,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
       return
     }
     const pending = readLocalReviewStore().marks.filter(
-      mark => !isFileReviewed(snapshot.store, mark.repositoryRoot, mark.commitId, { path: mark.path, contentDigest: mark.contentDigest }),
+      mark => !ReviewProgressModel.isReviewed(snapshot.store, mark.repositoryRoot, mark.commitId, { path: mark.path, contentDigest: mark.contentDigest }),
     )
     if (pending.length === 0) {
       rememberReviewMigration()
@@ -449,7 +449,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     enabled: repoId !== null && selectedRevision !== undefined,
   })
   const details = detailsQuery.data
-  const selectedReviewProgress = reviewProgress(reviewStore, state?.root ?? '', selectedRevision?.commitId ?? '', details?.files ?? [])
+  const selectedReviewProgress = ReviewProgressModel.progress(reviewStore, state?.root ?? '', selectedRevision?.commitId ?? '', details?.files ?? [])
 
   const fullDiffQuery = useQuery({
     queryKey: jujutsuQueryKeys.details(path, fullDiff?.commitId ?? ''),
@@ -774,7 +774,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     const commitId = selectedRevision.commitId
     const saved = changes.some(change => change.reviewed) ? 'Review progress saved.' : 'Review mark cleared.'
     if (!reviewAvailable) {
-      const next = applyFileReviews({ store: reviewStore, changes, repositoryRoot, commitId, reviewedAt: new Date().toISOString() })
+      const next = ReviewProgressModel.apply({ store: reviewStore, changes, repositoryRoot, commitId, reviewedAt: new Date().toISOString() })
       setReviewStore(next)
       const fallbackSaved = changes.some(change => change.reviewed) ? 'Review progress saved in this browser.' : 'Review mark cleared.'
       setReviewNotice(writeLocalReviewStore(next) ? fallbackSaved : 'Browser storage is unavailable. Review progress was not changed.')
@@ -963,7 +963,8 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   const revisionDetails = (revision: Revision): ReactNode => {
     const repositoryRoot = state?.root ?? ''
     const parent = revisionsByCommitId.get(revision.parents[0] ?? '')
-    const visibleFiles = details?.files.filter(file => !hideReviewedFiles || !isFileReviewed(reviewStore, repositoryRoot, revision.commitId, file)) ?? []
+    const visibleFiles =
+      details?.files.filter(file => !hideReviewedFiles || !ReviewProgressModel.isReviewed(reviewStore, repositoryRoot, revision.commitId, file)) ?? []
     const describeText = describeDrafts[revision.commitId] ?? editableDescription(revision.description)
     const describeChanged = RevisionGraphModel.describeDraftChanged(describeText, revision.description)
     const editing = editingDescription === revision.commitId && !revision.immutable
@@ -1102,11 +1103,13 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
                 const selected = new Set(paths)
                 updateFileReviews(
                   details.files
-                    .filter(file => selected.has(file.path) !== isFileReviewed(reviewStore, repositoryRoot, revision.commitId, file))
+                    .filter(file => selected.has(file.path) !== ReviewProgressModel.isReviewed(reviewStore, repositoryRoot, revision.commitId, file))
                     .map(file => ({ file, reviewed: selected.has(file.path) })),
                 )
               }}
-              selectedPaths={details.files.filter(file => isFileReviewed(reviewStore, repositoryRoot, revision.commitId, file)).map(file => file.path)}
+              selectedPaths={details.files
+                .filter(file => ReviewProgressModel.isReviewed(reviewStore, repositoryRoot, revision.commitId, file))
+                .map(file => file.path)}
               selectionLabel="Mark reviewed"
               view={preferences.fileView}
             />

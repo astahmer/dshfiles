@@ -45,7 +45,7 @@ export interface ReviewChange {
 
 const emptyReviewStore = (): ReviewStore => ({ schemaVersion: 1, marks: [] })
 
-export const readReviewStore = (source: string | null): ReviewStore => {
+const readReviewStore = (source: string | null): ReviewStore => {
   if (source === null || new TextEncoder().encode(source).byteLength > MAX_REVIEW_STORE_BYTES) return emptyReviewStore()
   try {
     const decoded: unknown = JSON.parse(source)
@@ -56,14 +56,14 @@ export const readReviewStore = (source: string | null): ReviewStore => {
   }
 }
 
-export const isFileReviewed = (store: ReviewStore, repositoryRoot: string, commitId: string, file: ReviewFile): boolean =>
+const isFileReviewed = (store: ReviewStore, repositoryRoot: string, commitId: string, file: ReviewFile): boolean =>
   file.contentDigest !== null &&
   store.marks.some(
     mark => mark.repositoryRoot === repositoryRoot && mark.commitId === commitId && mark.path === file.path && mark.contentDigest === file.contentDigest,
   )
 
 /** Newest marks win; keeps both the count and byte bounds the browser store enforced. */
-export const boundedReviewMarks = (ordered: readonly ReviewMark[]): ReviewMark[] => {
+const boundedReviewMarks = (ordered: readonly ReviewMark[]): ReviewMark[] => {
   const encoder = new TextEncoder()
   const emptySize = encoder.encode(JSON.stringify({ schemaVersion: 1, marks: [] })).byteLength
   const bounded: ReviewMark[] = []
@@ -80,13 +80,13 @@ export const boundedReviewMarks = (ordered: readonly ReviewMark[]): ReviewMark[]
 
 const byReviewedAtDescending = (left: ReviewMark, right: ReviewMark): number => right.reviewedAt.localeCompare(left.reviewedAt)
 
-export const toggleFileReview = (store: ReviewStore, mark: ReviewMark, reviewed: boolean): ReviewStore => {
+const toggleFileReview = (store: ReviewStore, mark: ReviewMark, reviewed: boolean): ReviewStore => {
   const previous = store.marks.filter(item => item.repositoryRoot !== mark.repositoryRoot || item.commitId !== mark.commitId || item.path !== mark.path)
   if (!reviewed) return reviewStoreSchema.parse({ schemaVersion: 1, marks: previous })
   return reviewStoreSchema.parse({ schemaVersion: 1, marks: boundedReviewMarks([...previous, mark].sort(byReviewedAtDescending)) })
 }
 
-export const applyFileReviews = ({
+const applyFileReviews = ({
   store,
   changes,
   repositoryRoot,
@@ -111,7 +111,7 @@ export const applyFileReviews = ({
     store,
   )
 
-export const reviewProgress = (
+const reviewProgress = (
   store: ReviewStore,
   repositoryRoot: string,
   commitId: string,
@@ -122,4 +122,13 @@ export const reviewProgress = (
     reviewed: reviewableFiles.filter(file => isFileReviewed(store, repositoryRoot, commitId, file)).length,
     total: reviewableFiles.length,
   }
+}
+
+export class ReviewProgressModel {
+  static readonly readStore = readReviewStore
+  static readonly isReviewed = isFileReviewed
+  static readonly boundedMarks = boundedReviewMarks
+  static readonly toggle = toggleFileReview
+  static readonly apply = applyFileReviews
+  static readonly progress = reviewProgress
 }
