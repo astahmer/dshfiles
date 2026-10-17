@@ -4,7 +4,7 @@ import { CommandRuntime } from '@deepseek-ai/dsh-commands'
 import { SystemPrompt } from '@deepseek-ai/dsh-system-prompt'
 import { ToolRuntime } from '@deepseek-ai/dsh-tools'
 import type { SlotRegistry } from '@deepseek-ai/dsh-client-ui-renderer/client'
-import type { ConnectionFetchHandler, ConnectionFetchRoute, HostConnectionHandle } from '@deepseek-ai/dsh-client-connection'
+import type { ConnectionFetchHandler, ConnectionFetchRoute, HostConnectionHandle, PeerScope } from '@deepseek-ai/dsh-client-connection'
 import { ApiProtocolModel } from '../api/common.js'
 import { ApiDefinitionModel } from '../api/define.js'
 import { createHostModule, createHostPlugin } from '../host/runtime.js'
@@ -44,9 +44,12 @@ export interface TestConnection {
 /** Provide the native Host Connection contract with an in-memory Fetch route carrier. */
 export function provideTestConnection(ctx: Context): TestConnection {
   const routes = new Map<string, ConnectionFetchRoute>()
-  const operator: HostConnectionHandle['operator'] = {
-    id: 'dshx-test' as HostConnectionHandle['operator']['id'],
+  const peer: PeerScope = {
+    id: 'dshx-test' as PeerScope['id'],
     ctx,
+    principal: { kind: 'owner' },
+    signal: new AbortController().signal,
+    interactions: 'answer',
     dispose: async () => undefined,
   }
   const notFound = (): Response => new Response('not found', { status: 404 })
@@ -55,7 +58,10 @@ export function provideTestConnection(ctx: Context): TestConnection {
     fetch: async request => (await routes.get(new URL(request.url).pathname)?.fetch(request)) ?? notFound(),
   }
   const connection: HostConnectionHandle = {
-    operator,
+    browserPeer: peer,
+    allowsRemoteAuthorities: false,
+    createPeer: options => ({ ...peer, principal: options.principal, interactions: options.interactions ?? 'answer' }),
+    admitConnection: () => ({ peer, release: async () => undefined }),
     fetch: {
       register(route) {
         if (routes.has(route.path)) throw new Error(`Connection route already registered: ${route.path}`)
@@ -75,7 +81,7 @@ export function provideTestConnection(ctx: Context): TestConnection {
     },
     createSharedFetchHandler: () => handler,
     requestRejection: () => undefined,
-    admit: () => ({ peer: operator }),
+    admit: () => ({ peer }),
     authorizeIndex: () => true,
     authenticatedUrl: baseUrl => baseUrl,
   }
@@ -93,7 +99,7 @@ export function provideTestConnection(ctx: Context): TestConnection {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ type: 'client-request', rpcId: 'dshx-test', method: endpoint, payload: { version, input } }),
       })
-      return handler.fetch(request)
+      return handler.fetch(request, peer)
     },
     dispose,
   }

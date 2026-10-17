@@ -6,7 +6,7 @@ import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import {
   IconCheckOutlineRegular, IconChevronDownOutlineRegular, IconChevronUpOutlineRegular, IconCloseOutlineRegular,
   FileTypeIcon, fileSizeText, IconEditOutlineRegular, IconQueueOutlineRegular, IconSendOutlineRegular,
-  IconTrashOutlineRegular, projectUserText, Tooltip,
+  IconTrashOutlineRegular, Tooltip, UserTextRun,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InboxState } from '@deepseek-ai/dsh-agent/types'
 import type { QueueAction } from '@deepseek-ai/dsh-api-session-controller/types'
@@ -278,7 +278,7 @@ export function QueueDock({ useSession, useProjection, updateQueue, notify, load
                             ))}
                         </span>
                       )}
-                      <span className={css.preview}>{projectUserText(previewOf(row.content), [])}</span>
+                      <span className={css.preview}><UserTextRun text={previewOf(row.content)} /></span>
                     </>
                   )}
                 {queueMutable && <div className={css.actions}>
@@ -392,7 +392,7 @@ export function QueueDock({ useSession, useProjection, updateQueue, notify, load
                       ))}
                   </span>
                 )}
-                <span className={css.preview}>{projectUserText(submission.text, [])}</span>
+                <span className={css.preview}><UserTextRun text={submission.text} /></span>
                 <span className={css.status} role="status">{t('queue.sending')}</span>
                 {queueMutable && <div className={css.actions}>
                   <button

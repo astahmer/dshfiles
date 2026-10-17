@@ -70,6 +70,7 @@ const session: SessionSnapshot = {
 
 const props = (): SubagentHeaderLineageProps => ({
   usePanelInfo: unavailable,
+  useAccess: unavailable,
   useSessionRetainInfo: unavailable,
   useWorkspaces: unavailable,
   useProjection: (key: Parameters<SubagentHeaderLineageProps['useProjection']>[0]) => (key === 'threadSidebarModelRoute' ? 'openai/gpt-6.1-luna' : undefined),
@@ -80,11 +81,15 @@ const props = (): SubagentHeaderLineageProps => ({
     captureInsertion: unavailable,
     insertText: unavailable,
     setDraft: unavailable,
+    persistDraft: unavailable,
     addAttachments: unavailable,
     removeAttachment: unavailable,
     pruneAttachments: unavailable,
     submit: unavailable,
   },
+  useRemoteAccess: unavailable,
+  useSessionAccess: unavailable,
+  useWorkspaceAccess: unavailable,
   useSessions: select => select(sessionList),
   useSession: select => select(session),
   useSessionStatus: <T,>(select: (snapshot: SessionStatusSnapshot) => T): T => select(new Map()),

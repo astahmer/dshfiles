@@ -1,5 +1,5 @@
 /**
- * Ported from @deepseek-ai/dsh-client-ui-settings-general@0.2.0-rc.2 (MIT): `GeneralSection.js`,
+ * Ported from @deepseek-ai/dsh-client-ui-settings-general@0.2.1-rc.2 (MIT): `GeneralSection.js`,
  * `CurrentVersionRow.js`, `DeveloperToolsRow.js` and `chrome.js`.
  */
 import type { ObservableSnapshot } from '@deepseek-ai/dsh-client-store'

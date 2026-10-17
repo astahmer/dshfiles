@@ -18,7 +18,7 @@ import type {} from '@deepseek-ai/dsh-token-meter/client'
 import css from './SubagentHeaderLineage.module.css'
 
 type SubagentCatalogSnapshot = Omit<SessionProjectionSnapshot, 'values' | 'state'> & {
-  state: 'loading' | 'ready' | 'error'
+  state: 'loading' | 'ready' | 'error' | 'migration-required'
   entries: (SessionProjectionMap['subagentCatalog'][number] & { activity: 'running' | 'inactive' })[]
 }
 type Catalogs = Readonly<Record<SessionId, SubagentCatalogSnapshot>>
@@ -198,7 +198,7 @@ function CatalogRows({
     }
   }, [running])
   const emptyLoading = catalog.state === 'loading' && catalog.entries.length === 0
-  const reserveDisclosure = catalog.entries.some(entry => !isKnownLeaf(catalogs[entry.id]))
+  const reserveDisclosure = catalog.entries.some(entry => entry.mode !== 'external' && !isKnownLeaf(catalogs[entry.id]))
   return (
     <>
       {emptyLoading && <CatalogLoadingRows t={t} />}
@@ -218,16 +218,30 @@ function CatalogRows({
         </div>
       )}
       {catalog.entries.map(entry => {
+        // An external execution has no local child Session, so it is a leaf that cannot be opened.
+        const external = entry.mode === 'external'
         const childCatalog = catalogs[entry.id]
         const isCurrent = entry.id === currentSessionId
         const isExpanded = expanded.has(entry.id)
-        const knownLeaf = isKnownLeaf(childCatalog)
+        const knownLeaf = external || isKnownLeaf(childCatalog)
         const childLoading = childCatalog === undefined || (childCatalog.state === 'loading' && childCatalog.entries.length === 0)
         const summary = summaries[entry.id]
         const label = entry.label ?? entry.id
-        const mode = entry.mode === 'unknown' ? t('mode.unknown') : entry.mode === 'one-shot' ? t('mode.oneShot') : t('mode.continuable')
-        const completed = entry.activity === 'inactive' && summary?.projectionValues?.subagentTiming?.lastTurnCompleted === true
-        const activity = entry.activity === 'running' ? t('activity.running') : completed ? t('activity.completed') : t('activity.inactive')
+        const mode = external
+          ? t('mode.external')
+          : entry.mode === 'unknown'
+            ? t('mode.unknown')
+            : entry.mode === 'one-shot'
+              ? t('mode.oneShot')
+              : t('mode.continuable')
+        const completed = !external && entry.activity === 'inactive' && summary?.projectionValues?.subagentTiming?.lastTurnCompleted === true
+        const activity = external
+          ? undefined
+          : entry.activity === 'running'
+            ? t('activity.running')
+            : completed
+              ? t('activity.completed')
+              : t('activity.inactive')
         const agentRoute = SubagentRouteLabelModel.displayedAgentRouteLabel(
           summary?.projectionValues?.threadSidebarModelRoute,
           summary?.projectionValues?.subagent,
@@ -246,6 +260,7 @@ function CatalogRows({
         const metrics = [tokenMetric, durationMetric?.exact].filter(value => value !== undefined).join(' · ')
 
         const open = (): void => {
+          if (external) return
           openChild({
             parentSessionId,
             childSessionId: entry.id,
@@ -256,6 +271,7 @@ function CatalogRows({
         const openAside = (event: MouseEvent<HTMLButtonElement>): void => {
           event.preventDefault()
           event.stopPropagation()
+          if (external) return
           openChildAside({ parentSessionId, childSessionId: entry.id, mode: entry.mode })
           closeCatalog()
         }
@@ -280,9 +296,10 @@ function CatalogRows({
           <div key={entry.id} className={css.node}>
             <div
               role="treeitem"
-              tabIndex={0}
+              tabIndex={external ? -1 : 0}
               aria-level={level}
               aria-current={isCurrent || undefined}
+              aria-disabled={external || undefined}
               aria-label={[label, secondary, metrics].filter(value => value !== '').join(' ')}
               {...(knownLeaf ? {} : { 'aria-expanded': isExpanded })}
               className={css.row}
@@ -320,7 +337,7 @@ function CatalogRows({
                     )}
                   </span>
                 )}
-                {!isCurrent && (
+                {!isCurrent && !external && (
                   <Tooltip label={t('open.sidebar')} side="bottom" align="end">
                     <button
                       type="button"

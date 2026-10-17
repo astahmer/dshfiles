@@ -1,5 +1,5 @@
 /**
- * Ported from @deepseek-ai/dsh-client-ui-settings-general@0.2.0-rc.2 (MIT): `settings-document-store.js`. Whether the
+ * Ported from @deepseek-ai/dsh-client-ui-settings-general@0.2.1-rc.2 (MIT): `settings-document-store.js`. Whether the
  * provider owns a local settings document, and its pathless native open. The action that renders it is
  * `open-config-action.tsx`, a split button in place of the native single button.
  */

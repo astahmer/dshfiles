@@ -27,10 +27,10 @@
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "catalog:",
-    "@deepseek-ai/dsh": "0.2.0-rc.2",
+    "@deepseek-ai/dsh": "0.2.1-rc.2",
     "@deepseek-ai/dsh-agent": "catalog:",
     "@deepseek-ai/dsh-llm": "catalog:",
-    "@deepseek-ai/dsh-scope": "0.2.0-rc.2",
+    "@deepseek-ai/dsh-scope": "0.2.1-rc.2",
     "@dshfiles/dshx": "workspace:*",
     "@types/node": "22.20.5",
     "typescript": "catalog:",
@@ -38,11 +38,11 @@
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "~4.0.4",
-    "@deepseek-ai/dsh": ">=0.2.0-rc.1 <0.3.0-0",
-    "@deepseek-ai/dsh-agent": ">=0.2.0-rc.1 <0.3.0-0",
-    "@deepseek-ai/dsh-llm": ">=0.2.0-rc.1 <0.3.0-0",
-    "@deepseek-ai/dsh-scope": ">=0.2.0-rc.1 <0.3.0-0",
-    "@deepseek-ai/dsh-tools": ">=0.2.0-rc.1 <0.3.0-0"
+    "@deepseek-ai/dsh": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-agent": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-llm": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-scope": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-tools": ">=0.2.1-rc.2 <0.3.0-0"
   },
   "engines": {
     "node": ">=22.13.0"

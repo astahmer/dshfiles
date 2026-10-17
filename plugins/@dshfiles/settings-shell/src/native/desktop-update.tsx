@@ -1,5 +1,5 @@
 /**
- * Ported from @deepseek-ai/dsh-client-ui-settings-general@0.2.0-rc.2 (MIT): `DesktopUpdateIndicator.js` and
+ * Ported from @deepseek-ai/dsh-client-ui-settings-general@0.2.1-rc.2 (MIT): `DesktopUpdateIndicator.js` and
  * `desktop-update-source.js`. Optional Electron update status; the native shell owns actions and Web owns copy.
  */
 import type { DesktopUpdateBridge, DesktopUpdatePresentation, DesktopUpdateView } from '@deepseek-ai/dsh-client-ui-settings-general/types'

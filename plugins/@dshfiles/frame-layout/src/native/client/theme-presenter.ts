@@ -10,6 +10,7 @@
  * so foreign attributes, metadata, and inline styles survive.
  */
 import type { ThemeSnapshot } from '@deepseek-ai/dsh-client-ui-theme/client'
+import { z } from 'zod'
 
 /** Body attribute selecting the dark base palette in the token stylesheets. */
 export const DARK_ATTRIBUTE = 'data-ds-dark-theme'
@@ -27,6 +28,25 @@ export const THEME_SOURCE_ATTRIBUTE = 'data-ds-theme-source'
 
 /** Body variable carrying the user's content font size in px. */
 export const CONTENT_FONT_SIZE_VARIABLE = '--dsh-content-font-size'
+
+/** Size the runtime uses for the text role when the snapshot carries neither shape. */
+export const DEFAULT_CONTENT_FONT_SIZE = 14
+
+/**
+ * Boundary decode for the content font size. `fontSizes` replaced the flat
+ * `fontSize` in 0.2.1, and a rebuilt client can run against the previous Host
+ * until the next restart, so accept both shapes. This presenter applies before
+ * anything else in the layout plugin: a throw here leaves the `layout` service
+ * unregistered and every entry that waits on it pending.
+ */
+export const readContentFontSize = (snapshot: unknown): number => {
+  const decoded = z.object({
+    fontSizes: z.object({ text: z.number() }).optional(),
+    fontSize: z.number().optional(),
+  }).safeParse(snapshot)
+  if (!decoded.success) return DEFAULT_CONTENT_FONT_SIZE
+  return decoded.data.fontSizes?.text ?? decoded.data.fontSize ?? DEFAULT_CONTENT_FONT_SIZE
+}
 
 /** Applies theme snapshots to the document; one instance per plugin fiber. */
 export class ThemePresenter {
@@ -58,7 +78,7 @@ export class ThemePresenter {
     const body = document.body
     if (scheme === 'dark') body.setAttribute(DARK_ATTRIBUTE, '')
     else body.removeAttribute(DARK_ATTRIBUTE)
-    body.style.setProperty(CONTENT_FONT_SIZE_VARIABLE, `${snapshot.fontSize}px`)
+    body.style.setProperty(CONTENT_FONT_SIZE_VARIABLE, `${readContentFontSize(snapshot)}px`)
     for (const name of this.appliedTokens) body.style.removeProperty(name)
     this.appliedTokens = []
     for (const [name, value] of Object.entries(snapshot.active.tokens)) {

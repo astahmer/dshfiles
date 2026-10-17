@@ -1,12 +1,13 @@
 import type {} from '@deepseek-ai/dsh-api-settings-controller/remote'
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
+import type { ClientReleaseChange } from '@deepseek-ai/dsh-client-modules/client'
 import type {} from '@deepseek-ai/dsh-plugin-manager/remote'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
-import { createSnapshotStore, type ObservableSnapshot } from '@deepseek-ai/dsh-client-store'
+import { createSnapshotStore, type ObservableSnapshot, type SnapshotSelectorHook } from '@deepseek-ai/dsh-client-store'
 import { closeTopModal } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client'
 import { resolveSlotLabel, type PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
@@ -22,6 +23,7 @@ import { DesktopUpdateBadge, DesktopUpdateSource, desktopUpdateBridge } from './
 import { SettingsDocumentStore } from './native/document-action.js'
 import { OpenConfigAction, type ConfigFileOpeners } from './open-config-action.js'
 import { CloseLabel, CurrentVersionRow, DeveloperToolsRow, GeneralSection, HeaderContent, TriggerContent } from './native/general-section.js'
+import { HostReleasePrompt } from './native/host-release-prompt.js'
 import { SHELL_LOCALE_NAMESPACE, shellLocale, type ShellTranslate } from './native/locales.js'
 import { ShellRoot, type OnboardingStep, type ShellRootDeps } from './native/shell-root.js'
 import { SHELL_CHILDREN, type ShellRenderSlot } from './native/slots.js'
@@ -96,7 +98,7 @@ const CurrentVersion = (props: { readonly t: ShellTranslate }): JSX.Element => {
 export default defineClient({
   name: '@dshfiles/settings-shell',
   locales: [shellLocale, welcomeLocale],
-  inject: ['slots', 'connection', 'remote', 'remote.settings', 'remote.session', 'configForms', 'shortcuts', 'sessions', 'layout'],
+  inject: ['slots', 'connection', 'remote', 'remote.settings', 'remote.session', 'configForms', 'shortcuts', 'sessions', 'layout', 'modules'],
   setup(ctx, decorate, metadata) {
     const t = ctx.locale.bind(SHELL_LOCALE_NAMESPACE)
     const connection = clientConnectionSchema.parse(ctx.get('connection'))
@@ -518,6 +520,28 @@ export default defineClient({
         ),
       )
     }
+
+    // A page that reconnected to another Host release pauses plugin updates until the user reloads.
+    ctx.slots.inject('shell.overlay', () =>
+      ctx.slots.register(
+        {
+          name: 'shell.overlay',
+          id: 'host-release-change',
+          locale: SHELL_LOCALE_NAMESPACE,
+          inject: () => ({
+            dismissRelease: (): void => ctx.modules.entries.dismissRelease(),
+            reloadPage: (): void => globalThis.location.reload(),
+            hooks: { releaseChange: ctx.modules.entries.releaseChange },
+          }),
+        },
+        (props: {
+          readonly t: ShellTranslate
+          readonly useReleaseChange: SnapshotSelectorHook<ClientReleaseChange | undefined>
+          readonly dismissRelease: () => void
+          readonly reloadPage: () => void
+        }) => <HostReleasePrompt {...props} />,
+      ),
+    )
 
     // Native policy: only a loopback page gets the privileged document actions (and the path they reveal).
     if (ctx.remote.$host.isLoopback) {

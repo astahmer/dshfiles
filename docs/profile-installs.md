@@ -105,7 +105,7 @@ Two failure modes to recognize:
   tries to resolve `@deepseek-ai/dsh-type-meta`, which is not on npm at all
   (404).
 - **The public `@deepseek-ai/*` npm line is a different, older generation**
-  (`0.0.1-rc.x`) from what DSH 0.2.0-rc.2 ships internally. Installing them to
+  (`0.0.1-rc.x`) from what DSH 0.2.1-rc.2 ships internally. Installing them to
   satisfy a peer will make the plugin manager reject them as version-incompatible
   — correctly, because they genuinely are not the same code.
 

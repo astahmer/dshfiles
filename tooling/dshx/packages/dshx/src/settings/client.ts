@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import type z from '@deepseek-ai/schemastery'
-import type { ConfigForms as OfficialConfigForms } from '@deepseek-ai/dsh-client-ui-settings/client'
+import type { ConfigForms as OfficialConfigForms, ConfigFormSnapshot } from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { SettingsContract, SettingsReadError, SettingsState, SettingsValue } from './types.js'
 
 type ReactRuntime = typeof import('react')
@@ -95,7 +95,7 @@ function unavailableScope<T>(message: string): Scope<T> {
     user: undefined,
     revision: undefined,
     writable: false,
-    mode: 'host',
+    mode: 'memory',
   }
   const reject = (): Promise<boolean> => Promise.reject(new Error(message))
   return {
@@ -130,7 +130,7 @@ export function createSettingsClientRuntime(ctx: ContextLike): SettingsClientRun
       const existing = bindings.get(contract)
       if (existing !== undefined) return existing as Binding<T>
       const source = forms?.get<unknown>(contract.namespace) ?? unavailableScope<unknown>(missing)
-      let previous: ScopeSnapshot<unknown> | undefined
+      let previous: ConfigFormSnapshot<unknown> | undefined
       let snapshot: ScopeSnapshot<T>
       const scope: Scope<T> = {
         subscribe: listener => source.subscribe(listener),
@@ -143,9 +143,9 @@ export function createSettingsClientRuntime(ctx: ContextLike): SettingsClientRun
             try {
               const value =
                 next.status !== 'ready' ? undefined : contract.client === undefined ? (contract.schema(next.value) as T) : contract.client.decode(next.value)
-              snapshot = { ...next, value }
+              snapshot = { ...next, value, mode: 'host' }
             } catch {
-              snapshot = { ...next, value: undefined, status: 'unavailable' }
+              snapshot = { ...next, value: undefined, status: 'unavailable', mode: 'host' }
             }
           }
           return snapshot

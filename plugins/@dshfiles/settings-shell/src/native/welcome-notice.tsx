@@ -1,5 +1,5 @@
 /**
- * Ported from @deepseek-ai/dsh-client-ui-settings-models@0.2.0-rc.2 (MIT): `OnboardingModal.js`, `WelcomeNotice.js`,
+ * Ported from @deepseek-ai/dsh-client-ui-settings-models@0.2.1-rc.2 (MIT): `OnboardingModal.js`, `WelcomeNotice.js`,
  * `welcome-store.js`, `onboarding-copy.js` and the welcome copy of its dictionaries. The native step keeps its
  * acknowledgement in the `ui-settings-general` namespace, which only the switched-off native row serves, so this copy
  * shadows the `welcome-notice` onboarding entry and keeps it in this plugin's own namespace instead.
@@ -68,10 +68,12 @@ const providedWelcomeNoticeMachine = welcomeNoticeMachine.provide({ actors: { pe
 
 const scopeState = (scope: ConfigForm<unknown>): WelcomeNoticeScopeState => {
   const snapshot = scope.getSnapshot()
-  if (snapshot.mode === 'memory') return { mode: snapshot.mode, status: snapshot.status, acknowledged: false }
+  // DSH 0.2.1 dropped the snapshot's explicit `mode`; a scope the Host keeps process-local is the one it never accepts writes for.
+  const mode: WelcomeNoticeScopeState['mode'] = snapshot.writable ? 'host' : 'memory'
+  if (mode === 'memory') return { mode, status: snapshot.status, acknowledged: false }
   const parsed = ackSchema.safeParse(snapshot.value)
   return {
-    mode: snapshot.mode,
+    mode,
     status: snapshot.status,
     acknowledged: snapshot.status === 'ready' && parsed.success && parsed.data[WELCOME_NOTICE_ACK_FIELD] === WELCOME_NOTICE_VERSION,
   }

@@ -1,7 +1,7 @@
 # dshfiles
 
 Personal DeepSeek Harness (DSH) setup: marketplace plugins we adopt, and
-plugins we own. The repository runs on stock DSH 0.2.0-rc.2; it carries no
+plugins we own. The repository runs on stock DSH 0.2.1-rc.2; it carries no
 core patches. Never patch DSH core from this repository or recommend a core
 patch as a fallback. If a need cannot be expressed through supported dshx or
 plugin APIs, document the concrete Host/core gap in `plans/dsh-host-gaps.md`

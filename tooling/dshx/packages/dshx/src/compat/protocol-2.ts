@@ -1,6 +1,6 @@
 import type { DshCompatibility } from './types.js'
 
-const VERIFIED_PROTOCOL_2_VERSIONS = ['0.2.0-rc.1', '0.2.0-rc.2'] as const
+const VERIFIED_PROTOCOL_2_VERSIONS = ['0.2.0-rc.1', '0.2.0-rc.2', '0.2.1-rc.2'] as const
 
 /**
  * Adapter for the second observable DSH contract generation.

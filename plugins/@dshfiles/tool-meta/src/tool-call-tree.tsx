@@ -1,5 +1,5 @@
 import type { RenderOpts, StoredEntry } from '@deepseek-ai/dsh-client-ui-slots'
-import type { ToolCallHookContext, ToolCallOwnerProps, ToolTreeProps } from '@deepseek-ai/dsh-client-ui-tool/client'
+import type { ToolCallOwnerProps, ToolTreeProps } from '@deepseek-ai/dsh-client-ui-tool/client'
 import { createElement, useEffect, useMemo, useRef, type ComponentType, type ReactElement, type ReactNode } from 'react'
 import { warnOnce } from './warn-once.js'
 
@@ -24,7 +24,7 @@ export const wrapToolCallTree = (input: { readonly tree: ComponentType<ToolTreeP
     const dispatched = useRef(false)
     const renderSlot = useMemo((): RenderToolView | undefined => {
       if (nativeRenderSlot === undefined) return undefined
-      const framed = (key: 'tool.call.toolview', owner: ToolCallOwnerProps, options: RenderOpts & { readonly hookContext: ToolCallHookContext }): ReactNode => {
+      const framed = (key: 'tool.call.toolview', owner: ToolCallOwnerProps, options: RenderOpts): ReactNode => {
         dispatched.current = true
         return (
           <div className="dshx:relative" data-dshfiles-tool-meta-frame="">

@@ -25,7 +25,7 @@ describe('runtime launch file', () => {
   test('overwrites insecure existing metadata, tightens modes, and removes its own record', async () => {
     const home = await mkdtemp(join(tmpdir(), 'multi-host-launch-'))
     homes.push(home)
-    const [path] = launchFilePaths(home)
+    const [path] = RuntimeLaunchFile.launchFilePaths(home)
     const directory = dirname(path)
     await mkdir(directory, { recursive: true, mode: 0o700 })
     await chmod(directory, 0o777)
@@ -34,25 +34,25 @@ describe('runtime launch file', () => {
     })
     await chmod(path, 0o644)
 
-    await writeLaunchFile({ dshHome: home, launchUrl: 'http://127.0.0.1:43124/?token=new-runtime-token-5678' })
+    await RuntimeLaunchFile.writeLaunchFile({ dshHome: home, launchUrl: 'http://127.0.0.1:43124/?token=new-runtime-token-5678' })
 
     expect((await stat(directory)).mode & 0o777).toBe(0o700)
     expect((await stat(path)).mode & 0o777).toBe(0o600)
     const content = await readFile(path, 'utf8')
     expect(content).not.toContain('old-runtime-token-1234')
-    expect(parseRuntimeLaunch(content)).toEqual({ port: 43124, token: 'new-runtime-token-5678' })
+    expect(RuntimeLaunchFile.parseRuntimeLaunch(content)).toEqual({ port: 43124, token: 'new-runtime-token-5678' })
 
-    await removeLaunchFile(path)
+    await RuntimeLaunchFile.removeLaunchFile(path)
     await expect(stat(path)).rejects.toMatchObject({ code: 'ENOENT' })
   })
 
   test('removes a temporary token file when publishing fails', async () => {
     const home = await mkdtemp(join(tmpdir(), 'multi-host-launch-'))
     homes.push(home)
-    const [path] = launchFilePaths(home)
+    const [path] = RuntimeLaunchFile.launchFilePaths(home)
     await mkdir(path, { recursive: true, mode: 0o700 })
 
-    await expect(writeLaunchFile({ dshHome: home, launchUrl: 'http://127.0.0.1:43125/?token=cleanup-token-12345' })).rejects.toThrow()
+    await expect(RuntimeLaunchFile.writeLaunchFile({ dshHome: home, launchUrl: 'http://127.0.0.1:43125/?token=cleanup-token-12345' })).rejects.toThrow()
     expect(await readdir(dirname(path))).toEqual(['launch.json'])
   })
 

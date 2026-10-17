@@ -9,7 +9,7 @@ export interface SessionCostDisplayValue {
   readonly rows: readonly SessionCostDialogRow[]
 }
 
-const STATS_ROOT = '[data-composer-stats]'
+const STATS_ROOT = '[data-composer-stat="usage"]'
 const DIALOG_TRIGGER = 'button[aria-haspopup="dialog"]'
 const DOCK_ANCHOR = '[data-slot="conversation.composer.dock"]'
 const COST_ATTRIBUTE = 'data-ai-accounts-session-cost'

@@ -107,7 +107,7 @@ describe('account provider profiles', () => {
     expect(model).toMatchObject({ provider: 'github-copilot-work', api: 'openai-responses' })
   })
 
-  it('adds custom OpenCode Go models and keeps non-favorites available', () => {
+  it('offers a custom OpenCode Go model the catalog already knows and keeps non-favorites available', () => {
     const profile = buildProfile({
       upstream: opencodeGoProvider(),
       provider: 'opencode-go-alex',
@@ -118,11 +118,11 @@ describe('account provider profiles', () => {
     const models = modelsFor(profile)
 
     expect(models.map(model => model.id)).toContain('minimax-m3')
-    expect(models.map(model => model.id)).toContain('deepseek-v4-flash')
+    expect(models.map(model => model.id)).toContain('deepseek-v4.1-flash')
     expect(models.find(model => model.id === 'step-5-preview-free')).toMatchObject({
       api: 'openai-completions',
       id: 'step-5-preview-free',
-      name: 'opencode-go-alex/step-5-preview-free',
+      name: 'opencode-go-alex/Step 5 Preview Free',
       provider: 'opencode-go-alex',
     })
   })
@@ -156,10 +156,10 @@ describe('account provider profiles', () => {
       provider: 'opencode-go-alex',
       displayName: 'OpenCode Go Alex',
       additionalModelIds: [],
-      hiddenModelIds: ['deepseek-v4-flash'],
+      hiddenModelIds: ['deepseek-v4.1-flash'],
     })
 
-    expect(modelsFor(profile).map(model => model.id)).not.toContain('deepseek-v4-flash')
+    expect(modelsFor(profile).map(model => model.id)).not.toContain('deepseek-v4.1-flash')
   })
 })
 
@@ -221,8 +221,8 @@ describe('Codex upstream replay overflow', () => {
 })
 
 describe('OpenCode Go DeepSeek thinking', () => {
-  const wireBody = async (model: string, reasoningEffort?: string): Promise<Record<string, unknown>> => {
-    const profile = buildProfile({ upstream: opencodeGoProvider(), provider: 'opencode-go-test', displayName: 'OpenCode Go Test', additionalModelIds: [] })
+  const wireBody = async (model: string, reasoningEffort?: string, upstream = opencodeGoProvider()): Promise<Record<string, unknown>> => {
+    const profile = buildProfile({ upstream, provider: 'opencode-go-test', displayName: 'OpenCode Go Test', additionalModelIds: [] })
     const adapter = new EffortPinnedAdapter(
       {
         profiles: () => new Map([['opencode-go-test', profile]]),
@@ -280,6 +280,12 @@ describe('OpenCode Go DeepSeek thinking', () => {
   })
 
   it('leaves a DeepSeek model whose catalog already offered off unchanged', async () => {
-    expect(await wireBody('deepseek-v4-flash')).toMatchObject({ thinking: { type: 'disabled' } })
+    const upstream = opencodeGoProvider()
+    const catalogOffersOff = upstream
+      .getModels()
+      .map(model => (model.id === 'deepseek-v4.1-flash' ? { ...model, thinkingLevelMap: { ...model.thinkingLevelMap, off: 'none' } } : model))
+    const alreadyOff = { ...upstream, getModels: () => catalogOffersOff }
+
+    expect(await wireBody('deepseek-v4.1-flash', undefined, alreadyOff)).toMatchObject({ thinking: { type: 'disabled' } })
   })
 })

@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render, screen } from '@testing-library/react'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
+import { PartialArguments } from '@deepseek-ai/dsh-util-values'
 import { SubagentProvenanceToolRow } from './subagent-tool-row.js'
 
 vi.mock('@deepseek-ai/dsh-client-ui-primitives', () => ({
@@ -52,6 +53,7 @@ const props = ({
     time: 1,
     subCalls: [],
     argsRaw: JSON.stringify({ prompt, provider, model }),
+    args: PartialArguments.fromText(JSON.stringify({ prompt, provider, model })),
   },
   callId: 'call-1',
   toolName: 'subagent',
@@ -60,7 +62,10 @@ const props = ({
   openFile: unused,
   loadImage: unused,
   useDisclosure: () => ({ expanded, setExpanded: unused, toggle: unused }),
-  useToolCallArgumentsPartial: () => '',
+  useAccess: unused,
+  useRemoteAccess: unused,
+  useSessionAccess: unused,
+  useWorkspaceAccess: unused,
   useWorkspaces: unused,
   usePanelInfo: unused,
   useSessions: unused,
@@ -73,6 +78,7 @@ const props = ({
     captureInsertion: unused,
     insertText: unused,
     setDraft: unused,
+    persistDraft: unused,
     addAttachments: unused,
     removeAttachment: unused,
     pruneAttachments: unused,

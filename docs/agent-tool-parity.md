@@ -2,10 +2,12 @@
 
 Every capability a human can reach in DSH should be reachable by an Agent through a
 tool, the way BB gives plugins a capability API plus `registerTool`. This document
-audits that parity across the owned plugins and the native DSH surfaces we run
-(DSH `0.2.0-rc.2`, revision `thread-d91e67`), lists every missing tool with the
-Host verb its implementation would call, and separates what a plugin can build
-from what needs a Host verb first.
+audits that parity across the owned plugins and the native DSH surfaces we run.
+The survey below was taken on DSH `0.2.0-rc.2`, revision `thread-d91e67`, so treat
+its native-side findings as of that version until the affected rows are re-checked
+against the installed runtime; it lists every missing tool with the Host verb its
+implementation would call, and separates what a plugin can build from what needs a
+Host verb first.
 
 The rules that keep the list honest:
 

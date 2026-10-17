@@ -1,5 +1,5 @@
-import type { ComposerAttachmentsProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
-import type { MessageImagesProps } from '@deepseek-ai/dsh-client-ui-chat/client'
+import type { ComposerAttachmentsProps, MessageImageLabels } from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import type { AttachmentRailLabels } from '../AttachmentRail.js'
 import type { DropOverlayLabels } from '../DropOverlay.js'
 import type { FileCardLabels } from '../FileCard.js'
@@ -17,14 +17,26 @@ export class AttachmentGalleryLabelsModel {
     loading: t('loading'),
   })
 
-  static readonly messageImageLabels = (t: MessageImagesProps['t'], lightbox: ImageLightboxLabels): ImageLabels => ({
-    image: t('image.label'),
-    open: t('image.openOriginal'),
-    openNamed: label => t('image.openOriginalLabel', { label }),
-    loading: t('image.loading'),
-    loadFailed: t('image.loadFailed'),
-    lightbox,
-  })
+  static readonly messageImageLabels = (t: TranslateNS<'conversation'>, lightbox: ImageLightboxLabels, override?: MessageImageLabels): ImageLabels => {
+    if (override !== undefined) {
+      return {
+        image: override.image,
+        open: override.open,
+        openNamed: override.openNamed,
+        loading: override.loading,
+        loadFailed: override.loadFailed,
+        lightbox,
+      }
+    }
+    return {
+      image: t('image.label'),
+      open: t('image.openOriginal'),
+      openNamed: label => t('image.openOriginalLabel', { label }),
+      loading: t('image.loading'),
+      loadFailed: t('image.loadFailed'),
+      lightbox,
+    }
+  }
 
   static readonly dropOverlayLabels = (
     t: ComposerAttachmentsProps['t'],

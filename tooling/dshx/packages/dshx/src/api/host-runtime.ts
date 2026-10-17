@@ -145,7 +145,7 @@ async function registerRoutes(
             })
             return Response.json(mismatch)
           }
-          const result = await dispatch(method, message.payload, request.signal, { kind: 'client' }, connection.operator)
+          const result = await dispatch(method, message.payload, request.signal, { kind: 'client' }, connection.browserPeer)
           return Response.json(serverResponseSchema.parse({ type: 'server-response', rpcId: message.rpcId, result }))
         },
       }

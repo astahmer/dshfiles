@@ -320,7 +320,7 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
 }
 
 /**
- * The dialog frame, ported from the native `SettingsPanel` (@deepseek-ai/dsh-client-ui-settings-general@0.2.0-rc.2,
+ * The dialog frame, ported from the native `SettingsPanel` (@deepseek-ai/dsh-client-ui-settings-general@0.2.1-rc.2,
  * MIT): body-portaled mask and panel closed by the header button, a mask click and document-level Escape. Expanded,
  * the panel fills the window below the frame chrome, like VS Code's maximized editor.
  */

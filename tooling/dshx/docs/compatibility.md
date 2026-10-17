@@ -18,7 +18,7 @@ ranges, selects the adapter, and reports capabilities.
 | Field | Value |
 |---|---|
 | DSH range | `>=0.2.0-rc.1 <0.3.0-0` |
-| Verified versions | `0.2.0-rc.1`, `0.2.0-rc.2` |
+| Verified versions | `0.2.0-rc.1`, `0.2.0-rc.2`, `0.2.1-rc.2` |
 | Node range | `^22.19.0 \|\| >=24.0.0` |
 | Settings service | `configForms` from `@deepseek-ai/dsh-client-ui-settings` |
 | Conversation contracts | `@deepseek-ai/dsh-client-ui-conversation` |

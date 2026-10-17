@@ -4,11 +4,12 @@ import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-tool/client'
 import type {} from '@deepseek-ai/dsh-client-ui-trajectory/client'
+import type { ComposerAttachmentsProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type { FactoryComponentPropsOf } from '@deepseek-ai/dsh-client-ui-slots'
+import type { MessageImagesProps } from '@deepseek-ai/dsh-client-ui-chat/client'
 import { defineClient } from '@dshfiles/dshx/client'
 import { ComposerAttachments } from './client/ComposerAttachments.js'
-import type { ComposerAttachmentsProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
-import { MessageImages } from './client/MessageImages.js'
-import type { MessageImagesProps } from '@deepseek-ai/dsh-client-ui-chat/client'
+import { MessageImages, MessageImagesContent } from './client/MessageImages.js'
 import { AttachmentGalleryLabelsModel } from './client/labels.js'
 import { ATTACHMENT_GALLERY_LOCALE_NAMESPACE, attachmentGalleryLocale } from './locales.js'
 
@@ -18,10 +19,10 @@ export default defineClient({
   inject: ['slots'],
   setup(ctx, decorate) {
     const translate = ctx.locale.bind(ATTACHMENT_GALLERY_LOCALE_NAMESPACE)
-    const ComposerSlot = (props: ComposerAttachmentsProps) => (
-      <ComposerAttachments {...props} galleryLabels={AttachmentGalleryLabelsModel.imageLightboxLabels(translate)} />
-    )
-    const MessageSlot = (props: MessageImagesProps) => <MessageImages {...props} galleryLabels={AttachmentGalleryLabelsModel.imageLightboxLabels(translate)} />
+    const galleryLabels = AttachmentGalleryLabelsModel.imageLightboxLabels(translate)
+    const ComposerSlot = (props: ComposerAttachmentsProps) => <ComposerAttachments {...props} galleryLabels={galleryLabels} />
+    const GallerySlot = (props: FactoryComponentPropsOf<'conversation.images.content'>) => <MessageImagesContent {...props} galleryLabels={galleryLabels} />
+    const ImageSlot = (props: MessageImagesProps) => <MessageImages {...props} />
 
     ctx.slots.inject('conversation.input.attachments', () =>
       ctx.slots.register(
@@ -32,31 +33,48 @@ export default defineClient({
         decorate(ComposerSlot),
       ),
     )
-    ctx.slots.inject('conversation.message.images', () =>
+    ctx.slots.registerFactory(
+      {
+        name: 'conversation.images.content',
+        scope: 'root',
+        locale: 'conversation',
+      },
+      decorate(GallerySlot),
+    )
+    ctx.slots.inject('conversation.chat.message.images', () =>
       ctx.slots.register(
         {
-          name: 'conversation.message.images',
-          locale: 'conversation',
+          name: 'conversation.chat.message.images',
+          priority: 100,
         },
-        decorate(MessageSlot),
+        decorate(ImageSlot),
+      ),
+    )
+    ctx.slots.inject('conversation.chat.user.images', () =>
+      ctx.slots.register(
+        {
+          name: 'conversation.chat.user.images',
+          priority: 100,
+        },
+        decorate(ImageSlot),
       ),
     )
     ctx.slots.inject('conversation.trajectory.images', () =>
       ctx.slots.register(
         {
           name: 'conversation.trajectory.images',
-          locale: 'conversation',
+          priority: 100,
         },
-        decorate(MessageSlot),
+        decorate(ImageSlot),
       ),
     )
     ctx.slots.inject('tool.call.images', () =>
       ctx.slots.register(
         {
           name: 'tool.call.images',
-          locale: 'conversation',
+          priority: 100,
         },
-        decorate(MessageSlot),
+        decorate(ImageSlot),
       ),
     )
   },

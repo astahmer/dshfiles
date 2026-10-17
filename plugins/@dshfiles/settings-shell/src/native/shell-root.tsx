@@ -1,5 +1,5 @@
 /**
- * Ported from @deepseek-ai/dsh-client-ui-settings-general@0.2.0-rc.2 (MIT): `SettingsRoot.js`. The sidebar-foot
+ * Ported from @deepseek-ai/dsh-client-ui-settings-general@0.2.1-rc.2 (MIT): `SettingsRoot.js`. The sidebar-foot
  * trigger row (connection recovery, Desktop update) plus the settings surface and the onboarding coordinator, which
  * mounts exactly one ordered `settings.onboarding` step while the main view shows no thread.
  */

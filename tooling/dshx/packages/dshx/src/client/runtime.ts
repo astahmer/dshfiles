@@ -46,6 +46,8 @@ export interface CreatedClientPlugin {
 interface ClientSlotsService {
   inject(name: string, register: () => unknown): unknown
   register(options: Record<string, unknown>, component: unknown): unknown
+  /** Shared-position factories (`conversation.images.content`): replace one definition, fill every position it feeds. */
+  registerFactory(options: Record<string, unknown>, component: unknown): unknown
 }
 
 interface ClientConversationEventsService {
