@@ -31,10 +31,6 @@ export class PluginApiError extends Error {
   }
 }
 
-export function isPluginApiError(value: unknown): value is PluginApiError {
-  return value instanceof PluginApiError || (typeof value === 'object' && value !== null && (value as Record<PropertyKey, unknown>)[PLUGIN_API_ERROR] === true)
-}
-
 class InternalApiError extends Error {
   override readonly name = 'ApiError' as const
   readonly [API_ERROR] = true
@@ -52,10 +48,6 @@ class InternalApiError extends Error {
   }
 }
 
-export function isApiError(value: unknown): value is ApiError {
-  return value instanceof InternalApiError || (typeof value === 'object' && value !== null && (value as Record<PropertyKey, unknown>)[API_ERROR] === true)
-}
-
 function stableHash(value: string): string {
   let hash = 2166136261
   for (let index = 0; index < value.length; index += 1) {
@@ -63,49 +55,6 @@ function stableHash(value: string): string {
     hash = Math.imul(hash, 16777619)
   }
   return (hash >>> 0).toString(16).padStart(8, '0')
-}
-
-export function apiChannel(packageId: string, apiId: string): string {
-  return `/dshx-${stableHash(`${packageId}\0${apiId}`)}`
-}
-
-export function jsonBytes(value: unknown): number {
-  if (value === undefined) return 0
-  const active = new Set<object>()
-  const visit = (item: unknown, depth: number): void => {
-    if (depth > 100) throw new ContractViolation('API payload exceeds 100 levels of JSON nesting.')
-    if (item === null || typeof item === 'string' || typeof item === 'boolean') return
-    if (typeof item === 'number' && Number.isFinite(item)) return
-    if (typeof item !== 'object' || item === null)
-      throw new ContractViolation('API payload must contain only JSON values; undefined is permitted only for a void root.')
-    if (active.has(item)) throw new ContractViolation('API payload contains a cycle.')
-    const prototype = Object.getPrototypeOf(item)
-    if (!Array.isArray(item) && prototype !== Object.prototype && prototype !== null)
-      throw new ContractViolation('API payload must use plain objects and arrays.')
-    if (Object.getOwnPropertySymbols(item).length > 0) throw new ContractViolation('API payload cannot contain symbol properties.')
-    active.add(item)
-    if (Array.isArray(item)) {
-      for (let index = 0; index < item.length; index += 1) visit(item[index], depth + 1)
-    } else {
-      for (const descriptor of Object.values(Object.getOwnPropertyDescriptors(item))) {
-        if (descriptor.get !== undefined || descriptor.set !== undefined || !descriptor.enumerable)
-          throw new ContractViolation('API payload cannot contain accessors or non-enumerable properties.')
-        visit(descriptor.value, depth + 1)
-      }
-    }
-    active.delete(item)
-  }
-  visit(value, 0)
-  let encoded: string
-  try {
-    encoded = JSON.stringify(value)
-  } catch (cause) {
-    throw new ContractViolation(`API payload is not JSON serializable: ${cause instanceof Error ? cause.message : String(cause)}`)
-  }
-  if (encoded === undefined) throw new ContractViolation('API payload must be JSON serializable.')
-  const bytes = new TextEncoder().encode(encoded).byteLength
-  if (bytes > MAX_JSON_BYTES) throw new ContractViolation(`API payload exceeds ${MAX_JSON_BYTES} bytes.`)
-  return bytes
 }
 
 /** The first few Standard Schema issues as `path: message`, so a caller (often the agent) can fix its input. */
@@ -119,59 +68,109 @@ function describeIssues(issues: readonly StandardSchemaV1.Issue[]): string {
   return `: ${described.join('; ')}${issues.length > 3 ? ` (+${issues.length - 3} more)` : ''}`
 }
 
-export async function validate(schema: unknown, value: unknown): Promise<unknown> {
-  if (schema === undefined) return value
-  const validator = (
-    schema as {
-      '~standard'?: {
-        validate?: (input: unknown) => unknown | Promise<unknown>
-      }
-    }
-  )['~standard']?.validate
-  if (typeof validator !== 'function') throw new ContractViolation('API schema does not implement Standard Schema validate().')
-  const result = await validator(value)
-  if (result === undefined || typeof result !== 'object' || result === null) {
-    throw new ContractViolation('API schema returned an invalid Standard Schema result.')
-  }
-  const issues = (result as { readonly issues?: unknown }).issues
-  if (issues !== undefined) {
-    throw new ContractViolation(`API schema validation failed${describeIssues(Array.isArray(issues) ? issues : [])}.`)
-  }
-  if (!Object.hasOwn(result, 'value')) throw new ContractViolation('API schema success result is missing value.')
-  return (result as { readonly value: unknown }).value
-}
-
-export function error(
-  kind: ApiError['kind'],
-  message: string,
-  apiId: string,
-  method: string,
-  retryable: boolean,
-  cause?: unknown,
-  remoteCode?: string,
-): ApiError {
-  return new InternalApiError(kind, message, apiId, method, retryable, remoteCode, cause === undefined ? undefined : { cause })
-}
-
-export function aborted(apiId: string, method: string, cause?: unknown): ApiError {
-  return error('aborted', 'API request was aborted.', apiId, method, false, cause, 'aborted')
-}
-
-export function throwIfAborted(signal: AbortSignal | undefined, apiId: string, method: string): void {
-  if (signal?.aborted === true) throw aborted(apiId, method, signal.reason)
-}
-
 const OWNER_MISSING = 'owner-missing'
 
-/** The owner of an API is not loaded in this DSH process (or, from a Client, its routes do not exist). */
-export function ownerMissing(owner: string, apiId: string, method: string, cause?: unknown): ApiError {
-  return error('unavailable', `${owner} is not loaded, so ${apiId}.${method} is unavailable.`, apiId, method, true, cause, OWNER_MISSING)
+export class ApiProtocolModel {
+  static isPluginApiError(value: unknown): value is PluginApiError {
+    return (
+      value instanceof PluginApiError || (typeof value === 'object' && value !== null && (value as Record<PropertyKey, unknown>)[PLUGIN_API_ERROR] === true)
+    )
+  }
+
+  static isApiError(value: unknown): value is ApiError {
+    return value instanceof InternalApiError || (typeof value === 'object' && value !== null && (value as Record<PropertyKey, unknown>)[API_ERROR] === true)
+  }
+
+  static apiChannel(packageId: string, apiId: string): string {
+    return `/dshx-${stableHash(`${packageId}\0${apiId}`)}`
+  }
+
+  static jsonBytes(value: unknown): number {
+    if (value === undefined) return 0
+    const active = new Set<object>()
+    const visit = (item: unknown, depth: number): void => {
+      if (depth > 100) throw new ContractViolation('API payload exceeds 100 levels of JSON nesting.')
+      if (item === null || typeof item === 'string' || typeof item === 'boolean') return
+      if (typeof item === 'number' && Number.isFinite(item)) return
+      if (typeof item !== 'object' || item === null)
+        throw new ContractViolation('API payload must contain only JSON values; undefined is permitted only for a void root.')
+      if (active.has(item)) throw new ContractViolation('API payload contains a cycle.')
+      const prototype = Object.getPrototypeOf(item)
+      if (!Array.isArray(item) && prototype !== Object.prototype && prototype !== null)
+        throw new ContractViolation('API payload must use plain objects and arrays.')
+      if (Object.getOwnPropertySymbols(item).length > 0) throw new ContractViolation('API payload cannot contain symbol properties.')
+      active.add(item)
+      if (Array.isArray(item)) {
+        for (let index = 0; index < item.length; index += 1) visit(item[index], depth + 1)
+      } else {
+        for (const descriptor of Object.values(Object.getOwnPropertyDescriptors(item))) {
+          if (descriptor.get !== undefined || descriptor.set !== undefined || !descriptor.enumerable)
+            throw new ContractViolation('API payload cannot contain accessors or non-enumerable properties.')
+          visit(descriptor.value, depth + 1)
+        }
+      }
+      active.delete(item)
+    }
+    visit(value, 0)
+    let encoded: string
+    try {
+      encoded = JSON.stringify(value)
+    } catch (cause) {
+      throw new ContractViolation(`API payload is not JSON serializable: ${cause instanceof Error ? cause.message : String(cause)}`)
+    }
+    if (encoded === undefined) throw new ContractViolation('API payload must be JSON serializable.')
+    const bytes = new TextEncoder().encode(encoded).byteLength
+    if (bytes > MAX_JSON_BYTES) throw new ContractViolation(`API payload exceeds ${MAX_JSON_BYTES} bytes.`)
+    return bytes
+  }
+
+  static async validate(schema: unknown, value: unknown): Promise<unknown> {
+    if (schema === undefined) return value
+    const validator = (
+      schema as {
+        '~standard'?: {
+          validate?: (input: unknown) => unknown | Promise<unknown>
+        }
+      }
+    )['~standard']?.validate
+    if (typeof validator !== 'function') throw new ContractViolation('API schema does not implement Standard Schema validate().')
+    const result = await validator(value)
+    if (result === undefined || typeof result !== 'object' || result === null) {
+      throw new ContractViolation('API schema returned an invalid Standard Schema result.')
+    }
+    const issues = (result as { readonly issues?: unknown }).issues
+    if (issues !== undefined) {
+      throw new ContractViolation(`API schema validation failed${describeIssues(Array.isArray(issues) ? issues : [])}.`)
+    }
+    if (!Object.hasOwn(result, 'value')) throw new ContractViolation('API schema success result is missing value.')
+    return (result as { readonly value: unknown }).value
+  }
+
+  static error(kind: ApiError['kind'], message: string, apiId: string, method: string, retryable: boolean, cause?: unknown, remoteCode?: string): ApiError {
+    return new InternalApiError(kind, message, apiId, method, retryable, remoteCode, cause === undefined ? undefined : { cause })
+  }
+
+  static aborted(apiId: string, method: string, cause?: unknown): ApiError {
+    return ApiProtocolModel.error('aborted', 'API request was aborted.', apiId, method, false, cause, 'aborted')
+  }
+
+  static throwIfAborted(signal: AbortSignal | undefined, apiId: string, method: string): void {
+    if (signal?.aborted === true) throw ApiProtocolModel.aborted(apiId, method, signal.reason)
+  }
+
+  /** The owner of an API is not loaded in this DSH process (or, from a Client, its routes do not exist). */
+  static ownerMissing(owner: string, apiId: string, method: string, cause?: unknown): ApiError {
+    return ApiProtocolModel.error('unavailable', `${owner} is not loaded, so ${apiId}.${method} is unavailable.`, apiId, method, true, cause, OWNER_MISSING)
+  }
+
+  /**
+   * Whether a call failed only because the plugin that owns the API is not
+   * loaded. Stop polling and hide the feature instead of reporting an error.
+   */
+  static isApiOwnerMissing(value: Error | null | undefined): boolean {
+    return ApiProtocolModel.isApiError(value) && value.kind === 'unavailable' && value.remoteCode === OWNER_MISSING
+  }
 }
 
-/**
- * Whether a call failed only because the plugin that owns the API is not
- * loaded. Stop polling and hide the feature instead of reporting an error.
- */
-export function isApiOwnerMissing(value: Error | null | undefined): boolean {
-  return isApiError(value) && value.kind === 'unavailable' && value.remoteCode === OWNER_MISSING
-}
+export const isApiError = ApiProtocolModel.isApiError
+export const isApiOwnerMissing = ApiProtocolModel.isApiOwnerMissing

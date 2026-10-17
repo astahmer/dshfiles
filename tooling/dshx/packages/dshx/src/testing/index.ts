@@ -5,7 +5,7 @@ import { SystemPrompt } from '@deepseek-ai/dsh-system-prompt'
 import { ToolRuntime } from '@deepseek-ai/dsh-tools'
 import type { SlotRegistry } from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type { ConnectionFetchHandler, ConnectionFetchRoute, HostConnectionHandle } from '@deepseek-ai/dsh-client-connection'
-import { apiChannel } from '../api/common.js'
+import { ApiProtocolModel } from '../api/common.js'
 import { ApiDefinitionModel } from '../api/define.js'
 import { createHostModule, createHostPlugin } from '../host/runtime.js'
 import { createClientModule, createClientPlugin } from '../client/runtime.js'
@@ -83,11 +83,11 @@ export function provideTestConnection(ctx: Context): TestConnection {
   return {
     /** Routes the mounted plugins registered, without the registry listing dshx serves on the first one's behalf. */
     get routeCount() {
-      const registryPrefix = `/api${apiChannel(ApiDefinitionModel.registryOwner, ApiDefinitionModel.registryApi.id)}/`
+      const registryPrefix = `/api${ApiProtocolModel.apiChannel(ApiDefinitionModel.registryOwner, ApiDefinitionModel.registryApi.id)}/`
       return [...routes.keys()].filter(path => !path.startsWith(registryPrefix)).length
     },
     requestApi: ({ packageId, apiId, method, version, input }) => {
-      const endpoint = `${apiChannel(packageId, apiId).slice(1)}/${method}`
+      const endpoint = `${ApiProtocolModel.apiChannel(packageId, apiId).slice(1)}/${method}`
       const request = new Request(`http://dshx.test/api/${endpoint}`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },

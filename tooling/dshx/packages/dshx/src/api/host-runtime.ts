@@ -16,7 +16,7 @@ import type {
   RegistrySkillView,
 } from './types.js'
 import { ApiDefinitionModel } from './define.js'
-import { apiChannel, ContractViolation, error, isApiError, isPluginApiError, jsonBytes, throwIfAborted, validate } from './common.js'
+import { ApiProtocolModel, ContractViolation } from './common.js'
 import { apiKey, apiRegistry, type ApiDispatch, type ApiRegistry, type RegisteredApi, type RegistryMember } from './registry.js'
 import { publishedJsonSchema, toToolSchema } from './json-schema.js'
 
@@ -78,23 +78,23 @@ function createDispatch(ctx: Context, packageId: string, registration: ApiHostRe
       return { ok: false, error: { code: 'bad-request', message: `Unknown API method ${endpoint}.`, details: {} } }
     }
     try {
-      throwIfAborted(signal, contract.id, endpoint)
+      ApiProtocolModel.throwIfAborted(signal, contract.id, endpoint)
       if (typeof payload !== 'object' || payload === null || Array.isArray(payload))
-        throw error('contract', 'Invalid API request envelope.', contract.id, endpoint, false)
+        throw ApiProtocolModel.error('contract', 'Invalid API request envelope.', contract.id, endpoint, false)
       const envelope = payload as { version?: unknown; input?: unknown }
       if (envelope.version !== contract.version)
-        throw error('contract', `API version mismatch for ${contract.id}.`, contract.id, endpoint, false, undefined, 'DSHX6401')
-      jsonBytes(envelope.input)
-      const input = await validate(methodDefinition.input, envelope.input)
-      throwIfAborted(signal, contract.id, endpoint)
-      const output = await validate(methodDefinition.output, await handler({ input, ctx, signal, peer, caller } as never))
-      throwIfAborted(signal, contract.id, endpoint)
-      jsonBytes(output)
+        throw ApiProtocolModel.error('contract', `API version mismatch for ${contract.id}.`, contract.id, endpoint, false, undefined, 'DSHX6401')
+      ApiProtocolModel.jsonBytes(envelope.input)
+      const input = await ApiProtocolModel.validate(methodDefinition.input, envelope.input)
+      ApiProtocolModel.throwIfAborted(signal, contract.id, endpoint)
+      const output = await ApiProtocolModel.validate(methodDefinition.output, await handler({ input, ctx, signal, peer, caller } as never))
+      ApiProtocolModel.throwIfAborted(signal, contract.id, endpoint)
+      ApiProtocolModel.jsonBytes(output)
       return { ok: true, value: { version: contract.version, output } }
     } catch (cause) {
-      if (isApiError(cause)) return { ok: false, error: { code: cause.remoteCode ?? 'internal', message: cause.message, details: {} } }
+      if (ApiProtocolModel.isApiError(cause)) return { ok: false, error: { code: cause.remoteCode ?? 'internal', message: cause.message, details: {} } }
       if (cause instanceof ContractViolation) return { ok: false, error: { code: 'contract', message: cause.message, details: {} } }
-      if (isPluginApiError(cause)) return { ok: false, error: { code: cause.code, message: cause.message, details: {} } }
+      if (ApiProtocolModel.isPluginApiError(cause)) return { ok: false, error: { code: cause.code, message: cause.message, details: {} } }
       hostLogger(ctx).error(`API handler ${packageId} ${contract.id}.${endpoint} failed: ${describeFailure(cause)}`)
       return { ok: false, error: { code: 'internal', message: 'API handler failed. See Host diagnostics.', details: {} } }
     }
@@ -415,7 +415,7 @@ async function mountApi(
   const registry = apiRegistry(ctx)
   const key = apiKey(packageId, contract.id)
   if (registry.apis.has(key)) throw new Error(`API ${contract.id} of ${packageId} is already served in this process.`)
-  const channel = apiChannel(packageId, contract.id)
+  const channel = ApiProtocolModel.apiChannel(packageId, contract.id)
   const root = ctx.root ?? ctx
   const owners = channelOwners.get(root) ?? new Map<string, string>()
   const owner = `${packageId}:${contract.id}`

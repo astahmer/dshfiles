@@ -11,7 +11,7 @@ import type {
   ApiQueryOptions,
   ApiQueryResult,
 } from './types.js'
-import { isApiError } from './common.js'
+import { ApiProtocolModel } from './common.js'
 import { ApiRuntimeModel } from './runtime.js'
 
 type ReactRuntime = typeof import('react')
@@ -112,7 +112,7 @@ const startApiQueryEffect = <T>(options: ApiQueryEffectOptions<T>): (() => void)
         if (!disposed && !controller.signal.aborted) options.onSuccess(value)
       },
       cause => {
-        if (!disposed && !disconnected && (callerAborted || !controller.signal.aborted) && isApiError(cause)) options.onError(cause)
+        if (!disposed && !disconnected && (callerAborted || !controller.signal.aborted) && ApiProtocolModel.isApiError(cause)) options.onError(cause)
       },
     )
   }

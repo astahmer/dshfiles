@@ -1,7 +1,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { ClientConnectionRpc } from '@deepseek-ai/dsh-client-connection/client'
 import type { AnyApiMethodDefinition, ApiCallOptions, ApiClient, ApiContract, ApiError } from './types.js'
-import { aborted, apiChannel, ContractViolation, error, isApiError, jsonBytes, ownerMissing, throwIfAborted } from './common.js'
+import { ApiProtocolModel, ContractViolation } from './common.js'
 
 type RpcResult =
   | { readonly ok: true; readonly value: unknown }
@@ -33,10 +33,10 @@ function errorFromRemote(result: Extract<RpcResult, { readonly ok: false }>, api
   const code = result.error?.code
   const message = result.error?.message ?? `API method ${method} failed.`
   if (code === 'DSHX6401' || code === 'contract' || code === 'bad-request') {
-    return error('contract', message, apiId, method, false, undefined, code)
+    return ApiProtocolModel.error('contract', message, apiId, method, false, undefined, code)
   }
-  if (code === 'aborted') return aborted(apiId, method)
-  return error('remote', message, apiId, method, false, undefined, code)
+  if (code === 'aborted') return ApiProtocolModel.aborted(apiId, method)
+  return ApiProtocolModel.error('remote', message, apiId, method, false, undefined, code)
 }
 
 function createApiClient<const Methods extends Record<string, AnyApiMethodDefinition>>(
@@ -45,31 +45,32 @@ function createApiClient<const Methods extends Record<string, AnyApiMethodDefini
   packageId = 'plugin',
 ): ApiClient<Methods> {
   const connection = context === undefined || typeof context.get !== 'function' ? undefined : (context.get('connection') as ClientConnectionLike | undefined)
-  const channel = apiChannel(contract.owner ?? packageId, contract.id)
+  const channel = ApiProtocolModel.apiChannel(contract.owner ?? packageId, contract.id)
   const call = async (name: string, input: unknown, options?: ApiCallOptions): Promise<unknown> => {
     const rpc = connection?.rpc
-    if (rpc?.call === undefined) throw error('unavailable', 'The DSH Connection provider is unavailable.', contract.id, name, true)
+    if (rpc?.call === undefined) throw ApiProtocolModel.error('unavailable', 'The DSH Connection provider is unavailable.', contract.id, name, true)
     try {
-      throwIfAborted(options?.signal, contract.id, name)
-      if (contract.methods[name] === undefined) throw error('contract', `Unknown API method ${name}.`, contract.id, name, false)
-      jsonBytes(input)
-      throwIfAborted(options?.signal, contract.id, name)
+      ApiProtocolModel.throwIfAborted(options?.signal, contract.id, name)
+      if (contract.methods[name] === undefined) throw ApiProtocolModel.error('contract', `Unknown API method ${name}.`, contract.id, name, false)
+      ApiProtocolModel.jsonBytes(input)
+      ApiProtocolModel.throwIfAborted(options?.signal, contract.id, name)
       const result = await rpc.call('/api', `${channel.slice(1)}/${name}`, { version: contract.version, input }, options?.signal)
-      throwIfAborted(options?.signal, contract.id, name)
+      ApiProtocolModel.throwIfAborted(options?.signal, contract.id, name)
       if (!result.ok) throw errorFromRemote(result, contract.id, name)
       const envelope = result.value as { version?: unknown; output?: unknown }
       if (envelope.version !== contract.version)
-        throw error('contract', `API version mismatch for ${contract.id}.`, contract.id, name, false, undefined, 'DSHX6401')
-      jsonBytes(envelope.output)
-      throwIfAborted(options?.signal, contract.id, name)
+        throw ApiProtocolModel.error('contract', `API version mismatch for ${contract.id}.`, contract.id, name, false, undefined, 'DSHX6401')
+      ApiProtocolModel.jsonBytes(envelope.output)
+      ApiProtocolModel.throwIfAborted(options?.signal, contract.id, name)
       return envelope.output
     } catch (cause) {
-      if (isApiError(cause)) throw cause
-      if (options?.signal?.aborted) throw aborted(contract.id, name, cause)
-      if (cause instanceof ContractViolation) throw error('contract', cause.message, contract.id, name, false, cause)
+      if (ApiProtocolModel.isApiError(cause)) throw cause
+      if (options?.signal?.aborted) throw ApiProtocolModel.aborted(contract.id, name, cause)
+      if (cause instanceof ContractViolation) throw ApiProtocolModel.error('contract', cause.message, contract.id, name, false, cause)
       // Connection answers a route nobody registered with HTTP 404: the owning plugin is not loaded.
-      if (cause instanceof Error && /\bHTTP 404$/.test(cause.message)) throw ownerMissing(contract.owner ?? packageId, contract.id, name, cause)
-      throw error('transport', cause instanceof Error ? cause.message : String(cause), contract.id, name, true, cause)
+      if (cause instanceof Error && /\bHTTP 404$/.test(cause.message))
+        throw ApiProtocolModel.ownerMissing(contract.owner ?? packageId, contract.id, name, cause)
+      throw ApiProtocolModel.error('transport', cause instanceof Error ? cause.message : String(cause), contract.id, name, true, cause)
     }
   }
   const client: Record<string, unknown> = { safe: {} }
@@ -82,7 +83,7 @@ function createApiClient<const Methods extends Record<string, AnyApiMethodDefini
       } catch (cause) {
         return {
           ok: false,
-          error: isApiError(cause) ? cause : error('transport', String(cause), contract.id, name, true, cause),
+          error: ApiProtocolModel.isApiError(cause) ? cause : ApiProtocolModel.error('transport', String(cause), contract.id, name, true, cause),
         }
       }
     }

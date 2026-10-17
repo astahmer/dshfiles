@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { z } from 'zod'
-import { apiChannel } from '../api/common.js'
+import { ApiProtocolModel } from '../api/common.js'
 import type { JsonValue } from './client.js'
 import { DshPlatformError, loopbackLaunchUrl, resolveLaunchUrl } from './client.js'
 
@@ -37,7 +37,7 @@ const safeMessage = (message: string): string => message.replace(/([?&]token=)[^
 
 /** Calls one versioned DSHX Host API using an existing authenticated native session. */
 export const createDshxApiCaller = ({ origin, cookie, packageId, apiId, version, fetch: request = fetch }: DshxApiCallerOptions): DshxApiCall => {
-  const channel = apiChannel(packageId, apiId)
+  const channel = ApiProtocolModel.apiChannel(packageId, apiId)
   return async (method, input, signal) => {
     if (!/^[A-Za-z][A-Za-z0-9]*$/.test(method)) throw new DshPlatformError('invalid-method', 'DSHX API method names must be plain identifiers.')
     const rpcId = randomUUID()

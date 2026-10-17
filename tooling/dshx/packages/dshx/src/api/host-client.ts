@@ -1,6 +1,6 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { AnyApiMethodDefinition, ApiCallOptions, ApiCallResult, ApiClient, ApiContract, RegistryApiView } from './types.js'
-import { aborted, error, isApiError, jsonBytes, ownerMissing, throwIfAborted, ContractViolation } from './common.js'
+import { ApiProtocolModel, ContractViolation } from './common.js'
 import { apiKey, apiRegistry, type ApiPayload } from './registry.js'
 import { ApiRuntimeModel } from './runtime.js'
 
@@ -21,11 +21,11 @@ function createHostApiClient<const Methods extends Record<string, AnyApiMethodDe
   const owner = contract.owner ?? callerPackageId
   const call = async (name: string, input: ApiPayload, options?: ApiCallOptions): Promise<ApiPayload> => {
     try {
-      throwIfAborted(options?.signal, contract.id, name)
-      if (contract.methods[name] === undefined) throw error('contract', `Unknown API method ${name}.`, contract.id, name, false)
+      ApiProtocolModel.throwIfAborted(options?.signal, contract.id, name)
+      if (contract.methods[name] === undefined) throw ApiProtocolModel.error('contract', `Unknown API method ${name}.`, contract.id, name, false)
       const served = registry.apis.get(apiKey(owner, contract.id))
-      if (served === undefined) throw ownerMissing(owner, contract.id, name)
-      jsonBytes(input)
+      if (served === undefined) throw ApiProtocolModel.ownerMissing(owner, contract.id, name)
+      ApiProtocolModel.jsonBytes(input)
       const result = await served.dispatch(
         name,
         // Copies, so an in-process caller and the owner never share mutable objects, exactly as over Connection.
@@ -34,14 +34,14 @@ function createHostApiClient<const Methods extends Record<string, AnyApiMethodDe
         { kind: 'plugin', packageId: callerPackageId },
         undefined,
       )
-      throwIfAborted(options?.signal, contract.id, name)
+      ApiProtocolModel.throwIfAborted(options?.signal, contract.id, name)
       if (!result.ok) throw ApiRuntimeModel.errorFromRemote(result, contract.id, name)
       return structuredClone(result.value.output)
     } catch (cause) {
-      if (isApiError(cause)) throw cause
-      if (options?.signal?.aborted) throw aborted(contract.id, name, cause)
-      if (cause instanceof ContractViolation) throw error('contract', cause.message, contract.id, name, false, cause)
-      throw error('transport', cause instanceof Error ? cause.message : String(cause), contract.id, name, true, cause)
+      if (ApiProtocolModel.isApiError(cause)) throw cause
+      if (options?.signal?.aborted) throw ApiProtocolModel.aborted(contract.id, name, cause)
+      if (cause instanceof ContractViolation) throw ApiProtocolModel.error('contract', cause.message, contract.id, name, false, cause)
+      throw ApiProtocolModel.error('transport', cause instanceof Error ? cause.message : String(cause), contract.id, name, true, cause)
     }
   }
   const names = Object.keys(contract.methods)
@@ -53,7 +53,10 @@ function createHostApiClient<const Methods extends Record<string, AnyApiMethodDe
         try {
           return { ok: true, value: await call(name, input, options) }
         } catch (cause) {
-          return { ok: false, error: isApiError(cause) ? cause : error('transport', String(cause), contract.id, name, true, cause) }
+          return {
+            ok: false,
+            error: ApiProtocolModel.isApiError(cause) ? cause : ApiProtocolModel.error('transport', String(cause), contract.id, name, true, cause),
+          }
         }
       },
     ]),
