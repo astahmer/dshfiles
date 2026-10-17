@@ -60,6 +60,17 @@ const openSidebarSettings = async (page: Page): Promise<void> => {
   await expect(sidebarSettings(page)).toBeVisible()
 }
 
+/** The account launcher owns the foot's settings seat, so Settings is its first menu item there. */
+const openSettings = async (page: Page): Promise<void> => {
+  const trigger = page.getByRole('button', { name: 'Settings', exact: true })
+  if ((await trigger.count()) > 0) {
+    await trigger.click()
+    return
+  }
+  await page.getByRole('button', { name: 'Account menu', exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Settings', exact: true }).click()
+}
+
 const statusFilterLabels: readonly string[] = ['All threads', 'Working', 'Not working', 'Needs attention', 'Muted', 'Archived']
 
 const setThreadStatusFilters = async (page: Page, triggerName: string, selectedLabels: readonly string[]): Promise<void> => {
@@ -684,7 +695,8 @@ Then('the selected attention color survives a browser reload', async ({ page }: 
 
 When('notification routes and sounds are configured in Settings', async ({ page }: { page: Page }) => {
   const settingsDialog = page.getByRole('dialog', { name: 'Settings', exact: true })
-  await page.getByRole('button', { name: 'Settings', exact: true }).click()
+  await openSettings(page)
+  await expect(settingsDialog).toBeVisible()
   await settingsDialog.getByRole('button', { name: 'Built-in plugins', exact: true }).click()
   await settingsDialog.getByRole('tab', { name: 'Thread sidebar', exact: true }).click()
   const notificationSettings = settingsDialog.getByRole('group', { name: 'Thread notifications', exact: true })
@@ -699,7 +711,7 @@ When('notification routes and sounds are configured in Settings', async ({ page 
 Then('the notification settings survive a browser reload', async ({ page }: { page: Page }) => {
   const settingsDialog = page.getByRole('dialog', { name: 'Settings', exact: true })
   await page.reload()
-  await page.getByRole('button', { name: 'Settings', exact: true }).click()
+  await openSettings(page)
   await settingsDialog.getByRole('button', { name: 'Built-in plugins', exact: true }).click()
   await settingsDialog.getByRole('tab', { name: 'Thread sidebar', exact: true }).click()
   const notificationSettings = settingsDialog.getByRole('group', { name: 'Thread notifications', exact: true })
@@ -737,6 +749,24 @@ Then('the custom layout survives a browser reload', async ({ page }: { page: Pag
     const navigation = sidebarNavigation(page)
     await expect(navigation.getByRole('button', { name: 'Search threads', exact: true })).toHaveCount(0)
     await expect(navigation.getByRole('button', { name: 'New thread', exact: true })).toHaveText('New thread')
+  })
+  await finishJourneyAssertions(page)
+})
+
+When('the sidebar footer More menu is opened', async ({ page }: { page: Page }) => {
+  await page.getByRole('button', { name: 'More', exact: true }).click()
+})
+
+Then('the footer menu lists the sidebar pages and opens the Plugins page', async ({ page }: { page: Page }) => {
+  const menu = page.getByRole('dialog', { name: 'More', exact: true })
+  const plugins = menu.getByRole('button', { name: 'Plugins', exact: true })
+  await recordAssertion(page, 'thread-sidebar-footer-more-lists-pages', async () => {
+    await expect(menu.getByText('Pages', { exact: true })).toBeVisible()
+    await expect(plugins).toBeVisible()
+  })
+  await plugins.click()
+  await recordAssertion(page, 'thread-sidebar-footer-more-opens-the-plugins-page', async () => {
+    await expect(sidebarNavigation(page).getByRole('button', { name: 'Plugins', exact: true })).toHaveAttribute('aria-current', 'page')
   })
   await finishJourneyAssertions(page)
 })

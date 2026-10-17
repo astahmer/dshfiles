@@ -149,6 +149,8 @@ const text = (translate: SidebarShellTranslate, key: Parameters<SidebarShellTran
 
 const toggleHidden = (ids: readonly string[], id: string): string[] => (ids.includes(id) ? ids.filter(item => item !== id) : [...ids, id])
 
+const sameIds = (left: readonly string[], right: readonly string[]): boolean => left.length === right.length && left.every((id, index) => id === right[index])
+
 /** Commands that only reopen this palette are left out of its command list. */
 const SELF_COMMAND_IDS = new Set(['commandPalette.open'])
 
@@ -475,6 +477,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   const [customizeOpen, setCustomizeOpen] = useState(false)
   const [moreOpen, setMoreOpen] = useState(false)
   const [footerFit, setFooterFit] = useState<readonly boolean[] | null>(null)
+  const [emptyFooterIds, setEmptyFooterIds] = useState<readonly string[]>([])
   const shellRef = useRef<HTMLDivElement>(null)
   const brandRef = useRef<HTMLDivElement>(null)
   const headerRegionRef = useRef<HTMLDivElement>(null)
@@ -763,29 +766,40 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   const visibleFooterEntries = orderedFooterEntries.filter(entry => !preferences.hiddenFooterIds.includes(entry.id))
   const hiddenFooterEntries = orderedFooterEntries.filter(entry => preferences.hiddenFooterIds.includes(entry.id))
   const footerEntryFits = (index: number): boolean => !wide || footerFit === null || footerFit[index] !== false
-  const overflowFooterEntries = [...visibleFooterEntries.filter((_, index) => !footerEntryFits(index)), ...hiddenFooterEntries]
+  // A seat whose card yielded to another surface (the usage strip above the foot,
+  // the cordis panel with nothing to show) renders nothing: it keeps its place in
+  // the order but takes no room and never sends the More control after it.
+  const footerEntryEmpty = (entry: FooterEntry): boolean => emptyFooterIds.includes(entry.id)
+  const footerEntryInline = (entry: FooterEntry, index: number): boolean => !footerEntryEmpty(entry) && footerEntryFits(index)
+  const overflowFooterEntries = [...visibleFooterEntries.filter((entry, index) => !footerEntryInline(entry, index)), ...hiddenFooterEntries]
   const visibleFooterKey = visibleFooterEntries.map(entry => entry.id).join('|')
+  const footerPages = visibleHeaderEntries
+    .filter(entry => entry.kind === 'panel')
+    .map(entry => ({ entry, current: entry.panelId !== undefined && entry.panelId === activePanelId }))
 
   useLayoutEffect(() => {
     const footer = footerRegionRef.current
+    const ids = visibleFooterKey.split('|').filter(Boolean)
     if (!wide || footer === null) {
       setFooterFit(null)
+      setEmptyFooterIds(current => (current.length === 0 ? current : []))
       return
     }
     const measure = (): void => {
-      const widths = visibleFooterKey
-        .split('|')
-        .filter(Boolean)
-        .map(id => footerItemRefs.current.get(id)?.getBoundingClientRect().width ?? 0)
+      const widths = ids.map(id => footerItemRefs.current.get(id)?.getBoundingClientRect().width ?? 0)
+      setEmptyFooterIds(current => {
+        const next = ids.filter((_, index) => (widths[index] ?? 0) <= 0)
+        return sameIds(current, next) ? current : next
+      })
       const style = window.getComputedStyle(footer)
-      const available = footer.clientWidth - Number.parseFloat(style.paddingLeft) - Number.parseFloat(style.paddingRight)
-      const moreAlwaysShown = hiddenFooterEntries.length > 0
+      const reserved = footer.clientWidth - Number.parseFloat(style.paddingLeft) - Number.parseFloat(style.paddingRight)
+      // The More control is always seated in the wide foot, so it always keeps its room.
       setFooterFit(
         SidebarOrganization.fitItems({
           widths,
-          available: moreAlwaysShown ? available - FOOTER_MORE_WIDTH - FOOTER_GAP : available,
+          available: reserved - FOOTER_MORE_WIDTH - FOOTER_GAP,
           gap: FOOTER_GAP,
-          reserve: moreAlwaysShown ? 0 : FOOTER_MORE_WIDTH + FOOTER_GAP,
+          reserve: 0,
         }),
       )
     }
@@ -795,7 +809,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
     observer.observe(footer)
     footerItemRefs.current.forEach(element => observer.observe(element))
     return () => observer.disconnect()
-  }, [wide, visibleFooterKey, hiddenFooterEntries.length])
+  }, [wide, visibleFooterKey])
 
   const renderFooterEntry = (entry: FooterEntry, renderWide: boolean): ReactNode => {
     if (entry.kind === 'settings') {
@@ -1575,7 +1589,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
             </Button>
           )}
           {visibleFooterEntries.map((entry, index) => {
-            const overflowed = !footerEntryFits(index)
+            const concealed = !footerEntryInline(entry, index)
             const item = (
               <div
                 key={entry.id}
@@ -1583,14 +1597,14 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
                   if (element === null) footerItemRefs.current.delete(entry.id)
                   else {
                     footerItemRefs.current.set(entry.id, element)
-                    element.inert = overflowed
+                    element.inert = concealed
                   }
                 }}
-                aria-hidden={overflowed ? true : undefined}
-                data-overflowed={overflowed ? 'true' : undefined}
+                aria-hidden={concealed ? true : undefined}
+                data-overflowed={concealed ? 'true' : undefined}
                 className={cn(
                   'dshx:flex dshx:w-max dshx:max-h-11 dshx:shrink-0 dshx:items-center dshx:whitespace-nowrap dshx:*:shrink-0',
-                  overflowed && 'dshx:pointer-events-none dshx:invisible dshx:absolute dshx:top-0 dshx:left-0',
+                  concealed && 'dshx:pointer-events-none dshx:invisible dshx:absolute dshx:top-0 dshx:left-0',
                 )}
               >
                 {renderFooterEntry(entry, wide)}
@@ -1604,7 +1618,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
               </Tooltip>
             )
           })}
-          {overflowFooterEntries.length > 0 ? (
+          {wide || overflowFooterEntries.length > 0 ? (
             <Popover open={moreOpen} onOpenChange={setMoreOpen}>
               <PopoverTrigger asChild>
                 <Button
@@ -1624,9 +1638,34 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
                 aria-label={text(props.t, 'threadSidebarMore')}
               >
                 {overflowFooterEntries.map(entry => (
-                  <div className="dshx:flex dshx:min-h-9 dshx:items-center dshx:whitespace-nowrap dshx:*:w-full" key={entry.id}>
+                  <div className="dshx:flex dshx:items-center dshx:whitespace-nowrap dshx:*:w-full" key={entry.id}>
                     {renderFooterEntry(entry, true)}
                   </div>
+                ))}
+                {overflowFooterEntries.length === 0 ? null : <div className="dshx:my-1 dshx:h-px dshx:shrink-0 dshx:bg-border" aria-hidden="true" />}
+                {footerPages.length === 0 ? null : (
+                  <span className="dshx:px-2 dshx:pt-0.5 dshx:pb-1 dshx:text-xs dshx:font-medium dshx:text-muted-foreground">
+                    {text(props.t, 'threadSidebarMorePages')}
+                  </span>
+                )}
+                {footerPages.map(({ entry, current }) => (
+                  <Button
+                    key={entry.id}
+                    variant="ghost"
+                    className={cn(
+                      'dshx:w-full dshx:shrink-0 dshx:justify-start dshx:gap-2 dshx:font-normal dshx:text-muted-foreground dshx:hover:text-foreground',
+                      current && 'dshx:bg-accent dshx:text-foreground',
+                    )}
+                    aria-current={current ? 'page' : undefined}
+                    onClick={() => {
+                      setMoreOpen(false)
+                      activateHeaderEntry(entry)
+                    }}
+                  >
+                    {headerIconFor(entry, 16)}
+                    <span className="dshx:truncate">{entry.label}</span>
+                    {current ? <CheckIcon className="dshx:ml-auto dshx:size-4" aria-hidden="true" /> : null}
+                  </Button>
                 ))}
               </PopoverContent>
             </Popover>

@@ -678,7 +678,8 @@
       "title": "Configure per-category thread notifications",
       "summary": "Choose off, in-app, system, or both delivery for approval, input, completed-turn, and failed-turn events; configure per-category sounds and grant system permission explicitly.",
       "reach": [
-        "click button \"Settings\"",
+        "click button \"Account menu\"",
+        "click menuitem \"Settings\"",
         "click button \"Built-in plugins\"",
         "click tab \"Thread sidebar\"",
         "expect group \"Thread notifications\"",
@@ -832,6 +833,34 @@
           "id": "thread-sidebar.navigation-layout-unit-slot-seat-ownership",
           "file": "plugins/@dshfiles/thread-sidebar/src/slot-takeover.test.ts",
           "testName": "the seat above the foot exists only once this sidebar declares it"
+        }
+      ]
+    },
+    {
+      "id": "footer-more-menu",
+      "title": "Reach sidebar pages and hidden footer actions from the footer More menu",
+      "summary": "The wide sidebar foot always seats a More control; it lists hidden or overflowed footer actions and every sidebar page, so Plugins stays one click away however narrow the sidebar is. A seat whose card yielded to another surface takes no room and can never leave the menu empty.",
+      "reach": ["expect button \"More\"", "click button \"More\"", "expect text \"Pages\""],
+      "surfaces": ["client", "settings"],
+      "configuration": [],
+      "states": ["wide", "narrow", "collapsed", "hidden-entry", "entry-yielded-to-another-seat"],
+      "failureModes": [
+        "A footer seat that renders nothing never overflows and never opens an empty More menu.",
+        "A hidden footer action stays reachable from More.",
+        "The More control keeps its room, so no entry ever sits under it."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "thread-sidebar.footer-more-menu",
+          "featureFile": "tooling/dshx/e2e/features/thread-sidebar.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.footer-more-menu-unit-empty-seat",
+          "file": "plugins/@dshfiles/thread-sidebar/src/organization.test.ts",
+          "testName": "a footer seat that renders nothing never overflows and takes no gap"
         }
       ]
     },

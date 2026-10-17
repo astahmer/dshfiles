@@ -347,3 +347,9 @@ test('footer and icon-row overflow keep whole items and reserve the More control
   assert.deepEqual(SidebarOrganization.fitItems({ widths: [90, 250, 70], available: 260, gap: 8, reserve: 36 }), [true, false, true])
   assert.deepEqual(SidebarOrganization.fitItems({ widths: [], available: 0, gap: 8, reserve: 36 }), [])
 })
+
+test('a footer seat that renders nothing never overflows and takes no gap', () => {
+  assert.deepEqual(SidebarOrganization.fitItems({ widths: [190, 0, 0, 0], available: 150, gap: 8, reserve: 36 }), [false, true, true, true])
+  assert.deepEqual(SidebarOrganization.fitItems({ widths: [0, 190], available: 150, gap: 8, reserve: 36 }), [true, false])
+  assert.deepEqual(SidebarOrganization.fitItems({ widths: [190, 0], available: 200, gap: 8, reserve: 36 }), [true, true])
+})

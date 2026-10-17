@@ -103,6 +103,12 @@ Feature: Thread sidebar journeys
     When the header is expanded, reordered, and one destination is hidden
     Then the custom layout survives a browser reload
 
+  @scenario:thread-sidebar.footer-more-menu
+  Scenario: The footer More menu stays a real menu and reaches the Plugins page
+    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
+    When the sidebar footer More menu is opened
+    Then the footer menu lists the sidebar pages and opens the Plugins page
+
   @scenario:thread-sidebar.palette-search
   Scenario: Thread search reports an empty result from a fresh Host profile
     Given the isolated plugin composition "@dshfiles/thread-sidebar" and "@dshfiles/command-palette" is booted
