@@ -246,7 +246,7 @@ const editors = new Map<string, { readonly session: SessionFace; readonly editor
  * The editor for one session, kept for the page's lifetime so an edit survives switching threads. While a record
  * is open the session stays retained, so its inbox and submissions keep flowing to the editor in the background.
  */
-export const sessionQueueEditor = (ctx: Context, sessionId: SessionFace['sessionId']): QueueEditor | undefined => {
+const sessionQueueEditor = (ctx: Context, sessionId: SessionFace['sessionId']): QueueEditor | undefined => {
   const binding = ctx.sessions.binding(sessionId)
   const scoped = ctx.sessions.scope(sessionId)
   if (binding === undefined || scoped === undefined) return undefined
@@ -280,7 +280,7 @@ export const sessionQueueEditor = (ctx: Context, sessionId: SessionFace['session
 }
 
 /** Reads one queued image of a session, for the dock's thumbnails. */
-export const sessionImageReader = (ctx: Context, sessionId: SessionFace['sessionId']): ((attachment: QueuedImageAttachment) => Promise<Blob>) | undefined => {
+const sessionImageReader = (ctx: Context, sessionId: SessionFace['sessionId']): ((attachment: QueuedImageAttachment) => Promise<Blob>) | undefined => {
   const binding = ctx.sessions.binding(sessionId)
   return binding === undefined ? undefined : sessionQueueIo({ sessionId, session: binding.session }).readImage
 }
@@ -318,7 +318,7 @@ const conversationOf = (ctx: Context, sessionId: SessionFace['sessionId']) => {
  * The "Move to thread" flow for one session's queue, kept for the page's lifetime like the editor: opening the
  * target thread unmounts this dock, and the move must still finish.
  */
-export const sessionQueueTransfer = (ctx: Context, sessionId: SessionFace['sessionId']): QueueTransferActor | undefined => {
+const sessionQueueTransfer = (ctx: Context, sessionId: SessionFace['sessionId']): QueueTransferActor | undefined => {
   const binding = ctx.sessions.binding(sessionId)
   const source = conversationOf(ctx, sessionId)
   if (binding === undefined || source === undefined) return undefined
@@ -370,3 +370,9 @@ export const sessionQueueTransfer = (ctx: Context, sessionId: SessionFace['sessi
 }
 
 export type { QueuedRow }
+
+export class SessionQueueEditorModel {
+  static readonly editor = sessionQueueEditor
+  static readonly imageReader = sessionImageReader
+  static readonly transfer = sessionQueueTransfer
+}

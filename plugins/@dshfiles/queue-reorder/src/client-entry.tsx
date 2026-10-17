@@ -5,7 +5,7 @@ import { MessageId } from '@deepseek-ai/dsh-llm/brand'
 import { defineClient } from '@dshfiles/dshx/client'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { type DockProps, DraggableQueueDock } from './client.js'
-import { sessionImageReader, sessionQueueEditor, sessionQueueTransfer } from './session-queue-editor.js'
+import { SessionQueueEditorModel } from './session-queue-editor.js'
 import { QUEUE_REORDER_LOCALE_NAMESPACE, queueReorderLocale } from './locales.js'
 
 /**
@@ -66,9 +66,9 @@ export default defineClient({
             }
             return {
               updateQueue: (itemId: MessageId, action: QueueAction): Promise<void> => conversation.updateQueue(itemId, action),
-              queueEditor: sessionQueueEditor(ctx, sessionId),
-              queueTransfer: sessionQueueTransfer(ctx, sessionId),
-              readImage: sessionImageReader(ctx, sessionId),
+              queueEditor: SessionQueueEditorModel.editor(ctx, sessionId),
+              queueTransfer: SessionQueueEditorModel.transfer(ctx, sessionId),
+              readImage: SessionQueueEditorModel.imageReader(ctx, sessionId),
               threads: ctx.sessions.list,
             }
           },
