@@ -11,7 +11,7 @@ const jjAvailable = spawnSync('jj', ['--version']).status === 0
 
 const executor: JjExecutor = async ({ args, cwd }) => {
   const result = spawnSync('jj', ['--color=never', '--no-pager', ...args], { cwd, encoding: 'utf8', env: { ...process.env, JJ_CONFIG: '' } })
-  return { exitCode: result.status ?? 1, stdout: result.stdout, stderr: result.stderr }
+  return { exitCode: result.status ?? 1, stdout: result.stdout, stdoutLossy: false, stderr: result.stderr }
 }
 
 const jj = (cwd: string, ...args: string[]): string =>
@@ -23,6 +23,9 @@ const jj = (cwd: string, ...args: string[]): string =>
   })
 
 const bookmarkTarget = (cwd: string): string => jj(cwd, '--ignore-working-copy', 'log', '--no-graph', '-r', 'main', '-T', 'description.first_line()')
+const bookmarkTargetCommitId = (cwd: string): string =>
+  jj(cwd, '--ignore-working-copy', 'log', '--no-graph', '-r', 'bookmarks(exact:"main")', '-T', 'commit_id').trim()
+const commitIdAt = (cwd: string, revset: string): string => jj(cwd, '--ignore-working-copy', 'log', '--no-graph', '-r', revset, '-T', 'commit_id').trim()
 const changeIdAt = (cwd: string, revset: string): string =>
   jj(cwd, '--ignore-working-copy', 'log', '--no-graph', '-r', revset, '-T', 'change_id.short(12)').trim()
 
@@ -173,6 +176,327 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
     expect(status.rebasedTipChangeId).toBeUndefined()
   })
 
+  it('runs Project Checks on the exact rebased candidate before moving the bookmark', async () => {
+    const thread = await threads.provision(repo)
+    writeFileSync(join(thread.path, 'feature.txt'), 'verified feature\n')
+    jj(thread.path, 'describe', '-m', 'feat: verified feature')
+    const sourceRevision = await threads.workingCopyCommitId(thread.path)
+    const bookmarkBefore = bookmarkTargetCommitId(repo)
+    const verifiedCandidates: string[] = []
+
+    const outcome = await threads.landVerified({
+      path: thread.path,
+      expectedSourceRevision: sourceRevision,
+      authorize: async location => location.threadName === thread.name,
+      verifyCandidate: async candidate => {
+        verifiedCandidates.push(candidate.workingCopyCommitId)
+        expect(candidate.attempt).toBe(1)
+        expect(await threads.workingCopyCommitId(thread.path)).toBe(candidate.workingCopyCommitId)
+        expect(bookmarkTargetCommitId(repo)).toBe(bookmarkBefore)
+        return { status: 'passed' }
+      },
+    })
+
+    expect(outcome).toMatchObject({ status: 'landed', head: { commitId: verifiedCandidates[0] } })
+    expect(verifiedCandidates).toHaveLength(1)
+    expect(bookmarkTargetCommitId(repo)).toBe(verifiedCandidates[0])
+    expect(bookmarkTargetCommitId(repo)).not.toBe(bookmarkBefore)
+  })
+
+  it('does not move the bookmark when Project Checks reject the rebased candidate', async () => {
+    const thread = await threads.provision(repo)
+    writeFileSync(join(thread.path, 'feature.txt'), 'unverified feature\n')
+    jj(thread.path, 'describe', '-m', 'feat: unverified feature')
+    const sourceRevision = await threads.workingCopyCommitId(thread.path)
+    const bookmarkBefore = bookmarkTargetCommitId(repo)
+
+    const outcome = await threads.landVerified({
+      path: thread.path,
+      expectedSourceRevision: sourceRevision,
+      authorize: async () => true,
+      verifyCandidate: async () => ({ status: 'failed', message: 'post-rebase test failed' }),
+    })
+
+    expect(outcome).toEqual({ status: 'verification-failed', message: 'post-rebase test failed' })
+    expect(bookmarkTargetCommitId(repo)).toBe(bookmarkBefore)
+  })
+
+  it('rejects a stale completion source before rebasing the thread', async () => {
+    const thread = await threads.provision(repo)
+    const staleSourceRevision = await threads.workingCopyCommitId(thread.path)
+    writeFileSync(join(thread.path, 'feature.txt'), 'changed after checks\n')
+    jj(thread.path, 'describe', '-m', 'feat: changed after checks')
+    const currentSourceRevision = await threads.workingCopyCommitId(thread.path)
+    const bookmarkBefore = bookmarkTargetCommitId(repo)
+
+    const outcome = await threads.landVerified({
+      path: thread.path,
+      expectedSourceRevision: staleSourceRevision,
+      authorize: async () => true,
+      verifyCandidate: async () => ({ status: 'passed' }),
+    })
+
+    expect(outcome).toMatchObject({ status: 'verification-stale' })
+    expect(bookmarkTargetCommitId(repo)).toBe(bookmarkBefore)
+    expect(await threads.workingCopyCommitId(thread.path)).toBe(currentSourceRevision)
+  })
+
+  it('does not replay an exact patch already represented on the bookmark', async () => {
+    const thread = await threads.provision(repo)
+    writeFileSync(join(repo, 'shared.txt'), 'one\nrepresented\n')
+    jj(repo, 'describe', '-m', 'feat: target patch')
+    jj(repo, 'bookmark', 'set', 'main', '-r', '@')
+    writeFileSync(join(thread.path, 'shared.txt'), 'one\nrepresented\n')
+    jj(thread.path, 'describe', '-m', 'feat: duplicate thread patch')
+    const sourceRevision = await threads.workingCopyCommitId(thread.path)
+    const bookmarkBefore = bookmarkTargetCommitId(repo)
+    let verified = false
+
+    const outcome = await threads.landVerified({
+      path: thread.path,
+      expectedSourceRevision: sourceRevision,
+      authorize: async () => true,
+      verifyCandidate: async () => {
+        verified = true
+        return { status: 'passed' }
+      },
+    })
+
+    expect(outcome).toMatchObject({ status: 'already-integrated', revisions: [{ commitId: sourceRevision }] })
+    expect(bookmarkTargetCommitId(repo)).toBe(bookmarkBefore)
+    expect(await threads.workingCopyCommitId(thread.path)).toBe(sourceRevision)
+    expect(verified).toBe(false)
+  })
+
+  it('blocks mixed represented and unique work before candidate verification', async () => {
+    const thread = await threads.provision(repo)
+    writeFileSync(join(repo, 'shared.txt'), 'one\nrepresented\n')
+    jj(repo, 'describe', '-m', 'feat: target patch')
+    jj(repo, 'bookmark', 'set', 'main', '-r', '@')
+    writeFileSync(join(thread.path, 'shared.txt'), 'one\nrepresented\n')
+    jj(thread.path, 'describe', '-m', 'feat: represented thread patch')
+    jj(thread.path, 'new')
+    writeFileSync(join(thread.path, 'unique.txt'), 'unique work\n')
+    jj(thread.path, 'describe', '-m', 'feat: unique thread patch')
+    const sourceRevision = await threads.workingCopyCommitId(thread.path)
+    const bookmarkBefore = bookmarkTargetCommitId(repo)
+    let verified = false
+
+    const outcome = await threads.landVerified({
+      path: thread.path,
+      expectedSourceRevision: sourceRevision,
+      authorize: async () => true,
+      verifyCandidate: async () => {
+        verified = true
+        return { status: 'passed' }
+      },
+    })
+
+    expect(outcome.status).toBe('patch-equivalent-work')
+    expect(bookmarkTargetCommitId(repo)).toBe(bookmarkBefore)
+    expect(await threads.workingCopyCommitId(thread.path)).toBe(sourceRevision)
+    expect(verified).toBe(false)
+  })
+
+  it('blocks detached thread-owned work without moving the bookmark', async () => {
+    const thread = await threads.provision(repo)
+    writeFileSync(join(thread.path, 'detached.txt'), 'detached work\n')
+    jj(thread.path, 'describe', '-m', 'feat: detached thread work')
+    const detachedCommitId = await threads.workingCopyCommitId(thread.path)
+    jj(thread.path, 'new', 'main')
+    const sourceRevision = await threads.workingCopyCommitId(thread.path)
+    const bookmarkBefore = bookmarkTargetCommitId(repo)
+    let verified = false
+
+    const outcome = await threads.landVerified({
+      path: thread.path,
+      expectedSourceRevision: sourceRevision,
+      authorize: async () => true,
+      verifyCandidate: async () => {
+        verified = true
+        return { status: 'passed' }
+      },
+    })
+
+    expect(outcome).toMatchObject({ status: 'detached-work', revisions: [{ commitId: detachedCommitId }] })
+    expect(bookmarkTargetCommitId(repo)).toBe(bookmarkBefore)
+    expect(verified).toBe(false)
+  })
+
+  it('does not block a thread on a sibling workspace detached head', async () => {
+    const thread = await threads.provision(repo)
+    const sibling = await threads.provision(repo)
+    writeFileSync(join(sibling.path, 'sibling-detached.txt'), 'sibling work\n')
+    jj(sibling.path, 'describe', '-m', 'feat: sibling detached work')
+    const siblingDetachedCommitId = await threads.workingCopyCommitId(sibling.path)
+    jj(sibling.path, 'new', 'main')
+    writeFileSync(join(thread.path, 'target.txt'), 'target work\n')
+    jj(thread.path, 'describe', '-m', 'feat: target work')
+    const sourceRevision = await threads.workingCopyCommitId(thread.path)
+    let verified = false
+
+    const outcome = await threads.landVerified({
+      path: thread.path,
+      expectedSourceRevision: sourceRevision,
+      authorize: async () => true,
+      verifyCandidate: async () => {
+        verified = true
+        return { status: 'passed' }
+      },
+    })
+
+    expect(outcome).toMatchObject({ status: 'landed' })
+    expect(verified).toBe(true)
+    expect(jj(repo, '--ignore-working-copy', 'log', '--no-graph', '-r', `all() ~ ::main`, '-T', 'commit_id')).toContain(siblingDetachedCommitId)
+  })
+
+  it('fails closed on binary patches whose equivalence cannot be proven', async () => {
+    const thread = await threads.provision(repo)
+    writeFileSync(join(thread.path, 'binary.dat'), Buffer.from([0, 255, 1, 0]))
+    jj(thread.path, 'describe', '-m', 'feat: binary payload')
+    const sourceRevision = await threads.workingCopyCommitId(thread.path)
+    const bookmarkBefore = bookmarkTargetCommitId(repo)
+    let verified = false
+
+    const outcome = await threads.landVerified({
+      path: thread.path,
+      expectedSourceRevision: sourceRevision,
+      authorize: async () => true,
+      verifyCandidate: async () => {
+        verified = true
+        return { status: 'passed' }
+      },
+    })
+
+    expect(outcome).toMatchObject({ status: 'patch-equivalence-unavailable', revisions: [{ commitId: sourceRevision }] })
+    expect(bookmarkTargetCommitId(repo)).toBe(bookmarkBefore)
+    expect(await threads.workingCopyCommitId(thread.path)).toBe(sourceRevision)
+    expect(verified).toBe(false)
+  })
+
+  it('rejects work added during candidate checks before moving the bookmark', async () => {
+    const thread = await threads.provision(repo)
+    writeFileSync(join(thread.path, 'feature.txt'), 'candidate feature\n')
+    jj(thread.path, 'describe', '-m', 'feat: candidate feature')
+    const sourceRevision = await threads.workingCopyCommitId(thread.path)
+    const bookmarkBefore = bookmarkTargetCommitId(repo)
+
+    const outcome = await threads.landVerified({
+      path: thread.path,
+      expectedSourceRevision: sourceRevision,
+      authorize: async () => true,
+      verifyCandidate: async () => {
+        writeFileSync(join(thread.path, 'late.txt'), 'late work\n')
+        jj(thread.path, 'describe', '-m', 'feat: late work')
+        return { status: 'passed' }
+      },
+    })
+
+    expect(outcome).toMatchObject({ status: 'verification-stale' })
+    expect(bookmarkTargetCommitId(repo)).toBe(bookmarkBefore)
+  })
+
+  it('does not move the bookmark when candidate checks are cancelled', async () => {
+    const thread = await threads.provision(repo)
+    writeFileSync(join(thread.path, 'feature.txt'), 'cancelled feature\n')
+    jj(thread.path, 'describe', '-m', 'feat: cancelled feature')
+    const sourceRevision = await threads.workingCopyCommitId(thread.path)
+    const bookmarkBefore = bookmarkTargetCommitId(repo)
+    const controller = new AbortController()
+
+    const outcome = await threads.landVerified({
+      path: thread.path,
+      signal: controller.signal,
+      expectedSourceRevision: sourceRevision,
+      authorize: async () => true,
+      verifyCandidate: async () => {
+        controller.abort()
+        return { status: 'cancelled' }
+      },
+    })
+
+    expect(outcome).toEqual({ status: 'verification-cancelled' })
+    expect(bookmarkTargetCommitId(repo)).toBe(bookmarkBefore)
+  })
+
+  it('confirms a completed bookmark move even if cancellation arrives immediately afterward', async () => {
+    const thread = await threads.provision(repo)
+    writeFileSync(join(thread.path, 'feature.txt'), 'landed before cancellation\n')
+    jj(thread.path, 'describe', '-m', 'feat: landed before cancellation')
+    const sourceRevision = await threads.workingCopyCommitId(thread.path)
+    const controller = new AbortController()
+    const verifiedCandidates: string[] = []
+    const abortAfterMoveExecutor: JjExecutor = async input => {
+      const result = await executor(input)
+      if (input.args.includes('bookmark') && input.args.includes('move')) controller.abort()
+      return result
+    }
+    const guardedThreads = createThreads({ executor: abortAfterMoveExecutor, bookmark: () => 'main', threadsDirectory: defaultThreadsDirectory })
+
+    const outcome = await guardedThreads.landVerified({
+      path: thread.path,
+      signal: controller.signal,
+      expectedSourceRevision: sourceRevision,
+      authorize: async () => true,
+      verifyCandidate: async candidate => {
+        verifiedCandidates.push(candidate.workingCopyCommitId)
+        return { status: 'passed' }
+      },
+    })
+
+    expect(outcome).toMatchObject({ status: 'landed', head: { commitId: verifiedCandidates[0] } })
+    expect(controller.signal.aborted).toBe(true)
+    expect(bookmarkTargetCommitId(repo)).toBe(verifiedCandidates[0])
+  })
+
+  it('fails closed when JJ truncates revision metadata', async () => {
+    const thread = await threads.provision(repo)
+    writeFileSync(join(thread.path, 'feature.txt'), 'truncated output case\n')
+    jj(thread.path, 'describe', '-m', 'feat: truncated output case')
+    const sourceRevision = await threads.workingCopyCommitId(thread.path)
+    const bookmarkBefore = bookmarkTargetCommitId(repo)
+    const lossyExecutor: JjExecutor = async input => {
+      const result = await executor(input)
+      return input.args.some(argument => argument.includes('change_id ++')) ? { ...result, stdoutLossy: true } : result
+    }
+    const guardedThreads = createThreads({ executor: lossyExecutor, bookmark: () => 'main', threadsDirectory: defaultThreadsDirectory })
+
+    await expect(
+      guardedThreads.landVerified({
+        path: thread.path,
+        expectedSourceRevision: sourceRevision,
+        authorize: async () => true,
+        verifyCandidate: async () => ({ status: 'passed' }),
+      }),
+    ).rejects.toMatchObject({ code: 'jj-failed' })
+    expect(bookmarkTargetCommitId(repo)).toBe(bookmarkBefore)
+    expect(await threads.workingCopyCommitId(thread.path)).toBe(sourceRevision)
+  })
+
+  it('fails closed on malformed revision rows instead of treating them as empty', async () => {
+    const thread = await threads.provision(repo)
+    writeFileSync(join(thread.path, 'feature.txt'), 'malformed output case\n')
+    jj(thread.path, 'describe', '-m', 'feat: malformed output case')
+    const sourceRevision = await threads.workingCopyCommitId(thread.path)
+    const bookmarkBefore = bookmarkTargetCommitId(repo)
+    const malformedExecutor: JjExecutor = async input => {
+      const result = await executor(input)
+      return input.args.some(argument => argument.includes('change_id ++')) ? { ...result, stdout: 'malformed\\tmetadata\\n' } : result
+    }
+    const guardedThreads = createThreads({ executor: malformedExecutor, bookmark: () => 'main', threadsDirectory: defaultThreadsDirectory })
+
+    await expect(
+      guardedThreads.landVerified({
+        path: thread.path,
+        expectedSourceRevision: sourceRevision,
+        authorize: async () => true,
+        verifyCandidate: async () => ({ status: 'passed' }),
+      }),
+    ).rejects.toMatchObject({ code: 'jj-failed' })
+    expect(bookmarkTargetCommitId(repo)).toBe(bookmarkBefore)
+    expect(await threads.workingCopyCommitId(thread.path)).toBe(sourceRevision)
+  })
+
   it('rebases described work onto the bookmark and leaves a fresh working copy', async () => {
     const thread = await threads.provision(repo)
     writeFileSync(join(thread.path, 'feature.txt'), 'feature\n')
@@ -199,20 +523,38 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
     expect((await reloaded.list(repo))[0]?.rebasedTipChangeId).toBe(tipChangeId)
   })
 
-  it('brings the default checkout onto the rebased bookmark with dshx checkout sync, keeping its local edits', async () => {
+  it('syncs the default checkout to the exact landed commit even if the bookmark advances later', async () => {
     writeFileSync(join(repo, '.secret.json'), 'local\n')
     const thread = await threads.provision(repo)
     writeFileSync(join(thread.path, 'feature.txt'), 'feature\n')
     jj(thread.path, 'describe', '-m', 'feat: add feature')
-    expect(await threads.land(thread.path)).toMatchObject({ status: 'landed' })
+    const landed = await threads.land(thread.path)
+    expect(landed.status).toBe('landed')
+    if (landed.status !== 'landed' || landed.head === undefined) throw new Error('Expected a landed commit id.')
+    const landedCommitId = landed.head.commitId
 
-    const [command = '', ...args] = checkoutSyncArgv({ repoRoot: repo, workspace: 'default', bookmark: 'main' })
+    jj(thread.path, 'new', 'main')
+    writeFileSync(join(thread.path, 'later.txt'), 'later work\n')
+    jj(thread.path, 'describe', '-m', 'feat: later work')
+    jj(thread.path, 'bookmark', 'set', 'main', '-r', '@')
+    const laterBookmarkTarget = bookmarkTargetCommitId(repo)
+    expect(laterBookmarkTarget).not.toBe(landedCommitId)
+
+    const [command = '', ...args] = checkoutSyncArgv({
+      repoRoot: repo,
+      workspace: 'default',
+      bookmark: 'main',
+      revision: landedCommitId,
+    })
     const synced = spawnSync(command, args, { encoding: 'utf8', env: { ...process.env, JJ_CONFIG: '' } })
     expect(JsonText.decode(z.unknown(), synced.stdout)?.data).toMatchObject({
       ok: true,
-      data: { status: 'synced', kept: [{ description: '' }], changedFiles: ['feature.txt'] },
+      data: { status: 'synced', to: landedCommitId, kept: [{ description: '' }], changedFiles: ['feature.txt'] },
     })
+    expect(commitIdAt(repo, 'default@-')).toBe(landedCommitId)
+    expect(bookmarkTargetCommitId(repo)).toBe(laterBookmarkTarget)
     expect(readFileSync(join(repo, 'feature.txt'), 'utf8')).toBe('feature\n')
+    expect(() => readFileSync(join(repo, 'later.txt'))).toThrow()
     expect(readFileSync(join(repo, '.secret.json'), 'utf8')).toBe('local\n')
   })
 

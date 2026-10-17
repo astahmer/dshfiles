@@ -7,9 +7,20 @@ export const jjIntegrationSettings = defineSettings({
     isolateByDefault: Schema.boolean()
       .default(false)
       .description(
-        'Start new threads in a jj repository in their own jj workspace. The workspace toggle above a new thread’s composer overrides it per thread.',
+        'Start new threads in their own jj workspace by default. Automatic integration scope all forces this on; the composer toggle can override it per thread.',
       ),
-    bookmark: Schema.string().default('main').description('Bookmark new threads start from and Rebase advances.'),
+    autoIntegrationScope: Schema.union([
+      Schema.const('none').description('Keep integration manual.'),
+      Schema.const('isolated').description('Automatically integrate verified, isolated thread workspaces; new-thread isolation stays opt-in.'),
+      Schema.const('all').description(
+        'Automatically isolate each new thread and integrate only its verified, uniquely owned thread workspace; existing shared checkouts stay manual.',
+      ),
+    ])
+      .default('none')
+      .description(
+        'Automatically rebase finished thread work after Project Checks pass. All scope also isolates new threads by default; existing shared checkouts stay manual.',
+      ),
+    bookmark: Schema.string().default('main').description('Exact local bookmark new threads start from and Rebase advances.'),
     threadsDirectory: Schema.string()
       .default('')
       .description('Parent directory for thread workspaces. Empty uses `<repository>-threads` beside the repository.'),
@@ -28,3 +39,12 @@ export const jjIntegrationSettings = defineSettings({
 })
 
 export type JjIntegrationSettings = SettingsValue<typeof jjIntegrationSettings.schema>
+
+export const isolatesNewThreadsByDefault = (settings: JjIntegrationSettings): boolean => settings.isolateByDefault || settings.autoIntegrationScope === 'all'
+
+export const mayAutoIntegrateWorkspace = (input: {
+  readonly scope: JjIntegrationSettings['autoIntegrationScope']
+  readonly isThreadWorkspace: boolean
+  readonly sessionId: string
+  readonly sessionIds: readonly string[]
+}): boolean => input.scope !== 'none' && input.isThreadWorkspace && input.sessionIds.length === 1 && input.sessionIds[0] === input.sessionId

@@ -8,13 +8,15 @@ import type { SessionRequestId } from '@deepseek-ai/dsh-api-session-controller'
 import type {} from '@deepseek-ai/dsh-subprocess'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import { WorkspaceId, type Workspace } from '@deepseek-ai/dsh-workspace'
-import { PluginApiError, type ApiCaller } from '@dshfiles/dshx/api'
-import { defineCommand, defineHost, type CommandInvocation, type CommandResult } from '@dshfiles/dshx/host'
+import { isApiOwnerMissing, PluginApiError, type ApiCaller } from '@dshfiles/dshx/api'
+import { createHostApiClient, defineCommand, defineHost, type CommandInvocation, type CommandResult } from '@dshfiles/dshx/host'
+import { projectChecksApi } from '@dshfiles/project-checks/api'
+import type { ProjectChecksVerifiedTurn } from '@dshfiles/project-checks/completion-event'
 import type { SettingsScope } from '@dshfiles/dshx/settings'
 import { z } from 'zod'
 import { jjIntegrationApi, type DestinationView, type LandResult, type RepositoryView, type ThreadView, type WorkspaceSyncView } from './api.js'
 import { JsonText } from './json-text.js'
-import { jjIntegrationSettings, type JjIntegrationSettings } from './settings.js'
+import { isolatesNewThreadsByDefault, jjIntegrationSettings, mayAutoIntegrateWorkspace, type JjIntegrationSettings } from './settings.js'
 import { hasPendingUserQuestion, threadRebaseEligibility, type ThreadSessionActivity } from './thread-rebase-eligibility.js'
 import { workspaceHasOtherSession } from './thread-session-ownership.js'
 import { registeredProjects } from './registered-projects.js'
@@ -79,6 +81,7 @@ let threads: Threads | undefined
 const isolatedSessionWorkspaces = new Map<string, { readonly name: string; readonly path: string }>()
 let workspaceSync: WorkspaceSyncView | null = null
 let workspaceSyncQueued = false
+const pendingWorkspaceSyncs = new Map<string, WorkspaceSyncInput>()
 let workspaceSyncQueue: Promise<void> = Promise.resolve()
 
 const readSettings = (): JjIntegrationSettings => {
@@ -112,12 +115,30 @@ const registryOf = () => {
   return registry
 }
 
+type ActivityLevel = 'routine' | 'notable' | 'attention'
+type AutoIntegrationActivityState =
+  | 'queued'
+  | 'cancelled'
+  | 'skipped'
+  | 'failed'
+  | 'landed'
+  | 'nothing-to-land'
+  | 'already-integrated'
+  | 'patch-equivalent-work'
+  | 'patch-equivalence-unavailable'
+  | 'conflicted'
+  | 'needs-description'
+  | 'detached-work'
+  | 'verification-failed'
+
 const emitActivity = (input: {
   readonly type: string
   readonly summary: string
   readonly detail?: string | undefined
   readonly path: string
-  readonly level?: string
+  readonly sessionId?: string | null | undefined
+  readonly correlationId?: string | undefined
+  readonly level?: ActivityLevel | undefined
 }): void => {
   const at = Date.now()
   hostContext?.emit('dshfiles/activity/event', {
@@ -129,12 +150,23 @@ const emitActivity = (input: {
       level: input.level ?? 'notable',
       summary: input.summary,
       detail: input.detail ?? null,
-      sessionId: null,
+      sessionId: input.sessionId ?? null,
+      correlationId: input.correlationId ?? null,
       workspaceId: input.path,
       workspaceName: basename(input.path),
     },
   })
 }
+
+const safePromptField = (value: string, maximumLength: number): string =>
+  [...value]
+    .map(character => {
+      const codePoint = character.codePointAt(0) ?? 0
+      return codePoint <= 0x1f || (codePoint >= 0x7f && codePoint <= 0x9f) ? ' ' : character
+    })
+    .join('')
+    .replaceAll('`', "'")
+    .slice(0, maximumLength)
 
 const createExecutor =
   (context: Context): JjExecutor =>
@@ -149,9 +181,11 @@ const createExecutor =
       signal,
     })
     const outcome = await handle.done
+    const stdout = handle.collected.stdout?.readFrom(0)
     return {
       exitCode: outcome.exitCode ?? 1,
-      stdout: handle.collected.stdout?.readFrom(0)?.text ?? '',
+      stdout: stdout?.text ?? '',
+      stdoutLossy: stdout?.lossy ?? true,
       stderr: handle.collected.stderr?.readFrom(0)?.text ?? '',
     }
   }
@@ -313,6 +347,9 @@ interface WorkspaceSyncInput {
   readonly repoRoot: string
   readonly workspace: string
   readonly bookmark: string
+  readonly revision?: string | undefined
+  readonly sessionId?: string | null | undefined
+  readonly correlationId?: string | undefined
 }
 
 const workspaceSyncView = (input: WorkspaceSyncInput, state: WorkspaceSyncView['state'], message: string | null): WorkspaceSyncView => ({
@@ -361,26 +398,52 @@ const runWorkspaceSync = async (input: WorkspaceSyncInput): Promise<WorkspaceSyn
   }
 }
 
-/** Runs one sync at a time; rebases arriving while one waits share it. */
-const queueWorkspaceSync = (repoRoot: string): void => {
-  const settings = readSettings()
-  const workspace = settings.syncWorkspaceAfterLand.trim()
-  if (workspace === '' || workspaceSyncQueued) return
+/** Runs exact-commit syncs serially and coalesces pending work per repository. */
+const queueWorkspaceSync = (input: {
+  readonly repoRoot: string
+  readonly bookmark: string
+  readonly revision?: string | undefined
+  readonly sessionId?: string | null | undefined
+  readonly correlationId?: string | undefined
+}): void => {
+  const workspace = readSettings().syncWorkspaceAfterLand.trim()
+  if (workspace === '') return
+  const nextInput: WorkspaceSyncInput = { ...input, workspace }
+  pendingWorkspaceSyncs.set(nextInput.repoRoot, nextInput)
+  workspaceSync = workspaceSyncView(nextInput, 'running', null)
+  if (workspaceSyncQueued) return
   workspaceSyncQueued = true
-  const input = { repoRoot, workspace, bookmark: settings.bookmark }
-  workspaceSync = workspaceSyncView(input, 'running', null)
-  workspaceSyncQueue = workspaceSyncQueue.then(async () => {
-    workspaceSyncQueued = false
-    const view = await runWorkspaceSync(input).catch(error => workspaceSyncView(input, 'failed', error instanceof Error ? error.message : String(error)))
-    workspaceSync = view
-    emitActivity({
-      type: `workspace.sync_${view.state}`,
-      level: view.state === 'failed' || view.restartNeeded ? 'attention' : 'notable',
-      summary: describeWorkspaceSync(view),
-      detail: view.message ?? undefined,
-      path: repoRoot,
+  workspaceSyncQueue = workspaceSyncQueue
+    .then(async () => {
+      try {
+        while (pendingWorkspaceSyncs.size > 0) {
+          const next = pendingWorkspaceSyncs.entries().next().value
+          if (next === undefined) break
+          const [repoRoot, current] = next
+          pendingWorkspaceSyncs.delete(repoRoot)
+          workspaceSync = workspaceSyncView(current, 'running', null)
+          const view = await runWorkspaceSync(current).catch(error =>
+            workspaceSyncView(current, 'failed', error instanceof Error ? error.message : String(error)),
+          )
+          workspaceSync = view
+          emitActivity({
+            type: `workspace.sync_${view.state}`,
+            level: view.state === 'failed' || view.restartNeeded ? 'attention' : 'notable',
+            summary: describeWorkspaceSync(view),
+            detail: view.message ?? undefined,
+            path: current.repoRoot,
+            sessionId: current.sessionId,
+            correlationId: current.correlationId,
+          })
+        }
+      } finally {
+        workspaceSyncQueued = false
+      }
     })
-  })
+    .catch(error => {
+      workspaceSyncQueued = false
+      hostContext?.logger.warn('jj-integration: queued checkout sync failed: %o', error)
+    })
 }
 
 const landThread = async (input: {
@@ -391,6 +454,7 @@ const landThread = async (input: {
 }): Promise<LandResult> => {
   recordIntegrationProgress(input.path, 'queued')
   const bookmark = readSettings().bookmark
+  const correlationId = randomUUID()
   const activeThreads = requireThreads()
   const location = await activeThreads.locate(input.path)
   const validate = async (): Promise<void> => {
@@ -418,22 +482,30 @@ const landThread = async (input: {
   const onProgress = (phase: IntegrationProgressPhase): void => recordIntegrationProgress(input.path, phase)
   const outcome = await activeThreads.landAt(
     { ...location, threadName },
-    input.signal === undefined ? { validate, onProgress } : { signal: input.signal, validate, onProgress },
+    input.signal === undefined ? { bookmark, validate, onProgress } : { bookmark, signal: input.signal, validate, onProgress },
   )
   const result: LandResult = {
     status: outcome.status,
     revisions: outcome.status === 'nothing-to-land' ? [] : [...outcome.revisions],
     files: outcome.status === 'conflicted' ? [...outcome.files] : [],
     bookmark,
-    ...(outcome.status === 'landed' && outcome.head !== undefined ? { head: outcome.head } : {}),
     agentAsked: false,
   }
+  if (outcome.status === 'landed') result.head = outcome.head
   const message = landingMessage(result)
   const agentAsked =
     message !== undefined && !input.fromAgent && readSettings().askAgentToFixLanding
       ? await askAgent(input.path, input.sessionId, message).catch(() => false)
       : false
-  if (outcome.status === 'landed') queueWorkspaceSync(location.repoRoot)
+  if (outcome.status === 'landed') {
+    queueWorkspaceSync({
+      repoRoot: location.repoRoot,
+      bookmark,
+      revision: outcome.head.commitId,
+      sessionId: input.sessionId,
+      correlationId,
+    })
+  }
   emitActivity({
     type: `workspace.rebase_${outcome.status.replaceAll('-', '_')}`,
     level: outcome.status === 'landed' || outcome.status === 'nothing-to-land' ? 'notable' : 'attention',
@@ -442,6 +514,8 @@ const landThread = async (input: {
         ? `Rebased ${String(outcome.revisions.length)} revision(s) from ${basename(input.path)} onto ${bookmark}`
         : `Rebase ${outcome.status} in ${basename(input.path)}`,
     path: input.path,
+    sessionId: input.sessionId,
+    correlationId,
   })
   return { ...result, agentAsked }
 }
@@ -458,8 +532,9 @@ const discardThread = async (input: { readonly path: string; readonly force: boo
     for (const [sessionId, workspace] of isolatedSessionWorkspaces) {
       if (workspace.path === found.thread.path) isolatedSessionWorkspaces.delete(sessionId)
     }
-    emitActivity({ type: 'workspace.discarded', summary: `Removed thread workspace ${found.thread.name}`, path: input.path })
-    queueWorkspaceSync(found.repoRoot)
+    const correlationId = randomUUID()
+    emitActivity({ type: 'workspace.discarded', summary: `Removed thread workspace ${found.thread.name}`, path: input.path, correlationId })
+    queueWorkspaceSync({ repoRoot: found.repoRoot, bookmark: readSettings().bookmark, correlationId })
   }
   return { status: outcome.status, revisions: outcome.status === 'has-work' ? [...outcome.revisions] : [] }
 }
@@ -540,7 +615,7 @@ const destinationAt = async (workspaceRoot: string, isolated: boolean, projectWo
     projectWorkspaceId,
     bookmark: bookmarks.current,
     bookmarks: [...bookmarks.names],
-    isolateByDefault: readSettings().isolateByDefault,
+    isolateByDefault: isolatesNewThreadsByDefault(readSettings()),
   }
 }
 
@@ -553,9 +628,9 @@ const api = jjIntegrationApi.host({
     const location = await requireThreads()
       .locate(source.path)
       .catch(() => undefined)
-    if (location === undefined) return { workspaceId: source.id, isolated: false, destination: noDestination(settings.isolateByDefault) }
+    if (location === undefined) return { workspaceId: source.id, isolated: false, destination: noDestination(isolatesNewThreadsByDefault(settings)) }
     const project = await registry.resolveByPath(location.repoRoot)
-    if (!(input.isolate ?? settings.isolateByDefault)) {
+    if (!(input.isolate ?? isolatesNewThreadsByDefault(settings))) {
       const projectId = project?.id ?? source.id
       return { workspaceId: projectId, isolated: false, destination: await destinationAt(location.repoRoot, false, project?.id ?? null) }
     }
@@ -577,7 +652,7 @@ const api = jjIntegrationApi.host({
             .locate(source.path)
             .catch(() => undefined)
     if (location === undefined) {
-      const destination = noDestination(readSettings().isolateByDefault)
+      const destination = noDestination(isolatesNewThreadsByDefault(readSettings()))
       if (ownedByAnotherSession === undefined) return destination
       return { ...destination, ownedByAnotherSession }
     }
@@ -704,6 +779,223 @@ const ownedSettings = jjIntegrationSettings.host({
 const setupHost = (context: Context): Effect<void> => {
   hostContext = context
   threads = createThreads({ executor: createExecutor(context), bookmark: () => readSettings().bookmark, threadsDirectory })
+  const projectChecks = createHostApiClient(context, projectChecksApi, '@dshfiles/jj-integration')
+  const handleVerifiedTurn = async (verifiedTurn: ProjectChecksVerifiedTurn): Promise<void> => {
+    if (verifiedTurn.signal.aborted) return
+
+    const registry = registryOf()
+    const sessionWorkspaces = [...registry.list()].filter(workspace => workspace.sessionIds.includes(verifiedTurn.sessionId))
+    const workspace = sessionWorkspaces[0]
+    if (sessionWorkspaces.length !== 1 || workspace === undefined) return
+
+    const activeThreads = requireThreads()
+    const initialLocation = await activeThreads.locate(workspace.path, verifiedTurn.signal).catch(() => undefined)
+    if (
+      initialLocation === undefined ||
+      !mayAutoIntegrateWorkspace({
+        scope: readSettings().autoIntegrationScope,
+        isThreadWorkspace: initialLocation.threadName !== undefined,
+        sessionId: verifiedTurn.sessionId,
+        sessionIds: workspace.sessionIds,
+      })
+    ) {
+      return
+    }
+
+    const correlationId = randomUUID()
+    const report = (
+      state: AutoIntegrationActivityState,
+      summary: string,
+      level: ActivityLevel = 'notable',
+      detail = `Turn ${String(verifiedTurn.turn)}`,
+    ): void =>
+      emitActivity({
+        type: `workspace.auto_integration_${state}`,
+        summary,
+        detail,
+        path: workspace.path,
+        sessionId: verifiedTurn.sessionId,
+        correlationId,
+        level,
+      })
+
+    report('queued', `Queued automatic integration for ${basename(workspace.path)}`)
+    const bookmark = readSettings().bookmark
+    let repoRoot: string | undefined
+    let outcome: Awaited<ReturnType<Threads['landVerified']>>
+    try {
+      outcome = await activeThreads.landVerified({
+        path: workspace.path,
+        bookmark,
+        signal: verifiedTurn.signal,
+        expectedSourceRevision: verifiedTurn.sourceRevision,
+        authorize: async location => {
+          const current = await registry.resolveByPath(location.workspaceRoot)
+          if (
+            current === undefined ||
+            current.path !== workspace.path ||
+            !mayAutoIntegrateWorkspace({
+              scope: readSettings().autoIntegrationScope,
+              isThreadWorkspace: location.threadName !== undefined,
+              sessionId: verifiedTurn.sessionId,
+              sessionIds: current.sessionIds,
+            })
+          ) {
+            return false
+          }
+          const authorization = await projectChecks.safe.assertVerifiedCompletion(
+            {
+              sessionId: verifiedTurn.sessionId,
+              turn: verifiedTurn.turn,
+              sourceRevision: verifiedTurn.sourceRevision,
+            },
+            { signal: verifiedTurn.signal },
+          )
+          if (!authorization.ok || authorization.value.status !== 'authorized') return false
+          repoRoot = location.repoRoot
+          return true
+        },
+        verifyCandidate: async candidate => {
+          const result = await projectChecks.safe.verifyCandidate(
+            {
+              sessionId: verifiedTurn.sessionId,
+              turn: verifiedTurn.turn,
+              sourceRevision: verifiedTurn.sourceRevision,
+              expectedRevision: candidate.workingCopyCommitId,
+            },
+            { signal: verifiedTurn.signal },
+          )
+          if (!result.ok) {
+            const message = isApiOwnerMissing(result.error)
+              ? 'Project Checks became unavailable during automatic integration. The bookmark was not advanced; retry when it is available.'
+              : 'Project Checks could not verify the rebased candidate. The bookmark was not advanced; retry or integrate manually.'
+            return { status: 'failed', message }
+          }
+          if (result.value.status === 'passed') return { status: 'passed' }
+          if (result.value.status === 'cancelled' || verifiedTurn.signal.aborted) return { status: 'cancelled' }
+          if (result.value.status === 'unavailable' && result.value.prompt === null) return { status: 'cancelled' }
+          const message = result.value.prompt ?? 'Project Checks did not verify the rebased candidate. The bookmark was not advanced.'
+          return result.value.status === 'stale' ? { status: 'stale', message } : { status: 'failed', message }
+        },
+      })
+    } catch (error) {
+      if (verifiedTurn.signal.aborted) {
+        report('cancelled', 'Automatic integration was cancelled.', 'routine')
+        return
+      }
+      if (error instanceof ThreadError && error.code === 'not-a-thread') {
+        report('skipped', 'Automatic integration skipped a shared or unmanaged workspace.', 'routine')
+        return
+      }
+      verifiedTurn.requestAgentFix(
+        'Automatic integration could not safely rebase this thread. The main bookmark was not advanced; resolve the issue and stop again, or integrate manually.',
+      )
+      report('failed', 'Automatic integration stopped before advancing the bookmark.', 'attention')
+      return
+    }
+
+    const bookmarkLabel = safePromptField(bookmark, 128)
+    if (outcome.status === 'landed') {
+      if (repoRoot !== undefined) {
+        queueWorkspaceSync({ repoRoot, bookmark, revision: outcome.head.commitId, sessionId: verifiedTurn.sessionId, correlationId })
+      }
+      report('landed', `Automatically rebased ${String(outcome.revisions.length)} revision(s) onto ${bookmarkLabel}.`)
+      return
+    }
+    if (outcome.status === 'nothing-to-land') {
+      report('nothing-to-land', 'Automatic integration found no remaining work.', 'routine')
+      return
+    }
+    if (outcome.status === 'already-integrated') {
+      report('already-integrated', `All remaining revisions already match patches in ${bookmarkLabel}. No rebase or bookmark change was made.`, 'routine')
+      return
+    }
+    if (outcome.status === 'patch-equivalent-work') {
+      const revisions = outcome.revisions.map(revision => `- ${safePromptField(revision.changeId, 64)} (${revision.commitId.slice(0, 12)})`)
+      verifiedTurn.requestAgentFix(
+        [
+          'Automatic integration found revisions with exact patch matches in target history:',
+          ...revisions,
+          'Do not rebase this mixed branch automatically. Separate represented revisions from unique work, then stop for Project Checks again. The bookmark was not changed.',
+        ].join('\n'),
+      )
+      report('patch-equivalent-work', 'Automatic integration paused to avoid replaying represented patches.', 'attention')
+      return
+    }
+    if (outcome.status === 'patch-equivalence-unavailable') {
+      const revisions = outcome.revisions.map(revision => `- ${safePromptField(revision.changeId, 64)} (${revision.commitId.slice(0, 12)})`)
+      verifiedTurn.requestAgentFix(
+        [
+          'Automatic integration could not safely compare these revision patches:',
+          ...revisions,
+          'Inspect the patches and target history manually. No rebase or bookmark change was made; stop for Project Checks again only after resolving the uncertainty.',
+        ].join('\n'),
+      )
+      report('patch-equivalence-unavailable', 'Automatic integration paused because patch equivalence could not be proven.', 'attention')
+      return
+    }
+    if (outcome.status === 'detached-work') {
+      const revisions = outcome.revisions.map(revision => `- ${safePromptField(revision.changeId, 64)} (${revision.commitId.slice(0, 12)})`)
+      verifiedTurn.requestAgentFix(
+        [
+          'Automatic integration stopped because this thread has detached revisions that are not covered by the current completion checks:',
+          ...revisions,
+          'Inspect and reattach only the intended work into this thread’s active working copy, then stop for Project Checks again. Do not advance the bookmark or discard these revisions directly.',
+        ].join('\n'),
+      )
+      report(
+        'detached-work',
+        'Automatic integration paused for detached revisions.',
+        'attention',
+        `${String(outcome.revisions.length)} detached revision(s) · turn ${String(verifiedTurn.turn)}`,
+      )
+      return
+    }
+    if (outcome.status === 'conflicted') {
+      const files = outcome.files.map(file => safePromptField(file, 240))
+      verifiedTurn.requestAgentFix(
+        [
+          `Automatic integration onto \`${bookmarkLabel}\` stopped with conflicts in:`,
+          ...files.map(file => `- ${file}`),
+          'Resolve them in this dedicated workspace and keep each revision described. The bookmark was not advanced; after Project Checks pass again, the queue will retry against the latest bookmark.',
+        ].join('\n'),
+      )
+      report(
+        'conflicted',
+        'Automatic integration stopped on rebase conflicts.',
+        'attention',
+        `${String(files.length)} conflicted file(s) · turn ${String(verifiedTurn.turn)}`,
+      )
+      return
+    }
+    if (outcome.status === 'needs-description') {
+      verifiedTurn.requestAgentFix(
+        [
+          `Automatic integration onto \`${bookmarkLabel}\` stopped because these revisions have no real description:`,
+          ...outcome.revisions.map(revision => `- ${safePromptField(revision.changeId, 64)}`),
+          'Describe each revision with `jj describe -r <change-id> -m "<conventional commit message>"`. The bookmark was not advanced; after Project Checks pass again, the queue will retry.',
+        ].join('\n'),
+      )
+      report(
+        'needs-description',
+        'Automatic integration stopped on undescribed revisions.',
+        'attention',
+        `${String(outcome.revisions.length)} revision(s) · turn ${String(verifiedTurn.turn)}`,
+      )
+      return
+    }
+    if (outcome.status === 'verification-failed' || outcome.status === 'verification-stale') {
+      verifiedTurn.requestAgentFix(outcome.message)
+      report('verification-failed', 'Project Checks did not verify the rebased candidate; the bookmark was not advanced.', 'attention')
+      return
+    }
+    if (outcome.status === 'verification-cancelled') {
+      report('cancelled', 'Automatic integration was cancelled before the bookmark moved.', 'routine')
+      return
+    }
+    report('skipped', 'Automatic integration skipped because workspace ownership or completion verification could not be revalidated.', 'routine')
+  }
+  context.on('dshfiles/project-checks/verified', handleVerifiedTurn)
   const sweep = (): void => {
     void sweepFinishedThreads().catch(error => context.logger.warn('jj-integration: thread sweep failed: %o', error))
   }

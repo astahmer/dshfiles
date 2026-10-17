@@ -9,10 +9,11 @@ import { JsonText } from './json-text.js'
 export interface JjResult {
   readonly exitCode: number
   readonly stdout: string
+  readonly stdoutLossy: boolean
   readonly stderr: string
 }
 
-export type JjExecutor = (input: { readonly args: readonly string[]; readonly cwd: string; readonly signal?: AbortSignal }) => Promise<JjResult>
+export type JjExecutor = (input: { readonly args: readonly string[]; readonly cwd: string; readonly signal?: AbortSignal | undefined }) => Promise<JjResult>
 
 export class ThreadError extends Error {
   constructor(
@@ -58,46 +59,234 @@ export interface ThreadStatus {
 }
 
 export type LandOutcome =
-  | { readonly status: 'landed'; readonly revisions: readonly ThreadRevision[]; readonly head: ThreadRevision | undefined }
+  | { readonly status: 'landed'; readonly revisions: readonly ThreadRevision[]; readonly head: ThreadRevision }
   | { readonly status: 'nothing-to-land' }
   | { readonly status: 'needs-description'; readonly revisions: readonly ThreadRevision[] }
   | { readonly status: 'conflicted'; readonly revisions: readonly ThreadRevision[]; readonly files: readonly string[] }
 
+export interface LandCandidate {
+  readonly workingCopyCommitId: string
+  readonly attempt: number
+}
+
+export type LandCandidateVerification =
+  | { readonly status: 'passed' }
+  | { readonly status: 'failed'; readonly message: string }
+  | { readonly status: 'stale'; readonly message: string }
+  | { readonly status: 'cancelled' }
+
+export type VerifiedLandOutcome =
+  | LandOutcome
+  | { readonly status: 'already-integrated'; readonly revisions: readonly ThreadRevision[] }
+  | { readonly status: 'patch-equivalent-work'; readonly revisions: readonly ThreadRevision[] }
+  | { readonly status: 'patch-equivalence-unavailable'; readonly revisions: readonly ThreadRevision[] }
+  | { readonly status: 'detached-work'; readonly revisions: readonly ThreadRevision[] }
+  | { readonly status: 'not-eligible' }
+  | { readonly status: 'verification-failed'; readonly message: string }
+  | { readonly status: 'verification-stale'; readonly message: string }
+  | { readonly status: 'verification-cancelled' }
+
+export interface VerifiedLandOptions {
+  readonly path: string
+  readonly bookmark?: string | undefined
+  readonly signal?: AbortSignal | undefined
+  readonly expectedSourceRevision: string
+  readonly authorize: (location: ThreadLocation) => Promise<boolean>
+  readonly verifyCandidate: (candidate: LandCandidate) => Promise<LandCandidateVerification>
+}
+
 export type DiscardOutcome = { readonly status: 'discarded' } | { readonly status: 'has-work'; readonly revisions: readonly ThreadRevision[] }
 
-const REVISION_TEMPLATE = 'change_id.short(12) ++ "\\t" ++ commit_id ++ "\\t" ++ conflict ++ "\\t" ++ description.first_line() ++ "\\n"'
+const REVISION_TEMPLATE = 'change_id ++ "\\t" ++ commit_id ++ "\\t" ++ conflict ++ "\\t" ++ description.first_line() ++ "\\n"'
 const LAND_REVISION_TEMPLATE =
   'change_id.short(12) ++ "\\t" ++ commit_id ++ "\\t" ++ conflict ++ "\\t" ++ empty ++ "\\t" ++ current_working_copy ++ "\\t" ++ description.first_line() ++ "\\n"'
 const PLACEHOLDER_DESCRIPTIONS = new Set(['', 'wip'])
 const MAX_CONFLICT_FILES = 50
+const MAX_DETACHED_REVISIONS = 128
+const MAX_PATCH_REVISIONS = 128
+const MAX_PATCH_FILES = 64
+const MAX_PATCH_PATHS = 128
+const MAX_PATCH_PATH_BYTES = 16_384
+const MAX_PATCH_TARGET_REVISIONS = 1_024
+const MAX_PATCH_BODY_BYTES = 65_536
 const LAND_ATTEMPTS = 3
+const THREAD_WORKSPACE_NAME = /^thread-[0-9a-f]{6}$/u
+const HEX_ID = /^[0-9a-f]+$/u
+const isCommitId = (value: string): boolean => value.length >= 40 && HEX_ID.test(value)
+const commitIdRevset = (commitId: string): string => {
+  if (!isCommitId(commitId)) throw new ThreadError('jj-failed', 'JJ returned an invalid commit ID; refusing revision selection.')
+  return `commit_id(${JSON.stringify(commitId)})`
+}
+const exactBookmarkNamePattern = (bookmark: string): string => `exact:${JSON.stringify(bookmark)}`
+const bookmarkRevset = (bookmark: string): string => `bookmarks(${exactBookmarkNamePattern(bookmark)})`
+const isUnsupportedRevsetPath = (path: string): boolean =>
+  [...path].some(character => {
+    const codePoint = character.codePointAt(0)
+    return codePoint !== undefined && (codePoint < 32 || codePoint === 127)
+  })
+const PATCH_FINGERPRINT = `if(stringify(diff.git(3)).contains("Binary files") || stringify(diff.git(3)).contains("GIT binary patch") || stringify(diff.git(3)).len() > ${MAX_PATCH_BODY_BYTES} || diff.files().len() > ${MAX_PATCH_FILES}, "", hash(diff.git(3)))`
+const PATCH_CANDIDATE_TEMPLATE = `commit_id ++ "\\t" ++ parents.len() ++ "\\t" ++ conflict ++ "\\t" ++ ${PATCH_FINGERPRINT} ++ "\\t" ++ if(diff.files().len() > ${MAX_PATCH_FILES}, "[]", json(diff.files().map(|file| file.path()))) ++ "\\n"`
+const PATCH_TARGET_TEMPLATE = `commit_id ++ "\\t" ++ parents.len() ++ "\\t" ++ conflict ++ "\\t" ++ ${PATCH_FINGERPRINT} ++ "\\n"`
+const PATCH_BODY_TEMPLATE = 'commit_id ++ "\\t" ++ json(stringify(diff.git(3))) ++ "\\n"'
 const rebaseTimestampSchema = z.number().int().nonnegative().safe()
 const rebaseMetadataEntrySchema = z.object({ at: rebaseTimestampSchema, tipChangeId: z.string().min(1).max(128).optional() }).strict()
 const rebaseMetadataValueSchema = z.union([rebaseTimestampSchema, rebaseMetadataEntrySchema])
 const rebaseMetadataSchema = z.record(z.string(), rebaseMetadataValueSchema)
 type RebaseMetadataEntry = z.infer<typeof rebaseMetadataEntrySchema>
 
-const parseRevisions = (stdout: string): readonly ThreadRevision[] =>
-  stdout
-    .split('\n')
-    .filter(line => line.includes('\t'))
-    .map(line => {
-      const [changeId = '', commitId = '', conflict = 'false', ...description] = line.split('\t')
-      return { changeId, commitId, conflict: conflict === 'true', description: description.join('\t').trim() }
-    })
+interface PatchCandidate {
+  readonly commitId: string
+  readonly parentCount: number
+  readonly conflict: boolean
+  readonly fingerprint: string
+  readonly paths: readonly string[]
+}
 
-const parseLandRevisions = (stdout: string): readonly { readonly revision: ThreadRevision; readonly empty: boolean; readonly currentWorkingCopy: boolean }[] =>
-  stdout
-    .split('\n')
-    .filter(line => line.includes('\t'))
-    .map(line => {
-      const [changeId = '', commitId = '', conflict = 'false', empty = 'false', currentWorkingCopy = 'false', ...description] = line.split('\t')
-      return {
-        revision: { changeId, commitId, conflict: conflict === 'true', description: description.join('\t').trim() },
-        empty: empty === 'true',
-        currentWorkingCopy: currentWorkingCopy === 'true',
-      }
+interface TargetPatch {
+  readonly commitId: string
+  readonly parentCount: number
+  readonly conflict: boolean
+  readonly fingerprint: string
+}
+
+interface PatchComparison {
+  readonly equivalentCommitIds: ReadonlySet<string>
+  readonly unverifiedCommitIds: ReadonlySet<string>
+  readonly fingerprintsByChangeId: ReadonlyMap<string, string>
+  readonly complete: boolean
+}
+
+interface ReadSnapshot {
+  readonly operationId: string
+  readonly bookmarkCommitId: string
+}
+
+interface WorkspaceRevisionGroups {
+  readonly detached: readonly ThreadRevision[]
+  readonly represented: readonly ThreadRevision[]
+}
+
+const parseRevisions = (stdout: string): readonly ThreadRevision[] => {
+  const revisions: ThreadRevision[] = []
+  for (const line of stdout.split('\n').filter(line => line.length > 0)) {
+    const [changeId = '', commitId = '', conflict = '', ...description] = line.split('\t')
+    if (changeId.length === 0 || !isCommitId(commitId) || (conflict !== 'true' && conflict !== 'false')) {
+      throw new ThreadError('jj-failed', 'JJ returned incomplete revision metadata; refusing to continue.')
+    }
+    revisions.push({ changeId, commitId, conflict: conflict === 'true', description: description.join('\t').trim() })
+  }
+  return revisions
+}
+
+const parseLandRevisions = (
+  stdout: string,
+): readonly { readonly revision: ThreadRevision; readonly empty: boolean; readonly currentWorkingCopy: boolean }[] => {
+  const revisions: { readonly revision: ThreadRevision; readonly empty: boolean; readonly currentWorkingCopy: boolean }[] = []
+  for (const line of stdout.split('\n').filter(line => line.length > 0)) {
+    const [changeId = '', commitId = '', conflict = '', empty = '', currentWorkingCopy = '', ...description] = line.split('\t')
+    if (
+      changeId.length === 0 ||
+      !isCommitId(commitId) ||
+      (conflict !== 'true' && conflict !== 'false') ||
+      (empty !== 'true' && empty !== 'false') ||
+      (currentWorkingCopy !== 'true' && currentWorkingCopy !== 'false')
+    ) {
+      throw new ThreadError('jj-failed', 'JJ returned incomplete landing metadata; refusing to continue.')
+    }
+    revisions.push({
+      revision: { changeId, commitId, conflict: conflict === 'true', description: description.join('\t').trim() },
+      empty: empty === 'true',
+      currentWorkingCopy: currentWorkingCopy === 'true',
     })
+  }
+  return revisions
+}
+
+const parsePatchCandidateRecords = (stdout: string): readonly PatchCandidate[] | undefined => {
+  const records: PatchCandidate[] = []
+  for (const line of stdout.split('\n').filter(line => line.length > 0)) {
+    const [commitId = '', parentCountText = '', conflictText = '', fingerprint = '', pathsText = '', ...extra] = line.split('\t')
+    const paths = JsonText.decode(z.array(z.string()), pathsText)
+    const parentCount = Number(parentCountText)
+    if (
+      extra.length > 0 ||
+      !isCommitId(commitId) ||
+      !Number.isSafeInteger(parentCount) ||
+      parentCount < 0 ||
+      (conflictText !== 'true' && conflictText !== 'false') ||
+      paths?.success !== true
+    ) {
+      return undefined
+    }
+    records.push({ commitId, parentCount, conflict: conflictText === 'true', fingerprint, paths: paths.data })
+  }
+  return records
+}
+
+const parseTargetPatchRecords = (stdout: string): readonly TargetPatch[] | undefined => {
+  const records: TargetPatch[] = []
+  for (const line of stdout.split('\n').filter(line => line.length > 0)) {
+    const [commitId = '', parentCountText = '', conflictText = '', fingerprint = '', ...extra] = line.split('\t')
+    const parentCount = Number(parentCountText)
+    if (
+      extra.length > 0 ||
+      !isCommitId(commitId) ||
+      !Number.isSafeInteger(parentCount) ||
+      parentCount < 0 ||
+      (conflictText !== 'true' && conflictText !== 'false')
+    ) {
+      return undefined
+    }
+    records.push({ commitId, parentCount, conflict: conflictText === 'true', fingerprint })
+  }
+  return records
+}
+
+const parsePatchBodies = (stdout: string): ReadonlyMap<string, string> | undefined => {
+  const bodies = new Map<string, string>()
+  for (const line of stdout.split('\n').filter(line => line.length > 0)) {
+    const separator = line.indexOf('\t')
+    if (separator < 1) return undefined
+    const commitId = line.slice(0, separator)
+    const body = JsonText.decode(z.string(), line.slice(separator + 1))
+    if (!isCommitId(commitId) || bodies.has(commitId) || body?.success !== true) return undefined
+    bodies.set(commitId, body.data)
+  }
+  return bodies
+}
+
+const patchFingerprintsMatch = (expected: PatchComparison, actual: PatchComparison): boolean => {
+  if (!expected.complete || !actual.complete || expected.fingerprintsByChangeId.size !== actual.fingerprintsByChangeId.size) return false
+  for (const [changeId, fingerprint] of expected.fingerprintsByChangeId) {
+    if (actual.fingerprintsByChangeId.get(changeId) !== fingerprint) return false
+  }
+  return true
+}
+
+const workMetadataMatches = (expected: readonly ThreadRevision[], actual: readonly ThreadRevision[]): boolean => {
+  if (expected.length !== actual.length) return false
+  const actualByChangeId = new Map(actual.map(revision => [revision.changeId, revision.description]))
+  return expected.every(revision => actualByChangeId.get(revision.changeId) === revision.description)
+}
+
+const patchGuardOutcome = (
+  revisions: readonly ThreadRevision[],
+  comparison: PatchComparison,
+):
+  | { readonly status: 'already-integrated'; readonly revisions: readonly ThreadRevision[] }
+  | { readonly status: 'patch-equivalent-work'; readonly revisions: readonly ThreadRevision[] }
+  | { readonly status: 'patch-equivalence-unavailable'; readonly revisions: readonly ThreadRevision[] }
+  | undefined => {
+  if (!comparison.complete) {
+    const unverified = revisions.filter(revision => comparison.unverifiedCommitIds.has(revision.commitId))
+    return { status: 'patch-equivalence-unavailable', revisions: unverified.length > 0 ? unverified : revisions }
+  }
+  const represented = revisions.filter(revision => comparison.equivalentCommitIds.has(revision.commitId))
+  if (represented.length === 0) return undefined
+  return represented.length === revisions.length
+    ? { status: 'already-integrated', revisions: represented }
+    : { status: 'patch-equivalent-work', revisions: represented }
+}
 
 /** `<root>/.jj/repo` is the store in the owning checkout and a pointer file in every other workspace. */
 const storeRootOf = (workspaceRoot: string): string | undefined => {
@@ -124,40 +313,303 @@ export const createThreads = (options: {
     return next
   }
 
-  const jj = async (args: readonly string[], cwd: string, signal?: AbortSignal): Promise<string> => {
-    const result = await options.executor({ args, cwd, ...(signal === undefined ? {} : { signal }) })
-    if (result.exitCode !== 0) throw new ThreadError('jj-failed', `jj ${args.join(' ').slice(0, 120)}: ${result.stderr.trim().slice(0, 400)}`)
+  const execute = (args: readonly string[], cwd: string, signal?: AbortSignal): Promise<JjResult> =>
+    signal === undefined ? options.executor({ args, cwd }) : options.executor({ args, cwd, signal })
+
+  const completeStdout = (result: JjResult): string => {
+    if (result.stdoutLossy) throw new ThreadError('jj-failed', 'JJ output exceeded the safe size limit; refusing incomplete repository data.')
     return result.stdout
   }
 
-  const revisions = async (revset: string, cwd: string, observe = false): Promise<readonly ThreadRevision[]> =>
-    parseRevisions(await jj([...(observe ? ['--ignore-working-copy'] : []), 'log', '--no-graph', '-r', revset, '-T', REVISION_TEMPLATE], cwd))
+  const jj = async (args: readonly string[], cwd: string, signal?: AbortSignal): Promise<string> => {
+    const result = await execute(args, cwd, signal)
+    if (result.exitCode !== 0) throw new ThreadError('jj-failed', `jj ${args.join(' ').slice(0, 120)}: ${result.stderr.trim().slice(0, 400)}`)
+    return completeStdout(result)
+  }
 
-  const landRevisions = async (revset: string, cwd: string, observe = false) =>
-    parseLandRevisions(await jj([...(observe ? ['--ignore-working-copy'] : []), 'log', '--no-graph', '-r', revset, '-T', LAND_REVISION_TEMPLATE], cwd))
+  const revisions = async (revset: string, cwd: string, observe = false, signal?: AbortSignal): Promise<readonly ThreadRevision[]> =>
+    parseRevisions(await jj([...(observe ? ['--ignore-working-copy'] : []), 'log', '--no-graph', '-r', revset, '-T', REVISION_TEMPLATE], cwd, signal))
 
-  const locate = async (path: string): Promise<ThreadLocation> => {
-    const result = await options.executor({ args: ['--ignore-working-copy', 'root'], cwd: path })
+  const landRevisions = async (revset: string, cwd: string, observe = false, signal?: AbortSignal) =>
+    parseLandRevisions(await jj([...(observe ? ['--ignore-working-copy'] : []), 'log', '--no-graph', '-r', revset, '-T', LAND_REVISION_TEMPLATE], cwd, signal))
+
+  const readAtOperation = (args: readonly string[], cwd: string, operationId: string, signal?: AbortSignal): Promise<string> =>
+    jj(['--at-operation', operationId, ...args], cwd, signal)
+
+  const revisionsAtOperation = async (
+    revset: string,
+    cwd: string,
+    operationId: string,
+    signal?: AbortSignal,
+    maxRevisions?: number,
+  ): Promise<readonly ThreadRevision[]> =>
+    parseRevisions(
+      await readAtOperation(
+        ['log', '--no-graph', ...(maxRevisions === undefined ? [] : ['-n', String(maxRevisions)]), '-r', revset, '-T', REVISION_TEMPLATE],
+        cwd,
+        operationId,
+        signal,
+      ),
+    )
+
+  const readSnapshot = async (repoRoot: string, bookmark: string, signal?: AbortSignal): Promise<ReadSnapshot> => {
+    const operationOutput = await jj(['--ignore-working-copy', 'op', 'log', '-n', '1', '--no-graph', '-T', 'self.id() ++ "\\n"'], repoRoot, signal)
+    const [operationId, ...extraOperations] = operationOutput.split('\n').filter(line => line.length > 0)
+    if (operationId === undefined || extraOperations.length > 0 || !HEX_ID.test(operationId)) {
+      throw new ThreadError('jj-failed', 'Could not pin one JJ operation for the safe integration scan.')
+    }
+    const bookmarkOutput = await readAtOperation(
+      ['log', '--no-graph', '-r', bookmarkRevset(bookmark), '-T', 'commit_id ++ "\\n"'],
+      repoRoot,
+      operationId,
+      signal,
+    )
+    const [bookmarkCommitId, ...extraBookmarkCommits] = bookmarkOutput.split('\n').filter(line => line.length > 0)
+    if (bookmarkCommitId === undefined || extraBookmarkCommits.length > 0 || !isCommitId(bookmarkCommitId)) {
+      throw new ThreadError('jj-failed', 'Could not resolve one exact target bookmark; automatic integration is paused.')
+    }
+    return { operationId, bookmarkCommitId }
+  }
+
+  const bookmarkTargetDescendsFrom = async (input: {
+    readonly repoRoot: string
+    readonly operationId: string
+    readonly expectedCommitId: string
+    readonly currentCommitId: string
+    readonly signal?: AbortSignal | undefined
+  }): Promise<boolean> => {
+    if (input.expectedCommitId === input.currentCommitId) return true
+    const [expectedRevision] = await revisionsAtOperation(
+      `${commitIdRevset(input.expectedCommitId)} & ::${commitIdRevset(input.currentCommitId)}`,
+      input.repoRoot,
+      input.operationId,
+      input.signal,
+      1,
+    )
+    return expectedRevision?.commitId === input.expectedCommitId
+  }
+
+  const comparePatchEquivalence = async (input: {
+    readonly candidates: readonly ThreadRevision[]
+    readonly repoRoot: string
+    readonly snapshot: ReadSnapshot
+    readonly signal?: AbortSignal | undefined
+  }): Promise<PatchComparison> => {
+    const candidates = input.candidates
+    const allCandidateIds = new Set(candidates.map(revision => revision.commitId))
+    const incomplete = (): PatchComparison => ({
+      equivalentCommitIds: new Set(),
+      unverifiedCommitIds: allCandidateIds,
+      fingerprintsByChangeId: new Map(),
+      complete: false,
+    })
+    if (candidates.length === 0) return { equivalentCommitIds: new Set(), unverifiedCommitIds: new Set(), fingerprintsByChangeId: new Map(), complete: true }
+    const changeIdByCommitId = new Map(candidates.map(revision => [revision.commitId, revision.changeId]))
+    if (
+      candidates.length > MAX_PATCH_REVISIONS ||
+      changeIdByCommitId.size !== candidates.length ||
+      new Set(changeIdByCommitId.values()).size !== candidates.length ||
+      [...allCandidateIds].some(commitId => !isCommitId(commitId))
+    ) {
+      return incomplete()
+    }
+
+    const candidateRevset = [...allCandidateIds].map(commitIdRevset).join(' | ')
+    const candidateOutput = await readAtOperation(
+      ['log', '--no-graph', '-r', candidateRevset, '-T', PATCH_CANDIDATE_TEMPLATE],
+      input.repoRoot,
+      input.snapshot.operationId,
+      input.signal,
+    )
+    const candidateRecords = parsePatchCandidateRecords(candidateOutput)
+    if (candidateRecords === undefined || candidateRecords.length !== allCandidateIds.size) return incomplete()
+    const candidateById = new Map(candidateRecords.map(candidate => [candidate.commitId, candidate]))
+    const unverifiedCommitIds = new Set<string>()
+    const candidatesToCompare: PatchCandidate[] = []
+    for (const commitId of allCandidateIds) {
+      const candidate = candidateById.get(commitId)
+      if (candidate === undefined || candidate.parentCount !== 1 || candidate.conflict || candidate.fingerprint.length === 0 || candidate.paths.length === 0) {
+        unverifiedCommitIds.add(commitId)
+        continue
+      }
+      candidatesToCompare.push(candidate)
+    }
+    const fingerprintsByChangeId = new Map<string, string>()
+    for (const candidate of candidatesToCompare) {
+      const changeId = changeIdByCommitId.get(candidate.commitId)
+      if (changeId === undefined || fingerprintsByChangeId.has(changeId)) return incomplete()
+      fingerprintsByChangeId.set(changeId, candidate.fingerprint)
+    }
+    if (candidatesToCompare.length === 0) {
+      return { equivalentCommitIds: new Set(), unverifiedCommitIds, fingerprintsByChangeId, complete: unverifiedCommitIds.size === 0 }
+    }
+
+    const paths = new Set<string>()
+    let pathBytes = 0
+    for (const candidate of candidatesToCompare) {
+      for (const path of candidate.paths) {
+        if (path.length === 0 || isUnsupportedRevsetPath(path)) return incomplete()
+        if (paths.has(path)) continue
+        pathBytes += Buffer.byteLength(path)
+        paths.add(path)
+        if (paths.size > MAX_PATCH_PATHS || pathBytes > MAX_PATCH_PATH_BYTES) return incomplete()
+      }
+    }
+
+    const fileFilters = [...paths].map(path => `files(file:${JSON.stringify(path)})`)
+    const targetRevset = `(::${commitIdRevset(input.snapshot.bookmarkCommitId)}) & (${fileFilters.join(' | ')})`
+    const targetOutput = await readAtOperation(
+      ['log', '--no-graph', '-n', String(MAX_PATCH_TARGET_REVISIONS + 1), '-r', targetRevset, '-T', PATCH_TARGET_TEMPLATE],
+      input.repoRoot,
+      input.snapshot.operationId,
+      input.signal,
+    )
+    const targetRecords = parseTargetPatchRecords(targetOutput)
+    if (targetRecords === undefined || targetRecords.length > MAX_PATCH_TARGET_REVISIONS) return incomplete()
+    if (targetRecords.some(target => target.parentCount !== 1 || target.conflict || target.fingerprint.length === 0)) return incomplete()
+
+    const targetsByFingerprint = new Map<string, TargetPatch[]>()
+    for (const target of targetRecords) {
+      const matches = targetsByFingerprint.get(target.fingerprint) ?? []
+      matches.push(target)
+      targetsByFingerprint.set(target.fingerprint, matches)
+    }
+    const equivalentCommitIds = new Set<string>()
+    for (const candidate of candidatesToCompare) {
+      for (const target of targetsByFingerprint.get(candidate.fingerprint) ?? []) {
+        const bodyOutput = await readAtOperation(
+          ['log', '--no-graph', '-r', `${commitIdRevset(candidate.commitId)} | ${commitIdRevset(target.commitId)}`, '-T', PATCH_BODY_TEMPLATE],
+          input.repoRoot,
+          input.snapshot.operationId,
+          input.signal,
+        )
+        const bodies = parsePatchBodies(bodyOutput)
+        const candidateBody = bodies?.get(candidate.commitId)
+        const targetBody = bodies?.get(target.commitId)
+        if (candidateBody === undefined || targetBody === undefined) {
+          unverifiedCommitIds.add(candidate.commitId)
+          break
+        }
+        if (candidateBody === targetBody) {
+          equivalentCommitIds.add(candidate.commitId)
+          break
+        }
+      }
+    }
+    return { equivalentCommitIds, unverifiedCommitIds, fingerprintsByChangeId, complete: unverifiedCommitIds.size === 0 }
+  }
+
+  const detachedRevisionsByWorkspace = async (
+    repoRoot: string,
+    snapshot: ReadSnapshot,
+    signal?: AbortSignal,
+  ): Promise<ReadonlyMap<string, WorkspaceRevisionGroups>> => {
+    const detachedRevisions = await revisionsAtOperation(
+      `((all() ~ ::${commitIdRevset(snapshot.bookmarkCommitId)}) ~ ::(working_copies())) ~ empty()`,
+      repoRoot,
+      snapshot.operationId,
+      signal,
+      MAX_DETACHED_REVISIONS + 1,
+    )
+    if (detachedRevisions.length > MAX_DETACHED_REVISIONS) {
+      throw new ThreadError('jj-failed', 'Too many detached revisions to scan safely; automatic integration is paused.')
+    }
+    const patchComparison = await comparePatchEquivalence({ candidates: detachedRevisions, repoRoot, snapshot, signal })
+    const byWorkspace = new Map<string, { detached: ThreadRevision[]; represented: ThreadRevision[] }>()
+    for (const revision of detachedRevisions) {
+      const workspaceOutput = await readAtOperation(
+        ['evolog', '--no-graph', '-n', '1', '-r', commitIdRevset(revision.commitId), '-T', 'self.operation().workspace_name() ++ "\\n"'],
+        repoRoot,
+        snapshot.operationId,
+        signal,
+      )
+      const [workspaceName, ...extraWorkspaceNames] = workspaceOutput.split('\n').filter(line => line.length > 0)
+      if (workspaceName === undefined || extraWorkspaceNames.length > 0 || !workspaceName.endsWith('@')) {
+        throw new ThreadError('jj-failed', 'Could not attribute detached JJ work to one owning workspace; automatic integration is paused.')
+      }
+      const name = workspaceName.slice(0, -1)
+      if (name.length === 0 || (name.startsWith('thread-') && !THREAD_WORKSPACE_NAME.test(name))) {
+        throw new ThreadError('jj-failed', 'Detached JJ work has an unrecognized thread owner; automatic integration is paused.')
+      }
+      if (!THREAD_WORKSPACE_NAME.test(name)) continue
+      const owned = byWorkspace.get(name) ?? { detached: [], represented: [] }
+      if (patchComparison.equivalentCommitIds.has(revision.commitId)) owned.represented.push(revision)
+      else owned.detached.push(revision)
+      byWorkspace.set(name, owned)
+    }
+    return byWorkspace
+  }
+
+  const locate = async (path: string, signal?: AbortSignal): Promise<ThreadLocation> => {
+    const result = await execute(['--ignore-working-copy', 'root'], path, signal)
     if (result.exitCode !== 0) throw new ThreadError('not-a-repository', `${path} is not inside a jj repository.`)
-    const workspaceRoot = result.stdout.trim()
+    const workspaceRoot = completeStdout(result).trim()
     const repoRoot = storeRootOf(workspaceRoot) ?? workspaceRoot
     const isThread = workspaceRoot !== repoRoot && dirname(workspaceRoot) === options.threadsDirectory(repoRoot)
     return { repoRoot, workspaceRoot, threadName: isThread ? basename(workspaceRoot) : undefined }
   }
 
-  const requireThread = async (path: string): Promise<ThreadLocation & { readonly threadName: string }> => {
-    const location = await locate(path)
-    if (location.threadName === undefined) throw new ThreadError('not-a-thread', `${path} is not a thread workspace.`)
+  const requireThread = async (path: string, signal?: AbortSignal): Promise<ThreadLocation & { readonly threadName: string }> => {
+    const location = await locate(path, signal)
+    if (location.threadName === undefined || !THREAD_WORKSPACE_NAME.test(location.threadName)) {
+      throw new ThreadError('not-a-thread', `${path} is not a managed thread workspace.`)
+    }
     return { ...location, threadName: location.threadName }
   }
 
-  const workingCopyCommitId = async (path: string): Promise<string> => {
-    const commitId = (await jj(['log', '--no-graph', '-r', '@', '-T', 'commit_id'], path)).trim()
-    if (commitId.length === 0) throw new ThreadError('jj-failed', 'Could not resolve the current working-copy revision.')
+  const workingCopyCommitId = async (path: string, signal?: AbortSignal): Promise<string> => {
+    const commitId = (await jj(['log', '--no-graph', '-r', '@', '-T', 'commit_id'], path, signal)).trim()
+    if (!isCommitId(commitId)) throw new ThreadError('jj-failed', 'Could not resolve the current working-copy revision.')
     return commitId
   }
 
   const unlandedRevset = (name: string): string => `(::${name}@ ~ ::${options.bookmark()}) ~ empty()`
+  const unlandedRevsetAt = (name: string, bookmarkCommitId: string): string => `(::${name}@ ~ ::${commitIdRevset(bookmarkCommitId)}) ~ empty()`
+
+  type RebasedStateScan =
+    | { readonly status: 'not-eligible' }
+    | { readonly status: 'bookmark-moved'; readonly snapshot: ReadSnapshot }
+    | {
+        readonly status: 'ready'
+        readonly snapshot: ReadSnapshot
+        readonly revisions: readonly ThreadRevision[]
+        readonly comparison: PatchComparison
+        readonly detached: readonly ThreadRevision[]
+        readonly workingCopyEmpty: boolean
+        readonly workingCopyRevisionId: string
+      }
+
+  const scanRebasedState = async (input: {
+    readonly repoRoot: string
+    readonly cwd: string
+    readonly threadName: string
+    readonly bookmark: string
+    readonly expectedBookmarkCommitId: string
+    readonly authorize: () => Promise<boolean>
+    readonly signal?: AbortSignal | undefined
+  }): Promise<RebasedStateScan> => {
+    if (!(await input.authorize())) return { status: 'not-eligible' }
+    await jj(['workspace', 'update-stale'], input.cwd, input.signal)
+    const workingCopyRevisionId = await workingCopyCommitId(input.cwd, input.signal)
+    const snapshot = await readSnapshot(input.repoRoot, input.bookmark, input.signal)
+    if (snapshot.bookmarkCommitId !== input.expectedBookmarkCommitId) return { status: 'bookmark-moved', snapshot }
+    const [revisionsOnThread, detachedByWorkspace, emptyRevision] = await Promise.all([
+      revisionsAtOperation(unlandedRevsetAt(input.threadName, snapshot.bookmarkCommitId), input.repoRoot, snapshot.operationId, input.signal),
+      detachedRevisionsByWorkspace(input.repoRoot, snapshot, input.signal),
+      revisionsAtOperation('@ & empty()', input.cwd, snapshot.operationId, input.signal, 1),
+    ])
+    const comparison = await comparePatchEquivalence({ candidates: revisionsOnThread, repoRoot: input.repoRoot, snapshot, signal: input.signal })
+    const detached = detachedByWorkspace.get(input.threadName)?.detached ?? []
+    return {
+      status: 'ready',
+      snapshot,
+      revisions: revisionsOnThread,
+      comparison,
+      detached,
+      workingCopyEmpty: emptyRevision.length > 0,
+      workingCopyRevisionId,
+    }
+  }
   const timestampFile = (repoRoot: string): string => join(options.threadsDirectory(repoRoot), '.dshfiles-rebase-timestamps.json')
   const readRebaseMetadata = async (repoRoot: string): Promise<Readonly<Record<string, RebaseMetadataEntry>>> => {
     try {
@@ -240,10 +692,365 @@ export const createThreads = (options: {
       return { name, path }
     })
 
+  const landVerified = async (input: VerifiedLandOptions): Promise<VerifiedLandOutcome> => {
+    if (input.signal?.aborted) return { status: 'verification-cancelled' }
+    const initialThread = await requireThread(input.path, input.signal)
+    return serialized(initialThread.repoRoot, async () => {
+      if (input.signal?.aborted) return { status: 'verification-cancelled' }
+      const thread = await requireThread(input.path, input.signal)
+      if (thread.repoRoot !== initialThread.repoRoot || thread.threadName !== initialThread.threadName) return { status: 'not-eligible' }
+      const ensureAuthorized = async (): Promise<boolean> => await input.authorize(thread)
+      if (!(await ensureAuthorized())) return { status: 'not-eligible' }
+      const repoRoot = thread.repoRoot
+      const cwd = thread.workspaceRoot
+      const bookmark = input.bookmark ?? options.bookmark()
+      const sourceRevision = await workingCopyCommitId(cwd, input.signal)
+      if (sourceRevision !== input.expectedSourceRevision) {
+        return {
+          status: 'verification-stale',
+          message: 'The thread changed after its completion checks passed. Stop for Project Checks again; automatic integration did not rebase it.',
+        }
+      }
+
+      const snapshot = await readSnapshot(repoRoot, bookmark, input.signal)
+      const detachedGroup = (await detachedRevisionsByWorkspace(repoRoot, snapshot, input.signal)).get(thread.threadName) ?? {
+        detached: [],
+        represented: [],
+      }
+      if (detachedGroup.detached.length > 0) return { status: 'detached-work', revisions: detachedGroup.detached }
+      const work = await revisionsAtOperation(unlandedRevsetAt(thread.threadName, snapshot.bookmarkCommitId), cwd, snapshot.operationId, input.signal)
+      const leftovers = await revisionsAtOperation(
+        `((${commitIdRevset(snapshot.bookmarkCommitId)}..@) & empty()) ~ @ ~ merges() ~ working_copies()`,
+        cwd,
+        snapshot.operationId,
+        input.signal,
+      )
+      if (work.length === 0) {
+        return detachedGroup.represented.length > 0 ? { status: 'already-integrated', revisions: detachedGroup.represented } : { status: 'nothing-to-land' }
+      }
+      const initialPatchComparison = await comparePatchEquivalence({ candidates: work, repoRoot, snapshot, signal: input.signal })
+      const initialPatchBlock = patchGuardOutcome(work, initialPatchComparison)
+      if (initialPatchBlock !== undefined) return initialPatchBlock
+      const undescribed = work.filter(revision => PLACEHOLDER_DESCRIPTIONS.has(revision.description.toLowerCase()))
+      if (undescribed.length > 0) return { status: 'needs-description', revisions: undescribed }
+
+      if (!(await ensureAuthorized())) return { status: 'not-eligible' }
+      if ((await workingCopyCommitId(cwd, input.signal)) !== sourceRevision) {
+        return {
+          status: 'verification-stale',
+          message: 'The thread changed during the patch scan. Stop for Project Checks again; automatic integration did not rebase it.',
+        }
+      }
+      if (leftovers.length > 0) {
+        if (!(await ensureAuthorized())) return { status: 'not-eligible' }
+        await jj(['abandon', ...leftovers.map(revision => commitIdRevset(revision.commitId))], cwd, input.signal)
+      }
+
+      for (let attempt = 1; ; attempt++) {
+        if (input.signal?.aborted) return { status: 'verification-cancelled' }
+        if (!(await ensureAuthorized())) return { status: 'not-eligible' }
+        const attemptSourceRevision = await workingCopyCommitId(cwd, input.signal)
+        if (attempt === 1 && attemptSourceRevision !== input.expectedSourceRevision) {
+          return {
+            status: 'verification-stale',
+            message: 'The thread changed after its completion checks passed. Stop for Project Checks again; automatic integration did not rebase it.',
+          }
+        }
+        const attemptSnapshot = await readSnapshot(repoRoot, bookmark, input.signal)
+        const attemptWorkspaceRevision = await revisionsAtOperation('@', cwd, attemptSnapshot.operationId, input.signal)
+        if (attemptWorkspaceRevision[0]?.commitId !== attemptSourceRevision) {
+          return {
+            status: 'verification-stale',
+            message: 'The thread changed during the patch scan. Stop for Project Checks again; automatic integration did not rebase it.',
+          }
+        }
+        const attemptDetachedGroup = (await detachedRevisionsByWorkspace(repoRoot, attemptSnapshot, input.signal)).get(thread.threadName) ?? {
+          detached: [],
+          represented: [],
+        }
+        if (attemptDetachedGroup.detached.length > 0) return { status: 'detached-work', revisions: attemptDetachedGroup.detached }
+        const attemptWork = await revisionsAtOperation(
+          unlandedRevsetAt(thread.threadName, attemptSnapshot.bookmarkCommitId),
+          cwd,
+          attemptSnapshot.operationId,
+          input.signal,
+        )
+        const patchComparison = await comparePatchEquivalence({ candidates: attemptWork, repoRoot, snapshot: attemptSnapshot, signal: input.signal })
+        if (!workMetadataMatches(work, attemptWork) || !patchFingerprintsMatch(initialPatchComparison, patchComparison)) {
+          return {
+            status: 'verification-stale',
+            message: 'The thread work changed after its initial scan. Review the current work and run Project Checks again.',
+          }
+        }
+        if (attemptWork.length === 0) {
+          return attemptDetachedGroup.represented.length > 0
+            ? { status: 'already-integrated', revisions: attemptDetachedGroup.represented }
+            : { status: 'nothing-to-land' }
+        }
+        const patchBlock = patchGuardOutcome(attemptWork, patchComparison)
+        if (patchBlock !== undefined) return patchBlock
+        const attemptUndescribed = attemptWork.filter(revision => PLACEHOLDER_DESCRIPTIONS.has(revision.description.toLowerCase()))
+        if (attemptUndescribed.length > 0) return { status: 'needs-description', revisions: attemptUndescribed }
+        if (!(await ensureAuthorized())) return { status: 'not-eligible' }
+        if ((await workingCopyCommitId(cwd, input.signal)) !== attemptSourceRevision) {
+          return {
+            status: 'verification-stale',
+            message: 'The thread changed during the patch scan. Stop for Project Checks again; automatic integration did not rebase it.',
+          }
+        }
+        const latestSnapshot = await readSnapshot(repoRoot, bookmark, input.signal)
+        if (latestSnapshot.bookmarkCommitId !== attemptSnapshot.bookmarkCommitId) {
+          const targetMovedForward = await bookmarkTargetDescendsFrom({
+            repoRoot,
+            operationId: latestSnapshot.operationId,
+            expectedCommitId: attemptSnapshot.bookmarkCommitId,
+            currentCommitId: latestSnapshot.bookmarkCommitId,
+            signal: input.signal,
+          })
+          if (!targetMovedForward) {
+            return { status: 'verification-stale', message: 'The target bookmark moved backwards or sideways during scanning; review it before retrying.' }
+          }
+          if (attempt >= LAND_ATTEMPTS) {
+            return {
+              status: 'verification-stale',
+              message: 'The repository changed during the patch scan. Retry integration after the current changes settle.',
+            }
+          }
+          continue
+        }
+        if (latestSnapshot.operationId !== attemptSnapshot.operationId) {
+          if (attempt >= LAND_ATTEMPTS) {
+            return {
+              status: 'verification-stale',
+              message: 'The repository changed during the patch scan. Retry integration after the current changes settle.',
+            }
+          }
+          continue
+        }
+        if (!(await ensureAuthorized())) return { status: 'not-eligible' }
+        await jj(
+          [
+            '--at-operation',
+            attemptSnapshot.operationId,
+            'rebase',
+            '-b',
+            commitIdRevset(attemptSourceRevision),
+            '-d',
+            commitIdRevset(attemptSnapshot.bookmarkCommitId),
+          ],
+          cwd,
+          input.signal,
+        )
+        if (input.signal?.aborted) return { status: 'verification-cancelled' }
+        const afterRebase = await scanRebasedState({
+          repoRoot,
+          cwd,
+          threadName: thread.threadName,
+          bookmark,
+          expectedBookmarkCommitId: attemptSnapshot.bookmarkCommitId,
+          authorize: ensureAuthorized,
+          signal: input.signal,
+        })
+        if (afterRebase.status === 'not-eligible') return { status: 'not-eligible' }
+        if (afterRebase.status === 'bookmark-moved') {
+          const targetMovedForward = await bookmarkTargetDescendsFrom({
+            repoRoot,
+            operationId: afterRebase.snapshot.operationId,
+            expectedCommitId: attemptSnapshot.bookmarkCommitId,
+            currentCommitId: afterRebase.snapshot.bookmarkCommitId,
+            signal: input.signal,
+          })
+          if (!targetMovedForward) {
+            return { status: 'verification-stale', message: 'The target bookmark moved backwards or sideways during rebase; review it before retrying.' }
+          }
+          if (attempt >= LAND_ATTEMPTS)
+            return { status: 'verification-stale', message: 'The bookmark changed during rebase. Retry integration after the current changes settle.' }
+          continue
+        }
+        const rebased = afterRebase.revisions
+        let workingCopyEmpty = afterRebase.workingCopyEmpty
+        const conflicted = rebased.filter(revision => revision.conflict)
+        if (conflicted.length > 0) {
+          const files = new Set<string>()
+          for (const revision of conflicted) {
+            const listed = await execute(['resolve', '--list', '-r', commitIdRevset(revision.commitId)], cwd, input.signal)
+            if (listed.exitCode !== 0) throw new ThreadError('jj-failed', `jj resolve --list failed: ${listed.stderr.trim().slice(0, 400)}`)
+            for (const line of completeStdout(listed).split('\n')) {
+              const file = line.trim().split(/\s{2,}/)[0]
+              if (file !== undefined && file.length > 0) files.add(file)
+            }
+          }
+          return { status: 'conflicted', revisions: conflicted, files: [...files].slice(0, MAX_CONFLICT_FILES) }
+        }
+        if (afterRebase.detached.length > 0) return { status: 'detached-work', revisions: afterRebase.detached }
+        if (!workMetadataMatches(work, rebased) || !patchFingerprintsMatch(initialPatchComparison, afterRebase.comparison)) {
+          return {
+            status: 'verification-stale',
+            message: 'The thread changed during rebase. The bookmark was not advanced; retry after reviewing the current work.',
+          }
+        }
+        const [candidateRevision, ...extraCandidateRevisions] = await revisionsAtOperation(
+          workingCopyEmpty ? '@-' : '@',
+          cwd,
+          afterRebase.snapshot.operationId,
+          input.signal,
+        )
+        if (candidateRevision === undefined || extraCandidateRevisions.length > 0) {
+          return { status: 'verification-stale', message: 'Could not identify one checked revision to advance the bookmark to.' }
+        }
+
+        if (input.signal?.aborted) return { status: 'verification-cancelled' }
+        if (!(await ensureAuthorized())) return { status: 'not-eligible' }
+        await jj(['edit', commitIdRevset(candidateRevision.commitId)], cwd, input.signal)
+        const verificationState = await scanRebasedState({
+          repoRoot,
+          cwd,
+          threadName: thread.threadName,
+          bookmark,
+          expectedBookmarkCommitId: attemptSnapshot.bookmarkCommitId,
+          authorize: ensureAuthorized,
+          signal: input.signal,
+        })
+        if (verificationState.status === 'not-eligible') return { status: 'not-eligible' }
+        if (verificationState.status === 'bookmark-moved') {
+          const targetMovedForward = await bookmarkTargetDescendsFrom({
+            repoRoot,
+            operationId: verificationState.snapshot.operationId,
+            expectedCommitId: attemptSnapshot.bookmarkCommitId,
+            currentCommitId: verificationState.snapshot.bookmarkCommitId,
+            signal: input.signal,
+          })
+          if (!targetMovedForward) return { status: 'verification-stale', message: 'The target bookmark moved backwards or sideways before Project Checks.' }
+          if (attempt >= LAND_ATTEMPTS)
+            return { status: 'verification-stale', message: 'The bookmark changed while preparing Project Checks; retry integration.' }
+          continue
+        }
+        if (
+          verificationState.workingCopyRevisionId !== candidateRevision.commitId ||
+          verificationState.detached.length > 0 ||
+          !workMetadataMatches(work, verificationState.revisions) ||
+          !patchFingerprintsMatch(initialPatchComparison, verificationState.comparison)
+        ) {
+          return {
+            status: 'verification-stale',
+            message: 'The thread changed while preparing Project Checks. The bookmark was not advanced; retry after reviewing the current work.',
+          }
+        }
+        if (verificationState.revisions.some(revision => revision.conflict)) {
+          return { status: 'verification-stale', message: 'A conflict appeared while preparing Project Checks; resolve it before retrying.' }
+        }
+        workingCopyEmpty = false
+        if (!(await ensureAuthorized())) return { status: 'not-eligible' }
+        const verification = await input.verifyCandidate({ workingCopyCommitId: candidateRevision.commitId, attempt })
+        if (verification.status === 'cancelled' || input.signal?.aborted) return { status: 'verification-cancelled' }
+        if (verification.status === 'stale') return { status: 'verification-stale', message: verification.message }
+        if (verification.status === 'failed') return { status: 'verification-failed', message: verification.message }
+        const postVerificationState = await scanRebasedState({
+          repoRoot,
+          cwd,
+          threadName: thread.threadName,
+          bookmark,
+          expectedBookmarkCommitId: attemptSnapshot.bookmarkCommitId,
+          authorize: ensureAuthorized,
+          signal: input.signal,
+        })
+        if (postVerificationState.status === 'not-eligible') return { status: 'not-eligible' }
+        if (postVerificationState.status === 'bookmark-moved') {
+          const targetMovedForward = await bookmarkTargetDescendsFrom({
+            repoRoot,
+            operationId: postVerificationState.snapshot.operationId,
+            expectedCommitId: attemptSnapshot.bookmarkCommitId,
+            currentCommitId: postVerificationState.snapshot.bookmarkCommitId,
+            signal: input.signal,
+          })
+          if (!targetMovedForward) {
+            return { status: 'verification-stale', message: 'The target bookmark moved backwards or sideways during Project Checks.' }
+          }
+          if (attempt >= LAND_ATTEMPTS) return { status: 'verification-stale', message: 'The bookmark changed while Project Checks ran; retry integration.' }
+          continue
+        }
+        if (
+          postVerificationState.workingCopyRevisionId !== candidateRevision.commitId ||
+          postVerificationState.detached.length > 0 ||
+          !workMetadataMatches(work, postVerificationState.revisions) ||
+          !patchFingerprintsMatch(initialPatchComparison, postVerificationState.comparison)
+        ) {
+          return {
+            status: 'verification-stale',
+            message: 'The thread changed while Project Checks ran. The bookmark was not advanced; review the current work.',
+          }
+        }
+
+        const beforeMoveSnapshot = await readSnapshot(repoRoot, bookmark, input.signal)
+        if (beforeMoveSnapshot.bookmarkCommitId !== attemptSnapshot.bookmarkCommitId) {
+          const targetMovedForward = await bookmarkTargetDescendsFrom({
+            repoRoot,
+            operationId: beforeMoveSnapshot.operationId,
+            expectedCommitId: attemptSnapshot.bookmarkCommitId,
+            currentCommitId: beforeMoveSnapshot.bookmarkCommitId,
+            signal: input.signal,
+          })
+          if (!targetMovedForward) {
+            return { status: 'verification-stale', message: 'The target bookmark moved backwards or sideways before landing; review it before retrying.' }
+          }
+          if (attempt >= LAND_ATTEMPTS)
+            return { status: 'verification-stale', message: 'The bookmark moved before landing. Retry integration after the current changes settle.' }
+          continue
+        }
+        if (input.signal?.aborted) return { status: 'verification-cancelled' }
+        if (!(await ensureAuthorized())) return { status: 'not-eligible' }
+        const moved = await execute(
+          [
+            '--ignore-working-copy',
+            'bookmark',
+            'move',
+            '--from',
+            commitIdRevset(attemptSnapshot.bookmarkCommitId),
+            '--to',
+            commitIdRevset(candidateRevision.commitId),
+            exactBookmarkNamePattern(bookmark),
+          ],
+          cwd,
+          input.signal,
+        )
+        const afterMoveSnapshot = await readSnapshot(repoRoot, bookmark)
+        const candidateIsOnBookmark = await bookmarkTargetDescendsFrom({
+          repoRoot,
+          operationId: afterMoveSnapshot.operationId,
+          expectedCommitId: candidateRevision.commitId,
+          currentCommitId: afterMoveSnapshot.bookmarkCommitId,
+        })
+        if (candidateIsOnBookmark) {
+          if (!workingCopyEmpty && (await ensureAuthorized().catch(() => false))) {
+            await jj(['new', commitIdRevset(afterMoveSnapshot.bookmarkCommitId)], cwd).catch(() => undefined)
+          }
+          await writeRebaseMetadata(thread.repoRoot, thread.threadName, candidateRevision.changeId).catch(() => undefined)
+          return { status: 'landed', revisions: rebased, head: candidateRevision }
+        }
+        if (input.signal?.aborted) return { status: 'verification-cancelled' }
+        const targetMovedForward = await bookmarkTargetDescendsFrom({
+          repoRoot,
+          operationId: afterMoveSnapshot.operationId,
+          expectedCommitId: attemptSnapshot.bookmarkCommitId,
+          currentCommitId: afterMoveSnapshot.bookmarkCommitId,
+          signal: input.signal,
+        })
+        if (!targetMovedForward) {
+          return { status: 'verification-stale', message: 'The target bookmark moved backwards or sideways while landing; review it before retrying.' }
+        }
+        if (attempt >= LAND_ATTEMPTS) {
+          if (moved.exitCode !== 0) throw new ThreadError('jj-failed', `Could not move ${bookmark}: ${moved.stderr.trim().slice(0, 400)}`)
+          return { status: 'verification-stale', message: 'The bookmark changed before the checked revision could be landed; retry integration.' }
+        }
+      }
+    })
+  }
+
   const landAt = async (
     thread: ThreadLocation & { readonly threadName: string },
     input: {
-      readonly signal?: AbortSignal
+      readonly bookmark?: string | undefined
+      readonly signal?: AbortSignal | undefined
       readonly validate?: () => Promise<void>
       readonly onProgress?: (phase: 'queued' | 'validating' | 'rebasing') => void
     } = {},
@@ -253,7 +1060,7 @@ export const createThreads = (options: {
       input.onProgress?.('validating')
       await input.validate?.()
       const cwd = thread.workspaceRoot
-      const bookmark = options.bookmark()
+      const bookmark = input.bookmark ?? options.bookmark()
 
       for (let attempt = 1; ; attempt++) {
         input.onProgress?.('rebasing')
@@ -276,8 +1083,9 @@ export const createThreads = (options: {
         if (conflicted.length > 0) {
           const files = new Set<string>()
           for (const revision of conflicted) {
-            const listed = await options.executor({ args: ['resolve', '--list', '-r', revision.commitId], cwd })
-            for (const line of listed.stdout.split('\n')) {
+            const listed = await execute(['resolve', '--list', '-r', commitIdRevset(revision.commitId)], cwd, input.signal)
+            if (listed.exitCode !== 0) throw new ThreadError('jj-failed', `jj resolve --list failed: ${listed.stderr.trim().slice(0, 400)}`)
+            for (const line of completeStdout(listed).split('\n')) {
               const file = line.trim().split(/\s{2,}/)[0]
               if (file !== undefined && file.length > 0) files.add(file)
             }
@@ -287,11 +1095,12 @@ export const createThreads = (options: {
         const workingCopyEmpty = postRebase.some(item => item.empty && item.currentWorkingCopy)
         const target = workingCopyEmpty ? '@-' : '@'
         // A bookmark only moves forward; if another writer advanced it meanwhile, rebase again onto the new tip.
-        const moved = await options.executor({ args: ['bookmark', 'set', bookmark, '-r', target], cwd })
+        const moved = await execute(['bookmark', 'set', bookmark, '-r', target], cwd, input.signal)
         if (moved.exitCode === 0) {
           if (!workingCopyEmpty) await jj(['new', bookmark], cwd, input.signal)
           const head = rebased[0]
-          await writeRebaseMetadata(thread.repoRoot, thread.threadName, head?.changeId).catch(() => undefined)
+          if (head === undefined) throw new ThreadError('jj-failed', 'The rebased revisions have no bookmark head.')
+          await writeRebaseMetadata(thread.repoRoot, thread.threadName, head.changeId).catch(() => undefined)
           return { status: 'landed', revisions: rebased, head }
         }
         if (attempt >= LAND_ATTEMPTS) throw new ThreadError('jj-failed', `Could not move ${bookmark}: ${moved.stderr.trim().slice(0, 400)}`)
@@ -302,7 +1111,7 @@ export const createThreads = (options: {
   const land = async (
     path: string,
     input: {
-      readonly signal?: AbortSignal
+      readonly signal?: AbortSignal | undefined
       readonly validate?: () => Promise<void>
       readonly onProgress?: (phase: 'queued' | 'validating' | 'rebasing') => void
     } = {},
@@ -382,18 +1191,20 @@ export const createThreads = (options: {
     return (await readAtOperation(['log', '--no-pager', '--color=never', '--limit', '20', '-r', revset, '-T', template])).trimEnd()
   }
 
-  return { locate, list, status, provision, land, landAt, discard, bookmarks, workingCopyCommitId, revisionGraph }
+  return { locate, list, status, provision, land, landAt, landVerified, discard, bookmarks, workingCopyCommitId, revisionGraph }
 }
 
 export type Threads = ReturnType<typeof createThreads>
 
 export const defaultThreadsDirectory = (repoRoot: string): string => `${repoRoot}-threads`
 
-/**
- * `dshx checkout sync` from the dshx this plugin builds with: the one routine that brings the checkout running DSH
- * onto the bookmark after rebasing, and that agents run after moving the bookmark by hand. Throws when dshx is missing.
- */
-export const checkoutSyncArgv = (input: { readonly repoRoot: string; readonly workspace: string; readonly bookmark: string }): readonly string[] => [
+/** `dshx checkout sync` from the dshx this plugin builds with; accepts an exact landed commit or the bookmark tip. */
+export const checkoutSyncArgv = (input: {
+  readonly repoRoot: string
+  readonly workspace: string
+  readonly bookmark: string
+  readonly revision?: string | undefined
+}): readonly string[] => [
   process.execPath,
   join(dirname(createRequire(import.meta.url).resolve('@dshfiles/dshx')), 'cli', 'bin.js'),
   'checkout',
@@ -402,6 +1213,7 @@ export const checkoutSyncArgv = (input: { readonly repoRoot: string; readonly wo
   input.workspace,
   '--bookmark',
   input.bookmark,
+  ...(input.revision === undefined ? [] : ['--revision', input.revision]),
   '--cwd',
   input.repoRoot,
   '--json',

@@ -1539,6 +1539,9 @@ importers:
       '@dshfiles/plugin-ui':
         specifier: workspace:*
         version: link:../plugin-ui
+      '@dshfiles/project-checks':
+        specifier: workspace:*
+        version: link:../project-checks
       '@dshfiles/project-folder-picker':
         specifier: workspace:*
         version: link:../project-folder-picker

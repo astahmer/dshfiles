@@ -2,7 +2,7 @@
   "name": "@dshfiles/jj-integration",
   "version": "0.1.0",
   "private": true,
-  "description": "One jj workspace per thread, chosen above a new thread’s composer, with an Integrate action and /rebase command that move finished thread work onto main.",
+  "description": "One jj workspace per thread, with a manual integration dashboard and optional Project Checks-verified automatic integration.",
   "files": [
     "dist",
     "cordis.patch.yml"
@@ -16,11 +16,11 @@
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./api": {
       "types": "./src/api.ts",
-      "default": "./src/api.ts"
+      "default": "./dist/api.js"
     },
     "./settings": {
       "types": "./src/settings.ts",
-      "default": "./src/settings.ts"
+      "default": "./dist/settings.js"
     }
   },
   "scripts": {
@@ -35,6 +35,7 @@
     "@dshfiles/command-palette": "workspace:*",
     "@dshfiles/multi-host": "workspace:*",
     "@dshfiles/plugin-ui": "workspace:*",
+    "@dshfiles/project-checks": "workspace:*",
     "@dshfiles/project-folder-picker": "workspace:*",
     "@dshfiles/shared-runtime": "workspace:*",
     "zod": "catalog:"

@@ -129,8 +129,10 @@ the hand-back note below):
 
 5. When `syncWorkspaceAfterLand` names a workspace (`default`, the checkout
    `dsh web` usually runs from), run `dshx checkout sync` for it in the
-   background: its working copy follows the bookmark with its local edits, and
-   dshx and the changed plugins are rebuilt. The panel shows the outcome, e.g.
+   background with the exact landed commit (`--revision <commit-id>`); it keeps
+   local edits and refuses if that commit is no longer on the bookmark. This
+   avoids silently syncing a later bookmark tip. dshx and changed plugins are
+   rebuilt. The panel shows the outcome, e.g.
    `default updated · 3 plugins rebuilt · restart to apply`, with **Restart**
    (the thread sidebar's restart) when a Host bundle changed; client-only
    changes arrive over HMR. Conflicts or described work the bookmark lacks
@@ -147,6 +149,28 @@ in scope, so Rebase stays refused while a user's session works.
 After a successful rebase, the conversation notice shows the target bookmark and
 12-character tip change ID. Its **Archive** action archives only that Session
 and is disabled while the Session is running.
+
+### Verified automatic integration
+
+`autoIntegrationScope` defaults to `none`, so the manual dashboard and `/rebase`
+remain the only integration paths unless automatic integration is enabled. With
+`isolated`, a completed turn can integrate only when its Project Checks pass and
+the thread workspace has exactly one owning Session. Scope `all` also makes
+isolation the default for new threads; existing shared workspaces remain manual.
+The composer workspace control can still opt a new thread out of isolation.
+
+Automatic integration is separate from **Integrate**: it checks the completion
+receipt against the source revision, pins the current bookmark, and fails closed
+on detached work, represented or mixed patches, or scans that cannot prove patch
+equivalence. It rebases the thread, reruns Project Checks against the exact
+rebased working-copy revision, then advances the bookmark only if the checked
+candidate and target are still current. Stale work, conflicts, and failed checks
+stop before the bookmark moves. A cancellation received before the move also
+stops it; if cancellation races a completed move, the confirmed landing is
+reported instead of a false cancellation. The thread agent receives a repair
+message when it can safely continue. After a successful automatic landing,
+`syncWorkspaceAfterLand` applies to the DSH checkout just as it does after manual
+integration.
 
 ## Cleanup
 
@@ -171,14 +195,15 @@ The confirmation dialog explains these effects before removal.
 
 ## Settings (`jj-integration`)
 
-| Key                      | Default   | Meaning                                                                                     |
-| ------------------------ | --------- | ------------------------------------------------------------------------------------------- |
-| `isolateByDefault`       | `false`   | Initial state of the workspace toggle for new threads.                                      |
-| `bookmark`               | `main`    | Bookmark threads start from and Rebase advances.                                            |
-| `threadsDirectory`       | empty     | Parent for thread workspaces; empty uses `<repository>-threads`.                            |
-| `askAgentToFixLanding`   | `true`    | Hand Rebase problems back to the thread's agent.                                            |
-| `syncWorkspaceAfterLand` | `default` | Workspace brought onto the bookmark after Rebase (`dshx checkout sync`); empty disables it. |
-| `removeFinishedThreads`  | `true`    | Remove finished thread workspaces without revisions to rebase.                              |
+| Key                      | Default   | Meaning                                                                                                                    |
+| ------------------------ | --------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `autoIntegrationScope`   | `none`    | `none` is manual; `isolated` auto-integrates uniquely owned thread workspaces; `all` also isolates new threads by default. |
+| `isolateByDefault`       | `false`   | Initial state of the new-thread workspace toggle; `all` scope forces isolation on by default.                              |
+| `bookmark`               | `main`    | Exact bookmark threads start from and Rebase advances.                                                                     |
+| `threadsDirectory`       | empty     | Parent for thread workspaces; empty uses `<repository>-threads`.                                                           |
+| `askAgentToFixLanding`   | `true`    | Hand Rebase problems back to the thread's agent.                                                                           |
+| `syncWorkspaceAfterLand` | `default` | Workspace brought onto the bookmark after Rebase (`dshx checkout sync`); empty disables it.                                |
+| `removeFinishedThreads`  | `true`    | Remove finished thread workspaces without revisions to rebase.                                                             |
 
 The settings keys `askAgentToFixLanding` and `syncWorkspaceAfterLand` retain
 their names for saved-settings compatibility; their descriptions and UI copy
