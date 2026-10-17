@@ -270,6 +270,19 @@ const integrationBlockMessage = (t: JjIntegrationTranslate, reason: ReturnType<t
   return t('behindWithoutWorkNextStep', { bookmark })
 }
 
+/**
+ * A repository scan costs one jj process per workspace, and a thread whose eligibility is still unknown
+ * re-asks for it on every render; one refresh per window is enough to learn the activity that resolves it.
+ */
+const ELIGIBILITY_REFRESH_INTERVAL_MS = 10_000
+let lastEligibilityRefreshAt = 0
+const refreshRepositoriesForUnknownEligibility = (queryClient: ReturnType<typeof useQueryClient>): void => {
+  const now = Date.now()
+  if (now - lastEligibilityRefreshAt < ELIGIBILITY_REFRESH_INTERVAL_MS) return
+  lastEligibilityRefreshAt = now
+  void queryClient.invalidateQueries({ queryKey: threadQueryKeys.repositories })
+}
+
 const ThreadRow = (props: {
   readonly thread: ThreadView
   readonly sessionById: ReadonlyMap<string, SessionSummary>
@@ -327,7 +340,7 @@ const ThreadRow = (props: {
   const mainSession = thread.sessionIds.map(sessionId => props.sessionById.get(sessionId)).find(session => session !== undefined)
   useEffect(() => {
     if (thread.canRebase !== false || !clientCanRebase) return
-    void queryClient.invalidateQueries({ queryKey: threadQueryKeys.repositories })
+    refreshRepositoriesForUnknownEligibility(queryClient)
   }, [clientCanRebase, queryClient, thread.canRebase])
   const statusLabel = props.job === undefined ? integrationStateLabel(t, state, thread) : integrationJobLabel(t, props.job.phase)
   const statusDescription = props.job?.message ?? integrationBlockMessage(t, blockReason, props.bookmark)

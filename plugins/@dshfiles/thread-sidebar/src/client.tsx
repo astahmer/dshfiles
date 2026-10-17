@@ -1087,7 +1087,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       return { sessionIds: activeSessionIds }
     },
     enabled: questionCandidates.length > 0,
-    refetchInterval: questionCandidates.length > 0 ? 5_000 : false,
+    refetchInterval: questionCandidates.length > 0 ? 10_000 : false,
     retry: false,
   })
   const continuedQuestionSessionIds = useMemo(() => new Set(activeQuestionsQuery.data?.sessionIds ?? []), [activeQuestionsQuery.data])
