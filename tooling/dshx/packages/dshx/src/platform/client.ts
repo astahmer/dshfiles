@@ -529,10 +529,12 @@ function decodeJsonValue(value: unknown, context: string): JsonValue {
   return result.data
 }
 
-export function loopbackLaunchUrl(value: string): {
+const loopbackLaunchUrl = (
+  value: string,
+): {
   readonly origin: string
   readonly token: string
-} {
+} => {
   let url: URL
   try {
     url = new URL(value)
@@ -946,7 +948,7 @@ export function createDshPlatformClientFromTransport(transport: DshPlatformTrans
 }
 
 /** The launch URL from options, DSHX_URL, or the one the dsh-web supervisor records for this DSH home. */
-export const resolveLaunchUrl = (explicit: string | undefined, env: NodeJS.ProcessEnv = process.env): string | undefined => {
+const resolveLaunchUrl = (explicit: string | undefined, env: NodeJS.ProcessEnv = process.env): string | undefined => {
   const configured = explicit ?? env.DSHX_URL
   if (configured !== undefined) return configured
   const dshHome = env.DSH_HOME?.trim() || join(homedir(), '.dsh')
@@ -958,19 +960,24 @@ export const resolveLaunchUrl = (explicit: string | undefined, env: NodeJS.Proce
   }
 }
 
+export class DshPlatformLaunchUrl {
+  static readonly loopbackLaunchUrl = loopbackLaunchUrl
+  static readonly resolveLaunchUrl = resolveLaunchUrl
+}
+
 export interface ConnectDshPlatformClientOptions {
   readonly url?: string
   readonly fetch?: typeof fetch
 }
 
 export async function connectDshPlatformClient(options: ConnectDshPlatformClientOptions = {}): Promise<DshPlatformClient> {
-  const launchUrl = resolveLaunchUrl(options.url)
+  const launchUrl = DshPlatformLaunchUrl.resolveLaunchUrl(options.url)
   if (launchUrl === undefined)
     throw new DshPlatformError(
       'missing-url',
       'Set DSHX_URL to the tokenized DSH launch URL printed by dsh, or start DSH with dsh-web so it records one in ~/.dsh/runtime/web-url.',
     )
-  const parsed = loopbackLaunchUrl(launchUrl)
+  const parsed = DshPlatformLaunchUrl.loopbackLaunchUrl(launchUrl)
   const request = options.fetch ?? fetch
   let exchange: Response
   try {

@@ -1,4 +1,5 @@
-export { connectDshPlatformClient, createDshPlatformClientFromTransport, DshPlatformError, loopbackLaunchUrl } from './client.js'
+export { connectDshPlatformClient, createDshPlatformClientFromTransport, DshPlatformError } from './client.js'
+export { loopbackLaunchUrl } from './host-api.js'
 export { connectDshxApi, createDshxApiCaller } from './dshx-api.js'
 export type { DshxApiCall, DshxApiCallerOptions } from './dshx-api.js'
 export type {

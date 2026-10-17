@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { z } from 'zod'
 import { ApiProtocolModel } from '../api/common.js'
 import type { JsonValue } from './client.js'
-import { DshPlatformError, loopbackLaunchUrl, resolveLaunchUrl } from './client.js'
+import { DshPlatformError, DshPlatformLaunchUrl } from './client.js'
 
 const responseSchema = z
   .object({
@@ -97,13 +97,13 @@ export const connectDshxApi = async ({
   readonly version: number
   readonly fetch?: typeof fetch
 }): Promise<DshxApiCall> => {
-  const launchUrl = resolveLaunchUrl(url)
+  const launchUrl = DshPlatformLaunchUrl.resolveLaunchUrl(url)
   if (launchUrl === undefined)
     throw new DshPlatformError(
       'missing-url',
       'Set DSHX_URL to the tokenized DSH launch URL printed by dsh, or start DSH with dsh-web so it records one in ~/.dsh/runtime/web-url.',
     )
-  const parsed = loopbackLaunchUrl(launchUrl)
+  const parsed = DshPlatformLaunchUrl.loopbackLaunchUrl(launchUrl)
   let exchange: Response
   try {
     exchange = await request(parsed.origin + '/?token=' + encodeURIComponent(parsed.token), { redirect: 'manual' })

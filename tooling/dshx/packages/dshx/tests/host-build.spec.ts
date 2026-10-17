@@ -209,6 +209,23 @@ describe('host compiler', () => {
     expect(code).not.toMatch(/from\s+['"]@dshfiles\/dshx\//)
   })
 
+  it('inlines loopbackLaunchUrl from the Host API boundary', async () => {
+    const root = await temporaryProject()
+    await writeFile(
+      resolve(root, 'src/host.ts'),
+      [
+        "import { defineHost } from '@dshfiles/dshx/host'",
+        "import { loopbackLaunchUrl } from '@dshfiles/dshx/platform/host-api'",
+        'export default defineHost({ setup() { return { loopbackLaunchUrl } } })',
+        '',
+      ].join('\n'),
+    )
+    await buildHost({ packageId: '@dshx/fixture-plugin', root, entry: 'src/host.ts', outDir: 'dist' })
+    const code = await readFile(resolve(root, 'dist/index.js'), 'utf8')
+    expect(code).toContain('loopbackLaunchUrl')
+    expect(code).not.toMatch(/from\s+['"]@dshfiles\/dshx\//)
+  })
+
   it('inlines the public Host platform API helpers into Host artifacts', async () => {
     const root = await temporaryProject()
     await writeFile(
