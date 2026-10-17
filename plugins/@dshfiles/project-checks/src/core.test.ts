@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isWithinRoot, projectChecksConfigSchema, receiptFreshness, verificationPrompt } from './core.js'
+import { projectChecksConfigSchema, ProjectChecksModel } from './core.js'
 import { receiptsAfter, storedReceiptSchema, trimReceiptRows, type StoredReceipt } from './store.js'
 
 describe('trusted project actions', () => {
@@ -77,20 +77,20 @@ describe('trusted project actions', () => {
   })
 
   it('allows a session directory under its trusted root and rejects sibling traversal', () => {
-    expect(isWithinRoot('/work/project', '/work/project/packages/app')).toBe(true)
-    expect(isWithinRoot('/work/project', '/work/project-elsewhere')).toBe(false)
-    expect(isWithinRoot('/work/project', '/work/project/../secrets')).toBe(false)
-    expect(isWithinRoot('relative/project', '/work/project')).toBe(false)
+    expect(ProjectChecksModel.isWithinRoot('/work/project', '/work/project/packages/app')).toBe(true)
+    expect(ProjectChecksModel.isWithinRoot('/work/project', '/work/project-elsewhere')).toBe(false)
+    expect(ProjectChecksModel.isWithinRoot('/work/project', '/work/project/../secrets')).toBe(false)
+    expect(ProjectChecksModel.isWithinRoot('relative/project', '/work/project')).toBe(false)
   })
 
   it('marks check receipts stale when the working-copy revision changes', () => {
-    expect(receiptFreshness('revision-a', 'revision-a')).toBe('current')
-    expect(receiptFreshness('revision-a', 'revision-b')).toBe('stale')
-    expect(receiptFreshness(null, 'revision-b')).toBe('unknown')
+    expect(ProjectChecksModel.receiptFreshness('revision-a', 'revision-a')).toBe('current')
+    expect(ProjectChecksModel.receiptFreshness('revision-a', 'revision-b')).toBe('stale')
+    expect(ProjectChecksModel.receiptFreshness(null, 'revision-b')).toBe('unknown')
   })
 
   it('bounds completion feedback and names the attempt limit', () => {
-    const prompt = verificationPrompt(
+    const prompt = ProjectChecksModel.verificationPrompt(
       Array.from({ length: 10 }, (_, index) => ({ label: `check-${index}`, status: 'failed' as const, exitCode: 1, failure: null })),
       2,
       2,

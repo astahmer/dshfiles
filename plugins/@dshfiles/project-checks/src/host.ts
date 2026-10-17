@@ -16,7 +16,7 @@ import { isAbsolute, normalize } from 'node:path'
 import { PluginApiError, type ApiCaller } from '@dshfiles/dshx/api'
 import { mayVerifyCandidate, projectChecksApi, type CandidateVerificationInput, type ProjectHookEvent } from './api.js'
 import type { ProjectChecksVerifiedTurn } from './completion-event.js'
-import { isWithinRoot, projectChecksConfigSchema, receiptFreshness, verificationPrompt, type ProjectAction } from './core.js'
+import { projectChecksConfigSchema, ProjectChecksModel, type ProjectAction } from './core.js'
 import { emitProjectChecksActivity, persistReceiptAndEmitActivity, type ProjectChecksActivityEvent } from './receipt-activity.js'
 import { MAX_RECEIPTS_TOTAL, projectChecksDomain, receiptKey, receiptsAfter, trimReceiptRows, type StoredReceipt } from './store.js'
 
@@ -139,7 +139,7 @@ const sessionPaths = async (ctx: Context, sessionId: string, action: ProjectActi
 
   const [root, cwd] = await Promise.all([realpath(action.root), realpath(selectedCwd)])
   if (root !== normalize(action.root)) throw new Error('Configured project root must be a canonical path.')
-  if (!isWithinRoot(root, cwd)) throw new Error('This session is outside the action’s trusted project root.')
+  if (!ProjectChecksModel.isWithinRoot(root, cwd)) throw new Error('This session is outside the action’s trusted project root.')
   return { root, cwd }
 }
 
@@ -403,7 +403,7 @@ const verifyRebasedCandidate = async (ctx: Context, input: CandidateVerification
   if (failed.length > 0) {
     return {
       status: 'failed' as const,
-      prompt: verificationPrompt(
+      prompt: ProjectChecksModel.verificationPrompt(
         failed.map(receipt => ({
           label: receipt.label,
           status: receipt.status,
@@ -471,7 +471,7 @@ const apiReceipts = async (ctx: Context, sessionId: string) => {
           revisions.set(action.root, revision)
         }
         const receiptRevision = receipt.sourceRevisionAfter === undefined ? receipt.sourceRevision : receipt.sourceRevisionAfter
-        return { ...receipt, configurationFreshness: 'unknown' as const, freshness: receiptFreshness(receiptRevision, await revision) }
+        return { ...receipt, configurationFreshness: 'unknown' as const, freshness: ProjectChecksModel.receiptFreshness(receiptRevision, await revision) }
       }),
     )
   } catch (cause) {
@@ -546,7 +546,7 @@ const hostApi = projectChecksApi.host({
       requireRevision: false,
     })
     const receiptRevision = receipt.sourceRevisionAfter === undefined ? receipt.sourceRevision : receipt.sourceRevisionAfter
-    const freshness = receiptFreshness(
+    const freshness = ProjectChecksModel.receiptFreshness(
       receiptRevision,
       await (async () => {
         try {
@@ -671,7 +671,7 @@ export default defineHost({
       const failurePrompt =
         failed.length === 0
           ? 'Project checks did not verify one exact working-copy revision. Inspect the work and stop again so every check runs against the same revision.'
-          : verificationPrompt(
+          : ProjectChecksModel.verificationPrompt(
               failed.map(receipt => ({
                 label: receipt.label,
                 status: receipt.status,
