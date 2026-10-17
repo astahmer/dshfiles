@@ -7,12 +7,12 @@ export interface ThreadSessionActivity {
   readonly pendingUserQuestion: boolean | undefined
 }
 
-export const hasPendingUserQuestion = (projectionValues: UserQuestionProjectionValues | undefined): boolean | undefined => {
+const hasPendingUserQuestion = (projectionValues: UserQuestionProjectionValues | undefined): boolean | undefined => {
   const userQuestions = projectionValues?.userQuestions
   return userQuestions === undefined ? undefined : userQuestions.active.length > 0
 }
 
-export const canRebaseThread = (sessionIds: readonly string[], getActivity: (sessionId: string) => ThreadSessionActivity | undefined): boolean | undefined => {
+const canRebaseThread = (sessionIds: readonly string[], getActivity: (sessionId: string) => ThreadSessionActivity | undefined): boolean | undefined => {
   let hasUnknownActivity = false
   for (const sessionId of sessionIds) {
     const activity = getActivity(sessionId)
@@ -22,10 +22,7 @@ export const canRebaseThread = (sessionIds: readonly string[], getActivity: (ses
   return hasUnknownActivity ? undefined : true
 }
 
-export const canRebaseThreadIfKnown = (
-  sessionIds: readonly string[],
-  activity: ReadonlyMap<string, ThreadSessionActivity> | undefined,
-): boolean | undefined => {
+const canRebaseThreadIfKnown = (sessionIds: readonly string[], activity: ReadonlyMap<string, ThreadSessionActivity> | undefined): boolean | undefined => {
   if (sessionIds.length === 0) return true
   if (activity === undefined) return undefined
   return canRebaseThread(sessionIds, sessionId => activity.get(sessionId))
@@ -39,7 +36,7 @@ export const canRebaseThreadIfKnown = (
  * `/rebase` paths keep the caller in scope so a rebase stays refused while a
  * session works.
  */
-export const rebaseGuardSessionIds = (input: {
+const rebaseGuardSessionIds = (input: {
   readonly sessionIds: readonly string[]
   readonly fromAgent: boolean
   readonly sessionId: string | undefined
@@ -54,7 +51,7 @@ export const rebaseGuardSessionIds = (input: {
  * same caller exemption, so `jj_thread_status` reports what a rebase would do
  * instead of counting the asking Agent's own turn against it.
  */
-export const threadRebaseEligibility = (input: {
+const threadRebaseEligibility = (input: {
   readonly sessionIds: readonly string[]
   readonly activity: ReadonlyMap<string, ThreadSessionActivity> | undefined
   readonly fromAgent: boolean
@@ -62,8 +59,17 @@ export const threadRebaseEligibility = (input: {
 }): boolean | undefined =>
   canRebaseThreadIfKnown(rebaseGuardSessionIds({ sessionIds: input.sessionIds, fromAgent: input.fromAgent, sessionId: input.sessionId }), input.activity)
 
-export const canRebaseFromClientSnapshot = (input: {
+const canRebaseFromClientSnapshot = (input: {
   readonly threadSessionsEligible: boolean | undefined
   readonly sessionRunning: boolean
   readonly questionPending: boolean
 }): boolean => input.threadSessionsEligible === true && !input.sessionRunning && !input.questionPending
+
+export class ThreadRebaseEligibilityModel {
+  static readonly hasPendingUserQuestion = hasPendingUserQuestion
+  static readonly canRebase = canRebaseThread
+  static readonly canRebaseIfKnown = canRebaseThreadIfKnown
+  static readonly guardSessionIds = rebaseGuardSessionIds
+  static readonly eligibility = threadRebaseEligibility
+  static readonly fromClientSnapshot = canRebaseFromClientSnapshot
+}

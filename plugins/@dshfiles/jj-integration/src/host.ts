@@ -17,7 +17,7 @@ import { z } from 'zod'
 import { jjIntegrationApi, type DestinationView, type LandResult, type RepositoryView, type ThreadView, type WorkspaceSyncView } from './api.js'
 import { JsonText } from './json-text.js'
 import { isolatesNewThreadsByDefault, jjIntegrationSettings, mayAutoIntegrateWorkspace, type JjIntegrationSettings } from './settings.js'
-import { hasPendingUserQuestion, threadRebaseEligibility, type ThreadSessionActivity } from './thread-rebase-eligibility.js'
+import { ThreadRebaseEligibilityModel, type ThreadSessionActivity } from './thread-rebase-eligibility.js'
 import { workspaceHasOtherSession } from './thread-session-ownership.js'
 import { registeredProjects } from './registered-projects.js'
 import {
@@ -204,7 +204,7 @@ const readSessionActivity = async (): Promise<ReadonlyMap<string, ThreadSessionA
     for (const item of result.items) {
       activity.set(item.sessionId, {
         running: item.running,
-        pendingUserQuestion: hasPendingUserQuestion(item.projections?.values),
+        pendingUserQuestion: ThreadRebaseEligibilityModel.hasPendingUserQuestion(item.projections?.values),
       })
     }
     return activity
@@ -221,7 +221,7 @@ const threadView = (
   caller: { readonly fromAgent: boolean; readonly sessionId: string | undefined } = { fromAgent: false, sessionId: undefined },
 ): ThreadView => {
   const sessionIds = [...new Set([...(workspace?.sessionIds ?? []), ...isolatedSessionIdsAt(status.path)])]
-  const canRebase = threadRebaseEligibility({ sessionIds, activity, fromAgent: caller.fromAgent, sessionId: caller.sessionId })
+  const canRebase = ThreadRebaseEligibilityModel.eligibility({ sessionIds, activity, fromAgent: caller.fromAgent, sessionId: caller.sessionId })
   const view: ThreadView = {
     name: status.name,
     path: status.path,
@@ -525,7 +525,7 @@ const landThread = async (input: {
     const workspace = await registryOf().resolveByPath(location.workspaceRoot)
     if (workspace === undefined) throw new PluginApiError('Could not verify thread activity before rebasing.', { code: 'thread-activity-unknown' })
     const activity = await readSessionActivity()
-    const eligible = threadRebaseEligibility({
+    const eligible = ThreadRebaseEligibilityModel.eligibility({
       sessionIds: workspace.sessionIds,
       activity,
       fromAgent: input.fromAgent,

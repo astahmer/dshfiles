@@ -45,7 +45,7 @@ import { useDiscardConfirmation } from './discard-machine.js'
 import { announceRepositoryChange, describeLandResult } from './land-feedback.js'
 import type { JjIntegrationTranslate } from './locales.js'
 import { integrationQueueMachine, type IntegrationJob, type IntegrationJobPhase } from './integration-queue-machine.js'
-import { canRebaseThread, hasPendingUserQuestion } from './thread-rebase-eligibility.js'
+import { ThreadRebaseEligibilityModel } from './thread-rebase-eligibility.js'
 import { threadIntegrationBlockReason, threadIntegrationState, type ThreadIntegrationState } from './thread-integration-state.js'
 import { useToast } from './toast.js'
 
@@ -313,16 +313,20 @@ const ThreadRow = (props: {
   )
   const readClientCanRebase = useCallback(() => {
     const sessions = props.sessions.list.getSnapshot().byId
-    return canRebaseThread(thread.sessionIds, sessionId => {
+    return ThreadRebaseEligibilityModel.canRebase(thread.sessionIds, sessionId => {
       const session = sessions[SessionId(sessionId)]
-      return session === undefined ? undefined : { running: session.running, pendingUserQuestion: hasPendingUserQuestion(session.projectionValues) }
+      return session === undefined
+        ? undefined
+        : { running: session.running, pendingUserQuestion: ThreadRebaseEligibilityModel.hasPendingUserQuestion(session.projectionValues) }
     })
   }, [props.sessions, thread.sessionIds])
   const readClientQuestionPending = useCallback(() => {
     const sessions = props.sessions.list.getSnapshot().byId
     return (
-      thread.sessionIds.some(sessionId => hasPendingUserQuestion(sessions[SessionId(sessionId)]?.projectionValues) === true) ||
-      Object.values(sessions).some(session => session.cwd === thread.path && hasPendingUserQuestion(session.projectionValues) === true)
+      thread.sessionIds.some(sessionId => ThreadRebaseEligibilityModel.hasPendingUserQuestion(sessions[SessionId(sessionId)]?.projectionValues) === true) ||
+      Object.values(sessions).some(
+        session => session.cwd === thread.path && ThreadRebaseEligibilityModel.hasPendingUserQuestion(session.projectionValues) === true,
+      )
     )
   }, [props.sessions, thread.path, thread.sessionIds])
   const sessionRunning = useSyncExternalStore(subscribe, readSessionRunning, () => true)
@@ -743,10 +747,14 @@ export const ThreadWorkspacesPanel = (props: {
     const state = threadIntegrationState(thread)
     if (state !== 'ready') return state
     const sessionIsRunning = [...sessionById.values()].some(session => session.cwd === thread.path && session.running)
-    const userQuestionIsPending = thread.sessionIds.some(sessionId => hasPendingUserQuestion(sessionById.get(sessionId)?.projectionValues) === true)
-    const threadSessionsAreEligible = canRebaseThread(thread.sessionIds, sessionId => {
+    const userQuestionIsPending = thread.sessionIds.some(
+      sessionId => ThreadRebaseEligibilityModel.hasPendingUserQuestion(sessionById.get(sessionId)?.projectionValues) === true,
+    )
+    const threadSessionsAreEligible = ThreadRebaseEligibilityModel.canRebase(thread.sessionIds, sessionId => {
       const session = sessionById.get(sessionId)
-      return session === undefined ? undefined : { running: session.running, pendingUserQuestion: hasPendingUserQuestion(session.projectionValues) }
+      return session === undefined
+        ? undefined
+        : { running: session.running, pendingUserQuestion: ThreadRebaseEligibilityModel.hasPendingUserQuestion(session.projectionValues) }
     })
     return sessionIsRunning || userQuestionIsPending || !threadSessionsAreEligible ? 'waiting' : state
   }
