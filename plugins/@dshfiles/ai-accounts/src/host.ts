@@ -31,14 +31,15 @@ import type { AdapterRegistrationHandle, DirectoryRegistrationHandle, GenerateOp
 // Value imports, not `import type {}`: an empty type-only import is elided and
 // never loads the package's cordis module augmentation, which is what makes
 // `ctx.on('llm/stream')` and the agent-scoped listeners typecheck here.
-import { LlmError, resolveImageAttachmentAccess, type LlmFailure } from '@deepseek-ai/dsh-llm'
+import { LlmError, resolveImageAttachmentAccess } from '@deepseek-ai/dsh-llm'
 import type { ResolvedPiAiProviderProfile } from '@deepseek-ai/dsh-llm-pi-ai'
 import { createAccountPool, creditServedAttempt } from './account-pool.js'
 import { explainSilentRejections } from './silent-rejection.js'
-import { createFailureRecovery, offloadResentImages, quotaRecoveryFor, type RecoveryAction } from './failure-recovery.js'
+import { createFailureRecovery, offloadResentImages, quotaRecoveryFor } from './failure-recovery.js'
+import { isRetryId, retryNotice } from './retry-notice.js'
 import { failoverAccountIds, selectRequestAccount } from './request-account-routing.js'
 // Types the `llm/retry` rows this plugin writes, so a fail-over shows in the turn like DSH's own retries.
-import type { LlmRetryEventData, LlmRetryStartedEventData, RetryId } from '@deepseek-ai/dsh-llm-retry'
+import type { LlmRetryEventData, LlmRetryStartedEventData } from '@deepseek-ai/dsh-llm-retry'
 import type {} from '@dshfiles/request-messages'
 declare module '@deepseek-ai/dsh-session/types' {
   interface SessionEventMap {
@@ -74,7 +75,6 @@ export { CODEX_KIND, OPENCODE_KIND, COMMANDCODE_KIND, CLAUDE_KIND } from './prov
 const HOUR_MS = 3_600_000
 /** A Luna Reserve switch outlives a stale usage card for this long, then the card decides again. */
 const LUNA_RESERVE_HOLD_MS = 60 * 60_000
-const NOTICE_MESSAGE_CHARS = 400
 /** The refresh period is in hours; checking twice an hour keeps a lowered setting honest. */
 const PRICING_CHECK_MS = 30 * 60_000
 
@@ -642,7 +642,15 @@ export default definePlugin({
                 }
                 const retryId = action.retryId
                 if (!isRetryId(retryId)) return next()
-                const notice = retryNotice(action, { retryId, turn, step, failure, label: accountId => routes.get(accountId)?.displayName ?? accountId })
+                const requestProvider = agent.session.requestHeader()?.config.provider ?? provider
+                const notice = retryNotice(action, {
+                  retryId,
+                  turn,
+                  step,
+                  provider: requestProvider,
+                  failure,
+                  label: accountId => routes.get(accountId)?.displayName ?? accountId,
+                })
                 ctx.logger.info(`ai-accounts: ${notice.failure.message}`)
                 agent.session.append('llm/retry', notice)
                 const delayMs = action.step.kind === 'retry' || action.step.kind === 'wait' ? action.step.delayMs : 0
@@ -692,9 +700,6 @@ export default definePlugin({
   },
 })
 
-/** `RetryId` is an unvalidated brand; narrowing here keeps llm-retry a type-only import. */
-const isRetryId = (id: string): id is RetryId => id.length > 0
-
 const cancellableDelay = (delayMs: number, signal: AbortSignal): Promise<boolean> => {
   if (signal.aborted) return Promise.resolve(false)
   if (delayMs <= 0) return Promise.resolve(true)
@@ -709,41 +714,4 @@ const cancellableDelay = (delayMs: number, signal: AbortSignal): Promise<boolean
     }, delayMs)
     signal.addEventListener('abort', onAbort, { once: true })
   })
-}
-
-/**
- * One `llm/retry` row per rung, under this plugin's own policy key so DSH's
- * retry counter never mistakes it for its own. A switch of account, model or
- * request carries its own code so the chat row shows what changed instead of
- * the generic quota or auth text the original code maps to.
- */
-const retryNotice = (
-  action: Extract<RecoveryAction, { kind: 'retry' }>,
-  context: {
-    readonly retryId: RetryId
-    readonly turn: number
-    readonly step: number
-    readonly failure: LlmFailure
-    readonly label: (accountId: string) => string
-  },
-): Extract<LlmRetryEventData, { mode: 'normal' }> => {
-  const from = context.label(action.account)
-  const cause = context.failure.message.slice(0, NOTICE_MESSAGE_CHARS)
-  const step = action.step
-  let failure: LlmFailure = { ...context.failure, message: `${from}: ${cause}` }
-  if (step.kind === 'failover') failure = { message: `Switched from ${from} to ${context.label(step.to)} after: ${cause}`, code: 'ACCOUNT_FAILOVER' }
-  if (step.kind === 'luna-reserve') failure = { message: `Continuing ${from} on Luna Reserve after: ${cause}`, code: 'LUNA_RESERVE' }
-  if (step.kind === 'shrink') failure = { message: `Retrying ${from} with earlier images as file placeholders after: ${cause}`, code: 'REQUEST_SHRUNK' }
-  return {
-    retryId: context.retryId,
-    turn: context.turn,
-    step: context.step,
-    provider: action.account,
-    mode: 'normal',
-    policyKey: `ai-accounts:${action.failureKind}`,
-    retry: action.attempt,
-    maxRetries: action.plannedAttempts,
-    delayMs: step.kind === 'retry' || step.kind === 'wait' ? step.delayMs : 0,
-    failure,
-  }
 }

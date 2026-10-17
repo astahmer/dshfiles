@@ -155,7 +155,7 @@ describe('failure recovery through the account pool', () => {
     })
   })
 
-  it('retries transport failures in place first and numbers every attempt of one step under one retry id', () => {
+  it('retries transport failures in place first and numbers every attempt of one chain under one retry id', () => {
     const { fail } = setup()
     const first = fail(transport)
     const second = fail(transport)
@@ -166,6 +166,23 @@ describe('failure recovery through the account pool', () => {
       ['failover', 3, 'retry-1'],
     ])
     expect(fail(transport, 2)).toMatchObject({ kind: 'retry', attempt: 1, retryId: 'retry-2', step: { kind: 'retry' } })
+  })
+
+  it('gives each failure kind of one step its own retry id and attempt sequence', () => {
+    // DSH validates a stored log chain by chain, keyed by turn, step, provider and policy key: a row that
+    // continues another kind's numbering, or reuses its retryId, makes the whole log unreadable.
+    const { fail } = setup()
+    const exhaustedFirst = fail(quota)
+    const transportFirst = fail(transport)
+    const exhaustedSecond = fail(quota)
+    const seen = [exhaustedFirst, transportFirst, exhaustedSecond].map(action =>
+      action.kind === 'retry' ? [action.failureKind, action.attempt, action.retryId] : action.kind,
+    )
+    expect(seen).toEqual([
+      ['exhausted', 1, 'retry-1'],
+      ['transport', 1, 'retry-2'],
+      ['exhausted', 2, 'retry-1'],
+    ])
   })
 
   it('passes through routes and failures it does not own', () => {
