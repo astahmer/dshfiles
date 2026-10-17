@@ -1,7 +1,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-storage-domain'
 import { jujutsuReviewProgressApi } from './review-progress-api.js'
-import { createReviewProgressStore, reviewProgressDomain, type ReviewProgressStore } from './review-progress-store.js'
+import { ReviewProgressStoreModel, reviewProgressDomain, type ReviewProgressStore } from './review-progress-store.js'
 
 interface OpenedReviewProgress {
   readonly store: ReviewProgressStore
@@ -19,7 +19,7 @@ const openReviewProgress = async (ctx: Context): Promise<OpenedReviewProgress> =
   const storage = ctx.get('storageDomain')
   if (storage === undefined) throw new Error('Jujutsu review progress storage is unavailable.')
   const domain = await storage.open(reviewProgressDomain)
-  return { store: createReviewProgressStore({ table: domain.table('marks') }), close: () => domain.close() }
+  return { store: ReviewProgressStoreModel.create({ table: domain.table('marks') }), close: () => domain.close() }
 }
 
 export const reviewProgressFor = (ctx: Context): Promise<ReviewProgressStore> => {

@@ -19,10 +19,10 @@ export interface ReviewMarkIdentity {
 }
 
 /** One row per reviewed file: re-reviewing changed content replaces its digest instead of adding a row. */
-export const reviewMarkKey = (identity: ReviewMarkIdentity): string => `${identity.repositoryRoot}\u0000${identity.commitId}\u0000${identity.path}`
+const reviewMarkKey = (identity: ReviewMarkIdentity): string => `${identity.repositoryRoot}\u0000${identity.commitId}\u0000${identity.path}`
 
 /** Monotone across Host restarts: a new snapshot always outranks every stored revision. */
-export const nextReviewRevision = (current: number, now: number): number => Math.max(current + 1, now)
+const nextReviewRevision = (current: number, now: number): number => Math.max(current + 1, now)
 
 const byReviewedAtDescending = (left: ReviewMark, right: ReviewMark): number => right.reviewedAt.localeCompare(left.reviewedAt)
 
@@ -33,7 +33,7 @@ export interface ReviewProgressStore {
 }
 
 /** The Host's durable record of which exact file contents the user reviewed, shared by every browser and plugin. */
-export const createReviewProgressStore = ({
+const createReviewProgressStore = ({
   table,
   now = Date.now,
   reportError = error => console.error('Jujutsu review progress write failed', { error: error instanceof Error ? error.message.slice(0, 200) : String(error) }),
@@ -90,4 +90,10 @@ export const createReviewProgressStore = ({
     },
     flush: () => writes,
   }
+}
+
+export class ReviewProgressStoreModel {
+  static readonly key = reviewMarkKey
+  static readonly nextRevision = nextReviewRevision
+  static readonly create = createReviewProgressStore
 }
