@@ -15,7 +15,7 @@ import type {
   RegistryListing,
   RegistrySkillView,
 } from './types.js'
-import { apiHostRegistrationParts, DSHX_REGISTRY_OWNER, dshxRegistryApi } from './define.js'
+import { ApiDefinitionModel } from './define.js'
 import { apiChannel, ContractViolation, error, isApiError, isPluginApiError, jsonBytes, throwIfAborted, validate } from './common.js'
 import { apiKey, apiRegistry, type ApiDispatch, type ApiRegistry, type RegisteredApi, type RegistryMember } from './registry.js'
 import { publishedJsonSchema, toToolSchema } from './json-schema.js'
@@ -70,7 +70,7 @@ function hostLogger(ctx: Context): LoggerLike {
 }
 
 function createDispatch(ctx: Context, packageId: string, registration: ApiHostRegistration): ApiDispatch {
-  const { contract, handlers } = apiHostRegistrationParts(registration)
+  const { contract, handlers } = ApiDefinitionModel.hostRegistrationParts(registration)
   return async (endpoint, payload, signal, caller, peer) => {
     const methodDefinition = contract.methods[endpoint]
     const handler = handlers[endpoint]
@@ -366,9 +366,9 @@ async function lead(registry: ApiRegistry): Promise<void> {
   const member = registry.members[0]
   if (member === undefined || registry.leader !== undefined) return
   registry.leader = member
-  const registration = dshxRegistryApi.host({ list: ({ input }) => describeRegistry(member.ctx, registry, input ?? {}) })
+  const registration = ApiDefinitionModel.registryApi.host({ list: ({ input }) => describeRegistry(member.ctx, registry, input ?? {}) })
   try {
-    const unmount = (await mountApi(member.ctx, DSHX_REGISTRY_OWNER, registration)).dispose
+    const unmount = (await mountApi(member.ctx, ApiDefinitionModel.registryOwner, registration)).dispose
     const tools = toolsOf(member.ctx)
     const unregister = tools?.register(capabilitiesTool(registry))
     member.stop = async () => {
@@ -408,7 +408,7 @@ async function mountApi(
   packageId: string,
   registration: ApiHostRegistration,
 ): Promise<{ readonly dispose: () => Promise<void>; readonly servesClients: boolean }> {
-  const { contract } = apiHostRegistrationParts(registration)
+  const { contract } = ApiDefinitionModel.hostRegistrationParts(registration)
   if (contract.owner !== undefined && contract.owner !== packageId) {
     throw new Error(`API ${contract.id} is owned by ${contract.owner} and cannot be served by ${packageId}.`)
   }
@@ -466,7 +466,7 @@ async function mountApi(
 export async function registerApi(ctx: Context, packageId: string, registration: ApiHostRegistration): Promise<void> {
   const mounted = await mountApi(ctx, packageId, registration)
   try {
-    ctx.effect(() => mounted.dispose, `dshx api: ${apiHostRegistrationParts(registration).contract.id}`)
+    ctx.effect(() => mounted.dispose, `dshx api: ${ApiDefinitionModel.hostRegistrationParts(registration).contract.id}`)
   } catch (cause) {
     await mounted.dispose()
     throw cause

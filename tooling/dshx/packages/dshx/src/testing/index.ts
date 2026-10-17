@@ -6,7 +6,7 @@ import { ToolRuntime } from '@deepseek-ai/dsh-tools'
 import type { SlotRegistry } from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type { ConnectionFetchHandler, ConnectionFetchRoute, HostConnectionHandle } from '@deepseek-ai/dsh-client-connection'
 import { apiChannel } from '../api/common.js'
-import { DSHX_REGISTRY_OWNER, dshxRegistryApi } from '../api/define.js'
+import { ApiDefinitionModel } from '../api/define.js'
 import { createHostModule, createHostPlugin } from '../host/runtime.js'
 import { createClientModule, createClientPlugin } from '../client/runtime.js'
 import { createClientModuleLoader } from './client-module.js'
@@ -83,7 +83,7 @@ export function provideTestConnection(ctx: Context): TestConnection {
   return {
     /** Routes the mounted plugins registered, without the registry listing dshx serves on the first one's behalf. */
     get routeCount() {
-      const registryPrefix = `/api${apiChannel(DSHX_REGISTRY_OWNER, dshxRegistryApi.id)}/`
+      const registryPrefix = `/api${apiChannel(ApiDefinitionModel.registryOwner, ApiDefinitionModel.registryApi.id)}/`
       return [...routes.keys()].filter(path => !path.startsWith(registryPrefix)).length
     },
     requestApi: ({ packageId, apiId, method, version, input }) => {

@@ -171,7 +171,11 @@ function clientEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, op
       }
       if (id === `${VIRTUAL_CLIENT_PUBLIC}-api`) {
         return [
-          `export { defineApi, DSHX_REGISTRY_OWNER, dshxRegistryApi, method } from ${JSON.stringify(API_DEFINE_PATH)}`,
+          `import { ApiDefinitionModel } from ${JSON.stringify(API_DEFINE_PATH)}`,
+          'export const defineApi = ApiDefinitionModel.define',
+          'export const DSHX_REGISTRY_OWNER = ApiDefinitionModel.registryOwner',
+          'export const dshxRegistryApi = ApiDefinitionModel.registryApi',
+          'export const method = ApiDefinitionModel.method',
           `export { isApiError, isApiOwnerMissing, PluginApiError } from ${JSON.stringify(API_COMMON_PATH)}`,
           '',
         ].join('\n')

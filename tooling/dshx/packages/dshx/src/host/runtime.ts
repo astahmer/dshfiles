@@ -23,7 +23,7 @@ import { loadRuntimePlugins } from './runtime-plugins.js'
 import { HostInspectBridge } from './inspect-bridge.js'
 import { registerApi } from '../api/host-runtime.js'
 import { apiRegistry } from '../api/registry.js'
-import { apiHostRegistrationParts, isApiHostRegistration } from '../api/define.js'
+import { ApiDefinitionModel } from '../api/define.js'
 import type { SettingsContract, SettingsContribution, SettingsHostContribution } from '../settings/types.js'
 import { SettingsDefinitionModel } from '../settings/define.js'
 import { HostDefinitionModel } from './define.js'
@@ -329,7 +329,7 @@ function validateDefinition(value: unknown, metadata: HostPluginMetadata): HostD
       'Use either Config for native Loader-owned fields or settings for a DSHX Settings namespace. Split the Host entry if it needs both.',
     )
   }
-  if (source.apis !== undefined && (!Array.isArray(source.apis) || source.apis.some(item => !isApiHostRegistration(item)))) {
+  if (source.apis !== undefined && (!Array.isArray(source.apis) || source.apis.some(item => !ApiDefinitionModel.isHostRegistration(item)))) {
     fail('DSHX2002', 'Host apis must be an array of values returned by api.host().', metadata, 'Use apis: [contract.host({ ... })] or remove apis.')
   }
   if (source.setup !== undefined && typeof source.setup !== 'function') {
@@ -348,7 +348,7 @@ export function createHostPlugin(value: unknown, metadata: HostPluginMetadata): 
   if ((definition.settings?.length ?? 0) > 0 && !inject.includes('settings')) inject.push('settings')
   const apis = definition.apis ?? []
   if (apis.length > 0 && !inject.includes('connection')) inject.push('connection')
-  const exposesTools = apis.some(api => Object.values(apiHostRegistrationParts(api).contract.methods).some(method => method.tool !== undefined))
+  const exposesTools = apis.some(api => Object.values(ApiDefinitionModel.hostRegistrationParts(api).contract.methods).some(method => method.tool !== undefined))
   if (exposesTools && !inject.includes('tools')) inject.push('tools')
   const config =
     definition.Config ??

@@ -29,14 +29,14 @@ type MethodFromSchemas<InputSchema, OutputSchema> = ApiMethodDefinition<
   OutputSchema extends ApiSchema ? SchemaOutput<OutputSchema> : unknown
 >
 
-export function method<I = void, O = unknown>(): ApiMethodDefinition<I, I, O, O>
-export function method<const InputSchema extends ApiSchema | undefined = undefined, const OutputSchema extends ApiSchema | undefined = undefined>(options: {
+function method<I = void, O = unknown>(): ApiMethodDefinition<I, I, O, O>
+function method<const InputSchema extends ApiSchema | undefined = undefined, const OutputSchema extends ApiSchema | undefined = undefined>(options: {
   readonly input?: InputSchema
   readonly output?: OutputSchema
   readonly description?: string
   readonly tool?: ApiToolExposure<OutputSchema extends ApiSchema ? SchemaOutput<OutputSchema> : unknown>
 }): MethodFromSchemas<InputSchema, OutputSchema>
-export function method(options: ApiMethodOptions = {}): AnyApiMethodDefinition {
+function method(options: ApiMethodOptions = {}): AnyApiMethodDefinition {
   return { ...options }
 }
 
@@ -47,18 +47,18 @@ function assertId(id: string): void {
 }
 
 /** Internal authenticity check shared by the source and generated Host adapters. */
-export function isApiHostRegistration(value: unknown): value is ApiHostRegistration {
+function isApiHostRegistration(value: unknown): value is ApiHostRegistration {
   return typeof value === 'object' && value !== null && apiHostRegistrations.has(value)
 }
 
 /** Internal registration data shared by the author helper and Host runtime. */
-export function apiHostRegistrationParts(value: ApiHostRegistration): ApiHostRegistrationParts {
+function apiHostRegistrationParts(value: ApiHostRegistration): ApiHostRegistrationParts {
   const parts = apiHostRegistrations.get(value)
   if (parts === undefined) throw new TypeError('Invalid API Host contribution; create it with contract.host({ ...handlers }).')
   return parts
 }
 
-export function defineApi<const Methods extends Record<string, AnyApiMethodDefinition>>(definition: {
+function defineApi<const Methods extends Record<string, AnyApiMethodDefinition>>(definition: {
   readonly id: string
   readonly version: number
   readonly owner?: string
@@ -101,13 +101,13 @@ export function defineApi<const Methods extends Record<string, AnyApiMethodDefin
 }
 
 /** Package that serves the dshx registry listing on behalf of the first loaded API Host. */
-export const DSHX_REGISTRY_OWNER = '@dshfiles/dshx'
+const DSHX_REGISTRY_OWNER = '@dshfiles/dshx'
 
 /**
  * Discovery of every dshx API served in this DSH process, plus the agent's
  * tools and skills. The first loaded dshx Host plugin with an API serves it.
  */
-export const dshxRegistryApi = defineApi({
+const dshxRegistryApi = defineApi({
   id: 'registry',
   version: 1,
   owner: DSHX_REGISTRY_OWNER,
@@ -115,3 +115,12 @@ export const dshxRegistryApi = defineApi({
     list: method<RegistryListInput, RegistryListing>(),
   },
 })
+
+export class ApiDefinitionModel {
+  static readonly method = method
+  static readonly isHostRegistration = isApiHostRegistration
+  static readonly hostRegistrationParts = apiHostRegistrationParts
+  static readonly define = defineApi
+  static readonly registryOwner = DSHX_REGISTRY_OWNER
+  static readonly registryApi = dshxRegistryApi
+}

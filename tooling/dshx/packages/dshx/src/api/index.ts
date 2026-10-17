@@ -1,4 +1,9 @@
-export { defineApi, DSHX_REGISTRY_OWNER, dshxRegistryApi, method } from './define.js'
+import { ApiDefinitionModel } from './define.js'
+
+export const defineApi = ApiDefinitionModel.define
+export const DSHX_REGISTRY_OWNER = ApiDefinitionModel.registryOwner
+export const dshxRegistryApi = ApiDefinitionModel.registryApi
+export const method = ApiDefinitionModel.method
 export { isApiError, isApiOwnerMissing, PluginApiError } from './common.js'
 export type {
   AnyApiMethodDefinition,
