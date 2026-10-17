@@ -51,7 +51,6 @@ export const startThreadWithModel = async (page: Page, input: { readonly project
   await expect(async () => {
     await page.keyboard.press('Escape')
     await page.getByRole('button', { name: /^Select model/ }).click()
-    await page.getByRole('menuitem', { name: /^Model / }).click()
     await page.getByRole('menuitemradio', { name: model, exact: true }).click({ timeout: 2_000 })
   }).toPass({ timeout: 30_000 })
   await expect(page.getByRole('button', { name: new RegExp(`^Select model, current ${model.replaceAll('/', '\\/')}`) })).toBeVisible()

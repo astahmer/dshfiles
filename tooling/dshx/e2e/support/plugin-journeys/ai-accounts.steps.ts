@@ -21,9 +21,16 @@ const addCommandCodeAccount = async (page: Page, input: { readonly name: string;
 }
 
 const openAccountsPanel = async (page: Page): Promise<void> => {
-  await page.getByRole('button', { name: 'Settings', exact: true }).click()
-  await page.getByRole('dialog').getByRole('button', { name: 'AI Accounts', exact: true }).click()
-  await page.getByRole('button', { name: 'Open AI Accounts', exact: true }).click()
+  if (await providerAccounts(page).isVisible()) return
+
+  const globalPanel = page.getByRole('button', { name: 'AI Accounts', exact: true })
+  if (await globalPanel.isVisible()) {
+    await globalPanel.click()
+  } else {
+    await page.getByRole('button', { name: 'Settings', exact: true }).click()
+    await page.getByRole('dialog').getByRole('button', { name: 'AI Accounts', exact: true }).click()
+    await page.getByRole('button', { name: 'Open AI Accounts', exact: true }).click()
+  }
   await expect(providerAccounts(page)).toBeVisible()
 }
 

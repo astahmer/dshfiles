@@ -13,7 +13,12 @@
         "press Enter",
         "expect button \"Locate Current\"",
         "click button \"Compare\"",
-        "expect region \"Revision comparison\""
+        "expect region \"Revision comparison\"",
+        "click combobox \"Comparison target\"",
+        "click option \"Another revision…\"",
+        "expect combobox \"Choose revision target\"",
+        "click combobox \"Choose revision target\"",
+        "expect combobox \"Search loaded revisions\""
       ],
       "surfaces": ["client", "host", "integration"],
       "configuration": [],

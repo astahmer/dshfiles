@@ -5,7 +5,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { PassThrough } from 'node:stream'
 import { afterEach, describe, expect, it } from 'vitest'
+import { chromium } from 'playwright'
 import { runCli } from '../src/cli/run.js'
+import { StartupDialogs } from '../src/project/startup-dialogs.js'
 import { installFakeSecretCli, NEW_THREAD_START_BUTTON_NAME } from '../src/scratch/seed.js'
 import type { ScratchState } from '../src/scratch/state.js'
 
@@ -73,6 +75,7 @@ describe('dshx dev scratch commands', () => {
     expect(help.code).toBe(0)
     expect(help.stdout).toContain('dshx dev open <feature>')
     expect(help.stdout).toContain('click <role|text|label|title>')
+    expect(help.stdout).toContain('provider-setup dialogs')
     expect(help.stdout).toContain('credential-recovery')
 
     const missingFeature = await run(['dev', 'open', '--json'])
@@ -82,6 +85,29 @@ describe('dshx dev scratch commands', () => {
     const misplaced = await run(['dev', 'doctor', '--dry-run'])
     expect(misplaced.code).toBe(2)
     expect(misplaced.stderr).toContain('--dry-run is not an option of dev doctor')
+  })
+
+  it('dismisses legacy and current provider setup dialogs on a scratch page', async () => {
+    const browser = await chromium.launch({ headless: true })
+    try {
+      for (const dialog of [
+        { name: 'Add an API key to get started', button: 'Configure later' },
+        { name: 'Get started', button: 'Close' },
+      ]) {
+        const page = await browser.newPage()
+        try {
+          await page.setContent(
+            `<div role="dialog" aria-label="${dialog.name}"><button aria-label="${dialog.button}" onclick="this.closest('[role=dialog]').remove()"></button></div>`,
+          )
+          expect(await StartupDialogs.dismissProviderSetupDuringStartup(page, 1_000)).toBe(true)
+          expect(await page.getByRole('dialog').count()).toBe(0)
+        } finally {
+          await page.close()
+        }
+      }
+    } finally {
+      await browser.close()
+    }
   })
 
   it('reports a missing instance with the command that starts one', async () => {

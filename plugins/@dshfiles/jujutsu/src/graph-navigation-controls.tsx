@@ -1,6 +1,8 @@
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
-import { Input } from '@dshfiles/plugin-ui/components/ui/input'
-import { LocateFixedIcon, XIcon } from '@dshfiles/plugin-ui/icons'
+import { Command, CommandEmpty, CommandInput, CommandItem, CommandList } from '@dshfiles/plugin-ui/components/ui/command'
+import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
+import { CheckIcon, ChevronDownIcon, LocateFixedIcon, XIcon } from '@dshfiles/plugin-ui/icons'
 import { errorMessage } from '@dshfiles/plugin-ui/query'
 import { useState } from 'react'
 import type { Revision } from './api.js'
@@ -55,13 +57,76 @@ interface RelationshipInspectorProps {
   readonly onLocate: (revision: Revision) => void
 }
 
-const SELECT_CLASS = 'dshx:h-7 dshx:min-w-0 dshx:max-w-full dshx:rounded-md dshx:border dshx:bg-background dshx:px-2 dshx:text-xs'
+interface RevisionTargetComboboxProps {
+  readonly revisions: readonly Revision[]
+  readonly selectedId: string
+  readonly search: string
+  readonly onSelect: (commitId: string) => void
+  readonly onSearchChange: (search: string) => void
+}
+
+const RevisionTargetCombobox = ({ revisions, selectedId, search, onSelect, onSearchChange }: RevisionTargetComboboxProps): JSX.Element => {
+  const [open, setOpen] = useState(false)
+  const candidates = revisions.filter(revision => RevisionGraphModel.matchesRevisionSearch(revision, search)).slice(0, 50)
+  const selectedRevision = revisions.find(revision => revision.commitId === selectedId)
+  const selectedDescription = selectedRevision?.description.split('\n')[0] || '(empty)'
+
+  return (
+    <Popover onOpenChange={setOpen} open={open}>
+      <PopoverTrigger asChild>
+        <Button
+          aria-expanded={open}
+          aria-label="Choose revision target"
+          aria-valuetext={selectedRevision === undefined ? undefined : `${selectedRevision.shortestChangeId} · ${selectedDescription}`}
+          className="dshx:flex-1 dshx:shrink dshx:justify-between dshx:min-w-0"
+          role="combobox"
+          size="sm"
+          type="button"
+          variant="outline"
+        >
+          {selectedRevision === undefined ? (
+            <span className="dshx:truncate">Choose revision…</span>
+          ) : (
+            <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:gap-2">
+              <span className="dshx:shrink-0 dshx:font-mono">{selectedRevision.shortestChangeId}</span>
+              <span className="dshx:min-w-0 dshx:truncate">{selectedDescription}</span>
+            </span>
+          )}
+          <ChevronDownIcon aria-hidden className="dshx:size-3.5 dshx:shrink-0 dshx:opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="dshx-root dshx:w-[var(--radix-popover-trigger-width)] dshx:max-w-[calc(100vw-16px)] dshx:p-0">
+        <Command shouldFilter={false}>
+          <CommandInput autoFocus aria-label="Search loaded revisions" onValueChange={onSearchChange} placeholder="Search loaded revisions…" value={search} />
+          <CommandList>
+            <CommandEmpty>No matching revisions.</CommandEmpty>
+            {candidates.map(revision => (
+              <CommandItem
+                key={revision.commitId}
+                onSelect={() => {
+                  onSelect(revision.commitId)
+                  setOpen(false)
+                }}
+                value={revision.commitId}
+              >
+                <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:gap-2">
+                  <span className="dshx:shrink-0 dshx:font-mono">{revision.shortestChangeId}</span>
+                  <span className="dshx:min-w-0 dshx:truncate">{revision.description.split('\n')[0] || '(empty)'}</span>
+                </span>
+                {revision.commitId === selectedId ? <CheckIcon aria-hidden className="dshx:size-3.5" /> : null}
+              </CommandItem>
+            ))}
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  )
+}
 
 export const RelationshipInspector = ({ navigation, selected, revisions, onLocate }: RelationshipInspectorProps): JSX.Element => {
   const [search, setSearch] = useState('')
   const relationship = navigation.relationshipQuery.data
   const subjectLabel = selected.workingCopy ? 'Current' : selected.shortestChangeId
-  const candidates = revisions.filter(revision => RevisionGraphModel.matchesRevisionSearch(revision, search)).slice(0, 50)
   const target = relationship?.revisions.find(revision => revision.commitId === relationship.targetCommitId)
   const unavailableLandmark =
     navigation.targetKey !== 'revision' && navigation.comparisonTarget !== undefined && navigation.comparisonTarget.status !== 'resolved'
@@ -77,20 +142,20 @@ export const RelationshipInspector = ({ navigation, selected, revisions, onLocat
           {subjectLabel}
         </span>
         <span className="dshx:text-muted-foreground">with</span>
-        <select
-          aria-label="Comparison target"
-          className={`${SELECT_CLASS} dshx:w-40 dshx:max-w-full`}
-          onChange={event => navigation.chooseTarget(event.target.value)}
-          value={navigation.targetKey}
-        >
-          {navigation.landmarks.map(landmark => (
-            <option disabled={landmark.status !== 'resolved'} key={landmark.kind} value={landmark.kind}>
-              {landmark.label}
-              {landmark.status === 'resolved' ? '' : ` (${landmark.status})`}
-            </option>
-          ))}
-          <option value="revision">Another revision…</option>
-        </select>
+        <Select onValueChange={navigation.chooseTarget} value={navigation.targetKey}>
+          <SelectTrigger aria-label="Comparison target" className="dshx:w-40 dshx:max-w-full dshx:px-2 dshx:text-xs" size="sm">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent className="dshx-root">
+            {navigation.landmarks.map(landmark => (
+              <SelectItem disabled={landmark.status !== 'resolved'} key={landmark.kind} value={landmark.kind}>
+                {landmark.label}
+                {landmark.status === 'resolved' ? '' : ` (${landmark.status})`}
+              </SelectItem>
+            ))}
+            <SelectItem value="revision">Another revision…</SelectItem>
+          </SelectContent>
+        </Select>
         {target !== undefined && (
           <Button
             aria-label="Locate comparison target"
@@ -109,26 +174,13 @@ export const RelationshipInspector = ({ navigation, selected, revisions, onLocat
       </div>
       {navigation.targetKey === 'revision' && (
         <div className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-center dshx:gap-1.5">
-          <Input
-            aria-label="Find comparison target"
-            className="dshx:h-7 dshx:w-40 dshx:max-w-full dshx:text-xs"
-            onChange={event => setSearch(event.target.value)}
-            placeholder="Search loaded revisions…"
-            value={search}
+          <RevisionTargetCombobox
+            onSelect={navigation.setCustomTargetId}
+            onSearchChange={setSearch}
+            revisions={revisions}
+            search={search}
+            selectedId={navigation.customTargetId}
           />
-          <select
-            aria-label="Choose revision target"
-            className={`${SELECT_CLASS} dshx:flex-1`}
-            onChange={event => navigation.setCustomTargetId(event.target.value)}
-            value={navigation.customTargetId}
-          >
-            <option value="">Choose revision…</option>
-            {candidates.map(revision => (
-              <option key={revision.commitId} value={revision.commitId}>
-                {revision.shortestChangeId} · {revision.description.split('\n')[0] || '(empty)'}
-              </option>
-            ))}
-          </select>
         </div>
       )}
       {navigation.relationshipQuery.isFetching && (

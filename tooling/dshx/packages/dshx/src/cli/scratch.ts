@@ -69,7 +69,7 @@ ${COMMON_HELP}`,
 <feature> is a feature id from a plugins/@dshfiles/*/dshx.features.json catalog, optionally
 qualified: "thread-destination", "jj-integration/thread-destination" or
 "@dshfiles/jj-integration#thread-destination". Navigates to the app root, dismisses the Preview
-Notice and "Add an API key" dialogs, then runs the feature's "reach" steps:
+Notice and provider-setup dialogs, then runs the feature's "reach" steps:
   click <role|text|label|title> "<name>"       fill <role|label> "<name>" "<value>"
   rightclick <role|text|label|title> "<name>"  press <key>
   hover <role|text|label|title> "<name>"       (leaves the pointer there, for hover-only UI)

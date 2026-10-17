@@ -262,7 +262,7 @@ export const checkClientBoot = async (options: ClientBootCheckOptions): Promise<
                 expectedClientEntries: options.expectedClientEntries,
                 inspectSlotFailures: options.expectedClientEntries.length > 0,
               })
-              // A scratch home has no provider, so DSH opens "Add an API key" over the shell, and the Slots behind it
+              // A scratch home has no provider, so DSH opens its provider-setup dialog over the shell, and the Slots behind it
               // never mount: an entry that crashes while rendering there leaves no trace at all. Dismiss it, let the
               // shell render, then read the Slot traces once more without disturbing the audit read above.
               await dismissProviderSetupIfShown(page)

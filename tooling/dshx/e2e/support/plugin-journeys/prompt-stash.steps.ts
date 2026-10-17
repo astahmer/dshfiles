@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Then, When } from '../bdd.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
+import { dismissProviderSetupDuringStartup } from '../../../packages/dshx/src/project/startup-dialogs.js'
 
 const COMPOSER_LABEL = 'Describe what you want to build, / commands, @ files or sessions'
 
@@ -130,10 +131,7 @@ When(
         await previewNotice.getByRole('button', { name: 'Continue', exact: true }).click()
       }
 
-      const providerSetup = otherTab.getByRole('dialog', { name: 'Add an API key to get started', exact: true })
-      if (await providerSetup.isVisible()) {
-        await providerSetup.getByRole('button', { name: 'Configure later', exact: true }).click()
-      }
+      await dismissProviderSetupDuringStartup(otherTab)
 
       await openPromptLibrary({ page: otherTab })
       await openPromptForEditing({ page: otherTab, title: currentTitle })

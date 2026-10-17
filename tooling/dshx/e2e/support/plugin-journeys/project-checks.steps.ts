@@ -124,7 +124,7 @@ When('a thread is started in the {string} folder', async ({ page }: { page: Page
       .last(),
   ).toBeVisible({ timeout: 60_000 })
   await expect(page.getByRole('textbox', { name: 'Message or run a task, / commands, @ files or sessions', exact: true })).toBeVisible()
-  await expect(page.getByRole('dialog', { name: 'Add an API key to get started', exact: true })).toBeHidden()
+  await expect(page.getByRole('dialog', { name: /^(?:Add an API key to get started|Get started)$/ })).toBeHidden()
 })
 
 When('a thread on the fake model is started in the trusted project', async ({ page }: { page: Page }) => {

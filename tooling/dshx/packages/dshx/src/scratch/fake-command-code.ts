@@ -22,7 +22,9 @@ export const FAKE_COMMAND_CODE_MODEL = 'commandcode_work/gpt-6-luna'
 
 const HOUR_MS = 3_600_000
 const TITLE_INSTRUCTION = 'Create a concise title for an AI coding-assistant session'
-const RUNTIME_CONTEXT = 'Current runtime context.'
+const RUNTIME_CONTEXT_PREFIXES = ['Current runtime context.', 'Time sampled while preparing turn ']
+
+const isRuntimeContextMessage = (text: string): boolean => RUNTIME_CONTEXT_PREFIXES.some(prefix => text.startsWith(prefix))
 
 const messageTextSchema = z
   .union([z.string(), z.array(z.object({ text: z.string().optional() }).passthrough()).transform(parts => parts.map(part => part.text ?? '').join(''))])
@@ -132,8 +134,8 @@ export const startFakeCommandCode = async (): Promise<FakeCommandCode> => {
             JSON.stringify({ error: { message: 'Usage limit reached for this account.', type: 'insufficient_quota', code: 'USAGE_LIMIT_REACHED' } }),
           )
         }
-        // DSH appends its runtime-context snapshot after the user's message.
-        const last = messages.filter(message => !message.text.startsWith(RUNTIME_CONTEXT)).at(-1)
+        // DSH appends runtime context and turn-time snapshots after the user's message.
+        const last = messages.filter(message => !isRuntimeContextMessage(message.text)).at(-1)
         if (last?.role === 'tool') return streamAnswer(response, { content: 'Tool finished.' })
         if (last?.text.includes('[[empty]]') === true) return streamAnswer(response, { reasoning_content: 'Thinking without an answer.' })
         if (last?.text.includes('[[hold]]') === true) {
