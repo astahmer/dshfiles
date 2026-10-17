@@ -157,7 +157,7 @@ export const createScratchProfile = async (options: ScratchProfileOptions): Prom
   }
 }
 
-const isolatedHostEnvironment = (home: string, profileRoot: string, source: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv => {
+export const isolatedHostEnvironment = (home: string, profileRoot: string, source: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv => {
   const allowedNames = ['PATH', 'TMPDIR', 'TMP', 'TEMP', 'LANG', 'LC_ALL', 'LC_CTYPE', 'TERM', 'USER', 'LOGNAME']
   const environment = Object.fromEntries(
     allowedNames.flatMap(name => {
@@ -183,7 +183,7 @@ const isolatedHostEnvironment = (home: string, profileRoot: string, source: Node
   }
 }
 
-const redactHostOutput = (output: string): string => output.replace(/http:\/\/127\.0\.0\.1:\d+\/[^\s]*/g, match => `${new URL(match).origin}/[redacted]`)
+export const redactHostOutput = (output: string): string => output.replace(/http:\/\/127\.0\.0\.1:\d+\/[^\s]*/g, match => `${new URL(match).origin}/[redacted]`)
 
 export class ScratchProfileRuntime {
   static readonly hostEnvironment = isolatedHostEnvironment

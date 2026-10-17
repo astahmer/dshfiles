@@ -34,13 +34,13 @@ export const projectChecksConfigSchema = z
 export type ProjectAction = z.infer<typeof projectActionSchema>
 export type ProjectChecksConfig = z.infer<typeof projectChecksConfigSchema>
 
-const isWithinRoot = (root: string, cwd: string): boolean => {
+export const isWithinRoot = (root: string, cwd: string): boolean => {
   if (!isAbsolute(root) || !isAbsolute(cwd)) return false
   const pathFromRoot = relative(root, cwd)
   return pathFromRoot === '' || (pathFromRoot !== '..' && !pathFromRoot.startsWith(`..${sep}`) && !isAbsolute(pathFromRoot))
 }
 
-const receiptFreshness = (receiptRevision: string | null, currentRevision: string | null): 'current' | 'stale' | 'unknown' => {
+export const receiptFreshness = (receiptRevision: string | null, currentRevision: string | null): 'current' | 'stale' | 'unknown' => {
   if (receiptRevision === null || currentRevision === null) return 'unknown'
   return receiptRevision === currentRevision ? 'current' : 'stale'
 }
@@ -52,7 +52,7 @@ export interface VerificationFailure {
   readonly failure: string | null
 }
 
-const verificationPrompt = (failures: readonly VerificationFailure[], attempt: number, maxAttempts: number): string => {
+export const verificationPrompt = (failures: readonly VerificationFailure[], attempt: number, maxAttempts: number): string => {
   const failed = failures
     .slice(0, 6)
     .map(item => `${item.label} (${item.status}${item.exitCode === null ? '' : `, exit ${item.exitCode}`}${item.failure === null ? '' : `, ${item.failure}`})`)

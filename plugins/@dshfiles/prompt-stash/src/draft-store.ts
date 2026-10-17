@@ -92,7 +92,7 @@ const readDraftStore = (source: string | null): DraftStore => {
  * Reads the drafts key. Drafts left under the key they once shared with the prompt library move to their own key
  * on first read, so a later library save cannot overwrite them.
  */
-const readStoredDrafts = (storage: { getItem(key: string): string | null; setItem(key: string, value: string): void }): DraftStore => {
+export const readStoredDrafts = (storage: { getItem(key: string): string | null; setItem(key: string, value: string): void }): DraftStore => {
   const current = storage.getItem(DRAFT_STORE_KEY)
   if (current !== null) return readDraftStore(current)
   const legacy = readDraftStore(storage.getItem(LEGACY_DRAFT_STORE_KEY))
@@ -106,7 +106,7 @@ const defaultDraftTitle = (text: string): string => {
   return title.length > MAX_DRAFT_TITLE_CHARS ? `${title.slice(0, MAX_DRAFT_TITLE_CHARS - 1)}…` : title
 }
 
-const saveDraft = (
+export const saveDraft = (
   current: DraftStore,
   draft: { readonly id: string; readonly title: string; readonly text: string; readonly now: string },
 ): SaveDraftResult => {
@@ -125,7 +125,7 @@ const saveDraft = (
   return { ok: true, store, serialized }
 }
 
-const removeDraft = (current: DraftStore, draftId: string): DraftStore =>
+export const removeDraft = (current: DraftStore, draftId: string): DraftStore =>
   draftStoreSchema.parse({
     schemaVersion: 1,
     drafts: current.drafts.filter(draft => draft.id !== draftId),

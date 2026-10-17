@@ -4094,12 +4094,18 @@ importers:
       '@deepseek-ai/dsh':
         specifier: 0.2.0-rc.2
         version: 0.2.0-rc.2(fdbcc682763b993a831b7773f8ab957d)
+      '@hono/node-server':
+        specifier: 2.1.5
+        version: 2.1.5(hono@4.13.13)
       '@playwright/test':
         specifier: 1.56.1
         version: 1.56.1
       '@types/node':
         specifier: 'catalog:'
         version: 22.19.20
+      hono:
+        specifier: 4.13.13
+        version: 4.13.13
       knip:
         specifier: 6.32.2
         version: 6.32.2

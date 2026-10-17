@@ -62,7 +62,7 @@ const resolveStateDir = (options: { readonly name: string; readonly stateDir?: s
 
 const stateFile = (stateDir: string): string => join(stateDir, 'state.json')
 
-const readScratchState = async (stateDir: string, name: string): Promise<ScratchState> => {
+export const readScratchState = async (stateDir: string, name: string): Promise<ScratchState> => {
   const source = await readFile(stateFile(stateDir), 'utf8').catch(() => undefined)
   if (source === undefined) {
     throw new ScratchError(
@@ -82,7 +82,7 @@ const readScratchState = async (stateDir: string, name: string): Promise<Scratch
   return parsed.data
 }
 
-const writeScratchState = async (state: ScratchState): Promise<void> => {
+export const writeScratchState = async (state: ScratchState): Promise<void> => {
   await mkdir(state.stateDir, { recursive: true, mode: 0o700 })
   await writeFile(stateFile(state.stateDir), `${JSON.stringify(state, null, 2)}\n`, { mode: 0o600 })
 }
@@ -105,24 +105,24 @@ const publicState = (state: ScratchState) => ({
   evidenceDir: state.evidenceDir,
 })
 
-const isWithin = (root: string, target: string): boolean => {
+export const isWithin = (root: string, target: string): boolean => {
   const normalizedRoot = resolve(root)
   const normalizedTarget = resolve(target)
   return normalizedTarget === normalizedRoot || normalizedTarget.startsWith(`${normalizedRoot}${sep}`)
 }
 
 /** Running, and still the process we started: its command line carries every signature fragment. */
-const ownedProcessStatus = (owned: { readonly pid: number; readonly signature: readonly string[] }): 'running' | 'gone' | 'foreign' => {
+export const ownedProcessStatus = (owned: { readonly pid: number; readonly signature: readonly string[] }): 'running' | 'gone' | 'foreign' => {
   const result = spawnSync('ps', ['-o', 'command=', '-p', String(owned.pid)], { encoding: 'utf8' })
   const command = result.stdout.trim()
   if (result.status !== 0 || command === '') return 'gone'
   return owned.signature.every(fragment => command.includes(fragment)) ? 'running' : 'foreign'
 }
 
-const redactUrls = (text: string): string => text.replace(/https?:\/\/(127\.0\.0\.1|localhost):\d+\/[^\s"']*/g, match => `${new URL(match).origin}/[redacted]`)
+export const redactUrls = (text: string): string => text.replace(/https?:\/\/(127\.0\.0\.1|localhost):\d+\/[^\s"']*/g, match => `${new URL(match).origin}/[redacted]`)
 
 /** Start a process in its own group, logging to `log`, so `down` can stop it and everything it spawned. */
-const spawnDetached = (
+export const spawnDetached = (
   command: string,
   args: readonly string[],
   options: { readonly cwd: string; readonly env: NodeJS.ProcessEnv; readonly log: string },

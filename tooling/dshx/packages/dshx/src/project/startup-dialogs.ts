@@ -32,7 +32,7 @@ const registerProviderSetupDismissal = (page: Page): Promise<void> => {
  * The dialog returns on the first New thread screen of a fresh page, possibly after a key press is already on its way;
  * a step that types or presses keys checks for it first, since only locator actions trigger the registered handler.
  */
-const dismissProviderSetupIfShown = async (page: Page): Promise<void> => {
+export const dismissProviderSetupIfShown = async (page: Page): Promise<void> => {
   const providerSetup = page.getByRole('dialog', { name: PROVIDER_SETUP_DIALOG, exact: true })
   if (!(await providerSetup.isVisible())) return
   // While it animates in or out the button may refuse a click; the locator handler covers what remains.

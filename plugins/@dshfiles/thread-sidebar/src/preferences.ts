@@ -95,7 +95,7 @@ export const decodePreferences = (value: unknown): SidebarPreferences | null => 
  * Browser values to copy into Host settings once: only keys the Host still holds
  * at their default, so another device's choices are never overwritten.
  */
-const preferencesToMigrate = (local: SidebarPreferences, host: SidebarPreferences): Partial<SidebarPreferences> => {
+export const preferencesToMigrate = (local: SidebarPreferences, host: SidebarPreferences): Partial<SidebarPreferences> => {
   const patch: Partial<SidebarPreferences> = {}
   for (const key of Object.keys(DEFAULT_PREFERENCES).filter(isPreferenceKey)) {
     const same = (left: unknown, right: unknown): boolean => JSON.stringify(left) === JSON.stringify(right)

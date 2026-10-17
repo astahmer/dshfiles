@@ -110,7 +110,7 @@ const dshxDistributionOf = (path: string): string | undefined => {
  * class change only dedupes once every dependant is rebuilt) or bundles a changed dshx runtime file. Missing plugin bundle
  * outputs are selected independently so an up-to-date checkout can repair its generated artifacts without rebuilding dependants.
  */
-const planRebuild = (input: { readonly root: string; readonly changedFiles: readonly string[] }): RebuildPlan => {
+export const planRebuild = (input: { readonly root: string; readonly changedFiles: readonly string[] }): RebuildPlan => {
   const changed = input.changedFiles.filter(isBuildInput)
   const packages = readPluginPackages(input.root)
   const owns = (pluginPackage: PluginPackage, path: string): boolean => path.startsWith(`${pluginPackage.directory}/`)
@@ -165,7 +165,7 @@ const planRebuild = (input: { readonly root: string; readonly changedFiles: read
 
 const fingerprint = (path: string): string | null => (existsSync(path) ? createHash('sha256').update(readFileSync(path)).digest('hex') : null)
 
-const runCommand = (input: {
+export const runCommand = (input: {
   readonly argv: readonly [string, ...string[]]
   readonly cwd: string
   readonly env?: NodeJS.ProcessEnv | undefined
@@ -194,7 +194,7 @@ export interface RebuildOutcome {
 }
 
 /** Installs, then dshx (plugins build with it), then the selected plugins in dependency order. */
-const runRebuild = async (input: {
+export const runRebuild = async (input: {
   readonly root: string
   readonly plan: RebuildPlan
   readonly changedFiles: readonly string[]

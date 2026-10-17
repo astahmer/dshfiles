@@ -133,10 +133,10 @@ const readLiveSettings = (): object => {
 }
 
 /** Live pricing preferences; defaults when the namespace is not registered on this Host. */
-const readPricingSettings = (): PricingSettings => pricingSettingsSchema.parse(readLiveSettings())
+export const readPricingSettings = (): PricingSettings => pricingSettingsSchema.parse(readLiveSettings())
 
 /** Live Luna Reserve routing; on when the namespace is not registered on this Host. */
-const readLunaReserveRouting = (): boolean =>
+export const readLunaReserveRouting = (): boolean =>
   z
     .object({ codexLunaReserve: z.boolean().catch(true) })
     .catch({ codexLunaReserve: true })
@@ -149,7 +149,7 @@ const recoverySettingsSchema = z.object({
 })
 
 /** Live failure policy plus the account order and hidden list a fail-over respects; defaults when unregistered. */
-const readRecoverySettings = (): {
+export const readRecoverySettings = (): {
   readonly policy: RecoveryPolicy
   readonly usageOrder: readonly string[]
   readonly hiddenUsageAccounts: readonly string[]
@@ -164,7 +164,7 @@ const quotaRetrySettingsSchema = z.object({
 })
 
 /** Quota retry defaults; old or unregistered Hosts remain opted out and show the turn-level option. */
-const readQuotaRetrySettings = (): {
+export const readQuotaRetrySettings = (): {
   readonly autoRetryDefault: boolean
   readonly showChoice: boolean
 } => {

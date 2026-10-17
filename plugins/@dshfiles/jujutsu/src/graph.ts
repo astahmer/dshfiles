@@ -52,7 +52,7 @@ export interface GraphParentLink {
 const describeDraftChanged = (draft: string, current: string): boolean => draft.replace(/\n+$/, '') !== current.replace(/\n+$/, '')
 
 /** Search full IDs and the user-visible revision labels. */
-const matchesRevisionSearch = (revision: SearchableRevision, query: string): boolean => {
+export const matchesRevisionSearch = (revision: SearchableRevision, query: string): boolean => {
   const needle = query.trim().toLocaleLowerCase()
   if (needle.length === 0) return true
   return [
