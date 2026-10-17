@@ -1,6 +1,7 @@
 import Schema from '@deepseek-ai/schemastery'
 import { defineSettings } from '@dshfiles/dshx/settings'
 import { ATTENTION_COLOR_OPTIONS, DEFAULT_PREFERENCES, REBASED_THREAD_ARCHIVE_DELAYS } from './organization.js'
+import { threadNotificationCategoriesSchema } from './thread-notifications.js'
 import { DEFAULT_THREAD_VIEW_SETTINGS } from './thread-view-preferences.js'
 
 const ids = (): Schema<string[]> => Schema.array(Schema.string()).default([]).hidden()
@@ -63,8 +64,9 @@ export const threadSidebarSettings = defineSettings({
       .default(DEFAULT_PREFERENCES.includeSubagentAttention)
       .description('Include child session attention in groups, thread-row labels, and desktop alerts.'),
     desktopNotificationsEnabled: Schema.boolean().default(DEFAULT_PREFERENCES.desktopNotificationsEnabled).hidden(),
-    // The client decodes this bounded nested structure with the shared Zod contract.
-    notificationCategories: Schema.any().default(DEFAULT_PREFERENCES.notificationCategories).hidden(),
+    notificationCategories: Schema.transform(Schema.any(), value => threadNotificationCategoriesSchema.parse(value))
+      .default(DEFAULT_PREFERENCES.notificationCategories)
+      .hidden(),
     applyActionsToChildThreads: Schema.boolean()
       .default(DEFAULT_PREFERENCES.applyActionsToChildThreads)
       .description('Apply manual pin, park, archive, and restore actions to all child threads.'),

@@ -147,6 +147,17 @@ test('legacy desktop alerts migrate to per-category system delivery unless the n
   assert.deepEqual(decodePreferences(custom)?.notificationCategories, custom.notificationCategories)
 })
 
+test('malformed notification categories reject Host preferences rather than reaching the sidebar', () => {
+  const invalid = {
+    ...DEFAULT_PREFERENCES,
+    notificationCategories: {
+      ...DEFAULT_PREFERENCES.notificationCategories,
+      'approval-needed': { ...DEFAULT_PREFERENCES.notificationCategories['approval-needed'], delivery: 'email', volume: 2 },
+    },
+  }
+  assert.equal(decodePreferences(invalid), null)
+})
+
 test('legacy local alert settings migrate into Host preferences without overriding customized routes', () => {
   const local = { ...DEFAULT_PREFERENCES, desktopNotificationsEnabled: true }
   const migrated = preferencesToMigrate(local, DEFAULT_PREFERENCES)
