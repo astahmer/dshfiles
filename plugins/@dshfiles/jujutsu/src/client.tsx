@@ -77,7 +77,7 @@ import { ProjectFolderPicker, type DirectoryPickerPort, type RegisteredProject }
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent, type ReactNode } from 'react'
 import { z } from 'zod'
 import type { GraphLandmark, Mutation, ReadFailure, Revision } from './api.js'
-import { resolveChatReference } from './chat-reference.js'
+import { ChatReferenceModel } from './chat-reference.js'
 import { ChangedFiles, FileViewToggle, LineCounts } from './changed-files.js'
 import { FullDiffDialog } from './full-diff-dialog.js'
 import { RevisionGraphModel, reverseHexChangeId, type GraphLane, type RevisionGraphRow } from './graph.js'
@@ -641,7 +641,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
 
   useEffect(() => {
     if (pendingReferenceRequest === null || state === undefined) return
-    const match = resolveChatReference({ reference: pendingReferenceRequest, revisions: allRevisions })
+    const match = ChatReferenceModel.resolve({ reference: pendingReferenceRequest, revisions: allRevisions })
     if (match === undefined) {
       const searchKey = `${repoId ?? ''}:${pendingReferenceRequest.kind}:${pendingReferenceRequest.value}`
       if (pendingReferenceSearch.current !== searchKey) {

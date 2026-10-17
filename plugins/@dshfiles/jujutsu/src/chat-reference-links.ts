@@ -1,4 +1,4 @@
-import { CHAT_REFERENCE_PREFIX, chatReferenceDisplay, chatReferenceFromCode, type ChatReference } from './chat-reference.js'
+import { CHAT_REFERENCE_PREFIX, ChatReferenceModel, type ChatReference } from './chat-reference.js'
 
 export interface ChatReferenceLinkOptions {
   readonly sessionId: string
@@ -25,7 +25,7 @@ const ownConversation = (sessionId: string): Element | null => {
  */
 export const installChatReferenceLinks = (options: ChatReferenceLinkOptions): (() => void) => {
   const referenceIn = (element: Element): ChatReference | undefined =>
-    chatReferenceFromCode({
+    ChatReferenceModel.fromCode({
       value: element.textContent ?? '',
       bookmarks: options.bookmarks,
       prefixed: element.hasAttribute(PREFIXED),
@@ -75,7 +75,7 @@ export const installChatReferenceLinks = (options: ChatReferenceLinkOptions): ((
         element.setAttribute('role', 'link')
         element.setAttribute('tabindex', '0')
       }
-      const display = chatReferenceDisplay(written)
+      const display = ChatReferenceModel.display(written)
       if (display !== written) element.textContent = display
     }
   }

@@ -27,7 +27,7 @@ const referenceOf = (token: string): ChatReference | undefined => {
 
 const withoutPrefix = (candidate: string): string => (candidate.startsWith(CHAT_REFERENCE_PREFIX) ? candidate.slice(CHAT_REFERENCE_PREFIX.length) : candidate)
 
-export const chatReferenceFromCode = (input: ChatReferenceText): ChatReference | undefined => {
+const chatReferenceFromCode = (input: ChatReferenceText): ChatReference | undefined => {
   const candidate = input.value.trim()
   // An explicit `jj:` token is the author saying "this is a reference", so it needs no repository lookup.
   if (input.prefixed === true || candidate.startsWith(CHAT_REFERENCE_PREFIX)) return referenceOf(withoutPrefix(candidate))
@@ -36,9 +36,9 @@ export const chatReferenceFromCode = (input: ChatReferenceText): ChatReference |
 }
 
 /** What the reader sees: the prefix is a writing convention, not part of the name. */
-export const chatReferenceDisplay = (value: string): string => withoutPrefix(value.trim())
+const chatReferenceDisplay = (value: string): string => withoutPrefix(value.trim())
 
-export const resolveChatReference = <
+const resolveChatReference = <
   Revision extends {
     readonly commitId: string
     readonly changeId: string
@@ -56,4 +56,10 @@ export const resolveChatReference = <
       : revision.commitId.toLocaleLowerCase().startsWith(value) || revision.changeId.toLocaleLowerCase().startsWith(value),
   )
   return matches.length === 1 ? matches.at(0) : undefined
+}
+
+export class ChatReferenceModel {
+  static readonly fromCode = chatReferenceFromCode
+  static readonly display = chatReferenceDisplay
+  static readonly resolve = resolveChatReference
 }

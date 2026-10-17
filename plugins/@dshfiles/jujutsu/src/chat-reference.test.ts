@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { chatReferenceDisplay, chatReferenceFromCode, resolveChatReference } from './chat-reference.js'
+import { ChatReferenceModel } from './chat-reference.js'
 
 describe('chat reference tokens', () => {
-  const read = (value: string, bookmarks: readonly string[] = ['main', 'feature/topic-1']) => chatReferenceFromCode({ value, bookmarks })
+  const read = (value: string, bookmarks: readonly string[] = ['main', 'feature/topic-1']) => ChatReferenceModel.fromCode({ value, bookmarks })
 
   it('recognizes revision-shaped tokens and repository bookmark names', () => {
     expect(read('94526da8')).toEqual({ value: '94526da8', kind: 'revision' })
@@ -32,12 +32,12 @@ describe('chat reference tokens', () => {
   })
 
   it('reads the displayed form of a prefixed token and hides the prefix', () => {
-    expect(chatReferenceFromCode({ value: 'main', bookmarks: [], prefixed: true })).toEqual({ value: 'main', kind: 'bookmark' })
-    expect(chatReferenceFromCode({ value: '94526da8', bookmarks: [], prefixed: true })).toEqual({ value: '94526da8', kind: 'revision' })
-    expect(chatReferenceFromCode({ value: 'release-2026.10', bookmarks: [], prefixed: true })).toEqual({ value: 'release-2026.10', kind: 'bookmark' })
-    expect(chatReferenceDisplay('jj:main')).toBe('main')
-    expect(chatReferenceDisplay(' jj:94526da8 ')).toBe('94526da8')
-    expect(chatReferenceDisplay('main')).toBe('main')
+    expect(ChatReferenceModel.fromCode({ value: 'main', bookmarks: [], prefixed: true })).toEqual({ value: 'main', kind: 'bookmark' })
+    expect(ChatReferenceModel.fromCode({ value: '94526da8', bookmarks: [], prefixed: true })).toEqual({ value: '94526da8', kind: 'revision' })
+    expect(ChatReferenceModel.fromCode({ value: 'release-2026.10', bookmarks: [], prefixed: true })).toEqual({ value: 'release-2026.10', kind: 'bookmark' })
+    expect(ChatReferenceModel.display('jj:main')).toBe('main')
+    expect(ChatReferenceModel.display(' jj:94526da8 ')).toBe('94526da8')
+    expect(ChatReferenceModel.display('main')).toBe('main')
   })
 
   it('resolves only a unique revision prefix or exact bookmark', () => {
@@ -45,9 +45,9 @@ describe('chat reference tokens', () => {
       { commitId: 'a1b2c3d4', changeId: 'e5f6g7', bookmarks: ['main'], localBookmarks: ['main'] },
       { commitId: 'a1b2c3e5', changeId: 'e5f6g8', bookmarks: [], localBookmarks: [] },
     ]
-    expect(resolveChatReference({ reference: { value: 'a1b2c3d4', kind: 'revision' }, revisions })).toEqual(revisions[0])
-    expect(resolveChatReference({ reference: { value: 'a1b2', kind: 'revision' }, revisions })).toBeUndefined()
-    expect(resolveChatReference({ reference: { value: 'main', kind: 'bookmark' }, revisions })).toEqual(revisions[0])
-    expect(resolveChatReference({ reference: { value: 'missing', kind: 'bookmark' }, revisions })).toBeUndefined()
+    expect(ChatReferenceModel.resolve({ reference: { value: 'a1b2c3d4', kind: 'revision' }, revisions })).toEqual(revisions[0])
+    expect(ChatReferenceModel.resolve({ reference: { value: 'a1b2', kind: 'revision' }, revisions })).toBeUndefined()
+    expect(ChatReferenceModel.resolve({ reference: { value: 'main', kind: 'bookmark' }, revisions })).toEqual(revisions[0])
+    expect(ChatReferenceModel.resolve({ reference: { value: 'missing', kind: 'bookmark' }, revisions })).toBeUndefined()
   })
 })
