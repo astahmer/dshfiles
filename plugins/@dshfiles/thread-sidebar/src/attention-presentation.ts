@@ -36,17 +36,20 @@ const attentionDotClasses = {
   danger: 'dshx:bg-destructive',
 } satisfies Record<AttentionColor, string>
 
-export const attentionLabelClass = (label: ThreadAttentionLabel, attentionColors: AttentionColors): string =>
+const attentionLabelClass = (label: ThreadAttentionLabel, attentionColors: AttentionColors): string =>
   `${attentionTextClasses[attentionColorForLabel(label, attentionColors)]}/80`
 
-export const attentionDotClass = (input: ThreadStatusVisualInput): string => {
+const attentionDotClass = (input: ThreadStatusVisualInput): string => {
   if (input.attentionLabel !== undefined) return attentionDotClasses[attentionColorForLabel(input.attentionLabel, input.attentionColors)]
   if (input.unread) return 'dshx:bg-primary'
   if (input.running) return 'dshx:animate-pulse dshx:bg-info'
   return 'dshx:bg-muted-foreground/45'
 }
 
-export const attentionColorDotClass = (color: AttentionColor): string => attentionDotClasses[color]
+const attentionColorDotClass = (color: AttentionColor): string => attentionDotClasses[color]
 
-/** Free model name main's tests and client import; the lane grouped the same helpers here. */
-export const ThreadAttentionPresentationModel = { attentionLabelClass, attentionDotClass, attentionColorDotClass }
+export class ThreadAttentionPresentationModel {
+  static readonly attentionLabelClass = attentionLabelClass
+  static readonly attentionDotClass = attentionDotClass
+  static readonly attentionColorDotClass = attentionColorDotClass
+}

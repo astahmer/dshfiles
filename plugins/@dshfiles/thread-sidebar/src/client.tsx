@@ -97,7 +97,7 @@ import {
   workspaceForLineage,
   workspaceForSessions,
 } from './organization.js'
-import { ThreadAttentionPresentationModel, attentionLabelClass, type ThreadAttentionLabel } from './attention-presentation.js'
+import { ThreadAttentionPresentationModel, type ThreadAttentionLabel } from './attention-presentation.js'
 import { attentionColorSchema, toggleCollapsedSection } from './preferences.js'
 import { selectInputNeededRows, selectTurnFinishedRows } from './attention-rows.js'
 import { registerPaletteAction, setPaletteRecentLimit, type PaletteAction } from '@dshfiles/command-palette/api'
@@ -2892,7 +2892,12 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           {statusFilteredNeedsResumeRows.length > 0 ? (
             <section className="dshx:mt-1" aria-label={props.tSidebar('threadSidebarNeedsResume')}>
               <div className={cn(stickyHeaderClass, 'dshx:flex dshx:h-8 dshx:items-center dshx:gap-2 dshx:px-2.5 dshx:text-sm')}>
-                <span className={cn('dshx:whitespace-nowrap dshx:font-medium', attentionLabelClass('threadSidebarNeedsResume', preferences.attentionColors))}>
+                <span
+                  className={cn(
+                    'dshx:whitespace-nowrap dshx:font-medium',
+                    ThreadAttentionPresentationModel.attentionLabelClass('threadSidebarNeedsResume', preferences.attentionColors),
+                  )}
+                >
                   {props.tSidebar('threadSidebarNeedsResume')}
                 </span>
                 <span className="dshx:text-xs dshx:tabular-nums">({statusFilteredNeedsResumeRows.length})</span>
