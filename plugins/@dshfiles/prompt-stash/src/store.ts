@@ -1,13 +1,6 @@
 import { defineDomain, type KvTable } from '@deepseek-ai/dsh-storage-domain'
-import {
-  removeDraft as removeDraftEntry,
-  saveDraft as saveDraftEntry,
-  savedDraftSchema,
-  type DraftStore,
-  type SaveDraftResult,
-  type SavedDraft,
-} from './draft-store.js'
-import { MAX_PROMPTS, promptSchema, removePromptIfCurrent, writePromptIfCurrent, type SavedPrompt } from './library.js'
+import { PromptDrafts, savedDraftSchema, type DraftStore, type SaveDraftResult, type SavedDraft } from './draft-store.js'
+import { MAX_PROMPTS, PromptLibrary, promptSchema, type SavedPrompt } from './library.js'
 
 export const promptStashDomain = defineDomain({
   name: 'prompt_stash',
@@ -67,10 +60,10 @@ const nextStashRevision = (current: number, now: number): number => Math.max(cur
 const byIdAscending = (left: { readonly id: string }, right: { readonly id: string }): number => left.id.localeCompare(right.id)
 
 /** Newest edit first, so a saved or edited prompt sits where the composer list already shows it. */
-export const orderPrompts = (prompts: Iterable<SavedPrompt>): SavedPrompt[] =>
+const orderPrompts = (prompts: Iterable<SavedPrompt>): SavedPrompt[] =>
   [...prompts].sort((left, right) => right.updatedAt - left.updatedAt || byIdAscending(left, right))
 
-export const orderDrafts = (drafts: Iterable<SavedDraft>): SavedDraft[] =>
+const orderDrafts = (drafts: Iterable<SavedDraft>): SavedDraft[] =>
   [...drafts].sort((left, right) => right.createdAt.localeCompare(left.createdAt) || byIdAscending(left, right))
 
 const draftStoreOf = (drafts: SavedDraft[]): DraftStore => ({ schemaVersion: 1, drafts })
@@ -80,7 +73,7 @@ const draftStoreOf = (drafts: SavedDraft[]): DraftStore => ({ schemaVersion: 1, 
  * tables. Every browser, plugin and CLI reads the same rows; the prompt library
  * keeps its per-prompt revision for conflict detection.
  */
-export const createPromptStashStore = ({
+const createPromptStashStore = ({
   prompts,
   drafts,
   now = Date.now,
@@ -114,7 +107,7 @@ export const createPromptStashStore = ({
     draftsSnapshot,
     save: async ({ prompt, expectedRevision }) => {
       const current = orderPrompts(promptRecords.values())
-      const result = writePromptIfCurrent(current, prompt, expectedRevision)
+      const result = PromptLibrary.writeIfCurrent(current, prompt, expectedRevision)
       if (result.kind === 'conflict') return { kind: 'conflict', revision, prompts: current }
       if (!promptRecords.has(prompt.id) && promptRecords.size >= MAX_PROMPTS) return { kind: 'limit', revision, prompts: current }
 
@@ -125,7 +118,7 @@ export const createPromptStashStore = ({
     },
     remove: async ({ id, expectedRevision }) => {
       const current = orderPrompts(promptRecords.values())
-      if (removePromptIfCurrent(current, id, expectedRevision).kind === 'conflict') return { kind: 'conflict', revision, prompts: current }
+      if (PromptLibrary.removeIfCurrent(current, id, expectedRevision).kind === 'conflict') return { kind: 'conflict', revision, prompts: current }
 
       promptRecords.delete(id)
       promote()
@@ -133,7 +126,7 @@ export const createPromptStashStore = ({
       return { kind: 'applied', revision, prompts: snapshot().prompts }
     },
     saveDraft: async draft => {
-      const result = saveDraftEntry(draftStoreOf(orderDrafts(draftRecords.values())), draft)
+      const result = PromptDrafts.save(draftStoreOf(orderDrafts(draftRecords.values())), draft)
       if (!result.ok) return { kind: 'rejected', reason: result.reason, revision, drafts: orderDrafts(draftRecords.values()) }
 
       const saved = result.store.drafts.find(item => item.id === draft.id)
@@ -145,7 +138,7 @@ export const createPromptStashStore = ({
     },
     removeDraft: async id => {
       const current = orderDrafts(draftRecords.values())
-      if (removeDraftEntry(draftStoreOf(current), id).drafts.length !== current.length) {
+      if (PromptDrafts.remove(draftStoreOf(current), id).drafts.length !== current.length) {
         draftRecords.delete(id)
         promote()
         await enqueue(() => drafts.delete(id)).catch(reportError)
@@ -154,4 +147,10 @@ export const createPromptStashStore = ({
     },
     flush: () => writes,
   }
+}
+
+export class PromptStashModel {
+  static readonly orderPrompts = orderPrompts
+  static readonly orderDrafts = orderDrafts
+  static readonly createStore = createPromptStashStore
 }

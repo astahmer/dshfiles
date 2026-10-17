@@ -1,14 +1,7 @@
 import { useApi, useApiQuery } from '@dshfiles/dshx/client'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { promptStashApi } from './library-api.js'
-import {
-  PROMPT_LIBRARY_STORAGE_KEY,
-  readPromptLibrary,
-  removePromptIfCurrent,
-  serializePromptLibrary,
-  writePromptIfCurrent,
-  type SavedPrompt,
-} from './library.js'
+import { PROMPT_LIBRARY_STORAGE_KEY, PromptLibrary, type SavedPrompt } from './library.js'
 
 export type PromptLibraryState = 'loading' | 'ready' | 'invalid' | 'unavailable'
 
@@ -35,7 +28,7 @@ export interface PromptLibraryClient {
 
 const readLocalLibrary = (): PromptLibraryRead => {
   try {
-    const result = readPromptLibrary(window.localStorage.getItem(PROMPT_LIBRARY_STORAGE_KEY))
+    const result = PromptLibrary.read(window.localStorage.getItem(PROMPT_LIBRARY_STORAGE_KEY))
     return result.ok ? { kind: 'ready', prompts: result.prompts } : { kind: 'invalid' }
   } catch {
     return { kind: 'unavailable' }
@@ -45,7 +38,7 @@ const readLocalLibrary = (): PromptLibraryRead => {
 type LocalWrite = 'ok' | 'too-large' | 'unavailable'
 
 const writeLocalLibrary = (prompts: readonly SavedPrompt[]): LocalWrite => {
-  const serialized = serializePromptLibrary(prompts)
+  const serialized = PromptLibrary.serialize(prompts)
   if (serialized === null) return 'too-large'
   try {
     window.localStorage.setItem(PROMPT_LIBRARY_STORAGE_KEY, serialized)
@@ -119,7 +112,7 @@ export const usePromptLibrary = (): PromptLibraryClient => {
   useEffect(() => {
     const onStorage = (event: StorageEvent): void => {
       if (host.current || event.key !== PROMPT_LIBRARY_STORAGE_KEY) return
-      const update = readPromptLibrary(event.newValue)
+      const update = PromptLibrary.read(event.newValue)
       if (!update.ok) {
         setState('invalid')
         return
@@ -149,7 +142,7 @@ export const usePromptLibrary = (): PromptLibraryClient => {
         setState(local.kind)
         return { kind: 'unavailable', prompts: [] }
       }
-      const result = writePromptIfCurrent(local.prompts, input.prompt, input.expectedRevision)
+      const result = PromptLibrary.writeIfCurrent(local.prompts, input.prompt, input.expectedRevision)
       if (result.kind === 'conflict') {
         setPrompts(result.prompts)
         return { kind: 'conflict', prompts: result.prompts }
@@ -185,7 +178,7 @@ export const usePromptLibrary = (): PromptLibraryClient => {
         setState(local.kind)
         return { kind: 'unavailable', prompts: [] }
       }
-      const result = removePromptIfCurrent(local.prompts, input.id, input.expectedRevision)
+      const result = PromptLibrary.removeIfCurrent(local.prompts, input.id, input.expectedRevision)
       if (result.kind === 'conflict') {
         setPrompts(result.prompts)
         return { kind: 'conflict', prompts: result.prompts }

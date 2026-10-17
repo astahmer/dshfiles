@@ -2,7 +2,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-storage-domain'
 import { defineHost } from '@dshfiles/dshx/host'
 import { promptStashApi } from './library-api.js'
-import { createPromptStashStore, promptStashDomain, type PromptStashStore } from './store.js'
+import { PromptStashModel, promptStashDomain, type PromptStashStore } from './store.js'
 
 interface OpenedStash {
   readonly store: PromptStashStore
@@ -21,7 +21,7 @@ const openStash = async (ctx: Context): Promise<OpenedStash> => {
   if (storage === undefined) throw new Error('Prompt stash storage is unavailable.')
   const domain = await storage.open(promptStashDomain)
   return {
-    store: createPromptStashStore({ prompts: domain.table('prompts'), drafts: domain.table('drafts') }),
+    store: PromptStashModel.createStore({ prompts: domain.table('prompts'), drafts: domain.table('drafts') }),
     close: () => domain.close(),
   }
 }

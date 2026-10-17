@@ -1,7 +1,7 @@
 import { useApi, useApiQuery } from '@dshfiles/dshx/client'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { promptStashApi } from './library-api.js'
-import { DRAFT_STORE_KEY, LEGACY_DRAFT_STORE_KEY, readStoredDrafts, removeDraft, saveDraft, type SavedDraft, type SaveDraftResult } from './draft-store.js'
+import { DRAFT_STORE_KEY, LEGACY_DRAFT_STORE_KEY, PromptDrafts, type SavedDraft, type SaveDraftResult } from './draft-store.js'
 
 export type SavedDraftsState = 'loading' | 'ready' | 'unavailable'
 export type DraftRejectionReason = Extract<SaveDraftResult, { ok: false }>['reason']
@@ -23,7 +23,7 @@ type LocalDraftRead = { readonly kind: 'ready'; readonly drafts: readonly SavedD
 
 const readLocalDrafts = (): LocalDraftRead => {
   try {
-    return { kind: 'ready', drafts: readStoredDrafts(window.localStorage).drafts }
+    return { kind: 'ready', drafts: PromptDrafts.readStored(window.localStorage).drafts }
   } catch {
     return { kind: 'unavailable' }
   }
@@ -118,7 +118,7 @@ export const useSavedDrafts = (): SavedDraftsClient => {
         setState('unavailable')
         return { kind: 'unavailable' }
       }
-      const result = saveDraft({ schemaVersion: 1, drafts: [...local.drafts] }, draft)
+      const result = PromptDrafts.save({ schemaVersion: 1, drafts: [...local.drafts] }, draft)
       if (!result.ok) return { kind: 'rejected', reason: result.reason }
       if (!writeLocalDrafts(result.serialized)) {
         setState('unavailable')
@@ -148,7 +148,7 @@ export const useSavedDrafts = (): SavedDraftsClient => {
         setState('unavailable')
         return false
       }
-      const next = removeDraft({ schemaVersion: 1, drafts: [...local.drafts] }, id)
+      const next = PromptDrafts.remove({ schemaVersion: 1, drafts: [...local.drafts] }, id)
       if (!writeLocalDrafts(JSON.stringify(next))) {
         setState('unavailable')
         return false

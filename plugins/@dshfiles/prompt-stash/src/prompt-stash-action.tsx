@@ -9,9 +9,9 @@ import { Textarea } from '@dshfiles/plugin-ui/components/ui/textarea'
 import { useEffect, useId, useRef, useState } from 'react'
 import type { ComposerActionProps } from '@dshfiles/dshx/client'
 import { areRecentPromptsEqual, MAX_RECENT_PROMPTS, MAX_RECENT_SCAN_NODES, projectRecentPrompts } from './recent-prompts.js'
-import { MAX_PROMPTS, MAX_PROMPT_TEXT_LENGTH, MAX_PROMPT_TITLE_LENGTH, defaultPromptTitle, type SavedPrompt } from './library.js'
+import { MAX_PROMPTS, MAX_PROMPT_TEXT_LENGTH, MAX_PROMPT_TITLE_LENGTH, PromptLibrary, type SavedPrompt } from './library.js'
 import { usePromptLibrary } from './library-client.js'
-import { draftSaveBlock, type DraftSaveBlock } from './draft-store.js'
+import { PromptDrafts, type DraftSaveBlock } from './draft-store.js'
 
 const draftBlockNotice = {
   busy: 'Wait for the current composer action to finish.',
@@ -49,7 +49,7 @@ const PromptStashAction = (props: ComposerActionProps): JSX.Element => {
   const insertionSpan = useRef<ReturnType<ComposerActionProps['inputActions']['captureInsertion']> | null>(null)
   const promptTextRef = useRef<HTMLTextAreaElement>(null)
   const shouldFocusNewPrompt = useRef(false)
-  const currentDraftBlock = draftSaveBlock({
+  const currentDraftBlock = PromptDrafts.saveBlock({
     phase: input.phase,
     text: input.draft,
     attachmentCount: input.attachmentIds.length,
@@ -130,7 +130,7 @@ const PromptStashAction = (props: ComposerActionProps): JSX.Element => {
   const saveEditor = async (saveAsCopy: boolean): Promise<void> => {
     if (editor === null) return
     if (libraryState !== 'ready') return
-    const title = editor.title.trim() || defaultPromptTitle(editor.text)
+    const title = editor.title.trim() || PromptLibrary.defaultTitle(editor.text)
     if (editor.text.trim().length === 0) {
       setNotice('Add prompt text before saving.')
       return
@@ -186,7 +186,7 @@ const PromptStashAction = (props: ComposerActionProps): JSX.Element => {
     const prompt: SavedPrompt = {
       id: crypto.randomUUID(),
       revision: crypto.randomUUID(),
-      title: defaultPromptTitle(input.draft),
+      title: PromptLibrary.defaultTitle(input.draft),
       text: input.draft,
       updatedAt: Date.now(),
     }

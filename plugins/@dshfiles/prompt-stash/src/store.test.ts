@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'vitest'
 import type { SavedDraft } from './draft-store.js'
 import type { SavedPrompt } from './library.js'
-import { createPromptStashStore, orderPrompts } from './store.js'
+import { PromptStashModel } from './store.js'
 
 const prompt = (index: number, updatedAt = index): SavedPrompt => ({
   id: `00000000-0000-4000-8000-${String(index).padStart(12, '0')}`,
@@ -39,7 +39,7 @@ const memoryTable = <Value extends { readonly id: string }>(initial: readonly Va
 const emptyStore = (now: () => number) => {
   const prompts = memoryTable<SavedPrompt>()
   const drafts = memoryTable<SavedDraft>()
-  return { prompts, drafts, store: createPromptStashStore({ prompts, drafts, now }) }
+  return { prompts, drafts, store: PromptStashModel.createStore({ prompts, drafts, now }) }
 }
 
 test('saves prompts durably, newest edit first, with a monotone revision', async () => {
@@ -108,7 +108,7 @@ test('saves drafts, rejects a duplicate id, and removes one', async () => {
 
 test('orders equally recent prompts by identity for a stable list', () => {
   assert.deepEqual(
-    orderPrompts([prompt(2, 5), prompt(1, 5)]).map(item => item.id),
+    PromptStashModel.orderPrompts([prompt(2, 5), prompt(1, 5)]).map(item => item.id),
     [prompt(1).id, prompt(2).id],
   )
 })

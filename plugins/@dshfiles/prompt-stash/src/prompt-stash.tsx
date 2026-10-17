@@ -7,15 +7,7 @@ import { useMemo, useState } from 'react'
 import type {} from '@deepseek-ai/dsh-client-ui-chat/client'
 import type { ComposerActionProps } from '@dshfiles/dshx/client'
 import { useDraftAttachmentRetention, type DraftAttachmentKeeper } from './draft-attachment-retention.js'
-import {
-  MAX_SENT_PROMPTS,
-  defaultDraftTitle,
-  draftSaveBlock,
-  sentPromptFromNode,
-  type DraftSaveBlock,
-  type SavedDraft,
-  type SentPrompt,
-} from './draft-store.js'
+import { MAX_SENT_PROMPTS, PromptDrafts, type DraftSaveBlock, type SavedDraft, type SentPrompt } from './draft-store.js'
 import { useSavedDrafts } from './draft-client.js'
 
 const draftBlockMessage = {
@@ -39,7 +31,7 @@ export const PromptStashAction = (
   const [title, setTitle] = useState('')
   const [message, setMessage] = useState('')
   const [insertionSpan, setInsertionSpan] = useState<ReturnType<ComposerActionProps['inputActions']['captureInsertion']> | null>(null)
-  const block = draftSaveBlock({
+  const block = PromptDrafts.saveBlock({
     phase: input.phase,
     text: input.draft,
     attachmentCount: input.attachmentIds.length,
@@ -51,7 +43,7 @@ export const PromptStashAction = (
         .flatMap(key => {
           const node = chatNodes.get(key)
           if (node?.kind !== 'user') return []
-          const prompt = sentPromptFromNode(node.data)
+          const prompt = PromptDrafts.sentPromptFromNode(node.data)
           return prompt === null ? [] : [prompt]
         })
         .slice(-MAX_SENT_PROMPTS)
@@ -73,7 +65,7 @@ export const PromptStashAction = (
     }
     const result = await savedDrafts.save({
       id: crypto.randomUUID(),
-      title: title.trim() || defaultDraftTitle(input.draft),
+      title: title.trim() || PromptDrafts.defaultTitle(input.draft),
       text: input.draft,
       now: new Date().toISOString(),
     })
@@ -149,7 +141,7 @@ export const PromptStashAction = (
             className="dshx:h-7 dshx:text-sm dshx:md:text-sm"
             aria-label="Draft title"
             maxLength={120}
-            placeholder={defaultDraftTitle(input.draft)}
+            placeholder={PromptDrafts.defaultTitle(input.draft)}
             value={title}
             onChange={event => setTitle(event.currentTarget.value)}
           />
