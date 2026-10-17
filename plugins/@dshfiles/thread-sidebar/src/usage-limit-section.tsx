@@ -13,7 +13,7 @@ import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { MoreVerticalIcon, RefreshCwIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import type { ThreadSidebarLocaleKey } from './locales.js'
-import { formatRemaining, usageLimitTiming, type UsageLimitRow } from './usage-limit-rows.js'
+import { UsageLimitRowsModel, type UsageLimitRow } from './usage-limit-rows.js'
 
 export type UsageLimitSnooze = 'one-hour' | 'four-hours' | 'one-day' | 'unsnooze'
 
@@ -52,14 +52,14 @@ const SNOOZES: readonly { readonly duration: UsageLimitSnooze; readonly labelKey
  */
 export const UsageLimitSection = <Thread extends UsageLimitThread>(props: UsageLimitSectionProps<Thread>): JSX.Element | null => {
   const t = props.translate
-  const statusText = (timing: ReturnType<typeof usageLimitTiming>): string => {
+  const statusText = (timing: ReturnType<typeof UsageLimitRowsModel.timing>): string => {
     switch (timing.kind) {
       case 'snoozed':
-        return t('threadSidebarUsageLimitSnoozed', { time: formatRemaining(timing.until, props.now) })
+        return t('threadSidebarUsageLimitSnoozed', { time: UsageLimitRowsModel.formatRemaining(timing.until, props.now) })
       case 'ready':
         return t('threadSidebarUsageLimitReady')
       case 'waiting':
-        return t('threadSidebarUsageLimitResets', { time: formatRemaining(timing.resetAt, props.now) })
+        return t('threadSidebarUsageLimitResets', { time: UsageLimitRowsModel.formatRemaining(timing.resetAt, props.now) })
       default:
         return t('threadSidebarUsageLimitUnknown')
     }
@@ -81,7 +81,7 @@ export const UsageLimitSection = <Thread extends UsageLimitThread>(props: UsageL
       </div>
       {props.rows.map(row => {
         const busy = props.busyIds.has(row.continuation.continuationId)
-        const timing = usageLimitTiming(row.continuation, props.now)
+        const timing = UsageLimitRowsModel.timing(row.continuation, props.now)
         const snoozed = timing.kind === 'snoozed'
         const status = statusText(timing)
 

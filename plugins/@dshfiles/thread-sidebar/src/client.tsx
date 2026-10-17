@@ -115,7 +115,7 @@ import {
 import { threadSidebarMachineApi } from './machine-api.js'
 import { threadSidebarRecoveryApi } from './recovery-api.js'
 import { selectRestartRecoveryRows } from './restart-recovery-rows.js'
-import { selectUsageLimitRows, type QuotaContinuation } from './usage-limit-rows.js'
+import { UsageLimitRowsModel, type QuotaContinuation } from './usage-limit-rows.js'
 import { UsageLimitSection, type UsageLimitSnooze } from './usage-limit-section.js'
 import { groupThreadChildren, partitionFinishedChildren, shouldOpenChildThreadList, threadActionTargetIds, visibleChildren } from './thread-children.js'
 import { buildThreadUrl, clearThreadUrl, readThreadUrl } from './thread-url.js'
@@ -1139,7 +1139,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   )
   const usageLimitRows = useMemo(
     () =>
-      selectUsageLimitRows({
+      UsageLimitRowsModel.select({
         sessions,
         continuations: usageLimitQuery.data?.continuations ?? EMPTY_CONTINUATIONS,
         mutedSessionIds,

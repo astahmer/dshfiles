@@ -17,7 +17,7 @@ export type UsageLimitTiming =
   | { readonly kind: 'unknown' }
   | { readonly kind: 'waiting'; readonly resetAt: number }
 
-export const usageLimitTiming = (continuation: QuotaContinuation, now: number): UsageLimitTiming => {
+const usageLimitTiming = (continuation: QuotaContinuation, now: number): UsageLimitTiming => {
   if (continuation.state === 'queued') return { kind: 'queued' }
   if (continuation.snoozedUntil !== null && continuation.snoozedUntil > now) return { kind: 'snoozed', until: continuation.snoozedUntil }
   if (continuation.ready) return { kind: 'ready' }
@@ -28,7 +28,7 @@ export const usageLimitTiming = (continuation: QuotaContinuation, now: number): 
  * "2h 30m" until a reset a future timestamp names. The shared `relativeTime`
  * helper clamps a future timestamp to "now", so a countdown needs its own.
  */
-export const formatRemaining = (at: number, now: number): string => {
+const formatRemaining = (at: number, now: number): string => {
   const minutes = Math.max(0, Math.round((at - now) / 60_000))
   if (minutes < 60) return `${String(minutes)}m`
   const hours = Math.floor(minutes / 60)
@@ -53,7 +53,7 @@ type UsageLimitSession = {
  * already queued, a Session running again, and anything muted or archived stay
  * out. Resets that have already passed come first, so the actionable rows lead.
  */
-export const selectUsageLimitRows = <Session extends UsageLimitSession>(options: {
+const selectUsageLimitRows = <Session extends UsageLimitSession>(options: {
   readonly sessions: readonly Session[]
   readonly continuations: readonly QuotaContinuation[]
   readonly mutedSessionIds: ReadonlySet<string>
@@ -75,4 +75,10 @@ export const selectUsageLimitRows = <Session extends UsageLimitSession>(options:
     const ready = Number(right.continuation.ready) - Number(left.continuation.ready)
     return ready === 0 ? right.continuation.failedAt - left.continuation.failedAt : ready
   })
+}
+
+export class UsageLimitRowsModel {
+  static readonly timing = usageLimitTiming
+  static readonly formatRemaining = formatRemaining
+  static readonly select = selectUsageLimitRows
 }

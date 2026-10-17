@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatRemaining, selectUsageLimitRows, usageLimitTiming, type QuotaContinuation } from './usage-limit-rows.js'
+import { UsageLimitRowsModel, type QuotaContinuation } from './usage-limit-rows.js'
 
 const NOW = 1_000_000_000
 
@@ -31,7 +31,7 @@ const select = (input: {
   readonly muted?: string[]
   readonly archived?: string[]
 }) =>
-  selectUsageLimitRows({
+  UsageLimitRowsModel.select({
     sessions: input.sessions ?? [session()],
     continuations: input.continuations ?? [continuation()],
     mutedSessionIds: new Set(input.muted ?? []),
@@ -52,7 +52,7 @@ describe('usage limit rows', () => {
   })
 
   it('honours the workspace and source filters the view already applies', () => {
-    const filtered = selectUsageLimitRows({
+    const filtered = UsageLimitRowsModel.select({
       sessions: [session()],
       continuations: [continuation()],
       mutedSessionIds: new Set(),
@@ -78,29 +78,29 @@ describe('usage limit rows', () => {
 
 describe('usage limit timing', () => {
   it('names the wait, the reset that passed, and the one nobody knows', () => {
-    expect(usageLimitTiming(continuation(), NOW)).toEqual({ kind: 'waiting', resetAt: NOW + 3_600_000 })
-    expect(usageLimitTiming(continuation({ ready: true }), NOW)).toEqual({ kind: 'ready' })
-    expect(usageLimitTiming(continuation({ resetAt: null }), NOW)).toEqual({ kind: 'unknown' })
-    expect(usageLimitTiming(continuation({ state: 'queued' }), NOW)).toEqual({ kind: 'queued' })
+    expect(UsageLimitRowsModel.timing(continuation(), NOW)).toEqual({ kind: 'waiting', resetAt: NOW + 3_600_000 })
+    expect(UsageLimitRowsModel.timing(continuation({ ready: true }), NOW)).toEqual({ kind: 'ready' })
+    expect(UsageLimitRowsModel.timing(continuation({ resetAt: null }), NOW)).toEqual({ kind: 'unknown' })
+    expect(UsageLimitRowsModel.timing(continuation({ state: 'queued' }), NOW)).toEqual({ kind: 'queued' })
   })
 
   it('reports a snooze only while it still holds', () => {
-    expect(usageLimitTiming(continuation({ snoozedUntil: NOW + 600_000 }), NOW)).toEqual({ kind: 'snoozed', until: NOW + 600_000 })
-    expect(usageLimitTiming(continuation({ snoozedUntil: NOW - 1 }), NOW)).toEqual({ kind: 'waiting', resetAt: NOW + 3_600_000 })
+    expect(UsageLimitRowsModel.timing(continuation({ snoozedUntil: NOW + 600_000 }), NOW)).toEqual({ kind: 'snoozed', until: NOW + 600_000 })
+    expect(UsageLimitRowsModel.timing(continuation({ snoozedUntil: NOW - 1 }), NOW)).toEqual({ kind: 'waiting', resetAt: NOW + 3_600_000 })
   })
 })
 
 describe('formatRemaining', () => {
   it('counts down in the largest useful unit', () => {
-    expect(formatRemaining(NOW + 30_000, NOW)).toBe('1m')
-    expect(formatRemaining(NOW + 42 * 60_000, NOW)).toBe('42m')
-    expect(formatRemaining(NOW + 3_600_000, NOW)).toBe('1h')
-    expect(formatRemaining(NOW + 150 * 60_000, NOW)).toBe('2h 30m')
-    expect(formatRemaining(NOW + 26 * 3_600_000, NOW)).toBe('1d 2h')
-    expect(formatRemaining(NOW + 48 * 3_600_000, NOW)).toBe('2d')
+    expect(UsageLimitRowsModel.formatRemaining(NOW + 30_000, NOW)).toBe('1m')
+    expect(UsageLimitRowsModel.formatRemaining(NOW + 42 * 60_000, NOW)).toBe('42m')
+    expect(UsageLimitRowsModel.formatRemaining(NOW + 3_600_000, NOW)).toBe('1h')
+    expect(UsageLimitRowsModel.formatRemaining(NOW + 150 * 60_000, NOW)).toBe('2h 30m')
+    expect(UsageLimitRowsModel.formatRemaining(NOW + 26 * 3_600_000, NOW)).toBe('1d 2h')
+    expect(UsageLimitRowsModel.formatRemaining(NOW + 48 * 3_600_000, NOW)).toBe('2d')
   })
 
   it('never counts a reset that already passed below zero', () => {
-    expect(formatRemaining(NOW - 60_000, NOW)).toBe('0m')
+    expect(UsageLimitRowsModel.formatRemaining(NOW - 60_000, NOW)).toBe('0m')
   })
 })
