@@ -47,6 +47,12 @@ const conceptEmbedder: MemoryEmbedder = {
 const setup = (overrides: Partial<MemorySettings> = {}, embedder?: MemoryEmbedder) => {
   const logs = new Map<string, SessionLog>()
   const summaries: string[] = []
+  const titles = new Map<string, string>()
+  const content = {
+    hits: [] as { sessionId: string; snippet: string }[],
+    error: undefined as unknown,
+    calls: 0,
+  }
   const store = openMemoryStore({ path: join(root, 'memory.db') })
   const runtime = createMemoryRuntime({
     store,
@@ -54,7 +60,13 @@ const setup = (overrides: Partial<MemorySettings> = {}, embedder?: MemoryEmbedde
     logger: { info: () => {}, warn: () => {} },
     services: {
       projectPath: projectPathFor,
-      listSessions: async () => [...logs.values()].map(log => ({ header: { ...log.header, createdAt: Date.now() }, live: false })),
+      listSessions: async () => [...logs.values()].map(log => ({ header: { ...log.header, createdAt: Date.now() }, live: false, persisted: true })),
+      readSessionTitles: async ids => ids.map(id => ({ sessionId: id, title: titles.get(id), updatedAt: undefined })),
+      searchSessionContent: async () => {
+        content.calls += 1
+        if (content.error !== undefined) throw content.error
+        return { hits: content.hits, hasMore: false }
+      },
       readSession: async id => {
         const log = logs.get(id)
         if (!log) throw new Error(`no session ${id}`)
@@ -77,7 +89,7 @@ const setup = (overrides: Partial<MemorySettings> = {}, embedder?: MemoryEmbedde
     id,
     session: { header: origin === undefined ? { id, cwd } : { id, cwd, origin, parentSession: 'session-parent' } },
   })
-  return { logs, summaries, store, runtime, caller }
+  return { logs, summaries, store, runtime, caller, titles, content }
 }
 
 const halyardThread = (id: string) => {
@@ -310,5 +322,32 @@ describe('memory runtime', () => {
 
     const flags = Object.fromEntries(store.recentCitations(10).map(citation => [citation.thread, [citation.userCorrected, citation.agentCorrected]]))
     expect(flags).toEqual({ 'session-user': [true, false], 'session-agent': [false, true], 'session-fine': [false, false] })
+  })
+
+  it('finds a thread by title and content inside the caller project and records the finder call', async () => {
+    const { logs, runtime, store, caller, titles, content } = setup()
+    const thread = halyardThread('session-11111111-0000-4000-8000-000000000000')
+    logs.set(thread.header.id, thread.log())
+    titles.set(thread.header.id, 'Northwind escalation')
+    content.hits = [{ sessionId: thread.header.id, snippet: 'Northwind Freight: account ACC-77341' }]
+    const page = await runtime.findThreads(caller('session-reader'), { query: 'northwind' })
+    expect(page.project).toBe(root)
+    expect(page.hits.map(hit => hit.sessionId)).toEqual([thread.header.id])
+    expect(page.hits[0]?.sources).toContain('session-content')
+    expect(page.degraded).toEqual([])
+    expect(store.usage().tools.map(entry => entry.tool)).toContain('find_threads')
+  })
+
+  it('reports a finder that cannot search content as an actionable code, never as an empty page', async () => {
+    const { logs, runtime, caller, content } = setup()
+    const thread = halyardThread('session-11111111-0000-4000-8000-000000000000')
+    logs.set(thread.header.id, thread.log())
+    content.error = Object.assign(new Error('session search is disabled: this deployment configures the session-query index with openAt "never"'), {
+      code: 'SESSION_QUERY_SEARCH_DISABLED',
+    })
+    await expect(runtime.findThreads(caller('session-reader'), { query: 'nothing matches this' })).rejects.toMatchObject({
+      name: 'PluginApiError',
+      code: 'search-unavailable',
+    })
   })
 })

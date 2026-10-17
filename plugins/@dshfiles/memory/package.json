@@ -23,6 +23,7 @@
     "build": "dshx build",
     "test": "vitest run",
     "test:scale": "MEMORY_SCALE_TESTS=1 vitest run src/search-latency.scale.test.ts",
+    "bench:finder": "node --experimental-strip-types bench/thread-finder.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test:boot": "node ../../../tooling/dshx/scripts/boot-check-web.mjs --plugin",
     "test:e2e": "node ../../../tooling/dshx/scripts/run-e2e.mjs"
@@ -50,6 +51,7 @@
     "@deepseek-ai/dsh-llm": "catalog:",
     "@deepseek-ai/dsh-session": "catalog:",
     "@deepseek-ai/dsh-session-query": "catalog:",
+    "@deepseek-ai/dsh-session-query-sqlite": "catalog:",
     "@deepseek-ai/dsh-system-prompt": "catalog:",
     "@deepseek-ai/dsh-tools": "catalog:",
     "@dshfiles/dshx": "workspace:*",

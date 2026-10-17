@@ -1,6 +1,7 @@
 import { basename } from 'node:path'
 
 import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
+import { PluginApiError } from '@dshfiles/dshx/api'
 import { Utf8 } from '@dshfiles/optmem-core'
 
 import { renderStartBlock } from './block.ts'
@@ -10,12 +11,32 @@ import type { MemoryEmbedder, RetrievalStatus } from './embedder.ts'
 import { JevClassifier } from './jev.ts'
 import type { MemorySettings } from './settings.ts'
 import type { MemoryStore, NoteCategory, SearchHit } from './store.ts'
+import {
+  createThreadFinder,
+  ThreadFinderError,
+  type ThreadFinder,
+  type ThreadFinderMemoryHit,
+  type ThreadFinderPage,
+  type ThreadFinderRecord,
+  type ThreadFinderRelations,
+} from './thread-finder.ts'
 
 export type SessionLog = { readonly header: ThreadHeader; readonly inheritedEventCount: number; readonly events: readonly SessionEvent[] }
 
+export type SessionTitleRead = { readonly sessionId: string; readonly title: string | undefined; readonly updatedAt: number | undefined }
+
 export type MemoryServices = {
   readonly projectPath: (cwd: string) => Promise<string>
-  readonly listSessions: () => Promise<readonly { readonly header: ThreadHeader & { readonly createdAt: number }; readonly live: boolean }[]>
+  readonly listSessions: () => Promise<
+    readonly { readonly header: ThreadHeader & { readonly createdAt: number }; readonly live: boolean; readonly persisted: boolean }[]
+  >
+  /** Folded titles for the requested sessions; a per-session failure leaves that title absent instead of failing the batch. */
+  readonly readSessionTitles: (sessionIds: readonly string[]) => Promise<readonly SessionTitleRead[]>
+  /** Full-text search over Session content through the supported session-query backend. */
+  readonly searchSessionContent: (request: {
+    readonly query: string
+    readonly limit: number
+  }) => Promise<{ readonly hits: readonly { readonly sessionId: string; readonly snippet: string }[]; readonly hasMore: boolean }>
   readonly readSession: (sessionId: string) => Promise<SessionLog>
   /** One cheap-model call on the thread's route (reasoning off by default); rejects when no route is offered. */
   readonly summarize: (request: { readonly conversationId: string; readonly system: string; readonly input: string }) => Promise<{
@@ -94,6 +115,10 @@ export const createMemoryRuntime = (options: {
     projects.set(cwd, pending)
     return pending
   }
+
+  /** Which projects a caller may search: its own, one named project, or every project when cross-project memory is on. */
+  const projectsFilterFor = (own: string, wanted: string | undefined): readonly string[] =>
+    wanted !== undefined && wanted.length > 0 && wanted !== 'all' ? [wanted === 'current' ? own : wanted] : options.settings().crossProject ? [] : [own]
 
   const readLog = async (sessionId: string): Promise<SessionLog> => {
     const cached = logCache.find(entry => entry.id === sessionId)
@@ -372,9 +397,6 @@ export const createMemoryRuntime = (options: {
     args: { readonly query: string; readonly project?: string | undefined; readonly limit?: number | undefined },
   ): Promise<string> => {
     const own = await projectOf(caller.session.header)
-    const wanted = args.project?.trim()
-    const projectsFilter =
-      wanted !== undefined && wanted.length > 0 && wanted !== 'all' ? [wanted === 'current' ? own : wanted] : options.settings().crossProject ? [] : [own]
     const limit = Math.max(1, Math.min(args.limit ?? 6, 20))
     const { embedder } = await retrieval()
     const queryVector =
@@ -387,7 +409,7 @@ export const createMemoryRuntime = (options: {
     if (embedder !== undefined) void embedMissing()
     const hits = store.search({
       query: args.query,
-      projects: projectsFilter,
+      projects: projectsFilterFor(own, args.project?.trim()),
       ownProject: own,
       limit,
       ranker: queryVector === undefined ? 'bm25' : 'hybrid',
@@ -423,6 +445,171 @@ export const createMemoryRuntime = (options: {
       ...lines,
       'memory_read(id) opens a digest or note; memory_read("t:<id>", "<from>-<to>") shows raw messages around #seq.',
     ].join('\n')
+  }
+
+  /** Folded session titles are read for the newest sessions only: older ones still match by digest title, identifier, or indexed message. */
+  const titleReadLimit = 80
+
+  const threadRecords = async (): Promise<readonly ThreadFinderRecord[]> => {
+    const sessions = await services.listSessions()
+    const titled = await services.readSessionTitles(sessions.slice(0, titleReadLimit).map(session => session.header.id)).catch(() => [])
+    const titles = new Map(titled.map(entry => [entry.sessionId, entry]))
+    const records: ThreadFinderRecord[] = []
+    for (const session of sessions) {
+      const digest = store.thread(session.header.id)
+      const title = titles.get(session.header.id)
+      records.push({
+        sessionId: session.header.id,
+        title: title?.title ?? digest?.title ?? '',
+        createdAt: session.header.createdAt,
+        updatedAt: Math.max(session.header.createdAt, title?.updatedAt ?? 0, digest?.updatedAt ?? 0),
+        cwd: session.header.cwd ?? null,
+        project: await projectOf(session.header),
+        live: session.live,
+        persisted: session.persisted,
+        parentSessionId: session.header.parentSession ?? null,
+      })
+    }
+    return records
+  }
+
+  const finderMemoryHits = async (
+    request: { readonly query: string; readonly limit: number; readonly projects: readonly string[] },
+    own: string,
+  ): Promise<readonly ThreadFinderMemoryHit[]> => {
+    const { embedder } = await retrieval()
+    const queryVector =
+      embedder === undefined
+        ? undefined
+        : await embedder
+            .embed([request.query], 'query')
+            .then(vectors => vectors[0])
+            .catch(() => undefined)
+    if (embedder !== undefined) void embedMissing()
+    const hits = store.search({
+      query: request.query,
+      projects: [...request.projects],
+      ownProject: own,
+      limit: request.limit,
+      ranker: queryVector === undefined ? 'bm25' : 'hybrid',
+      queryVector,
+      embeddingModel: embedder?.model,
+    })
+    const mapped: ThreadFinderMemoryHit[] = []
+    for (const hit of hits) {
+      if (hit.kind === 'thread') {
+        const thread = store.thread(hit.id)
+        if (thread)
+          mapped.push({
+            kind: 'digest',
+            sessionId: thread.id,
+            project: thread.project,
+            updatedAt: thread.updatedAt,
+            title: thread.title,
+            text: thread.digest,
+            score: hit.score,
+          })
+        continue
+      }
+      if (hit.kind === 'note') {
+        const note = store.note(hit.id)
+        if (note)
+          mapped.push({
+            kind: 'note',
+            noteId: note.id,
+            project: note.project,
+            updatedAt: note.createdAt,
+            text: note.text,
+            sourceThread: note.sourceThread,
+            score: hit.score,
+          })
+        continue
+      }
+      const text = await messageText(hit.thread, hit.seq)
+      if (text !== undefined)
+        mapped.push({
+          kind: 'message',
+          sessionId: hit.thread,
+          seq: hit.seq,
+          role: hit.role,
+          project: hit.project,
+          updatedAt: hit.updatedAt,
+          text: redact(text),
+          score: hit.score,
+        })
+    }
+    return mapped
+  }
+
+  /** A finder failure is a user-readable outcome, so it must survive the dshx API boundary with its code and message. */
+  const withFinderErrors = async <Value>(run: () => Promise<Value>): Promise<Value> => {
+    try {
+      return await run()
+    } catch (error) {
+      if (error instanceof ThreadFinderError) throw new PluginApiError(error.message, { code: error.code, cause: error })
+      throw error
+    }
+  }
+
+  const finderFor = async (own: string): Promise<ThreadFinder> => {
+    const records = await threadRecords()
+    return createThreadFinder({
+      listSessions: async () => records,
+      searchContent: request => services.searchSessionContent(request),
+      searchMemory: request => finderMemoryHits(request, own),
+      readDigest: async sessionId => store.thread(sessionId)?.digest ?? null,
+      logger: { info: (message, fields) => logger.info(`memory: ${message} ${JSON.stringify(fields)}`) },
+    })
+  }
+
+  const findThreads = async (
+    caller: Caller,
+    args: {
+      readonly query: string
+      readonly project?: string | undefined
+      readonly limit?: number | undefined
+      readonly cursor?: string | undefined
+      readonly availability?: readonly ('live' | 'persisted')[] | undefined
+      readonly createdFrom?: number | undefined
+      readonly createdTo?: number | undefined
+      readonly includeNotes?: boolean | undefined
+    },
+  ): Promise<ThreadFinderPage & { readonly project: string }> => {
+    const own = await projectOf(caller.session.header)
+    const finder = await finderFor(own)
+    const page = await withFinderErrors(() =>
+      finder.find({
+        query: args.query,
+        projects: projectsFilterFor(own, args.project?.trim()),
+        ownProject: own,
+        limit: args.limit ?? 8,
+        ...(args.cursor === undefined ? {} : { cursor: args.cursor }),
+        ...(args.availability === undefined ? {} : { availability: args.availability }),
+        ...(args.createdFrom === undefined ? {} : { createdFrom: args.createdFrom }),
+        ...(args.createdTo === undefined ? {} : { createdTo: args.createdTo }),
+        ...(args.includeNotes === undefined ? {} : { includeNotes: args.includeNotes }),
+      }),
+    )
+    store.recordToolCall({ thread: caller.id, tool: 'find_threads', results: page.hits.length + page.notes.length, ids: page.hits.map(hit => hit.sessionId) })
+    return { ...page, project: own }
+  }
+
+  const relatedThreads = async (
+    caller: Caller,
+    args: { readonly sessionId: string; readonly project?: string | undefined; readonly limit?: number | undefined },
+  ): Promise<ThreadFinderRelations & { readonly project: string }> => {
+    const own = await projectOf(caller.session.header)
+    const finder = await finderFor(own)
+    const relations = await withFinderErrors(() =>
+      finder.related({ sessionId: args.sessionId, projects: projectsFilterFor(own, args.project?.trim()), limit: args.limit ?? 8 }),
+    )
+    store.recordToolCall({
+      thread: caller.id,
+      tool: 'related_threads',
+      results: relations.explicit.length + relations.inferred.length,
+      ids: [...relations.explicit, ...relations.inferred].map(hit => hit.sessionId),
+    })
+    return { ...relations, project: own }
   }
 
   const readMemory = async (args: { readonly id: string; readonly range?: string | undefined }, caller?: Caller): Promise<string> => {
@@ -567,6 +754,8 @@ export const createMemoryRuntime = (options: {
     digest,
     catchUp,
     search,
+    findThreads,
+    relatedThreads,
     read,
     preview,
     note,

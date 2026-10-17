@@ -22,8 +22,9 @@ Cross-thread, cross-project memory for DSH that leaves the live context and the 
 - **Tools.** `memory_search` (digests, valid notes and indexed messages; FTS5 porter words plus trigram identifiers,
   BM25 fused by reciprocal rank, recency decay, project and note-type boosts), `memory_read` (a digest, a note, or a
   bounded raw excerpt read back from the session log), `memory_note` (add, update with a reason — the old row stays as
-  superseded history — or forget with a reason). Note types follow Claude Code: `user`, `feedback`, `project`,
-  `reference`, with `scope`, `confidence` and the source thread and message.
+  superseded history — or forget with a reason), `find_threads` (the composed finder described below), and
+  `related_threads` (explicit lineage first, inferred same-workspace/topic candidates second). Note types follow Claude
+  Code: `user`, `feedback`, `project`, `reference`, with `scope`, `confidence` and the source thread and message.
 - **One registry.** The agent tools are `dshfiles-memory` API methods (`search`, `read`, `note`) opted into dshx's
   agent registry, so the agent, other Host plugins and Clients call the same handlers; `preview` serves the UI without
   recording a tool call, while `usage` and `citations` expose memory's statistics. `startBlock({ cwd })` previews the
@@ -80,6 +81,44 @@ export default async function createEmbedder() {
 ```
 
 The [benchmark](docs/benchmark.md#retrieval-bm25-vs-local-embeddings-vs-hybrid) is why BM25 is the default.
+
+## Finding threads: one finder over titles, content and memory
+
+`findThreads` (agent tool `find_threads`) answers "which conversation was that?" from four places in one ranked page:
+exact and partial **titles** (read through `sessionQuery.readTitleSnapshots` for the newest 80 sessions, so an older
+session still matches by digest title, identifier or indexed message), **session ids and cwd/workspace paths**,
+**message text** through the supported `sessionQuery.searchSessions` backend, and memory's own **digests, notes and
+message index**. Each hit carries `sources` (`session-title`, `session-metadata`, `session-content`, `memory-digest`,
+`memory-message`, `memory-note`) and `evidence` (`exact-title`, `identifier`, `title-match`, `text-match`), deduped by
+canonical session id with one merged row per Session. Ordering is score, then `updatedAt`, then session id, so a
+repeated query returns the same page.
+
+- **Scope is the caller's authorization.** Results stay inside the calling Session's project unless the
+  `crossProject` setting is on; `project` narrows further and never widens. Sessions outside that scope are absent,
+  not hidden.
+- **Filters and bounds.** `project`, `availability` (`live` / `persisted`), `createdFrom` / `createdTo`, `limit` (1–20,
+  default 8), and `includeNotes` (default off, so a Session search usually returns only Sessions). Snippets are bounded
+  and redacted like every other memory read.
+- **Cursors expire safely.** A cursor is an offset plus a corpus stamp (`count:newest-updatedAt`). If the corpus moved,
+  the call fails with `stale-cursor` instead of paging over shifted results; the caller restarts the search.
+- **Failure is labeled, never empty.** Content search is wrapped in a bounded retry (4 attempts, 75/200/500 ms) for the
+  transient `SESSION_QUERY_PERSISTENCE_FAILED` the SQLite backend raises while the corpus is still moving. If it keeps
+  failing, or the backend is configured with `openAt: "never"`, the page carries `degraded: [{ source, code, message,
+attempts }]` and hits from the other three places; when nothing else matches, the call fails with the typed
+  `search-unavailable` code and a message that says to retry or narrow the query. It never reports "no matches" for a
+  search it could not run.
+- **Related threads are a separate operation** (`relatedThreads`, tool `related_threads`): `explicit` holds real
+  lineage (the session's `parentSessionId` and its children), `inferred` holds same-workspace and same-topic
+  candidates, each labeled with the evidence that suggested it. Inferred precision is measured in the benchmark below.
+
+```sh
+pnpm bench:finder   # recall@3/@5, related precision, p50/p95 for session-only, memory-only and composed search
+```
+
+The benchmark runs the real SQLite session-query engine and the real store over 24 synthetic threads (16 topics plus
+8 follow-ups) and exits non-zero if any mode stops finding its labeled session. Composed retrieval reaches recall 1.00
+on every probe kind; related suggestions recover every labeled sibling at precision@5 0.67, which is why they stay an
+opt-in second call.
 
 ## Per-project roll-up (designed, not built)
 

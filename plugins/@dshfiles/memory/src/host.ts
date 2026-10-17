@@ -24,6 +24,7 @@ import { memoryApi, type MemoryCostLine, type MemoryCosts, type MemoryUsage, typ
 import { projectPathFor } from './project-path.ts'
 import { createMemoryRuntime, type Caller, type MemoryRuntime, type MemoryServices } from './runtime.ts'
 import { memorySettings, type MemorySettings } from './settings.ts'
+import { sessionContentHits } from './session-content.ts'
 import { openMemoryStore, type MemoryStore, type NoteRecord, type StoredThread } from './store.ts'
 
 let runtime: MemoryRuntime | undefined
@@ -102,7 +103,26 @@ const hostServices = (ctx: Context): MemoryServices => {
       await projectNormalization
       return projectPathFor(cwd)
     },
-    listSessions: async () => (await sessionQuery().listSessions()).map(record => ({ header: record.header, live: record.live })),
+    listSessions: async () => (await sessionQuery().listSessions()).map(record => ({ header: record.header, live: record.live, persisted: record.persisted })),
+    readSessionTitles: async sessionIds => {
+      const results = await sessionQuery().readTitleSnapshots(sessionIds.map(id => SessionId(id)))
+      return results.map(result =>
+        result.status === 'fulfilled'
+          ? { sessionId: result.sessionId, title: result.value.title?.title, updatedAt: result.value.title?.updatedAt }
+          : { sessionId: result.sessionId, title: undefined, updatedAt: undefined },
+      )
+    },
+    searchSessionContent: async request => {
+      const page = await sessionQuery().searchSessions({
+        query: request.query,
+        eventFilters: [
+          { kind: 'type', values: ['user/message', 'assistant/message'] },
+          { kind: 'surface', values: ['current'] },
+        ],
+        limit: request.limit,
+      })
+      return sessionContentHits(page)
+    },
     readSession: async sessionId => {
       const log = await sessionQuery().readSession(SessionId(sessionId))
       return { header: log.session, inheritedEventCount: log.inheritedEventCount, events: log.events }
@@ -340,8 +360,36 @@ const withRuntime = async (body: (active: MemoryRuntime) => Promise<string>): Pr
   return { summary: await body(runtime) }
 }
 
+/** Same activation gate as withRuntime, for capabilities that return structured data instead of a summary. */
+const withMemory = async <Result>(body: (active: MemoryRuntime) => Promise<Result>): Promise<Result> => {
+  if (!runtime) throw new Error('Memory is not active in this DSH host (setting dshfiles-memory.enabled, or the plugin failed to start).')
+  await projectNormalization
+  return body(runtime)
+}
+
+const dayMs = 86_400_000
+
+/** `YYYY-MM-DD` (a whole UTC day) or an ISO 8601 timestamp; anything else is refused rather than silently ignored. */
+const instant = (value: string | undefined, endOfDay: boolean): number | undefined => {
+  if (value === undefined || value.trim().length === 0) return undefined
+  const text = value.trim()
+  const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(text)
+  const parsed = dateOnly ? Date.parse(`${text}T00:00:00.000Z`) : Date.parse(text)
+  if (!Number.isFinite(parsed)) throw new Error(`${JSON.stringify(value)} is not a date: use YYYY-MM-DD or an ISO 8601 timestamp.`)
+  return dateOnly && endOfDay ? parsed + dayMs - 1 : parsed
+}
+
 const panelApi = memoryApi.host({
   search: ({ input, caller }) => withRuntime(active => active.search(callerOf(caller), input)),
+  findThreads: ({ input, caller }) =>
+    withMemory(active =>
+      active.findThreads(callerOf(caller), {
+        ...input,
+        createdFrom: instant(input.createdFrom, false),
+        createdTo: instant(input.createdTo, true),
+      }),
+    ),
+  relatedThreads: ({ input, caller }) => withMemory(active => active.relatedThreads(callerOf(caller), input)),
   read: ({ input, caller }) => withRuntime(active => active.read(callerOf(caller), input)),
   preview: ({ input }) => withRuntime(active => active.preview(input)),
   note: ({ input, caller }) => withRuntime(active => active.note(callerOf(caller), input)),
@@ -406,8 +454,6 @@ const panelApi = memoryApi.host({
     return [...requireStore().listThreads({ project, limit: 300 }).map(panelThread)]
   },
 })
-
-const dayMs = 86_400_000
 
 const normalizeProjectPaths = async (opened: MemoryStore) => {
   const mappings: { from: string; to: string }[] = []

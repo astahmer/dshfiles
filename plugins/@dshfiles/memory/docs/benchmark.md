@@ -130,6 +130,37 @@ paraphrase misses either. See the [README](../README.md#per-project-roll-up-desi
 
 `src/scale.test.ts` keeps the scale bound in CI: 5,000 items, search p95 < 150 ms, and a block within its byte budget.
 
+## Thread finder (2026-10-17)
+
+`bench/thread-finder.ts` (`pnpm bench:finder`) runs the composed finder over the real
+`@deepseek-ai/dsh-session-query-sqlite` engine and the real memory store: 24 synthetic threads (16 topics and 8
+follow-ups that share title words and cwd with their seed), queried in three modes — session-only, memory-only and
+composed — with identifier, paraphrase and title probes. It exits non-zero when a labeled thread leaves the top 5, so
+a ranking change cannot silently drop recall.
+
+| Mode     | Probe      | recall@3 | recall@5 | p50    | p95      |
+| -------- | ---------- | -------- | -------- | ------ | -------- |
+| session  | identifier | 1.00     | 1.00     | 2.1 ms | 157.1 ms |
+| session  | paraphrase | 1.00     | 1.00     | 1.3 ms | 1.9 ms   |
+| session  | title      | 1.00     | 1.00     | 0.4 ms | 55.8 ms  |
+| memory   | identifier | 1.00     | 1.00     | 3.8 ms | 61.4 ms  |
+| memory   | paraphrase | 1.00     | 1.00     | 0.9 ms | 10.2 ms  |
+| memory   | title      | 0.94     | 1.00     | 0.3 ms | 3.1 ms   |
+| composed | identifier | 1.00     | 1.00     | 1.8 ms | 24.3 ms  |
+| composed | paraphrase | 1.00     | 1.00     | 3.8 ms | 51.4 ms  |
+| composed | title      | 1.00     | 1.00     | 3.1 ms | 20.4 ms  |
+
+Recall is the stable, meaningful figure: composed retrieval is the only mode at 1.00 on every probe kind, which is why
+the finder reads both sources. Latency is not: p50 stays within a few milliseconds, but p95 tracks the first search
+that opens and reconciles the FTS index plus whatever else the machine is doing. Across runs the same table reported
+p95 2–35 ms when idle and up to 157 ms while a full workspace build ran, with no change in recall. Treat p95 as an
+index warm-up bound, not a steady-state one; warm searches stay under 10 ms.
+
+Related-thread inference (same-workspace and same-topic candidates, a separate opt-in operation) reaches **labeled
+recall 1.00 at precision@5 0.67** on the same corpus: every follow-up is found, but a page of five usually holds one
+or two threads that merely share a workspace or words. That measurement is why inferred candidates stay out of the
+primary page and carry their evidence label.
+
 ## Jev (optional, off by default)
 
 `bench/jev-eval.ts` ran on the user messages of the five scenarios: 96 calls, 40,483 input tokens, **$0.0017** in

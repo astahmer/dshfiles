@@ -3,6 +3,7 @@ import { z } from 'zod'
 
 import type { RetrievalStatus } from './embedder.ts'
 import { MemoryGuidance } from './guidance.ts'
+import type { ThreadFinderPage, ThreadFinderRelations } from './thread-finder.ts'
 
 /** What the panel shows about whether memory earns its keep. Counters are local and never leave the machine. */
 export type MemoryUsage = {
@@ -138,6 +139,31 @@ const readInput = z
   })
   .strict()
 
+const findThreadsInput = z
+  .object({
+    query: z.string().min(1).max(512).describe('A few words, an exact phrase, a thread title, a Session id, or a repository/workspace identifier.'),
+    project: z.string().max(4_096).optional().describe('Restrict to one project: "current", a project path, or "all" (default: current first, then others).'),
+    limit: z.number().int().min(1).max(20).optional().describe('Hits to return, 1 to 20; default 8.'),
+    cursor: z.string().max(512).optional().describe('nextCursor from an earlier call with the same query; a cursor from a changed corpus is refused.'),
+    availability: z
+      .array(z.enum(['live', 'persisted']))
+      .max(2)
+      .optional()
+      .describe('Restrict to Sessions whose log is live in this Host, persisted on disk, or either.'),
+    createdFrom: z.string().max(40).optional().describe('Earliest creation date, inclusive: YYYY-MM-DD or an ISO 8601 timestamp.'),
+    createdTo: z.string().max(40).optional().describe('Latest creation date, inclusive: YYYY-MM-DD or an ISO 8601 timestamp.'),
+    includeNotes: z.boolean().optional().describe('Also return matching notes as separate labeled items; default false.'),
+  })
+  .strict()
+
+const relatedThreadsInput = z
+  .object({
+    sessionId: z.string().min(1).max(200).describe('The Session whose relatives to list.'),
+    project: z.string().max(4_096).optional().describe('Restrict to one project: "current", a project path, or "all" (default: current first, then others).'),
+    limit: z.number().int().min(1).max(20).optional().describe('Inferred candidates to return, 1 to 20; default 8. Explicit lineage is always complete.'),
+  })
+  .strict()
+
 const noteInput = z
   .object({
     action: z.enum(['add', 'update', 'forget']).optional().describe('Default add.'),
@@ -170,6 +196,18 @@ export const memoryApi = defineApi({
       output: toolOutput,
       description: MemoryGuidance.searchDescription,
       tool: { name: 'memory_search', readOnly: true, render: output => output.summary },
+    }),
+    findThreads: method({
+      input: findThreadsInput,
+      output: z.custom<ThreadFinderPage & { readonly project: string }>(),
+      description: MemoryGuidance.findThreadsDescription,
+      tool: { name: 'find_threads', readOnly: true, render: output => MemoryGuidance.renderFinderPage(output) },
+    }),
+    relatedThreads: method({
+      input: relatedThreadsInput,
+      output: z.custom<ThreadFinderRelations & { readonly project: string }>(),
+      description: MemoryGuidance.relatedThreadsDescription,
+      tool: { name: 'related_threads', readOnly: true, render: output => MemoryGuidance.renderRelations(output) },
     }),
     read: method({
       input: readInput,

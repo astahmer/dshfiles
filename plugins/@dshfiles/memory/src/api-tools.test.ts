@@ -5,6 +5,7 @@ describe('memory tool exposure', () => {
   test('the memory panel actions an Agent may take are named tools', () => {
     const tools = Object.values(memoryApi.methods).flatMap(method => (method.tool === undefined ? [] : [method.tool]))
     expect(tools.map(tool => tool.name).sort()).toEqual([
+      'find_threads',
       'memory_citations',
       'memory_edit_note',
       'memory_forget_note',
@@ -16,12 +17,14 @@ describe('memory tool exposure', () => {
       'memory_search',
       'memory_start_block',
       'memory_threads',
+      'related_threads',
     ])
     const readOnly = tools
       .filter(tool => tool.readOnly === true)
       .map(tool => tool.name)
       .sort()
     expect(readOnly).toEqual([
+      'find_threads',
       'memory_citations',
       'memory_note_history',
       'memory_notes',
@@ -30,6 +33,7 @@ describe('memory tool exposure', () => {
       'memory_search',
       'memory_start_block',
       'memory_threads',
+      'related_threads',
     ])
   })
 
