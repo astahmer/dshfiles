@@ -34,7 +34,8 @@ snapshotting the 4.1 GB live runtime took ~21 s and a few MB of disk.
 ```sh
 node ~/dev/dshfiles/scripts/dsh-lkg/cli.mjs snapshot [--label <text>] [--if-changed]
 node ~/dev/dshfiles/scripts/dsh-lkg/cli.mjs list
-node ~/dev/dshfiles/scripts/dsh-lkg/cli.mjs verify [<id>|current]
+node ~/dev/dshfiles/scripts/dsh-lkg/cli.mjs verify [<id>|current] [--turn] [--turn-model <provider/model>]
+node ~/dev/dshfiles/scripts/dsh-lkg/cli.mjs upgrade <version> [--turn-model <provider/model>]
 node ~/dev/dshfiles/scripts/dsh-lkg/cli.mjs reap [--keep 3]
 node ~/dev/dshfiles/scripts/dsh-lkg/cli.mjs remove <id>
 node ~/dev/dshfiles/scripts/dsh-lkg/cli.mjs unlock <id>
@@ -44,12 +45,13 @@ node ~/dev/dshfiles/scripts/dsh-lkg/cli.mjs unlock <id>
 on its own port with its own state**, and requires three checks before `current`
 moves:
 
-| check                 | refuses when                                                      |
-| --------------------- | ----------------------------------------------------------------- |
-| `node`                | the recorded interpreter is gone                                  |
-| `activation`          | any entry fails to activate, **or any profile bundle is skipped** |
-| `authenticated-index` | the tokenized URL never appears, or does not answer 200/303       |
+| check                 | refuses when                                                                                                |
+| --------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `node`                | the recorded interpreter is gone                                                                            |
+| `activation`          | any entry fails to activate, **or any profile bundle is skipped**                                           |
+| `authenticated-index` | the tokenized URL never appears, or does not answer 200/303                                                 |
 | `client-boot`         | headless Chromium never sees DSH's `__DSH_BOOT_READY__` resolve, or the page shows "Failed to load plugins" |
+| `turn` (opt-in)       | one real prompt ends in anything but completion or a provider/account refusal                               |
 
 `session-api` and `thread-load` exist because a launch URL that answers proves
 the shell boots, not that the Host works: they call the same authenticated RPC
@@ -78,6 +80,49 @@ link to (dshx under `tooling/`), so bare imports hoisted to the root resolve.
 A failed candidate is deleted (kept as `versions/.<id>.failed` with
 `DSH_LKG_KEEP_FAILED=1`) and its Host output is written to
 `logs/health-<id>.log`; the previous known-good snapshot stays current. `reap` keeps the newest three plus whatever `current` points at.
+
+## Upgrading DSH
+
+```sh
+DSH_LKG_ADMIN=1 node ~/dev/dshfiles/scripts/dsh-lkg/cli.mjs upgrade 0.2.2
+```
+
+`pnpm add -g @deepseek-ai/dsh@<new>` swaps the live core in place, and nothing
+proved the live profile and plugins against it first. `upgrade` does:
+
+1. `snapshot --if-changed`, and refuses unless `current` is recorded healthy, so
+   a recovery point for the pre-upgrade install exists.
+2. `pnpm add -g` of the exact version under a private `PNPM_HOME`
+   (`state/upgrade-<version>-<id>`); the live global install is never touched.
+3. A candidate built exactly like a snapshot from that core, the live web
+   profile and its linked plugins, health-checked with every check above plus
+   `turn`. The candidate is removed afterwards and never promoted.
+4. Only if every check passes: `pnpm add -g` into the live global (skipped when
+   it already is that version), then `snapshot --if-changed`. The running
+   `dsh web` keeps the old core until you restart it.
+
+On failure it prints each check, names the host log, and exits 1 with the live
+install untouched. Running it again for the installed version is a no-op apart
+from the checks.
+
+`turn` exists because a Host can boot, list threads and render the client while
+every turn fails: an `unknown prompt variable "{{cwd}}"` in the persona suffix
+did exactly that. It clones the live `~/.dsh` data into the verify state (same
+exclusions as `dsh-recover`, so the accounts exist), creates a Session through
+the `session` RPC, sends one short prompt with the profile's default model (or
+`--turn-model`), and reads `session/page` until `turn/end`. The verdict comes
+from that event's `reason`:
+
+| ending                                                                                                         | verdict                                          |
+| -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| `completed`, `max-tokens`                                                                                      | pass                                             |
+| `error` with a provider/account code (`QUOTA`, `RATE_LIMIT`, `MISSING_CREDENTIAL`, `PI_AI_ERROR`, `SERVER`, …) | pass: the runtime assembled and sent the request |
+| `error` with any other code (`UNKNOWN`, `NO_ADAPTER`, `INVALID_REQUEST`, unseen codes)                         | fail                                             |
+| any other ending, or none within three minutes                                                                 | fail                                             |
+
+The provider list is `PROVIDER_FAILURE_CODES` in `cli.mjs`; it fails closed, so
+a new provider code needs adding there. `verify --turn` runs the same check on
+an existing snapshot; it costs one small model request.
 
 ## Recovery
 
@@ -111,7 +156,7 @@ uchg`. Writes fail with `Operation not permitted` — verified — and clearing
    — in every Session, including one whose cwd is not a registered workspace. The
    list is `ownership.protectedPaths` in settings (default `['~/.dsh-lkg']`).
 
-`snapshot`, `reap`, `remove` and `unlock` additionally refuse to run when a DSH
+`snapshot`, `upgrade`, `reap`, `remove` and `unlock` additionally refuse to run when a DSH
 Session environment is detected, unless `DSH_LKG_ADMIN=1` is set.
 
 ## Limits, stated plainly

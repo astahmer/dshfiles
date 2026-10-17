@@ -43,6 +43,36 @@ const CURRENT = join(STORE, 'current')
 const DEFAULT_KEEP = 3
 const HEALTH_TIMEOUT_MS = 90_000
 const CLIENT_SETTLE_MS = 45_000
+const TURN_TIMEOUT_MS = 180_000
+const TURN_PROMPT = 'Health check from dsh-lkg: reply with the single word OK. Do not call any tools.'
+// The parts of a DSH_HOME a snapshot owns or that are disposable; dsh-recover skips the same ones.
+const LIVE_HOME_EXCLUDES = new Set(['profiles', 'logs', 'cache', 'runtime', 'jj-isolation'])
+/**
+ * Failure codes that mean the provider or the account refused the request, not
+ * that this runtime cannot assemble or run a turn. Anything else — `UNKNOWN`
+ * (prompt-assembly errors such as an unknown `{{cwd}}` variable), `NO_ADAPTER`,
+ * `INVALID_REQUEST`, or a code this list has never seen — fails closed.
+ */
+const PROVIDER_FAILURE_CODES = new Set([
+  'ACCOUNT_FAILOVER',
+  'ACCOUNT_QUOTA',
+  'AUTH',
+  'AUTHCODE_EXPIRED',
+  'EMPTY_RESPONSE',
+  'FORBIDDEN',
+  'INVALID_CREDENTIAL',
+  'MISSING_CREDENTIAL',
+  'NETWORK',
+  'PI_AI_ERROR',
+  'PROVIDER_HTTP_ERROR',
+  'QUOTA',
+  'RATE_LIMIT',
+  'SERVER',
+  'STREAM_CLOSED',
+  'TIMEOUT',
+  'TRANSPORT',
+  'UNAUTHORIZED',
+])
 
 const fail = message => {
   process.stderr.write(`dsh-lkg: ${message}\n`)
@@ -143,6 +173,10 @@ const dshEntryOf = root => join(root, 'runtime', 'node_modules', '@deepseek-ai',
 const installedGlobalRoot = () => {
   const shim = run(['sh', '-c', 'command -v dsh']).stdout.trim()
   if (shim.length === 0) fail('no dsh on PATH; set DSH_LKG_GLOBAL to the global install root')
+  return globalRootOfShim(shim)
+}
+
+const globalRootOfShim = shim => {
   const target = /cmd-shim-target=(.+)$/m.exec(readFileSync(shim, 'utf8'))?.[1]?.trim()
   const packageDirectory = realpathSync(target === undefined ? shim : dirname(dirname(target)))
   const marker = '/node_modules/.pnpm/'
@@ -256,11 +290,95 @@ const clientBootCheck = async ({ origin, cookie }) => {
 }
 
 /**
+ * Decide whether one health-check turn proves the runtime works, from the
+ * Session events it produced. A completed turn passes. A turn that failed
+ * because the provider or account refused it passes too: the Host assembled and
+ * sent the request, so the runtime is fine and the account is not this check's
+ * business. Every other ending fails, including no ending at all.
+ */
+const classifyTurn = events => {
+  const header = events.findLast(event => event.type === 'request/header')?.data?.header?.config
+  const route = header === undefined ? 'no request sent' : `${header.provider}/${header.model}`
+  const end = events.findLast(event => event.type === 'turn/end')
+  if (end === undefined) {
+    const lastAttempt = events.findLast(event => event.type === 'assistant/attempt')
+    const failure = lastAttempt?.data?.stream?.findLast(item => item.chunk?.type === 'finish')?.chunk?.reason?.failure
+    if (failure !== undefined && PROVIDER_FAILURE_CODES.has(failure.code)) {
+      return { ok: true, outcome: 'retrying', detail: `${route}: provider still refusing (${failure.code}): ${failure.message}` }
+    }
+    return { ok: false, outcome: 'pending', detail: `${route}: the turn never ended` }
+  }
+  const reason = end.data?.reason ?? {}
+  if (reason.kind === 'completed' || reason.kind === 'max-tokens') return { ok: true, outcome: 'completed', detail: `${route}: turn ${reason.kind}` }
+  if (reason.kind === 'error') {
+    const code = reason.error?.code ?? 'UNKNOWN'
+    const message = String(reason.error?.message ?? '').slice(0, 300)
+    if (PROVIDER_FAILURE_CODES.has(code)) return { ok: true, outcome: 'provider', detail: `${route}: provider refused (${code}): ${message}` }
+    return { ok: false, outcome: 'host', detail: `${route}: turn failed (${code}): ${message}` }
+  }
+  return { ok: false, outcome: 'host', detail: `${route}: turn ended ${String(reason.kind)}` }
+}
+
+/**
+ * Run one real turn through the Session RPC the browser uses: create a Session,
+ * optionally pin its model, prompt it, and read its log until the turn ends.
+ */
+const turnCheck = async ({ rpc, cwd, model }) => {
+  const valueOf = async response => {
+    const parsed = response.status === 200 ? JSON.parse(response.body) : undefined
+    if (parsed?.result?.ok === false || parsed?.error !== undefined || parsed === undefined) {
+      throw new Error(`HTTP ${response.status}: ${response.body.slice(0, 300)}`)
+    }
+    return parsed.result?.value ?? parsed.result
+  }
+  try {
+    const created = await valueOf(await rpc('session', 'create', { request: { cwd } }))
+    const sessionId = created.sessionId
+    if (model !== undefined) {
+      const slash = model.indexOf('/')
+      await valueOf(await rpc('session', 'selectModel', { request: { sessionId, provider: model.slice(0, slash), model: model.slice(slash + 1) } }))
+    }
+    await valueOf(
+      await rpc('session', 'prompt', {
+        request: { requestId: randomUUID(), sessionId, mode: 'queue', content: [{ type: 'text', text: TURN_PROMPT }] },
+      }),
+    )
+    const deadline = Date.now() + TURN_TIMEOUT_MS
+    let verdict
+    while (Date.now() < deadline) {
+      await sleep(2000)
+      const projections = await valueOf(await rpc('session', 'projections', { request: { sessionId } }))
+      if (projections?.kind !== 'sequenced') continue
+      const page = await valueOf(
+        await rpc('session', 'page', { request: { address: { kind: 'session', sessionId }, throughSeq: projections.asOfSeq, maxMessages: 50 } }),
+      )
+      verdict = classifyTurn(page.records.map(record => record.event))
+      if (verdict.outcome !== 'pending' && verdict.outcome !== 'retrying') break
+    }
+    await rpc('session', 'cancel', { request: { sessionId } }).catch(() => undefined)
+    verdict ??= { ok: false, outcome: 'pending', detail: 'the Session log never became readable' }
+    return { name: 'turn', ok: verdict.ok, detail: `${verdict.outcome}: ${verdict.detail}` }
+  } catch (error) {
+    return { name: 'turn', ok: false, detail: String(error).slice(0, 400) }
+  }
+}
+
+/** Clone the live DSH_HOME's data (accounts, credentials, plugin storage, threads) the way dsh-recover does. */
+const cloneLiveData = (liveHome, home) => {
+  if (!existsSync(liveHome)) return
+  for (const entry of readdirSync(liveHome)) {
+    if (LIVE_HOME_EXCLUDES.has(entry)) continue
+    cloneTree(join(liveHome, entry), join(home, entry))
+  }
+  run(['find', join(home, 'sessions'), '-name', 'session.lock', '-delete'])
+}
+
+/**
  * Boot one version on a private port with private state and require that it
  * activates cleanly and answers an authenticated request. Nothing is promoted
  * on a partial pass.
  */
-const healthCheck = async (root, { keepState = false } = {}) => {
+const healthCheck = async (root, { keepState = false, turn } = {}) => {
   const checks = []
   const entry = dshEntryOf(root)
   const nodePath = readFileSync(join(root, 'runtime', 'node-path'), 'utf8').trim()
@@ -270,6 +388,8 @@ const healthCheck = async (root, { keepState = false } = {}) => {
 
   const home = join(STATE, `verify-${randomUUID()}`)
   mkdirSync(home, { recursive: true })
+  // A real turn needs the live accounts and credentials; the other checks run on an empty state.
+  if (turn !== undefined) cloneLiveData(resolve(process.env.DSH_LKG_LIVE_HOME?.trim() || join(homedir(), '.dsh')), home)
   cloneTree(join(root, 'profile'), join(home, 'profiles', 'web'))
   // The snapshot's payload is frozen; a state the Host runs from must not be, or
   // the Host cannot maintain its own profile and the state cannot be removed.
@@ -394,12 +514,21 @@ const healthCheck = async (root, { keepState = false } = {}) => {
     }
   }
 
+  if (turn !== undefined) {
+    if (origin === undefined || cookie === undefined || !answered) checks.push({ name: 'turn', ok: false, detail: 'the API was never reached' })
+    else {
+      const cwd = join(home, 'turn-cwd')
+      mkdirSync(cwd, { recursive: true })
+      checks.push(await turnCheck({ rpc, cwd, model: turn.model }))
+    }
+  }
+
   checks.push(await clientBootCheck({ origin, cookie }))
 
   child.kill('SIGTERM')
   await sleep(1500)
   if (child.exitCode === null) child.kill('SIGKILL')
-  writeFileSync(join(LOGS, `health-${basename(root)}.log`), output.replace(/token=[A-Za-z0-9_-]+/g, 'token=<redacted>'))
+  writeFileSync(join(LOGS, `health-${basename(root).replace(/^\./, '')}.log`), output.replace(/token=[A-Za-z0-9_-]+/g, 'token=<redacted>'))
   if (!keepState) rmSync(home, { recursive: true, force: true })
   const healthy = checks.every(check => check.ok)
   return { healthy, checks, url: url === undefined ? null : url.replace(/token=[A-Za-z0-9_-]+/, 'token=<redacted>') }
@@ -415,8 +544,14 @@ const writeLauncher = () => {
   return target
 }
 
-const snapshot = async ({ label, ifChanged = false } = {}) => {
+/**
+ * Build, health-check and promote a new LKG. With `candidateGlobal` it instead
+ * builds a throwaway candidate from that core install, checks it and removes it
+ * again: nothing is frozen, promoted, or left under `versions/`.
+ */
+const snapshot = async ({ label, ifChanged = false, candidateGlobal, turn } = {}) => {
   requireOperator()
+  const candidate = candidateGlobal !== undefined
   mkdirSync(VERSIONS, { recursive: true })
   mkdirSync(STATE, { recursive: true })
   mkdirSync(LOGS, { recursive: true })
@@ -428,18 +563,19 @@ const snapshot = async ({ label, ifChanged = false } = {}) => {
     '-' +
     randomUUID().slice(0, 8)
   const staging = join(VERSIONS, `.${id}.staging`)
-  const final = join(VERSIONS, id)
+  const final = join(VERSIONS, candidate ? `.${id}.candidate` : id)
   rmSync(staging, { recursive: true, force: true })
 
   const profileSource = resolve(process.env.DSH_LKG_PROFILE?.trim() || join(homedir(), '.dsh', 'profiles', 'web'))
-  const globalRoot = resolve(process.env.DSH_LKG_GLOBAL?.trim() || installedGlobalRoot())
+  const globalRoot = resolve(candidateGlobal ?? (process.env.DSH_LKG_GLOBAL?.trim() || installedGlobalRoot()))
   if (!existsSync(globalRoot)) fail(`global install not found: ${globalRoot}`)
   if (!existsSync(profileSource)) fail(`web profile not found: ${profileSource}`)
   const fingerprint = liveFingerprint(profileSource, globalRoot)
   const currentId = currentVersionId()
-  if (ifChanged && currentId !== undefined && readJson(join(VERSIONS, currentId, 'manifest.json'))?.fingerprint === fingerprint) {
+  const currentManifest = currentId === undefined ? undefined : readJson(join(VERSIONS, currentId, 'manifest.json'))
+  if (ifChanged && !candidate && currentManifest?.fingerprint === fingerprint) {
     log(`dsh-lkg: ${currentId} already captures this installation; nothing to do`)
-    return currentId
+    return { id: currentId, health: currentManifest.health }
   }
   log(`dsh-lkg: building ${id}${label === undefined ? '' : ` (${label})`}`)
 
@@ -565,10 +701,16 @@ const snapshot = async ({ label, ifChanged = false } = {}) => {
   //    renamed into place first, because its links target that final path, but
   //    `current` still names the previous snapshot until the check passes.
   renameSync(staging, final)
-  log('dsh-lkg: health check (own port, own state)')
-  const health = await healthCheck(final)
+  log(`dsh-lkg: health check (own port, own state${turn === undefined ? '' : ', live data, one real turn'})`)
+  const health = await healthCheck(final, { turn })
   for (const check of health.checks) log(`  ${check.ok ? 'ok  ' : 'FAIL'} ${check.name}: ${check.detail}`)
   manifest.health = { healthy: health.healthy, checkedAt: new Date().toISOString(), checks: health.checks, url: health.url ?? null }
+  if (candidate) {
+    thawed(final)
+    if (!health.healthy && process.env.DSH_LKG_KEEP_FAILED === '1') renameSync(final, join(VERSIONS, `.${id}.failed`))
+    else rmSync(final, { recursive: true, force: true })
+    return { id, health: { ...health, log: join(LOGS, `health-${basename(final).replace(/^\./, '')}.log`) } }
+  }
   if (!health.healthy) {
     thawed(final)
     if (process.env.DSH_LKG_KEEP_FAILED === '1') renameSync(final, join(VERSIONS, `.${id}.failed`))
@@ -587,7 +729,60 @@ const snapshot = async ({ label, ifChanged = false } = {}) => {
   symlinkSync(final, link)
   renameSync(link, CURRENT)
   log(`dsh-lkg: promoted ${id}; dsh-recover is ${launcher}`)
-  return id
+  return { id, health }
+}
+
+const dshVersionAt = globalRoot => readJson(join(globalRoot, 'node_modules', '@deepseek-ai', 'dsh', 'package.json'))?.version
+
+/**
+ * `pnpm add -g` swaps the live core in place, so a new version is installed
+ * into a private PNPM_HOME first and must run the live profile, plugins and
+ * data — including one real turn — before the live install is touched.
+ */
+const upgrade = async (version, { turnModel } = {}) => {
+  requireOperator()
+  if (version === undefined || !/^\d[\w.+-]*$/.test(version)) fail('upgrade needs an exact @deepseek-ai/dsh version, e.g. 0.2.2')
+  if (process.env.DSH_LKG_GLOBAL?.trim()) fail('upgrade manages the pnpm global install; unset DSH_LKG_GLOBAL')
+  log('dsh-lkg: making sure a healthy snapshot captures the installation before the upgrade')
+  const before = await snapshot({ label: 'before upgrade', ifChanged: true })
+  if (before.health?.healthy !== true) fail(`the current snapshot ${before.id} is not recorded healthy; run \`verify\` or \`snapshot\` first`)
+
+  const work = join(STATE, `upgrade-${version}-${randomUUID().slice(0, 8)}`)
+  const abort = message => {
+    rmSync(work, { recursive: true, force: true })
+    fail(`${message}; the live install is untouched`)
+  }
+  mkdirSync(work, { recursive: true })
+  log(`dsh-lkg: installing @deepseek-ai/dsh@${version} into ${work}`)
+  // pnpm puts a global install under PNPM_HOME and refuses one whose bin dir is
+  // not on PATH; a private PNPM_HOME keeps the live install out of reach.
+  const installed = run(['pnpm', 'add', '-g', `@deepseek-ai/dsh@${version}`], {
+    cwd: homedir(),
+    env: { ...process.env, PNPM_HOME: work, PATH: `${join(work, 'bin')}:${process.env.PATH ?? ''}` },
+  })
+  const shim = join(work, 'bin', 'dsh')
+  if (installed.status !== 0 || !existsSync(shim)) abort(`pnpm could not install ${version}: ${`${installed.stdout}${installed.stderr}`.trim().slice(-800)}`)
+  const candidateGlobal = globalRootOfShim(shim)
+  const candidateVersion = dshVersionAt(candidateGlobal)
+  if (candidateVersion !== version) abort(`pnpm installed ${candidateVersion ?? 'nothing'} instead of ${version}`)
+
+  log(`dsh-lkg: checking dsh ${version} against the live profile, plugins and data`)
+  const candidate = await snapshot({ label: `candidate dsh ${version}`, candidateGlobal, turn: { model: turnModel } })
+  if (!candidate.health.healthy) {
+    const failed = candidate.health.checks.filter(check => !check.ok).map(check => check.name)
+    abort(`dsh ${version} failed ${failed.join(', ')} (host log: ${candidate.health.log})`)
+  }
+  rmSync(work, { recursive: true, force: true })
+
+  const liveVersion = dshVersionAt(installedGlobalRoot())
+  if (liveVersion === version) log(`dsh-lkg: dsh ${version} is already the live install`)
+  else {
+    log(`dsh-lkg: dsh ${version} passed; installing it globally (was ${liveVersion ?? 'unknown'})`)
+    const live = spawnSync('pnpm', ['add', '-g', `@deepseek-ai/dsh@${version}`], { cwd: homedir(), stdio: 'inherit' })
+    if (live.status !== 0) fail(`the global install of ${version} failed; dsh-recover still starts ${before.id}`)
+  }
+  const after = await snapshot({ label: `dsh ${version}`, ifChanged: true })
+  log(`dsh-lkg: dsh ${version} is live and ${after.id} is current; restart \`dsh web\` when it suits you`)
 }
 
 const list = () => {
@@ -605,12 +800,12 @@ const list = () => {
   }
 }
 
-const verify = async target => {
+const verify = async (target, { turn } = {}) => {
   const id = target === undefined || target === 'current' ? currentVersionId() : target
   if (id === undefined) fail('no current snapshot')
   const root = join(VERSIONS, id)
   if (!existsSync(root)) fail(`unknown version ${id}`)
-  const health = await healthCheck(root)
+  const health = await healthCheck(root, { turn })
   for (const check of health.checks) log(`  ${check.ok ? 'ok  ' : 'FAIL'} ${check.name}: ${check.detail}`)
   const manifestPath = join(root, 'manifest.json')
   const manifest = readJson(manifestPath) ?? {}
@@ -672,13 +867,19 @@ const usage = () => {
                               build, health-check and promote a new LKG;
                               --if-changed skips when current already matches
   list                        versions, health and freeze state
-  verify [<id>|current]       re-run the health check on a version
+  verify [<id>|current] [--turn] [--turn-model <provider/model>]
+                              re-run the health check on a version; --turn
+                              also sends one real prompt on a clone of ~/.dsh
+  upgrade <version> [--turn-model <provider/model>]
+                              install @deepseek-ai/dsh@<version> globally only
+                              after an isolated candidate passes every check,
+                              including --turn
   reap [--keep <n>]           drop old versions (default ${DEFAULT_KEEP})
   unlock <id>                 clear immutable flags for maintenance
   remove <id>                 drop one version (never the current one)
   status                      where the store lives
 
-Operator commands (snapshot, reap, unlock) refuse to run from a DSH agent
+Operator commands (snapshot, upgrade, reap, unlock) refuse to run from a DSH agent
 session unless DSH_LKG_ADMIN=1 is set.`)
 }
 
@@ -688,6 +889,13 @@ const main = async () => {
     const index = rest.indexOf(name)
     return index === -1 ? undefined : rest[index + 1]
   }
+  const flagValues = new Set(['--label', '--keep', '--turn-model'].flatMap(name => (flag(name) === undefined ? [] : [flag(name)])))
+  const positional = () => rest.find(value => !value.startsWith('--') && !flagValues.has(value))
+  const turnModel = () => {
+    const model = flag('--turn-model')
+    if (model !== undefined && !/^[^/\s]+\/\S+$/.test(model)) fail('--turn-model takes provider/model')
+    return model
+  }
   switch (command) {
     case 'snapshot':
       await snapshot({ label: flag('--label'), ifChanged: rest.includes('--if-changed') })
@@ -696,7 +904,10 @@ const main = async () => {
       list()
       return
     case 'verify':
-      await verify(rest.find(value => !value.startsWith('--')))
+      await verify(positional(), { turn: rest.includes('--turn') || flag('--turn-model') !== undefined ? { model: turnModel() } : undefined })
+      return
+    case 'upgrade':
+      await upgrade(positional(), { turnModel: turnModel() })
       return
     case 'reap':
       reap(Number.parseInt(flag('--keep') ?? String(DEFAULT_KEEP), 10))
@@ -718,4 +929,4 @@ const main = async () => {
 
 if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) await main()
 
-export { cloneTree, healthCheck, snapshot }
+export { classifyTurn, cloneTree, healthCheck, snapshot }
