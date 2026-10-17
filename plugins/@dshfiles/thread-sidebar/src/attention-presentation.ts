@@ -1,6 +1,11 @@
 import type { AttentionColor, AttentionColors, AttentionColorKey } from './organization.js'
 
-export type ThreadAttentionLabel = 'threadSidebarApprovalNeeded' | 'threadSidebarInputNeeded' | 'threadSidebarTurnFinished' | 'threadSidebarNeedsResume'
+export type ThreadAttentionLabel =
+  | 'threadSidebarApprovalNeeded'
+  | 'threadSidebarInputNeeded'
+  | 'threadSidebarTurnFinished'
+  | 'threadSidebarNeedsResume'
+  | 'threadSidebarInterrupted'
 
 export interface ThreadStatusVisualInput {
   readonly attentionLabel: ThreadAttentionLabel | undefined
@@ -13,10 +18,14 @@ const attentionColorKeys = {
   threadSidebarApprovalNeeded: 'approvalNeeded',
   threadSidebarInputNeeded: 'inputNeeded',
   threadSidebarTurnFinished: 'turnFinished',
-} satisfies Record<Exclude<ThreadAttentionLabel, 'threadSidebarNeedsResume'>, AttentionColorKey>
+} satisfies Record<Exclude<ThreadAttentionLabel, 'threadSidebarNeedsResume' | 'threadSidebarInterrupted'>, AttentionColorKey>
 
-const attentionColorForLabel = (label: ThreadAttentionLabel, attentionColors: AttentionColors): AttentionColor =>
-  label === 'threadSidebarNeedsResume' ? 'warning' : attentionColors[attentionColorKeys[label]]
+/** The recovery labels describe a Host fact, not a user preference, so they keep fixed colors. */
+const attentionColorForLabel = (label: ThreadAttentionLabel, attentionColors: AttentionColors): AttentionColor => {
+  if (label === 'threadSidebarNeedsResume') return 'warning'
+  if (label === 'threadSidebarInterrupted') return 'danger'
+  return attentionColors[attentionColorKeys[label]]
+}
 
 const attentionTextClasses = {
   muted: 'dshx:text-muted-foreground',

@@ -31,7 +31,7 @@ backing verb; `host-gap` counts capabilities no verb can reach yet.
 
 | Owner                                                                                                                                             | Capabilities audited | Agent tools today                                                                                        | Missing tools | Host gaps |
 | ------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- | -------------------------------------------------------------------------------------------------------- | ------------- | --------- |
-| thread-sidebar                                                                                                                                    | 40                   | 16 (new)                                                                                                 | 12            | 4         |
+| thread-sidebar                                                                                                                                    | 40                   | 18 (new)                                                                                                 | 12            | 5         |
 | main-tabs                                                                                                                                         | 8                    | 0                                                                                                        | 2             | 2         |
 | home                                                                                                                                              | 4                    | 0                                                                                                        | 3             | 0         |
 | sidebar-commands                                                                                                                                  | 2                    | 0                                                                                                        | 1             | 0         |
@@ -89,7 +89,10 @@ Each row is a tool worth building today: the backing verb already exists.
 | `remote_thread_list`             | Threads on other hosts                                   | `multi-host.threadList` (no `tool` binding)                                      |
 | `dsh_restart`                    | Restart DSH / copy launch URL                            | own `requestRestart` host service (`src/host.ts:18-28`)                          |
 
-Already tool-served (this change): the 16 `thread_*` / `project_*` tools below.
+Already tool-served (this change): the 18 `thread_*` / `project_*` tools below, including
+`thread_recoveries` (list the threads whose turn a restart or a crash interrupted) and
+`thread_recovery_resume` (queue the continuation prompt for one of them) — the same
+`thread-sidebar-recovery` verbs the Interrupted and Needs resume groups drive.
 
 ### main-tabs
 

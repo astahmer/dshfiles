@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'vitest'
-import { selectRestartRecoveryRows } from './restart-recovery-rows.js'
+import { selectRecoveryRows, selectRestartRecoveryRows } from './restart-recovery-rows.js'
+import type { RecoveryReason } from './restart-recovery.js'
 
 const session = (id: string, updatedAt: number, overrides: Partial<{ readonly blank: boolean; readonly running: boolean }> = {}) => ({
   id,
@@ -31,5 +32,31 @@ test('recovery rows include only persisted restart candidates that remain idle a
   assert.deepEqual(
     rows.map(row => row.id),
     ['restart-interrupted'],
+  )
+})
+
+test('interrupted rows keep crash recoveries apart from managed restarts', () => {
+  const reasons = new Map<string, RecoveryReason>([
+    ['crash-a', 'interrupted'],
+    ['crash-b', 'interrupted'],
+    ['restart-a', 'restart'],
+  ])
+  const options = {
+    sessions: [session('crash-a', 1), session('crash-b', 9), session('restart-a', 5), session('no-reason', 7)],
+    sessionIds: new Set(['crash-a', 'crash-b', 'restart-a']),
+    reasonFor: (sessionId: string) => reasons.get(sessionId),
+    mutedSessionIds: new Set<string>(),
+    archivedSessionIds: new Set<string>(),
+    matchesWorkspace: () => true,
+    matchesSource: () => true,
+  }
+
+  assert.deepEqual(
+    selectRecoveryRows({ ...options, reason: 'interrupted' }).map(row => row.id),
+    ['crash-b', 'crash-a'],
+  )
+  assert.deepEqual(
+    selectRecoveryRows({ ...options, reason: 'restart' }).map(row => row.id),
+    ['restart-a'],
   )
 })

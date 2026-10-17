@@ -103,7 +103,8 @@ import {
 } from './sidebar-notice.js'
 import { threadSidebarMachineApi } from './machine-api.js'
 import { threadSidebarRecoveryApi } from './recovery-api.js'
-import { selectRestartRecoveryRows } from './restart-recovery-rows.js'
+import { selectRecoveryRows } from './restart-recovery-rows.js'
+import type { RecoveryReason } from './restart-recovery.js'
 import { UsageLimitRowsModel, type QuotaContinuation } from './usage-limit-rows.js'
 import { UsageLimitSection, type UsageLimitSnooze } from './usage-limit-section.js'
 import { groupThreadChildren, partitionFinishedChildren, shouldOpenChildThreadList, threadActionTargetIds, visibleChildren } from './thread-children.js'
@@ -922,7 +923,19 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   })
   const resumeMutation = useMutation({ mutationFn: (input: { readonly sessionId: SessionSummary['id'] }) => recoveryApi.resume(input) })
   const dismissMutation = useMutation({ mutationFn: (input: { readonly sessionId: SessionSummary['id'] }) => recoveryApi.dismiss(input) })
-  const recoverySessionIds = useMemo(() => new Set(recoveryQuery.data?.sessionIds ?? []), [recoveryQuery.data?.sessionIds])
+  // A Host that predates the reason field answers with ids only; those entries are managed restarts.
+  const recoveryReasonBySessionId = useMemo(() => {
+    const reasons = new Map<string, RecoveryReason>()
+    const entries = recoveryQuery.data?.entries
+    if (entries === undefined) for (const sessionId of recoveryQuery.data?.sessionIds ?? []) reasons.set(sessionId, 'restart')
+    else for (const entry of entries) reasons.set(entry.sessionId, entry.reason)
+    return reasons
+  }, [recoveryQuery.data])
+  const recoverySessionIds = useMemo(() => new Set(recoveryReasonBySessionId.keys()), [recoveryReasonBySessionId])
+  const recoveryReasonFor = useCallback(
+    (sessionId: string): RecoveryReason | undefined => recoveryReasonBySessionId.get(sessionId),
+    [recoveryReasonBySessionId],
+  )
   const [resumeBusySessionIds, setResumeBusySessionIds] = useState<ReadonlySet<string>>(() => new Set())
   const [resumeAllBusy, setResumeAllBusy] = useState(false)
   const accountsApi = useApi(aiAccountsApi)
@@ -1084,22 +1097,23 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     () => sessions.filter(session => SidebarOrganization.isAttentionSessionIncluded(session, preferences.includeSubagentAttention)),
     [preferences.includeSubagentAttention, sessions],
   )
-  const needsResumeRows = useMemo(
-    () =>
-      selectRestartRecoveryRows({
-        sessions,
-        sessionIds: recoverySessionIds,
-        mutedSessionIds,
-        archivedSessionIds,
-        matchesWorkspace: session =>
-          preferences.workspaceFilter === null ||
-          (SidebarOrganization.workspaceForLineage(session, sessionState.byId, workspaceBySession) ?? '') === preferences.workspaceFilter,
-        matchesSource: session => ThreadViewModel.matchesSourceFilter(session, threadView.sourceFilter),
-      }),
+  const recoveryRowOptions = useMemo(
+    () => ({
+      sessions,
+      sessionIds: recoverySessionIds,
+      reasonFor: recoveryReasonFor,
+      mutedSessionIds,
+      archivedSessionIds,
+      matchesWorkspace: (session: SessionSummary) =>
+        preferences.workspaceFilter === null ||
+        (SidebarOrganization.workspaceForLineage(session, sessionState.byId, workspaceBySession) ?? '') === preferences.workspaceFilter,
+      matchesSource: (session: SessionSummary) => ThreadViewModel.matchesSourceFilter(session, threadView.sourceFilter),
+    }),
     [
       archivedSessionIds,
       mutedSessionIds,
       preferences.workspaceFilter,
+      recoveryReasonFor,
       recoverySessionIds,
       sessionState.byId,
       sessions,
@@ -1107,6 +1121,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       workspaceBySession,
     ],
   )
+  const needsResumeRows = useMemo(() => selectRecoveryRows({ ...recoveryRowOptions, reason: 'restart' }), [recoveryRowOptions])
+  const interruptedRows = useMemo(() => selectRecoveryRows({ ...recoveryRowOptions, reason: 'interrupted' }), [recoveryRowOptions])
   const usageLimitRows = useMemo(
     () =>
       UsageLimitRowsModel.select({
@@ -1222,9 +1238,9 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       setUsageLimitResumeAllBusy(false)
     }
   }
-  const resumeAllRecoveries = async (): Promise<void> => {
+  const resumeAllRecoveries = async (rows: readonly SessionSummary[]): Promise<void> => {
     if (resumeAllBusy) return
-    const sessionIds = needsResumeRows.filter(session => !resumeBusySessionIds.has(session.id)).map(session => session.id)
+    const sessionIds = rows.filter(session => !resumeBusySessionIds.has(session.id)).map(session => session.id)
     if (sessionIds.length === 0) return
     setResumeAllBusy(true)
     setResumeBusySessionIds(current => new Set([...current, ...sessionIds]))
@@ -1938,8 +1954,16 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   )
   const waitingSessionIds = useMemo(() => new Set([...approvalNeededRows, ...needsInputRows].map(session => session.id)), [approvalNeededRows, needsInputRows])
   const attentionSessionIds = useMemo(
-    () => new Set([...approvalNeededRows, ...needsInputRows, ...turnFinishedRows, ...needsResumeRows, ...usageLimitRows.map(row => row.session.id)]),
-    [approvalNeededRows, needsInputRows, needsResumeRows, turnFinishedRows, usageLimitRows],
+    () =>
+      new Set([
+        ...approvalNeededRows,
+        ...needsInputRows,
+        ...turnFinishedRows,
+        ...needsResumeRows,
+        ...interruptedRows,
+        ...usageLimitRows.map(row => row.session.id),
+      ]),
+    [approvalNeededRows, interruptedRows, needsInputRows, needsResumeRows, turnFinishedRows, usageLimitRows],
   )
   const attentionRootIds = useMemo(() => {
     const ids = new Set(attentionSessionIds)
@@ -2018,6 +2042,19 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       ),
     [archivedSessionIds, currentWorkingThreadIds, mutedSessionIds, needsResumeRows, threadView.sourceFilter, threadView.statusFilters],
   )
+  const statusFilteredInterruptedRows = useMemo(
+    () =>
+      interruptedRows.filter(session =>
+        ThreadViewModel.matchesStatusFilter({
+          filters: threadView.statusFilters,
+          running: threadView.sourceFilter === 'subagents' ? session.running : currentWorkingThreadIds.has(session.id),
+          needsAttention: true,
+          archived: archivedSessionIds.has(session.id),
+          muted: mutedSessionIds.has(session.id),
+        }),
+      ),
+    [archivedSessionIds, currentWorkingThreadIds, interruptedRows, mutedSessionIds, threadView.sourceFilter, threadView.statusFilters],
+  )
   const statusFilteredUsageLimitRows = useMemo(
     () =>
       usageLimitRows.filter(row =>
@@ -2032,8 +2069,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     [archivedSessionIds, currentWorkingThreadIds, mutedSessionIds, threadView.sourceFilter, threadView.statusFilters, usageLimitRows],
   )
   const statusFilteredRecoveryRows = useMemo(
-    () => [...statusFilteredNeedsResumeRows, ...statusFilteredUsageLimitRows.map(row => row.session)],
-    [statusFilteredNeedsResumeRows, statusFilteredUsageLimitRows],
+    () => [...statusFilteredInterruptedRows, ...statusFilteredNeedsResumeRows, ...statusFilteredUsageLimitRows.map(row => row.session)],
+    [statusFilteredInterruptedRows, statusFilteredNeedsResumeRows, statusFilteredUsageLimitRows],
   )
   const attentionIds = useMemo(
     () =>
@@ -2862,6 +2899,34 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
               {props.tSidebar('threadSidebarLoading')}
             </div>
           ) : null}
+          {statusFilteredInterruptedRows.length > 0 ? (
+            <section className="dshx:mt-1" aria-label={props.tSidebar('threadSidebarInterrupted')}>
+              <div className={cn(stickyHeaderClass, 'dshx:flex dshx:h-8 dshx:items-center dshx:gap-2 dshx:px-2.5 dshx:text-sm')}>
+                <span
+                  className={cn(
+                    'dshx:whitespace-nowrap dshx:font-medium',
+                    ThreadAttentionPresentationModel.attentionLabelClass('threadSidebarInterrupted', preferences.attentionColors),
+                  )}
+                >
+                  {props.tSidebar('threadSidebarInterrupted')}
+                </span>
+                <span className="dshx:text-xs dshx:tabular-nums">({statusFilteredInterruptedRows.length})</span>
+                <span className="dshx:h-px dshx:flex-1 dshx:bg-border" aria-hidden="true" />
+                <Button
+                  type="button"
+                  size="xs"
+                  variant="outline"
+                  disabled={resumeAllBusy}
+                  onClick={() => void resumeAllRecoveries(statusFilteredInterruptedRows)}
+                >
+                  {resumeAllBusy ? <Spinner className="dshx:size-3" /> : null}
+                  {props.tSidebar('threadSidebarResumeAll')}
+                </Button>
+              </div>
+              <p className="dshx:px-2.5 dshx:pb-1 dshx:text-xs dshx:text-muted-foreground">{props.tSidebar('threadSidebarInterruptedHint')}</p>
+              {statusFilteredInterruptedRows.map(session => renderThreadRow(session, 'threadSidebarInterrupted'))}
+            </section>
+          ) : null}
           {statusFilteredNeedsResumeRows.length > 0 ? (
             <section className="dshx:mt-1" aria-label={props.tSidebar('threadSidebarNeedsResume')}>
               <div className={cn(stickyHeaderClass, 'dshx:flex dshx:h-8 dshx:items-center dshx:gap-2 dshx:px-2.5 dshx:text-sm')}>
@@ -2875,7 +2940,13 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                 </span>
                 <span className="dshx:text-xs dshx:tabular-nums">({statusFilteredNeedsResumeRows.length})</span>
                 <span className="dshx:h-px dshx:flex-1 dshx:bg-border" aria-hidden="true" />
-                <Button type="button" size="xs" variant="outline" disabled={resumeAllBusy} onClick={() => void resumeAllRecoveries()}>
+                <Button
+                  type="button"
+                  size="xs"
+                  variant="outline"
+                  disabled={resumeAllBusy}
+                  onClick={() => void resumeAllRecoveries(statusFilteredNeedsResumeRows)}
+                >
                   {resumeAllBusy ? <Spinner className="dshx:size-3" /> : null}
                   {props.tSidebar('threadSidebarResumeAll')}
                 </Button>

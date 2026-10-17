@@ -1222,6 +1222,59 @@
       ]
     },
     {
+      "id": "interrupted-turn-threads",
+      "title": "See threads a crash interrupted",
+      "summary": "Every turn the Host opens is recorded in a small durable in-flight file and cleared when the turn ends, so the next Host process knows exactly which turns a crash, kill or shutdown timeout left open; it promotes them into the durable recovery store at boot, marked interrupted, and the sidebar lists them under Interrupted with Resume, Resume all and dismiss actions until the thread runs again.",
+      "surfaces": ["client", "host", "api", "tool", "storage"],
+      "configuration": [],
+      "states": ["turn-open", "turn-closed", "interrupted", "managed-restart", "promoted", "resumed", "dismissed"],
+      "failureModes": [
+        "A turn that ended before the process stopped is never reported: turn/end clears its in-flight marker.",
+        "The in-flight file is cleared while its entries are promoted, so one exit is reported once even if recording the recovery rows fails.",
+        "A thread already recorded by a managed restart keeps the restart reason instead of being promoted twice.",
+        "A recovery file written before reasons existed still reads, with every entry treated as a managed restart.",
+        "An older Host that answers with session ids only keeps working: the client treats those ids as managed restarts."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.interrupted-turn-threads-unit-boundaries",
+          "file": "plugins/@dshfiles/thread-sidebar/src/inflight-turns.test.ts",
+          "testName": "turn boundaries are the only events that open or close an in-flight turn"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.interrupted-turn-threads-unit-promotion",
+          "file": "plugins/@dshfiles/thread-sidebar/src/inflight-turns.test.ts",
+          "testName": "a turn left in flight by an ungraceful exit is promoted as interrupted, once"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.interrupted-turn-threads-unit-reason-kept",
+          "file": "plugins/@dshfiles/thread-sidebar/src/inflight-turns.test.ts",
+          "testName": "a managed restart keeps its own reason when the same thread was also in flight"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.interrupted-turn-threads-unit-legacy-file",
+          "file": "plugins/@dshfiles/thread-sidebar/src/restart-recovery.test.ts",
+          "testName": "a recovery file written before reasons existed reads as managed restarts"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.interrupted-turn-threads-unit-rows",
+          "file": "plugins/@dshfiles/thread-sidebar/src/restart-recovery-rows.test.ts",
+          "testName": "interrupted rows keep crash recoveries apart from managed restarts"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "thread-sidebar.interrupted-turn-threads-no-browser-journey",
+          "reason": "The state needs a Host that stopped mid-turn, which no UI step can produce: a browser journey would first need a new dshx dev seed that opens a turn, kills the scratch Host without the managed-restart handshake, and boots it again."
+        }
+      ]
+    },
+    {
       "id": "thread-reference-mention",
       "title": "Insert cross-session references into the composer",
       "summary": "Resolve a target Host session and insert its native reference chip at the active composer\u2019s captured selection.",

@@ -173,7 +173,7 @@ section, is skipped by auto-archive, and stays parked until unparked, but its
 alerts still fire. Mute keeps the thread where it is and only silences it, for
 a while or for good. They answer different questions ("not now" vs "not
 noisy"), so they stay separate and combine freely. The sidebar separates **Approval needed**,
-**Input needed**, **Turn finished**, and **Needs resume**.
+**Input needed**, **Turn finished**, **Interrupted**, and **Needs resume**.
 Permission approvals and plan-review decisions use **Approval needed**;
 structured user-question requests use **Input needed**. Open questions use the
 Client's explicit Session pending-interaction status; the sidebar also checks
@@ -183,14 +183,20 @@ kinds and generic unstructured questions remain unclassified. **Turn finished**
 marks an eligible finished turn from the Host's attention record; selecting that
 thread from any route acknowledges it. **Needs resume** contains only Sessions
 the managed restart captures as running immediately before its Host exit.
-Completed, already-idle, and user-cancelled Sessions are not added. Each row has
-explicit **Resume** and dismiss actions, and the group offers **Resume all** (up
-to three requests at once). Resume sends a new continuation prompt that directs
-the agent to inspect its transcript and workspace before continuing; it does not
-replay the interrupted model/tool call. A manual process stop or crash without
-the managed restart handshake does not create a recovery marker. Approval, Input,
-and Turn finished can be configured independently as a separate group or inline
-thread-row label.
+Completed, already-idle, and user-cancelled Sessions are not added. **Interrupted**
+contains Sessions whose turn was still open when a previous Host process stopped
+without that capture — a crash, a kill, or a shutdown timeout. The Host half
+records every `turn/start` in a small durable in-flight file and clears it on
+`turn/end`, so whatever the next process finds there is exactly the set of turns
+that never closed; it promotes those ids into the same recovery store at boot,
+marked `interrupted` instead of `restart`, and clears the file so one exit is
+reported once. Both groups show explicit **Resume** and dismiss actions, and each
+offers **Resume all** (up to three requests at once). Resume sends a new
+continuation prompt that directs the agent to inspect its transcript and
+workspace before continuing; it does not replay the interrupted model/tool call.
+A row leaves its group as soon as that thread runs again, and dismissing drops it
+by hand. Approval, Input, and Turn finished can be configured independently as a
+separate group or inline thread-row label.
 Approval and Input default to groups; Turn finished defaults to an inline
 label. Each status has an independently configurable semantic color in Sidebar
 settings (Muted, Primary, Info, Success, Warning, or Danger); the default colors

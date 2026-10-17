@@ -18,6 +18,7 @@ import { threadSidebarRecoveryApi } from './recovery-api.js'
 import { createPluginUpdateWatch } from './plugin-updates.js'
 import { threadSidebarRestartApi } from './restart-api.js'
 import { threadSidebarSessionArchiveApi } from './session-archive-api.js'
+import { InflightTurns } from './inflight-turns.js'
 import { activeRestartSessionIds, createRestartRecoveryStore } from './restart-recovery.js'
 import { createRestartController, readLaunchUrl } from './restart.js'
 import { threadSidebarSettings } from './settings.js'
@@ -26,6 +27,7 @@ import { setThreadActionsContext, threadActionsHost } from './thread-actions-hos
 import { threadQueueHost } from './queue-host.js'
 
 const restartRecoveryStore = createRestartRecoveryStore()
+const inflightTurns = InflightTurns.open()
 
 const restartController = (ctx: Context) =>
   createRestartController(ctx, {
@@ -33,7 +35,7 @@ const restartController = (ctx: Context) =>
       const persistence = ctx.get('sessionPersistence')
       if (persistence === undefined) throw new Error('Session persistence is unavailable.')
       await persistence.flush()
-      await restartRecoveryStore.record(activeRestartSessionIds(ctx.agents.list()))
+      await restartRecoveryStore.record(activeRestartSessionIds(ctx.agents.list()), 'restart')
     },
     onExitFailure: () => console.error('thread-sidebar: managed restart was canceled because running-thread recovery could not be saved'),
   })
@@ -70,7 +72,11 @@ const resumePrompt = [
 const recoveryApi = threadSidebarRecoveryApi.host({
   pending: async ({ ctx }) => {
     await restartRecoveryStore.remove(new Set(activeRestartSessionIds(ctx.agents.list())))
-    return { sessionIds: (await restartRecoveryStore.list()).map(entry => entry.sessionId) }
+    const entries = await restartRecoveryStore.list()
+    return {
+      sessionIds: entries.map(entry => entry.sessionId),
+      entries: entries.map(entry => ({ sessionId: entry.sessionId, reason: entry.reason, interruptedAt: entry.interruptedAt })),
+    }
   },
   resume: async ({ ctx, input }) => {
     const entry = (await restartRecoveryStore.list()).find(candidate => candidate.sessionId === input.sessionId)
@@ -199,6 +205,20 @@ export default defineHost({
         await closeAttention()
       }
     }, 'thread-sidebar: thread attention store')
+    // A turn that was still open when the previous Host process stopped never wrote its own recovery
+    // record: the crash leaves the marker behind instead, and this process turns it into a visible row.
+    ctx.effect(() => {
+      void InflightTurns.promote({ inflight: inflightTurns, recovery: restartRecoveryStore }).catch(() => undefined)
+      const stop = ctx.on('session/event', (session, event) => {
+        const boundary = InflightTurns.boundaryFromEvent(event)
+        if (boundary === null) return
+        const sessionId = String(session.id)
+        void (boundary === 'start' ? inflightTurns.start(sessionId) : inflightTurns.end(sessionId)).catch(() => undefined)
+      })
+      return () => {
+        stop()
+      }
+    }, 'thread-sidebar: interrupted-turn tracking')
     ctx.inject(['clientModules'], scoped => {
       const registry: ClientModuleRegistrySurface | undefined = scoped.get('clientModules')
       if (registry?.graph === undefined || registry.clientPath === undefined) return
