@@ -130,24 +130,20 @@ const pluginUpdatesApi = threadSidebarPluginUpdatesApi.host({
   pending: async () => ({ plugins: (await pluginUpdates?.pending()) ?? [] }),
 })
 
+/**
+ * One `sessionController.list` answers every requested Session at once. Observing each Session
+ * separately re-read its log, which cost seconds per poll and pinned a browser connection with it.
+ */
 const pendingQuestionsApi = threadSidebarPendingQuestionsApi.host({
   active: async ({ ctx, input, signal }) => {
-    const activeSessionIds: string[] = []
-    for (let offset = 0; offset < input.sessionIds.length; offset += 8) {
-      const batch = input.sessionIds.slice(offset, offset + 8)
-      const results = await Promise.all(
-        batch.map(async sessionId => {
-          const observation = await ctx.sessionQuery.observeSession(SessionId(sessionId), { signal, projectionMode: 'all' })
-          try {
-            return observation.projections?.values.userQuestions?.active.length ? sessionId : undefined
-          } finally {
-            observation[Symbol.dispose]()
-          }
-        }),
-      )
-      activeSessionIds.push(...results.filter((sessionId): sessionId is string => sessionId !== undefined))
+    if (input.sessionIds.length === 0) return { sessionIds: [] }
+    const candidates = new Set<string>(input.sessionIds)
+    const listed = await ctx.sessionController.list({}, signal)
+    return {
+      sessionIds: listed.items
+        .filter(item => candidates.has(item.sessionId) && (item.projections?.values.userQuestions?.active.length ?? 0) > 0)
+        .map(item => item.sessionId),
     }
-    return { sessionIds: activeSessionIds }
   },
 })
 
