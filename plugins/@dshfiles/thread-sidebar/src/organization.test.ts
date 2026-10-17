@@ -315,6 +315,31 @@ test('archive adapter explicitly refuses to stop Host activity', async () => {
   assert.deepEqual(request, { sessionId: 'session-1', options: { stopActivity: false } })
 })
 
+const activeRefusal = (kinds: readonly string[]) =>
+  Object.assign(new Error('workspace session archive failed'), {
+    rpcError: { code: 'workspace/session-active', message: 'active', details: { sessionId: 'session-1', activity: kinds.map(kind => ({ kind, items: [] })) } },
+  })
+
+test('archive stops a parked quota recovery, the only activity that waits for the user', async () => {
+  const requests: { readonly stopActivity: boolean }[] = []
+  await SidebarOrganization.archiveWithoutStopping(async (_sessionId, options) => {
+    requests.push(options)
+    if (!options.stopActivity) throw activeRefusal(['quota-continuation'])
+  }, 'session-1')
+  assert.deepEqual(requests, [{ stopActivity: false }, { stopActivity: true }])
+})
+
+test('archive still refuses when anything other than a quota recovery is running', async () => {
+  const requests: { readonly stopActivity: boolean }[] = []
+  await assert.rejects(
+    SidebarOrganization.archiveWithoutStopping(async (_sessionId, options) => {
+      requests.push(options)
+      throw activeRefusal(['quota-continuation', 'turn'])
+    }, 'session-1'),
+  )
+  assert.deepEqual(requests, [{ stopActivity: false }])
+})
+
 test('footer and icon-row overflow keep whole items and reserve the More control only when something overflows', () => {
   assert.deepEqual(SidebarOrganization.fitItems({ widths: [80, 120], available: 208, gap: 8, reserve: 36 }), [true, true])
   assert.deepEqual(SidebarOrganization.fitItems({ widths: [80, 120], available: 200, gap: 8, reserve: 36 }), [true, false])

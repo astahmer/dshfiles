@@ -1,4 +1,5 @@
 import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
+import { z } from 'zod'
 import type { WorkspaceView } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { FinishedSubagentsMode } from './thread-children.js'
 import type { ThreadMutes } from './thread-mute.js'
@@ -328,10 +329,30 @@ const reorderVisibleEntry = (options: {
 const dropIndexAt = (options: { readonly centers: readonly number[]; readonly fromIndex: number; readonly position: number }): number =>
   options.centers.filter((center, index) => index !== options.fromIndex && center < options.position).length
 
-const archiveWithoutStopping = <SessionId extends string>(
-  archive: (sessionId: SessionId, options: { readonly stopActivity: false }) => Promise<void>,
+/** The client's WorkspaceArchiveError carries the Host refusal as `rpcError`. */
+const parkedRecoveryRefusal = z.object({
+  rpcError: z.object({
+    code: z.literal('workspace/session-active'),
+    details: z.object({ activity: z.array(z.object({ kind: z.literal('quota-continuation') })).min(1) }),
+  }),
+})
+
+/**
+ * Archive without stopping Host activity, except a parked quota recovery: it
+ * only waits for a reset to resume the thread, and archiving means the user no
+ * longer wants that, so stopping it is the archive's intent rather than a loss.
+ */
+const archiveWithoutStopping = async <SessionId extends string>(
+  archive: (sessionId: SessionId, options: { readonly stopActivity: boolean }) => Promise<void>,
   sessionId: SessionId,
-): Promise<void> => archive(sessionId, { stopActivity: false })
+): Promise<void> => {
+  try {
+    await archive(sessionId, { stopActivity: false })
+  } catch (error) {
+    if (!parkedRecoveryRefusal.safeParse(error).success) throw error
+    await archive(sessionId, { stopActivity: true })
+  }
+}
 
 const hasPassedIdleThreshold = (session: Pick<SessionActivity, 'updatedAt'>, now: number, idleMinutes: number): boolean =>
   Number.isFinite(session.updatedAt) && session.updatedAt <= now && now - session.updatedAt >= idleMinutes * 60_000
