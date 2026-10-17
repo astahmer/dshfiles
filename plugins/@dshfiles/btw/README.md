@@ -29,6 +29,8 @@ forks it exactly as `/btw` does and closes once the side panel opens:
   `cacheRead / (input + cacheRead + cacheWrite)` of the first
   `assistant/message` after `session/end-seed`, the share `@dshfiles/usage`
   reports.
+  embedded body sizes itself as a flex item, so a block wrapper would grow it
+  past the pane, hide the composer and leave the transcript unscrollable.
 - **Hidden and archived:** `@dshfiles/thread-sidebar` hides threads titled
   `btw · …`. Closing the tab archives the fork; a failure after the fork
   archives it too, and the composer shows why.

@@ -386,7 +386,8 @@ export default defineClient({
                     {actor === undefined ? null : <SideChatStatus actor={actor} t={t} />}
                     {resource.value === undefined ? null : <CacheReading reference={resource.value.reference} t={t} />}
                   </div>
-                  <div className="dshx:min-h-0 dshx:flex-1">
+                  {/* A flex column, not a block: the embedded Conversation sizes itself as a flex item of its parent. */}
+                  <div className="dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col">
                     {resource.value === undefined ? null : (
                       <props.SessionProvider session={resource.value.reference}>{props.renderSlot(CONVERSATION_SLOT, {})}</props.SessionProvider>
                     )}
