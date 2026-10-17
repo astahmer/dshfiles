@@ -14,7 +14,7 @@ import {
   type PromptContext,
   type PromptSection,
 } from '../src/host/index.js'
-import { promptContributionParts } from '../src/host/define.js'
+import { HostDefinitionModel } from '../src/host/define.js'
 import { defineSettings } from '../src/settings/index.js'
 import { defineApi, method } from '../src/api/index.js'
 import { createHostModule, createHostPlugin } from '../src/host/runtime.js'
@@ -118,9 +118,9 @@ describe('defineHost', () => {
     const promptContext = definePromptContext(contextValue)
 
     expect(section).toEqual({})
-    expect(promptContributionParts(section)).toEqual({ kind: 'section', value: sectionValue })
+    expect(HostDefinitionModel.promptContributionParts(section)).toEqual({ kind: 'section', value: sectionValue })
     expect(promptContext).toEqual({})
-    expect(promptContributionParts(promptContext)).toEqual({ kind: 'context', value: contextValue })
+    expect(HostDefinitionModel.promptContributionParts(promptContext)).toEqual({ kind: 'context', value: contextValue })
     expectTypeOf(section).toMatchTypeOf<import('../src/host/types.js').PromptSectionContribution<typeof sectionValue>>()
     expectTypeOf(promptContext).toMatchTypeOf<import('../src/host/types.js').PromptContextContribution<typeof contextValue>>()
   })

@@ -1,4 +1,9 @@
-export { defineCommand, defineHost, definePromptContext, definePromptSection } from './define.js'
+import { HostDefinitionModel } from './define.js'
+
+export const defineCommand = HostDefinitionModel.defineCommand
+export const defineHost = HostDefinitionModel.define
+export const definePromptContext = HostDefinitionModel.definePromptContext
+export const definePromptSection = HostDefinitionModel.definePromptSection
 export { defineTool } from '@deepseek-ai/dsh-tools'
 import { HostApiClientModel } from '../api/host-client.js'
 

@@ -26,7 +26,7 @@ import { apiRegistry } from '../api/registry.js'
 import { apiHostRegistrationParts, isApiHostRegistration } from '../api/define.js'
 import type { SettingsContract, SettingsContribution, SettingsHostContribution } from '../settings/types.js'
 import { SettingsDefinitionModel } from '../settings/define.js'
-import { promptContributionKind, promptContributionParts } from './define.js'
+import { HostDefinitionModel } from './define.js'
 
 const HOST_DEFINITION_KEYS = new Set(['name', 'inject', 'tools', 'commands', 'prompts', 'Config', 'settings', 'apis', 'setup'])
 
@@ -280,8 +280,11 @@ function validateDefinition(value: unknown, metadata: HostPluginMetadata): HostD
       )
     }
     for (const contribution of source.prompts) {
-      const kind = promptContributionKind(contribution)
-      if (kind === undefined || record(promptContributionParts(contribution as import('./types.js').PromptContribution).value) === undefined) {
+      const kind = HostDefinitionModel.promptContributionKind(contribution)
+      if (
+        kind === undefined ||
+        record(HostDefinitionModel.promptContributionParts(contribution as import('./types.js').PromptContribution).value) === undefined
+      ) {
         fail(
           'DSHX2002',
           'Host definition prompts contains a malformed Prompt contribution.',
@@ -364,7 +367,7 @@ export function createHostPlugin(value: unknown, metadata: HostPluginMetadata): 
       }
       for (const command of definition.commands ?? []) ctx.commands.register(command)
       for (const prompt of definition.prompts ?? []) {
-        const contribution = promptContributionParts(prompt)
+        const contribution = HostDefinitionModel.promptContributionParts(prompt)
         if (contribution.kind === 'section') ctx.systemPrompt.section(contribution.value)
         else ctx.systemPrompt.context(contribution.value)
       }

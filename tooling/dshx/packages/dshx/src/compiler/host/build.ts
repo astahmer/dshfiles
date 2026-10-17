@@ -98,7 +98,11 @@ function hostEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, opti
     load(id) {
       if (id === VIRTUAL_HOST_PUBLIC) {
         return [
-          `export { defineHost, defineCommand, definePromptContext, definePromptSection } from ${JSON.stringify(HOST_DEFINE_PATH)}`,
+          `import { HostDefinitionModel } from ${JSON.stringify(HOST_DEFINE_PATH)}`,
+          'export const defineHost = HostDefinitionModel.define',
+          'export const defineCommand = HostDefinitionModel.defineCommand',
+          'export const definePromptContext = HostDefinitionModel.definePromptContext',
+          'export const definePromptSection = HostDefinitionModel.definePromptSection',
           `export { definePlugin } from ${JSON.stringify(HOST_SDK_PATH)}`,
           // Managed-subprocess helpers are public: a Host plugin that spawns a
           // process needs them to await and terminate it, and without this the
