@@ -1,5 +1,25 @@
 # Session search and thread finder plan
 
+> **Status: delivered and verified (2026-10-17).** Resume here: nothing outstanding except the plan's own retirement
+> (see "Delivered" below). All seven implementation steps are done; the acceptance list below is ticked with the
+> evidence for each line.
+
+## Delivered
+
+| Piece | Where it lives |
+|-------|----------------|
+| Root cause and the supported mitigation | [`dsh-host-gaps.md`](dsh-host-gaps.md) — the SQLite backend allows two corpus observations and `continue`s on any snapshot/live-set change; the code is lost across the core RPC as `gateway/internal` |
+| The composed finder (`findThreads`, `relatedThreads`, tools `find_threads` / `related_threads`) | [`plugins/@dshfiles/memory/src/thread-finder.ts`](../plugins/@dshfiles/memory/src/thread-finder.ts), wired in `runtime.ts` / `host.ts` / `api.ts` |
+| Finder contract, degradation, scoping, cursors | [memory README → Finding threads](../plugins/@dshfiles/memory/README.md#finding-threads-one-finder-over-titles-content-and-memory) |
+| CLI resilience (`dshx sessions search`, `--limit`, fallback, typed failure) | [`tooling/dshx/docs/cli-reference.md`](../tooling/dshx/docs/cli-reference.md#dsh-platform-control-plane) |
+| Tests | `thread-finder.test.ts` (15), `thread-finder.integration.test.ts` (4, real SQLite engine), `session-search.spec.ts` (14), `runtime.test.ts` (2 new) |
+| Benchmark | `pnpm --dir plugins/@dshfiles/memory bench:finder` — real engine + real store, 24 threads, recall/precision/p50/p95 |
+| Ownership decision vs. Agent Session History | [`agent-session-history.md`](agent-session-history.md) — corrected context plus a decision row |
+
+Open follow-up (not blocking this plan): the same plan document exists as an identical commit in the JJ workspace
+`thread-992924`. This revision keeps its copy so the two lineages merge without a delete/modify conflict; whoever owns
+that workspace should retire its copy with `complete-plan` once both are on `main`.
+
 ## Context
 
 - The Web profile mounts DSH's `@deepseek-ai/dsh-session-query-sqlite` as a derived FTS5 index, configured with `openAt: first-search`. It reconciles the current session corpus on search and returns literal token/phrase matches with snippets and cursor pagination. It is not the session-persistence database.
@@ -134,23 +154,38 @@ The actual type must enumerate safe fields, use the canonical Session identity, 
 ## Open questions
 
 1. Which callers are required in the first delivery: `dshx sessions search`, Agent tool, Thread Sidebar, or a shared API consumed by more than one?
+   **Answered:** the Agent tools (`find_threads`, `related_threads`) and `dshx sessions search`, both served by the one `dshfiles-memory` API; no Thread Sidebar surface was added in this delivery.
 2. Should the unified finder include notes as searchable results, or only use memory results to find Sessions? Recommendation: include notes only when explicitly useful and visibly label them; keep the user’s request focused on locating conversations.
+   **Answered:** notes are excluded by default (`includeNotes: false`) and, when asked for, come back in a separate `notes` list labeled `memory-note`.
 3. What is the precise typed error and originating component behind “persistence observation did not stabilize”? Must be established by reproduction before choosing retry/backoff behavior.
+   **Answered:** `@deepseek-ai/dsh-session-query-sqlite`, `_observeStable`, code `SESSION_QUERY_PERSISTENCE_FAILED` after `STABLE_OBSERVATION_ATTEMPTS = 2`; the code is lost across the session-controller RPC, so the caller also classifies the `gateway/internal` message.
 4. Which metadata filters and relation signals are available through the installed supported contracts to each caller?
+   **Answered:** `id`, `cwd`, `created-at`, `parent`, `availability`, titles via `readTitleSnapshots`, and full-text search via `searchSessions`; relations come from `parentSessionId` plus same-workspace/same-topic inference.
 5. Should inferred related-thread candidates be part of the initial UI/tool response or an explicit second operation? Recommendation: separate opt-in operation until precision is measured.
+   **Answered:** separate `related_threads` operation; precision is now measured at 0.67 @5.
 
 ## Acceptance criteria
 
-- [ ] The original persistence-observation failure is reproduced or conclusively shown to be stale/non-reproducible; the exact component and error contract are documented.
-- [ ] A regression test covers the confirmed failure and proves bounded behavior: valid results, an explicitly labeled partial fallback, or a typed actionable error—never a false empty/success.
-- [ ] The configured SQLite index remains a derived index separate from persistence; no direct private-store access or unowned second index is introduced.
-- [ ] One documented finder contract searches supported session content/metadata and uses memory only through its public API; caller authorization is enforced before content is returned.
-- [ ] Results are bounded, deterministic, deduplicated by canonical session ID, include provenance and a usable native reference, and paginate safely under corpus changes.
-- [ ] Exact title, repository/workspace identifier, natural message-text, ambiguous-title, and cross-source duplicate cases pass focused tests.
-- [ ] Explicit session lineage is distinguishable from same-workspace/topic suggestions; inferred candidates are labeled and precision is measured.
-- [ ] A benchmark reports top-k recall/precision and p50/p95 latency for session-only, memory-only, and composed search; any ranking changes are supported by evidence.
-- [ ] Scratch-profile verification proves the intended caller path and failure behavior without modifying or restarting the live profile.
-- [ ] The scope overlaps cleanly with `agent-session-history.md`; no duplicate history tool or unauthorized Host surface is added.
+- [x] The original persistence-observation failure is reproduced or conclusively shown to be stale/non-reproducible; the exact component and error contract are documented.
+      Reproduced live (`dshx sessions search "session search"` and `"wasnt there another thread"`). Exact component: `@deepseek-ai/dsh-session-query-sqlite` `_observeStable` with `STABLE_OBSERVATION_ATTEMPTS = 2`; documented in [`dsh-host-gaps.md`](dsh-host-gaps.md).
+- [x] A regression test covers the confirmed failure and proves bounded behavior: valid results, an explicitly labeled partial fallback, or a typed actionable error—never a false empty/success.
+      `thread-finder.integration.test.ts` proves exactly 4 `list()` calls (2 observation attempts) then `SESSION_QUERY_PERSISTENCE_FAILED`, retry recovery with `diagnostics.attempts === 2`, and a labeled degraded page when instability is permanent; `runtime.test.ts` proves the typed `search-unavailable` failure instead of an empty page.
+- [x] The configured SQLite index remains a derived index separate from persistence; no direct private-store access or unowned second index is introduced.
+      The finder only calls `sessionQuery.searchSessions` / `readTitleSnapshots` and memory's own store; no new table, file or connection was added.
+- [x] One documented finder contract searches supported session content/metadata and uses memory only through its public API; caller authorization is enforced before content is returned.
+      `findThreads` / `relatedThreads` in memory, scoped by `projectsFilterFor(own, project)` (caller's project, or all only when `crossProject` is on); scoping happens before scoring and before snippets are produced.
+- [x] Results are bounded, deterministic, deduplicated by canonical session ID, include provenance and a usable native reference, and paginate safely under corpus changes.
+      `limit` 1–20 (default 8), deterministic order (score → `updatedAt` → session id), one merged row per session id with `sources`/`evidence`, and a stamped cursor that fails with `stale-cursor` when the corpus moved.
+- [x] Exact title, repository/workspace identifier, natural message-text, ambiguous-title, and cross-source duplicate cases pass focused tests.
+      `thread-finder.test.ts` — exact-title ranking, cwd identifier, paraphrase via content, two-source dedupe, ambiguous deterministic order, digest merge, cursor paging/stale/bad, filters, related explicit vs inferred; `runtime.test.ts` covers title+content on one hit.
+- [x] Explicit session lineage is distinguishable from same-workspace/topic suggestions; inferred candidates are labeled and precision is measured.
+      `related` returns `explicit` (parent/children) and `inferred` (labeled `shared-workspace` / `topic-candidate`); the benchmark measures inferred precision@5 = 0.67 with labeled sibling recall 1.00.
+- [x] A benchmark reports top-k recall/precision and p50/p95 latency for session-only, memory-only, and composed search; any ranking changes are supported by evidence.
+      `bench/thread-finder.ts`: recall@3/@5 = 1.00 in every mode and probe kind except memory-only title (0.94 @3, 1.00 @5); p50 ≤ 2.8 ms and p95 ≤ 35 ms across runs (the worst p95 is the first content search that opens/rebuilds the index; warm runs stay ≤ 8 ms), related precision@5 0.67. No ranking change was made on assumption: it fails the run when a labeled session stops being found.
+- [x] Scratch-profile verification proves the intended caller path and failure behavior without modifying or restarting the live profile.
+      Scratch `dshx dev up --plugin @dshfiles/memory` (port 60546, temp `DSH_HOME`): (a) degraded index (`openAt: "never"`) → labeled page `SESSION_QUERY_SEARCH_DISABLED after 1 attempt(s)` with title+memory hits, exit 0; (b) an unmatched query → exit 1 with `error [session-search-unavailable]: … Retry shortly or narrow the query.`; (c) after enabling the index patch and restarting the scratch host, `"cap the retry storm"` returned one deduped hit with `sources: [session-title, session-content, memory-message]` and no degradation. Scratch torn down with `dshx dev down`; the live `127.0.0.1:3080` instance was never touched.
+- [x] The scope overlaps cleanly with `agent-session-history.md`; no duplicate history tool or unauthorized Host surface is added.
+      Ownership decision recorded in [`agent-session-history.md`](agent-session-history.md): memory owns discovery, upstream `dsh-tool-session-query` owns trajectory reads (verified: nine tools, workspace-id authorization, installed nowhere); tool names `find_threads` / `related_threads` do not collide with the core `session_*` names.
 
 ## Decisions log
 
@@ -159,3 +194,7 @@ The actual type must enumerate safe fields, use the canonical Session identity, 
 | 2026-10-16 | Plan reliability repair and a composed thread finder together, but gate design on reproducing the reported persistence-observation error | Search reliability and cross-source discovery are one user journey; the single reported failure is not enough evidence to assume its root cause. |
 | 2026-10-16 | Reuse supported session-query and memory APIs; do not add an index or default embeddings initially | Existing systems already index session history and memory records; duplication and embedding overhead need measured justification. |
 | 2026-10-16 | Treat explicit lineage and inferred topical/workspace similarity as separate evidence | Avoid presenting merely related sessions as confirmed follow-ups. |
+| 2026-10-17 | Fix the reliability incident at the caller, not in the SQLite backend | The two-attempt observation loop lives in installed core (`STABLE_OBSERVATION_ATTEMPTS = 2`) and this repo carries no core patches; a bounded caller retry plus a labeled metadata/memory fallback keeps results honest without forking. The gap is recorded in [`dsh-host-gaps.md`](dsh-host-gaps.md). |
+| 2026-10-17 | The finder lives in `@dshfiles/memory` as `findThreads` / `relatedThreads` | Memory already owns cross-thread retrieval and reads `sessionQuery`, so no new plugin, no second index, and no duplicate of the upstream `session_*` tool names. |
+| 2026-10-17 | A finder failure crosses the dshx API boundary as a `PluginApiError` (`search-unavailable`), which the CLI reports as `session-search-unavailable` | Verified on a scratch Host: a thrown `ThreadFinderError` otherwise reaches the caller as `internal — API handler failed. See Host diagnostics.`, which is not actionable. The dshx Host already forwards plugin error codes and messages. |
+| 2026-10-17 | Inferred related threads stay an opt-in second call | Measured precision@5 is 0.67 (labeled recall 1.00), so they are useful but not good enough to merge into the primary page. |

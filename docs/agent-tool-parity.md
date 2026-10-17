@@ -52,7 +52,7 @@ backing verb; `host-gap` counts capabilities no verb can reach yet.
 | ai-accounts                                                                                                                                       | 21                   | 18                                                                                                       | 7             | 1         |
 | model-effort-picker                                                                                                                               | 3                    | 0                                                                                                        | 1             | 0         |
 | usage                                                                                                                                             | 5                    | 2 (not installed)                                                                                        | 2             | 1         |
-| memory                                                                                                                                            | 12                   | 11                                                                                                       | 1             | 0         |
+| memory                                                                                                                                            | 13                   | 13                                                                                                       | 1             | 0         |
 | optmem                                                                                                                                            | 6                    | 7 (plugin not installed)                                                                                 | 3             | 0         |
 | editor                                                                                                                                            | 7                    | 1                                                                                                        | 5             | 2         |
 | diff-viewed                                                                                                                                       | 3                    | 0                                                                                                        | 1             | 2         |
@@ -297,11 +297,16 @@ Still missing, because they write secrets or need a browser:
   existing `usage_requests` and `usage_report` — but the plugin is **not installed**
   in the web profile, so all four are latent until it is.
 - `memory`: bound (sibling revision `feat(memory): expose note curation and
-memory inspection as agent tools`) — read-only `memory_projects`,
-  `memory_start_block`, `memory_notes`, `memory_note_history`, `memory_threads`
-  and `memory_citations`, plus `memory_edit_note` and `memory_forget_note`. Their
+memory inspection as agent tools`, plus `feat(memory): search threads across
+titles, content and memory`) — read-only `memory_projects`,
+  `memory_start_block`, `memory_notes`, `memory_note_history`, `memory_threads`,
+  `memory_citations`, `find_threads` and `related_threads`, plus
+  `memory_edit_note` and `memory_forget_note`. Their
   panel types are now schemas (`panelNote`, `panelThread`, `notesFilter`,
-  `memoryCitation`) with the public types derived from them. Left out on purpose:
+  `memoryCitation`) with the public types derived from them. `find_threads` and
+  `related_threads` back the finder contract over `sessionQuery` and the store
+  (see the [memory README](../plugins/@dshfiles/memory/README.md#finding-threads-one-finder-over-titles-content-and-memory));
+  both are read-only and project-scoped by the caller's authorization. Left out on purpose:
   `memory_usage` (needs the full `MemoryUsage` schema), `memory_preview`
   (duplicates `memory_read` and would distort the memory-tool counters),
   `memory_rate_citation` (an Agent must not rate its own citations), and the
