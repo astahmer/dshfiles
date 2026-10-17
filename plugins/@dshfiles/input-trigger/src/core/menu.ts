@@ -6,7 +6,7 @@
  *
  * Roster protocol: the frozen `hit` event carries no source roster, so the
  * reducer cannot invent groups. Opening from a closed state, the shell seeds
- * the roster with {@link seedGroups} and then dispatches `hit`; a `hit`
+ * the roster with {@link InputTriggerMenuModel.seedGroups} and then dispatches `hit`; a `hit`
  * while open (query refinement) resets the existing groups to pending under
  * a new generation while keeping their items on screen until the new fetch
  * settles (stale-while-revalidate — the render layer shows skeletons only
@@ -27,7 +27,7 @@ export const MENU_CLOSED: MenuState = { open: false, hit: null, generation: 0, g
  * @param sources - Sources registered for the hit trigger, in menu order.
  * @returns State carrying the new pending roster; highlight cleared.
  */
-export function seedGroups(state: MenuState, sources: readonly Pick<InputTriggerSource, 'name' | 'showGroupTitle'>[]): MenuState {
+const seedGroups = (state: MenuState, sources: readonly Pick<InputTriggerSource, 'name' | 'showGroupTitle'>[]): MenuState => {
   return {
     ...state,
     groups: sources.map((source): MenuState['groups'][number] => {
@@ -87,7 +87,7 @@ const allReadyEmpty = (groups: MenuState['groups']): boolean => groups.every(g =
  * @param ev - Menu event.
  * @returns Next state; the same reference when stale or a no-op.
  */
-export const menuReduce: MenuReduce = (state, ev) => {
+const menuReduce: MenuReduce = (state, ev) => {
   switch (ev.type) {
     case 'hit': {
       if (ev.hit === null) return closed(state)
@@ -155,8 +155,14 @@ export const menuReduce: MenuReduce = (state, ev) => {
  * @returns The candidate, or null when the group is absent, not ready, or
  * has no candidate of that name.
  */
-export const exactMatch: ExactMatch = (groups, source, name) => {
+const exactMatch: ExactMatch = (groups, source, name) => {
   const group = groups.find(g => g.source === source)
   if (!group || group.status !== 'ready') return null
   return group.items.find(c => c.name === name) ?? null
+}
+
+export class InputTriggerMenuModel {
+  static readonly seedGroups = seedGroups
+  static readonly reduce = menuReduce
+  static readonly exactMatch = exactMatch
 }

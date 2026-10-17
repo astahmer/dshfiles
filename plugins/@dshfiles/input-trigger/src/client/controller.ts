@@ -12,7 +12,7 @@ import { createSnapshotStore, type SnapshotStore } from '@deepseek-ai/dsh-client
 import type { ArbitrateKey, ArbitrateOutcome, CommandClaim, PickOutcome, ReferenceInsert, TokenSpan } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { detectTrigger } from '../core/detect.js'
-import { MENU_CLOSED, menuReduce, seedGroups } from '../core/menu.js'
+import { InputTriggerMenuModel, MENU_CLOSED } from '../core/menu.js'
 import type { MenuEvent, MenuState, TriggerHit } from '../core/contract.js'
 import type {
   ClientSessionContext,
@@ -183,7 +183,7 @@ export class InputTriggerController {
       return
     }
     if (launched || !prev.open || prev.hit === null || prev.hit.trigger !== hit.trigger) {
-      this.menu.set(seedGroups(this.menu.getSnapshot(), roster))
+      this.menu.set(InputTriggerMenuModel.seedGroups(this.menu.getSnapshot(), roster))
     }
     this.reduce({ type: 'hit', hit })
     this.refreshHeaders(hit, roster)
@@ -212,7 +212,7 @@ export class InputTriggerController {
     this.stopFetch()
     this.hit = hit
     this.launcher.set(source)
-    this.menu.set(seedGroups(this.menu.getSnapshot(), [match]))
+    this.menu.set(InputTriggerMenuModel.seedGroups(this.menu.getSnapshot(), [match]))
     this.reduce({ type: 'hit', hit })
     this.refreshHeaders(hit, [match])
     this.fetchCandidates(hit, [match])
@@ -671,7 +671,7 @@ export class InputTriggerController {
 
   private reduce(ev: MenuEvent): void {
     const cur = this.menu.getSnapshot()
-    const next = menuReduce(cur, ev)
+    const next = InputTriggerMenuModel.reduce(cur, ev)
     if (next !== cur) this.menu.set(next)
     if (next.open) return
     this.clearLauncher()
