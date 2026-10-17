@@ -4,7 +4,7 @@ import { closePalette, openPalette, type PaletteMode } from '@dshfiles/command-p
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import type { MutableRefObject, ReactNode } from 'react'
 import { DEFAULT_PREFERENCES, type SidebarPreferences } from './organization.js'
-import { SidebarPreferencesModel, decodePreferences, storedPreferences } from './preferences.js'
+import { SidebarPreferencesModel, storedPreferences } from './preferences.js'
 import { threadSidebarSettings } from './settings.js'
 
 interface PreferencesSnapshot {
@@ -43,7 +43,7 @@ export const usePreferences = (): PreferencesSnapshot & {
   const [localWriteFailed, setLocalWriteFailed] = useState(false)
   const [pending, setPending] = useState<Partial<SidebarPreferences>>({})
   const [writeFailed, setWriteFailed] = useState(false)
-  const hostPreferences = useMemo(() => (settings?.value === undefined ? null : decodePreferences(settings.value)), [settings?.value])
+  const hostPreferences = useMemo(() => (settings?.value === undefined ? null : SidebarPreferencesModel.decode(settings.value)), [settings?.value])
   const hostBacked = settings !== null && settings.status === 'ready' && settings.writable && hostPreferences !== null
   const settingsRef = useRef(settings)
   settingsRef.current = settings

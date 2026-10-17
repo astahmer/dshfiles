@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
 import { test, vi } from 'vitest'
 import { SidebarOrganization, type AutoArchiveContext, DEFAULT_PREFERENCES, type SidebarPreferences, type SidebarSection } from './organization.js'
-import { decodePreferences, PREFERENCES_STORAGE_KEY, storedPreferences } from './preferences.js'
+import { SidebarPreferencesModel, PREFERENCES_STORAGE_KEY, storedPreferences } from './preferences.js'
 
 interface SessionFixture extends Partial<Omit<SessionSummary, 'id' | 'parentId'>> {
   id: string
@@ -203,11 +203,11 @@ test('child threads inherit the nearest known workspace through the parent chain
 
 test('invalid stored preference data is rejected without exposing the raw value', () => {
   const raw = '{"session":"private-session-id","newerVersion":true}'
-  assert.equal(decodePreferences(JSON.parse(raw)), null)
+  assert.equal(SidebarPreferencesModel.decode(JSON.parse(raw)), null)
 })
 
 test('navigation preferences preserve independent order, visibility, and header mode', () => {
-  const stored = decodePreferences({
+  const stored = SidebarPreferencesModel.decode({
     ...DEFAULT_PREFERENCES,
     headerMode: 'expanded',
     headerOrder: ['panel:files', 'search'],

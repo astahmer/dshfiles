@@ -75,7 +75,7 @@ const preferencesSchema = preferencesInputSchema.extend({
 })
 
 /** Decode a Host settings value; null when it does not satisfy the sidebar contract. */
-export const decodePreferences = (value: unknown): SidebarPreferences | null => {
+const decodePreferences = (value: unknown): SidebarPreferences | null => {
   const checked = preferencesInputSchema.safeParse(value)
   if (!checked.success) return null
   const categoriesStillDefault =
@@ -95,7 +95,7 @@ export const decodePreferences = (value: unknown): SidebarPreferences | null => 
  * Browser values to copy into Host settings once: only keys the Host still holds
  * at their default, so another device's choices are never overwritten.
  */
-export const preferencesToMigrate = (local: SidebarPreferences, host: SidebarPreferences): Partial<SidebarPreferences> => {
+const preferencesToMigrate = (local: SidebarPreferences, host: SidebarPreferences): Partial<SidebarPreferences> => {
   const patch: Partial<SidebarPreferences> = {}
   for (const key of Object.keys(DEFAULT_PREFERENCES).filter(isPreferenceKey)) {
     const same = (left: unknown, right: unknown): boolean => JSON.stringify(left) === JSON.stringify(right)
@@ -115,10 +115,11 @@ const isPreferenceKey = (key: string): key is keyof SidebarPreferences => key in
 /** Browser copy used only while the Host settings namespace is unavailable; null when absent or invalid. */
 export const storedPreferences = createStoredValue({ key: PREFERENCES_STORAGE_KEY, schema: preferencesSchema, fallback: null })
 
-export const toggleCollapsedSection = (collapsedSections: readonly SidebarSection[], section: SidebarSection): SidebarSection[] =>
+const toggleCollapsedSection = (collapsedSections: readonly SidebarSection[], section: SidebarSection): SidebarSection[] =>
   collapsedSections.includes(section) ? collapsedSections.filter(item => item !== section) : [...collapsedSections, section]
 
 export class SidebarPreferencesModel {
+  static readonly decode = decodePreferences
   static readonly isPreferenceKey = isPreferenceKey
   static readonly preferencesToMigrate = preferencesToMigrate
   static readonly toggleCollapsedSection = toggleCollapsedSection

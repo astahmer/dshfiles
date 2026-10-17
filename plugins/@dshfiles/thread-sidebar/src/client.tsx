@@ -98,7 +98,7 @@ import {
   workspaceForSessions,
 } from './organization.js'
 import { ThreadAttentionPresentationModel, type ThreadAttentionLabel } from './attention-presentation.js'
-import { attentionColorSchema, toggleCollapsedSection } from './preferences.js'
+import { SidebarPreferencesModel, attentionColorSchema } from './preferences.js'
 import { selectInputNeededRows, selectTurnFinishedRows } from './attention-rows.js'
 import { registerPaletteAction, setPaletteRecentLimit, type PaletteAction } from '@dshfiles/command-palette/api'
 import { useSidebarState } from './sidebar-state.js'
@@ -1650,7 +1650,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
 
   const toggleSection = (section: SidebarSection): void => {
     changePreferences({
-      collapsedSections: toggleCollapsedSection(preferences.collapsedSections, section),
+      collapsedSections: SidebarPreferencesModel.toggleCollapsedSection(preferences.collapsedSections, section),
     })
   }
 
