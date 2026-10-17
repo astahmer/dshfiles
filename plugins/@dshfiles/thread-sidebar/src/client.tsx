@@ -159,7 +159,7 @@ import {
   type ThreadInteractionStatus,
   type ThreadNotificationCategory,
 } from './thread-notifications.js'
-import { playThreadNotificationSound } from './thread-notification-audio.js'
+import { ThreadNotificationAudioModel } from './thread-notification-audio.js'
 import { useThreadAttention } from './attention-client.js'
 import type { ThreadAttentionView } from './attention-api.js'
 import {
@@ -1639,7 +1639,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         setNotice({ tone: 'warning', message: props.tSidebar('threadSidebarNotificationsUnavailable') })
       }
     }
-    if (categoryPreferences.sound) playThreadNotificationSound(categoryPreferences.soundPreset, categoryPreferences.volume)
+    if (categoryPreferences.sound) ThreadNotificationAudioModel.play(categoryPreferences.soundPreset, categoryPreferences.volume)
   }
 
   const toggleParked = (sessionId: SessionSummary['id']): void => {

@@ -21,7 +21,7 @@ import {
   type ThreadNotificationDelivery,
   type ThreadNotificationSound,
 } from './thread-notifications.js'
-import { previewThreadNotificationSound, unlockThreadNotificationAudio } from './thread-notification-audio.js'
+import { ThreadNotificationAudioModel } from './thread-notification-audio.js'
 
 export type BrowserNotificationPermission = NotificationPermission | 'unsupported'
 
@@ -73,7 +73,7 @@ export const ThreadNotificationSettings = (props: ThreadNotificationSettingsProp
 
   const updateCategory = (category: ThreadNotificationCategory, patch: Partial<ThreadNotificationCategories[ThreadNotificationCategory]>): void => {
     props.onChange({ ...props.categories, [category]: { ...props.categories[category], ...patch } })
-    if (patch.sound === true) void unlockThreadNotificationAudio().then(available => setAudioUnavailable(!available))
+    if (patch.sound === true) void ThreadNotificationAudioModel.unlock().then(available => setAudioUnavailable(!available))
   }
 
   const requestPermission = async (): Promise<void> => {
@@ -90,7 +90,7 @@ export const ThreadNotificationSettings = (props: ThreadNotificationSettingsProp
 
   const previewSound = async (category: ThreadNotificationCategory): Promise<void> => {
     const preference = props.categories[category]
-    setAudioUnavailable(!(await previewThreadNotificationSound(preference.soundPreset, preference.volume)))
+    setAudioUnavailable(!(await ThreadNotificationAudioModel.preview(preference.soundPreset, preference.volume)))
   }
 
   return (

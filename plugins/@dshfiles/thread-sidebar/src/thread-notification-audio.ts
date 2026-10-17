@@ -9,7 +9,7 @@ const notificationSoundFrequencies = {
 
 let audioContext: AudioContext | null = null
 
-export const unlockThreadNotificationAudio = async (): Promise<boolean> => {
+const unlockThreadNotificationAudio = async (): Promise<boolean> => {
   if (typeof window === 'undefined' || !('AudioContext' in window)) return false
   try {
     const context = audioContext ?? new window.AudioContext()
@@ -21,7 +21,7 @@ export const unlockThreadNotificationAudio = async (): Promise<boolean> => {
   }
 }
 
-export const playThreadNotificationSound = (sound: ThreadNotificationSound, volume: number): void => {
+const playThreadNotificationSound = (sound: ThreadNotificationSound, volume: number): void => {
   if (audioContext === null || audioContext.state !== 'running' || volume <= 0) return
   try {
     const oscillator = audioContext.createOscillator()
@@ -41,8 +41,14 @@ export const playThreadNotificationSound = (sound: ThreadNotificationSound, volu
   }
 }
 
-export const previewThreadNotificationSound = async (sound: ThreadNotificationSound, volume: number): Promise<boolean> => {
+const previewThreadNotificationSound = async (sound: ThreadNotificationSound, volume: number): Promise<boolean> => {
   if (!(await unlockThreadNotificationAudio())) return false
   playThreadNotificationSound(sound, volume)
   return true
+}
+
+export class ThreadNotificationAudioModel {
+  static readonly unlock = unlockThreadNotificationAudio
+  static readonly play = playThreadNotificationSound
+  static readonly preview = previewThreadNotificationSound
 }
