@@ -37,24 +37,24 @@ const finishReasonByKind: Readonly<Record<string, AttentionFinishReason>> = {
   'max-tokens': 'max-tokens',
 }
 
-export const finishReasonFromEvent = (event: unknown): AttentionFinishReason | null => {
+const finishReasonFromEvent = (event: unknown): AttentionFinishReason | null => {
   const parsed = turnEndEventSchema.safeParse(event)
   return parsed.success ? (finishReasonByKind[parsed.data.data.reason.kind] ?? null) : null
 }
 
 /** Monotone across Host restarts: a new record always outranks every stored version. */
-export const nextAttentionVersion = (current: number, now: number): number => Math.max(current + 1, now)
+const nextAttentionVersion = (current: number, now: number): number => Math.max(current + 1, now)
 
 const byVersionAscending = (left: ThreadAttentionView, right: ThreadAttentionView): number => left.version - right.version
 
 /** Keys to drop once the store exceeds its bound; the least recently written records go first. */
-export const attentionKeysToTrim = (records: readonly ThreadAttentionView[], limit = MAX_ATTENTION_SESSIONS): readonly string[] =>
+const attentionKeysToTrim = (records: readonly ThreadAttentionView[], limit = MAX_ATTENTION_SESSIONS): readonly string[] =>
   [...records]
     .sort(byVersionAscending)
     .slice(0, Math.max(0, records.length - limit))
     .map(record => record.sessionId)
 
-export const legacyAttentionRecord = (entry: ThreadAttentionMigrationEntry, version: number): ThreadAttentionView | null =>
+const legacyAttentionRecord = (entry: ThreadAttentionMigrationEntry, version: number): ThreadAttentionView | null =>
   entry.finishedAt === null && !entry.manuallyUnread
     ? null
     : {
@@ -178,4 +178,11 @@ export const createAttentionStore = ({
     },
     flush: () => writes,
   }
+}
+
+export class ThreadAttentionStoreModel {
+  static readonly finishReasonFromEvent = finishReasonFromEvent
+  static readonly nextVersion = nextAttentionVersion
+  static readonly keysToTrim = attentionKeysToTrim
+  static readonly legacyRecord = legacyAttentionRecord
 }

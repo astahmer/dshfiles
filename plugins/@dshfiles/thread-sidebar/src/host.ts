@@ -10,7 +10,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { SessionRequestId } from '@deepseek-ai/dsh-api-session-controller'
 import { z } from 'zod'
 import { attentionFor, closeAttention, threadAttentionApiHost } from './attention-host.js'
-import { finishReasonFromEvent } from './attention-store.js'
+import { ThreadAttentionStoreModel } from './attention-store.js'
 import { threadSidebarMachineApi } from './machine-api.js'
 import { threadSidebarPendingQuestionsApi } from './pending-questions-api.js'
 import { threadSidebarPluginUpdatesApi } from './plugin-updates-api.js'
@@ -190,7 +190,7 @@ export default defineHost({
       const opening = attentionFor(ctx)
       void opening.catch(() => undefined)
       const stop = ctx.on('session/event', (session, event) => {
-        const reason = finishReasonFromEvent(event)
+        const reason = ThreadAttentionStoreModel.finishReasonFromEvent(event)
         if (reason === null) return
         void opening.then(store => store.recordFinish({ sessionId: String(session.id), seq: event.seq, time: event.time, reason })).catch(() => undefined)
       })

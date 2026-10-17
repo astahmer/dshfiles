@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'vitest'
 import type { ThreadAttentionView } from './attention-api.js'
-import { attentionKeysToTrim, createAttentionStore, finishReasonFromEvent, nextAttentionVersion, type AttentionTable } from './attention-store.js'
+import { createAttentionStore, ThreadAttentionStoreModel, type AttentionTable } from './attention-store.js'
 
 const memoryTable = (initial: readonly ThreadAttentionView[] = []): AttentionTable & { readonly rows: Map<string, ThreadAttentionView> } => {
   const rows = new Map(initial.map(record => [record.sessionId, record]))
@@ -30,20 +30,20 @@ const memoryTable = (initial: readonly ThreadAttentionView[] = []): AttentionTab
 const turnEnd = (kind: string): unknown => ({ type: 'turn/end', seq: 12, time: 1_000, data: { turn: 3, reason: { kind } } })
 
 test('only turn ends that ask the user for something count as attention', () => {
-  assert.equal(finishReasonFromEvent(turnEnd('completed')), 'completed')
-  assert.equal(finishReasonFromEvent(turnEnd('error')), 'error')
-  assert.equal(finishReasonFromEvent(turnEnd('aborted')), 'aborted')
-  assert.equal(finishReasonFromEvent(turnEnd('blocked')), 'blocked')
-  assert.equal(finishReasonFromEvent(turnEnd('max-tokens')), 'max-tokens')
-  assert.equal(finishReasonFromEvent(turnEnd('forked')), null)
-  assert.equal(finishReasonFromEvent(turnEnd('interrupted')), null)
-  assert.equal(finishReasonFromEvent({ type: 'turn/start', data: {} }), null)
-  assert.equal(finishReasonFromEvent('nonsense'), null)
+  assert.equal(ThreadAttentionStoreModel.finishReasonFromEvent(turnEnd('completed')), 'completed')
+  assert.equal(ThreadAttentionStoreModel.finishReasonFromEvent(turnEnd('error')), 'error')
+  assert.equal(ThreadAttentionStoreModel.finishReasonFromEvent(turnEnd('aborted')), 'aborted')
+  assert.equal(ThreadAttentionStoreModel.finishReasonFromEvent(turnEnd('blocked')), 'blocked')
+  assert.equal(ThreadAttentionStoreModel.finishReasonFromEvent(turnEnd('max-tokens')), 'max-tokens')
+  assert.equal(ThreadAttentionStoreModel.finishReasonFromEvent(turnEnd('forked')), null)
+  assert.equal(ThreadAttentionStoreModel.finishReasonFromEvent(turnEnd('interrupted')), null)
+  assert.equal(ThreadAttentionStoreModel.finishReasonFromEvent({ type: 'turn/start', data: {} }), null)
+  assert.equal(ThreadAttentionStoreModel.finishReasonFromEvent('nonsense'), null)
 })
 
 test('a version always outranks every stored version, even after a clock step back', () => {
-  assert.equal(nextAttentionVersion(0, 1_000), 1_000)
-  assert.equal(nextAttentionVersion(1_000, 900), 1_001)
+  assert.equal(ThreadAttentionStoreModel.nextVersion(0, 1_000), 1_000)
+  assert.equal(ThreadAttentionStoreModel.nextVersion(1_000, 900), 1_001)
 })
 
 test('a finished turn is stored durably and acknowledged once the caller saw it', async () => {
@@ -172,6 +172,6 @@ test('the least recently written records are trimmed past the bound', () => {
     finishedReason: null,
     manuallyUnread: false,
   })
-  assert.deepEqual(attentionKeysToTrim([record('newest', 3), record('oldest', 1), record('middle', 2)], 2), ['oldest'])
-  assert.deepEqual(attentionKeysToTrim([record('a', 1)], 2), [])
+  assert.deepEqual(ThreadAttentionStoreModel.keysToTrim([record('newest', 3), record('oldest', 1), record('middle', 2)], 2), ['oldest'])
+  assert.deepEqual(ThreadAttentionStoreModel.keysToTrim([record('a', 1)], 2), [])
 })
