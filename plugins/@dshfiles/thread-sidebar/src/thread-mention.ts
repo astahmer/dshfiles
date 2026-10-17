@@ -80,3 +80,12 @@ export const captureThreadMentionInsertion = (): void => {
 export const requestThreadMentionInsertion = (sessionId: string): void => {
   window.dispatchEvent(new CustomEvent(ThreadMentionModel.THREAD_MENTION_INSERT_EVENT, { detail: { sessionId } }))
 }
+export const THREAD_MENTION_CAPTURE_EVENT = ThreadMentionModel.THREAD_MENTION_CAPTURE_EVENT
+export const THREAD_MENTION_INSERT_EVENT = ThreadMentionModel.THREAD_MENTION_INSERT_EVENT
+export const buildThreadReferenceInsert = ThreadMentionModel.buildThreadReferenceInsert
+export const classifyThreadMentionFailure = ThreadMentionModel.classifyThreadMentionFailure
+export const decodeThreadMentionSessionId = ThreadMentionModel.decodeThreadMentionSessionId
+export const summarizeThreadMentionFailure = ThreadMentionModel.summarizeThreadMentionFailure
+
+/** Free name main's client entry imports; the lane grouped the same schema under the model. */
+export const threadMentionFailureCodeSchema = ThreadMentionModel.failureCodeSchema

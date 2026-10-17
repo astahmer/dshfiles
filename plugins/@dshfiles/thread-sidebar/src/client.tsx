@@ -97,7 +97,7 @@ import {
   workspaceForLineage,
   workspaceForSessions,
 } from './organization.js'
-import { ThreadAttentionPresentationModel, type ThreadAttentionLabel } from './attention-presentation.js'
+import { ThreadAttentionPresentationModel, attentionLabelClass, type ThreadAttentionLabel } from './attention-presentation.js'
 import { attentionColorSchema, toggleCollapsedSection } from './preferences.js'
 import { selectInputNeededRows, selectTurnFinishedRows } from './attention-rows.js'
 import { registerPaletteAction, setPaletteRecentLimit, type PaletteAction } from '@dshfiles/command-palette/api'

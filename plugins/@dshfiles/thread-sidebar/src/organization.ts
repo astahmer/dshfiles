@@ -142,7 +142,7 @@ export interface OrderedSidebarEntry {
 
 export type SessionActivity = Pick<SessionSummary, 'id' | 'running' | 'updatedAt' | 'blank'>
 
-const isAttentionSessionIncluded = (session: Pick<SessionSummary, 'origin' | 'parentId'>, includeSubagentAttention: boolean): boolean =>
+export const isAttentionSessionIncluded = (session: Pick<SessionSummary, 'origin' | 'parentId'>, includeSubagentAttention: boolean): boolean =>
   includeSubagentAttention || (session.origin !== 'subagent' && session.parentId === undefined)
 
 export interface AutoArchiveContext {
@@ -156,13 +156,13 @@ export interface AutoArchiveContext {
 
 export type AutoArchiveOverride = 'inherit' | 'enabled' | 'disabled'
 
-const autoArchiveOverrideForSession = (preferences: SidebarPreferences, sessionId: string): AutoArchiveOverride => {
+export const autoArchiveOverrideForSession = (preferences: SidebarPreferences, sessionId: string): AutoArchiveOverride => {
   if (preferences.autoArchiveDisabledSessionIds.includes(sessionId)) return 'disabled'
   if (preferences.autoArchiveSessionIds.includes(sessionId)) return 'enabled'
   return 'inherit'
 }
 
-const setAutoArchiveOverride = (preferences: SidebarPreferences, sessionId: string, override: AutoArchiveOverride): SidebarPreferences => ({
+export const setAutoArchiveOverride = (preferences: SidebarPreferences, sessionId: string, override: AutoArchiveOverride): SidebarPreferences => ({
   ...preferences,
   autoArchiveSessionIds:
     override === 'enabled' ? [...new Set([...preferences.autoArchiveSessionIds, sessionId])] : preferences.autoArchiveSessionIds.filter(id => id !== sessionId),
@@ -172,7 +172,7 @@ const setAutoArchiveOverride = (preferences: SidebarPreferences, sessionId: stri
       : preferences.autoArchiveDisabledSessionIds.filter(id => id !== sessionId),
 })
 
-const shouldScanForAutoArchive = (preferences: SidebarPreferences): boolean => preferences.autoArchiveEnabled || preferences.autoArchiveSessionIds.length > 0
+export const shouldScanForAutoArchive = (preferences: SidebarPreferences): boolean => preferences.autoArchiveEnabled || preferences.autoArchiveSessionIds.length > 0
 
 export interface SessionLineage {
   /** Number of known direct-parent edges above the session. */
@@ -188,7 +188,7 @@ export interface SessionLineage {
  * chain. A visited set keeps corrupt cycles bounded; missing ancestors still
  * preserve the direct relationship and one level of indentation.
  */
-const sessionLineage = (session: Pick<SessionSummary, 'id' | 'parentId'>, byId: Readonly<Record<string, SessionSummary>>): SessionLineage => {
+export const sessionLineage = (session: Pick<SessionSummary, 'id' | 'parentId'>, byId: Readonly<Record<string, SessionSummary>>): SessionLineage => {
   if (session.parentId === undefined) return { depth: 0 }
 
   let depth = 0
@@ -232,7 +232,7 @@ export const projectWorkspaces = (workspaces: readonly WorkspaceView[]): readonl
 }
 
 /** Resolve a workspace from the session or its nearest known ancestor. */
-const workspaceForLineage = (
+export const workspaceForLineage = (
   session: Pick<SessionSummary, 'id' | 'parentId'>,
   byId: Readonly<Record<string, SessionSummary>>,
   workspaceBySession: ReadonlyMap<string, string>,
@@ -248,7 +248,7 @@ const workspaceForLineage = (
   return undefined
 }
 
-const parseSessionIds = (value: string): string[] => [
+export const parseSessionIds = (value: string): string[] => [
   ...new Set(
     value
       .split(/[\s,;]+/)
@@ -335,7 +335,7 @@ const archiveWithoutStopping = <SessionId extends string>(
 const hasPassedIdleThreshold = (session: Pick<SessionActivity, 'updatedAt'>, now: number, idleMinutes: number): boolean =>
   Number.isFinite(session.updatedAt) && session.updatedAt <= now && now - session.updatedAt >= idleMinutes * 60_000
 
-const nextIdleTransitionAt = (sessions: readonly Pick<SessionActivity, 'running' | 'updatedAt'>[], now: number, idleMinutes: number): number | null => {
+export const nextIdleTransitionAt = (sessions: readonly Pick<SessionActivity, 'running' | 'updatedAt'>[], now: number, idleMinutes: number): number | null => {
   let next: number | null = null
   for (const session of sessions) {
     if (session.running || !Number.isFinite(session.updatedAt)) continue
@@ -345,7 +345,7 @@ const nextIdleTransitionAt = (sessions: readonly Pick<SessionActivity, 'running'
   return next
 }
 
-const isAutoArchiveCandidate = ({ session, workspaceId, now, preferences, archivedSessionIds, pinnedSessionIds }: AutoArchiveContext): boolean => {
+export const isAutoArchiveCandidate = ({ session, workspaceId, now, preferences, archivedSessionIds, pinnedSessionIds }: AutoArchiveContext): boolean => {
   if (session.running || session.blank) return false
   if (archivedSessionIds.has(session.id) || pinnedSessionIds.has(session.id)) return false
   if (preferences.parkedSessionIds.includes(session.id)) return false
@@ -358,7 +358,7 @@ const isAutoArchiveCandidate = ({ session, workspaceId, now, preferences, archiv
   return hasPassedIdleThreshold(session, now, preferences.idleMinutes)
 }
 
-const sectionForSession = ({
+export const sectionForSession = ({
   session,
   archivedSessionIds,
   pinnedSessionIds,

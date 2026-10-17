@@ -115,7 +115,7 @@ const isPreferenceKey = (key: string): key is keyof SidebarPreferences => key in
 /** Browser copy used only while the Host settings namespace is unavailable; null when absent or invalid. */
 export const storedPreferences = createStoredValue({ key: PREFERENCES_STORAGE_KEY, schema: preferencesSchema, fallback: null })
 
-const toggleCollapsedSection = (collapsedSections: readonly SidebarSection[], section: SidebarSection): SidebarSection[] =>
+export const toggleCollapsedSection = (collapsedSections: readonly SidebarSection[], section: SidebarSection): SidebarSection[] =>
   collapsedSections.includes(section) ? collapsedSections.filter(item => item !== section) : [...collapsedSections, section]
 
 export class SidebarPreferencesModel {

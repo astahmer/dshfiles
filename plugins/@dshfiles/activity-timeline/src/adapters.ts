@@ -231,3 +231,8 @@ export const verificationReceiptActivity = (receipt: VerificationReceiptSummary)
     provenance: 'observed',
   }
 }
+export const communicationActivity = ActivityTimelineAdapters.communicationActivity
+export const communicationMessage = ActivityTimelineAdapters.communicationMessage
+export const integrationActivity = ActivityTimelineAdapters.integrationActivity
+export const sessionActivity = ActivityTimelineAdapters.sessionActivity
+export const workspaceActivity = ActivityTimelineAdapters.workspaceActivity

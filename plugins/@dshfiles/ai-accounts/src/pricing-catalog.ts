@@ -230,7 +230,7 @@ const findInProvider = (cache: PricingCache, provider: string, model: string): {
  * `provider/*`; the route's own models.dev provider (by account kind, alias or
  * id); then any provider pricing the same normalized model id, vendors first.
  */
-const resolveRouteQuote = (input: {
+export const resolveRouteQuote = (input: {
   readonly route: { readonly provider: string; readonly model: string }
   readonly cache: PricingCache | null
   readonly accountKind?: string | undefined

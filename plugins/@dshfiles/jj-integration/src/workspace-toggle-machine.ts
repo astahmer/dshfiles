@@ -376,12 +376,14 @@ export const workspaceToggleMachine = setup({
 
 export type WorkspaceToggleActor = ActorRefFrom<typeof workspaceToggleMachine>
 
+
 export interface WorkspaceToggleOutcome {
   readonly workspaceId: string | null
   readonly error: string | null
 }
 
 export const waitForWorkspaceToggle = (input: { readonly actor: WorkspaceToggleActor; readonly signal: AbortSignal }): Promise<WorkspaceToggleOutcome> =>
+
   new Promise((resolve, reject) => {
     let settled = false
     let unsubscribe = (): void => undefined
@@ -412,3 +414,5 @@ export const waitForWorkspaceToggle = (input: { readonly actor: WorkspaceToggleA
     }
     finish(input.actor.getSnapshot())
   })
+
+export const WorkspaceToggle = { waitForWorkspaceToggle } as const

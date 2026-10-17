@@ -69,3 +69,5 @@ export class GraphNavigationModel {
     }
   }
 }
+export const filterGraphRevisions = GraphNavigationModel.filterGraphRevisions
+export const mergeGraphRevisions = GraphNavigationModel.mergeGraphRevisions

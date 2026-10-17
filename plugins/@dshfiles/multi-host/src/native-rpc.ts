@@ -8,7 +8,7 @@ const isMutation = (request: NativeRpcRequest): boolean =>
 const mayHaveReachedRuntime = (code: string): boolean =>
   ['cancelled', 'gateway-unreachable', 'authentication-expired', 'invalid-response', 'gateway-http-error'].includes(code)
 
-const callNativeRpc = async (gateway: Gateway, request: NativeRpcRequest, signal?: AbortSignal): Promise<NativeRpcResult> => {
+export const callNativeRpc = async (gateway: Gateway, request: NativeRpcRequest, signal?: AbortSignal): Promise<NativeRpcResult> => {
   const args = jsonValueSchema.parse(request.args)
   const safeArgs = z.record(z.string(), jsonValueSchema).parse(args)
   try {

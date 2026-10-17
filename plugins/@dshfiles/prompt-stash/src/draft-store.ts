@@ -64,7 +64,7 @@ export type SaveDraftResult =
 
 const emptyDraftStore = (): DraftStore => ({ schemaVersion: 1, drafts: [] })
 
-const draftSaveBlock = (input: {
+export const draftSaveBlock = (input: {
   readonly phase: string
   readonly text: string
   readonly attachmentCount: number
@@ -100,7 +100,7 @@ export const readStoredDrafts = (storage: { getItem(key: string): string | null;
   return legacy
 }
 
-const defaultDraftTitle = (text: string): string => {
+export const defaultDraftTitle = (text: string): string => {
   const firstLine = text.split(/\r?\n/, 1)[0]?.trim() ?? ''
   const title = firstLine.length === 0 ? 'Saved draft' : firstLine
   return title.length > MAX_DRAFT_TITLE_CHARS ? `${title.slice(0, MAX_DRAFT_TITLE_CHARS - 1)}…` : title
@@ -131,7 +131,7 @@ export const removeDraft = (current: DraftStore, draftId: string): DraftStore =>
     drafts: current.drafts.filter(draft => draft.id !== draftId),
   })
 
-const sentPromptFromNode = (source: unknown): SentPrompt | null => {
+export const sentPromptFromNode = (source: unknown): SentPrompt | null => {
   const result = sentPromptNodeSchema.safeParse(source)
   if (!result.success || result.data.content.length === 0) return null
   if (result.data.content.some(block => block.type !== 'text' || block.text === undefined)) return null

@@ -37,6 +37,7 @@ import {
 import { reduceTranscript } from './transcript.js'
 import { forgetRemoteThreads, listRemoteThreads, recordRemoteThread } from './thread-store.js'
 import { reserveLoopbackEndpoint } from './connectors/loopback.js'
+import { callNativeRpc } from './native-rpc.js'
 
 const profileSchema = z
   .string()

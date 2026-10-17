@@ -338,7 +338,7 @@ const mostFrequent = (counts: ReadonlyMap<string, number>): string | undefined =
   [...counts.entries()].reduce<[string, number] | undefined>((best, entry) => (best === undefined || entry[1] > best[1] ? entry : best), undefined)?.[0]
 
 /** Folds a Session's event history into what a supervisor needs: state, plan, recent actions, changes, and failures. */
-const digestSession = (input: {
+export const digestSession = (input: {
   readonly summary: SessionSummary
   readonly records: readonly SessionDigestRecord[]
   readonly now: number

@@ -13,16 +13,7 @@ import {
   type QuotaRecoveryModelCatalog,
   type QuotaRecoveryModelSelection,
 } from './api.js'
-import {
-  AccountStoreModel,
-  buildAccountsFile,
-  moveAccount,
-  readAccountFile,
-  readAccountIdentity,
-  removeAccount,
-  setDistribution,
-  upsertAccount,
-} from './account-store.js'
+import { AccountStoreModel, accountStoreService } from './account-store.js'
 import { readAccountUsage } from './account-usage.js'
 import { resolveKeyFromContext } from './credentials.js'
 import { createUsageHistoryService } from './usage-recorder.js'
@@ -30,7 +21,7 @@ import { knownQuotaResetAt } from './quota-reset.js'
 import { readNativeProviders, setNativeProviderEnabled } from './native-providers.js'
 import { PricingCatalogModel } from './pricing-catalog.js'
 import { readPricingSettings } from './settings.js'
-import { readCopilotCredential } from './copilot-credentials.js'
+import { createCopilotCredentialsService } from './copilot-credentials.js'
 
 /**
  * The one read operation. Profiles come from the accounts file, joined with the
@@ -64,11 +55,11 @@ const selectionForContinuation = (selection: QuotaRecoveryModelSelection | undef
 }
 
 export const accountsFile = async (ctx: Context): Promise<AccountsFile> =>
-  buildAccountsFile(
-    await readAccountFile(),
+  accountStoreService.buildAccountsFile(
+    await accountStoreService.readAccountFile(),
     accountRuntime(ctx)?.accounts?.pool.describe() ?? [],
     resolveKeyFromContext(ctx),
-    async instanceId => (await readCopilotCredential(ctx.get('credentials'), instanceId)) !== undefined,
+    async instanceId => (await createCopilotCredentialsService(ctx.get('credentials')).read(instanceId)) !== undefined,
   )
 
 export const accountsSnapshot = accountsFile
@@ -110,7 +101,7 @@ export const accountsHostApi = aiAccountsApi.host({
     }
   },
   importSecretCatalogKey: async ({ input, ctx }) => {
-    const account = (await readAccountFile()).accounts.find(candidate => candidate.instanceId === input.instanceId)
+    const account = (await accountStoreService.readAccountFile()).accounts.find(candidate => candidate.instanceId === input.instanceId)
     if (account === undefined || account.kind === 'codex') throw new Error('This keyed account is no longer available.')
     if (!isKeyEnvName(account.apiKeyEnv)) throw new Error('Save a valid API-key variable ending in _API_KEY first.')
     const bridge = secretCatalogBridgeFor(ctx)
@@ -127,28 +118,28 @@ export const accountsHostApi = aiAccountsApi.host({
     return { imported: true, apiKeyEnv: account.apiKeyEnv }
   },
   save: async ({ input, ctx }) => {
-    await upsertAccount(input.draft, input.previousInstanceId)
+    await accountStoreService.upsertAccount(input.draft, input.previousInstanceId)
     accountRuntime(ctx)?.usageCache?.invalidate()
     await refreshRoutes(ctx)
     return accountsFile(ctx)
   },
   remove: async ({ input, ctx }) => {
-    await removeAccount(input.instanceId)
+    await accountStoreService.removeAccount(input.instanceId)
     accountRuntime(ctx)?.usageCache?.invalidate()
     await refreshRoutes(ctx)
     return accountsFile(ctx)
   },
   moveAccount: async ({ input, ctx }) => {
-    await moveAccount(input.instanceId, input.direction)
+    await accountStoreService.moveAccount(input.instanceId, input.direction)
     await refreshRoutes(ctx)
     return accountsFile(ctx)
   },
   setDistribution: async ({ input, ctx }) => {
-    await setDistribution(input.distribution)
+    await accountStoreService.setDistribution(input.distribution)
     await refreshRoutes(ctx)
     return accountsFile(ctx)
   },
-  identity: async ({ input }) => readAccountIdentity(input.instanceId),
+  identity: async ({ input }) => accountStoreService.readAccountIdentity(input.instanceId),
   beginCopilotLogin: async ({ input, ctx }) => copilotLoginFor(ctx).begin(input.instanceId),
   copilotLoginStatus: async ({ input, ctx }) => copilotLoginFor(ctx).state(input.instanceId),
   cancelCopilotLogin: async ({ input, ctx }) => {
@@ -206,13 +197,13 @@ export const accountsHostApi = aiAccountsApi.host({
     const pricing = pricingFor(ctx)
     const settings = readPricingSettings()
     if (pricing.current() === null && settings.costEstimates) void pricing.ensureFresh(0)
-    const file = await readAccountFile()
+    const file = await accountStoreService.readAccountFile()
     const kinds = new Map(file.accounts.map(account => [account.instanceId.trim() || account.kind, account.kind]))
     const cache = pricing.current()
     return {
       fetchedAt: cache?.fetchedAt ?? null,
       quotes: input.routes.map(route =>
-        PricingCatalogModel.resolveRouteQuote({ route, cache, accountKind: kinds.get(route.provider), overrides: settings.pricingOverrides }),
+        PricingCatalogModel.resolveRouteQuote({ route, cache, accountKind: typeof route.provider === 'string' ? kinds.get(route.provider) : undefined, overrides: settings.pricingOverrides }),
       ),
     }
   },
@@ -278,8 +269,11 @@ const refreshRoutes = async (ctx: Context): Promise<void> => {
   }
   const activeAccounts = runtime.accounts
   if (activeAccounts === undefined) return
-  const file = await readAccountFile()
+  const file = await accountStoreService.readAccountFile()
   const config = configFromAccountsFile(file)
   activeAccounts.config = config
   activeAccounts.pool.setDistribution(file.distribution)
 }
+
+/** The helper surface main's Host still calls by name; the lane grouped the same functions here. */
+export const AccountsHostApiModel = { accountsFile, readAccountsUsage, readQuotaResetAt } as const

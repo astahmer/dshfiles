@@ -212,3 +212,6 @@ export class CostEstimateModel {
     return `$${Math.round(amount).toLocaleString('en-US')}`
   }
 }
+
+/** Free-function surface the memory plugin imports; the lane grouped it under the model. */
+export const costOfTokens = CostEstimateModel.costOfTokens

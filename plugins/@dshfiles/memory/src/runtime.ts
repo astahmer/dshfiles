@@ -1,3 +1,4 @@
+import { redact } from './digest.js'
 import { basename } from 'node:path'
 
 import type { SessionEvent } from '@deepseek-ai/dsh-session/types'

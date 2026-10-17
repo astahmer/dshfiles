@@ -109,3 +109,13 @@ export class ThreadMuteModel {
       }),
     )
 }
+export const effectiveActivityAt = ThreadMuteModel.effectiveActivityAt
+export const isMuteActive = ThreadMuteModel.isMuteActive
+export const legacyMutesToMigrate = ThreadMuteModel.legacyMutesToMigrate
+export const muteOptionLabelKeys = ThreadMuteModel.muteOptionLabelKeys
+export const muteRemaining = ThreadMuteModel.muteRemaining
+export const muteSessions = ThreadMuteModel.muteSessions
+export const muteUntil = ThreadMuteModel.muteUntil
+export const nextMuteExpiry = ThreadMuteModel.nextMuteExpiry
+export const unmuteSessions = ThreadMuteModel.unmuteSessions
+export const withoutExpiredMutes = ThreadMuteModel.withoutExpiredMutes

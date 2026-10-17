@@ -39,7 +39,7 @@ const indexedMessageBytes = 16_000
 const tokenizedUrl = /([?&#](?:token|access_token|key|api_key|auth|sig|signature)=)[^\s&#"')]+/gi
 
 /** A cheap pass: known credential shapes, bearer tokens, `key=value` secrets and tokenized URLs. */
-const redact = (text: string): string => Redaction.redact(text, []).text.replace(tokenizedUrl, '$1[REDACTED]')
+export const redact = (text: string): string => Redaction.redact(text, []).text.replace(tokenizedUrl, '$1[REDACTED]')
 
 const oneLine = (text: string, bytes: number): string => Utf8.clip(text.replace(/\s+/g, ' ').trim(), bytes)
 

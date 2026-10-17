@@ -66,3 +66,6 @@ export class RevisionListModel {
     return null
   }
 }
+export const activeDayIndex = RevisionListModel.activeDayIndex
+export const flattenRevisionGroups = RevisionListModel.flattenRevisionGroups
+export const remoteBookmarkRevision = RevisionListModel.remoteBookmarkRevision

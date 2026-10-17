@@ -595,3 +595,5 @@ export const aiAccountsApi = defineApi({
     }),
   },
 })
+export const baseModelName = AccountsRules.baseModelName
+export const isKeyEnvName = AccountsRules.isKeyEnvName

@@ -47,3 +47,6 @@ export const attentionDotClass = (input: ThreadStatusVisualInput): string => {
 }
 
 export const attentionColorDotClass = (color: AttentionColor): string => attentionDotClasses[color]
+
+/** Free model name main's tests and client import; the lane grouped the same helpers here. */
+export const ThreadAttentionPresentationModel = { attentionLabelClass, attentionDotClass, attentionColorDotClass }

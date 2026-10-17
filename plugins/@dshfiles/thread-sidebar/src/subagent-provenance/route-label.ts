@@ -57,3 +57,4 @@ export class SubagentRouteLabelModel {
   static readonly displayedAgentRouteLabel = (route: ThreadSidebarModelRoute | undefined, identity: SubagentIdentity | null | undefined): string | undefined =>
     SubagentRouteLabelModel.projectedRouteLabel(route) ?? SubagentRouteLabelModel.agentIdentityLabel(identity)
 }
+export const providerModelLabel = SubagentRouteLabelModel.providerModelLabel

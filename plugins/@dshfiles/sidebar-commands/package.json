@@ -37,7 +37,8 @@
     "@dshfiles/dshx": "workspace:*",
     "@types/react": "catalog:",
     "typescript": "catalog:",
-    "vitest": "catalog:"
+    "vitest": "catalog:",
+    "@deepseek-ai/dsh-client-connection": "catalog:"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "~4.0.4",
@@ -50,7 +51,8 @@
     "@deepseek-ai/dsh-client-ui-sidebar": ">=0.2.0-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-client-ui-slots": ">=0.2.0-rc.1 <0.3.0-0",
     "@deepseek-ai/dsh-client-ui-workspace": ">=0.2.0-rc.1 <0.3.0-0",
-    "@deepseek-ai/dsh-tools": ">=0.2.0-rc.1 <0.3.0-0"
+    "@deepseek-ai/dsh-tools": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-client-connection": ">=0.2.0-rc.1 <0.3.0-0"
   },
   "dsh": {
     "bundle": {
@@ -65,7 +67,8 @@
         "@deepseek-ai/dsh-client-ui-layout",
         "@deepseek-ai/dsh-client-ui-slots",
         "@deepseek-ai/dsh-client-ui-workspace",
-        "@deepseek-ai/dsh-client-locale"
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-connection"
       ],
       "locales": [
         "dshfiles.sidebarCommands"

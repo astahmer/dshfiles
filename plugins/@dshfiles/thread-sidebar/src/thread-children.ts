@@ -132,3 +132,8 @@ export class ThreadChildrenModel {
     return { live, finished: options.mode === 'hide' ? [] : finished }
   }
 }
+export const groupThreadChildren = ThreadChildrenModel.groupThreadChildren
+export const partitionFinishedChildren = ThreadChildrenModel.partitionFinishedChildren
+export const shouldOpenChildThreadList = ThreadChildrenModel.shouldOpenChildThreadList
+export const threadActionTargetIds = ThreadChildrenModel.threadActionTargetIds
+export const visibleChildren = ThreadChildrenModel.visibleChildren

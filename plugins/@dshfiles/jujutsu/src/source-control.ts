@@ -77,3 +77,5 @@ export class SourceControlModel {
     return result
   }
 }
+export const descendantCommitIds = SourceControlModel.descendantCommitIds
+export const emptyAncestorCandidates = SourceControlModel.emptyAncestorCandidates

@@ -40,3 +40,6 @@ export class ThreadUrlModel {
     return url.toString()
   }
 }
+export const buildThreadUrl = ThreadUrlModel.buildThreadUrl
+export const clearThreadUrl = ThreadUrlModel.clearThreadUrl
+export const readThreadUrl = ThreadUrlModel.readThreadUrl

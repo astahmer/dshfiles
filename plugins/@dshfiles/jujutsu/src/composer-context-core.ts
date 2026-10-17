@@ -25,7 +25,7 @@ export const composerBaseFromSetting = (value: unknown): ComposerBase => {
   return bookmark.success ? bookmark.data : { kind: 'parent' }
 }
 
-const composerBaseSetting = (base: ComposerBase): string => (base.kind === 'bookmark' ? base.name : base.kind)
+export const composerBaseSetting = (base: ComposerBase): string => (base.kind === 'bookmark' ? base.name : base.kind)
 
 /** The revision the base names; empty when a bookmark does not exist. */
 const composerBaseTarget = (base: ComposerBase): string => {

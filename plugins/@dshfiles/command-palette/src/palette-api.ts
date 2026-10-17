@@ -115,7 +115,7 @@ const notify = (current: PaletteRegistry): void => {
 }
 
 /** Register a browser-local action and return its lifecycle disposer. */
-const registerPaletteAction = (input: PaletteAction): (() => void) => {
+export const registerPaletteAction = (input: PaletteAction): (() => void) => {
   const parsed = paletteActionSchema.safeParse(input)
   if (!parsed.success) throw new Error('Command palette action has an invalid definition.')
   const current = registry()
@@ -140,8 +140,7 @@ const subscribePaletteActions = (listener: () => void): (() => void) => {
   current.listeners.add(onChange)
   return () => current.listeners.delete(onChange)
 }
-
-const setPaletteRecentLimit = (recentLimit: number): void => {
+export const setPaletteRecentLimit = (recentLimit: number): void => {
   const parsed = z.number().int().min(1).max(50).parse(recentLimit)
   const current = registry()
   if (current.recentLimit === parsed) return

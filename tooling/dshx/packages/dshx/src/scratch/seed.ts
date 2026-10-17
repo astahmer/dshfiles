@@ -177,6 +177,7 @@ const configureFakeProviderThread = async (input: {
   readonly page: Page
   readonly seed: string
   readonly timeoutMs: number
+  readonly apiKey?: string
 }): Promise<NonNullable<ScratchState['fakeProvider']>> => {
   const { state, page, timeoutMs } = input
   if (!state.bundles.includes('@dshfiles/ai-accounts')) {
@@ -204,7 +205,7 @@ const configureFakeProviderThread = async (input: {
     .waitFor({ state: 'visible', timeout: timeoutMs })
   await page.getByRole('button', { name: 'Set up key…', exact: true }).click({ timeout: timeoutMs })
   const keyDialog = page.getByRole('dialog', { name: `Configure ${FAKE_PROVIDER_ACCOUNT} key`, exact: true })
-  await keyDialog.getByRole('textbox', { name: 'API key value', exact: true }).fill('dshx-dev-fake-key', { timeout: timeoutMs })
+  await keyDialog.getByRole('textbox', { name: 'API key value', exact: true }).fill(input.apiKey ?? 'dshx-dev-fake-key', { timeout: timeoutMs })
   await keyDialog.getByRole('button', { name: 'Store key', exact: true }).click({ timeout: timeoutMs })
   await keyDialog.waitFor({ state: 'hidden', timeout: timeoutMs })
 
@@ -262,6 +263,10 @@ const seedToolCallThread = async (state: ScratchState, page: Page, timeoutMs: nu
     .waitFor({ state: 'visible', timeout: timeoutMs + 10_000 })
   return process
 }
+
+/** Seed a model-selected thread whose loopback provider rejects the key, so the next turn fails. */
+const seedCredentialRecovery = (state: ScratchState, page: Page, timeoutMs: number): Promise<NonNullable<ScratchState['fakeProvider']>> =>
+  configureFakeProviderThread({ state, page, seed: 'credential-recovery', timeoutMs, apiKey: 'dshx-dev-fake-MISSING' })
 
 const FAKE_SECRET_CLI = join(DSHFILES_ROOT, 'tooling', 'dshx', 'e2e', 'support', 'fake-secret-cli.mjs')
 
@@ -355,6 +360,7 @@ const applySeed = async (input: {
     await seedFakeSecretCli(input.state)
     return {}
   }
+  if (input.seed === 'credential-recovery') return { fakeProvider: await seedCredentialRecovery(input.state, input.page, input.timeoutMs) }
   if (input.seed === 'tool-call-thread') return { fakeProvider: await seedToolCallThread(input.state, input.page, input.timeoutMs) }
   if (input.seed === 'chat-reference-thread') return { fakeProvider: await seedChatReferenceThread(input.state, input.page, input.timeoutMs) }
   await seedRebaseReadyThread(input.state, input.page, input.timeoutMs)
