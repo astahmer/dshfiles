@@ -72,7 +72,7 @@ import {
   XIcon,
 } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { memo, useCallback, useEffect, useId, useMemo, useReducer, useRef, useState, type ReactElement, type ReactNode } from 'react'
+import { createContext, memo, useCallback, useContext, useEffect, useId, useMemo, useReducer, useRef, useState, type ReactElement, type ReactNode } from 'react'
 import { z } from 'zod'
 import {
   autoArchiveOverrideForSession,
@@ -316,6 +316,16 @@ const formatAge = (updatedAt: number): string => {
   return age.unit === 'now' ? 'now' : `${age.n}${RELATIVE_TIME_SUFFIX[age.unit]}`
 }
 
+/** Show one thread in a right-sidebar tab; provided by the client entry that owns the sidebar-right controller. */
+type OpenAside = (sessionId: SessionSummary['id']) => void
+
+const AsideOpenContext = createContext<OpenAside | null>(null)
+
+/** Provider the entry wraps the sidebar in; the row menu reads it, so this seat's injected props keep their shape. */
+export const ThreadAsideOpenProvider = AsideOpenContext.Provider
+
+const useAsideOpen = (): OpenAside | null => useContext(AsideOpenContext)
+
 type RowOperation = 'pin' | 'unpin' | 'archive' | 'unarchive'
 
 interface RowActions {
@@ -544,6 +554,7 @@ type ThreadContextMenuProps = Pick<
 const ThreadContextMenu = (props: ThreadContextMenuProps): JSX.Element => {
   const { session, unread, archived, pinned, parked } = props
   const t = props.actions.translate
+  const openAside = useAsideOpen()
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>{props.children}</ContextMenuTrigger>
@@ -555,6 +566,7 @@ const ThreadContextMenu = (props: ThreadContextMenuProps): JSX.Element => {
         >
           {t('threadSidebarCopyLink')}
         </ContextMenuItem>
+        {archived || openAside === null ? null : <ContextMenuItem onSelect={() => openAside(session.id)}>{t('threadSidebarOpenInSidePanel')}</ContextMenuItem>}
         <ContextMenuSeparator />
         <ContextMenuItem disabled={unread} onSelect={() => props.actions.markUnread(session.id)}>
           {t('threadSidebarMarkUnread')}

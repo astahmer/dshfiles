@@ -1363,6 +1363,32 @@
           "testName": "resumes one thread, resumes all of them, and opens the thread behind a row"
         }
       ]
+    },
+    {
+      "id": "open-thread-in-side-panel",
+      "title": "Open a thread in the right side panel",
+      "summary": "A thread row's context menu opens that thread in the right sidebar instead of the main column: the row action routes through the entry's sidebar-right controller, which opens a threadaside resource tab. The tab retains the Session and hosts the same embedded Conversation a subagent chat does, so the thread streams and its composer works beside the thread the user is reading; closing the tab only releases the reference, and an already-open aside is focused instead of duplicated.",
+      "surfaces": ["client"],
+      "configuration": [],
+      "states": ["closed", "open", "focused"],
+      "failureModes": [
+        "An aside tab closed while the thread is still running keeps running: nothing is archived.",
+        "An archived row offers no aside, because a stopped thread has nothing to show."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "thread-sidebar.open-in-side-panel",
+          "featureFile": "tooling/dshx/e2e/features/thread-sidebar.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.aside-address",
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-aside.test.ts",
+          "testName": "round-trips one session id"
+        }
+      ]
     }
   ],
   "kind": "bundle"

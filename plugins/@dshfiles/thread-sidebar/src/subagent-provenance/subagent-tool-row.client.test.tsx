@@ -68,6 +68,7 @@ const props = ({
   useWorkspaceAccess: unused,
   useWorkspaces: unused,
   usePanelInfo: unused,
+  useResource: unused,
   useSessions: unused,
   useSessionStatus: unused,
   useSessionRetainInfo: unused,

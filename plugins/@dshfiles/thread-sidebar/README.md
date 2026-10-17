@@ -78,6 +78,19 @@ on the first nine rows, and Enter to open. Restart asks for confirmation, then
 requests a graceful Host exit; the Nix supervisor relaunches only its own DSH
 child.
 
+**Open in side panel.** A thread row's context menu opens that thread in the
+right sidebar instead of the main column, so a second thread can be read and
+driven beside the one on screen. The row action routes through a React context
+the entry fills (`ThreadAsideOpenProvider`), which calls
+`sidebarRight.openResource` on a `threadaside` address; the resource retains the
+Session and the tab hosts the same embedded Conversation a subagent chat does,
+composer included. Opening the same thread twice focuses its existing tab, and
+closing the tab only releases the reference — nothing is archived. Archived rows
+offer no aside, and the item is absent if no entry provided the opener. The pane
+is a flex column, not a block, so the embedded Conversation is sized by the pane:
+a block wrapper makes it grow past the pane's height, which cuts the composer off
+and leaves the transcript unscrollable.
+
 **Pending restarts.** Client bundles hot-reload; Host code, `package.json` and
 `cordis.patch.yml` load only at boot. The Host half remembers a content hash of
 those files for every plugin package the Host's client module registry lists

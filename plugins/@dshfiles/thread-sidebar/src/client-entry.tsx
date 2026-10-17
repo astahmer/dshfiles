@@ -1,5 +1,6 @@
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
-import type {} from '@deepseek-ai/dsh-api-session-controller/client'
+import type { SessionReference } from '@deepseek-ai/dsh-api-session-controller/client'
+import type {} from '@deepseek-ai/dsh-client-resources/client'
 import type {} from '@dshfiles/input-trigger/client'
 import type { InputActions } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
@@ -9,7 +10,7 @@ import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import type { SidebarPanelMetadata, SidebarRootInjected } from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import { rankByName } from '@deepseek-ai/dsh-client-ui-primitives'
-import { resolveSlotLabel, type TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
+import { resolveSlotLabel, type PropsRenderSlots, type PropsRuntime, type TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
@@ -20,12 +21,14 @@ import { useEffect, useRef } from 'react'
 import { ArchivedThreadDock } from './archived-thread-dock.js'
 import { archivedViewMachine } from './archived-view-machine.js'
 import { SidebarRoot, type FooterSnapshot, type SidebarShellBaseProps } from './sidebar-shell.js'
-import { ThreadSidebar } from './client.js'
+import { ThreadAsideOpenProvider, ThreadSidebar } from './client.js'
 import { HeaderThreadActions } from './header-actions.js'
 import { SubagentCatalogAction, SubagentHeaderLineage, type SubagentCatalogInjected } from './subagent-provenance/SubagentHeaderLineage.js'
 import { SubagentProvenanceToolRow } from './subagent-provenance/subagent-tool-row.js'
 import { NS as SUBAGENT_LOCALE_NAMESPACE } from './subagent-provenance/locales.js'
 import { subagentChatAddress } from './subagent-provenance/resource.js'
+import { ThreadAsideConversation } from './thread-aside-panel.js'
+import { THREAD_ASIDE_CONVERSATION_SLOT, THREAD_ASIDE_ID, THREAD_ASIDE_KIND, threadAsideAddress, threadAsideSessionId } from './thread-aside.js'
 import type { SubagentAddress } from '@deepseek-ai/dsh-subagent/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { sidebarChildren } from './sidebar-contract.js'
@@ -50,6 +53,21 @@ declare module '@deepseek-ai/dsh-api-session-controller/client' {
   interface SessionReferenceSourceMap {
     threadSidebarArchivedView: unknown
     threadSidebarSkillAutocomplete: unknown
+    /** One thread shown in its own right-sidebar tab (opened from the row menu). */
+    threadSidebarAside: unknown
+  }
+}
+
+declare module '@deepseek-ai/dsh-client-ui-slots' {
+  interface ResourceProtocolMap {
+    threadaside: SessionReference
+  }
+  interface SlotMap {
+    /** The aside tab's embedded Conversation for the thread it holds. */
+    'dshfiles.thread-sidebar.conversation': {
+      kind: 'single'
+      scope: 'session'
+    }
   }
 }
 
@@ -100,6 +118,8 @@ export default defineClient({
     'sessions',
     'conversation',
     'sidebarRight',
+    'sidebarRightTabs',
+    'resources',
     'remote',
     'remote.workspace',
     'remote.sessionReferenceResolver',
@@ -566,10 +586,76 @@ export default defineClient({
         },
         decorate((props: Parameters<typeof ThreadSidebar>[0]) => (
           <PluginQueryProvider>
-            <ThreadSidebar {...props} />
+            <ThreadAsideOpenProvider value={sessionId => ctx.sidebarRight.openResource(threadAsideAddress(sessionId), { kind: THREAD_ASIDE_KIND })}>
+              <ThreadSidebar {...props} />
+            </ThreadAsideOpenProvider>
           </PluginQueryProvider>
         )),
       ),
+    )
+
+    // One thread in its own right-sidebar tab: the same embedded Conversation a subagent chat hosts, but for a
+    // thread the user picked from the list, so closing the tab only releases the reference (nothing is archived).
+    ctx.effect(
+      () =>
+        ctx.resources.register({
+          protocol: THREAD_ASIDE_KIND,
+          async *open(address, { signal }) {
+            const requested = threadAsideSessionId(address)
+            const listed = ctx.sessions.list.getSnapshot().ids.find(id => id === requested)
+            if (listed === undefined) throw new Error(`thread-sidebar: no thread at "${address}"`)
+            const reference = ctx.sessions.retain(listed, { source: 'threadSidebarAside', signal })
+            try {
+              yield { ok: true, value: reference }
+              await new Promise<void>(resolve => signal.addEventListener('abort', () => resolve(), { once: true }))
+            } finally {
+              reference.release()
+            }
+          },
+        }),
+      'thread-sidebar: aside resources',
+    )
+
+    ctx.effect(
+      () =>
+        ctx.sidebarRightTabs.register({
+          id: THREAD_ASIDE_ID,
+          kind: THREAD_ASIDE_KIND,
+          patterns: ['dsh-resource://threadaside/session/**'],
+          canOpen: address => threadAsideSessionId(address) !== undefined,
+          title: address => {
+            const snapshot = ctx.sessions.list.getSnapshot()
+            const listed = snapshot.ids.find(id => id === threadAsideSessionId(address))
+            return (listed === undefined ? undefined : snapshot.byId[listed]?.displayTitle) ?? translate('threadSidebarThreadFallback')
+          },
+        }),
+      'thread-sidebar: aside tab type',
+    )
+
+    ctx.effect(
+      () =>
+        ctx.slots.inject('sidebar.right.pane.tab', () =>
+          ctx.slots.register(
+            { name: 'sidebar.right.pane.tab', key: THREAD_ASIDE_ID, children: { [THREAD_ASIDE_CONVERSATION_SLOT]: { kind: 'single', scope: 'session' } } },
+            (props: PropsRuntime<'sidebar.right.pane.tab'> & PropsRenderSlots<typeof THREAD_ASIDE_CONVERSATION_SLOT>) => {
+              const { tab } = props.useTabInfo()
+              const resource = props.useResource(tab.contentId)
+              return (
+                <div className="dshx-root dshx:flex dshx:h-full dshx:min-h-0" data-dshfiles-thread-aside="">
+                  {resource.value === undefined ? null : (
+                    <props.SessionProvider session={resource.value}>{props.renderSlot(THREAD_ASIDE_CONVERSATION_SLOT, {})}</props.SessionProvider>
+                  )}
+                </div>
+              )
+            },
+          ),
+        ),
+      'thread-sidebar: aside tab body',
+    )
+
+    ctx.effect(
+      () => ctx.slots.inject(THREAD_ASIDE_CONVERSATION_SLOT, () => ctx.slots.register({ name: THREAD_ASIDE_CONVERSATION_SLOT }, ThreadAsideConversation)),
+      'thread-sidebar: aside Conversation',
     )
   },
 })

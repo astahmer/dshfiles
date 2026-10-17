@@ -144,3 +144,9 @@ Feature: Thread sidebar journeys
     Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted with the autocomplete skill fixture
     When the composer searches @ autocomplete for skill "e2e-skill-mentions"
     Then the skill "e2e-skill-mentions" appears as an @ suggestion
+
+  @scenario:thread-sidebar.open-in-side-panel
+  Scenario: Open a thread in the right side panel from its row menu
+    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
+    When a nonblank Host thread is opened in the side panel from its context menu
+    Then the side panel hosts that thread's scrollable conversation and composer

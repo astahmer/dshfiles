@@ -70,6 +70,7 @@ const session: SessionSnapshot = {
 
 const props = (): SubagentHeaderLineageProps => ({
   usePanelInfo: unavailable,
+  useResource: unavailable,
   useAccess: unavailable,
   useSessionRetainInfo: unavailable,
   useWorkspaces: unavailable,

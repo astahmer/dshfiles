@@ -927,3 +927,55 @@ Then('the skill {string} appears as an @ suggestion', async ({ page }: { page: P
   })
   await finishJourneyAssertions(page)
 })
+
+let asideThreadId: string | null = null
+
+When('a nonblank Host thread is opened in the side panel from its context menu', async ({ page }: { page: Page }) => {
+  if (currentThreadId(page) === null) await startBlankThread(page)
+  const composer = page.getByRole('textbox').first()
+  await composer.fill('aside e2e target')
+  await composer.press('Enter')
+  const threadId = currentThreadId(page)
+  if (threadId === null) throw new Error('The Host did not keep the selected thread after its first message.')
+  asideThreadId = threadId
+  const targetRow = threadRow(page, threadId)
+  await expect(targetRow).toHaveCount(1)
+  await targetRow.click({ button: 'right' })
+  await page.getByRole('menuitem', { name: 'Open in side panel', exact: true }).click()
+})
+
+Then("the side panel hosts that thread's scrollable conversation and composer", async ({ page }: { page: Page }) => {
+  if (asideThreadId === null) throw new Error('No thread was opened aside.')
+  const aside = page.locator('[data-dshfiles-thread-aside]')
+  await recordAssertion(page, 'thread-sidebar-aside-opens-a-panel-tab', async () => {
+    await expect(aside).toHaveCount(1)
+    await expect(page.locator('[data-dockkit-tab]').filter({ hasText: 'aside e2e target' })).toHaveCount(1)
+  })
+  await recordAssertion(page, 'thread-sidebar-aside-pane-holds-the-conversation', async () => {
+    // The embedded Conversation must be sized by the pane, not by its content: the body never grows past the pane, it
+    // owns a real scroll container, and its composer stays inside both the pane and the viewport.
+    const geometry = await aside.evaluate(element => {
+      const body = element.querySelector('.wSkVaW_body')
+      const scrollBody = element.querySelector('.wSkVaW_scrollBody')
+      const composer = element.querySelector('.wSkVaW_composerSeat')
+      if (body === null || scrollBody === null || composer === null) throw new Error('the aside holds no conversation body or composer')
+      const pane = element.getBoundingClientRect()
+      return {
+        paneHeight: Math.round(pane.height),
+        paneBottom: Math.round(pane.bottom),
+        bodyHeight: Math.round(body.getBoundingClientRect().height),
+        scrollHeight: scrollBody.scrollHeight,
+        clientHeight: scrollBody.clientHeight,
+        composerBottom: Math.round(composer.getBoundingClientRect().bottom),
+        viewportHeight: window.innerHeight,
+      }
+    })
+    expect(geometry.bodyHeight).toBeLessThanOrEqual(geometry.paneHeight)
+    expect(geometry.scrollHeight).toBeGreaterThanOrEqual(geometry.clientHeight)
+    expect(geometry.composerBottom).toBeLessThanOrEqual(Math.min(geometry.paneBottom, geometry.viewportHeight))
+  })
+  await recordAssertion(page, 'thread-sidebar-aside-keeps-the-thread-listed', async () => {
+    await expect(threadRow(page, asideThreadId ?? '')).toHaveCount(1)
+  })
+  await finishJourneyAssertions(page)
+})
