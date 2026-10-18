@@ -312,6 +312,65 @@ available header size, and the 0 key restores the content-sized default. The han
 is hidden when the Host collapses the sidebar to its narrow rail, where the
 thread region is not rendered.
 
+## Render cost at scale
+
+The Session Controller's `projectList` builds a **new summary object for every
+session on every list projection** (its `byId` record is rebuilt, not
+structurally shared). A row whose data did not change therefore still receives a
+new `session` object, which defeats `memo` on the row and every memo upstream of
+it. At 305 rows one "New thread" navigation published a handful of projections,
+and each one re-rendered the whole list: measured on a scratch DSH, ~4,300-5,500
+`ThreadRow` renders per click, 11-15 long tasks and 1.7-2.4 s of blocking work,
+with the sidebar itself accounting for all of it. Nothing loops; the cost is one
+full re-render per store update.
+
+Three pieces keep the work proportional to what actually changed, all on the
+client side — no Host change is involved:
+
+- `src/session-list-cache.ts` is the selector the sidebar passes to
+  `useSessions`. It reuses the previous summary whenever every field is equal
+  (including `retainedBy` and `projectionValues`), reuses the `ids` array and the
+  projection map when their content is equal, and returns the **previous state
+  object** when a projection changed nothing at all, so the store notification
+  does not re-render the sidebar.
+- `src/stable-value.ts` keeps a derived `Set` or `Map` when its content is
+  equal. The unread, waiting and attention id sets and the inline attention
+  label map are row props, so without this every row re-renders although none of
+  them changed.
+- `src/thread-child-rows.ts` derives each parent's listed, live and finished
+  child rows once and caches them under the children array the thread tree hands
+  out, so an untouched parent keeps the exact arrays its row already holds. A
+  parent without children shares one empty row.
+
+After the change, the same click on the same instance costs 0-30 `ThreadRow`
+renders (only rows whose `age` or selection really changed), no long task in the
+navigation window on a calm machine, and about 4-9 ms of total sidebar render
+time across the 8 renders the store still asks for. Click-to-composer went from
+1,072-1,563 ms to 31-208 ms across runs; on the same instance with the project
+filter set to a bucket with no rows it measures 28-49 ms, so what remains is
+Host RPC time (`session/create`, `destination`) and the machine's load, not row
+work. Those wall-clock figures come from a shared machine (load average ~28);
+the render counts and the long-task count are the load-independent evidence.
+
+To reproduce, start a scratch DSH and seed it:
+
+```sh
+node tooling/dshx/packages/dshx/dist/cli/bin.js dev up \
+  --plugin @dshfiles/jj-integration --plugin @dshfiles/home \
+  --plugin @dshfiles/thread-sidebar --plugin @dshfiles/ui-styles \
+  --name sidebar-scale --skip-build --json
+node tooling/dshx/scripts/sidebar-scale-bench.mjs "$TMPDIR/dshx-dev/sidebar-scale/state.json" --seed 305 --rounds 5
+```
+
+The benchmark reports long tasks (inside and after the navigation window),
+click-to-composer and the slowest RPCs. Render counts need a temporary counter:
+add `globalThis.__threadRowRenders = (globalThis.__threadRowRenders ?? 0) + 1` at
+the top of `ThreadRow` and
+`globalThis.__sidebarRenders = (globalThis.__sidebarRenders ?? 0) + 1` at the top
+of `ThreadSidebarContent`, rebuild the plugin, and read both from
+`page.evaluate`. Wall-clock numbers depend on the machine's load; the render
+counts and the long-task count do not.
+
 ## Agent tools
 
 One dshx API (`thread-actions`, owner `@dshfiles/thread-sidebar`, defined in

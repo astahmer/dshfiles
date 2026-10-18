@@ -5,6 +5,9 @@ import type { WorkspaceBrowserProps } from '@deepseek-ai/dsh-client-ui-workspace
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
 import { RemoteThreadsSection } from './remote-threads-section.js'
+import { SessionListCacheModel } from './session-list-cache.js'
+import { StableValueModel, useStableValue } from './stable-value.js'
+import { createThreadChildRowCache, type ThreadChildRowCache } from './thread-child-rows.js'
 import type { ActorRefFrom } from '@dshfiles/plugin-ui/machine'
 import type { archivedViewMachine } from './archived-view-machine.js'
 import { useApi, useApiQuery } from '@dshfiles/dshx/client'
@@ -125,14 +128,7 @@ import { selectRecoveryRows } from './restart-recovery-rows.js'
 import type { RecoveryReason } from './restart-recovery.js'
 import { UsageLimitRowsModel, type QuotaContinuation } from './usage-limit-rows.js'
 import { UsageLimitSection, type UsageLimitSnooze } from './usage-limit-section.js'
-import {
-  groupThreadChildren,
-  listChildThreads,
-  partitionFinishedChildren,
-  shouldOpenChildThreadList,
-  threadActionTargetIds,
-  visibleChildren,
-} from './thread-children.js'
+import { groupThreadChildren, partitionFinishedChildren, shouldOpenChildThreadList, threadActionTargetIds, visibleChildren } from './thread-children.js'
 import { buildThreadUrl, clearThreadUrl, readThreadUrl } from './thread-url.js'
 import { workingThreadIds } from './working-threads.js'
 import { indexRebasedThreadSessions, rebasedThreadArchiveDelayMs } from './rebased-threads.js'
@@ -955,7 +951,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => (
 )
 
 const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
-  const sessionState = props.useSessions(state => state)
+  const sessionState = props.useSessions(SessionListCacheModel.selectStableSessionListState)
   const sessionStatus = props.useSessionStatus(state => state)
   const workspaceState = props.useWorkspaces(state => state)
   const { preferences, updatePreferences, storageWarning, hostBacked, setSelectedThreadId, threadTitle } = useSidebarState()
@@ -1329,12 +1325,15 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       setResumeAllBusy(false)
     }
   }
-  const unreadSessionIds = useMemo(
-    () =>
-      new Set(
-        sessions.filter(session => !mutedSessionIds.has(session.id) && attention.records.get(session.id)?.manuallyUnread === true).map(session => session.id),
-      ),
-    [attention.records, mutedSessionIds, sessions],
+  const unreadSessionIds = useStableValue(
+    useMemo(
+      () =>
+        new Set(
+          sessions.filter(session => !mutedSessionIds.has(session.id) && attention.records.get(session.id)?.manuallyUnread === true).map(session => session.id),
+        ),
+      [attention.records, mutedSessionIds, sessions],
+    ),
+    StableValueModel.sameSet,
   )
   /** Only an unacknowledged completion carries a timestamp; a hand mark alone is not a finished turn. */
   const finishedAtBySession = useMemo(() => {
@@ -1958,7 +1957,10 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       workspaceBySession,
     ],
   )
-  const needsInputIds = useMemo(() => new Set(needsInputRows.map(session => session.id)), [needsInputRows])
+  const needsInputIds = useStableValue(
+    useMemo(() => new Set(needsInputRows.map(session => session.id)), [needsInputRows]),
+    StableValueModel.sameSet,
+  )
   const approvalNeededRows = useMemo(
     () =>
       attentionSessions
@@ -1986,7 +1988,10 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       workspaceBySession,
     ],
   )
-  const approvalNeededIds = useMemo(() => new Set(approvalNeededRows.map(session => session.id)), [approvalNeededRows])
+  const approvalNeededIds = useStableValue(
+    useMemo(() => new Set(approvalNeededRows.map(session => session.id)), [approvalNeededRows]),
+    StableValueModel.sameSet,
+  )
   const turnFinishedRows = useMemo(
     () =>
       selectTurnFinishedRows({
@@ -2016,26 +2021,35 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       workspaceBySession,
     ],
   )
-  const waitingSessionIds = useMemo(() => new Set([...approvalNeededRows, ...needsInputRows].map(session => session.id)), [approvalNeededRows, needsInputRows])
-  const attentionSessionIds = useMemo(
-    () =>
-      new Set([
-        ...approvalNeededRows,
-        ...needsInputRows,
-        ...turnFinishedRows,
-        ...needsResumeRows,
-        ...interruptedRows,
-        ...usageLimitRows.map(row => row.session.id),
-      ]),
-    [approvalNeededRows, interruptedRows, needsInputRows, needsResumeRows, turnFinishedRows, usageLimitRows],
+  const waitingSessionIds = useStableValue(
+    useMemo(() => new Set([...approvalNeededRows, ...needsInputRows].map(session => session.id)), [approvalNeededRows, needsInputRows]),
+    StableValueModel.sameSet,
   )
-  const attentionRootIds = useMemo(() => {
-    const ids = new Set(attentionSessionIds)
-    for (const { session } of sectionEntries) {
-      if ((threadTree.childrenByRoot.get(session.id) ?? NO_CHILDREN).some(child => attentionSessionIds.has(child.id))) ids.add(session.id)
-    }
-    return ids
-  }, [attentionSessionIds, sectionEntries, threadTree])
+  const attentionSessionIds = useStableValue(
+    useMemo(
+      () =>
+        new Set([
+          ...approvalNeededRows,
+          ...needsInputRows,
+          ...turnFinishedRows,
+          ...needsResumeRows,
+          ...interruptedRows,
+          ...usageLimitRows.map(row => row.session.id),
+        ]),
+      [approvalNeededRows, interruptedRows, needsInputRows, needsResumeRows, turnFinishedRows, usageLimitRows],
+    ),
+    StableValueModel.sameSet,
+  )
+  const attentionRootIds = useStableValue(
+    useMemo(() => {
+      const ids = new Set(attentionSessionIds)
+      for (const { session } of sectionEntries) {
+        if ((threadTree.childrenByRoot.get(session.id) ?? NO_CHILDREN).some(child => attentionSessionIds.has(child.id))) ids.add(session.id)
+      }
+      return ids
+    }, [attentionSessionIds, sectionEntries, threadTree]),
+    StableValueModel.sameSet,
+  )
   const visibleThreadEntries = useMemo(
     () =>
       sourceFilteredThreadEntries.filter(entry =>
@@ -2136,36 +2150,45 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     () => [...statusFilteredInterruptedRows, ...statusFilteredNeedsResumeRows, ...statusFilteredUsageLimitRows.map(row => row.session)],
     [statusFilteredInterruptedRows, statusFilteredNeedsResumeRows, statusFilteredUsageLimitRows],
   )
-  const attentionIds = useMemo(
-    () =>
-      new Set(
-        [...groupedAttentionRows.approvalNeeded, ...groupedAttentionRows.inputNeeded, ...groupedAttentionRows.turnFinished, ...statusFilteredRecoveryRows].map(
-          session => session.id,
+  const attentionIds = useStableValue(
+    useMemo(
+      () =>
+        new Set(
+          [
+            ...groupedAttentionRows.approvalNeeded,
+            ...groupedAttentionRows.inputNeeded,
+            ...groupedAttentionRows.turnFinished,
+            ...statusFilteredRecoveryRows,
+          ].map(session => session.id),
         ),
-      ),
-    [groupedAttentionRows, statusFilteredRecoveryRows],
+      [groupedAttentionRows, statusFilteredRecoveryRows],
+    ),
+    StableValueModel.sameSet,
   )
-  const inlineAttentionLabels = useMemo(() => {
-    const labels = new Map<SessionSummary['id'], ThreadAttentionLabel>()
-    if (threadView.groupBy !== 'status' || preferences.approvalNeededDisplay === 'label') {
-      for (const session of approvalNeededRows) labels.set(session.id, 'threadSidebarApprovalNeeded')
-    }
-    if (threadView.groupBy !== 'status' || preferences.inputNeededDisplay === 'label') {
-      for (const session of needsInputRows) labels.set(session.id, 'threadSidebarInputNeeded')
-    }
-    if (threadView.groupBy !== 'status' || preferences.turnFinishedDisplay === 'label') {
-      for (const session of turnFinishedRows) labels.set(session.id, 'threadSidebarTurnFinished')
-    }
-    return labels
-  }, [
-    approvalNeededRows,
-    needsInputRows,
-    preferences.approvalNeededDisplay,
-    preferences.inputNeededDisplay,
-    preferences.turnFinishedDisplay,
-    threadView.groupBy,
-    turnFinishedRows,
-  ])
+  const inlineAttentionLabels = useStableValue(
+    useMemo(() => {
+      const labels = new Map<SessionSummary['id'], ThreadAttentionLabel>()
+      if (threadView.groupBy !== 'status' || preferences.approvalNeededDisplay === 'label') {
+        for (const session of approvalNeededRows) labels.set(session.id, 'threadSidebarApprovalNeeded')
+      }
+      if (threadView.groupBy !== 'status' || preferences.inputNeededDisplay === 'label') {
+        for (const session of needsInputRows) labels.set(session.id, 'threadSidebarInputNeeded')
+      }
+      if (threadView.groupBy !== 'status' || preferences.turnFinishedDisplay === 'label') {
+        for (const session of turnFinishedRows) labels.set(session.id, 'threadSidebarTurnFinished')
+      }
+      return labels
+    }, [
+      approvalNeededRows,
+      needsInputRows,
+      preferences.approvalNeededDisplay,
+      preferences.inputNeededDisplay,
+      preferences.turnFinishedDisplay,
+      threadView.groupBy,
+      turnFinishedRows,
+    ]),
+    StableValueModel.sameMap,
+  )
 
   /**
    * Branches whose parent session is gone from the corpus. They keep the same
@@ -2509,23 +2532,23 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     }
   }, [])
 
+  // Kept for this component's lifetime: the per-parent child rows must outlive a render to stay identical.
+  const childRowCacheRef = useRef<ThreadChildRowCache | null>(null)
+  childRowCacheRef.current ??= createThreadChildRowCache()
+  const childRowCache = childRowCacheRef.current
+
   const renderThreadRow = (session: SessionSummary, attentionLabel: ThreadRowProps['attentionLabel']): JSX.Element => {
     const lineage = SidebarOrganization.sessionLineage(session, sessionState.byId)
     const workspaceId = SidebarOrganization.workspaceForLineage(session, sessionState.byId, workspaceBySession)
-    const listedChildThreads =
-      threadView.sourceFilter === 'main'
-        ? NO_CHILDREN
-        : listChildThreads({
-            children: threadTree.childrenByRoot.get(session.id) ?? NO_CHILDREN,
-            groupedAttentionIds: attentionIds,
-            groupByStatus: threadView.groupBy === 'status',
-          })
-    const selectedChildId = listedChildThreads.some(child => child.id === selectedSession?.id) ? selectedSession?.id : undefined
-    const { live: childThreads, finished: finishedChildThreads } = partitionFinishedChildren({
-      children: listedChildThreads,
+    // Derived once per parent change: an untouched parent keeps the arrays its row already holds, so memo holds.
+    const childRow = childRowCache.resolve({
+      children: threadTree.childrenByRoot.get(session.id) ?? NO_CHILDREN,
+      groupedAttentionIds: attentionIds,
+      listChildren: threadView.sourceFilter !== 'main',
+      groupByStatus: threadView.groupBy === 'status',
       mode: preferences.finishedSubagents,
-      isFinished: child => child.origin === 'subagent' && !child.running && !waitingSessionIds.has(child.id),
-      selectedId: selectedChildId,
+      waitingSessionIds,
+      selectedSessionId: selectedSession?.id,
     })
     const rowAttentionLabel = attentionLabel ?? inlineAttentionLabels.get(session.id)
     return (
@@ -2552,11 +2575,11 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         childAttentionLabels={inlineAttentionLabels}
         rowStyle={rowStyle}
         hiddenRowActions={preferences.hiddenRowActions}
-        childThreads={childThreads}
-        finishedChildThreads={finishedChildThreads}
-        childrenOpen={shouldOpenChildThreadList({ children: listedChildThreads, override: childrenOpenOverrides.get(session.id) })}
+        childThreads={childRow.live}
+        finishedChildThreads={childRow.finished}
+        childrenOpen={shouldOpenChildThreadList({ children: childRow.listed, override: childrenOpenOverrides.get(session.id) })}
         allChildrenShown={expandedParents.has(session.id)}
-        selectedChildId={selectedChildId}
+        selectedChildId={childRow.selectedChildId}
         actions={rowActions}
       />
     )
