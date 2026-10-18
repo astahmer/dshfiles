@@ -298,14 +298,29 @@ thread region is not rendered.
 
 One dshx API (`thread-actions`, owner `@dshfiles/thread-sidebar`, defined in
 `src/thread-actions-api.ts`) exposes the sidebar's thread and project actions to
-the Agent as sixteen native tools: `thread_list`, `thread_archive`,
+the Agent as seventeen native tools: `thread_list`, `thread_archive`,
 `thread_unarchive`, `thread_pin`, `thread_unpin`, `thread_rename`,
 `thread_fork`, `thread_create`, `thread_stop`, `thread_select_model`,
-`project_list`, `project_register`, `project_rename`, `project_delete`,
-`project_reorder`, and `thread_move`. `src/thread-actions.ts` holds the
-decoded logic over plain ids and `src/thread-actions-host.ts` resolves the live
-Host services on each call (`sessionController`, `workspaceController`,
-`workspaceRegistry`, `sessionQuery`).
+`thread_references`, `project_list`, `project_register`, `project_rename`,
+`project_delete`, `project_reorder`, and `thread_move`. `src/thread-actions.ts`
+holds the decoded logic over plain ids and `src/thread-actions-host.ts` resolves
+the live Host services on each call (`sessionController`,
+`workspaceController`, `workspaceRegistry`, `sessionQuery`).
+
+`thread_references` answers which other threads point back at one thread: its
+forked and subagent children (`header.parentSession`), plus the threads whose
+messages pulled it in as referenced context. The second half is one bounded
+full-text lookup for the thread id over `sessionQuery.searchSessions` — the
+referenced-context snapshot records `"sessionId":"session-<id>"`, so the id's own
+uuid is the phrase to search. That lookup needs the Host's session-content index
+(the web profile's `session-query-sqlite` Loader row); a search that is still
+reconciling the corpus, or a Host without the index, is attempted three times
+with a 1.5 s deadline each and then reported as `degraded: true` with lineage
+only. `references` therefore never holds a menu open and never claims "nothing
+references this thread" when it could not look. The same rows drive the
+**Referenced by** submenu of a thread row's context menu and of the conversation
+header's `...` menu, which is why the client tolerates a Host that predates the
+method (it shows one muted line instead of the rows).
 
 Every write tool's description says it may run only when the user asked for that
 change. `thread_archive` never stops running work on its own: without

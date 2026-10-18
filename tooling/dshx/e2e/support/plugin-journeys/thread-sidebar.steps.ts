@@ -1040,3 +1040,69 @@ Then('the thread row keeps the context-menu action but drops the hover one', asy
   })
   await finishJourneyAssertions(page)
 })
+
+interface ThreadReferenceJourney {
+  readonly targetThreadId: string
+  readonly referencingThreadId: string
+}
+
+const threadReferenceJourneys = new WeakMap<Page, ThreadReferenceJourney>()
+
+// A referencing thread's own title is folded asynchronously and can still be missing, so the row is found by the
+// relation it names; the journey proves identity by clicking it and landing on the referencing thread.
+const referencedByRows = (page: Page) =>
+  page.getByRole('menu', { name: 'Referenced by', exact: true }).getByRole('menuitem').filter({ hasText: 'References this thread' })
+
+When('another thread references a visible Host thread from its composer', async ({ page }: { page: Page }) => {
+  const targetThreadId = await startBlankThread(page)
+  const targetComposer = page.getByRole('textbox').first()
+  await targetComposer.fill('thread sidebar referenced-by e2e target')
+  await targetComposer.press('Enter')
+  await expect(threadRow(page, targetThreadId)).toHaveCount(1)
+
+  const referencingThreadId = await startBlankThread(page)
+  expect(referencingThreadId).not.toBe(targetThreadId)
+
+  await threadRow(page, targetThreadId).click({ button: 'right' })
+  const mentionMenuItem = page.getByRole('menuitem', { name: '@Mention thread', exact: true })
+  await expect(mentionMenuItem).toBeVisible()
+  await mentionMenuItem.click()
+
+  const composer = page.getByRole('textbox').first()
+  await expect(composer.locator('[data-composer-chip="reference"]')).toHaveCount(1)
+  await composer.click()
+  await composer.press('Enter')
+  threadReferenceJourneys.set(page, { targetThreadId, referencingThreadId })
+})
+
+Then('both menus list the referencing thread under Referenced by', async ({ page }: { page: Page }) => {
+  const journey = threadReferenceJourneys.get(page)
+  if (journey === undefined) throw new Error('No thread reference journey was recorded for this browser page.')
+
+  await recordAssertion(page, 'thread-sidebar-row-menu-lists-the-referencing-thread', async () => {
+    await threadRow(page, journey.targetThreadId).click({ button: 'right' })
+    const trigger = page.getByRole('menuitem', { name: 'Referenced by', exact: true })
+    await expect(trigger).toBeVisible()
+    await trigger.hover()
+    await expect(referencedByRows(page)).toHaveCount(1, { timeout: 15_000 })
+    // One Escape closes the submenu and a second the row menu: a menu left open swallows the next row click.
+    await page.keyboard.press('Escape')
+    await page.keyboard.press('Escape')
+    await expect(trigger).toHaveCount(0)
+  })
+  await recordAssertion(page, 'thread-sidebar-header-menu-lists-the-referencing-thread', async () => {
+    // The row's hover toolbar overlays its right half, so the title area is clicked by position, not by centre.
+    await threadRow(page, journey.targetThreadId).click({ position: { x: 24, y: 12 } })
+    await expect.poll(() => currentThreadId(page)).toBe(journey.targetThreadId)
+    const threadActions = page.getByRole('group', { name: 'Thread actions', exact: true })
+    await threadActions.getByRole('button', { name: 'More thread actions', exact: true }).click()
+    const trigger = page.getByRole('menuitem', { name: 'Referenced by', exact: true })
+    await expect(trigger).toBeVisible()
+    await trigger.hover()
+    const row = referencedByRows(page)
+    await expect(row).toHaveCount(1, { timeout: 15_000 })
+    await row.click()
+    await expect.poll(() => currentThreadId(page)).toBe(journey.referencingThreadId)
+  })
+  await finishJourneyAssertions(page)
+})

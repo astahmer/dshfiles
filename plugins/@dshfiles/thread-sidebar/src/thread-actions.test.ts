@@ -24,6 +24,8 @@ const project = (projectId: string, sessionIds: readonly string[] = []): Project
 const createDeps = (overrides: Partial<ThreadActionDeps> = {}): ThreadActionDeps => ({
   listSessions: async () => [summary('session-a'), summary('session-b')],
   readTitles: async ids => new Map(ids.map(id => [id, `title ${id}`])),
+  listThreadRelations: async () => [],
+  searchThreadContent: async () => [],
   projects: () => [],
   archivedSessionIds: () => [],
   pinnedSessionIds: () => [],
@@ -313,6 +315,84 @@ describe('thread actions: projects', () => {
   })
 })
 
+describe('thread actions: references', () => {
+  test('lists children and mentioning threads, titled, newest lineage first', async () => {
+    const searched: Array<{ query: string; limit: number }> = []
+    const actions = createThreadActions(
+      createDeps({
+        listSessions: async () => [summary('session-seed'), summary('session-fork', { updatedAt: 30 }), summary('session-mention', { updatedAt: 90 })],
+        listThreadRelations: async () => [
+          { sessionId: 'session-fork', parentSessionId: 'session-seed' },
+          { sessionId: 'session-mention', parentSessionId: null },
+        ],
+        searchThreadContent: async (query, limit) => {
+          searched.push({ query, limit })
+          return [{ sessionId: 'session-mention' }]
+        },
+      }),
+    )
+
+    expect(await actions.references({ input: { sessionId: 'session-seed' }, caller: agent('session-a'), signal })).toEqual({
+      sessionId: 'session-seed',
+      references: [
+        { sessionId: 'session-fork', relation: 'fork', updatedAt: 30, title: 'title session-fork' },
+        { sessionId: 'session-mention', relation: 'mention', updatedAt: 90, title: 'title session-mention' },
+      ],
+      omitted: 0,
+      degraded: false,
+    })
+    expect(searched).toEqual([{ query: 'seed', limit: 20 }])
+  })
+
+  test('a failed or slow content search still answers with lineage, marked degraded', async () => {
+    const actions = createThreadActions(
+      createDeps({
+        listSessions: async () => [summary('session-a'), summary('session-child')],
+        listThreadRelations: async () => [{ sessionId: 'session-child', parentSessionId: 'session-a' }],
+        searchThreadContent: async () => {
+          throw new Error('session-search persistence observation did not stabilize')
+        },
+      }),
+    )
+
+    const result = await actions.references({ input: { sessionId: 'session-a' }, caller: agent('session-a'), signal })
+    expect(result.degraded).toBe(true)
+    expect(result.references).toEqual([{ sessionId: 'session-child', relation: 'fork', updatedAt: 1, title: 'title session-child' }])
+  })
+
+  test('retries a search that could not answer yet before calling the lookup degraded', async () => {
+    let attempts = 0
+    const actions = createThreadActions(
+      createDeps({
+        listSessions: async () => [summary('session-seed'), summary('session-mention', { updatedAt: 90 })],
+        searchThreadContent: async () => {
+          attempts += 1
+          if (attempts === 1) throw new Error('session-search persistence observation did not stabilize')
+          return [{ sessionId: 'session-mention' }]
+        },
+      }),
+    )
+
+    const result = await actions.references({ input: { sessionId: 'session-seed' }, caller: agent('session-a'), signal })
+    expect(attempts).toBe(2)
+    expect(result.degraded).toBe(false)
+    expect(result.references).toEqual([{ sessionId: 'session-mention', relation: 'mention', updatedAt: 90, title: 'title session-mention' }])
+  })
+
+  test('defaults to the calling thread and caps the requested limit', async () => {
+    const actions = createThreadActions(
+      createDeps({
+        listSessions: async () => [summary('session-a'), summary('session-child')],
+        listThreadRelations: async () => [{ sessionId: 'session-child', parentSessionId: 'session-a' }],
+      }),
+    )
+
+    expect((await actions.references({ input: { limit: 500 }, caller: agent('session-a'), signal })).references).toHaveLength(1)
+    expect((await actions.references({ input: {}, caller: agent('session-a'), signal })).sessionId).toBe('session-a')
+    await expect(actions.references({ input: {}, caller: { kind: 'client' }, signal })).rejects.toThrow(/Pass sessionId/u)
+  })
+})
+
 describe('thread actions: tool exposure', () => {
   test('every action is a uniquely named tool with a model-facing description', () => {
     const names = Object.values(threadActionsApi.methods).map(method => method.tool?.name)
@@ -327,6 +407,7 @@ describe('thread actions: tool exposure', () => {
       'thread_create',
       'thread_stop',
       'thread_select_model',
+      'thread_references',
       'project_list',
       'project_register',
       'project_rename',
@@ -345,6 +426,6 @@ describe('thread actions: tool exposure', () => {
     const readOnly = Object.values(threadActionsApi.methods)
       .filter(method => method.tool?.readOnly === true)
       .map(method => method.tool?.name)
-    expect(readOnly).toEqual(['thread_list', 'project_list'])
+    expect(readOnly).toEqual(['thread_list', 'thread_references', 'project_list'])
   })
 })

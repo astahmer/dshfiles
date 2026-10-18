@@ -1462,6 +1462,44 @@
           "testName": "older preferences show every thread-row hover action"
         }
       ]
+    },
+    {
+      "id": "thread-referenced-by",
+      "title": "See which threads reference one thread",
+      "summary": "Both thread menus open a Referenced by submenu listing the threads that point back at one thread: its forked and subagent children from the Host session headers, plus the threads whose messages pulled it in as referenced context, found by one bounded session-content lookup for the thread id. Mention rows need the Host's session-content index (the web profile's session-query-sqlite Loader row); without it the submenu lists forked and subagent threads only and says so. Rows open the referencing thread, and a lookup that cannot answer never holds the menu open.",
+      "surfaces": ["client", "host", "integration"],
+      "configuration": [],
+      "states": ["loading", "empty", "listed", "degraded"],
+      "failureModes": [
+        "A content search still reconciling the corpus times out after two seconds and lists lineage only.",
+        "An agent tool call without a sessionId and without an acting Agent asks for the target instead of guessing."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "thread-sidebar.referenced-by",
+          "featureFile": "tooling/dshx/e2e/features/thread-sidebar.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.thread-referenced-by-unit-merge",
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-references.test.ts",
+          "testName": "forked and subagent children come first, then mentioning threads, newest first"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.thread-referenced-by-unit-degraded",
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-actions.test.ts",
+          "testName": "a failed or slow content search still answers with lineage, marked degraded"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.thread-referenced-by-unit-retry",
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-actions.test.ts",
+          "testName": "retries a search that could not answer yet before calling the lookup degraded"
+        }
+      ]
     }
   ],
   "kind": "bundle"

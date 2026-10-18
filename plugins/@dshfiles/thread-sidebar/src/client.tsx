@@ -109,6 +109,7 @@ import { selectInputNeededRows, selectTurnFinishedRows } from './attention-rows.
 import { PaletteApi, type PaletteAction } from '@dshfiles/command-palette/api'
 import { useSidebarState } from './sidebar-state.js'
 import { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
+import { ThreadReferencesItems } from './thread-references-menu.js'
 import { projectTextTone } from './project-tone.js'
 import {
   archivedOpenFailureNotice,
@@ -563,6 +564,12 @@ const ThreadContextMenu = (props: ThreadContextMenuProps): JSX.Element => {
           {t('threadSidebarCopyLink')}
         </ContextMenuItem>
         {archived || openAside === null ? null : <ContextMenuItem onSelect={() => openAside(session.id)}>{t('threadSidebarOpenInSidePanel')}</ContextMenuItem>}
+        <ContextMenuSub>
+          <ContextMenuSubTrigger>{t('threadSidebarReferencedBy')}</ContextMenuSubTrigger>
+          <ContextMenuSubContent className="dshx-root dshx:min-w-56 dshx:max-w-72" aria-label={t('threadSidebarReferencedBy')}>
+            <ThreadReferencesItems sessionId={session.id} t={t} openThread={props.actions.open} Item={ContextMenuItem} />
+          </ContextMenuSubContent>
+        </ContextMenuSub>
         <ContextMenuSeparator />
         <ContextMenuItem disabled={unread} onSelect={() => props.actions.markUnread(session.id)}>
           {t('threadSidebarMarkUnread')}

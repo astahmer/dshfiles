@@ -1,5 +1,6 @@
 import { PluginApiError, type ApiCaller } from '@dshfiles/dshx/api'
 import { z } from 'zod'
+import { ThreadReferencesModel, type ThreadReferenceMention, type ThreadReferenceThread } from './thread-references.js'
 
 /** The subset of a Host Session summary these actions read. */
 export interface ThreadSummary {
@@ -22,6 +23,10 @@ export interface ProjectRow {
 export interface ThreadActionDeps {
   readonly listSessions: (signal: AbortSignal) => Promise<readonly ThreadSummary[]>
   readonly readTitles: (sessionIds: readonly string[], signal: AbortSignal) => Promise<ReadonlyMap<string, string>>
+  /** Fork lineage as the Host records it: one entry per session, without reading any log. */
+  readonly listThreadRelations: (signal: AbortSignal) => Promise<readonly ThreadReferenceThread[]>
+  /** Full-text search over session messages; the reference lookup asks it for one session id. */
+  readonly searchThreadContent: (query: string, limit: number, signal: AbortSignal) => Promise<readonly ThreadReferenceMention[]>
   readonly projects: () => readonly ProjectRow[]
   readonly archivedSessionIds: () => readonly string[]
   readonly pinnedSessionIds: () => readonly string[]
@@ -71,6 +76,10 @@ export interface ThreadArchiveInput {
 }
 export interface ThreadTargetInput {
   readonly sessionId: string
+}
+export interface ThreadReferencesInput {
+  readonly sessionId?: string | undefined
+  readonly limit?: number | undefined
 }
 export interface ThreadRenameInput {
   readonly sessionId?: string | undefined
@@ -130,6 +139,11 @@ const DEFAULT_LIMIT = 50
 /** Title folding is a per-session log read; cap the batch so one listing stays bounded. */
 const TITLE_BUDGET = 300
 const MAX_ERROR_MESSAGE = 300
+/** A reference search still reconciling the corpus must not hold a menu open; lineage still answers. */
+const REFERENCE_SEARCH_DEADLINE_MS = 1_500
+/** The full-text index builds on its first search, so early attempts can time out before they can answer. */
+const REFERENCE_SEARCH_ATTEMPTS = 3
+const REFERENCE_SEARCH_RETRY_DELAY_MS = 150
 
 /** The Host failures these actions read: a stable code, and the activity an archive refusal named. */
 const remoteFailureSchema = z.looseObject({
@@ -185,6 +199,43 @@ const matches = (query: string, summary: ThreadSummary, title: string | undefine
   (summary.cwd ?? '').toLowerCase().includes(query) ||
   (project?.title ?? '').toLowerCase().includes(query)
 
+/** Threads whose indexed message pulled `sessionId` in as referenced context; null when the search could not answer. */
+const searchWithinDeadline = async (deps: ThreadActionDeps, query: string, signal: AbortSignal): Promise<readonly ThreadReferenceMention[] | null> => {
+  const deadline = new AbortController()
+  const timer = setTimeout(() => deadline.abort(), REFERENCE_SEARCH_DEADLINE_MS)
+  try {
+    return await deps.searchThreadContent(query, ThreadReferencesModel.maxLimit, AbortSignal.any([signal, deadline.signal]))
+  } catch {
+    return null
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+const waitBeforeRetry = (signal: AbortSignal): Promise<void> =>
+  new Promise(resolve => {
+    const timer = setTimeout(() => {
+      signal.removeEventListener('abort', onAbort)
+      resolve()
+    }, REFERENCE_SEARCH_RETRY_DELAY_MS)
+    const onAbort = (): void => {
+      clearTimeout(timer)
+      resolve()
+    }
+    signal.addEventListener('abort', onAbort, { once: true })
+  })
+
+/** Threads whose indexed message pulled `sessionId` in as referenced context; null when the search could not answer. */
+const mentionThreads = async (deps: ThreadActionDeps, sessionId: string, signal: AbortSignal): Promise<readonly ThreadReferenceMention[] | null> => {
+  const query = ThreadReferencesModel.mentionQuery(sessionId)
+  for (let attempt = 0; attempt < REFERENCE_SEARCH_ATTEMPTS; attempt += 1) {
+    if (attempt > 0) await waitBeforeRetry(signal)
+    const mentions = await searchWithinDeadline(deps, query, signal)
+    if (mentions !== null || signal.aborted) return mentions
+  }
+  return null
+}
+
 /** Builds the thread and project actions over the injected Host services. */
 /** The registered project that owns a directory, if any; the lookup is best-effort and never blocks creating a thread. */
 const projectIdForPath = (deps: ThreadActionDeps, cwd: string | undefined): string | undefined => {
@@ -237,6 +288,38 @@ export const createThreadActions = (deps: ThreadActionDeps) => ({
 
     const limit = Math.min(input.limit ?? DEFAULT_LIMIT, rows.length)
     return { threads: rows.slice(0, limit), total: rows.length, truncated: rows.length > limit }
+  },
+
+  references: async ({ input, caller, signal }: ThreadActionContext<ThreadReferencesInput>) => {
+    const sessionId = targetSessionId(input.sessionId, caller)
+    const limit = Math.max(1, Math.min(input.limit ?? ThreadReferencesModel.defaultLimit, ThreadReferencesModel.maxLimit))
+    const [sessions, relations] = await Promise.all([deps.listSessions(signal), deps.listThreadRelations(signal)])
+    const relationById = new Map(relations.map(relation => [relation.sessionId, relation]))
+    const summaryById = new Map(sessions.map(summary => [summary.sessionId, summary]))
+    const mentions = await mentionThreads(deps, sessionId, signal)
+    const merged = ThreadReferencesModel.merge({
+      sessionId,
+      limit,
+      degraded: mentions === null,
+      // The logical-session corpus is the authority on lineage; the summary only adds recency.
+      threads: [...new Set([...relationById.keys(), ...summaryById.keys()])].map(threadId => {
+        const relation = relationById.get(threadId)
+        const updatedAt = summaryById.get(threadId)?.updatedAt
+        return {
+          sessionId: threadId,
+          parentSessionId: relation?.parentSessionId ?? null,
+          ...(updatedAt === undefined ? undefined : { updatedAt }),
+          ...(relation?.origin === undefined ? undefined : { origin: relation.origin }),
+        }
+      }),
+      mentions: mentions ?? [],
+    })
+    if (merged.references.length === 0) return { ...merged, references: [] }
+    const titles = await deps.readTitles(
+      merged.references.map(row => row.sessionId),
+      signal,
+    )
+    return { ...merged, references: [...ThreadReferencesModel.withTitles(merged.references, titles)] }
   },
 
   archive: async ({ input, caller }: ThreadActionContext<ThreadArchiveInput>) => {

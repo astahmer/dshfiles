@@ -24,6 +24,32 @@ const pinnedSetSchema = z.object({ pinnedSessionIds: z.array(z.string()).max(200
 
 const projectRowSchema = z.object({ projectId: z.string(), title: z.string(), path: z.string(), threadCount: z.number() }).strict()
 
+const threadReferenceRowSchema = z
+  .object({
+    sessionId: z.string(),
+    title: z.string().optional(),
+    updatedAt: z.number().optional(),
+    relation: z.enum(['fork', 'subagent', 'mention']),
+  })
+  .strict()
+
+const threadReferencesSchema = z
+  .object({
+    sessionId: z.string(),
+    references: z.array(threadReferenceRowSchema).max(20),
+    omitted: z.number().int().min(0),
+    degraded: z.boolean(),
+  })
+  .strict()
+
+const renderReferences = (output: z.infer<typeof threadReferencesSchema>): string => {
+  const header = `Threads that reference ${output.sessionId}${output.degraded ? ' (lineage only: the content search could not answer)' : ''}:`
+  const rows = output.references.map(row => `${row.sessionId} · ${row.title ?? '(untitled)'} · ${row.relation}`)
+  if (rows.length === 0) return `${header} none yet.`
+  const omitted = output.omitted === 0 ? '' : `\n${output.omitted} more not shown.`
+  return `${header}\n${rows.join('\n')}${omitted}`
+}
+
 const archiveResultSchema = z
   .object({
     status: z.enum(['archived', 'refused-active']),
@@ -157,6 +183,13 @@ export const threadActionsApi = defineApi({
         render: output =>
           `Thread ${output.sessionId} now uses ${output.provider}/${output.model}${output.reasoningEffort === undefined ? '' : ` at ${output.reasoningEffort} effort`}.`,
       },
+    }),
+    references: method({
+      input: z.object({ sessionId: sessionIdSchema.optional(), limit: z.number().int().min(1).max(20).optional() }).strict(),
+      output: threadReferencesSchema,
+      description:
+        'Threads that reference one thread (DSH Session): its forked and subagent children, plus the threads whose messages pulled it in as referenced context. Reports degraded: true with lineage only when the Host cannot search session content. Defaults to the calling thread. Read-only.',
+      tool: { name: 'thread_references', readOnly: true, render: renderReferences },
     }),
     projectList: method({
       input: z.object({}).strict(),

@@ -246,6 +246,20 @@ Given('the isolated plugin profile {string} is booted', async ({ page }: { page:
   await visitIsolatedPluginProfile(page, await bootPluginProfile(packageId))
 })
 
+// The web profile carries its session-content index as a Loader row, not as a bundle, so a journey that reads
+// referenced-session context must ask for it explicitly. First-search keeps the SQLite module unloaded until then.
+const sessionContentSearchPatch = `- id: session-query-sqlite
+  name: '@deepseek-ai/dsh-session-query-sqlite'
+  config:
+    path: !!js (process.env.DSH_HOME || process.env.HOME + '/.dsh') + '/plugins/session-query-sqlite/index.sqlite'
+    openAt: first-search
+`
+
+Given('the isolated plugin profile {string} is booted with session content search', async ({ page }: { page: Page }, packageId: string) => {
+  const profile = await bootComposedPluginProfile({ packageIds: [packageId], profileLabel: packageId, cordisPatch: sessionContentSearchPatch })
+  await visitIsolatedPluginProfile(page, profile)
+})
+
 const privacyControlsDefaults = `- id: command-feedback
   disabled: true
 - id: message-feedback

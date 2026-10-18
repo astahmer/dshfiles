@@ -24,12 +24,14 @@ import { usePreferences } from './sidebar-state.js'
 import { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
 import { SidebarOrganization } from './organization.js'
 import { ThreadUrlModel } from './thread-url.js'
+import { ThreadReferencesItems } from './thread-references-menu.js'
 
 interface HeaderThreadActionsInjected {
   archiveSession: (sessionId: SessionSummary['id']) => Promise<void>
   unarchiveSession: (sessionId: SessionSummary['id']) => Promise<void>
   pinSession: (sessionId: SessionSummary['id']) => Promise<void>
   unpinSession: (sessionId: SessionSummary['id']) => Promise<void>
+  openThread: (sessionId: SessionSummary['id']) => void
 }
 
 // Only the slot props this component reads, so a test can supply them without the whole runtime surface.
@@ -83,6 +85,7 @@ export const HeaderThreadActions = ({
   unarchiveSession,
   pinSession,
   unpinSession,
+  openThread,
   t,
 }: HeaderThreadActionsProps) => {
   const sessionState = useSessions(state => state)
@@ -235,6 +238,13 @@ export const HeaderThreadActions = ({
               <CopyIcon aria-hidden="true" />
               {t('threadSidebarCopyLink')}
             </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger>{t('threadSidebarReferencedBy')}</DropdownMenuSubTrigger>
+              <DropdownMenuSubContent className="dshx-root dshx:min-w-56 dshx:max-w-72" aria-label={t('threadSidebarReferencedBy')}>
+                <ThreadReferencesItems sessionId={sessionId} t={t} openThread={openThread} Item={DropdownMenuItem} />
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
           </DropdownMenuContent>
         </DropdownMenu>
         {actionFailed ? (

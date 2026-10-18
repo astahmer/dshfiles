@@ -573,7 +573,7 @@ export default defineClient({
           order: 100,
           label: () => ctx.locale.bind(THREAD_SIDEBAR_LOCALE_NAMESPACE)('threadSidebarThreadActions'),
           locale: THREAD_SIDEBAR_LOCALE_NAMESPACE,
-          inject: () => ({ archiveSession, unarchiveSession, pinSession, unpinSession }),
+          inject: () => ({ archiveSession, unarchiveSession, pinSession, unpinSession, openThread }),
         },
         decorate(HeaderThreadActions),
       ),

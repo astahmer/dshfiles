@@ -155,3 +155,9 @@ Feature: Thread sidebar journeys
     Then the side panel hosts that thread again
     When the side-panel hover action is switched off in Customize sidebar
     Then the thread row keeps the context-menu action but drops the hover one
+
+  @scenario:thread-sidebar.referenced-by
+  Scenario: See which thread references a thread from its row and header menus
+    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted with session content search
+    When another thread references a visible Host thread from its composer
+    Then both menus list the referencing thread under Referenced by

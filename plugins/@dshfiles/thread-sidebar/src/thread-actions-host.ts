@@ -42,6 +42,16 @@ const dependencies: ThreadActionDeps = {
     }
     return titles
   },
+  listThreadRelations: async () =>
+    (await requireContext().sessionQuery.listSessions()).map(record => ({
+      sessionId: record.header.id,
+      parentSessionId: record.header.parentSession ?? null,
+      ...(record.header.origin === undefined ? undefined : { origin: record.header.origin }),
+    })),
+  searchThreadContent: async (query, limit, signal) => {
+    const page = await requireContext().sessionQuery.searchSessions({ query, eventFilters: [{ kind: 'type', values: ['user/message'] }], limit }, { signal })
+    return page.items.map(hit => ({ sessionId: hit.header.id }))
+  },
   projects: () =>
     requireContext()
       .workspaceRegistry.list()
