@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import type { ThreadSidebarLocaleKey } from './locales.js'
 import type { QuotaContinuation } from './usage-limit-rows.js'
 import { UsageLimitSection } from './usage-limit-section.js'
 
@@ -20,25 +21,25 @@ const continuation = (patch: Partial<QuotaContinuation> = {}): QuotaContinuation
   ...patch,
 })
 
-const labels: Readonly<Record<string, string>> = {
-  threadSidebarUsageLimit: 'Usage limit',
-  threadSidebarUsageLimitResume: 'Resume this thread',
-  threadSidebarUsageLimitResumeAll: 'Resume all',
-  threadSidebarUsageLimitReady: 'Ready to resume',
-  threadSidebarUsageLimitUnknown: 'Reset time unknown',
-  threadSidebarUsageLimitScheduled: 'Retry scheduled',
-  threadSidebarUsageLimitAutoRetryOn: 'Auto-retry on',
-  threadSidebarUsageLimitOptions: 'Usage limit options',
-  threadSidebarUsageLimitSnoozeHour: 'Snooze 1 hour',
-  threadSidebarUsageLimitSnoozeFourHours: 'Snooze 4 hours',
-  threadSidebarUsageLimitSnoozeDay: 'Snooze 1 day',
-  threadSidebarUsageLimitSnoozeOff: 'Unsnooze',
-  threadSidebarUsageLimitAutoRetry: 'Retry automatically',
-  threadSidebarUsageLimitRecovery: 'Recovery',
-}
+const labels = new Map<ThreadSidebarLocaleKey, string>([
+  ['threadSidebarUsageLimit', 'Usage limit'],
+  ['threadSidebarUsageLimitResume', 'Resume this thread'],
+  ['threadSidebarUsageLimitResumeAll', 'Resume all'],
+  ['threadSidebarUsageLimitReady', 'Ready to resume'],
+  ['threadSidebarUsageLimitUnknown', 'Reset time unknown'],
+  ['threadSidebarUsageLimitScheduled', 'Retry scheduled'],
+  ['threadSidebarUsageLimitAutoRetryOn', 'Auto-retry on'],
+  ['threadSidebarUsageLimitOptions', 'Usage limit options'],
+  ['threadSidebarUsageLimitSnoozeHour', 'Snooze 1 hour'],
+  ['threadSidebarUsageLimitSnoozeFourHours', 'Snooze 4 hours'],
+  ['threadSidebarUsageLimitSnoozeDay', 'Snooze 1 day'],
+  ['threadSidebarUsageLimitSnoozeOff', 'Unsnooze'],
+  ['threadSidebarUsageLimitAutoRetry', 'Retry automatically'],
+  ['threadSidebarUsageLimitRecovery', 'Recovery'],
+])
 
-const translate = (key: string, params?: Readonly<Record<string, string | number>>): string => {
-  const template = labels[key] ?? key
+const translate = (key: ThreadSidebarLocaleKey, params?: Readonly<Record<string, string | number>>): string => {
+  const template = labels.get(key) ?? key
   if (key === 'threadSidebarUsageLimitResets') return `Resets in ${String(params?.time ?? '')}`
   if (key === 'threadSidebarUsageLimitSnoozed') return `Snoozed for ${String(params?.time ?? '')}`
   return template
@@ -146,6 +147,7 @@ describe('usage limit section', () => {
     fill({ continuations: [continuation()], busy: ['11111111-1111-4111-8111-111111111111'] })
 
     expect(screen.getByRole('button', { name: 'Resume this thread' }).hasAttribute('disabled')).toBe(true)
+    expect(screen.getByRole('button', { name: 'Usage limit options' }).hasAttribute('disabled')).toBe(true)
     expect(screen.getByRole('button', { name: 'Resume all' }).hasAttribute('disabled')).toBe(true)
   })
 })

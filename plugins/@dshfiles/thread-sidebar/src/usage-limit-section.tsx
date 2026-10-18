@@ -113,7 +113,7 @@ export const UsageLimitSection = <Thread extends UsageLimitThread>(props: UsageL
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button aria-label={t('threadSidebarUsageLimitOptions')} size="icon-xs" type="button" variant="ghost">
+                <Button aria-label={t('threadSidebarUsageLimitOptions')} disabled={busy} size="icon-xs" type="button" variant="ghost">
                   <MoreVerticalIcon className="dshx:size-3.5" />
                 </Button>
               </DropdownMenuTrigger>
@@ -121,6 +121,7 @@ export const UsageLimitSection = <Thread extends UsageLimitThread>(props: UsageL
                 <DropdownMenuLabel>{t('threadSidebarUsageLimitRecovery')}</DropdownMenuLabel>
                 {SNOOZES.map(snooze => (
                   <DropdownMenuItem
+                    disabled={busy}
                     key={snooze.duration}
                     onSelect={() => props.onSnooze({ continuationId: row.continuation.continuationId, duration: snooze.duration })}
                   >
@@ -128,13 +129,14 @@ export const UsageLimitSection = <Thread extends UsageLimitThread>(props: UsageL
                   </DropdownMenuItem>
                 ))}
                 {snoozed ? (
-                  <DropdownMenuItem onSelect={() => props.onSnooze({ continuationId: row.continuation.continuationId, duration: 'unsnooze' })}>
+                  <DropdownMenuItem disabled={busy} onSelect={() => props.onSnooze({ continuationId: row.continuation.continuationId, duration: 'unsnooze' })}>
                     {t('threadSidebarUsageLimitSnoozeOff')}
                   </DropdownMenuItem>
                 ) : null}
                 <DropdownMenuSeparator />
                 <DropdownMenuCheckboxItem
                   checked={row.continuation.autoRetry}
+                  disabled={busy}
                   onCheckedChange={enabled => props.onAutoRetry({ continuationId: row.continuation.continuationId, sessionId: row.session.id, enabled })}
                 >
                   {t('threadSidebarUsageLimitAutoRetry')}
