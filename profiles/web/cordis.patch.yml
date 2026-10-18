@@ -1,10 +1,15 @@
 # Your patch layer for this dsh profile, applied after every bundle layer:
 # a top-level YAML array of loader patch entries (id-targeted config
 # overrides, disables, and insert lists; `!!js` expressions allowed).
-# Keep a private file-backed index for Command Palette content search; first-search
-# keeps the SQLite module unloaded until someone uses that feature.
+# Content search is served by the owned @dshfiles/session-search backend, which
+# reconciles its index off the Host event loop; the stock backend reconciles on
+# the read path (measured: one search blocked the Host loop for 290 s cold and
+# 43.5 s warm). One process may own the `sessionQuery` service, so the stock row
+# is disabled and its derived index file is kept on disk untouched for now.
+# Re-enable this row only together with removing the owned bundle.
 - id: session-query-sqlite
   name: '@deepseek-ai/dsh-session-query-sqlite'
+  disabled: true
   config:
     path: !!js (process.env.DSH_HOME || process.env.HOME + '/.dsh') + '/plugins/session-query-sqlite/index.sqlite'
     openAt: first-search
