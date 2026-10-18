@@ -1,7 +1,9 @@
-import { mkdtemp, rm, stat } from 'node:fs/promises'
+import fs from 'node:fs'
+import { mkdtemp, rm, stat, writeFile } from 'node:fs/promises'
+import { syncBuiltinESMExports } from 'node:module'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ActivityTimelineAdapters } from './adapters.js'
 import { ActivityTimelineCondensation } from './condensation.js'
 import { createActivityTimelineService } from './service.js'
@@ -276,5 +278,59 @@ describe('activity condensation primitives', () => {
         outcome: 'integrated',
       }).level,
     ).toBe('routine')
+  })
+})
+
+describe('activity timeline ingest batching', () => {
+  it('serves repeated reads from one parsed snapshot and still sees an external write', async () => {
+    const path = await statePath()
+    const service = createActivityTimelineService({ statePath: path, now: () => now })
+    await service.ingest(routine(1, now))
+    const readSpy = vi.spyOn(fs.promises, 'readFile')
+    syncBuiltinESMExports()
+    try {
+      await service.page({})
+      await service.stats()
+      const stored = await service.event('routine-1')
+      expect(readSpy).not.toHaveBeenCalled()
+
+      // Another writer replaces the file: the revision, not the cache, decides what a read sees.
+      await writeFile(path, JSON.stringify({ schemaVersion: 1, events: [{ ...stored, id: 'external-1' }], ingestCount: 2, duplicateCount: 0, startedAt: now }))
+      expect((await service.event('external-1')).id).toBe('external-1')
+      expect(readSpy).toHaveBeenCalledTimes(1)
+    } finally {
+      readSpy.mockRestore()
+      syncBuiltinESMExports()
+    }
+  })
+
+  it('flushes a burst as one durable write and settles every caller', async () => {
+    const service = createActivityTimelineService({ statePath: await statePath(), now: () => now })
+    const writeSpy = vi.spyOn(fs.promises, 'writeFile')
+    syncBuiltinESMExports()
+    try {
+      const results = await Promise.all(Array.from({ length: 50 }, (_unused, index) => service.enqueue(routine(index + 1, now + index))))
+      expect(results.every(result => !result.duplicate)).toBe(true)
+      expect(writeSpy).toHaveBeenCalledTimes(1)
+      expect(await service.stats()).toMatchObject({ retained: 50, ingested: 50, duplicates: 0 })
+    } finally {
+      writeSpy.mockRestore()
+      syncBuiltinESMExports()
+    }
+  })
+
+  it('settles duplicates per caller and drains a pending batch on demand', async () => {
+    const service = createActivityTimelineService({ statePath: await statePath(), now: () => now })
+    const first = service.enqueue(routine(1, now))
+    const second = service.enqueue(routine(1, now))
+    await service.drain()
+    const [one, two] = await Promise.all([first, second])
+    expect([one?.duplicate, two?.duplicate].sort()).toEqual([false, true])
+    expect(await service.stats()).toMatchObject({ retained: 1, ingested: 1, duplicates: 1 })
+
+    const third = service.enqueue(routine(2, now + 1))
+    await service.drain()
+    expect((await third).duplicate).toBe(false)
+    expect(await service.stats()).toMatchObject({ retained: 2, ingested: 2, duplicates: 1 })
   })
 })

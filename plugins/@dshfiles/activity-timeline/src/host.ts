@@ -56,23 +56,23 @@ const setupHost = (context: Context): Effect<void> => {
   const active = createActivityTimelineService()
   service = active
   context.on('agent/created', ({ agent }) => {
-    void active.ingest(sessionActivity({ kind: 'created', at: Date.now(), sessionId: agent.id }))
+    void active.enqueue(sessionActivity({ kind: 'created', at: Date.now(), sessionId: agent.id }))
     return undefined
   })
   context.on('agent/disposed', ({ agent }) => {
-    void active.ingest(sessionActivity({ kind: 'disposed', at: Date.now(), sessionId: agent.id }))
+    void active.enqueue(sessionActivity({ kind: 'disposed', at: Date.now(), sessionId: agent.id }))
     return undefined
   })
   context.on('agent/status', ({ agent, status }) => {
-    void active.ingest(sessionActivity({ kind: 'status', at: Date.now(), sessionId: agent.id, status }))
+    void active.enqueue(sessionActivity({ kind: 'status', at: Date.now(), sessionId: agent.id, status }))
     return undefined
   })
   context.on('agent/error', ({ agent, error }) => {
-    void active.ingest(sessionActivity({ kind: 'error', at: Date.now(), sessionId: agent.id, detail: describeError(error) }))
+    void active.enqueue(sessionActivity({ kind: 'error', at: Date.now(), sessionId: agent.id, detail: describeError(error) }))
     return undefined
   })
   context.on('agent/inbox/inserted', ({ agent }) => {
-    void active.ingest(sessionActivity({ kind: 'input', at: Date.now(), sessionId: agent.id }))
+    void active.enqueue(sessionActivity({ kind: 'input', at: Date.now(), sessionId: agent.id }))
     return undefined
   })
   context.on('dshfiles/activity/source-ready', payload => {
@@ -84,16 +84,16 @@ const setupHost = (context: Context): Effect<void> => {
     const parsed = activityEventPayloadSchema.safeParse(payload)
     if (!parsed.success) return undefined
     if (parsed.data.kind === 'verification-receipt') {
-      void active.ingest(verificationReceiptActivity(parsed.data.value)).catch(() => undefined)
+      void active.enqueue(verificationReceiptActivity(parsed.data.value)).catch(() => undefined)
       return undefined
     }
     if (parsed.data.kind === 'communication-activity')
-      void active.ingest(communicationActivity(parsed.data.value as Parameters<typeof communicationActivity>[0])).catch(() => undefined)
-    if (parsed.data.kind === 'communication-message') void active.ingest(communicationMessageSafe(parsed.data.value)).catch(() => undefined)
+      void active.enqueue(communicationActivity(parsed.data.value as Parameters<typeof communicationActivity>[0])).catch(() => undefined)
+    if (parsed.data.kind === 'communication-message') void active.enqueue(communicationMessageSafe(parsed.data.value)).catch(() => undefined)
     if (parsed.data.kind === 'integration')
-      void active.ingest(integrationActivity(parsed.data.value as Parameters<typeof integrationActivity>[0])).catch(() => undefined)
+      void active.enqueue(integrationActivity(parsed.data.value as Parameters<typeof integrationActivity>[0])).catch(() => undefined)
     if (parsed.data.kind === 'workspace')
-      void active.ingest(workspaceActivity(parsed.data.value as Parameters<typeof workspaceActivity>[0])).catch(() => undefined)
+      void active.enqueue(workspaceActivity(parsed.data.value as Parameters<typeof workspaceActivity>[0])).catch(() => undefined)
     return undefined
   })
   return {
@@ -102,6 +102,8 @@ const setupHost = (context: Context): Effect<void> => {
         context.emit('dshfiles/activity/backfill', { since: Date.now() - BACKFILL_WINDOW_MS })
         yield async () => {
           if (service === active) service = undefined
+          // Store what this service already accepted before its owner goes away.
+          await active.drain()
         }
       } catch (error) {
         if (service === active) service = undefined

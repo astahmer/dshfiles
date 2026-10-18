@@ -1,4 +1,5 @@
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, rename, stat, writeFile } from 'node:fs/promises'
+import type { Stats } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { randomUUID } from 'node:crypto'
@@ -15,6 +16,12 @@ import { ActivityTimelineCondensation } from './condensation.js'
 
 const MAX_EVENTS = 5000
 const DEFAULT_PAGE = 60
+/** A cached snapshot older than this is re-read even when the file's metadata looks unchanged. */
+const STATE_FRESHNESS_MS = 30_000
+/** Buffered events flush within this delay, so an acknowledgement is delayed but never dropped. */
+const INGEST_BATCH_DELAY_MS = 25
+/** A burst this large flushes immediately instead of growing the buffer. */
+const INGEST_BATCH_LIMIT = 200
 
 export class ActivityError extends Error {
   constructor(
@@ -38,6 +45,16 @@ const defaultStatePath = (): string => {
 }
 
 const initialState = (now: number): ActivityState => ({ schemaVersion: 1, events: [], ingestCount: 0, duplicateCount: 0, startedAt: now })
+
+/** The identity a snapshot is validated against: file metadata plus this process's own write counter. */
+const revisionOf = (info: Stats, writeRevision: number): string =>
+  `${String(info.dev)}:${String(info.ino)}:${String(info.size)}:${String(info.mtimeMs)}:${String(writeRevision)}`
+
+interface QueuedIngest {
+  readonly event: ActivityEvent
+  readonly settle: (result: { readonly event: ActivityEvent; readonly duplicate: boolean }) => void
+  readonly reject: (error: unknown) => void
+}
 
 const cursorOf = (event: ActivityEvent): string => `${String(event.at)}:${event.id}`
 
@@ -76,6 +93,12 @@ export class ActivityTimelineService {
   readonly #maxEvents: number
   readonly #listeners = new Set<(event: ActivityEvent) => void>()
   #writes: Promise<void> = Promise.resolve()
+  /** Last parsed state, reused while the file's revision and the freshness window agree. */
+  #cached: { readonly revision: string; readonly at: number; readonly state: ActivityState } | undefined
+  /** Bumped by every own write, so a cached snapshot can never mask one. */
+  #writeRevision = 0
+  readonly #queued: QueuedIngest[] = []
+  #queueTimer: ReturnType<typeof setTimeout> | undefined
 
   constructor(options: ActivityTimelineServiceOptions = {}) {
     this.#statePath = options.statePath ?? defaultStatePath()
@@ -90,40 +113,86 @@ export class ActivityTimelineService {
 
   async ingest(input: ActivityIngest): Promise<{ readonly event: ActivityEvent; readonly duplicate: boolean }> {
     const event = normalize(input)
-    const result = await this.#serialize(async () => {
-      const state = await this.#readState()
-      const existing = state.events.find(candidate => candidate.id === event.id)
-      if (existing !== undefined) {
-        await this.#writeState({ ...state, duplicateCount: state.duplicateCount + 1 })
-        return { event: existing, duplicate: true }
+    const [result] = await this.#ingestEvents([event])
+    return result ?? { event, duplicate: false }
+  }
+
+  /**
+   * Buffer one event into the next batch. The promise settles when that batch is durably written, so callers keep
+   * acknowledgement semantics while a burst of events costs one read/write cycle instead of one each.
+   * @param input - the event to ingest.
+   * @returns its stored event and whether it was a duplicate.
+   */
+  enqueue(input: ActivityIngest): Promise<{ readonly event: ActivityEvent; readonly duplicate: boolean }> {
+    const event = normalize(input)
+    return new Promise((resolve, reject) => {
+      this.#queued.push({ event, settle: resolve, reject })
+      if (this.#queued.length >= INGEST_BATCH_LIMIT) {
+        void this.#flushQueue().catch(() => undefined)
+        return
       }
-      const events = [...state.events, event].sort((left, right) => left.at - right.at || left.id.localeCompare(right.id)).slice(-this.#maxEvents)
-      await this.#writeState({ ...state, events, ingestCount: state.ingestCount + 1, duplicateCount: state.duplicateCount })
-      return { event, duplicate: false }
+      if (this.#queueTimer === undefined) {
+        this.#queueTimer = setTimeout(() => {
+          this.#queueTimer = undefined
+          void this.#flushQueue().catch(() => undefined)
+        }, INGEST_BATCH_DELAY_MS)
+      }
     })
-    if (!result.duplicate) for (const listener of this.#listeners) listener(result.event)
-    return result
+  }
+
+  /** Flush buffered events and wait for the writes already running, so a shutdown stores what it accepted. */
+  async drain(): Promise<void> {
+    await this.#flushQueue().catch(() => undefined)
+    await this.#writes
   }
 
   async ingestMany(inputs: readonly ActivityIngest[]): Promise<{ readonly ingested: number; readonly duplicates: number }> {
     if (inputs.length === 0) return { ingested: 0, duplicates: 0 }
-    const events = inputs.map(normalize)
-    const result = await this.#serialize(async () => {
+    const results = await this.#ingestEvents(inputs.map(normalize))
+    return {
+      ingested: results.filter(result => !result.duplicate).length,
+      duplicates: results.filter(result => result.duplicate).length,
+    }
+  }
+
+  async #flushQueue(): Promise<void> {
+    if (this.#queueTimer !== undefined) {
+      clearTimeout(this.#queueTimer)
+      this.#queueTimer = undefined
+    }
+    const batch = this.#queued.splice(0)
+    if (batch.length === 0) return
+    try {
+      const results = await this.#ingestEvents(batch.map(item => item.event))
+      batch.forEach((item, index) => item.settle(results[index] ?? { event: item.event, duplicate: false }))
+    } catch (error) {
+      for (const item of batch) item.reject(error)
+      throw error
+    }
+  }
+
+  /** One serialized batch: duplicate detection, ordering, retention and a single durable write. */
+  async #ingestEvents(events: readonly ActivityEvent[]): Promise<readonly { readonly event: ActivityEvent; readonly duplicate: boolean }[]> {
+    const outcome = await this.#serialize(async () => {
       const state = await this.#readState()
-      const known = new Set(state.events.map(event => event.id))
+      const byId = new Map(state.events.map(event => [event.id, event]))
+      const results: { readonly event: ActivityEvent; readonly duplicate: boolean }[] = []
       const fresh: ActivityEvent[] = []
       let duplicates = 0
       for (const event of events) {
-        if (known.has(event.id)) {
+        const existing = byId.get(event.id)
+        if (existing !== undefined) {
           duplicates += 1
+          results.push({ event: existing, duplicate: true })
           continue
         }
-        known.add(event.id)
+        byId.set(event.id, event)
         fresh.push(event)
+        results.push({ event, duplicate: false })
       }
       if (fresh.length === 0) {
         if (duplicates > 0) await this.#writeState({ ...state, duplicateCount: state.duplicateCount + duplicates })
-        return { fresh, duplicates }
+        return { results, fresh }
       }
       const merged = [...state.events, ...fresh].sort((left, right) => left.at - right.at || left.id.localeCompare(right.id)).slice(-this.#maxEvents)
       await this.#writeState({
@@ -132,10 +201,10 @@ export class ActivityTimelineService {
         ingestCount: state.ingestCount + fresh.length,
         duplicateCount: state.duplicateCount + duplicates,
       })
-      return { fresh, duplicates }
+      return { results, fresh }
     })
-    for (const event of result.fresh) for (const listener of this.#listeners) listener(event)
-    return { ingested: result.fresh.length, duplicates: result.duplicates }
+    for (const event of outcome.fresh) for (const listener of this.#listeners) listener(event)
+    return outcome.results
   }
 
   async page(filter: ActivityFilter = {}): Promise<ActivityPage> {
@@ -211,6 +280,17 @@ export class ActivityTimelineService {
   }
 
   async #readState(): Promise<ActivityState> {
+    const info = await stat(this.#statePath).catch((error: unknown) => {
+      if (error instanceof Error && 'code' in error && error.code === 'ENOENT') return undefined
+      throw new ActivityError('state-unreadable', 'Activity state is unreadable.')
+    })
+    if (info === undefined) {
+      this.#cached = undefined
+      return initialState(this.#now())
+    }
+    const revision = revisionOf(info, this.#writeRevision)
+    const cached = this.#cached
+    if (cached !== undefined && cached.revision === revision && this.#now() - cached.at < STATE_FRESHNESS_MS) return cached.state
     let text: string
     try {
       text = await readFile(this.#statePath, 'utf8')
@@ -218,11 +298,14 @@ export class ActivityTimelineService {
       if (error instanceof Error && 'code' in error && error.code === 'ENOENT') return initialState(this.#now())
       throw new ActivityError('state-unreadable', 'Activity state is unreadable.')
     }
+    let state: ActivityState
     try {
-      return activityStateSchema.parse(JSON.parse(text))
+      state = activityStateSchema.parse(JSON.parse(text))
     } catch {
       throw new ActivityError('state-invalid', 'Activity state is invalid; it was left untouched.')
     }
+    this.#cached = { revision, at: this.#now(), state }
+    return state
   }
 
   async #writeState(state: ActivityState): Promise<void> {
@@ -232,6 +315,10 @@ export class ActivityTimelineService {
     const temporaryPath = `${this.#statePath}.tmp-${randomUUID()}`
     await writeFile(temporaryPath, `${JSON.stringify(parsed)}\n`, { mode: 0o600 })
     await rename(temporaryPath, this.#statePath)
+    // Publish the write into the snapshot, so the read that follows a write costs one stat instead of a full parse.
+    this.#writeRevision += 1
+    const info = await stat(this.#statePath).catch(() => undefined)
+    this.#cached = info === undefined ? undefined : { revision: revisionOf(info, this.#writeRevision), at: this.#now(), state: parsed }
   }
 
   #serialize<T>(operation: () => Promise<T>): Promise<T> {
