@@ -34,6 +34,14 @@ describe('layout store', () => {
     expect(createLayoutStore({ surface: 'side-panel', storage: memory.storage }).get()).toEqual(layout)
   })
 
+  it('keeps the global dock layout apart from the main-area and side-panel ones', () => {
+    const memory = memoryStorage()
+    createLayoutStore({ surface: 'dock', storage: memory.storage }).set(layout)
+    expect(createLayoutStore({ storage: memory.storage }).get()).toBeNull()
+    expect(createLayoutStore({ surface: 'side-panel', storage: memory.storage }).get()).toBeNull()
+    expect(createLayoutStore({ surface: 'dock', storage: memory.storage }).get()).toEqual(layout)
+  })
+
   it('reads a layout from another component, malformed JSON or a missing grid as no layout', () => {
     const memory = memoryStorage()
     const store = createLayoutStore({ storage: memory.storage })
