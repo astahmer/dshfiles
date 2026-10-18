@@ -24,6 +24,25 @@ a tunable, so this plugin replaces the backend and inverts the split.
 - **The profile has one owner.** `cordis.patch.yml` inserts this row and the seed disables the stock
   `session-query-sqlite` row, because one process may own the `sessionQuery` service and each index path.
 
+## Measured
+
+Bench: `pnpm bench:owned` (gated on `OWNED_BENCH=1`; it copies a byte-bounded subset of the newest logs the stock index
+also knows into a temporary root, so the live corpus is only read). Runs on 2026-10-18 with the machine already at load
+20-40 from other work:
+
+| Signal | Owned backend | Stock backend (same corpus, same day) |
+|---|---|---|
+| Host event-loop gaps over 250 ms while indexing | **0** (worst gap 171-240 ms) | 24 gaps, worst 290 000 ms |
+| Worst external ping round trip | 249-395 ms | 290 490 ms |
+| Content search during the build | p50 5-34 ms, p95 25-148 ms | 43 500 ms on a warm index |
+| Ingest cost in isolation | 8.7 s for a 49.5 MB log (23 853 documents, ~2 700 docs/s) | — |
+| Stock recall (queries whose matches the stock index also held) | **1.0** on every query | 1.0 by definition |
+
+The ingest time above is measured with the machine otherwise idle-ish; under the load 20-40 of that day a first build
+takes minutes of wall clock in the worker, which is exactly the point: it is background work the Host never waits on.
+The bench deliberately polls at 1 s because the worker is single-threaded: a per-150 ms poll competes with the ingest
+it is measuring.
+
 ## Development
 
 ```sh
