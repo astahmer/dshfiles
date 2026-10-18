@@ -48,11 +48,15 @@ export const startThreadWithModel = async (page: Page, input: { readonly project
   }
   await expect(projectButton).toHaveText(input.project)
   // A just-added account publishes its route a moment later, so the picker is reopened until the model is listed.
-  // Models sit in the picker directly, one radio per route; the provider is the section label above them.
   await expect(async () => {
     await page.keyboard.press('Escape')
     await page.getByRole('button', { name: /^Select model/ }).click()
-    await page.getByRole('menuitemradio', { name: model, exact: true }).click({ timeout: 2_000 })
+    // The picker opens straight on the model radios only while the session has no
+    // model yet; once one is selected the root pane shows Model/Effort cells, so
+    // the `Model …` cell has to open that list first.
+    const option = page.getByRole('menuitemradio', { name: model, exact: true })
+    if ((await option.count()) === 0) await page.getByRole('menuitem', { name: /^Model / }).click({ timeout: 2_000 })
+    await option.click({ timeout: 2_000 })
   }).toPass({ timeout: 30_000 })
   await expect(page.getByRole('button', { name: new RegExp(`^Select model, current ${model.replaceAll('/', '\\/')}`) })).toBeVisible()
 }
