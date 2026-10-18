@@ -1,6 +1,6 @@
 import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
 import { useSettings } from '@dshfiles/dshx/client'
-import { closePalette, openPalette, type PaletteMode } from '@dshfiles/command-palette/api'
+import { PaletteApi, type PaletteMode } from '@dshfiles/command-palette/api'
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import type { MutableRefObject, ReactNode } from 'react'
 import { DEFAULT_PREFERENCES, type SidebarPreferences } from './organization.js'
@@ -120,7 +120,17 @@ export const SidebarStateProvider = ({ children }: { children: ReactNode }): JSX
   const threadTitle = useRef<(sessionId: SessionSummary['id']) => string | undefined>(() => undefined)
 
   const state = useMemo(
-    () => ({ preferences, updatePreferences, storageWarning, hostBacked, openPalette, closePalette, selectedThreadId, setSelectedThreadId, threadTitle }),
+    () => ({
+      preferences,
+      updatePreferences,
+      storageWarning,
+      hostBacked,
+      openPalette: PaletteApi.open,
+      closePalette: PaletteApi.close,
+      selectedThreadId,
+      setSelectedThreadId,
+      threadTitle,
+    }),
     [preferences, updatePreferences, storageWarning, hostBacked, selectedThreadId],
   )
 

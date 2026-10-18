@@ -1,20 +1,10 @@
 import assert from 'node:assert/strict'
 import { test } from 'vitest'
-import {
-  categoryForFinishReason,
-  claimNotificationEvent,
-  DEFAULT_THREAD_NOTIFICATION_CATEGORIES,
-  legacyAttentionEntries,
-  notificationRouteHasInApp,
-  notificationRouteHasSystem,
-  threadInteractionTransitions,
-  threadNotificationCategoriesSchema,
-  threadNotificationHasOutput,
-} from './thread-notifications.js'
+import { DEFAULT_THREAD_NOTIFICATION_CATEGORIES, ThreadNotificationModel, threadNotificationCategoriesSchema } from './thread-notifications.js'
 
 test('a structured question becomes input-needed attention', () => {
   assert.deepEqual(
-    threadInteractionTransitions({ question: { pendingInteractionKey: undefined, pendingInteractionKind: undefined } }, [
+    ThreadNotificationModel.threadInteractionTransitions({ question: { pendingInteractionKey: undefined, pendingInteractionKind: undefined } }, [
       { sessionId: 'question', status: { pendingInteractionKey: 'question-1', pendingInteractionKind: 'question' } },
     ]),
     { approvalNeeded: [], inputNeeded: ['question'] },
@@ -30,8 +20,8 @@ test('approval and plan-review requests become approval-needed attention', () =>
     { sessionId: 'approval', status: { pendingInteractionKey: 'approval-1', pendingInteractionKind: 'approval' } },
     { sessionId: 'review', status: { pendingInteractionKey: 'review-1', pendingInteractionKind: 'plan-review' } },
   ]
-  assert.deepEqual(threadInteractionTransitions(previous, current), { approvalNeeded: ['approval', 'review'], inputNeeded: [] })
-  assert.deepEqual(threadInteractionTransitions(Object.fromEntries(current.map(entry => [entry.sessionId, entry.status])), current), {
+  assert.deepEqual(ThreadNotificationModel.threadInteractionTransitions(previous, current), { approvalNeeded: ['approval', 'review'], inputNeeded: [] })
+  assert.deepEqual(ThreadNotificationModel.threadInteractionTransitions(Object.fromEntries(current.map(entry => [entry.sessionId, entry.status])), current), {
     approvalNeeded: [],
     inputNeeded: [],
   })
@@ -39,7 +29,7 @@ test('approval and plan-review requests become approval-needed attention', () =>
 
 test('unknown interaction kinds stay unclassified', () => {
   assert.deepEqual(
-    threadInteractionTransitions({ thread: { pendingInteractionKey: undefined, pendingInteractionKind: undefined } }, [
+    ThreadNotificationModel.threadInteractionTransitions({ thread: { pendingInteractionKey: undefined, pendingInteractionKind: undefined } }, [
       { sessionId: 'thread', status: { pendingInteractionKey: 'opaque-request', pendingInteractionKind: 'other' } },
     ]),
     { approvalNeeded: [], inputNeeded: [] },
@@ -48,7 +38,7 @@ test('unknown interaction kinds stay unclassified', () => {
 
 test('an initial status snapshot does not replay desktop alerts', () => {
   assert.deepEqual(
-    threadInteractionTransitions(null, [
+    ThreadNotificationModel.threadInteractionTransitions(null, [
       { sessionId: 'question', status: { pendingInteractionKey: 'question-1', pendingInteractionKind: 'question' } },
       { sessionId: 'approval', status: { pendingInteractionKey: 'approval-1', pendingInteractionKind: 'approval' } },
     ]),
@@ -58,7 +48,7 @@ test('an initial status snapshot does not replay desktop alerts', () => {
 
 test('browser attention carries over its needs-you timestamps and manual marks', () => {
   assert.deepEqual(
-    legacyAttentionEntries({
+    ThreadNotificationModel.legacyAttentionEntries({
       enabled: true,
       needsYouAt: { finished: 123 },
       mutedUntil: {},
@@ -82,8 +72,8 @@ test('notification categories default off and validate delivery, sound, and volu
     }).success,
     false,
   )
-  assert.equal(threadNotificationHasOutput(DEFAULT_THREAD_NOTIFICATION_CATEGORIES.failed), false)
-  assert.equal(threadNotificationHasOutput({ ...DEFAULT_THREAD_NOTIFICATION_CATEGORIES.failed, sound: true }), true)
+  assert.equal(ThreadNotificationModel.threadNotificationHasOutput(DEFAULT_THREAD_NOTIFICATION_CATEGORIES.failed), false)
+  assert.equal(ThreadNotificationModel.threadNotificationHasOutput({ ...DEFAULT_THREAD_NOTIFICATION_CATEGORIES.failed, sound: true }), true)
 })
 
 test('delivery routing distinguishes in-app, system, both, and off', () => {
@@ -94,7 +84,7 @@ test('delivery routing distinguishes in-app, system, both, and off', () => {
         'approval-needed': { ...DEFAULT_THREAD_NOTIFICATION_CATEGORIES['approval-needed'], delivery },
       })
       const route = parsed['approval-needed'].delivery
-      return [notificationRouteHasInApp(route), notificationRouteHasSystem(route)]
+      return [ThreadNotificationModel.notificationRouteHasInApp(route), ThreadNotificationModel.notificationRouteHasSystem(route)]
     }),
     [
       [false, false],
@@ -106,23 +96,23 @@ test('delivery routing distinguishes in-app, system, both, and off', () => {
 })
 
 test('only completed and error endings notify; cancellation and interruption are not failures', () => {
-  assert.equal(categoryForFinishReason('completed'), 'turn-finished')
-  assert.equal(categoryForFinishReason('error'), 'failed')
-  assert.equal(categoryForFinishReason('aborted'), undefined)
-  assert.equal(categoryForFinishReason('blocked'), undefined)
-  assert.equal(categoryForFinishReason('max-tokens'), undefined)
+  assert.equal(ThreadNotificationModel.categoryForFinishReason('completed'), 'turn-finished')
+  assert.equal(ThreadNotificationModel.categoryForFinishReason('error'), 'failed')
+  assert.equal(ThreadNotificationModel.categoryForFinishReason('aborted'), undefined)
+  assert.equal(ThreadNotificationModel.categoryForFinishReason('blocked'), undefined)
+  assert.equal(ThreadNotificationModel.categoryForFinishReason('max-tokens'), undefined)
 })
 
 test('event claims deduplicate ids and retain only the newest 5,000', () => {
-  const firstClaim = claimNotificationEvent([], 'approval:thread:key')
+  const firstClaim = ThreadNotificationModel.claimNotificationEvent([], 'approval:thread:key')
   assert.deepEqual(firstClaim, { claimed: true, notificationIds: ['approval:thread:key'] })
-  assert.deepEqual(claimNotificationEvent(firstClaim.notificationIds, 'approval:thread:key'), {
+  assert.deepEqual(ThreadNotificationModel.claimNotificationEvent(firstClaim.notificationIds, 'approval:thread:key'), {
     claimed: false,
     notificationIds: firstClaim.notificationIds,
   })
 
   const fullLedger = Array.from({ length: 5_000 }, (_value, index) => `event-${index}`)
-  const boundedClaim = claimNotificationEvent(fullLedger, 'new-event')
+  const boundedClaim = ThreadNotificationModel.claimNotificationEvent(fullLedger, 'new-event')
   assert.equal(boundedClaim.notificationIds.length, 5_000)
   assert.equal(boundedClaim.notificationIds[0], 'event-1')
   assert.equal(boundedClaim.notificationIds.at(-1), 'new-event')

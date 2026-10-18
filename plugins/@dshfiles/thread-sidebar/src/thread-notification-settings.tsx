@@ -14,8 +14,8 @@ import {
 import { useId, useState } from 'react'
 import type { ThreadSidebarTranslate } from './thread-view-manager.js'
 import {
-  notificationRouteHasSystem,
   THREAD_NOTIFICATION_CATEGORIES,
+  ThreadNotificationModel,
   type ThreadNotificationCategories,
   type ThreadNotificationCategory,
   type ThreadNotificationDelivery,
@@ -69,7 +69,9 @@ export const ThreadNotificationSettings = (props: ThreadNotificationSettingsProp
   const id = useId()
   const [permission, setPermission] = useState(readBrowserNotificationPermission)
   const [audioUnavailable, setAudioUnavailable] = useState(false)
-  const hasSystemRoute = THREAD_NOTIFICATION_CATEGORIES.some(category => notificationRouteHasSystem(props.categories[category].delivery))
+  const hasSystemRoute = THREAD_NOTIFICATION_CATEGORIES.some(category =>
+    ThreadNotificationModel.notificationRouteHasSystem(props.categories[category].delivery),
+  )
 
   const updateCategory = (category: ThreadNotificationCategory, patch: Partial<ThreadNotificationCategories[ThreadNotificationCategory]>): void => {
     props.onChange({ ...props.categories, [category]: { ...props.categories[category], ...patch } })

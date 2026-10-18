@@ -89,7 +89,7 @@ import {
 import { ThreadAttentionPresentationModel, type ThreadAttentionLabel } from './attention-presentation.js'
 import { SidebarPreferencesModel, attentionColorSchema } from './preferences.js'
 import { selectInputNeededRows, selectTurnFinishedRows } from './attention-rows.js'
-import { registerPaletteAction, setPaletteRecentLimit, type PaletteAction } from '@dshfiles/command-palette/api'
+import { PaletteApi, type PaletteAction } from '@dshfiles/command-palette/api'
 import { useSidebarState } from './sidebar-state.js'
 import { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
 import { projectTextTone } from './project-tone.js'
@@ -123,16 +123,8 @@ import { DEFAULT_THREAD_VIEW_SETTINGS, ThreadViewPreferencesModel, threadViewPre
 import { ThreadViewManager, threadViewPresetLabel } from './thread-view-manager.js'
 import { captureThreadMentionInsertion, requestThreadMentionInsertion } from './thread-mention.js'
 import {
-  categoriesForLegacyDesktopNotifications,
-  categoryForFinishReason,
-  claimThreadNotification,
-  legacyAttentionEntries,
+  ThreadNotificationModel,
   legacyNotificationPreferences,
-  notificationCategoriesAreDefault,
-  notificationRouteHasInApp,
-  notificationRouteHasSystem,
-  threadInteractionTransitions,
-  threadNotificationHasOutput,
   type ThreadInteractionStatus,
   type ThreadNotificationCategory,
 } from './thread-notifications.js'
@@ -1586,14 +1578,14 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
 
   const notifyThread = (category: ThreadNotificationCategory, eventId: string, sessionId: SessionSummary['id'], title: string, fallbackBody: string): void => {
     const categoryPreferences = preferences.notificationCategories[category]
-    if (!threadNotificationHasOutput(categoryPreferences) || isMuteActive(mutedThreads[sessionId], Date.now())) return
+    if (!ThreadNotificationModel.threadNotificationHasOutput(categoryPreferences) || isMuteActive(mutedThreads[sessionId], Date.now())) return
     const session = sessionState.byId[sessionId]
     if (session === undefined || !SidebarOrganization.isAttentionSessionIncluded(session, preferences.includeSubagentAttention)) return
-    const inApp = notificationRouteHasInApp(categoryPreferences.delivery)
-    const systemRequested = notificationRouteHasSystem(categoryPreferences.delivery)
+    const inApp = ThreadNotificationModel.notificationRouteHasInApp(categoryPreferences.delivery)
+    const systemRequested = ThreadNotificationModel.notificationRouteHasSystem(categoryPreferences.delivery)
     const system = systemRequested && 'Notification' in window && window.Notification.permission === 'granted'
     if (!inApp && !system && !categoryPreferences.sound) return
-    if (!claimThreadNotification(eventId)) return
+    if (!ThreadNotificationModel.claimThreadNotification(eventId)) return
     if (inApp) {
       dispatchNoticeQueue({
         type: 'enqueue-notification',
@@ -1847,13 +1839,13 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     if (Object.keys(migrated).length > 0) updatePreferences({ mutedThreads: { ...mutedThreads, ...migrated } })
     if (legacy.enabled || preferences.desktopNotificationsEnabled) {
       updatePreferences({
-        notificationCategories: notificationCategoriesAreDefault(preferences.notificationCategories)
-          ? categoriesForLegacyDesktopNotifications()
+        notificationCategories: ThreadNotificationModel.notificationCategoriesAreDefault(preferences.notificationCategories)
+          ? ThreadNotificationModel.categoriesForLegacyDesktopNotifications()
           : preferences.notificationCategories,
         desktopNotificationsEnabled: false,
       })
     }
-    const entries = legacyAttentionEntries(legacy)
+    const entries = ThreadNotificationModel.legacyAttentionEntries(legacy)
     // Keep the browser copy until the Host stored it, so a failed write is retried on the next load.
     if (entries.length === 0) legacyNotificationPreferences.remove()
     else
@@ -2248,9 +2240,9 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     changePreferences,
   }
   useEffect(() => {
-    setPaletteRecentLimit(preferences.paletteRecentLimit)
+    PaletteApi.setRecentLimit(preferences.paletteRecentLimit)
   }, [preferences.paletteRecentLimit])
-  useEffect(() => () => setPaletteRecentLimit(10), [])
+  useEffect(() => () => PaletteApi.setRecentLimit(10), [])
   useEffect(() => {
     const actions: readonly PaletteAction[] = [
       {
@@ -2301,7 +2293,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         },
       },
     ]
-    const disposers = actions.map(action => registerPaletteAction(action))
+    const disposers = actions.map(action => PaletteApi.registerAction(action))
     return () => disposers.forEach(dispose => dispose())
   }, [])
   // One stable object for every row; it reads the latest closures so memoized rows never go stale.
@@ -2421,7 +2413,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     const currentStatus: Readonly<Record<string, ThreadInteractionStatus>> = Object.fromEntries(
       currentStatusEntries.map((entry): [string, ThreadInteractionStatus] => [entry.sessionId, entry.status]),
     )
-    const transitions = threadInteractionTransitions(previousStatus.current, currentStatusEntries)
+    const transitions = ThreadNotificationModel.threadInteractionTransitions(previousStatus.current, currentStatusEntries)
     previousStatus.current = currentStatus
     for (const sessionId of transitions.approvalNeeded) {
       if (selectedSession?.id === sessionId) continue
@@ -2459,7 +2451,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       if (previous.get(sessionId)?.finishedSeq === record.finishedSeq || record.finishedReason === null) continue
       const session = sessions.find(candidate => candidate.id === sessionId)
       if (session === undefined || sessionStatus.get(session.id)?.pendingInteraction !== undefined) continue
-      const category = categoryForFinishReason(record.finishedReason)
+      const category = ThreadNotificationModel.categoryForFinishReason(record.finishedReason)
       if (category === undefined) continue
       latestRowActions.current.notifyThread(
         category,

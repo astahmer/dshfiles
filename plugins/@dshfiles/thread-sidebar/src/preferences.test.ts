@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'vitest'
 import { DEFAULT_PREFERENCES } from './organization.js'
 import { SidebarPreferencesModel } from './preferences.js'
-import { categoriesForLegacyDesktopNotifications } from './thread-notifications.js'
+import { ThreadNotificationModel } from './thread-notifications.js'
 
 test('older stored preferences default the header and thread split to natural height', () => {
   const stored = JSON.stringify({ ...DEFAULT_PREFERENCES, headerRegionHeight: undefined })
@@ -133,7 +133,7 @@ test('the saved thread views live in the Host-synced preferences', () => {
 test('legacy desktop alerts migrate to per-category system delivery unless the new setting is customized', () => {
   const { notificationCategories: _notificationCategories, ...legacyPreferences } = DEFAULT_PREFERENCES
   const migrated = SidebarPreferencesModel.decode({ ...legacyPreferences, desktopNotificationsEnabled: true })
-  assert.deepEqual(migrated?.notificationCategories, categoriesForLegacyDesktopNotifications())
+  assert.deepEqual(migrated?.notificationCategories, ThreadNotificationModel.categoriesForLegacyDesktopNotifications())
   assert.equal(migrated?.desktopNotificationsEnabled, false)
 
   const custom = {
@@ -161,6 +161,6 @@ test('malformed notification categories reject Host preferences rather than reac
 test('legacy local alert settings migrate into Host preferences without overriding customized routes', () => {
   const local = { ...DEFAULT_PREFERENCES, desktopNotificationsEnabled: true }
   const migrated = SidebarPreferencesModel.preferencesToMigrate(local, DEFAULT_PREFERENCES)
-  assert.deepEqual(migrated.notificationCategories, categoriesForLegacyDesktopNotifications())
+  assert.deepEqual(migrated.notificationCategories, ThreadNotificationModel.categoriesForLegacyDesktopNotifications())
   assert.equal(migrated.desktopNotificationsEnabled, false)
 })

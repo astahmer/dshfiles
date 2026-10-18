@@ -42,11 +42,11 @@ export const threadNotificationCategoriesSchema = z
   .strict()
   .default(DEFAULT_THREAD_NOTIFICATION_CATEGORIES)
 
-export const notificationRouteHasInApp = (delivery: ThreadNotificationDelivery): boolean => delivery === 'in-app' || delivery === 'both'
-export const notificationRouteHasSystem = (delivery: ThreadNotificationDelivery): boolean => delivery === 'system' || delivery === 'both'
-export const threadNotificationHasOutput = (preference: ThreadNotificationCategoryPreferences): boolean => preference.delivery !== 'off' || preference.sound
+const notificationRouteHasInApp = (delivery: ThreadNotificationDelivery): boolean => delivery === 'in-app' || delivery === 'both'
+const notificationRouteHasSystem = (delivery: ThreadNotificationDelivery): boolean => delivery === 'system' || delivery === 'both'
+const threadNotificationHasOutput = (preference: ThreadNotificationCategoryPreferences): boolean => preference.delivery !== 'off' || preference.sound
 
-export const notificationCategoriesAreDefault = (categories: ThreadNotificationCategories): boolean =>
+const notificationCategoriesAreDefault = (categories: ThreadNotificationCategories): boolean =>
   THREAD_NOTIFICATION_CATEGORIES.every(category => {
     const current = categories[category]
     const fallback = DEFAULT_THREAD_NOTIFICATION_CATEGORIES[category]
@@ -58,7 +58,7 @@ export const notificationCategoriesAreDefault = (categories: ThreadNotificationC
     )
   })
 
-export const categoriesForLegacyDesktopNotifications = () =>
+const categoriesForLegacyDesktopNotifications = () =>
   ({
     'approval-needed': { ...DEFAULT_THREAD_NOTIFICATION_CATEGORIES['approval-needed'], delivery: 'system' },
     'input-needed': { ...DEFAULT_THREAD_NOTIFICATION_CATEGORIES['input-needed'], delivery: 'system' },
@@ -66,7 +66,7 @@ export const categoriesForLegacyDesktopNotifications = () =>
     failed: { ...DEFAULT_THREAD_NOTIFICATION_CATEGORIES.failed, delivery: 'system' },
   }) satisfies ThreadNotificationCategories
 
-export const categoryForFinishReason = (reason: AttentionFinishReason): ThreadNotificationCategory | undefined =>
+const categoryForFinishReason = (reason: AttentionFinishReason): ThreadNotificationCategory | undefined =>
   reason === 'error' ? 'failed' : reason === 'completed' ? 'turn-finished' : undefined
 
 const deliveredNotificationIdsSchema = z.array(z.string().min(1).max(1024)).max(5000)
@@ -76,13 +76,13 @@ const deliveredNotificationIds = createStoredValue({
   fallback: deliveredNotificationIdsSchema.parse([]),
 })
 
-export const claimNotificationEvent = (knownIds: readonly string[], eventId: string) => {
+const claimNotificationEvent = (knownIds: readonly string[], eventId: string) => {
   if (knownIds.includes(eventId)) return { claimed: false, notificationIds: knownIds }
   return { claimed: true, notificationIds: [...knownIds, eventId].slice(-5000) }
 }
 
 /** Claim a bounded per-browser event id before delivery, so mounted tabs do not repeat it. */
-export const claimThreadNotification = (eventId: string): boolean => {
+const claimThreadNotification = (eventId: string): boolean => {
   const claim = claimNotificationEvent(deliveredNotificationIds.get() ?? [], eventId)
   if (!claim.claimed) return false
   return deliveredNotificationIds.set([...claim.notificationIds])
@@ -104,7 +104,7 @@ export interface ThreadInteractionTransitions<SessionIdentifier extends string =
 }
 
 /** Approvals and questions come from the Host's pending interactions, not from stored attention. */
-export const threadInteractionTransitions = <SessionIdentifier extends string>(
+const threadInteractionTransitions = <SessionIdentifier extends string>(
   previous: Readonly<Record<string, ThreadInteractionStatus>> | null,
   current: readonly ThreadInteractionSnapshot<SessionIdentifier>[],
 ): ThreadInteractionTransitions<SessionIdentifier> => {
@@ -150,7 +150,7 @@ export const legacyNotificationPreferences = createStoredValue({
  * it witnessed, so a stale "seen" id must not clear a completion the browser
  * has not shown yet.
  */
-export const legacyAttentionEntries = (legacy: LegacyNotificationPreferences): readonly ThreadAttentionMigrationEntry[] => {
+const legacyAttentionEntries = (legacy: LegacyNotificationPreferences): readonly ThreadAttentionMigrationEntry[] => {
   const entries = new Map<string, ThreadAttentionMigrationEntry>()
   for (const [sessionId, finishedAt] of Object.entries(legacy.needsYouAt)) entries.set(sessionId, { sessionId, finishedAt, manuallyUnread: false })
   for (const sessionId of legacy.manuallyUnreadSessionIds) {
@@ -158,4 +158,17 @@ export const legacyAttentionEntries = (legacy: LegacyNotificationPreferences): r
     entries.set(sessionId, { sessionId, finishedAt: existing?.finishedAt ?? null, manuallyUnread: true })
   }
   return [...entries.values()]
+}
+
+export class ThreadNotificationModel {
+  static readonly notificationRouteHasInApp = notificationRouteHasInApp
+  static readonly notificationRouteHasSystem = notificationRouteHasSystem
+  static readonly threadNotificationHasOutput = threadNotificationHasOutput
+  static readonly notificationCategoriesAreDefault = notificationCategoriesAreDefault
+  static readonly categoriesForLegacyDesktopNotifications = categoriesForLegacyDesktopNotifications
+  static readonly categoryForFinishReason = categoryForFinishReason
+  static readonly claimNotificationEvent = claimNotificationEvent
+  static readonly claimThreadNotification = claimThreadNotification
+  static readonly threadInteractionTransitions = threadInteractionTransitions
+  static readonly legacyAttentionEntries = legacyAttentionEntries
 }

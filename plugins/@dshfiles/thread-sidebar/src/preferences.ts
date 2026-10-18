@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { threadMutesSchema } from './thread-mute.js'
 import { ATTENTION_COLOR_OPTIONS, DEFAULT_PREFERENCES, REBASED_THREAD_ARCHIVE_DELAYS, type SidebarPreferences, type SidebarSection } from './organization.js'
 import { threadViewSettingsSchema } from './thread-view-preferences.js'
-import { categoriesForLegacyDesktopNotifications, DEFAULT_THREAD_NOTIFICATION_CATEGORIES, threadNotificationCategoriesSchema } from './thread-notifications.js'
+import { DEFAULT_THREAD_NOTIFICATION_CATEGORIES, ThreadNotificationModel, threadNotificationCategoriesSchema } from './thread-notifications.js'
 
 export const PREFERENCES_STORAGE_KEY = 'dshfiles.thread-sidebar.v1'
 
@@ -86,7 +86,7 @@ const decodePreferences = (value: unknown): SidebarPreferences | null => {
     ...checked.data,
     desktopNotificationsEnabled: migrateDesktopNotifications ? false : checked.data.desktopNotificationsEnabled,
     notificationCategories: migrateDesktopNotifications
-      ? categoriesForLegacyDesktopNotifications()
+      ? ThreadNotificationModel.categoriesForLegacyDesktopNotifications()
       : (checked.data.notificationCategories ?? DEFAULT_THREAD_NOTIFICATION_CATEGORIES),
   }
 }
@@ -104,7 +104,7 @@ const preferencesToMigrate = (local: SidebarPreferences, host: SidebarPreference
   const legacyCategoriesUnchanged = JSON.stringify(local.notificationCategories) === JSON.stringify(DEFAULT_THREAD_NOTIFICATION_CATEGORIES)
   const hostCategoriesUnchanged = JSON.stringify(host.notificationCategories) === JSON.stringify(DEFAULT_THREAD_NOTIFICATION_CATEGORIES)
   if (local.desktopNotificationsEnabled && legacyCategoriesUnchanged && hostCategoriesUnchanged) {
-    patch.notificationCategories = categoriesForLegacyDesktopNotifications()
+    patch.notificationCategories = ThreadNotificationModel.categoriesForLegacyDesktopNotifications()
     patch.desktopNotificationsEnabled = false
   }
   return patch
