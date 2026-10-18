@@ -45,6 +45,21 @@ describe('client compiler', () => {
     await expect(buildClient({ ...options, bundleDependencies: ['@deepseek-ai/cordis'] })).rejects.toMatchObject({ code: 'DSHX4004' })
   })
 
+  it('writes a compact dependency manifest next to the client bundle', async () => {
+    const root = await temporaryProject()
+    await writeFile(resolve(root, 'src/helper.ts'), 'export const helper = "manifest-helper"\n')
+    await writeFile(resolve(root, 'src/client.tsx'), "import { helper } from './helper'\nexport const name = helper\nexport function apply() {}\n")
+    await buildClient({ packageId: '@dshx/fixture-plugin', root, entry: 'src/client.tsx', outDir: 'dist' })
+    const manifest = z
+      .object({ version: z.number(), face: z.string(), sources: z.array(z.string()) })
+      .parse(JSON.parse(await readFile(resolve(root, 'dist/client.js.deps.json'), 'utf8')))
+    expect(manifest.version).toBe(1)
+    expect(manifest.face).toBe('client')
+    expect(manifest.sources).toContain('src/client.tsx')
+    expect(manifest.sources).toContain('src/helper.ts')
+    expect(manifest.sources).not.toContain('')
+  })
+
   it('emits one lazy-CJS bundle with external React, owned CSS, and a TSX sourcemap', async () => {
     const root = await temporaryProject()
     await buildClient({

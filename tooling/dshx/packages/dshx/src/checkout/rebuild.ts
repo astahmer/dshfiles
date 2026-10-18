@@ -45,13 +45,15 @@ const manifestSchema = z.object({
   dsh: z.object({ client: z.unknown().optional() }).optional(),
 })
 const sourceMapSchema = z.object({ sources: z.array(z.string()) })
+const dependencyManifestSchema = z.object({ version: z.literal(1), sources: z.array(z.string()) })
 
 interface PluginPackage {
   readonly name: string
   readonly directory: string
   readonly workspaceDependencies: readonly string[]
-  readonly hostSources: ReadonlySet<string>
-  readonly clientSources: ReadonlySet<string>
+  /** Read on demand: an unchanged checkout never needs to know which files a bundle inlined. */
+  readonly hostSources: () => ReadonlySet<string>
+  readonly clientSources: () => ReadonlySet<string>
   readonly missingHostBundle: boolean
   readonly missingClientBundle: boolean
 }
@@ -59,9 +61,25 @@ interface PluginPackage {
 /** Tests, docs and catalogs never reach a build's output. */
 const isBuildInput = (path: string): boolean => !/\.md$|\.(test|spec)\.[cm]?[jt]sx?$|(^|\/)(tests?|docs|e2e)\/|(^|\/)dshx\.features\.json$/.test(path)
 
-/** Checkout-relative paths of the sources a bundle's previous build was made from. */
+const memoizedSources = (read: () => ReadonlySet<string>): (() => ReadonlySet<string>) => {
+  let cached: ReadonlySet<string> | undefined
+  return () => (cached ??= read())
+}
+
+/**
+ * Checkout-relative paths of the sources a bundle's previous build was made from, read from the
+ * compact dependency manifest the compiler emits next to the bundle. A bundle without one (an
+ * older artifact) falls back to its source map, which is much larger because it carries every
+ * source's contents.
+ */
 const bundledSources = (root: string, directory: string, bundle: string): ReadonlySet<string> => {
-  const mapPath = join(root, directory, 'dist', `${bundle}.js.map`)
+  const distDirectory = join(root, directory, 'dist')
+  const manifestPath = join(distDirectory, `${bundle}.js.deps.json`)
+  if (existsSync(manifestPath)) {
+    const manifest = dependencyManifestSchema.safeParse(JSON.parse(readFileSync(manifestPath, 'utf8')))
+    if (manifest.success) return new Set(manifest.data.sources.map(source => relative(root, resolve(join(root, directory), source))))
+  }
+  const mapPath = join(distDirectory, `${bundle}.js.map`)
   if (!existsSync(mapPath)) return new Set()
   const parsed = sourceMapSchema.safeParse(JSON.parse(readFileSync(mapPath, 'utf8')))
   if (!parsed.success) return new Set()
@@ -88,8 +106,8 @@ const readPluginPackages = (root: string): readonly PluginPackage[] => {
         workspaceDependencies: Object.entries({ ...manifest.data.dependencies, ...manifest.data.devDependencies })
           .filter(([, spec]) => spec.startsWith('workspace:'))
           .map(([name]) => name),
-        hostSources: bundledSources(root, directory, 'index'),
-        clientSources: bundledSources(root, directory, 'client'),
+        hostSources: memoizedSources(() => bundledSources(root, directory, 'index')),
+        clientSources: memoizedSources(() => bundledSources(root, directory, 'client')),
         missingHostBundle: !existsSync(join(distDirectory, 'index.js')),
         missingClientBundle: hasClientBundle && !existsSync(join(distDirectory, 'client.js')),
       })
@@ -121,7 +139,8 @@ const planRebuild = (input: { readonly root: string; readonly changedFiles: read
       .filter(
         pluginPackage =>
           changed.some(path => owns(pluginPackage, path)) ||
-          [...dshxOutputs].some(output => pluginPackage.hostSources.has(output) || pluginPackage.clientSources.has(output)),
+          (dshxOutputs.size > 0 &&
+            [...dshxOutputs].some(output => pluginPackage.hostSources().has(output) || pluginPackage.clientSources().has(output))),
       )
       .map(pluginPackage => pluginPackage.name),
   )
@@ -140,13 +159,18 @@ const planRebuild = (input: { readonly root: string; readonly changedFiles: read
   ])
 
   const changedSet = new Set(changed)
+  // Nothing changed, so no bundle's source list can match: skip reading its manifest or source map.
+  const comparesSources = changedSet.size > 0 || dshxOutputs.size > 0
   const plugins = packages
     .filter(pluginPackage => selected.has(pluginPackage.name))
     .map(pluginPackage => {
       const own = changed.filter(path => owns(pluginPackage, path))
       const manifestChanged = own.some(path => /\/(package\.json|cordis\.patch\.yml)$/.test(path))
-      const unmapped = own.some(path => /\.[cm]?[jt]sx?$/.test(path) && !pluginPackage.hostSources.has(path) && !pluginPackage.clientSources.has(path))
-      const hits = (sources: ReadonlySet<string>): boolean => [...sources].some(source => changedSet.has(source) || dshxOutputs.has(source))
+      const unmapped = own.some(
+        path => /\.[cm]?[jt]sx?$/.test(path) && !pluginPackage.hostSources().has(path) && !pluginPackage.clientSources().has(path),
+      )
+      const hits = (sources: () => ReadonlySet<string>): boolean =>
+        comparesSources && [...sources()].some(source => changedSet.has(source) || dshxOutputs.has(source))
       // A source the last build never saw could land in either bundle; assume the Host so a restart is not missed.
       const host = pluginPackage.missingHostBundle || manifestChanged || unmapped || hits(pluginPackage.hostSources)
       return { name: pluginPackage.name, host, client: pluginPackage.missingClientBundle || !host || hits(pluginPackage.clientSources) }

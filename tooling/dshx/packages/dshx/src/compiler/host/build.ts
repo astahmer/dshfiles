@@ -304,6 +304,11 @@ async function hostConfig(paths: Awaited<ReturnType<typeof resolveOptions>>, opt
       hostEntryPlugin(paths, options),
       ...userPlugins,
       CompilerKernel.artifactDeclarationPlugin('host', paths.outDir, options.declarations ?? true),
+      // A generation build publishes a hashed chunk behind a wrapper, so only the primary Host
+      // bundle names its own entry and can carry a dependency manifest a planner can read.
+      ...(generation === undefined
+        ? [CompilerKernel.dependencyManifestPlugin({ face: 'host', root: paths.root, outDir: paths.outDir, entryFile: 'index.js' })]
+        : []),
       HostCompilerGuards.hostPeerDependencyPlugin(paths.root),
       CompilerKernel.boundaryPlugin({
         face: 'host',

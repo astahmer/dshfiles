@@ -348,4 +348,18 @@ describe('checkout rebuild selection', () => {
       ['@dshfiles/sidebar', true],
     ])
   })
+
+  it('never opens a bundle source map when nothing changed', () => {
+    // An unparseable map only proves the point if the planner would have read it.
+    writeFile(join(root, 'plugins/@dshfiles/panel/dist/client.js.map'), 'not json')
+    writeFile(join(root, 'plugins/@dshfiles/quiet/dist/index.js.map'), 'not json')
+    expect(CheckoutRebuild.plan({ root, changedFiles: [] }).plugins).toEqual([])
+  })
+
+  it('reads a compact dependency manifest instead of the larger source map', () => {
+    writeFile(join(root, 'plugins/@dshfiles/quiet/dist/index.js.map'), 'not json')
+    writeFile(join(root, 'plugins/@dshfiles/quiet/dist/index.js.deps.json'), JSON.stringify({ version: 1, face: 'host', sources: ['src/host.ts'] }))
+    const plan = CheckoutRebuild.plan({ root, changedFiles: ['plugins/@dshfiles/quiet/src/host.ts'] })
+    expect(plan.plugins).toEqual([{ name: '@dshfiles/quiet', host: true, client: false }])
+  })
 })

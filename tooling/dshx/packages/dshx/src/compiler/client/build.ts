@@ -512,6 +512,7 @@ async function clientConfig(paths: Awaited<ReturnType<typeof resolveOptions>>, o
       clientGuardPlugin(externals, options.packageId, bundleDependencies),
       ...userPlugins,
       CompilerKernel.artifactDeclarationPlugin('client', paths.outDir, options.declarations ?? true),
+      CompilerKernel.dependencyManifestPlugin({ face: 'client', root: paths.root, outDir: paths.outDir, entryFile: 'client.js' }),
       ...(supplier === undefined || options.shared === undefined
         ? []
         : [SharedRuntime.consumerPlugin({ supplier: options.shared, modules: supplier.modules, bundleDependencies })]),

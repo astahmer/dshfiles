@@ -1,5 +1,5 @@
 import { mkdir, rm, writeFile } from 'node:fs/promises'
-import { resolve } from 'node:path'
+import { isAbsolute, relative, resolve } from 'node:path'
 import type { InlineConfig, Plugin, PluginOption, ResolvedConfig, Rollup } from 'vite'
 import { DshxError } from '../diagnostics.js'
 import { resolveVitePlugins } from '../config/vite-plugins.js'
@@ -136,10 +136,33 @@ const buildWatcher = (result: unknown, face: 'host' | 'client', errorCode: strin
   return result as BuildWatcher
 }
 
+/**
+ * Record the modules a bundle retained, so a checkout planner can decide which plugins a change
+ * affects without reading a full source map (which also carries every source's contents). Real
+ * files only: a virtual id cannot be matched against a changed checkout path.
+ */
+const dependencyManifestPlugin = (options: { readonly face: 'host' | 'client'; readonly root: string; readonly outDir: string; readonly entryFile: string }): Plugin => {
+  let modules: readonly string[] = []
+  return {
+    name: `dshx-${options.face}-dependency-manifest`,
+    enforce: 'post',
+    generateBundle(_bundleOptions, bundle) {
+      const chunk = Object.values(bundle).find(item => item.type === 'chunk' && item.isEntry)
+      modules = chunk === undefined || chunk.type !== 'chunk' ? [] : Object.keys(chunk.modules)
+    },
+    async writeBundle() {
+      const sources = [...new Set(modules.flatMap(id => (id.startsWith('\0') || !isAbsolute(id) ? [] : [relative(options.root, id)])))].sort()
+      await mkdir(options.outDir, { recursive: true })
+      await writeFile(resolve(options.outDir, `${options.entryFile}.deps.json`), `${JSON.stringify({ version: 1, face: options.face, sources }, null, 2)}\n`, 'utf8')
+    },
+  }
+}
+
 export class CompilerKernel {
   static readonly resolveUserPlugins = resolveUserPlugins
   static readonly boundaryPlugin = kernelBoundaryPlugin
   static readonly artifactDeclarationPlugin = artifactDeclarationPlugin
+  static readonly dependencyManifestPlugin = dependencyManifestPlugin
   static readonly buildReport = buildReport
   static readonly buildWatcher = buildWatcher
 }
