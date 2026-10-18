@@ -26,7 +26,8 @@ import { errorMessage, useInfiniteQuery, useMutation, useQuery, useQueryClient }
 import { useApi } from '@dshfiles/dshx/client'
 import type { CommunicationDiagnosticAgent, CommunicationDiagnostics, CommunicationMessage } from '@dshfiles/dshx/communication'
 import { useState } from 'react'
-import { agentCommunicationApi, type AgentCommunicationPostInput } from './api.js'
+import { agentCommunicationApi, type AgentCommunicationBrowseInput, type AgentCommunicationPostInput } from './api.js'
+import { MessagePages } from './message-pages.js'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import type { AgentCommunicationTranslate } from './locales.js'
@@ -372,29 +373,23 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
   // Sorted by label so a project's channel sits next to its thread workspaces' channels.
   const topicEntries = [...topics.entries()].sort(([left], [right]) => labels.topic(left).localeCompare(labels.topic(right)))
   const conversationKey = selectionKey(selection)
-  const messagesQuery = useInfiniteQuery({
-    queryKey: [...conversationKey, debouncedSearch],
-    enabled: diagnostics !== undefined,
-    initialPageParam: null as string | null,
-    queryFn: ({ pageParam, signal }) => {
-      const browseInput = {
-        ...(selection.kind === 'topic' ? { topic: selection.topic } : {}),
-        ...(selection.kind === 'direct' ? { agentId: selection.agentId } : {}),
-        ...(debouncedSearch.length === 0 ? {} : { search: debouncedSearch }),
-        ...(pageParam === null ? {} : { beforeId: pageParam }),
-        limit: PAGE_SIZE,
-      }
-      return runHostRequest({ signal, request: hostSignal => api.browseMessages(browseInput, { signal: hostSignal }) })
-    },
-    getNextPageParam: page => page.nextCursor ?? undefined,
-    refetchInterval: 30_000,
-    retry: false,
+  const browseInputFor = (beforeId: string | null): AgentCommunicationBrowseInput => ({
+    ...(selection.kind === 'topic' ? { topic: selection.topic } : {}),
+    ...(selection.kind === 'direct' ? { agentId: selection.agentId } : {}),
+    ...(debouncedSearch.length === 0 ? {} : { search: debouncedSearch }),
+    ...(beforeId === null ? {} : { beforeId }),
+    limit: PAGE_SIZE,
   })
-  const messages =
-    messagesQuery.data?.pages
-      .slice()
-      .reverse()
-      .flatMap(page => page.items) ?? []
+  const browseMessages = (beforeId: string | null, signal: AbortSignal) =>
+    runHostRequest({ signal, request: hostSignal => api.browseMessages(browseInputFor(beforeId), { signal: hostSignal }) })
+  const browseQueryKey = [...conversationKey, debouncedSearch]
+  const messagesQuery = useInfiniteQuery(MessagePages.historyOptions({ queryKey: browseQueryKey, enabled: diagnostics !== undefined, browse: browseMessages }))
+  const headQuery = useQuery(MessagePages.headOptions({ queryKey: browseQueryKey, enabled: diagnostics !== undefined, browse: browseMessages }))
+  const messagePages = MessagePages.merge({ head: headQuery.data, pages: messagesQuery.data?.pages ?? [] })
+  const messages = messagePages
+    .slice()
+    .reverse()
+    .flatMap(page => page.items)
   const selectedMessage = messages.find(message => message.id === selectedMessageId) ?? null
   const recipientQuery = useQuery({
     queryKey: [...messageRecipientsKey, selectedMessageId],
@@ -607,7 +602,7 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
                   <CardHeader className="dshx:gap-3 dshx:sm:flex-row dshx:sm:items-center dshx:sm:justify-between">
                     <div className="dshx:min-w-0">
                       <CardTitle className="dshx:truncate">{currentTitle}</CardTitle>
-                      <CardDescription>{t('messageCount', { count: messagesQuery.data?.pages[0]?.totalMatching ?? 0 })}</CardDescription>
+                      <CardDescription>{t('messageCount', { count: messagePages[0]?.totalMatching ?? 0 })}</CardDescription>
                     </div>
                     <div className="dshx:relative dshx:w-full dshx:sm:max-w-xs">
                       <SearchIcon className="dshx:absolute dshx:left-2.5 dshx:top-2.5 dshx:size-4 dshx:text-muted-foreground" aria-hidden />
