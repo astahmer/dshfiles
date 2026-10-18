@@ -54,15 +54,13 @@ const selectionForContinuation = (selection: QuotaRecoveryModelSelection | undef
   return { provider: selection.provider, model: selection.model, reasoningEffort: selection.reasoningEffort }
 }
 
-export const accountsFile = async (ctx: Context): Promise<AccountsFile> =>
+const accountsFile = async (ctx: Context): Promise<AccountsFile> =>
   accountStoreService.buildAccountsFile(
     await accountStoreService.readAccountFile(),
     accountRuntime(ctx)?.accounts?.pool.describe() ?? [],
     resolveKeyFromContext(ctx),
     async instanceId => (await createCopilotCredentialsService(ctx.get('credentials')).read(instanceId)) !== undefined,
   )
-
-export const accountsSnapshot = accountsFile
 
 const pricingFor = (ctx: Context) => {
   const pricing = accountRuntime(ctx)?.pricing
@@ -225,7 +223,7 @@ export const accountsHostApi = aiAccountsApi.host({
   snoozeQuotaContinuation: async ({ input, ctx }) => quotaContinuationServiceFor(ctx).snooze(input.continuationId, input.duration),
 })
 
-export const readQuotaResetAt = async (ctx: Context, accountId: string): Promise<number | null> => {
+const readQuotaResetAt = async (ctx: Context, accountId: string): Promise<number | null> => {
   const file = await accountsFile(ctx)
   const account = file.accounts.find(profile => profile.instanceId === accountId)
   if (account === undefined) return null
@@ -239,7 +237,7 @@ export const readQuotaResetAt = async (ctx: Context, accountId: string): Promise
  * on an interval, so a provider that is slow or down costs its own card rather
  * than the panel.
  */
-export const readAccountsUsage = async (ctx: Context): Promise<AccountsUsage> => {
+const readAccountsUsage = async (ctx: Context): Promise<AccountsUsage> => {
   // Read the observed file so a Codex account uses the same shadow home the
   // panel already shows, not a re-derived guess.
   const file = await accountsFile(ctx)
@@ -280,5 +278,8 @@ const refreshRoutes = async (ctx: Context): Promise<void> => {
   activeAccounts.pool.setDistribution(file.distribution)
 }
 
-/** The helper surface main's Host still calls by name; the lane grouped the same functions here. */
-export const AccountsHostApiModel = { accountsFile, readAccountsUsage, readQuotaResetAt } as const
+export class AccountsHostApiModel {
+  static readonly accountsFile = accountsFile
+  static readonly readAccountsUsage = readAccountsUsage
+  static readonly readQuotaResetAt = readQuotaResetAt
+}

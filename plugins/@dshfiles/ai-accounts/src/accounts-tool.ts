@@ -3,7 +3,7 @@ import { defineTool } from '@dshfiles/dshx/host'
 /**
  * Read-only account report.
  *
- * The tool and the settings page call the same `accountsSnapshot`, so an agent
+ * The tool and the settings page call the same `AccountsHostApiModel.accountsFile`, so an agent
  * and a human never disagree about which account serves what. It reads only:
  * there is no operation here that could sign in, rotate, or reconfigure an
  * account, and none should be added without the same thought applied to the
@@ -64,9 +64,9 @@ export const aiAccountsTool = defineTool({
   execute: async (_args, exec) => {
     const ctx = exec.agent?.ctx
     if (ctx === undefined) throw new Error('AI Accounts requires an active agent context.')
-    const { accountsSnapshot } = await import('./host.js')
+    const { AccountsHostApiModel } = await import('./accounts-host-api.js')
     const { accountRuntime } = await import('./account-runtime.js')
-    const snapshot = await accountsSnapshot(ctx)
+    const snapshot = await AccountsHostApiModel.accountsFile(ctx)
     return {
       distribution: snapshot.distribution,
       cooldownMs: snapshot.cooldownMs,
