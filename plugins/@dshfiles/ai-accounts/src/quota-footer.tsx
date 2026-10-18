@@ -13,7 +13,8 @@ import { QUOTA_TONE_TEXT, quotaTone } from './quota-tone.js'
 import { ArrangeableAccount, useUsageLayout } from './usage-arrangement.js'
 import { useAccountsUsage } from './use-accounts-usage.js'
 import { usePreferences, type MeterLabel, type UsageWindowLayout } from './use-preferences.js'
-import { UsageOverview, useNow } from './usage-overview.js'
+import { useQuotaClock } from './quota-clock.js'
+import { UsageOverview } from './usage-overview.js'
 import { UsageOverviewModel, type QuotaSummaryItem } from './usage-overview-model.js'
 
 const RESET_UNIT = { now: 'now', minutes: 'min', hours: 'h', days: 'd', months: 'mo', years: 'y' } as const
@@ -180,16 +181,23 @@ const UsagePopoverContent = (props: {
  * actions above Settings, so there it renders in place.
  */
 export const QuotaStrip = (props: { readonly onOpenUsageHistory: () => void }): JSX.Element | null => {
-  const { footerButton, meterLabel, usageWindowLayout, usageShortNames } = usePreferences()
+  const { footerButton } = usePreferences()
+  // A disabled strip mounts nothing: no usage query, no clock and no layout subscription behind an empty surface.
+  if (!footerButton) return null
+  return <QuotaStripBody {...props} />
+}
+
+const QuotaStripBody = (props: { readonly onOpenUsageHistory: () => void }): JSX.Element => {
+  const { meterLabel, usageWindowLayout, usageShortNames } = usePreferences()
   const arrangement = useUsageLayout()
   const [open, setOpen] = useState(false)
-  const { usage } = useAccountsUsage({ enabled: footerButton })
+  const { usage } = useAccountsUsage()
   const withShortName = useShortNames()
-  const now = useNow()
   const stripRef = useRef<HTMLDivElement>(null)
-
-  if (!footerButton) return null
   const items = UsageOverviewModel.stripItems(usage, arrangement.layout).map(withShortName)
+  // Minutes and reset countdowns are all the closed strip shows, so its clock wakes on those boundaries instead of
+  // every second; the open overview keeps its own second-resolution clock.
+  const now = useQuotaClock({ resetsAt: items.map(item => item.resetsAt) })
   const shownIds = items.map(item => item.instanceId)
   const label = items.length === 0 ? 'AI accounts usage' : `AI accounts usage. ${items.map(item => describeItem(item, now, usageWindowLayout)).join('. ')}`
 
@@ -258,8 +266,8 @@ const QuotaRailButton = (props: { readonly onOpenUsageHistory: () => void }): JS
   const [open, setOpen] = useState(false)
   const { usage } = useAccountsUsage()
   const withShortName = useShortNames()
-  const now = useNow()
   const items = UsageOverviewModel.stripItems(usage, arrangement.layout).map(withShortName)
+  const now = useQuotaClock({ resetsAt: items.map(item => item.resetsAt) })
   const label = items.length === 0 ? 'AI accounts usage' : `AI accounts usage. ${items.map(item => describeItem(item, now)).join('. ')}`
   const critical = UsageOverviewModel.mostCritical(items)
   return (
