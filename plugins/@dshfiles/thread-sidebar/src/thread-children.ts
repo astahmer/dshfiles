@@ -9,6 +9,13 @@ export interface ThreadTree<Thread extends ThreadNode> {
   readonly roots: readonly Thread[]
   /** Descendants folded under their top-most listed ancestor, newest first. */
   readonly childrenByRoot: ReadonlyMap<string, readonly Thread[]>
+  /**
+   * Branches whose nearest listed ancestor is gone from the corpus, keyed by
+   * the missing ancestor's id and newest first. Their parent no longer has a
+   * row to nest under, so they get their own labelled group instead of
+   * pretending to be top-level threads.
+   */
+  readonly detachedByMissingAncestor: ReadonlyMap<string, readonly Thread[]>
 }
 
 export type FinishedSubagentsMode = 'show' | 'collapse' | 'hide'
@@ -55,40 +62,56 @@ export class ThreadChildrenModel {
 
   /**
    * Fold every thread under its top-most ancestor that is itself listed, regardless
-   * of which sidebar section would otherwise contain it. A child whose ancestors
-   * are all missing (filtered or blank) stays a root row, and a visited set keeps
-   * corrupt parent cycles bounded.
+   * of which sidebar section would otherwise contain it. A branch whose ancestors
+   * are all missing (quarantined or filtered) is detached: it is grouped under the
+   * nearest missing ancestor id rather than listed as a root row, and a visited set
+   * keeps corrupt parent cycles bounded.
    */
   static readonly groupThreadChildren = <Thread extends ThreadNode>(options: { readonly threads: readonly Thread[] }): ThreadTree<Thread> => {
     const listed = new Map(options.threads.map(thread => [thread.id, thread]))
-    const rootOf = (thread: Thread): Thread | undefined => {
+    /**
+     * Walk the durable parent chain once. `root` is the top-most listed
+     * ancestor, and only when the chain above it ends at a real top-level
+     * thread: an ancestor whose own parent is missing is not a root, because
+     * its whole branch is detached and nesting under it would hide the branch.
+     * `missingAncestor` is the nearest ancestor with no listed row.
+     */
+    const ancestryOf = (thread: Thread): { root?: Thread; missingAncestor?: string } => {
       let root: Thread | undefined
       let cursor = thread.parentId
       const visited = new Set<string>([thread.id])
       while (cursor !== undefined && !visited.has(cursor)) {
         visited.add(cursor)
         const ancestor = listed.get(cursor)
-        if (ancestor === undefined) break
+        if (ancestor === undefined) return { missingAncestor: cursor }
         root = ancestor
         cursor = ancestor.parentId
       }
-      return root
+      return root === undefined ? {} : { root }
     }
 
     const roots: Thread[] = []
     const childrenByRoot = new Map<string, Thread[]>()
+    const detachedByMissingAncestor = new Map<string, Thread[]>()
     for (const thread of options.threads) {
-      const root = rootOf(thread)
-      if (root === undefined) {
+      const { root, missingAncestor } = ancestryOf(thread)
+      if (root !== undefined) {
+        const children = childrenByRoot.get(root.id) ?? []
+        children.push(thread)
+        childrenByRoot.set(root.id, children)
+        continue
+      }
+      if (missingAncestor === undefined) {
         roots.push(thread)
         continue
       }
-      const children = childrenByRoot.get(root.id) ?? []
-      children.push(thread)
-      childrenByRoot.set(root.id, children)
+      const detached = detachedByMissingAncestor.get(missingAncestor) ?? []
+      detached.push(thread)
+      detachedByMissingAncestor.set(missingAncestor, detached)
     }
     for (const children of childrenByRoot.values()) children.sort((left, right) => right.updatedAt - left.updatedAt)
-    return { roots, childrenByRoot }
+    for (const detached of detachedByMissingAncestor.values()) detached.sort((left, right) => right.updatedAt - left.updatedAt)
+    return { roots, childrenByRoot, detachedByMissingAncestor }
   }
 
   /**

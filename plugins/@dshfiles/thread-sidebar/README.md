@@ -239,6 +239,14 @@ view filters: the children follow the parent they belong to, folded while no
 subagent is working and unfolded when one is, so a subagent working under a
 parent shows there and child threads never appear as rows of their own.
 
+A branch whose nearest listed ancestor is gone from the corpus (for example a
+quarantined session log) never turns into a top-level row: the whole branch
+groups under one “Parent thread unavailable: …” header naming the missing
+session, with its children nested and the same status, source, and finished
+subagent rules as a listed parent. Nothing can create that state through the
+UI — DSH has no session delete — so a unit test covers the grouping and the
+browser journeys cover the listed-parent case.
+
 Finished subagents (not running and not waiting on approval or input) fold
 into one “N finished” line by default so live ones stay on top; the
 `finishedSubagents` setting can also list them or hide them. The open child is

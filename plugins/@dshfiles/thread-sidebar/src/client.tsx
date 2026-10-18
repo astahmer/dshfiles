@@ -311,6 +311,9 @@ const formatAge = (updatedAt: number): string => {
   return age.unit === 'now' ? 'now' : `${age.n}${RELATIVE_TIME_SUFFIX[age.unit]}`
 }
 
+/** Short readable form of a session id for a row that cannot show the thread's own title. */
+const shortSessionId = (sessionId: string): string => sessionId.replace(/^session-/, '').slice(0, 8)
+
 /** Show one thread in a right-sidebar tab; provided by the client entry that owns the sidebar-right controller. */
 type OpenAside = (sessionId: SessionSummary['id']) => void
 
@@ -329,7 +332,8 @@ interface RowActions {
   readonly toggleParked: (sessionId: SessionSummary['id']) => void
   readonly copy: (value: string, successMessage: string) => Promise<void>
   readonly toggleChildren: (sessionId: SessionSummary['id'], currentlyOpen: boolean) => void
-  readonly toggleAllChildren: (sessionId: SessionSummary['id']) => void
+  /** Any parent id, including a missing ancestor only its detached children name. */
+  readonly toggleAllChildren: (parentId: string) => void
   readonly mute: (sessionId: SessionSummary['id'], option: ThreadMuteOption) => void
   readonly unmute: (sessionId: SessionSummary['id']) => void
   readonly markUnread: (sessionId: SessionSummary['id']) => void
@@ -448,7 +452,7 @@ const StatusDot = (props: {
 }
 
 const ChildThreadList = (props: {
-  readonly parentId: SessionSummary['id']
+  readonly parentId: string
   readonly childThreads: readonly SessionSummary[]
   readonly finishedChildThreads: readonly SessionSummary[]
   readonly unreadSessionIds: ReadonlySet<SessionSummary['id']>
@@ -1841,6 +1845,17 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       ),
     [mutedThreads, now, sessionState.byId, threadTree, workspaceBySession],
   )
+  const detachedThreadEntries = useMemo(
+    () =>
+      Array.from(threadTree.detachedByMissingAncestor.values()).flatMap(children =>
+        children.map(session => ({
+          session,
+          workspaceId: SidebarOrganization.workspaceForLineage(session, sessionState.byId, workspaceBySession),
+          activity: { id: session.id, updatedAt: effectiveActivityAt(mutedThreads, session, now), running: session.running },
+        })),
+      ),
+    [mutedThreads, now, sessionState.byId, threadTree, workspaceBySession],
+  )
   const sourceFilteredThreadEntries = useMemo(() => {
     if (threadView.sourceFilter === 'subagents') {
       return [...childThreadEntries, ...sectionEntries.filter(entry => ThreadViewModel.matchesSourceFilter(entry.session, 'subagents'))]
@@ -1852,13 +1867,15 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const currentWorkingThreadIds = useMemo(() => workingThreadIds(sectionEntries.map(entry => entry.activity)), [sectionEntries])
   const workingThreadCountsBySource = useMemo(
     () => ({
-      all: sectionEntries.filter(entry => entry.activity.running).length,
+      all: sectionEntries.filter(entry => entry.activity.running).length + detachedThreadEntries.filter(entry => entry.activity.running).length,
       main: sectionEntries.filter(entry => entry.activity.running && ThreadViewModel.matchesSourceFilter(entry.session, 'main')).length,
-      subagents: [...childThreadEntries, ...sectionEntries.filter(entry => ThreadViewModel.matchesSourceFilter(entry.session, 'subagents'))].filter(
-        entry => entry.activity.running,
-      ).length,
+      subagents: [
+        ...childThreadEntries,
+        ...detachedThreadEntries,
+        ...sectionEntries.filter(entry => ThreadViewModel.matchesSourceFilter(entry.session, 'subagents')),
+      ].filter(entry => entry.activity.running).length,
     }),
-    [childThreadEntries, sectionEntries],
+    [childThreadEntries, detachedThreadEntries, sectionEntries],
   )
   const nextMuteWake = useMemo(() => nextMuteExpiry(mutedThreads, now), [mutedThreads, now])
   const nextIdleAt = useMemo(
@@ -2145,6 +2162,50 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     preferences.turnFinishedDisplay,
     threadView.groupBy,
     turnFinishedRows,
+  ])
+
+  /**
+   * Branches whose parent session is gone from the corpus. They keep the same
+   * status and attention filtering as a listed parent's children, so a view
+   * filter never resurrects a row the rest of the list hides.
+   */
+  const detachedThreadGroups = useMemo(() => {
+    if (threadView.sourceFilter === 'main') return []
+    return [...threadTree.detachedByMissingAncestor.entries()]
+      .map(([missingAncestorId, children]) => {
+        const listed = children.filter(
+          child =>
+            !(threadView.groupBy === 'status' && attentionIds.has(child.id)) &&
+            ThreadViewModel.matchesStatusFilter({
+              filters: threadView.statusFilters,
+              running: child.running,
+              needsAttention: attentionSessionIds.has(child.id),
+              archived: archivedSessionIds.has(child.id),
+              muted: mutedSessionIds.has(child.id),
+            }),
+        )
+        const selectedChildId = listed.some(child => child.id === selectedSession?.id) ? selectedSession?.id : undefined
+        const { live, finished } = partitionFinishedChildren({
+          children: listed,
+          mode: preferences.finishedSubagents,
+          isFinished: child => child.origin === 'subagent' && !child.running && !waitingSessionIds.has(child.id),
+          selectedId: selectedChildId,
+        })
+        return { missingAncestorId, live, finished, selectedChildId, count: live.length + finished.length }
+      })
+      .filter(group => group.count > 0)
+  }, [
+    archivedSessionIds,
+    attentionIds,
+    attentionSessionIds,
+    mutedSessionIds,
+    preferences.finishedSubagents,
+    selectedSession?.id,
+    threadTree,
+    threadView.groupBy,
+    threadView.sourceFilter,
+    threadView.statusFilters,
+    waitingSessionIds,
   ])
 
   const rowsBySection = useMemo(() => {
@@ -3137,8 +3198,41 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                   {group.threads.map(session => renderThreadRow(session, undefined))}
                 </section>
               ))}
+          {detachedThreadGroups.map(group => (
+            <section
+              className="dshx:mt-1"
+              key={`detached:${group.missingAncestorId}`}
+              aria-label={`${props.tSidebar('threadSidebarMissingParent')} ${group.missingAncestorId}`}
+            >
+              <div
+                className={cn(
+                  stickyHeaderClass,
+                  'dshx:flex dshx:h-8 dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:px-2.5 dshx:text-sm dshx:text-muted-foreground',
+                )}
+              >
+                <span className="dshx:shrink-0 dshx:whitespace-nowrap">{props.tSidebar('threadSidebarMissingParent')}</span>
+                <span className="dshx:min-w-0 dshx:truncate dshx:text-xs" title={group.missingAncestorId}>
+                  {shortSessionId(group.missingAncestorId)}
+                </span>
+                <span className="dshx:text-xs dshx:tabular-nums">({group.count})</span>
+                <span className="dshx:h-px dshx:flex-1 dshx:bg-border" aria-hidden="true" />
+              </div>
+              <ChildThreadList
+                parentId={group.missingAncestorId}
+                childThreads={group.live}
+                finishedChildThreads={group.finished}
+                unreadSessionIds={unreadSessionIds}
+                allShown={expandedParents.has(group.missingAncestorId)}
+                selectedChildId={group.selectedChildId}
+                attentionLabels={inlineAttentionLabels}
+                rowStyle={rowStyle}
+                actions={rowActions}
+              />
+            </section>
+          ))}
           {props.openRemoteThreads === undefined ? null : <RemoteThreadsSection headerClassName={stickyHeaderClass} onOpen={props.openRemoteThreads} />}
           {sessionState.phase === 'ready' &&
+          detachedThreadGroups.length === 0 &&
           groupedAttentionRows.approvalNeeded.length === 0 &&
           groupedAttentionRows.inputNeeded.length === 0 &&
           groupedAttentionRows.turnFinished.length === 0 &&

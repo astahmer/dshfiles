@@ -989,7 +989,7 @@
     {
       "id": "thread-children-and-links",
       "title": "Browse child sessions and share thread URLs",
-      "summary": "Default child lists to open only while a subagent is working, preserve manual toggles, expand recursive child sessions with inherited workspace context, fold or hide finished subagents, and copy credential-free thread URLs.",
+      "summary": "Default child lists to open only while a subagent is working, preserve manual toggles, expand recursive child sessions with inherited workspace context, fold or hide finished subagents, group a branch whose parent session is gone under a \u201cparent thread unavailable\u201d header instead of a top-level row, and copy credential-free thread URLs.",
       "reach": [
         "click button \"Sidebar settings\"",
         "click button \"Finished subagents: Fold into \u201cN finished\u201d\"",
@@ -1015,8 +1015,12 @@
           ]
         }
       ],
-      "states": ["collapsed", "expanded", "nested", "copied", "finished-folded"],
-      "failureModes": ["Child chains preserve inherited workspace identity.", "Copied links omit credentials and unsupported path-based routes."],
+      "states": ["collapsed", "expanded", "nested", "copied", "finished-folded", "parent-unavailable"],
+      "failureModes": [
+        "Child chains preserve inherited workspace identity.",
+        "A branch whose nearest listed ancestor is missing from the corpus groups under one \u201cparent thread unavailable\u201d header and never renders as a top-level thread row.",
+        "Copied links omit credentials and unsupported path-based routes."
+      ],
       "externalDependencies": [],
       "verification": [
         {
@@ -1029,6 +1033,18 @@
           "id": "thread-sidebar.thread-children-and-links-unit-nested-child-folding",
           "file": "plugins/@dshfiles/thread-sidebar/src/thread-children.test.ts",
           "testName": "subagents and their own children fold under the top-most listed ancestor, newest first"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.thread-children-and-links-unit-detached-missing-parent",
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-children.test.ts",
+          "testName": "a child whose parent is not listed is detached under that missing ancestor instead of posing as a root row"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.thread-children-and-links-unit-detached-branch",
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-children.test.ts",
+          "testName": "a branch whose listed ancestor has a missing parent follows it into one detached group"
         },
         {
           "kind": "unit-test",

@@ -12,10 +12,20 @@ test('subagents and their own children fold under the top-most listed ancestor, 
   assert.deepEqual(ids(tree.childrenByRoot.get('parent')), ['grandchild', 'child-a'])
 })
 
-test('a child whose parent is not listed stays its own row', () => {
+test('a child whose parent is not listed is detached under that missing ancestor instead of posing as a root row', () => {
   const tree = ThreadChildrenModel.groupThreadChildren({ threads: [thread('orphan', 1, 'missing')] })
-  assert.deepEqual(ids(tree.roots), ['orphan'])
+  assert.deepEqual(ids(tree.roots), [])
   assert.equal(tree.childrenByRoot.size, 0)
+  assert.deepEqual(ids(tree.detachedByMissingAncestor.get('missing')), ['orphan'])
+})
+
+test('a branch whose listed ancestor has a missing parent follows it into one detached group', () => {
+  const tree = ThreadChildrenModel.groupThreadChildren({
+    threads: [thread('kept', 10), thread('detached', 9, 'gone'), thread('nested', 8, 'detached')],
+  })
+  assert.deepEqual(ids(tree.roots), ['kept'])
+  assert.equal(tree.childrenByRoot.size, 0)
+  assert.deepEqual(ids(tree.detachedByMissingAncestor.get('gone')), ['detached', 'nested'])
 })
 
 test('children stay nested under their parent even when sidebar sections differ', () => {
