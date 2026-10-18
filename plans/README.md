@@ -25,7 +25,7 @@ Checkboxes and receipts in a plan are history, not fresh verification.
 ## Testing, research and housekeeping
 
 | Plan                                                               | Open work                                                                                                                                                                |
-| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+|--------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | [Plugin E2E coverage](plugin-e2e-coverage.md)                      | Run journeys in CI, a fresh baseline, Host egress, catalog scaffolding.                                                                                                  |
 | [E2E speed and work-skipping](e2e-speed/README.md)                 | Phase trace and composition cache landed; next a per-scenario result cache, boot reuse, the network-boundary measurement.                                                |
 | [Host loop freezes](host-loop-freezes/README.md)                   | Measurement-gated fixes for the session-search Host stall: harness, L0 escape hatch, L1 coalescing, L2 warm index, L3 measured plugin tax, L4 off-loop engine.           |
@@ -34,4 +34,5 @@ Checkboxes and receipts in a plan are history, not fresh verification.
 | [Guardrails: refactors](guardrails-refactors.md)                   | Steps 10–12: Hono e2e fakes, the `no-export-bag` rule in emilint, XState and namespace classes per plugin.                                                               |
 | [Host gaps](dsh-host-gaps.md)                                      | Behaviors our plugins cannot build until DSH exposes a capability. A standing list, not a task plan.                                                                     |
 | [Reference feature additions](reference-feature-additions.md)      | Evidence-gated feature and adoption backlog from reference products.                                                                                                     |
+| [Self-improvement](self-improve/README.md)                         | Open improvements mined from DSH Session history; the ledger dedups and reopens them. A standing backlog, not a task plan.                                               |
 | [~/dev cleanup](dev-cleanup-audit.md)                              | 23 workspaces and repositories awaiting a keep/archive/remove decision.                                                                                                  |
