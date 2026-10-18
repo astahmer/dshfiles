@@ -125,6 +125,10 @@ When('a searchable user message is sent to a new thread', async ({ page }: { pag
   await paletteInput(page).fill('New thread')
   await paletteOption(page, /New thread/).click()
   await expect(paletteDialog(page)).not.toBeVisible()
+  await page.getByRole('button', { name: /^Select model/ }).click()
+  await page.getByRole('menuitem', { name: /^Model / }).click()
+  await page.getByRole('menuitemradio', { name: 'commandcode_work/gpt-6-luna', exact: true }).click()
+  await expect(page.getByRole('button', { name: /^Select model, current commandcode_work\/gpt-6-luna/ })).toBeVisible()
 
   const composer = page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions' })
   await composer.fill(marker)

@@ -20,14 +20,12 @@ routes error-prone. pandwind's pattern: a pure `create…App()` Hono app plus a 
 
 **Slices:**
 
-- [ ] 10a. `chore(deps)`: add `hono` and `@hono/node-server` to the catalog, pinned (pandwind's versions), as dshx
-      dev dependencies; knip must stay clean.
-- [ ] 10b. `test(e2e)`: `createFakeCommandCodeApp(state)` — routes, SSE through `streamSSE`, port 0. The chat
-      dispatch (title / turn, `[[call]]`, `[[title …]]`) stays a pure function tested through
-      `app.request()` without a socket.
-- [ ] 10c. `test(e2e)`: the OAuth MCP fake as a Hono app (discovery, registration, PKCE, sign-in/out routes).
-- [ ] 10d. `test(e2e)`: the hub fake moves out of the step file into `support/fake-hub.ts` as a Hono app.
-- [ ] 10e. `docs(e2e)`: the fakes pattern in `docs/e2e-testing.md`.
+- [x] 10a. `chore(deps)`: pin `hono` and `@hono/node-server` in the pnpm catalog as dshx dev dependencies; Knip is clean.
+- [x] 10b. `test(e2e)`: `createFakeCommandCodeApp(state)` — explicit routes, SSE through `streamSSE`, and port 0.
+      Chat dispatch remains testable through `app.request()` without a socket.
+- [x] 10c. `test(e2e)`: the OAuth MCP fake is a Hono app (discovery, registration, PKCE, sign-in/out routes).
+- [x] 10d. `test(e2e)`: the hub fake lives in `support/fake-hub.ts` as a Hono app.
+- [x] 10e. `docs(e2e)`: the fakes pattern is documented in `docs/e2e-testing.md`.
 
 **Done when:** no fake routes on `url`/`pathname` comparisons; each fake has unit tests through `app.request()`;
 `pnpm check:e2e` for diff-viewed, tool-meta, memory, mcp-servers, plugin-marketplace and `dshx dev` seeds that

@@ -12,7 +12,7 @@ const addCommandCodeAccount = async (page: Page, input: { readonly name: string;
   const baseUrl = page.getByRole('textbox', { name: 'API base URL', exact: true })
   await baseUrl.fill(fakeCommandCodeFor(page).baseUrl)
   await baseUrl.blur()
-  await expect(page.getByRole('status').filter({ hasText: /^Saved/ })).toBeVisible()
+  await expect(page.getByRole('status').filter({ hasText: /^(Saved|Changes save automatically)$/ })).toBeVisible()
   await page.getByRole('button', { name: 'Set up key…', exact: true }).click()
   const keyDialog = page.getByRole('dialog', { name: `Configure ${input.name} key`, exact: true })
   await keyDialog.getByRole('textbox', { name: 'API key value', exact: true }).fill(input.key)

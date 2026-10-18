@@ -12,7 +12,8 @@ Feature: Command palette
 
   @scenario:command-palette.content-search
   Scenario: Content search finds a real user message and opens its thread
-    Given the isolated plugin profile "@dshfiles/command-palette" is booted with the session-content index
+    Given the isolated plugin composition "@dshfiles/command-palette,@dshfiles/ai-accounts" is booted with the session-content index
+    When a Command Code account backed by a local fake provider is added
     When a searchable user message is sent to a new thread
     When the command palette is opened
     When the palette query is "#dshx-content-search-e2e-marker"

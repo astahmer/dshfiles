@@ -325,6 +325,16 @@ Given('the isolated plugin profile {string} is booted with the session-content i
   await visitIsolatedPluginProfile(page, profile)
 })
 
+Given('the isolated plugin composition {string} is booted with the session-content index', async ({ page }: { page: Page }, packageList: string) => {
+  const packageIds = packageList
+    .split(',')
+    .map(packageId => packageId.trim())
+    .filter(packageId => packageId.length > 0)
+  if (packageIds.length === 0) throw new Error('The plugin composition names no package.')
+  const profile = await bootComposedPluginProfile({ packageIds, profileLabel: packageIds.join('+'), cordisPatch: sessionContentIndexPatch })
+  await visitIsolatedPluginProfile(page, profile)
+})
+
 Then('the content-search index exists under the isolated DSH home', async ({ page }: { page: Page }) => {
   const indexPath = join(profileFor(page).homeRoot, 'plugins', 'session-query-sqlite', 'index.sqlite')
   await recordAssertion(page, 'command-palette-content-index-is-under-the-isolated-home', () =>
