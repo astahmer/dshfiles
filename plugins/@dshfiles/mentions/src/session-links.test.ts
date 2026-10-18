@@ -15,6 +15,15 @@ describe('SessionLinks', () => {
     expect(SessionLinks.idFromMention('@[x](dsh-session:!!)')).toBeUndefined()
   })
 
+  it('reads the session out of an anchor an Agent wrote, from its href or its title', () => {
+    const element = (attributes: Record<string, string>) => ({ getAttribute: (name: string) => attributes[name] ?? null })
+    const uri = `dsh-session:${Buffer.from(JSON.stringify('session-abc'), 'utf8').toString('base64url')}`
+    expect(SessionLinks.idFromAnchor(element({ href: uri }))).toBe('session-abc')
+    expect(SessionLinks.idFromAnchor(element({ title: `@[Fix deploy](${uri})` }))).toBe('session-abc')
+    expect(SessionLinks.idFromAnchor(element({ href: 'https://example.com' }))).toBeUndefined()
+    expect(SessionLinks.idFromAnchor(element({ href: 'dsh-session:!!' }))).toBeUndefined()
+  })
+
   it('maps labels to the sessions a thread referenced, the latest reference winning', () => {
     const byLabel = SessionLinks.referencedSessions([
       { type: 'user/message', data: { source: { kind: 'user' } } },

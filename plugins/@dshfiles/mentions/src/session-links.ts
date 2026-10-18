@@ -28,6 +28,14 @@ export class SessionLinks {
     }
   }
 
+  /**
+   * The session a rendered element names: an Agent writes `@[label](dsh-session:…)`, which native markdown renders as
+   * an anchor whose href carries the URI (its title may carry the whole mention instead).
+   */
+  static idFromAnchor(element: { getAttribute(name: string): string | null }): string | undefined {
+    return SessionLinks.idFromMention(element.getAttribute('href') ?? '') ?? SessionLinks.idFromMention(element.getAttribute('title') ?? '')
+  }
+
   /** Label → session id for every session a thread's loaded messages referenced; a later reference wins a label. */
   static referencedSessions(events: readonly unknown[]): Map<string, string> {
     const byLabel = new Map<string, string>()

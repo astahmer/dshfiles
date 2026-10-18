@@ -28,7 +28,8 @@ const TIMING_MEASURE = 'dshfiles-mentions:candidates'
 const OPEN_THREAD_EVENT = 'dshfiles:open-thread'
 // A sent message's in-text session chip (ui-primitives `projectUserText`) and its "Referenced session · …" line (ui-chat).
 const SESSION_CHIP = '[data-ref-chip="session"]'
-const SESSION_LINK = `${SESSION_CHIP}, [class*="_referenceSummary"]`
+// Chips and "Referenced session · …" lines come from the composer; an Agent-written mention is a plain anchor.
+const SESSION_LINK = `${SESSION_CHIP}, [class*="_referenceSummary"], a[href^="dsh-session:"]`
 
 type PickValue =
   | { readonly kind: 'file'; readonly fileKind: 'file' | 'directory'; readonly label: string; readonly mention: string; readonly drillText: string }
@@ -95,7 +96,7 @@ export default defineClient({
 
     /** The session a sent message's chip or "Referenced session · …" line names, read from that thread's own recall events. */
     const referencedSessionAt = (element: Element, point: { readonly x: number; readonly y: number }): string | undefined => {
-      const fromMention = SessionLinks.idFromMention(element.getAttribute('title') ?? '')
+      const fromMention = SessionLinks.idFromAnchor(element)
       if (fromMention !== undefined) return fromMention
       const threadId = element.closest('[data-conversation-session]')?.getAttribute('data-conversation-session') ?? ''
       const thread = sessions.list.getSnapshot().ids.find(id => id === threadId)
