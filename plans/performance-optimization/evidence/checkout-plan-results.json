@@ -1,0 +1,278 @@
+{
+  "recordedAt": "2026-10-18T12:44:53.213Z",
+  "kind": "checkout-planner-probe-suite",
+  "note": "Implementation is this workspace build; the shared checkout holds older artifacts that predate the dependency manifest, so it exercises the source-map fallback.",
+  "baselineFromAudit": {
+    "mapReads": 74,
+    "mapBytes": 53913303,
+    "warmMedianMs": 171.09
+  },
+  "results": [
+    {
+      "id": "no-change-shared-checkout",
+      "kind": "checkout-planner-probe",
+      "implementation": "/Users/astahmer/dev/dshfiles-threads/thread-5c0266/tooling/dshx/packages/dshx/dist/checkout/rebuild.js",
+      "targetRoot": "/Users/astahmer/dev/dshfiles",
+      "changedFiles": [],
+      "samples": [
+        {
+          "elapsedMs": 23.51,
+          "mapReads": 0,
+          "mapBytes": 0,
+          "manifestReads": 0,
+          "manifestBytes": 0,
+          "selectedPlugins": 0
+        },
+        {
+          "elapsedMs": 5.87,
+          "mapReads": 0,
+          "mapBytes": 0,
+          "manifestReads": 0,
+          "manifestBytes": 0,
+          "selectedPlugins": 0
+        },
+        {
+          "elapsedMs": 9.13,
+          "mapReads": 0,
+          "mapBytes": 0,
+          "manifestReads": 0,
+          "manifestBytes": 0,
+          "selectedPlugins": 0
+        },
+        {
+          "elapsedMs": 6.86,
+          "mapReads": 0,
+          "mapBytes": 0,
+          "manifestReads": 0,
+          "manifestBytes": 0,
+          "selectedPlugins": 0
+        }
+      ],
+      "selection": []
+    },
+    {
+      "id": "one-changed-source-shared-checkout",
+      "kind": "checkout-planner-probe",
+      "implementation": "/Users/astahmer/dev/dshfiles-threads/thread-5c0266/tooling/dshx/packages/dshx/dist/checkout/rebuild.js",
+      "targetRoot": "/Users/astahmer/dev/dshfiles",
+      "changedFiles": [
+        "plugins/@dshfiles/jujutsu/src/client.tsx"
+      ],
+      "samples": [
+        {
+          "elapsedMs": 43.79,
+          "mapReads": 2,
+          "mapBytes": 4099100,
+          "manifestReads": 0,
+          "manifestBytes": 0,
+          "selectedPlugins": 1
+        },
+        {
+          "elapsedMs": 24.49,
+          "mapReads": 2,
+          "mapBytes": 4099100,
+          "manifestReads": 0,
+          "manifestBytes": 0,
+          "selectedPlugins": 1
+        },
+        {
+          "elapsedMs": 20.92,
+          "mapReads": 2,
+          "mapBytes": 4099100,
+          "manifestReads": 0,
+          "manifestBytes": 0,
+          "selectedPlugins": 1
+        },
+        {
+          "elapsedMs": 26.87,
+          "mapReads": 2,
+          "mapBytes": 4099100,
+          "manifestReads": 0,
+          "manifestBytes": 0,
+          "selectedPlugins": 1
+        }
+      ],
+      "selection": [
+        "@dshfiles/jujutsu:-client"
+      ]
+    },
+    {
+      "id": "one-changed-source-this-workspace",
+      "kind": "checkout-planner-probe",
+      "implementation": "/Users/astahmer/dev/dshfiles-threads/thread-5c0266/tooling/dshx/packages/dshx/dist/checkout/rebuild.js",
+      "targetRoot": "/Users/astahmer/dev/dshfiles-threads/thread-5c0266",
+      "changedFiles": [
+        "plugins/@dshfiles/shared-streams/src/host.ts"
+      ],
+      "samples": [
+        {
+          "elapsedMs": 30.71,
+          "mapReads": 0,
+          "mapBytes": 0,
+          "manifestReads": 1,
+          "manifestBytes": 1414,
+          "selectedPlugins": 44
+        },
+        {
+          "elapsedMs": 9.61,
+          "mapReads": 0,
+          "mapBytes": 0,
+          "manifestReads": 1,
+          "manifestBytes": 1414,
+          "selectedPlugins": 44
+        },
+        {
+          "elapsedMs": 9.36,
+          "mapReads": 0,
+          "mapBytes": 0,
+          "manifestReads": 1,
+          "manifestBytes": 1414,
+          "selectedPlugins": 44
+        },
+        {
+          "elapsedMs": 7.35,
+          "mapReads": 0,
+          "mapBytes": 0,
+          "manifestReads": 1,
+          "manifestBytes": 1414,
+          "selectedPlugins": 44
+        }
+      ],
+      "selection": [
+        "@dshfiles/activity-timeline:hostclient",
+        "@dshfiles/agent-communication:hostclient",
+        "@dshfiles/agent-questions:hostclient",
+        "@dshfiles/agent-toolkit:hostclient",
+        "@dshfiles/ai-accounts:hostclient",
+        "@dshfiles/attachment-gallery:hostclient",
+        "@dshfiles/btw:hostclient",
+        "@dshfiles/command-palette:hostclient",
+        "@dshfiles/diff-viewed:hostclient",
+        "@dshfiles/editor:hostclient",
+        "@dshfiles/frame-layout:hostclient",
+        "@dshfiles/goal-stall-guard:host-",
+        "@dshfiles/home:hostclient",
+        "@dshfiles/input-trigger:hostclient",
+        "@dshfiles/jj-integration:hostclient",
+        "@dshfiles/jujutsu:hostclient",
+        "@dshfiles/main-tabs:hostclient",
+        "@dshfiles/mcp-servers:hostclient",
+        "@dshfiles/memory:hostclient",
+        "@dshfiles/mentions:hostclient",
+        "@dshfiles/model-effort-picker:hostclient",
+        "@dshfiles/multi-host:hostclient",
+        "@dshfiles/optmem-core:host-",
+        "@dshfiles/plugin-marketplace:hostclient",
+        "@dshfiles/privacy-controls:hostclient",
+        "@dshfiles/project-checks:hostclient",
+        "@dshfiles/prompt-stash:hostclient",
+        "@dshfiles/pulls-review:hostclient",
+        "@dshfiles/queue-reorder:hostclient",
+        "@dshfiles/request-messages:host-",
+        "@dshfiles/rich-composer:hostclient",
+        "@dshfiles/secret-catalog:hostclient",
+        "@dshfiles/send-after-upload:hostclient",
+        "@dshfiles/settings-shell:hostclient",
+        "@dshfiles/shared-runtime:hostclient",
+        "@dshfiles/shared-streams:host-",
+        "@dshfiles/shortcuts:hostclient",
+        "@dshfiles/sidebar-commands:hostclient",
+        "@dshfiles/thread-sidebar:hostclient",
+        "@dshfiles/tool-meta:hostclient",
+        "@dshfiles/ui-styles:hostclient",
+        "@dshfiles/usage:hostclient",
+        "@dshfiles/workbench:hostclient",
+        "@dshfiles/workspace-folder-picker:hostclient"
+      ]
+    },
+    {
+      "id": "changed-dshx-runtime-this-workspace",
+      "kind": "checkout-planner-probe",
+      "implementation": "/Users/astahmer/dev/dshfiles-threads/thread-5c0266/tooling/dshx/packages/dshx/dist/checkout/rebuild.js",
+      "targetRoot": "/Users/astahmer/dev/dshfiles-threads/thread-5c0266",
+      "changedFiles": [
+        "tooling/dshx/packages/dshx/src/api/define.ts"
+      ],
+      "samples": [
+        {
+          "elapsedMs": 17.83,
+          "mapReads": 0,
+          "mapBytes": 0,
+          "manifestReads": 1,
+          "manifestBytes": 1414,
+          "selectedPlugins": 44
+        },
+        {
+          "elapsedMs": 8.09,
+          "mapReads": 0,
+          "mapBytes": 0,
+          "manifestReads": 1,
+          "manifestBytes": 1414,
+          "selectedPlugins": 44
+        },
+        {
+          "elapsedMs": 6.28,
+          "mapReads": 0,
+          "mapBytes": 0,
+          "manifestReads": 1,
+          "manifestBytes": 1414,
+          "selectedPlugins": 44
+        },
+        {
+          "elapsedMs": 5.99,
+          "mapReads": 0,
+          "mapBytes": 0,
+          "manifestReads": 1,
+          "manifestBytes": 1414,
+          "selectedPlugins": 44
+        }
+      ],
+      "selection": [
+        "@dshfiles/activity-timeline:hostclient",
+        "@dshfiles/agent-communication:hostclient",
+        "@dshfiles/agent-questions:hostclient",
+        "@dshfiles/agent-toolkit:hostclient",
+        "@dshfiles/ai-accounts:hostclient",
+        "@dshfiles/attachment-gallery:hostclient",
+        "@dshfiles/btw:hostclient",
+        "@dshfiles/command-palette:hostclient",
+        "@dshfiles/diff-viewed:hostclient",
+        "@dshfiles/editor:hostclient",
+        "@dshfiles/frame-layout:hostclient",
+        "@dshfiles/goal-stall-guard:host-",
+        "@dshfiles/home:hostclient",
+        "@dshfiles/input-trigger:hostclient",
+        "@dshfiles/jj-integration:hostclient",
+        "@dshfiles/jujutsu:hostclient",
+        "@dshfiles/main-tabs:hostclient",
+        "@dshfiles/mcp-servers:hostclient",
+        "@dshfiles/memory:hostclient",
+        "@dshfiles/mentions:hostclient",
+        "@dshfiles/model-effort-picker:hostclient",
+        "@dshfiles/multi-host:hostclient",
+        "@dshfiles/optmem-core:host-",
+        "@dshfiles/plugin-marketplace:hostclient",
+        "@dshfiles/privacy-controls:hostclient",
+        "@dshfiles/project-checks:hostclient",
+        "@dshfiles/prompt-stash:hostclient",
+        "@dshfiles/pulls-review:hostclient",
+        "@dshfiles/queue-reorder:hostclient",
+        "@dshfiles/request-messages:host-",
+        "@dshfiles/rich-composer:hostclient",
+        "@dshfiles/secret-catalog:hostclient",
+        "@dshfiles/send-after-upload:hostclient",
+        "@dshfiles/settings-shell:hostclient",
+        "@dshfiles/shared-runtime:hostclient",
+        "@dshfiles/shared-streams:host-",
+        "@dshfiles/shortcuts:hostclient",
+        "@dshfiles/sidebar-commands:hostclient",
+        "@dshfiles/thread-sidebar:hostclient",
+        "@dshfiles/tool-meta:hostclient",
+        "@dshfiles/ui-styles:hostclient",
+        "@dshfiles/usage:hostclient",
+        "@dshfiles/workbench:hostclient",
+        "@dshfiles/workspace-folder-picker:hostclient"
+      ]
+    }
+  ]
+}
