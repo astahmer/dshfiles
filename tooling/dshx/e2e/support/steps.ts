@@ -5,7 +5,7 @@ import { After, Before, Given, Then, readBootOutcome } from './bdd.js'
 import { bootComposedPluginProfile, bootPluginProfile, bootProfile, type BootedProfile } from './boot.js'
 import { redactHostOutput } from './scratch-profile.js'
 import { clientEntryFailures, parseBootText } from '../../packages/dshx/src/project/client-boot-check.js'
-import { dismissProviderSetupDuringStartup, registerProviderSetupDismissal } from '../../packages/dshx/src/project/startup-dialogs.js'
+import { StartupDialogs } from '../../packages/dshx/src/project/startup-dialogs.js'
 import {
   capturePageEvidenceFrame,
   completeEvidenceStep,
@@ -102,7 +102,7 @@ Before(async ({ page, $testInfo }) => {
   browserDiagnostics.set(page, diagnostics)
   allowedBrowserOrigins.set(page, allowedOrigins)
   page.context().on('page', newPage => {
-    void registerProviderSetupDismissal(newPage).catch(() => {
+    void StartupDialogs.registerProviderSetupDismissal(newPage).catch(() => {
       diagnostics.push('provider onboarding handler registration failed')
     })
   })
@@ -186,7 +186,7 @@ export const restartScratchProfileInBrowser = async (page: Page): Promise<string
   await visitScratchProfile(page, profile, freshUrl)
   const previewNotice = page.getByRole('dialog', { name: 'Preview Notice', exact: true })
   if (await previewNotice.isVisible()) await previewNotice.getByRole('button', { name: 'Continue', exact: true }).click()
-  await dismissProviderSetupDuringStartup(page)
+  await StartupDialogs.dismissProviderSetupDuringStartup(page)
   assertClientBootReady(await readProfileOutcome(page, profile), profile, 'The restarted scratch profile did not boot cleanly.')
   return freshUrl
 }
@@ -199,7 +199,7 @@ export const visitIsolatedPluginProfile = async (page: Page, profile: BootedProf
     await expect(previewNotice).toBeVisible()
     await previewNotice.getByRole('button', { name: 'Continue', exact: true }).click()
     await expect(previewNotice).toBeHidden()
-    await dismissProviderSetupDuringStartup(page)
+    await StartupDialogs.dismissProviderSetupDuringStartup(page)
     completeEvidenceStep(evidenceRunFor(page), 'profile-booted')
     await capturePageEvidenceFrame(evidenceRunFor(page), page, 'profile-booted')
   } catch (error) {
@@ -214,7 +214,7 @@ Given('the web profile is booted', async ({ page }: { page: Page }) => {
   profiles.set(page, profile)
   try {
     await visitScratchProfile(page, profile)
-    await dismissProviderSetupDuringStartup(page)
+    await StartupDialogs.dismissProviderSetupDuringStartup(page)
     completeEvidenceStep(evidenceRunFor(page), 'profile-booted')
     await capturePageEvidenceFrame(evidenceRunFor(page), page, 'profile-booted')
   } catch (error) {

@@ -2,7 +2,7 @@ import { expect, type Page } from '@playwright/test'
 import { z } from 'zod'
 import { Then, When } from '../bdd.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
-import { dismissProviderSetupIfShown } from '../../../packages/dshx/src/project/startup-dialogs.js'
+import { StartupDialogs } from '../../../packages/dshx/src/project/startup-dialogs.js'
 import { sendMessage } from '../threads.js'
 
 const createdSessionResponseSchema = z.object({
@@ -86,7 +86,7 @@ const startSidebarThread = async (page: Page, prompt: string): Promise<string> =
   const sessionId = parsedResponse.data.result.value.sessionId
   await expect.poll(() => new URL(page.url()).searchParams.get('thread')).toBe(sessionId)
   await expect(page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })).toBeVisible()
-  await dismissProviderSetupIfShown(page)
+  await StartupDialogs.dismissProviderSetupIfShown(page)
   await sendMessage(page, prompt)
   await expect(sidebarThreadRow(page, sessionId)).toBeVisible()
   return sessionId

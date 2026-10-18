@@ -32,7 +32,7 @@ const appears = (dialog: Locator, timeoutMs: number): Promise<boolean> =>
   )
 
 /** Dismiss the provider-setup dialog whenever it covers an element this page acts on. */
-export const registerProviderSetupDismissal = (page: Page): Promise<void> => {
+const registerProviderSetupDismissal = (page: Page): Promise<void> => {
   // A dialog opened over it (a palette) blocks the click; the blocked action then fails on its own instead of the
   // handler rejecting after the page has closed and crashing the process.
   return page.addLocatorHandler(providerSetupDialog(page), async dialog => {
@@ -44,7 +44,7 @@ export const registerProviderSetupDismissal = (page: Page): Promise<void> => {
  * The dialog returns on the first New thread screen of a fresh page, possibly after a key press is already on its way;
  * a step that types or presses keys checks for it first, since only locator actions trigger the registered handler.
  */
-export const dismissProviderSetupIfShown = async (page: Page): Promise<void> => {
+const dismissProviderSetupIfShown = async (page: Page): Promise<void> => {
   const providerSetup = providerSetupDialog(page)
   if (!(await providerSetup.isVisible())) return
   // While it animates in or out the button may refuse a click; the locator handler covers what remains.
@@ -55,7 +55,7 @@ export const dismissProviderSetupIfShown = async (page: Page): Promise<void> => 
  * A scratch DSH has no provider, so it opens the provider-setup dialog at startup; its dismissal button is the user's
  * own way past it. The handler keeps dismissing it if it comes back later in the same page.
  */
-export const dismissProviderSetupDuringStartup = async (page: Page, timeoutMs = 5_000): Promise<boolean> => {
+const dismissProviderSetupDuringStartup = async (page: Page, timeoutMs = 5_000): Promise<boolean> => {
   const appeared = await appears(providerSetupDialog(page), timeoutMs)
   if (appeared) {
     const providerSetup = providerSetupDialog(page)
@@ -71,7 +71,7 @@ export const dismissProviderSetupDuringStartup = async (page: Page, timeoutMs = 
  * handler dismisses it only once it blocks an action, and that dismissal also closes any menu the action had opened,
  * so the reload waits it out before the next interaction.
  */
-export const reloadPastProviderSetup = async (page: Page, timeoutMs = 5_000): Promise<void> => {
+const reloadPastProviderSetup = async (page: Page, timeoutMs = 5_000): Promise<void> => {
   await page.reload()
   if (!(await appears(providerSetupDialog(page), timeoutMs))) return
   const providerSetup = providerSetupDialog(page)

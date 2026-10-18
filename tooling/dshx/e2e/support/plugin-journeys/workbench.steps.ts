@@ -1,5 +1,5 @@
 import { expect, type Page } from '@playwright/test'
-import { reloadPastProviderSetup } from '../../../packages/dshx/src/project/startup-dialogs.js'
+import { StartupDialogs } from '../../../packages/dshx/src/project/startup-dialogs.js'
 import { Then, When } from '../bdd.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
 import { sendMessage } from '../threads.js'
@@ -43,13 +43,13 @@ When('the Workbench is opened', async ({ page }: { page: Page }) => {
 When('the Editor panel is closed and the page is reloaded', async ({ page }: { page: Page }) => {
   await page.getByRole('button', { name: 'Close Editor', exact: true }).click()
   await expect(page.getByRole('region', { name: 'Editor', exact: true })).toHaveCount(0)
-  await reloadPastProviderSetup(page)
+  await StartupDialogs.reloadPastProviderSetup(page)
   await openWorkbench(page)
 })
 
 When('the saved Workbench layout is corrupted and the page is reloaded', async ({ page }: { page: Page }) => {
   await page.evaluate(key => localStorage.setItem(key, '{"grid":"truncated'), MAIN_LAYOUT_KEY)
-  await reloadPastProviderSetup(page)
+  await StartupDialogs.reloadPastProviderSetup(page)
   await openWorkbench(page)
 })
 

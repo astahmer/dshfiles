@@ -4,7 +4,7 @@ import type { ChildProcess } from 'node:child_process'
 import { spawnOwnedProcess, stopOwnedProcess } from './owned-process.js'
 import { compositionFailures, readProfileComposition } from './profile-composition.js'
 import { isolatedHostEnvironment, redactHostOutput } from './scratch-profile.js'
-import { dismissProviderSetupIfShown } from './startup-dialogs.js'
+import { StartupDialogs } from './startup-dialogs.js'
 import type { BrowserBootEvidence, SlotRenderFailure } from './browser-boot.js'
 export { compositionFailures }
 
@@ -265,7 +265,7 @@ export const checkClientBoot = async (options: ClientBootCheckOptions): Promise<
               // A scratch home has no provider, so DSH opens its provider-setup dialog over the shell, and the Slots behind it
               // never mount: an entry that crashes while rendering there leaves no trace at all. Dismiss it, let the
               // shell render, then read the Slot traces once more without disturbing the audit read above.
-              await dismissProviderSetupIfShown(page)
+              await StartupDialogs.dismissProviderSetupIfShown(page)
               await new Promise(resolve => setTimeout(resolve, SLOT_SETTLE_MS))
               const mounted = await readClientBootOutcome(page, {
                 timeoutMs,
