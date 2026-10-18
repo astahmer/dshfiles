@@ -50,8 +50,8 @@ const linkFor = (block: Element, segment: TextSegment, match: MemoryReferenceMat
   }
 }
 
-const markMemoryReferences = (): void => {
-  for (const block of document.querySelectorAll(messageBlocksSelector)) {
+const markMemoryReferences = (blocks: Iterable<Element>): void => {
+  for (const block of blocks) {
     const segments = textSegments(block)
     const text = segments.map(segment => segment.node.textContent ?? '').join('')
     const matches = memoryReferenceMatches(text)
@@ -60,6 +60,31 @@ const markMemoryReferences = (): void => {
       if (segment !== undefined) linkFor(block, segment, match)
     }
   }
+}
+
+/**
+ * The blocks a batch of mutation records can have changed. Rescanning only these keeps streaming
+ * decoration proportional to the new tokens instead of to the loaded transcript.
+ */
+const dirtyBlocks = (records: readonly MutationRecord[]): readonly Element[] => {
+  const blocks = new Set<Element>()
+  const add = (node: Node | null): void => {
+    const element = node instanceof Element ? node : (node?.parentElement ?? null)
+    if (element === null) return
+    const own = element.closest(messageBlocksSelector)
+    if (own !== null) blocks.add(own)
+    for (const nested of element.querySelectorAll(messageBlocksSelector)) blocks.add(nested)
+  }
+  for (const record of records) {
+    if (record.type === 'characterData') {
+      add(record.target)
+      continue
+    }
+    for (const node of record.addedNodes) add(node)
+    // A replaced child list changes that block's text; a replaced transcript reports its container.
+    add(record.target)
+  }
+  return [...blocks]
 }
 
 const previewAt = (element: Element): boolean => {
@@ -92,15 +117,21 @@ const onKeyDown = (event: KeyboardEvent): void => {
 
 export const installMemoryReferenceLinks = (): (() => void) => {
   let frame = 0
-  const observer = new MutationObserver(() => {
-    if (frame !== 0) return
+  const pending = new Set<Element>()
+  const observer = new MutationObserver(records => {
+    for (const block of dirtyBlocks(records)) pending.add(block)
+    if (pending.size === 0 || frame !== 0) return
     frame = requestAnimationFrame(() => {
       frame = 0
-      markMemoryReferences()
+      const blocks = [...pending]
+      pending.clear()
+      markMemoryReferences(blocks)
     })
   })
   observer.observe(document.body, { childList: true, subtree: true, characterData: true })
-  markMemoryReferences()
+  markMemoryReferences(document.querySelectorAll(messageBlocksSelector))
+  // That first pass wrote the links already, so drop its records instead of rescanning them.
+  observer.takeRecords()
   window.addEventListener('click', onClick)
   window.addEventListener('keydown', onKeyDown)
   return () => {

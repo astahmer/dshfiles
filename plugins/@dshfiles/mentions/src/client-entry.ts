@@ -132,25 +132,44 @@ export default defineClient({
       if (sessionId !== undefined && openThread(sessionId, event.metaKey || event.ctrlKey)) event.preventDefault()
     }
     // Native renders these as inert text; marking them keeps React's own nodes and only adds link semantics.
-    const markLinks = (): void => {
-      for (const element of document.querySelectorAll(`${SESSION_LINK}:not([data-dshfiles-session-link])`)) {
-        if (element.closest('[data-composer-card]') !== null) continue
-        element.setAttribute('data-dshfiles-session-link', '')
-        element.setAttribute('role', 'link')
-        element.setAttribute('tabindex', '0')
+    const markLinks = (roots: Iterable<Element>): void => {
+      for (const root of roots) {
+        const candidates = root.matches(SESSION_LINK) ? [root] : []
+        for (const element of [...candidates, ...root.querySelectorAll(SESSION_LINK)]) {
+          if (element.closest('[data-composer-card]') !== null || element.hasAttribute('data-dshfiles-session-link')) continue
+          element.setAttribute('data-dshfiles-session-link', '')
+          element.setAttribute('role', 'link')
+          element.setAttribute('tabindex', '0')
+        }
       }
     }
     ctx.effect(() => {
       let frame = 0
-      const observer = new MutationObserver(() => {
-        if (frame === 0)
-          frame = requestAnimationFrame(() => {
-            frame = 0
-            markLinks()
-          })
+      const pending = new Set<Element>()
+      // Only a subtree that can hold a referenced-session chip is worth inspecting, so an unrelated
+      // sidebar or ticker mutation costs nothing while a streaming message still gets marked.
+      const collect = (node: Node | null): void => {
+        const element = node instanceof Element ? node : (node?.parentElement ?? null)
+        if (element === null) return
+        if (element.matches(SESSION_LINK) || element.querySelector(SESSION_LINK) !== null) pending.add(element)
+      }
+      const observer = new MutationObserver(records => {
+        for (const record of records) {
+          for (const node of record.addedNodes) collect(node)
+          collect(record.target)
+        }
+        if (pending.size === 0 || frame !== 0) return
+        frame = requestAnimationFrame(() => {
+          frame = 0
+          const roots = [...pending]
+          pending.clear()
+          markLinks(roots)
+        })
       })
       observer.observe(document.body, { childList: true, subtree: true })
-      markLinks()
+      markLinks([document.body])
+      // That first pass marked what it found, so drop its records instead of rescanning them.
+      observer.takeRecords()
       window.addEventListener('pointerdown', onPointerDown, true)
       window.addEventListener('click', onClick)
       window.addEventListener('keydown', onKeyDown)

@@ -118,8 +118,8 @@ export const installChatReferenceLinks = (options: ChatReferenceLinkOptions): ((
     const link = linkOf(event.target)
     if (link !== null && navigate(link)) event.preventDefault()
   }
-  const markLinks = (): void => {
-    for (const element of ownConversation(options.sessionId)?.querySelectorAll('code') ?? []) {
+  const markLinks = (codes: Iterable<Element>): void => {
+    for (const element of codes) {
       if (element.closest('[data-composer-card]') !== null) continue
       const marked = element.getAttribute(MARKER) === options.sessionId
       const written = element.textContent ?? ''
@@ -139,16 +139,48 @@ export const installChatReferenceLinks = (options: ChatReferenceLinkOptions): ((
       if (display !== written) element.textContent = display
     }
   }
+  /** A code element this installer owns: it belongs to the Session's own conversation. */
+  const isOwnCode = (element: Element): boolean => element.closest(CONVERSATION)?.getAttribute('data-conversation-session') === options.sessionId
+  /**
+   * The code elements a batch of mutation records can have changed. Rescanning only these keeps
+   * streaming decoration proportional to the new tokens instead of to the loaded transcript.
+   */
+  const dirtyCodes = (records: readonly MutationRecord[]): readonly Element[] => {
+    const codes = new Set<Element>()
+    const add = (node: Node | null): void => {
+      const element = node instanceof Element ? node : (node?.parentElement ?? null)
+      if (element === null) return
+      const own = element.closest('code')
+      if (own !== null && isOwnCode(own)) codes.add(own)
+      for (const nested of element.querySelectorAll('code')) if (isOwnCode(nested)) codes.add(nested)
+    }
+    for (const record of records) {
+      if (record.type === 'characterData') {
+        add(record.target)
+        continue
+      }
+      for (const node of record.addedNodes) add(node)
+      // A replaced child list changes that code's text; a replaced transcript reports its container.
+      add(record.target)
+    }
+    return [...codes]
+  }
   let frame = 0
-  const observer = new MutationObserver(() => {
-    if (frame === 0)
-      frame = requestAnimationFrame(() => {
-        frame = 0
-        markLinks()
-      })
+  const pending = new Set<Element>()
+  const observer = new MutationObserver(records => {
+    for (const element of dirtyCodes(records)) pending.add(element)
+    if (pending.size === 0 || frame !== 0) return
+    frame = requestAnimationFrame(() => {
+      frame = 0
+      const codes = [...pending]
+      pending.clear()
+      markLinks(codes)
+    })
   })
-  observer.observe(document.body, { childList: true, subtree: true })
-  markLinks()
+  observer.observe(document.body, { childList: true, subtree: true, characterData: true })
+  markLinks(ownConversation(options.sessionId)?.querySelectorAll('code') ?? [])
+  // That first pass marked what it found, so drop its records instead of rescanning them.
+  observer.takeRecords()
   window.addEventListener('click', onClick)
   window.addEventListener('keydown', onKeyDown)
   window.addEventListener('pointerover', onPointerOver)

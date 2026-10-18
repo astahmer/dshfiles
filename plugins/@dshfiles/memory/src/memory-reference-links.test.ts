@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 // @vitest-environment-options {"pretendToBeVisual":true}
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { memoryReferencePreviewEvent } from './memory-reference.ts'
 import { installMemoryReferenceLinks } from './memory-reference-links.ts'
 
@@ -41,6 +41,26 @@ describe('memory reference links', () => {
     expect(requests[0]?.anchorId).toBeGreaterThan(0)
     expect(document.querySelector(`[data-dshfiles-memory-preview-anchor="${String(requests[0]?.anchorId)}"]`)).not.toBeNull()
     window.removeEventListener(memoryReferencePreviewEvent, onRequest)
+    stop()
+  })
+
+  it('rescans only the block whose text changed', async () => {
+    const messages = Array.from({ length: 200 }, (_unused, index) => `<p>message ${String(index)}: memory: n:${String(index + 1)}</p>`).join('')
+    document.body.innerHTML = `<div data-conversation-session="s">${messages}</div>`
+    const stop = installMemoryReferenceLinks()
+    const changed = document.querySelectorAll('p')[0]
+    if (changed === undefined) throw new Error('fixture blocks are missing')
+    expect(links()).toHaveLength(200)
+
+    // Every rescan walks a block's text, so the walker roots are exactly the work this installer did.
+    const walker = vi.spyOn(document, 'createTreeWalker')
+    changed.textContent = 'only memory: n:1 remains'
+    await new Promise(resolve => setTimeout(resolve, 60))
+
+    const rescanned = new Set(walker.mock.calls.map(call => call[0]))
+    expect([...rescanned]).toEqual([changed])
+    expect(links()).toHaveLength(200)
+    walker.mockRestore()
     stop()
   })
 })

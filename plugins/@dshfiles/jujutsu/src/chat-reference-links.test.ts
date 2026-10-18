@@ -116,4 +116,23 @@ describe('chat reference links', () => {
     expect(marked()).toHaveLength(0)
     expect(document.querySelectorAll('code[role="link"]')).toHaveLength(0)
   })
+
+  it('rescans only the code that changed, not the whole conversation', async () => {
+    const onOpen = vi.fn()
+    document.body.innerHTML = sessionMarkup('<code>jj:main</code><code>jj:94526da8</code>')
+    const stop = install(onOpen)
+    const conversation = document.querySelector('[data-conversation-session="session-1"]')
+    const changed = document.querySelectorAll('code')[0]
+    if (conversation === null || changed === undefined) throw new Error('fixture conversation is missing')
+
+    const scans = vi.spyOn(conversation, 'querySelectorAll')
+    changed.textContent = 'ordinary words'
+    await settleMarks()
+
+    expect(scans).not.toHaveBeenCalled()
+    expect(changed.getAttribute('data-dshfiles-jj-reference')).toBeNull()
+    expect(marked()).toEqual(['94526da8'])
+    scans.mockRestore()
+    stop()
+  })
 })
