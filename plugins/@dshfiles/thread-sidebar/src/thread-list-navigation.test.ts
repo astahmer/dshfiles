@@ -25,14 +25,17 @@ const dispatchArrow = (target: HTMLElement, key: string, repeat = false): Keyboa
   return event
 }
 
-const installNavigation = (list: HTMLElement) => {
+const installNavigation = (list: HTMLElement, onOpen: (sessionId: string) => void = () => undefined) => {
   const opened: string[] = []
   const warmed: string[][] = []
   list.addEventListener('keydown', event =>
     ThreadListNavigationModel.navigate({
       event,
       list,
-      open: sessionId => opened.push(sessionId),
+      open: sessionId => {
+        opened.push(sessionId)
+        onOpen(sessionId)
+      },
       onLookahead: sessionIds => warmed.push([...sessionIds]),
     }),
   )
@@ -109,6 +112,39 @@ describe('thread list keyboard navigation', () => {
     const unfocusedRowEvent = dispatchArrow(next.button, 'ArrowDown')
     expect(unfocusedRowEvent.defaultPrevented).toBe(false)
     expect(callbacks.opened).toEqual(['next'])
+  })
+
+  it('restores row focus after opening moves focus elsewhere', () => {
+    const list = document.createElement('div')
+    const current = threadRow('current')
+    const next = threadRow('next')
+    const outsideControl = document.createElement('button')
+    list.append(current.article, next.article)
+    document.body.append(list, outsideControl)
+    const frames: FrameRequestCallback[] = []
+    const previousRequestAnimationFrame = Object.getOwnPropertyDescriptor(window, 'requestAnimationFrame')
+    Object.defineProperty(window, 'requestAnimationFrame', {
+      configurable: true,
+      value: (callback: FrameRequestCallback) => {
+        frames.push(callback)
+        return frames.length
+      },
+    })
+
+    try {
+      const callbacks = installNavigation(list, () => outsideControl.focus())
+      current.button.focus()
+      dispatchArrow(current.button, 'ArrowDown')
+      expect(callbacks.opened).toEqual(['next'])
+      expect(document.activeElement).toBe(outsideControl)
+      const restoreFocus = frames.shift()
+      if (restoreFocus === undefined) throw new Error('Expected a focus-restoration frame')
+      restoreFocus(0)
+      expect(document.activeElement).toBe(next.button)
+    } finally {
+      if (previousRequestAnimationFrame === undefined) Reflect.deleteProperty(window, 'requestAnimationFrame')
+      if (previousRequestAnimationFrame !== undefined) Object.defineProperty(window, 'requestAnimationFrame', previousRequestAnimationFrame)
+    }
   })
 
   it('accepts every repeated ArrowDown and ArrowUp target without wrapping', () => {

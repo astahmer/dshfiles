@@ -94,6 +94,11 @@ export class ThreadListNavigationModel {
     nextRow.button.focus()
     input.open(nextRow.id)
     input.onLookahead(ThreadListNavigationModel.lookahead({ rows, index: nextIndex, direction }))
+    const view = input.list.ownerDocument.defaultView
+    view?.requestAnimationFrame?.(() => {
+      const row = ThreadListNavigationModel.visibleRows(input.list).find(candidate => candidate.id === nextRow.id)
+      row?.button.focus()
+    })
   }
 
   static retainLookahead<SessionId extends string>(input: RetainThreadHistoryLookaheadInput<SessionId>): () => void {
