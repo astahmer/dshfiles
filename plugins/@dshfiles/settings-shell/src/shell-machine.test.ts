@@ -74,4 +74,16 @@ describe('settings shell machine', () => {
     expect(actor.getSnapshot().context.sectionId).toBe('plugins')
     expect(calls).toEqual(['show'])
   })
+
+  it('drills into a side-panel section and goes back to the section list', () => {
+    const { actor, calls } = start()
+    actor.send({ type: 'select', sectionId: 'models' })
+    actor.send({ type: 'search', query: 'tab' })
+    expect(actor.getSnapshot().value).toBe('closed')
+    expect(actor.getSnapshot().context).toMatchObject({ sectionId: 'models', query: 'tab' })
+    actor.send({ type: 'back' })
+    expect(actor.getSnapshot().value).toBe('closed')
+    expect(actor.getSnapshot().context).toMatchObject({ sectionId: undefined, query: '' })
+    expect(calls).toEqual([])
+  })
 })

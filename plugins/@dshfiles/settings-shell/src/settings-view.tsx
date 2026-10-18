@@ -11,7 +11,17 @@ import {
   useModalLayer,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@dshfiles/plugin-ui/components/ui/input-group'
-import { AppWindowIcon, ChevronDownIcon, ChevronRightIcon, Maximize2Icon, Minimize2Icon, PuzzleIcon, SearchIcon, XIcon } from '@dshfiles/plugin-ui/icons'
+import {
+  AppWindowIcon,
+  ChevronDownIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  Maximize2Icon,
+  Minimize2Icon,
+  PuzzleIcon,
+  SearchIcon,
+  XIcon,
+} from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useId, useRef, useState, type ReactNode, type SyntheticEvent } from 'react'
 import { createPortal } from 'react-dom'
@@ -28,8 +38,8 @@ export interface SectionRow {
   readonly label: string
 }
 
-/** How the view is framed: the centered dialog, that dialog filling the window, or the main view. */
-type ViewVariant = 'modal' | 'expanded' | 'tab'
+/** How the view is framed: the centered dialog, that dialog filling the window, the main view, or the side panel. */
+type ViewVariant = 'modal' | 'expanded' | 'tab' | 'sidebar'
 
 /** Nav glyph by section id, as the native shell draws it; unknown ids fall back to the settings gear. */
 const navIcon = (id: string): JSX.Element => {
@@ -50,7 +60,7 @@ const navCellActive = 'dshx:bg-[var(--dsw-specific-sidebar-nav-item-active)]'
 const navGroup =
   'dshx:mt-3 dshx:flex dshx:items-center dshx:gap-1 dshx:px-3 dshx:pb-1 dshx:text-[12px] dshx:font-medium dshx:text-[var(--dsw-alias-label-secondary)]'
 
-interface SettingsViewProps {
+export interface SettingsViewProps {
   readonly variant: ViewVariant
   readonly rows: readonly SectionRow[]
   /** Pages the shell draws itself from each plugin's settings schema. */
@@ -65,6 +75,8 @@ interface SettingsViewProps {
   readonly t: ShellTranslate
   readonly onSelect: (sectionId: string) => void
   readonly onSearch: (query: string) => void
+  /** Leaves the drilled-in side-panel section for the section list; a no-op elsewhere. */
+  readonly onBack: () => void
   /** Absent in a tab the strip closes. */
   readonly onClose: (() => void) | undefined
   readonly onExpand: () => void
@@ -150,10 +162,13 @@ const SearchResults = (props: SettingsViewProps & { readonly result: SettingsSea
 /** Search field, navigation tree and the active section, or the search results; the frame decides dialog or tab. */
 const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): JSX.Element => {
   const { t } = props
+  const sidebar = props.variant === 'sidebar'
   const searching = props.query.trim() !== ''
   const result = searchSettings({ query: props.query, sections: props.rows, pages: props.pluginPages })
   const activePage = props.pluginPages.find(page => page.pageId === props.activeId)
   const active = activePage?.pageId ?? props.rows.find(row => row.id === props.activeId)?.id ?? props.rows[0]?.id
+  // A narrow side panel shows one column: the section list until the user picks one, that section afterwards.
+  const drilled = sidebar && (searching || props.activeId !== undefined)
   const plugins = props.pluginPages.filter(page => page.group === 'plugins')
   const more = props.pluginPages.filter(page => page.group === 'more' && (!searching || (result.counts.get(page.pageId) ?? 0) > 0))
   const [moreOpen, setMoreOpen] = useState(activePage?.group === 'more')
@@ -166,11 +181,20 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
     else props.onSelect(id)
   }
   const foundText = result.total === 1 ? t('search.foundOne') : t('search.found', { count: result.total })
+  const activeLabel = activePage?.title ?? props.rows.find(row => row.id === props.activeId)?.label ?? ''
   return (
-    <div className="dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:flex-col">
-      <div className="dshx:box-border dshx:flex dshx:h-[58px] dshx:flex-none dshx:items-center dshx:gap-3 dshx:border-b-[0.5px] dshx:border-[var(--dsw-alias-border-l2)] dshx:px-4">
+    <div className={cn('dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:flex-col', sidebar && 'dshx:@container')}>
+      <div
+        className={cn(
+          'dshx:box-border dshx:flex dshx:h-[58px] dshx:flex-none dshx:items-center dshx:gap-3 dshx:border-b-[0.5px] dshx:border-[var(--dsw-alias-border-l2)] dshx:px-4',
+          sidebar && 'dshx:h-11 dshx:gap-2 dshx:px-3',
+        )}
+      >
         <div
-          className="dshx:w-[176px] dshx:shrink-0 dshx:px-2 dshx:text-[16px] dshx:leading-6 dshx:font-medium dshx:text-[var(--dsw-alias-label-primary)]"
+          className={cn(
+            'dshx:w-[176px] dshx:shrink-0 dshx:px-2 dshx:text-[16px] dshx:leading-6 dshx:font-medium dshx:text-[var(--dsw-alias-label-primary)]',
+            sidebar && 'dshx:hidden dshx:@pane-compact:block',
+          )}
           id={props.titleId}
         >
           {props.renderSlot('settings.header', {})}
@@ -209,13 +233,17 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
           )}
         </InputGroup>
         {searching && (
-          <span aria-live="polite" className="dshx:shrink-0 dshx:text-[12px] dshx:text-muted-foreground" role="status">
+          <span
+            aria-live="polite"
+            className={cn('dshx:shrink-0 dshx:text-[12px] dshx:text-muted-foreground', sidebar && 'dshx:@max-pane-narrow:hidden')}
+            role="status"
+          >
             {foundText}
           </span>
         )}
         <div className="dshx:ml-auto dshx:flex dshx:min-w-0 dshx:items-center dshx:justify-end dshx:gap-1.5">
           {props.renderSlot('settings.action', {})}
-          {props.variant !== 'tab' && (
+          {props.variant !== 'tab' && props.variant !== 'sidebar' && (
             <Tooltip label={t('view.openInTab')}>
               <button aria-label={t('view.openInTab')} className={headerButton} onClick={props.onMoveToTab} type="button">
                 <AppWindowIcon />
@@ -247,7 +275,11 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
       <div className="dshx:flex dshx:min-h-0 dshx:flex-1">
         <nav
           aria-label={t('title')}
-          className="dshx:box-border dshx:flex dshx:min-h-0 dshx:w-[208px] dshx:flex-none dshx:flex-col dshx:gap-1 dshx:overflow-y-auto dshx:px-3 dshx:pt-3 dshx:pb-4"
+          className={cn(
+            'dshx:box-border dshx:flex dshx:min-h-0 dshx:w-[208px] dshx:flex-none dshx:flex-col dshx:gap-1 dshx:overflow-y-auto dshx:px-3 dshx:pt-3 dshx:pb-4',
+            sidebar && 'dshx:w-full dshx:@pane-compact:w-[208px]',
+            drilled && 'dshx:hidden dshx:@pane-compact:flex',
+          )}
         >
           {props.rows.map(row => (
             <NavCell
@@ -307,7 +339,24 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
             </div>
           )}
         </nav>
-        <div className="dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:overflow-y-auto dshx:px-6 dshx:pt-5 dshx:pb-6" ref={content}>
+        <div
+          className={cn(
+            'dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:overflow-y-auto dshx:px-6 dshx:pt-5 dshx:pb-6',
+            sidebar && 'dshx:px-3 dshx:pt-3 dshx:@pane-compact:px-6 dshx:@pane-compact:pt-5',
+            sidebar && !drilled && 'dshx:hidden dshx:@pane-compact:block',
+          )}
+          ref={content}
+        >
+          {drilled && (
+            <div className="dshx:mb-2 dshx:flex dshx:items-center dshx:gap-1.5 dshx:@pane-compact:hidden">
+              <button aria-label={t('sidebar.back')} className={headerButton} onClick={props.onBack} type="button">
+                <ChevronLeftIcon />
+              </button>
+              <span className="dshx:min-w-0 dshx:truncate dshx:text-[13px] dshx:font-medium dshx:text-[var(--dsw-alias-label-primary)]">
+                {searching ? t('search.placeholder') : activeLabel}
+              </span>
+            </div>
+          )}
           <div className="dshx:max-w-[880px]">
             {searching && <SearchResults {...props} result={result} />}
             {!searching && activePage !== undefined && props.renderPluginPage(activePage)}
@@ -375,6 +424,27 @@ export const SettingsTab = (props: SettingsViewProps & { readonly host: HTMLElem
       onPointerDown={stopPropagation}
     >
       <SettingsView {...props} titleId={titleId} />
+    </section>,
+    props.host,
+  )
+}
+
+/**
+ * The side-panel frame: Settings fills the right sidebar's tab. The panel follows its own width, so a narrow one shows
+ * the section list (then one section, with back) and a wide one keeps the dialog's two columns.
+ */
+export const SettingsSidePanel = (props: SettingsViewProps & { readonly host: HTMLElement }): ReactNode => {
+  const titleId = useId()
+  return createPortal(
+    <section
+      aria-label={props.t('title')}
+      className="dshx-root dshx:flex dshx:h-full dshx:min-h-0 dshx:w-full dshx:flex-col dshx:bg-[var(--dsw-alias-bg-layer-1)]"
+      data-settings-view="sidebar"
+      onClick={stopPropagation}
+      onKeyDown={stopPropagation}
+      onPointerDown={stopPropagation}
+    >
+      <SettingsView {...props} titleId={titleId} variant="sidebar" />
     </section>,
     props.host,
   )

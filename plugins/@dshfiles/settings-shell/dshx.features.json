@@ -46,8 +46,8 @@
         {
           "key": "openIn",
           "defaultValue": "auto",
-          "constraints": "Where Settings opens: auto (a tab when main-tabs is loaded), tab, or modal.",
-          "choices": ["auto", "tab", "modal"],
+          "constraints": "Where Settings opens: auto (a tab when main-tabs is loaded), tab, modal, or sidebar.",
+          "choices": ["auto", "tab", "modal", "sidebar"],
           "coveredBy": ["settings-shell.tab", "settings-shell.preference-unit"]
         }
       ],
@@ -71,6 +71,44 @@
           "id": "settings-shell.preference-unit",
           "file": "plugins/@dshfiles/settings-shell/src/settings-preference.test.ts",
           "testName": "opens a tab when main-tabs is loaded, the dialog otherwise, unless the user chose"
+        }
+      ]
+    },
+    {
+      "id": "settings-side-panel",
+      "title": "Settings in the side panel",
+      "summary": "The thread's right side panel offers Settings beside the other panel cards: picking that card opens a Settings tab in the panel, which lists every section and plugin page and drills into one on a narrow panel (a wide one keeps the dialog's two columns). The gear, the palette and Mod+, can also send Settings there.",
+      "reach": [
+        "click button \"Open right sidebar\"",
+        "click text \"Edit Settings in this panel.\"",
+        "click button \"General\"",
+        "expect button \"Back to all settings\""
+      ],
+      "surfaces": ["client", "settings"],
+      "configuration": [],
+      "states": ["panel-collapsed", "list", "section", "searching", "narrow", "wide"],
+      "failureModes": [
+        "Without a thread on screen there is no side panel to open Settings in, so the guide card and the palette action do nothing.",
+        "The guide hides entry descriptions once it lists many entries; the catalog reach and its journey find the card by that description, so a crowded guide changes that path."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "settings-shell.side-panel",
+          "featureFile": "tooling/dshx/e2e/features/settings-shell.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "settings-shell.preference-unit-sidebar",
+          "file": "plugins/@dshfiles/settings-shell/src/settings-preference.test.ts",
+          "testName": "opens the side panel wherever the user chose it, whatever the main view offers"
+        },
+        {
+          "kind": "unit-test",
+          "id": "settings-shell.machine-unit-back",
+          "file": "plugins/@dshfiles/settings-shell/src/shell-machine.test.ts",
+          "testName": "drills into a side-panel section and goes back to the section list"
         }
       ]
     },

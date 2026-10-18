@@ -84,3 +84,15 @@ Feature: Settings shell
     Then the Editor file-link preference is found switched on
     When the Editor file-link preference is switched off in the General section
     Then Settings search shows the Editor file-link preference switched off
+
+  @scenario:settings-shell.side-panel
+  Scenario: Settings opens as a tab in the thread's side panel
+    The right side panel lists Settings beside the other panel cards; picking it
+    opens a Settings tab in that panel, which lists every section and drills into
+    one when the panel is narrow.
+
+    Given the isolated plugin profile "@dshfiles/settings-shell" is booted
+    When the side panel opens Settings
+    Then the side panel shows a Settings tab with its sections
+    When a section is picked in the side panel
+    Then the section fills the panel and Back returns to the section list

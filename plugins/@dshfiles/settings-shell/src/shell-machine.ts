@@ -1,6 +1,9 @@
 import { assign, setup } from '@dshfiles/plugin-ui/machine'
 
-/** Where Settings shows: a dialog over the current view, that dialog filling the window, or the main view (a tab). */
+/**
+ * Where Settings shows: a dialog over the current view, that dialog filling the window, or the main view (a tab).
+ * The side panel is not a surface here: its own tab owns that placement, and shares this machine's section and query.
+ */
 export type ShellSurface = 'modal' | 'tab'
 
 interface ShellPorts {
@@ -20,7 +23,9 @@ type ShellEvent =
   | { readonly type: 'open'; readonly surface: ShellSurface; readonly sectionId?: string; readonly field?: FieldTarget; readonly query?: string }
   | { readonly type: 'search'; readonly query: string }
   | { readonly type: 'close' }
+  | { readonly type: 'back' }
   | { readonly type: 'select'; readonly sectionId: string }
+  | { readonly type: 'focus'; readonly field: FieldTarget }
   | { readonly type: 'expand' }
   | { readonly type: 'restore' }
   | { readonly type: 'moveToTab' }
@@ -35,6 +40,11 @@ interface ShellContext {
   /** The search field's text; non-empty replaces the section with matching settings. */
   readonly query: string
 }
+
+const focusRequested = assign<ShellContext, ShellEvent, undefined, ShellEvent, never>(({ event }) => {
+  if (event.type !== 'focus') return {}
+  return { sectionId: event.field.sectionId, field: event.field, query: '' }
+})
 
 const selectRequested = assign<ShellContext, ShellEvent, undefined, ShellEvent, never>(({ context, event }) => {
   if (event.type !== 'open') return {}
@@ -55,6 +65,7 @@ export const shellMachine = setup({
     showPanel: ({ context }) => context.ports.showPanel(),
     leavePanel: ({ context }) => context.ports.leavePanel(),
     selectRequested,
+    focusRequested,
     forgetSection: assign({ sectionId: undefined, field: undefined, query: '' }),
     search: assign({ query: ({ event }) => (event.type === 'search' ? event.query : '') }),
   },
@@ -67,6 +78,10 @@ export const shellMachine = setup({
   initial: 'closed',
   on: {
     select: { actions: assign({ sectionId: ({ event }) => event.sectionId, field: undefined, query: '' }) },
+    // The side panel keeps Settings outside this machine's surfaces: it still shares the section and the query.
+    back: { actions: 'forgetSection' },
+    focus: { actions: 'focusRequested' },
+    search: { actions: 'search' },
   },
   states: {
     closed: {

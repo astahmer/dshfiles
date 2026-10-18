@@ -14,6 +14,7 @@ import { resolveSlotLabel, type PropsRenderSlots } from '@deepseek-ai/dsh-client
 import { createApiClient, defineClient, provideSettingsPageRenderer, useApiQuery, type SettingsPageRendererProps } from '@dshfiles/dshx/client'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import { PaletteApi } from '@dshfiles/command-palette/api'
+import { SettingsIcon } from '@dshfiles/plugin-ui/icons'
 import { createActor } from '@dshfiles/plugin-ui/machine'
 import { useEffect, useState } from 'react'
 import { z } from 'zod'
@@ -35,9 +36,9 @@ import { PluginSettingsPageView } from './plugin-settings-page.js'
 import type { SettingField } from './schema-form/schema-model.js'
 import { SettingsForm } from './schema-form/settings-form.js'
 import { SettingsPluginPages, type NamespaceLabel, type PluginSettingsPage } from './plugin-settings.js'
-import { preferredSurface } from './settings-preference.js'
-import { SettingsDialog, SettingsTab, type SectionRow } from './settings-view.js'
-import { shellMachine, type FieldTarget, type ShellSurface } from './shell-machine.js'
+import { preferredSurface, type SettingsSurface } from './settings-preference.js'
+import { SettingsDialog, SettingsSidePanel, SettingsTab, type SectionRow, type SettingsViewProps } from './settings-view.js'
+import { shellMachine, type FieldTarget } from './shell-machine.js'
 import { PORTED_FROM } from './upstream.js'
 
 /** The main panel Settings fills when it opens as a tab; main-tabs names the tab "Settings" from this id. */
@@ -48,7 +49,15 @@ const MAIN_TABS_OVERLAY_ID = 'dshfiles-main-tabs'
 const EDITOR_PANE_ID = '@dshfiles/editor/files'
 const OPEN_FILE_EVENT = 'dshfiles:open-file'
 const OPEN_SETTINGS_COMMAND = 'settings.open'
+/** The right-sidebar tab type Settings opens as; the panel's guide offers it beside the other panel cards. */
+const SETTINGS_SIDEBAR_TAB_ID = '@dshfiles/settings-shell/side-panel'
+const SETTINGS_SIDEBAR_KIND = 'dshfiles-settings-panel'
 
+/** A frame's portal target: the element the panel or the side panel currently renders, or null while unmounted. */
+interface HostSlot {
+  readonly observable: ObservableSnapshot<HTMLElement | null>
+  readonly set: (element: HTMLElement | null) => void
+}
 const isShortcutCommandId = (value: string): value is ShortcutCommandId => /^[a-z][a-zA-Z0-9-]*(?:\.[a-zA-Z][a-zA-Z0-9-]*)+$/u.test(value)
 
 const shortcutCommandId = (value: string): ShortcutCommandId => {
@@ -98,7 +107,20 @@ const CurrentVersion = (props: { readonly t: ShellTranslate }): JSX.Element => {
 export default defineClient({
   name: '@dshfiles/settings-shell',
   locales: [shellLocale, welcomeLocale],
-  inject: ['slots', 'connection', 'remote', 'remote.settings', 'remote.session', 'configForms', 'shortcuts', 'sessions', 'layout', 'modules'],
+  inject: [
+    'slots',
+    'connection',
+    'remote',
+    'remote.settings',
+    'remote.session',
+    'configForms',
+    'shortcuts',
+    'sessions',
+    'layout',
+    'modules',
+    'sidebarRight',
+    'sidebarRightTabs',
+  ],
   setup(ctx, decorate, metadata) {
     const t = ctx.locale.bind(SHELL_LOCALE_NAMESPACE)
     const connection = clientConnectionSchema.parse(ctx.get('connection'))
@@ -157,13 +179,31 @@ export default defineClient({
       },
     }
     const formFor = (ns: string): ConfigForm<unknown> => (ns === SETTINGS_NAMESPACE ? ownForm : ctx.configForms.get<unknown>(ns))
-    const surface = (): ShellSurface =>
+    const surface = (): SettingsSurface =>
       preferredSurface({
         settings: requestedOpenIn === undefined ? preferences.getSnapshot().value : { openIn: requestedOpenIn },
         tabsLoaded: ctx.slots.entriesOfSlot('shell.overlay').some(entry => entry.options.id === MAIN_TABS_OVERLAY_ID),
       })
-    const openSettings = (sectionId?: string): void =>
-      actor.send(sectionId === undefined ? { type: 'open', surface: surface() } : { type: 'open', surface: surface(), sectionId })
+    /** The right-sidebar tab showing Settings, when the panel's active tab is ours. */
+    const sidebarSettingsTab = (): ReturnType<typeof ctx.sidebarRight.active> => {
+      const tab = ctx.sidebarRight.active()
+      return tab?.kind === SETTINGS_SIDEBAR_KIND ? tab : undefined
+    }
+    /** Open (or focus) Settings in the side panel; a dialog left over from the other surface would float above it. */
+    const openSidePanelSettings = (sectionId?: string, field?: FieldTarget): void => {
+      if (field !== undefined) actor.send({ type: 'focus', field })
+      else if (sectionId !== undefined) actor.send({ type: 'select', sectionId })
+      if (actor.getSnapshot().matches('modal')) actor.send({ type: 'close' })
+      ctx.sidebarRight.openTab(SETTINGS_SIDEBAR_KIND)
+    }
+    const openSettings = (sectionId?: string): void => {
+      const next = surface()
+      if (next === 'sidebar') {
+        openSidePanelSettings(sectionId)
+        return
+      }
+      actor.send(sectionId === undefined ? { type: 'open', surface: next } : { type: 'open', surface: next, sectionId })
+    }
 
     // Bundle manifests title each namespace ("Thread Sidebar" for `thread-sidebar`); read once Settings first opens.
     const labels = createSnapshotStore<ReadonlyMap<string, NamespaceLabel>>(new Map())
@@ -233,28 +273,40 @@ export default defineClient({
     )
 
     /** Opens the page that edits one settings field; false when no served namespace has it. */
-    const openSettingsTarget = (target: { readonly entryId: string; readonly fieldPath: readonly string[] }, requested?: ShellSurface): boolean => {
+    const openSettingsTarget = (target: { readonly entryId: string; readonly fieldPath: readonly string[] }, requested?: SettingsSurface): boolean => {
       void describe.ensure()
       const page = pluginPages.getSnapshot().find(candidate => candidate.ns === target.entryId)
       if (page === undefined) return false
       const field: FieldTarget = { sectionId: SettingsPluginPages.pluginPageId(page.ns), fieldPath: target.fieldPath }
-      actor.send({ type: 'open', surface: requested ?? surface(), field })
+      const next = requested ?? surface()
+      if (next === 'sidebar') {
+        openSidePanelSettings(undefined, field)
+        return true
+      }
+      actor.send({ type: 'open', surface: next, field })
       return true
     }
 
-    let panelHost: HTMLElement | null = null
-    const hostListeners = new Set<() => void>()
-    const mainPanelHost: ObservableSnapshot<HTMLElement | null> = {
-      getSnapshot: () => panelHost,
-      subscribe: listener => {
-        hostListeners.add(listener)
-        return () => hostListeners.delete(listener)
-      },
+    /** One element a Settings frame portals into (the main panel, the side panel's tab): null while it is unmounted. */
+    const hostSlot = (): HostSlot => {
+      let element: HTMLElement | null = null
+      const listeners = new Set<() => void>()
+      return {
+        observable: {
+          getSnapshot: () => element,
+          subscribe: (listener: () => void) => {
+            listeners.add(listener)
+            return () => listeners.delete(listener)
+          },
+        },
+        set: (next: HTMLElement | null) => {
+          element = next
+          listeners.forEach(listener => listener())
+        },
+      }
     }
-    const setPanelHost = (element: HTMLElement | null): void => {
-      panelHost = element
-      hostListeners.forEach(listener => listener())
-    }
+    const mainPanelHostSlot = hostSlot()
+    const sidePanelHostSlot = hostSlot()
 
     const desktopUpdate = new DesktopUpdateSource(desktopUpdateBridge())
     ctx.effect(() => () => desktopUpdate.dispose(), 'settings-shell: desktop update carrier')
@@ -324,11 +376,50 @@ export default defineClient({
       openSection: sectionId => openSettings(sectionId),
     }
 
+    /** Everything a Settings frame shows, minus the frame and its close button: every surface shares one copy. */
+    const settingsViewProps = (input: {
+      readonly renderSlot: ShellRenderSlot
+      readonly t: ShellTranslate
+      readonly rows: readonly SectionRow[]
+      readonly activeId: string | undefined
+      readonly pluginPages: readonly PluginSettingsPage[]
+      readonly field: FieldTarget | undefined
+      readonly query: string
+    }): Omit<SettingsViewProps, 'variant' | 'onClose'> => ({
+      rows: input.rows,
+      activeId: input.activeId,
+      renderSlot: input.renderSlot,
+      pluginPages: input.pluginPages,
+      renderPluginPage: (page: PluginSettingsPage) => (
+        <PluginSettingsPageView
+          form={formFor(page.ns)}
+          key={page.ns}
+          page={page}
+          t={input.t}
+          {...(input.field?.sectionId === page.pageId ? { focusPath: input.field.fieldPath } : {})}
+        />
+      ),
+      renderMatches: (page: PluginSettingsPage, fields: readonly SettingField[], highlight: string) => (
+        <SettingsForm fields={fields} form={formFor(page.ns)} highlight={highlight} key={page.ns} t={input.t} />
+      ),
+      sectionOwner,
+      t: input.t,
+      onSelect: (sectionId: string) => actor.send({ type: 'select', sectionId }),
+      onSearch: (next: string) => actor.send({ type: 'search', query: next }),
+      // Only the side panel drills in and out of sections; the other frames leave `onBack` unused.
+      onBack: () => actor.send({ type: 'back' }),
+      onExpand: () => actor.send({ type: 'expand' }),
+      onRestore: () => actor.send({ type: 'restore' }),
+      onMoveToTab: () => actor.send({ type: 'moveToTab' }),
+      query: input.query,
+    })
+
     const Surface = (props: { readonly renderSlot: ShellRenderSlot; readonly t: ShellTranslate }): JSX.Element | null => {
       const rows = useObservable(sections)
       const activeId = useObservable(activeSection)
       const variant = useObservable(surfaceState)
-      const host = useObservable(mainPanelHost)
+      const host = useObservable(mainPanelHostSlot.observable)
+      const sidePanelHost = useObservable(sidePanelHostSlot.observable)
       const pages = useObservable(pluginPages)
       const field = useObservable(fieldTarget)
       const query = useObservable(searchQuery)
@@ -336,37 +427,25 @@ export default defineClient({
         void describe.ensure()
       }, [])
       const tabsLoaded = useObservable(mainTabsLoaded)
-      if (variant === 'closed') return null
-      const view = {
-        rows,
-        activeId,
-        renderSlot: props.renderSlot,
-        pluginPages: pages,
-        renderPluginPage: (page: PluginSettingsPage) => (
-          <PluginSettingsPageView
-            form={formFor(page.ns)}
-            key={page.ns}
-            page={page}
-            t={props.t}
-            {...(field?.sectionId === page.pageId ? { focusPath: field.fieldPath } : {})}
-          />
-        ),
-        sectionOwner,
-        t: props.t,
-        onSelect: (sectionId: string) => actor.send({ type: 'select', sectionId }),
-        query,
-        onSearch: (next: string) => actor.send({ type: 'search', query: next }),
-        renderMatches: (page: PluginSettingsPage, fields: readonly SettingField[], highlight: string) => (
-          <SettingsForm fields={fields} form={formFor(page.ns)} highlight={highlight} key={page.ns} t={props.t} />
-        ),
-        onExpand: () => actor.send({ type: 'expand' }),
-        onRestore: () => actor.send({ type: 'restore' }),
-        onMoveToTab: () => actor.send({ type: 'moveToTab' }),
-      }
-      if (variant !== 'tab') return <SettingsDialog {...view} onClose={deps.closeSettings} variant={variant} />
-      if (host === null) return null
+      const view = settingsViewProps({ renderSlot: props.renderSlot, t: props.t, rows, activeId, pluginPages: pages, field, query })
+      // The side panel owns its frame: it renders whenever its tab is mounted, whatever the dialog or main view shows.
+      const sidePanel = sidePanelHost === null ? null : <SettingsSidePanel {...view} host={sidePanelHost} onClose={undefined} variant="sidebar" />
+      if (variant === 'closed') return sidePanel
+      if (variant !== 'tab')
+        return (
+          <>
+            {sidePanel}
+            <SettingsDialog {...view} onClose={deps.closeSettings} variant={variant} />
+          </>
+        )
+      if (host === null) return sidePanel
       // With main-tabs the strip closes the tab; without it the header keeps a way back to the previous view.
-      return <SettingsTab {...view} host={host} onClose={tabsLoaded ? undefined : deps.closeSettings} variant="tab" />
+      return (
+        <>
+          {sidePanel}
+          <SettingsTab {...view} host={host} onClose={tabsLoaded ? undefined : deps.closeSettings} variant="tab" />
+        </>
+      )
     }
 
     ctx.slots.inject('sidebar.settings', () => {
@@ -388,7 +467,9 @@ export default defineClient({
           return {
             status: 'handled',
             run: () => {
+              const sidebarTab = sidebarSettingsTab()
               if (modal === 'settings') closeTopModal(document)
+              else if (sidebarTab !== undefined) ctx.sidebarRight.close(sidebarTab.id)
               else if (actor.getSnapshot().matches('tab')) deps.closeSettings()
               else deps.openSettings()
             },
@@ -430,6 +511,11 @@ export default defineClient({
     const openRequest = (request: OpenSettingsRequest): void => {
       const requested = request.surface ?? surface()
       if (request.setting !== undefined && openSettingsTarget(request.setting, requested)) return
+      if (requested === 'sidebar') {
+        openSidePanelSettings(request.section)
+        if (request.query !== undefined) actor.send({ type: 'search', query: request.query })
+        return
+      }
       actor.send(request.section === undefined ? { type: 'open', surface: requested } : { type: 'open', surface: requested, sectionId: request.section })
       if (request.query !== undefined) actor.send({ type: 'search', query: request.query })
     }
@@ -437,12 +523,43 @@ export default defineClient({
     const PanelHost = (): JSX.Element => {
       const [element, setElement] = useState<HTMLDivElement | null>(null)
       useEffect(() => {
-        setPanelHost(element)
-        return () => setPanelHost(null)
+        mainPanelHostSlot.set(element)
+        return () => mainPanelHostSlot.set(null)
       }, [element])
       return <div className="dshx:h-full dshx:min-h-0 dshx:w-full" data-settings-panel-host="" ref={setElement} />
     }
     ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: SETTINGS_PANEL_ID }, PanelHost))
+
+    // Settings also lives in the side panel: its own guide card, beside Files, Jujutsu and the other panel cards.
+    ctx.effect(
+      () =>
+        ctx.sidebarRightTabs.register({
+          id: SETTINGS_SIDEBAR_TAB_ID,
+          kind: SETTINGS_SIDEBAR_KIND,
+          title: () => t('title'),
+          guide: [
+            {
+              id: 'settings',
+              order: 90,
+              title: () => t('title'),
+              description: () => t('sidebar.guide'),
+              commandId: openSettingsCommand,
+              icon: (props: { readonly size?: number | undefined }) => <SettingsIcon aria-hidden size={props.size ?? 18} />,
+            },
+          ],
+        }),
+      'settings-shell: side panel tab type',
+    )
+    /** The side panel tab's body is a host: the shell entry, which owns the section slots, portals its page into it. */
+    const SidePanelHost = (): JSX.Element => {
+      const [element, setElement] = useState<HTMLDivElement | null>(null)
+      useEffect(() => {
+        sidePanelHostSlot.set(element)
+        return () => sidePanelHostSlot.set(null)
+      }, [element])
+      return <div className="dshx:h-full dshx:min-h-0 dshx:w-full" data-settings-side-panel-host="" ref={setElement} />
+    }
+    ctx.slots.inject('sidebar.right.pane.tab', () => ctx.slots.register({ name: 'sidebar.right.pane.tab', key: SETTINGS_SIDEBAR_TAB_ID }, SidePanelHost))
 
     ctx.effect(() => {
       const onOpenSettings = (event: Event): void => {
@@ -467,6 +584,13 @@ export default defineClient({
             aliases: ['settings', 'preferences', 'options'],
             group: 'command',
             run: () => openSettings(),
+          }),
+          PaletteApi.registerAction({
+            id: '@dshfiles/settings-shell/open-side-panel',
+            label: () => t('palette.sidePanel'),
+            aliases: ['settings', 'preferences', 'side panel'],
+            group: 'command',
+            run: () => openSidePanelSettings(),
           }),
           ...[...sections.getSnapshot(), ...pluginPages.getSnapshot().map(page => ({ id: page.pageId, label: page.title }))].map(row =>
             PaletteApi.registerAction({

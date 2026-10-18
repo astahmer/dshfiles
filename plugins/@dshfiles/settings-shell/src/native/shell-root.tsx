@@ -56,7 +56,7 @@ export const ShellRoot = (props: {
   readonly t: ShellTranslate
   readonly renderSlot: ShellRenderSlot
   readonly deps: ShellRootDeps
-  /** The settings surface (modal or tab) rendered while Settings is open. */
+  /** The settings surface: the dialog or main-view tab while Settings is open, and the side panel's page whenever its tab is. */
   readonly surface: ReactNode
 }): JSX.Element => {
   const { deps, t, renderSlot, wide } = props
@@ -179,7 +179,8 @@ export const ShellRoot = (props: {
         />
         <DesktopUpdateIndicator hidden={connectionIndicator !== undefined && !installing} source={deps.desktopUpdate} t={t} wide={wide} />
       </div>
-      {open && props.surface}
+      {/* The surface decides what shows: the side panel keeps its page mounted while the dialog is closed. */}
+      {props.surface}
       {onboardingStep !== undefined &&
         renderSlot(
           'settings.onboarding',

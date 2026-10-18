@@ -9,6 +9,11 @@ describe('preferredSurface', () => {
     expect(preferredSurface({ settings: { openIn: 'tab' }, tabsLoaded: false })).toBe('tab')
   })
 
+  it('opens the side panel wherever the user chose it, whatever the main view offers', () => {
+    expect(preferredSurface({ settings: { openIn: 'sidebar' }, tabsLoaded: true })).toBe('sidebar')
+    expect(preferredSurface({ settings: { openIn: 'sidebar' }, tabsLoaded: false })).toBe('sidebar')
+  })
+
   it('treats an unserved or malformed namespace as automatic', () => {
     expect(preferredSurface({ settings: undefined, tabsLoaded: true })).toBe('tab')
     expect(preferredSurface({ settings: { openIn: 'sideways' }, tabsLoaded: false })).toBe('modal')

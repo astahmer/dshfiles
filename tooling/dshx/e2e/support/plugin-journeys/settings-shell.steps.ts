@@ -262,3 +262,43 @@ Then('Settings search shows the Editor file-link preference switched off', async
   )
   await finishJourneyAssertions(page)
 })
+
+const sidePanelSettings = (page: Page) => page.locator('[data-settings-view="sidebar"]')
+
+When('the side panel opens Settings', async ({ page }: { page: Page }) => {
+  const openPanel = page.getByRole('button', { name: 'Open right sidebar', exact: true })
+  if (!(await openPanel.isVisible())) await page.getByRole('button', { name: 'New session', exact: true }).first().click()
+  await openPanel.click()
+  await page.getByText('Edit Settings in this panel.', { exact: true }).click()
+  await expect(sidePanelSettings(page)).toBeVisible()
+})
+
+Then('the side panel shows a Settings tab with its sections', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'settings-shell-side-panel-opens', async () => {
+    const panel = sidePanelSettings(page)
+    await expect(panel).toHaveAttribute('data-settings-view', 'sidebar')
+    await expect(panel.getByRole('searchbox', { name: 'Search settings', exact: true })).toBeVisible()
+    await expect(panel.getByRole('button', { name: 'General', exact: true })).toBeVisible()
+    await expect(panel.getByRole('button', { name: 'Models', exact: true })).toBeVisible()
+    // The side panel is not the dialog and not a main-view tab: Settings lives in the panel alone.
+    await expect(page.getByRole('dialog', { name: 'Settings' })).toHaveCount(0)
+    await expect(page.locator('[data-slot="main"] [data-settings-view="tab"]')).toHaveCount(0)
+  })
+})
+
+When('a section is picked in the side panel', async ({ page }: { page: Page }) => {
+  await sidePanelSettings(page).getByRole('button', { name: 'General', exact: true }).click()
+})
+
+Then('the section fills the panel and Back returns to the section list', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'settings-shell-side-panel-drills-in', async () => {
+    const panel = sidePanelSettings(page)
+    await expect(panel.getByRole('switch', { name: 'Show coding view', exact: true })).toBeVisible()
+    const back = panel.getByRole('button', { name: 'Back to all settings', exact: true })
+    // A wide panel keeps the dialog's two columns, where the section list never leaves the screen.
+    if (!(await back.isVisible())) return
+    await back.click()
+    await expect(panel.getByRole('button', { name: 'Models', exact: true })).toBeVisible()
+  })
+  await finishJourneyAssertions(page)
+})
