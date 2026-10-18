@@ -54,6 +54,7 @@ backing verb; `host-gap` counts capabilities no verb can reach yet.
 | ai-accounts                                                                                                                                       | 21                   | 18                                                                                                       | 7             | 1         |
 | model-effort-picker                                                                                                                               | 3                    | 0                                                                                                        | 1             | 0         |
 | usage                                                                                                                                             | 5                    | 2 (not installed)                                                                                        | 2             | 1         |
+| background-jobs                                                                                                                                   | 4                    | 4                                                                                                        | 0             | 0         |
 | memory                                                                                                                                            | 13                   | 13                                                                                                       | 1             | 0         |
 | optmem                                                                                                                                            | 6                    | 7 (plugin not installed)                                                                                 | 3             | 0         |
 | editor                                                                                                                                            | 7                    | 1                                                                                                        | 5             | 2         |
@@ -585,6 +586,17 @@ differently and the page loaded a second full Tailwind copy — the palette budg
 "plugins share one stylesheet" scenario was red for it, including on main. Moving
 those rules to `memory-reference.css` made the sheet byte-identical again and the
 scenario passes.
+
+## Landed: the background jobs board
+
+`@dshfiles/background-jobs` serves a `background-jobs` dshx API whose four methods
+carry `tool:` bindings: `background_jobs_board` (read-only, every Session's jobs
+with their category and status), `background_jobs_output` (read-only, a live
+job's retained ring without touching the model's consuming cursor),
+`background_jobs_refresh` (write, index the session logs again) and
+`background_jobs_kill` (write, destructive: stopping another Session's job
+requires the explicit `confirm: true` its description names). The same four
+verbs are the Jobs panel's scope tabs, row expansion, Refresh and Stop.
 
 ## Backlog
 

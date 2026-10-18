@@ -1,0 +1,102 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "jobs-board",
+      "title": "Cross-Session background jobs board",
+      "summary": "One page lists every background job of every Session: running jobs projected live from the job registry, finished or interrupted ones from the session logs, classified into deterministic categories derived from the job kind and label.",
+      "reach": ["click button \"Jobs\"", "expect text \"Every background job across Sessions*\""],
+      "surfaces": ["host", "tool", "storage", "client"],
+      "configuration": [],
+      "states": ["running", "finished", "interrupted", "filtered", "searched", "grouped", "paged", "indexing", "registry-unavailable", "history-only"],
+      "failureModes": [
+        "A job of another Session is listed and described, but stopping it goes through the registry's owner fence, not a client-side bypass.",
+        "A job whose output ring belongs to an earlier DSH process reports that only its lifecycle record was retained instead of an empty output.",
+        "A malformed session-log record is skipped without dropping the rest of the file or the persisted index.",
+        "A missing or malformed index state file is rebuilt by rescanning the logs instead of failing the board.",
+        "An unreadable sessions root leaves the board listing live jobs rather than erroring.",
+        "The retained history is bounded, so old jobs age out predictably."
+      ],
+      "externalDependencies": [
+        {
+          "id": "@deepseek-ai/dsh-jobs",
+          "boundary": "Read-only projection of the live job registry plus the human kill; the board never starts or mutates a job record.",
+          "deterministicFake": "src/service.test.ts drives a registry stub that delivers registry events and records the fenced read/kill calls."
+        },
+        {
+          "id": "@dshfiles/usage",
+          "boundary": "Imports the published `session-log` frame reader to resume session logs at a byte offset; the board reads no usage state.",
+          "deterministicFake": "src/history.test.ts writes plain JSONL session logs and asserts the incremental resume and the merged lifecycle rows."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "background-jobs.board-browser-journey",
+          "featureFile": "tooling/dshx/e2e/features/background-jobs.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "background-jobs.classify.commands",
+          "file": "plugins/@dshfiles/background-jobs/src/classify.test.ts",
+          "testName": "reads the package manager script that did the work, not the wrapper around it"
+        },
+        {
+          "kind": "unit-test",
+          "id": "background-jobs.classify.kinds",
+          "file": "plugins/@dshfiles/background-jobs/src/classify.test.ts",
+          "testName": "names the producer kind for jobs that are not shell commands"
+        },
+        {
+          "kind": "unit-test",
+          "id": "background-jobs.board.order",
+          "file": "plugins/@dshfiles/background-jobs/src/service.test.ts",
+          "testName": "lists running jobs before finished ones and pages with a cursor"
+        },
+        {
+          "kind": "unit-test",
+          "id": "background-jobs.board.categories",
+          "file": "plugins/@dshfiles/background-jobs/src/service.test.ts",
+          "testName": "counts and filters by the category derived from the command"
+        },
+        {
+          "kind": "unit-test",
+          "id": "background-jobs.board.interrupted",
+          "file": "plugins/@dshfiles/background-jobs/src/service.test.ts",
+          "testName": "marks a recorded job without a settlement as interrupted until a live twin overrides it"
+        },
+        {
+          "kind": "unit-test",
+          "id": "background-jobs.board.output-fence",
+          "file": "plugins/@dshfiles/background-jobs/src/service.test.ts",
+          "testName": "reads a live job output as its owner and refuses output from an earlier process"
+        },
+        {
+          "kind": "unit-test",
+          "id": "background-jobs.board.kill-fence",
+          "file": "plugins/@dshfiles/background-jobs/src/service.test.ts",
+          "testName": "kills a running job as its owner and reports a settled one as already finished"
+        },
+        {
+          "kind": "unit-test",
+          "id": "background-jobs.history.records",
+          "file": "plugins/@dshfiles/background-jobs/src/history.test.ts",
+          "testName": "records job lifecycle events, session titles and a settled/unsettled status"
+        },
+        {
+          "kind": "unit-test",
+          "id": "background-jobs.history.resume",
+          "file": "plugins/@dshfiles/background-jobs/src/history.test.ts",
+          "testName": "resumes from the persisted offset and reads only the appended records"
+        },
+        {
+          "kind": "unit-test",
+          "id": "background-jobs.history.malformed-state",
+          "file": "plugins/@dshfiles/background-jobs/src/history.test.ts",
+          "testName": "keeps the durable record when a state file is malformed"
+        }
+      ]
+    }
+  ]
+}
