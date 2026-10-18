@@ -147,13 +147,114 @@ plugin (`mcp-servers`) or a feature-file name (`ai-accounts-copilot` runs its
 owner, `ai-accounts`). A fresh clone gets the pinned Chromium from
 `pnpm install:all` (`setup:browser`).
 
+### Naming a scope, and the run that is not a scope
+
+Pass a plugin or feature name with `pnpm run check:e2e <name>`, or through
+`DSHX_E2E_ONLY=<name>` on any invocation. Do **not** write
+`node --run check:e2e <name>`: Node drops a bare argument after the script name
+silently, and on 2026-10-19 that turned an intended one-owner run into every
+journey in the repository — 50 minutes, 34 owner tasks, load average 10 on ten
+cores. A broad `e2e` run therefore refuses to start outside CI unless it is
+acknowledged with `--all` (or `DSHX_E2E_ALL=1`), and prints the two ways to
+scope it. `smoke` and `boot` stay broad by design.
+
+A broad local journey run also fails fast: Turbo stops at the first red owner
+instead of paying for the rest, and Playwright stops that owner after
+`DSHX_E2E_MAX_FAILURES` failures (default 3). `DSHX_E2E_KEEP_GOING=1` reports
+the whole picture the way CI does.
+
+### Wait budgets
+
+Every wait is bounded. Playwright's `actionTimeout` defaults to _no_ timeout, so
+with only the test timeout set, one locator that never appears waits out the
+whole test: a broad run measured 1302 s of its 2594 s task time in four owners
+that way (`locator.click: Test timeout of 300000ms exceeded`). The config now
+sets `actionTimeout: 15 s`, `navigationTimeout: 30 s`, `expect.timeout: 15 s`
+and a `150 s` test timeout; `DSHX_E2E_TEST_TIMEOUT_MS` overrides the last, and a
+scenario that legitimately needs longer calls `test.slow()` or passes its own
+`timeout` to the step it is waiting on. `DSHX_E2E_WORKERS` raises the worker
+count for a measured run.
+
+### One build, one generation
+
+`check-browser.mjs` does the shared work once per run: build the selected closure
+through Turbo (a no-change closure is `FULL TURBO` in ~1.5 s, and the digest pass
+over every package is ~0.3 s), write the `dist` digests the tasks key on, and
+generate the 48 BDD specs. Each owner task then runs only `playwright test`:
+`DSHX_E2E_GENERATED=1` tells it the specs are already there, because
+regenerating them cost 3.6-4.8 s per owner — about 2.6 minutes of a broad run —
+for identical output. A task whose inputs did not change never starts at all.
+
+The `DSHX_E2E_*` knobs (workers, failure ceiling, timeout override, generation
+flag) are passed through the generated task environment without being hashed:
+they change how a run is driven, not what it proves.
+
+### Parallelism
+
+Journeys stay serial by default, and the measurement is why.
+`CHECK_BROWSER_CONCURRENCY=3` on eight owners (eleven journeys, forced) ran the
+same set in 110 s against 155 s serial — 1.41× on a ten-core machine that was
+already loaded, with every task stretched by contention (242 s of task time
+against 103 s) — and one of the eight failed: `pulls-review` read
+`default-workspace` out of the Session hierarchy where it expected its own
+thread, a product race that load exposes and that a wait budget cannot absorb.
+A flake costs a whole owner rerun, so the serial default stands;
+`CHECK_BROWSER_CONCURRENCY` and `DSHX_E2E_WORKERS` opt in for a measured run,
+and the boot gate — which runs no journey — keeps its measured three.
+
+### Orphaned scratch processes
+
+A run that is cancelled — Ctrl-C, a stopped job, a killed worker, Turbo aborting
+the graph — never reaches the harness `After` hook, so its scratch Host
+(`dsh --profile dshx-boot`) or fake provider is re-parented to pid 1 and keeps a
+port, ~30 MB and CPU. Thirteen such Hosts and twelve fake providers were
+measured, the oldest 23 hours old, and they slow every later boot and make the
+timing-sensitive journeys flakier.
+
+`check-browser.mjs` sweeps before and after every run, but the sweep cannot
+match on shape: `dshx dev up` deliberately daemonizes a Host with the _same_
+`dshx-boot` profile and its own pid 1, so a pattern would take a live
+development session down with it. The harness therefore records every Host it
+spawns in a ledger (`.turbo/e2e-scratch-hosts.jsonl`), and the sweep reaps a
+recorded pid only while it is parentless and still runs the recorded command
+signature — a reused pid or an unrecorded lookalike is dropped, never killed.
+`tooling/dshx/scripts/reap-scratch-processes.mjs` runs the same sweep from a
+shell (`--dry-run`, `--workspace`, `--min-age-seconds`), and its `--patterns`
+mode is the blunt instrument for a one-off cleanup: that one does match a live
+`dshx dev up` Host.
+
+### What one change re-runs
+
+A task's key is the runtime `dist` digest of every bundle its journeys boot, so
+the cache replays owners the change cannot reach and re-runs the ones it can. A
+leaf plugin is cheap — the planner's fan-out for `pulls-review` is 3 of 43
+journey tasks — while a bundle shared by many compositions is not:
+
+| Changed bundle digest                                                           | Journey tasks that re-run |
+| ------------------------------------------------------------------------------- | ------------------------: |
+| `@dshfiles/dshx`                                                                |                        43 |
+| `@dshfiles/plugin-ui`                                                           |                        39 |
+| `@dshfiles/ui-styles`                                                           |                        38 |
+| `@dshfiles/shared-runtime`                                                      |                        36 |
+| `@dshfiles/command-palette`, `workspace-folder-picker`, `project-folder-picker` |                        30 |
+| `@dshfiles/ai-accounts`, `request-messages`, `secret-catalog`                   |                        23 |
+| `@dshfiles/thread-sidebar`                                                      |                        10 |
+| `@dshfiles/pulls-review`, `shortcuts`, `tool-meta`                              |                         3 |
+
+Measured 2026-10-19 by counting a dry-run plan (`turbo run test:e2e --dry=json`)
+over the generated task inputs. The wide rows are earned rather than an
+artifact: those bundles are booted, or driven by a shared step, in those
+journeys. It is also why a broad run is the post-merge gate and not the loop:
+editing one of those bundles re-runs a third of the suite, while editing a leaf
+plugin replays all but a handful of tasks in seconds.
+
 ### Provider credentials
 
 A journey that sends a message needs a working provider route, and the scratch
 profile defaults to `deepseek-official`. In an environment without
 `DEEPSEEK_API_KEY` (or an account row serving that route) every turn ends with
 _no API key for provider route "deepseek-official"_, and the message-sending
-journeys then sit out their full 300 s timeout while the journeys that only
+journeys then sit out their full test timeout while the journeys that only
 drive the UI pass — an environment failure that reads like a product
 regression. Check for that Failed turn in the failure snapshot before believing
 one. Run a single stack at a time for the same reason `check:e2e` uses

@@ -31,7 +31,7 @@
       ],
       "outputs": [],
       "env": ["CI", "DSHX_TOOL_VERSIONS"],
-      "passThroughEnv": ["HOME", "TMPDIR", "USER", "LANG", "PLAYWRIGHT_BROWSERS_PATH", "GITHUB_*", "RUNNER_*"]
+      "passThroughEnv": ["HOME", "TMPDIR", "USER", "LANG", "PLAYWRIGHT_BROWSERS_PATH", "GITHUB_*", "RUNNER_*", "DSHX_E2E_*"]
     },
     "test:e2e": {
       "dependsOn": [],
@@ -81,7 +81,6 @@
         "$TURBO_ROOT$/tooling/dshx/e2e/features/workbench.feature",
         "$TURBO_ROOT$/tooling/dshx/e2e/fixtures/**",
         "$TURBO_ROOT$/tooling/dshx/e2e/support/*",
-        "$TURBO_ROOT$/tooling/dshx/e2e/support/plugin-journeys/btw.steps.ts",
         "$TURBO_ROOT$/tooling/dshx/e2e/support/plugin-journeys/editor.steps.ts",
         "$TURBO_ROOT$/tooling/dshx/e2e/support/plugin-journeys/workbench.steps.ts",
         "$TURBO_ROOT$/tooling/dshx/package.json",
@@ -89,11 +88,12 @@
         "$TURBO_ROOT$/tooling/dshx/packages/dshx/package.json",
         "$TURBO_ROOT$/tooling/dshx/playwright.e2e.config.ts",
         "$TURBO_ROOT$/tooling/dshx/scripts/browser-tasks.mjs",
+        "$TURBO_ROOT$/tooling/dshx/scripts/reap-scratch-processes.mjs",
         "$TURBO_ROOT$/tooling/dshx/scripts/run-e2e.mjs"
       ],
       "outputs": [],
       "env": ["CI", "DSHX_TOOL_VERSIONS"],
-      "passThroughEnv": ["HOME", "TMPDIR", "USER", "LANG", "PLAYWRIGHT_BROWSERS_PATH", "GITHUB_*", "RUNNER_*"]
+      "passThroughEnv": ["HOME", "TMPDIR", "USER", "LANG", "PLAYWRIGHT_BROWSERS_PATH", "GITHUB_*", "RUNNER_*", "DSHX_E2E_*"]
     },
     "test:e2e:smoke": {
       "dependsOn": [],
@@ -143,7 +143,6 @@
         "$TURBO_ROOT$/tooling/dshx/e2e/features/workbench.feature",
         "$TURBO_ROOT$/tooling/dshx/e2e/fixtures/**",
         "$TURBO_ROOT$/tooling/dshx/e2e/support/*",
-        "$TURBO_ROOT$/tooling/dshx/e2e/support/plugin-journeys/btw.steps.ts",
         "$TURBO_ROOT$/tooling/dshx/e2e/support/plugin-journeys/editor.steps.ts",
         "$TURBO_ROOT$/tooling/dshx/e2e/support/plugin-journeys/workbench.steps.ts",
         "$TURBO_ROOT$/tooling/dshx/package.json",
@@ -151,11 +150,12 @@
         "$TURBO_ROOT$/tooling/dshx/packages/dshx/package.json",
         "$TURBO_ROOT$/tooling/dshx/playwright.e2e.config.ts",
         "$TURBO_ROOT$/tooling/dshx/scripts/browser-tasks.mjs",
+        "$TURBO_ROOT$/tooling/dshx/scripts/reap-scratch-processes.mjs",
         "$TURBO_ROOT$/tooling/dshx/scripts/run-e2e.mjs"
       ],
       "outputs": [],
       "env": ["CI", "DSHX_TOOL_VERSIONS"],
-      "passThroughEnv": ["HOME", "TMPDIR", "USER", "LANG", "PLAYWRIGHT_BROWSERS_PATH", "GITHUB_*", "RUNNER_*"]
+      "passThroughEnv": ["HOME", "TMPDIR", "USER", "LANG", "PLAYWRIGHT_BROWSERS_PATH", "GITHUB_*", "RUNNER_*", "DSHX_E2E_*"]
     }
   }
 }

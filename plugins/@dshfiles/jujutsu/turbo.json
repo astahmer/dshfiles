@@ -8,6 +8,7 @@
       "inputs": [
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__command-palette.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__dshx.sha256",
+        "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__frame-layout.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__jj-integration.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__jujutsu.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__multi-host.sha256",
@@ -15,9 +16,12 @@
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__project-checks.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__project-folder-picker.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__shared-runtime.sha256",
+        "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__workbench.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__workspace-folder-picker.sha256",
         "$TURBO_ROOT$/plugins/@dshfiles/command-palette/cordis.patch.yml",
         "$TURBO_ROOT$/plugins/@dshfiles/command-palette/package.json",
+        "$TURBO_ROOT$/plugins/@dshfiles/frame-layout/cordis.patch.yml",
+        "$TURBO_ROOT$/plugins/@dshfiles/frame-layout/package.json",
         "$TURBO_ROOT$/plugins/@dshfiles/jj-integration/cordis.patch.yml",
         "$TURBO_ROOT$/plugins/@dshfiles/jj-integration/package.json",
         "$TURBO_ROOT$/plugins/@dshfiles/jujutsu/cordis.patch.yml",
@@ -32,6 +36,8 @@
         "$TURBO_ROOT$/plugins/@dshfiles/project-folder-picker/package.json",
         "$TURBO_ROOT$/plugins/@dshfiles/shared-runtime/cordis.patch.yml",
         "$TURBO_ROOT$/plugins/@dshfiles/shared-runtime/package.json",
+        "$TURBO_ROOT$/plugins/@dshfiles/workbench/cordis.patch.yml",
+        "$TURBO_ROOT$/plugins/@dshfiles/workbench/package.json",
         "$TURBO_ROOT$/plugins/@dshfiles/workspace-folder-picker/cordis.patch.yml",
         "$TURBO_ROOT$/plugins/@dshfiles/workspace-folder-picker/package.json",
         "$TURBO_ROOT$/pnpm-lock.yaml",
@@ -46,7 +52,7 @@
       ],
       "outputs": [],
       "env": ["CI", "DSHX_TOOL_VERSIONS"],
-      "passThroughEnv": ["HOME", "TMPDIR", "USER", "LANG", "PLAYWRIGHT_BROWSERS_PATH", "GITHUB_*", "RUNNER_*"]
+      "passThroughEnv": ["HOME", "TMPDIR", "USER", "LANG", "PLAYWRIGHT_BROWSERS_PATH", "GITHUB_*", "RUNNER_*", "DSHX_E2E_*"]
     },
     "test:e2e": {
       "dependsOn": [],
@@ -54,6 +60,7 @@
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__ai-accounts.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__command-palette.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__dshx.sha256",
+        "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__frame-layout.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__jj-integration.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__jujutsu.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__multi-host.sha256",
@@ -64,11 +71,14 @@
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__secret-catalog.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__shared-runtime.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__ui-styles.sha256",
+        "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__workbench.sha256",
         "$TURBO_ROOT$/.turbo/browser-dist/dshfiles__workspace-folder-picker.sha256",
         "$TURBO_ROOT$/plugins/@dshfiles/ai-accounts/cordis.patch.yml",
         "$TURBO_ROOT$/plugins/@dshfiles/ai-accounts/package.json",
         "$TURBO_ROOT$/plugins/@dshfiles/command-palette/cordis.patch.yml",
         "$TURBO_ROOT$/plugins/@dshfiles/command-palette/package.json",
+        "$TURBO_ROOT$/plugins/@dshfiles/frame-layout/cordis.patch.yml",
+        "$TURBO_ROOT$/plugins/@dshfiles/frame-layout/package.json",
         "$TURBO_ROOT$/plugins/@dshfiles/jj-integration/cordis.patch.yml",
         "$TURBO_ROOT$/plugins/@dshfiles/jj-integration/package.json",
         "$TURBO_ROOT$/plugins/@dshfiles/jujutsu/cordis.patch.yml",
@@ -89,6 +99,8 @@
         "$TURBO_ROOT$/plugins/@dshfiles/shared-runtime/package.json",
         "$TURBO_ROOT$/plugins/@dshfiles/ui-styles/cordis.patch.yml",
         "$TURBO_ROOT$/plugins/@dshfiles/ui-styles/package.json",
+        "$TURBO_ROOT$/plugins/@dshfiles/workbench/cordis.patch.yml",
+        "$TURBO_ROOT$/plugins/@dshfiles/workbench/package.json",
         "$TURBO_ROOT$/plugins/@dshfiles/workspace-folder-picker/cordis.patch.yml",
         "$TURBO_ROOT$/plugins/@dshfiles/workspace-folder-picker/package.json",
         "$TURBO_ROOT$/pnpm-lock.yaml",
@@ -104,11 +116,12 @@
         "$TURBO_ROOT$/tooling/dshx/packages/dshx/package.json",
         "$TURBO_ROOT$/tooling/dshx/playwright.e2e.config.ts",
         "$TURBO_ROOT$/tooling/dshx/scripts/browser-tasks.mjs",
+        "$TURBO_ROOT$/tooling/dshx/scripts/reap-scratch-processes.mjs",
         "$TURBO_ROOT$/tooling/dshx/scripts/run-e2e.mjs"
       ],
       "outputs": [],
       "env": ["CI", "DSHX_TOOL_VERSIONS"],
-      "passThroughEnv": ["HOME", "TMPDIR", "USER", "LANG", "PLAYWRIGHT_BROWSERS_PATH", "GITHUB_*", "RUNNER_*"]
+      "passThroughEnv": ["HOME", "TMPDIR", "USER", "LANG", "PLAYWRIGHT_BROWSERS_PATH", "GITHUB_*", "RUNNER_*", "DSHX_E2E_*"]
     }
   }
 }

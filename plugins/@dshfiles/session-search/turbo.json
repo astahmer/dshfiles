@@ -22,7 +22,7 @@
       ],
       "outputs": [],
       "env": ["CI", "DSHX_TOOL_VERSIONS"],
-      "passThroughEnv": ["HOME", "TMPDIR", "USER", "LANG", "PLAYWRIGHT_BROWSERS_PATH", "GITHUB_*", "RUNNER_*"]
+      "passThroughEnv": ["HOME", "TMPDIR", "USER", "LANG", "PLAYWRIGHT_BROWSERS_PATH", "GITHUB_*", "RUNNER_*", "DSHX_E2E_*"]
     }
   }
 }

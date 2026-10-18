@@ -4,6 +4,7 @@ import { prepareComposedBootProfile, type PreparedBootProfile } from '../../pack
 import { DSHFILES_ROOT, buildPlugin, findFreePort, LocalBundleModel } from '../../packages/dshx/src/project/local-bundles.js'
 import { compositionFailures, readProfileComposition } from '../../packages/dshx/src/project/profile-composition.js'
 import { spawnOwnedProcess, stopOwnedProcess } from '../../packages/dshx/src/project/owned-process.js'
+import { recordScratchProcess, scratchLedgerPath } from '../../scripts/reap-scratch-processes.mjs'
 import { isolatedHostEnvironment, redactHostOutput } from './scratch-profile.js'
 import { createScratchHostLifecycle, type ScratchHostInstance } from './scratch-host-lifecycle.js'
 
@@ -94,6 +95,13 @@ export const startScratchProfile = async (
     }
     host.stdout?.on('data', collect)
     host.stderr?.on('data', collect)
+    // A cancelled run never reaches its `After` hook, so record the Host: the next run's sweep reaps exactly this pid
+    // and nothing that merely looks like it (a live `dshx dev up` Host has the same profile).
+    await recordScratchProcess({
+      ledgerPath: scratchLedgerPath(DSHFILES_ROOT),
+      pid: host.pid,
+      signature: `--profile ${prepared.profile} --port ${String(port)}`,
+    })
     try {
       const url = await waitForHostUrl(host, () => output, profileLabel, timeoutMs)
       return { host, port, url, output: () => redactHostOutput(output) }
