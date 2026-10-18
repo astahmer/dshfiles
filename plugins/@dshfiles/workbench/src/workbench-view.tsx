@@ -24,10 +24,7 @@ interface WorkbenchViewProps {
    * Per-surface actions in the view's header, given the live API and the open
    * panel ids, so a surface can offer the moves it owns.
    */
-  readonly headerActions?: (context: {
-    readonly api: DockviewApi | null
-    readonly openIds: readonly string[]
-  }) => JSX.Element | null
+  readonly headerActions?: (context: { readonly api: DockviewApi | null; readonly openIds: readonly string[] }) => JSX.Element | null
 }
 
 const usePanelDefinitions = (registry: WorkbenchPanelRegistry) => useSyncExternalStore(registry.subscribe, registry.list, registry.list)

@@ -10,7 +10,5 @@ import type { RightPanelMode } from '@dshfiles/frame-layout/right-panel'
  * takes the column back, so a clicked file link is never a no-op; the dock
  * returns — with its layout intact — once that Session has no open tabs.
  */
-export const effectiveRightPanelMode = (input: {
-  readonly setting: RightPanelMode
-  readonly nativeTabsOnScreen: boolean
-}): RightPanelMode => (input.setting === 'dock' && input.nativeTabsOnScreen ? 'native' : input.setting)
+export const effectiveRightPanelMode = (input: { readonly setting: RightPanelMode; readonly nativeTabsOnScreen: boolean }): RightPanelMode =>
+  input.setting === 'dock' && input.nativeTabsOnScreen ? 'native' : input.setting

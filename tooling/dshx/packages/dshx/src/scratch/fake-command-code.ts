@@ -90,7 +90,7 @@ const writeStreamAnswer = async (stream: SSEStreamingApi, delta: ChatDelta, dela
       model: 'fake',
       choices: [{ index: 0, delta: body, finish_reason: finishReason }],
     })
-  const contentChunks = delayBetweenWordsMs > 0 && typeof delta.content === 'string' ? delta.content.match(/\S+\s*/gu) ?? [delta.content] : undefined
+  const contentChunks = delayBetweenWordsMs > 0 && typeof delta.content === 'string' ? (delta.content.match(/\S+\s*/gu) ?? [delta.content]) : undefined
   if (contentChunks === undefined) {
     await stream.writeSSE({ data: chunk({ role: 'assistant', ...delta }, null) })
   } else {
@@ -166,7 +166,8 @@ const chatCompletionResponse = (input: { readonly state: FakeCommandCodeState; r
   if (read?.[1] !== undefined) return streamAnswer(toolCall('read', JSON.stringify({ file_path: read[1] })))
 
   const search = /\[\[memory_search ([^\]]+?)(?: in ([a-z-]+))?\]\]/.exec(last?.text ?? '')
-  if (search?.[1] !== undefined) return streamAnswer(toolCall('memory_search', JSON.stringify(search[2] === undefined ? { query: search[1] } : { query: search[1], scope: search[2] })))
+  if (search?.[1] !== undefined)
+    return streamAnswer(toolCall('memory_search', JSON.stringify(search[2] === undefined ? { query: search[1] } : { query: search[1], scope: search[2] })))
 
   return streamAnswer({ content: `Answered by ${input.key.slice(-6)}` }, streamDelayMs)
 }

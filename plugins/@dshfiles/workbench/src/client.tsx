@@ -14,7 +14,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { LayoutGridIcon } from '@dshfiles/plugin-ui/icons'
 import type { DockviewApi } from 'dockview-react'
 import dockviewSheet from 'virtual:dshfiles-workbench/dockview-css'
-import { useEffect, useLayoutEffect, useState, useSyncExternalStore } from 'react'
+import { useEffect, useLayoutEffect, useSyncExternalStore } from 'react'
 import { demoPanels } from './demo-panels.js'
 import { createLayoutStore, WorkbenchLayout } from './layout-store.js'
 import { WORKBENCH_LOCALE_NAMESPACE, workbenchLocale } from './locales.js'
@@ -108,9 +108,6 @@ export default defineClient({
               registry={registry}
               store={store}
               t={props.t}
-              onApi={api => {
-                mainApi = api
-              }}
               headerActions={context => <MainMoveToDock {...context} />}
             />
           )
@@ -142,7 +139,6 @@ export default defineClient({
     // select the feature's own main panel (or open the panel in the dock) and the
     // other surface shows it.
     let dockApi: DockviewApi | null = null
-    let mainApi: DockviewApi | null = null
     let pendingDockOpen: string | null = null
 
     const moveToMainView = (api: DockviewApi, panelId: string): void => {
@@ -183,7 +179,9 @@ export default defineClient({
       return (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button size="sm" variant="ghost">{translate('moveToMainView')}</Button>
+            <Button size="sm" variant="ghost">
+              {translate('moveToMainView')}
+            </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             {movable.map(id => (
@@ -203,7 +201,9 @@ export default defineClient({
       return (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button size="sm" variant="ghost">{translate('moveToDock')}</Button>
+            <Button size="sm" variant="ghost">
+              {translate('moveToDock')}
+            </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             {props.openIds.map(id => (
