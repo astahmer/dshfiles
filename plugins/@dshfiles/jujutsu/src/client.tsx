@@ -81,6 +81,7 @@ import { ChatReferenceModel } from './chat-reference.js'
 import { ChangedFiles, FileViewToggle, LineCounts } from './changed-files.js'
 import { FullDiffDialog } from './full-diff-dialog.js'
 import { RevisionGraphModel, reverseHexChangeId, type GraphLane, type RevisionGraphRow } from './graph.js'
+import { GraphPagingModel } from './graph-paging.js'
 import { jujutsuApi } from './api.js'
 import { useAutoRefresh } from './auto-refresh.js'
 import { openInEditor } from './open-in-editor.js'
@@ -401,16 +402,19 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
       if (input.repoId !== repoId || input.query !== debouncedSearchRef.current) return
       setGraphPageState(current => {
         const samePageSet = current.repoId === input.repoId && current.query === input.query
+        const loaded = samePageSet ? current.revisions : []
+        const seen = new Set(loaded.map(revision => revision.commitId))
         return {
           repoId: input.repoId,
           query: input.query,
-          revisions: [...(samePageSet ? current.revisions : []), ...page.revisions],
+          // Two triggers can overlap on one page; a revision already loaded is appended only once.
+          revisions: [...loaded, ...page.revisions.filter(revision => !seen.has(revision.commitId))],
           hasMore: page.hasMore,
         }
       })
     },
   })
-  const { mutate: requestGraphPage } = graphPageMutation
+  const { isPending: graphPagePending, mutate: requestGraphPage } = graphPageMutation
   useEffect(() => {
     setGraphPageState({ repoId, query: debouncedSearch, revisions: [], hasMore: debouncedSearch.length > 0 || (state?.graphHasMore ?? false) })
     if (repoId !== null && debouncedSearch.length > 0) requestGraphPage({ repoId, query: debouncedSearch, excludeCommitIds: [] })
@@ -614,9 +618,10 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   const virtualItems = listVirtualizer.getVirtualItems()
   const stickyDayIndex = activeDayIndex(listItems, listVirtualizer.range?.startIndex ?? 0)
   const graphHasMore = graphPageIsCurrent ? graphPageState.hasMore : debouncedSearch.length > 0 || (state?.graphHasMore ?? false)
-  const loadMoreGraphRevisions = (): void => {
-    if (repoId === null || !graphHasMore || graphPageMutation.isPending) return
-    graphPageMutation.mutate({
+  const loadedGraphRevisions = (state?.revisions.length ?? 0) + graphPageRevisions.length
+  const loadMoreGraphRevisions = useCallback((): void => {
+    if (repoId === null || !graphHasMore || graphPagePending) return
+    requestGraphPage({
       repoId,
       query: debouncedSearch,
       excludeCommitIds: [
@@ -624,7 +629,19 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
         ...graphPageRevisions.map(revision => revision.commitId),
       ],
     })
-  }
+  }, [repoId, graphHasMore, graphPagePending, debouncedSearch, state?.revisions, graphPageRevisions, requestGraphPage])
+  // Each page lands below the viewport, so the list tops itself up instead of waiting for a scroll event at the very end of the loaded history.
+  useEffect(() => {
+    const element = listScrollRef.current
+    if (element === null) return
+    const needsTopUp = GraphPagingModel.shouldLoadNextPage({
+      loadedRevisions: loadedGraphRevisions,
+      scrollTop: element.scrollTop,
+      scrollHeight: element.scrollHeight,
+      clientHeight: element.clientHeight,
+    })
+    if (needsTopUp) loadMoreGraphRevisions()
+  }, [loadedGraphRevisions, graphHasMore, graphPagePending, listItems.length, loadMoreGraphRevisions])
 
   const locateRevision = useCallback(
     (revision: Revision): void => {
@@ -1304,11 +1321,13 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
         <div
           aria-label="Revisions"
           className="dshx:min-h-0 dshx:flex-1 dshx:overflow-auto dshx:overscroll-contain"
+          data-loaded-revisions={loadedGraphRevisions}
           onDragEnd={endDrag}
           onKeyDown={moveRowFocus}
           onScroll={event => {
             const element = event.currentTarget
-            if (element.scrollHeight - element.scrollTop - element.clientHeight < 600) loadMoreGraphRevisions()
+            if (GraphPagingModel.needsAnotherPage({ scrollTop: element.scrollTop, scrollHeight: element.scrollHeight, clientHeight: element.clientHeight }))
+              loadMoreGraphRevisions()
           }}
           ref={listScrollRef}
           role="region"
@@ -1416,13 +1435,13 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
               )
             })}
           </div>
-          {graphPageMutation.isPending && (
+          {graphPagePending && (
             <div className="dshx:flex dshx:items-center dshx:justify-center dshx:gap-2 dshx:p-3 dshx:text-xs dshx:text-muted-foreground" role="status">
               <Spinner className="dshx:size-3" />
               {debouncedSearch.length > 0 ? 'Searching all revisions…' : 'Loading older revisions…'}
             </div>
           )}
-          {visibleRevisions.length === 0 && !graphPageMutation.isPending && (
+          {visibleRevisions.length === 0 && !graphPagePending && (
             <Empty className="dshx:gap-2 dshx:p-6 dshx:md:p-6">
               <EmptyHeader>
                 <EmptyTitle className="dshx:text-sm">No revisions match these filters.</EmptyTitle>

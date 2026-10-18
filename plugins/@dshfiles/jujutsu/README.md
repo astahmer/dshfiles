@@ -118,6 +118,12 @@ contracts.
   Graph/ID output is capped at 500 revisions and advertises truncation. Counts
   remain exact independently of that cap; overly large or timed-out exact
   reads fail explicitly instead of returning estimates.
+- The graph loads history ahead of the scroll instead of at its end: two Host
+  pages (200 revisions) load before anything scrolls, and every later page that
+  lands tops the list up again while less than three viewport-heights of loaded
+  history remains below the viewport. The automatic top-up stops at 2,000 loaded
+  revisions — scrolling continues past it — and a short list that a filter
+  emptied keeps loading until it shows rows.
 
 ### Verification
 

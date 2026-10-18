@@ -48,6 +48,7 @@ const descriptions = (repository: Repository): readonly string[] =>
 
 const revisionsRegion = (page: Page) => page.getByRole('region', { name: 'Revisions', exact: true }).first()
 const revisionRow = (page: Page, description: string) => revisionsRegion(page).locator('article').filter({ hasText: description })
+const loadedRevisions = async (page: Page): Promise<number> => Number((await revisionsRegion(page).getAttribute('data-loaded-revisions')) ?? 0)
 
 When('a disposable Jujutsu repository with two authors is opened in the Jujutsu panel', async ({ page }: { page: Page }) => {
   const root = await createScratchDirectory('dshx-jujutsu-journeys-')
@@ -136,6 +137,9 @@ Then('searching, filtering by author and hiding immutable revisions narrow the g
   jj(repository, ['new', '@'])
   await page.getByRole('button', { name: 'Refresh', exact: true }).click()
   await expect(revisionRow(page, 'History filler 104')).toBeVisible()
+  await recordAssertion(page, 'jujutsu-graph-loads-past-the-first-page-without-scrolling', async () => {
+    await expect.poll(() => loadedRevisions(page)).toBeGreaterThan(100)
+  })
   await search.fill('needle hidden beyond the first page')
   await expect(revisionRow(page, 'Needle hidden beyond the first page')).toBeVisible()
   await search.fill(targetRevisionId)
