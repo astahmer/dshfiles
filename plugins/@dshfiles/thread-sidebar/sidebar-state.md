@@ -96,7 +96,10 @@ The status sections are **Pinned**, **Active**, **Parked**, **Inactive**, and
 **Archived**. The separate filters are **All**, **Working**, **Attention**,
 **Muted**, and **Archived**. For example, the Working filter hides a finished
 thread when neither it nor its child work is running, even if its attention
-display is configured as a group. **Filter: None** means no additional status
+display is configured as a group. A listed thread keeps its own child list
+whatever the filters say: children follow the parent row they belong to, folded
+while none of them is working and unfolded when a subagent runs. **Filter:
+None** means no additional status
 filter.
 
 ### Reading the sidebar counts

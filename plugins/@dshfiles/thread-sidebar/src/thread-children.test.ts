@@ -46,6 +46,15 @@ test('thread action targets remain unique when parent links contain a cycle', ()
   assert.deepEqual(ThreadChildrenModel.threadActionTargetIds({ threadId: 'parent', threads, cascadeToChildren: true }), ['parent', 'child'])
 })
 
+test('a parent lists every child under it whatever the view filters, minus the children an attention group renders', () => {
+  const children = ['live', 'finished', 'waiting'].map(id => ({ id }))
+  const listed = (options: { readonly groupedAttentionIds: ReadonlySet<string>; readonly groupByStatus: boolean }): string[] =>
+    ThreadChildrenModel.listChildThreads({ children, ...options }).map(child => child.id)
+  assert.deepEqual(listed({ groupedAttentionIds: new Set(), groupByStatus: true }), ['live', 'finished', 'waiting'])
+  assert.deepEqual(listed({ groupedAttentionIds: new Set(['waiting']), groupByStatus: true }), ['live', 'finished'])
+  assert.deepEqual(listed({ groupedAttentionIds: new Set(['waiting']), groupByStatus: false }), ['live', 'finished', 'waiting'])
+})
+
 test('children past the limit hide behind a count until every child is shown', () => {
   const children = ['a', 'b', 'c', 'd', 'e'].map(id => ({ id }))
   const truncated = ThreadChildrenModel.visibleChildren({ children, limit: 3, showAll: false, selectedId: undefined })

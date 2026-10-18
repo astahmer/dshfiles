@@ -124,7 +124,14 @@ import { selectRecoveryRows } from './restart-recovery-rows.js'
 import type { RecoveryReason } from './restart-recovery.js'
 import { UsageLimitRowsModel, type QuotaContinuation } from './usage-limit-rows.js'
 import { UsageLimitSection, type UsageLimitSnooze } from './usage-limit-section.js'
-import { groupThreadChildren, partitionFinishedChildren, shouldOpenChildThreadList, threadActionTargetIds, visibleChildren } from './thread-children.js'
+import {
+  groupThreadChildren,
+  listChildThreads,
+  partitionFinishedChildren,
+  shouldOpenChildThreadList,
+  threadActionTargetIds,
+  visibleChildren,
+} from './thread-children.js'
 import { buildThreadUrl, clearThreadUrl, readThreadUrl } from './thread-url.js'
 import { workingThreadIds } from './working-threads.js'
 import { indexRebasedThreadSessions, rebasedThreadArchiveDelayMs } from './rebased-threads.js'
@@ -2437,17 +2444,11 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     const listedChildThreads =
       threadView.sourceFilter === 'main'
         ? NO_CHILDREN
-        : (threadTree.childrenByRoot.get(session.id) ?? NO_CHILDREN).filter(
-            child =>
-              !(threadView.groupBy === 'status' && attentionIds.has(child.id)) &&
-              ThreadViewModel.matchesStatusFilter({
-                filters: threadView.statusFilters,
-                running: child.running,
-                needsAttention: attentionSessionIds.has(child.id),
-                archived: archivedSessionIds.has(child.id),
-                muted: mutedSessionIds.has(child.id),
-              }),
-          )
+        : listChildThreads({
+            children: threadTree.childrenByRoot.get(session.id) ?? NO_CHILDREN,
+            groupedAttentionIds: attentionIds,
+            groupByStatus: threadView.groupBy === 'status',
+          })
     const selectedChildId = listedChildThreads.some(child => child.id === selectedSession?.id) ? selectedSession?.id : undefined
     const { live: childThreads, finished: finishedChildThreads } = partitionFinishedChildren({
       children: listedChildThreads,

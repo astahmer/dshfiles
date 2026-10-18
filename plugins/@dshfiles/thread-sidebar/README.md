@@ -234,7 +234,10 @@ Child sessions render with increasing indentation and a direct “child of …�
 label. The sidebar follows DSH's durable `parentId` chain, so the presentation
 is not limited to parent/child pairs; a child link carries
 the workspace found on the nearest ancestor when the child has no direct
-workspace membership.
+workspace membership. A child list stays with its parent's row whatever the
+view filters: the children follow the parent they belong to, folded while no
+subagent is working and unfolded when one is, so a subagent working under a
+parent shows there and child threads never appear as rows of their own.
 
 Finished subagents (not running and not waiting on approval or input) fold
 into one “N finished” line by default so live ones stay on top; the

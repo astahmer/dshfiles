@@ -1011,6 +1011,12 @@
         },
         {
           "kind": "unit-test",
+          "id": "thread-sidebar.thread-children-and-links-unit-child-list-under-parent",
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-children.test.ts",
+          "testName": "a parent lists every child under it whatever the view filters, minus the children an attention group renders"
+        },
+        {
+          "kind": "unit-test",
           "id": "thread-sidebar.thread-children-and-links-unit-action-cycle-bound",
           "file": "plugins/@dshfiles/thread-sidebar/src/thread-children.test.ts",
           "testName": "thread action targets remain unique when parent links contain a cycle"

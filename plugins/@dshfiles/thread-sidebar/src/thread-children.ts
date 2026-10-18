@@ -92,6 +92,17 @@ export class ThreadChildrenModel {
   }
 
   /**
+   * The child rows a parent lists: every child it has, whatever the view filters. A
+   * filter selects parent rows, never a child's place under its parent, so only an
+   * attention group that already renders a child takes that child off the list.
+   */
+  static readonly listChildThreads = <Thread extends { readonly id: string }>(options: {
+    readonly children: readonly Thread[]
+    readonly groupedAttentionIds: ReadonlySet<string>
+    readonly groupByStatus: boolean
+  }): readonly Thread[] => options.children.filter(child => !(options.groupByStatus && options.groupedAttentionIds.has(child.id)))
+
+  /**
    * The child rows a parent shows: the first `limit`, or all of them once expanded.
    * A selected child past the limit still shows so the open thread is never hidden.
    */
@@ -133,6 +144,7 @@ export class ThreadChildrenModel {
   }
 }
 export const groupThreadChildren = ThreadChildrenModel.groupThreadChildren
+export const listChildThreads = ThreadChildrenModel.listChildThreads
 export const partitionFinishedChildren = ThreadChildrenModel.partitionFinishedChildren
 export const shouldOpenChildThreadList = ThreadChildrenModel.shouldOpenChildThreadList
 export const threadActionTargetIds = ThreadChildrenModel.threadActionTargetIds
