@@ -1739,58 +1739,56 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
               </Tooltip>
             )
           })}
-          {wide || overflowFooterEntries.length > 0 ? (
-            <Popover open={moreOpen} onOpenChange={setMoreOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  className={cn('dshx:shrink-0 dshx:text-muted-foreground', wide && 'dshx:ml-auto')}
-                  aria-label={text(props.t, 'threadSidebarMore')}
-                  title={text(props.t, 'threadSidebarMore')}
-                >
-                  <IconEllipsisOutlineRegular size={16} />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent
-                side="top"
-                align="end"
-                className="dshx-root dshx:flex dshx:max-h-[min(480px,calc(100vh-96px))] dshx:w-auto dshx:min-w-56 dshx:max-w-[min(360px,calc(100vw-16px))] dshx:flex-col dshx:gap-0.5 dshx:overflow-y-auto dshx:p-1"
+          <Popover open={moreOpen} onOpenChange={setMoreOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className={cn('dshx:shrink-0 dshx:text-muted-foreground', wide && 'dshx:ml-auto')}
                 aria-label={text(props.t, 'threadSidebarMore')}
+                title={text(props.t, 'threadSidebarMore')}
               >
-                {overflowFooterEntries.map(entry => (
-                  <div className="dshx:flex dshx:items-center dshx:whitespace-nowrap dshx:*:w-full" key={entry.id}>
-                    {renderFooterEntry(entry, true)}
-                  </div>
-                ))}
-                {overflowFooterEntries.length === 0 ? null : <div className="dshx:my-1 dshx:h-px dshx:shrink-0 dshx:bg-border" aria-hidden="true" />}
-                {footerPages.length === 0 ? null : (
-                  <span className="dshx:px-2 dshx:pt-0.5 dshx:pb-1 dshx:text-xs dshx:font-medium dshx:text-muted-foreground">
-                    {text(props.t, 'threadSidebarMorePages')}
-                  </span>
-                )}
-                {footerPages.map(({ entry, current }) => (
-                  <Button
-                    key={entry.id}
-                    variant="ghost"
-                    className={cn(
-                      'dshx:w-full dshx:shrink-0 dshx:justify-start dshx:gap-2 dshx:font-normal dshx:text-muted-foreground dshx:hover:text-foreground',
-                      current && 'dshx:bg-accent dshx:text-foreground',
-                    )}
-                    aria-current={current ? 'page' : undefined}
-                    onClick={() => {
-                      setMoreOpen(false)
-                      activateHeaderEntry(entry)
-                    }}
-                  >
-                    {headerIconFor(entry, 16)}
-                    <span className="dshx:truncate">{entry.label}</span>
-                    {current ? <CheckIcon className="dshx:ml-auto dshx:size-4" aria-hidden="true" /> : null}
-                  </Button>
-                ))}
-              </PopoverContent>
-            </Popover>
-          ) : null}
+                <IconEllipsisOutlineRegular size={16} />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent
+              side={wide ? 'top' : 'right'}
+              align={wide ? 'end' : 'start'}
+              className="dshx-root dshx:flex dshx:max-h-[min(480px,calc(100vh-96px))] dshx:w-auto dshx:min-w-56 dshx:max-w-[min(360px,calc(100vw-16px))] dshx:flex-col dshx:gap-0.5 dshx:overflow-y-auto dshx:p-1"
+              aria-label={text(props.t, 'threadSidebarMore')}
+            >
+              {overflowFooterEntries.map(entry => (
+                <div className="dshx:flex dshx:items-center dshx:whitespace-nowrap dshx:*:w-full" key={entry.id}>
+                  {renderFooterEntry(entry, true)}
+                </div>
+              ))}
+              {overflowFooterEntries.length === 0 ? null : <div className="dshx:my-1 dshx:h-px dshx:shrink-0 dshx:bg-border" aria-hidden="true" />}
+              {footerPages.length === 0 ? null : (
+                <span className="dshx:px-2 dshx:pt-0.5 dshx:pb-1 dshx:text-xs dshx:font-medium dshx:text-muted-foreground">
+                  {text(props.t, 'threadSidebarMorePages')}
+                </span>
+              )}
+              {footerPages.map(({ entry, current }) => (
+                <Button
+                  key={entry.id}
+                  variant="ghost"
+                  className={cn(
+                    'dshx:w-full dshx:shrink-0 dshx:justify-start dshx:gap-2 dshx:font-normal dshx:text-muted-foreground dshx:hover:text-foreground',
+                    current && 'dshx:bg-accent dshx:text-foreground',
+                  )}
+                  aria-current={current ? 'page' : undefined}
+                  onClick={() => {
+                    setMoreOpen(false)
+                    activateHeaderEntry(entry)
+                  }}
+                >
+                  {headerIconFor(entry, 16)}
+                  <span className="dshx:truncate">{entry.label}</span>
+                  {current ? <CheckIcon className="dshx:ml-auto dshx:size-4" aria-hidden="true" /> : null}
+                </Button>
+              ))}
+            </PopoverContent>
+          </Popover>
         </footer>
       </div>
       <AlertDialog
