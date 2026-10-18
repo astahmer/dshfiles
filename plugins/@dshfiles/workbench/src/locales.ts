@@ -17,7 +17,7 @@ const en = {
   rendersLabel: 'Renders',
   tickerTitle: 'Ticker',
   tickerHint: 'Counts seconds since this panel mounted. A remount restarts it at 0.',
-  toggleSidePanel: 'Toggle the workbench side panel',
+  toggleRightPanel: 'Toggle the persistent panel in the right column',
   sidePanelGuide: 'Dock and arrange registered panels beside the thread.',
   dockHeading: 'Panels',
 }
@@ -36,7 +36,7 @@ const zh = {
   rendersLabel: '渲染',
   tickerTitle: '计时器',
   tickerHint: '自此面板挂载以来的秒数。重新挂载会从 0 开始。',
-  toggleSidePanel: '切换工作台侧边面板',
+  toggleRightPanel: '切换右栏的常驻面板',
   sidePanelGuide: '在会话旁停靠和排列已注册的面板。',
   dockHeading: '面板',
 } satisfies Record<keyof typeof en, string>

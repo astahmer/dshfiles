@@ -49,6 +49,7 @@
     "@deepseek-ai/dsh-storage-domain": "catalog:",
     "@deepseek-ai/dsh-subprocess": "catalog:",
     "@dshfiles/dshx": "workspace:*",
+    "@dshfiles/frame-layout": "workspace:*",
     "@types/node": "22.20.5",
     "@types/react": "catalog:",
     "jsdom": "catalog:",

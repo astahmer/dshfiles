@@ -7,6 +7,8 @@ import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import { defineClient, useApi } from '@dshfiles/dshx/client'
+// Type-only: `ctx.rightPanel`, the frame's right-column seat.
+import type {} from '@dshfiles/frame-layout/right-panel'
 import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
 import { PluginQueryProvider, pluginQueryClient, useQuery } from '@dshfiles/plugin-ui/query'
 import type { DirectoryPickerPort, RegisteredProject } from '@dshfiles/project-folder-picker'
@@ -84,6 +86,14 @@ export default defineClient({
     }, 'dshfiles-jujutsu: refresh after another plugin changes the repository')
     // Older Hosts lack active()/isExpanded(); without them the toggle only ever opens.
     const toggleJujutsu = (path: string | null): void => {
+      // While the global dock owns the right column, the panel to reveal is the
+      // dock's own — the per-thread surface is not drawn, so driving it would
+      // land nowhere.
+      if (ctx.get('rightPanel')?.mode() === 'dock') {
+        if (path !== null) sidePanelRepository.request({ path })
+        workbenchPanels().open(DOCK_PANEL_ID)
+        return
+      }
       const sidebar = ctx.sidebarRight
       const showingJujutsu =
         typeof sidebar.isExpanded === 'function' &&

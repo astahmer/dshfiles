@@ -1848,6 +1848,9 @@ importers:
       '@dshfiles/dshx':
         specifier: workspace:*
         version: link:../../../tooling/dshx/packages/dshx
+      '@dshfiles/frame-layout':
+        specifier: workspace:*
+        version: link:../frame-layout
       '@types/node':
         specifier: 22.20.5
         version: 22.20.5
