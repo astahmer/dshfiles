@@ -301,7 +301,7 @@
     {
       "id": "memory-reference-preview",
       "title": "Preview cited memory inline",
-      "summary": "Memory citations in conversation messages are clickable links that show the relevant note, thread digest or bounded message excerpt inline; preview reads do not create synthetic memory-tool usage records.",
+      "summary": "Memory citations in conversation messages are clickable links: the whole `memory: <id>` token carries the link and opens a wide inline preview of the relevant note, thread digest or bounded message excerpt, with an Open in Memory button that takes the same item to the Memory page (a note opens its detail, a digest opens its row). Preview reads do not create synthetic memory-tool usage records.",
       "surfaces": ["client", "api"],
       "configuration": [],
       "states": ["idle", "loading", "note", "digest", "excerpt", "unavailable"],
@@ -336,7 +336,9 @@
         "expect link \"Preview memory n:1\"",
         "click link \"Preview memory n:1\"",
         "expect text \"Memory · n:1\"",
-        "expect text \"No valid note n:1*\""
+        "expect text \"No valid note n:1*\"",
+        "click button \"Open in Memory\"",
+        "expect heading \"Memory\""
       ]
     },
     {

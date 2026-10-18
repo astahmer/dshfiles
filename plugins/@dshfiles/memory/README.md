@@ -32,8 +32,10 @@ Cross-thread, cross-project memory for DSH that leaves the live context and the 
   `@dshfiles/memory/api`.
 - **Citations as usage.** The block asks agents to cite memory they used as `memory: <id>`. A citation marks the tool
   call that returned the id as used and ranks the cited item higher in later blocks. In conversation replies, citations
-  are clickable links that open an inline preview of the note, digest or bounded message excerpt. The UI uses the
-  `preview` API method, which does not create a synthetic memory-tool usage record.
+  are clickable links that open a wide inline preview of the note, digest or bounded message excerpt, with an
+  **Open in Memory** button that takes the same item to the Memory page (notes open their detail, digests open their
+  row). The whole `memory: <id>` token carries the link, and the preview uses the `preview` API method, which does not
+  create a synthetic memory-tool usage record.
 - **Memory panel** (sidebar → Memory): notes by type with their source (project, thread, message, who wrote it,
   created and updated), inline edit and forget, superseded history, markdown preview through DSH's own
   `MarkdownText`; thread digests by project; usage: cost per day, start-block size and the requests that carried

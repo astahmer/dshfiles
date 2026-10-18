@@ -24,6 +24,13 @@ const textSegments = (block: Element): readonly TextSegment[] => {
   return segments
 }
 
+/**
+ * The whole `memory: t:abc` is the link when the citation sits in one text node; a backticked id is its own element, so
+ * that reference falls back to its own range instead of dropping the link.
+ */
+const linkStartFor = (segment: TextSegment, match: MemoryReferenceMatch): number =>
+  match.citationStart >= segment.start && match.end <= segment.end ? match.citationStart : match.start
+
 const linkFor = (block: Element, segment: TextSegment, match: MemoryReferenceMatch): void => {
   if (segment.node.parentElement?.closest(memoryReferenceSelector) !== null) return
   const link = block.ownerDocument.createElement('span')
@@ -33,7 +40,7 @@ const linkFor = (block: Element, segment: TextSegment, match: MemoryReferenceMat
   link.setAttribute('aria-label', `Preview memory ${match.id}${match.range === undefined ? '' : ` #${match.range}`}`)
   link.tabIndex = 0
   const range = block.ownerDocument.createRange()
-  range.setStart(segment.node, match.start - segment.start)
+  range.setStart(segment.node, linkStartFor(segment, match) - segment.start)
   range.setEnd(segment.node, match.end - segment.start)
   try {
     range.surroundContents(link)

@@ -12,6 +12,8 @@ describe('memoryReferenceMatches', () => {
       { id: 't:session_01', range: '42' },
     ])
     expect(references.map(reference => text.slice(reference.start, reference.end))).toEqual(['t:9356abc7', 'n:3', 't:session_01#42'])
+    // The whole `memory: t:9356abc7` can carry the link; a second reference in the same citation starts at itself.
+    expect(references.map(reference => text.slice(reference.citationStart, reference.end))).toEqual(['Memory: t:9356abc7', 'n:3', 'memory: t:session_01#42'])
   })
 
   it('ignores malformed citations and rejects non-positive note ids', () => {

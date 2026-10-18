@@ -1,5 +1,6 @@
 import { MarkdownText, type MarkdownLabels } from '@deepseek-ai/dsh-client-ui-primitives'
 import { useApi } from '@dshfiles/dshx/client'
+import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Popover, PopoverAnchor, PopoverContent, PopoverHeader, PopoverTitle } from '@dshfiles/plugin-ui/components/ui/popover'
 import { errorMessage, useQuery } from '@dshfiles/plugin-ui/query'
 import { useEffect, useState } from 'react'
@@ -9,7 +10,10 @@ import { memoryReferencePreviewEvent, memoryReferencePreviewRequestSchema, type 
 
 const markdownLabels: MarkdownLabels = { code: { copyLabel: 'Copy', copiedLabel: 'Copied' }, footnotes: 'Footnotes' }
 
-export const MemoryReferenceOverlay = (): JSX.Element | null => {
+export const MemoryReferenceOverlay = (props: {
+  /** Opens the Memory page on this item, the way the sidebar's Memory row would. */
+  readonly openInMemory: (focus: { readonly id: string; readonly range?: string }) => void
+}): JSX.Element | null => {
   const api = useApi(memoryApi)
   const [request, setRequest] = useState<MemoryReferencePreviewRequest | null>(null)
   const preview = useQuery({
@@ -61,16 +65,40 @@ export const MemoryReferenceOverlay = (): JSX.Element | null => {
           }}
         />
       </PopoverAnchor>
-      <PopoverContent align="start" side="bottom" sideOffset={6} className="dshx-root" data-dshfiles-memory-preview>
+      <PopoverContent
+        align="start"
+        side="bottom"
+        sideOffset={6}
+        className="dshx-root dshx:w-[44rem] dshx:max-w-[calc(100vw-1rem)]"
+        data-dshfiles-memory-preview
+      >
         <PopoverHeader>
           <PopoverTitle>
             Memory · {request.id}
             {request.range === undefined ? '' : ` #${request.range}`}
           </PopoverTitle>
         </PopoverHeader>
-        {preview.isPending ? <p>Loading memory…</p> : null}
-        {preview.isError ? <p>{errorMessage(preview.error, 'Memory reference is unavailable.')}</p> : null}
-        {preview.data === undefined ? null : <MarkdownText text={preview.data.summary} labels={markdownLabels} variant="compact" />}
+        <div className="dshx:max-h-[52vh] dshx:overflow-auto">
+          {preview.isPending ? <p className="dshx:text-xs dshx:text-muted-foreground">Loading memory…</p> : null}
+          {preview.isError ? (
+            <p className="dshx:text-xs dshx:text-destructive" role="alert">
+              {errorMessage(preview.error, 'Memory reference is unavailable.')}
+            </p>
+          ) : null}
+          {preview.data === undefined ? null : <MarkdownText text={preview.data.summary} labels={markdownLabels} variant="compact" />}
+        </div>
+        <div className="dshx:flex dshx:justify-end">
+          <Button
+            size="xs"
+            variant="outline"
+            onClick={() => {
+              props.openInMemory(request.range === undefined ? { id: request.id } : { id: request.id, range: request.range })
+              setRequest(null)
+            }}
+          >
+            Open in Memory
+          </Button>
+        </div>
       </PopoverContent>
     </Popover>
   )

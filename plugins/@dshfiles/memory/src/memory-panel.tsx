@@ -8,9 +8,10 @@ import { Textarea } from '@dshfiles/plugin-ui/components/ui/textarea'
 import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
-import { useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 
 import { memoryApi, type MemoryCitation, type MemoryNoteType, type MemoryUsage, type PanelNote, type PanelThread } from './api.ts'
+import { MemoryFocusModel } from './memory-focus.ts'
 import { useNoteEditor } from './use-note-editor.js'
 
 const noteTypes: readonly { readonly value: MemoryNoteType; readonly label: string; readonly hint: string }[] = [
@@ -224,13 +225,16 @@ const NoteDetail = (props: { readonly note: PanelNote; readonly openThread: Open
   )
 }
 
-const NotesTab = (props: { readonly project: string | undefined; readonly openThread: OpenThread }): JSX.Element => {
+const NotesTab = (props: { readonly project: string | undefined; readonly openThread: OpenThread; readonly focusNoteId: number | undefined }): JSX.Element => {
   const api = useApi(memoryApi)
   const [query, setQuery] = useState('')
   const [type, setType] = useState<MemoryNoteType | ''>('')
   const [scope, setScope] = useState('')
   const [includeInvalid, setIncludeInvalid] = useState(false)
   const [selectedId, setSelectedId] = useState<number | null>(null)
+  useEffect(() => {
+    if (props.focusNoteId !== undefined) setSelectedId(props.focusNoteId)
+  }, [props.focusNoteId])
   const debounced = useDebouncedValue({ value: query, delayMs: 250 })
   const notes = useQuery({
     queryKey: ['dshfiles-memory', 'notes', props.project, debounced, type, scope, includeInvalid],
@@ -291,11 +295,17 @@ const NotesTab = (props: { readonly project: string | undefined; readonly openTh
   )
 }
 
-const ThreadRow = (props: { readonly thread: PanelThread; readonly openThread: OpenThread }): JSX.Element => {
+const ThreadRow = (props: { readonly thread: PanelThread; readonly openThread: OpenThread; readonly focused?: boolean }): JSX.Element => {
   const [open, setOpen] = useState(false)
+  const row = useRef<HTMLLIElement | null>(null)
   const thread = props.thread
+  useEffect(() => {
+    if (props.focused !== true) return
+    setOpen(true)
+    row.current?.scrollIntoView({ block: 'center' })
+  }, [props.focused])
   return (
-    <li className="dshx:flex dshx:flex-col dshx:gap-1 dshx:py-2">
+    <li className="dshx:flex dshx:flex-col dshx:gap-1 dshx:py-2" ref={row}>
       <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:text-sm">
         <ThreadLink id={thread.id} openThread={props.openThread} />
         <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{thread.title}</span>
@@ -318,7 +328,11 @@ const ThreadRow = (props: { readonly thread: PanelThread; readonly openThread: O
   )
 }
 
-const ThreadsTab = (props: { readonly project: string | undefined; readonly openThread: OpenThread }): JSX.Element => {
+const ThreadsTab = (props: {
+  readonly project: string | undefined
+  readonly openThread: OpenThread
+  readonly focusThreadId: string | undefined
+}): JSX.Element => {
   const api = useApi(memoryApi)
   const threads = useQuery({
     queryKey: ['dshfiles-memory', 'threads', props.project],
@@ -339,7 +353,7 @@ const ThreadsTab = (props: { readonly project: string | undefined; readonly open
             {list
               .filter(thread => thread.project === project)
               .map(thread => (
-                <ThreadRow key={thread.id} thread={thread} openThread={props.openThread} />
+                <ThreadRow focused={thread.id === props.focusThreadId} key={thread.id} thread={thread} openThread={props.openThread} />
               ))}
           </ul>
         </section>
@@ -522,6 +536,16 @@ const UsageTab = (props: { readonly usage: MemoryUsage | undefined; readonly ope
 export const MemoryPanel = (props: { readonly openThread: OpenThread }): JSX.Element => {
   const api = useApi(memoryApi)
   const [project, setProject] = useState('')
+  const [tab, setTab] = useState('notes')
+  const focus = useSyncExternalStore(MemoryFocusModel.subscribe, MemoryFocusModel.read, () => null)
+  useEffect(() => {
+    if (focus === null) return
+    // A reference can name an item in any project, so the request also clears the project filter.
+    setProject('')
+    setTab(focus.id.startsWith('n:') ? 'notes' : 'threads')
+    const timer = window.setTimeout(MemoryFocusModel.clear, 0)
+    return () => window.clearTimeout(timer)
+  }, [focus])
   const projects = useQuery({ queryKey: ['dshfiles-memory', 'projects'], queryFn: ({ signal }) => api.projects(undefined, { signal }) })
   const usage = useQuery({
     queryKey: ['dshfiles-memory', 'usage'],
@@ -532,7 +556,7 @@ export const MemoryPanel = (props: { readonly openThread: OpenThread }): JSX.Ele
   const selected = project === '' ? undefined : project
   return (
     <main className="dshx-root dshx:flex dshx:h-full dshx:min-h-0 dshx:flex-col dshx:bg-background dshx:text-foreground">
-      <Tabs defaultValue="notes" className="dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col">
+      <Tabs value={tab} onValueChange={setTab} className="dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col">
         <header className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-3 dshx:border-b dshx:border-border dshx:px-4 dshx:py-3">
           <h2 className="dshx:text-base dshx:font-semibold">Memory</h2>
           {usage.data === undefined ? null : (
@@ -561,10 +585,10 @@ export const MemoryPanel = (props: { readonly openThread: OpenThread }): JSX.Ele
         </header>
         <div className="dshx:min-h-0 dshx:flex-1 dshx:overflow-auto dshx:px-4 dshx:py-3">
           <TabsContent value="notes">
-            <NotesTab project={selected} openThread={props.openThread} />
+            <NotesTab focusNoteId={MemoryFocusModel.noteIdOf(focus)} project={selected} openThread={props.openThread} />
           </TabsContent>
           <TabsContent value="threads">
-            <ThreadsTab project={selected} openThread={props.openThread} />
+            <ThreadsTab focusThreadId={MemoryFocusModel.threadIdOf(focus)} project={selected} openThread={props.openThread} />
           </TabsContent>
           <TabsContent value="usage">
             <UsageTab usage={usage.data} openThread={props.openThread} />

@@ -2,10 +2,12 @@ import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
+import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import { defineClient } from '@dshfiles/dshx/client'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 
 import { MemoryPanel } from './memory-panel.tsx'
+import { MemoryFocusModel } from './memory-focus.ts'
 import { installMemoryReferenceLinks } from './memory-reference-links.ts'
 import { MemoryReferenceOverlay } from './memory-reference-overlay.tsx'
 import './client.css'
@@ -14,7 +16,7 @@ const PANEL_ID = 'dshfiles-memory-panel'
 
 export default defineClient({
   name: '@dshfiles/memory',
-  inject: ['slots', 'sessions', 'uiWorkspace'],
+  inject: ['slots', 'sessions', 'uiWorkspace', 'layout'],
   setup(ctx, decorate) {
     ctx.effect(() => installMemoryReferenceLinks(), 'memory reference links')
     const PanelView = (): JSX.Element => (
@@ -29,7 +31,12 @@ export default defineClient({
     )
     const ReferenceOverlay = (): JSX.Element => (
       <PluginQueryProvider>
-        <MemoryReferenceOverlay />
+        <MemoryReferenceOverlay
+          openInMemory={focus => {
+            MemoryFocusModel.request(focus)
+            ctx.layout.selectPanel(PANEL_ID as MainPanelId)
+          }}
+        />
       </PluginQueryProvider>
     )
     ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 4, label: 'Memory' }, PanelGlyph))
