@@ -5,6 +5,7 @@ import { createRequire } from 'node:module'
 import { basename, dirname, join, resolve } from 'node:path'
 import { z } from 'zod'
 import { JsonText } from './json-text.js'
+import { ThreadIntegrationModel } from './thread-integration-state.js'
 
 export interface JjResult {
   readonly exitCode: number
@@ -103,8 +104,9 @@ export type DiscardOutcome = { readonly status: 'discarded' } | { readonly statu
 const REVISION_TEMPLATE = 'change_id ++ "\\t" ++ commit_id ++ "\\t" ++ conflict ++ "\\t" ++ description.first_line() ++ "\\n"'
 const LAND_REVISION_TEMPLATE =
   'change_id.short(12) ++ "\\t" ++ commit_id ++ "\\t" ++ conflict ++ "\\t" ++ empty ++ "\\t" ++ current_working_copy ++ "\\t" ++ description.first_line() ++ "\\n"'
-const PLACEHOLDER_DESCRIPTIONS = new Set(['', 'wip'])
 const MAX_CONFLICT_FILES = 50
+/** How far behind the bookmark a workspace is read; the count is displayed, so an exact value past this is noise. */
+const MAX_BEHIND_REVISIONS = 1_000
 const MAX_DETACHED_REVISIONS = 128
 const MAX_PATCH_REVISIONS = 128
 const MAX_PATCH_FILES = 64
@@ -330,8 +332,23 @@ export const createThreads = (options: {
     return completeStdout(result)
   }
 
-  const revisions = async (revset: string, cwd: string, observe = false, signal?: AbortSignal): Promise<readonly ThreadRevision[]> =>
-    parseRevisions(await jj([...(observe ? ['--ignore-working-copy'] : []), 'log', '--no-graph', '-r', revset, '-T', REVISION_TEMPLATE], cwd, signal))
+  const revisions = async (revset: string, cwd: string, observe = false, signal?: AbortSignal, maxRevisions?: number): Promise<readonly ThreadRevision[]> =>
+    parseRevisions(
+      await jj(
+        [
+          ...(observe ? ['--ignore-working-copy'] : []),
+          'log',
+          '--no-graph',
+          ...(maxRevisions === undefined ? [] : ['-n', String(maxRevisions)]),
+          '-r',
+          revset,
+          '-T',
+          REVISION_TEMPLATE,
+        ],
+        cwd,
+        signal,
+      ),
+    )
 
   const landRevisions = async (revset: string, cwd: string, observe = false, signal?: AbortSignal) =>
     parseLandRevisions(await jj([...(observe ? ['--ignore-working-copy'] : []), 'log', '--no-graph', '-r', revset, '-T', LAND_REVISION_TEMPLATE], cwd, signal))
@@ -566,8 +583,14 @@ export const createThreads = (options: {
     return commitId
   }
 
-  const unlandedRevset = (name: string): string => `(::${name}@ ~ ::${options.bookmark()}) ~ empty()`
+  const unlandedRevset = (name: string): string => `(::${name}@ ~ ::${bookmarkRevset(options.bookmark())}) ~ empty()`
   const unlandedRevsetAt = (name: string, bookmarkCommitId: string): string => `(::${name}@ ~ ::${commitIdRevset(bookmarkCommitId)}) ~ empty()`
+  /**
+   * Commits the bookmark has that this working copy lacks. Comparing the other way round counts the workspace's own
+   * commits — including its always-present empty working copy — so a workspace that merely predates the bookmark's
+   * advance looked like it held work to integrate.
+   */
+  const behindRevset = (workingCopy: string): string => `(::${bookmarkRevset(options.bookmark())} ~ ::${workingCopy}) ~ empty()`
 
   type RebasedStateScan =
     | { readonly status: 'not-eligible' }
@@ -665,7 +688,7 @@ export const createThreads = (options: {
         const present = existsSync(join(path, '.jj'))
         if (!present && !name.startsWith('thread-')) continue
         const unlanded = await revisions(unlandedRevset(name), repoRoot, true)
-        const behind = await revisions(`${name}@ ~ ${options.bookmark()}::`, repoRoot, true)
+        const behind = await revisions(behindRevset(`${name}@`), repoRoot, true, undefined, MAX_BEHIND_REVISIONS + 1)
         statuses[index] = withRebaseMetadata(
           {
             name,
@@ -674,7 +697,7 @@ export const createThreads = (options: {
             missing: !present,
             unlanded,
             behind: behind.length > 0,
-            behindCount: behind.length,
+            behindCount: Math.min(behind.length, MAX_BEHIND_REVISIONS),
           },
           rebaseMetadata[name],
         )
@@ -688,11 +711,19 @@ export const createThreads = (options: {
     const path = join(options.threadsDirectory(repoRoot), name)
     const bookmark = options.bookmark()
     const [unlanded, behind, rebaseMetadata] = await Promise.all([
-      revisions(`(::@ ~ ::${bookmark}) ~ empty()`, path, true),
-      revisions(`@ ~ ${bookmark}::`, path, true),
+      revisions(`(::@ ~ ::${bookmarkRevset(bookmark)}) ~ empty()`, path, true),
+      revisions(behindRevset('@'), path, true, undefined, MAX_BEHIND_REVISIONS + 1),
       readRebaseMetadata(repoRoot),
     ])
-    const threadStatus = { name, path, repoRoot, missing: !existsSync(join(path, '.jj')), unlanded, behind: behind.length > 0, behindCount: behind.length }
+    const threadStatus = {
+      name,
+      path,
+      repoRoot,
+      missing: !existsSync(join(path, '.jj')),
+      unlanded,
+      behind: behind.length > 0,
+      behindCount: Math.min(behind.length, MAX_BEHIND_REVISIONS),
+    }
     return withRebaseMetadata(threadStatus, rebaseMetadata[name])
   }
 
@@ -746,7 +777,7 @@ export const createThreads = (options: {
       const initialPatchComparison = await comparePatchEquivalence({ candidates: work, repoRoot, snapshot, signal: input.signal })
       const initialPatchBlock = patchGuardOutcome(work, initialPatchComparison)
       if (initialPatchBlock !== undefined) return initialPatchBlock
-      const undescribed = work.filter(revision => PLACEHOLDER_DESCRIPTIONS.has(revision.description.toLowerCase()))
+      const undescribed = work.filter(revision => ThreadIntegrationModel.isPlaceholderRevisionDescription(revision.description))
       if (undescribed.length > 0) return { status: 'needs-description', revisions: undescribed }
 
       if (!(await ensureAuthorized())) return { status: 'not-eligible' }
@@ -804,7 +835,7 @@ export const createThreads = (options: {
         }
         const patchBlock = patchGuardOutcome(attemptWork, patchComparison)
         if (patchBlock !== undefined) return patchBlock
-        const attemptUndescribed = attemptWork.filter(revision => PLACEHOLDER_DESCRIPTIONS.has(revision.description.toLowerCase()))
+        const attemptUndescribed = attemptWork.filter(revision => ThreadIntegrationModel.isPlaceholderRevisionDescription(revision.description))
         if (attemptUndescribed.length > 0) return { status: 'needs-description', revisions: attemptUndescribed }
         if (!(await ensureAuthorized())) return { status: 'not-eligible' }
         if ((await workingCopyCommitId(cwd, input.signal)) !== attemptSourceRevision) {
@@ -1092,7 +1123,7 @@ export const createThreads = (options: {
         }
         const rebased = postRebase.filter(item => !item.empty).map(item => item.revision)
         if (rebased.length === 0) return { status: 'nothing-to-land' }
-        const undescribed = rebased.filter(revision => PLACEHOLDER_DESCRIPTIONS.has(revision.description.toLowerCase()))
+        const undescribed = rebased.filter(revision => ThreadIntegrationModel.isPlaceholderRevisionDescription(revision.description))
         if (undescribed.length > 0) return { status: 'needs-description', revisions: undescribed }
         const conflicted = rebased.filter(revision => revision.conflict)
         if (conflicted.length > 0) {

@@ -122,6 +122,54 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
     expect(invocations.every(invocation => invocation.cwd === target.path && invocation.command === 'log')).toBe(true)
   })
 
+  it('reports a workspace that only sits behind the bookmark as behind with nothing to integrate', async () => {
+    const thread = await threads.provision(repo)
+    writeFileSync(join(repo, 'shared.txt'), 'one\nadvanced\n')
+    jj(repo, 'commit', '-m', 'feat: advance main')
+    jj(repo, 'bookmark', 'set', 'main', '-r', '@-')
+
+    const status = (await threads.list(repo)).find(candidate => candidate.name === thread.name)
+
+    expect(status).toMatchObject({ unlanded: [], behind: true, behindCount: 1, missing: false })
+  })
+
+  it('never counts a thread’s own pending revisions as being behind the bookmark', async () => {
+    const thread = await threads.provision(repo)
+    writeFileSync(join(thread.path, 'feature.txt'), 'feature\n')
+    jj(thread.path, 'describe', '-m', 'feat: pending work')
+
+    const status = await threads.status(repo, thread.name)
+
+    expect(status).toMatchObject({ behind: false, behindCount: 0 })
+    expect(status.unlanded.map(revision => revision.description)).toEqual(['feat: pending work'])
+  })
+
+  it('counts every bookmark commit the workspace lacks', async () => {
+    const thread = await threads.provision(repo)
+    writeFileSync(join(repo, 'one.txt'), 'one\n')
+    jj(repo, 'commit', '-m', 'feat: first')
+    writeFileSync(join(repo, 'two.txt'), 'two\n')
+    jj(repo, 'commit', '-m', 'feat: second')
+    jj(repo, 'bookmark', 'set', 'main', '-r', '@-')
+
+    expect((await threads.status(repo, thread.name)).behindCount).toBe(2)
+  })
+
+  it('leaves a landed workspace on the bookmark with no pending work and no stale base', async () => {
+    const thread = await threads.provision(repo)
+    writeFileSync(join(thread.path, 'feature.txt'), 'feature\n')
+    jj(thread.path, 'describe', '-m', 'feat: landed feature')
+    writeFileSync(join(repo, 'other.txt'), 'other\n')
+    jj(repo, 'commit', '-m', 'other work')
+    jj(repo, 'bookmark', 'set', 'main', '-r', '@-')
+
+    const outcome = await threads.land(thread.path)
+    const status = await threads.status(repo, thread.name)
+
+    expect(outcome.status).toBe('landed')
+    expect(status).toMatchObject({ unlanded: [], behind: false, behindCount: 0, rebasedAt: expect.any(Number) })
+  })
+
   it('lists local bookmarks and starts a thread from the chosen one', async () => {
     jj(repo, 'bookmark', 'create', 'feature', '-r', '@')
     jj(repo, 'describe', '-m', 'feature base')

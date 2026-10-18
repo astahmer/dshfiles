@@ -18,6 +18,7 @@ import { jjIntegrationApi, type DestinationView, type LandResult, type Repositor
 import { JsonText } from './json-text.js'
 import { isolatesNewThreadsByDefault, jjIntegrationSettings, mayAutoIntegrateWorkspace, type JjIntegrationSettings } from './settings.js'
 import { ThreadRebaseEligibilityModel, type ThreadSessionActivity } from './thread-rebase-eligibility.js'
+import { ThreadIntegrationModel } from './thread-integration-state.js'
 import { workspaceHasOtherSession } from './thread-session-ownership.js'
 import { registeredProjects } from './registered-projects.js'
 import { createThreads, ThreadWorkspaceModel, ThreadError, type JjExecutor, type ThreadLocation, type ThreadStatus, type Threads } from './threads.js'
@@ -183,8 +184,6 @@ const createExecutor =
 const isolatedSessionIdsAt = (path: string): readonly string[] =>
   [...isolatedSessionWorkspaces].flatMap(([sessionId, workspace]) => (workspace.path === path ? [sessionId] : []))
 
-const isFinished = (sessionIds: readonly string[], archived: ReadonlySet<string>): boolean => sessionIds.every(sessionId => archived.has(sessionId))
-
 const readSessionActivity = async (): Promise<ReadonlyMap<string, ThreadSessionActivity> | undefined> => {
   const controller = requireContext().get('sessionController')
   if (controller === undefined) return undefined
@@ -217,13 +216,14 @@ const threadView = (
     path: status.path,
     workspaceId: workspace?.id ?? null,
     sessionIds,
-    finished: isFinished(sessionIds, archived),
+    finished: ThreadIntegrationModel.isFinishedThread(sessionIds, archived),
     missing: status.missing,
     behind: status.behind,
     behindCount: status.behindCount,
     unlanded: [...status.unlanded],
   }
-  const withEligibility: ThreadView = canRebase === undefined ? view : { ...view, canRebase }
+  const withWorkspaceTitle: ThreadView = workspace === undefined ? view : { ...view, workspaceTitle: workspace.title }
+  const withEligibility: ThreadView = canRebase === undefined ? withWorkspaceTitle : { ...withWorkspaceTitle, canRebase }
   if (status.rebasedAt === undefined) return withEligibility
   const viewWithRebaseTimestamp = { ...withEligibility, rebasedAt: status.rebasedAt }
   if (status.rebasedTipChangeId === undefined) return viewWithRebaseTimestamp

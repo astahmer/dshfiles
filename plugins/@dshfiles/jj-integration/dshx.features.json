@@ -451,7 +451,7 @@
     {
       "id": "thread-workspaces-panel",
       "title": "Thread integration control center",
-      "summary": "A full-page control center, also in the conversation side panel: state tabs with live counts, an Inactive filter, and a banner whose primary action integrates every ready workspace at once. Workspaces are grouped into Conflicts, Ready to integrate, Waiting and Up to date, each with a tone icon, a count and an explanation, and each row shows the workspace ID, the conversation title, when it was last active, its user-message count from the turnOutline projection, its pending revision count, a branch diagram with how far it sits behind the bookmark, a status chip and the blocker keeping it out of the ready group. Ready rows carry a checkbox, the banner then integrates the selection serially, and the row reports the Host's queued, validating and rebasing phases. Details expand on demand with the pending revisions, the thread's sessions and one conversation preview. Behind-only work and already-integrated revisions are never offered again.",
+      "summary": "A full-page control center, also in the conversation side panel: state tabs with live counts, a separate lifecycle filter, and a banner whose primary action integrates every ready workspace at once. Integration state (ready, blocked, conflicts, integrating, integrated, no changes, unverified) is kept separate from lifecycle (active, idle, finished, missing), so a workspace that merely sits behind the bookmark is 'no changes', never a blocker. Empty sections are not rendered while their counts stay in the filter bar. Rows prioritise the conversation title (falling back to the pending revision description, then the project name), the specific blocker, the pending-versus-behind distinction and a contextual action; workspace and thread ids stay secondary and copyable. Batch integration enqueues ready workspaces serially through the existing coordinator, and the queue line names what is active, queued or failed.",
       "reach": [
         "seed rebase-ready-thread",
         "click button \"Current thread workspace: thread-*\"",
@@ -473,12 +473,17 @@
         "no-repositories",
         "no-threads",
         "side-panel",
+        "attention-filter",
+        "lifecycle-filter",
         "ready-to-integrate",
         "conflicts",
-        "waiting-for-writer-or-question",
-        "waiting-for-description",
+        "blocked-by-writer",
+        "blocked-by-question",
+        "blocked-by-description",
+        "unverified-eligibility",
+        "workspace-missing",
+        "behind-without-pending-work",
         "already-integrated",
-        "behind-without-integratable-work",
         "integration-queued",
         "integration-validating",
         "integration-rebasing",
@@ -494,8 +499,9 @@
         "Work that appears after the removal dialog opened is refused by the Host and never deleted unseen; the dialog asks for a refresh.",
         "A Host error while removing stays in the dialog with a retry.",
         "Removal deletes the jj workspace and folder but retains conversation sessions in DSH without changing their archive state.",
-        "Integration is offered only for described, conflict-free, unlanded revisions when both Host and client activity checks allow it.",
-        "Being behind the bookmark without pending revisions is not treated as ready work; successfully integrated work is not offered a second time.",
+        "Integration is offered only for described, conflict-free pending revisions with no writing Session and no pending question; being behind the bookmark alone is never offered.",
+        "A workspace with no pending revisions is reported as no changes or already integrated, never as a blocked one.",
+        "A missing directory or an unknown eligibility is reported as unverified and never offered for integration; the Host re-checks and refuses an unsafe operation.",
         "Batch integration is serialized and continues after per-workspace failures; conflict and description failures remain visible and require user action."
       ],
       "externalDependencies": [
@@ -527,6 +533,118 @@
           "id": "jj-integration.discard-raced-work",
           "file": "plugins/@dshfiles/jj-integration/src/discard-machine.test.ts",
           "testName": "never retries once the Host reports work that appeared after the dialog opened"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.pending-is-not-behind",
+          "file": "plugins/@dshfiles/jj-integration/src/threads.integration.test.ts",
+          "testName": "never counts a thread’s own pending revisions as being behind the bookmark"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.behind-without-work",
+          "file": "plugins/@dshfiles/jj-integration/src/threads.integration.test.ts",
+          "testName": "reports a workspace that only sits behind the bookmark as behind with nothing to integrate"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.behind-count",
+          "file": "plugins/@dshfiles/jj-integration/src/threads.integration.test.ts",
+          "testName": "counts every bookmark commit the workspace lacks"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.integration-classification",
+          "file": "plugins/@dshfiles/jj-integration/src/thread-integration-state.test.ts",
+          "testName": "treats a workspace that only sits behind the bookmark as no changes, never as a blocker"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.multiple-blockers",
+          "file": "plugins/@dshfiles/jj-integration/src/thread-integration-state.test.ts",
+          "testName": "shows every blocker while the failing one stays primary"
+        }
+      ]
+    },
+    {
+      "id": "thread-integration-attention-view",
+      "title": "Thread integration prioritises what needs attention",
+      "summary": "Opening the panel from the left sidebar lands on the Needs attention view: conflicts, ready work and blocked workspaces first, with completed or unchanged workspaces one click away. Integration-state tabs and the lifecycle filter stay separate, and switching to All keeps every count visible.",
+      "reach": [
+        "click button \"Thread integration\"",
+        "expect heading \"Thread integration\"",
+        "expect button \"Needs attention*\"",
+        "click button \"Refresh\"",
+        "click button \"All*\"",
+        "expect button \"Completed*\"",
+        "click button \"Needs attention*\"",
+        "click button \"All*\"",
+        "expect button \"Conflicts*\""
+      ],
+      "surfaces": ["client"],
+      "configuration": [],
+      "states": ["attention-default", "all-view", "completed-count", "lifecycle-filter"],
+      "failureModes": [
+        "The default view falls back to listing every workspace instead of prioritising conflicts, ready work and blocked rows.",
+        "Integration state and lifecycle are collapsed into one filter, so a finished thread with pending work disappears.",
+        "Switching filters loses the counts that make the empty groups discoverable."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.attention-filter-default",
+          "file": "plugins/@dshfiles/jj-integration/src/thread-integration-state.test.ts",
+          "testName": "blocks pending work on the specific reason, hardest first"
+        }
+      ]
+    },
+    {
+      "id": "thread-integration-row-details",
+      "title": "Thread integration row details",
+      "summary": "One row expands in place: every blocker in priority order, the pending revisions with their change ids, the thread's sessions, the workspace path with a copy action, and an on-demand preview of the latest messages. The workspace and thread ids stay secondary and copyable rather than driving the row.",
+      "reach": [
+        "seed rebase-ready-thread",
+        "click button \"Current thread workspace: thread-*\"",
+        "expect button \"Open thread workspaces in side panel\"",
+        "click button \"Open thread workspaces in side panel\"",
+        "expect heading \"Thread integration\"",
+        "click button \"View details\"",
+        "expect button \"Preview\""
+      ],
+      "surfaces": ["client"],
+      "configuration": [],
+      "states": ["details-collapsed", "details-expanded", "single-blocker", "multiple-blockers", "preview-open"],
+      "failureModes": [
+        "A blocked row states one specific primary blocker without needing the details panel.",
+        "Multiple blockers remain reachable in the expanded row instead of being collapsed into one generic message.",
+        "The expanded row keeps the pending revisions and session list without opening a conversation."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.blockers-priority",
+          "file": "plugins/@dshfiles/jj-integration/src/thread-integration-state.test.ts",
+          "testName": "shows every blocker while the failing one stays primary"
+        }
+      ]
+    },
+    {
+      "id": "thread-integration-empty",
+      "title": "Thread integration with no thread workspaces",
+      "summary": "A registered project with no thread workspace shows one plain sentence instead of empty groups, banners or filter tabs: the page never fabricates work, and the counts only appear once a workspace exists.",
+      "reach": ["click button \"Thread integration\"", "expect heading \"Thread integration\"", "expect text \"No thread workspaces.\""],
+      "surfaces": ["client"],
+      "configuration": [],
+      "states": ["no-threads", "no-filter-bar"],
+      "failureModes": ["An empty project still renders group cards or a ready banner instead of one sentence."],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "not-applicable",
+          "id": "jj-integration.empty-presentation",
+          "reason": "Presentation-only empty state: the filter bar and groups are hidden, which the reach proves in the running client."
         }
       ]
     }

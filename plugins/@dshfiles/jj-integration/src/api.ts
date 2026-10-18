@@ -9,6 +9,8 @@ const threadSchema = z
     name: z.string(),
     path: z.string(),
     workspaceId: z.string().nullable(),
+    /** The registered DSH workspace title; absent from a Host older than this field. */
+    workspaceTitle: z.string().optional(),
     sessionIds: z.array(z.string()),
     finished: z.boolean(),
     canRebase: z.boolean().optional(),
@@ -144,7 +146,7 @@ export const jjIntegrationApi = defineApi({
       input: z.object({}).strict(),
       output: z.object({ repositories: z.array(repositorySchema) }).strict(),
       description:
-        'List jj repositories and their thread workspaces: each thread workspace’s name, path, owning Sessions, finished state, unlanded revisions, and whether it can be rebased. Read-only.',
+        'List jj repositories and their thread workspaces: each thread workspace’s name, path, owning Sessions, finished state, pending revisions, how far behind the bookmark it is, and whether it can be integrated right now. Read-only.',
       tool: {
         name: 'jj_thread_repositories',
         readOnly: true,
@@ -156,10 +158,10 @@ export const jjIntegrationApi = defineApi({
                 ...repository.threads.map(thread => {
                   const flags = [
                     thread.finished ? 'finished' : undefined,
-                    thread.missing ? 'missing' : undefined,
-                    thread.behind ? 'behind' : undefined,
-                    thread.canRebase === true ? 'can rebase' : undefined,
-                    thread.unlanded.length === 0 ? undefined : `${String(thread.unlanded.length)} unlanded`,
+                    thread.missing ? 'missing workspace' : undefined,
+                    thread.canRebase === true ? 'can rebase' : thread.canRebase === false ? 'blocked' : 'activity unknown',
+                    thread.unlanded.length === 0 ? 'no pending revisions' : `${String(thread.unlanded.length)} pending`,
+                    (thread.behindCount ?? (thread.behind ? 1 : 0)) === 0 ? undefined : `${String(thread.behindCount ?? 1)} behind`,
                   ].filter(flag => flag !== undefined)
                   return `  ${thread.name} · ${thread.path}${thread.sessionIds.length === 0 ? '' : ` · ${thread.sessionIds.join(', ')}`}${flags.length === 0 ? '' : ` · ${flags.join(' · ')}`}`
                 }),

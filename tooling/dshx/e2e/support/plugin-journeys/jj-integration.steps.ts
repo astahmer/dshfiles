@@ -628,7 +628,7 @@ When('the Thread workspaces panel is opened', async ({ page }: { page: Page }) =
 
 Then('the thread row offers Integrate for its 1 revision', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'jj-integration-panel-offers-integrate-only-for-valid-work', async () => {
-    await expect(threadRow(page).getByText('1 revision(s)', { exact: true })).toBeVisible()
+    await expect(threadRow(page).getByText('1 pending revision', { exact: true })).toBeVisible()
     await expect(threadRow(page).getByRole('button', { name: 'Integrate', exact: true })).toBeVisible()
     await expect(threadRow(page).getByRole('button', { name: 'Discard', exact: true })).toHaveCount(0)
   })

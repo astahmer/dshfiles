@@ -1,5 +1,5 @@
 import type { ISessions, SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
-import { relativeTime } from '@deepseek-ai/dsh-client-ui-primitives'
+import { relativeTime, writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {} from '@deepseek-ai/dsh-session-turn-outline/client'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { PaletteApi, type PaletteActionContext } from '@dshfiles/command-palette/api'
@@ -26,7 +26,9 @@ import {
   ChevronDownIcon,
   CircleAlertIcon,
   CircleCheckIcon,
+  CircleSlashIcon,
   ClockIcon,
+  CopyIcon,
   EllipsisIcon,
   GitForkIcon,
   RefreshCwIcon,
@@ -46,7 +48,12 @@ import { announceRepositoryChange, describeLandResult } from './land-feedback.js
 import type { JjIntegrationTranslate } from './locales.js'
 import { integrationQueueMachine, type IntegrationJob, type IntegrationJobPhase } from './integration-queue-machine.js'
 import { ThreadRebaseEligibilityModel } from './thread-rebase-eligibility.js'
-import { threadIntegrationBlockReason, threadIntegrationState, type ThreadIntegrationState } from './thread-integration-state.js'
+import {
+  ThreadIntegrationModel,
+  type ThreadIntegrationAssessment,
+  type ThreadIntegrationBlocker,
+  type ThreadIntegrationCategory,
+} from './thread-integration-state.js'
 import { useToast } from './toast.js'
 
 export const threadQueryKeys = {
@@ -57,87 +64,90 @@ export const threadQueryKeys = {
 export const threadRebaseMutationKey = ['jj-integration', 'thread-rebase'] as const
 
 /** Rows one group shows before it offers to reveal the rest. */
-const GROUP_LIMIT = 6
+const GROUP_LIMIT = 8
 
-/** One row layout for every workspace: select, id, thread, activity, revisions, bookmark, status, blocker, actions. */
+/** One row layout: selection, thread, activity, changes, status/blocker, actions. */
 const ROW_GRID =
-  'dshx:grid dshx:grid-cols-[1.25rem_minmax(6rem,0.6fr)_minmax(7.5rem,1.3fr)_minmax(4rem,0.45fr)_minmax(8rem,0.8fr)_minmax(9.5rem,1fr)_auto_minmax(2rem,0.5fr)_auto] dshx:items-center dshx:gap-x-2'
+  'dshx:grid dshx:grid-cols-[1.25rem_minmax(10rem,1.6fr)_minmax(4.5rem,0.5fr)_minmax(7rem,0.8fr)_minmax(10rem,1.1fr)_auto] dshx:items-center dshx:gap-x-3'
 
-type IntegrationFilter = 'all' | ThreadIntegrationState | 'inactive'
+type IntegrationFilter = 'attention' | 'all' | 'ready' | 'blocked' | 'conflicts' | 'integrating' | 'completed'
+type LifecycleFilter = 'any' | 'active' | 'idle' | 'finished' | 'missing'
+type ThreadLifecycle = 'active' | 'waiting-input' | 'idle' | 'finished' | 'missing'
+type RowGroup = 'conflicts' | 'ready' | 'blocked' | 'integrating' | 'completed'
 
 type ToneClasses = { readonly solid: string; readonly text: string; readonly chip: string; readonly dot: string }
 
 const toneClasses = {
-  ready: {
-    solid: 'dshx:bg-success',
-    text: 'dshx:text-success',
-    chip: 'dshx:border-success/30 dshx:bg-success/10 dshx:text-success',
-    dot: 'dshx:bg-success',
-  },
   conflicts: {
     solid: 'dshx:bg-destructive',
     text: 'dshx:text-destructive',
     chip: 'dshx:border-destructive/30 dshx:bg-destructive/10 dshx:text-destructive',
     dot: 'dshx:bg-destructive',
   },
-  waiting: {
+  ready: {
+    solid: 'dshx:bg-success',
+    text: 'dshx:text-success',
+    chip: 'dshx:border-success/30 dshx:bg-success/10 dshx:text-success',
+    dot: 'dshx:bg-success',
+  },
+  blocked: {
     solid: 'dshx:bg-warning',
     text: 'dshx:text-warning',
     chip: 'dshx:border-warning/30 dshx:bg-warning/10 dshx:text-warning',
     dot: 'dshx:bg-warning',
   },
-  'up-to-date': {
+  unknown: {
+    solid: 'dshx:bg-warning',
+    text: 'dshx:text-warning',
+    chip: 'dshx:border-warning/40 dshx:bg-warning/5 dshx:text-warning',
+    dot: 'dshx:bg-warning',
+  },
+  integrating: {
+    solid: 'dshx:bg-primary',
+    text: 'dshx:text-primary',
+    chip: 'dshx:border-primary/30 dshx:bg-primary/10 dshx:text-primary',
+    dot: 'dshx:bg-primary',
+  },
+  integrated: {
     solid: 'dshx:bg-muted-foreground',
     text: 'dshx:text-muted-foreground',
     chip: 'dshx:border-border dshx:bg-muted dshx:text-muted-foreground',
     dot: 'dshx:bg-muted-foreground',
   },
-} satisfies Record<ThreadIntegrationState, ToneClasses>
+  'no-changes': {
+    solid: 'dshx:bg-muted-foreground',
+    text: 'dshx:text-muted-foreground',
+    chip: 'dshx:border-border dshx:bg-muted dshx:text-muted-foreground',
+    dot: 'dshx:bg-muted-foreground',
+  },
+} satisfies Record<ThreadIntegrationCategory, ToneClasses>
 
-const statusChip = (props: { readonly label: string; readonly tone: ThreadIntegrationState }): JSX.Element => (
-  <Badge variant="outline" className={cn('dshx:gap-1.5 dshx:px-2.5 dshx:py-1', toneClasses[props.tone].chip)}>
+const statusChip = (props: { readonly label: string; readonly tone: ThreadIntegrationCategory }): JSX.Element => (
+  <Badge variant="outline" className={cn('dshx:w-fit dshx:gap-1.5 dshx:px-2.5 dshx:py-1', toneClasses[props.tone].chip)}>
     <span className={cn('dshx:size-1.5 dshx:rounded-full', toneClasses[props.tone].dot)} aria-hidden="true" />
     {props.label}
   </Badge>
 )
 
-const groupIcon = (tone: ThreadIntegrationState): JSX.Element => {
-  const Icon = tone === 'conflicts' ? CircleAlertIcon : tone === 'waiting' ? ClockIcon : CircleCheckIcon
-  return <Icon className="dshx:size-4" />
+const groupIcon = (category: ThreadIntegrationCategory): JSX.Element => {
+  if (category === 'conflicts' || category === 'unknown') return <CircleAlertIcon className="dshx:size-4" />
+  if (category === 'ready' || category === 'integrated') return <CircleCheckIcon className="dshx:size-4" />
+  if (category === 'integrating') return <GitForkIcon className="dshx:size-4" />
+  if (category === 'no-changes') return <CircleSlashIcon className="dshx:size-4" />
+  return <ClockIcon className="dshx:size-4" />
 }
 
-const groupGlyph = (tone: ThreadIntegrationState): JSX.Element => (
+const groupGlyph = (category: ThreadIntegrationCategory): JSX.Element => (
   <span
     aria-hidden="true"
     className={cn(
       'dshx:mt-0.5 dshx:flex dshx:size-6 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-full dshx:text-white',
-      toneClasses[tone].solid,
+      toneClasses[category].solid,
     )}
   >
-    {groupIcon(tone)}
+    {groupIcon(category)}
   </span>
 )
-
-/** The branch diagram: the thread's own revision branching off the base it landed on, then the bookmark it still trails. */
-const IntegrationGlyph = (props: { readonly behind: number; readonly pending: number; readonly muted: boolean }): JSX.Element => {
-  const branch = props.muted || props.pending === 0 ? 'dshx:text-muted-foreground/60' : 'dshx:text-primary'
-  const base = props.muted ? 'dshx:text-muted-foreground/60' : 'dshx:text-primary'
-  const tail = props.muted || props.behind > 0 ? 'dshx:text-muted-foreground/60' : base
-  return (
-    <svg viewBox="0 0 59 18" aria-hidden="true" className="dshx:h-3.5 dshx:w-11.5 dshx:shrink-0">
-      <g className={branch}>
-        <path d="M2 2.5V15.5" stroke="currentColor" strokeWidth="1.5" fill="none" />
-        <circle cx="2" cy="2.5" r="2.2" fill="currentColor" />
-        <circle cx="2" cy="15.5" r="2.2" fill="currentColor" />
-        <path d="M2 2.5C2 7.4 4.6 9 13 9" stroke="currentColor" strokeWidth="1.5" fill="none" />
-      </g>
-      <path d="M13 9H29.4" className={base} stroke="currentColor" strokeWidth="1.8" fill="none" />
-      <circle cx="34" cy="9" r="4.6" className={base} stroke="currentColor" strokeWidth="1.8" fill="none" />
-      <path d="M38.6 9H49.2" className={tail} stroke="currentColor" strokeWidth="1.3" fill="none" />
-      <circle cx="53.5" cy="9" r="4.3" className={tail} stroke="currentColor" strokeWidth="1.5" fill="none" />
-    </svg>
-  )
-}
 
 /** The thread sidebar owns restarting DSH (with its confirmation dialog) and registers it as a palette action. */
 const RESTART_ACTION_ID = '@dshfiles/thread-sidebar/action/restart-dsh'
@@ -240,11 +250,14 @@ const activityLabel = (t: JjIntegrationTranslate, at: number, now: number): stri
   return t('timeYears', { n: age.n })
 }
 
-const integrationStateLabel = (t: JjIntegrationTranslate, state: ThreadIntegrationState, thread: ThreadView): string => {
-  if (state === 'ready') return t('readyToIntegrate')
-  if (state === 'conflicts') return t('conflict')
-  if (state === 'waiting') return t('waiting')
-  return thread.rebasedAt === undefined ? t('upToDateHeading') : t('integrated')
+const integrationStatusLabel = (t: JjIntegrationTranslate, assessment: ThreadIntegrationAssessment): string => {
+  if (assessment.category === 'ready') return t('readyToIntegrate')
+  if (assessment.category === 'conflicts') return t('conflict')
+  if (assessment.category === 'blocked') return t('blockedStatus')
+  if (assessment.category === 'unknown') return t('unknownStatus')
+  if (assessment.category === 'integrating') return t('integrationInProgress')
+  if (assessment.category === 'integrated') return t('integrated')
+  return t('noChanges')
 }
 
 const integrationJobLabel = (t: JjIntegrationTranslate, phase: IntegrationJobPhase): string => {
@@ -255,19 +268,57 @@ const integrationJobLabel = (t: JjIntegrationTranslate, phase: IntegrationJobPha
   if (phase === 'integrated') return t('integrated')
   if (phase === 'conflicts') return t('conflict')
   if (phase === 'needs-description') return t('describeFirst')
-  if (phase === 'up-to-date') return t('upToDateHeading')
+  if (phase === 'up-to-date') return t('noChanges')
   return t('integrationFailed')
 }
 
-const integrationBlockMessage = (t: JjIntegrationTranslate, reason: ReturnType<typeof threadIntegrationBlockReason>, bookmark: string): string | undefined => {
-  if (reason === undefined) return undefined
-  if (reason === 'missing') return t('missingWorkspaceNextStep')
-  if (reason === 'conflicts') return t('resolveConflictsNextStep')
-  if (reason === 'active') return t('waitForThreadNextStep')
-  if (reason === 'question') return t('answerQuestionNextStep')
-  if (reason === 'description') return t('describeRevisionsNextStep')
-  if (reason === 'activity-unknown') return t('activityUnknownNextStep')
-  return t('behindWithoutWorkNextStep', { bookmark })
+/** The one specific reason a row cannot integrate right now, primary blocker first. */
+const blockerMessage = (t: JjIntegrationTranslate, blocker: ThreadIntegrationBlocker, bookmark: string): string => {
+  if (blocker === 'missing') return t('blockerMissing')
+  if (blocker === 'conflict') return t('blockerConflict', { bookmark })
+  if (blocker === 'question') return t('blockerQuestion')
+  if (blocker === 'active') return t('blockerActive')
+  if (blocker === 'description') return t('blockerDescription')
+  return t('blockerActivityUnknown')
+}
+
+/** A non-blocking note: a stale base is not work to integrate, so it must not read like one. */
+const advisoryMessage = (t: JjIntegrationTranslate, assessment: ThreadIntegrationAssessment, bookmark: string): string | undefined => {
+  if (assessment.pendingRevisions > 0) return undefined
+  if (assessment.category === 'integrated') return t('alreadyIntegrated')
+  if (assessment.behindBookmark > 0) return t('advisoryBehind', { count: assessment.behindBookmark, bookmark })
+  return undefined
+}
+
+const lifecycleLabel = (t: JjIntegrationTranslate, lifecycle: ThreadLifecycle): string | undefined => {
+  if (lifecycle === 'active') return t('lifecycleRunning')
+  if (lifecycle === 'waiting-input') return t('lifecycleWaitingInput')
+  if (lifecycle === 'finished') return t('lifecycleFinished')
+  if (lifecycle === 'missing') return t('lifecycleMissing')
+  return undefined
+}
+
+const lifecycleOf = (thread: ThreadView, running: boolean, waitingForInput: boolean): ThreadLifecycle => {
+  if (thread.missing) return 'missing'
+  if (waitingForInput) return 'waiting-input'
+  if (running) return 'active'
+  if (thread.finished) return 'finished'
+  return 'idle'
+}
+
+const rowGroupOf = (category: ThreadIntegrationCategory): RowGroup => {
+  if (category === 'conflicts') return 'conflicts'
+  if (category === 'ready') return 'ready'
+  if (category === 'integrating') return 'integrating'
+  if (category === 'integrated' || category === 'no-changes') return 'completed'
+  return 'blocked'
+}
+
+const workspaceTitlePrefix = (title: string | undefined): string | undefined => {
+  if (title === undefined) return undefined
+  const [prefix] = title.split(' · ')
+  const trimmed = prefix?.trim() ?? ''
+  return trimmed.length === 0 ? undefined : trimmed
 }
 
 /**
@@ -285,13 +336,17 @@ const refreshRepositoriesForUnknownEligibility = (queryClient: ReturnType<typeof
 
 const ThreadRow = (props: {
   readonly thread: ThreadView
+  readonly repositoryTitle: string
+  readonly assessment: ThreadIntegrationAssessment
+  readonly lifecycle: ThreadLifecycle
+  /** The Host cached a refusal while every Session the client can see is idle; one refresh settles it. */
+  readonly hostEligibilityStale: boolean
   readonly sessionById: ReadonlyMap<string, SessionSummary>
   readonly userMessagesBySession: ReadonlyMap<string, number>
   readonly sessions: ISessions
   readonly openSession: (sessionId: SessionSummary['id']) => void
   readonly t: JjIntegrationTranslate
   readonly bookmark: string
-  readonly state: ThreadIntegrationState
   readonly selected: boolean
   readonly selectable: boolean
   readonly job: IntegrationJob | undefined
@@ -301,60 +356,30 @@ const ThreadRow = (props: {
   readonly onIntegrate: () => void
   readonly onDiscard: () => void
 }): JSX.Element => {
-  const { thread, t } = props
+  const { thread, t, assessment } = props
   const queryClient = useQueryClient()
   const [expanded, setExpanded] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
+  const [copied, setCopied] = useState(false)
   const previewId = useId()
-  const subscribe = useCallback((listener: () => void) => props.sessions.list.subscribe(listener), [props.sessions])
-  const readSessionRunning = useCallback(
-    () => Object.values(props.sessions.list.getSnapshot().byId).some(session => session.cwd === thread.path && session.running),
-    [props.sessions, thread.path],
-  )
-  const readClientCanRebase = useCallback(() => {
-    const sessions = props.sessions.list.getSnapshot().byId
-    return ThreadRebaseEligibilityModel.canRebase(thread.sessionIds, sessionId => {
-      const session = sessions[SessionId(sessionId)]
-      return session === undefined
-        ? undefined
-        : { running: session.running, pendingUserQuestion: ThreadRebaseEligibilityModel.hasPendingUserQuestion(session.projectionValues) }
-    })
-  }, [props.sessions, thread.sessionIds])
-  const readClientQuestionPending = useCallback(() => {
-    const sessions = props.sessions.list.getSnapshot().byId
-    return (
-      thread.sessionIds.some(sessionId => ThreadRebaseEligibilityModel.hasPendingUserQuestion(sessions[SessionId(sessionId)]?.projectionValues) === true) ||
-      Object.values(sessions).some(
-        session => session.cwd === thread.path && ThreadRebaseEligibilityModel.hasPendingUserQuestion(session.projectionValues) === true,
-      )
-    )
-  }, [props.sessions, thread.path, thread.sessionIds])
-  const sessionRunning = useSyncExternalStore(subscribe, readSessionRunning, () => true)
-  const clientCanRebase = useSyncExternalStore(subscribe, readClientCanRebase, () => false)
-  const sessionWaitingForInput = useSyncExternalStore(subscribe, readClientQuestionPending, () => true)
-  const safeToIntegrate = thread.canRebase === true && clientCanRebase && !sessionRunning && !sessionWaitingForInput
-  const state = safeToIntegrate ? props.state : threadIntegrationState({ ...thread, canRebase: false })
-  const blockReason = threadIntegrationBlockReason({
-    thread,
-    sessionRunning,
-    sessionWaitingForInput,
-    sessionActivityUnknown: thread.canRebase === true && !clientCanRebase && !sessionRunning && !sessionWaitingForInput,
-    state,
-  })
-  const mainSession = thread.sessionIds.map(sessionId => props.sessionById.get(sessionId)).find(session => session !== undefined)
   useEffect(() => {
-    if (thread.canRebase !== false || !clientCanRebase) return
+    if (!props.hostEligibilityStale) return
     refreshRepositoriesForUnknownEligibility(queryClient)
-  }, [clientCanRebase, queryClient, thread.canRebase])
-  const statusLabel = props.job === undefined ? integrationStateLabel(t, state, thread) : integrationJobLabel(t, props.job.phase)
-  const statusDescription = props.job?.message ?? integrationBlockMessage(t, blockReason, props.bookmark)
+  }, [props.hostEligibilityStale, queryClient])
+  const mainSession = thread.sessionIds.map(sessionId => props.sessionById.get(sessionId)).find(session => session !== undefined)
+  const statusLabel = props.job === undefined ? integrationStatusLabel(t, assessment) : integrationJobLabel(t, props.job.phase)
+  const primaryBlocker = props.job?.message ?? (assessment.blocker === undefined ? undefined : blockerMessage(t, assessment.blocker, props.bookmark))
+  const statusDescription = primaryBlocker ?? advisoryMessage(t, assessment, props.bookmark)
   const updatedAt = thread.sessionIds.reduce<number | undefined>((latest, sessionId) => {
     const updated = props.sessionById.get(sessionId)?.updatedAt
     if (updated === undefined) return latest
     return latest === undefined || updated > latest ? updated : latest
   }, undefined)
   const tip = thread.unlanded[0]
-  const subtitle = tip === undefined ? thread.rebasedTipChangeId : tip.changeId
+  const title = workspaceTitlePrefix(thread.workspaceTitle) ?? props.repositoryTitle
+  const sessionTitle = mainSession?.displayTitle
+  const revisionTitle = tip !== undefined && !ThreadIntegrationModel.isPlaceholderRevisionDescription(tip.description) ? tip.description.trim() : undefined
+  const heading = sessionTitle ?? revisionTitle ?? title
   const userMessages = thread.sessionIds.reduce<{ count: number; known: boolean }>(
     (totals, sessionId) => {
       if (props.sessionById.get(sessionId)?.origin === 'subagent') return totals
@@ -365,82 +390,100 @@ const ThreadRow = (props: {
     { count: 0, known: false },
   )
   const behindLabel =
-    thread.behindCount === undefined
-      ? thread.behind
-        ? t('behind', { bookmark: props.bookmark })
-        : t('onBookmark', { bookmark: props.bookmark })
-      : thread.behindCount > 0
-        ? t('commitsBehind', { count: thread.behindCount, bookmark: props.bookmark })
-        : t('onBookmark', { bookmark: props.bookmark })
-  const title =
-    mainSession === undefined ? (
-      <span className="dshx:min-w-0 dshx:truncate dshx:text-sm dshx:font-medium">{thread.name}</span>
-    ) : (
-      <Button
-        size="sm"
-        variant="ghost"
-        className="dshx:min-w-0 dshx:justify-start dshx:truncate dshx:px-1 dshx:font-medium"
-        title={mainSession.displayTitle}
-        aria-label={t('openThread', { title: mainSession.displayTitle })}
-        onClick={() => props.openSession(mainSession.id)}
-      >
-        {mainSession.displayTitle}
-      </Button>
-    )
-  const subtitleLine = (
-    <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5 dshx:text-[11px] dshx:text-muted-foreground">
-      {subtitle === undefined ? null : <span className="dshx:truncate dshx:font-mono">{subtitle}</span>}
-      <span className="dshx:shrink-0">{t('revisionCount', { count: thread.unlanded.length })}</span>
-    </span>
-  )
-  const activityLine = (
-    <span className="dshx:flex dshx:items-center dshx:gap-1.5 dshx:whitespace-nowrap dshx:text-xs dshx:text-muted-foreground">
-      <ClockIcon aria-hidden="true" className="dshx:size-3.5 dshx:shrink-0 dshx:opacity-70" />
-      {updatedAt === undefined ? '—' : activityLabel(t, updatedAt, props.now)}
-    </span>
-  )
-  const messagesLine = (
-    <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5 dshx:text-xs dshx:text-muted-foreground">
-      <UsersIcon aria-hidden="true" className="dshx:size-3.5 dshx:shrink-0 dshx:opacity-70" />
-      <span className="dshx:truncate" title={userMessages.known ? userMessagesLabel(t, userMessages.count) : undefined}>
-        {userMessages.known ? userMessagesLabel(t, userMessages.count) : '—'}
-      </span>
-    </span>
-  )
-  const bookmarkLine = (
-    <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
-      <IntegrationGlyph behind={thread.behindCount ?? (thread.behind ? 1 : 0)} pending={thread.unlanded.length} muted={state === 'up-to-date'} />
-      <span className={cn('dshx:whitespace-nowrap dshx:text-xs', thread.behind ? toneClasses.waiting.text : 'dshx:text-muted-foreground')}>{behindLabel}</span>
-    </span>
-  )
-  const actions = (
+    assessment.behindBookmark > 0
+      ? t('commitsBehind', { count: assessment.behindBookmark, bookmark: props.bookmark })
+      : t('onBookmark', { bookmark: props.bookmark })
+  const pendingLabel =
+    assessment.pendingRevisions === 0
+      ? t('noPending')
+      : assessment.pendingRevisions === 1
+        ? t('pendingRevision', { count: assessment.pendingRevisions })
+        : t('pendingRevisions', { count: assessment.pendingRevisions })
+  const lifecycleText = lifecycleLabel(t, props.lifecycle)
+  const copyName = (): void => {
+    void writeClipboard(thread.name).then(ok => {
+      if (!ok) return
+      setCopied(true)
+      window.setTimeout(() => setCopied(false), 1_500)
+    })
+  }
+  const details = (
     <>
-      {state === 'ready' ? (
-        <Button size="sm" disabled={props.busy || props.job !== undefined} onClick={props.onIntegrate}>
-          {t('integrate')}
-        </Button>
-      ) : null}
-      {props.job?.phase === 'failed' ? (
-        <Button size="sm" variant="outline" disabled={props.busy} onClick={props.onIntegrate}>
-          {t('retryIntegration')}
-        </Button>
-      ) : null}
-      <Button size="sm" variant="outline" disabled={props.busy} aria-expanded={expanded} onClick={() => setExpanded(open => !open)}>
-        {t(expanded ? 'hideDetails' : 'showDetails')}
-        <ChevronDownIcon className={cn('dshx:transition-transform', expanded && 'dshx:rotate-180')} />
-      </Button>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button size="icon-sm" variant="ghost" disabled={props.busy} aria-label={t('moreActions', { name: thread.name })}>
-            <EllipsisIcon />
+      {assessment.blockers.length === 0 ? null : (
+        <ul className="dshx:flex dshx:flex-col dshx:gap-1">
+          {assessment.blockers.map((blocker, index) => (
+            <li
+              key={blocker}
+              className={cn('dshx:flex dshx:items-start dshx:gap-2 dshx:text-sm', index === 0 ? 'dshx:text-foreground' : 'dshx:text-muted-foreground')}
+            >
+              <CircleAlertIcon aria-hidden="true" className={cn('dshx:mt-0.5 dshx:size-4 dshx:shrink-0', toneClasses.blocked.text)} />
+              <span className="dshx:min-w-0">{blockerMessage(t, blocker, props.bookmark)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {thread.rebasedAt === undefined ? null : (
+        <p className="dshx:text-xs dshx:text-muted-foreground">{t('lastIntegrated', { date: new Date(thread.rebasedAt).toLocaleString() })}</p>
+      )}
+      <dl className="dshx:grid dshx:grid-cols-[auto_minmax(0,1fr)] dshx:gap-x-3 dshx:gap-y-1 dshx:text-xs">
+        <dt className="dshx:text-muted-foreground">{t('workspaceColumn')}</dt>
+        <dd className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5">
+          <span className="dshx:truncate dshx:font-mono">{thread.path}</span>
+          <Button
+            size="icon-sm"
+            variant="ghost"
+            className="dshx:shrink-0"
+            aria-label={copied ? t('copied') : t('copyWorkspaceId', { name: thread.name })}
+            title={copied ? t('copied') : t('copyWorkspaceId', { name: thread.name })}
+            onClick={copyName}
+          >
+            {copied ? <CheckIcon className="dshx:text-success" /> : <CopyIcon />}
           </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem variant="destructive" onSelect={props.onDiscard}>
-            {thread.unlanded.length > 0 ? t('removeWorkspaceWorkMenu') : t('removeWorkspaceMenu')}
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+        </dd>
+      </dl>
+      {thread.unlanded.length > 0 ? (
+        <ul className="dshx:flex dshx:flex-col dshx:gap-1">
+          {thread.unlanded.map(revision => (
+            <li key={revision.commitId} className="dshx:min-w-0 dshx:text-xs">
+              <span className="dshx:font-mono dshx:text-muted-foreground">{revision.changeId}</span>{' '}
+              <span className="dshx:font-sans">{revision.description}</span>
+              {revision.conflict ? <Badge variant="destructive">{t('conflict')}</Badge> : null}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {thread.sessionIds.length > 0 ? (
+        <ul className="dshx:flex dshx:flex-col dshx:gap-1">
+          {thread.sessionIds.map(sessionId => {
+            const session = props.sessionById.get(sessionId)
+            return (
+              <li key={sessionId}>
+                {session === undefined ? (
+                  <span className="dshx:font-mono dshx:text-xs">{sessionId}</span>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="dshx:justify-start"
+                    aria-label={t('openThread', { title: session.displayTitle })}
+                    onClick={() => props.openSession(session.id)}
+                  >
+                    {session.displayTitle}
+                  </Button>
+                )}
+              </li>
+            )
+          })}
+        </ul>
+      ) : null}
+      {mainSession === undefined ? null : (
+        <div>
+          <Button size="sm" variant="outline" aria-expanded={previewOpen} aria-controls={previewId} onClick={() => setPreviewOpen(open => !open)}>
+            {t(previewOpen ? 'hidePreview' : 'preview')}
+          </Button>
+          {previewOpen ? <SessionConversationPreview id={previewId} session={mainSession} sessions={props.sessions} t={t} /> : null}
+        </div>
+      )}
     </>
   )
   return (
@@ -448,97 +491,119 @@ const ThreadRow = (props: {
       <div
         className={cn(
           ROW_GRID,
-          'dshx:px-3 dshx:py-2.5',
+          'dshx:cursor-pointer dshx:px-3 dshx:py-2.5 dshx:hover:bg-muted/40',
           'dshx:@max-pane-compact:grid-cols-[auto_minmax(0,1fr)_auto] dshx:@max-pane-compact:gap-x-2 dshx:@max-pane-compact:gap-y-1.5 dshx:@max-pane-compact:py-3',
         )}
+        onClick={() => setExpanded(open => !open)}
       >
-        <input
-          type="checkbox"
-          className="dshx:size-4 dshx:accent-primary dshx:@max-pane-compact:col-start-1 dshx:@max-pane-compact:row-start-1"
-          aria-label={t('selectWorkspace', { name: thread.name })}
-          checked={props.selected}
-          disabled={!props.selectable || props.busy}
-          onChange={props.onSelect}
-        />
-        <span className="dshx:min-w-0 dshx:truncate dshx:font-mono dshx:text-xs dshx:text-muted-foreground dshx:@max-pane-compact:col-start-2 dshx:@max-pane-compact:row-start-1">
-          {thread.name}
-        </span>
-        <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-0.5 dshx:@max-pane-compact:col-span-3 dshx:@max-pane-compact:col-start-1 dshx:@max-pane-compact:row-start-2">
-          {title}
-          {subtitleLine}
-        </div>
-        <span className="dshx:@max-pane-compact:col-start-3 dshx:@max-pane-compact:row-start-1 dshx:@max-pane-compact:justify-self-end">{activityLine}</span>
-        <span className="dshx:@max-pane-compact:col-start-1 dshx:@max-pane-compact:row-start-3">{messagesLine}</span>
-        <span className="dshx:@max-pane-compact:col-span-2 dshx:@max-pane-compact:col-start-2 dshx:@max-pane-compact:row-start-3">{bookmarkLine}</span>
-        <span className="dshx:w-fit dshx:@max-pane-compact:col-start-1 dshx:@max-pane-compact:row-start-4">
-          {statusChip({ label: statusLabel, tone: state })}
-        </span>
-        {statusDescription === undefined ? (
-          <span className="dshx:@max-pane-compact:col-span-2 dshx:@max-pane-compact:col-start-2 dshx:@max-pane-compact:row-start-4" />
+        {props.selectable ? (
+          <input
+            type="checkbox"
+            className="dshx:size-4 dshx:accent-primary dshx:@max-pane-compact:col-start-1 dshx:@max-pane-compact:row-start-1"
+            aria-label={t('selectWorkspace', { name: thread.name })}
+            checked={props.selected}
+            disabled={props.busy}
+            onClick={event => event.stopPropagation()}
+            onChange={props.onSelect}
+          />
         ) : (
-          <span
-            className="dshx:truncate dshx:text-xs dshx:text-muted-foreground dshx:@max-pane-compact:col-span-2 dshx:@max-pane-compact:col-start-2 dshx:@max-pane-compact:row-start-4"
-            title={statusDescription}
-          >
-            {statusDescription}
-          </span>
+          <span aria-hidden="true" className="dshx:@max-pane-compact:col-start-1 dshx:@max-pane-compact:row-start-1" />
         )}
-        <span className="dshx:flex dshx:items-center dshx:justify-end dshx:gap-1 dshx:@max-pane-compact:col-span-3 dshx:@max-pane-compact:col-start-1 dshx:@max-pane-compact:row-start-5 dshx:@max-pane-compact:flex-wrap dshx:@max-pane-compact:justify-start">
-          {actions}
+        <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-0.5 dshx:@max-pane-compact:col-span-3 dshx:@max-pane-compact:col-start-1 dshx:@max-pane-compact:row-start-2">
+          {sessionTitle === undefined ? (
+            <span className="dshx:min-w-0 dshx:truncate dshx:text-sm dshx:font-medium" title={heading}>
+              {heading}
+            </span>
+          ) : (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="dshx:min-w-0 dshx:justify-start dshx:truncate dshx:px-1 dshx:font-medium"
+              title={sessionTitle}
+              aria-label={t('openThread', { title: sessionTitle })}
+              onClick={event => {
+                event.stopPropagation()
+                if (mainSession !== undefined) props.openSession(mainSession.id)
+              }}
+            >
+              {sessionTitle}
+            </Button>
+          )}
+          <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5 dshx:text-[11px] dshx:text-muted-foreground">
+            <span className="dshx:truncate dshx:font-mono">{thread.name}</span>
+            {lifecycleText === undefined ? null : <span className="dshx:shrink-0">· {lifecycleText}</span>}
+          </span>
+        </div>
+        <span className="dshx:flex dshx:flex-col dshx:gap-0.5 dshx:@max-pane-compact:col-start-3 dshx:@max-pane-compact:row-start-1 dshx:@max-pane-compact:justify-self-end">
+          <span className="dshx:flex dshx:items-center dshx:gap-1.5 dshx:whitespace-nowrap dshx:text-xs dshx:text-muted-foreground">
+            <ClockIcon aria-hidden="true" className="dshx:size-3.5 dshx:shrink-0 dshx:opacity-70" />
+            {updatedAt === undefined ? '—' : activityLabel(t, updatedAt, props.now)}
+          </span>
+          <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5 dshx:text-xs dshx:text-muted-foreground">
+            <UsersIcon aria-hidden="true" className="dshx:size-3.5 dshx:shrink-0 dshx:opacity-70" />
+            <span className="dshx:truncate" title={userMessages.known ? userMessagesLabel(t, userMessages.count) : undefined}>
+              {userMessages.known ? userMessagesLabel(t, userMessages.count) : '—'}
+            </span>
+          </span>
+        </span>
+        <span className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-0.5 dshx:@max-pane-compact:col-span-2 dshx:@max-pane-compact:col-start-2 dshx:@max-pane-compact:row-start-3">
+          <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5 dshx:text-xs">
+            {assessment.pendingRevisions === 0 ? null : <GitForkIcon aria-hidden="true" className="dshx:size-3.5 dshx:shrink-0 dshx:text-primary" />}
+            <span className={cn('dshx:truncate', assessment.pendingRevisions > 0 ? 'dshx:font-medium' : 'dshx:text-muted-foreground')}>{pendingLabel}</span>
+          </span>
+          <span className={cn('dshx:truncate dshx:text-xs', assessment.behindBookmark > 0 ? 'dshx:text-warning' : 'dshx:text-muted-foreground')}>
+            {behindLabel}
+          </span>
+        </span>
+        <span className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-0.5 dshx:@max-pane-compact:col-span-2 dshx:@max-pane-compact:col-start-2 dshx:@max-pane-compact:row-start-4">
+          {statusChip({ label: statusLabel, tone: assessment.category })}
+          {statusDescription === undefined ? null : (
+            <span className="dshx:truncate dshx:text-xs dshx:text-muted-foreground" title={statusDescription}>
+              {statusDescription}
+            </span>
+          )}
+        </span>
+        <span
+          className="dshx:flex dshx:items-center dshx:justify-end dshx:gap-1 dshx:@max-pane-compact:col-span-3 dshx:@max-pane-compact:col-start-1 dshx:@max-pane-compact:row-start-5 dshx:@max-pane-compact:flex-wrap dshx:@max-pane-compact:justify-start"
+          onClick={event => event.stopPropagation()}
+        >
+          {assessment.category === 'ready' ? (
+            <Button size="sm" disabled={props.busy || props.job !== undefined} onClick={props.onIntegrate}>
+              {t('integrate')}
+            </Button>
+          ) : null}
+          {props.job?.phase === 'failed' ? (
+            <Button size="sm" variant="outline" disabled={props.busy} onClick={props.onIntegrate}>
+              {t('retryIntegration')}
+            </Button>
+          ) : null}
+          <Button
+            size="icon-sm"
+            variant="ghost"
+            disabled={props.busy}
+            aria-expanded={expanded}
+            title={t(expanded ? 'hideDetails' : 'showDetails')}
+            onClick={() => setExpanded(open => !open)}
+          >
+            <span className="dshx:sr-only">{t(expanded ? 'hideDetails' : 'showDetails')}</span>
+            <ChevronDownIcon className={cn('dshx:transition-transform', expanded && 'dshx:rotate-180')} />
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="icon-sm" variant="ghost" disabled={props.busy} aria-label={t('moreActions', { name: thread.name })}>
+                <EllipsisIcon />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem variant="destructive" onSelect={props.onDiscard}>
+                {thread.unlanded.length > 0 ? t('removeWorkspaceWorkMenu') : t('removeWorkspaceMenu')}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </span>
       </div>
       {expanded ? (
-        <div className="dshx:flex dshx:flex-col dshx:gap-2 dshx:border-t dshx:bg-muted/20 dshx:px-12 dshx:py-3 dshx:@max-pane-narrow:px-3">
-          {blockReason === undefined ? null : (
-            <p className="dshx:text-sm dshx:text-muted-foreground">{integrationBlockMessage(t, blockReason, props.bookmark)}</p>
-          )}
-          {thread.rebasedAt === undefined ? null : (
-            <p className="dshx:text-xs dshx:text-muted-foreground">{t('lastIntegrated', { date: new Date(thread.rebasedAt).toLocaleString() })}</p>
-          )}
-          {thread.unlanded.length > 0 ? (
-            <ul className="dshx:flex dshx:flex-col dshx:gap-1">
-              {thread.unlanded.map(revision => (
-                <li key={revision.commitId} className="dshx:min-w-0 dshx:text-xs">
-                  <span className="dshx:font-mono dshx:text-muted-foreground">{revision.changeId}</span>{' '}
-                  <span className="dshx:font-sans">{revision.description}</span>
-                  {revision.conflict ? <Badge variant="destructive">{t('conflict')}</Badge> : null}
-                </li>
-              ))}
-            </ul>
-          ) : null}
-          {thread.sessionIds.length > 0 ? (
-            <ul className="dshx:flex dshx:flex-col dshx:gap-1">
-              {thread.sessionIds.map(sessionId => {
-                const session = props.sessionById.get(sessionId)
-                return (
-                  <li key={sessionId}>
-                    {session === undefined ? (
-                      <span className="dshx:font-mono dshx:text-xs">{sessionId}</span>
-                    ) : (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="dshx:justify-start"
-                        aria-label={t('openThread', { title: session.displayTitle })}
-                        onClick={() => props.openSession(session.id)}
-                      >
-                        {session.displayTitle}
-                      </Button>
-                    )}
-                  </li>
-                )
-              })}
-            </ul>
-          ) : null}
-          {mainSession === undefined ? null : (
-            <div>
-              <Button size="sm" variant="outline" aria-expanded={previewOpen} aria-controls={previewId} onClick={() => setPreviewOpen(open => !open)}>
-                {t(previewOpen ? 'hidePreview' : 'preview')}
-              </Button>
-              {previewOpen ? <SessionConversationPreview id={previewId} session={mainSession} sessions={props.sessions} t={t} /> : null}
-            </div>
-          )}
-        </div>
+        <div className="dshx:flex dshx:flex-col dshx:gap-2 dshx:border-t dshx:bg-muted/20 dshx:px-12 dshx:py-3 dshx:@max-pane-narrow:px-3">{details}</div>
       ) : null}
     </li>
   )
@@ -645,6 +710,15 @@ const useSessionDirectory = (sessions: ISessions): SessionDirectory => {
   return { byId, userMessagesBySession }
 }
 
+interface ThreadEntry {
+  readonly thread: ThreadView
+  readonly repositoryTitle: string
+  readonly repositoryRoot: string
+  readonly assessment: ThreadIntegrationAssessment
+  readonly lifecycle: ThreadLifecycle
+  readonly hostEligibilityStale: boolean
+}
+
 export const ThreadWorkspacesPanel = (props: {
   readonly t: JjIntegrationTranslate
   readonly bookmark: string
@@ -662,6 +736,8 @@ export const ThreadWorkspacesPanel = (props: {
   const repositories = useQuery({
     queryKey: threadQueryKeys.repositories,
     queryFn: ({ signal }) => runHostRequest({ signal, timeoutMs: 60_000, request: hostSignal => api.repositories({}, { signal: hostSignal }) }),
+    staleTime: 15_000,
+    refetchInterval: 60_000,
   })
   const refreshAfterChange = (): void => {
     void queryClient.invalidateQueries({ queryKey: ['jj-integration'] })
@@ -679,7 +755,9 @@ export const ThreadWorkspacesPanel = (props: {
           return {
             repositories: previous.repositories.map(repository => ({
               ...repository,
-              threads: repository.threads.map(thread => (thread.path === input.path ? { ...thread, unlanded: [], behind: false } : thread)),
+              threads: repository.threads.map(thread =>
+                thread.path === input.path ? { ...thread, unlanded: [], behind: false, behindCount: 0, rebasedAt: Date.now() } : thread,
+              ),
             })),
           }
         })
@@ -726,12 +804,16 @@ export const ThreadWorkspacesPanel = (props: {
     },
     onSettled: refreshAfterChange,
   })
-  const [filter, setFilter] = useState<IntegrationFilter>('all')
+  const [filter, setFilter] = useState<IntegrationFilter>('attention')
+  const [lifecycleFilter, setLifecycleFilter] = useState<LifecycleFilter>('any')
   const [search, setSearch] = useState('')
   const [showAll, setShowAll] = useState<Readonly<Record<string, boolean>>>({})
   const [selectedPaths, setSelectedPaths] = useState<ReadonlySet<string>>(new Set())
-  const repositoriesWithThreads = repositories.data?.repositories.filter(repository => repository.threads.length > 0)
-  const threads = repositoriesWithThreads?.flatMap(repository => repository.threads.map(thread => ({ repository, thread }))) ?? []
+  const repositoriesWithThreads = useMemo(() => repositories.data?.repositories.filter(repository => repository.threads.length > 0), [repositories.data])
+  const threads = useMemo(
+    () => repositoriesWithThreads?.flatMap(repository => repository.threads.map(thread => ({ repository, thread }))) ?? [],
+    [repositoriesWithThreads],
+  )
   const requestedProjections = useRef(new Set<string>())
   useEffect(() => {
     for (const { thread } of threads) {
@@ -743,35 +825,62 @@ export const ThreadWorkspacesPanel = (props: {
       }
     }
   }, [props.sessions, threads])
-  const categoryOf = (thread: ThreadView): ThreadIntegrationState => {
-    const state = threadIntegrationState(thread)
-    if (state !== 'ready') return state
-    const sessionIsRunning = [...sessionById.values()].some(session => session.cwd === thread.path && session.running)
-    const userQuestionIsPending = thread.sessionIds.some(
-      sessionId => ThreadRebaseEligibilityModel.hasPendingUserQuestion(sessionById.get(sessionId)?.projectionValues) === true,
-    )
-    const threadSessionsAreEligible = ThreadRebaseEligibilityModel.canRebase(thread.sessionIds, sessionId => {
-      const session = sessionById.get(sessionId)
-      return session === undefined
-        ? undefined
-        : { running: session.running, pendingUserQuestion: ThreadRebaseEligibilityModel.hasPendingUserQuestion(session.projectionValues) }
-    })
-    return sessionIsRunning || userQuestionIsPending || !threadSessionsAreEligible ? 'waiting' : state
+  /**
+   * The client merges the Host's eligibility verdict with the sessions it can see. An id the client cannot read
+   * stays unverified rather than passing silently: the Host re-checks when the integration runs either way.
+   */
+  const entries = useMemo<readonly ThreadEntry[]>(
+    () =>
+      threads.map(({ repository, thread }) => {
+        const related = [...sessionById.values()].filter(session => thread.sessionIds.includes(session.id) || session.cwd === thread.path)
+        const running = related.some(session => session.running)
+        const waitingForInput = related.some(session => ThreadRebaseEligibilityModel.hasPendingUserQuestion(session.projectionValues) === true)
+        const clientCanRebase = ThreadRebaseEligibilityModel.canRebase(thread.sessionIds, sessionId => {
+          const session = sessionById.get(sessionId)
+          return session === undefined
+            ? undefined
+            : { running: session.running, pendingUserQuestion: ThreadRebaseEligibilityModel.hasPendingUserQuestion(session.projectionValues) }
+        })
+        const integrationAllowed =
+          thread.canRebase === false || clientCanRebase === false || running || waitingForInput
+            ? false
+            : thread.canRebase === true && clientCanRebase === true
+              ? true
+              : undefined
+        return {
+          thread,
+          repositoryTitle: repository.title,
+          repositoryRoot: repository.repoRoot,
+          assessment: ThreadIntegrationModel.assess({
+            thread,
+            running,
+            waitingForInput,
+            integrationAllowed,
+            jobPhase: integrationJobs.get(thread.path)?.phase,
+          }),
+          lifecycle: lifecycleOf(thread, running, waitingForInput),
+          hostEligibilityStale: thread.canRebase === false && clientCanRebase === true,
+        }
+      }),
+    [integrationJobs, sessionById, threads],
+  )
+  const lifecycleMatches = (entry: ThreadEntry): boolean => {
+    if (lifecycleFilter === 'any') return true
+    if (lifecycleFilter === 'active') return entry.lifecycle === 'active' || entry.lifecycle === 'waiting-input'
+    return entry.lifecycle === lifecycleFilter
   }
-  /** A workspace whose Sessions are all archived is inactive; one DSH never opened is not. */
-  const isInactive = ({ thread }: { readonly thread: ThreadView }): boolean => thread.sessionIds.length > 0 && thread.finished
-  const liveThreads = threads.filter(entry => !isInactive(entry))
-  const inactiveThreads = threads.filter(isInactive)
+  const lifecycleEntries = entries.filter(lifecycleMatches)
   const counts = {
-    all: liveThreads.length,
-    ready: liveThreads.filter(({ thread }) => categoryOf(thread) === 'ready').length,
-    conflicts: liveThreads.filter(({ thread }) => categoryOf(thread) === 'conflicts').length,
-    waiting: liveThreads.filter(({ thread }) => categoryOf(thread) === 'waiting').length,
-    'up-to-date': liveThreads.filter(({ thread }) => categoryOf(thread) === 'up-to-date').length,
-    inactive: inactiveThreads.length,
-  } satisfies Record<IntegrationFilter, number>
-  const eligibleThreads = liveThreads.filter(({ thread }) => categoryOf(thread) === 'ready')
-  const selectedEligiblePaths = eligibleThreads.filter(({ thread }) => selectedPaths.has(thread.path)).map(({ thread }) => thread.path)
+    all: lifecycleEntries.length,
+    attention: lifecycleEntries.filter(entry => entry.assessment.needsAttention).length,
+    ready: lifecycleEntries.filter(entry => entry.assessment.category === 'ready').length,
+    blocked: lifecycleEntries.filter(entry => entry.assessment.category === 'blocked' || entry.assessment.category === 'unknown').length,
+    conflicts: lifecycleEntries.filter(entry => entry.assessment.category === 'conflicts').length,
+    integrating: lifecycleEntries.filter(entry => entry.assessment.category === 'integrating').length,
+    completed: lifecycleEntries.filter(entry => !entry.assessment.needsAttention).length,
+  }
+  const eligibleEntries = lifecycleEntries.filter(entry => entry.assessment.category === 'ready')
+  const selectedEligiblePaths = eligibleEntries.filter(entry => selectedPaths.has(entry.thread.path)).map(entry => entry.thread.path)
   const startIntegration = (paths: readonly string[]): void => {
     if (queueBusy || rebasesPending) return
     for (const path of paths) void queryClient.removeQueries({ queryKey: ['jj-integration', 'integration-progress', path] })
@@ -786,62 +895,94 @@ export const ThreadWorkspacesPanel = (props: {
       return next
     })
   }
-  const visibleThreads = (filter === 'inactive' ? inactiveThreads : liveThreads).filter(({ thread }) => {
-    const query = search.trim().toLocaleLowerCase()
-    const matchesSearch =
-      query === '' ||
-      [thread.name, ...thread.sessionIds.map(id => sessionById.get(id)?.displayTitle ?? ''), ...thread.unlanded.map(revision => revision.description)]
-        .join(' ')
-        .toLocaleLowerCase()
-        .includes(query)
-    return matchesSearch && (filter === 'all' || filter === 'inactive' || categoryOf(thread) === filter)
+  const matchesSearch = (entry: ThreadEntry, query: string): boolean => {
+    if (query === '') return true
+    const { thread } = entry
+    const parts = [
+      thread.name,
+      thread.path,
+      thread.workspaceTitle ?? '',
+      thread.workspaceId ?? '',
+      entry.repositoryTitle,
+      entry.repositoryRoot,
+      ...thread.sessionIds.map(sessionId => sessionById.get(sessionId)?.displayTitle ?? ''),
+      ...thread.unlanded.flatMap(revision => [revision.description, revision.changeId, revision.commitId]),
+    ]
+    return parts.join(' ').toLocaleLowerCase().includes(query)
+  }
+  const visibleEntries = entries.filter(entry => {
+    if (!lifecycleMatches(entry)) return false
+    if (!matchesSearch(entry, search.trim().toLocaleLowerCase())) return false
+    if (filter === 'all') return true
+    // A row this page just integrated keeps its outcome on screen instead of leaving the attention view immediately.
+    if (filter === 'attention') return entry.assessment.needsAttention || integrationJobs.has(entry.thread.path)
+    if (filter === 'ready') return entry.assessment.category === 'ready'
+    if (filter === 'conflicts') return entry.assessment.category === 'conflicts'
+    if (filter === 'integrating') return entry.assessment.category === 'integrating'
+    if (filter === 'blocked') return entry.assessment.category === 'blocked' || entry.assessment.category === 'unknown'
+    return !entry.assessment.needsAttention
   })
   const groups: readonly {
-    readonly id: ThreadIntegrationState
+    readonly id: RowGroup
     readonly title: string
     readonly description: string
-    readonly emptyTitle: string
-    readonly emptyBody: string
+    readonly tone: ThreadIntegrationCategory
   }[] = [
     {
       id: 'conflicts',
       title: t('conflictsHeading'),
       description: t('conflictsDescription'),
-      emptyTitle: t('emptyConflictsTitle'),
-      emptyBody: t('emptyConflictsBody'),
+      tone: 'conflicts',
     },
     {
       id: 'ready',
       title: t('readyToIntegrate'),
       description: t('readyDescription', { bookmark: props.bookmark }),
-      emptyTitle: t('emptyReadyTitle'),
-      emptyBody: t('emptyReadyBody'),
+      tone: 'ready',
     },
     {
-      id: 'waiting',
-      title: t('waitingHeading'),
-      description: t('waitingDescription', { bookmark: props.bookmark }),
-      emptyTitle: t('emptyWaitingTitle'),
-      emptyBody: t('emptyWaitingBody'),
+      id: 'blocked',
+      title: t('blockedHeading'),
+      description: t('blockedDescription', { bookmark: props.bookmark }),
+      tone: 'blocked',
     },
     {
-      id: 'up-to-date',
-      title: t('upToDateHeading'),
-      description: t('upToDateDescription', { bookmark: props.bookmark }),
-      emptyTitle: t('emptyUpToDateTitle'),
-      emptyBody: t('emptyUpToDateBody', { bookmark: props.bookmark }),
+      id: 'integrating',
+      title: t('integratingHeading'),
+      description: t('integratingDescription'),
+      tone: 'integrating',
+    },
+    {
+      id: 'completed',
+      title: t('completedHeading'),
+      description: t('completedDescription', { bookmark: props.bookmark }),
+      tone: 'no-changes',
     },
   ]
   const tabs: readonly { readonly id: IntegrationFilter; readonly label: string; readonly dot: string | undefined }[] = [
-    { id: 'all', label: t('allThreads'), dot: undefined },
+    { id: 'attention', label: t('attentionFilter'), dot: undefined },
     { id: 'ready', label: t('readyToIntegrate'), dot: toneClasses.ready.dot },
-    { id: 'waiting', label: t('waitingHeading'), dot: toneClasses.waiting.dot },
+    { id: 'blocked', label: t('blockedHeading'), dot: toneClasses.blocked.dot },
     { id: 'conflicts', label: t('conflictsHeading'), dot: toneClasses.conflicts.dot },
-    { id: 'up-to-date', label: t('upToDateHeading'), dot: toneClasses['up-to-date'].dot },
+    { id: 'integrating', label: t('integratingHeading'), dot: toneClasses.integrating.dot },
+    { id: 'completed', label: t('completedFilter'), dot: toneClasses['no-changes'].dot },
+    { id: 'all', label: t('allThreads'), dot: undefined },
   ]
+  const lifecycleOptions: readonly { readonly id: LifecycleFilter; readonly label: string }[] = [
+    { id: 'any', label: t('lifecycleAny') },
+    { id: 'active', label: t('lifecycleActive') },
+    { id: 'idle', label: t('lifecycleIdle') },
+    { id: 'finished', label: t('lifecycleFinished') },
+    { id: 'missing', label: t('lifecycleMissing') },
+  ]
+  const queuedCount = Math.max(queueSnapshot.context.queue.length - (activeIntegrationPath === null ? 0 : 1), 0)
+  const failedPaths = [...integrationJobs.entries()].filter(([, job]) => job.phase === 'failed').map(([path]) => path)
+  const activeTitle = activeIntegrationPath === null ? undefined : entries.find(entry => entry.thread.path === activeIntegrationPath)?.thread
+  const activeLabel = activeTitle === undefined ? undefined : (sessionById.get(activeTitle.sessionIds[0] ?? '')?.displayTitle ?? activeTitle.name)
+  const queueVisible = queueBusy || failedPaths.length > 0
 
   return (
-    <div className="dshx-root dshx:@container dshx:flex dshx:h-full dshx:flex-col dshx:gap-5 dshx:overflow-auto dshx:p-6 dshx:@max-pane-narrow:p-3">
+    <div className="dshx-root dshx:@container dshx:flex dshx:h-full dshx:flex-col dshx:gap-4 dshx:overflow-auto dshx:p-6 dshx:@max-pane-narrow:p-3">
       <header className="dshx:flex dshx:flex-wrap dshx:items-start dshx:gap-4">
         <div className="dshx:flex dshx:min-w-0 dshx:items-start dshx:gap-3">
           <span
@@ -912,19 +1053,39 @@ export const ThreadWorkspacesPanel = (props: {
               </Button>
             ))}
             <Separator orientation="vertical" className="dshx:mx-1 dshx:h-5!" />
-            <Button
-              size="sm"
-              variant={filter === 'inactive' ? 'secondary' : 'ghost'}
-              className="dshx:gap-2"
-              aria-pressed={filter === 'inactive'}
-              title={t('inactiveHint')}
-              onClick={() => setFilter(filter === 'inactive' ? 'all' : 'inactive')}
-            >
-              {t('inactiveFilter')}
-              <span className="dshx:text-muted-foreground dshx:tabular-nums">{counts.inactive}</span>
-            </Button>
+            <label className="dshx:flex dshx:items-center dshx:gap-1.5 dshx:px-2 dshx:text-xs dshx:text-muted-foreground">
+              {t('lifecycleFilter')}
+              <select
+                aria-label={t('lifecycleFilter')}
+                className="dshx:rounded-md dshx:border dshx:bg-background dshx:px-1.5 dshx:py-1 dshx:text-xs dshx:text-foreground"
+                value={lifecycleFilter}
+                onChange={event => {
+                  const next = lifecycleOptions.find(option => option.id === event.currentTarget.value)
+                  if (next !== undefined) setLifecycleFilter(next.id)
+                }}
+              >
+                {lifecycleOptions.map(option => (
+                  <option key={option.id} value={option.id}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
           </nav>
-          {counts.ready > 0 ? (
+          {queueVisible ? (
+            <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-3 dshx:rounded-xl dshx:border dshx:bg-muted/30 dshx:px-4 dshx:py-2 dshx:text-xs">
+              <span className="dshx:font-medium">{t('queueHeading')}</span>
+              {activeLabel === undefined ? null : (
+                <span className="dshx:flex dshx:items-center dshx:gap-1.5">
+                  {queueBusy ? <Spinner /> : null}
+                  {t('queueActive', { name: activeLabel })}
+                </span>
+              )}
+              {queuedCount === 0 ? null : <span className="dshx:text-muted-foreground">{t('queueQueued', { count: queuedCount })}</span>}
+              {failedPaths.length === 0 ? null : <span className="dshx:text-destructive">{t('queueFailed', { count: failedPaths.length })}</span>}
+            </div>
+          ) : null}
+          {counts.ready > 0 && (filter === 'attention' || filter === 'all' || filter === 'ready') ? (
             <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-4 dshx:rounded-xl dshx:border dshx:border-success/30 dshx:bg-success/5 dshx:px-4 dshx:py-3">
               <span
                 aria-hidden="true"
@@ -944,7 +1105,7 @@ export const ThreadWorkspacesPanel = (props: {
               <Button
                 size="sm"
                 disabled={queueBusy || rebasesPending}
-                onClick={() => startIntegration(selectedEligiblePaths.length > 0 ? selectedEligiblePaths : eligibleThreads.map(({ thread }) => thread.path))}
+                onClick={() => startIntegration(selectedEligiblePaths.length > 0 ? selectedEligiblePaths : eligibleEntries.map(entry => entry.thread.path))}
               >
                 {queueBusy ? <Spinner /> : null}
                 {selectedEligiblePaths.length > 0
@@ -954,101 +1115,100 @@ export const ThreadWorkspacesPanel = (props: {
             </div>
           ) : null}
           {groups.map(group => {
-            if (filter !== 'all' && filter !== 'inactive' && filter !== group.id) return null
-            const entries = visibleThreads.filter(({ thread }) => categoryOf(thread) === group.id)
+            const entriesInGroup = visibleEntries.filter(entry => rowGroupOf(entry.assessment.category) === group.id)
+            if (entriesInGroup.length === 0) return null
             const expandedGroup = showAll[group.id] === true
-            const shownEntries = expandedGroup ? entries : entries.slice(0, GROUP_LIMIT)
-            const hiddenCount = entries.length - shownEntries.length
+            const shownEntries = expandedGroup ? entriesInGroup : entriesInGroup.slice(0, GROUP_LIMIT)
+            const hiddenCount = entriesInGroup.length - shownEntries.length
             return (
-              <section key={group.id} className="dshx:flex dshx:flex-col dshx:gap-3">
+              <section key={group.id} className="dshx:flex dshx:flex-col dshx:gap-2">
                 <div className="dshx:flex dshx:min-w-0 dshx:items-start dshx:gap-3">
-                  {groupGlyph(group.id)}
+                  {groupGlyph(group.tone)}
                   <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-0.5">
                     <h2 className="dshx:text-base dshx:font-semibold">
-                      {group.title} <span className="dshx:text-muted-foreground">({entries.length})</span>
+                      {group.title} <span className="dshx:text-muted-foreground">({entriesInGroup.length})</span>
                     </h2>
                     <p className="dshx:text-sm dshx:text-muted-foreground">{group.description}</p>
                   </div>
                 </div>
-                {entries.length === 0 ? (
-                  <div className="dshx:flex dshx:flex-col dshx:items-center dshx:gap-0.5 dshx:rounded-xl dshx:border dshx:px-4 dshx:py-5 dshx:text-center">
-                    <span className={cn('dshx:mb-1 dshx:[&>svg]:size-5', toneClasses[group.id].text)} aria-hidden="true">
-                      {groupIcon(group.id)}
-                    </span>
-                    <p className="dshx:text-sm dshx:font-medium">{group.emptyTitle}</p>
-                    <p className="dshx:text-xs dshx:text-muted-foreground">{group.emptyBody}</p>
-                  </div>
-                ) : (
-                  <div className="dshx:overflow-hidden dshx:rounded-xl dshx:border">
-                    {repositoriesWithThreads?.map(repository => {
-                      const repoEntries = shownEntries.filter(entry => entry.repository.repoRoot === repository.repoRoot)
-                      if (repoEntries.length === 0) return null
-                      return (
-                        <div key={repository.repoRoot} className="dshx:flex dshx:flex-col">
-                          {repositoriesWithThreads.length > 1 ? (
-                            <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:border-b dshx:border-border dshx:bg-muted/30 dshx:px-3 dshx:py-1.5 dshx:text-xs">
-                              <span className="dshx:font-medium">{repository.title}</span>
-                              <span className="dshx:min-w-0 dshx:truncate dshx:font-mono dshx:text-muted-foreground">{repository.repoRoot}</span>
-                            </div>
-                          ) : null}
-                          <ul className="dshx:flex dshx:flex-col">
-                            {repoEntries.map(({ thread }) => (
-                              <ThreadRow
-                                key={thread.path}
-                                thread={thread}
-                                sessionById={sessionById}
-                                userMessagesBySession={userMessagesBySession}
-                                sessions={props.sessions}
-                                openSession={props.openSession}
-                                t={t}
-                                bookmark={props.bookmark}
-                                state={categoryOf(thread)}
-                                selected={selectedPaths.has(thread.path)}
-                                selectable={categoryOf(thread) === 'ready'}
-                                job={integrationJobs.get(thread.path)}
-                                busy={queueBusy || rebasesPending}
-                                now={now}
-                                onSelect={() => toggleSelectedPath(thread.path)}
-                                onIntegrate={() => startIntegration([thread.path])}
-                                onDiscard={() => discard.request({ path: thread.path, name: thread.name, unlandedCount: thread.unlanded.length })}
-                              />
-                            ))}
-                          </ul>
-                        </div>
-                      )
-                    })}
-                    {hiddenCount > 0 ? (
-                      <div className="dshx:flex dshx:justify-center dshx:border-t dshx:border-border dshx:bg-muted/20 dshx:py-1.5">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="dshx:text-muted-foreground"
-                          onClick={() => setShowAll(previous => ({ ...previous, [group.id]: true }))}
-                        >
-                          <ChevronDownIcon />
-                          {t('showMoreThreads', { count: hiddenCount })}
-                        </Button>
+                <div className="dshx:overflow-hidden dshx:rounded-xl dshx:border">
+                  {repositoriesWithThreads?.map(repository => {
+                    const repoEntries = shownEntries.filter(entry => entry.repositoryRoot === repository.repoRoot)
+                    if (repoEntries.length === 0) return null
+                    return (
+                      <div key={repository.repoRoot} className="dshx:flex dshx:flex-col">
+                        {repositoriesWithThreads.length > 1 ? (
+                          <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:border-b dshx:border-border dshx:bg-muted/30 dshx:px-3 dshx:py-1.5 dshx:text-xs">
+                            <span className="dshx:font-medium">{repository.title}</span>
+                            <span className="dshx:min-w-0 dshx:truncate dshx:font-mono dshx:text-muted-foreground">{repository.repoRoot}</span>
+                          </div>
+                        ) : null}
+                        <ul className="dshx:flex dshx:flex-col">
+                          {repoEntries.map(entry => (
+                            <ThreadRow
+                              key={entry.thread.path}
+                              thread={entry.thread}
+                              repositoryTitle={entry.repositoryTitle}
+                              assessment={entry.assessment}
+                              lifecycle={entry.lifecycle}
+                              hostEligibilityStale={entry.hostEligibilityStale}
+                              sessionById={sessionById}
+                              userMessagesBySession={userMessagesBySession}
+                              sessions={props.sessions}
+                              openSession={props.openSession}
+                              t={t}
+                              bookmark={props.bookmark}
+                              selected={selectedPaths.has(entry.thread.path)}
+                              selectable={entry.assessment.category === 'ready'}
+                              job={integrationJobs.get(entry.thread.path)}
+                              busy={queueBusy || rebasesPending}
+                              now={now}
+                              onSelect={() => toggleSelectedPath(entry.thread.path)}
+                              onIntegrate={() => startIntegration([entry.thread.path])}
+                              onDiscard={() =>
+                                discard.request({ path: entry.thread.path, name: entry.thread.name, unlandedCount: entry.thread.unlanded.length })
+                              }
+                            />
+                          ))}
+                        </ul>
                       </div>
-                    ) : null}
-                    {expandedGroup && entries.length > GROUP_LIMIT ? (
-                      <div className="dshx:flex dshx:justify-center dshx:border-t dshx:border-border dshx:bg-muted/20 dshx:py-1.5">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="dshx:text-muted-foreground"
-                          onClick={() => setShowAll(previous => ({ ...previous, [group.id]: false }))}
-                        >
-                          <ChevronDownIcon className="dshx:rotate-180" />
-                          {t('hideExtraThreads')}
-                        </Button>
-                      </div>
-                    ) : null}
-                  </div>
-                )}
+                    )
+                  })}
+                  {hiddenCount > 0 ? (
+                    <div className="dshx:flex dshx:justify-center dshx:border-t dshx:border-border dshx:bg-muted/20 dshx:py-1.5">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="dshx:text-muted-foreground"
+                        onClick={() => setShowAll(previous => ({ ...previous, [group.id]: true }))}
+                      >
+                        <ChevronDownIcon />
+                        {t('showMoreThreads', { count: hiddenCount })}
+                      </Button>
+                    </div>
+                  ) : null}
+                  {expandedGroup && entriesInGroup.length > GROUP_LIMIT ? (
+                    <div className="dshx:flex dshx:justify-center dshx:border-t dshx:border-border dshx:bg-muted/20 dshx:py-1.5">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="dshx:text-muted-foreground"
+                        onClick={() => setShowAll(previous => ({ ...previous, [group.id]: false }))}
+                      >
+                        <ChevronDownIcon className="dshx:rotate-180" />
+                        {t('hideExtraThreads')}
+                      </Button>
+                    </div>
+                  ) : null}
+                </div>
               </section>
             )
           })}
-          {visibleThreads.length === 0 && search.trim() !== '' ? <p className="dshx:text-sm dshx:text-muted-foreground">{t('noMatchingThreads')}</p> : null}
+          {visibleEntries.length === 0 ? (
+            <p className="dshx:text-sm dshx:text-muted-foreground">
+              {search.trim() !== '' ? t('noMatchingThreads') : filter === 'attention' ? t('nothingNeedsAttention') : t('noThreadsInFilter')}
+            </p>
+          ) : null}
         </>
       ) : null}
       <DiscardDialog t={t} confirmation={discard} />
