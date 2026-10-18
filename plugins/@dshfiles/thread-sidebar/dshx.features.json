@@ -424,7 +424,7 @@
         "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Idle policy target\"",
         "click button \"Send message\"",
         "expect text \"This turn failed*\"",
-        "rightclick text \"Idle policy target\"",
+        "rightclick text \"Idle policy target\" at 8,8",
         "click menuitem \"Auto-settle behavior\"",
         "expect menuitemradio \"Auto-archive after idle threshold\"",
         "press Escape",
@@ -539,7 +539,7 @@
         "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Mute target\"",
         "click button \"Send message\"",
         "expect text \"This turn failed*\"",
-        "rightclick text \"Mute target\"",
+        "rightclick text \"Mute target\" at 8,8",
         "click menuitem \"Mute thread\"",
         "click menuitem \"Until tomorrow morning\"",
         "expect img \"Muted\""
@@ -606,7 +606,7 @@
         "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Unread neighbour\"",
         "click button \"Send message\"",
         "expect text \"This turn failed*\"",
-        "rightclick text \"Unread target\"",
+        "rightclick text \"Unread target\" at 8,8",
         "click menuitem \"Mark unread\"",
         "expect img \"Unread\""
       ],
@@ -1356,7 +1356,7 @@
         "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Mention source\"",
         "click button \"Send message\"",
         "expect text \"This turn failed*\"",
-        "rightclick text \"Mention target\"",
+        "rightclick text \"Mention target\" at 8,8",
         "click menuitem \"@Mention thread\"",
         "expect title \"Mention target\""
       ],
