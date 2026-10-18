@@ -46,7 +46,7 @@ ast-grep can't count matches per file, so it must be an Oxlint JS rule.
 - [x] 11b. dshfiles `chore(lint)`: re-vendor `tooling/antislop` at that emilint revision; enable the rule as a
       ratcheted warning with excludes for `components/ui/**`, dshx's public `index.ts` entry points and test support
       (`tooling/dshx/scripts/**`, `tooling/dshx/e2e/support/**`). Record the starting count in `scripts/lint-ratchet.json`.
-- [ ] 11c. Lower the cap as step 12 converts modules; promote to `error` at zero.
+- [x] 11c. Keep the cap at zero and promote to `error` once the product-only scan returns no findings.
 
 **Hotspots to expect first:** dshx `communication/types.ts`, thread-sidebar `organization.ts`, ai-accounts `api.ts`,
 thread-sidebar `thread-view-preferences.ts`.

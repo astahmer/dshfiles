@@ -25,7 +25,7 @@
     "antislop/no-conditional-empty-object-spread": "warn",
     "antislop/no-known-value-widening": "warn",
     "antislop/no-export-bag": [
-      "warn",
+      "error",
       {
         "minExports": 3,
         "excludePaths": [
