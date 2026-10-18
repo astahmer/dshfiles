@@ -257,6 +257,20 @@ const orderBranches = (input: {
   return { order: repaired.length === order.length ? repaired : order, owner, trunk, branches }
 }
 
+/** True when one of `rows` (ascending) lies strictly between two row indexes. */
+const rowBetween = (rows: readonly number[], childRow: number, parentRow: number): boolean => {
+  const low = childRow + 1
+  let left = 0
+  let right = rows.length
+  while (left < right) {
+    const middle = (left + right) >> 1
+    if ((rows[middle] ?? 0) < low) left = middle + 1
+    else right = middle
+  }
+  const candidate = rows[left]
+  return candidate !== undefined && candidate < parentRow
+}
+
 /**
  * Lay out the revision graph the way VisualJJ reads: the trunk bookmark's first-parent line stays straight in
  * lane 0, every other head opens a branch whose revisions form one contiguous block down to its fork point,
@@ -287,8 +301,12 @@ const layoutRevisionGraph = (
   const sideLaneFloor = trunk === undefined ? 0 : 1
 
   const runs = new Map<Branch, LaneRun>()
+  /** Each branch's rows, ascending, for the crossing test below. */
+  const branchRows = new Map<Branch, readonly number[]>()
   for (const branch of branches) {
     const rows = branch.revisions.map(rowOf)
+    const ascending = [...rows].sort((left, right) => left - right)
+    branchRows.set(branch, ascending)
     const minLane = branch === trunk ? 0 : branch.parent === undefined || branch.parent === trunk ? sideLaneFloor : -1
     runs.set(branch, { start: 2 * Math.min(...rows), end: 2 * Math.max(...rows), lane: branch === trunk ? 0 : -1, color: 0, minLane })
   }
@@ -315,10 +333,10 @@ const layoutRevisionGraph = (
         if (!listed.has(link.commitId) || parentRun === undefined) return { target: 'stub' as const, dashed }
         const parentRow = rowOf(link.commitId)
         const parentBranch = owner.get(link.commitId)
-        const blocked = (parentBranch?.revisions ?? []).some(other => {
-          const otherRow = rowOf(other)
-          return otherRow > childRow && otherRow < parentRow
-        })
+        const parentRows = parentBranch === undefined ? undefined : branchRows.get(parentBranch)
+        // The parent's branch crossing this link means a lane change: a binary search over its rows,
+        // not a scan of the whole branch, which made a long linear trunk quadratic.
+        const blocked = parentRows !== undefined && rowBetween(parentRows, childRow, parentRow)
         if (!blocked) {
           if (parentRun === run) return { target: run, dashed }
           parentRun.start = Math.min(parentRun.start, 2 * childRow + 1)
