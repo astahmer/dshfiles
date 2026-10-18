@@ -45,7 +45,12 @@ inspect native forms in child Sessions. The inventory uses SessionQuery
 projections and the parent-question store, not transcripts. It reports options and recommendation markers, open
 versus continued state, blocking/timed mode, answerability, and a page of results
 (`offset`/`limit`). Root inventory scans Session projections with bounded
-concurrency before paginating, so very large corpora may take longer.
+concurrency before paginating. Reading every Session is the expensive part — a
+cold projection re-reads that session's log — so a Session the corpus reports as
+not live is reused from a 30-second facts cache (live Sessions are always
+re-read, because only a live Session can open or answer a question), and the
+result reports `nativeSessionsReused` beside `nativeSessionsScanned`. Pass
+`sessionId` to read one Session exactly and skip the corpus scan.
 
 Native coverage is the timed `ask_user_question` projection; legacy-schema
 calls are not included. A timed deadline is derived from the recorded tool-call
