@@ -74,7 +74,7 @@ function record(value: unknown): Record<string, unknown> | undefined {
   return typeof value === 'object' && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : undefined
 }
 
-export function isStandardSchema(value: unknown): value is StandardSchemaV1 {
+function isStandardSchema(value: unknown): value is StandardSchemaV1 {
   const source = record(value)
   const standard = record(source?.['~standard'])
   return standard?.version === 1 && typeof standard.vendor === 'string' && typeof standard.validate === 'function'
@@ -406,4 +406,8 @@ export function createHostModule(source: Record<string, unknown>, metadata: Host
       return withRuntime(ctx, apply(ctx, config), metadata)
     },
   }
+}
+
+export class HostRuntimeModel {
+  static readonly isStandardSchema = isStandardSchema
 }

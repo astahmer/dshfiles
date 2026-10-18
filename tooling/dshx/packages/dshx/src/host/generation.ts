@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url'
 import type { Context, Fiber, Inject } from '@deepseek-ai/cordis'
 import type { StandardSchemaV1 } from '@standard-schema/spec'
 import { z } from 'zod'
-import { isStandardSchema, type HostPluginMetadata } from './runtime.js'
+import { HostRuntimeModel, type HostPluginMetadata } from './runtime.js'
 import { hostGenerationManifestSchema, HOST_GENERATION_DIRECTORY } from './generation-contract.js'
 
 /** The Loader and lifecycle surface one generation must provide. */
@@ -132,7 +132,7 @@ export const createHostGenerationPlugin = (options: HostGenerationPluginOptions)
         contractChanged(generation, 'Loader Config')
         return undefined
       }
-      if (config !== undefined && !isStandardSchema(config)) {
+      if (config !== undefined && !HostRuntimeModel.isStandardSchema(config)) {
         logger.error('Invalid Host generation Config schema (plugin=%s generation=%s)', options.metadata.packageId, generation)
         return undefined
       }
