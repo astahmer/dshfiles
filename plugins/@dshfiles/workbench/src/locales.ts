@@ -18,6 +18,8 @@ const en = {
   tickerTitle: 'Ticker',
   tickerHint: 'Counts seconds since this panel mounted. A remount restarts it at 0.',
   toggleRightPanel: 'Toggle the persistent panel in the right column',
+  moveToMainView: 'Move to main view',
+  moveToDock: 'Move to the dock',
   sidePanelGuide: 'Dock and arrange registered panels beside the thread.',
   dockHeading: 'Panels',
 }
@@ -37,6 +39,8 @@ const zh = {
   tickerTitle: '计时器',
   tickerHint: '自此面板挂载以来的秒数。重新挂载会从 0 开始。',
   toggleRightPanel: '切换右栏的常驻面板',
+  moveToMainView: '移到主视图',
+  moveToDock: '移到右栏',
   sidePanelGuide: '在会话旁停靠和排列已注册的面板。',
   dockHeading: '面板',
 } satisfies Record<keyof typeof en, string>
