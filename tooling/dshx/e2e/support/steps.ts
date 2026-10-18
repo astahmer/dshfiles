@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { After, Before, Given, Then, readBootOutcome } from './bdd.js'
 import { bootComposedPluginProfile, bootPluginProfile, bootProfile, type BootedProfile } from './boot.js'
 import { redactHostOutput } from './scratch-profile.js'
-import { clientEntryFailures, parseBootText } from '../../packages/dshx/src/project/client-boot-check.js'
+import { ClientBootCheckModel } from '../../packages/dshx/src/project/client-boot-check.js'
 import { StartupDialogs } from '../../packages/dshx/src/project/startup-dialogs.js'
 import {
   capturePageEvidenceFrame,
@@ -149,7 +149,7 @@ export const profileFor = (page: Page): BootedProfile => {
 }
 
 const assertClientBootReady = (outcome: Awaited<ReturnType<typeof readBootOutcome>>, profile: BootedProfile, label: string): void => {
-  const failures = clientEntryFailures(parseBootText(outcome.text), profile.expectedClientEntries)
+  const failures = ClientBootCheckModel.clientEntryFailures(ClientBootCheckModel.parseBootText(outcome.text), profile.expectedClientEntries)
   const details = `${label}\n${outcome.text}\n\nHost output:\n${profile.output()}`
   expect(outcome.ready, `${details}\n\nReadiness: ${outcome.readinessError ?? 'not reported'}`).toBe(true)
   expect(outcome.missingClientEntries, details).toEqual([])
@@ -344,7 +344,7 @@ Then('every client entry that failed to activate is reported by id', async ({ pa
     await capturePageEvidenceFrame(evidenceRunFor(page), page, 'assertion-complete')
     return
   }
-  const failures = clientEntryFailures(parseBootText(outcome.text), profile.expectedClientEntries)
+  const failures = ClientBootCheckModel.clientEntryFailures(ClientBootCheckModel.parseBootText(outcome.text), profile.expectedClientEntries)
   await recordAssertion(page, 'failed-client-entry-ids-are-reported', () => {
     for (const entry of failures) {
       expect(outcome.text).toContain(`${entry.id}:`)

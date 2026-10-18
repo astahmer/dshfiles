@@ -3,8 +3,7 @@ import { access, chmod, mkdir, mkdtemp, rm, stat, writeFile } from 'node:fs/prom
 import { createServer, type Server } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { checkClientBoot, waitForHostResponse } from '../src/project/client-boot-check.js'
-import { clientEntryFailures, compositionFailures, parseBootText } from '../src/project/client-boot-check.js'
+import { checkClientBoot, ClientBootCheckModel, compositionFailures } from '../src/project/client-boot-check.js'
 import { BrowserBootModel, type BrowserBootEvidence, type BrowserBootOutcome } from '../src/project/browser-boot.js'
 
 /**
@@ -22,7 +21,7 @@ describe('client boot card parsing', () => {
       '@deepseek-ai/dsh-client-ui-chat: pending (waiting for service: uiConversation)',
       '@deepseek-ai/dsh-client-ui-goal: pending (waiting for service: uiConversation)',
     ].join('\n')
-    expect(parseBootText(text)).toEqual([
+    expect(ClientBootCheckModel.parseBootText(text)).toEqual([
       { id: '@deepseek-ai/dsh-client-ui-conversation', state: 'failed' },
       { id: '@deepseek-ai/dsh-client-ui-chat', state: 'pending', detail: '(waiting for service: uiConversation)' },
       { id: '@deepseek-ai/dsh-client-ui-goal', state: 'pending', detail: '(waiting for service: uiConversation)' },
@@ -33,7 +32,7 @@ describe('client boot card parsing', () => {
     const text = [
       '@dshfiles/queue-reorder: failed: import failed: client-modules: "@dshfiles/queue-reorder" not loaded because dependency "@deepseek-ai/dsh-client-connection" failed',
     ].join('\n')
-    expect(parseBootText(text)).toEqual([
+    expect(ClientBootCheckModel.parseBootText(text)).toEqual([
       {
         id: '@dshfiles/queue-reorder',
         state: 'failed',
@@ -43,7 +42,7 @@ describe('client boot card parsing', () => {
   })
 
   it('redacts tokenized local URLs from entry details', () => {
-    const entries = parseBootText('@dshfiles/demo: failed: opened http://127.0.0.1:3199/private-token')
+    const entries = ClientBootCheckModel.parseBootText('@dshfiles/demo: failed: opened http://127.0.0.1:3199/private-token')
     expect(entries).toEqual([{ id: '@dshfiles/demo', state: 'failed', detail: 'opened http://127.0.0.1:3199/[redacted]' }])
   })
 
@@ -54,22 +53,22 @@ describe('client boot card parsing', () => {
       '@deepseek-ai/dsh-client-ui-conversation',
       'web boot: 2 entries did not activate',
     ].join('\n')
-    expect(parseBootText(text)).toEqual([])
+    expect(ClientBootCheckModel.parseBootText(text)).toEqual([])
   })
 
   it('returns nothing for empty text', () => {
-    expect(parseBootText('')).toEqual([])
+    expect(ClientBootCheckModel.parseBootText('')).toEqual([])
   })
 
   it('ignores lines that are not entry states', () => {
     const text = ['Booting DSH', 'ready', 'some: thing'].join('\n')
-    expect(parseBootText(text)).toEqual([])
+    expect(ClientBootCheckModel.parseBootText(text)).toEqual([])
   })
 })
 
 describe('pending Client entries', () => {
   it('allows only explicit service waits outside the expected plugin entry', () => {
-    const entries = parseBootText(
+    const entries = ClientBootCheckModel.parseBootText(
       [
         '@dshfiles/demo: pending (waiting for service: uiConversation)',
         '@deepseek-ai/dsh-client-ui-chat: pending (waiting for service: uiConversation)',
@@ -77,7 +76,7 @@ describe('pending Client entries', () => {
         '@deepseek-ai/dsh-client-ui-settings: failed: apply threw',
       ].join('\n'),
     )
-    expect(clientEntryFailures(entries, ['@dshfiles/demo'])).toEqual([
+    expect(ClientBootCheckModel.clientEntryFailures(entries, ['@dshfiles/demo'])).toEqual([
       { id: '@dshfiles/demo', state: 'pending', detail: '(waiting for service: uiConversation)' },
       { id: '@deepseek-ai/dsh-client-ui-models', state: 'pending' },
       { id: '@deepseek-ai/dsh-client-ui-settings', state: 'failed', detail: 'apply threw' },
@@ -317,7 +316,7 @@ describe('host response probe', () => {
     const fixture = await listenRandomPort(createServer((_request, response) => response.end('ok')))
     try {
       const startedAt = Date.now()
-      await waitForHostResponse(fixture.url, 5_000)
+      await ClientBootCheckModel.waitForHostResponse(fixture.url, 5_000)
       expect(Date.now() - startedAt).toBeLessThan(1_000)
     } finally {
       await fixture.close()
@@ -328,7 +327,7 @@ describe('host response probe', () => {
     const fixture = await listenRandomPort(createServer(() => {}))
     await fixture.close()
     const startedAt = Date.now()
-    await waitForHostResponse(fixture.url, 300)
+    await ClientBootCheckModel.waitForHostResponse(fixture.url, 300)
     const elapsed = Date.now() - startedAt
     expect(elapsed).toBeGreaterThanOrEqual(250)
     expect(elapsed).toBeLessThan(5_000)

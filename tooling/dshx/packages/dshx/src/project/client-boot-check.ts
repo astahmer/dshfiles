@@ -91,7 +91,7 @@ const SLOT_SETTLE_MS = 1_000
  * Recover entry states from the boot card text. The card prints the summary line
  * first and then one line per entry, so the audit below it is the whole record.
  */
-export const parseBootText = (text: string): ClientBootCheckEntry[] => {
+const parseBootText = (text: string): ClientBootCheckEntry[] => {
   const entries: ClientBootCheckEntry[] = []
   for (const raw of text.split('\n')) {
     const line = raw.trim()
@@ -109,7 +109,7 @@ export const parseBootText = (text: string): ClientBootCheckEntry[] => {
 }
 
 /** Pending is acceptable only for a non-target entry with an explicit native service wait. */
-export const clientEntryFailures = (entries: readonly ClientBootCheckEntry[], expectedClientEntries: readonly string[]): ClientBootCheckEntry[] => {
+const clientEntryFailures = (entries: readonly ClientBootCheckEntry[], expectedClientEntries: readonly string[]): ClientBootCheckEntry[] => {
   const expected = new Set(expectedClientEntries)
   return entries.filter(entry => {
     if (entry.state !== 'pending') return true
@@ -171,7 +171,7 @@ const waitForHostUrl = (
  * the first answer replaces a fixed settle that cost two seconds on every check, and still waits when a Host
  * announces before it accepts connections.
  */
-export const waitForHostResponse = async (url: string, timeoutMs = HOST_RESPONSE_TIMEOUT_MS): Promise<void> => {
+const waitForHostResponse = async (url: string, timeoutMs = HOST_RESPONSE_TIMEOUT_MS): Promise<void> => {
   const deadline = Date.now() + timeoutMs
   for (;;) {
     try {
@@ -331,4 +331,10 @@ export const checkClientBoot = async (options: ClientBootCheckOptions): Promise<
     ...(browserError === undefined ? {} : { browserError: redactHostOutput(browserError) }),
     ...(readinessError === undefined ? {} : { readinessError: redactHostOutput(readinessError) }),
   }
+}
+
+export class ClientBootCheckModel {
+  static readonly parseBootText = parseBootText
+  static readonly clientEntryFailures = clientEntryFailures
+  static readonly waitForHostResponse = waitForHostResponse
 }
