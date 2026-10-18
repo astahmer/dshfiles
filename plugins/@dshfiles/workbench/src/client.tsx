@@ -103,14 +103,7 @@ export default defineClient({
         decorate(props => {
           useDockviewSheet()
           useDemoPanels()
-          return (
-            <WorkbenchView
-              registry={registry}
-              store={store}
-              t={props.t}
-              headerActions={context => <MainMoveToDock {...context} />}
-            />
-          )
+          return <WorkbenchView registry={registry} store={store} t={props.t} headerActions={context => <MainMoveToDock {...context} />} />
         }),
       ),
     )
