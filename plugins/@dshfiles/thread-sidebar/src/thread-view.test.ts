@@ -76,33 +76,77 @@ describe('thread view filters', () => {
   })
 
   it('filters supported activity states', () => {
-    expect(ThreadViewModel.matchesStatusFilter({ filters: [], running: false, needsAttention: false, archived: false, muted: false })).toBe(true)
-    expect(ThreadViewModel.matchesStatusFilter({ filters: ['working'], running: true, needsAttention: false, archived: false, muted: false })).toBe(true)
-    expect(ThreadViewModel.matchesStatusFilter({ filters: ['working'], running: false, needsAttention: false, archived: false, muted: false })).toBe(false)
-    expect(ThreadViewModel.matchesStatusFilter({ filters: ['attention'], running: false, needsAttention: true, archived: false, muted: false })).toBe(true)
-    expect(ThreadViewModel.matchesStatusFilter({ filters: ['archived'], running: false, needsAttention: false, archived: true, muted: false })).toBe(true)
-    expect(ThreadViewModel.matchesStatusFilter({ filters: ['muted'], running: true, needsAttention: false, archived: false, muted: true })).toBe(true)
-    expect(ThreadViewModel.matchesStatusFilter({ filters: ['muted'], running: true, needsAttention: false, archived: false, muted: false })).toBe(false)
+    expect(ThreadViewModel.matchesStatusFilter({ filters: [], running: false, needsAttention: false, archived: false, settled: false, muted: false })).toBe(
+      true,
+    )
     expect(
-      ThreadViewModel.matchesStatusFilter({ filters: ['working', 'attention'], running: false, needsAttention: true, archived: false, muted: false }),
+      ThreadViewModel.matchesStatusFilter({ filters: ['working'], running: true, needsAttention: false, archived: false, settled: false, muted: false }),
     ).toBe(true)
     expect(
-      ThreadViewModel.matchesStatusFilter({ filters: ['working', 'attention'], running: false, needsAttention: false, archived: false, muted: false }),
+      ThreadViewModel.matchesStatusFilter({ filters: ['working'], running: false, needsAttention: false, archived: false, settled: false, muted: false }),
+    ).toBe(false)
+    expect(
+      ThreadViewModel.matchesStatusFilter({ filters: ['attention'], running: false, needsAttention: true, archived: false, settled: false, muted: false }),
+    ).toBe(true)
+    expect(
+      ThreadViewModel.matchesStatusFilter({ filters: ['archived'], running: false, needsAttention: false, archived: true, settled: false, muted: false }),
+    ).toBe(true)
+    expect(
+      ThreadViewModel.matchesStatusFilter({ filters: ['settled'], running: false, needsAttention: false, archived: false, settled: true, muted: false }),
+    ).toBe(true)
+    expect(
+      ThreadViewModel.matchesStatusFilter({ filters: ['settled'], running: false, needsAttention: false, archived: false, settled: false, muted: false }),
+    ).toBe(false)
+    expect(
+      ThreadViewModel.matchesStatusFilter({ filters: ['muted'], running: true, needsAttention: false, archived: false, settled: false, muted: true }),
+    ).toBe(true)
+    expect(
+      ThreadViewModel.matchesStatusFilter({ filters: ['muted'], running: true, needsAttention: false, archived: false, settled: false, muted: false }),
+    ).toBe(false)
+    expect(
+      ThreadViewModel.matchesStatusFilter({
+        filters: ['working', 'attention'],
+        running: false,
+        needsAttention: true,
+        archived: false,
+        settled: false,
+        muted: false,
+      }),
+    ).toBe(true)
+    expect(
+      ThreadViewModel.matchesStatusFilter({
+        filters: ['working', 'attention'],
+        running: false,
+        needsAttention: false,
+        archived: false,
+        settled: false,
+        muted: false,
+      }),
     ).toBe(false)
   })
 
   it('includes stopped input-needed and usage-limit threads in Not working', () => {
     for (const status of ['input-needed', 'usage-limit']) {
       expect(
-        ThreadViewModel.matchesStatusFilter({ filters: ['not-working'], running: false, needsAttention: true, archived: false, muted: false }),
+        ThreadViewModel.matchesStatusFilter({ filters: ['not-working'], running: false, needsAttention: true, archived: false, settled: false, muted: false }),
         status,
       ).toBe(true)
     }
-    expect(ThreadViewModel.matchesStatusFilter({ filters: ['not-working'], running: false, needsAttention: false, archived: false, muted: false })).toBe(true)
-    expect(ThreadViewModel.matchesStatusFilter({ filters: ['not-working'], running: true, needsAttention: true, archived: false, muted: false })).toBe(true)
-    expect(ThreadViewModel.matchesStatusFilter({ filters: ['not-working'], running: true, needsAttention: false, archived: false, muted: false })).toBe(false)
-    expect(ThreadViewModel.matchesStatusFilter({ filters: ['not-working'], running: false, needsAttention: false, archived: true, muted: false })).toBe(false)
-    expect(ThreadViewModel.matchesStatusFilter({ filters: ['not-working'], running: false, needsAttention: false, archived: false, muted: true })).toBe(false)
+    expect(
+      ThreadViewModel.matchesStatusFilter({ filters: ['not-working'], running: false, needsAttention: false, archived: false, settled: false, muted: false }),
+    ).toBe(true)
+    expect(
+      ThreadViewModel.matchesStatusFilter({ filters: ['not-working'], running: true, needsAttention: true, archived: false, settled: false, muted: false }),
+    ).toBe(true)
+    expect(
+      ThreadViewModel.matchesStatusFilter({ filters: ['not-working'], running: true, needsAttention: false, archived: false, settled: false, muted: false }),
+    ).toBe(false)
+    expect(
+      ThreadViewModel.matchesStatusFilter({ filters: ['not-working'], running: false, needsAttention: false, archived: true, settled: false, muted: false }),
+    ).toBe(false)
+    expect(
+      ThreadViewModel.matchesStatusFilter({ filters: ['not-working'], running: false, needsAttention: false, archived: false, settled: false, muted: true }),
+    ).toBe(false)
   })
 
   it('filters main and subagent sources using Host lineage metadata', () => {

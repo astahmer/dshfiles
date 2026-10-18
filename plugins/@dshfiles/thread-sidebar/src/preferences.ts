@@ -4,7 +4,7 @@ import { threadMutesSchema } from './thread-mute.js'
 import {
   ATTENTION_COLOR_OPTIONS,
   DEFAULT_PREFERENCES,
-  REBASED_THREAD_ARCHIVE_DELAYS,
+  REBASED_THREAD_SETTLE_DELAYS,
   THREAD_ROW_ACTIONS,
   type SidebarPreferences,
   type SidebarSection,
@@ -14,26 +14,54 @@ import { DEFAULT_THREAD_NOTIFICATION_CATEGORIES, ThreadNotificationModel, thread
 
 export const PREFERENCES_STORAGE_KEY = 'dshfiles.thread-sidebar.v1'
 
-const sidebarSectionSchema = z.enum(['pinned', 'active', 'parked', 'inactive', 'archived'])
+const sidebarSectionSchema = z.enum(['pinned', 'active', 'parked', 'settled', 'inactive', 'archived'])
 const threadRowActionSchema = z.enum(THREAD_ROW_ACTIONS)
 export const attentionColorSchema = z.enum(ATTENTION_COLOR_OPTIONS)
+
+/**
+ * Auto-archive became auto-settle: the same idle scan now writes our own soft status instead of the
+ * native archive verb. A stored document from before the rename still carries the old keys, so map
+ * them onto the current field names and drop the legacy ones before the strict parse.
+ */
+const legacyPreferenceRenames = {
+  autoArchiveEnabled: 'autoSettleEnabled',
+  autoArchiveSessionIds: 'autoSettleSessionIds',
+  autoArchiveDisabledSessionIds: 'autoSettleDisabledSessionIds',
+  rebasedThreadArchiveDelay: 'rebasedThreadSettleDelay',
+} as const
+
+const preferenceDocumentSchema = z.record(z.string(), z.unknown())
+
+const upgradeLegacyPreferenceKeys = (value: unknown): unknown => {
+  const parsed = preferenceDocumentSchema.safeParse(value)
+  // Anything that is not a preferences document is left to the strict schema, which rejects it.
+  if (!parsed.success) return value
+  const upgraded: Record<string, unknown> = { ...parsed.data }
+  for (const [legacy, current] of Object.entries(legacyPreferenceRenames)) {
+    if (!(legacy in upgraded)) continue
+    if (upgraded[current] === undefined) upgraded[current] = upgraded[legacy]
+    delete upgraded[legacy]
+  }
+  return upgraded
+}
 
 const preferencesInputSchema = z
   .object({
     archiveUndoEnabled: z.boolean().default(DEFAULT_PREFERENCES.archiveUndoEnabled),
     archiveUndoDurationSeconds: z.number().int().min(1).max(30).default(DEFAULT_PREFERENCES.archiveUndoDurationSeconds),
-    autoArchiveEnabled: z.boolean(),
-    rebasedThreadArchiveDelay: z.enum(REBASED_THREAD_ARCHIVE_DELAYS).default(DEFAULT_PREFERENCES.rebasedThreadArchiveDelay),
+    autoSettleEnabled: z.boolean(),
+    rebasedThreadSettleDelay: z.enum(REBASED_THREAD_SETTLE_DELAYS).default(DEFAULT_PREFERENCES.rebasedThreadSettleDelay),
     idleMinutes: z.number().int().min(15).max(10080),
     scanIntervalMinutes: z.number().int().min(1).max(120),
     excludedWorkspaceIds: z.array(z.string().min(1).max(256)).max(500),
     excludedSessionIds: z.array(z.string().min(1).max(256)).max(5000),
-    autoArchiveSessionIds: z.array(z.string().min(1).max(256)).max(5000).default(DEFAULT_PREFERENCES.autoArchiveSessionIds),
-    autoArchiveDisabledSessionIds: z.array(z.string().min(1).max(256)).max(5000).default(DEFAULT_PREFERENCES.autoArchiveDisabledSessionIds),
+    autoSettleSessionIds: z.array(z.string().min(1).max(256)).max(5000).default(DEFAULT_PREFERENCES.autoSettleSessionIds),
+    autoSettleDisabledSessionIds: z.array(z.string().min(1).max(256)).max(5000).default(DEFAULT_PREFERENCES.autoSettleDisabledSessionIds),
     parkedSessionIds: z.array(z.string().min(1).max(256)).max(5000),
+    settledSessionIds: z.array(z.string().min(1).max(256)).max(5000).default(DEFAULT_PREFERENCES.settledSessionIds),
     mutedThreads: threadMutesSchema.default(DEFAULT_PREFERENCES.mutedThreads),
-    collapsedSections: z.array(sidebarSectionSchema).max(5),
-    workspaceFilter: z.string().max(256).nullable(),
+    collapsedSections: z.array(sidebarSectionSchema).max(6),
+    workspaceFilter: z.string().max(256).nullable().default(DEFAULT_PREFERENCES.workspaceFilter),
     headerMode: z.enum(['compact', 'expanded']),
     hideBrandLogo: z.boolean().default(DEFAULT_PREFERENCES.hideBrandLogo),
     headerRegionHeight: z.number().int().min(40).max(10000).nullable().default(null),
@@ -85,7 +113,7 @@ const preferencesSchema = preferencesInputSchema.extend({
 
 /** Decode a Host settings value; null when it does not satisfy the sidebar contract. */
 const decodePreferences = (value: unknown): SidebarPreferences | null => {
-  const checked = preferencesInputSchema.safeParse(value)
+  const checked = preferencesInputSchema.safeParse(upgradeLegacyPreferenceKeys(value))
   if (!checked.success) return null
   const categoriesStillDefault =
     checked.data.notificationCategories === undefined ||
@@ -122,7 +150,11 @@ const preferencesToMigrate = (local: SidebarPreferences, host: SidebarPreference
 const isPreferenceKey = (key: string): key is keyof SidebarPreferences => key in DEFAULT_PREFERENCES
 
 /** Browser copy used only while the Host settings namespace is unavailable; null when absent or invalid. */
-export const storedPreferences = createStoredValue({ key: PREFERENCES_STORAGE_KEY, schema: preferencesSchema, fallback: null })
+export const storedPreferences = createStoredValue({
+  key: PREFERENCES_STORAGE_KEY,
+  schema: z.preprocess(upgradeLegacyPreferenceKeys, preferencesSchema),
+  fallback: null,
+})
 
 const toggleCollapsedSection = (collapsedSections: readonly SidebarSection[], section: SidebarSection): SidebarSection[] =>
   collapsedSections.includes(section) ? collapsedSections.filter(item => item !== section) : [...collapsedSections, section]

@@ -32,6 +32,9 @@ export interface ThreadActionDeps {
   readonly projects: () => readonly ProjectRow[]
   readonly archivedSessionIds: () => readonly string[]
   readonly pinnedSessionIds: () => readonly string[]
+  readonly settledSessionIds: () => readonly string[]
+  /** Move one thread into or out of the plugin's own settled status; returns the set the Host now holds. */
+  readonly setSettled: (sessionId: string, settled: boolean) => Promise<readonly string[]>
   readonly archive: (sessionId: string, stopActivity: boolean) => Promise<readonly string[]>
   readonly unarchive: (sessionId: string) => Promise<readonly string[]>
   readonly pin: (sessionId: string) => Promise<readonly string[]>
@@ -134,6 +137,7 @@ export interface ThreadListRow {
   readonly liveAgent: boolean
   readonly archived: boolean
   readonly pinned: boolean
+  readonly settled: boolean
   readonly updatedAt?: number
 }
 
@@ -281,6 +285,7 @@ export const createThreadActions = (deps: ThreadActionDeps) => ({
     const projects = deps.projects()
     const archived = new Set(deps.archivedSessionIds())
     const pinned = new Set(deps.pinnedSessionIds())
+    const settled = new Set(deps.settledSessionIds())
     const projectOf = new Map<string, ProjectRow>()
     for (const project of projects) {
       for (const sessionId of project.sessionIds) projectOf.set(sessionId, project)
@@ -310,6 +315,7 @@ export const createThreadActions = (deps: ThreadActionDeps) => ({
         liveAgent: summary.agentAvailable,
         archived: isArchived,
         pinned: pinned.has(summary.sessionId),
+        settled: settled.has(summary.sessionId),
         updatedAt: summary.updatedAt,
       })
     }
@@ -375,6 +381,23 @@ export const createThreadActions = (deps: ThreadActionDeps) => ({
       return { sessionId: input.sessionId, archivedSessionIds: [...archivedSessionIds] }
     } catch (error) {
       throw failure(error, `Could not restore thread ${input.sessionId}.`)
+    }
+  },
+
+  settle: async ({ input, caller }: ThreadActionContext<ThreadArchiveInput>) => {
+    const sessionId = targetSessionId(input.sessionId, caller)
+    try {
+      return { sessionId, settledSessionIds: [...(await deps.setSettled(sessionId, true))] }
+    } catch (error) {
+      throw failure(error, `Could not settle thread ${sessionId}.`)
+    }
+  },
+
+  unsettle: async ({ input }: ThreadActionContext<ThreadTargetInput>) => {
+    try {
+      return { sessionId: input.sessionId, settledSessionIds: [...(await deps.setSettled(input.sessionId, false))] }
+    } catch (error) {
+      throw failure(error, `Could not unsettle thread ${input.sessionId}.`)
     }
   },
 

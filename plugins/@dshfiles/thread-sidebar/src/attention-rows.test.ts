@@ -10,6 +10,7 @@ test('shows the selected thread when it has an unanswered question', () => {
     pendingInteractionKindFor: () => 'question',
     mutedSessionIds: new Set<string>(),
     archivedSessionIds: new Set<string>(),
+    settledSessionIds: new Set(),
     matchesWorkspace: () => true,
   })
 
@@ -27,6 +28,7 @@ test('keeps an unresolved continued question out of Turn finished', () => {
     completionAt: { [continuedQuestion.id]: 1, [finishedSession.id]: 2 },
     mutedSessionIds: new Set<string>(),
     archivedSessionIds: new Set<string>(),
+    settledSessionIds: new Set(),
     excludedSessionIds: new Set<ReturnType<typeof SessionId>>(),
     matchesWorkspace: () => true,
   })
@@ -45,6 +47,7 @@ test('keeps a thread another group already lists out of Turn finished', () => {
     completionAt: { [groupedElsewhere.id]: 1, [finishedSession.id]: 2 },
     mutedSessionIds: new Set<string>(),
     archivedSessionIds: new Set<string>(),
+    settledSessionIds: new Set(),
     excludedSessionIds: new Set([groupedElsewhere.id]),
     matchesWorkspace: () => true,
   })

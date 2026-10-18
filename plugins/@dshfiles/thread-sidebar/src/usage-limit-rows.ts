@@ -58,6 +58,7 @@ const selectUsageLimitRows = <Session extends UsageLimitSession>(options: {
   readonly continuations: readonly QuotaContinuation[]
   readonly mutedSessionIds: ReadonlySet<string>
   readonly archivedSessionIds: ReadonlySet<string>
+  readonly settledSessionIds: ReadonlySet<string>
   readonly matchesWorkspace: (session: Session) => boolean
   readonly matchesSource: (session: Session) => boolean
 }): UsageLimitRow<Session>[] => {
@@ -67,7 +68,7 @@ const selectUsageLimitRows = <Session extends UsageLimitSession>(options: {
     if (continuation.state !== 'waiting') continue
     const session = byId.get(continuation.sessionId)
     if (session === undefined || session.blank || session.running) continue
-    if (options.mutedSessionIds.has(session.id) || options.archivedSessionIds.has(session.id)) continue
+    if (options.mutedSessionIds.has(session.id) || options.archivedSessionIds.has(session.id) || options.settledSessionIds.has(session.id)) continue
     if (!options.matchesWorkspace(session) || !options.matchesSource(session)) continue
     rows.push({ continuation, session })
   }

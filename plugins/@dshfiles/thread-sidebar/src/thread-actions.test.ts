@@ -29,6 +29,8 @@ const createDeps = (overrides: Partial<ThreadActionDeps> = {}): ThreadActionDeps
   projects: () => [],
   archivedSessionIds: () => [],
   pinnedSessionIds: () => [],
+  settledSessionIds: () => [],
+  setSettled: async () => ['session-a'],
   archive: async () => ['session-a'],
   unarchive: async () => [],
   pin: async () => ['session-a'],
@@ -68,6 +70,7 @@ describe('thread actions: list', () => {
         liveAgent: false,
         archived: false,
         pinned: true,
+        settled: false,
         updatedAt: 1,
       },
     ])
@@ -106,6 +109,60 @@ describe('thread actions: list', () => {
 
     expect(result.threads.map(thread => thread.sessionId)).toEqual(['session-c'])
     expect(result.total).toBe(1)
+  })
+})
+
+describe('thread actions: settle', () => {
+  test('settles the named thread and reports the set the Host now holds', async () => {
+    const actions = createThreadActions(
+      createDeps({
+        setSettled: async (sessionId, settled) => {
+          expect([sessionId, settled]).toEqual(['session-b', true])
+          return ['session-b']
+        },
+      }),
+    )
+
+    expect(await actions.settle({ input: { sessionId: 'session-b' }, caller: agent('session-a'), signal })).toEqual({
+      sessionId: 'session-b',
+      settledSessionIds: ['session-b'],
+    })
+  })
+
+  test('settles the calling thread when no sessionId is given and unsettles by id', async () => {
+    const writes: { sessionId: string; settled: boolean }[] = []
+    const actions = createThreadActions(
+      createDeps({
+        setSettled: async (sessionId, settled) => {
+          writes.push({ sessionId, settled })
+          return settled ? [sessionId] : []
+        },
+      }),
+    )
+
+    await actions.settle({ input: {}, caller: agent('session-self'), signal })
+    expect(await actions.unsettle({ input: { sessionId: 'session-self' }, caller: agent('session-a'), signal })).toEqual({
+      sessionId: 'session-self',
+      settledSessionIds: [],
+    })
+    expect(writes).toEqual([
+      { sessionId: 'session-self', settled: true },
+      { sessionId: 'session-self', settled: false },
+    ])
+  })
+
+  test('reports a failed settle as a plugin error', async () => {
+    const actions = createThreadActions(
+      createDeps({
+        setSettled: async () => {
+          throw new Error('The thread-sidebar settings namespace is unavailable on this Host.')
+        },
+      }),
+    )
+
+    await expect(actions.settle({ input: { sessionId: 'session-b' }, caller: agent('session-a'), signal })).rejects.toThrow(
+      'The thread-sidebar settings namespace is unavailable on this Host.',
+    )
   })
 })
 
@@ -435,6 +492,8 @@ describe('thread actions: tool exposure', () => {
       'thread_list',
       'thread_archive',
       'thread_unarchive',
+      'thread_settle',
+      'thread_unsettle',
       'thread_pin',
       'thread_unpin',
       'thread_rename',

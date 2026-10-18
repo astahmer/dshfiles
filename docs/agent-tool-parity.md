@@ -31,7 +31,7 @@ backing verb; `host-gap` counts capabilities no verb can reach yet.
 
 | Owner                                                                                                                                             | Capabilities audited | Agent tools today                                                                                        | Missing tools | Host gaps |
 | ------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- | -------------------------------------------------------------------------------------------------------- | ------------- | --------- |
-| thread-sidebar                                                                                                                                    | 40                   | 19 (new)                                                                                                 | 12            | 5         |
+| thread-sidebar                                                                                                                                    | 42                   | 21 (new)                                                                                                 | 12            | 5         |
 | main-tabs                                                                                                                                         | 8                    | 0                                                                                                        | 2             | 2         |
 | home                                                                                                                                              | 4                    | 0                                                                                                        | 3             | 0         |
 | sidebar-commands                                                                                                                                  | 2                    | 0                                                                                                        | 1             | 0         |
@@ -84,13 +84,15 @@ Each row is a tool worth building today: the backing verb already exists.
 | `thread_settle_policy`           | Per-thread auto-settle override                          | `settings/update`, `thread-sidebar` (`src/settings.ts:108-109`)                  |
 | `thread_views_update`            | Saved views add/rename/reorder/remove                    | `settings/update`, view presets                                                  |
 | `thread_sidebar_settings_update` | Row display, attention groups, colours, subagent folding | `settings/update`, `thread-sidebar` (`src/settings.ts:10-21, 27-68, 123-126`)    |
-| `thread_auto_archive_settings`   | Auto-archive idle threads, interval, exclusions          | `settings/update`, `thread-sidebar` (`src/settings.ts:77-90`)                    |
+| `thread_auto_settle_settings`    | Auto-settle idle threads, interval, exclusions           | `settings/update`, `thread-sidebar` (`src/settings.ts:77-90`)                    |
 | `thread_archive_rebased`         | Archive rebased threads after a delay                    | `workspace/archiveSession` + jj `/threadAt`                                      |
 | `thread_children_list`           | Child/subagent rows with fold state                      | `thread_references` lists the children of one thread; fold state is client-only  |
 | `remote_thread_list`             | Threads on other hosts                                   | `multi-host.threadList` (no `tool` binding)                                      |
 | `dsh_restart`                    | Restart DSH / copy launch URL                            | own `requestRestart` host service (`src/host.ts:18-28`)                          |
 
-Already tool-served (this change): the 19 `thread_*` / `project_*` tools below, including
+Already tool-served (this change): the 21 `thread_*` / `project_*` tools below, including
+`thread_settle` / `thread_unsettle` (move one thread into or out of the plugin's own
+settled status, which the Host `agent/pre-step` gate enforces) and
 `thread_recoveries` (list the threads whose turn a restart or a crash interrupted) and
 `thread_recovery_resume` (queue the continuation prompt for one of them) — the same
 `thread-sidebar-recovery` verbs the Interrupted and Needs resume groups drive.
@@ -508,16 +510,20 @@ actions` makes `@dshfiles/thread-sidebar` serve a `thread-actions` dshx API
 [`thread-actions-host.ts`](../plugins/@dshfiles/thread-sidebar/src/thread-actions-host.ts))
 whose methods carry `tool:` bindings:
 
-`thread_list`, `thread_archive`, `thread_unarchive`, `thread_pin`,
-`thread_unpin`, `thread_rename`, `thread_fork`, `thread_create`, `thread_stop`,
-`thread_select_model`, `project_list`, `project_register`, `project_rename`,
-`project_delete`, `project_reorder`, `thread_move`.
+`thread_list`, `thread_archive`, `thread_unarchive`, `thread_settle`,
+`thread_unsettle`, `thread_pin`, `thread_unpin`, `thread_rename`, `thread_fork`,
+`thread_create`, `thread_stop`, `thread_select_model`, `project_list`,
+`project_register`, `project_rename`, `project_delete`, `project_reorder`,
+`thread_move`.
 
 Semantics worth knowing:
 
 - Write methods take an optional `sessionId` and default to the **calling**
   thread, so a thread can rename, fork, pin, stop, re-model, archive or move
   itself.
+- `thread_settle` writes the plugin's own settled status through its settings
+  scope; the Host then refuses every model step that Session proposes, so a late
+  wake ends as `blocked` until `thread_unsettle`.
 - `thread_archive` never stops running work on its own. A running thread is
   refused with the active families (turn, job, subagent, schedule) named; only
   `stopActivity: true`, which the description ties to an explicit user request,

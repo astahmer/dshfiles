@@ -1,6 +1,6 @@
 import Schema from '@deepseek-ai/schemastery'
 import { defineSettings } from '@dshfiles/dshx/settings'
-import { ATTENTION_COLOR_OPTIONS, DEFAULT_PREFERENCES, REBASED_THREAD_ARCHIVE_DELAYS, THREAD_ROW_ACTIONS } from './organization.js'
+import { ATTENTION_COLOR_OPTIONS, DEFAULT_PREFERENCES, REBASED_THREAD_SETTLE_DELAYS, THREAD_ROW_ACTIONS } from './organization.js'
 import { threadNotificationCategoriesSchema } from './thread-notifications.js'
 import { DEFAULT_THREAD_VIEW_SETTINGS } from './thread-view-preferences.js'
 
@@ -88,20 +88,22 @@ export const threadSidebarSettings = defineSettings({
       .max(30)
       .default(DEFAULT_PREFERENCES.archiveUndoDurationSeconds)
       .description('How long the manual archive undo notice stays visible, in seconds.'),
-    autoArchiveEnabled: Schema.boolean().default(DEFAULT_PREFERENCES.autoArchiveEnabled).description('Archive idle threads automatically.'),
-    rebasedThreadArchiveDelay: Schema.union(REBASED_THREAD_ARCHIVE_DELAYS)
-      .default(DEFAULT_PREFERENCES.rebasedThreadArchiveDelay)
-      .description('Archive successfully rebased threads immediately or after a delay. Running or waiting threads are never archived.'),
+    autoSettleEnabled: Schema.boolean()
+      .default(DEFAULT_PREFERENCES.autoSettleEnabled)
+      .description('Settle idle threads automatically: they stay listed and openable, but run no model step until unsettled.'),
+    rebasedThreadSettleDelay: Schema.union(REBASED_THREAD_SETTLE_DELAYS)
+      .default(DEFAULT_PREFERENCES.rebasedThreadSettleDelay)
+      .description('Settle successfully rebased threads immediately or after a delay. Running or waiting threads are never settled.'),
     idleMinutes: Schema.natural()
       .min(15)
       .max(10080)
       .default(DEFAULT_PREFERENCES.idleMinutes)
-      .description('Idle threshold in minutes before threads move to Inactive; auto-archive uses the same threshold.'),
+      .description('Idle threshold in minutes before threads move to Inactive; auto-settle uses the same threshold.'),
     scanIntervalMinutes: Schema.natural()
       .min(1)
       .max(120)
       .default(DEFAULT_PREFERENCES.scanIntervalMinutes)
-      .description('How often auto-archive checks, in minutes.'),
+      .description('How often auto-settle checks, in minutes.'),
     paletteChord: Schema.union([Schema.const(null), Schema.string()])
       .default(DEFAULT_PREFERENCES.paletteChord)
       .hidden(),
@@ -119,13 +121,14 @@ export const threadSidebarSettings = defineSettings({
       .hidden(),
     excludedWorkspaceIds: ids(),
     excludedSessionIds: ids(),
-    autoArchiveSessionIds: ids(),
-    autoArchiveDisabledSessionIds: ids(),
+    autoSettleSessionIds: ids(),
+    autoSettleDisabledSessionIds: ids(),
     parkedSessionIds: ids(),
+    settledSessionIds: ids(),
     mutedThreads: Schema.dict(Schema.object({ until: Schema.union([Schema.const(null), Schema.natural()]), activityAt: Schema.natural() }))
       .default({})
       .hidden(),
-    collapsedSections: Schema.array(Schema.union(['pinned', 'active', 'parked', 'inactive', 'archived'] as const))
+    collapsedSections: Schema.array(Schema.union(['pinned', 'active', 'parked', 'settled', 'inactive', 'archived'] as const))
       .default(DEFAULT_PREFERENCES.collapsedSections)
       .hidden(),
     workspaceFilter: Schema.union([Schema.const(null), Schema.string()])
@@ -143,3 +146,46 @@ export const threadSidebarSettings = defineSettings({
   }),
   applies: 'live',
 })
+
+let readSettledSessionIds: (() => readonly string[]) | undefined
+let writeSettledSessionIds: ((next: readonly string[]) => Promise<void>) | undefined
+
+/**
+ * The Host half of the namespace. It remembers its live scope so the settled-thread gate and the Agent's
+ * settle verbs read and write the same values the sidebar shows, instead of a second copy of the status.
+ */
+export const threadSidebarHostSettings = threadSidebarSettings.host({
+  setup: scope => {
+    const read = (): readonly string[] => scope.get().settledSessionIds
+    const write = async (next: readonly string[]): Promise<void> => {
+      await scope.update({ settledSessionIds: [...next] })
+    }
+    readSettledSessionIds = read
+    writeSettledSessionIds = write
+    return () => {
+      if (readSettledSessionIds !== read) return
+      readSettledSessionIds = undefined
+      writeSettledSessionIds = undefined
+    }
+  },
+})
+
+/** Settled Session ids on this Host; empty while the namespace is unregistered (desktop shells, older builds). */
+export const settledSessionIdsFromHost = (): readonly string[] => {
+  try {
+    return readSettledSessionIds?.() ?? []
+  } catch {
+    return []
+  }
+}
+
+/** Add or drop one settled Session id, returning the set the Host now holds. */
+export const setSessionSettled = async (sessionId: string, settled: boolean): Promise<readonly string[]> => {
+  if (readSettledSessionIds === undefined || writeSettledSessionIds === undefined) {
+    throw new Error('The thread-sidebar settings namespace is unavailable on this Host.')
+  }
+  const current = readSettledSessionIds()
+  const next = settled ? [...new Set([...current, sessionId])] : current.filter(candidate => candidate !== sessionId)
+  await writeSettledSessionIds(next)
+  return next
+}

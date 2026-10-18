@@ -2,7 +2,23 @@ import assert from 'node:assert/strict'
 import { test } from 'vitest'
 import { DEFAULT_PREFERENCES } from './organization.js'
 import { SidebarPreferencesModel } from './preferences.js'
+import { threadSidebarSettings } from './settings.js'
 import { ThreadNotificationModel } from './thread-notifications.js'
+
+/**
+ * The Host hands the plugin the settings schema's resolved output, and Schemastery drops a
+ * null-valued union field from it. A decoder field without its own default therefore rejected every
+ * Host document, which silently kept the whole namespace browser-local: this pins the two schemas
+ * together so adding a nullable field without a decoder default fails here instead of in the browser.
+ */
+test('the settings schema and the preference decoder agree on every field', () => {
+  const resolved = threadSidebarSettings.schema({})
+  const decoded = SidebarPreferencesModel.decode(resolved)
+  assert.ok(decoded, `decode rejected the resolved settings value: ${Object.keys(resolved).join(', ')}`)
+  assert.deepEqual(decoded.settledSessionIds, [])
+  assert.equal(decoded.autoSettleEnabled, false)
+  assert.equal(decoded.workspaceFilter, null)
+})
 
 test('older stored preferences default the header and thread split to natural height', () => {
   const stored = JSON.stringify({ ...DEFAULT_PREFERENCES, headerRegionHeight: undefined })
@@ -24,12 +40,35 @@ test('older preferences gain attention modes and default child-thread actions to
   assert.equal(SidebarPreferencesModel.decode({ ...DEFAULT_PREFERENCES, turnFinishedDisplay: 'section' }), null)
 })
 
-test('older preferences default rebase-triggered auto-archive to disabled', () => {
-  const { rebasedThreadArchiveDelay, ...older } = DEFAULT_PREFERENCES
-  assert.equal(rebasedThreadArchiveDelay, 'disabled')
-  assert.equal(SidebarPreferencesModel.decode(older)?.rebasedThreadArchiveDelay, 'disabled')
-  assert.equal(SidebarPreferencesModel.decode({ ...DEFAULT_PREFERENCES, rebasedThreadArchiveDelay: 'after-1-day' })?.rebasedThreadArchiveDelay, 'after-1-day')
-  assert.equal(SidebarPreferencesModel.decode({ ...DEFAULT_PREFERENCES, rebasedThreadArchiveDelay: 'after-5-minutes' }), null)
+test('older preferences default rebase-triggered auto-settle to disabled', () => {
+  const { rebasedThreadSettleDelay, ...older } = DEFAULT_PREFERENCES
+  assert.equal(rebasedThreadSettleDelay, 'disabled')
+  assert.equal(SidebarPreferencesModel.decode(older)?.rebasedThreadSettleDelay, 'disabled')
+  assert.equal(SidebarPreferencesModel.decode({ ...DEFAULT_PREFERENCES, rebasedThreadSettleDelay: 'after-1-day' })?.rebasedThreadSettleDelay, 'after-1-day')
+  assert.equal(SidebarPreferencesModel.decode({ ...DEFAULT_PREFERENCES, rebasedThreadSettleDelay: 'after-5-minutes' }), null)
+})
+
+test('auto-archive preference keys from an older document decode as their auto-settle replacements', () => {
+  const legacy = {
+    ...DEFAULT_PREFERENCES,
+    autoArchiveEnabled: true,
+    autoArchiveSessionIds: ['settle-me'],
+    autoArchiveDisabledSessionIds: ['keep-me'],
+    rebasedThreadArchiveDelay: 'after-1-hour',
+  }
+  const {
+    autoSettleEnabled: _autoSettleEnabled,
+    autoSettleSessionIds: _autoSettleSessionIds,
+    autoSettleDisabledSessionIds: _autoSettleDisabledSessionIds,
+    rebasedThreadSettleDelay: _rebasedThreadSettleDelay,
+    ...older
+  } = legacy
+  const parsed = SidebarPreferencesModel.decode(older)
+  assert.ok(parsed)
+  assert.equal(parsed.autoSettleEnabled, true)
+  assert.deepEqual(parsed.autoSettleSessionIds, ['settle-me'])
+  assert.deepEqual(parsed.autoSettleDisabledSessionIds, ['keep-me'])
+  assert.equal(parsed.rebasedThreadSettleDelay, 'after-1-hour')
 })
 
 test('archive undo defaults on and rejects durations outside one through thirty seconds', () => {
@@ -46,19 +85,19 @@ test('archive undo defaults on and rejects durations outside one through thirty 
   assert.equal(SidebarPreferencesModel.decode({ ...DEFAULT_PREFERENCES, archiveUndoDurationSeconds: 31 }), null)
 })
 
-test('older preferences default per-thread auto-archive overrides to inherit global behavior', () => {
-  const { autoArchiveSessionIds, autoArchiveDisabledSessionIds, ...older } = DEFAULT_PREFERENCES
-  assert.deepEqual(autoArchiveSessionIds, [])
-  assert.deepEqual(autoArchiveDisabledSessionIds, [])
-  assert.deepEqual(SidebarPreferencesModel.decode(older)?.autoArchiveSessionIds, [])
-  assert.deepEqual(SidebarPreferencesModel.decode(older)?.autoArchiveDisabledSessionIds, [])
+test('older preferences default per-thread auto-settle overrides to inherit global behavior', () => {
+  const { autoSettleSessionIds, autoSettleDisabledSessionIds, ...older } = DEFAULT_PREFERENCES
+  assert.deepEqual(autoSettleSessionIds, [])
+  assert.deepEqual(autoSettleDisabledSessionIds, [])
+  assert.deepEqual(SidebarPreferencesModel.decode(older)?.autoSettleSessionIds, [])
+  assert.deepEqual(SidebarPreferencesModel.decode(older)?.autoSettleDisabledSessionIds, [])
   const saved = SidebarPreferencesModel.decode({
     ...DEFAULT_PREFERENCES,
-    autoArchiveSessionIds: ['enabled-thread'],
-    autoArchiveDisabledSessionIds: ['disabled-thread'],
+    autoSettleSessionIds: ['enabled-thread'],
+    autoSettleDisabledSessionIds: ['disabled-thread'],
   })
-  assert.deepEqual(saved?.autoArchiveSessionIds, ['enabled-thread'])
-  assert.deepEqual(saved?.autoArchiveDisabledSessionIds, ['disabled-thread'])
+  assert.deepEqual(saved?.autoSettleSessionIds, ['enabled-thread'])
+  assert.deepEqual(saved?.autoSettleDisabledSessionIds, ['disabled-thread'])
 })
 
 test('valid saved split heights persist and invalid heights are rejected', () => {

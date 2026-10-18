@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { WorkspaceView } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import { test, vi } from 'vitest'
-import { SidebarOrganization, type AutoArchiveContext, DEFAULT_PREFERENCES, type SidebarPreferences, type SidebarSection } from './organization.js'
+import { SidebarOrganization, type AutoSettleContext, DEFAULT_PREFERENCES, type SidebarPreferences, type SidebarSection } from './organization.js'
 import { SidebarPreferencesModel, PREFERENCES_STORAGE_KEY, storedPreferences } from './preferences.js'
 
 interface SessionFixture extends Partial<Omit<SessionSummary, 'id' | 'parentId'>> {
@@ -49,22 +49,23 @@ class MemoryStorage implements Storage {
 }
 
 const now = 10_000_000
-const preferences: SidebarPreferences = { ...DEFAULT_PREFERENCES, autoArchiveEnabled: true }
+const preferences: SidebarPreferences = { ...DEFAULT_PREFERENCES, autoSettleEnabled: true }
 const idSets = {
   archivedSessionIds: new Set<string>(),
   pinnedSessionIds: new Set<string>(),
+  settledSessionIds: new Set<string>(),
 }
 
-test('archived starts folded and the working sections start open', () => {
-  // Archived is storage rather than a place to work, so it opens folded; every
+test('archived and settled start folded and the working sections start open', () => {
+  // Archived and settled are storage rather than places to work, so they open folded; every
   // other section holds threads a user comes here to act on.
-  assert.deepEqual(DEFAULT_PREFERENCES.collapsedSections, ['archived'])
+  assert.deepEqual(DEFAULT_PREFERENCES.collapsedSections, ['archived', 'settled'])
   const workingSections = (['pinned', 'active', 'parked', 'inactive'] as const).filter(section => DEFAULT_PREFERENCES.collapsedSections.includes(section))
   assert.deepEqual(workingSections, [])
 })
 
 test('every default collapsed section is one the sidebar can actually render', () => {
-  const known = new Set<SidebarSection>(['pinned', 'active', 'parked', 'inactive', 'archived'])
+  const known = new Set<SidebarSection>(['pinned', 'active', 'parked', 'settled', 'inactive', 'archived'])
   for (const section of DEFAULT_PREFERENCES.collapsedSections) assert.ok(known.has(section), `unknown section ${section}`)
 })
 
@@ -78,12 +79,17 @@ test('subagent attention is opt-in and recognizes durable child links or origin'
 
 test('recent threads stay active until idle threshold; running and organization state keep priority', () => {
   const parkedIds = new Set(['parked'])
-  const classify = (session: SessionSummary, overrides: { archived?: ReadonlySet<string>; pinned?: ReadonlySet<string>; parked?: ReadonlySet<string> } = {}) =>
+  const settledIds = new Set(['settled'])
+  const classify = (
+    session: SessionSummary,
+    overrides: { archived?: ReadonlySet<string>; pinned?: ReadonlySet<string>; parked?: ReadonlySet<string>; settled?: ReadonlySet<string> } = {},
+  ) =>
     SidebarOrganization.sectionForSession({
       session,
       archivedSessionIds: overrides.archived ?? idSets.archivedSessionIds,
       pinnedSessionIds: overrides.pinned ?? idSets.pinnedSessionIds,
       parkedSessionIds: overrides.parked ?? parkedIds,
+      settledSessionIds: overrides.settled ?? settledIds,
       now,
       idleMinutes: 120,
     })
@@ -94,6 +100,10 @@ test('recent threads stay active until idle threshold; running and organization 
   assert.equal(classify(sessionSummary({ id: 'pinned', updatedAt: now }), { pinned: new Set(['pinned']) }), 'pinned')
   assert.equal(classify(sessionSummary({ id: 'parked', updatedAt: now })), 'parked')
   assert.equal(classify(sessionSummary({ id: 'archived', updatedAt: now }), { archived: new Set(['archived']) }), 'archived')
+  assert.equal(classify(sessionSummary({ id: 'settled', updatedAt: now })), 'settled')
+  assert.equal(classify(sessionSummary({ id: 'settled-running', running: true, updatedAt: now })), 'active')
+  assert.equal(classify(sessionSummary({ id: 'settled-pinned', updatedAt: now }), { pinned: new Set(['settled-pinned']) }), 'pinned')
+  assert.equal(classify(sessionSummary({ id: 'parked-beats-settled', updatedAt: now }), { parked: new Set(['parked-beats-settled']) }), 'parked')
 })
 
 test('next idle transition ignores running sessions and returns earliest future boundary', () => {
@@ -112,58 +122,59 @@ test('next idle transition ignores running sessions and returns earliest future 
   assert.equal(SidebarOrganization.nextIdleTransitionAt([{ running: false, updatedAt: now - 120 * 60_000 }], now, 120), null)
 })
 
-test('auto archive requires an old, idle, nonblank, unpinned, unparked, included session', () => {
-  const candidate: AutoArchiveContext = {
+test('auto settle requires an old, idle, nonblank, unpinned, unparked, unsettled, included session', () => {
+  const candidate: AutoSettleContext = {
     session: sessionSummary({ id: 'idle', updatedAt: now - 120 * 60_000 }),
     workspaceId: 'project-a',
     now,
     preferences,
     ...idSets,
   }
-  assert.equal(SidebarOrganization.isAutoArchiveCandidate(candidate), true)
-  assert.equal(SidebarOrganization.isAutoArchiveCandidate({ ...candidate, session: { ...candidate.session, running: true } }), false)
-  assert.equal(SidebarOrganization.isAutoArchiveCandidate({ ...candidate, session: { ...candidate.session, blank: true } }), false)
-  assert.equal(SidebarOrganization.isAutoArchiveCandidate({ ...candidate, session: { ...candidate.session, updatedAt: now - 1 } }), false)
-  assert.equal(SidebarOrganization.isAutoArchiveCandidate({ ...candidate, session: { ...candidate.session, updatedAt: now + 1 } }), false)
-  assert.equal(SidebarOrganization.isAutoArchiveCandidate({ ...candidate, pinnedSessionIds: new Set(['idle']) }), false)
-  assert.equal(SidebarOrganization.isAutoArchiveCandidate({ ...candidate, archivedSessionIds: new Set(['idle']) }), false)
-  assert.equal(SidebarOrganization.isAutoArchiveCandidate({ ...candidate, preferences: { ...preferences, parkedSessionIds: ['idle'] } }), false)
-  assert.equal(SidebarOrganization.isAutoArchiveCandidate({ ...candidate, preferences: { ...preferences, excludedSessionIds: ['idle'] } }), false)
-  assert.equal(SidebarOrganization.isAutoArchiveCandidate({ ...candidate, preferences: { ...preferences, excludedWorkspaceIds: ['project-a'] } }), false)
-  assert.equal(SidebarOrganization.isAutoArchiveCandidate({ ...candidate, preferences: { ...preferences, autoArchiveEnabled: false } }), false)
+  assert.equal(SidebarOrganization.isAutoSettleCandidate(candidate), true)
+  assert.equal(SidebarOrganization.isAutoSettleCandidate({ ...candidate, session: { ...candidate.session, running: true } }), false)
+  assert.equal(SidebarOrganization.isAutoSettleCandidate({ ...candidate, session: { ...candidate.session, blank: true } }), false)
+  assert.equal(SidebarOrganization.isAutoSettleCandidate({ ...candidate, session: { ...candidate.session, updatedAt: now - 1 } }), false)
+  assert.equal(SidebarOrganization.isAutoSettleCandidate({ ...candidate, session: { ...candidate.session, updatedAt: now + 1 } }), false)
+  assert.equal(SidebarOrganization.isAutoSettleCandidate({ ...candidate, pinnedSessionIds: new Set(['idle']) }), false)
+  assert.equal(SidebarOrganization.isAutoSettleCandidate({ ...candidate, archivedSessionIds: new Set(['idle']) }), false)
+  assert.equal(SidebarOrganization.isAutoSettleCandidate({ ...candidate, settledSessionIds: new Set(['idle']) }), false)
+  assert.equal(SidebarOrganization.isAutoSettleCandidate({ ...candidate, preferences: { ...preferences, parkedSessionIds: ['idle'] } }), false)
+  assert.equal(SidebarOrganization.isAutoSettleCandidate({ ...candidate, preferences: { ...preferences, excludedSessionIds: ['idle'] } }), false)
+  assert.equal(SidebarOrganization.isAutoSettleCandidate({ ...candidate, preferences: { ...preferences, excludedWorkspaceIds: ['project-a'] } }), false)
+  assert.equal(SidebarOrganization.isAutoSettleCandidate({ ...candidate, preferences: { ...preferences, autoSettleEnabled: false } }), false)
 })
 
-test('per-thread auto-archive override inherits, enables, disables, and resets without losing other overrides', () => {
-  const idleCandidate: AutoArchiveContext = {
+test('per-thread auto-settle override inherits, enables, disables, and resets without losing other overrides', () => {
+  const idleCandidate: AutoSettleContext = {
     session: sessionSummary({ id: 'thread', updatedAt: now - 120 * 60_000 }),
     workspaceId: undefined,
     now,
     preferences: DEFAULT_PREFERENCES,
     ...idSets,
   }
-  assert.equal(SidebarOrganization.autoArchiveOverrideForSession(DEFAULT_PREFERENCES, 'thread'), 'inherit')
-  assert.equal(SidebarOrganization.shouldScanForAutoArchive(DEFAULT_PREFERENCES), false)
+  assert.equal(SidebarOrganization.autoSettleOverrideForSession(DEFAULT_PREFERENCES, 'thread'), 'inherit')
+  assert.equal(SidebarOrganization.shouldScanForAutoSettle(DEFAULT_PREFERENCES), false)
 
-  const enabled = SidebarOrganization.setAutoArchiveOverride(DEFAULT_PREFERENCES, 'thread', 'enabled')
-  assert.equal(SidebarOrganization.autoArchiveOverrideForSession(enabled, 'thread'), 'enabled')
-  assert.equal(SidebarOrganization.shouldScanForAutoArchive(enabled), true)
-  assert.equal(SidebarOrganization.isAutoArchiveCandidate({ ...idleCandidate, preferences: enabled }), true)
+  const enabled = SidebarOrganization.setAutoSettleOverride(DEFAULT_PREFERENCES, 'thread', 'enabled')
+  assert.equal(SidebarOrganization.autoSettleOverrideForSession(enabled, 'thread'), 'enabled')
+  assert.equal(SidebarOrganization.shouldScanForAutoSettle(enabled), true)
+  assert.equal(SidebarOrganization.isAutoSettleCandidate({ ...idleCandidate, preferences: enabled }), true)
 
-  const disabled = SidebarOrganization.setAutoArchiveOverride(
-    { ...preferences, autoArchiveSessionIds: ['other'], excludedSessionIds: ['globally-excluded'] },
+  const disabled = SidebarOrganization.setAutoSettleOverride(
+    { ...preferences, autoSettleSessionIds: ['other'], excludedSessionIds: ['globally-excluded'] },
     'thread',
     'disabled',
   )
-  assert.equal(SidebarOrganization.autoArchiveOverrideForSession(disabled, 'thread'), 'disabled')
-  assert.equal(SidebarOrganization.isAutoArchiveCandidate({ ...idleCandidate, preferences: disabled }), false)
-  const inherited = SidebarOrganization.setAutoArchiveOverride(disabled, 'thread', 'inherit')
-  assert.equal(SidebarOrganization.autoArchiveOverrideForSession(inherited, 'thread'), 'inherit')
-  assert.deepEqual(inherited.autoArchiveSessionIds, ['other'])
-  assert.deepEqual(inherited.autoArchiveDisabledSessionIds, [])
+  assert.equal(SidebarOrganization.autoSettleOverrideForSession(disabled, 'thread'), 'disabled')
+  assert.equal(SidebarOrganization.isAutoSettleCandidate({ ...idleCandidate, preferences: disabled }), false)
+  const inherited = SidebarOrganization.setAutoSettleOverride(disabled, 'thread', 'inherit')
+  assert.equal(SidebarOrganization.autoSettleOverrideForSession(inherited, 'thread'), 'inherit')
+  assert.deepEqual(inherited.autoSettleSessionIds, ['other'])
+  assert.deepEqual(inherited.autoSettleDisabledSessionIds, [])
   assert.deepEqual(inherited.excludedSessionIds, ['globally-excluded'])
-  assert.equal(SidebarOrganization.isAutoArchiveCandidate({ ...idleCandidate, preferences: { ...enabled, excludedSessionIds: ['thread'] } }), false)
+  assert.equal(SidebarOrganization.isAutoSettleCandidate({ ...idleCandidate, preferences: { ...enabled, excludedSessionIds: ['thread'] } }), false)
   assert.equal(
-    SidebarOrganization.isAutoArchiveCandidate({
+    SidebarOrganization.isAutoSettleCandidate({
       ...idleCandidate,
       workspaceId: 'excluded-project',
       preferences: { ...enabled, excludedWorkspaceIds: ['excluded-project'] },
@@ -264,7 +275,8 @@ test('parked ids, sidebar settings, and navigation choices round-trip through br
   try {
     const saved: SidebarPreferences = {
       ...DEFAULT_PREFERENCES,
-      autoArchiveEnabled: true,
+      autoSettleEnabled: true,
+      settledSessionIds: ['settled-session'],
       idleMinutes: 240,
       scanIntervalMinutes: 20,
       parkedSessionIds: ['parked-session'],

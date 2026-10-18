@@ -73,7 +73,7 @@ const openSidebarSettings = async (page: Page): Promise<void> => {
   await expect(sidebarSettings(page)).toBeVisible()
 }
 
-const statusFilterLabels: readonly string[] = ['All threads', 'Working', 'Not working', 'Needs attention', 'Muted', 'Archived']
+const statusFilterLabels: readonly string[] = ['All threads', 'Working', 'Not working', 'Needs attention', 'Muted', 'Settled', 'Archived']
 
 const setThreadStatusFilters = async (page: Page, triggerName: string, selectedLabels: readonly string[]): Promise<void> => {
   await threadSidebar(page).getByRole('button', { name: triggerName, exact: true }).click()
@@ -263,25 +263,67 @@ When('an archived thread is opened from the Archived section', async ({ page }: 
 
   await threadSidebar(page).getByRole('button', { name: 'Archived (1)', exact: true }).click()
   await openThreadRow(targetRow)
-  const restoreButton = threadSidebar(page).getByTestId('thread-sidebar-transient-notice').getByRole('button', { name: 'Restore and open', exact: true })
-  await expect(restoreButton).toBeVisible({ timeout: 15_000 })
   archivedOpenJourneys.set(page, archivedThreadId)
 })
 
-Then('the archived-open notice dismisses and returns on the next attempt', async ({ page }: { page: Page }) => {
+Then('the thread is restored and open with no archived banner', async ({ page }: { page: Page }) => {
   const archivedThreadId = archivedOpenJourneys.get(page)
   if (archivedThreadId === undefined) throw new Error('No archived thread was opened in this journey.')
   const targetRow = threadRow(page, archivedThreadId)
   const transientNotice = threadSidebar(page).getByTestId('thread-sidebar-transient-notice')
-  const restoreButton = transientNotice.getByRole('button', { name: 'Restore and open', exact: true })
 
-  await recordAssertion(page, 'thread-sidebar-archived-open-notice-dismisses', async () => {
-    await expect(restoreButton).toBeHidden({ timeout: 15_000 })
+  await recordAssertion(page, 'thread-sidebar-archived-open-restores-and-opens', async () => {
+    // One click restores and opens: no recovery notice, no repeated "keeps closing" failure.
     await expect(transientNotice).toHaveCount(0)
+    await expect(threadSidebar(page).getByRole('button', { name: 'Archived (0)', exact: true })).toHaveCount(0)
+    await expect(page.getByRole('status', { name: 'This thread is archived.' })).toHaveCount(0, { timeout: 15_000 })
+    await expect(targetRow).toHaveCount(1)
+    await expect.poll(() => currentThreadId(page)).toBe(archivedThreadId)
   })
-  await recordAssertion(page, 'thread-sidebar-archived-open-notice-returns', async () => {
-    await openThreadRow(targetRow)
-    await expect(restoreButton).toBeVisible({ timeout: 15_000 })
+  await finishJourneyAssertions(page)
+})
+
+let settledThreadId: string | null = null
+
+When('a nonblank Host thread is settled from its context menu', async ({ page }: { page: Page }) => {
+  if (currentThreadId(page) === null) await startBlankThread(page)
+  const composer = page.getByRole('textbox').first()
+  await composer.fill('thread sidebar settle e2e target')
+  await composer.press('Enter')
+  // The profile has no provider credentials, so the turn fails: only an idle thread can be settled.
+  await expect(page.getByText('This turn failed', { exact: false })).toBeVisible({ timeout: 30_000 })
+  const threadId = currentThreadId(page)
+  if (threadId === null) throw new Error('The Host did not keep the selected thread after its first message.')
+  settledThreadId = threadId
+  const targetRow = threadRow(page, threadId)
+  await expect(targetRow).toHaveCount(1)
+  await openThreadRowMenu(targetRow)
+  await page.getByRole('menuitem', { name: 'Settle', exact: true }).click()
+  await expect(threadSidebar(page).getByRole('button', { name: 'Settled (1)', exact: true })).toBeVisible()
+})
+
+Then('the thread is settled, opens read-only and unsettles to reply', async ({ page }: { page: Page }) => {
+  if (settledThreadId === null) throw new Error('No thread was settled.')
+  const targetRow = threadRow(page, settledThreadId)
+  await recordAssertion(page, 'thread-sidebar-settle-blocks-the-composer', async () => {
+    // Settled opens folded, so its rows appear after the section is expanded.
+    await threadSidebar(page).getByRole('button', { name: 'Settled (1)', exact: true }).click()
+    await expect(targetRow).toHaveCount(1)
+    await expect(page.getByRole('status', { name: 'This thread is settled.' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Unsettle to reply', exact: true })).toBeVisible()
+  })
+  await page.getByRole('button', { name: 'Unsettle to reply', exact: true }).click()
+  await recordAssertion(page, 'thread-sidebar-unsettle-restores-the-composer', async () => {
+    await expect(page.getByRole('status', { name: 'This thread is settled.' })).toHaveCount(0, { timeout: 15_000 })
+    // A settled Composer refuses input; a fill that lands and an enabled Send button prove it is live.
+    await page.getByRole('textbox').first().fill('thread sidebar unsettled reply e2e')
+    await expect(page.getByRole('button', { name: 'Send message' })).toBeEnabled()
+  })
+  await page.reload()
+  await expect(threadSidebar(page)).toBeVisible()
+  await recordAssertion(page, 'thread-sidebar-unsettle-survives-reload', async () => {
+    await expect(page.getByRole('status', { name: 'This thread is settled.' })).toHaveCount(0)
+    await expect(threadSidebar(page).getByRole('button', { name: 'Settled (0)', exact: true })).toHaveCount(0)
   })
   await finishJourneyAssertions(page)
 })
@@ -527,11 +569,11 @@ Then('only matching rows remain visible after reload', async ({ page }: { page: 
   await finishJourneyAssertions(page)
 })
 
-When('auto-archive is enabled with a new idle threshold and scan interval', async ({ page }: { page: Page }) => {
+When('auto-settle is enabled with a new idle threshold and scan interval', async ({ page }: { page: Page }) => {
   await openSidebarSettings(page)
-  const autoArchive = sidebarSettings(page).getByRole('checkbox', { name: 'Auto-archive inactive threads' })
-  await expect(autoArchive).not.toBeChecked()
-  await autoArchive.click()
+  const autoSettle = sidebarSettings(page).getByRole('checkbox', { name: 'Settle inactive threads' })
+  await expect(autoSettle).not.toBeChecked()
+  await autoSettle.click()
   await page.getByLabel('Move to inactive after (minutes)').fill('45')
   await page.getByLabel('Check every (minutes)').fill('5')
   await page.reload()
@@ -541,7 +583,7 @@ When('auto-archive is enabled with a new idle threshold and scan interval', asyn
 
 Then('the policy settings survive a browser reload', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'thread-sidebar-idle-policy-settings-survive-reload', async () => {
-    await expect(sidebarSettings(page).getByRole('checkbox', { name: 'Auto-archive inactive threads' })).toBeChecked()
+    await expect(sidebarSettings(page).getByRole('checkbox', { name: 'Settle inactive threads' })).toBeChecked()
     await expect(page.getByLabel('Move to inactive after (minutes)')).toHaveValue('45')
     await expect(page.getByLabel('Check every (minutes)')).toHaveValue('5')
   })
@@ -643,7 +685,7 @@ Then('every open tab shows the finished turn until one tab opens it', async ({ p
   await finishJourneyAssertions(page)
 })
 
-When('auto-archive is enabled for one thread while global auto-archive stays off', async ({ page }: { page: Page }) => {
+When('auto-settle is enabled for one thread while global auto-settle stays off', async ({ page }: { page: Page }) => {
   const targetThreadId = await startBlankThread(page)
   const prompt = 'thread sidebar auto archive override'
   const composer = page.getByRole('textbox').first()
@@ -652,11 +694,11 @@ When('auto-archive is enabled for one thread while global auto-archive stays off
   const targetRow = threadSidebar(page).locator('article').filter({ hasText: 'thread sidebar auto archive override' })
   await expect(targetRow).toHaveCount(1)
   await openSidebarSettings(page)
-  await expect(sidebarSettings(page).getByRole('checkbox', { name: 'Auto-archive inactive threads' })).not.toBeChecked()
+  await expect(sidebarSettings(page).getByRole('checkbox', { name: 'Settle inactive threads' })).not.toBeChecked()
   await threadSidebar(page).getByRole('button', { name: 'Sidebar settings', exact: true }).click()
   await openThreadRowMenu(targetRow)
   await page.getByRole('menuitem', { name: 'Auto-settle behavior', exact: true }).click()
-  const enableForThread = page.getByRole('menuitemradio', { name: 'Auto-archive after idle threshold', exact: true })
+  const enableForThread = page.getByRole('menuitemradio', { name: 'Settle after idle threshold', exact: true })
   await enableForThread.click()
   await expect(enableForThread).toHaveAttribute('aria-checked', 'true')
   await page.reload()
@@ -667,14 +709,14 @@ When('auto-archive is enabled for one thread while global auto-archive stays off
 Then('the per-thread override survives reload without changing the global setting', async ({ page }: { page: Page }) => {
   const targetRow = threadSidebar(page).locator('article').filter({ hasText: 'thread sidebar auto archive override' })
   await openSidebarSettings(page)
-  await recordAssertion(page, 'thread-sidebar-global-auto-archive-remains-off', async () => {
-    await expect(sidebarSettings(page).getByRole('checkbox', { name: 'Auto-archive inactive threads' })).not.toBeChecked()
+  await recordAssertion(page, 'thread-sidebar-global-auto-settle-remains-off', async () => {
+    await expect(sidebarSettings(page).getByRole('checkbox', { name: 'Settle inactive threads' })).not.toBeChecked()
   })
   await threadSidebar(page).getByRole('button', { name: 'Sidebar settings', exact: true }).click()
   await openThreadRowMenu(targetRow)
   await page.getByRole('menuitem', { name: 'Auto-settle behavior', exact: true }).click()
-  await recordAssertion(page, 'thread-sidebar-per-thread-auto-archive-survives-reload', async () => {
-    await expect(page.getByRole('menuitemradio', { name: 'Auto-archive after idle threshold', exact: true })).toHaveAttribute('aria-checked', 'true')
+  await recordAssertion(page, 'thread-sidebar-per-thread-auto-settle-survives-reload', async () => {
+    await expect(page.getByRole('menuitemradio', { name: 'Settle after idle threshold', exact: true })).toHaveAttribute('aria-checked', 'true')
   })
   await finishJourneyAssertions(page)
 })

@@ -25,6 +25,7 @@ test('recovery rows include only persisted restart candidates that remain idle a
     sessionIds: new Set(['restart-interrupted', 'still-running', 'blank', 'muted', 'archived', 'other-project', 'other-source']),
     mutedSessionIds: new Set(['muted']),
     archivedSessionIds: new Set(['archived']),
+    settledSessionIds: new Set(),
     matchesWorkspace: candidate => candidate.id !== 'other-project',
     matchesSource: candidate => candidate.id !== 'other-source',
   })
@@ -47,6 +48,7 @@ test('interrupted rows keep crash recoveries apart from managed restarts', () =>
     reasonFor: (sessionId: string) => reasons.get(sessionId),
     mutedSessionIds: new Set<string>(),
     archivedSessionIds: new Set<string>(),
+    settledSessionIds: new Set<string>(),
     matchesWorkspace: () => true,
     matchesSource: () => true,
   }

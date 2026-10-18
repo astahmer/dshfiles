@@ -10,6 +10,7 @@ export const selectRecoveryRows = <Session extends RecoveryRow>(options: {
   readonly reasonFor: (sessionId: string) => RecoveryReason | undefined
   readonly mutedSessionIds: ReadonlySet<string>
   readonly archivedSessionIds: ReadonlySet<string>
+  readonly settledSessionIds: ReadonlySet<string>
   readonly matchesWorkspace: (session: Session) => boolean
   readonly matchesSource: (session: Session) => boolean
 }): Session[] =>
@@ -22,6 +23,7 @@ export const selectRecoveryRows = <Session extends RecoveryRow>(options: {
         !session.running &&
         !options.mutedSessionIds.has(session.id) &&
         !options.archivedSessionIds.has(session.id) &&
+        !options.settledSessionIds.has(session.id) &&
         options.matchesWorkspace(session) &&
         options.matchesSource(session),
     )
@@ -33,6 +35,7 @@ export const selectRestartRecoveryRows = <Session extends RecoveryRow>(options: 
   readonly sessionIds: ReadonlySet<string>
   readonly mutedSessionIds: ReadonlySet<string>
   readonly archivedSessionIds: ReadonlySet<string>
+  readonly settledSessionIds: ReadonlySet<string>
   readonly matchesWorkspace: (session: Session) => boolean
   readonly matchesSource: (session: Session) => boolean
   readonly reasonFor?: (sessionId: string) => RecoveryReason | undefined

@@ -16,10 +16,16 @@ Feature: Thread sidebar journeys
     Then archive undo settings control the temporary notice
 
   @scenario:thread-sidebar.archived-open-notice
-  Scenario: The archived-open recovery notice clears itself
+  Scenario: Opening an archived thread restores it in one click
     Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
     When an archived thread is opened from the Archived section
-    Then the archived-open notice dismisses and returns on the next attempt
+    Then the thread is restored and open with no archived banner
+
+  @scenario:thread-sidebar.settle
+  Scenario: Settle a thread from its context menu and unsettle it to reply
+    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
+    When a nonblank Host thread is settled from its context menu
+    Then the thread is settled, opens read-only and unsettles to reply
 
   @smoke
   @scenario:thread-sidebar.park-context-menu
@@ -55,9 +61,9 @@ Feature: Thread sidebar journeys
     Then only matching rows remain visible after reload
 
   @scenario:thread-sidebar.idle-archive
-  Scenario: Auto-archive stays opt-in and saves its schedule
+  Scenario: Auto-settle stays opt-in and saves its schedule
     Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
-    When auto-archive is enabled with a new idle threshold and scan interval
+    When auto-settle is enabled with a new idle threshold and scan interval
     Then the policy settings survive a browser reload
 
   @scenario:thread-sidebar.thread-mute
@@ -80,9 +86,9 @@ Feature: Thread sidebar journeys
     Then every open tab shows the finished turn until one tab opens it
 
   @scenario:thread-sidebar.auto-archive-overrides
-  Scenario: Per-thread auto-archive overrides the global opt-in
+  Scenario: Per-thread auto-settle overrides the global opt-in
     Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
-    When auto-archive is enabled for one thread while global auto-archive stays off
+    When auto-settle is enabled for one thread while global auto-settle stays off
     Then the per-thread override survives reload without changing the global setting
 
   @scenario:thread-sidebar.attention-colors

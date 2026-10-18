@@ -117,6 +117,7 @@ const rowActionLabelKeys = {
   aside: 'threadSidebarOpenInSidePanel',
   pin: 'threadSidebarPin',
   park: 'threadSidebarPark',
+  settle: 'threadSidebarSettle',
   mute: 'threadSidebarMute',
   archive: 'threadSidebarArchive',
   restore: 'threadSidebarRestore',

@@ -2,7 +2,7 @@
 
 This bundle builds a full sidebar replacement with the repository's local
 `@dshfiles/dshx` fork. It groups the real DSH session list by project and
-activity, with pinned, active, parked, inactive, and archived sections. Active
+activity, with pinned, active, parked, settled, inactive, and archived sections. Active
 includes running or recently updated threads; the idle threshold moves older,
 non-running threads to Inactive. The project picker scopes rows to one workspace
 or unassigned sessions.
@@ -20,13 +20,18 @@ and scope decisions read.
 Running state comes from `SessionSummary.running`; recency uses its
 `updatedAt` value. Pin and archive state come from the Host Workspace controller
 stream. Pin, unpin, archive, and restore call that controller directly.
-Auto-archive is off by default; when enabled, the configured scan interval
-checks the same idle threshold and only calls
-`archiveSession(sessionId, { stopActivity: false })`. It skips running, blank,
-archived, pinned, parked, excluded-session, and excluded-project entries. A
-thread menu can inherit the global setting, explicitly auto-archive that thread,
-or exclude it; explicit per-thread enables still honor excluded projects and
-other safety checks.
+
+**Settled vs archived.** Archived is DSH's own hard verb: it stops the work it
+names, blocks every later wake-up, and hides the thread from native navigation
+until it is restored. Settled is this plugin's own status: the thread stays
+listed and openable, the archive verb is never called, and the Host refuses the
+model steps it proposes until it is unsettled. Auto-settle is off by default;
+when enabled, the configured scan interval checks the same idle threshold and
+writes `settledSessionIds`. It skips running, blank, archived, pinned, parked,
+already-settled, excluded-session, excluded-project, and still-running-descendant
+entries. A thread menu can inherit the global setting, explicitly settle that
+thread, or exclude it; explicit per-thread enables still honor excluded projects
+and other safety checks.
 
 Sidebar preferences live in DSH Settings under the Host-synced `thread-sidebar`
 namespace (`src/settings.ts`, registered by `src/host.ts`). The plugin draws its
@@ -34,7 +39,7 @@ own **Settings › Thread sidebar** section (`src/settings-tab.tsx`, registered 
 `src/client-entry.tsx`) for the preferences the generated form cannot show. The
 generated Plugins page still carries the user-facing namespace fields
 (header style, density, icon-row overflow, recent-thread count, inactive
-threshold, auto-archive); layout state
+threshold, auto-settle); layout state
 (order, visibility,
 collapsed sections, project filter, split height, chords) is hidden everywhere.
 Values previously kept in browser `localStorage` (`dshfiles.thread-sidebar.v1`)
@@ -77,10 +82,19 @@ and filters fit together, see [Thread sidebar states](sidebar-state.md).
 **Archive undo notice.** Archiving reports itself as a compact overlay anchored
 to the sidebar (`data-testid="thread-sidebar-transient-notice"`), so the thread
 list does not move, and the notice offers an immediate undo before it disappears.
-Opening a thread DSH keeps closing shows the same overlay with **Restore and
-open**; it stays for 10 seconds, longer than a confirmation, and returns if the
-thread is opened again. Persistent warnings — storage failures and restart
-requests — stay in the list flow instead.
+Clicking an archived row restores it and then opens it, because DSH drops an
+archived Session from the main view on every list change; a refused restore
+reports the failure and leaves the thread archived. An open archived thread
+blocks its composer behind a **Restore to reply** banner. Persistent warnings —
+storage failures and restart requests — stay in the list flow instead.
+
+**Settled composer.** A settled thread opens normally and reads as history: the
+composer carries an **Unsettle to reply** banner (`src/settled-thread-dock.tsx`),
+because the Host rejects the next model step while the thread is settled. The
+rejection is a `agent/pre-step` listener in `src/host.ts` over
+`src/settled-gate.ts`: a settled Session, or a subagent descendant of one, runs
+no model step until it is unsettled, so a late wake (subagent settlement, queued
+follow-up, reminder) proposes a step that ends as `blocked` without a request.
 
 **Command palette.** Search threads, the ⌘ button in the header, and the
 keyboard all open a shadcn `CommandDialog`: fuzzy search over thread title,
@@ -154,7 +168,7 @@ no such seat, so an occupant keeps a footer-action fallback and registers throug
 generated text field cannot capture.
 
 Every thread row also exposes **Copy thread ID**, **Copy thread link**, **Mark
-unread**, per-thread auto-settle behavior, and a **Mute thread** menu.
+unread**, per-thread auto-settle behavior, a **Settle**/**Unsettle** toggle, and a **Mute thread** menu.
 Attention is Host-owned: the plugin records one durable row per unacknowledged
 thread (a finished turn, a manual unread mark, or both) in the
 `thread_attention` storage domain and serves it through the
@@ -170,9 +184,10 @@ rendered, so a turn that finishes in between stays unacknowledged, and it never
 clears a manual unread mark on the same thread. A browser that still holds markers
 from the older browser-local version hands them to the Host once and then drops
 its copy.
-Auto-settle can inherit the global auto-archive setting, explicitly enable it
+Auto-settle can inherit the global auto-settle setting, explicitly enable it
 for one thread, or exclude that thread; the global idle threshold and safety
-exclusions still apply. **Mute thread** (row bell, context menu, and the
+exclusions still apply. A thread with a still-running descendant is never
+settled, so a child turn is never rejected mid-step. **Mute thread** (row bell, context menu, and the
 session header's More menu) silences a thread for 1, 8 or 24 hours, until
 tomorrow morning (09:00 local), for a week, or until it is unmuted, like a
 Discord channel. A muted thread raises no desktop alert, attention group,
@@ -194,9 +209,11 @@ unlocked by the first user gesture and resumed before every tone, so an alert in
 background tab still rings. Existing desktop-alert choices migrate to system
 delivery.
 
-**Park vs mute.** Park files a finished thread away: it moves to the Parked
-section, is skipped by auto-archive, and stays parked until unparked, but its
-alerts still fire. Mute keeps the thread where it is and only silences it, for
+**Park vs settle vs mute.** Park files a finished thread away: it moves to the
+Parked section, is skipped by auto-settle, and stays parked until unparked, but
+its alerts still fire and it still runs steps when something wakes it. Settle
+goes further: the thread moves to the Settled section and runs no step at all
+until it is unsettled, while staying listed and openable. Mute keeps the thread where it is and only silences it, for
 a while or for good. They answer different questions ("not now" vs "not
 noisy"), so they stay separate and combine freely. The sidebar separates **Approval needed**,
 **Input needed**, **Turn finished**, **Interrupted**, and **Needs resume**.
@@ -382,14 +399,18 @@ counts and the long-task count do not.
 
 One dshx API (`thread-actions`, owner `@dshfiles/thread-sidebar`, defined in
 `src/thread-actions-api.ts`) exposes the sidebar's thread and project actions to
-the Agent as seventeen native tools: `thread_list`, `thread_archive`,
-`thread_unarchive`, `thread_pin`, `thread_unpin`, `thread_rename`,
+the Agent as nineteen native tools: `thread_list`, `thread_archive`,
+`thread_unarchive`, `thread_settle`, `thread_unsettle`, `thread_pin`,
+`thread_unpin`, `thread_rename`,
 `thread_fork`, `thread_create`, `thread_stop`, `thread_select_model`,
 `thread_references`, `project_list`, `project_register`, `project_rename`,
 `project_delete`, `project_reorder`, and `thread_move`. `src/thread-actions.ts`
 holds the decoded logic over plain ids and `src/thread-actions-host.ts` resolves
 the live Host services on each call (`sessionController`,
-`workspaceController`, `workspaceRegistry`, `sessionQuery`).
+`workspaceController`, `workspaceRegistry`, `sessionQuery`, and this plugin's own
+`thread-sidebar` settings scope for the settled set). `thread_settle` and
+`thread_unsettle` write `settledSessionIds` through that scope, so the Agent and
+every browser see one status.
 
 `thread_references` answers which other threads point back at one thread: its
 forked and subagent children (`header.parentSession`), plus the threads whose

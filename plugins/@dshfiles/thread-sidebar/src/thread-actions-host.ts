@@ -5,6 +5,7 @@ import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { WorkspaceId } from '@deepseek-ai/dsh-workspace'
 import { createThreadActions, type ThreadActionDeps } from './thread-actions.js'
 import { threadActionsApi } from './thread-actions-api.js'
+import { setSessionSettled, settledSessionIdsFromHost } from './settings.js'
 
 let hostContext: Context | undefined
 
@@ -63,6 +64,8 @@ const dependencies: ThreadActionDeps = {
       })),
   archivedSessionIds: () => [...requireContext().workspaceRegistry.archivedSessionIds],
   pinnedSessionIds: () => [...requireContext().workspaceRegistry.pinnedSessionIds],
+  settledSessionIds: () => settledSessionIdsFromHost(),
+  setSettled: (sessionId, settled) => setSessionSettled(sessionId, settled),
   archive: async (sessionId, stopActivity) => {
     const value = await requireContext().workspaceController.archiveSession({ sessionId: SessionId(sessionId), stopActivity })
     return value.archivedSessionIds

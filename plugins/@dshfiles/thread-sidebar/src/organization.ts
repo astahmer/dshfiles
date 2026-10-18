@@ -6,7 +6,7 @@ import type { ThreadMutes } from './thread-mute.js'
 import { DEFAULT_THREAD_NOTIFICATION_CATEGORIES, type ThreadNotificationCategories } from './thread-notifications.js'
 import { DEFAULT_THREAD_VIEW_SETTINGS, type ThreadViewSettings } from './thread-view-preferences.js'
 
-export type SidebarSection = 'pinned' | 'active' | 'parked' | 'inactive' | 'archived'
+export type SidebarSection = 'pinned' | 'active' | 'parked' | 'settled' | 'inactive' | 'archived'
 
 export const SIDEBAR_HEADER_MIN_HEIGHT = 44
 export const SIDEBAR_THREAD_MIN_HEIGHT = 120
@@ -21,25 +21,28 @@ export const ATTENTION_COLOR_OPTIONS = ['muted', 'primary', 'info', 'success', '
 export type AttentionColor = (typeof ATTENTION_COLOR_OPTIONS)[number]
 export type AttentionColorKey = 'approvalNeeded' | 'inputNeeded' | 'turnFinished'
 export type AttentionColors = Record<AttentionColorKey, AttentionColor>
-export const REBASED_THREAD_ARCHIVE_DELAYS = ['disabled', 'immediately', 'after-1-hour', 'after-1-day', 'after-1-week'] as const
-export type RebasedThreadArchiveDelay = (typeof REBASED_THREAD_ARCHIVE_DELAYS)[number]
+export const REBASED_THREAD_SETTLE_DELAYS = ['disabled', 'immediately', 'after-1-hour', 'after-1-day', 'after-1-week'] as const
+export type RebasedThreadSettleDelay = (typeof REBASED_THREAD_SETTLE_DELAYS)[number]
 
 /** Every hover action a thread row can offer; the Customize sidebar panel toggles them one by one. */
-export const THREAD_ROW_ACTIONS = ['resume', 'resumeDismiss', 'aside', 'pin', 'park', 'mute', 'archive', 'restore'] as const
+export const THREAD_ROW_ACTIONS = ['resume', 'resumeDismiss', 'aside', 'pin', 'park', 'settle', 'mute', 'archive', 'restore'] as const
 export type ThreadRowAction = (typeof THREAD_ROW_ACTIONS)[number]
 
 export interface SidebarPreferences {
   archiveUndoEnabled: boolean
   archiveUndoDurationSeconds: number
-  autoArchiveEnabled: boolean
-  rebasedThreadArchiveDelay: RebasedThreadArchiveDelay
+  /** Auto-settle idle threads: our own soft status, which never calls the native archive verb. */
+  autoSettleEnabled: boolean
+  rebasedThreadSettleDelay: RebasedThreadSettleDelay
   idleMinutes: number
   scanIntervalMinutes: number
   excludedWorkspaceIds: string[]
   excludedSessionIds: string[]
-  autoArchiveSessionIds: string[]
-  autoArchiveDisabledSessionIds: string[]
+  autoSettleSessionIds: string[]
+  autoSettleDisabledSessionIds: string[]
   parkedSessionIds: string[]
+  /** Settled threads by session id: listed and openable, but no model step starts until unsettled. */
+  settledSessionIds: string[]
   /** Muted or snoozed threads by session id; Host-synced so every browser stays quiet. */
   mutedThreads: ThreadMutes
   collapsedSections: SidebarSection[]
@@ -92,18 +95,19 @@ export type ThreadRowDensity = 'compact' | 'comfortable'
 export const DEFAULT_PREFERENCES: SidebarPreferences = {
   archiveUndoEnabled: true,
   archiveUndoDurationSeconds: 5,
-  autoArchiveEnabled: false,
-  rebasedThreadArchiveDelay: 'disabled',
+  autoSettleEnabled: false,
+  rebasedThreadSettleDelay: 'disabled',
   idleMinutes: 120,
   scanIntervalMinutes: 10,
   excludedWorkspaceIds: [],
   excludedSessionIds: [],
-  autoArchiveSessionIds: [],
-  autoArchiveDisabledSessionIds: [],
+  autoSettleSessionIds: [],
+  autoSettleDisabledSessionIds: [],
   parkedSessionIds: [],
+  settledSessionIds: [],
   mutedThreads: {},
-  // Keep every working section open; archived threads stay folded until requested.
-  collapsedSections: ['archived'],
+  // Keep every working section open; archived and settled threads stay folded until requested.
+  collapsedSections: ['archived', 'settled'],
   workspaceFilter: null,
   headerMode: 'compact',
   hideBrandLogo: false,
@@ -153,34 +157,35 @@ export type SessionActivity = Pick<SessionSummary, 'id' | 'running' | 'updatedAt
 const isAttentionSessionIncluded = (session: Pick<SessionSummary, 'origin' | 'parentId'>, includeSubagentAttention: boolean): boolean =>
   includeSubagentAttention || (session.origin !== 'subagent' && session.parentId === undefined)
 
-export interface AutoArchiveContext {
+export interface AutoSettleContext {
   session: SessionActivity
   workspaceId: string | undefined
   now: number
   preferences: SidebarPreferences
   archivedSessionIds: ReadonlySet<string>
   pinnedSessionIds: ReadonlySet<string>
+  settledSessionIds: ReadonlySet<string>
 }
 
-export type AutoArchiveOverride = 'inherit' | 'enabled' | 'disabled'
+export type AutoSettleOverride = 'inherit' | 'enabled' | 'disabled'
 
-const autoArchiveOverrideForSession = (preferences: SidebarPreferences, sessionId: string): AutoArchiveOverride => {
-  if (preferences.autoArchiveDisabledSessionIds.includes(sessionId)) return 'disabled'
-  if (preferences.autoArchiveSessionIds.includes(sessionId)) return 'enabled'
+const autoSettleOverrideForSession = (preferences: SidebarPreferences, sessionId: string): AutoSettleOverride => {
+  if (preferences.autoSettleDisabledSessionIds.includes(sessionId)) return 'disabled'
+  if (preferences.autoSettleSessionIds.includes(sessionId)) return 'enabled'
   return 'inherit'
 }
 
-const setAutoArchiveOverride = (preferences: SidebarPreferences, sessionId: string, override: AutoArchiveOverride): SidebarPreferences => ({
+const setAutoSettleOverride = (preferences: SidebarPreferences, sessionId: string, override: AutoSettleOverride): SidebarPreferences => ({
   ...preferences,
-  autoArchiveSessionIds:
-    override === 'enabled' ? [...new Set([...preferences.autoArchiveSessionIds, sessionId])] : preferences.autoArchiveSessionIds.filter(id => id !== sessionId),
-  autoArchiveDisabledSessionIds:
+  autoSettleSessionIds:
+    override === 'enabled' ? [...new Set([...preferences.autoSettleSessionIds, sessionId])] : preferences.autoSettleSessionIds.filter(id => id !== sessionId),
+  autoSettleDisabledSessionIds:
     override === 'disabled'
-      ? [...new Set([...preferences.autoArchiveDisabledSessionIds, sessionId])]
-      : preferences.autoArchiveDisabledSessionIds.filter(id => id !== sessionId),
+      ? [...new Set([...preferences.autoSettleDisabledSessionIds, sessionId])]
+      : preferences.autoSettleDisabledSessionIds.filter(id => id !== sessionId),
 })
 
-const shouldScanForAutoArchive = (preferences: SidebarPreferences): boolean => preferences.autoArchiveEnabled || preferences.autoArchiveSessionIds.length > 0
+const shouldScanForAutoSettle = (preferences: SidebarPreferences): boolean => preferences.autoSettleEnabled || preferences.autoSettleSessionIds.length > 0
 
 export interface SessionLineage {
   /** Number of known direct-parent edges above the session. */
@@ -397,17 +402,52 @@ const nextIdleTransitionAt = (sessions: readonly Pick<SessionActivity, 'running'
   return next
 }
 
-const isAutoArchiveCandidate = ({ session, workspaceId, now, preferences, archivedSessionIds, pinnedSessionIds }: AutoArchiveContext): boolean => {
+const isAutoSettleCandidate = ({
+  session,
+  workspaceId,
+  now,
+  preferences,
+  archivedSessionIds,
+  pinnedSessionIds,
+  settledSessionIds,
+}: AutoSettleContext): boolean => {
   if (session.running || session.blank) return false
-  if (archivedSessionIds.has(session.id) || pinnedSessionIds.has(session.id)) return false
+  if (archivedSessionIds.has(session.id) || pinnedSessionIds.has(session.id) || settledSessionIds.has(session.id)) return false
   if (preferences.parkedSessionIds.includes(session.id)) return false
   if (preferences.excludedSessionIds.includes(session.id)) return false
   if (workspaceId !== undefined && preferences.excludedWorkspaceIds.includes(workspaceId)) return false
-  const override = autoArchiveOverrideForSession(preferences, session.id)
+  const override = autoSettleOverrideForSession(preferences, session.id)
   if (override === 'disabled') return false
-  if (!preferences.autoArchiveEnabled && override !== 'enabled') return false
+  if (!preferences.autoSettleEnabled && override !== 'enabled') return false
 
   return hasPassedIdleThreshold(session, now, preferences.idleMinutes)
+}
+
+/**
+ * Whether any running Session descends from `sessionId`. Settling an ancestor would reject the next
+ * step of that child mid-turn, so a candidate with live descendants stays unsettled.
+ */
+const hasRunningDescendant = (input: {
+  readonly sessionId: string
+  readonly sessions: readonly {
+    readonly id: string
+    readonly running: boolean
+    readonly blank: boolean
+    readonly parentId?: string | undefined
+  }[]
+}): boolean => {
+  const byId = new Map(input.sessions.map(session => [session.id, session] as const))
+  for (const session of input.sessions) {
+    if (session.blank || !session.running || session.id === input.sessionId) continue
+    let cursor = session.parentId
+    const visited = new Set<string>([session.id])
+    while (cursor !== undefined && !visited.has(cursor)) {
+      if (cursor === input.sessionId) return true
+      visited.add(cursor)
+      cursor = byId.get(cursor)?.parentId
+    }
+  }
+  return false
 }
 
 const sectionForSession = ({
@@ -415,6 +455,7 @@ const sectionForSession = ({
   archivedSessionIds,
   pinnedSessionIds,
   parkedSessionIds,
+  settledSessionIds,
   now,
   idleMinutes,
 }: {
@@ -422,6 +463,7 @@ const sectionForSession = ({
   readonly archivedSessionIds: ReadonlySet<string>
   readonly pinnedSessionIds: ReadonlySet<string>
   readonly parkedSessionIds: ReadonlySet<string>
+  readonly settledSessionIds: ReadonlySet<string>
   readonly now: number
   readonly idleMinutes: number
 }): SidebarSection => {
@@ -429,6 +471,7 @@ const sectionForSession = ({
   if (pinnedSessionIds.has(session.id)) return 'pinned'
   if (session.running) return 'active'
   if (parkedSessionIds.has(session.id)) return 'parked'
+  if (settledSessionIds.has(session.id)) return 'settled'
   return hasPassedIdleThreshold(session, now, idleMinutes) ? 'inactive' : 'active'
 }
 
@@ -457,9 +500,9 @@ const fitItems = ({ widths, available, gap, reserve }: { widths: readonly number
 
 export class SidebarOrganization {
   static readonly isAttentionSessionIncluded = isAttentionSessionIncluded
-  static readonly autoArchiveOverrideForSession = autoArchiveOverrideForSession
-  static readonly setAutoArchiveOverride = setAutoArchiveOverride
-  static readonly shouldScanForAutoArchive = shouldScanForAutoArchive
+  static readonly autoSettleOverrideForSession = autoSettleOverrideForSession
+  static readonly setAutoSettleOverride = setAutoSettleOverride
+  static readonly shouldScanForAutoSettle = shouldScanForAutoSettle
   static readonly sessionLineage = sessionLineage
   static readonly workspaceForSessions = workspaceForSessions
   static readonly projectWorkspaces = projectWorkspaces
@@ -472,7 +515,8 @@ export class SidebarOrganization {
   static readonly dropIndexAt = dropIndexAt
   static readonly archiveWithoutStopping = archiveWithoutStopping
   static readonly nextIdleTransitionAt = nextIdleTransitionAt
-  static readonly isAutoArchiveCandidate = isAutoArchiveCandidate
+  static readonly isAutoSettleCandidate = isAutoSettleCandidate
+  static readonly hasRunningDescendant = hasRunningDescendant
   static readonly sectionForSession = sectionForSession
   static readonly fitItems = fitItems
 }

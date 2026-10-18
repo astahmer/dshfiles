@@ -4,7 +4,7 @@
     {
       "id": "thread-classification",
       "title": "Organize threads by workspace and status",
-      "summary": "Group active, pinned, parked, inactive, and archived threads by project; park with sidebar preferences and pin/archive through Host APIs.",
+      "summary": "Group active, pinned, parked, settled, inactive, and archived threads by project; park and settle through sidebar preferences and pin/archive through Host APIs.",
       "reach": ["expect region \"Threads\"", "expect button \"Group: Status\""],
       "surfaces": ["client", "host", "settings", "storage", "integration"],
       "configuration": [
@@ -77,6 +77,12 @@
           "coveredBy": ["thread-sidebar.classification"]
         },
         {
+          "key": "settledSessionIds",
+          "defaultValue": "[]",
+          "constraints": "Settled session IDs in Host-synced sidebar preferences; a settled session stays listed and openable but runs no model step until it is unsettled.",
+          "coveredBy": ["thread-sidebar.settle"]
+        },
+        {
           "key": "applyActionsToChildThreads",
           "defaultValue": "true",
           "constraints": "Boolean; apply manual actions to every descendant when acting on a parent thread.",
@@ -85,14 +91,15 @@
         },
         {
           "key": "collapsedSections",
-          "defaultValue": "[archived]",
-          "constraints": "Section ID list; archived is collapsed by default.",
+          "defaultValue": "[archived,settled]",
+          "constraints": "Section ID list; archived and settled are collapsed by default.",
           "coveredBy": ["thread-sidebar.classification"]
         }
       ],
-      "states": ["active", "pinned", "parked", "inactive", "archived"],
+      "states": ["active", "pinned", "parked", "settled", "inactive", "archived"],
       "failureModes": [
         "Parking updates sidebar preferences without depending on Host session-attention mutations.",
+        "Settling an ancestor with a still-running descendant is refused, so a child turn is never rejected mid-step.",
         "Activity uses session metadata timestamps and may reflect metadata updates."
       ],
       "externalDependencies": [],
@@ -105,6 +112,11 @@
         {
           "kind": "gherkin",
           "id": "thread-sidebar.row-pin",
+          "featureFile": "tooling/dshx/e2e/features/thread-sidebar.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "thread-sidebar.settle",
           "featureFile": "tooling/dshx/e2e/features/thread-sidebar.feature"
         },
         {
@@ -139,7 +151,7 @@
           "kind": "unit-test",
           "id": "thread-sidebar.thread-classification-unit-section-collapse-defaults",
           "file": "plugins/@dshfiles/thread-sidebar/src/organization.test.ts",
-          "testName": "archived starts folded and the working sections start open"
+          "testName": "archived and settled start folded and the working sections start open"
         },
         {
           "kind": "unit-test",
@@ -164,7 +176,7 @@
     {
       "id": "manual-archive-undo",
       "title": "Undo a manual thread archive",
-      "summary": "Configure a temporary notice after manual archive, restore exactly the threads archived by that action when Undo is selected, or open an archived thread read-only (composer blocked, \"Restore to reply\" banner); when DSH closes or cannot load it, the sidebar names the failure and offers Restore and open in a notice that clears itself.",
+      "summary": "Configure a temporary notice after manual archive, restore exactly the threads archived by that action when Undo is selected, and open an archived thread by restoring it: DSH drops an archived Session from the main view, so one click restores and opens it instead of retrying a view that keeps closing.",
       "reach": [
         "click button \"New thread\"",
         "click button \"Choose workspace\"",
@@ -178,7 +190,7 @@
         "click menuitem \"Archive\"",
         "click button \"Archived*\"",
         "click text \"Archive me later\"",
-        "expect button \"Restore and open\""
+        "expect banner \"This thread is archived.\""
       ],
       "surfaces": ["client", "host", "settings", "integration"],
       "configuration": [
@@ -196,14 +208,15 @@
           "coveredBy": ["thread-sidebar.archive-undo-preferences"]
         }
       ],
-      "states": ["archived", "undo-available", "archived-open", "restored", "restore-failed", "archived-open-failed"],
+      "states": ["archived", "undo-available", "restoring-to-open", "restored", "restore-failed"],
       "failureModes": [
         "Undo is offered only for thread IDs successfully archived by the initiating action.",
         "A partial restore reports failure without hiding the remaining archive state.",
         "Disabling the undo notice does not prevent archival.",
-        "Opening an archived thread leaves it archived.",
-        "DSH clears an archived main Session whenever its lists change; the sidebar reopens it at most 3 times in 10 s, then shows the failure with Restore and open instead of a blank composer.",
-        "The archived-open failure notice clears itself after 10 s and returns when the thread is opened again, so it does not stay over the thread list."
+        "Opening an archived thread restores it first, so a successful open leaves the row unarchived.",
+        "DSH clears an archived main Session whenever its lists change; the sidebar therefore restores before opening rather than retrying a view that keeps closing.",
+        "A refused restore reports the failure and leaves the thread archived.",
+        "The restore-before-open path lives in the client row action, not in a retry machine."
       ],
       "externalDependencies": [],
       "verification": [
@@ -224,9 +237,9 @@
         },
         {
           "kind": "unit-test",
-          "id": "thread-sidebar.archived-view",
-          "file": "plugins/@dshfiles/thread-sidebar/src/archived-view-machine.test.ts",
-          "testName": "stops reopening and reports the thread when DSH keeps closing it"
+          "id": "thread-sidebar.manual-archive-undo-unit-archive-adapter",
+          "file": "plugins/@dshfiles/thread-sidebar/src/organization.test.ts",
+          "testName": "archive adapter explicitly refuses to stop Host activity"
         }
       ]
     },
@@ -356,7 +369,7 @@
           "kind": "unit-test",
           "id": "thread-sidebar.view-controls-unit-not-working-filter",
           "file": "plugins/@dshfiles/thread-sidebar/src/thread-view.test.ts",
-          "testName": "filters completed and attention-needed threads but excludes archived and muted threads"
+          "testName": "includes stopped input-needed and usage-limit threads in Not working"
         },
         {
           "kind": "unit-test",
@@ -416,8 +429,8 @@
     },
     {
       "id": "idle-archive-policy",
-      "title": "Automatically archive eligible idle threads",
-      "summary": "Apply an opt-in idle policy with per-thread overrides while excluding active, blank, pinned, parked, and explicitly excluded sessions and workspaces.",
+      "title": "Automatically settle eligible idle threads",
+      "summary": "Apply an opt-in idle policy with per-thread overrides while excluding active, blank, pinned, parked, settled, and explicitly excluded sessions and workspaces. Settling is the plugin's own status: the thread stays listed and openable, the native archive verb is never called, and the Host pre-step gate stops its model steps until it is unsettled.",
       "reach": [
         "click button \"All threads\"",
         "click button \"New thread\"",
@@ -426,18 +439,18 @@
         "expect text \"This turn failed*\"",
         "rightclick text \"Idle policy target\" at 8,8",
         "click menuitem \"Auto-settle behavior\"",
-        "expect menuitemradio \"Auto-archive after idle threshold\"",
+        "expect menuitemradio \"Settle after idle threshold\"",
         "press Escape",
         "press Escape",
         "click button \"Sidebar settings\"",
-        "expect checkbox \"Auto-archive inactive threads\""
+        "expect checkbox \"Settle inactive threads\""
       ],
       "surfaces": ["client", "host", "settings", "integration"],
       "configuration": [
         {
-          "key": "autoArchiveEnabled",
+          "key": "autoSettleEnabled",
           "defaultValue": "false",
-          "constraints": "Boolean; automatic archive is opt-in.",
+          "constraints": "Boolean; automatic settling is opt-in.",
           "choices": ["true", "false"],
           "coveredBy": ["thread-sidebar.idle-archive"]
         },
@@ -466,15 +479,15 @@
           "coveredBy": ["thread-sidebar.idle-archive", "thread-sidebar.auto-archive-overrides"]
         },
         {
-          "key": "autoArchiveSessionIds",
+          "key": "autoSettleSessionIds",
           "defaultValue": "[]",
-          "constraints": "Session ID allow-list; enables per-thread auto-archive even when global policy is off.",
+          "constraints": "Session ID allow-list; enables per-thread auto-settle even when global policy is off.",
           "coveredBy": ["thread-sidebar.auto-archive-overrides"]
         },
         {
-          "key": "autoArchiveDisabledSessionIds",
+          "key": "autoSettleDisabledSessionIds",
           "defaultValue": "[]",
-          "constraints": "Session ID deny-list; disables auto-archive for one thread without changing global exclusions.",
+          "constraints": "Session ID deny-list; disables auto-settle for one thread without changing global exclusions.",
           "coveredBy": ["thread-sidebar.auto-archive-overrides"]
         },
         {
@@ -484,12 +497,13 @@
           "coveredBy": ["thread-sidebar.idle-archive"]
         }
       ],
-      "states": ["disabled", "eligible", "per-thread-enabled", "per-thread-disabled", "excluded", "archived", "archive-failed"],
+      "states": ["disabled", "eligible", "per-thread-enabled", "per-thread-disabled", "excluded", "settled", "settle-failed"],
       "failureModes": [
-        "Running, blank, pinned, parked, or excluded sessions are never automatically archived.",
+        "Running, blank, pinned, parked, settled, or excluded sessions are never automatically settled.",
+        "A thread with a still-running descendant is never automatically settled, so a child turn cannot be rejected mid-step.",
         "Per-thread enable still respects session and workspace safety exclusions.",
         "Per-thread disable does not alter global session exclusions.",
-        "A failed archive leaves the session visible and reports the failure."
+        "A refused settings write leaves the session visible and reports the failure."
       ],
       "externalDependencies": [],
       "verification": [
@@ -507,7 +521,7 @@
           "kind": "unit-test",
           "id": "thread-sidebar.idle-archive-policy-unit-per-thread-overrides",
           "file": "plugins/@dshfiles/thread-sidebar/src/organization.test.ts",
-          "testName": "per-thread auto-archive override inherits, enables, disables, and resets without losing other overrides"
+          "testName": "per-thread auto-settle override inherits, enables, disables, and resets without losing other overrides"
         },
         {
           "kind": "unit-test",
@@ -519,7 +533,19 @@
           "kind": "unit-test",
           "id": "thread-sidebar.idle-archive-policy-unit-auto-archive-eligibility",
           "file": "plugins/@dshfiles/thread-sidebar/src/organization.test.ts",
-          "testName": "auto archive requires an old, idle, nonblank, unpinned, unparked, included session"
+          "testName": "auto settle requires an old, idle, nonblank, unpinned, unparked, unsettled, included session"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.idle-archive-policy-unit-settled-gate",
+          "file": "plugins/@dshfiles/thread-sidebar/src/settled-gate.test.ts",
+          "testName": "a subagent child of a settled session is covered through its recorded parent id"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.idle-archive-policy-unit-settle-verbs",
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-actions.test.ts",
+          "testName": "settles the named thread and reports the set the Host now holds"
         },
         {
           "kind": "unit-test",

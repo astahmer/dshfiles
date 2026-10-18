@@ -1,4 +1,4 @@
-import type { RebasedThreadArchiveDelay } from './organization.js'
+import type { RebasedThreadSettleDelay } from './organization.js'
 
 export interface RebasedThread {
   readonly sessionIds: readonly string[]
@@ -13,7 +13,7 @@ export interface RebasedSessionState {
   readonly updatedAt: number
 }
 
-export const rebasedThreadArchiveDelayMs = (delay: RebasedThreadArchiveDelay): number => {
+export const rebasedThreadSettleDelayMs = (delay: RebasedThreadSettleDelay): number => {
   if (delay === 'immediately') return 0
   if (delay === 'after-1-hour') return 60 * 60_000
   if (delay === 'after-1-day') return 24 * 60 * 60_000
@@ -31,6 +31,7 @@ export const indexRebasedThreadSessions = (input: {
   readonly sessions: ReadonlyMap<string, RebasedSessionState>
   readonly archivedSessionIds: ReadonlySet<string>
   readonly pinnedSessionIds: ReadonlySet<string>
+  readonly settledSessionIds: ReadonlySet<string>
   readonly now: number
   readonly delayMs: number
 }): RebasedThreadSessionIndex => {
@@ -56,7 +57,8 @@ export const indexRebasedThreadSessions = (input: {
     )
       continue
 
-    for (const sessionId of thread.sessionIds) if (!input.archivedSessionIds.has(sessionId)) dueSessionIds.add(sessionId)
+    for (const sessionId of thread.sessionIds)
+      if (!input.archivedSessionIds.has(sessionId) && !input.settledSessionIds.has(sessionId)) dueSessionIds.add(sessionId)
   }
 
   return { rebasedAtBySessionId, dueSessionIds: [...dueSessionIds] }

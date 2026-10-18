@@ -11,6 +11,7 @@ export const selectTurnFinishedRows = <Session extends TurnFinishedSession>(opti
   readonly completionAt: Readonly<Record<string, number>>
   readonly mutedSessionIds: ReadonlySet<string>
   readonly archivedSessionIds: ReadonlySet<string>
+  readonly settledSessionIds: ReadonlySet<string>
   /** Threads a sibling group already lists, so one thread never claims two groups. */
   readonly excludedSessionIds: ReadonlySet<Session['id']>
   readonly matchesWorkspace: (session: Session) => boolean
@@ -27,6 +28,7 @@ export const selectTurnFinishedRows = <Session extends TurnFinishedSession>(opti
         options.completionAt[session.id] !== undefined &&
         !options.mutedSessionIds.has(session.id) &&
         !options.archivedSessionIds.has(session.id) &&
+        !options.settledSessionIds.has(session.id) &&
         options.matchesWorkspace(session),
     )
     .sort((left, right) => (options.completionAt[right.id] ?? 0) - (options.completionAt[left.id] ?? 0))
@@ -36,6 +38,7 @@ export const selectInputNeededRows = <Session extends InputNeededSession>(option
   readonly pendingInteractionKindFor: (sessionId: Session['id']) => string | undefined
   readonly mutedSessionIds: ReadonlySet<string>
   readonly archivedSessionIds: ReadonlySet<string>
+  readonly settledSessionIds: ReadonlySet<string>
   readonly matchesWorkspace: (session: Session) => boolean
 }): Session[] =>
   options.sessions
@@ -45,6 +48,7 @@ export const selectInputNeededRows = <Session extends InputNeededSession>(option
         options.pendingInteractionKindFor(session.id) === 'question' &&
         !options.mutedSessionIds.has(session.id) &&
         !options.archivedSessionIds.has(session.id) &&
+        !options.settledSessionIds.has(session.id) &&
         options.matchesWorkspace(session),
     )
     .sort((left, right) => right.updatedAt - left.updatedAt)

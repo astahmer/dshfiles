@@ -1,5 +1,4 @@
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
-import { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { WorkspaceBrowserProps } from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
@@ -8,8 +7,6 @@ import { RemoteThreadsSection } from './remote-threads-section.js'
 import { SessionListCacheModel } from './session-list-cache.js'
 import { StableValueModel, useStableValue } from './stable-value.js'
 import { createThreadChildRowCache, type ThreadChildRowCache } from './thread-child-rows.js'
-import type { ActorRefFrom } from '@dshfiles/plugin-ui/machine'
-import type { archivedViewMachine } from './archived-view-machine.js'
 import { useApi, useApiQuery } from '@dshfiles/dshx/client'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { isApiOwnerMissing } from '@dshfiles/dshx/api'
@@ -17,6 +14,7 @@ import { aiAccountsApi } from '@dshfiles/ai-accounts/api'
 import { threadSidebarPendingQuestionsApi } from './pending-questions-api.js'
 import {
   IconArchiveOutlineRegular,
+  IconCheckCircleOutlineRegular,
   IconChevronDownOutlineRegular,
   IconChevronUpOutlineRegular,
   IconPauseOutlineRegular,
@@ -93,14 +91,14 @@ import {
 } from 'react'
 import { z } from 'zod'
 import {
-  REBASED_THREAD_ARCHIVE_DELAYS,
+  REBASED_THREAD_SETTLE_DELAYS,
   THREAD_ROW_ACTIONS,
   SidebarOrganization,
-  type AutoArchiveOverride,
+  type AutoSettleOverride,
   type AttentionColor,
   type AttentionColorKey,
   type AttentionColors,
-  type RebasedThreadArchiveDelay,
+  type RebasedThreadSettleDelay,
   type SidebarPreferences,
   type SidebarSection,
   type ThreadRowAction,
@@ -115,7 +113,6 @@ import { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
 import { ThreadReferencesItems } from './thread-references-menu.js'
 import { projectTextTone } from './project-tone.js'
 import {
-  archivedOpenFailureNotice,
   INITIAL_SIDEBAR_NOTICE_QUEUE_STATE,
   scheduleSuccessNoticeDismissal,
   SidebarNoticeMessage,
@@ -131,7 +128,7 @@ import { UsageLimitSection, type UsageLimitSnooze } from './usage-limit-section.
 import { groupThreadChildren, partitionFinishedChildren, shouldOpenChildThreadList, threadActionTargetIds, visibleChildren } from './thread-children.js'
 import { buildThreadUrl, clearThreadUrl, readThreadUrl } from './thread-url.js'
 import { workingThreadIds } from './working-threads.js'
-import { indexRebasedThreadSessions, rebasedThreadArchiveDelayMs } from './rebased-threads.js'
+import { indexRebasedThreadSessions, rebasedThreadSettleDelayMs } from './rebased-threads.js'
 import {
   THREAD_GROUP_BY_OPTIONS,
   THREAD_SOURCE_FILTER_OPTIONS,
@@ -177,8 +174,6 @@ type InjectedActions = {
   unpinSession: (sessionId: SessionSummary['id']) => Promise<void>
   /** Show the remote thread view; set when the layout service is available. */
   openRemoteThreads?: () => void
-  /** Reports archived threads that failed to open or keep being closed by DSH. */
-  archivedView?: ActorRefFrom<typeof archivedViewMachine>
 }
 
 type ThreadSidebarProps = Pick<WorkspaceBrowserProps, 'open' | 'useSessions' | 'useSessionStatus' | 'useWorkspaces'> &
@@ -193,6 +188,7 @@ const emptyThreadsMessage = {
   'not-working': 'threadSidebarNoNotWorkingThreads',
   attention: 'threadSidebarNoAttentionThreads',
   muted: 'threadSidebarNoMutedThreads',
+  settled: 'threadSidebarNoSettledThreads',
   archived: 'threadSidebarNoArchivedThreads',
 } as const satisfies Record<(typeof THREAD_STATUS_FILTER_OPTIONS)[number], string>
 type AttentionDisplayPreferenceKey = 'approvalNeededDisplay' | 'inputNeededDisplay' | 'turnFinishedDisplay'
@@ -209,13 +205,13 @@ const attentionPreferenceRows: readonly {
 
 const attentionColorOptions: readonly AttentionColor[] = ['muted', 'primary', 'info', 'success', 'warning', 'danger']
 
-const rebasedArchiveDelayLabelKeys = {
+const rebasedSettleDelayLabelKeys = {
   disabled: 'threadSidebarRebasedArchiveDisabled',
   immediately: 'threadSidebarRebasedArchiveImmediate',
   'after-1-hour': 'threadSidebarRebasedArchiveHour',
   'after-1-day': 'threadSidebarRebasedArchiveDay',
   'after-1-week': 'threadSidebarRebasedArchiveWeek',
-} satisfies Record<RebasedThreadArchiveDelay, Parameters<ThreadSidebarTranslate>[0]>
+} satisfies Record<RebasedThreadSettleDelay, Parameters<ThreadSidebarTranslate>[0]>
 
 type ThreadSidebarLabelKey = Parameters<ThreadSidebarTranslate>[0]
 
@@ -234,7 +230,7 @@ const finishNotificationMessageKeys = {
   failed: { title: 'threadSidebarFailedNotificationTitle', body: 'threadSidebarFailedNotificationBody' },
 } as const satisfies Record<ThreadFinishNotificationCategory, { readonly title: ThreadSidebarLabelKey; readonly body: ThreadSidebarLabelKey }>
 
-const rebasedArchiveDelayFromValue = (value: string): RebasedThreadArchiveDelay | undefined => REBASED_THREAD_ARCHIVE_DELAYS.find(option => option === value)
+const rebasedSettleDelayFromValue = (value: string): RebasedThreadSettleDelay | undefined => REBASED_THREAD_SETTLE_DELAYS.find(option => option === value)
 
 const attentionColorLabelKeys = {
   muted: 'threadSidebarColorMuted',
@@ -258,6 +254,7 @@ const threadStatusFilterLabelKeys = {
   'not-working': 'threadSidebarFilterNotWorking',
   attention: 'threadSidebarFilterAttention',
   muted: 'threadSidebarFilterMuted',
+  settled: 'threadSidebarSettled',
   archived: 'threadSidebarArchived',
 } satisfies Record<(typeof THREAD_STATUS_FILTER_OPTIONS)[number], Parameters<ThreadSidebarTranslate>[0]>
 
@@ -270,12 +267,13 @@ const threadSourceFilterLabelKeys = {
 const ALL_PROJECTS = '__all__'
 const UNASSIGNED_PROJECT = '__unassigned__'
 
-const sections: readonly SidebarSection[] = ['pinned', 'active', 'parked', 'inactive', 'archived']
+const sections: readonly SidebarSection[] = ['pinned', 'active', 'parked', 'settled', 'inactive', 'archived']
 
 const sectionLabels: Record<SidebarSection, Parameters<ThreadSidebarTranslate>[0]> = {
   pinned: 'threadSidebarPinned',
   active: 'threadSidebarActive',
   parked: 'threadSidebarParked',
+  settled: 'threadSidebarSettled',
   inactive: 'threadSidebarInactive',
   archived: 'threadSidebarArchived',
 }
@@ -290,6 +288,7 @@ const sectionIcons: Record<SidebarSection, ReactNode> = {
   pinned: <IconPinOutlineRegular size={14} />,
   active: <ActivityIcon className="dshx:size-3.5" />,
   parked: <IconPauseOutlineRegular size={14} />,
+  settled: <IconCheckCircleOutlineRegular size={14} />,
   inactive: <CirclePauseIcon className="dshx:size-3.5" />,
   archived: <IconArchiveOutlineRegular size={14} />,
 }
@@ -344,6 +343,7 @@ interface RowActions {
   readonly open: (sessionId: SessionSummary['id']) => void
   readonly mutate: (sessionId: SessionSummary['id'], operation: RowOperation) => Promise<void>
   readonly toggleParked: (sessionId: SessionSummary['id']) => void
+  readonly toggleSettled: (sessionId: SessionSummary['id']) => void
   readonly copy: (value: string, successMessage: string) => Promise<void>
   readonly toggleChildren: (sessionId: SessionSummary['id'], currentlyOpen: boolean) => void
   /** Any parent id, including a missing ancestor only its detached children name. */
@@ -353,7 +353,7 @@ interface RowActions {
   readonly markUnread: (sessionId: SessionSummary['id']) => void
   readonly resume: (sessionId: SessionSummary['id']) => void
   readonly dismissRecovery: (sessionId: SessionSummary['id']) => void
-  readonly setAutoArchiveOverride: (sessionId: SessionSummary['id'], override: AutoArchiveOverride) => void
+  readonly setAutoSettleOverride: (sessionId: SessionSummary['id'], override: AutoSettleOverride) => void
   readonly translate: ThreadSidebarTranslate
 }
 
@@ -373,11 +373,12 @@ interface RowStyle {
 interface ThreadRowProps {
   readonly session: SessionSummary
   readonly unread: boolean
-  readonly autoArchiveOverride: AutoArchiveOverride
+  readonly autoSettleOverride: AutoSettleOverride
   readonly unreadSessionIds: ReadonlySet<SessionSummary['id']>
   readonly archived: boolean
   readonly pinned: boolean
   readonly parked: boolean
+  readonly settled: boolean
   readonly selected: boolean
   readonly parentTitle: string | undefined
   readonly workspaceId: string | undefined
@@ -562,12 +563,12 @@ const ChildThreadList = (props: {
 
 type ThreadContextMenuProps = Pick<
   ThreadRowProps,
-  'session' | 'unread' | 'autoArchiveOverride' | 'mute' | 'archived' | 'pinned' | 'parked' | 'workspaceId' | 'actions'
+  'session' | 'unread' | 'autoSettleOverride' | 'mute' | 'archived' | 'pinned' | 'parked' | 'settled' | 'workspaceId' | 'actions'
 > & { readonly children: JSX.Element }
 
 /** Right-click menu of one thread, shared by thread rows and the usage-limit rows. */
 const ThreadContextMenu = (props: ThreadContextMenuProps): JSX.Element => {
-  const { session, unread, archived, pinned, parked } = props
+  const { session, unread, archived, pinned, parked, settled } = props
   const t = props.actions.translate
   const openAside = useAsideOpen()
   return (
@@ -596,12 +597,12 @@ const ThreadContextMenu = (props: ThreadContextMenuProps): JSX.Element => {
         <ContextMenuSub>
           <ContextMenuSubTrigger>{t('threadSidebarAutoSettleBehavior')}</ContextMenuSubTrigger>
           <ContextMenuSubContent className="dshx-root dshx:min-w-44">
-            <ContextMenuRadioGroup value={props.autoArchiveOverride}>
+            <ContextMenuRadioGroup value={props.autoSettleOverride}>
               <ContextMenuRadioItem
                 value="inherit"
                 onSelect={event => {
                   event.preventDefault()
-                  props.actions.setAutoArchiveOverride(session.id, 'inherit')
+                  props.actions.setAutoSettleOverride(session.id, 'inherit')
                 }}
               >
                 {t('threadSidebarAutoSettleInherit')}
@@ -610,7 +611,7 @@ const ThreadContextMenu = (props: ThreadContextMenuProps): JSX.Element => {
                 value="enabled"
                 onSelect={event => {
                   event.preventDefault()
-                  props.actions.setAutoArchiveOverride(session.id, 'enabled')
+                  props.actions.setAutoSettleOverride(session.id, 'enabled')
                 }}
               >
                 {t('threadSidebarAutoSettleEnabled')}
@@ -619,7 +620,7 @@ const ThreadContextMenu = (props: ThreadContextMenuProps): JSX.Element => {
                 value="disabled"
                 onSelect={event => {
                   event.preventDefault()
-                  props.actions.setAutoArchiveOverride(session.id, 'disabled')
+                  props.actions.setAutoSettleOverride(session.id, 'disabled')
                 }}
               >
                 {t('threadSidebarAutoSettleDisabled')}
@@ -653,6 +654,9 @@ const ThreadContextMenu = (props: ThreadContextMenuProps): JSX.Element => {
             <ContextMenuItem disabled={session.running} onSelect={() => props.actions.toggleParked(session.id)}>
               {t(parked ? 'threadSidebarUnpark' : 'threadSidebarPark')}
             </ContextMenuItem>
+            <ContextMenuItem disabled={session.running} onSelect={() => props.actions.toggleSettled(session.id)}>
+              {t(settled ? 'threadSidebarUnsettle' : 'threadSidebarSettle')}
+            </ContextMenuItem>
             <ContextMenuItem disabled={session.running} onSelect={() => void props.actions.mutate(session.id, 'archive')}>
               {t('threadSidebarArchive')}
             </ContextMenuItem>
@@ -665,7 +669,7 @@ const ThreadContextMenu = (props: ThreadContextMenuProps): JSX.Element => {
 
 /** Memoized so a session update re-renders only its own row, not the whole list. */
 const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
-  const { session, archived, pinned, parked, rowStyle } = props
+  const { session, archived, pinned, parked, settled, rowStyle } = props
   const t = props.actions.translate
   const unread = props.unread
   const compact = rowStyle.density === 'compact'
@@ -746,6 +750,20 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
         </Button>,
       )
     }
+    if (action === 'settle') {
+      return withTooltip(
+        t(settled ? 'threadSidebarUnsettle' : 'threadSidebarSettle'),
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          aria-label={t(settled ? 'threadSidebarUnsettle' : 'threadSidebarSettle')}
+          disabled={session.running || props.childThreads.some(child => child.running)}
+          onClick={() => props.actions.toggleSettled(session.id)}
+        >
+          {settled ? <IconPlayOutlineRegular size={14} /> : <IconCheckCircleOutlineRegular size={14} />}
+        </Button>,
+      )
+    }
     if (action === 'mute') {
       return withTooltip(
         props.mute === undefined ? t('threadSidebarMute') : muteStatusLabel(t, props.mute),
@@ -787,11 +805,12 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
     <ThreadContextMenu
       session={session}
       unread={unread}
-      autoArchiveOverride={props.autoArchiveOverride}
+      autoSettleOverride={props.autoSettleOverride}
       mute={props.mute}
       archived={archived}
       pinned={pinned}
       parked={parked}
+      settled={settled}
       workspaceId={props.workspaceId}
       actions={props.actions}
     >
@@ -1067,7 +1086,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const [routeRequest, setRouteRequest] = useState<string | null>(() =>
     typeof window === 'undefined' ? null : (readThreadUrl(window.location.href)?.sessionId ?? null),
   )
-  const archiveInFlight = useRef(false)
+  const settleInFlight = useRef(false)
   const previousStatus = useRef<Readonly<Record<string, ThreadInteractionStatus>> | null>(null)
   const openedRouteId = useRef<string | null>(null)
   const suppressUrlForSession = useRef<string | null>(null)
@@ -1075,16 +1094,15 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const attentionRefreshed = useRef(false)
   const previousAttention = useRef<ReadonlyMap<string, ThreadAttentionView> | null>(null)
   const previousSelectedId = useRef<string | null>(null)
-  const latestAutoArchive = useRef<{
+  const latestAutoSettle = useRef<{
     sessions: SessionSummary[]
     workspaceBySession: Map<string, string>
     preferences: SidebarPreferences
     dueRebasedSessionIds: readonly string[]
     archived: ReadonlySet<string>
     pinned: ReadonlySet<string>
-    archive: ThreadSidebarProps['archiveSession']
-    announce: (notice: SidebarNotice) => void
-    archiveFailureMessage: string
+    settled: ReadonlySet<string>
+    settle: (sessionIds: readonly string[]) => void
   } | null>(null)
 
   const sessions = useMemo(() => sessionsForAutoArchive(sessionState.ids, sessionState.byId), [sessionState.byId, sessionState.ids])
@@ -1094,6 +1112,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   )
   const archivedSessionIds = useMemo(() => setIncludes(workspaceState.archivedSessionIds), [workspaceState.archivedSessionIds])
   const pinnedSessionIds = useMemo(() => setIncludes(workspaceState.pinnedSessionIds), [workspaceState.pinnedSessionIds])
+  const settledSessionIds = useMemo(() => setIncludes(preferences.settledSessionIds), [preferences.settledSessionIds])
   const displayWorkspaces = useMemo(
     () =>
       SidebarOrganization.projectWorkspaces(workspaceState.items).map(workspace => ({
@@ -1119,10 +1138,11 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         ),
         archivedSessionIds,
         pinnedSessionIds,
+        settledSessionIds,
         now,
-        delayMs: rebasedThreadArchiveDelayMs(preferences.rebasedThreadArchiveDelay),
+        delayMs: rebasedThreadSettleDelayMs(preferences.rebasedThreadSettleDelay),
       }),
-    [archivedSessionIds, jjRepositories.data, now, pinnedSessionIds, preferences.rebasedThreadArchiveDelay, sessionStatus, sessions],
+    [archivedSessionIds, jjRepositories.data, now, pinnedSessionIds, preferences.rebasedThreadSettleDelay, sessionStatus, sessions, settledSessionIds],
   )
   const questionCandidates = useMemo(
     () =>
@@ -1169,6 +1189,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       reasonFor: recoveryReasonFor,
       mutedSessionIds,
       archivedSessionIds,
+      settledSessionIds,
       matchesWorkspace: (session: SessionSummary) =>
         preferences.workspaceFilter === null ||
         (SidebarOrganization.workspaceForLineage(session, sessionState.byId, workspaceBySession) ?? '') === preferences.workspaceFilter,
@@ -1176,6 +1197,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     }),
     [
       archivedSessionIds,
+      settledSessionIds,
       mutedSessionIds,
       preferences.workspaceFilter,
       recoveryReasonFor,
@@ -1195,6 +1217,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         continuations: usageLimitQuery.data?.continuations ?? EMPTY_CONTINUATIONS,
         mutedSessionIds,
         archivedSessionIds,
+        settledSessionIds,
         matchesWorkspace: session =>
           preferences.workspaceFilter === null ||
           (SidebarOrganization.workspaceForLineage(session, sessionState.byId, workspaceBySession) ?? '') === preferences.workspaceFilter,
@@ -1202,6 +1225,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       }),
     [
       archivedSessionIds,
+      settledSessionIds,
       mutedSessionIds,
       preferences.workspaceFilter,
       sessionState.byId,
@@ -1614,33 +1638,9 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     setNotice(failed ? { tone: 'danger', message: props.tSidebar('threadSidebarActionFailure') } : null)
   }
 
-  const archivedView = props.archivedView
-  const unarchiveSession = props.unarchiveSession
-  const reopenThread = props.open
   const tSidebar = props.tSidebar
-  useEffect(() => {
-    if (archivedView === undefined) return
-    const subscription = archivedView.on('failed', event => {
-      const sessionId = event.sessionId
-      if (sessionId === null) return
-      setNotice(
-        archivedOpenFailureNotice({
-          message: tSidebar(event.failure === 'keeps-closing' ? 'threadSidebarArchivedKeepsClosing' : 'threadSidebarArchivedLoadFailed'),
-          actionLabel: tSidebar('threadSidebarRestoreAndOpen'),
-          onAction: () => {
-            setNotice(null)
-            void unarchiveSession(sessionId).then(
-              () => reopenThread(sessionId),
-              () => setNotice({ tone: 'danger', message: tSidebar('threadSidebarActionFailure') }),
-            )
-          },
-        }),
-      )
-    })
-    return () => subscription.unsubscribe()
-  }, [archivedView, reopenThread, setNotice, tSidebar, unarchiveSession])
 
-  const openThread = (sessionId: SessionSummary['id']): void => {
+  const selectThread = (sessionId: SessionSummary['id']): void => {
     const opened = attention.records.get(sessionId)
     if (opened !== undefined) attention.clearUnread(sessionId, opened.version)
     setRouteRequest(null)
@@ -1650,6 +1650,22 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     const workspaceId = session === undefined ? undefined : SidebarOrganization.workspaceForLineage(session, sessionState.byId, workspaceBySession)
     window.history.replaceState(window.history.state, '', buildThreadUrl(window.location.href, sessionId, workspaceId))
     props.open(sessionId)
+  }
+
+  /**
+   * Select the thread in the main view. An archived thread is restored first: DSH drops an archived
+   * Session from the main view on every list change, so opening one without restoring it fails as a
+   * released Session reference — restoring is the one click that replaces that retry fight.
+   */
+  const openThread = (sessionId: SessionSummary['id']): void => {
+    if (archivedSessionIds.has(sessionId)) {
+      void props.unarchiveSession(sessionId).then(
+        () => selectThread(sessionId),
+        () => setNotice({ tone: 'danger', message: props.tSidebar('threadSidebarActionFailure') }),
+      )
+      return
+    }
+    selectThread(sessionId)
   }
 
   const copyContextValue = async (value: string, successMessage: string): Promise<void> => {
@@ -1712,101 +1728,112 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     setNotice(null)
   }
 
+  /** One Settings write per scan rather than one per thread; the status is ours, not a Host verb. */
+  const settleSessions = (sessionIds: readonly string[]): void => {
+    if (sessionIds.length === 0) return
+    changePreferences({ settledSessionIds: [...new Set([...preferences.settledSessionIds, ...sessionIds])] })
+  }
+
+  const toggleSettled = (sessionId: SessionSummary['id']): void => {
+    const shouldSettle = !settledSessionIds.has(sessionId)
+    if (shouldSettle && SidebarOrganization.hasRunningDescendant({ sessionId, sessions })) {
+      setNotice({ tone: 'warning', message: props.tSidebar('threadSidebarRunningNotice') })
+      return
+    }
+    const next = new Set(preferences.settledSessionIds)
+    for (const targetId of threadActionTargetIds({
+      threadId: sessionId,
+      threads: Object.values(sessionState.byId).filter(session => !session.blank),
+      cascadeToChildren: preferences.applyActionsToChildThreads,
+    })) {
+      if (shouldSettle) next.add(targetId)
+      else next.delete(targetId)
+    }
+    changePreferences({ settledSessionIds: [...next] })
+    setNotice(shouldSettle ? { tone: 'success', message: props.tSidebar('threadSidebarSettledNotice') } : null)
+  }
+
   const toggleSection = (section: SidebarSection): void => {
     changePreferences({
       collapsedSections: SidebarPreferencesModel.toggleCollapsedSection(preferences.collapsedSections, section),
     })
   }
 
-  const runAutoArchive = async (): Promise<void> => {
-    const latest = latestAutoArchive.current
-    if (archiveInFlight.current || latest === null || !SidebarOrganization.shouldScanForAutoArchive(latest.preferences)) return
-    archiveInFlight.current = true
-    let failed = false
+  const runAutoSettle = async (): Promise<void> => {
+    const latest = latestAutoSettle.current
+    if (settleInFlight.current || latest === null || !SidebarOrganization.shouldScanForAutoSettle(latest.preferences)) return
+    settleInFlight.current = true
     try {
       const now = Date.now()
-      for (const session of latest.sessions) {
-        if (
-          !SidebarOrganization.isAutoArchiveCandidate({
+      const due = latest.sessions.filter(
+        session =>
+          SidebarOrganization.isAutoSettleCandidate({
             session,
             workspaceId: latest.workspaceBySession.get(session.id),
             now,
             preferences: latest.preferences,
             archivedSessionIds: latest.archived,
             pinnedSessionIds: latest.pinned,
-          })
-        )
-          continue
-        try {
-          await latest.archive(session.id)
-        } catch {
-          failed = true
-        }
-      }
+            settledSessionIds: latest.settled,
+          }) && !SidebarOrganization.hasRunningDescendant({ sessionId: session.id, sessions: latest.sessions }),
+      )
+      if (due.length > 0) latest.settle(due.map(session => session.id))
     } finally {
-      archiveInFlight.current = false
+      settleInFlight.current = false
     }
-    if (failed) latest.announce({ tone: 'danger', message: props.tSidebar('threadSidebarArchiveFailure') })
   }
 
-  const runRebasedAutoArchive = useCallback(async (): Promise<void> => {
-    const latest = latestAutoArchive.current
-    if (archiveInFlight.current || latest === null || latest.dueRebasedSessionIds.length === 0) return
-    archiveInFlight.current = true
-    let failed = false
+  const runRebasedAutoSettle = useCallback(async (): Promise<void> => {
+    const latest = latestAutoSettle.current
+    if (settleInFlight.current || latest === null || latest.dueRebasedSessionIds.length === 0) return
+    settleInFlight.current = true
     try {
-      for (const sessionId of latest.dueRebasedSessionIds) {
-        if (latest.archived.has(sessionId) || latest.pinned.has(sessionId)) continue
-        try {
-          await latest.archive(SessionId(sessionId))
-        } catch {
-          failed = true
-        }
-      }
+      const due = latest.dueRebasedSessionIds.filter(
+        sessionId => !latest.settled.has(sessionId) && !SidebarOrganization.hasRunningDescendant({ sessionId, sessions: latest.sessions }),
+      )
+      if (due.length > 0) latest.settle(due)
     } finally {
-      archiveInFlight.current = false
+      settleInFlight.current = false
     }
-    if (failed) latest.announce({ tone: 'danger', message: latest.archiveFailureMessage })
   }, [])
 
-  latestAutoArchive.current = {
+  latestAutoSettle.current = {
     sessions,
     workspaceBySession,
     preferences,
     dueRebasedSessionIds: rebasedIndex.dueSessionIds,
     archived: archivedSessionIds,
     pinned: pinnedSessionIds,
-    archive: props.archiveSession,
-    announce: setNotice,
-    archiveFailureMessage: props.tSidebar('threadSidebarArchiveFailure'),
+    settled: settledSessionIds,
+    settle: settleSessions,
   }
 
   useEffect(() => {
-    if (!SidebarOrganization.shouldScanForAutoArchive(preferences)) return
+    if (!SidebarOrganization.shouldScanForAutoSettle(preferences)) return
     if (sessionState.phase !== 'ready' || workspaceState.phase !== 'ready') return
-    void runAutoArchive()
-    const timer = window.setInterval(() => void runAutoArchive(), preferences.scanIntervalMinutes * 60_000)
+    void runAutoSettle()
+    const timer = window.setInterval(() => void runAutoSettle(), preferences.scanIntervalMinutes * 60_000)
     return () => window.clearInterval(timer)
   }, [
-    preferences.autoArchiveEnabled,
-    preferences.autoArchiveDisabledSessionIds,
-    preferences.autoArchiveSessionIds,
+    preferences.autoSettleEnabled,
+    preferences.autoSettleDisabledSessionIds,
+    preferences.autoSettleSessionIds,
     preferences.scanIntervalMinutes,
     sessionState.phase,
     workspaceState.phase,
   ])
 
   useEffect(() => {
-    if (preferences.rebasedThreadArchiveDelay === 'disabled' || jjRepositories.data === undefined) return
+    if (preferences.rebasedThreadSettleDelay === 'disabled' || jjRepositories.data === undefined) return
     if (sessionState.phase !== 'ready' || workspaceState.phase !== 'ready') return
-    void runRebasedAutoArchive()
-    const timer = window.setInterval(() => void runRebasedAutoArchive(), preferences.scanIntervalMinutes * 60_000)
+    void runRebasedAutoSettle()
+    const timer = window.setInterval(() => void runRebasedAutoSettle(), preferences.scanIntervalMinutes * 60_000)
     return () => window.clearInterval(timer)
   }, [
     jjRepositories.data,
-    preferences.rebasedThreadArchiveDelay,
+    preferences.rebasedThreadSettleDelay,
     preferences.scanIntervalMinutes,
-    runRebasedAutoArchive,
+    runRebasedAutoSettle,
     sessionState.phase,
     workspaceState.phase,
   ])
@@ -1960,12 +1987,14 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           sessionStatus.get(sessionId)?.pendingInteraction?.kind ?? (continuedQuestionSessionIds.has(sessionId) ? 'question' : undefined),
         mutedSessionIds,
         archivedSessionIds,
+        settledSessionIds,
         matchesWorkspace: session =>
           preferences.workspaceFilter === null ||
           (SidebarOrganization.workspaceForLineage(session, sessionState.byId, workspaceBySession) ?? '') === preferences.workspaceFilter,
       }),
     [
       archivedSessionIds,
+      settledSessionIds,
       attentionSessions,
       continuedQuestionSessionIds,
       mutedSessionIds,
@@ -1990,6 +2019,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
             (kind === 'approval' || kind === 'plan-review') &&
             !mutedSessionIds.has(session.id) &&
             !archivedSessionIds.has(session.id) &&
+            !settledSessionIds.has(session.id) &&
             (preferences.workspaceFilter === null ||
               (SidebarOrganization.workspaceForLineage(session, sessionState.byId, workspaceBySession) ?? '') === preferences.workspaceFilter)
           )
@@ -1997,6 +2027,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         .sort((left, right) => right.updatedAt - left.updatedAt),
     [
       archivedSessionIds,
+      settledSessionIds,
       attentionSessions,
       mutedSessionIds,
       preferences.workspaceFilter,
@@ -2020,6 +2051,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         completionAt: finishedAtBySession,
         mutedSessionIds,
         archivedSessionIds,
+        settledSessionIds,
         excludedSessionIds: usageLimitSessionIds,
         matchesWorkspace: session =>
           preferences.workspaceFilter === null ||
@@ -2028,6 +2060,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     [
       approvalNeededIds,
       archivedSessionIds,
+      settledSessionIds,
       attentionSessions,
       finishedAtBySession,
       mutedSessionIds,
@@ -2076,11 +2109,13 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           running: threadView.sourceFilter === 'subagents' ? entry.activity.running : currentWorkingThreadIds.has(entry.session.id),
           needsAttention: threadView.sourceFilter === 'subagents' ? attentionSessionIds.has(entry.session.id) : attentionRootIds.has(entry.session.id),
           archived: archivedSessionIds.has(entry.session.id),
+          settled: settledSessionIds.has(entry.session.id),
           muted: mutedSessionIds.has(entry.session.id),
         }),
       ),
     [
       archivedSessionIds,
+      settledSessionIds,
       attentionRootIds,
       attentionSessionIds,
       currentWorkingThreadIds,
@@ -2101,6 +2136,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
             running: threadView.sourceFilter === 'subagents' ? session.running : currentWorkingThreadIds.has(session.id),
             needsAttention: true,
             archived: archivedSessionIds.has(session.id),
+            settled: settledSessionIds.has(session.id),
             // Attention rows already leave muted threads out.
             muted: false,
           }),
@@ -2113,6 +2149,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     }
   }, [
     archivedSessionIds,
+    settledSessionIds,
     approvalNeededRows,
     currentWorkingThreadIds,
     needsInputRows,
@@ -2133,10 +2170,11 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           running: threadView.sourceFilter === 'subagents' ? session.running : currentWorkingThreadIds.has(session.id),
           needsAttention: true,
           archived: archivedSessionIds.has(session.id),
+          settled: settledSessionIds.has(session.id),
           muted: mutedSessionIds.has(session.id),
         }),
       ),
-    [archivedSessionIds, currentWorkingThreadIds, mutedSessionIds, needsResumeRows, threadView.sourceFilter, threadView.statusFilters],
+    [archivedSessionIds, settledSessionIds, currentWorkingThreadIds, mutedSessionIds, needsResumeRows, threadView.sourceFilter, threadView.statusFilters],
   )
   const statusFilteredInterruptedRows = useMemo(
     () =>
@@ -2146,10 +2184,11 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           running: threadView.sourceFilter === 'subagents' ? session.running : currentWorkingThreadIds.has(session.id),
           needsAttention: true,
           archived: archivedSessionIds.has(session.id),
+          settled: settledSessionIds.has(session.id),
           muted: mutedSessionIds.has(session.id),
         }),
       ),
-    [archivedSessionIds, currentWorkingThreadIds, interruptedRows, mutedSessionIds, threadView.sourceFilter, threadView.statusFilters],
+    [archivedSessionIds, settledSessionIds, currentWorkingThreadIds, interruptedRows, mutedSessionIds, threadView.sourceFilter, threadView.statusFilters],
   )
   const statusFilteredUsageLimitRows = useMemo(
     () =>
@@ -2159,10 +2198,11 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           running: threadView.sourceFilter === 'subagents' ? row.session.running : currentWorkingThreadIds.has(row.session.id),
           needsAttention: true,
           archived: archivedSessionIds.has(row.session.id),
+          settled: settledSessionIds.has(row.session.id),
           muted: mutedSessionIds.has(row.session.id),
         }),
       ),
-    [archivedSessionIds, currentWorkingThreadIds, mutedSessionIds, threadView.sourceFilter, threadView.statusFilters, usageLimitRows],
+    [archivedSessionIds, settledSessionIds, currentWorkingThreadIds, mutedSessionIds, threadView.sourceFilter, threadView.statusFilters, usageLimitRows],
   )
   const statusFilteredRecoveryRows = useMemo(
     () => [...statusFilteredInterruptedRows, ...statusFilteredNeedsResumeRows, ...statusFilteredUsageLimitRows.map(row => row.session)],
@@ -2225,6 +2265,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
               running: child.running,
               needsAttention: attentionSessionIds.has(child.id),
               archived: archivedSessionIds.has(child.id),
+              settled: settledSessionIds.has(child.id),
               muted: mutedSessionIds.has(child.id),
             }),
         )
@@ -2243,6 +2284,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     attentionIds,
     attentionSessionIds,
     mutedSessionIds,
+    settledSessionIds,
     preferences.finishedSubagents,
     selectedSession?.id,
     threadTree,
@@ -2262,6 +2304,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         archivedSessionIds,
         pinnedSessionIds,
         parkedSessionIds,
+        settledSessionIds,
         now,
         idleMinutes: preferences.idleMinutes,
       })
@@ -2403,6 +2446,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     openAside: asideOpener,
     mutateSession,
     toggleParked,
+    toggleSettled,
+    settleSessions,
     copyContextValue,
     resumeRecoverySession,
     dismissRecoverySession,
@@ -2418,6 +2463,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     openAside: asideOpener,
     mutateSession,
     toggleParked,
+    toggleSettled,
+    settleSessions,
     copyContextValue,
     resumeRecoverySession,
     dismissRecoverySession,
@@ -2509,6 +2556,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       open: sessionId => latestRowActions.current.openThread(sessionId),
       mutate: (sessionId, operation) => latestRowActions.current.mutateSession(sessionId, operation),
       toggleParked: sessionId => latestRowActions.current.toggleParked(sessionId),
+      toggleSettled: sessionId => latestRowActions.current.toggleSettled(sessionId),
       copy: (value, successMessage) => latestRowActions.current.copyContextValue(value, successMessage),
       toggleChildren: (sessionId, currentlyOpen) => setChildrenOpenOverrides(current => new Map(current).set(sessionId, !currentlyOpen)),
       toggleAllChildren: sessionId => setExpandedParents(current => toggleSetMember(current, sessionId)),
@@ -2538,12 +2586,12 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       },
       resume: sessionId => void latestRowActions.current.resumeRecoverySession(sessionId),
       dismissRecovery: sessionId => void latestRowActions.current.dismissRecoverySession(sessionId),
-      setAutoArchiveOverride: (sessionId, override) => {
+      setAutoSettleOverride: (sessionId, override) => {
         const current = latestRowActions.current
-        const next = SidebarOrganization.setAutoArchiveOverride(current.preferences, sessionId, override)
+        const next = SidebarOrganization.setAutoSettleOverride(current.preferences, sessionId, override)
         current.changePreferences({
-          autoArchiveSessionIds: next.autoArchiveSessionIds,
-          autoArchiveDisabledSessionIds: next.autoArchiveDisabledSessionIds,
+          autoSettleSessionIds: next.autoSettleSessionIds,
+          autoSettleDisabledSessionIds: next.autoSettleDisabledSessionIds,
         })
       },
       translate: (...args) => latestRowActions.current.props.tSidebar(...args),
@@ -2574,11 +2622,12 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         key={session.id}
         session={session}
         unread={unreadSessionIds.has(session.id)}
-        autoArchiveOverride={SidebarOrganization.autoArchiveOverrideForSession(preferences, session.id)}
+        autoSettleOverride={SidebarOrganization.autoSettleOverrideForSession(preferences, session.id)}
         unreadSessionIds={unreadSessionIds}
         archived={archivedSessionIds.has(session.id)}
         pinned={pinnedSessionIds.has(session.id)}
         parked={parkedSessionIds.has(session.id)}
+        settled={settledSessionIds.has(session.id)}
         selected={selectedSession?.id === session.id}
         parentTitle={lineage.parentTitle}
         workspaceId={workspaceId}
@@ -2861,7 +2910,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
               </Button>
             </fieldset>
             <Label className="dshx:font-normal dshx:leading-snug">
-              <Checkbox checked={preferences.autoArchiveEnabled} onCheckedChange={checked => changePreferences({ autoArchiveEnabled: checked === true })} />
+              <Checkbox checked={preferences.autoSettleEnabled} onCheckedChange={checked => changePreferences({ autoSettleEnabled: checked === true })} />
               {props.tSidebar('threadSidebarAutoArchive')}
             </Label>
             <div className="dshx:grid dshx:min-w-0 dshx:gap-1" role="group" aria-label={props.tSidebar('threadSidebarArchiveRebased')}>
@@ -2869,20 +2918,20 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button size="sm" variant="outline" className="dshx:min-w-0 dshx:justify-start">
-                    {props.tSidebar(rebasedArchiveDelayLabelKeys[preferences.rebasedThreadArchiveDelay])}
+                    {props.tSidebar(rebasedSettleDelayLabelKeys[preferences.rebasedThreadSettleDelay])}
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start">
                   <DropdownMenuRadioGroup
-                    value={preferences.rebasedThreadArchiveDelay}
+                    value={preferences.rebasedThreadSettleDelay}
                     onValueChange={value => {
-                      const delay = rebasedArchiveDelayFromValue(value)
-                      if (delay !== undefined) changePreferences({ rebasedThreadArchiveDelay: delay })
+                      const delay = rebasedSettleDelayFromValue(value)
+                      if (delay !== undefined) changePreferences({ rebasedThreadSettleDelay: delay })
                     }}
                   >
-                    {REBASED_THREAD_ARCHIVE_DELAYS.map(delay => (
+                    {REBASED_THREAD_SETTLE_DELAYS.map(delay => (
                       <DropdownMenuRadioItem key={delay} value={delay}>
-                        {props.tSidebar(rebasedArchiveDelayLabelKeys[delay])}
+                        {props.tSidebar(rebasedSettleDelayLabelKeys[delay])}
                       </DropdownMenuRadioItem>
                     ))}
                   </DropdownMenuRadioGroup>
@@ -3135,11 +3184,12 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                 key={session.id}
                 session={session}
                 unread={unreadSessionIds.has(session.id)}
-                autoArchiveOverride={SidebarOrganization.autoArchiveOverrideForSession(preferences, session.id)}
+                autoSettleOverride={SidebarOrganization.autoSettleOverrideForSession(preferences, session.id)}
                 mute={mutedSessionIds.has(session.id) ? mutedThreads[session.id] : undefined}
                 archived={archivedSessionIds.has(session.id)}
                 pinned={pinnedSessionIds.has(session.id)}
                 parked={parkedSessionIds.has(session.id)}
+                settled={settledSessionIds.has(session.id)}
                 workspaceId={SidebarOrganization.workspaceForLineage(session, sessionState.byId, workspaceBySession)}
                 actions={rowActions}
               >

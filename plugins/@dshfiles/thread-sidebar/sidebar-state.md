@@ -19,10 +19,16 @@ thread can be unacknowledged without being active.
 running threads; a parent thread may count while one of its child threads is
 running. Working is not an unread or attention state.
 
-**Active** is a status section, not a synonym for Working. Archived and Pinned
-sections take precedence. Otherwise, running threads are Active; non-running
-Parked threads are Parked; the rest remain Active until the idle threshold. By
-default, a non-running thread becomes Inactive after two hours.
+**Active** is a status section, not a synonym for Working. Archived, Pinned,
+and Settled sections take precedence. Otherwise, running threads are Active;
+non-running Parked threads are Parked; the rest remain Active until the idle
+threshold. By default, a non-running thread becomes Inactive after two hours.
+
+**Settled** is this plugin's own status, not DSH's archive: the thread stays
+listed and openable, but the Host refuses the model steps it proposes until it
+is unsettled, so nothing wakes it. **Archived** is the native hard verb: it stops
+the work it names, blocks later wakes, and hides the thread from native
+navigation until it is restored.
 
 ## Attention
 
@@ -92,9 +98,9 @@ the ordinary status sections. Categories configured as labels stay on their
 thread rows. With Project or Date grouping, attention is shown inline on rows.
 Turn finished defaults to an inline label; it can be changed to a group.
 
-The status sections are **Pinned**, **Active**, **Parked**, **Inactive**, and
-**Archived**. The separate filters are **All**, **Working**, **Attention**,
-**Muted**, and **Archived**. For example, the Working filter hides a finished
+The status sections are **Pinned**, **Active**, **Parked**, **Settled**,
+**Inactive**, and **Archived**. The separate filters are **All**, **Working**,
+**Attention**, **Muted**, **Settled**, and **Archived**. For example, the Working filter hides a finished
 thread when neither it nor its child work is running, even if its attention
 display is configured as a group. A listed thread keeps its own child list
 whatever the filters say: children follow the parent row they belong to, folded

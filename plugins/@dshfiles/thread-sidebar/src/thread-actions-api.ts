@@ -15,12 +15,14 @@ const threadRowSchema = z
     liveAgent: z.boolean(),
     archived: z.boolean(),
     pinned: z.boolean(),
+    settled: z.boolean(),
     updatedAt: z.number().optional(),
   })
   .strict()
 
 const archivedSetSchema = z.object({ archivedSessionIds: z.array(z.string()).max(2000) }).strict()
 const pinnedSetSchema = z.object({ pinnedSessionIds: z.array(z.string()).max(2000) }).strict()
+const settledSetSchema = z.object({ settledSessionIds: z.array(z.string()).max(2000) }).strict()
 
 const projectRowSchema = z.object({ projectId: z.string(), title: z.string(), path: z.string(), threadCount: z.number() }).strict()
 
@@ -77,16 +79,19 @@ export const threadActionsApi = defineApi({
         .strict(),
       output: z.object({ threads: z.array(threadRowSchema).max(200), total: z.number(), truncated: z.boolean() }).strict(),
       description:
-        'List threads (DSH Sessions) with title, project, running and pinned/archived state. Use it to resolve which thread the user means before another thread_* or move call. Read-only.',
+        'List threads (DSH Sessions) with title, project, running and pinned/archived/settled state. A settled thread is listed and openable but runs no model step until thread_unsettle. Use it to resolve which thread the user means before another thread_* or move call. Read-only.',
       tool: {
         name: 'thread_list',
         readOnly: true,
         render: output =>
           output.threads
             .map(thread => {
-              const flags = [thread.running ? 'running' : 'idle', thread.archived ? 'archived' : undefined, thread.pinned ? 'pinned' : undefined].filter(
-                Boolean,
-              )
+              const flags = [
+                thread.running ? 'running' : 'idle',
+                thread.archived ? 'archived' : undefined,
+                thread.pinned ? 'pinned' : undefined,
+                thread.settled ? 'settled' : undefined,
+              ].filter(Boolean)
               return `${thread.sessionId} · ${thread.title ?? '(untitled)'} · ${thread.projectTitle ?? 'no project'} · ${flags.join(', ')}`
             })
             .join('\n') || 'No threads matched.',
@@ -109,6 +114,18 @@ export const threadActionsApi = defineApi({
       output: z.object({ sessionId: z.string(), archivedSessionIds: archivedSetSchema.shape.archivedSessionIds }).strict(),
       description: `Restore an archived thread to its recorded place in the sidebar. ${ONLY_WHEN_ASKED}`,
       tool: { name: 'thread_unarchive', render: output => `Restored thread ${output.sessionId}.` },
+    }),
+    settle: method({
+      input: z.object({ sessionId: sessionIdSchema.optional() }).strict(),
+      output: z.object({ sessionId: z.string(), settledSessionIds: settledSetSchema.shape.settledSessionIds }).strict(),
+      description: `Settle one thread: it stays listed and openable, but no model step starts — not from a message, a subagent settlement, a reminder or a queued follow-up — until thread_unsettle. Refuse while its own turn runs; stop it first. Defaults to the calling thread when sessionId is omitted. ${ONLY_WHEN_ASKED}`,
+      tool: { name: 'thread_settle', render: output => `Settled thread ${output.sessionId}.` },
+    }),
+    unsettle: method({
+      input: z.object({ sessionId: sessionIdSchema }).strict(),
+      output: z.object({ sessionId: z.string(), settledSessionIds: settledSetSchema.shape.settledSessionIds }).strict(),
+      description: `Unsettle a settled thread so it can run model steps again. ${ONLY_WHEN_ASKED}`,
+      tool: { name: 'thread_unsettle', render: output => `Unsettled thread ${output.sessionId}.` },
     }),
     pin: method({
       input: z.object({ sessionId: sessionIdSchema }).strict(),

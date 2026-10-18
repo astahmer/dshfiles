@@ -36,6 +36,7 @@ const select = (input: {
     continuations: input.continuations ?? [continuation()],
     mutedSessionIds: new Set(input.muted ?? []),
     archivedSessionIds: new Set(input.archived ?? []),
+    settledSessionIds: new Set(),
     matchesWorkspace: () => true,
     matchesSource: () => true,
   })
@@ -57,6 +58,7 @@ describe('usage limit rows', () => {
       continuations: [continuation()],
       mutedSessionIds: new Set(),
       archivedSessionIds: new Set(),
+      settledSessionIds: new Set(),
       matchesWorkspace: () => false,
       matchesSource: () => true,
     })
