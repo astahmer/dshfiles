@@ -18,6 +18,7 @@ import { jjIntegrationApi, type DestinationView, type LandResult, type Repositor
 import { JsonText } from './json-text.js'
 import { isolatesNewThreadsByDefault, jjIntegrationSettings, mayAutoIntegrateWorkspace, type JjIntegrationSettings } from './settings.js'
 import { ThreadRebaseEligibilityModel, type ThreadSessionActivity } from './thread-rebase-eligibility.js'
+import { createSessionActivityCache } from './session-activity-cache.js'
 import { ThreadIntegrationModel } from './thread-integration-state.js'
 import { workspaceHasOtherSession } from './thread-session-ownership.js'
 import { registeredProjects } from './registered-projects.js'
@@ -184,23 +185,42 @@ const createExecutor =
 const isolatedSessionIdsAt = (path: string): readonly string[] =>
   [...isolatedSessionWorkspaces].flatMap(([sessionId, workspace]) => (workspace.path === path ? [sessionId] : []))
 
-const readSessionActivity = async (): Promise<ReadonlyMap<string, ThreadSessionActivity> | undefined> => {
+/**
+ * The Session activity fold costs seconds on a large store, so a repository scan waits no more than this while a
+ * rebase's guard keeps the longer budget it needs to answer authoritatively.
+ */
+const SESSION_ACTIVITY_TTL_MS = 30_000
+const SESSION_ACTIVITY_DISPLAY_BUDGET_MS = 2_500
+const SESSION_ACTIVITY_GUARD_BUDGET_MS = 15_000
+const readSessionActivity = (budgetMs: number): Promise<ReadonlyMap<string, ThreadSessionActivity> | undefined> => {
   const controller = requireContext().get('sessionController')
-  if (controller === undefined) return undefined
-  try {
-    const result = await controller.list({}, AbortSignal.timeout(15_000))
-    const activity = new Map<string, ThreadSessionActivity>()
-    for (const item of result.items) {
-      activity.set(item.sessionId, {
-        running: item.running,
-        pendingUserQuestion: ThreadRebaseEligibilityModel.hasPendingUserQuestion(item.projections?.values),
-      })
-    }
-    return activity
-  } catch {
-    return undefined
-  }
+  if (controller === undefined) return Promise.resolve(undefined)
+  return controller
+    .list({}, AbortSignal.timeout(budgetMs))
+    .then(result => {
+      const activity = new Map<string, ThreadSessionActivity>()
+      for (const item of result.items) {
+        activity.set(item.sessionId, {
+          running: item.running,
+          pendingUserQuestion: ThreadRebaseEligibilityModel.hasPendingUserQuestion(item.projections?.values),
+        })
+      }
+      return activity
+    })
+    .catch(() => undefined)
 }
+
+/**
+ * The Host folds every stored Session's projections to answer this, which costs seconds on a store this size, so the
+ * shared cache serves the last good value at once and refreshes it in the background while a rebase's own guard reads
+ * fresh activity before it decides.
+ */
+const sessionActivity = createSessionActivityCache({
+  read: readSessionActivity,
+  ttlMs: SESSION_ACTIVITY_TTL_MS,
+  displayBudgetMs: SESSION_ACTIVITY_DISPLAY_BUDGET_MS,
+  guardBudgetMs: SESSION_ACTIVITY_GUARD_BUDGET_MS,
+})
 
 const threadView = (
   status: ThreadStatus,
@@ -239,6 +259,8 @@ const threadView = (
 const LOCATION_CACHE_TTL_MS = 30 * 60_000
 const THREAD_STATUS_CACHE_TTL_MS = 30_000
 const REPOSITORY_VIEW_TTL_MS = 60_000
+/** One `jj workspace list` plus two revsets per thread, so repositories are scanned a bounded few at a time. */
+const REPOSITORY_SCAN_CONCURRENCY = 4
 
 type Cached<Value> = { readonly value: Value; readonly at: number }
 
@@ -254,6 +276,7 @@ const invalidateRepositories = (): void => {
   repositoryViews = undefined
   repositoryScan = undefined
   threadStatusCache.clear()
+  sessionActivity.reset()
 }
 
 /**
@@ -304,23 +327,20 @@ const scanRepositories = async (): Promise<readonly RepositoryView[]> => {
   const workspaces = registry.list()
   const byPath = new Map(workspaces.map(workspace => [workspace.path, workspace]))
   const archived = new Set<string>(registry.archivedSessionIds)
-  const activity = await readSessionActivity()
+  const activity = await sessionActivity.display()
   const present = presentWorkspaces(workspaces)
   const locations = await mapBounded(present, LOCATE_CONCURRENCY, workspace => cachedLocation(active, workspace.path))
-  const repositories = new Map<string, RepositoryView>()
-  for (const [index] of present.entries()) {
-    const location = locations[index]
-    if (location === undefined || repositories.has(location.repoRoot)) continue
-    const owner = byPath.get(location.repoRoot)
-    const statuses = await cachedThreadStatuses(active, location.repoRoot)
-    repositories.set(location.repoRoot, {
-      repoRoot: location.repoRoot,
-      title: owner?.title ?? basename(location.repoRoot),
+  const repoRoots = [...new Set(locations.flatMap(location => (location === undefined ? [] : [location.repoRoot])))]
+  const statusesByRepo = await mapBounded(repoRoots, REPOSITORY_SCAN_CONCURRENCY, repoRoot => cachedThreadStatuses(active, repoRoot))
+  return repoRoots.map((repoRoot, index) => {
+    const owner = byPath.get(repoRoot)
+    return {
+      repoRoot,
+      title: owner?.title ?? basename(repoRoot),
       workspaceId: owner?.id ?? null,
-      threads: statuses.map(status => threadView(status, byPath.get(status.path), archived, activity)),
-    })
-  }
-  return [...repositories.values()]
+      threads: (statusesByRepo[index] ?? []).map(status => threadView(status, byPath.get(status.path), archived, activity)),
+    }
+  })
 }
 
 const listRepositories = async (): Promise<readonly RepositoryView[]> => {
@@ -358,7 +378,7 @@ const findThread = async (input: {
   const shouldReadActivity = input.includeActivity !== false && workspace !== undefined && workspace.sessionIds.length > 0
   const [threadStatus, activity] = await Promise.all([
     active.status(location.repoRoot, location.threadName),
-    shouldReadActivity ? readSessionActivity() : Promise.resolve(undefined),
+    shouldReadActivity ? sessionActivity.display() : Promise.resolve(undefined),
   ])
   return {
     repoRoot: location.repoRoot,
@@ -540,7 +560,7 @@ const landThread = async (input: {
     if (location.threadName === undefined) return
     const workspace = await registryOf().resolveByPath(location.workspaceRoot)
     if (workspace === undefined) throw new PluginApiError('Could not verify thread activity before rebasing.', { code: 'thread-activity-unknown' })
-    const activity = await readSessionActivity()
+    const activity = await sessionActivity.guard()
     const eligible = ThreadRebaseEligibilityModel.eligibility({
       sessionIds: workspace.sessionIds,
       activity,
