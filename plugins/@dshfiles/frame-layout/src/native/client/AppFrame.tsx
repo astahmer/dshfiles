@@ -27,7 +27,7 @@ import css from './AppFrame.module.css'
 /** Full composed props: runtime share + child-slot render share + store share. */
 export type AppFrameProps =
   & PropsRuntime<'root'>
-  & PropsRenderSlots<'sidebar' | 'main' | 'rightbar' | 'shell.overlay' | 'shell.leading'>
+  & PropsRenderSlots<'sidebar' | 'main' | 'rightbar' | 'shell.dock' | 'shell.overlay' | 'shell.leading'>
   & PropsStore<ReturnType<typeof createLayoutStore>>
   & PropsLocale<'common'>
 
@@ -247,6 +247,13 @@ export function AppFrame({
     <MainPanel usePanelInfo={usePanelInfo} renderSlot={renderSlot} />
   ), [usePanelInfo, renderSlot])
   const overlays = useMemo(() => renderSlot('shell.overlay', {}), [renderSlot])
+  // One owner at a time: the global dock a plugin registered into `shell.dock`,
+  // or the native per-session occupant. Both receive the same resolved geometry
+  // and report their own presentation back through ctx.layout.
+  const rightColumn = useMemo(() => {
+    const owner = { width: normal.rightbar, viewportWidth: viewport, canShow: normal.rightbar > 0 }
+    return layoutInfo.rightPanelMode === 'dock' ? renderSlot('shell.dock', owner) : renderSlot('rightbar', owner)
+  }, [renderSlot, layoutInfo.rightPanelMode, normal.rightbar, viewport])
   // Window-chrome seat over the main panels' top-left corner: only a fully
   // hidden sidebar column on macOS desktop leaves window chrome without a
   // home — the Windows zero-width collapse keeps its controls in the caption
@@ -283,7 +290,7 @@ export function AppFrame({
       <>
         <CenterColumn>{main}</CenterColumn>
         <RightbarColumn>
-          {renderSlot('rightbar', { width: normal.rightbar, viewportWidth: viewport, canShow: normal.rightbar > 0 })}
+          {rightColumn}
         </RightbarColumn>
       </>
       <div className={css.overlayLayer} data-shell-overlay>

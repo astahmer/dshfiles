@@ -10,6 +10,7 @@ import { defineClient, useApi } from '@dshfiles/dshx/client'
 import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
 import { PluginQueryProvider, pluginQueryClient, useQuery } from '@dshfiles/plugin-ui/query'
 import type { DirectoryPickerPort, RegisteredProject } from '@dshfiles/project-folder-picker'
+import { workbenchPanels } from '@dshfiles/workbench/registry'
 import { useCallback, useMemo, useSyncExternalStore } from 'react'
 import { ChatReferenceOverlay } from './chat-reference-overlay.js'
 import { JujutsuPanel } from './client.js'
@@ -20,6 +21,8 @@ import './client.css'
 const PANEL_ID = 'dshfiles-jujutsu'
 const RIGHT_PANE_ID = '@dshfiles/jujutsu/revision-graph'
 const RIGHT_PANE_KIND = 'dshfiles-jujutsu-revision-graph'
+/** The workbench panel id the global dock opens by default. */
+const DOCK_PANEL_ID = 'dshfiles-jujutsu.dock'
 
 export default defineClient({
   name: '@dshfiles/jujutsu',
@@ -37,7 +40,7 @@ export default defineClient({
       const workspace = await ctx.workspaces.create({ path: canonicalPath })
       return { workspaceId: workspace.workspaceId, title: workspace.title, canonicalPath: workspace.path }
     }
-    const panelForSurface = (surface: 'main' | 'side-panel') =>
+    const panelForSurface = (surface: 'main' | 'side-panel' | 'dock') =>
       decorate(() => (
         <PluginQueryProvider>
           <ProjectsBoundPanel
@@ -171,6 +174,19 @@ export default defineClient({
     )
     ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: PANEL_ID }, panelForSurface('main')))
     ctx.slots.inject('sidebar.right.pane.tab', () => ctx.slots.register({ name: 'sidebar.right.pane.tab', key: RIGHT_PANE_ID }, panelForSurface('side-panel')))
+    // The global dock exists to keep this panel on screen across threads, so it
+    // leads the dock's default layout. The registry is page-global: registering
+    // before the workbench loads is fine, and it is a no-op without it.
+    ctx.effect(
+      () =>
+        workbenchPanels().register({
+          id: DOCK_PANEL_ID,
+          title: 'Jujutsu',
+          dockDefault: true,
+          component: panelForSurface('dock'),
+        }),
+      'dshfiles-jujutsu: dock panel',
+    )
   },
 })
 

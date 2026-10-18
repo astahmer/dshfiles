@@ -16,6 +16,10 @@
   "exports": {
     ".": "./dist/index.js",
     "./client": "./dist/client.js",
+    "./right-panel": {
+      "types": "./src/right-panel.ts",
+      "default": "./dist/right-panel.js"
+    },
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./package.json": "./package.json"
   },
@@ -37,6 +41,7 @@
     "@deepseek-ai/dsh-client-locale": "catalog:",
     "@deepseek-ai/dsh-client-shortcuts": "catalog:",
     "@deepseek-ai/dsh-client-store": "catalog:",
+    "@deepseek-ai/dsh-client-ui-layout": "catalog:",
     "@deepseek-ai/dsh-client-ui-renderer": "catalog:",
     "@deepseek-ai/dsh-client-ui-session": "catalog:",
     "@deepseek-ai/dsh-client-ui-slots": "catalog:",
@@ -58,6 +63,7 @@
     "@deepseek-ai/dsh-client-locale": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-client-shortcuts": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-client-store": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-client-ui-layout": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-client-ui-renderer": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-client-ui-session": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-client-ui-slots": ">=0.2.1-rc.2 <0.3.0-0",

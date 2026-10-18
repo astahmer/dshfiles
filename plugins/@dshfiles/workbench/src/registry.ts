@@ -12,6 +12,12 @@ export interface WorkbenchPanelDefinition {
   readonly id: string
   readonly title: string
   readonly component: ComponentType<WorkbenchPanelProps>
+  /**
+   * Leads the global dock's default layout. The panel the persistent right-hand
+   * surface exists for marks itself, so the workbench needs no list of ids; a
+   * saved layout always wins over this.
+   */
+  readonly dockDefault?: boolean
 }
 
 export interface WorkbenchPanelRegistry {

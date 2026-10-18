@@ -6,7 +6,11 @@ import type { WorkbenchPanelDefinition } from './registry.js'
 /** Every docked panel uses this one Dockview component; the panel id names the registry entry it renders. */
 export const WORKBENCH_COMPONENT = 'workbench-panel'
 
-const LAYOUT_STORAGE_KEYS = { main: 'dshfiles.workbench.layout.v1', 'side-panel': 'dshfiles.workbench.side-panel-layout.v1' } as const
+const LAYOUT_STORAGE_KEYS = {
+  main: 'dshfiles.workbench.layout.v1',
+  'side-panel': 'dshfiles.workbench.side-panel-layout.v1',
+  dock: 'dshfiles.workbench.dock-layout.v1',
+} as const
 
 const serializedPanelSchema = z.looseObject({ id: z.string(), contentComponent: z.literal(WORKBENCH_COMPONENT), title: z.string().optional() })
 
@@ -38,12 +42,17 @@ const openPanel = (api: DockviewApi, definition: Pick<WorkbenchPanelDefinition, 
 /** The Editor's panel id: the workbench exists to host it, so it opens alone when it is registered. */
 const EDITOR_PANEL_ID = 'dshfiles-editor.main'
 
-/** The Editor alone when registered; otherwise the first two panels side by side and the rest as tabs of the first group. */
-const applyDefaultLayout = (api: DockviewApi, panels: readonly WorkbenchPanelDefinition[]): void => {
+/**
+ * The Editor alone when registered; otherwise the first two panels side by side
+ * and the rest as tabs of the first group. In the dock the panel a contributor
+ * marked `dockDefault` leads instead, so the persistent side panel opens on the
+ * panel it exists for.
+ */
+const applyDefaultLayout = (api: DockviewApi, panels: readonly WorkbenchPanelDefinition[], preferDockDefault = false): void => {
   api.clear()
-  const editor = panels.find(panel => panel.id === EDITOR_PANEL_ID)
-  if (editor !== undefined) {
-    api.addPanel({ id: editor.id, component: WORKBENCH_COMPONENT, title: editor.title }).api.setActive()
+  const preferred = (preferDockDefault ? panels.find(panel => panel.dockDefault === true) : undefined) ?? panels.find(panel => panel.id === EDITOR_PANEL_ID)
+  if (preferred !== undefined) {
+    api.addPanel({ id: preferred.id, component: WORKBENCH_COMPONENT, title: preferred.title }).api.setActive()
     return
   }
   const [first, second, ...rest] = panels
@@ -57,7 +66,12 @@ const applyDefaultLayout = (api: DockviewApi, panels: readonly WorkbenchPanelDef
 }
 
 /** Restores the saved layout; a missing or unreadable one is cleared and replaced by the default. */
-const restoreLayout = (api: DockviewApi, store: LayoutStore, panels: readonly WorkbenchPanelDefinition[]): 'restored' | 'default' => {
+const restoreLayout = (
+  api: DockviewApi,
+  store: LayoutStore,
+  panels: readonly WorkbenchPanelDefinition[],
+  preferDockDefault = false,
+): 'restored' | 'default' => {
   const saved = store.get()
   if (saved !== null) {
     try {
@@ -67,7 +81,7 @@ const restoreLayout = (api: DockviewApi, store: LayoutStore, panels: readonly Wo
       store.remove()
     }
   }
-  applyDefaultLayout(api, panels)
+  applyDefaultLayout(api, panels, preferDockDefault)
   return 'default'
 }
 

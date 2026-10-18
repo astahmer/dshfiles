@@ -3,6 +3,7 @@
  * The registration supplies a fresh store and binds its actions to ctx.layout.
  */
 import { defineStore, type EngineStoreHandle } from '@deepseek-ai/dsh-client-store'
+import type { RightPanelMode } from '../../right-panel.ts'
 import type { MainPanelId } from './service.ts'
 import {
   clampWidth, RIGHTBAR_DEFAULT_RATIO, RIGHTBAR_MAX_RATIO, RIGHTBAR_MIN,
@@ -54,6 +55,13 @@ type LayoutInfo = {
   rightbarFullscreen: boolean
   /** Suppress transitions for a fullscreen exit until another geometry action. */
   rightbarInstant: boolean
+  /**
+   * Which surface fills the right column (local delta; see README "Local
+   * delta"): the native per-session right sidebar, or the global dock a plugin
+   * registers into `shell.dock`. Reported through `ctx.rightPanel`, so the
+   * column keeps one owner at a time.
+   */
+  rightPanelMode: RightPanelMode
 }
 
 /**
@@ -69,8 +77,8 @@ type LayoutActions = {
   setRightbar: (draft: LayoutState, px: number) => void
   openRightbar: (draft: LayoutState, track: boolean, fullscreen: boolean) => void
   closeRightbar: (draft: LayoutState) => void
+  setMode: (draft: LayoutState, mode: RightPanelMode) => void
 }
-
 /**
  * Create the layout panel store handle. For the sidebar the preference IS the
  * width, so closing it forgets its drag width — reopening restores the contract
@@ -94,6 +102,7 @@ export function createLayoutStore(): EngineStoreHandle<LayoutState, LayoutAction
         rightbarTrack: false,
         rightbarFullscreen: false,
         rightbarInstant: false,
+        rightPanelMode: 'native',
       },
     }),
     actions: {
@@ -147,6 +156,11 @@ export function createLayoutStore(): EngineStoreHandle<LayoutState, LayoutAction
         d.layoutInfo.rightbarShown = false
         d.layoutInfo.rightbarTrack = false
         d.layoutInfo.rightbarFullscreen = false
+      },
+      // The frame's right column has one owner at a time: a plugin takes it
+      // over for its global dock, or hands it back to the native surface.
+      setMode: (d, mode: RightPanelMode) => {
+        d.layoutInfo.rightPanelMode = mode
       },
     },
   })

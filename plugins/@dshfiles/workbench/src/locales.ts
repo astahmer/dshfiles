@@ -19,6 +19,7 @@ const en = {
   tickerHint: 'Counts seconds since this panel mounted. A remount restarts it at 0.',
   toggleSidePanel: 'Toggle the workbench side panel',
   sidePanelGuide: 'Dock and arrange registered panels beside the thread.',
+  dockHeading: 'Panels',
 }
 
 const zh = {
@@ -37,6 +38,7 @@ const zh = {
   tickerHint: '自此面板挂载以来的秒数。重新挂载会从 0 开始。',
   toggleSidePanel: '切换工作台侧边面板',
   sidePanelGuide: '在会话旁停靠和排列已注册的面板。',
+  dockHeading: '面板',
 } satisfies Record<keyof typeof en, string>
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {

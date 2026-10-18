@@ -1433,6 +1433,9 @@ importers:
       '@deepseek-ai/dsh-client-store':
         specifier: 'catalog:'
         version: 0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)
+      '@deepseek-ai/dsh-client-ui-layout':
+        specifier: 'catalog:'
+        version: 0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)
       '@deepseek-ai/dsh-client-ui-renderer':
         specifier: 'catalog:'
         version: 0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)
@@ -1790,6 +1793,9 @@ importers:
       '@dshfiles/shared-runtime':
         specifier: workspace:*
         version: link:../shared-runtime
+      '@dshfiles/workbench':
+        specifier: workspace:*
+        version: link:../workbench
       zod:
         specifier: 'catalog:'
         version: 4.4.3
@@ -4173,6 +4179,9 @@ importers:
       '@deepseek-ai/dsh-client-ui-slots':
         specifier: 'catalog:'
         version: 0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)
+      '@dshfiles/frame-layout':
+        specifier: workspace:*
+        version: link:../frame-layout
       '@testing-library/react':
         specifier: 'catalog:'
         version: 16.3.3(@testing-library/dom@10.4.2)(@types/react-dom@18.3.7(@types/react@18.3.31))(@types/react@18.3.31)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)

@@ -14,6 +14,8 @@ DSH's three-column AppFrame, forked so the frame's dragged panel widths and coll
   wide-frame override. The right panel still boots hidden, and stores only its width.
 - **Storage failure degrades to upstream behavior**: a blocked or full store (private mode, quota) leaves the geometry
   in-memory, exactly as the native package.
+- **Right-column seat**: the column renders the native per-thread right sidebar, or the global dock a plugin registers into
+  `shell.dock` and asks for through `ctx.rightPanel.setMode('dock')` — see [the right-column seat](#the-right-column-seat).
 
 ## Port
 
@@ -38,22 +40,34 @@ occupant, so the smallest place that can persist one is the package that owns th
 Every other vendored file is byte-identical to the pinned revision, so an upstream update starts from a real `diff`. The
 whole delta is:
 
-| File                          | Change                                                                                                                                                                                                                                                                                                                                                   |
-| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/native/client/index.ts`  | the `apply` context type comes from `@dshfiles/dshx/client` (`ClientContext`); the Host `Context.sessions` augmentation is in scope in this program, so the dshx client-program context is the one the entry contract hands over. Also restores the stored geometry on the freshly created instance and disposes the write-back subscription on teardown |
-| `src/native/client/stores.ts` | `layoutInfo.sidebarLastOpen` remembers the last non-zero width; `setSidebar` writes it and `toggleSidebar` reopens at it instead of `SIDEBAR_DEFAULT`, so a remembered collapse can reopen where the user left it                                                                                                                                        |
-| `src/frame-widths.ts`         | new: the browser-local geometry record (schema, read, write) and the store restore/write-back helpers                                                                                                                                                                                                                                                    |
+| File                             | Change                                                                                                                                                                                                                                                                                                                                                                                               |
+| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/native/client/index.ts`     | the `apply` context type comes from `@dshfiles/dshx/client` (`ClientContext`); the Host `Context.sessions` augmentation is in scope in this program, so the dshx client-program context is the one the entry contract hands over. Also restores the stored geometry on the freshly created instance, declares the `shell.dock` child slot, and provides `ctx.rightPanel`, disposing both on teardown |
+| `src/native/client/stores.ts`    | `layoutInfo.sidebarLastOpen` remembers the last non-zero width; `setSidebar` writes it and `toggleSidebar` reopens at it instead of `SIDEBAR_DEFAULT`, so a remembered collapse can reopen where the user left it. `layoutInfo.rightPanelMode` plus its `setMode` action record which surface fills the right column                                                                                 |
+| `src/native/client/AppFrame.tsx` | renders `rightbar` or the `shell.dock` seat in the right column according to `layoutInfo.rightPanelMode`, passing both the same resolved geometry                                                                                                                                                                                                                                                    |
+| `src/frame-widths.ts`            | new: the browser-local geometry record (schema, read, write) and the store restore/write-back helpers                                                                                                                                                                                                                                                                                                |
+| `src/right-panel.ts`             | new: the right-column seat contract — `RightPanelSeat`, the `ctx.rightPanel` augmentation a dock plugin calls, and the `shell.dock` slot declaration it registers into                                                                                                                                                                                                                               |
 
 `src/native/index.ts` stays upstream's no-op Host body, re-exported by `src/host.ts` because the dshx Host entry lives at
 that path.
+
+### The right-column seat
+
+The right column has one owner at a time. A plugin that wants to keep panels on screen across threads registers into the
+`shell.dock` slot and calls `ctx.rightPanel.setMode('dock')`; the frame then renders that seat instead of the native
+per-session right sidebar, with the same width, drag handle, collapse and fullscreen behaviour, and hands it the same
+resolved geometry (`RightbarOwnerProps`). `setMode('native')` — what a plugin does when its setting turns the dock off, and
+what it does on teardown — gives the column back. A frame without this seat (the stock package) is a different layout owner
+altogether, so `ctx.rightPanel` is simply absent; read it through `ctx.get('rightPanel')` rather than injecting it.
 
 ### Updating to a new DSH release
 
 1. Compare the entire upstream package (`packages/client/ui-layout/src`) at the exact release commit against the pinned
    revision; the table above lists the only files that should differ.
 2. Re-apply the local delta on top of the new upstream files rather than porting your own edits forward.
-3. Recheck the Loader row identity (`ui-layout`), the `root` slot and its five child declarations, `dsh.client.external`,
-   and the plugin peer ranges against the installed release.
+3. Recheck the Loader row identity (`ui-layout`), the `root` slot and its child declarations (upstream adds and renames
+   seats; `shell.dock` is this fork's own addition), the `ctx.rightPanel` seat, `dsh.client.external`, and the plugin peer
+   ranges against the installed release.
 4. Update the pins, source revision and this document together; run typecheck, tests, build, the Host import check,
    `pnpm check:e2e frame-layout`, and the browser journey.
 

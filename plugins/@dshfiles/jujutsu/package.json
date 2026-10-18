@@ -29,6 +29,7 @@
     "@dshfiles/plugin-ui": "workspace:*",
     "@dshfiles/project-folder-picker": "workspace:*",
     "@dshfiles/shared-runtime": "workspace:*",
+    "@dshfiles/workbench": "workspace:*",
     "zod": "catalog:"
   },
   "devDependencies": {

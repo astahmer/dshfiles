@@ -44,10 +44,19 @@ const registryWith = (...ids: string[]): WorkbenchPanelRegistry => {
   return registry
 }
 
-const renderWorkbench = (registry: WorkbenchPanelRegistry, storage = memoryStorage()) => {
+/** One dock-preferred panel, one Editor and one ordinary panel: each surface's default layout names a different one. */
+const mixedRegistry = (): WorkbenchPanelRegistry => {
+  const registry = createWorkbenchPanelRegistry()
+  registry.register({ id: 'other.panel', title: 'other', component: DraftPanel })
+  registry.register({ id: 'dshfiles-editor.main', title: 'editor', component: DraftPanel })
+  registry.register({ id: 'jujutsu.dock', title: 'jujutsu', component: DraftPanel, dockDefault: true })
+  return registry
+}
+
+const renderWorkbench = (registry: WorkbenchPanelRegistry, storage = memoryStorage(), surface?: 'main' | 'side-panel' | 'dock') => {
   let api: DockviewApi | undefined
   const store = createLayoutStore({ storage })
-  const view = render(<WorkbenchView registry={registry} store={store} t={t} onApi={ready => (api = ready)} />)
+  const view = render(<WorkbenchView registry={registry} store={store} t={t} onApi={ready => (api = ready)} {...(surface === undefined ? {} : { surface })} />)
   if (api === undefined) throw new Error('Dockview did not become ready')
   return { api, store, storage, view }
 }
@@ -79,6 +88,16 @@ describe('WorkbenchView', () => {
     const { api } = renderWorkbench(registryWith('other-plugin.panel', 'dshfiles-editor.main', 'other'))
     expect(api.panels.map(panel => panel.id)).toEqual(['dshfiles-editor.main'])
     expect(api.getPanel('dshfiles-editor.main')?.api.isActive).toBe(true)
+  })
+
+  it('leads the dock default layout with the dock panel, and the main one with the Editor', () => {
+    const dock = renderWorkbench(mixedRegistry(), memoryStorage(), 'dock')
+    expect(dock.api.panels.map(panel => panel.id)).toEqual(['jujutsu.dock'])
+    expect(dock.api.getPanel('jujutsu.dock')?.api.isActive).toBe(true)
+    dock.view.unmount()
+
+    const main = renderWorkbench(mixedRegistry())
+    expect(main.api.panels.map(panel => panel.id)).toEqual(['dshfiles-editor.main'])
   })
 
   it('keeps a panel mounted with its draft while it is tabbed, split, floated and moved back', () => {

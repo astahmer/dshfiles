@@ -114,7 +114,8 @@ interface FullDiffTarget {
 }
 
 interface JujutsuPanelProps {
-  readonly surface?: 'main' | 'side-panel'
+  /** `side-panel` is the narrow per-thread surface; `dock` is the global dock, laid out like the main page. */
+  readonly surface?: 'main' | 'side-panel' | 'dock'
   readonly projects: readonly RegisteredProject[]
   readonly directoryPicker: DirectoryPickerPort
   readonly registerWorkspace: (canonicalPath: string) => Promise<RegisteredProject>

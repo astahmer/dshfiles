@@ -17,6 +17,10 @@ interface WorkbenchViewProps {
   readonly t: WorkbenchTranslate
   /** Receives the Dockview API once the saved layout is restored, for callers that drive the layout (commands, tests). */
   readonly onApi?: (api: DockviewApi) => void
+  /** `dock` is the global right-column surface: its default layout leads with the panel marked `dockDefault`. */
+  readonly surface?: 'main' | 'side-panel' | 'dock'
+  /** Header text; defaults to the workbench title. */
+  readonly heading?: string
 }
 
 const usePanelDefinitions = (registry: WorkbenchPanelRegistry) => useSyncExternalStore(registry.subscribe, registry.list, registry.list)
@@ -56,7 +60,7 @@ export const WorkbenchView = (props: WorkbenchViewProps): JSX.Element => {
   }, [registry, t])
 
   const onReady = (event: DockviewReadyEvent): void => {
-    WorkbenchLayout.restoreLayout(event.api, store, registry.list())
+    WorkbenchLayout.restoreLayout(event.api, store, registry.list(), props.surface === 'dock')
     setApi(event.api)
     props.onApi?.(event.api)
   }
@@ -104,7 +108,7 @@ export const WorkbenchView = (props: WorkbenchViewProps): JSX.Element => {
   return (
     <div className="dshx-root dshx:flex dshx:h-full dshx:min-h-0 dshx:flex-col">
       <header className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-2 dshx:border-b dshx:border-border dshx:px-3 dshx:py-1.5">
-        <h2 className="dshx:text-sm dshx:font-medium">{t('title')}</h2>
+        <h2 className="dshx:text-sm dshx:font-medium">{props.heading ?? t('title')}</h2>
         <div className="dshx:flex dshx:items-center dshx:gap-1">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -131,7 +135,7 @@ export const WorkbenchView = (props: WorkbenchViewProps): JSX.Element => {
             onClick={() => {
               if (api === null) return
               store.remove()
-              WorkbenchLayout.applyDefaultLayout(api, registry.list())
+              WorkbenchLayout.applyDefaultLayout(api, registry.list(), props.surface === 'dock')
             }}
           >
             <RotateCcwIcon /> {t('resetLayout')}

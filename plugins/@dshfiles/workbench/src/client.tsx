@@ -6,6 +6,8 @@ import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import { defineClient, useSettings } from '@dshfiles/dshx/client'
+// Type-only: the frame's right-column seat and the `shell.dock` slot it declares.
+import type {} from '@dshfiles/frame-layout/right-panel'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { LayoutGridIcon } from '@dshfiles/plugin-ui/icons'
 import dockviewSheet from 'virtual:dshfiles-workbench/dockview-css'
@@ -47,6 +49,7 @@ export default defineClient({
     const registry = workbenchPanels()
     const store = createLayoutStore()
     const sideStore = createLayoutStore({ surface: 'side-panel' })
+    const dockStore = createLayoutStore({ surface: 'dock' })
 
     // The slot ledger erases the brand; an id is a MainPanelId exactly when `main` registers it.
     const isMainPanelId = (id: string): id is MainPanelId => ctx.slots.entriesOfSlot('main').some(entry => entry.options.key === id)
@@ -128,6 +131,45 @@ export default defineClient({
           return <WorkbenchView registry={registry} store={sideStore} t={props.t} />
         }),
       ),
+    )
+
+    // The global dock: one surface in the frame's right column whose panel set
+    // and layout belong to the browser, not to a thread, so it survives every
+    // thread switch. The frame renders it only while `rightPanel` asks for it.
+    ctx.slots.inject('shell.dock', () =>
+      ctx.slots.register(
+        { name: 'shell.dock', locale: WORKBENCH_LOCALE_NAMESPACE },
+        decorate(props => {
+          useDockviewSheet()
+          useDemoPanels()
+          // The column reserves a track only while its occupant reports itself
+          // shown, exactly as the native right sidebar does.
+          useLayoutEffect(() => {
+            ctx.layout.openRightbar(true, false)
+            return () => ctx.layout.closeRightbar()
+          }, [])
+          return <WorkbenchView registry={registry} store={dockStore} surface="dock" t={props.t} heading={props.t('dockHeading')} />
+        }),
+      ),
+    )
+
+    // Reports the setting that chooses the column's surface. `ctx.get` keeps the
+    // workbench loadable on a frame that offers no such seat (the stock layout).
+    const RightPanelModeReporter = decorate(() => {
+      const mode = useSettings(workbenchSettings).value?.rightPanel ?? 'native'
+      useEffect(() => {
+        ctx.get('rightPanel')?.setMode(mode)
+      }, [mode])
+      useEffect(
+        () => () => {
+          ctx.get('rightPanel')?.setMode('native')
+        },
+        [],
+      )
+      return null
+    })
+    ctx.slots.inject('shell.overlay', () =>
+      ctx.slots.register({ name: 'shell.overlay', id: 'dshfiles-workbench-right-panel', order: 44 }, RightPanelModeReporter),
     )
 
     // Same shape as the Jujutsu toggle: close the side panel when it already shows the workbench, otherwise show it.

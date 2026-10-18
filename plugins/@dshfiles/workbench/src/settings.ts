@@ -4,6 +4,14 @@ import { defineSettings } from '@dshfiles/dshx/settings'
 export const workbenchSettings = defineSettings({
   namespace: 'dshfiles-workbench',
   schema: Schema.object({
+    rightPanel: Schema.union([
+      Schema.const('native').description('Per-thread (the native right sidebar)'),
+      Schema.const('dock').description('Global dock (persistent panels in the right column)'),
+    ])
+      .default('native')
+      .description(
+        'Which surface fills the right column: the native per-thread right sidebar, or the global dock, whose layout and panel set are the same in every thread.',
+      ),
     headerToggle: Schema.boolean()
       .default(false)
       .description(

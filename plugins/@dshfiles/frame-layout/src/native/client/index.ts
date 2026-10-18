@@ -1,7 +1,7 @@
 /**
  * Layout plugin, browser half: one register() call contributes AppFrame into
- * the runtime's built-in 'root' slot and, in the same breath, declares the
- * five child slots (declaration = exclusive render authority), seats the
+ * the runtime's built-in 'root' slot and, in the same breath, declares its
+ * child slots (declaration = exclusive render authority), seats the
  * layout store (panel geometry), and wires the panel-action service face.
  * ctx.layout selects the main panel and controls column geometry; Session
  * selection belongs to the Session Controller. A second effect seats the theme
@@ -13,6 +13,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 import type {} from '@deepseek-ai/dsh-client-ui-theme/client'
 import type { HostObservable, SnapshotSelectorHook } from '@deepseek-ai/dsh-client-ui-slots'
+import type { RightPanelSeat } from '../../right-panel.ts'
 import type { PanelInfo } from './service.ts'
 import { AppFrame } from './AppFrame.tsx'
 import { createLayoutStore } from './stores.ts'
@@ -164,6 +165,12 @@ export function apply(ctx: ClientContext): void {
       instance.actions.retainMainPanels(ctx.slots.entries('main').flatMap(entry =>
         entry.options.key === undefined ? [] : [entry.options.key]))
     }
+    // The right column's seat: a plugin reports which surface fills it (local
+    // delta; see README "Local delta"). The frame only needs that choice, never
+    // the dock's own state.
+    const rightPanel: RightPanelSeat = {
+      setMode: mode => instance.actions.setMode(mode),
+    }
     const panelInfo: HostObservable<PanelInfo> = {
       getSnapshot: () => instance.getSnapshot().panelInfo,
       subscribe: listener => instance.subscribe(listener),
@@ -172,6 +179,7 @@ export function apply(ctx: ClientContext): void {
       ctx.slots.entries('main').some(entry => entry.options.key === id), panelInfo)
     const disposePanelInfo = ctx.slots.provideRoot({ hooks: { panelInfo: layout.panelInfo } })
     const disposeService = ctx.reflect.provide('layout', layout)
+    const disposeRightPanel = ctx.reflect.provide('rightPanel', rightPanel)
     const disposeRegistration = ctx.slots.register({
       name: 'root',
       locale: 'common',
@@ -179,6 +187,7 @@ export function apply(ctx: ClientContext): void {
         'sidebar': { kind: 'single', scope: 'root' },
         'main': { kind: 'keyed', scope: 'root' },
         'rightbar': { kind: 'single', scope: 'root' },
+        'shell.dock': { kind: 'single', scope: 'root' },
         'shell.overlay': { kind: 'list', scope: 'root' },
         'shell.leading': { kind: 'single', scope: 'root' },
       },
@@ -207,6 +216,7 @@ export function apply(ctx: ClientContext): void {
       disposePanelInfo()
       // provide()'s disposer settles asynchronously; teardown is synchronous fire-and-forget.
       void disposeService()
+      void disposeRightPanel()
     }
   }, 'ui-layout: service + root registration')
 
