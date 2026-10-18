@@ -10,6 +10,7 @@ import { createThreadChildRowCache, type ThreadChildRowCache } from './thread-ch
 import { useApi, useApiQuery } from '@dshfiles/dshx/client'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { isApiOwnerMissing } from '@dshfiles/dshx/api'
+import { createInventoryPoll } from './inventory-poll.js'
 import { aiAccountsApi } from '@dshfiles/ai-accounts/api'
 import { threadSidebarPendingQuestionsApi } from './pending-questions-api.js'
 import {
@@ -265,6 +266,8 @@ const threadSourceFilterLabelKeys = {
 } satisfies Record<ThreadSourceFilter, Parameters<ThreadSidebarTranslate>[0]>
 
 const ALL_PROJECTS = '__all__'
+/** How often the sidebar re-reads the JJ inventory while the page is visible. */
+const INVENTORY_REFRESH_INTERVAL_MS = 30_000
 const UNASSIGNED_PROJECT = '__unassigned__'
 
 const sections: readonly SidebarSection[] = ['pinned', 'active', 'parked', 'settled', 'inactive', 'archived']
@@ -1031,10 +1034,26 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const machine = useApiQuery(threadSidebarMachineApi, 'name', { enabled: preferences.threadRowMachine }).data?.name
   const jjRepositories = useApiQuery(jjIntegrationApi, 'repositories', { input: {} })
   const refetchJjRepositories = jjRepositories.refetch
+  const jjOwnerMissing = isApiOwnerMissing(jjRepositories.error)
   useEffect(() => {
-    const timer = window.setInterval(refetchJjRepositories, 30_000)
-    return () => window.clearInterval(timer)
-  }, [refetchJjRepositories])
+    // The inventory schedule pauses with the page and stops for good once the API owner is missing, instead of
+    // polling a Host that no longer answers the integration API every thirty seconds.
+    const poll = createInventoryPoll({
+      refresh: refetchJjRepositories,
+      intervalMs: INVENTORY_REFRESH_INTERVAL_MS,
+      isHidden: () => document.hidden,
+      schedule: (callback: () => void, delayMs: number) => window.setTimeout(callback, delayMs),
+      cancel: (handle: number) => window.clearTimeout(handle),
+    })
+    const onVisibilityChange = (): void => poll.visibilityChanged()
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    poll.start()
+    poll.setAvailable(!jjOwnerMissing)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+      poll.stop()
+    }
+  }, [jjOwnerMissing, refetchJjRepositories])
   const [childrenOpenOverrides, setChildrenOpenOverrides] = useState<ReadonlyMap<string, boolean>>(() => new Map())
   const [expandedParents, setExpandedParents] = useState<ReadonlySet<string>>(() => new Set())
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -1121,6 +1140,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       })),
     [props.tSidebar, workspaceState.items],
   )
+  /** Titles by workspace id, so a row does not rescan every workspace on each render. */
+  const workspaceTitleById = useMemo(() => new Map<string, string>(displayWorkspaces.map(workspace => [workspace.id, workspace.title])), [displayWorkspaces])
   const rebasedIndex = useMemo(
     () =>
       indexRebasedThreadSessions({
@@ -2631,7 +2652,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         selected={selectedSession?.id === session.id}
         parentTitle={lineage.parentTitle}
         workspaceId={workspaceId}
-        workspaceTitle={displayWorkspaces.find(workspace => workspace.id === workspaceId)?.title}
+        workspaceTitle={workspaceId === undefined ? undefined : workspaceTitleById.get(workspaceId)}
         machine={machine}
         age={formatAge(session.updatedAt)}
         mute={mutedSessionIds.has(session.id) ? mutedThreads[session.id] : undefined}

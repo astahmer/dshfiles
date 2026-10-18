@@ -119,3 +119,37 @@ test('parent groups expand by default only while a subagent is working and respe
   assert.equal(ThreadChildrenModel.shouldOpenChildThreadList({ children: [{ origin: 'subagent', running: true }], override: false }), false)
   assert.equal(ThreadChildrenModel.shouldOpenChildThreadList({ children: [{ origin: 'subagent', running: false }], override: true }), true)
 })
+
+test('an unchanged child list keeps its array identity instead of being copied', () => {
+  const children = [thread('a', 2), thread('b', 1)]
+  assert.equal(ThreadChildrenModel.listChildThreads({ children, groupedAttentionIds: new Set(), groupByStatus: true }), children)
+  assert.equal(ThreadChildrenModel.listChildThreads({ children, groupedAttentionIds: new Set(['elsewhere']), groupByStatus: true }), children)
+  assert.equal(ThreadChildrenModel.listChildThreads({ children, groupedAttentionIds: new Set(['elsewhere']), groupByStatus: false }), children)
+  assert.deepEqual(ids(ThreadChildrenModel.listChildThreads({ children, groupedAttentionIds: new Set(['a']), groupByStatus: true })), ['b'])
+})
+
+test('nothing finished keeps the child list and one shared empty finished list', () => {
+  const children = [thread('a', 2), thread('b', 1)]
+  const collapsed = ThreadChildrenModel.partitionFinishedChildren({ children, mode: 'collapse', isFinished: () => false, selectedId: undefined })
+  const shown = ThreadChildrenModel.partitionFinishedChildren({ children, mode: 'show', isFinished: () => true, selectedId: undefined })
+  const hidden = ThreadChildrenModel.partitionFinishedChildren({ children: [], mode: 'hide', isFinished: () => true, selectedId: undefined })
+  assert.equal(collapsed.live, children)
+  assert.equal(shown.live, children)
+  assert.equal(collapsed.finished, shown.finished)
+  assert.equal(shown.finished, hidden.finished)
+  assert.deepEqual(ids(collapsed.finished), [])
+})
+
+test('the open child stays live while finished ones fold away or disappear', () => {
+  const children = [thread('a', 2), thread('b', 1), thread('open', 3)]
+  const isFinished = (child: ThreadNode): boolean => child.id !== 'open'
+  const collapsed = ThreadChildrenModel.partitionFinishedChildren({ children, mode: 'collapse', isFinished, selectedId: undefined })
+  assert.deepEqual(ids(collapsed.live), ['open'])
+  assert.deepEqual(ids(collapsed.finished), ['a', 'b'])
+  const hidden = ThreadChildrenModel.partitionFinishedChildren({ children, mode: 'hide', isFinished, selectedId: undefined })
+  assert.deepEqual(ids(hidden.live), ['open'])
+  assert.deepEqual(ids(hidden.finished), [])
+  const selectedStaysLive = ThreadChildrenModel.partitionFinishedChildren({ children, mode: 'collapse', isFinished: () => true, selectedId: 'b' })
+  assert.deepEqual(ids(selectedStaysLive.live), ['b'])
+  assert.deepEqual(ids(selectedStaysLive.finished), ['a', 'open'])
+})

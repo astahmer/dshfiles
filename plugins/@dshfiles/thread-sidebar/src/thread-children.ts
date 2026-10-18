@@ -18,6 +18,9 @@ export interface ThreadTree<Thread extends ThreadNode> {
   readonly detachedByMissingAncestor: ReadonlyMap<string, readonly Thread[]>
 }
 
+/** A canonical empty list, so an unchanged row keeps the same prop identity across renders. */
+const NO_THREADS: readonly never[] = []
+
 export type FinishedSubagentsMode = 'show' | 'collapse' | 'hide'
 
 interface VisibleChildrenResult<Thread> {
@@ -123,7 +126,12 @@ export class ThreadChildrenModel {
     readonly children: readonly Thread[]
     readonly groupedAttentionIds: ReadonlySet<string>
     readonly groupByStatus: boolean
-  }): readonly Thread[] => options.children.filter(child => !(options.groupByStatus && options.groupedAttentionIds.has(child.id)))
+  }): readonly Thread[] => {
+    if (options.children.length === 0) return options.children
+    if (!options.groupByStatus || options.groupedAttentionIds.size === 0) return options.children
+    const listed = options.children.filter(child => !options.groupedAttentionIds.has(child.id))
+    return listed.length === options.children.length ? options.children : listed
+  }
 
   /**
    * The child rows a parent shows: the first `limit`, or all of them once expanded.
@@ -156,14 +164,16 @@ export class ThreadChildrenModel {
     readonly isFinished: (thread: Thread) => boolean
     readonly selectedId: string | undefined
   }): FinishedPartition<Thread> => {
-    if (options.mode === 'show') return { live: options.children, finished: [] }
+    if (options.mode === 'show') return { live: options.children, finished: NO_THREADS }
     const live: Thread[] = []
     const finished: Thread[] = []
     for (const child of options.children) {
       if (child.id !== options.selectedId && options.isFinished(child)) finished.push(child)
       else live.push(child)
     }
-    return { live, finished: options.mode === 'hide' ? [] : finished }
+    // Nothing finished: the live list is the child list, so the row keeps its prop identity.
+    if (finished.length === 0) return { live: options.children, finished: NO_THREADS }
+    return { live, finished: options.mode === 'hide' ? NO_THREADS : finished }
   }
 }
 export const groupThreadChildren = ThreadChildrenModel.groupThreadChildren
