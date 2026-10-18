@@ -24,10 +24,9 @@ dshx dev up --plugin @dshfiles/jj-integration --plugin @dshfiles/home --json
 Builds the named bundles (plus the client bundles they load), installs a scratch
 profile in a temp `DSH_HOME`, seeds a jj project `sample` with a `main`
 bookmark, starts `dsh` on a free port and a headless Chromium. Without
-`--plugin` it loads every owned bundle (slow); that broad profile currently
-fails `doctor` because ThreadSidebar is pending on the `workspaces` Host
-service. Use a targeted set for the feature and do not relax `doctor` to mask an
-inactive entry. `--skip-build` reuses `dist/`; `--project <dir>` registers a
+`--plugin` it loads every owned bundle (slow). Treat any pending entry as a real
+failure; diagnose its Host activation issue and record a Host gap instead of
+relaxing `doctor`. `--skip-build` reuses `dist/`; `--project <dir>` registers a
 real folder instead (kept on `down`); `--name` runs another instance beside it.
 Takes ~20 s for three bundles.
 
@@ -137,7 +136,9 @@ A red journey is drift or a regression: triage it with `maintain-verification-sk
   ("its cwd resolves to …").
 - Sessions created with `dshx sessions create --cwd` stay "Unassigned" (not in
   the project's workspace); seed threads through the composer, as `home-screen`
-  does.
+  does. After clicking `New thread`, wait for its tab to become selected before
+  sending text: a visible composer can still belong to the previously selected
+  thread, so setup prompts may be queued there.
 - Without `@dshfiles/multi-host`, each multi-host query logs one 404 per page
   load (e.g. `/api/dshx-9ca8a5fa/list`): the chip and sidebar see an
   owner-missing error and stop polling. Load multi-host or discount it.

@@ -12,7 +12,7 @@ import { z } from 'zod'
  * `[[call TOOL {json}]]` calls any tool; `[[once call TOOL {json}]]` calls it only on its first match; `[[read PATH]]`
  * and `[[memory_search QUERY]]` call tools; `[[empty]]` settles with reasoning but no answer; `[[hold]]` keeps the
  * turn running until `releaseHeldTurns`; `[[title NAME]]` sets the thread name; `[[answer TEXT]]` returns markdown;
- * the turn after a tool result answers `Tool finished.`.
+ * `[[stream MS]]` emits that answer word by word with a bounded delay; the turn after a tool result answers `Tool finished.`.
  *
  * E2E journeys start it per page; `dshx dev`'s `tool-call-thread` seed runs it as its own process.
  */
@@ -64,11 +64,23 @@ interface ChatDelta {
   readonly tool_calls?: readonly ToolCallDelta[]
 }
 
-const streamAnswer = (response: ServerResponse, delta: ChatDelta): void => {
+let completionSequence = 0
+
+const streamAnswer = async (response: ServerResponse, delta: ChatDelta, delayBetweenWordsMs = 0): Promise<void> => {
+  const id = `fake-${String(++completionSequence).padStart(6, '0')}`
+  const created = Math.floor(Date.now() / 1000)
   const chunk = (body: ChatDelta, finishReason: string | null): string =>
-    `data: ${JSON.stringify({ id: 'fake', object: 'chat.completion.chunk', created: 1, model: 'fake', choices: [{ index: 0, delta: body, finish_reason: finishReason }] })}\n\n`
+    `data: ${JSON.stringify({ id, object: 'chat.completion.chunk', created, model: 'fake', choices: [{ index: 0, delta: body, finish_reason: finishReason }] })}\n\n`
   response.writeHead(200, { 'content-type': 'text/event-stream' })
-  response.write(chunk({ role: 'assistant', ...delta }, null))
+  const contentChunks = delayBetweenWordsMs > 0 && typeof delta.content === 'string' ? (delta.content.match(/\S+\s*/gu) ?? [delta.content]) : undefined
+  if (contentChunks === undefined) {
+    response.write(chunk({ role: 'assistant', ...delta }, null))
+  } else {
+    for (const [index, content] of contentChunks.entries()) {
+      response.write(chunk(index === 0 ? { role: 'assistant', content } : { content }, null))
+      if (index < contentChunks.length - 1) await new Promise<void>(resolveDelay => setTimeout(resolveDelay, delayBetweenWordsMs))
+    }
+  }
   response.write(chunk({}, delta.tool_calls === undefined ? 'stop' : 'tool_calls'))
   response.end('data: [DONE]\n\n')
 }
@@ -136,6 +148,11 @@ export const startFakeCommandCode = async (): Promise<FakeCommandCode> => {
         }
         // DSH appends runtime context and turn-time snapshots after the user's message.
         const last = messages.filter(message => !isRuntimeContextMessage(message.text)).at(-1)
+        const streamDirective = /\[\[stream (\d+)\]\]/.exec(last?.text ?? '')
+        const parsedDelay = streamDirective === null ? null : z.number().int().min(1).max(250).safeParse(Number(streamDirective[1]))
+        if (parsedDelay !== null && !parsedDelay.success)
+          return reply(400, JSON.stringify({ error: { message: 'Stream delay must be between 1 and 250 ms.' } }))
+        const streamDelayMs = parsedDelay?.success === true ? parsedDelay.data : 0
         if (last?.role === 'tool') return streamAnswer(response, { content: 'Tool finished.' })
         if (last?.text.includes('[[empty]]') === true) return streamAnswer(response, { reasoning_content: 'Thinking without an answer.' })
         if (last?.text.includes('[[hold]]') === true) {
@@ -143,7 +160,7 @@ export const startFakeCommandCode = async (): Promise<FakeCommandCode> => {
           return
         }
         const answer = /\[\[answer ([^\]]+)\]\]/.exec(last?.text ?? '')
-        if (answer?.[1] !== undefined) return streamAnswer(response, { content: answer[1] })
+        if (answer?.[1] !== undefined) return streamAnswer(response, { content: answer[1] }, streamDelayMs)
         const calls = [...(last?.text ?? '').matchAll(/\[\[(once )?call (\w+) (\{.*?\})\]\]/g)].flatMap(match => {
           const directive = match[0] ?? ''
           if (match[1] !== undefined) {
@@ -164,7 +181,7 @@ export const startFakeCommandCode = async (): Promise<FakeCommandCode> => {
             toolCall('memory_search', JSON.stringify(search[2] === undefined ? { query: search[1] } : { query: search[1], scope: search[2] })),
           )
         }
-        return streamAnswer(response, { content: `Answered by ${key.slice(-6)}` })
+        return streamAnswer(response, { content: `Answered by ${key.slice(-6)}` }, streamDelayMs)
       })
   })
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))

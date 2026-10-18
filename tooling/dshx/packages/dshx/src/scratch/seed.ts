@@ -10,8 +10,49 @@ import { FAKE_COMMAND_CODE_MODEL } from './fake-command-code.js'
 import { ScratchError, ScratchStateRuntime, type ScratchState } from './state.js'
 
 const NEW_THREAD_COMPOSER = 'Describe what you want to build, / commands, @ files or sessions'
+const AI_ACCOUNTS_BUTTON_NAME = 'AI Accounts'
 export const NEW_THREAD_START_BUTTON_NAME = /^(?:New thread|New session)$/i
 const fakeProviderScript = fileURLToPath(new URL('./fake-provider-main.js', import.meta.url))
+
+const openAIAccountsPanel = async (page: Page, timeoutMs: number): Promise<void> => {
+  await page.getByRole('button', { name: AI_ACCOUNTS_BUTTON_NAME, exact: true }).click({ timeout: timeoutMs })
+}
+
+const openSeedThreadComposer = async (page: Page, timeoutMs: number) => {
+  const composer = page.getByRole('textbox', { name: NEW_THREAD_COMPOSER, exact: true })
+  if (await composer.isVisible()) return composer
+  await page.getByRole('button', { name: NEW_THREAD_START_BUTTON_NAME }).first().click({ timeout: timeoutMs })
+  if (!(await composer.isVisible())) {
+    await page.getByRole('treeitem').filter({ hasText: 'New Session' }).last().click({ timeout: timeoutMs })
+  }
+  await composer.waitFor({ state: 'visible', timeout: timeoutMs })
+  return composer
+}
+
+const chooseFakeProviderModel = async (page: Page, timeoutMs: number): Promise<void> => {
+  const modelPicker = page.getByRole('button', { name: /^(?:Select model|.+,\s*reasoning)/u }).first()
+  const currentModelLabel = (await modelPicker.getAttribute('aria-label')) ?? ''
+  if (currentModelLabel.includes(FAKE_COMMAND_CODE_MODEL)) return
+
+  await modelPicker.click({ timeout: Math.min(timeoutMs, 5_000) })
+  const modelList = page.getByRole('list', { name: 'Models grouped by provider', exact: true })
+  const hasModelEffortPicker = (await modelList.count()) > 0
+  const routeOption = page
+    .getByRole('menuitemradio', { name: FAKE_COMMAND_CODE_MODEL, exact: true })
+    .or(modelList.getByRole('button').filter({ hasText: FAKE_COMMAND_CODE_MODEL }))
+  await routeOption.first().waitFor({ state: 'visible', timeout: timeoutMs })
+  await routeOption.first().click({ timeout: timeoutMs })
+
+  if (hasModelEffortPicker) {
+    await page.keyboard.press('Escape')
+    await modelPicker.waitFor({ state: 'visible', timeout: timeoutMs })
+    const selectedModelLabel = (await modelPicker.getAttribute('aria-label')) ?? ''
+    if (!selectedModelLabel.includes(FAKE_COMMAND_CODE_MODEL)) {
+      throw new ScratchError('seed-failed', `The model picker kept ${selectedModelLabel || 'no model'} selected.`, 'Check the AI Accounts panel.')
+    }
+  }
+}
+
 const FAKE_PROVIDER_ACCOUNT = 'Command Code 1'
 /** A call that runs long enough to watch a live tool-call counter, then settles. */
 const TOOL_CALL_DIRECTIVE = `[[call bash ${JSON.stringify({ command: 'sleep 3 && echo tool-call-thread', description: 'Wait three seconds' })}]]`
@@ -76,9 +117,7 @@ const seedRebaseReadyThread = async (state: ScratchState, page: Page, timeoutMs:
       'Run "dshx dev down" then "dshx dev up --plugin @dshfiles/jj-integration ...".',
     )
   }
-  const composer = page.getByRole('textbox', { name: NEW_THREAD_COMPOSER, exact: true })
-  if (!(await composer.isVisible())) await page.getByRole('button', { name: 'New thread', exact: true }).first().click({ timeout: timeoutMs })
-  await composer.waitFor({ state: 'visible', timeout: timeoutMs })
+  const composer = await openSeedThreadComposer(page, timeoutMs)
   const projectName = basename(state.project.path)
   const projectButton = page.getByRole('button', { name: 'Choose workspace', exact: true })
   if ((await projectButton.textContent())?.trim() !== projectName) {
@@ -158,11 +197,13 @@ const startFakeProvider = async (
     env: process.env,
     log: join(state.stateDir, 'fake-provider.log'),
   })
+  const providerProcess = { pid, signature: [fakeProviderScript, readyFile] }
+  await ScratchStateRuntime.trackFakeProvider(state, providerProcess)
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
     // The file holds one line once the server listens; a partial write fails the URL check and is read again.
     const ready = z.url().safeParse((await readFile(readyFile, 'utf8').catch(() => '')).trim())
-    if (ready.success) return { baseUrl: ready.data, process: { pid, signature: [fakeProviderScript, readyFile] } }
+    if (ready.success) return { baseUrl: ready.data, process: providerProcess }
     await new Promise(resolve => setTimeout(resolve, 100))
   }
   throw new ScratchError('seed-failed', 'The fake model provider did not start.', `Read ${join(state.stateDir, 'fake-provider.log')}.`)
@@ -188,9 +229,7 @@ const configureFakeProviderThread = async (input: {
     )
   }
   const fake = await startFakeProvider(state, timeoutMs)
-  await page.getByRole('button', { name: 'Settings', exact: true }).click({ timeout: timeoutMs })
-  await page.getByRole('dialog').getByRole('button', { name: 'AI Accounts', exact: true }).click({ timeout: timeoutMs })
-  await page.getByRole('button', { name: 'Open AI Accounts', exact: true }).click({ timeout: timeoutMs })
+  await openAIAccountsPanel(page, timeoutMs)
   const accounts = page.getByRole('complementary', { name: 'Provider accounts' })
   await accounts.getByRole('button', { name: 'Add account', exact: true }).click({ timeout: timeoutMs })
   await page.getByRole('menuitem', { name: 'Command Code account', exact: true }).click({ timeout: timeoutMs })
@@ -209,9 +248,7 @@ const configureFakeProviderThread = async (input: {
   await keyDialog.getByRole('button', { name: 'Store key', exact: true }).click({ timeout: timeoutMs })
   await keyDialog.waitFor({ state: 'hidden', timeout: timeoutMs })
 
-  await page.getByRole('button', { name: NEW_THREAD_START_BUTTON_NAME }).first().click({ timeout: timeoutMs })
-  const composer = page.getByRole('textbox', { name: NEW_THREAD_COMPOSER, exact: true })
-  await composer.waitFor({ state: 'visible', timeout: timeoutMs })
+  await openSeedThreadComposer(page, timeoutMs)
   const projectName = basename(state.project.path)
   const projectButton = page.getByRole('button', { name: 'Choose workspace', exact: true })
   if ((await projectButton.textContent())?.trim() !== projectName) {
@@ -225,23 +262,7 @@ const configureFakeProviderThread = async (input: {
       await page.keyboard.press('Enter')
     } else await page.getByRole('menuitem', { name: projectName, exact: true }).click({ timeout: timeoutMs })
   }
-  // A just-added account publishes its models a moment later, so the picker is reopened until the model is listed.
-  const deadline = Date.now() + timeoutMs
-  for (;;) {
-    await page.keyboard.press('Escape')
-    await page.getByRole('button', { name: /^Select model/ }).click({ timeout: timeoutMs })
-    await page.getByRole('menuitem', { name: /^Model / }).click({ timeout: timeoutMs })
-    const picked = await page
-      .getByRole('menuitemradio', { name: FAKE_COMMAND_CODE_MODEL, exact: true })
-      .click({ timeout: 2_000 })
-      .then(
-        () => true,
-        () => false,
-      )
-    if (picked) break
-    if (Date.now() > deadline)
-      throw new ScratchError('seed-failed', `The model picker never listed ${FAKE_COMMAND_CODE_MODEL}.`, 'Check the AI Accounts panel.')
-  }
+  await chooseFakeProviderModel(page, timeoutMs)
   return fake.process
 }
 
@@ -371,5 +392,8 @@ export class ScratchSeedRuntime {
   static readonly sampleProject = seedSampleProject
   static readonly restorePendingRestart = restorePendingRestart
   static readonly installFakeSecretCli = installFakeSecretCli
+  static readonly openAIAccountsPanel = openAIAccountsPanel
+  static readonly openSeedThreadComposer = openSeedThreadComposer
+  static readonly chooseFakeProviderModel = chooseFakeProviderModel
   static readonly applySeed = applySeed
 }

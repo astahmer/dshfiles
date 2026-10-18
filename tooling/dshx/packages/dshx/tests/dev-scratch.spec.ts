@@ -8,7 +8,8 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { chromium } from 'playwright'
 import { runCli } from '../src/cli/run.js'
 import { StartupDialogs } from '../src/project/startup-dialogs.js'
-import { installFakeSecretCli, NEW_THREAD_START_BUTTON_NAME } from '../src/scratch/seed.js'
+import { FAKE_COMMAND_CODE_MODEL } from '../src/scratch/fake-command-code.js'
+import { installFakeSecretCli, NEW_THREAD_START_BUTTON_NAME, ScratchSeedRuntime } from '../src/scratch/seed.js'
 import { ScratchStateRuntime, type ScratchState } from '../src/scratch/state.js'
 
 const run = async (argv: readonly string[]): Promise<{ readonly code: number; readonly stdout: string; readonly stderr: string }> => {
@@ -68,6 +69,44 @@ describe('dshx dev scratch commands', () => {
     expect(NEW_THREAD_START_BUTTON_NAME.test('New Session')).toBe(true)
     expect(NEW_THREAD_START_BUTTON_NAME.test('New session in sample')).toBe(false)
     expect(NEW_THREAD_START_BUTTON_NAME.test('Settings')).toBe(false)
+  })
+
+  it('opens AI Accounts and selects fake routes in both model picker variants', async () => {
+    const browser = await chromium.launch({ headless: true })
+    try {
+      const page = await browser.newPage()
+      await page.setContent(`
+        <button aria-label="AI Accounts" onclick="document.querySelector('#accounts').hidden = false">AI Accounts</button>
+        <section id="accounts" hidden>Provider accounts</section>
+        <button aria-label="New session" onclick="const row = document.createElement('div'); row.setAttribute('role', 'treeitem'); row.textContent = 'New Session'; row.onclick = () => { document.querySelector('#composer').hidden = false }; document.body.append(row)"></button>
+        <div id="composer" role="textbox" aria-label="Describe what you want to build, / commands, @ files or sessions" contenteditable="true" hidden></div>
+        <button aria-label="Select model" onclick="document.querySelector('#models').hidden = false">Select model</button>
+        <div id="models" role="menu" aria-label="Model" hidden><div role="menuitemradio" aria-label="${FAKE_COMMAND_CODE_MODEL}" aria-checked="false" onclick="this.setAttribute('aria-checked', 'true')">${FAKE_COMMAND_CODE_MODEL}</div></div>
+      `)
+
+      await ScratchSeedRuntime.openAIAccountsPanel(page, 1_000)
+      expect(await page.locator('#accounts').isVisible()).toBe(true)
+      const composer = await ScratchSeedRuntime.openSeedThreadComposer(page, 1_000)
+      expect(await composer.isVisible()).toBe(true)
+      await ScratchSeedRuntime.chooseFakeProviderModel(page, 1_000)
+      expect(await page.getByRole('menuitemradio', { name: FAKE_COMMAND_CODE_MODEL, exact: true }).getAttribute('aria-checked')).toBe('true')
+
+      await page.setContent(`
+        <button id="model-picker" aria-label="deepseek-flash, reasoning Default" onclick="document.querySelector('#models').showModal()">deepseek-flash</button>
+        <dialog id="models" aria-label="Models">
+          <button aria-label="${FAKE_COMMAND_CODE_MODEL}, reasoning Provider default">${FAKE_COMMAND_CODE_MODEL} · Provider default</button>
+          <div role="list" aria-label="Models grouped by provider">
+            <button id="route-option" onclick="this.dataset.selected = 'true'; document.querySelector('#model-picker').setAttribute('aria-label', '${FAKE_COMMAND_CODE_MODEL}, reasoning Provider default')">${FAKE_COMMAND_CODE_MODEL} gpt-6-luna</button>
+          </div>
+        </dialog>
+      `)
+      await ScratchSeedRuntime.chooseFakeProviderModel(page, 1_000)
+      expect(await page.locator('#route-option').getAttribute('data-selected')).toBe('true')
+      expect(await page.locator('#models').evaluate(element => element.open)).toBe(false)
+      await page.close()
+    } finally {
+      await browser.close()
+    }
   })
 
   it('explains each action and names the fix for misuse', async () => {
