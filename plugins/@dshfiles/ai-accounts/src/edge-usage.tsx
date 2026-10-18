@@ -1,8 +1,9 @@
 import { z } from 'zod'
 import { Popover, PopoverAnchor, PopoverContent } from '@dshfiles/plugin-ui/components/ui/popover'
+import { createCoalescedWrite } from '@dshfiles/plugin-ui/hooks/coalesced-write'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { QUOTA_TONE_TEXT, quotaTone } from './quota-tone.js'
 import { useAccountsUsage } from './use-accounts-usage.js'
@@ -51,6 +52,8 @@ const clamp = (position: EdgePosition, viewport: { readonly innerWidth: number; 
 const viewport = (): { readonly innerWidth: number; readonly innerHeight: number } => ({ innerWidth: window.innerWidth, innerHeight: window.innerHeight })
 
 const storedPosition = createStoredValue({ key: EDGE_USAGE_STORAGE_KEY, schema: positionSchema, fallback: null })
+/** One persisted position per this window while a drag moves the widget. */
+const POSITION_WRITE_DELAY_MS = 200
 
 const readPosition = (): EdgePosition => {
   const stored = storedPosition.get()
@@ -84,9 +87,29 @@ export const EdgeUsageWidget = (props: { readonly onOpenUsageHistory: () => void
   } | null>(null)
   const dragMovedRef = useRef(false)
 
+  // A drag updates the position on every pointer move; one write per window keeps storage off the drag path and the
+  // unmount/pagehide flush hands the last position over.
+  const positionWrite = useMemo(
+    () =>
+      createCoalescedWrite<EdgePosition>({
+        write: value => void storedPosition.set(value),
+        delayMs: POSITION_WRITE_DELAY_MS,
+        schedule: (callback: () => void, delayMs: number) => window.setTimeout(callback, delayMs),
+        cancel: (handle: number) => window.clearTimeout(handle),
+      }),
+    [],
+  )
   useEffect(() => {
-    storedPosition.set(position)
-  }, [position])
+    positionWrite.set(() => position)
+  }, [position, positionWrite])
+  useEffect(() => {
+    const flush = (): void => positionWrite.flush()
+    window.addEventListener('pagehide', flush)
+    return () => {
+      window.removeEventListener('pagehide', flush)
+      positionWrite.flush()
+    }
+  }, [positionWrite])
 
   useEffect(() => {
     const resize = () => setPosition(current => clamp(current, viewport()))

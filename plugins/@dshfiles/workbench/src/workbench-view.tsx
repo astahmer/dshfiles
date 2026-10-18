@@ -3,6 +3,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { PlusIcon, RotateCcwIcon } from '@dshfiles/plugin-ui/icons'
 import { DockviewReact, type DockviewApi, type DockviewReadyEvent, type DockviewTheme, type IDockviewPanelProps } from 'dockview-react'
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
+import { createCoalescedWrite } from '@dshfiles/plugin-ui/hooks/coalesced-write'
 import { WorkbenchLayout, WORKBENCH_COMPONENT, type LayoutStore } from './layout-store.js'
 import type { WorkbenchTranslate } from './locales.js'
 import type { WorkbenchPanelRegistry } from './registry.js'
@@ -19,6 +20,9 @@ interface WorkbenchViewProps {
 }
 
 const usePanelDefinitions = (registry: WorkbenchPanelRegistry) => useSyncExternalStore(registry.subscribe, registry.list, registry.list)
+
+/** One persisted layout write per this window, with an unmount/pagehide flush for the last one. */
+const LAYOUT_WRITE_DELAY_MS = 250
 
 export const WorkbenchView = (props: WorkbenchViewProps): JSX.Element => {
   const { registry, store, t } = props
@@ -59,10 +63,22 @@ export const WorkbenchView = (props: WorkbenchViewProps): JSX.Element => {
 
   useEffect(() => {
     if (api === null) return
-    const syncOpenIds = (): void => setOpenIds(api.panels.map(panel => panel.id))
+    // A drag or resize emits layout events continuously, and each one serializing and storing the whole layout also
+    // publishes it to every listener; one write per window keeps the newest layout and the unmount flush keeps it.
+    const layoutWrite = createCoalescedWrite({
+      write: (value: Parameters<LayoutStore['set']>[0]) => void store.set(value),
+      delayMs: LAYOUT_WRITE_DELAY_MS,
+      schedule: (callback: () => void, delayMs: number) => window.setTimeout(callback, delayMs),
+      cancel: (handle: number) => window.clearTimeout(handle),
+    })
+    const syncOpenIds = (): void => {
+      const ids = api.panels.map(panel => panel.id)
+      // Membership only: a layout event that keeps the same panels must not re-render the view.
+      setOpenIds(previous => (previous.length === ids.length && previous.every((id, index) => id === ids[index]) ? previous : ids))
+    }
     syncOpenIds()
     const persist = api.onDidLayoutChange(() => {
-      store.set(api.toJSON())
+      layoutWrite.set(() => api.toJSON())
       syncOpenIds()
     })
     const takeOpenRequests = (): void => {
@@ -70,9 +86,16 @@ export const WorkbenchView = (props: WorkbenchViewProps): JSX.Element => {
     }
     takeOpenRequests()
     const unsubscribe = registry.subscribe(takeOpenRequests)
+    const flushLayout = (): void => layoutWrite.flush()
+    window.addEventListener('pagehide', flushLayout)
+    document.addEventListener('visibilitychange', flushLayout)
     return () => {
       persist.dispose()
       unsubscribe()
+      window.removeEventListener('pagehide', flushLayout)
+      document.removeEventListener('visibilitychange', flushLayout)
+      // Leaving the page must not drop the layout the window still holds.
+      layoutWrite.flush()
     }
   }, [api, registry, store])
 
