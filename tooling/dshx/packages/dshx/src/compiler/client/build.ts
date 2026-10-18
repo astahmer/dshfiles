@@ -221,6 +221,14 @@ function clientEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, op
   }
 }
 
+/**
+ * Module membership survives tree-shaking: the public Client module re-exports both hook modules, so a plugin that
+ * imports only `defineClient` still lands them in the chunk. Read the exports the bundler actually kept instead.
+ */
+function retainedHookExports(modules: Record<string, { readonly renderedExports: readonly string[] } | undefined>, virtualId: string): readonly string[] {
+  return modules[virtualId]?.renderedExports ?? []
+}
+
 /** Infer optional Client capabilities only from code retained in the final chunk. */
 function clientCapabilitiesPlugin(options: BuildClientOptions): Plugin {
   return {
@@ -229,8 +237,8 @@ function clientCapabilitiesPlugin(options: BuildClientOptions): Plugin {
     generateBundle(_output, bundle) {
       const chunk = Object.values(bundle).find(item => item.type === 'chunk' && item.isEntry)
       if (chunk === undefined || chunk.type !== 'chunk') return
-      const settingsRetained = Object.hasOwn(chunk.modules, VIRTUAL_CLIENT_SETTINGS_HOOK)
-      const apiRetained = Object.hasOwn(chunk.modules, VIRTUAL_CLIENT_API_HOOKS)
+      const settingsRetained = retainedHookExports(chunk.modules, VIRTUAL_CLIENT_SETTINGS_HOOK).length > 0
+      const apiRetained = retainedHookExports(chunk.modules, VIRTUAL_CLIENT_API_HOOKS).length > 0
       if (settingsRetained && !(options.inject ?? []).includes(SETTINGS_PROVIDER_PACKAGE)) {
         throw new DshxError('DSHX1203', 'useSettings() requires the official Settings Scope provider package edge.', {
           hint: `Add ${JSON.stringify(SETTINGS_PROVIDER_PACKAGE)} to package.json dsh.client.inject, then rebuild.`,
