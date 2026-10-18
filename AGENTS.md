@@ -353,14 +353,38 @@ adding or retagging a feature file, run
 
 `@deepseek-ai/dsh-client-hmr` polls each bundle every 500ms and pushes a graph
 frame, so a rebuilt `dist/client.js` reaches the browser without a restart.
-Changes to `cordis.patch.yml`, `package.json`, Host code, a settings namespace
-or the profile composition need a restart, which is the user's call.
+
+The Host's `hmr` entry is on in `web` too — it is disabled only when the
+launcher supplies no `profileContext` — with `root: []`: it watches the profile
+manifest and both user patch files, so ordinary plugin enable/disable and
+`cordis.patch.yml` edits recompose the running Host, and a recomposition also
+replaces the plugins whose linked-package files changed on disk — our
+`link:`-installed bundles included. What needs a restart, which is the user's
+call:
+
+- a failed or unavailable module comparison, logged as
+  `restart required: module-comparison`
+- a publication the runtime resolution rejects, such as a retained profile
+  mapping whose directory moved (`restartReason: 'package-moved'`)
+- Host code no recomposition reaches: `root: []` watches no source tree, and
+  `dshx dev.hostHmr` stays a development-only opt-in `web` does not enable
 
 Until then the live DSH runs the **old Host** under the **new client**: decode
 Host snapshots once at the boundary with defaults, never assume a new field or
 method exists, and fall back to defaults when the settings namespace is
 unregistered. Do not HMR-remove an old keybinding or event owner before its
 replacement is live.
+
+A reload is not a rollback. Once the old client fiber is torn down, a failed
+replacement leaves the plugin broken in that page — Settings → Plugins → Plugin
+list retries it — and a failed Host replacement stops the plugin and reports its
+entry `failed`. Revisions are bundle metadata (mtime, ctime, size), so a rewrite
+that preserves all three never reloads, while a metadata-only touch reloads the
+plugin with fresh component state. A page also applies graphs only from the
+release it booted, and it closes `/plugins/events` for good when a restarting
+Host answers that route non-200 before registering it: the page then updates
+nothing and learns of no release change until it is reloaded. Reload a tab you
+want kept in sync after a Host restart.
 
 Report the stages separately: source validated, web seed updated, profile
 synced, live runtime confirmed. If the active profile was not synced, say so.
