@@ -40,6 +40,9 @@ const threadsFor = (names: readonly string[]) => {
   }
 }
 
+/** Mirrors `STATUS_READ_CONCURRENCY`: a store with dozens of thread workspaces is scanned while the user works. */
+const MAX_CONCURRENT_THREAD_READS = 8
+
 describe('threads.list', () => {
   it('reads thread workspaces concurrently within the cap and keeps workspace order', async () => {
     const { repoRoot, directory } = await createRoot()
@@ -53,7 +56,7 @@ describe('threads.list', () => {
     expect(statuses.every(status => status.unlanded.length === 0 && status.behind === false && status.missing === false)).toBe(true)
     expect(listing.logReads()).toBe(names.length * 2)
     expect(listing.maximumConcurrent()).toBeGreaterThan(1)
-    expect(listing.maximumConcurrent()).toBeLessThanOrEqual(4)
+    expect(listing.maximumConcurrent()).toBeLessThanOrEqual(MAX_CONCURRENT_THREAD_READS)
   })
 
   it('skips a workspace that has no checkout and is not a thread workspace', async () => {

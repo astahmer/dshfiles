@@ -14,8 +14,11 @@ export interface JjResult {
   readonly stderr: string
 }
 
-/** Concurrent read-only `jj` processes per repository scan; higher values trade lock contention for latency. */
-const STATUS_READ_CONCURRENCY = 4
+/**
+ * Concurrent read-only `jj` processes per repository scan. Each thread costs two of them, and the scan runs while the
+ * New thread screen and the sidebar are open: 45 thread workspaces measured 2.1s at 4 and 1.0s at 8, with no gain above.
+ */
+const STATUS_READ_CONCURRENCY = 8
 
 export type JjExecutor = (input: { readonly args: readonly string[]; readonly cwd: string; readonly signal?: AbortSignal | undefined }) => Promise<JjResult>
 

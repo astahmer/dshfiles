@@ -58,6 +58,9 @@ export const HeroWorkspacePicker = (
   const projects = useQuery({
     queryKey: ['jj-integration', 'projects'],
     enabled: !remote,
+    // Every New thread remounts this picker, and the Host classifies each registered workspace against jj; the
+    // registered list changes only when a folder is added, so a remount reuses it instead of rescanning the store.
+    staleTime: 60_000,
     queryFn: ({ signal }) => runHostRequest({ signal, timeoutMs: 30_000, request: hostSignal => api.projects({}, { signal: hostSignal }) }),
   })
   if (destination.kind === 'runtime') {

@@ -231,17 +231,17 @@ const threadView = (
 }
 
 /**
- * A repository scan costs one `jj` process per workspace and two more per thread, while the sidebar
- * polls it. Every layer is cached and every scan is single-flight: a poll storm shares one scan
- * instead of pinning one browser connection per caller.
+ * A repository scan costs one `jj` process per workspace and two more per thread, while the New thread screen and the
+ * sidebar ask for it. Every layer is cached and every scan is single-flight: a poll storm shares one scan instead of
+ * pinning one browser connection per caller, and a mutation is the only thing that reads them all again.
  */
 const LOCATION_CACHE_TTL_MS = 5 * 60_000
 const THREAD_STATUS_CACHE_TTL_MS = 30_000
-const REPOSITORY_VIEW_TTL_MS = 15_000
+const REPOSITORY_VIEW_TTL_MS = 60_000
 
 type Cached<Value> = { readonly value: Value; readonly at: number }
 
-const locationCache = new Map<string, Cached<ThreadLocation>>()
+const locationCache = new Map<string, Cached<ThreadLocation | undefined>>()
 const threadStatusCache = new Map<string, Cached<readonly ThreadStatus[]>>()
 let repositoryViews: Cached<readonly RepositoryView[]> | undefined
 let repositoryScan: Promise<readonly RepositoryView[]> | undefined
@@ -255,13 +255,37 @@ const invalidateRepositories = (): void => {
   threadStatusCache.clear()
 }
 
+/**
+ * A registered workspace's location never moves, and most registered folders are not jj repositories at all: caching
+ * the misses too keeps a store with dozens of workspaces from paying one `jj` process each per scan.
+ */
 const cachedLocation = async (threads: Threads, path: string): Promise<ThreadLocation | undefined> => {
   const cached = locationCache.get(path)
   if (cached !== undefined && Date.now() - cached.at < LOCATION_CACHE_TTL_MS) return cached.value
   const location = await threads.locate(path).catch(() => undefined)
-  if (location === undefined) locationCache.delete(path)
-  else locationCache.set(path, { value: location, at: Date.now() })
+  locationCache.set(path, { value: location, at: Date.now() })
   return location
+}
+
+/** Registered workspaces whose folders still exist, so one missing entry cannot cost a process per scan. */
+const presentWorkspaces = (workspaces: readonly Workspace[]): readonly Workspace[] => workspaces.filter(workspace => existsSync(workspace.path))
+
+/** Reads them a bounded number at a time: one `jj` process each, and the scan runs while the user is working. */
+const LOCATE_CONCURRENCY = 8
+
+const mapBounded = async <Item, Result>(items: readonly Item[], limit: number, run: (item: Item) => Promise<Result>): Promise<readonly Result[]> => {
+  const results = new Array<Result>(items.length)
+  let cursor = 0
+  const worker = async (): Promise<void> => {
+    while (cursor < items.length) {
+      const index = cursor++
+      const item = items[index]
+      if (item === undefined) return
+      results[index] = await run(item)
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, () => worker()))
+  return results
 }
 
 const cachedThreadStatuses = async (threads: Threads, repoRoot: string): Promise<readonly ThreadStatus[]> => {
@@ -280,10 +304,11 @@ const scanRepositories = async (): Promise<readonly RepositoryView[]> => {
   const byPath = new Map(workspaces.map(workspace => [workspace.path, workspace]))
   const archived = new Set<string>(registry.archivedSessionIds)
   const activity = await readSessionActivity()
+  const present = presentWorkspaces(workspaces)
+  const locations = await mapBounded(present, LOCATE_CONCURRENCY, workspace => cachedLocation(active, workspace.path))
   const repositories = new Map<string, RepositoryView>()
-  for (const workspace of workspaces) {
-    if (!existsSync(workspace.path)) continue
-    const location = await cachedLocation(active, workspace.path)
+  for (const [index] of present.entries()) {
+    const location = locations[index]
     if (location === undefined || repositories.has(location.repoRoot)) continue
     const owner = byPath.get(location.repoRoot)
     const statuses = await cachedThreadStatuses(active, location.repoRoot)
@@ -702,12 +727,7 @@ const api = jjIntegrationApi.host({
     const source = registry.get(WorkspaceId(input.workspaceId))
     const ownedByAnotherSession =
       input.sessionId === undefined ? undefined : workspaceHasOtherSession({ sessionId: input.sessionId, workspaceSessionIds: source?.sessionIds })
-    const location =
-      source === undefined
-        ? undefined
-        : await requireThreads()
-            .locate(source.path)
-            .catch(() => undefined)
+    const location = source === undefined ? undefined : await cachedLocation(requireThreads(), source.path)
     if (location === undefined) {
       const destination = noDestination(isolatesNewThreadsByDefault(readSettings()))
       if (ownedByAnotherSession === undefined) return destination
@@ -739,9 +759,7 @@ const api = jjIntegrationApi.host({
       workspaces: workspaces.map(workspace => ({ workspaceId: workspace.id, title: workspace.title, path: workspace.path })),
       isSecondaryWorkspace: async path => {
         if (!existsSync(path)) return false
-        const location = await requireThreads()
-          .locate(path)
-          .catch(() => undefined)
+        const location = await cachedLocation(requireThreads(), path)
         return location !== undefined && ThreadWorkspaceModel.isSecondaryWorkspace(location)
       },
     })
