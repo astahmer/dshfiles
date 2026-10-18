@@ -16,19 +16,20 @@ Owned fork of DSH's native Conversation client plugin. It preserves the full nat
 
 Every other vendored file is byte-identical to the pinned revision, so an upstream update starts from a real `diff`. The whole delta is:
 
-| File                                             | Change                                                                                     |
-| ------------------------------------------------ | ------------------------------------------------------------------------------------------ |
-| `src/native/contract/slots.ts`                   | `ComposerBarInjected` gains `insertReference`                                              |
-| `src/native/apply.ts`                            | injects that action; workspace switch hands the draft over through `transferComposerDraft` |
-| `src/native/locales.ts`                          | `workspace.draftTransferRefused` notice for a refused handoff                              |
-| `src/native/skeleton/InputBar.tsx`               | paste converts canonical mentions into reference chips, falling back to text               |
-| `src/native/input/editor/keymap.ts`              | reads `text/html` when the clipboard has no plain text                                     |
-| `src/native/input/editor/view-binding.ts`        | routes the paste handler through the bar's live handler                                    |
-| `src/native/input/editor/runtime.ts`             | logs the Lexical error stack before rethrowing                                             |
-| `src/native/user-text/session-reference-rule.ts` | imports and augments `../index.ts` instead of the package's own `/client` self-reference   |
-| `src/composer-draft-handoff.ts`                  | new: refusing, rollback-safe draft handoff carrying the semantic `DraftSnapshot`           |
-| `src/paste-references.ts`                        | new: canonical wire-text parser and reference builder                                      |
-| `src/clipboard-text.ts`                          | new: markup-free clipboard text and `dsh-session:` link conversion                         |
+| File                                             | Change                                                                                                                                                                        |
+| ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/native/contract/slots.ts`                   | `ComposerBarInjected` gains `insertReference`                                                                                                                                 |
+| `src/native/apply.ts`                            | injects that action; workspace switch hands the draft over through `transferComposerDraft`                                                                                    |
+| `src/native/locales.ts`                          | `workspace.draftTransferRefused` notice for a refused handoff                                                                                                                 |
+| `src/native/skeleton/InputBar.tsx`               | paste converts canonical mentions into reference chips, falling back to text                                                                                                  |
+| `src/native/input/editor/keymap.ts`              | reads `text/html` when the clipboard has no plain text                                                                                                                        |
+| `src/native/input/editor/view-binding.ts`        | routes the paste handler through the bar's live handler                                                                                                                       |
+| `src/native/input/editor/runtime.ts`             | logs the Lexical error stack before rethrowing; reuses the content half of the projection while no commit dirtied the document (selection-only commits skip the walk)         |
+| `src/native/input/editor/projection.ts`          | splits `$projectComposer` into a content half (`$composerProjectionContent`) and a selection half (`$composerSelection`) so the reusable half can be recomputed independently |
+| `src/native/user-text/session-reference-rule.ts` | imports and augments `../index.ts` instead of the package's own `/client` self-reference                                                                                      |
+| `src/composer-draft-handoff.ts`                  | new: refusing, rollback-safe draft handoff carrying the semantic `DraftSnapshot`                                                                                              |
+| `src/paste-references.ts`                        | new: canonical wire-text parser and reference builder                                                                                                                         |
+| `src/clipboard-text.ts`                          | new: markup-free clipboard text and `dsh-session:` link conversion                                                                                                            |
 
 `src/native` is excluded from Oxlint, Oxfmt and ast-grep (see [native plugin overrides](../../../docs/native-plugin-overrides.md)); the files above that live outside it are linted normally.
 

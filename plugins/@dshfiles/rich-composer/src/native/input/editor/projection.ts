@@ -191,14 +191,33 @@ export function $detectOffsetOfPoint(layout: ComposerLayout, point: Point): numb
   return childBounds === undefined ? null : childBounds.start
 }
 
+/** Content-derived half of a projection: unchanged while only the selection moves. */
+export interface ComposerProjectionContent {
+  /** Trigger/TokenSpan coordinate text (chip = one U+FFFC). */
+  readonly detectText: string
+  /** Persistence/InputState draft text (chip = clipboardText). */
+  readonly clipboardText: string
+  /** InputState-compatible occurrence view (clipboardText coordinates). */
+  readonly occurrences: readonly Occurrence[]
+  /** Claim of the command chip opening the document; undefined without one. */
+  readonly command: CommandClaim | undefined
+}
+
+/** The selection half of a projection; nulls while the selection is absent or non-range. */
+export interface ComposerSelectionProjection {
+  readonly selection: EditorProjection['selection']
+  readonly caret: number | null
+}
+
 /**
- * Project the composer document and its caret.
- * @param idOf - stable occurrence-id assignment per chip NodeKey (the shell
- * owns the map so ids survive across projections of the same node).
- * @returns the three-view projection product.
+ * Fold the content of one layout: text views, chip occurrences and the leading
+ * command claim. Depends only on the document, never on the selection, so a
+ * selection-only commit can reuse the previous result.
+ * @param layout - the current walk product.
+ * @param idOf - stable occurrence-id assignment per chip NodeKey.
+ * @returns the content half of the projection.
  */
-export function $projectComposer(idOf: (key: NodeKey) => number): EditorProjection {
-  const layout = $composerLayout()
+export function $composerProjectionContent(layout: ComposerLayout, idOf: (key: NodeKey) => number): ComposerProjectionContent {
   const occurrences: Occurrence[] = []
   for (const segment of layout.segments) {
     if (segment.kind !== 'chip' || !$isReferenceChipNode(segment.node)) continue
@@ -216,21 +235,36 @@ export function $projectComposer(idOf: (key: NodeKey) => number): EditorProjecti
     })
   }
   const lead = layout.segments[0]?.node
-  const selection = $getSelection()
-  let range: { start: number; end: number } | null = null
-  if ($isRangeSelection(selection)) {
-    const anchor = $detectOffsetOfPoint(layout, selection.anchor)
-    const focus = $detectOffsetOfPoint(layout, selection.focus)
-    if (anchor !== null && focus !== null) {
-      range = { start: Math.min(anchor, focus), end: Math.max(anchor, focus) }
-    }
-  }
   return {
     detectText: layout.detectText,
     clipboardText: layout.clipboardText,
     occurrences,
-    selection: range,
-    caret: range !== null && range.start === range.end ? range.start : null,
     command: $isCommandChipNode(lead) ? lead.getClaim() : undefined,
   }
+}
+
+/**
+ * Fold the live selection against a layout.
+ * @param layout - the layout the selection belongs to.
+ * @returns the ordered range in detect coordinates, or nulls when unavailable.
+ */
+export function $composerSelection(layout: ComposerLayout): ComposerSelectionProjection {
+  const selection = $getSelection()
+  if (!$isRangeSelection(selection)) return { selection: null, caret: null }
+  const anchor = $detectOffsetOfPoint(layout, selection.anchor)
+  const focus = $detectOffsetOfPoint(layout, selection.focus)
+  if (anchor === null || focus === null) return { selection: null, caret: null }
+  const range = { start: Math.min(anchor, focus), end: Math.max(anchor, focus) }
+  return { selection: range, caret: range.start === range.end ? range.start : null }
+}
+
+/**
+ * Project the composer document and its caret.
+ * @param idOf - stable occurrence-id assignment per chip NodeKey (the shell
+ * owns the map so ids survive across projections of the same node).
+ * @returns the three-view projection product.
+ */
+export function $projectComposer(idOf: (key: NodeKey) => number): EditorProjection {
+  const layout = $composerLayout()
+  return { ...$composerProjectionContent(layout, idOf), ...$composerSelection(layout) }
 }

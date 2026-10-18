@@ -16,8 +16,8 @@ import { ReferenceChipNode, $createReferenceChipNode } from './chip-node.tsx'
 import { CommandChipNode, $createCommandChipNode, registerCommandChipSeat } from './command-chip-node.tsx'
 import { registerCommandChipSelection } from './command-chip-selection.ts'
 import { registerTextRefDecoration, rescanTextRefs, TextRefNode } from './text-ref.ts'
-import type { EditorProjection } from './projection.ts'
-import { $composerLayout, $projectComposer, detectOffsetOfClipboardOffset } from './projection.ts'
+import type { EditorProjection, ComposerLayout, ComposerProjectionContent } from './projection.ts'
+import { $composerLayout, $composerProjectionContent, $composerSelection, $projectComposer, detectOffsetOfClipboardOffset } from './projection.ts'
 import { $replaceDetectSpanWithNodes, $replaceDetectSpanWithText } from './span-map.ts'
 import type { DetectSpan } from './span-map.ts'
 
@@ -52,6 +52,10 @@ export class DraftEditorRuntime {
   /** Stable occurrence ids per chip NodeKey (undo restores keys, so ids survive it too). */
   private readonly occurrenceIds = new Map<NodeKey, number>()
   private occurrenceSeq = 0
+  /** Counts commits that dirtied the document; unchanged by a selection-only commit. */
+  private contentRevision = 0
+  /** Last full walk, reusable while no commit dirtied the document since it was taken. */
+  private projectionCache: { readonly revision: number; readonly layout: ComposerLayout; readonly content: ComposerProjectionContent } | undefined
   /** Live lexicon subscription disposer; undefined until the controller resolves. */
   private lexiconOff: (() => void) | undefined
   private lexiconSource: ObservableSnapshot<Lexicon> | undefined
@@ -93,7 +97,11 @@ export class DraftEditorRuntime {
       registerReferenceActivation(this.editor, (source, reference) =>
         this.deps.openReference(source, reference)),
       registerHistory(this.editor, createEmptyHistoryState(), HISTORY_MERGE_DELAY_MS),
-      this.editor.registerUpdateListener(() => { this.deps.onUpdate() }),
+      this.editor.registerUpdateListener(({ dirtyElements, dirtyLeaves }) => {
+        // A selection-only commit dirties no node; that is what lets the projection reuse its walk.
+        if (dirtyLeaves.size > 0 || dirtyElements.size > 0) this.contentRevision += 1
+        this.deps.onUpdate()
+      }),
       registerCommandChipSeat(this.editor),
       registerCommandChipSelection(this.editor),
       registerTextRefDecoration(this.editor, () => this.deps.lexicon()),
@@ -148,13 +156,21 @@ export class DraftEditorRuntime {
   }
 
   /**
-   * Re-project inside the existing editor update callback.
+   * Re-project inside the existing editor update callback. The walk is keyed on the document's
+   * content revision: a commit that only moved the selection dirtied no node, so its content half
+   * (and the chip occurrences it carries) is reused and only the caret is folded again.
    * @returns the projection preceding this read.
    */
   refreshProjection(): EditorProjection {
     const prev = this.projected
-    this.projected = this.editor.getEditorState().read(() =>
-      $projectComposer(key => this.occurrenceIdOf(key)))
+    this.projected = this.editor.getEditorState().read(() => {
+      const cached = this.projectionCache
+      if (cached !== undefined && cached.revision === this.contentRevision) return { ...cached.content, ...$composerSelection(cached.layout) }
+      const layout = $composerLayout()
+      const content = $composerProjectionContent(layout, key => this.occurrenceIdOf(key))
+      this.projectionCache = { revision: this.contentRevision, layout, content }
+      return { ...content, ...$composerSelection(layout) }
+    })
     return prev
   }
 
