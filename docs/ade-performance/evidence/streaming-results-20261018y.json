@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "run": "ade-speed-20261018y",
+  "summaryOnly": true,
+  "rawSampleRecordsIncluded": false,
+  "samples": 10,
+  "responseWords": 24,
+  "interWordDelayMs": 40,
+  "firstContentVisibleMs": { "p50": 297.4, "p95": 404.6 },
+  "completeAnswerVisibleMs": { "p50": 1196.1, "p95": 1289.1 },
+  "allSamplesProgressive": true,
+  "allSamplesCorrect": true,
+  "visibleWorkingRowsBeforeAndAfter": 20,
+  "maxFrameGapMs": 83.3,
+  "longTaskCount": 0,
+  "measurement": "Controlled stream plus browser/Host path; exact visible content followed by two requestAnimationFrame callbacks.",
+  "provenance": "Aggregates retained from the completed full-profile scratch run; per-sample records were not preserved in the final workspace."
+}

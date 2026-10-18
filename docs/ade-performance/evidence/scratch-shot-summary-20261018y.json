@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "sourceRun": "ade-speed-20261018y",
+  "screenshot": "long-history-100-full-profile.png",
+  "path": "/",
+  "title": "ADE Perf Long History — DSH Local Build",
+  "errors": { "console": 0, "page": 0, "requests": 0, "http": 0 },
+  "warnings": 6,
+  "topErrors": []
+}

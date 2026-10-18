@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "run": "ade-speed-20261018y",
+  "summaryOnly": true,
+  "rawSampleRecordsIncluded": false,
+  "turns": 100,
+  "allExactAnswersVerified": true,
+  "contentVisibleMs": { "samples": 100, "p50": 889.7, "p95": 1547.5, "max": 2127.3 },
+  "first20Turns": { "p50Ms": 498.1, "p95Ms": 1019.1, "longTaskCount": 0 },
+  "turns81To100": { "p50Ms": 1315.5, "p95Ms": 2066.8, "longTaskCount": 180, "maxLongTaskMs": 138, "maxFrameGapMs": 333.3 },
+  "allTurnsLongTaskCount": 333,
+  "domNodes": { "before": 1458, "after": 7586 },
+  "transcriptFlowItems": { "before": 0, "after": 400 },
+  "measurement": "Exact answer content followed by two requestAnimationFrame callbacks; end-to-end latency does not isolate transcript rendering.",
+  "provenance": "Aggregates retained from the completed full-profile scratch run; per-turn records were not preserved in the final workspace."
+}

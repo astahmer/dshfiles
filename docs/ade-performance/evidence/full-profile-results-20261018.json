@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "run": "ade-speed-20261018y",
+  "summaryOnly": true,
+  "rawSampleRecordsIncluded": false,
+  "runtime": {
+    "dsh": "0.2.1-rc.2",
+    "react": "18.3.1",
+    "tanstackQuery": "5.104.1",
+    "tanstackVirtual": "3.14.13",
+    "node": "22.23.3",
+    "chromium": "141.0.7390.37",
+    "viewport": "1440x900",
+    "platform": "darwin/arm64 Apple M4, 10 logical CPUs"
+  },
+  "profile": { "ownedBundles": 43, "activeEntries": 202, "doctorPassed": true },
+  "conversationSwitch": [
+    { "visibleWorkingRows": 1, "totalSessionRows": 2, "domNodes": 754, "samples": 40, "p50Ms": 144.6, "p95Ms": 164.5, "longTaskCount": 0 },
+    { "visibleWorkingRows": 5, "totalSessionRows": 6, "domNodes": 906, "samples": 40, "p50Ms": 143.7, "p95Ms": 213, "longTaskCount": 2, "maxLongTaskMs": 66 },
+    { "visibleWorkingRows": 20, "totalSessionRows": 21, "domNodes": 1476, "samples": 40, "p50Ms": 145.8, "p95Ms": 163, "longTaskCount": 1, "maxLongTaskMs": 52 }
+  ],
+  "panelNavigation": {
+    "samplesPerPath": 10,
+    "activityOpenMs": { "oneRow": { "p50": 82, "p95": 82.5 }, "fiveRows": { "p50": 81.1, "p95": 164.9 }, "twentyRows": { "p50": 98, "p95": 108.3 } },
+    "aiAccountsOpenMs": { "oneRow": { "p50": 98.1, "p95": 129.4 }, "fiveRows": { "p50": 102.7, "p95": 115.8 }, "twentyRows": { "p50": 97.3, "p95": 130.5 } },
+    "activityReturnMs": { "oneRow": { "p50": 65.8, "p95": 81.8 }, "fiveRows": { "p50": 64.6, "p95": 82.4 }, "twentyRows": { "p50": 97.7, "p95": 102.5 } }
+  },
+  "agentCreation": { "samples": 20, "p50Ms": 491.3, "p95Ms": 2323.1, "maxMs": 3347.7, "includes": ["session creation", "Host/provider activity", "rendering"] },
+  "heapSnapshotMB": 157,
+  "providerHoldLog": { "empty": true, "holdRequestAttempts": 0, "visibleWorkingRowsAreNotProviderRequestEvidence": true },
+  "measurement": "Exact content followed by two requestAnimationFrame callbacks; this is not compositor paint or occlusion proof.",
+  "provenance": "Aggregates retained from the completed full-profile scratch run; per-sample records were not preserved in the final workspace."
+}

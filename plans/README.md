@@ -27,7 +27,6 @@ Checkboxes and receipts in a plan are history, not fresh verification.
 | Plan | Open work |
 |---|---|
 | [Plugin E2E coverage](plugin-e2e-coverage.md) | Run journeys in CI, a fresh baseline, Host egress, catalog scaffolding. |
-| [ADE interaction-speed audit](ade-performance/README.md) | Correct-content browser baseline at 1/5/20 agents, reversible prototype and roadmap. |
 | [Host loop freezes](host-loop-freezes/README.md) | Measurement-gated fixes for the session-search Host stall: harness, L0 escape hatch, L1 coalescing, L2 warm index, L3 measured plugin tax, L4 off-loop engine. |
 | [Guardrails](guardrails.md) | Lint ratchets, ast-grep rules, knip, exact pins, a shared plugin tsconfig, XState and namespace-class refactors. |
 | [Guardrails: refactors](guardrails-refactors.md) | Steps 10–12: Hono e2e fakes, the `no-export-bag` rule in emilint, XState and namespace classes per plugin. |

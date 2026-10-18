@@ -13,5 +13,6 @@ This directory holds repository-wide operational guidance. Product and API docum
 | [Community plugin audit](community-plugin-audit.md)    | Dated 308-entry audit, decision tables, first-party alternatives, and disposable-probe screenshots.             |
 | [`scripts/README.md`](../scripts/README.md)            | Repository-level scripts and their owning workflows.                                                            |
 | [Agent tool parity](agent-tool-parity.md)              | Every user-facing capability's agent tool, what is missing, and which gaps need a Host verb.                    |
+| [ADE interaction performance](ade-performance/README.md) | Runtime audit, full-profile benchmarks, transcript prototype, architecture decision, and reversible roadmap.      |
 
 For the complete package guide index, see the [repository README](../README.md#owned-dsh-bundles). For dshx, see the [toolchain documentation index](../tooling/dshx/docs/index.md).
