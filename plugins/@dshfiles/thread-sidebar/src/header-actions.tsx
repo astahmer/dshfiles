@@ -17,7 +17,7 @@ import {
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { ArchiveIcon, ArchiveRestoreIcon, BellIcon, BellOffIcon, CopyIcon, EllipsisIcon, PauseIcon, PinIcon, PinOffIcon } from '@dshfiles/plugin-ui/icons'
-import { useLayoutEffect, useState } from 'react'
+import { useLayoutEffect, useMemo, useState } from 'react'
 import { ThreadMuteModel, THREAD_MUTE_OPTIONS, type ThreadMuteOption } from './thread-mute.js'
 import { ThreadChildrenModel } from './thread-children.js'
 import { usePreferences } from './sidebar-state.js'
@@ -96,6 +96,10 @@ export const HeaderThreadActions = ({
   const [copyStatus, setCopyStatus] = useState('')
   const [bar, setBar] = useState<HTMLElement | null>(null)
   const crowded = useCrowdedHeader(bar)
+  const workspaceBySession = useMemo(
+    () => SidebarOrganization.workspaceForSessions({ workspaces: workspaceState.items, sessions: Object.values(sessionState.byId) }),
+    [sessionState.byId, workspaceState.items],
+  )
   if (session === undefined || session.blank) return null
 
   const archived = workspaceState.archivedSessionIds.includes(sessionId)
@@ -108,7 +112,7 @@ export const HeaderThreadActions = ({
     threads: actionThreads,
     cascadeToChildren: preferences.applyActionsToChildThreads,
   })
-  const workspaceId = SidebarOrganization.workspaceForLineage(session, sessionState.byId, SidebarOrganization.workspaceForSessions(workspaceState.items))
+  const workspaceId = SidebarOrganization.workspaceForLineage(session, sessionState.byId, workspaceBySession)
   const updateParked = (): void => {
     if (session.running) return
     const parkedIds = new Set(preferences.parkedSessionIds)

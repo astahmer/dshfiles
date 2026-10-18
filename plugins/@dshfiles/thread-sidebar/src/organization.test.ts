@@ -1,6 +1,8 @@
 import { SessionId } from '@deepseek-ai/dsh-session/types'
+import { WorkspaceId } from '@deepseek-ai/dsh-workspace'
 import assert from 'node:assert/strict'
 import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
+import type { WorkspaceView } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import { test, vi } from 'vitest'
 import { SidebarOrganization, type AutoArchiveContext, DEFAULT_PREFERENCES, type SidebarPreferences, type SidebarSection } from './organization.js'
 import { SidebarPreferencesModel, PREFERENCES_STORAGE_KEY, storedPreferences } from './preferences.js'
@@ -14,6 +16,15 @@ const sessionSummary = ({ id, parentId, ...overrides }: SessionFixture): Session
   const summary: SessionSummary = { displayTitle: id, running: false, retainedBy: {}, blank: false, updatedAt: 0, ...overrides, id: SessionId(id) }
   return parentId === undefined ? summary : { ...summary, parentId: SessionId(parentId) }
 }
+
+const workspaceView = (input: { id: string; path: string; sessionIds?: readonly string[] }): WorkspaceView => ({
+  workspaceId: WorkspaceId(input.id),
+  path: input.path,
+  title: input.id,
+  sessionIds: (input.sessionIds ?? []).map(sessionId => SessionId(sessionId)),
+  createdAt: '2026-01-01T00:00:00.000Z',
+  updatedAt: '2026-01-01T00:00:00.000Z',
+})
 
 class MemoryStorage implements Storage {
   readonly #values = new Map<string, string>()
@@ -199,6 +210,29 @@ test('child threads inherit the nearest known workspace through the parent chain
   }
   assert.equal(SidebarOrganization.workspaceForLineage(byId.grandchild, byId, new Map([['root', 'workspace-a']])), 'workspace-a')
   assert.equal(SidebarOrganization.workspaceForLineage(byId.grandchild, byId, new Map()), undefined)
+})
+
+test('a session without a workspace falls back to the project its recorded cwd belongs to', () => {
+  const project = workspaceView({ id: 'project', path: '/dev/dshfiles' })
+  const thread = workspaceView({ id: 'thread', path: '/dev/dshfiles-threads/thread-a', sessionIds: ['accounted'] })
+  const workspaces = [project, thread]
+  const map = SidebarOrganization.workspaceForSessions({
+    workspaces,
+    sessions: [
+      sessionSummary({ id: 'accounted', cwd: '/dev/dshfiles-threads/thread-a' }),
+      sessionSummary({ id: 'forgotten', cwd: '/dev/dshfiles-threads/thread-b' }),
+      sessionSummary({ id: 'in-project', cwd: '/dev/dshfiles' }),
+      sessionSummary({ id: 'nested', cwd: '/dev/dshfiles/plugins/thread-sidebar' }),
+      sessionSummary({ id: 'unknown-repository', cwd: '/tmp/other-threads/thread-c' }),
+      sessionSummary({ id: 'no-cwd' }),
+    ],
+  })
+  assert.equal(map.get('accounted'), 'project')
+  assert.equal(map.get('forgotten'), 'project')
+  assert.equal(map.get('in-project'), 'project')
+  assert.equal(map.get('nested'), undefined)
+  assert.equal(map.get('unknown-repository'), undefined)
+  assert.equal(map.get('no-cwd'), undefined)
 })
 
 test('invalid stored preference data is rejected without exposing the raw value', () => {

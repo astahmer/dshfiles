@@ -7,6 +7,16 @@ includes running or recently updated threads; the idle threshold moves older,
 non-running threads to Inactive. The project picker scopes rows to one workspace
 or unassigned sessions.
 
+**Project attribution.** A `jj-integration` thread workspace
+(`<repository>-threads/<thread>`) is attributed to its owning repository. A
+session the Host accounts to no workspace at all — for example after its thread
+workspace registration was deleted, or when it was created with an explicit
+`cwd` instead of a workspace — is attributed to the project its recorded `cwd`
+resolves to: a registered workspace path, or the repository named by a
+`<repository>-threads` directory. Truly unknown paths stay unassigned. This is
+display attribution only: the Host Workspace registry is what `project_list`
+and scope decisions read.
+
 Running state comes from `SessionSummary.running`; recency uses its
 `updatedAt` value. Pin and archive state come from the Host Workspace controller
 stream. Pin, unpin, archive, and restore call that controller directly.

@@ -1073,7 +1073,11 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     archiveFailureMessage: string
   } | null>(null)
 
-  const workspaceBySession = useMemo(() => SidebarOrganization.workspaceForSessions(workspaceState.items), [workspaceState.items])
+  const sessions = useMemo(() => sessionsForAutoArchive(sessionState.ids, sessionState.byId), [sessionState.byId, sessionState.ids])
+  const workspaceBySession = useMemo(
+    () => SidebarOrganization.workspaceForSessions({ workspaces: workspaceState.items, sessions }),
+    [sessions, workspaceState.items],
+  )
   const archivedSessionIds = useMemo(() => setIncludes(workspaceState.archivedSessionIds), [workspaceState.archivedSessionIds])
   const pinnedSessionIds = useMemo(() => setIncludes(workspaceState.pinnedSessionIds), [workspaceState.pinnedSessionIds])
   const displayWorkspaces = useMemo(
@@ -1084,7 +1088,6 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       })),
     [props.tSidebar, workspaceState.items],
   )
-  const sessions = useMemo(() => sessionsForAutoArchive(sessionState.ids, sessionState.byId), [sessionState.byId, sessionState.ids])
   const rebasedIndex = useMemo(
     () =>
       indexRebasedThreadSessions({

@@ -152,6 +152,12 @@
           "id": "thread-sidebar.thread-classification-unit-parked-settings-storage",
           "file": "plugins/@dshfiles/thread-sidebar/src/organization.test.ts",
           "testName": "parked ids, sidebar settings, and navigation choices round-trip through browser storage"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.thread-classification-unit-cwd-project-fallback",
+          "file": "plugins/@dshfiles/thread-sidebar/src/organization.test.ts",
+          "testName": "a session without a workspace falls back to the project its recorded cwd belongs to"
         }
       ]
     },

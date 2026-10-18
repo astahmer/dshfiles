@@ -223,13 +223,37 @@ const projectOfThreadWorkspace = (workspace: WorkspaceView, byPath: ReadonlyMap<
   return parent.endsWith(THREADS_DIRECTORY_SUFFIX) ? byPath.get(parent.slice(0, -THREADS_DIRECTORY_SUFFIX.length)) : undefined
 }
 
-/** jj-integration's thread workspaces are attributed to their owning project workspace. */
-const workspaceForSessions = (workspaces: readonly WorkspaceView[]): Map<string, string> => {
-  const byPath = new Map(workspaces.map(workspace => [workspace.path, workspace]))
+/**
+ * The owning project of a filesystem path. A registered thread workspace resolves to the repository it builds in; a
+ * path under a `<repository>-threads` directory resolves even without a registration, which is all a session keeps
+ * after its thread workspace is forgotten.
+ */
+const projectIdForPath = (path: string, byPath: ReadonlyMap<string, WorkspaceView>): string | undefined => {
+  const registered = byPath.get(path)
+  if (registered !== undefined) return (projectOfThreadWorkspace(registered, byPath) ?? registered).workspaceId
+  const separator = path.lastIndexOf('/')
+  if (separator < 0) return undefined
+  const parent = path.slice(0, separator)
+  if (!parent.endsWith(THREADS_DIRECTORY_SUFFIX)) return undefined
+  const owner = byPath.get(parent.slice(0, -THREADS_DIRECTORY_SUFFIX.length))
+  return owner === undefined ? undefined : (projectOfThreadWorkspace(owner, byPath) ?? owner).workspaceId
+}
+
+/** jj-integration's thread workspaces are attributed to their owning project workspace; unaccounted sessions fall back to their recorded cwd. */
+const workspaceForSessions = (input: {
+  readonly workspaces: readonly WorkspaceView[]
+  readonly sessions: readonly Pick<SessionSummary, 'id' | 'cwd'>[]
+}): Map<string, string> => {
+  const byPath = new Map(input.workspaces.map(workspace => [workspace.path, workspace]))
   const map = new Map<string, string>()
-  for (const workspace of workspaces) {
+  for (const workspace of input.workspaces) {
     const owner = projectOfThreadWorkspace(workspace, byPath) ?? workspace
     for (const sessionId of workspace.sessionIds) map.set(sessionId, owner.workspaceId)
+  }
+  for (const session of input.sessions) {
+    if (map.has(session.id) || session.cwd === undefined) continue
+    const projectId = projectIdForPath(session.cwd, byPath)
+    if (projectId !== undefined) map.set(session.id, projectId)
   }
   return map
 }
