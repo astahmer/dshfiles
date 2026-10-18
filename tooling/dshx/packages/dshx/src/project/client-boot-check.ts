@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import type { ChildProcess } from 'node:child_process'
 import { spawnOwnedProcess, stopOwnedProcess } from './owned-process.js'
 import { compositionFailures, readProfileComposition } from './profile-composition.js'
-import { isolatedHostEnvironment, redactHostOutput } from './scratch-profile.js'
+import { ScratchProfileRuntime } from './scratch-profile.js'
 import { StartupDialogs } from './startup-dialogs.js'
 import type { BrowserBootEvidence, SlotRenderFailure } from './browser-boot.js'
 export { compositionFailures }
@@ -98,7 +98,7 @@ const parseBootText = (text: string): ClientBootCheckEntry[] => {
     const match = /^(?<id>@[^:]+): (?<state>failed|pending|error)\b(?<detail>.*)$/.exec(line)
     if (match?.groups === undefined) continue
     const rawDetail = match.groups.detail?.trim().replace(/^:\s*/, '')
-    const detail = rawDetail === undefined ? undefined : redactHostOutput(rawDetail)
+    const detail = rawDetail === undefined ? undefined : ScratchProfileRuntime.redactHostOutput(rawDetail)
     entries.push({
       id: match.groups.id ?? '',
       state: match.groups.state ?? '',
@@ -223,7 +223,7 @@ export const checkClientBoot = async (options: ClientBootCheckOptions): Promise<
       try {
         host = spawnOwnedProcess(executable, ['--profile', options.profile, '--port', String(port), '--no-open'], {
           cwd: options.projectRoot,
-          env: isolatedHostEnvironment(options.dshHome, options.profileRoot),
+          env: ScratchProfileRuntime.hostEnvironment(options.dshHome, options.profileRoot),
           stdio: ['ignore', 'pipe', 'pipe'],
         })
       } catch (error) {
@@ -286,7 +286,7 @@ export const checkClientBoot = async (options: ClientBootCheckOptions): Promise<
             }
           } catch (error) {
             const message = error instanceof Error ? error.message : String(error)
-            browserError = redactHostOutput(message)
+            browserError = ScratchProfileRuntime.redactHostOutput(message)
           }
         }
       }
@@ -324,12 +324,12 @@ export const checkClientBoot = async (options: ClientBootCheckOptions): Promise<
     browserReady,
     failureCardVisible,
     timedOut,
-    ...(processError === undefined ? {} : { processError: redactHostOutput(processError) }),
-    ...(spawnError === undefined ? {} : { spawnError: redactHostOutput(spawnError) }),
+    ...(processError === undefined ? {} : { processError: ScratchProfileRuntime.redactHostOutput(processError) }),
+    ...(spawnError === undefined ? {} : { spawnError: ScratchProfileRuntime.redactHostOutput(spawnError) }),
     ...(evidence === undefined ? {} : { evidence }),
     ...(launchUrl === undefined ? {} : { url: new URL(launchUrl).origin }),
-    ...(browserError === undefined ? {} : { browserError: redactHostOutput(browserError) }),
-    ...(readinessError === undefined ? {} : { readinessError: redactHostOutput(readinessError) }),
+    ...(browserError === undefined ? {} : { browserError: ScratchProfileRuntime.redactHostOutput(browserError) }),
+    ...(readinessError === undefined ? {} : { readinessError: ScratchProfileRuntime.redactHostOutput(readinessError) }),
   }
 }
 
