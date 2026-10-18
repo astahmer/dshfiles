@@ -17,7 +17,7 @@ export const sessionSearchRequestSchema = z.object({
   limit: z.number().int().min(1).max(100),
   /** Offset into the ranked result set; the host keeps cursors opaque. */
   cursor: z.number().int().nonnegative().optional(),
-  sessionIds: z.array(z.string().min(1)).optional(),
+  sessionIds: z.array(z.string().min(1)).readonly().optional(),
   cwd: z.string().min(1).optional(),
 })
 export type SessionSearchRequest = z.infer<typeof sessionSearchRequestSchema>

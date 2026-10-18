@@ -12,6 +12,7 @@ import { createRequire } from 'node:module'
 import { homedir, loadavg, tmpdir } from 'node:os'
 import { basename, join, resolve } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
+import { z } from 'zod'
 import { describe, expect, it } from 'vitest'
 import { FrameLog } from '../src/frame-log.js'
 import { SessionSearchEngine } from '../src/engine.js'
@@ -69,12 +70,11 @@ process.on('SIGTERM', () => {
 })
 `
 
-interface ProbeReading {
-  readonly samples: number
-  readonly maxRttMs: number
-  readonly p99RttMs: number
-  readonly gapsOverBudget: number
-}
+const probeReadingSchema = z.object({ samples: z.number(), maxRttMs: z.number(), p99RttMs: z.number(), gapsOverBudget: z.number() })
+type ProbeReading = z.infer<typeof probeReadingSchema>
+
+const sessionIdRowSchema = z.object({ id: z.string() })
+const storedSessionIdRowSchema = z.object({ session_id: z.string() })
 
 const startProbe = async (socketPath: string) => {
   await rm(socketPath, { force: true })
@@ -96,11 +96,8 @@ const startProbe = async (socketPath: string) => {
       }
       await new Promise(resolveClose => server.close(() => resolveClose()))
       await rm(socketPath, { force: true })
-      try {
-        return JSON.parse(output) as ProbeReading
-      } catch {
-        return { samples: 0, maxRttMs: -1, p99RttMs: -1, gapsOverBudget: -1 }
-      }
+      const parsed = probeReadingSchema.safeParse(JSON.parse(output || 'null'))
+      return parsed.success ? parsed.data : { samples: 0, maxRttMs: -1, p99RttMs: -1, gapsOverBudget: -1 }
     },
   }
 }
@@ -108,7 +105,7 @@ const startProbe = async (socketPath: string) => {
 const stockIndexedSessions = (): ReadonlySet<string> => {
   const database = new DatabaseSync(stockIndex, { readOnly: true })
   try {
-    return new Set(database.prepare('SELECT id FROM persisted_sessions').all().map(row => String((row as { id: string }).id)))
+    return new Set(database.prepare('SELECT id FROM persisted_sessions').all().map(row => sessionIdRowSchema.parse(row).id))
   } catch {
     return new Set()
   } finally {
@@ -156,7 +153,7 @@ const stockSessionIds = (query: string, sessionIds: ReadonlySet<string>): readon
     const rows = database
       .prepare(`SELECT DISTINCT session_id FROM persisted_docs WHERE persisted_docs MATCH ? AND session_id IN (${placeholders}) LIMIT 200`)
       .all(query, ...known)
-    return rows.map(row => String((row as { session_id: string }).session_id))
+    return rows.map(row => storedSessionIdRowSchema.parse(row).session_id)
   } catch {
     return []
   } finally {
@@ -217,15 +214,25 @@ describe.skipIf(process.env.OWNED_BENCH !== '1')('owned search backend bench', (
       const hostStall = await probe.stop()
       clearInterval(hostTimer)
 
-      const parity = QUERIES.map(query => {
-        const stock = stockSessionIds(query, subset.sessionIds)
-        const owned = results.get(query) ?? []
-        const ownedSet = new Set(owned)
-        const found = stock.filter(id => ownedSet.has(id)).length
-        return { query, stockSessions: stock.length, ownedSessions: owned.length, stockRecall: stock.length === 0 ? null : Number((found / stock.length).toFixed(3)) }
-      })
+      // Match-level parity: for a sample of the stock backend's sessions, ask our index for that session by id. Page
+      // limits would otherwise dominate the number (our loop asks for 20 while the stock sample can hold 200).
+      const parityComparable = health.behindSessions === 0
+      const parity = parityComparable
+        ? await Promise.all(
+            QUERIES.map(async query => {
+              const stock = stockSessionIds(query, subset.sessionIds).slice(0, 25)
+              let found = 0
+              for (const sessionId of stock) {
+                const page = await context.sessionQuery.searchSessions({ query, limit: 1, sessionFilters: [{ kind: 'id', values: [sessionId] }] })
+                found += page.items.some(item => item.header.id === sessionId) ? 1 : 0
+              }
+              return { query, sampled: stock.length, found, recall: stock.length === 0 ? null : Number((found / stock.length).toFixed(3)) }
+            }),
+          )
+        : []
       const report = {
         measuredAt: new Date().toISOString(),
+        parityNote: parityComparable ? 'match-level recall over a sample of the stock hits' : 'the index was still filling, so parity is not comparable in this round',
         corpus: { source: corpusRoot, subsetSessions: subset.sessions, subsetMB: Number((subset.bytes / 1048576).toFixed(1)) },
         loadAverage: loadavg(),
         ingest: { ms: ingestMs, sessions: health.sessions, documents: health.documents, indexBytes: health.indexBytes, behindSessions: health.behindSessions },

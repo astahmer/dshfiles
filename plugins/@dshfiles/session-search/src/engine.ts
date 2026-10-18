@@ -11,6 +11,7 @@ import {
   SessionQueryEngine,
   SessionQueryError,
   SessionSearchCursor,
+  type SessionResultFilter,
   type SessionEventSearchHit,
   type SessionEventSearchPage,
   type SessionEventSearchRequest,
@@ -37,7 +38,7 @@ export type SessionSearchEngineConfig = z.input<typeof engineConfigSchema>
 const cursorPayloadSchema = z.object({ version: z.literal(1), scope: z.enum(['sessions', 'events']), fingerprint: z.string(), offset: z.number().int().nonnegative() })
 
 type CursorFingerprint =
-  | { readonly scope: 'sessions'; readonly query: string; readonly limit: number }
+  | { readonly scope: 'sessions'; readonly query: string; readonly limit: number; readonly sessionIds?: readonly string[] }
   | { readonly scope: 'events'; readonly sessionId: string; readonly query: string; readonly limit: number }
 
 const toHeader = (row: SessionHeaderRow): SessionHeader =>
@@ -74,14 +75,18 @@ export class SessionSearchEngine extends SessionQueryEngine {
   }
 
   override async searchSessions(request: SessionSearchRequest, exec?: SessionSearchExecContext): Promise<SessionSearchPage<SessionSearchHit>> {
-    if (request.sessionFilters !== undefined && request.sessionFilters.length > 0) unsupportedFilters('session filters')
     if (request.eventFilters !== undefined && request.eventFilters.length > 0) unsupportedFilters('event filters')
     const query = request.query
     const limit = Math.min(this._maxLimit, Math.max(1, request.limit ?? this._defaultLimit))
-    const fingerprint = this._fingerprint({ scope: 'sessions', query, limit })
+    const sessionIds = this._sessionIds(request.sessionFilters)
+    const fingerprint = this._fingerprint(sessionIds === undefined ? { scope: 'sessions', query, limit } : { scope: 'sessions', query, limit, sessionIds })
     const offset = this._decodeCursor(request.cursor, 'sessions', fingerprint)
     exec?.signal?.throwIfAborted()
-    const page = await this._client.searchSessions(withoutUndefined({ query, limit, cursor: offset === 0 ? undefined : offset }))
+    // An id filter that matches nothing must answer empty, never fall back to the whole corpus.
+    if (sessionIds !== undefined && sessionIds.length === 0) return { items: [] }
+    const page = await this._client.searchSessions(
+      withoutUndefined({ query, limit, cursor: offset === 0 ? undefined : offset, sessionIds: sessionIds === undefined || sessionIds.length === 0 ? undefined : sessionIds }),
+    )
     exec?.signal?.throwIfAborted()
     return withoutUndefined({
       items: page.matches.map(match => this._sessionHit(match)),
@@ -104,6 +109,21 @@ export class SessionSearchEngine extends SessionQueryEngine {
       items: page.matches.map(match => this._eventHit(match)),
       nextCursor: page.hasMore ? this._encodeCursor('events', fingerprint, offset + limit) : undefined,
     })
+  }
+
+  /** Translate the `id` clause the callers use; every other session filter stays refused rather than ignored. */
+  _sessionIds(filters: readonly SessionResultFilter[] | undefined): readonly string[] | undefined {
+    if (filters === undefined || filters.length === 0) return undefined
+    let ids: readonly string[] | undefined
+    for (const filter of filters) {
+      if (filter.kind === 'id') {
+        const values = filter.values.map(value => String(value))
+        ids = ids === undefined ? values : ids.filter(id => values.includes(id))
+        continue
+      }
+      unsupportedFilters(`${filter.kind} session filters`)
+    }
+    return ids
   }
 
   _sessionHit(match: SearchMatch): SessionSearchHit {

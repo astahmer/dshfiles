@@ -2,6 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
+import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { SessionSearchEngine } from '../src/engine.js'
 import { SearchWorkerClient } from '../src/worker-client.js'
@@ -122,5 +123,18 @@ describe('owned search backend over the real worker', () => {
     })
     await client?.nudge()
     await waitFor(async () => (await context.sessionQuery.searchSessions({ query: 'afterthought', limit: 5 })).items.length > 0, 'the appended frame to be indexed')
+  })
+
+  it('restricts a search to the requested session ids', async () => {
+    const context = await boot()
+    await waitForIndex(2)
+    const first = SessionId('session-11111111-0000-4000-8000-000000000000')
+    const second = SessionId('session-22222222-0000-4000-8000-000000000000')
+    const both = await context.sessionQuery.searchSessions({ query: 'retry storm', limit: 5, sessionFilters: [{ kind: 'id', values: [first, second] }] })
+    expect(both.items).toHaveLength(2)
+    const one = await context.sessionQuery.searchSessions({ query: 'retry storm', limit: 5, sessionFilters: [{ kind: 'id', values: [first] }] })
+    expect(one.items.map(item => item.header.id)).toEqual([first])
+    const none = await context.sessionQuery.searchSessions({ query: 'retry storm', limit: 5, sessionFilters: [{ kind: 'id', values: [] }] })
+    expect(none.items).toHaveLength(0)
   })
 })
