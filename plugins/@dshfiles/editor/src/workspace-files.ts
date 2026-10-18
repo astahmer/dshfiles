@@ -30,6 +30,9 @@ const MAX_WATCHED_DIRECTORIES = 64
 const RELIST_DELAY_MS = 150
 /** How long watches outlive the last listener, so reopening ⌘P soon after still gets a live list. */
 const WATCH_IDLE_MS = 30_000
+/** Retained walks are a memory budget: this many quiet sessions stay warm, and only for this long. */
+export const RETAINED_INDEX_LIMIT = 8
+export const RETAINED_INDEX_TTL_MS = 5 * 60_000
 
 interface DirectoryEntry {
   readonly name: string
@@ -157,10 +160,15 @@ interface SessionIndex {
   walking: boolean
   /** Every listed directory has a live watch, so the index needs no TTL refresh. */
   fullyWatched: boolean
+  /** Cancels this session's own walk, relists and watches when its retained data is released. */
+  controller: AbortController
+  /** Bumped per walk so a walk that finishes after a release cannot publish or re-watch. */
+  generation: number
   readonly listeners: Set<(reply: WorkspaceFilesReply) => void>
   readonly watches: Map<string, AbortController>
   readonly relists: Map<string, ReturnType<typeof setTimeout>>
   idleTimer: ReturnType<typeof setTimeout> | null
+  releaseTimer: ReturnType<typeof setTimeout> | null
 }
 
 /**
@@ -186,7 +194,7 @@ export const createWorkspaceFileIndex = <SessionId extends string>(options: {
     truncated: index.truncated,
   })
   const publish = (sessionId: SessionId, index: SessionIndex): void => {
-    if (disposed.signal.aborted) return
+    if (disposed.signal.aborted || index.controller.signal.aborted) return
     for (const listener of index.listeners) listener(reply(sessionId, index))
   }
   const walkSource = (sessionId: SessionId): { readonly list: ListDirectory; readonly readText?: ReadText } => {
@@ -211,6 +219,32 @@ export const createWorkspaceFileIndex = <SessionId extends string>(options: {
     const listing = directories.get(path)
     directories.delete(path)
     for (const child of listing?.directories ?? []) removeSubtree(directories, child)
+  }
+
+  /** Drop one session's retained walk entirely; a later request starts it again from scratch. */
+  const release = (sessionId: SessionId, index: SessionIndex): void => {
+    index.controller.abort()
+    index.walking = false
+    if (index.idleTimer !== null) {
+      clearTimeout(index.idleTimer)
+      index.idleTimer = null
+    }
+    if (index.releaseTimer !== null) {
+      clearTimeout(index.releaseTimer)
+      index.releaseTimer = null
+    }
+    stopWatches(index)
+    sessions.delete(sessionId)
+  }
+
+  /** Keep the retained walks inside their budget, dropping the least recently used idle ones. */
+  const evictIdleOverLimit = (): void => {
+    for (const [candidate, candidateIndex] of sessions) {
+      if (sessions.size <= RETAINED_INDEX_LIMIT) return
+      // A session with a listener is in use, even mid-walk; a quiet one is released, walk included.
+      if (candidateIndex.listeners.size > 0) continue
+      release(candidate, candidateIndex)
+    }
   }
 
   const relist = async (sessionId: SessionId, index: SessionIndex, path: string): Promise<void> => {
@@ -247,7 +281,7 @@ export const createWorkspaceFileIndex = <SessionId extends string>(options: {
 
   const syncWatches = (sessionId: SessionId, index: SessionIndex): void => {
     const watch = options.watch
-    if (watch === undefined || disposed.signal.aborted) return
+    if (watch === undefined || disposed.signal.aborted || index.controller.signal.aborted) return
     const wanted = breadthFirst(index.directories).slice(0, MAX_WATCHED_DIRECTORIES)
     const wantedSet = new Set(wanted)
     for (const [path, controller] of index.watches) {
@@ -261,7 +295,11 @@ export const createWorkspaceFileIndex = <SessionId extends string>(options: {
       index.watches.set(path, controller)
       void (async () => {
         try {
-          for await (const frame of watch(sessionId, path === '' ? '.' : path, AbortSignal.any([controller.signal, disposed.signal]))) {
+          for await (const frame of watch(
+            sessionId,
+            path === '' ? '.' : path,
+            AbortSignal.any([controller.signal, disposed.signal, index.controller.signal]),
+          )) {
             if (frame.kind === 'change') scheduleRelist(sessionId, index, path)
           }
         } catch {
@@ -277,13 +315,17 @@ export const createWorkspaceFileIndex = <SessionId extends string>(options: {
 
   const refresh = (sessionId: SessionId, index: SessionIndex): void => {
     index.walking = true
+    const generation = ++index.generation
     const directories: Directories = new Map()
+    // A released index is gone from the map and has aborted its controller, so nothing here may publish.
+    const isCurrent = (): boolean => index.generation === generation && sessions.get(sessionId) === index && !index.controller.signal.aborted
     void walkInto({
       ...walkSource(sessionId),
-      signal: disposed.signal,
+      signal: index.controller.signal,
       directories,
       roots: [''],
       onProgress: () => {
+        if (!isCurrent()) return
         const files = flatten(directories).files
         // Progress only grows the list; a stale index keeps answering until the new walk overtakes it.
         if (files.length < index.files.length) return
@@ -292,6 +334,7 @@ export const createWorkspaceFileIndex = <SessionId extends string>(options: {
       },
     })
       .then(truncated => {
+        if (!isCurrent()) return
         const result = flatten(directories)
         index.directories = directories
         index.files = result.files
@@ -300,52 +343,67 @@ export const createWorkspaceFileIndex = <SessionId extends string>(options: {
       })
       .catch(() => undefined)
       .finally(() => {
+        if (index.generation !== generation) return
         index.walking = false
-        if (disposed.signal.aborted) return
+        if (disposed.signal.aborted || index.controller.signal.aborted) return
         if (index.listeners.size > 0 || index.idleTimer !== null) syncWatches(sessionId, index)
         publish(sessionId, index)
       })
   }
 
   const request = (sessionId: SessionId, listener: (reply: WorkspaceFilesReply) => void): (() => void) => {
-    const index: SessionIndex = sessions.get(sessionId) ?? {
+    const existing = sessions.get(sessionId)
+    const index: SessionIndex = existing ?? {
       directories: new Map(),
       files: [],
       truncated: false,
       indexedAt: null,
       walking: false,
       fullyWatched: false,
+      controller: new AbortController(),
+      generation: 0,
       listeners: new Set(),
       watches: new Map(),
       relists: new Map(),
       idleTimer: null,
+      releaseTimer: null,
     }
+    // Re-inserting keeps Map order least-recently-used first, which is what eviction walks.
+    if (existing !== undefined) sessions.delete(sessionId)
     sessions.set(sessionId, index)
     if (index.idleTimer !== null) clearTimeout(index.idleTimer)
     index.idleTimer = null
+    if (index.releaseTimer !== null) clearTimeout(index.releaseTimer)
+    index.releaseTimer = null
     index.listeners.add(listener)
     const fresh = index.indexedAt !== null && (index.fullyWatched || now() - index.indexedAt <= FRESH_MS)
     if (!index.walking && !fresh) refresh(sessionId, index)
     else if (!index.walking) syncWatches(sessionId, index)
     listener(reply(sessionId, index))
+    if (existing === undefined) evictIdleOverLimit()
     return () => {
       index.listeners.delete(listener)
       if (index.listeners.size > 0 || index.idleTimer !== null) return
       index.idleTimer = setTimeout(() => {
         index.idleTimer = null
-        if (index.listeners.size === 0) stopWatches(index)
+        if (index.listeners.size === 0 && sessions.get(sessionId) === index) stopWatches(index)
       }, WATCH_IDLE_MS)
+      // Watches outlive a brief reopen; the walk's retained paths and listings do not outlive this.
+      index.releaseTimer = setTimeout(() => {
+        index.releaseTimer = null
+        if (index.listeners.size > 0 || sessions.get(sessionId) !== index) return
+        release(sessionId, index)
+      }, RETAINED_INDEX_TTL_MS)
     }
   }
 
   return {
     request,
+    /** Retained walks, the memory this factory is allowed to hold between requests. */
+    retainedSessions: () => sessions.size,
     dispose: () => {
       disposed.abort()
-      for (const index of sessions.values()) {
-        stopWatches(index)
-        if (index.idleTimer !== null) clearTimeout(index.idleTimer)
-      }
+      for (const [sessionId, index] of [...sessions]) release(sessionId, index)
     },
   }
 }

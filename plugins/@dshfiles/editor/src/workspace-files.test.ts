@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createWorkspaceFileIndex, walkWorkspaceFiles, type WorkspaceFilesReply } from './workspace-files.js'
+import { createWorkspaceFileIndex, RETAINED_INDEX_LIMIT, RETAINED_INDEX_TTL_MS, walkWorkspaceFiles, type WorkspaceFilesReply } from './workspace-files.js'
 
 type Tree = { [name: string]: Tree | 'file' }
 
@@ -70,6 +70,69 @@ describe('createWorkspaceFileIndex', () => {
     const stale: WorkspaceFilesReply[] = []
     index.request('ses_1', reply => stale.push(reply))
     expect(stale[0]).toMatchObject({ status: 'indexing', files: ['README.md', 'src/index.ts', 'src/lib/deep.ts'] })
+    index.dispose()
+  })
+})
+
+describe('createWorkspaceFileIndex retention', () => {
+  it('releases an idle session, cancels its walk and never publishes that walk afterwards', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      const { list } = lister(workspace)
+      const signals: AbortSignal[] = []
+      const pendingListings: (() => void)[] = []
+      const index = createWorkspaceFileIndex({
+        list: (_sessionId, path, signal) => {
+          signals.push(signal)
+          return new Promise(resolve => {
+            pendingListings.push(() => void list(path).then(listing => resolve(listing)))
+          })
+        },
+        now: () => 0,
+      })
+      const replies: WorkspaceFilesReply[] = []
+      const stop = index.request('ses_1', reply => replies.push(reply))
+      expect(index.retainedSessions()).toBe(1)
+
+      stop()
+      await vi.advanceTimersByTimeAsync(RETAINED_INDEX_TTL_MS)
+
+      expect(index.retainedSessions()).toBe(0)
+      expect(signals.length).toBeGreaterThan(0)
+      expect(signals.every(signal => signal.aborted)).toBe(true)
+
+      const before = replies.length
+      for (const resolve of pendingListings) resolve()
+      await vi.advanceTimersByTimeAsync(0)
+      expect(replies.length).toBe(before)
+      index.dispose()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('evicts the least recently used idle session when the retained budget is exceeded', async () => {
+    const { list, listed } = lister(workspace)
+    const index = createWorkspaceFileIndex({ list: (_sessionId, path) => list(path), now: () => 0 })
+    const sessionIds = Array.from({ length: RETAINED_INDEX_LIMIT }, (_unused, position) => `ses_${String(position)}`)
+    for (const sessionId of sessionIds) {
+      // Each session is retained and then left idle, so the budget is the only thing keeping it.
+      const stop = index.request(sessionId, () => undefined)
+      stop()
+    }
+    await new Promise(resolve => setTimeout(resolve, 0))
+    expect(index.retainedSessions()).toBe(RETAINED_INDEX_LIMIT)
+
+    const newest = sessionIds.at(-1) ?? ''
+    index.request('ses_new', () => undefined)
+    expect(index.retainedSessions()).toBe(RETAINED_INDEX_LIMIT)
+
+    // The newest retained session still answers without walking; the evicted oldest walks again.
+    const afterEviction = listed.length
+    index.request(newest, () => undefined)
+    expect(listed.length).toBe(afterEviction)
+    index.request(sessionIds[0] ?? '', () => undefined)
+    expect(listed.length).toBeGreaterThan(afterEviction)
     index.dispose()
   })
 })
