@@ -102,7 +102,7 @@ describe('dshx dev scratch commands', () => {
       `)
       await ScratchSeedRuntime.chooseFakeProviderModel(page, 1_000)
       expect(await page.locator('#route-option').getAttribute('data-selected')).toBe('true')
-      expect(await page.locator('#models').evaluate(element => element.open)).toBe(false)
+      expect(await page.locator('#models').evaluate(element => element.hasAttribute('open'))).toBe(false)
       await page.close()
     } finally {
       await browser.close()
