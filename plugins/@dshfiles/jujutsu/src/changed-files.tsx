@@ -5,6 +5,7 @@ import { ChevronRightIcon, CircleXIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useMemo, useState, type ReactNode } from 'react'
 import type { FileStat, FileStatus } from './api.js'
+import { collectChangedFiles, indexChangedFileSelection } from './changed-file-selection.js'
 import { buildFileTree, splitFilePath, type FileTreeNode } from './file-tree.js'
 
 export type FileView = 'flat' | 'tree'
@@ -78,7 +79,8 @@ interface ChangedFilesProps {
 export const ChangedFiles = (props: ChangedFilesProps): JSX.Element => {
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => new Set())
   const tree = useMemo(() => buildFileTree(props.files), [props.files])
-  const selected = new Set(props.selectedPaths ?? [])
+  const selected = useMemo(() => new Set(props.selectedPaths ?? []), [props.selectedPaths])
+  const selectionIndex = useMemo(() => indexChangedFileSelection(tree, selected), [selected, tree])
   const onSelectionChange = props.onSelectionChange
 
   const setSelected = (paths: readonly string[], checked: boolean): void => {
@@ -161,26 +163,26 @@ export const ChangedFiles = (props: ChangedFilesProps): JSX.Element => {
     )
   }
 
-  const descendantFiles = (node: FileTreeNode<FileStat>): FileStat[] => (node.file !== null ? [node.file] : node.children.flatMap(descendantFiles))
-
   const treeRows = (nodes: readonly FileTreeNode<FileStat>[], depth: number): JSX.Element[] =>
     nodes.flatMap(node => {
       if (node.file !== null) return [fileRow(node.file, depth)]
       const open = !collapsed.has(node.path)
-      const subtree = descendantFiles(node).map(file => file.path)
-      const selectedCount = subtree.filter(path => selected.has(path)).length
+      // Without selection controls a folder needs neither its tri-state count nor a descendant walk.
+      const selectable = onSelectionChange !== undefined
+      const selectedCount = selectable ? selectionIndex.selectedUnder(node.path) : 0
+      const subtreeSize = selectable ? node.fileCount : 0
       return [
         <li
           className="dshx:flex dshx:h-6 dshx:items-center dshx:gap-1.5 dshx:rounded-sm dshx:pr-1 dshx:hover:bg-accent"
           key={'dir:' + node.path}
           style={{ paddingLeft: 4 + depth * 14 }}
         >
-          {onSelectionChange !== undefined && (
+          {selectable && (
             <Checkbox
               aria-label={`${props.selectionLabel ?? 'Select'} all files in ${node.path}`}
-              checked={selectedCount === 0 ? false : selectedCount === subtree.length ? true : 'indeterminate'}
+              checked={selectedCount === 0 ? false : selectedCount === subtreeSize ? true : 'indeterminate'}
               className="dshx:size-3.5"
-              onCheckedChange={checked => setSelected(subtree, checked === true)}
+              onCheckedChange={checked => setSelected(collectChangedFiles(node), checked === true)}
             />
           )}
           <button
