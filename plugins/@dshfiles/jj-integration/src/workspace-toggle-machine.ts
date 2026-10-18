@@ -87,7 +87,7 @@ type ToggleEvent =
  * Where a blank New-thread Session should start: in its own workspace when isolation is the default, or in the
  * project checkout when it inherited another thread's workspace and isolation is off.
  */
-export const defaultDestinationMove = (input: { readonly destination: DestinationView; readonly workspaceId: string }): ToggleRequest | null => {
+const defaultDestinationMove = (input: { readonly destination: DestinationView; readonly workspaceId: string }): ToggleRequest | null => {
   const { destination } = input
   if (destination.vcs !== 'jj') return null
   const projectWorkspaceId = destination.projectWorkspaceId ?? input.workspaceId
@@ -106,11 +106,7 @@ export const defaultDestinationMove = (input: { readonly destination: Destinatio
  * Starts isolation before the Host answers. When the composer inherited a thread workspace, exclude that workspace
  * from spare reuse so this New thread cannot keep using the previous thread's folder.
  */
-export const eagerDestinationMove = (input: {
-  readonly workspaceId: string
-  readonly projectWorkspaceId: string
-  readonly bookmark: string
-}): ToggleRequest => {
+const eagerDestinationMove = (input: { readonly workspaceId: string; readonly projectWorkspaceId: string; readonly bookmark: string }): ToggleRequest => {
   const request: ToggleRequest = {
     isolate: true,
     base: input.bookmark,
@@ -128,7 +124,7 @@ const pendingFor = (client: WorkspaceToggleClient, request: ToggleRequest, name:
   return { isolate: request.isolate, spare, name: request.isolate ? (spare?.name ?? name ?? client.generateName()) : null }
 }
 
-export const spareKey = (projectWorkspaceId: string, base: string | undefined | null): string => `${projectWorkspaceId}\u0000${base ?? ''}`
+const spareKey = (projectWorkspaceId: string, base: string | undefined | null): string => `${projectWorkspaceId}\u0000${base ?? ''}`
 
 const errorText = (error: unknown): string => (error instanceof Error && error.message.length > 0 ? error.message : String(error))
 
@@ -381,7 +377,7 @@ export interface WorkspaceToggleOutcome {
   readonly error: string | null
 }
 
-export const waitForWorkspaceToggle = (input: { readonly actor: WorkspaceToggleActor; readonly signal: AbortSignal }): Promise<WorkspaceToggleOutcome> =>
+const waitForWorkspaceToggle = (input: { readonly actor: WorkspaceToggleActor; readonly signal: AbortSignal }): Promise<WorkspaceToggleOutcome> =>
   new Promise((resolve, reject) => {
     let settled = false
     let unsubscribe = (): void => undefined
@@ -413,4 +409,9 @@ export const waitForWorkspaceToggle = (input: { readonly actor: WorkspaceToggleA
     finish(input.actor.getSnapshot())
   })
 
-export const WorkspaceToggle = { waitForWorkspaceToggle } as const
+export class WorkspaceToggle {
+  static readonly defaultDestinationMove = defaultDestinationMove
+  static readonly eagerDestinationMove = eagerDestinationMove
+  static readonly spareKey = spareKey
+  static readonly waitForWorkspaceToggle = waitForWorkspaceToggle
+}

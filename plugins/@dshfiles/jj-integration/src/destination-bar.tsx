@@ -21,8 +21,7 @@ import { resolveNewThreadWorkspaceId } from './new-thread-workspace.js'
 import { workspaceHasOtherSession } from './thread-session-ownership.js'
 import { jjIntegrationSettings } from './settings.js'
 import {
-  defaultDestinationMove,
-  eagerDestinationMove,
+  WorkspaceToggle,
   workspaceToggleMachine,
   type ProvisionedDestination,
   type ProvisionInput,
@@ -236,7 +235,7 @@ export const DestinationBar = (props: {
     // Use the owning checkout when known, and never reuse the inherited thread workspace as its own spare.
     resolved(
       newThreadId,
-      eagerDestinationMove({
+      WorkspaceToggle.eagerDestinationMove({
         workspaceId,
         projectWorkspaceId: destination.data?.projectWorkspaceId ?? workspaceId,
         bookmark,
@@ -245,7 +244,7 @@ export const DestinationBar = (props: {
   }, [arrive, bookmark, destination.data?.projectWorkspaceId, inThreadWorkspace, isolateByDefault, newThreadId, resolved, workspaceId])
   useEffect(() => {
     if (newThreadId === null || workspaceId === null || destination.data === undefined) return
-    resolved(newThreadId, defaultDestinationMove({ destination: destination.data, workspaceId }))
+    resolved(newThreadId, WorkspaceToggle.defaultDestinationMove({ destination: destination.data, workspaceId }))
   }, [destination.data, newThreadId, resolved, workspaceId])
 
   const current = destination.data

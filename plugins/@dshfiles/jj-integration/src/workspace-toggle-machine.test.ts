@@ -4,14 +4,7 @@ import { createActor, waitFor } from '@dshfiles/plugin-ui/machine'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { DestinationView } from './api.js'
 import { deferWorkspaceSubmit, type WorkspaceComposer } from './workspace-submit.js'
-import {
-  defaultDestinationMove,
-  eagerDestinationMove,
-  spareKey,
-  workspaceToggleMachine,
-  type SpareWorkspace,
-  type WorkspaceToggleClient,
-} from './workspace-toggle-machine.js'
+import { WorkspaceToggle, workspaceToggleMachine, type SpareWorkspace, type WorkspaceToggleClient } from './workspace-toggle-machine.js'
 
 const startToggle = (overrides: Partial<WorkspaceToggleClient> = {}) => {
   const calls: string[] = []
@@ -87,7 +80,7 @@ describe('workspaceToggleMachine', () => {
         return { workspaceId: 'ws-thread-abc123' }
       },
     })
-    const request = defaultDestinationMove({
+    const request = WorkspaceToggle.defaultDestinationMove({
       destination: { vcs: 'jj', isolated: false, projectWorkspaceId: 'project', bookmark: null, bookmarks: [], isolateByDefault: true },
       workspaceId: 'project',
     })
@@ -103,7 +96,7 @@ describe('workspaceToggleMachine', () => {
     const leaving = { workspaceId: 'ws-thread-abc123', name: 'thread-abc123' }
     toggle.actor.send({ type: 'toggle', request: { isolate: false, projectWorkspaceId: 'project', leaving, leavingBase: 'main' } })
     await waitFor(toggle.actor, snapshot => snapshot.matches('idle'))
-    expect(toggle.spares.get(spareKey('project', 'main'))).toEqual(leaving)
+    expect(toggle.spares.get(WorkspaceToggle.spareKey('project', 'main'))).toEqual(leaving)
     toggle.actor.send({ type: 'toggle', request: { isolate: true, base: 'main', projectWorkspaceId: 'project', leaving: null, leavingBase: null } })
     await waitFor(toggle.actor, snapshot => snapshot.matches('idle'))
     expect(toggle.calls.filter(call => call.startsWith('provision'))).toEqual([])
@@ -113,7 +106,7 @@ describe('workspaceToggleMachine', () => {
   it('does not reuse the inherited thread workspace even when it is also the stored spare', async () => {
     const toggle = startToggle()
     toggle.release()
-    const key = spareKey('project', 'main')
+    const key = WorkspaceToggle.spareKey('project', 'main')
     toggle.spares.set(key, { workspaceId: 'ws-old', name: 'thread-old' })
     toggle.actor.send({
       type: 'toggle',
@@ -183,7 +176,7 @@ describe('workspaceToggleMachine', () => {
     const toggle = startToggle()
     toggle.actor.send({ type: 'arrive', visitId: 's1', workspaceId: 'ws-shared', isolateByDefault: true })
     expect(toggle.actor.getSnapshot().matches('preparing')).toBe(true)
-    expect(eagerDestinationMove({ workspaceId: 'ws-shared', projectWorkspaceId: 'project', bookmark: 'main' })).toEqual({
+    expect(WorkspaceToggle.eagerDestinationMove({ workspaceId: 'ws-shared', projectWorkspaceId: 'project', bookmark: 'main' })).toEqual({
       isolate: true,
       base: 'main',
       projectWorkspaceId: 'project',
@@ -193,7 +186,7 @@ describe('workspaceToggleMachine', () => {
     })
     expect(toggle.calls).toEqual([])
 
-    const request = defaultDestinationMove({
+    const request = WorkspaceToggle.defaultDestinationMove({
       destination: { vcs: 'jj', isolated: true, projectWorkspaceId: 'project', bookmark: 'main', bookmarks: ['main'], isolateByDefault: true },
       workspaceId: 'ws-shared',
     })
@@ -206,7 +199,7 @@ describe('workspaceToggleMachine', () => {
 
   it('reuses the spare workspace for a new thread instead of provisioning one', async () => {
     const toggle = startToggle()
-    toggle.spares.set(spareKey('project', 'main'), { workspaceId: 'ws-spare', name: 'thread-5pa4e0' })
+    toggle.spares.set(WorkspaceToggle.spareKey('project', 'main'), { workspaceId: 'ws-spare', name: 'thread-5pa4e0' })
     toggle.actor.send({ type: 'arrive', visitId: 's1', workspaceId: 'project', isolateByDefault: true })
     toggle.actor.send({
       type: 'resolved',
@@ -217,13 +210,13 @@ describe('workspaceToggleMachine', () => {
     await waitFor(toggle.actor, snapshot => snapshot.matches('idle'))
     expect(toggle.calls.filter(call => call.startsWith('provision'))).toEqual([])
     expect(toggle.switched).toEqual(['ws-spare'])
-    expect(toggle.spares.has(spareKey('project', 'main'))).toBe(false)
+    expect(toggle.spares.has(WorkspaceToggle.spareKey('project', 'main'))).toBe(false)
   })
 
   it('does not assign a claimed spare workspace to a second new thread', async () => {
     const toggle = startToggle()
     toggle.release()
-    toggle.spares.set(spareKey('project', 'main'), { workspaceId: 'ws-spare', name: 'thread-5pa4e0' })
+    toggle.spares.set(WorkspaceToggle.spareKey('project', 'main'), { workspaceId: 'ws-spare', name: 'thread-5pa4e0' })
     const request = { isolate: true, base: 'main', projectWorkspaceId: 'project', leaving: null, leavingBase: null }
 
     for (const visitId of ['s1', 's2']) {
@@ -442,7 +435,7 @@ describe('defaultDestinationMove', () => {
   })
 
   it('isolates a new thread from the project checkout when isolation is the default', () => {
-    expect(defaultDestinationMove({ destination: destination({}), workspaceId: 'project' })).toEqual({
+    expect(WorkspaceToggle.defaultDestinationMove({ destination: destination({}), workspaceId: 'project' })).toEqual({
       isolate: true,
       base: 'main',
       projectWorkspaceId: 'project',
@@ -452,7 +445,7 @@ describe('defaultDestinationMove', () => {
   })
 
   it('does not reuse the inherited thread workspace when isolation is the default', () => {
-    expect(defaultDestinationMove({ destination: destination({ isolated: true }), workspaceId: 'ws-other' })).toEqual({
+    expect(WorkspaceToggle.defaultDestinationMove({ destination: destination({ isolated: true }), workspaceId: 'ws-other' })).toEqual({
       isolate: true,
       base: 'main',
       projectWorkspaceId: 'project',
@@ -463,30 +456,30 @@ describe('defaultDestinationMove', () => {
   })
 
   it('returns a new thread to the project checkout when isolation is off', () => {
-    expect(defaultDestinationMove({ destination: destination({ isolated: true, isolateByDefault: false }), workspaceId: 'ws-other' })).toEqual({
+    expect(WorkspaceToggle.defaultDestinationMove({ destination: destination({ isolated: true, isolateByDefault: false }), workspaceId: 'ws-other' })).toEqual({
       isolate: false,
       projectWorkspaceId: 'project',
       leaving: null,
       leavingBase: null,
     })
-    expect(defaultDestinationMove({ destination: destination({ isolateByDefault: false }), workspaceId: 'project' })).toBeNull()
+    expect(WorkspaceToggle.defaultDestinationMove({ destination: destination({ isolateByDefault: false }), workspaceId: 'project' })).toBeNull()
   })
 
   it('keeps a new thread outside jj unchanged', () => {
-    expect(defaultDestinationMove({ destination: destination({ vcs: 'none' }), workspaceId: 'project' })).toBeNull()
+    expect(WorkspaceToggle.defaultDestinationMove({ destination: destination({ vcs: 'none' }), workspaceId: 'project' })).toBeNull()
   })
 })
 
 describe('eagerDestinationMove', () => {
   it('isolates before the Host answers and excludes an inherited thread workspace from spare reuse', () => {
-    expect(eagerDestinationMove({ workspaceId: 'project', projectWorkspaceId: 'project', bookmark: 'main' })).toEqual({
+    expect(WorkspaceToggle.eagerDestinationMove({ workspaceId: 'project', projectWorkspaceId: 'project', bookmark: 'main' })).toEqual({
       isolate: true,
       base: 'main',
       projectWorkspaceId: 'project',
       leaving: null,
       leavingBase: null,
     })
-    expect(eagerDestinationMove({ workspaceId: 'ws-other', projectWorkspaceId: 'project', bookmark: 'main' })).toEqual({
+    expect(WorkspaceToggle.eagerDestinationMove({ workspaceId: 'ws-other', projectWorkspaceId: 'project', bookmark: 'main' })).toEqual({
       isolate: true,
       base: 'main',
       projectWorkspaceId: 'project',
