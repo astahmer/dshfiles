@@ -1,7 +1,7 @@
-import { expect, type Page, type TestInfo } from '@playwright/test'
+import { expect, type Locator, type Page, type TestInfo } from '@playwright/test'
 import { z } from 'zod'
 import { Then, When } from '../bdd.js'
-import { finishJourneyAssertions, recordAssertion } from '../steps.js'
+import { finishJourneyAssertions, openSettingsDialog, recordAssertion } from '../steps.js'
 
 const createdSessionResponseSchema = z.object({
   result: z.object({
@@ -36,6 +36,9 @@ const paletteInput = (page: Page) => paletteDialog(page).getByRole('combobox')
 const currentThreadId = (page: Page): string | null => new URL(page.url()).searchParams.get('thread')
 // The Host shortens display titles to their first words, so rows are found by thread id, not by the prompt.
 const threadRow = (page: Page, threadId: string) => threadSidebar(page).locator(`article[data-thread-id="${threadId}"]`)
+// A row also seats hover-only action buttons, so its first button is not the trigger any more: the body's own
+// first button is the one that opens the thread.
+const threadRowOpenButton = (row: Locator): Locator => row.locator(':scope > div > button').first()
 
 const startBlankThread = async (page: Page): Promise<string> => {
   const createResponsePromise = page.waitForResponse(
@@ -58,17 +61,6 @@ const startBlankThread = async (page: Page): Promise<string> => {
 const openSidebarSettings = async (page: Page): Promise<void> => {
   await threadSidebar(page).getByRole('button', { name: 'Sidebar settings', exact: true }).click()
   await expect(sidebarSettings(page)).toBeVisible()
-}
-
-/** The account launcher owns the foot's settings seat, so Settings is its first menu item there. */
-const openSettings = async (page: Page): Promise<void> => {
-  const trigger = page.getByRole('button', { name: 'Settings', exact: true })
-  if ((await trigger.count()) > 0) {
-    await trigger.click()
-    return
-  }
-  await page.getByRole('button', { name: 'Account menu', exact: true }).click()
-  await page.getByRole('menuitem', { name: 'Settings', exact: true }).click()
 }
 
 const statusFilterLabels: readonly string[] = ['All threads', 'Working', 'Not working', 'Needs attention', 'Muted', 'Archived']
@@ -562,17 +554,17 @@ When('one thread is marked unread and another thread is opened', async ({ page }
   const otherRow = threadSidebar(page).locator('article').filter({ hasText: 'thread sidebar sibling unread' })
   await expect(otherRow).toHaveCount(1)
 
-  await targetRow.getByRole('button').first().click()
+  await threadRowOpenButton(targetRow).click()
   await expect.poll(() => currentThreadId(page)).toBe(targetThreadId)
   await targetRow.click({ button: 'right' })
   await page.getByRole('menuitem', { name: 'Mark unread', exact: true }).click()
   await expect(targetRow.getByRole('img', { name: 'Unread', exact: true })).toBeVisible()
 
-  await otherRow.getByRole('button').first().click()
+  await threadRowOpenButton(otherRow).click()
   await expect.poll(() => currentThreadId(page)).toBe(otherThreadId)
   await expect(targetRow.getByRole('img', { name: 'Unread', exact: true })).toBeVisible()
 
-  await targetRow.getByRole('button').first().click()
+  await threadRowOpenButton(targetRow).click()
   await expect.poll(() => currentThreadId(page)).toBe(targetThreadId)
 })
 
@@ -629,7 +621,7 @@ Then('every open tab shows the finished turn until one tab opens it', async ({ p
       await expect(finishedLabel(otherTab)).toBeVisible({ timeout: 30_000 })
     })
     await recordAssertion(page, 'thread-sidebar-turn-finished-clears-in-every-tab', async () => {
-      await threadRow(otherTab, journey.targetThreadId).getByRole('button').first().click()
+      await threadRowOpenButton(threadRow(otherTab, journey.targetThreadId)).click()
       await expect(finishedLabel(otherTab)).toHaveCount(0, { timeout: 15_000 })
       await page.bringToFront()
       await page.reload()
@@ -695,7 +687,7 @@ Then('the selected attention color survives a browser reload', async ({ page }: 
 
 When('notification routes and sounds are configured in Settings', async ({ page }: { page: Page }) => {
   const settingsDialog = page.getByRole('dialog', { name: 'Settings', exact: true })
-  await openSettings(page)
+  await openSettingsDialog(page)
   await expect(settingsDialog).toBeVisible()
   await settingsDialog.getByRole('button', { name: 'Built-in plugins', exact: true }).click()
   await settingsDialog.getByRole('tab', { name: 'Thread sidebar', exact: true }).click()
@@ -711,7 +703,7 @@ When('notification routes and sounds are configured in Settings', async ({ page 
 Then('the notification settings survive a browser reload', async ({ page }: { page: Page }) => {
   const settingsDialog = page.getByRole('dialog', { name: 'Settings', exact: true })
   await page.reload()
-  await openSettings(page)
+  await openSettingsDialog(page)
   await settingsDialog.getByRole('button', { name: 'Built-in plugins', exact: true }).click()
   await settingsDialog.getByRole('tab', { name: 'Thread sidebar', exact: true }).click()
   const notificationSettings = settingsDialog.getByRole('group', { name: 'Thread notifications', exact: true })
@@ -980,8 +972,7 @@ Then("the side panel hosts that thread's scrollable conversation and composer", 
   await finishJourneyAssertions(page)
 })
 
-const asideTab = (page: Page) =>
-  page.locator('[data-dockkit-tab]').filter({ hasText: 'aside e2e target' })
+const asideTab = (page: Page) => page.locator('[data-dockkit-tab]').filter({ hasText: 'aside e2e target' })
 const rowActionContainer = (row: ReturnType<typeof threadRow>) => row.getByTestId('thread-row-actions')
 
 Then('the thread row offers the side-panel hover action', async ({ page }: { page: Page }) => {

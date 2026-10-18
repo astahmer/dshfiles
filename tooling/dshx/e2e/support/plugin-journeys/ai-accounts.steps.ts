@@ -1,6 +1,6 @@
 import { expect, type Page } from '@playwright/test'
 import { After, Then, When } from '../bdd.js'
-import { finishJourneyAssertions, recordAssertion } from '../steps.js'
+import { finishJourneyAssertions, openSettingsDialog, recordAssertion } from '../steps.js'
 import { fakeCommandCodeFor, startFakeCommandCode, stopFakeCommandCode } from '../fake-command-code.js'
 
 const providerAccounts = (page: Page) => page.getByRole('complementary', { name: 'Provider accounts' })
@@ -27,7 +27,7 @@ const openAccountsPanel = async (page: Page): Promise<void> => {
   if (await globalPanel.isVisible()) {
     await globalPanel.click()
   } else {
-    await page.getByRole('button', { name: 'Settings', exact: true }).click()
+    await openSettingsDialog(page)
     await page.getByRole('dialog').getByRole('button', { name: 'AI Accounts', exact: true }).click()
     await page.getByRole('button', { name: 'Open AI Accounts', exact: true }).click()
   }
@@ -52,13 +52,13 @@ Then('the inline credential action opens AI Accounts', async ({ page }: { page: 
 })
 
 When('the AI Accounts settings section is opened', async ({ page }: { page: Page }) => {
-  await page.getByRole('button', { name: 'Settings', exact: true }).click()
+  await openSettingsDialog(page)
   await page.getByRole('dialog').getByRole('button', { name: 'AI Accounts', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Failure recovery' })).toBeVisible()
 })
 
 When('a Codex account draft is edited in manual save mode', async ({ page }: { page: Page }) => {
-  await page.getByRole('button', { name: 'Settings', exact: true }).click()
+  await openSettingsDialog(page)
   await page.getByRole('dialog').getByRole('button', { name: 'AI Accounts', exact: true }).click()
   const manualSave = page.getByRole('radio', { name: /Manual/ })
   // The radio follows the stored setting, so it flips after the Host round trip rather than on click.
@@ -80,7 +80,7 @@ Then('the manual draft saves and persists when AI Accounts is reopened', async (
     await expect(saveChanges).toBeDisabled()
     // The panel header and the account footer both announce the save.
     await expect(page.getByRole('status').filter({ hasText: 'Saved. New sessions use the updated route settings.' }).first()).toBeVisible()
-    await page.getByRole('button', { name: 'Settings', exact: true }).click()
+    await openSettingsDialog(page)
     await page.getByRole('dialog').getByRole('button', { name: 'AI Accounts', exact: true }).click()
     await expect(page.getByRole('radio', { name: /Manual/ })).toBeChecked()
     await page.getByRole('button', { name: 'Open AI Accounts', exact: true }).click()
@@ -137,7 +137,7 @@ Then('the price refresh interval and explicit override can be changed and restor
     await overrides.blur()
     await expect(overrides).toHaveValue('codex/* = free')
     await page.getByRole('button', { name: 'Open AI Accounts', exact: true }).click()
-    await page.getByRole('button', { name: 'Settings', exact: true }).click()
+    await openSettingsDialog(page)
     await page.getByRole('dialog').getByRole('button', { name: 'AI Accounts', exact: true }).click()
     await expect(refreshInterval).toHaveText('2 days')
     await expect(overrides).toHaveValue('codex/* = free')
@@ -261,11 +261,20 @@ Then('the failed account reports the provider error instead of a quota', async (
   await finishJourneyAssertions(page)
 })
 
+/** The picker lists the route radios directly on a fresh session, but shows the Model cell that opens them once one is picked. */
+const selectAccountModel = async (page: Page, model: string): Promise<void> => {
+  const cell = page.getByRole('menuitem', { name: /^Model / })
+  const option = page.getByRole('menuitemradio', { name: model, exact: true })
+  await expect(option.or(cell).first()).toBeVisible()
+  if ((await option.count()) === 0) await cell.click()
+  await option.click()
+}
+
 const stripMeter = (page: Page) => page.getByRole('group', { name: /^AI accounts usage/ }).getByRole('button', { name: /^Command Code 1: Weekly limit/ })
 
 Then('the usage strip shows its short name, renamed from AI Accounts settings', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'ai-accounts-strip-shows-initials-by-default', () => expect(stripMeter(page)).toContainText('CC'))
-  await page.getByRole('button', { name: 'Settings', exact: true }).click()
+  await openSettingsDialog(page)
   await page.getByRole('dialog').getByRole('button', { name: 'AI Accounts', exact: true }).click()
   await expect(page.getByRole('switch', { name: 'Short names in the strip', exact: true })).toBeChecked()
   const shortName = page.getByRole('textbox', { name: 'Short name for Command Code 1', exact: true })
@@ -295,8 +304,7 @@ When('a rate-limited and a healthy Command Code account share a local fake provi
 When("a new thread asks the first account's model a question", async ({ page }: { page: Page }) => {
   await page.getByRole('treeitem', { name: 'New Session', exact: true }).click()
   await page.getByRole('button', { name: /^Select model/ }).click()
-  await page.getByRole('menuitem', { name: /^Model / }).click()
-  await page.getByRole('menuitemradio', { name: 'commandcode_work/gpt-6-luna', exact: true }).click()
+  await selectAccountModel(page, 'commandcode_work/gpt-6-luna')
   await expect(page.getByRole('button', { name: /^Select model, current commandcode_work\/gpt-6-luna/ })).toBeVisible()
   const composer = page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })
   await composer.fill('Which account answers?')
@@ -328,7 +336,7 @@ When('an exhausted Command Code account fails a turn with failover off', async (
   await openAccountsPanel(page)
   await addCommandCodeAccount(page, { name: 'Command Code 1', key: 'e2e-fake-key-EXHAUSTED' })
   // The inline recovery choice exists only while automatic exhausted-limit failover is off.
-  await page.getByRole('button', { name: 'Settings', exact: true }).click()
+  await openSettingsDialog(page)
   await page.getByRole('dialog').getByRole('button', { name: 'AI Accounts', exact: true }).click()
   const exhausted = page.getByRole('group', { name: /Usage exhausted/ })
   const failover = exhausted.getByRole('switch', { name: 'Fail over to the next account' })
@@ -337,8 +345,7 @@ When('an exhausted Command Code account fails a turn with failover off', async (
   await page.keyboard.press('Escape')
   await page.getByRole('treeitem', { name: 'New Session', exact: true }).click()
   await page.getByRole('button', { name: /^Select model/ }).click()
-  await page.getByRole('menuitem', { name: /^Model / }).click()
-  await page.getByRole('menuitemradio', { name: 'commandcode_work/gpt-6-luna', exact: true }).click()
+  await selectAccountModel(page, 'commandcode_work/gpt-6-luna')
   const composer = page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })
   await composer.fill('Recover this turn on another available route.')
   await composer.press('Enter')
