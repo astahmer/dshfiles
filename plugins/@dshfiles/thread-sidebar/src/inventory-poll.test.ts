@@ -102,3 +102,20 @@ test('a visibility event while the page stayed visible changes nothing', () => {
   assert.equal(timer.pending(), 1)
   assert.deepEqual(refreshes, [1])
 })
+
+test('a schedule stopped for a hidden surface stays quiet through a visibility cycle', () => {
+  const { subject, timer, refreshes, hide, show } = poll()
+  subject.start()
+  subject.setAvailable(false)
+  assert.equal(timer.pending(), 0)
+
+  hide()
+  subject.visibilityChanged()
+  show()
+  subject.visibilityChanged()
+  assert.deepEqual(refreshes, [])
+  assert.equal(timer.pending(), 0)
+
+  subject.setAvailable(true)
+  assert.equal(timer.pending(), 1)
+})

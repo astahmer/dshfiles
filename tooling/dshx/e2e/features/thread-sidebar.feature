@@ -168,3 +168,12 @@ Feature: Thread sidebar journeys
     Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted with session content search
     When another thread references a visible Host thread from its composer
     Then both menus list the referencing thread under Referenced by
+
+  @scenario:thread-sidebar.jj-inventory-pauses-while-collapsed
+  Scenario: A collapsed sidebar stops reading the JJ inventory
+    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
+    And the provider onboarding prompt is dismissed
+    And the browser counts JJ inventory requests
+    When the sidebar inventory pane is collapsed
+    Then no JJ inventory request is made while the sidebar is collapsed
+    Then the JJ inventory is read again after the sidebar expands

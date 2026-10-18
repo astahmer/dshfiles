@@ -1588,6 +1588,32 @@
           "testName": "retries a search that could not answer yet before calling the lookup degraded"
         }
       ]
+    },
+    {
+      "id": "thread-inventory-reads",
+      "title": "Read the thread inventory only while it is on screen",
+      "summary": "The sidebar reads the JJ repository inventory when its thread region is visible and stops while the sidebar is collapsed, so a hidden sidebar buys no jj scan; the schedule is sixty seconds, in step with the sixty-second repository view the Host keeps.",
+      "surfaces": ["client", "integration"],
+      "configuration": [],
+      "states": ["inventory-visible", "inventory-suspended"],
+      "failureModes": [
+        "A Host whose integration API owner is missing leaves the inventory query unanswered, and the schedule stops instead of repeating a request that cannot succeed.",
+        "Collapsing the sidebar while a read is in flight lets that read finish and ignores its result; no new read is scheduled."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "thread-sidebar.jj-inventory-pauses-while-collapsed",
+          "featureFile": "tooling/dshx/e2e/features/thread-sidebar.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.inventory-poll-collapsed",
+          "file": "plugins/@dshfiles/thread-sidebar/src/inventory-poll.test.ts",
+          "testName": "a schedule stopped for a hidden surface stays quiet through a visibility cycle"
+        }
+      ]
     }
   ],
   "kind": "bundle"

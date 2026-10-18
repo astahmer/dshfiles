@@ -183,6 +183,8 @@ type ThreadSidebarProps = Pick<WorkspaceBrowserProps, 'open' | 'useSessions' | '
   InjectedActions & {
     tSidebar: TranslateNS<typeof THREAD_SIDEBAR_LOCALE_NAMESPACE>
     onNavigationLookahead?: (sessionIds: readonly SessionSummary['id'][]) => void
+    /** The sidebar shell hides the thread region with CSS when it is collapsed; absent means a mount with no shell. */
+    wide?: boolean
   }
 
 type ThreadSidebarTranslate = ThreadSidebarProps['tSidebar']
@@ -269,8 +271,11 @@ const threadSourceFilterLabelKeys = {
 } satisfies Record<ThreadSourceFilter, Parameters<ThreadSidebarTranslate>[0]>
 
 const ALL_PROJECTS = '__all__'
-/** How often the sidebar re-reads the JJ inventory while the page is visible. */
-const INVENTORY_REFRESH_INTERVAL_MS = 30_000
+/**
+ * How often the sidebar re-reads the JJ inventory while the page is visible. The Host keeps a repository view for sixty
+ * seconds, so a shorter schedule spent a full jj scan on every other tick.
+ */
+const INVENTORY_REFRESH_INTERVAL_MS = 60_000
 const UNASSIGNED_PROJECT = '__unassigned__'
 
 const sections: readonly SidebarSection[] = ['pinned', 'active', 'parked', 'settled', 'inactive', 'archived']
@@ -1041,12 +1046,15 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const [usageLimitBusyIds, setUsageLimitBusyIds] = useState<ReadonlySet<string>>(() => new Set())
   const [usageLimitResumeAllBusy, setUsageLimitResumeAllBusy] = useState(false)
   const machine = useApiQuery(threadSidebarMachineApi, 'name', { enabled: preferences.threadRowMachine }).data?.name
-  const jjRepositories = useApiQuery(jjIntegrationApi, 'repositories', { input: {} })
+  // Collapsing the sidebar hides the thread region with CSS, so a jj scan bought while collapsed has no reader: the
+  // query waits, the schedule stops, and expanding the sidebar fetches once and arms it again.
+  const jjInventoryVisible = props.wide !== false
+  const jjRepositories = useApiQuery(jjIntegrationApi, 'repositories', { input: {}, enabled: jjInventoryVisible })
   const refetchJjRepositories = jjRepositories.refetch
   const jjOwnerMissing = isApiOwnerMissing(jjRepositories.error)
   useEffect(() => {
-    // The inventory schedule pauses with the page and stops for good once the API owner is missing, instead of
-    // polling a Host that no longer answers the integration API every thirty seconds.
+    // The inventory schedule pauses with the page, waits while the sidebar is collapsed, and stops for good once the
+    // API owner is missing, instead of polling a Host that no longer answers the integration API.
     const poll = createInventoryPoll({
       refresh: refetchJjRepositories,
       intervalMs: INVENTORY_REFRESH_INTERVAL_MS,
@@ -1057,12 +1065,12 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     const onVisibilityChange = (): void => poll.visibilityChanged()
     document.addEventListener('visibilitychange', onVisibilityChange)
     poll.start()
-    poll.setAvailable(!jjOwnerMissing)
+    poll.setAvailable(!jjOwnerMissing && jjInventoryVisible)
     return () => {
       document.removeEventListener('visibilitychange', onVisibilityChange)
       poll.stop()
     }
-  }, [jjOwnerMissing, refetchJjRepositories])
+  }, [jjInventoryVisible, jjOwnerMissing, refetchJjRepositories])
   const [childrenOpenOverrides, setChildrenOpenOverrides] = useState<ReadonlyMap<string, boolean>>(() => new Map())
   const [expandedParents, setExpandedParents] = useState<ReadonlySet<string>>(() => new Set())
   const [settingsOpen, setSettingsOpen] = useState(false)

@@ -1210,3 +1210,67 @@ Then('both menus list the referencing thread under Referenced by', async ({ page
   })
   await finishJourneyAssertions(page)
 })
+
+/**
+ * The collapsed sidebar labels its toggle "Expand sidebar" in this composition, and the frame-layout journeys own the
+ * "Open/Collapse sidebar" wording; these read the state instead of assuming either label.
+ */
+const sidebarCollapseControl = (page: Page) => page.getByRole('button', { name: /^Collapse sidebar$/ }).first()
+const sidebarExpandControl = (page: Page) => page.getByRole('button', { name: /^(?:Expand|Open) sidebar$/ }).first()
+
+const jjInventoryRequests = new WeakMap<Page, { count: number }>()
+
+/** Counts the JJ inventory reads the page makes, so a journey can prove a hidden surface bought none. */
+const countJjInventoryRequests = (page: Page): { count: number } => {
+  const existing = jjInventoryRequests.get(page)
+  if (existing !== undefined) return existing
+  const entry = { count: 0 }
+  page.on('request', request => {
+    if (/\/api\/dshx-[0-9a-f]+\/repositories$/.test(new URL(request.url()).pathname)) entry.count += 1
+  })
+  jjInventoryRequests.set(page, entry)
+  return entry
+}
+
+/** The fresh profile raises this prompt over the app; a collapse click would wait on it forever. */
+When('the provider onboarding prompt is dismissed', async ({ page }: { page: Page }) => {
+  const prompt = page.getByRole('dialog', { name: /^(?:Add an API key to get started|Get started)$/ })
+  if (!(await prompt.isVisible().catch(() => false))) return
+  await page.keyboard.press('Escape')
+  await prompt
+    .getByRole('button', { name: 'Close', exact: true })
+    .click({ timeout: 4_000 })
+    .catch(() => undefined)
+  await prompt.waitFor({ state: 'hidden', timeout: 4_000 }).catch(() => undefined)
+})
+
+When('the browser counts JJ inventory requests', async ({ page }: { page: Page }) => {
+  countJjInventoryRequests(page)
+})
+
+When('the sidebar inventory pane is collapsed', async ({ page }: { page: Page }) => {
+  await sidebarCollapseControl(page).click()
+  await expect(sidebarExpandControl(page)).toBeVisible()
+})
+
+Then('no JJ inventory request is made while the sidebar is collapsed', async ({ page }: { page: Page }) => {
+  const counted = countJjInventoryRequests(page)
+  const reads = counted.count
+  await page.waitForTimeout(2_000)
+  await recordAssertion(page, 'thread-sidebar-collapsed-skips-jj-inventory', async () => {
+    expect(counted.count).toBe(reads)
+  })
+  await finishJourneyAssertions(page)
+})
+
+Then('the JJ inventory is read again after the sidebar expands', async ({ page }: { page: Page }) => {
+  const counted = countJjInventoryRequests(page)
+  const reads = counted.count
+  await sidebarExpandControl(page).click()
+  await recordAssertion(page, 'thread-sidebar-expanded-reads-jj-inventory', async () => {
+    // Expanding re-enables the query; the sample is taken before the click so the read it buys is what is counted.
+    await expect.poll(() => counted.count, { timeout: 20_000 }).toBeGreaterThan(reads)
+    await expect(sidebarCollapseControl(page)).toBeVisible()
+  })
+  await finishJourneyAssertions(page)
+})
