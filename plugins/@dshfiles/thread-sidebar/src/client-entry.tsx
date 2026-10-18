@@ -355,13 +355,15 @@ export default defineClient({
       }, `thread-sidebar: ${commandId} shortcut`)
     }
 
-    ctx.slots.inject('settings.plugins.tab', () =>
+    // One surface, in the Settings navigation: users look for thread preferences beside the other
+    // sections, and the plugin's generated page cannot show these fields (they are hidden in the schema).
+    ctx.slots.inject('settings.section', () =>
       ctx.slots.register(
         {
-          name: 'settings.plugins.tab',
+          name: 'settings.section',
           registrant: '@dshfiles/thread-sidebar',
           id: 'thread-sidebar',
-          order: 30,
+          order: 40,
           label: () => ctx.locale.bind(THREAD_SIDEBAR_LOCALE_NAMESPACE)('threadSidebarSettingsTab'),
           locale: THREAD_SIDEBAR_LOCALE_NAMESPACE,
         },

@@ -39,7 +39,10 @@ const threadRow = (page: Page, threadId: string) => threadSidebar(page).locator(
 // A row seats a hover-only action strip over its right half, so a click at the row's centre lands on an action
 // button once the pointer reveals the strip: open the thread from the left half of its trigger instead.
 const openThreadRow = async (row: Locator): Promise<void> => {
-  await row.locator(':scope > div > button').first().click({ position: { x: 24, y: 16 } })
+  await row
+    .locator(':scope > div > button')
+    .first()
+    .click({ position: { x: 24, y: 16 } })
 }
 
 const startBlankThread = async (page: Page): Promise<string> => {
@@ -687,32 +690,93 @@ Then('the selected attention color survives a browser reload', async ({ page }: 
   await finishJourneyAssertions(page)
 })
 
-When('notification routes and sounds are configured in Settings', async ({ page }: { page: Page }) => {
+/**
+ * Opens the plugin's own Settings section. It is found by its label, not by a nav id: a profile whose
+ * composition uses the native settings shell renders this section without our `data-nav-id` attribute.
+ *
+ * Every action here is bounded: the app raises an unconfigured-Host provider prompt over the launcher and
+ * rebuilds the settings navigation as the profile settles, and an unbounded click would otherwise wait
+ * the whole test timeout instead of failing where the section never opened.
+ */
+const openThreadSidebarSettingsSection = async (page: Page): Promise<Locator> => {
   const settingsDialog = page.getByRole('dialog', { name: 'Settings', exact: true })
-  await openSettingsDialog(page)
-  await expect(settingsDialog).toBeVisible()
-  await settingsDialog.getByRole('button', { name: 'Built-in plugins', exact: true }).click()
-  await settingsDialog.getByRole('tab', { name: 'Thread sidebar', exact: true }).click()
+  const notifications = settingsDialog.getByRole('group', { name: 'Thread notifications', exact: true })
+  const section = settingsDialog.getByRole('button', { name: 'Thread sidebar', exact: true }).first()
+  const providerPrompt = page.getByRole('dialog', { name: /^(Add an API key to get started|Get started)$/ })
+  const deadline = Date.now() + 45_000
+  while (Date.now() < deadline) {
+    if (await notifications.isVisible().catch(() => false)) return settingsDialog
+    if (await providerPrompt.isVisible().catch(() => false)) {
+      // The scratch Host raises this prompt over the app, and it can end up stacked under the Settings
+      // modal, where each blocks the other's buttons. Close the top modal first, then the prompt itself.
+      await page.keyboard.press('Escape')
+      await providerPrompt
+        .getByRole('button', { name: 'Close', exact: true })
+        .click({ timeout: 4_000 })
+        .catch(() => undefined)
+      await providerPrompt.waitFor({ state: 'hidden', timeout: 4_000 }).catch(() => undefined)
+      continue
+    }
+    await openSettingsDialog(page, { timeoutMs: 4_000 }).catch(() => undefined)
+    await section.click({ timeout: 4_000 }).catch(() => undefined)
+  }
+  await expect(notifications).toBeVisible({ timeout: 10_000 })
+  return settingsDialog
+}
+
+/**
+ * Records every tone the client schedules, so a preview that produces nothing fails this journey
+ * instead of passing quietly. Patches the prototype, so it also sees a context created earlier.
+ */
+const installNotificationAudioProbe = async (page: Page): Promise<void> => {
+  await page.evaluate(() => {
+    document.body.dataset.dshNotificationTones = '0'
+    document.body.dataset.dshNotificationAudioState = ''
+    const originalCreateOscillator = AudioContext.prototype.createOscillator
+    AudioContext.prototype.createOscillator = function (this: AudioContext) {
+      const oscillator = originalCreateOscillator.call(this)
+      const originalStart = oscillator.start.bind(oscillator)
+      oscillator.start = (when?: number) => {
+        document.body.dataset.dshNotificationTones = String(Number(document.body.dataset.dshNotificationTones ?? '0') + 1)
+        document.body.dataset.dshNotificationAudioState = this.state
+        originalStart(when)
+      }
+      return oscillator
+    }
+  })
+}
+
+When('notification routes and sounds are configured in Settings', async ({ page }: { page: Page }) => {
+  const settingsDialog = await openThreadSidebarSettingsSection(page)
   const notificationSettings = settingsDialog.getByRole('group', { name: 'Thread notifications', exact: true })
   await expect(notificationSettings).toBeVisible()
+  await installNotificationAudioProbe(page)
   await notificationSettings.getByRole('button', { name: 'Approval needed: Off', exact: true }).click()
   await page.getByRole('menuitemradio', { name: 'In-app', exact: true }).click()
   await notificationSettings.getByRole('checkbox', { name: 'Approval needed: Play a sound', exact: true }).click()
   await notificationSettings.getByRole('button', { name: 'Approval needed Sound: Soft', exact: true }).click()
   await page.getByRole('menuitemradio', { name: 'Chime', exact: true }).click()
+  await notificationSettings.getByRole('button', { name: 'Turn stopped: Off', exact: true }).click()
+  await page.getByRole('menuitemradio', { name: 'System notification', exact: true }).click()
+  await notificationSettings.getByRole('button', { name: 'Preview sound', exact: true }).first().click()
+})
+
+Then('previewing a notification sound plays a tone through the browser audio context', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'thread-sidebar-notification-preview-plays-a-tone', async () => {
+    await expect.poll(() => page.evaluate(() => document.body.dataset.dshNotificationTones ?? '0')).not.toBe('0')
+    expect(await page.evaluate(() => document.body.dataset.dshNotificationAudioState ?? '')).toBe('running')
+  })
 })
 
 Then('the notification settings survive a browser reload', async ({ page }: { page: Page }) => {
-  const settingsDialog = page.getByRole('dialog', { name: 'Settings', exact: true })
   await page.reload()
-  await openSettingsDialog(page)
-  await settingsDialog.getByRole('button', { name: 'Built-in plugins', exact: true }).click()
-  await settingsDialog.getByRole('tab', { name: 'Thread sidebar', exact: true }).click()
+  const settingsDialog = await openThreadSidebarSettingsSection(page)
   const notificationSettings = settingsDialog.getByRole('group', { name: 'Thread notifications', exact: true })
   await recordAssertion(page, 'thread-sidebar-notification-category-settings-survive-reload', async () => {
     await expect(notificationSettings.getByRole('button', { name: 'Approval needed: In-app', exact: true })).toBeVisible()
     await expect(notificationSettings.getByRole('checkbox', { name: 'Approval needed: Play a sound', exact: true })).toBeChecked()
     await expect(notificationSettings.getByRole('button', { name: 'Approval needed Sound: Chime', exact: true })).toBeVisible()
+    await expect(notificationSettings.getByRole('button', { name: 'Turn stopped: System notification', exact: true })).toBeVisible()
   })
   await finishJourneyAssertions(page)
 })

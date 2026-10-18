@@ -76,6 +76,17 @@ test('notification categories default off and validate delivery, sound, and volu
   assert.equal(ThreadNotificationModel.threadNotificationHasOutput({ ...DEFAULT_THREAD_NOTIFICATION_CATEGORIES.failed, sound: true }), true)
 })
 
+test('categories saved before the stopped category decode with it defaulted in', () => {
+  const { stopped: _stopped, ...savedBeforeStopped } = DEFAULT_THREAD_NOTIFICATION_CATEGORIES
+  const parsed = threadNotificationCategoriesSchema.parse({
+    ...savedBeforeStopped,
+    'turn-finished': { ...DEFAULT_THREAD_NOTIFICATION_CATEGORIES['turn-finished'], delivery: 'system', sound: true },
+  })
+  assert.deepEqual(parsed.stopped, DEFAULT_THREAD_NOTIFICATION_CATEGORIES.stopped)
+  assert.equal(parsed['turn-finished'].delivery, 'system')
+  assert.equal(parsed['turn-finished'].sound, true)
+})
+
 test('delivery routing distinguishes in-app, system, both, and off', () => {
   assert.deepEqual(
     ['off', 'in-app', 'system', 'both'].map(delivery => {
@@ -95,12 +106,12 @@ test('delivery routing distinguishes in-app, system, both, and off', () => {
   )
 })
 
-test('only completed and error endings notify; cancellation and interruption are not failures', () => {
+test('completed, stopped, and error endings each notify as their own category', () => {
   assert.equal(ThreadNotificationModel.categoryForFinishReason('completed'), 'turn-finished')
   assert.equal(ThreadNotificationModel.categoryForFinishReason('error'), 'failed')
-  assert.equal(ThreadNotificationModel.categoryForFinishReason('aborted'), undefined)
-  assert.equal(ThreadNotificationModel.categoryForFinishReason('blocked'), undefined)
-  assert.equal(ThreadNotificationModel.categoryForFinishReason('max-tokens'), undefined)
+  assert.equal(ThreadNotificationModel.categoryForFinishReason('aborted'), 'stopped')
+  assert.equal(ThreadNotificationModel.categoryForFinishReason('blocked'), 'stopped')
+  assert.equal(ThreadNotificationModel.categoryForFinishReason('max-tokens'), 'stopped')
 })
 
 test('event claims deduplicate ids and retain only the newest 5,000', () => {

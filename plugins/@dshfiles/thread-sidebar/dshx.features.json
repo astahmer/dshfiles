@@ -682,21 +682,21 @@
     {
       "id": "notification-delivery",
       "title": "Configure per-category thread notifications",
-      "summary": "Choose off, in-app, system, or both delivery for approval, input, completed-turn, and failed-turn events; configure per-category sounds and grant system permission explicitly.",
+      "summary": "Choose off, in-app, system, or both delivery for approval, input, completed-turn, stopped-turn, and failed-turn events; configure per-category sounds and grant system permission explicitly.",
       "reach": [
         "click button \"Account menu\"",
         "click menuitem \"Settings\"",
-        "click button \"Built-in plugins\"",
-        "click tab \"Thread sidebar\"",
+        "click button \"Thread sidebar\"",
         "expect group \"Thread notifications\"",
-        "expect button \"Approval needed: Off\""
+        "expect button \"Approval needed: Off\"",
+        "expect button \"Turn stopped: Off\""
       ],
       "surfaces": ["client", "host", "settings", "storage"],
       "configuration": [
         {
           "key": "notificationCategories",
           "defaultValue": "all categories off; per-category sound disabled",
-          "constraints": "Host-synced category settings; each category selects off, in-app, system, or both, plus an optional sound preset and volume.",
+          "constraints": "Host-synced category settings; each of the five categories selects off, in-app, system, or both, plus an optional sound preset and volume.",
           "coveredBy": ["thread-sidebar.notifications-settings"]
         }
       ],
@@ -705,7 +705,8 @@
         "System permission is requested only by the explicit Allow system notifications action; notification delivery never prompts on its own.",
         "OS notification title and body are generic and omit thread titles, prompts, and raw error details; details stay inside DSH.",
         "Muted, selected, excluded subagent, or already-delivered events do not notify; event claims are bounded to the most recent 5,000 per browser.",
-        "Only completed and error endings notify; aborted, blocked, interrupted, and max-token endings are not classified as completed or failed alerts.",
+        "Only completed, stopped, and error endings notify; approvals and questions come from pending interactions instead.",
+        "A sound is scheduled only while the browser audio context runs; the first user gesture unlocks it, and a preview that produces no tone reports audio as unavailable.",
         "The Host attention record already stores finish reason and sequence, so notification categories require no duplicate outcome store."
       ],
       "externalDependencies": [],
@@ -725,7 +726,19 @@
           "kind": "unit-test",
           "id": "thread-sidebar.notifications-unit-finish-classification",
           "file": "plugins/@dshfiles/thread-sidebar/src/thread-notifications.test.ts",
-          "testName": "only completed and error endings notify; cancellation and interruption are not failures"
+          "testName": "completed, stopped, and error endings each notify as their own category"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.notifications-unit-stopped-migration",
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-notifications.test.ts",
+          "testName": "categories saved before the stopped category decode with it defaulted in"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.notifications-unit-audio",
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-notification-audio.test.ts",
+          "testName": "a notification sound resumes the audio context and starts a tone without a prior settings visit"
         },
         {
           "kind": "unit-test",

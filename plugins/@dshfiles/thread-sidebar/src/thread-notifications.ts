@@ -2,8 +2,11 @@ import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import { z } from 'zod'
 import type { AttentionFinishReason, ThreadAttentionMigrationEntry } from './attention-api.js'
 
-export const THREAD_NOTIFICATION_CATEGORIES = ['approval-needed', 'input-needed', 'turn-finished', 'failed'] as const
+export const THREAD_NOTIFICATION_CATEGORIES = ['approval-needed', 'input-needed', 'turn-finished', 'stopped', 'failed'] as const
 export type ThreadNotificationCategory = (typeof THREAD_NOTIFICATION_CATEGORIES)[number]
+/** The categories a finished turn can land in; approvals and questions come from pending interactions. */
+const THREAD_FINISH_NOTIFICATION_CATEGORIES = ['turn-finished', 'stopped', 'failed'] as const
+export type ThreadFinishNotificationCategory = (typeof THREAD_FINISH_NOTIFICATION_CATEGORIES)[number]
 export type ThreadNotificationDelivery = 'off' | 'in-app' | 'system' | 'both'
 export type ThreadNotificationSound = 'soft' | 'chime' | 'bright' | 'low'
 
@@ -20,6 +23,7 @@ export const DEFAULT_THREAD_NOTIFICATION_CATEGORIES = {
   'approval-needed': { delivery: 'off', sound: false, soundPreset: 'soft', volume: 0.5 },
   'input-needed': { delivery: 'off', sound: false, soundPreset: 'chime', volume: 0.5 },
   'turn-finished': { delivery: 'off', sound: false, soundPreset: 'bright', volume: 0.5 },
+  stopped: { delivery: 'off', sound: false, soundPreset: 'low', volume: 0.5 },
   failed: { delivery: 'off', sound: false, soundPreset: 'low', volume: 0.5 },
 } satisfies ThreadNotificationCategories
 
@@ -37,6 +41,7 @@ export const threadNotificationCategoriesSchema = z
     'approval-needed': threadNotificationCategoryPreferencesSchema.default(DEFAULT_THREAD_NOTIFICATION_CATEGORIES['approval-needed']),
     'input-needed': threadNotificationCategoryPreferencesSchema.default(DEFAULT_THREAD_NOTIFICATION_CATEGORIES['input-needed']),
     'turn-finished': threadNotificationCategoryPreferencesSchema.default(DEFAULT_THREAD_NOTIFICATION_CATEGORIES['turn-finished']),
+    stopped: threadNotificationCategoryPreferencesSchema.default(DEFAULT_THREAD_NOTIFICATION_CATEGORIES.stopped),
     failed: threadNotificationCategoryPreferencesSchema.default(DEFAULT_THREAD_NOTIFICATION_CATEGORIES.failed),
   })
   .strict()
@@ -63,11 +68,23 @@ const categoriesForLegacyDesktopNotifications = () =>
     'approval-needed': { ...DEFAULT_THREAD_NOTIFICATION_CATEGORIES['approval-needed'], delivery: 'system' },
     'input-needed': { ...DEFAULT_THREAD_NOTIFICATION_CATEGORIES['input-needed'], delivery: 'system' },
     'turn-finished': { ...DEFAULT_THREAD_NOTIFICATION_CATEGORIES['turn-finished'], delivery: 'system' },
+    stopped: { ...DEFAULT_THREAD_NOTIFICATION_CATEGORIES.stopped, delivery: 'system' },
     failed: { ...DEFAULT_THREAD_NOTIFICATION_CATEGORIES.failed, delivery: 'system' },
   }) satisfies ThreadNotificationCategories
 
-const categoryForFinishReason = (reason: AttentionFinishReason): ThreadNotificationCategory | undefined =>
-  reason === 'error' ? 'failed' : reason === 'completed' ? 'turn-finished' : undefined
+/**
+ * Every finish reason a thread can be notified about. A new reason in
+ * {@link AttentionFinishReason} fails this map instead of silently going unannounced.
+ */
+const finishReasonCategories = {
+  completed: 'turn-finished',
+  error: 'failed',
+  aborted: 'stopped',
+  blocked: 'stopped',
+  'max-tokens': 'stopped',
+} as const satisfies Record<AttentionFinishReason, ThreadFinishNotificationCategory>
+
+const categoryForFinishReason = (reason: AttentionFinishReason): ThreadFinishNotificationCategory => finishReasonCategories[reason]
 
 const deliveredNotificationIdsSchema = z.array(z.string().min(1).max(1024)).max(5000)
 const deliveredNotificationIds = createStoredValue({

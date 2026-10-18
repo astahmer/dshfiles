@@ -29,11 +29,14 @@ or exclude it; explicit per-thread enables still honor excluded projects and
 other safety checks.
 
 Sidebar preferences live in DSH Settings under the Host-synced `thread-sidebar`
-namespace (`src/settings.ts`, registered by `src/host.ts`). User-facing fields
+namespace (`src/settings.ts`, registered by `src/host.ts`). The plugin draws its
+own **Settings › Thread sidebar** section (`src/settings-tab.tsx`, registered by
+`src/client-entry.tsx`) for the preferences the generated form cannot show. The
+generated Plugins page still carries the user-facing namespace fields
 (header style, density, icon-row overflow, recent-thread count, inactive
-threshold, auto-archive) appear in the generated settings form; layout state
+threshold, auto-archive); layout state
 (order, visibility,
-collapsed sections, project filter, split height, chords) is hidden there.
+collapsed sections, project filter, split height, chords) is hidden everywhere.
 Values previously kept in browser `localStorage` (`dshfiles.thread-sidebar.v1`)
 are copied once into keys the Host still holds at their default, then removed.
 Browser storage is only used while the Host namespace is unavailable.
@@ -181,11 +184,15 @@ muted threads. Mutes follow child-thread action preferences and live in the
 Host-synced `mutedThreads` setting, so every browser stays quiet; mutes saved
 in this browser by older versions are copied there once. **Thread notifications**
 are configured in Settings › Thread sidebar, separately for approval requests,
-questions, completed turns, and failed turns. Each category can be off, in-app,
-system, or both, with an optional sound preset and volume; settings follow the
-user through Host settings. System permission is requested only after an
-explicit action, and OS notification text stays generic (no prompt, thread title,
-or raw error details). Existing desktop-alert choices migrate to system delivery.
+questions, completed turns, stopped turns, and failed turns. Each category can be
+off, in-app, system, or both, with an optional sound preset and volume; settings
+follow the user through Host settings. A stopped turn covers a cancellation, a
+blocked turn, and one that hit its token ceiling. System permission is requested
+only after an explicit action, and OS notification text stays generic (no prompt,
+thread title, or raw error details). Sounds use one browser audio context,
+unlocked by the first user gesture and resumed before every tone, so an alert in a
+background tab still rings. Existing desktop-alert choices migrate to system
+delivery.
 
 **Park vs mute.** Park files a finished thread away: it moves to the Parked
 section, is skipped by auto-archive, and stays parked until unparked, but its

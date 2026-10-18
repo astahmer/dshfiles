@@ -32,6 +32,7 @@ const categoryLabelKeys = {
   'approval-needed': 'threadSidebarApprovalNeeded',
   'input-needed': 'threadSidebarInputNeeded',
   'turn-finished': 'threadSidebarTurnFinished',
+  stopped: 'threadSidebarStopped',
   failed: 'threadSidebarFailed',
 } as const satisfies Record<ThreadNotificationCategory, Parameters<ThreadSidebarTranslate>[0]>
 

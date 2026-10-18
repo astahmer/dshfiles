@@ -83,16 +83,18 @@ const SETTINGS_LAUNCHER = '[data-slot="settings.launcher"] button'
 /**
  * Open the Settings dialog. The shell exposes Settings as an item of the sidebar's Account menu, so
  * clicking a bare `Settings` button resolves nothing: open the menu, then the item. The item carries
- * its shortcut in the accessible name, so match its start.
+ * its shortcut in the accessible name, so match its start. `timeoutMs` bounds every action for callers
+ * that retry while the app settles; omitting it keeps Playwright's unbounded default.
  */
-export const openSettingsDialog = async (page: Page): Promise<void> => {
+export const openSettingsDialog = async (page: Page, options?: { readonly timeoutMs?: number }): Promise<void> => {
+  const clickOptions = options?.timeoutMs === undefined ? undefined : { timeout: options.timeoutMs }
   const launcher = page.locator(SETTINGS_LAUNCHER).first()
   if (!(await launcher.isVisible())) {
-    await page.getByRole('button', { name: 'Account menu', exact: true }).click()
+    await page.getByRole('button', { name: 'Account menu', exact: true }).click(clickOptions)
   } else {
-    await launcher.click()
+    await launcher.click(clickOptions)
   }
-  await page.getByRole('menuitem', { name: /^Settings/ }).click()
+  await page.getByRole('menuitem', { name: /^Settings/ }).click(clickOptions)
 }
 
 export const finishJourneyAssertions = async (page: Page): Promise<void> => {

@@ -95,7 +95,8 @@ Feature: Thread sidebar journeys
   Scenario: Configure category-specific notification routes and sounds
     Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
     When notification routes and sounds are configured in Settings
-    Then the notification settings survive a browser reload
+    Then previewing a notification sound plays a tone through the browser audio context
+    And the notification settings survive a browser reload
 
   @scenario:thread-sidebar.navigation-layout
   Scenario: Header destinations can be reordered and hidden

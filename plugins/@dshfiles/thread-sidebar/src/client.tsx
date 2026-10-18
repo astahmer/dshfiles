@@ -149,6 +149,7 @@ import {
   legacyNotificationPreferences,
   type ThreadInteractionStatus,
   type ThreadNotificationCategory,
+  type ThreadFinishNotificationCategory,
 } from './thread-notifications.js'
 import { ThreadNotificationAudioModel } from './thread-notification-audio.js'
 import { useThreadAttention } from './attention-client.js'
@@ -215,6 +216,23 @@ const rebasedArchiveDelayLabelKeys = {
   'after-1-day': 'threadSidebarRebasedArchiveDay',
   'after-1-week': 'threadSidebarRebasedArchiveWeek',
 } satisfies Record<RebasedThreadArchiveDelay, Parameters<ThreadSidebarTranslate>[0]>
+
+type ThreadSidebarLabelKey = Parameters<ThreadSidebarTranslate>[0]
+
+/** One notice tone per category: failures read as errors, work that needs review as warnings. */
+const notificationNoticeTones = {
+  'approval-needed': 'warning',
+  'input-needed': 'warning',
+  'turn-finished': 'success',
+  stopped: 'warning',
+  failed: 'danger',
+} as const satisfies Record<ThreadNotificationCategory, SidebarNotice['tone']>
+
+const finishNotificationMessageKeys = {
+  'turn-finished': { title: 'threadSidebarNotificationTitle', body: 'threadSidebarNotificationDone' },
+  stopped: { title: 'threadSidebarStoppedNotificationTitle', body: 'threadSidebarStoppedNotificationBody' },
+  failed: { title: 'threadSidebarFailedNotificationTitle', body: 'threadSidebarFailedNotificationBody' },
+} as const satisfies Record<ThreadFinishNotificationCategory, { readonly title: ThreadSidebarLabelKey; readonly body: ThreadSidebarLabelKey }>
 
 const rebasedArchiveDelayFromValue = (value: string): RebasedThreadArchiveDelay | undefined => REBASED_THREAD_ARCHIVE_DELAYS.find(option => option === value)
 
@@ -1656,7 +1674,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       dispatchNoticeQueue({
         type: 'enqueue-notification',
         notice: {
-          tone: category === 'failed' ? 'danger' : category === 'approval-needed' || category === 'input-needed' ? 'warning' : 'success',
+          tone: notificationNoticeTones[category],
           message: `${title}: ${session.displayTitle ?? fallbackBody}`,
           durationMs: 5_000,
           actionLabel: props.tSidebar('threadSidebarNotificationOpenThread'),
@@ -2636,13 +2654,13 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       const session = sessions.find(candidate => candidate.id === sessionId)
       if (session === undefined || sessionStatus.get(session.id)?.pendingInteraction !== undefined) continue
       const category = ThreadNotificationModel.categoryForFinishReason(record.finishedReason)
-      if (category === undefined) continue
+      const messageKeys = finishNotificationMessageKeys[category]
       latestRowActions.current.notifyThread(
         category,
         `finish:${sessionId}:${record.finishedSeq}`,
         session.id,
-        tSidebar(category === 'failed' ? 'threadSidebarFailedNotificationTitle' : 'threadSidebarNotificationTitle'),
-        tSidebar(category === 'failed' ? 'threadSidebarFailedNotificationBody' : 'threadSidebarNotificationDone'),
+        tSidebar(messageKeys.title),
+        tSidebar(messageKeys.body),
       )
     }
   }, [attention.records, selectedSession?.id, sessionStatus, sessions, tSidebar])
