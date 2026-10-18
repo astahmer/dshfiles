@@ -15,6 +15,7 @@ import { useApi } from '@dshfiles/dshx/client'
 import type { ActivityEvent, ActivityLevel, ActivitySource, CondensedItem } from './types.js'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { activityTimelineApi } from './api.js'
+import { createFeedHistory, mergeFeedItems } from './feed-history.js'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import type { ActivityTimelineTranslate } from './locales.js'
 
@@ -89,6 +90,8 @@ export const ActivityTimelinePanel = (props: {
   const [detailed, setDetailed] = useState(false)
   const [older, setOlder] = useState<readonly CondensedItem[]>([])
   const [cursor, setCursor] = useState<string | null>(null)
+  const feedHistory = useMemo(() => createFeedHistory(), [])
+  const mergedItems = useRef<readonly CondensedItem[]>([])
   const [selected, setSelected] = useState<CondensedItem | null>(null)
   const [pendingNew, setPendingNew] = useState(0)
   const [navigationError, setNavigationError] = useState('')
@@ -127,7 +130,7 @@ export const ActivityTimelinePanel = (props: {
     retry: 1,
   })
   const olderMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (_token: number) => {
       if (cursor === null) return null
       return runHostRequest({
         request: signal =>
@@ -144,8 +147,9 @@ export const ActivityTimelinePanel = (props: {
           ),
       })
     },
-    onSuccess: page => {
-      if (page === null) return
+    onSuccess: (page, token) => {
+      // A page that resolved after the filter changed belongs to the previous history.
+      if (page === null || !feedHistory.accepts(token)) return
       setOlder(current => [...(page.items ?? []), ...current])
       setCursor(page.nextCursor)
     },
@@ -172,14 +176,9 @@ export const ActivityTimelinePanel = (props: {
   })
   const newestItems = feedQuery.data?.items ?? []
   const items = useMemo(() => {
-    const seen = new Set<string>()
-    const merged: CondensedItem[] = []
-    for (const item of [...older, ...newestItems]) {
-      if (seen.has(item.id)) continue
-      seen.add(item.id)
-      merged.push(item)
-    }
-    return merged.sort((left, right) => left.at - right.at || left.id.localeCompare(right.id))
+    const merged = mergeFeedItems({ older, newest: newestItems, previous: mergedItems.current })
+    mergedItems.current = merged
+    return merged
   }, [older, newestItems])
   const newestId = items.length === 0 ? null : (items[items.length - 1]?.id ?? null)
 
@@ -188,9 +187,11 @@ export const ActivityTimelinePanel = (props: {
   }, [selected?.id])
 
   useEffect(() => {
+    feedHistory.invalidate()
+    mergedItems.current = []
     setOlder([])
     setCursor(null)
-  }, [filterKey])
+  }, [feedHistory, filterKey])
 
   useEffect(() => {
     if (older.length === 0) setCursor(feedQuery.data?.nextCursor ?? null)
@@ -314,7 +315,7 @@ export const ActivityTimelinePanel = (props: {
                   </Button>
                 ) : null}
                 {cursor === null ? null : (
-                  <Button size="sm" variant="outline" disabled={olderMutation.isPending} onClick={() => olderMutation.mutate()}>
+                  <Button size="sm" variant="outline" disabled={olderMutation.isPending} onClick={() => olderMutation.mutate(feedHistory.request())}>
                     {olderMutation.isPending ? t('loadingOlder') : t('loadOlder')}
                   </Button>
                 )}
