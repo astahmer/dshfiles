@@ -201,11 +201,19 @@ export default defineClient({
     const jjThreads = createApiClient(ctx, jjIntegrationApi)
     const ThreadRebaseNotice = (props: { readonly sessionId: SessionSummary['id'] }): JSX.Element | null => {
       const api = useApi(jjIntegrationApi)
+      const subscribeToSessions = useCallback((listener: () => void) => ctx.sessions.list.subscribe(listener), [])
+      // A blank thread has no turn yet, so nothing of it can have been rebased: asking the Host for its workspace would
+      // spend one jj read on every New thread screen. The first send clears `blank`, which enables the query.
+      const blank = useSyncExternalStore(
+        subscribeToSessions,
+        () => ctx.sessions.list.getSnapshot().byId[props.sessionId]?.blank === true,
+        () => true,
+      )
       const session = ctx.sessions.list.getSnapshot().byId[props.sessionId]
       const path = session?.cwd
       const status = useQuery({
         queryKey: ['jj-integration', 'thread', path],
-        enabled: path !== undefined,
+        enabled: path !== undefined && !blank,
         retry: false,
         queryFn: ({ signal }) =>
           path === undefined
@@ -215,7 +223,6 @@ export default defineClient({
               })),
       })
       const bookmark = useBookmark()
-      const subscribeToSessions = useCallback((listener: () => void) => ctx.sessions.list.subscribe(listener), [])
       const sessionRunning = useSyncExternalStore(
         subscribeToSessions,
         () => ctx.sessions.list.getSnapshot().byId[props.sessionId]?.running === true,

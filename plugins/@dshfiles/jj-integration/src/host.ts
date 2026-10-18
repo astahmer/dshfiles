@@ -233,9 +233,10 @@ const threadView = (
 /**
  * A repository scan costs one `jj` process per workspace and two more per thread, while the New thread screen and the
  * sidebar ask for it. Every layer is cached and every scan is single-flight: a poll storm shares one scan instead of
- * pinning one browser connection per caller, and a mutation is the only thing that reads them all again.
+ * pinning one browser connection per caller, and a mutation is the only thing that reads them all again. A registered
+ * folder's repository and workspace identity never change, so it outlives the statuses that do.
  */
-const LOCATION_CACHE_TTL_MS = 5 * 60_000
+const LOCATION_CACHE_TTL_MS = 30 * 60_000
 const THREAD_STATUS_CACHE_TTL_MS = 30_000
 const REPOSITORY_VIEW_TTL_MS = 60_000
 
