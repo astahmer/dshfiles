@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import { mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
-import { DatabaseSync, type SQLOutputValue } from 'node:sqlite'
+import { DatabaseSync, type SQLOutputValue, type StatementSync } from 'node:sqlite'
 
 export type ThreadDigest = {
   readonly id: string
@@ -256,6 +256,18 @@ export const openMemoryStore = (options: { readonly path: string; readonly now?:
   const database = new DatabaseSync(options.path)
   database.exec('pragma journal_mode = wal; pragma busy_timeout = 5000;')
   database.exec(schema)
+  /**
+   * One prepared statement per SQL text for the life of this database. The store compiles the same index, lookup and
+   * retention SQL over and over otherwise — three statements per indexed message alone — and preparing re-parses it.
+   */
+  const statements = new Map<string, StatementSync>()
+  const statement = (sql: string): StatementSync => {
+    const cached = statements.get(sql)
+    if (cached !== undefined) return cached
+    const prepared = database.prepare(sql)
+    statements.set(sql, prepared)
+    return prepared
+  }
 
   let version = 0
   const listeners = new Set<(project: string) => void>()
@@ -265,7 +277,7 @@ export const openMemoryStore = (options: { readonly path: string; readonly now?:
   }
 
   const bump = (name: string, by = 1): void => {
-    database.prepare('insert into counters (name, value) values (?, ?) on conflict (name) do update set value = value + excluded.value').run(name, by)
+    statement('insert into counters (name, value) values (?, ?) on conflict (name) do update set value = value + excluded.value').run(name, by)
   }
 
   const transaction = <T>(run: () => T): T => {
@@ -281,14 +293,14 @@ export const openMemoryStore = (options: { readonly path: string; readonly now?:
   }
 
   const indexDoc = (kind: 'thread' | 'note', ref: string, project: string, text: string): void => {
-    database.prepare('insert into docs_words (text, kind, ref, project) values (?, ?, ?, ?)').run(text, kind, ref, project)
-    database.prepare('insert into docs_ids (text, kind, ref, project) values (?, ?, ?, ?)').run(text, kind, ref, project)
+    statement('insert into docs_words (text, kind, ref, project) values (?, ?, ?, ?)').run(text, kind, ref, project)
+    statement('insert into docs_ids (text, kind, ref, project) values (?, ?, ?, ?)').run(text, kind, ref, project)
   }
 
   const removeDoc = (kind: 'thread' | 'note', ref: string): void => {
-    database.prepare('delete from docs_words where kind = ? and ref = ?').run(kind, ref)
-    database.prepare('delete from docs_ids where kind = ? and ref = ?').run(kind, ref)
-    database.prepare('delete from embeddings where kind = ? and ref = ?').run(kind, ref)
+    statement('delete from docs_words where kind = ? and ref = ?').run(kind, ref)
+    statement('delete from docs_ids where kind = ? and ref = ?').run(kind, ref)
+    statement('delete from embeddings where kind = ? and ref = ?').run(kind, ref)
   }
 
   const threadRow = (row: Row): StoredThread => ({
@@ -334,34 +346,34 @@ export const openMemoryStore = (options: { readonly path: string; readonly now?:
   const putThread = (digest: ThreadDigest): { readonly stored: 'new' | 'updated' | 'unchanged' | 'duplicate' } =>
     transaction(() => {
       const hash = hashOf(digest.digest)
-      const existing = database.prepare('select digest_hash from threads where id = ?').get(digest.id)
+      const existing = statement('select digest_hash from threads where id = ?').get(digest.id)
       if (existing?.['digest_hash'] === hash) return { stored: 'unchanged' as const }
-      const twin = database
-        .prepare('select id from threads where project = ? and digest_hash = ? and id != ? and duplicate_of is null limit 1')
-        .get(digest.project, hash, digest.id)
+      const twin = statement('select id from threads where project = ? and digest_hash = ? and id != ? and duplicate_of is null limit 1').get(
+        digest.project,
+        hash,
+        digest.id,
+      )
       const duplicateOf = twin === undefined ? null : String(twin['id'])
-      database
-        .prepare(
-          `insert into threads (id, project, parent, title, decision, digest, digest_hash, source, last_seq, updated_at, digested_at, duplicate_of)
+      statement(
+        `insert into threads (id, project, parent, title, decision, digest, digest_hash, source, last_seq, updated_at, digested_at, duplicate_of)
            values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
            on conflict (id) do update set project = excluded.project, parent = excluded.parent, title = excluded.title, decision = excluded.decision,
              digest = excluded.digest, digest_hash = excluded.digest_hash, source = excluded.source, last_seq = excluded.last_seq,
              updated_at = excluded.updated_at, digested_at = excluded.digested_at, duplicate_of = excluded.duplicate_of`,
-        )
-        .run(
-          digest.id,
-          digest.project,
-          digest.parent,
-          digest.title,
-          digest.decision,
-          digest.digest,
-          hash,
-          digest.source,
-          digest.lastSeq,
-          digest.updatedAt,
-          now(),
-          duplicateOf,
-        )
+      ).run(
+        digest.id,
+        digest.project,
+        digest.parent,
+        digest.title,
+        digest.decision,
+        digest.digest,
+        hash,
+        digest.source,
+        digest.lastSeq,
+        digest.updatedAt,
+        now(),
+        duplicateOf,
+      )
       removeDoc('thread', digest.id)
       if (duplicateOf === null) indexDoc('thread', digest.id, digest.project, `${digest.title}\n${digest.digest}`)
       bump(duplicateOf === null ? `digests.${digest.source}` : 'digests.duplicate')
@@ -370,33 +382,31 @@ export const openMemoryStore = (options: { readonly path: string; readonly now?:
     })
 
   const note = (id: number): Note | undefined => {
-    const row = database.prepare('select * from notes where id = ? and valid = 1').get(id)
+    const row = statement('select * from notes where id = ? and valid = 1').get(id)
     return row === undefined ? undefined : noteRow(row)
   }
 
   const insertNote = (input: NoteInput, supersedes: Note | null): Note => {
     const at = now()
     const firstCreatedAt = supersedes?.firstCreatedAt ?? at
-    const result = database
-      .prepare(
-        `insert into notes (project, scope, category, confidence, text, hash, source_thread, source_seq, origin, created_at, first_created_at, supersedes, uses)
+    const result = statement(
+      `insert into notes (project, scope, category, confidence, text, hash, source_thread, source_seq, origin, created_at, first_created_at, supersedes, uses)
          values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      )
-      .run(
-        input.project,
-        input.scope,
-        input.category,
-        input.confidence,
-        input.text,
-        hashOf(input.text),
-        input.sourceThread,
-        input.sourceSeq,
-        input.origin,
-        at,
-        firstCreatedAt,
-        supersedes?.id ?? null,
-        supersedes?.uses ?? 0,
-      )
+    ).run(
+      input.project,
+      input.scope,
+      input.category,
+      input.confidence,
+      input.text,
+      hashOf(input.text),
+      input.sourceThread,
+      input.sourceSeq,
+      input.origin,
+      at,
+      firstCreatedAt,
+      supersedes?.id ?? null,
+      supersedes?.uses ?? 0,
+    )
     const id = Number(result.lastInsertRowid)
     indexDoc('note', String(id), input.project, `${input.category}: ${input.text}`)
     return { ...input, id, createdAt: at, firstCreatedAt, supersedes: supersedes?.id ?? null, uses: supersedes?.uses ?? 0 }
@@ -405,7 +415,7 @@ export const openMemoryStore = (options: { readonly path: string; readonly now?:
   /** A note whose text already exists as a valid note of the project is not stored twice; the existing one is returned. */
   const addNote = (input: NoteInput): { readonly note: Note; readonly duplicate: boolean } =>
     transaction(() => {
-      const twin = database.prepare('select * from notes where project = ? and hash = ? and valid = 1').get(input.project, hashOf(input.text))
+      const twin = statement('select * from notes where project = ? and hash = ? and valid = 1').get(input.project, hashOf(input.text))
       if (twin !== undefined) return { note: noteRow(twin), duplicate: true }
       const created = insertNote(input, null)
       bump('notes.added')
@@ -428,9 +438,9 @@ export const openMemoryStore = (options: { readonly path: string; readonly now?:
     transaction(() => {
       const current = note(input.id)
       if (current === undefined) return undefined
-      database.prepare('update notes set valid = 0, reason = ? where id = ?').run(input.reason, input.id)
+      statement('update notes set valid = 0, reason = ? where id = ?').run(input.reason, input.id)
       removeDoc('note', String(input.id))
-      const twin = database.prepare('select * from notes where project = ? and hash = ? and valid = 1').get(current.project, hashOf(input.text))
+      const twin = statement('select * from notes where project = ? and hash = ? and valid = 1').get(current.project, hashOf(input.text))
       const replacement =
         twin === undefined
           ? insertNote(
@@ -447,7 +457,7 @@ export const openMemoryStore = (options: { readonly path: string; readonly now?:
               current,
             )
           : noteRow(twin)
-      database.prepare('update notes set superseded_by = ? where id = ?').run(replacement.id, input.id)
+      statement('update notes set superseded_by = ? where id = ?').run(replacement.id, input.id)
       bump('notes.updated')
       changed(current.project)
       return replacement
@@ -458,7 +468,7 @@ export const openMemoryStore = (options: { readonly path: string; readonly now?:
     transaction(() => {
       const current = note(input.id)
       if (current === undefined) return false
-      database.prepare('update notes set valid = 0, forgotten_at = ?, reason = ? where id = ?').run(now(), input.reason, input.id)
+      statement('update notes set valid = 0, forgotten_at = ?, reason = ? where id = ?').run(now(), input.reason, input.id)
       removeDoc('note', String(input.id))
       bump('notes.forgotten')
       changed(current.project)
@@ -474,37 +484,40 @@ export const openMemoryStore = (options: { readonly path: string; readonly now?:
     readonly throughSeq: number
   }): number =>
     transaction(() => {
-      const known = database.prepare('select through_seq from indexed_threads where thread = ?').get(input.thread)
+      const known = statement('select through_seq from indexed_threads where thread = ?').get(input.thread)
       const through = known === undefined ? -1 : Number(known['through_seq'])
       let added = 0
       let last = through
       for (const message of input.messages) {
         if (message.seq <= through || message.text.trim().length === 0) continue
-        const result = database
-          .prepare('insert or ignore into messages (thread, seq, project, role, at) values (?, ?, ?, ?, ?)')
-          .run(input.thread, message.seq, input.project, message.role, message.at)
+        const result = statement('insert or ignore into messages (thread, seq, project, role, at) values (?, ?, ?, ?, ?)').run(
+          input.thread,
+          message.seq,
+          input.project,
+          message.role,
+          message.at,
+        )
         if (result.changes === 0) continue
-        database.prepare('insert into messages_words (rowid, text) values (?, ?)').run(result.lastInsertRowid, message.text)
-        database.prepare('insert into messages_ids (rowid, text) values (?, ?)').run(result.lastInsertRowid, message.text)
+        statement('insert into messages_words (rowid, text) values (?, ?)').run(result.lastInsertRowid, message.text)
+        statement('insert into messages_ids (rowid, text) values (?, ?)').run(result.lastInsertRowid, message.text)
         added++
         last = Math.max(last, message.seq)
       }
       last = Math.max(last, input.throughSeq)
       if (last > through)
-        database
-          .prepare('insert into indexed_threads (thread, through_seq) values (?, ?) on conflict (thread) do update set through_seq = excluded.through_seq')
-          .run(input.thread, last)
+        statement('insert into indexed_threads (thread, through_seq) values (?, ?) on conflict (thread) do update set through_seq = excluded.through_seq').run(
+          input.thread,
+          last,
+        )
       return added
     })
 
   const indexedThrough = (thread: string): number =>
-    Number(database.prepare('select through_seq from indexed_threads where thread = ?').get(thread)?.['through_seq'] ?? -1)
+    Number(statement('select through_seq from indexed_threads where thread = ?').get(thread)?.['through_seq'] ?? -1)
 
   /** A full session id, or the short form the block shows (the first eight characters of the uuid). */
   const thread = (id: string): StoredThread | undefined => {
-    const row = database
-      .prepare('select * from threads where id = ? or id like ? order by updated_at desc limit 1')
-      .get(id, `session-${id.replace(/^session-/, '')}%`)
+    const row = statement('select * from threads where id = ? or id like ? order by updated_at desc limit 1').get(id, `session-${id.replace(/^session-/, '')}%`)
     return row === undefined ? undefined : threadRow(row)
   }
 
@@ -533,19 +546,17 @@ export const openMemoryStore = (options: { readonly path: string; readonly now?:
       const cutoff = now() - input.staleDays * dayMs
       params.push(cutoff, cutoff)
     }
-    return database
-      .prepare(`select * from threads where ${clauses.join(' and ')} order by uses desc, updated_at desc limit ?`)
+    return statement(`select * from threads where ${clauses.join(' and ')} order by uses desc, updated_at desc limit ?`)
       .all(...params, input.limit)
       .map(threadRow)
   }
 
   /** Valid notes for a project's block: its own and global ones, ranked by citations, then feedback and project context first, then recency. */
   const blockNotes = (input: { readonly project: string; readonly limit: number }): readonly Note[] =>
-    database
-      .prepare(
-        `select * from notes where valid = 1 and (project = ? or scope = 'global')
+    statement(
+      `select * from notes where valid = 1 and (project = ? or scope = 'global')
          order by uses desc, case category when 'feedback' then 0 when 'project' then 1 when 'user' then 2 else 3 end, created_at desc limit ?`,
-      )
+    )
       .all(input.project, input.limit)
       .map(noteRow)
 
@@ -556,29 +567,25 @@ export const openMemoryStore = (options: { readonly path: string; readonly now?:
     readonly model: string
     readonly vector: Float32Array
   }): void => {
-    database
-      .prepare(
-        'insert into embeddings (kind, ref, model, project, updated_at, vector) values (?, ?, ?, ?, ?, ?) on conflict (kind, ref, model) do update set vector = excluded.vector, updated_at = excluded.updated_at',
-      )
-      .run(input.kind, input.ref, input.model, input.project, now(), new Uint8Array(input.vector.buffer, input.vector.byteOffset, input.vector.byteLength))
+    statement(
+      'insert into embeddings (kind, ref, model, project, updated_at, vector) values (?, ?, ?, ?, ?, ?) on conflict (kind, ref, model) do update set vector = excluded.vector, updated_at = excluded.updated_at',
+    ).run(input.kind, input.ref, input.model, input.project, now(), new Uint8Array(input.vector.buffer, input.vector.byteOffset, input.vector.byteLength))
   }
 
   /** Digests and valid notes that have no vector for `model` yet, oldest first. */
   const missingEmbeddings = (input: { readonly model: string; readonly limit: number }) => [
-    ...database
-      .prepare(
-        `select t.id ref, t.project, t.title || char(10) || t.digest text from threads t
+    ...statement(
+      `select t.id ref, t.project, t.title || char(10) || t.digest text from threads t
          left join embeddings e on e.kind = 'thread' and e.ref = t.id and e.model = ?
          where t.duplicate_of is null and e.ref is null order by t.updated_at limit ?`,
-      )
+    )
       .all(input.model, input.limit)
       .map(row => ({ kind: 'thread' as const, ref: String(row['ref']), project: String(row['project']), text: String(row['text']) })),
-    ...database
-      .prepare(
-        `select n.id ref, n.project, n.text from notes n
+    ...statement(
+      `select n.id ref, n.project, n.text from notes n
          left join embeddings e on e.kind = 'note' and e.ref = cast(n.id as text) and e.model = ?
          where n.valid = 1 and e.ref is null order by n.created_at limit ?`,
-      )
+    )
       .all(input.model, input.limit)
       .map(row => ({ kind: 'note' as const, ref: String(row['ref']), project: String(row['project']), text: String(row['text']) })),
   ]
@@ -587,6 +594,13 @@ export const openMemoryStore = (options: { readonly path: string; readonly now?:
     const ranker = request.ranker ?? 'bm25'
     const projectFilter = request.projects.length === 0 ? undefined : new Set(request.projects)
     const allowed = (project: string): boolean => projectFilter === undefined || projectFilter.has(project)
+    // The project predicate belongs in SQL: a global limit lets out-of-project candidates consume the budget, which
+    // suppresses in-scope recall entirely once another project's corpus outranks it. `json_each` keeps one cached
+    // statement text for any number of projects. The JS filter stays as the authorization gate either way.
+    const scoped = (column: string): { readonly sql: string; readonly parameters: readonly string[] } =>
+      request.projects.length === 0
+        ? { sql: '', parameters: [] }
+        : { sql: ` and ${column} in (select value from json_each(?))`, parameters: [JSON.stringify(request.projects)] }
     const depth = Math.max(50, request.limit * 5)
     const lists: SearchHit[][] = []
     const terms = queryTerms(request.query)
@@ -596,15 +610,15 @@ export const openMemoryStore = (options: { readonly path: string; readonly now?:
         ['docs_ids', identifierQuery(terms)],
       ] as const) {
         if (match === undefined) continue
+        const scope = scoped('d.project')
         lists.push(
-          database
-            .prepare(
-              `select d.kind, d.ref, d.project, coalesce(t.updated_at, n.created_at, 0) updated_at from ${table} d
+          statement(
+            `select d.kind, d.ref, d.project, coalesce(t.updated_at, n.created_at, 0) updated_at from ${table} d
                left join threads t on d.kind = 'thread' and t.id = d.ref
                left join notes n on d.kind = 'note' and n.id = cast(d.ref as integer)
-               where ${table} match ? order by bm25(${table}) limit ?`,
-            )
-            .all(match, depth * 4)
+               where ${table} match ?${scope.sql} order by bm25(${table}) limit ?`,
+          )
+            .all(match, ...scope.parameters, depth * 4)
             .filter(row => allowed(String(row['project'])))
             .slice(0, depth)
             .map((row): SearchHit => {
@@ -618,13 +632,13 @@ export const openMemoryStore = (options: { readonly path: string; readonly now?:
         ['messages_ids', identifierQuery(terms)],
       ] as const) {
         if (match === undefined) continue
+        const scope = scoped('m.project')
         lists.push(
-          database
-            .prepare(
-              `select m.thread, m.seq, m.role, m.project, m.at from ${table} f join messages m on m.rowid = f.rowid
-               where ${table} match ? order by bm25(${table}) limit ?`,
-            )
-            .all(match, depth * 4)
+          statement(
+            `select m.thread, m.seq, m.role, m.project, m.at from ${table} f join messages m on m.rowid = f.rowid
+               where ${table} match ?${scope.sql} order by bm25(${table}) limit ?`,
+          )
+            .all(match, ...scope.parameters, depth * 4)
             .filter(row => allowed(String(row['project'])))
             .slice(0, depth)
             .map((row): SearchHit => ({
@@ -641,13 +655,14 @@ export const openMemoryStore = (options: { readonly path: string; readonly now?:
     }
     if (ranker !== 'bm25' && request.queryVector !== undefined && request.embeddingModel !== undefined) {
       const queryVector = request.queryVector
+      // Scoring every project's vectors is the expensive half; the predicate keeps the work to the requested projects.
+      const scope = scoped('e.project')
       lists.push(
-        database
-          .prepare(
-            `select e.kind, e.ref, e.project, e.vector, e.updated_at, m.thread, m.seq, m.role from embeddings e
-             left join messages m on e.kind = 'message' and m.rowid = cast(e.ref as integer) where e.model = ?`,
-          )
-          .all(request.embeddingModel)
+        statement(
+          `select e.kind, e.ref, e.project, e.vector, e.updated_at, m.thread, m.seq, m.role from embeddings e
+             left join messages m on e.kind = 'message' and m.rowid = cast(e.ref as integer) where e.model = ?${scope.sql}`,
+        )
+          .all(request.embeddingModel, ...scope.parameters)
           .filter(row => allowed(String(row['project'])))
           .map(row => {
             const blob = row['vector']
@@ -680,7 +695,7 @@ export const openMemoryStore = (options: { readonly path: string; readonly now?:
     const categories = new Map(
       [...fused.values()]
         .flatMap(entry => (entry.hit.kind === 'note' ? [entry.hit.id] : []))
-        .map(id => [id, toCategory(database.prepare('select category from notes where id = ?').get(id)?.['category'])] as const),
+        .map(id => [id, toCategory(statement('select category from notes where id = ?').get(id)?.['category'])] as const),
     )
     for (const entry of fused.values()) {
       const ageDays = Math.max(0, (reference - entry.hit.updatedAt) / dayMs)
@@ -699,8 +714,8 @@ export const openMemoryStore = (options: { readonly path: string; readonly now?:
   /** Counts a citation of a thread or note: cited items rank higher in later start blocks. */
   const recordUse = (item: { readonly kind: 'thread'; readonly id: string } | { readonly kind: 'note'; readonly id: number }, citingThread: string): void => {
     const table = item.kind === 'thread' ? 'threads' : 'notes'
-    database.prepare(`update ${table} set uses = uses + 1, last_used_at = ? where id = ?`).run(now(), item.id)
-    database.prepare('insert into citations (at, thread, ref) values (?, ?, ?)').run(now(), citingThread, `${item.kind === 'thread' ? 't' : 'n'}:${item.id}`)
+    statement(`update ${table} set uses = uses + 1, last_used_at = ? where id = ?`).run(now(), item.id)
+    statement('insert into citations (at, thread, ref) values (?, ?, ?)').run(now(), citingThread, `${item.kind === 'thread' ? 't' : 'n'}:${item.id}`)
   }
 
   /** One model or classifier call memory made on its own behalf; priced later from the token counts. */
@@ -712,26 +727,29 @@ export const openMemoryStore = (options: { readonly path: string; readonly now?:
     readonly cacheRead: number
     readonly output: number
   }): void => {
-    database
-      .prepare('insert into costs (at, kind, provider, model, input, cache_read, output) values (?, ?, ?, ?, ?, ?, ?)')
-      .run(now(), input.kind, input.provider, input.model, input.input, input.cacheRead, input.output)
+    statement('insert into costs (at, kind, provider, model, input, cache_read, output) values (?, ?, ?, ?, ?, ?, ?)').run(
+      now(),
+      input.kind,
+      input.provider,
+      input.model,
+      input.input,
+      input.cacheRead,
+      input.output,
+    )
   }
 
   const bumpDaily = (name: string, by = 1): void => {
-    database
-      .prepare(
-        "insert into daily (day, name, value) values (date(? / 1000, 'unixepoch'), ?, ?) on conflict (day, name) do update set value = value + excluded.value",
-      )
-      .run(now(), name, by)
+    statement(
+      "insert into daily (day, name, value) values (date(? / 1000, 'unixepoch'), ?, ?) on conflict (day, name) do update set value = value + excluded.value",
+    ).run(now(), name, by)
   }
 
   /** Token totals per UTC day, kind and route, newest first. */
   const costsByDay = (days: number) =>
-    database
-      .prepare(
-        `select date(at / 1000, 'unixepoch') day, kind, provider, model, count(*) calls, sum(input) input, sum(cache_read) cache_read, sum(output) output
+    statement(
+      `select date(at / 1000, 'unixepoch') day, kind, provider, model, count(*) calls, sum(input) input, sum(cache_read) cache_read, sum(output) output
          from costs where at >= ? group by day, kind, provider, model order by day desc`,
-      )
+    )
       .all(now() - days * dayMs)
       .map(row => ({
         day: String(row['day']),
@@ -750,23 +768,23 @@ export const openMemoryStore = (options: { readonly path: string; readonly now?:
    */
   const flagCitations = (input: { readonly thread: string; readonly by: 'agent' | 'user'; readonly sinceMs: number }): number =>
     Number(
-      database
-        .prepare(`update citations set ${input.by === 'agent' ? 'agent_corrected' : 'user_corrected'} = 1 where thread = ? and at >= ?`)
-        .run(input.thread, now() - input.sinceMs).changes,
+      statement(`update citations set ${input.by === 'agent' ? 'agent_corrected' : 'user_corrected'} = 1 where thread = ? and at >= ?`).run(
+        input.thread,
+        now() - input.sinceMs,
+      ).changes,
     )
 
   const rateCitation = (input: { readonly id: number; readonly rating: 'up' | 'down' | null }): boolean =>
-    database.prepare('update citations set rating = ? where id = ?').run(input.rating, input.id).changes > 0
+    statement('update citations set rating = ? where id = ?').run(input.rating, input.id).changes > 0
 
   /** Recent citations with what they pointed at, for the panel's rating list. */
   const recentCitations = (limit: number) =>
-    database
-      .prepare(
-        `select c.*, coalesce(t.title, n.text) target from citations c
+    statement(
+      `select c.*, coalesce(t.title, n.text) target from citations c
          left join threads t on c.ref = 't:' || t.id
          left join notes n on c.ref = 'n:' || n.id
          order by c.at desc limit ?`,
-      )
+    )
       .all(limit)
       .map(row => ({
         id: Number(row['id']),
@@ -781,11 +799,11 @@ export const openMemoryStore = (options: { readonly path: string; readonly now?:
 
   /** Whether the start block and cited memory hold up: totals for the panel. */
   const effectiveness = () => {
-    const blocks = database.prepare("select count(*) n, avg(length(text)) mean, max(length(text)) max from thread_blocks where text != ''").get()
-    const citations = database
-      .prepare("select count(*) n, sum(agent_corrected) agent, sum(user_corrected) user, sum(rating = 'up') up, sum(rating = 'down') down from citations")
-      .get()
-    const daily = (name: string): number => Number(database.prepare('select sum(value) n from daily where name = ?').get(name)?.['n'] ?? 0)
+    const blocks = statement("select count(*) n, avg(length(text)) mean, max(length(text)) max from thread_blocks where text != ''").get()
+    const citations = statement(
+      "select count(*) n, sum(agent_corrected) agent, sum(user_corrected) user, sum(rating = 'up') up, sum(rating = 'down') down from citations",
+    ).get()
+    const daily = (name: string): number => Number(statement('select sum(value) n from daily where name = ?').get(name)?.['n'] ?? 0)
     return {
       block: {
         threads: Number(blocks?.['n'] ?? 0),
@@ -804,37 +822,42 @@ export const openMemoryStore = (options: { readonly path: string; readonly now?:
   }
 
   const frozenBlock = (threadId: string): string | undefined => {
-    const row = database.prepare('select text from thread_blocks where thread = ?').get(threadId)
+    const row = statement('select text from thread_blocks where thread = ?').get(threadId)
     return row === undefined ? undefined : String(row['text'])
   }
 
   const freezeBlock = (threadId: string, text: string): string => {
-    const result = database.prepare('insert or ignore into thread_blocks (thread, text, created_at) values (?, ?, ?)').run(threadId, text, now())
+    const result = statement('insert or ignore into thread_blocks (thread, text, created_at) values (?, ?, ?)').run(threadId, text, now())
     if (result.changes > 0) bump('blocks.served')
     return frozenBlock(threadId) ?? text
   }
 
   /** `ids` are the memory ids the call returned (`t:<short>`, `n:<id>`), matched later against citations. */
   const recordToolCall = (input: { readonly thread: string; readonly tool: string; readonly results: number; readonly ids: readonly string[] }): void => {
-    database
-      .prepare('insert into tool_calls (at, thread, tool, results, tokens) values (?, ?, ?, ?, ?)')
-      .run(now(), input.thread, input.tool, input.results, input.ids.slice(0, 40).join('\n'))
+    statement('insert into tool_calls (at, thread, tool, results, tokens) values (?, ?, ?, ?, ?)').run(
+      now(),
+      input.thread,
+      input.tool,
+      input.results,
+      input.ids.slice(0, 40).join('\n'),
+    )
   }
 
   /** A `memory: <id>` citation in the assistant's reply marks the thread's recent tool calls that returned that id as used. */
   const markCited = (input: { readonly thread: string; readonly cited: readonly string[]; readonly sinceMs: number }): number => {
     const cited = new Set(input.cited.map(id => id.toLowerCase()))
     let marked = 0
-    for (const row of database
-      .prepare('select id, tokens from tool_calls where thread = ? and used = 0 and results > 0 and at >= ?')
-      .all(input.thread, now() - input.sinceMs)) {
+    for (const row of statement('select id, tokens from tool_calls where thread = ? and used = 0 and results > 0 and at >= ?').all(
+      input.thread,
+      now() - input.sinceMs,
+    )) {
       if (
         !String(row['tokens'])
           .split('\n')
           .some(id => cited.has(id.toLowerCase()))
       )
         continue
-      database.prepare('update tool_calls set used = 1 where id = ?').run(Number(row['id']))
+      statement('update tool_calls set used = 1 where id = ?').run(Number(row['id']))
       marked++
     }
     return marked
@@ -868,8 +891,7 @@ export const openMemoryStore = (options: { readonly path: string; readonly now?:
       clauses.push('text like ?')
       params.push(`%${filter.query.trim().replaceAll('%', '')}%`)
     }
-    return database
-      .prepare(`select * from notes ${clauses.length === 0 ? '' : `where ${clauses.join(' and ')}`} order by created_at desc limit ?`)
+    return statement(`select * from notes ${clauses.length === 0 ? '' : `where ${clauses.join(' and ')}`} order by created_at desc limit ?`)
       .all(...params, filter.limit)
       .map(noteRecord)
   }
@@ -877,7 +899,7 @@ export const openMemoryStore = (options: { readonly path: string; readonly now?:
   /** The note's whole supersede chain, oldest first. */
   const noteHistory = (id: number): readonly NoteRecord[] => {
     const byId = (noteId: number): NoteRecord | undefined => {
-      const row = database.prepare('select * from notes where id = ?').get(noteId)
+      const row = statement('select * from notes where id = ?').get(noteId)
       return row === undefined ? undefined : noteRecord(row)
     }
     let first = byId(id)
@@ -891,22 +913,20 @@ export const openMemoryStore = (options: { readonly path: string; readonly now?:
   }
 
   const listThreads = (filter: { readonly project?: string | undefined; readonly limit: number }): readonly StoredThread[] =>
-    database
-      .prepare(`select * from threads where duplicate_of is null ${filter.project === undefined ? '' : 'and project = ?'} order by updated_at desc limit ?`)
+    statement(`select * from threads where duplicate_of is null ${filter.project === undefined ? '' : 'and project = ?'} order by updated_at desc limit ?`)
       .all(...(filter.project === undefined ? [] : [filter.project]), filter.limit)
       .map(threadRow)
 
   const projectPaths = (): readonly string[] =>
-    database
-      .prepare(
-        `select project from notes
+    statement(
+      `select project from notes
          union select project from threads
          union select project from messages
          union select project from embeddings
          union select project from docs_words
          union select project from docs_ids
          order by project`,
-      )
+    )
       .all()
       .map(row => String(row['project']))
 
@@ -936,22 +956,18 @@ export const openMemoryStore = (options: { readonly path: string; readonly now?:
       for (const [target, sources] of sourcesByTarget) {
         const projects = [target, ...sources]
         const placeholders = projects.map(() => '?').join(', ')
-        const noteCollisions = database
-          .prepare(
-            `select count(*) collisions from (
+        const noteCollisions = statement(
+          `select count(*) collisions from (
                select hash from notes where valid = 1 and hash is not null and project in (${placeholders})
                group by hash having count(*) > 1)`,
-          )
-          .get(...projects)
+        ).get(...projects)
         const noteCount = Number(noteCollisions?.['collisions'] ?? 0)
         if (noteCount > 0) conflicts.push({ kind: 'note', target, collisions: noteCount })
-        const threadCollisions = database
-          .prepare(
-            `select count(*) collisions from (
+        const threadCollisions = statement(
+          `select count(*) collisions from (
                select digest_hash from threads where duplicate_of is null and project in (${placeholders})
                group by digest_hash having count(*) > 1)`,
-          )
-          .get(...projects)
+        ).get(...projects)
         const threadCount = Number(threadCollisions?.['collisions'] ?? 0)
         if (threadCount > 0) conflicts.push({ kind: 'thread', target, collisions: threadCount })
       }
@@ -961,12 +977,12 @@ export const openMemoryStore = (options: { readonly path: string; readonly now?:
       let projectsMoved = 0
       for (const mapping of mappings) {
         const projectRows = {
-          notes: Number(database.prepare('update notes set project = ? where project = ?').run(mapping.to, mapping.from).changes),
-          threads: Number(database.prepare('update threads set project = ? where project = ?').run(mapping.to, mapping.from).changes),
-          messages: Number(database.prepare('update messages set project = ? where project = ?').run(mapping.to, mapping.from).changes),
-          embeddings: Number(database.prepare('update embeddings set project = ? where project = ?').run(mapping.to, mapping.from).changes),
-          docsWords: Number(database.prepare('update docs_words set project = ? where project = ?').run(mapping.to, mapping.from).changes),
-          docsIds: Number(database.prepare('update docs_ids set project = ? where project = ?').run(mapping.to, mapping.from).changes),
+          notes: Number(statement('update notes set project = ? where project = ?').run(mapping.to, mapping.from).changes),
+          threads: Number(statement('update threads set project = ? where project = ?').run(mapping.to, mapping.from).changes),
+          messages: Number(statement('update messages set project = ? where project = ?').run(mapping.to, mapping.from).changes),
+          embeddings: Number(statement('update embeddings set project = ? where project = ?').run(mapping.to, mapping.from).changes),
+          docsWords: Number(statement('update docs_words set project = ? where project = ?').run(mapping.to, mapping.from).changes),
+          docsIds: Number(statement('update docs_ids set project = ? where project = ?').run(mapping.to, mapping.from).changes),
         }
         if (Object.values(projectRows).some(count => count > 0)) {
           projectsMoved++
@@ -994,13 +1010,12 @@ export const openMemoryStore = (options: { readonly path: string; readonly now?:
   })
 
   const projects = (): readonly { readonly project: string; readonly threads: number; readonly notes: number }[] =>
-    database
-      .prepare(
-        `select project, sum(threads) threads, sum(notes) notes from (
+    statement(
+      `select project, sum(threads) threads, sum(notes) notes from (
            select project, count(*) threads, 0 notes from threads where duplicate_of is null group by project
            union all select project, 0, count(*) from notes where valid = 1 group by project)
          group by project order by project`,
-      )
+    )
       .all()
       .map(row => ({ project: String(row['project']), threads: Number(row['threads']), notes: Number(row['notes']) }))
 
@@ -1015,9 +1030,9 @@ export const openMemoryStore = (options: { readonly path: string; readonly now?:
       rows.set(day, created)
       return created
     }
-    for (const row of database
-      .prepare("select date(at / 1000, 'unixepoch') day, tool, count(*) calls, sum(used) used from tool_calls where at >= ? group by day, tool")
-      .all(since)) {
+    for (const row of statement(
+      "select date(at / 1000, 'unixepoch') day, tool, count(*) calls, sum(used) used from tool_calls where at >= ? group by day, tool",
+    ).all(since)) {
       const day = entry(String(row['day']))
       const tool = String(row['tool'])
       const calls = Number(row['calls'])
@@ -1026,14 +1041,13 @@ export const openMemoryStore = (options: { readonly path: string; readonly now?:
       else day.notes += calls
       day.cited += Number(row['used'] ?? 0)
     }
-    for (const row of database.prepare("select date(at / 1000, 'unixepoch') day, count(*) n from citations where at >= ? group by day").all(since))
+    for (const row of statement("select date(at / 1000, 'unixepoch') day, count(*) n from citations where at >= ? group by day").all(since))
       entry(String(row['day'])).citations += Number(row['n'])
     return [...rows.values()].sort((left, right) => right.day.localeCompare(left.day))
   }
 
   const usage = (): UsageCounts => ({
-    tools: database
-      .prepare('select tool, count(*) calls, sum(results > 0) with_results, sum(used) used from tool_calls group by tool order by tool')
+    tools: statement('select tool, count(*) calls, sum(results > 0) with_results, sum(used) used from tool_calls group by tool order by tool')
       .all()
       .map(row => ({
         tool: String(row['tool']),
@@ -1043,14 +1057,13 @@ export const openMemoryStore = (options: { readonly path: string; readonly now?:
         used: Number(row['used'] ?? 0),
       })),
     counters: Object.fromEntries(
-      database
-        .prepare('select name, value from counters')
+      statement('select name, value from counters')
         .all()
         .map(row => [String(row['name']), Number(row['value'])]),
     ),
-    threads: Number(database.prepare('select count(*) n from threads where duplicate_of is null').get()?.['n'] ?? 0),
-    notes: Number(database.prepare('select count(*) n from notes where valid = 1').get()?.['n'] ?? 0),
-    indexedMessages: Number(database.prepare('select count(*) n from messages').get()?.['n'] ?? 0),
+    threads: Number(statement('select count(*) n from threads where duplicate_of is null').get()?.['n'] ?? 0),
+    notes: Number(statement('select count(*) n from notes where valid = 1').get()?.['n'] ?? 0),
+    indexedMessages: Number(statement('select count(*) n from messages').get()?.['n'] ?? 0),
   })
 
   /** Drops digests, indexed messages, frozen blocks and telemetry older than the retention window. Notes stay until forgotten. */
@@ -1058,22 +1071,22 @@ export const openMemoryStore = (options: { readonly path: string; readonly now?:
     if (retentionDays <= 0) return { threads: 0, messages: 0 }
     const cutoff = now() - retentionDays * dayMs
     return transaction(() => {
-      const old = database.prepare('select id, project from threads where updated_at < ? and coalesce(last_used_at, 0) < ?').all(cutoff, cutoff)
+      const old = statement('select id, project from threads where updated_at < ? and coalesce(last_used_at, 0) < ?').all(cutoff, cutoff)
       for (const row of old) {
         removeDoc('thread', String(row['id']))
-        database.prepare('delete from threads where id = ?').run(String(row['id']))
+        statement('delete from threads where id = ?').run(String(row['id']))
       }
-      const messages = database.prepare('select rowid from messages where at < ?').all(cutoff)
+      const messages = statement('select rowid from messages where at < ?').all(cutoff)
       for (const row of messages) {
-        database.prepare('delete from messages_words where rowid = ?').run(Number(row['rowid']))
-        database.prepare('delete from messages_ids where rowid = ?').run(Number(row['rowid']))
-        database.prepare("delete from embeddings where kind = 'message' and ref = ?").run(String(row['rowid']))
+        statement('delete from messages_words where rowid = ?').run(Number(row['rowid']))
+        statement('delete from messages_ids where rowid = ?').run(Number(row['rowid']))
+        statement("delete from embeddings where kind = 'message' and ref = ?").run(String(row['rowid']))
       }
-      database.prepare('delete from messages where at < ?').run(cutoff)
-      database.prepare('delete from thread_blocks where created_at < ?').run(cutoff)
-      database.prepare('delete from tool_calls where at < ?').run(cutoff)
-      database.prepare('delete from costs where at < ?').run(cutoff)
-      database.prepare('delete from citations where at < ?').run(cutoff)
+      statement('delete from messages where at < ?').run(cutoff)
+      statement('delete from thread_blocks where created_at < ?').run(cutoff)
+      statement('delete from tool_calls where at < ?').run(cutoff)
+      statement('delete from costs where at < ?').run(cutoff)
+      statement('delete from citations where at < ?').run(cutoff)
       for (const project of new Set(old.map(row => String(row['project'])))) changed(project)
       return { threads: old.length, messages: messages.length }
     })
@@ -1121,7 +1134,10 @@ export const openMemoryStore = (options: { readonly path: string; readonly now?:
       listeners.add(listener)
       return () => listeners.delete(listener)
     },
-    close: (): void => database.close(),
+    close: (): void => {
+      statements.clear()
+      database.close()
+    },
   }
 }
 

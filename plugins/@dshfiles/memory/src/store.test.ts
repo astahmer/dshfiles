@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { DatabaseSync } from 'node:sqlite'
+import { describe, expect, it, vi } from 'vitest'
 
 import { openMemoryStore, type ThreadDigest } from './store.ts'
 
@@ -253,5 +254,71 @@ describe('memory store', () => {
       block: { threads: 2, meanBytes: 1_000, maxBytes: 1_100, requests: 7 },
       citations: { total: 2, agentCorrected: 0, userCorrected: 1, up: 0, down: 1 },
     })
+  })
+})
+
+describe('scoped retrieval', () => {
+  it('keeps in-scope recall when another project dominates the candidate budget', () => {
+    const store = open()
+    for (let index = 0; index < 300; index += 1) store.addNote(note('noise', `checkpoint checkpoint checkpoint noise ${String(index)}`))
+    for (let index = 0; index < 3; index += 1) store.addNote(note('mine', `note ${String(index)} mentions checkpoint once`))
+
+    const hits = store.search({ query: 'checkpoint', projects: ['mine'], limit: 10 })
+    // The out-of-project corpus outranks these notes, so a global limit used to consume the whole budget.
+    expect(hits.map(hit => hit.project)).toEqual(['mine', 'mine', 'mine'])
+  })
+
+  it('still finds every project when no filter is given', () => {
+    const store = open()
+    store.addNote(note('noise', 'checkpoint noise'))
+    store.addNote(note('mine', 'checkpoint mine'))
+
+    const hits = store.search({ query: 'checkpoint', projects: [], limit: 10 })
+    expect([...new Set(hits.map(hit => hit.project))].sort()).toEqual(['mine', 'noise'])
+  })
+
+  it('scores only the requested projects of the vector index', () => {
+    const store = open()
+    const noise = store.addNote(note('noise', 'checkpoint noise')).note
+    const mine = store.addNote(note('mine', 'checkpoint mine')).note
+    store.putEmbedding({ kind: 'note', ref: String(noise.id), project: 'noise', model: 'scoped-model', vector: new Float32Array([1, 0]) })
+    store.putEmbedding({ kind: 'note', ref: String(mine.id), project: 'mine', model: 'scoped-model', vector: new Float32Array([0, 1]) })
+
+    const hits = store.search({
+      query: 'checkpoint',
+      projects: ['mine'],
+      limit: 5,
+      ranker: 'vector',
+      queryVector: new Float32Array([0, 1]),
+      embeddingModel: 'scoped-model',
+    })
+    expect(hits.map(hit => [hit.kind, hit.project])).toEqual([['note', 'mine']])
+  })
+})
+
+describe('memory store statement reuse', () => {
+  it('prepares each SQL text once for the life of the database', () => {
+    const prepare = vi.spyOn(DatabaseSync.prototype, 'prepare')
+    try {
+      const store = open()
+      for (let index = 0; index < 25; index += 1) {
+        store.indexMessages({
+          thread: 'session-a',
+          project: 'dshfiles',
+          throughSeq: index + 1,
+          messages: [{ seq: index + 1, role: 'user', text: `checkpoint ${String(index)} before landing`, at: start + index }],
+        })
+      }
+      store.search({ query: 'checkpoint', projects: ['dshfiles'], limit: 5 })
+
+      const prepared = prepare.mock.calls.map(call => String(call[0]))
+      const repeated = prepared.filter((sql, index) => prepared.indexOf(sql) !== index)
+      expect(repeated).toEqual([])
+      // The workload really exercises the reuse: many statements, each compiled once.
+      expect(prepared.length).toBeGreaterThan(4)
+      store.close()
+    } finally {
+      prepare.mockRestore()
+    }
   })
 })
