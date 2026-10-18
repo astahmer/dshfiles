@@ -146,7 +146,12 @@ Feature: Thread sidebar journeys
     Then the skill "e2e-skill-mentions" appears as an @ suggestion
 
   @scenario:thread-sidebar.open-in-side-panel
-  Scenario: Open a thread in the right side panel from its row menu
-    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
+  Scenario: Open a thread in the right side panel from its row menu, its hover action and the palette
+    Given the isolated plugin composition "@dshfiles/thread-sidebar" and "@dshfiles/command-palette" is booted
     When a nonblank Host thread is opened in the side panel from its context menu
     Then the side panel hosts that thread's scrollable conversation and composer
+    And the thread row offers the side-panel hover action
+    When the side panel is closed and the same thread is opened from the command palette
+    Then the side panel hosts that thread again
+    When the side-panel hover action is switched off in Customize sidebar
+    Then the thread row keeps the context-menu action but drops the hover one

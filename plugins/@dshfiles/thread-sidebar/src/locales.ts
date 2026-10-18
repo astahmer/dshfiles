@@ -315,6 +315,9 @@ const en = {
   threadSidebarRowPath: 'Path',
   threadSidebarRowTime: 'Time',
   threadSidebarRowStatusDot: 'Status dot',
+  threadSidebarRowActions: 'Hover actions',
+  threadSidebarRowActionDismiss: 'Dismiss reminder',
+  threadSidebarRowActionsHint: 'Buttons drawn on a thread row while the pointer is over it.',
   threadSidebarDragToReorder: 'Drag to reorder',
 }
 
@@ -626,6 +629,9 @@ const zh = {
   threadSidebarRowPath: '路径',
   threadSidebarRowTime: '时间',
   threadSidebarRowStatusDot: '状态点',
+  threadSidebarRowActions: '悬停操作',
+  threadSidebarRowActionDismiss: '忽略提醒',
+  threadSidebarRowActionsHint: '指针悬停在会话行上时显示的按钮。',
   threadSidebarDragToReorder: '拖动以重新排序',
 }
 

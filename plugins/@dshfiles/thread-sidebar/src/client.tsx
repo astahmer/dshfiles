@@ -67,15 +67,31 @@ import {
   CirclePauseIcon,
   LinkIcon,
   MonitorIcon,
+  PanelRightOpenIcon,
   RefreshCwIcon,
   Settings2Icon,
   XIcon,
 } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { createContext, memo, useCallback, useContext, useEffect, useId, useMemo, useReducer, useRef, useState, type ReactElement, type ReactNode } from 'react'
+import {
+  createContext,
+  Fragment,
+  memo,
+  useCallback,
+  useContext,
+  useEffect,
+  useId,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+  type ReactElement,
+  type ReactNode,
+} from 'react'
 import { z } from 'zod'
 import {
   REBASED_THREAD_ARCHIVE_DELAYS,
+  THREAD_ROW_ACTIONS,
   SidebarOrganization,
   type AutoArchiveOverride,
   type AttentionColor,
@@ -84,6 +100,7 @@ import {
   type RebasedThreadArchiveDelay,
   type SidebarPreferences,
   type SidebarSection,
+  type ThreadRowAction,
   type ThreadRowDensity,
 } from './organization.js'
 import { ThreadAttentionPresentationModel, type ThreadAttentionLabel } from './attention-presentation.js'
@@ -349,6 +366,8 @@ interface ThreadRowProps {
   readonly resumeBusy: boolean
   readonly childAttentionLabels: ReadonlyMap<SessionSummary['id'], ThreadAttentionLabel>
   readonly rowStyle: RowStyle
+  /** Hover actions this row hides; see SidebarPreferences.hiddenRowActions. */
+  readonly hiddenRowActions: readonly ThreadRowAction[]
   readonly childThreads: readonly SessionSummary[]
   /** Finished subagents folded behind the "N finished" line; empty unless the setting collapses them. */
   readonly finishedChildThreads: readonly SessionSummary[]
@@ -624,6 +643,114 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
   const showPath = rowStyle.path && session.cwd !== undefined && session.cwd.length > 0
   const metaLine = showProject || showMachine || showPath || childCount > 0
   const headLine = rowStyle.title || rowStyle.time || rowStyle.statusDot || props.rebasedAt !== undefined
+  const openAside = useAsideOpen()
+  /**
+   * One hover action's button, or null when the row's own state rules it out: the recovery pair only on a thread that
+   * needs a resume, an archived row's Restore instead of the live actions, and the aside only when an entry provided
+   * its opener. The row's preference picks which of them render, and in which order.
+   */
+  const renderRowAction = (action: ThreadRowAction): JSX.Element | null => {
+    if (action === 'resume' || action === 'resumeDismiss') {
+      if (!props.needsResume) return null
+      const resume = action === 'resume'
+      return withTooltip(
+        t(resume ? 'threadSidebarResume' : 'threadSidebarResumeDismiss'),
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          aria-label={t(resume ? 'threadSidebarResume' : 'threadSidebarResumeDismiss')}
+          disabled={props.resumeBusy}
+          onClick={() => (resume ? props.actions.resume(session.id) : props.actions.dismissRecovery(session.id))}
+        >
+          {resume && props.resumeBusy ? <Spinner className="dshx:size-3.5" /> : null}
+          {resume && !props.resumeBusy ? <RefreshCwIcon className="dshx:size-3.5" /> : null}
+          {resume ? null : <XIcon className="dshx:size-3.5" />}
+        </Button>,
+      )
+    }
+    if (archived) {
+      if (action !== 'restore') return null
+      return withTooltip(
+        t('threadSidebarRestore'),
+        <Button variant="ghost" size="icon-xs" aria-label={t('threadSidebarRestore')} onClick={() => void props.actions.mutate(session.id, 'unarchive')}>
+          <IconUnarchiveOutlineRegular size={14} />
+        </Button>,
+      )
+    }
+    if (action === 'restore') return null
+    if (action === 'aside') {
+      if (openAside === null) return null
+      return withTooltip(
+        t('threadSidebarOpenInSidePanel'),
+        <Button variant="ghost" size="icon-xs" aria-label={t('threadSidebarOpenInSidePanel')} onClick={() => openAside(session.id)}>
+          <PanelRightOpenIcon size={14} />
+        </Button>,
+      )
+    }
+    if (action === 'pin') {
+      return withTooltip(
+        t(pinned ? 'threadSidebarUnpin' : 'threadSidebarPin'),
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          aria-label={t(pinned ? 'threadSidebarUnpin' : 'threadSidebarPin')}
+          onClick={() => void props.actions.mutate(session.id, pinned ? 'unpin' : 'pin')}
+        >
+          {pinned ? <IconPinFillRegular size={14} /> : <IconPinOutlineRegular size={14} />}
+        </Button>,
+      )
+    }
+    if (action === 'park') {
+      return withTooltip(
+        t(parked ? 'threadSidebarUnpark' : 'threadSidebarPark'),
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          aria-label={t(parked ? 'threadSidebarUnpark' : 'threadSidebarPark')}
+          disabled={session.running}
+          onClick={() => props.actions.toggleParked(session.id)}
+        >
+          {parked ? <IconPlayOutlineRegular size={14} /> : <IconPauseOutlineRegular size={14} />}
+        </Button>,
+      )
+    }
+    if (action === 'mute') {
+      return withTooltip(
+        props.mute === undefined ? t('threadSidebarMute') : muteStatusLabel(t, props.mute),
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon-xs" aria-label={t(props.mute === undefined ? 'threadSidebarMute' : 'threadSidebarMuted')}>
+              {props.mute === undefined ? <BellIcon className="dshx:size-3.5" /> : <BellOffIcon className="dshx:size-3.5" />}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="dshx-root dshx:min-w-44" aria-label={t('threadSidebarMute')}>
+            {THREAD_MUTE_OPTIONS.map(option => (
+              <DropdownMenuItem key={option} onSelect={() => props.actions.mute(session.id, option)}>
+                {t(muteOptionLabelKeys[option])}
+              </DropdownMenuItem>
+            ))}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem disabled={props.mute === undefined} onSelect={() => props.actions.unmute(session.id)}>
+              {t('threadSidebarUnmute')}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>,
+      )
+    }
+    return withTooltip(
+      t(session.running ? 'threadSidebarRunningNotice' : 'threadSidebarArchive'),
+      <Button
+        variant="ghost"
+        size="icon-xs"
+        aria-label={t('threadSidebarArchive')}
+        disabled={session.running}
+        onClick={() => void props.actions.mutate(session.id, 'archive')}
+      >
+        <IconArchiveOutlineRegular size={14} />
+      </Button>,
+    )
+  }
+
   return (
     <ThreadContextMenu
       session={session}
@@ -778,106 +905,9 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
             data-testid="thread-row-actions"
             className="dshx:pointer-events-none dshx:absolute dshx:top-1 dshx:right-1.5 dshx:flex dshx:gap-0.5 dshx:rounded-md dshx:border dshx:bg-popover dshx:p-0.5 dshx:opacity-0 dshx:shadow-xs dshx:transition-opacity dshx:group-hover/row:pointer-events-auto dshx:group-hover/row:opacity-100 dshx:focus-within:pointer-events-auto dshx:focus-within:opacity-100"
           >
-            {props.needsResume ? (
-              <>
-                {withTooltip(
-                  t('threadSidebarResume'),
-                  <Button
-                    variant="ghost"
-                    size="icon-xs"
-                    aria-label={t('threadSidebarResume')}
-                    disabled={props.resumeBusy}
-                    onClick={() => props.actions.resume(session.id)}
-                  >
-                    {props.resumeBusy ? <Spinner className="dshx:size-3.5" /> : <RefreshCwIcon className="dshx:size-3.5" />}
-                  </Button>,
-                )}
-                {withTooltip(
-                  t('threadSidebarResumeDismiss'),
-                  <Button
-                    variant="ghost"
-                    size="icon-xs"
-                    aria-label={t('threadSidebarResumeDismiss')}
-                    disabled={props.resumeBusy}
-                    onClick={() => props.actions.dismissRecovery(session.id)}
-                  >
-                    <XIcon className="dshx:size-3.5" />
-                  </Button>,
-                )}
-              </>
-            ) : null}
-            {!archived ? (
-              <>
-                {withTooltip(
-                  t(pinned ? 'threadSidebarUnpin' : 'threadSidebarPin'),
-                  <Button
-                    variant="ghost"
-                    size="icon-xs"
-                    aria-label={t(pinned ? 'threadSidebarUnpin' : 'threadSidebarPin')}
-                    onClick={() => void props.actions.mutate(session.id, pinned ? 'unpin' : 'pin')}
-                  >
-                    {pinned ? <IconPinFillRegular size={14} /> : <IconPinOutlineRegular size={14} />}
-                  </Button>,
-                )}
-                {withTooltip(
-                  t(parked ? 'threadSidebarUnpark' : 'threadSidebarPark'),
-                  <Button
-                    variant="ghost"
-                    size="icon-xs"
-                    aria-label={t(parked ? 'threadSidebarUnpark' : 'threadSidebarPark')}
-                    disabled={session.running}
-                    onClick={() => props.actions.toggleParked(session.id)}
-                  >
-                    {parked ? <IconPlayOutlineRegular size={14} /> : <IconPauseOutlineRegular size={14} />}
-                  </Button>,
-                )}
-                {withTooltip(
-                  props.mute === undefined ? t('threadSidebarMute') : muteStatusLabel(t, props.mute),
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon-xs" aria-label={t(props.mute === undefined ? 'threadSidebarMute' : 'threadSidebarMuted')}>
-                        {props.mute === undefined ? <BellIcon className="dshx:size-3.5" /> : <BellOffIcon className="dshx:size-3.5" />}
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="dshx-root dshx:min-w-44" aria-label={t('threadSidebarMute')}>
-                      {THREAD_MUTE_OPTIONS.map(option => (
-                        <DropdownMenuItem key={option} onSelect={() => props.actions.mute(session.id, option)}>
-                          {t(muteOptionLabelKeys[option])}
-                        </DropdownMenuItem>
-                      ))}
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem disabled={props.mute === undefined} onSelect={() => props.actions.unmute(session.id)}>
-                        {t('threadSidebarUnmute')}
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>,
-                )}
-                {withTooltip(
-                  t(session.running ? 'threadSidebarRunningNotice' : 'threadSidebarArchive'),
-                  <Button
-                    variant="ghost"
-                    size="icon-xs"
-                    aria-label={t('threadSidebarArchive')}
-                    disabled={session.running}
-                    onClick={() => void props.actions.mutate(session.id, 'archive')}
-                  >
-                    <IconArchiveOutlineRegular size={14} />
-                  </Button>,
-                )}
-              </>
-            ) : (
-              withTooltip(
-                t('threadSidebarRestore'),
-                <Button
-                  variant="ghost"
-                  size="icon-xs"
-                  aria-label={t('threadSidebarRestore')}
-                  onClick={() => void props.actions.mutate(session.id, 'unarchive')}
-                >
-                  <IconUnarchiveOutlineRegular size={14} />
-                </Button>,
-              )
-            )}
+            {THREAD_ROW_ACTIONS.filter(action => !props.hiddenRowActions.includes(action)).map(action => (
+              <Fragment key={action}>{renderRowAction(action)}</Fragment>
+            ))}
           </div>
         </div>
         {childCount > 0 && props.childrenOpen ? (
@@ -2248,8 +2278,10 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   ]
   const activeFilterSummary = activeFilterLabels.length === 0 ? props.tSidebar('threadSidebarFilterNone') : activeFilterLabels.join(' · ')
 
+  const asideOpener = useAsideOpen()
   const latestRowActions = useRef({
     openThread,
+    openAside: asideOpener,
     mutateSession,
     toggleParked,
     copyContextValue,
@@ -2264,6 +2296,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   })
   latestRowActions.current = {
     openThread,
+    openAside: asideOpener,
     mutateSession,
     toggleParked,
     copyContextValue,
@@ -2282,6 +2315,24 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   useEffect(() => () => PaletteApi.setRecentLimit(10), [])
   useEffect(() => {
     const actions: readonly PaletteAction[] = [
+      ...(asideOpener === null
+        ? []
+        : [
+            {
+              id: '@dshfiles/thread-sidebar/thread/open-aside',
+              label: () => latestRowActions.current.props.tSidebar('threadSidebarOpenInSidePanel'),
+              aliases: ['open in side panel', 'side panel', 'aside'],
+              icon: <PanelRightOpenIcon className="dshx:size-4" />,
+              group: 'action',
+              isAvailable: context => context.thread !== null && !context.thread.archived,
+              run: context => {
+                const thread = context.thread
+                if (thread === null) return
+                const session = Object.values(latestRowActions.current.sessionsById).find(candidate => candidate.id === thread.id)
+                if (session !== undefined) latestRowActions.current.openAside?.(session.id)
+              },
+            } satisfies PaletteAction,
+          ]),
       {
         id: '@dshfiles/thread-sidebar/thread/copy-link',
         label: () => latestRowActions.current.props.tSidebar('threadSidebarCopyLink'),
@@ -2428,6 +2479,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         resumeBusy={resumeBusySessionIds.has(session.id)}
         childAttentionLabels={inlineAttentionLabels}
         rowStyle={rowStyle}
+        hiddenRowActions={preferences.hiddenRowActions}
         childThreads={childThreads}
         finishedChildThreads={finishedChildThreads}
         childrenOpen={shouldOpenChildThreadList({ children: listedChildThreads, override: childrenOpenOverrides.get(session.id) })}

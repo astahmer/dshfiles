@@ -164,3 +164,11 @@ test('legacy local alert settings migrate into Host preferences without overridi
   assert.deepEqual(migrated.notificationCategories, ThreadNotificationModel.categoriesForLegacyDesktopNotifications())
   assert.equal(migrated.desktopNotificationsEnabled, false)
 })
+
+test('older preferences show every thread-row hover action', () => {
+  const { hiddenRowActions, ...older } = DEFAULT_PREFERENCES
+  assert.deepEqual(hiddenRowActions, [])
+  assert.deepEqual(SidebarPreferencesModel.decode(older)?.hiddenRowActions, [])
+  assert.deepEqual(SidebarPreferencesModel.decode({ ...DEFAULT_PREFERENCES, hiddenRowActions: ['aside', 'mute'] })?.hiddenRowActions, ['aside', 'mute'])
+  assert.equal(SidebarPreferencesModel.decode({ ...DEFAULT_PREFERENCES, hiddenRowActions: ['aside', 'nope'] }), null)
+})

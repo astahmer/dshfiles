@@ -1420,10 +1420,18 @@
     {
       "id": "open-thread-in-side-panel",
       "title": "Open a thread in the right side panel",
-      "summary": "A thread row's context menu opens that thread in the right sidebar instead of the main column: the row action routes through the entry's sidebar-right controller, which opens a threadaside resource tab. The tab retains the Session and hosts the same embedded Conversation a subagent chat does, so the thread streams and its composer works beside the thread the user is reading; closing the tab only releases the reference, and an already-open aside is focused instead of duplicated.",
+      "summary": "A thread's row context menu, its hover action and the Open in side panel command palette action open that thread in the right sidebar instead of the main column: the row action routes through the entry's sidebar-right controller, which opens a threadaside resource tab. The tab retains the Session and hosts the same embedded Conversation a subagent chat does, so the thread streams and its composer works beside the thread the user is reading; closing the tab only releases the reference, and an already-open aside is focused instead of duplicated. The rebindable command threadSidebar.openInSidePanel ships unbound, and Customize sidebar > Hover actions stores hiddenRowActions so every row button is per-user.",
       "surfaces": ["client"],
-      "configuration": [],
-      "states": ["closed", "open", "focused"],
+      "configuration": [
+        {
+          "key": "hiddenRowActions",
+          "defaultValue": "none",
+          "constraints": "Which hover buttons a row hides: none, or any combination of resume, resumeDismiss, aside, pin, park, mute, archive and restore. A missing id keeps its button.",
+          "choices": ["none", "resume", "resumeDismiss", "aside", "pin", "park", "mute", "archive", "restore"],
+          "coveredBy": ["thread-sidebar.open-in-side-panel"]
+        }
+      ],
+      "states": ["closed", "open", "focused", "hover-action-hidden"],
       "failureModes": [
         "An aside tab closed while the thread is still running keeps running: nothing is archived.",
         "An archived row offers no aside, because a stopped thread has nothing to show."
@@ -1440,6 +1448,12 @@
           "id": "thread-sidebar.aside-address",
           "file": "plugins/@dshfiles/thread-sidebar/src/thread-aside.test.ts",
           "testName": "round-trips one session id"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.aside-hover-actions-default",
+          "file": "plugins/@dshfiles/thread-sidebar/src/preferences.test.ts",
+          "testName": "older preferences show every thread-row hover action"
         }
       ]
     }

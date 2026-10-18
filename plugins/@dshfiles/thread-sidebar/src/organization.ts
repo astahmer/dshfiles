@@ -24,6 +24,10 @@ export type AttentionColors = Record<AttentionColorKey, AttentionColor>
 export const REBASED_THREAD_ARCHIVE_DELAYS = ['disabled', 'immediately', 'after-1-hour', 'after-1-day', 'after-1-week'] as const
 export type RebasedThreadArchiveDelay = (typeof REBASED_THREAD_ARCHIVE_DELAYS)[number]
 
+/** Every hover action a thread row can offer; the Customize sidebar panel toggles them one by one. */
+export const THREAD_ROW_ACTIONS = ['resume', 'resumeDismiss', 'aside', 'pin', 'park', 'mute', 'archive', 'restore'] as const
+export type ThreadRowAction = (typeof THREAD_ROW_ACTIONS)[number]
+
 export interface SidebarPreferences {
   archiveUndoEnabled: boolean
   archiveUndoDurationSeconds: number
@@ -65,6 +69,8 @@ export interface SidebarPreferences {
   threadRowPath: boolean
   threadRowTime: boolean
   threadRowStatusDot: boolean
+  /** Hover actions a row hides; an id that is absent keeps its button, so a new action ships visible. */
+  hiddenRowActions: ThreadRowAction[]
   approvalNeededDisplay: AttentionDisplayMode
   inputNeededDisplay: AttentionDisplayMode
   turnFinishedDisplay: AttentionDisplayMode
@@ -123,6 +129,7 @@ export const DEFAULT_PREFERENCES: SidebarPreferences = {
   threadRowPath: false,
   threadRowTime: true,
   threadRowStatusDot: true,
+  hiddenRowActions: [],
   approvalNeededDisplay: 'group',
   inputNeededDisplay: 'group',
   turnFinishedDisplay: 'label',

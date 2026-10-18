@@ -365,6 +365,40 @@ export default defineClient({
     ctx.effect(() => ctx.locale.subscribe(syncPanels), 'thread-sidebar: panel labels')
     syncPanels()
 
+    const ASK_SHORTCUT_ID = 'threadSidebar.openInSidePanel'
+    /** One stable identity: a fresh arrow each render would defeat the memoized thread rows. */
+    const openAside = (sessionId: SessionId): void => {
+      ctx.sidebarRight.openResource(threadAsideAddress(sessionId), { kind: THREAD_ASIDE_KIND })
+    }
+    /** The thread the main column shows, skipping blank drafts; undefined on a panel or the New thread screen. */
+    const mainViewThread = (): SessionId | undefined => {
+      const sessions = ctx.sessions.list.getSnapshot()
+      return sessions.ids.find(id => (sessions.byId[id]?.retainedBy.mainView ?? 0) > 0 && sessions.byId[id]?.blank === false)
+    }
+
+    // No default binding on purpose: the command is listed and rebindable in Settings › Shortcuts, but it never
+    // steals a chord until the user picks one.
+    if (isShortcutCommandId(ASK_SHORTCUT_ID))
+      ctx.effect(() => {
+        try {
+          return ctx.shortcuts.register({
+            id: ASK_SHORTCUT_ID,
+            label: () => translate('threadSidebarOpenInSidePanel'),
+            aliases: ['open in side panel', 'side panel', 'aside'],
+            defaults: {},
+            regions: ['page', 'editable'],
+            modals: [],
+            resolve: () => {
+              const sessionId = mainViewThread()
+              return sessionId === undefined ? { status: 'pass' } : { status: 'handled', run: () => openAside(sessionId) }
+            },
+          })
+        } catch (error) {
+          console.warn(`thread-sidebar: ${ASK_SHORTCUT_ID} could not be registered`, error)
+          return () => undefined
+        }
+      }, 'thread-sidebar: open-aside shortcut')
+
     const currentWorkspaceId = (): WorkspaceView['workspaceId'] | undefined => {
       const sessions = ctx.sessions.list.getSnapshot()
       const current = sessions.ids.find(id => (sessions.byId[id]?.retainedBy.mainView ?? 0) > 0)
@@ -586,7 +620,7 @@ export default defineClient({
         },
         decorate((props: Parameters<typeof ThreadSidebar>[0]) => (
           <PluginQueryProvider>
-            <ThreadAsideOpenProvider value={sessionId => ctx.sidebarRight.openResource(threadAsideAddress(sessionId), { kind: THREAD_ASIDE_KIND })}>
+            <ThreadAsideOpenProvider value={openAside}>
               <ThreadSidebar {...props} />
             </ThreadAsideOpenProvider>
           </PluginQueryProvider>

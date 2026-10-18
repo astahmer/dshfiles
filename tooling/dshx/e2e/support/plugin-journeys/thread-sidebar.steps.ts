@@ -979,3 +979,64 @@ Then("the side panel hosts that thread's scrollable conversation and composer", 
   })
   await finishJourneyAssertions(page)
 })
+
+const asideTab = (page: Page) =>
+  page.locator('[data-dockkit-tab]').filter({ hasText: 'aside e2e target' })
+const rowActionContainer = (row: ReturnType<typeof threadRow>) => row.getByTestId('thread-row-actions')
+
+Then('the thread row offers the side-panel hover action', async ({ page }: { page: Page }) => {
+  if (asideThreadId === null) throw new Error('No thread was opened aside.')
+  const row = threadRow(page, asideThreadId)
+  await row.hover()
+  const button = row.getByRole('button', { name: 'Open in side panel', exact: true })
+  await recordAssertion(page, 'thread-sidebar-aside-hover-action-shows', async () => {
+    await expect(rowActionContainer(row)).toHaveCount(1)
+    await expect.poll(() => rowActionContainer(row).evaluate(element => getComputedStyle(element).pointerEvents)).toBe('auto')
+    await expect(button).toBeVisible()
+  })
+  await recordAssertion(page, 'thread-sidebar-aside-hover-action-focuses-the-open-tab', async () => {
+    await button.click()
+    await expect(asideTab(page)).toHaveCount(1)
+    await expect(page.locator('[data-dshfiles-thread-aside]')).toHaveCount(1)
+  })
+})
+
+When('the side panel is closed and the same thread is opened from the command palette', async ({ page }: { page: Page }) => {
+  await asideTab(page).hover()
+  await asideTab(page).locator('button, [role=button]').last().click()
+  await expect(asideTab(page)).toHaveCount(0)
+  await page.keyboard.press('Meta+Shift+P')
+  const palette = paletteDialog(page)
+  await palette.getByRole('combobox').fill('side panel')
+  await palette.getByRole('option', { name: /^Open in side panel/ }).click()
+})
+
+Then('the side panel hosts that thread again', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'thread-sidebar-aside-palette-opens-the-panel', async () => {
+    await expect(asideTab(page)).toHaveCount(1)
+    await expect(page.locator('[data-dshfiles-thread-aside]')).toHaveCount(1)
+  })
+})
+
+When('the side-panel hover action is switched off in Customize sidebar', async ({ page }: { page: Page }) => {
+  await page.getByRole('button', { name: 'Customize sidebar', exact: true }).first().click()
+  const customize = customizeSidebar(page)
+  await expect(customize).toBeVisible()
+  await customize.getByRole('checkbox', { name: 'Open in side panel', exact: true }).click()
+  await customize.getByRole('button', { name: 'Done', exact: true }).click()
+})
+
+Then('the thread row keeps the context-menu action but drops the hover one', async ({ page }: { page: Page }) => {
+  if (asideThreadId === null) throw new Error('No thread was opened aside.')
+  const row = threadRow(page, asideThreadId)
+  await recordAssertion(page, 'thread-sidebar-aside-hover-action-hidden-by-setting', async () => {
+    await row.hover()
+    await expect(row.getByRole('button', { name: 'Open in side panel', exact: true })).toHaveCount(0)
+  })
+  await recordAssertion(page, 'thread-sidebar-aside-context-menu-action-stays', async () => {
+    await row.click({ button: 'right' })
+    await expect(page.getByRole('menuitem', { name: 'Open in side panel', exact: true })).toBeVisible()
+    await page.keyboard.press('Escape')
+  })
+  await finishJourneyAssertions(page)
+})

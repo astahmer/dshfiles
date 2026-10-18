@@ -60,10 +60,12 @@ import {
   SIDEBAR_ICON_ROW_THRESHOLD,
   SIDEBAR_SPLITTER_HEIGHT,
   SIDEBAR_THREAD_MIN_HEIGHT,
+  THREAD_ROW_ACTIONS,
   type NavigationDensity,
   type NavigationOverflow,
   type OrderedSidebarEntry,
   type SidebarPreferences,
+  type ThreadRowAction,
 } from './organization.js'
 import { NAVIGATION_EVENT, ThreadNavigationHistoryModel, type NavigationHistory, type NavigationLocation } from './navigation-history.js'
 import { PaletteApi, type PaletteAction } from '@dshfiles/command-palette/api'
@@ -102,6 +104,18 @@ const NAVIGATION_SETTLE_MS = 1500
 const HISTORY_HOLD_MS = 450
 const PLUGIN_UPDATE_CHECK_MS = 60_000
 const DRAG_THRESHOLD_PX = 5
+
+const rowActionLabelKeys = {
+  resume: 'threadSidebarResume',
+  // Shorter than the button's tooltip so the two-column hover grid keeps one line per action.
+  resumeDismiss: 'threadSidebarRowActionDismiss',
+  aside: 'threadSidebarOpenInSidePanel',
+  pin: 'threadSidebarPin',
+  park: 'threadSidebarPark',
+  mute: 'threadSidebarMute',
+  archive: 'threadSidebarArchive',
+  restore: 'threadSidebarRestore',
+} as const satisfies Record<ThreadRowAction, Parameters<SidebarShellTranslate>[0]>
 
 const rowFieldKeys = [
   ['threadRowProject', 'threadSidebarRowProject'],
@@ -148,6 +162,12 @@ const FOOTER_MORE_WIDTH = 28
 const text = (translate: SidebarShellTranslate, key: Parameters<SidebarShellTranslate>[0]): string => translate(key)
 
 const toggleHidden = (ids: readonly string[], id: string): string[] => (ids.includes(id) ? ids.filter(item => item !== id) : [...ids, id])
+
+/** Set one hover action's visibility; a redundant call keeps the stored array identical. */
+const withRowActionHidden = (actions: readonly ThreadRowAction[], action: ThreadRowAction, hidden: boolean): ThreadRowAction[] => {
+  if (hidden === actions.includes(action)) return [...actions]
+  return hidden ? [...actions, action] : actions.filter(item => item !== action)
+}
 
 const sameIds = (left: readonly string[], right: readonly string[]): boolean => left.length === right.length && left.every((id, index) => id === right[index])
 
@@ -1386,6 +1406,26 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
                   <label key={key} className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-sm">
                     <Checkbox checked={preferences[key]} onCheckedChange={checked => updatePreferences({ [key]: checked === true })} />
                     {text(props.t, label)}
+                  </label>
+                ))}
+              </div>
+            </section>
+            <section className="dshx:flex dshx:flex-col dshx:gap-1.5 dshx:px-2" aria-labelledby={`${headerRegionId}-actions`}>
+              <h3 id={`${headerRegionId}-actions`} className="dshx:text-xs dshx:font-medium dshx:text-muted-foreground">
+                {text(props.t, 'threadSidebarRowActions')}
+              </h3>
+              <p className="dshx:text-xs dshx:text-muted-foreground">{text(props.t, 'threadSidebarRowActionsHint')}</p>
+              <div className="dshx:grid dshx:grid-cols-2 dshx:gap-x-3 dshx:gap-y-1.5 dshx:pt-1">
+                {THREAD_ROW_ACTIONS.map(action => (
+                  <label key={action} className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-sm">
+                    <Checkbox
+                      checked={!preferences.hiddenRowActions.includes(action)}
+                      onCheckedChange={checked =>
+                        // Checked means shown, so an unchecked box is the one that hides the action.
+                        updatePreferences({ hiddenRowActions: withRowActionHidden(preferences.hiddenRowActions, action, checked !== true) })
+                      }
+                    />
+                    {text(props.t, rowActionLabelKeys[action])}
                   </label>
                 ))}
               </div>

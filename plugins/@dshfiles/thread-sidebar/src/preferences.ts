@@ -1,13 +1,21 @@
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import { z } from 'zod'
 import { threadMutesSchema } from './thread-mute.js'
-import { ATTENTION_COLOR_OPTIONS, DEFAULT_PREFERENCES, REBASED_THREAD_ARCHIVE_DELAYS, type SidebarPreferences, type SidebarSection } from './organization.js'
+import {
+  ATTENTION_COLOR_OPTIONS,
+  DEFAULT_PREFERENCES,
+  REBASED_THREAD_ARCHIVE_DELAYS,
+  THREAD_ROW_ACTIONS,
+  type SidebarPreferences,
+  type SidebarSection,
+} from './organization.js'
 import { threadViewSettingsSchema } from './thread-view-preferences.js'
 import { DEFAULT_THREAD_NOTIFICATION_CATEGORIES, ThreadNotificationModel, threadNotificationCategoriesSchema } from './thread-notifications.js'
 
 export const PREFERENCES_STORAGE_KEY = 'dshfiles.thread-sidebar.v1'
 
 const sidebarSectionSchema = z.enum(['pinned', 'active', 'parked', 'inactive', 'archived'])
+const threadRowActionSchema = z.enum(THREAD_ROW_ACTIONS)
 export const attentionColorSchema = z.enum(ATTENTION_COLOR_OPTIONS)
 
 const preferencesInputSchema = z
@@ -49,6 +57,7 @@ const preferencesInputSchema = z
     threadRowPath: z.boolean().default(DEFAULT_PREFERENCES.threadRowPath),
     threadRowTime: z.boolean().default(DEFAULT_PREFERENCES.threadRowTime),
     threadRowStatusDot: z.boolean().default(DEFAULT_PREFERENCES.threadRowStatusDot),
+    hiddenRowActions: z.array(threadRowActionSchema).max(THREAD_ROW_ACTIONS.length).default(DEFAULT_PREFERENCES.hiddenRowActions),
     approvalNeededDisplay: z.enum(['group', 'label']).default(DEFAULT_PREFERENCES.approvalNeededDisplay),
     inputNeededDisplay: z.enum(['group', 'label']).default(DEFAULT_PREFERENCES.inputNeededDisplay),
     turnFinishedDisplay: z.enum(['group', 'label']).default(DEFAULT_PREFERENCES.turnFinishedDisplay),

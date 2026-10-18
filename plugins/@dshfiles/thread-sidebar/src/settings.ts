@@ -1,6 +1,6 @@
 import Schema from '@deepseek-ai/schemastery'
 import { defineSettings } from '@dshfiles/dshx/settings'
-import { ATTENTION_COLOR_OPTIONS, DEFAULT_PREFERENCES, REBASED_THREAD_ARCHIVE_DELAYS } from './organization.js'
+import { ATTENTION_COLOR_OPTIONS, DEFAULT_PREFERENCES, REBASED_THREAD_ARCHIVE_DELAYS, THREAD_ROW_ACTIONS } from './organization.js'
 import { threadNotificationCategoriesSchema } from './thread-notifications.js'
 import { DEFAULT_THREAD_VIEW_SETTINGS } from './thread-view-preferences.js'
 
@@ -44,6 +44,8 @@ export const threadSidebarSettings = defineSettings({
     threadRowPath: Schema.boolean().default(DEFAULT_PREFERENCES.threadRowPath).description('Show the full working directory path.'),
     threadRowTime: Schema.boolean().default(DEFAULT_PREFERENCES.threadRowTime).description('Show the last activity time.'),
     threadRowStatusDot: Schema.boolean().default(DEFAULT_PREFERENCES.threadRowStatusDot).description('Show the running / unread status dot.'),
+    // Toggled in Customize sidebar, so the generated form shows no raw list.
+    hiddenRowActions: Schema.array(Schema.union(THREAD_ROW_ACTIONS)).default(DEFAULT_PREFERENCES.hiddenRowActions).hidden(),
     approvalNeededDisplay: Schema.union(['group', 'label'] as const)
       .default(DEFAULT_PREFERENCES.approvalNeededDisplay)
       .description('Show approval requests in a separate attention group or as an inline thread-row label.'),
