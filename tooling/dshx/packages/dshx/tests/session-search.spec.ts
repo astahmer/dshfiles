@@ -4,13 +4,7 @@ import { describe, expect, it } from 'vitest'
 
 import { runCli } from '../src/cli/run.js'
 import { createDshPlatformClientFromTransport, DshPlatformError, type DshPlatformClient, type DshPlatformTransport } from '../src/platform/client.js'
-import {
-  isFatalSessionSearchFailure,
-  isTransientSessionSearchFailure,
-  metadataSessionMatches,
-  searchSessionsResilient,
-  sessionTitleOf,
-} from '../src/platform/session-search.js'
+import { SessionSearchModel } from '../src/platform/session-search.js'
 import type { CliIO } from '../src/cli/run.js'
 
 const io = (): CliIO & { readonly stdout: PassThrough; readonly stderr: PassThrough } => {
@@ -33,16 +27,16 @@ const instability = (): DshPlatformError =>
 
 describe('session search resilience', () => {
   it('recognizes the transient observation failure in both the typed and the RPC-wrapped shape', () => {
-    expect(isTransientSessionSearchFailure({ code: 'SESSION_QUERY_PERSISTENCE_FAILED', message: 'did not stabilize' })).toBe(true)
-    expect(isTransientSessionSearchFailure(instability())).toBe(true)
-    expect(isTransientSessionSearchFailure(new DshPlatformError('gateway/internal', 'session search failed: something else'))).toBe(false)
-    expect(isTransientSessionSearchFailure(new DshPlatformError('SESSION_QUERY_SEARCH_DISABLED', 'full-text search is disabled'))).toBe(false)
-    expect(isFatalSessionSearchFailure(new DshPlatformError('authentication-expired', 'nope'))).toBe(true)
+    expect(SessionSearchModel.isTransientFailure({ code: 'SESSION_QUERY_PERSISTENCE_FAILED', message: 'did not stabilize' })).toBe(true)
+    expect(SessionSearchModel.isTransientFailure(instability())).toBe(true)
+    expect(SessionSearchModel.isTransientFailure(new DshPlatformError('gateway/internal', 'session search failed: something else'))).toBe(false)
+    expect(SessionSearchModel.isTransientFailure(new DshPlatformError('SESSION_QUERY_SEARCH_DISABLED', 'full-text search is disabled'))).toBe(false)
+    expect(SessionSearchModel.isFatalFailure(new DshPlatformError('authentication-expired', 'nope'))).toBe(true)
   })
 
   it('retries the transient failure and reports the content source', async () => {
     let calls = 0
-    const outcome = await searchSessionsResilient({
+    const outcome = await SessionSearchModel.searchResilient({
       query: 'synthetic',
       search: async () => {
         calls += 1
@@ -59,7 +53,7 @@ describe('session search resilience', () => {
 
   it('falls back to a labeled metadata page when the content search keeps failing', async () => {
     let calls = 0
-    const outcome = await searchSessionsResilient({
+    const outcome = await SessionSearchModel.searchResilient({
       query: 'thread search',
       search: async () => {
         calls += 1
@@ -80,7 +74,7 @@ describe('session search resilience', () => {
 
   it('does not retry a disabled index and still answers from metadata', async () => {
     let calls = 0
-    const outcome = await searchSessionsResilient({
+    const outcome = await SessionSearchModel.searchResilient({
       query: 'session-2',
       search: async () => {
         calls += 1
@@ -95,7 +89,7 @@ describe('session search resilience', () => {
 
   it('rethrows failures a metadata fallback cannot answer', async () => {
     await expect(
-      searchSessionsResilient({
+      SessionSearchModel.searchResilient({
         query: 'synthetic',
         search: async () => {
           throw new DshPlatformError('authentication-expired', 'copy the current URL')
@@ -112,17 +106,17 @@ describe('session search resilience', () => {
       { sessionId: 'session-b', updatedAt: 30, cwd: '/dev/dshfiles', projections: { values: { title: 'Alpha plan' } } },
       { sessionId: 'session-c', updatedAt: 40, projections: { values: { title: null } } },
     ]
-    expect(metadataSessionMatches(summaries, 'alpha', 5).map(item => item.sessionId)).toEqual(['session-b', 'session-a'])
-    expect(metadataSessionMatches(summaries, 'dshfiles', 5)).toEqual([{ sessionId: 'session-b', snippet: 'Alpha plan', evidence: ['identifier'] }])
-    expect(metadataSessionMatches(summaries, 'session-c', 5)).toEqual([{ sessionId: 'session-c', snippet: 'session-c', evidence: ['identifier'] }])
-    expect(metadataSessionMatches(summaries, 'nothing here', 5)).toEqual([])
+    expect(SessionSearchModel.metadataMatches(summaries, 'alpha', 5).map(item => item.sessionId)).toEqual(['session-b', 'session-a'])
+    expect(SessionSearchModel.metadataMatches(summaries, 'dshfiles', 5)).toEqual([{ sessionId: 'session-b', snippet: 'Alpha plan', evidence: ['identifier'] }])
+    expect(SessionSearchModel.metadataMatches(summaries, 'session-c', 5)).toEqual([{ sessionId: 'session-c', snippet: 'session-c', evidence: ['identifier'] }])
+    expect(SessionSearchModel.metadataMatches(summaries, 'nothing here', 5)).toEqual([])
   })
 
   it('decodes the Host title projection defensively', () => {
-    expect(sessionTitleOf({ projections: { kind: 'sequenced', values: { title: 'Ready' } } })).toBe('Ready')
-    expect(sessionTitleOf({ projections: { values: { title: null } } })).toBeUndefined()
-    expect(sessionTitleOf({ projections: { summary: 'no values' } })).toBeUndefined()
-    expect(sessionTitleOf({})).toBeUndefined()
+    expect(SessionSearchModel.titleOf({ projections: { kind: 'sequenced', values: { title: 'Ready' } } })).toBe('Ready')
+    expect(SessionSearchModel.titleOf({ projections: { values: { title: null } } })).toBeUndefined()
+    expect(SessionSearchModel.titleOf({ projections: { summary: 'no values' } })).toBeUndefined()
+    expect(SessionSearchModel.titleOf({})).toBeUndefined()
   })
 })
 

@@ -7,7 +7,7 @@ import { z } from 'zod'
 import type { CliArgs } from './args.js'
 import { renderCliUsage } from './usage.js'
 import { createDshPlatformClientFromTransport, DshPlatformError, connectDshPlatformClient } from '../platform/client.js'
-import { searchSessionsResilient } from '../platform/session-search.js'
+import { SessionSearchModel } from '../platform/session-search.js'
 import type { BundleSummary, DshPlatformClient, DshPlatformTransport, JsonValue, PluginSummary, SessionSummary } from '../platform/client.js'
 import type { CommunicationClient, ConnectCommunicationClientOptions } from '../communication/bridge.js'
 import { runCommunicationCommand } from '../communication/cli.js'
@@ -706,7 +706,11 @@ async function runPlatformAction(args: CliArgs, runtime: PlatformCliRuntime): Pr
           )
           return 0
         }
-        const outcome = await searchSessionsResilient({ query, search: search => client.sessions.search(search), list: () => client.sessions.list() })
+        const outcome = await SessionSearchModel.searchResilient({
+          query,
+          search: search => client.sessions.search(search),
+          list: () => client.sessions.list(),
+        })
         if (outcome.items.length === 0 && outcome.incomplete)
           throw new DshPlatformError(
             'session-search-unavailable',

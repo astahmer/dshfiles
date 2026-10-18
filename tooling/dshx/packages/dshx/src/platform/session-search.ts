@@ -79,19 +79,19 @@ const messageOf = (error: unknown): string => (error instanceof Error ? error.me
  * busy Host fails with `SESSION_QUERY_PERSISTENCE_FAILED`. The core RPC replaces the code with `gateway/internal` and
  * keeps the sentence, so both shapes are recognized here; nothing else is retried.
  */
-export const isTransientSessionSearchFailure = (error: unknown): boolean => {
+const isTransientSessionSearchFailure = (error: unknown): boolean => {
   const code = codeOf(error)
   if (code === 'SESSION_QUERY_PERSISTENCE_FAILED') return true
   if (code !== 'gateway/internal' && code !== 'remote-error') return false
   return /persistence observation did not stabilize|persistence observation failed/iu.test(messageOf(error))
 }
 
-export const isFatalSessionSearchFailure = (error: unknown): boolean => fatalCodes.has(codeOf(error))
+const isFatalSessionSearchFailure = (error: unknown): boolean => fatalCodes.has(codeOf(error))
 
 const projectionTitle = z.object({ values: z.object({ title: z.string() }) })
 
 /** The title the Host already projects for a Session row, decoded defensively; a different projection shape means no title. */
-export const sessionTitleOf = (summary: { readonly projections?: JsonValue | undefined }): string | undefined => {
+const sessionTitleOf = (summary: { readonly projections?: JsonValue | undefined }): string | undefined => {
   const parsed = projectionTitle.safeParse(summary.projections)
   return parsed.success ? parsed.data.values.title : undefined
 }
@@ -107,7 +107,7 @@ const termsOf = (value: string): readonly string[] => [
 ]
 
 /** Title, identifier and term matches over Session metadata only: no full-text index is involved. */
-export const metadataSessionMatches = (summaries: readonly SessionSearchSummary[], query: string, limit: number): readonly SessionSearchItem[] => {
+const metadataSessionMatches = (summaries: readonly SessionSearchSummary[], query: string, limit: number): readonly SessionSearchItem[] => {
   const needle = normalize(query)
   if (needle.length === 0) return []
   const words = termsOf(query)
@@ -153,7 +153,7 @@ export const metadataSessionMatches = (summaries: readonly SessionSearchSummary[
  * Search Session content with a bounded retry over the backend's own one-retry observation, then fall back to a
  * clearly labeled metadata search. A transient failure is retried; a fatal one is rethrown; everything else degrades.
  */
-export const searchSessionsResilient = async (options: SearchSessionsOptions): Promise<SessionSearchOutcome> => {
+const searchSessionsResilient = async (options: SearchSessionsOptions): Promise<SessionSearchOutcome> => {
   const attempts = Math.max(1, options.attempts ?? defaultAttempts)
   const delays = options.delaysMs ?? defaultDelaysMs
   const sleep = options.sleep ?? (milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds)))
@@ -190,4 +190,12 @@ export const searchSessionsResilient = async (options: SearchSessionsOptions): P
     elapsedMs: now() - startedAt,
     failure,
   }
+}
+
+export class SessionSearchModel {
+  static readonly isTransientFailure = isTransientSessionSearchFailure
+  static readonly isFatalFailure = isFatalSessionSearchFailure
+  static readonly titleOf = sessionTitleOf
+  static readonly metadataMatches = metadataSessionMatches
+  static readonly searchResilient = searchSessionsResilient
 }
