@@ -297,7 +297,11 @@ journeys only); before landing a plugin change, also run
 `pnpm check:e2e <plugin>` (its journeys, headless, serial) green. All three are
 Turbo tasks keyed on the built bundles they boot, so an unchanged package
 replays from cache in seconds; `--force` reruns everything (see
-[`docs/e2e-testing.md`](docs/e2e-testing.md#cached-browser-tasks)). After
+[`docs/e2e-testing.md`](docs/e2e-testing.md#cached-browser-tasks)). Do not reach
+for `--force`/`TURBO_FORCE` while iterating: 210 forced browser runs cost 3.7h
+of wall time across the 2026-10-15..18 window. Scope the run instead, and force
+only for the pass before landing or when a binary outside the repository
+changed. After
 adding or retagging a feature file, run
 `node tooling/dshx/scripts/browser-tasks.mjs --write`.
 

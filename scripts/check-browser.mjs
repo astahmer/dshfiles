@@ -28,6 +28,14 @@ if (task === undefined) {
 }
 const force = rest.includes('--force')
 const names = rest.filter(argument => argument !== '--force')
+const forcedByEnv = !['', '0', 'false'].includes(process.env.TURBO_FORCE ?? '')
+if (force || forcedByEnv) {
+  console.log(
+    `check-browser ${mode}: ${force ? '--force' : 'TURBO_FORCE'} ignores the Turbo cache, so this reruns every selected journey instead of ` +
+      'replaying an unchanged one. Use it only when a binary outside the repository changed (other than jj), or once before landing — while ' +
+      'iterating one plugin, run its scoped check without it.',
+  )
+}
 // Journeys stay serial (parallel Host plus Chromium boots make them flaky under load); the boot gate asserts a mount
 // and runs no journey, so three at a time measured ~2.7x faster on ten cores.
 const concurrency = process.env.CHECK_BROWSER_CONCURRENCY ?? (mode === 'boot' && process.env.CI === undefined ? '3' : '1')

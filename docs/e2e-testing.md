@@ -226,7 +226,12 @@ To bust the cache: `--force` reruns everything (do it after changing anything
 the inputs above cannot see, such as a system binary other than jj), and
 deleting that shared directory clears it for every task and workspace. A result
 is only as fresh as the built bundles, which is why the entry points always
-build first.
+build first. `TURBO_FORCE` bypasses the cache the same way from the environment,
+and the check entry point prints a warning for either. Forcing is expensive and
+easy to reach for out of habit — a forced `check:e2e` reruns every journey
+instead of replaying the unchanged ones, and 210 forced browser runs across the
+2026-10-15..18 window measured 3.7h of wall time — so scope the run
+(`pnpm check:e2e <plugin>`) rather than forcing the whole suite while iterating.
 
 In CI, `check.yml` runs `pnpm check`, which includes `features:check`, the
 web-profile boot and the `@smoke` journeys. `plugin-e2e-coverage.yml` runs the

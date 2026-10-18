@@ -102,6 +102,14 @@ Results are cached per package on the built bundles each journey boots, so a
 rerun without changes replays in seconds. A replayed pass is not a new run:
 pass `--force` when a binary outside the repository changed (other than jj).
 
+`--force` and `TURBO_FORCE` bypass that cache, and the script prints a warning
+when it sees either. In the 2026-10-15..18 window 210 forced browser runs cost
+3.7h of wall time (`pnpm check:e2e <plugin> --force`, `TURBO_FORCE=1`,
+`--repeat-each`). While iterating on one change, run the scoped check without
+them — `pnpm check:e2e <plugin>` already reruns a package whose inputs changed
+and replays the rest — and reserve a forced run for the one pass before landing,
+or when a binary outside the repository changed.
+
 A red journey is drift or a regression: triage it with `maintain-verification-skill`.
 
 ## Gotchas
