@@ -34,6 +34,17 @@ Reproduce without modifying source or saved baseline:
 node --experimental-strip-types plans/performance-optimization/evidence/graph-benchmark.mjs /private/tmp/graph-new-results.json
 ```
 
+## Memory retrieval scope probe
+
+[memory-retrieval-probe.mjs](memory-retrieval-probe.mjs) (results in [memory-retrieval-results.json](memory-retrieval-results.json)) builds a scratch memory database where one project's corpus is term-dense and 1,000× larger than the requested project's notes, then asks for the requested project only. It prints the scoped hit count, the projects of the hits, and the `EXPLAIN QUERY PLAN` of the docs FTS statement.
+
+| Run | Corpus | Scoped hits | Hit projects | Scoped search |
+| --- | --- | --- | --- | --- |
+| Before the SQL predicate | 2,000 noise notes + 5 in-scope | **0 / 5** | — | ~7 ms |
+| After the SQL predicate | same | **5 / 5** | `mine` | ~5 ms |
+
+The query plan is unchanged (`SCAN d VIRTUAL TABLE INDEX 0:M4`, `USE TEMP B-TREE FOR ORDER BY`): the fix is a predicate evaluated inside the FTS statement, not an index. Timings are single samples on a shared machine; the hit counts are deterministic.
+
 ## Checkout planner probe
 
 [Portable runner](checkout-benchmark.mjs) calls `CheckoutRebuild.plan({ root, changedFiles: [] })` six times in one process. It wraps `readFileSync` only to count actual `.js.map` reads and bytes; the real implementation and filesystem remain in use. No JJ operation, install, bundle build or checkout mutation occurs.
@@ -99,13 +110,94 @@ Implemented in revision `xlmxnrtl` on 2026-10-18, based on main `6ee7a86a`.
 
 Selection is byte-identical in the unit suite, `dshx dev up` still boots from existing artifacts, and the timing spread above is why the counts, not the milliseconds, are the primary evidence.
 
+## C01 and C06 implementation receipts
+
+Implemented in the working copy of thread workspace `thread-5c0266` on 2026-10-18 (unlanded; see the topology note below).
+
+**C01 — incremental transcript decoration.** All three decorators now derive a dirty set from `MutationRecord`s and rescan only those nodes, and the initial pass drains its own records with `takeRecords()`:
+
+- Memory: the strengthened unit test decorates **200 blocks**, changes one, and asserts the `createTreeWalker` roots are exactly that block — the untouched 199 are never walked. Memory suite 67/67 (decorator file 3/3).
+- Jujutsu: changing one code element makes the conversation's `querySelectorAll` run **zero** times while the changed code is still re-marked/unmarked correctly. JJ suite 155/155 (decorator file 6/6); `pnpm check:e2e jujutsu` → **11 passed, 0 failed**.
+- Mentions: a subtree is queued only when it can hold a reference chip, so an unrelated sidebar mutation does no document-wide query. Mentions suite 10/10, typecheck clean.
+- `check:diff` clean (5 changed files, 0 diagnostics).
+- Caveats: `memory.reference-preview` is the pre-existing flake documented in [the documented citation-preview flake](../../../docs/e2e-testing.md#provider-credentials); two fresh control runs on the reverted source also failed, and a control run *with* the change passed. The mentions journey fails with **and** without the change (the booted profile still exposes the new-thread composer placeholder instead of `Message or run a task, / commands, @ files or sessions`), so mentions is unit-verified only.
+
+**C06 — closed palette does no catalog work.** `PaletteOverlay` now reads only the palette snapshot and returns before mounting anything; `PaletteCatalog` owns the session/workspace subscriptions, and archived-ID/workspace joins are `Set`/`Map` lookups. Verified with 40/40 unit tests across 11 files, `typecheck`, `build`, and `pnpm check:e2e command-palette` → **12 passed, 0 failed** (includes `palette-performance`). Gap: the closed-path assertion is source-level; a unit test needs the full `shell.overlay` slot prop kit, so a shared test-props factory is the follow-up.
+
+## C07 implementation receipt
+
+Implemented in the working copy of `thread-5c0266` on 2026-10-18 (unlanded; see the topology note below).
+
+`$projectComposer` is split into `$composerProjectionContent` (text views, chip occurrences, command claim) and `$composerSelection` (range/caret). `DraftEditorRuntime.refreshProjection` reuses the content half while its `contentRevision` is unchanged, and the update listener bumps that revision only when a commit dirtied elements or leaves. Measured on the installed Lexical 0.49: selection-only commit `0/0`, `setDraft` `3/2`, `paste` `2/2` (elements/leaves).
+
+The first attempt keyed reuse on the `RootNode` instance; the new test immediately caught it serving a stale projection, because Lexical reuses the root object across content commits — the revision counter is the real signal, and the test now guards that regression.
+
+- [projection-reuse.test.ts](../../../plugins/@dshfiles/rich-composer/tests/projection-reuse.test.ts): 200-block draft, 100 caret moves reuse the identical `detectText`/`clipboardText`/`occurrences` objects and report caret `35`; a paste rebuilds; a chip's occurrence array and `occurrenceId` survive 50 caret moves.
+- rich-composer suite **16/16** across 4 files, `typecheck`, `build`, DSH-Node Host import check, `pnpm check:e2e rich-composer` → **1 passed, 0 failed**.
+- Both edited `src/native` files were added to the fork's local-delta table in the plugin README.
+- Not measured: input latency and allocations; range-selection/IME/undo rely on existing suites plus the new regression guard.
+
+## C10 implementation receipt (graph layout algorithm)
+
+Implemented in the working copy of `thread-5c0266` on 2026-10-18 (unlanded; see the topology note below). Scope: the algorithm half only.
+
+`layoutRevisionGraph` asked, per parent link, whether the parent's branch owns any row strictly between the child and parent rows — by scanning that branch. On a long linear trunk that is quadratic. It is now a binary search over each branch's sorted rows (`rowBetween` in [graph.ts](../../../plugins/@dshfiles/jujutsu/src/graph.ts)).
+
+Same archived runner, same machine, one warmup + seven samples per case, before → after p50:
+
+| Shape | Revisions | Before p50 / max (ms) | After p50 / max (ms) |
+|---|---:|---:|---:|
+| linear | 500 | 4.98 / 7.76 | **1.50 / 2.18** |
+| linear | 1,000 | 16.49 / 17.26 | **2.59 / 5.87** |
+| linear | 2,000 | 34.26 / 61.61 | **5.12 / 6.80** |
+| branchy | 2,000 | 6.60 / 7.80 | 5.60 / 8.59 |
+
+Raw samples: [before](graph-results-before-c10.json), [after](graph-results-after-c10.json). Pure Node observations, not browser frame or typing latency.
+
+Correctness evidence:
+
+- 26/26 graph unit tests, 155/155 full jujutsu suite, `typecheck`, `build`, DSH-Node Host import check.
+- A differential harness ran the previous and current `layoutRevisionGraph` over **120 random fixtures** (20–200 revisions, merges, immutable revisions, bookmarks) in both filter modes: **0 mismatches in 240 comparisons**.
+- `pnpm check:e2e jujutsu` → **11 passed, 0 failed**. One earlier run of the same code failed the filesystem-dependent `jujutsu.stale-repository-recovery` scenario (the harness deletes the repository directory and expects the unavailable-path notice) after 8m16s under load; the clean re-run passed it in 20s, so that was a load flake, not a layout regression.
+- Not shipped: deferring the layout off the raw keystroke path. It changes keypress-to-correct-content latency, so it needs the M01 harness before it can be called a win.
+
+## JJ topology note (2026-10-18)
+
+Several live threads rewrite the shared graph concurrently. During this work the audit revision was reparented under another thread's working copy, `main` advanced repeatedly, and a rebase reported rewriting 30 descendant commits; my own `jj` rewrites cascaded into 8-22 revisions held by other threads. My revisions were left conflict-free and their content is intact, but the stack currently sits on `ktkvyryz` (another thread's `@`) rather than `main`, and one unrelated conflict remains in another thread's revision. On 2026-10-18 the user chose to **freeze this topology**: keep stacking revisions in this thread workspace and stop rewriting shared history, rather than rebasing onto `main` (which cascaded into 8-22 revisions held by other live threads) or pausing until they finish. No rebase is attempted by this work; a later linearize pass settles the graph when the other threads are idle.
+
+## Session close-out (2026-10-18)
+
+What this session verified, per register:
+
+| Register | Entries with receipts | Verified by |
+| --- | --- | --- |
+| client | C19, C01, C03, C04, C06, C07, C08, C09, C10 (algorithm half), C11, C12, C13, C14, C16, C17, C20 | unit suites for the owning plugins, `typecheck`, `build`, DSH-Node Host import checks, and `pnpm check:e2e <plugin>` (jujutsu 11/11, jj-integration 14/14, editor 2/2, command-palette 12/12, rich-composer 1/1, thread-sidebar 26/26, ai-accounts 14/14, activity-timeline 3/3, memory 3/3) |
+| Host | H01, H02, H03, H04, H06 (rolling sweeps), H07 (SQL project scoping), H08 (statement reuse), H09 (overlapped sources), H21 (fingerprint cache) | dshx and plugin unit suites, instrumented read/write/fetch counts, the memory retrieval probe, and the plugin journeys that touch each owner |
+| tooling | T01 (dependency manifest), T04 (scoped browser prerequisites) | dshx spec suite, browser-task tests, the maintain-verify-dsh live pass (`dshx dev up/doctor/open/shot/down`), and the smoke journeys |
+
+Measured highlights: graph layout linear 1,000/2,000 revisions **16.49/34.26 ms → 2.59/5.12 ms** p50 (240/240 differential comparisons identical); browser-check preparation **41.1 s → 0.35 s** and **192 files/20.3 MB → 13 files/1.23 MB** hashed; memory scoped retrieval **0/5 → 5/5** in-scope hits under dominant cross-project noise; Activity Timeline reads **0 readFile** on the snapshot path and 50 buffered events as **1 writeFile**; telemetry bursts as **1 state write** instead of one per record; fingerprint checks issuing **zero reads** when nothing moved.
+
+Final gates on the last round's tree (2026-10-18):
+
+- `pnpm run typecheck` from `plugins/`: **96/96 Turbo tasks successful**, zero `error TS` lines.
+- `pnpm run test` from `plugins/`: **93/93 Turbo tasks successful**.
+- `node --run check:green`: stops at `@dshfiles/dshx#test` with **1 failed | 692 passed**, the single failure being the documented `tests/compat.spec.ts` prerelease-range assertion that predates this work and touches no file this work changed.
+- `pnpm check:e2e:smoke` (the `@smoke` subset across owners): **passed in 166 s** on the final tree (every owner task green, including thread-sidebar 2/2, ai-accounts 1/1, settings-shell 1/1, main-tabs, jj-integration, workbench, command-palette and the cross-plugin boot task).
+
+Baseline failures and flakes are listed under [Baseline failures on main](#baseline-failures-on-main-not-caused-by-optimization-work); all were re-checked before attributing them to this work.
+
 ## Baseline failures on main (not caused by optimization work)
 
 Verify these against the revision you start from before attributing a red check to your own change:
 
 - `pnpm lint` fails with `antislop(require-safety-comment-for-type-assertion): 338 findings, cap 336`. The changed `shared-streams` files contribute **0** of those findings, so the drift predates this work. Never raise the cap; fix the sites or leave main red as found.
+- `pnpm check:e2e jj-integration` (2026-10-18): the first run ended **13 passed, 1 failed** — `jj-integration.structured-reference-handoff-browser-journey` waited for the composer textbox `Message or run a task, / commands, @ files or sessions` and failed before any panel behaviour ran — while a second run of the same panel code passed **14/14**. Treat that composer accessible-name lookup as a flake (the same drift is recorded for the mentions journey below), not as a deterministic baseline failure.
+- `pnpm check:e2e thread-sidebar` (2026-10-18, C03 revision): **25 passed, 1 failed** on the first run and **23 passed, 3 failed** on the second. Every failure is outside row rendering: `thread-sidebar.notifications-settings` and `thread-view-presets.custom-views` click a Settings/dialog button after `page.reload()` while the scratch profile’s provider-setup dialog (`Add an API key to get started|Get started`) is up — the registered locator handler dismisses it but the action still waits for the dialog to hide, and those steps do not use `StartupDialogs.reloadPastProviderSetup`; `thread-sidebar.navigation-history` failed on a `startBlankThread` poll for the Host-created session id (15 s) on a run that took 14 minutes under load. Neither mechanism touches sidebar rows, child slices, unread markers or workspace titles, and the same code passed 25 of 26 journeys on the first run.
+- `pnpm check:e2e thread-sidebar` (2026-10-18, C04 revision): the first run ended **24 passed, 2 failed** — `thread-sidebar.mention-insertion` (a chip-ordering assertion in the composer, `rightIndex > labelIndex` was 4) and `thread-sidebar.referenced-by` (the `Referenced by` hover submenu item never appeared) — and a re-run of the same code passed **26/26**. Neither journey reads the sidebar inventory poll that revision changed, so both are recorded as flakes under load rather than regressions.
+- `pnpm check:e2e workbench` (2026-10-18, C17 revision) ends **3 passed, 1 failed**: `workbench.surface-layouts` waits for a turn-status chip (`getByRole('status')` filtered by `Completed|Failed|Stopped|Cancelled`) to appear after the shared `sendMessage` helper sends from a New-session composer, and it never counts it, although the failure snapshot shows the row as "Completed". **Control run:** restoring the pre-C17 `workbench-view.tsx` (`jj file show -r @-`) and re-running reproduced the identical failure on the same assertion, so this journey is a baseline failure, not a regression. The `@smoke` layout-persistence scenario in the same feature passes.
 - `pnpm --dir tooling/dshx run features:check` reports 8 issues in `jj-integration`, `pulls-review` and `thread-sidebar` (renamed/removed test references and one missing Gherkin tag). `shared-streams` reports none.
 - `pnpm --dir tooling/dshx run browser-tasks:check` reports drift in about a dozen `turbo.json` files that this change never touches.
+- `node --run check:green` (2026-10-18, final round) stops at `@dshfiles/dshx#test`: **1 failed | 692 passed**, and the one failure is the `tests/compat.spec.ts` prerelease-range assertion below. Nothing else in that run failed before it; the plugin-wide `typecheck`/`test` tasks and the smoke journeys were run separately and are green.
 - `pnpm --dir tooling/dshx/packages/dshx exec vitest run` ends with one unrelated failure in `tests/compat.spec.ts` ("publishes a peer range accepted by package managers for every verified prerelease"): `satisfies` rejects a verified prerelease against `PROTOCOL_2_COMPATIBILITY.dshRange`. Neither optimization revision touches `src/compat`.
 
 ## Validation boundaries

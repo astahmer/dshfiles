@@ -1,0 +1,37 @@
+{
+  "screenshot": "/var/folders/_p/mx79mqqn6ss8755q205k8_340000gn/T/dshx-dev/perf-audit-5c0266/evidence/2026-10-18T02-20-09.415Z-jujutsu.png",
+  "summary": "/var/folders/_p/mx79mqqn6ss8755q205k8_340000gn/T/dshx-dev/perf-audit-5c0266/evidence/2026-10-18T02-20-09.415Z-jujutsu.json",
+  "path": "/",
+  "title": "DeepSeek Harness",
+  "errors": {
+    "console": 1,
+    "page": 0,
+    "requests": 0,
+    "http": 1
+  },
+  "warnings": 0,
+  "topErrors": [
+    {
+      "kind": "http",
+      "detail": "404 fetch /api/dshx-e1cc781b/classifyWorkspaces",
+      "count": 1
+    },
+    {
+      "kind": "console.error",
+      "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "count": 1
+    }
+  ],
+  "events": [
+    {
+      "at": "2026-10-18T02:20:06.850Z",
+      "kind": "http",
+      "detail": "404 fetch /api/dshx-e1cc781b/classifyWorkspaces"
+    },
+    {
+      "at": "2026-10-18T02:20:06.853Z",
+      "kind": "console.error",
+      "detail": "Failed to load resource: the server responded with a status of 404 (Not Found)"
+    }
+  ]
+}

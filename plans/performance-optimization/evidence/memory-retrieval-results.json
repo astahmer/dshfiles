@@ -1,0 +1,30 @@
+{
+  "probe": "memory-retrieval-probe.mjs",
+  "capturedAt": "2026-10-18",
+  "corpus": {
+    "crossProjectNoiseNotes": 2000,
+    "inScopeNotes": 5,
+    "query": "checkpoint",
+    "requestedProject": "mine",
+    "limit": 10
+  },
+  "before": {
+    "scopedHits": 0,
+    "scopedProjects": [],
+    "scopedMs": 7
+  },
+  "after": {
+    "scopedHits": 5,
+    "scopedProjects": [
+      "mine"
+    ],
+    "scopedMs": 5
+  },
+  "queryPlan": {
+    "docsWordsFts": [
+      "SCAN d VIRTUAL TABLE INDEX 0:M4",
+      "USE TEMP B-TREE FOR ORDER BY"
+    ]
+  },
+  "note": "Run-to-run timings are single samples on a shared machine; the recall counts are the deterministic result."
+}

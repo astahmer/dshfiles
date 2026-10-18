@@ -1,0 +1,15 @@
+{
+  "screenshot": "/var/folders/_p/mx79mqqn6ss8755q205k8_340000gn/T/dshx-dev/perf-audit-5c0266/evidence/2026-10-18T02-19-05.766Z-activity.png",
+  "summary": "/var/folders/_p/mx79mqqn6ss8755q205k8_340000gn/T/dshx-dev/perf-audit-5c0266/evidence/2026-10-18T02-19-05.766Z-activity.json",
+  "path": "/",
+  "title": "DeepSeek Harness",
+  "errors": {
+    "console": 0,
+    "page": 0,
+    "requests": 0,
+    "http": 0
+  },
+  "warnings": 0,
+  "topErrors": [],
+  "events": []
+}

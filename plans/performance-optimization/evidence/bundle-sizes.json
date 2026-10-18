@@ -1,0 +1,220 @@
+{
+  "recordedAt": "2026-10-18T02:30:04.579Z",
+  "kind": "existing-artifacts-not-live-transfer",
+  "builtRoot": "/Users/astahmer/dev/dshfiles",
+  "bundles": 42,
+  "totalBytes": 15214373,
+  "totalGzipBytes": 3953003,
+  "sizes": [
+    {
+      "name": "editor",
+      "bytes": 5663518,
+      "gzipBytes": 1523265
+    },
+    {
+      "name": "pulls-review",
+      "bytes": 1645575,
+      "gzipBytes": 312209
+    },
+    {
+      "name": "jujutsu",
+      "bytes": 1587338,
+      "gzipBytes": 312453
+    },
+    {
+      "name": "shared-runtime",
+      "bytes": 702120,
+      "gzipBytes": 186305
+    },
+    {
+      "name": "rich-composer",
+      "bytes": 536254,
+      "gzipBytes": 159751
+    },
+    {
+      "name": "workbench",
+      "bytes": 496339,
+      "gzipBytes": 116454
+    },
+    {
+      "name": "ai-accounts",
+      "bytes": 417593,
+      "gzipBytes": 123915
+    },
+    {
+      "name": "thread-sidebar",
+      "bytes": 404538,
+      "gzipBytes": 107625
+    },
+    {
+      "name": "jj-integration",
+      "bytes": 248438,
+      "gzipBytes": 69102
+    },
+    {
+      "name": "workspace-folder-picker",
+      "bytes": 224270,
+      "gzipBytes": 66269
+    },
+    {
+      "name": "privacy-controls",
+      "bytes": 220688,
+      "gzipBytes": 65077
+    },
+    {
+      "name": "usage",
+      "bytes": 218090,
+      "gzipBytes": 69839
+    },
+    {
+      "name": "secret-catalog",
+      "bytes": 213516,
+      "gzipBytes": 61971
+    },
+    {
+      "name": "ui-styles",
+      "bytes": 188747,
+      "gzipBytes": 32154
+    },
+    {
+      "name": "model-effort-picker",
+      "bytes": 181254,
+      "gzipBytes": 57674
+    },
+    {
+      "name": "mcp-servers",
+      "bytes": 158412,
+      "gzipBytes": 47239
+    },
+    {
+      "name": "settings-shell",
+      "bytes": 146395,
+      "gzipBytes": 43853
+    },
+    {
+      "name": "agent-toolkit",
+      "bytes": 115147,
+      "gzipBytes": 34315
+    },
+    {
+      "name": "agent-communication",
+      "bytes": 107594,
+      "gzipBytes": 30226
+    },
+    {
+      "name": "optmem",
+      "bytes": 102453,
+      "gzipBytes": 29833
+    },
+    {
+      "name": "attachment-gallery",
+      "bytes": 101934,
+      "gzipBytes": 32402
+    },
+    {
+      "name": "command-palette",
+      "bytes": 101635,
+      "gzipBytes": 31103
+    },
+    {
+      "name": "frame-layout",
+      "bytes": 98577,
+      "gzipBytes": 28930
+    },
+    {
+      "name": "main-tabs",
+      "bytes": 98242,
+      "gzipBytes": 30881
+    },
+    {
+      "name": "memory",
+      "bytes": 96697,
+      "gzipBytes": 28242
+    },
+    {
+      "name": "queue-reorder",
+      "bytes": 96513,
+      "gzipBytes": 30032
+    },
+    {
+      "name": "plugin-marketplace",
+      "bytes": 91867,
+      "gzipBytes": 27842
+    },
+    {
+      "name": "prompt-stash",
+      "bytes": 91635,
+      "gzipBytes": 26878
+    },
+    {
+      "name": "settings-search",
+      "bytes": 91008,
+      "gzipBytes": 27041
+    },
+    {
+      "name": "home",
+      "bytes": 79792,
+      "gzipBytes": 24644
+    },
+    {
+      "name": "activity-timeline",
+      "bytes": 78131,
+      "gzipBytes": 23886
+    },
+    {
+      "name": "multi-host",
+      "bytes": 77583,
+      "gzipBytes": 23466
+    },
+    {
+      "name": "shortcuts",
+      "bytes": 68071,
+      "gzipBytes": 17944
+    },
+    {
+      "name": "btw",
+      "bytes": 66682,
+      "gzipBytes": 21821
+    },
+    {
+      "name": "input-trigger",
+      "bytes": 66193,
+      "gzipBytes": 20614
+    },
+    {
+      "name": "project-checks",
+      "bytes": 64051,
+      "gzipBytes": 19688
+    },
+    {
+      "name": "diff-viewed",
+      "bytes": 53568,
+      "gzipBytes": 17707
+    },
+    {
+      "name": "send-after-upload",
+      "bytes": 49216,
+      "gzipBytes": 16398
+    },
+    {
+      "name": "mentions",
+      "bytes": 47497,
+      "gzipBytes": 16031
+    },
+    {
+      "name": "tool-meta",
+      "bytes": 46811,
+      "gzipBytes": 15270
+    },
+    {
+      "name": "sidebar-commands",
+      "bytes": 36840,
+      "gzipBytes": 11950
+    },
+    {
+      "name": "agent-questions",
+      "bytes": 33551,
+      "gzipBytes": 10704
+    }
+  ]
+}

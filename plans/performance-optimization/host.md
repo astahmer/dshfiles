@@ -1,0 +1,376 @@
+# Host and data optimization work register
+
+## Scope, evidence and sequencing
+
+This register covers owned Host services, domain/storage code and relevant background work. It supplements the [master plan](README.md); implementation remains unstarted. Entries are **static source facts with unmeasured performance impact**, not measured bottlenecks or promised speedups. P1 means a high-leverage repeated path or resource-lifetime concern to profile first; P2 means a cold/scale path or a cheap adjunct to another change. Apply the master measurement gates before selecting implementation.
+
+The earlier [ADE baseline](../ade-performance/README.md#L20-L62) measured short, warm, non-streaming scratch interactions. It did not measure the storage, provider, remote or large-corpus workloads below. No live user database was opened, no query plan was collected, and no provider/secret/OAuth operation was invoked for this source audit. No product code or revision changes belong to this deliverable. One initial coordination notice used the durable communication inbox rather than the native parent-message channel; do not characterize the entire investigation as literally zero state writes.
+
+All cache work must specify its owner, full key, byte/count budget, external-change invalidation, error policy and disposal. Shared work must not inherit the first caller's cancellation signal. Preserve authorization, identity/path checks, durable acknowledgements, redaction and mutation freshness. A cache hit is not authorization to mutate.
+
+**Public-API feasibility gate:** verify the installed supported Host/dshx contract before relying on filtered queries, bulk storage operations, session cursors, recursive directory reads or streaming subscriptions. If the capability is absent, label the concrete requirement a **Host gap** and stop at that boundary. Do not patch or recommend patching DSH core, access undocumented native storage, or synthesize a second authoritative project/session store.
+
+## H01 — Batch Activity Timeline ingestion and cache its read model (P1)
+
+**Evidence and workload.** [Singleton ingestion](../../plugins/@dshfiles/activity-timeline/src/service.ts#L91-L106) reads and validates the whole retained JSON document, searches for a duplicate, sorts/copies events and writes the whole document. [Read APIs and persistence](../../plugins/@dshfiles/activity-timeline/src/service.ts#L141-L234) also reread/decode the document for every page, event, related lookup and stats call. [Host adapters](../../plugins/@dshfiles/activity-timeline/src/host.ts#L58-L96) submit each event separately, including burst/backfill traffic, despite an existing [batch method](../../plugins/@dshfiles/activity-timeline/src/service.ts#L108-L139). With E retained events and B new events, singleton ingestion performs B complete read/write cycles and up to O(B × E log E) sorting; E is capped at 5,000. Actual time and write volume remain unmeasured.
+
+- [x] Add a bounded, owner-local microbatch queue feeding `ingestMany`; specify maximum delay, backpressure, flush errors and disposal drain.
+- [x] Reuse a revision-validated parsed snapshot, with id/correlation/attention/source indexes only where useful; publish it after successful atomic replacement.
+- [ ] Test and measure before promoting.
+- **Receipt (2026-10-18, unlanded in this thread workspace):** `ActivityTimelineService.enqueue` buffers events and flushes them through one serialized `#ingestEvents` batch, so a burst costs one read/write cycle instead of one each. Maximum added delay is `INGEST_BATCH_DELAY_MS` (25 ms), a buffer of `INGEST_BATCH_LIMIT` (200) flushes immediately (backpressure), a failed flush rejects every buffered caller's promise, and `drain()` flushes the buffer and waits for running writes — the Host teardown now awaits it, so accepted events are stored before the service goes away. `ingest`, `ingestMany` and the queue share that one batch path, so duplicate detection, ordering by `(at, id)`, retention and listener order cannot drift between them.
+  Reads reuse a revision-validated snapshot: `#readState` stats the file, keys the cache on `dev:ino:size:mtimeMs` plus this process's own write counter, and re-reads when the file changes, when the process has written since, or when the snapshot is older than `STATE_FRESHNESS_MS` (30 s). `#writeState` publishes the parsed document into that snapshot after the atomic rename, so the read that follows a write costs one `stat`.
+  New tests in [service.test.ts](../../plugins/@dshfiles/activity-timeline/src/service.test.ts) instrument `node:fs` through `syncBuiltinESMExports`: three read APIs on an unchanged file issue **zero** `readFile` calls, then one external replacement (`readFile` ×1) is visible; a 50-event burst is exactly **one** `writeFile` with every caller settled; a duplicated id settles `duplicate: true` for that caller and increments the duplicate counter once; `drain()` stores a pending batch on demand. Checks: activity-timeline suite **20/20** (3 files), typecheck, build, DSH-Node Host import check, and `pnpm check:e2e activity-timeline` (result in the round report).
+- **Remaining:** no bytes-parse/write, queue-lag or p95 measurement was taken; the snapshot re-reads on any metadata change, so a same-size same-mtime rewrite is only caught by the 30 s freshness bound.
+
+**Guards.** Preserve durable acknowledgement and listener order, duplicate counters, retention, cursor ties and condensation. Invalidate on own writes and external file replacement using identity/revision metadata plus a bounded freshness check. Keep private-file/schema checks; do not drop attention events or silently relax durability to reduce IO.
+
+**Validation and metrics.** Test burst/backfill duplicates, equal timestamps, retention boundaries, concurrent readers, external replacement, flush failure, shutdown and restart. Record bytes parsed/serialized/written, read/write calls per event, queue depth/lag, p95 ingestion/page latency and event-loop delay.
+
+## H02 — Aggregate Agent Communication unread counts once per state revision (P1)
+
+**Evidence and workload.** [All-agent refresh](../../plugins/@dshfiles/agent-communication/src/host.ts#L505-L533) calls `unreadCount` for every Agent through `Promise.all`. [Each call](../../tooling/dshx/packages/dshx/src/communication/service.ts#L569-L576) reads secure state metadata, filters acknowledgements and scans messages/recipients. For A Agents, K acknowledgements, M messages and R average recipients, work approaches O(A × (K + M × R)), plus repeated metadata IO. A secure parsed-state cache already exists; full JSON rereading per call is not the finding.
+
+- [x] Add one service-owned bulk unread projection for requested principals, or a state-generation-keyed unread index, from a single secured state read/traversal.
+- [x] Keep the existing refresh single-flight and failure-isolated prompt nudge.
+- [ ] Test and measure before promoting.
+- **Receipt (2026-10-18, unlanded in this thread workspace):** `CommunicationService.unreadCounts(principals)` answers every requested principal from **one** secured `#readState()` read: acknowledgement sets are indexed once and a single message/recipient sweep increments each principal once per message (a reused per-message set keeps two recipients of one message from counting twice). Per-principal `unreadCount` is now that function with a single input, so both paths cannot drift. The plugin's [all-agent refresh](../../plugins/@dshfiles/agent-communication/src/host.ts#L505-L533) calls it once for the whole agent list and only falls back to per-principal reads — where the old code already isolated failures — when the batch read itself throws. Work drops from O(A × (K + M × R)) to O(A + K + M × R) scans per refresh.
+  New spec [communication.service.spec.ts](../../tooling/dshx/packages/dshx/tests/communication.service.spec.ts): three principals (two with messages, one quiet) with one acknowledgement give `[1, 1, 0]`, every entry equals its single-principal read, an empty input answers empty, and duplicated principals repeat their count. Checks: dshx service spec **17/17**, agent-communication suite **39/39** (9 files), plugin typecheck, build and DSH-Node Host import check, and `pnpm check:e2e agent-communication` → **4 passed, 0 failed**.
+- **Remaining:** no refresh-CPU or p95 measurement was taken; the win is stated as scan count, not milliseconds.
+
+**Guards.** Unread differs from unacknowledged: opening an inbox changes read state without acknowledging it. Update/invalidate for send, publish, inbox read, acknowledgement, pruning and external state revision. Preserve directory/file owner, permission and symlink checks; do not use a long TTL to suppress those checks.
+
+**Validation and metrics.** Exercise 1/20/100 Agents, 0/5,000 messages, fanout, inbox reads and acknowledgements, retained-message expiry and external replacement. Count `lstat`/parse calls, traversed records and refresh CPU; measure p95 refresh, maximum concurrency and nudge staleness.
+
+## H03 — Reduce durable communication telemetry write amplification (P1)
+
+**Evidence and workload.** [Tool completion](../../plugins/@dshfiles/agent-communication/src/host.ts#L548-L589) awaits `recordActivity` before returning, even for reads. [Recording activity](../../tooling/dshx/packages/dshx/src/communication/service.ts#L349-L369) appends through the same whole-state mutation path. [Persistence](../../tooling/dshx/packages/dshx/src/communication/service.ts#L800-L821) validates/serializes the full message/subscription/ack/activity snapshot and atomically writes with `fsync`. A state-changing tool can therefore persist its operation, persist another snapshot for telemetry, then cause Timeline persistence. Burst latency and actual bytes have not been measured.
+
+- [x] Add bounded bulk activity recording under the existing serialized state owner, with per-call promises resolved only after the required durable flush.
+- [ ] Consider a separate owned activity log/table only if measurements justify the storage change and a supported domain contract can express it.
+- [ ] Test and measure before promoting.
+- **Receipt (telemetry batching):** `CommunicationService.recordActivities(inputs)` appends a whole batch in **one** `#updateState`, which is one serialized validate/serialize/atomic-fsync write instead of one per record; `recordActivity` is now that function with a single input. `enqueueActivity(input)` buffers telemetry and flushes it after `ACTIVITY_BATCH_DELAY_MS` (25 ms) or immediately at `ACTIVITY_BATCH_LIMIT` (100) records; every caller's promise settles only after that batch is durably written, a failed flush rejects every caller in the batch, and `drainActivity()` writes what is buffered and waits for the running write chain. The Agent Communication plugin's `trackToolActivity` now enqueues, so a burst of tool calls costs one state write while its existing `catch` still logs a telemetry failure without failing the tool. Crash-loss window, stated explicitly: records still buffered are lost (≤ 25 ms); mandatory audit history is still awaited rather than fire-and-forget, and message/publish durability is untouched.
+  New tests in [communication.service.spec.ts](../../tooling/dshx/packages/dshx/tests/communication.service.spec.ts): 25 enqueued records call `recordActivities` exactly once with 25 inputs and leave 25 events on disk; a record buffered at drain time lands as the 26th; a failing flush rejects its caller. Checks: communication service spec **19/19**, agent-communication suite **39/39** (9 files), dshx and plugin typecheck, plugin build and DSH-Node Host import check, and `pnpm check:e2e agent-communication` → **4 passed, 0 failed**.
+- **Remaining:** bytes and `fsync` counts per tool were not measured, so the separate activity table stays unjustified.
+
+**Guards.** Do not make mandatory audit history fire-and-forget or weaken peer-message durability. Retain call/root correlation, ordering, bounded state, redaction and telemetry-failure behavior. Define crash-loss windows explicitly; preserve the bridge's single-owner model and do not replay deliveries during flush retries.
+
+**Validation and metrics.** Test bursts, duplicate/retried telemetry, partial flush failures, cancellation, restart and message success when telemetry fails. Measure bytes and `fsync` calls per tool, write-queue depth/p95, and tool duration with and without durable telemetry time.
+
+## H04 — Share concurrent native question fact reads without stale authority (P1)
+
+**Evidence and workload.** [Question listing](../../plugins/@dshfiles/agent-questions/src/host.ts#L358-L408) lists the corpus, scans selected Sessions and only then slices output pages. Even a `sessionId` request first lists all Sessions. [Projection reads](../../plugins/@dshfiles/agent-questions/src/host.ts#L68-L93) request all projections and dispose the observation. [The scan](../../plugins/@dshfiles/agent-questions/src/question-scan.ts#L46-L132) already has eight workers and a bounded, 30-second nonlive-session cache; live Sessions bypass that cache. Concurrent calls can still duplicate cold/live reads, and pagination repeats the scan. The inherited historical approximately 50-second scan report is not a new measurement.
+
+- [x] Share in-flight fact reads per Host/context and Session, keeping each caller's scope and fresh availability separate.
+- [ ] Evaluate a bounded raw scan generation for paging only if the API freshness contract permits it; keep deadlines/answerability derived at response time.
+- [x] Verify a supported exact-Session availability/bulk-projection API before attempting to avoid the corpus listing; otherwise record that requirement as a Host gap.
+- [ ] Test and measure before promoting.
+- **Receipt (shared reads):** `QuestionScan.createReads()` shares one in-flight read per **availability scope** — key `sessionId:live:persisted:liveRoot`, so callers that disagree about a Session's availability still read separately — and [host.ts](../../plugins/@dshfiles/agent-questions/src/host.ts) now passes one shared instance plus the caller's signal, with the loader taking that shared signal. The entry is dropped the moment its read settles, so nothing is served from a settled read; cancellation is reference-counted, so one caller leaving never cancels a read the others still await, while the last caller's departure aborts it. Answerability is still derived at response time, the facts cache still refuses live Sessions and never stores an unavailable projection — only the concurrent *attempt* is shared.
+  New tests in [question-scan.test.ts](../../plugins/@dshfiles/agent-questions/src/question-scan.test.ts): 20 concurrent callers start **one** load, all receive their facts, and a later caller loads again (nothing retained); a caller leaving does not cancel the shared read while another waits, whereas a solo caller's abort does abort it; two availability scopes for one Session read separately. Checks: agent-questions suite **50/50** (8 files), host and client typecheck, build, DSH-Node Host import check.
+- **Receipt (verified API, gap recorded):** the installed contract has `sessionQuery.load(sessionId, signal)` (live-preferred header + events) and `projectMany(sessionIds, project, signal)` (bulk projection over exact ids), but **neither reports the `live`/`persisted`/`formatStatus` availability** that a `SessionQuestionTarget` requires — only `listSessions` does. A `sessionId`-scoped listing therefore still lists the corpus first; the concrete requirement is recorded in [dsh-host-gaps.md](../dsh-host-gaps.md) rather than worked around.
+- **Remaining:** the bounded raw scan generation for paging is untouched, no browser journey covers the native question listing (unit-verified), and no concurrency measurement was taken.
+
+**Guards.** Do not cache answer authority, resurrect expired forms, or grant root rights from a shared projection. Reference-count shared cancellation, dispose observations and do not cache unavailable projections. An answer racing a scan remains subject to native rejection and current liveness checks.
+
+**Validation and metrics.** Test 20 concurrent callers, multipage listing, a Session becoming live, answers/expiry during a scan, unauthorized callers and cancellation. Count list/projection loads, cache/in-flight reuse and unavailable reads; measure cold/warm p95 and retained bytes.
+
+## H05 — Make account reads revision-aware and route refreshes no-op when unchanged (P2)
+
+**Evidence and workload.** [Every account read refreshes routes](../../plugins/@dshfiles/ai-accounts/src/accounts-host-api.ts#L85-L90), then [builds an observed file](../../plugins/@dshfiles/ai-accounts/src/accounts-host-api.ts#L57-L63). [The refresh queue](../../plugins/@dshfiles/ai-accounts/src/host.ts#L454-L525) serially rebuilds adapter/directory/pool/profile state rather than sharing an unchanged refresh. [The store](../../plugins/@dshfiles/ai-accounts/src/account-store.ts#L222-L283) rereads/decodes the file and observes all profiles; [observation](../../plugins/@dshfiles/ai-accounts/src/account-store.ts#L117-L218) may resolve credentials or inspect auth homes. At up to 64 accounts, repeated consumers can queue redundant file, credential and route work. Cost is unmeasured.
+
+- [ ] Cache validated authorable drafts by file revision; join one in-flight refresh and skip registration/pool/profile replacement for an equal route fingerprint.
+- [ ] Share per-request account observation and separate static configuration from volatile health/auth metadata.
+- [ ] Test and measure before promoting.
+
+**Guards.** Invalidate on saves, external file revision, credential-reference updates and relevant auth-file changes. Preserve external login detection, cooldown and pool state. Cache only metadata, not plaintext credentials. Retain the existing unchanged keyed-discovery registrations and abort stale discoveries on identity changes.
+
+**Validation and metrics.** Test concurrent reads, external saves, login/key rotation, account reorder, identity/layout changes and active cooldown. Count file/keychain/credential reads and route registration replacements; compare p95 account reads and retained bytes.
+
+## H06 — Share per-account quota reads and use rolling bounded workers (P1)
+
+**Evidence and workload.** [The UI sweep](../../plugins/@dshfiles/ai-accounts/src/accounts-host-api.ts#L226-L255) reads all profiles with unbounded `Promise.all` and returns after the slowest account. [History collection](../../plugins/@dshfiles/ai-accounts/src/usage-recorder.ts#L95-L151) separately reads enabled accounts in barrier batches of four. [The scheduler and UI cache](../../plugins/@dshfiles/ai-accounts/src/host.ts#L90-L106) have different collection paths; recovery reset reads also call the provider directly. The UI/footer/overlay already share [a 30-second single-flight sweep cache](../../plugins/@dshfiles/ai-accounts/src/account-usage.ts#L47-L79). Remaining work is cross-consumer duplication and unbounded or barrier-based scheduling, not absence of caching.
+
+- [ ] Own a bounded per-account reader keyed by account identity/layout and credential generation, shared by UI, history and recovery with explicit freshness requirements.
+- [x] Replace unbounded/barrier sweeps with a rolling concurrency policy; preserve explicit fresh refresh and manual history-sample semantics.
+- [ ] Test and measure before promoting.
+- **Receipt (rolling sweeps):** [rolling-concurrency.ts](../../plugins/@dshfiles/ai-accounts/src/rolling-concurrency.ts) adds `mapRolling` (no cancellation, every item mapped, input order kept) and `mapRollingUntilAborted` (an item never claimed before the abort answers `undefined`); a worker reserves its slot **before** awaiting and claims the next one as soon as it finishes, so one slow provider no longer holds back a whole wave. The UI sweep in [accounts-host-api.ts](../../plugins/@dshfiles/ai-accounts/src/accounts-host-api.ts) was an unbounded `Promise.all` over every account and is now bounded to four with the panel's account order preserved; history collection in [usage-recorder.ts](../../plugins/@dshfiles/ai-accounts/src/usage-recorder.ts) read in barrier batches of four and is now rolling at the same concurrency, writing each account's snapshot as that account's read finishes instead of once per wave. Failure and abort semantics are unchanged: a failed or aborted read writes nothing and counts as unwritten, aborted sweeps still skip the `lastAttemptAt` update, disabled accounts are still filtered first, and no plaintext token is retained.
+  New tests in [rolling-concurrency.test.ts](../../plugins/@dshfiles/ai-accounts/src/rolling-concurrency.test.ts): ten items at concurrency three map in order with a peak of exactly three in flight; with two workers a slow first item lets the others finish first (completion order `1, 2, 3, 0`, which a barrier cannot produce); an abort leaves unclaimed items unmapped; an empty list starts no worker. Checks: ai-accounts suite **317/317** (53 files), typecheck, build, DSH-Node Host import check, and `pnpm check:e2e ai-accounts` → **14 passed, 0 failed**. A first run was killed by the job limit after the `ai-accounts.pool-failover` journey failed once; the clean re-run passed that same journey, so it is recorded as a flake under load rather than a regression.
+- **Remaining (shared reader):** the entry's first bullet — one bounded per-account reader keyed by account identity/layout and credential generation, shared by UI, history and recovery with explicit freshness and per-caller cancellation — is still open; today only the 30-second single-flight sweep cache in `account-usage.ts` is shared. No provider-call-per-minute measurement was taken.
+
+**Guards.** Recovery must not unknowingly reuse stale reset information. Preserve last-good/error semantics and disabled-account visibility unless product behavior changes deliberately. Do not retain plaintext tokens. One caller cancelling must not cancel other waiters; terminate work at owner disposal and on superseded credential generations.
+
+**Validation and metrics.** Overlap manual, scheduled, footer and recovery requests with 64 accounts, slow/failing providers, forced refresh, rotation and shutdown. Count provider calls per account/minute, maximum concurrent requests, freshness and error rate; measure full-sweep and first-result p95.
+
+## H07 — Scope memory retrieval in SQL and bound vector ranking work (P1)
+
+**Evidence and workload.** [FTS retrieval](../../plugins/@dshfiles/memory/src/store.ts#L588-L640) applies a global SQL limit before filtering projects in JavaScript. Other projects can consume the candidate budget and suppress in-scope recall. [Vector retrieval and ranking](../../plugins/@dshfiles/memory/src/store.ts#L642-L696) loads all embeddings for a model, filters projects, copies vector blobs, computes O(V × D) cosine work and fully sorts O(V log V) before taking a bounded result. Each fused note triggers a separate category query. Current [schema and indexes](../../plugins/@dshfiles/memory/src/store.ts#L172-L247) must be checked against actual query plans before proposing new indexes. No database rows, counts or plans were collected here.
+
+- [x] Gate implementation on bounded, read-only schema/index/count and `EXPLAIN QUERY PLAN` evidence from a consented representative database or scratch fixture.
+- [x] Put parameterized project predicates before FTS limits and vector materialization; fetch categories in candidate joins or one bounded lookup.
+- **Receipt (SQL project scoping), 2026-10-18:**
+  **Gate evidence.** A committed scratch probe ([memory-retrieval-probe.mjs](evidence/memory-retrieval-probe.mjs), results in [memory-retrieval-results.json](evidence/memory-retrieval-results.json)) builds an in-memory corpus of **2,000** term-dense notes in one project and **5** notes in another, then asks for the second project only. `EXPLAIN QUERY PLAN` for the docs FTS statement is `SCAN d VIRTUAL TABLE INDEX 0:M4` + `USE TEMP B-TREE FOR ORDER BY` — no project index exists, and the schema/index shape was read before any change (no new index is proposed; the fix is a predicate, not an index).
+  **Finding.** Because the statement applied a global `limit depth * 4` **before** the JavaScript project filter, the unrelated corpus consumed the entire candidate budget: the scoped search returned **0 of 5** in-scope notes. After the fix the same probe returns **5 of 5**, all from the requested project, in ~5 ms.
+  **Change.** The project predicate now lives in SQL for all five retrieval statements (`docs_words`, `docs_ids`, `messages_words`, `messages_ids` and the embedding scan), parameterized through `json_each(?)` so one cached statement text serves any number of projects and no value is ever interpolated into SQL. The JavaScript `allowed` filter stays in place as the authorization gate, so a future path that forgets the predicate still cannot leak another project's rows. The vector path no longer materializes, copies or scores other projects' vectors.
+  **Guards kept.** Project authorization is unchanged and doubly enforced; model/dimension isolation is untouched (the `e.model` predicate stays); rank fusion, recency decay, category boosts and the result limit are untouched; exact search stays exact — no approximate retrieval and no native extension. No schema change, no migration.
+  **Tests.** Three in [store.test.ts](../../plugins/@dshfiles/memory/src/store.test.ts): in-scope recall under a dominant cross-project corpus (this is the test that returns `[]` without the predicate), an unfiltered search still spans projects, and the vector ranker returns only the requested project's notes. Checks: memory suite **71/71** (12 files), typecheck, build, DSH-Node Host import check, and `pnpm check:e2e memory` → **3 passed, 0 failed**.
+- **Remaining:** exact bounded top-k selection instead of sorting every in-scope vector, and any indexed prefilter or norm caching, are not done; categories are still fetched per fused note; and no 1k/10k/100k sweep or event-loop measurement was taken — the probe is 2k rows on one machine.
+- [ ] Replace full vector sorting with exact bounded top-k selection where equivalent; consider indexed prefilters/norm caching only after measurement.
+- [ ] Test and measure before promoting.
+
+**Guards.** Preserve project authorization, model/dimension isolation, forgetting, rank fusion, tie/recency/category boosts and exact scope recall. Invalidate any vectors/cache on note/digest edits, forgetting, pruning and project normalization. Key by model, project and store generation, with byte caps. Do not introduce an unvetted native extension or quietly change exact search to approximate retrieval.
+
+**Validation and metrics.** Use 1k/10k/100k rows and dominant cross-project noise; test forgotten notes, model changes and rank equivalence except the intentional scope-recall correction. Measure SQL statements, candidate/BLOB bytes, vector CPU, p95 search, event-loop delay and in-scope recall.
+
+## H08 — Reuse memory SQL statements and bound large maintenance batches (P2)
+
+**Evidence and workload.** [Message indexing](../../plugins/@dshfiles/memory/src/store.ts#L472-L497) prepares three invariant statements per inserted message inside an existing transaction. [Other helpers](../../plugins/@dshfiles/memory/src/store.ts#L253-L291) repeatedly prepare stable SQL, while [retention](../../plugins/@dshfiles/memory/src/store.ts#L1057-L1077) compiles/deletes row by row in a synchronous transaction. Unlike usage's store, memory has no equivalent statement reuse map. Actual preparation/maintenance cost is unmeasured. This is a cheap adjunct to H07, not a new storage architecture.
+
+- [x] Reuse invariant prepared statements for the lifetime of one opened database.
+- [ ] Profile large indexing/retention batches; chunk and yield only if event-loop evidence warrants it, with valid transaction/cursor boundaries.
+- [ ] Test and measure before promoting.
+- **Receipt (statement reuse):** [store.ts](../../plugins/@dshfiles/memory/src/store.ts) now keeps one `StatementSync` per SQL text for the life of its own database — a `statements` map behind a `statement(sql)` helper that all 79 former `database.prepare(...)` call sites use — and clears the map before `close()`, so statements live and die with the handle that owns them. Message indexing alone recompiled three invariant statements **per inserted message**; the note, digest, search and retention helpers recompiled stable SQL on every call. No SQL text changed, so atomic transaction boundaries, the contentless message index, the cursor and retention guarantees are exactly as before, and no schema or index was added.
+  New test in [store.test.ts](../../plugins/@dshfiles/memory/src/store.test.ts) spies on `DatabaseSync.prototype.prepare`, indexes 25 messages and searches, then asserts that **no SQL text is prepared twice** for the database's lifetime while more than four distinct statements were prepared — so the workload really exercises the reuse rather than passing on a trivial path. Checks: memory suite **68/68** (12 files), typecheck, build, DSH-Node Host import check, and `pnpm check:e2e memory` → **3 passed, 0 failed**.
+- **Remaining:** chunking/yielding large indexing and retention batches is deliberately not done — the entry gates it on event-loop evidence and none was collected; no prepare-count or CPU before/after measurement was taken either, so this is a mechanism fix, not a measured speedup.
+
+**Guards.** WAL and atomic message-index transactions already exist; do not present adding them as a fix. Preserve atomic consistency among message rows, both FTS tables and indexed cursors. Close statements with their database and maintain privacy-retention guarantees. Schema/index changes still require the H07 read-only query-plan gate and source-of-truth migrations.
+
+**Validation and metrics.** Index and prune 1k/10k messages through the actual store; inject failure before cursor advancement and compare FTS/row/cursor consistency. Count preparations, measure transaction/CPU time and event-loop delay; require equivalent results and retention.
+
+## H09 — Run independent thread-finder sources concurrently and batch metadata hydration (P2)
+
+**Evidence and workload.** [Record building](../../plugins/@dshfiles/memory/src/runtime.ts#L474-L497) lists Sessions, reads at most 80 title snapshots in a batch, then performs a digest lookup for every Session and normalizes its project. [Finding](../../plugins/@dshfiles/memory/src/thread-finder.ts#L400-L408) rebuilds that view on each page. [Content and memory sources](../../plugins/@dshfiles/memory/src/thread-finder.ts#L467-L484) are awaited sequentially although independent. For S Sessions, each search repeats O(S) projection/lookup work before bounded output; network/search latency can add instead of overlap. Impact remains unmeasured.
+
+- [x] Start independent content/memory retrieval together after scope resolution, preserving deterministic merge order.
+- [ ] Bulk-fetch exact-id digest metadata and reuse a bounded raw Session projection keyed by corpus/title/store generations where available.
+- **Receipt (overlapped sources):** [thread-finder.ts](../../plugins/@dshfiles/memory/src/thread-finder.ts) now starts the content search and the memory retrieval **together** (`Promise.all`) and consumes them in the same fixed order as before, so the ranking stays deterministic while the two latencies overlap instead of adding up; `Promise.all` attaches handlers to both, so a rejected source cannot turn into an unhandled rejection. [runtime.ts](../../plugins/@dshfiles/memory/src/runtime.ts) `threadRecords` resolves the per-cwd project of every listed Session **concurrently** and indexes the results back into the records in order, instead of awaiting one project lookup per Session inside the loop (the lookup itself was already cached per cwd, so this overlaps the distinct cwds only).
+  Guards untouched: the 80-title cap, the content deadline and degraded-source reporting (`content.failure` still drives `degraded`), cursor-staleness rejection, source/evidence labels and the absence of any retained transcript cache.
+  New test in [thread-finder.test.ts](../../plugins/@dshfiles/memory/src/thread-finder.test.ts): with both sources held open, content **and** memory are in flight before either answers — a sequential await would leave memory unstarted at that point — and the page still ranks the title match. Checks: memory suite **72/72** (12 files), typecheck, build, DSH-Node Host import check, and `pnpm check:e2e memory` → **3 passed, 0 failed**.
+- **Remaining:** bulk exact-id digest metadata (the per-Session `store.thread` lookup) and a bounded raw Session projection keyed by corpus/title/store generations are not done, and no 10k-Session or p95 measurement was taken.
+- [ ] Preserve the 80-title cap and existing content deadline/degraded-source behavior; do not replace native content search with raw-log scanning.
+- [ ] Test and measure before promoting.
+
+**Guards.** Recompute authorization and availability from current facts. Preserve cursor-staleness rejection and source/evidence labels. Shared cancellation and metadata caches must not retain private transcripts or lock in a transient project-resolution failure indefinitely.
+
+**Validation and metrics.** Test 10k Sessions, repeated pages, corpus/title changes, cancellation and content timeout while memory succeeds. Measure phase durations, title/digest lookup count, cached bytes and first/next-page p95; compare complete hit/source/ranking output.
+
+## H10 — Incrementalize and globally bound memory digest/classifier work (P1)
+
+**Evidence and workload.** [Signal classification](../../plugins/@dshfiles/memory/src/runtime.ts#L143-L168) can recheck the last 12 user messages serially. [Digest construction](../../plugins/@dshfiles/memory/src/runtime.ts#L219-L268) reads/materializes the full Session and runs classification before consulting the indexed cursor. [Per-session single-flight](../../plugins/@dshfiles/memory/src/runtime.ts#L271-L305) prevents duplicate work for one Session but not an unbounded burst across Sessions. [Stop](../../plugins/@dshfiles/memory/src/runtime.ts#L805-L810) clears idle timers without draining/cancelling in-flight digest work. Twenty simultaneous completions can therefore launch twenty pipelines; provider cost and latency have not been measured.
+
+- [ ] Add a bounded domain-owned queue with Session/last-sequence identity and a newest-dirty rerun policy.
+- [ ] Consult indexed/digested sequence before costly work; retain classifier verdicts only for unchanged message sequence plus classifier/prompt revision.
+- [ ] Tie in-flight cancellation/drain and database close ordering to runtime lifecycle.
+- [ ] Test and measure before promoting.
+
+**Guards.** A new turn can supersede queued work; do not publish stale summaries. Preserve deterministic fallback, provider-spend bounds and privacy retention. Incremental native session IO is a public-API feasibility gate, not permission to read undocumented log internals. Own materialization/classification can be incremental even when a full supported Host read remains necessary.
+
+**Validation and metrics.** Test repeated idle no-ops, long transcripts, 20 simultaneous finishes, new turns while queued, provider timeout and plugin unload. Count events/bytes read and classifier/model calls per new message; measure maximum concurrency, queue lag, p95 digest and pending work at shutdown.
+
+## H11 — Avoid full idle usage discovery and enforce index IO/CPU budgets (P1)
+
+**Evidence and workload.** [Discovery](../../plugins/@dshfiles/usage/src/indexer.ts#L23-L47) serially enumerates every project and Session directory and selects each current log generation. [Indexing](../../plugins/@dshfiles/usage/src/indexer.ts#L49-L110) stats every log before the unchanged-size/mtime skip. [The Host](../../plugins/@dshfiles/usage/src/host.ts#L42-L58) already shares one pass and [runs every 30 seconds with disposal drain](../../plugins/@dshfiles/usage/src/host.ts#L112-L120). Unchanged content is not repeatedly decoded, but metadata discovery remains O(S) IO per pass. A separate bound issue exists: [a frame exceeding the ordinary 4 MiB window](../../plugins/@dshfiles/usage/src/indexer.ts#L59-L79) causes a read of the remaining suffix; [the reader](../../plugins/@dshfiles/usage/src/session-log.ts#L71-L90) allocates that entire request and synchronously decompresses frames. Neither idle discovery cost nor large-frame stalls were measured.
+
+- [ ] Track known log generations and dirty Sessions using supported events/owned FS watches, with a slower full reconciliation for external writers and missed events.
+- [ ] Use a rolling, bounded discovery/stat/read pipeline while keeping cursor commits serialized and restart-safe.
+- [ ] Bound compressed/decompressed frame work; evaluate geometric read growth instead of whole-tail fallback and cooperative/worker decoding only if measured.
+- [ ] Test and measure before promoting.
+
+**Guards.** Preserve generation rollover, truncation, torn frames and external writers. Watch overflow/dropped events must trigger reconciliation, not silent omission. Huge valid frames need an explicit supported policy/diagnostic, not a fake completed cursor. Retain byte-offset resume, per-file skips, ordinary slices, yields and atomic request/cursor transactions.
+
+**Validation and metrics.** Exercise 1k/10k unchanged logs then one append, vN rollover, same-path replacement/truncation, torn/large frames, restart and unsupported watches. Count metadata calls and bytes per pass; measure CPU/event-loop delay, freshness, queue depth, peak RSS and disposal completion.
+
+## H12 — Cache or incrementally materialize usage chart projections (P2)
+
+**Evidence and workload.** [Each charts request](../../plugins/@dshfiles/usage/src/store.ts#L504-L615) synchronously performs three dimension breakdown aggregates, buckets, all successful-request latency rows, top threads and current/previous summaries. Exact latency calculation materializes O(R) rows and sorts each bucket, O(sum Rb log Rb), on the Host event loop. [Request listings](../../plugins/@dshfiles/usage/src/store.ts#L437-L489) also perform independent status/purpose counts and row retrieval. Small output does not bound input work; actual query plans and runtime cost remain unchecked.
+
+- [ ] Start with a bounded, generation-keyed result cache/single-flight for the full query, including Session metadata and rate generations.
+- [ ] Avoid recalculating unaffected dimensions/previous windows. Consider additive hourly/daily rollups only after representative query-plan/CPU evidence.
+- [ ] Keep exact percentiles unless an explicitly approved approximation contract is introduced; evaluate exact selection separately from cost/token rollups.
+- [ ] Test and measure before promoting.
+
+**Guards.** Invalidate on log/live upserts, live/log reconciliation, title/project mapping and repricing, not just a pass timestamp. Preserve timezone, purpose/status filters, list-price semantics and duplicate-call reconciliation. Schema/index changes require read-only database plans first and migration-source changes later.
+
+**Validation and metrics.** Use at least 100k fixture requests and repeated queries; change usage/rates/title metadata and exercise timezones/date/purpose permutations. Count SQL statements/materialized rows, cache bytes/hits and numerical differences; measure p95 charts and event-loop delay.
+
+## H13 — Reduce cold JJ integration process fanout (P2, measurement/CLI feasibility gate)
+
+**Evidence and workload.** [Repository caching](../../plugins/@dshfiles/jj-integration/src/host.ts#L233-L319) already has location/status/view TTLs, a single-flight scan and a generation fence. [A cold list](../../plugins/@dshfiles/jj-integration/src/threads.ts#L650-L684) uses four workers but still executes two sequential `jj` reads per workspace. [Repository discovery](../../plugins/@dshfiles/jj-integration/src/host.ts#L276-L296) serially resolves registered workspaces before grouping roots. A cold scan can pay W location reads plus approximately sum(1 + 2T) status processes; this is not the warm poll cost.
+
+- [ ] Group known owning projects/thread paths before redundant location resolution; bound missing-path/repository reads with a global process budget.
+- [ ] Evaluate batched/tagged workspace status queries against the installed JJ template/revset contract before proposing exact commands.
+- [ ] Bound/remove obsolete cache entries and apply generation protection to lower-cache publication too.
+- [ ] Test and measure before promoting.
+
+**Guards.** Do not parallelize mutation phases or reuse display eligibility as permission to integrate. Preserve fresh authority/bookmark/source checks. Distinguish cache misses, external edits and deleted/replaced repositories.
+
+**Validation and metrics.** Test multiple repositories and 100 workspaces, provision/discard, external bookmark movement and mutation during scan. Count cold/warm subprocesses and cache bytes; measure lock waits, p95 listing and stale-result rejection. Defer batching if no supported command preserves semantics or if cold scans are not a material cost.
+
+## H14 — Parallelize/lazily load immutable Jujutsu detail data (P1)
+
+**Evidence and workload.** [Details](../../plugins/@dshfiles/jujutsu/src/revision-reads.ts#L75-L102) performs existence validation, paths, patch, evolution and file stats as five serial processes. The post-validation content reads are independent for a pinned commit; their current critical path sums independent process latency. No representative detail timing was collected.
+
+- [ ] Run independent reads with an explicit bounded process policy after validation, or load fast file metadata before optional patch/evolution expansion.
+- [ ] Share in-flight reads and byte-capped LRU caches for immutable commit content using repository identity, commit and read options.
+- [ ] Test and measure before promoting.
+
+**Guards.** Evolution is not immutable merely because the queried commit id is: new successors/operation visibility can change it. Give evolution an operation/generation key or bounded freshness. Invalidate unavailable/GC'd commits and replaced repository identities; preserve truncation and cancellation, without permanently caching errors.
+
+**Validation and metrics.** Test large/binary/truncated patches, missing commits, simultaneous selection, cancellation, new successors and repository replacement. Count CLI reads, cache bytes/hits and critical-path time; measure first-files and complete-detail p95.
+
+## H15 — Separate Jujutsu mutable snapshots from slow-changing adjunct reads (P1)
+
+**Evidence and workload.** [Snapshot loading](../../plugins/@dshfiles/jujutsu/src/host.ts#L330-L396) runs snapshotting status, four parallel reads, then evolution: six processes. Last-push discovery scans up to 1,000 operation entries/512 KB each time. [Display loads](../../plugins/@dshfiles/jujutsu/src/host.ts#L679-L682) always invoke this path, as do [prepare/confirm](../../plugins/@dshfiles/jujutsu/src/host.ts#L740-L753). The path already avoids repeated working-copy snapshotting after status; it lacks a shared Host display load and stable adjunct reuse. Actual poll frequency and cost are unmeasured.
+
+- [ ] Add per-repository display-load single-flight; cache remotes/last push/evolution against the correct operation/config generation.
+- [ ] Evaluate incremental operation-log traversal until a known point instead of rescanning the same 1,000 entries.
+- [ ] Keep mutation validation on a separately fresh snapshot/fingerprint path.
+- [ ] Test and measure before promoting.
+
+**Guards.** Never authorize preview confirmation from a display TTL. Preserve repository identity checks, fresh remote-config fingerprinting and history-truncation flags. Invalidate on own mutations and external operation/config changes; account for concurrent cancellation without killing other consumers.
+
+**Validation and metrics.** Test multiple panels/tools, external JJ operations, fetch/config changes, truncated history and preview→external edit→confirm refusal. Count subprocesses and operation bytes/load; measure display p95, metadata cache bytes and stale-preview rejection.
+
+## H16 — Share remote read snapshots within existing gateway lifetimes (P2)
+
+**Evidence and workload.** [Runtime status](../../plugins/@dshfiles/multi-host/src/host.ts#L486-L517) performs workspace follow plus full remote `session.list` each call, then slices to 500 Sessions after retrieval. [Each follow](../../plugins/@dshfiles/multi-host/src/connectors/gateway.ts#L149-L191) opens a new WebSocket and [closes after its snapshot](../../plugins/@dshfiles/multi-host/src/connectors/gateway.ts#L227-L249). The [gateway pool](../../plugins/@dshfiles/multi-host/src/gateway-pool.ts#L13-L120) already shares authentication/tunnel lifetime and safely retries reads only. Local [list handlers](../../plugins/@dshfiles/multi-host/src/host.ts#L403-L405) separately request two views of the same [reparsed directory](../../plugins/@dshfiles/multi-host/src/store.ts#L86-L163); [security normalization](../../plugins/@dshfiles/multi-host/src/store.ts#L33-L51) even performs chmod on reads. Real remote cost was not exercised.
+
+- [ ] Share status reads by runtime and connection generation; use a short-lived read projection or supported workspace follow where appropriate.
+- [ ] Evaluate multiplexing owned follow requests on one supported socket only with lifecycle/cancellation tests.
+- [ ] Read one directory snapshot per local operation; any cross-request parse cache must retain security revalidation.
+- [ ] Test and measure before promoting.
+
+**Guards.** Invalidate on connection/identity changes and mutations; retain lease caps/idle eviction and never retry a mutation with unknown outcome. Do not keep permanent transcript/PII caches. Filtered/paged native Session listing is a Host feasibility gate; slicing the returned array does not reduce remote work.
+
+**Validation and metrics.** Use gateway fixtures and an authorized scratch remote with 1,000 Sessions; overlap status/transcript/cursor requests, drop tunnels and change identity. Count remote calls, WebSocket handshakes, bytes and retained leases; measure p95 and independent cancellation behavior.
+
+## H17 — Coalesce MCP reconciliation and avoid unnecessary credential work (P2)
+
+**Evidence and workload.** [Target construction](../../plugins/@dshfiles/mcp-servers/src/host.ts#L186-L271) resolves references sequentially within each server and constructs disabled/suspended targets too, before the reconciler filters them; OAuth refresh may therefore run for an inactive target. [Snapshot projection](../../plugins/@dshfiles/mcp-servers/src/host.ts#L146-L183) repeats shared credential metadata reads and scans every tool schema per server, O(S × T). [The lifecycle queue](../../plugins/@dshfiles/mcp-servers/src/reconcile.ts#L19-L77) retains every update and starts independent servers serially. [Multiple explicit restarts](../../plugins/@dshfiles/mcp-servers/src/host.ts#L390-L419) each reapply targets; [timer/credential triggers](../../plugins/@dshfiles/mcp-servers/src/host.ts#L613-L633) can add more work. Costs for up to 64 servers are unmeasured.
+
+- [ ] Keep one active reconciliation and one dirty-latest generation; union explicit restart ids rather than queue stale full snapshots.
+- [ ] Skip plaintext/OAuth resolution for inactive/suspended targets; deduplicate reference resolve/describe within an active reconciliation and index tool-prefix counts once per snapshot.
+- [ ] Preserve per-server stop-before-start; evaluate bounded independent starts only after supported Cordis lifecycle tests prove them safe.
+- [ ] Test and measure before promoting.
+
+**Guards.** Do not globally cache plaintext secrets. Retain OAuth record locking/double-check, redacting loggers, token-version reconnect and latest-configuration authority. Owner disposal must prevent stale queued starts. Keep failure/partial-start states explicit.
+
+**Validation and metrics.** Test 64 servers with shared refs, credential-update storms, slow/failing starts, disabled OAuth, newest-config wins, rotation and disposal. Count credential reads, applies/start/stop calls and queue depth; measure first/all-connected p95 and maximum startup concurrency.
+
+## H18 — Cache only decoded Secret Catalog metadata (P2)
+
+**Evidence and workload.** [API handlers construct fresh operations](../../plugins/@dshfiles/secret-catalog/src/host.ts#L14-L38), [list executes the CLI](../../plugins/@dshfiles/secret-catalog/src/secret-operations.ts#L97-L104), and [the account bridge](../../plugins/@dshfiles/secret-catalog/src/credential-bridge.ts#L16-L35) lists again. [Managed execution](../../plugins/@dshfiles/secret-catalog/src/secret-cli-runner.ts#L22-L61) resolves/spawns the CLI per request, with a 15-second deadline and 1 MB output bound. Catalog/key-picker/tool consumers can repeat the same up-to-5,000-row metadata work. Process and provider latency are unmeasured.
+
+- [ ] Own one operations instance per Host with bounded metadata-only single-flight/short TTL keyed by canonical cwd, scope and relevant session/auth identity.
+- [ ] Invalidate on mutations and external configuration/session revision; provide explicit freshness and bypass stale metadata for correctness checks.
+- [ ] Test and measure before promoting.
+
+**Guards.** Cache only [stripped metadata](../../plugins/@dshfiles/secret-catalog/src/secret-metadata.ts#L6-L30), never raw stdout, secret values, auth tokens or error payloads. Reveal/copy/get stay uncached. Create/rename/import uniqueness checks must be fresh. Preserve managed-process cleanup and secret-safe diagnostics.
+
+**Validation and metrics.** Test same/different cwd/auth identities, external alias edits, create/import races, failed mutations and unload. Count resolves/spawns and retained metadata bytes; measure picker-open p95 and verify no plaintext in cache/log output.
+
+## H19 — Cache public marketplace pages and bound catalog response bodies (P2)
+
+**Evidence and workload.** [Each catalog page](../../plugins/@dshfiles/plugin-marketplace/src/host-service.ts#L442-L480) resolves the current profile and CLI before a fetch. [Profile resolution](../../plugins/@dshfiles/plugin-marketplace/src/host-service.ts#L157-L169) realpaths and decodes the manifest; [CLI resolution](../../plugins/@dshfiles/plugin-marketplace/src/host-service.ts#L326-L339) rereads its manifest. [Response parsing](../../plugins/@dshfiles/plugin-marketplace/src/host-service.ts#L184-L210) accepts an unbounded body before schema limits apply. [Legacy pagination](../../plugins/@dshfiles/plugin-marketplace/src/host-service.ts#L228-L250) may scan up to 100 cursor-dependent pages under an overall deadline. Actual query/revisit cost is unmeasured.
+
+- [ ] Add bounded public parsed-page caching/single-flight keyed by hub, locale, sort, category, query and cursor; use HTTP validators when supported.
+- [ ] Reuse stable CLI metadata and revisioned profile overlays; bound response bytes before JSON parsing, including error bodies.
+- [ ] Test and measure before promoting.
+
+**Guards.** Invalidate on hub/profile/install changes. Installation must revalidate the fresh target, compatibility and local-profile realpath; never authorize installation from a stale public cache. Preserve the existing installer single-flight gate, legacy-mode cache and cursor-loop limit. Do not parallelize dependent legacy pages or allow one shared reader's cancellation to own all callers.
+
+**Validation and metrics.** Test oversize/malformed bodies, hub changes, install→list freshness, shared-reader cancellation and legacy cursor loops. Count HTTP/realpath/manifest reads and bytes; measure page/search p95 and cache memory.
+
+## H20 — Editor file-index lifecycle and relist batching (cross-reference only)
+
+**This is not an independent Host task.** Implementation belongs to [C08/C09 in the client register](client.md). The index is a client-owned projection calling supported Host `workspaceFiles`, not an owned Host filesystem service.
+
+[Traversal](../../plugins/@dshfiles/editor/src/workspace-files.ts#L106-L149) already uses eight parallel lists, a 20,000-file/4,000-directory cap and progress. [The per-Session map](../../plugins/@dshfiles/editor/src/workspace-files.ts#L171-L208) retains every visited index; [idle cleanup](../../plugins/@dshfiles/editor/src/workspace-files.ts#L310-L349) stops watches but never deletes cached Session entries. [Relists](../../plugins/@dshfiles/editor/src/workspace-files.ts#L216-L275) debounce before starting but can overlap in-flight work and repeatedly flatten the whole tree during a burst. These mechanisms warrant bounded inactive LRU/byte ownership and relist-generation/batch publication work under C08/C09; do not count it again here.
+
+- [ ] Track C08/C09 completion evidence: bounded retained indexes/watchers, correct gitignore/subtree updates, independent cancellation and drop-watch fallback; compare file-discovery lag, RPC counts, flatten CPU and heap across 100 Session visits/build bursts.
+
+## H21 — Avoid rehashing every plugin Host bundle on every update check (P1)
+
+**Evidence and workload.** [Fingerprinting](../../plugins/@dshfiles/thread-sidebar/src/plugin-updates.ts#L26-L40) walks ancestors to find the package manifest, then reads/hashes Host entry and bundle patch. [Every pending check](../../plugins/@dshfiles/thread-sidebar/src/plugin-updates.ts#L48-L67) repeats this for every registered plugin in unbounded `Promise.all`; only the initial baseline hash is cached. Work scales with plugin count, ancestor walks and total Host bytes. This owner is distinct from dshx dependency/source-map planning. Actual read volume and poll cost remain unmeasured.
+
+- [x] Cache resolved package/root/entry topology and revision-to-content hashes; use bounded scan single-flight.
+- [ ] Dirty package roots from owned watches where practical, with periodic reconciliation for missed events and deleted ids.
+- [ ] Test and measure before promoting.
+- **Receipt (revision-cached fingerprints):** [plugin-updates.ts](../../plugins/@dshfiles/thread-sidebar/src/plugin-updates.ts) now caches each plugin's resolved package topology (directory plus Host entry) and its `{ hash, revisions, hashedAt }`, where the revisions are `size/mtimeMs/ctimeMs` of the manifest, the Host entry and the bundle patch. A check probes those three files with `stat` only: while they still carry the revision the hash was computed from — and the hash is younger than `REHASH_AFTER_MS` (30 s) — the cached hash answers **without reading a byte**, which the new test measures as **zero** `readFile` calls on a repeat check. Metadata is only a hint: a changed revision re-reads and re-hashes before anything is reported, so an identical rebuild still flags nothing and a changed Host entry is still reported. Concurrent checks share **one** scan (`scan ??= scanOnce()`), the scan walks the plugin list with at most `SCAN_CONCURRENCY` (4) probes at once instead of an unbounded `Promise.all`, and topology/hash entries for ids that left the graph are pruned each scan.
+  Guards kept: content-hash comparison is unchanged (identical rebuild output requests no restart — the existing test still passes), a file still absent on both sides compares equal while one appearing or vanishing does not, the rehash window bounds how long a hint is trusted, and a read failure still answers `null`, so the last known baseline is not turned into a change.
+  New tests in [plugin-updates.test.ts](../../plugins/@dshfiles/thread-sidebar/src/plugin-updates.test.ts): a repeat check reads nothing, a real Host-entry change is still seen (and reads again), past the rehash window the bytes are hashed again while the boot baseline keeps reporting the change; two concurrent checks share one scan, reading three files for three plugins where the uncached path issued twelve. Checks: thread-sidebar suite **248/248** (42 files), typecheck, build, DSH-Node Host import check, and `pnpm check:e2e thread-sidebar` → **26 passed, 0 failed**, including the restart-banner journeys that read these fingerprints.
+- **Remaining:** the entry's second bullet — dirty package roots from owned watches with periodic reconciliation — is not implemented; no watch/dirty-set integration, and no hash-CPU or byte-volume measurement beyond the read counts the tests assert.
+
+**Guards.** Keep content-hash comparison: identical rebuild output must not falsely request restart. Metadata is an invalidation hint, not perpetual proof; include identity/ctime/size/mtime and periodic rehash. Invalidate on graph/client-path/manifest-export changes; cap/prune maps and close watches. Preserve last-known baseline semantics when reads fail.
+
+**Validation and metrics.** Test identical rebuilds, Host-only change, manifest exports/relocation, atomic replacement with similar mtimes and concurrent consumers. Count file reads/bytes, hash CPU and cache entries; measure scan p95 and false restart prompts/missed changes.
+
+## H22 — Hydrate thread titles only for emitted unfiltered rows (P2)
+
+**Evidence and workload.** [Thread listing](../../plugins/@dshfiles/thread-sidebar/src/thread-actions.ts#L189-L229) sorts all summaries, selects up to 300 recent candidates and hydrates titles for every eligible candidate before applying the requested limit. [Title access](../../plugins/@dshfiles/thread-sidebar/src/thread-actions-host.ts#L21-L43) already uses a bulk supported API, but can still project 300 Session logs for an unfiltered limit of one or the default 50. IO cost is unmeasured.
+
+- [ ] For query-empty requests, count/filter cheap metadata first and hydrate only emitted rows; preserve current total/truncation semantics for the 300-candidate scope.
+- [ ] Share bounded in-flight/revisioned title views for repeated listings when supported; keep title-dependent search behavior and its existing budget.
+- [ ] Test and measure before promoting.
+
+**Guards.** Preserve immediate rename freshness, archived/pinned flags and partial-title failure behavior. Do not replace native bulk access with per-Session observations, fake complete title search outside its existing budget, or retain full logs to cache titles.
+
+**Validation and metrics.** Compare no-query limits 1/50/200, archived candidates, rename and title failures. Count requested title snapshots/log IO, verify totals/results and measure listing p95/cache bytes.
+
+## Already optimized paths to preserve
+
+| Owner | Verified existing behavior | Evidence |
+|---|---|---|
+| Communication | Private owner/permission checks, 16 MiB state bound, retained-message bounds, inode/size/mtime parse cache and 30-second retention freshness | [State reader](../../tooling/dshx/packages/dshx/src/communication/service.ts#L753-L794) |
+| Communication history | Supported filtered Session search, at most 10 results and 280-character snippets; no need for a replacement raw-log scanner | [History request/projection](../../plugins/@dshfiles/agent-communication/src/session-history.ts#L5-L56) |
+| Questions | Eight workers, bounded nonlive fact cache, live cache bypass, failure retry and observation disposal | [Scan](../../plugins/@dshfiles/agent-questions/src/question-scan.ts#L46-L132), [reader](../../plugins/@dshfiles/agent-questions/src/host.ts#L68-L93) |
+| Timeline | Bounded retention, stable cursor ties, condensed output and an existing atomic batch method | [Service](../../plugins/@dshfiles/activity-timeline/src/service.ts#L108-L169) |
+| Accounts | Whole-sweep UI quota cache/single-flight; history single-flight, abort and concurrency four; unchanged keyed discovery reuse | [Cache](../../plugins/@dshfiles/ai-accounts/src/account-usage.ts#L47-L79), [scheduler](../../plugins/@dshfiles/ai-accounts/src/usage-recorder.ts#L189-L250), [routes](../../plugins/@dshfiles/ai-accounts/src/host.ts#L487-L504) |
+| Memory | WAL, atomic message/FTS indexing, contentless message FTS, per-Session digest single-flight and bounded title hydration | [Store](../../plugins/@dshfiles/memory/src/store.ts#L214-L257), [index](../../plugins/@dshfiles/memory/src/store.ts#L472-L497), [runtime](../../plugins/@dshfiles/memory/src/runtime.ts#L282-L292), [titles](../../plugins/@dshfiles/memory/src/runtime.ts#L474-L497) |
+| Usage | Compressed-frame byte-offset resume, unchanged-file skip, ordinary 4 MiB slices and yields, pass single-flight, atomic request/cursor commit, WAL and prepared-statement cache | [Indexer](../../plugins/@dshfiles/usage/src/indexer.ts#L49-L110), [store](../../plugins/@dshfiles/usage/src/store.ts#L203-L248), [commit](../../plugins/@dshfiles/usage/src/store.ts#L305-L324) |
+| JJ integration | Three TTL layers, shared scan, generation protection and four status workers; mutation safety checks must stay fresh | [Host](../../plugins/@dshfiles/jj-integration/src/host.ts#L233-L319), [workers](../../plugins/@dshfiles/jj-integration/src/threads.ts#L650-L684) |
+| Jujutsu | Status is the working-copy snapshot; subsequent reads ignore it, file stats are bulk, composer context already has argument-keyed short reuse | [Snapshot](../../plugins/@dshfiles/jujutsu/src/host.ts#L362-L371), [file stats](../../plugins/@dshfiles/jujutsu/src/revision-reads.ts#L48-L72), [composer](../../plugins/@dshfiles/jujutsu/src/composer-context-host.ts#L63-L149) |
+| Multi-host | Shared authenticated gateway/tunnel, idle eviction and generation guard; read-only transport retry, never mutation replay | [Pool](../../plugins/@dshfiles/multi-host/src/gateway-pool.ts#L13-L120) |
+| Project Checks | Per-Session 30/global 2,000 receipt bounds, one domain handle, freshness revision reads deduplicated per root within a call | [Store reads](../../plugins/@dshfiles/project-checks/src/host.ts#L156-L199), [freshness](../../plugins/@dshfiles/project-checks/src/host.ts#L450-L475) |
+| MCP | OAuth refresh under credential-record lock with double-check; secret-free public snapshots/fingerprints and redacting loggers | [Grant](../../plugins/@dshfiles/mcp-servers/src/host.ts#L118-L137), [target fingerprint](../../plugins/@dshfiles/mcp-servers/src/host.ts#L255-L265) |
+| Secrets | Decoded metadata strips unknown fields; managed process/output/deadline bounds; reveals are separate explicit actions | [Metadata](../../plugins/@dshfiles/secret-catalog/src/secret-metadata.ts#L6-L30), [runner](../../plugins/@dshfiles/secret-catalog/src/secret-cli-runner.ts#L22-L70) |
+| Folder browser | Thin scoped native browse capability with cancellation, maxEntries 1,000 and context disposal, not a second recursive walker | [Host](../../plugins/@dshfiles/workspace-folder-picker/src/host.ts#L10-L58) |
+
+## Coverage, deferred candidates and Host gaps
+
+| Domain | Coverage | Not proven / boundary |
+|---|---|---|
+| Agent Communication | Host tool tracking, secure state service, unread refresh, browse/recipient/history paths | No live throughput/bridge workload; native Session-search backend internals not audited |
+| Agent Questions | Root/target scans, facts cache/workers, parent pending listing, observation lifecycle | Native exact availability/bulk filtered projection and indexed tail-query capability need contract verification; absent capability is a Host gap |
+| Activity Timeline | Complete service and Host event adapters | Burst/backfill/retention runtime timing not collected |
+| AI Accounts | Account drafts/observation, routes, quota cache/readers/history/prune and lifecycle | Real provider latency, keychain and quota-recovery workloads not exercised |
+| Memory | Runtime, SQLite schema/retrieval/index/retention, finder and supported Host adapters | No live DB schema/count/EXPLAIN evidence; worker/native vector redesigns require evidence and API/dependency gates |
+| optmem-core | Engine scheduling, catch-up, cache/status and shutdown; helper/routing use traced | **Inactive engine exclusion:** production TypeScript search found `createMemoryEngine` only at its [export](../../plugins/@dshfiles/optmem-core/src/index.ts#L3) and [definition](../../plugins/@dshfiles/optmem-core/src/engine.ts#L262-L1073), not a production call site. Do not sell engine tuning as current ADE speedup; helpers/routing are consumed separately. Non-TS/external consumers were not exhaustively audited |
+| Usage | Host/indexer/log reader/store/pricing | No live DB/query plans or representative long-range/large-frame measurements |
+| JJ integration / Jujutsu | Host scan/cache/status, details/snapshot/files/navigation/composer boundaries | Full verified-landing/patch-equivalence algorithm not performance-profiled; intentionally sequential mutation/safety steps stay out of generic concurrency work |
+| Multi-host | Host directory/thread metadata, connection pool, gateway follow and view leases | No real SSH/remote workload; native filtered/paged Session list remains a public-API feasibility gate |
+| Project Checks | Domain/receipt reads and bounds, actions, hooks, revision freshness and managed execution | [Hook inspection](../../plugins/@dshfiles/project-checks/src/host.ts#L483-L521) lists all event references then reads at most 12. Verify supported filtered-tail/bulk Session event reads before proposing more than owner-local deduplication; absent API is a Host gap, not permission for native-log access |
+| Project state | [Owned lifecycle adapter](../../plugins/@dshfiles/thread-sidebar/src/thread-actions-host.ts#L45-L115) delegates to native registry/controller; thread-list title work is H22 | No separate owned project-state persistence to replace. Native registry persistence is outside this audit; supported batch reads/events must be verified first |
+| Project/workspace folder pickers | Scoped browser Host and project-picker model/adapter structure; native ownership traced | Native provider filesystem internals not audited; no unverified recursive browse recommendation |
+| Secret Catalog | Managed CLI, metadata decoder, operations and credential bridge | No secret values, credential store operations or live CLI exercised |
+| MCP servers | Snapshot/target projection, credentials/OAuth lifecycle, reconciler and registry search | No real OAuth/network/server startup workload; parallel lifecycle feasibility must be proven with supported Cordis APIs |
+| Plugin Marketplace | Catalog/list/install boundary, profile/CLI reads, legacy mode and response parsing | No real install or remote Hub workload; public HTTP validator availability not assumed |
+| Editor | Supported save Host boundary plus client-owned indexing/watches | H20 only cross-references C08/C09; native workspaceFiles implementation and save-guard internals not audited for performance |
+| Watchers/pollers | Communication/history/usage guards, JJ sweep, memory idle scheduling, MCP queue and plugin-update fingerprints | No blanket interval-leak claim. Native HMR polling is a Host/core boundary, not a proposed core change |
+
+### Conditional quota-history scale work — not a headline task
+
+[History read/prune](../../plugins/@dshfiles/ai-accounts/src/usage-recorder.ts#L155-L180) materializes all KV entries, filters one account and deletes expired entries one by one. [Defaults](../../plugins/@dshfiles/ai-accounts/src/usage-history.ts#L88-L99) are a five-minute interval and 90-day retention. A hypothetical always-on 64-account fixture can reach approximately 1.66 million interval buckets over that period; this is arithmetic, **not an observed live count**.
+
+- [ ] Measure a scratch long-retention fixture and verify the actual supported storage API before selecting an account/day index, time-bucket representation or migration.
+- [ ] If no indexed-range/bulk/transaction capability exists, record that as a Host gap; do not assume it, patch core, or reduce retention silently.
+
+An owner-local index must have a single durable source of truth, restart reconstruction, bounded memory and correct handling of interval/account changes. A new schema must come from the declared migration source. This remains conditional rather than padding the main work count.
+
+### Library-only optmem work — deferred
+
+The inspected engine already has fair stream scheduling, FIFO queues, concurrency/rate/backoff bounds, append/index batches, completion-scheduled catch-up and cached views. Its [all-stream catch-up](../../plugins/@dshfiles/optmem-core/src/engine.ts#L764-L819) and [status fanout](../../plugins/@dshfiles/optmem-core/src/engine.ts#L1007-L1057) may deserve scale tests for a future consumer, but no active production engine consumer was found. Do not add this to implementation waves as an ADE optimization without proving activation and a representative bottleneck.
+
+## Completion contract
+
+There are **22 register IDs: 21 independent Host/domain candidates and one client cross-reference (H20)**. Every implementation/validation checkbox is pending. H08 is deliberately a separate cheap store-owner adjunct; H13 is explicitly conditional on cold-path evidence and supported JJ batching. Conditional history/project-checks/optmem observations are not additional headline tasks.
+
+Before closing any item: attach a same-workload before/after result, operation/byte/resource counts, correctness and security checks, and a justified fixed/rejected/deferred disposition. Do not treat source shape, a smaller response, or an added cache as proof of user-visible improvement.

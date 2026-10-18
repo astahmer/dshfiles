@@ -1,0 +1,59 @@
+{
+  "recordedAt": "2026-10-18T02:30:04.586Z",
+  "sourceAuditCommit": "ecfd5375f823",
+  "sourceBaseCommit": "6a82b443dfe3",
+  "builtCheckoutCommitObservedEarlier": "f7b6aeddeb6d",
+  "node": "v22.23.3",
+  "pnpm": "12.5.1",
+  "platform": "darwin",
+  "architecture": "arm64",
+  "cpu": {
+    "model": "Apple M4",
+    "logical": 10
+  },
+  "sourceHashes": [
+    {
+      "path": "tooling/dshx/packages/dshx/src/checkout/rebuild.ts",
+      "sha256": "d63fabab6c25c2158bf152ff56f4a17cba4cba1edfd22907d1d1477dc132e2f2",
+      "sameAsSharedCheckoutSource": true
+    },
+    {
+      "path": "tooling/dshx/packages/dshx/src/compiler/client/capabilities.ts",
+      "sha256": "b8211aefcd74e79a559f2f153d75c9c2d2a583082e200ebb3b1288b46c62f0eb",
+      "sameAsSharedCheckoutSource": true
+    },
+    {
+      "path": "plugins/@dshfiles/jujutsu/src/graph.ts",
+      "sha256": "4d83533d1591e6faefdc275ee15abecd8ece0f9620ce2b8d0f0ab3a2c18f8879",
+      "sameAsSharedCheckoutSource": true
+    }
+  ],
+  "scanner": {
+    "exitCode": 0,
+    "diagnostics": 1861,
+    "severities": {
+      "warning": 1861
+    },
+    "rules": {
+      "antislop(no-runtime-typeof)": 311,
+      "antislop(no-unknown-parameters)": 194,
+      "antislop(no-unsafe-dictionary-type)": 222,
+      "antislop(require-safety-comment-for-type-assertion)": 335,
+      "antislop(no-conditional-empty-object-spread)": 492,
+      "antislop(no-known-value-widening)": 161,
+      "react(purity)": 13,
+      "react-hooks(exhaustive-deps)": 16,
+      "antislop(no-unknown-returns)": 117
+    },
+    "rawJsonBytes": 708420
+  },
+  "scratch": {
+    "name": "perf-audit-5c0266",
+    "origin": "http://127.0.0.1:60856",
+    "selectedBundles": 7,
+    "activeEntries": 173,
+    "cleanedUp": true,
+    "leftRunning": [],
+    "observedCompositionLimitation": "Jujutsu classifyWorkspaces owner jj-integration omitted; one HTTP404 and one corresponding console error"
+  }
+}

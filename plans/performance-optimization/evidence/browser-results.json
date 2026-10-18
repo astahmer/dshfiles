@@ -1,0 +1,388 @@
+{
+  "recordedAt": "2026-10-18T02:21:29.826Z",
+  "kind": "empty-small-fixture-smoke-resource-snapshot-not-latency-benchmark",
+  "browser": "141.0.7390.37",
+  "scratchOrigin": "http://127.0.0.1:60856",
+  "bundles": [
+    "@dshfiles/ui-styles",
+    "@dshfiles/shared-runtime",
+    "@dshfiles/activity-timeline",
+    "@dshfiles/ai-accounts",
+    "@dshfiles/project-checks",
+    "@dshfiles/agent-communication",
+    "@dshfiles/jujutsu"
+  ],
+  "snapshot": {
+    "pathname": "/",
+    "viewport": {
+      "width": 1440,
+      "height": 900
+    },
+    "domNodes": 618,
+    "scripts": 12,
+    "stylesheets": 163,
+    "heap": {
+      "used": 76600000,
+      "total": 81400000
+    },
+    "resources": [
+      {
+        "pathname": "/plugins/",
+        "type": "link",
+        "durationMs": 58,
+        "transferBytes": 0,
+        "decodedBytes": 9198843
+      },
+      {
+        "pathname": "/plugins/",
+        "type": "link",
+        "durationMs": 33.40000003576279,
+        "transferBytes": 0,
+        "decodedBytes": 5065799
+      },
+      {
+        "pathname": "/plugins/",
+        "type": "script",
+        "durationMs": 4,
+        "transferBytes": 0,
+        "decodedBytes": 46345
+      },
+      {
+        "pathname": "/assets/vendor-DcuzkuQH.js",
+        "type": "other",
+        "durationMs": 80.69999998807907,
+        "transferBytes": 210391,
+        "decodedBytes": 741114
+      },
+      {
+        "pathname": "/assets/index-CN7NIWNw.js",
+        "type": "script",
+        "durationMs": 88.19999998807907,
+        "transferBytes": 319890,
+        "decodedBytes": 939867
+      },
+      {
+        "pathname": "/assets/vendor-DV2921Zo.css",
+        "type": "link",
+        "durationMs": 20.599999964237213,
+        "transferBytes": 8373,
+        "decodedBytes": 27312
+      },
+      {
+        "pathname": "/assets/index-BxpfOGf3.css",
+        "type": "link",
+        "durationMs": 22.600000023841858,
+        "transferBytes": 19100,
+        "decodedBytes": 77343
+      },
+      {
+        "pathname": "/api/settings/describe",
+        "type": "fetch",
+        "durationMs": 54.59999996423721,
+        "transferBytes": 11079,
+        "decodedBytes": 52724
+      },
+      {
+        "pathname": "/api/dynamicCordisRunner/syncInspectManifest",
+        "type": "fetch",
+        "durationMs": 41.19999998807907,
+        "transferBytes": 415,
+        "decodedBytes": 107
+      },
+      {
+        "pathname": "/api/credentials/describe",
+        "type": "fetch",
+        "durationMs": 20.80000001192093,
+        "transferBytes": 456,
+        "decodedBytes": 160
+      },
+      {
+        "pathname": "/api/dynamicCordisRunner/inventory",
+        "type": "fetch",
+        "durationMs": 11.300000011920929,
+        "transferBytes": 417,
+        "decodedBytes": 105
+      },
+      {
+        "pathname": "/open-in-app/apps",
+        "type": "fetch",
+        "durationMs": 1.7000000476837158,
+        "transferBytes": 358,
+        "decodedBytes": 58
+      },
+      {
+        "pathname": "/api/session/modelCatalog",
+        "type": "fetch",
+        "durationMs": 13.900000035762787,
+        "transferBytes": 731,
+        "decodedBytes": 2656
+      },
+      {
+        "pathname": "/api/dshx-2c5a0dae/usage",
+        "type": "fetch",
+        "durationMs": 37.60000002384186,
+        "transferBytes": 470,
+        "decodedBytes": 185
+      },
+      {
+        "pathname": "/api/dshx-2c5a0dae/read",
+        "type": "fetch",
+        "durationMs": 52.59999996423721,
+        "transferBytes": 497,
+        "decodedBytes": 228
+      },
+      {
+        "pathname": "/api/agentPresets/list",
+        "type": "fetch",
+        "durationMs": 32.40000003576279,
+        "transferBytes": 481,
+        "decodedBytes": 291
+      },
+      {
+        "pathname": "/api/credentials/describe",
+        "type": "fetch",
+        "durationMs": 38.90000003576279,
+        "transferBytes": 457,
+        "decodedBytes": 160
+      },
+      {
+        "pathname": "/api/credentials/describe",
+        "type": "fetch",
+        "durationMs": 48.69999998807907,
+        "transferBytes": 455,
+        "decodedBytes": 160
+      },
+      {
+        "pathname": "/api/credentials/describe",
+        "type": "fetch",
+        "durationMs": 37.60000002384186,
+        "transferBytes": 456,
+        "decodedBytes": 160
+      },
+      {
+        "pathname": "/api/session/list",
+        "type": "fetch",
+        "durationMs": 112.59999996423721,
+        "transferBytes": 1102,
+        "decodedBytes": 1547
+      },
+      {
+        "pathname": "/api/permissionPresets/catalog",
+        "type": "fetch",
+        "durationMs": 45.09999996423721,
+        "transferBytes": 503,
+        "decodedBytes": 475
+      },
+      {
+        "pathname": "/api/dynamicCordisRunner/inventory",
+        "type": "fetch",
+        "durationMs": 53.89999997615814,
+        "transferBytes": 417,
+        "decodedBytes": 105
+      },
+      {
+        "pathname": "/api/agentPresets/list",
+        "type": "fetch",
+        "durationMs": 54.89999997615814,
+        "transferBytes": 482,
+        "decodedBytes": 291
+      },
+      {
+        "pathname": "/api/agentPresets/list",
+        "type": "fetch",
+        "durationMs": 58,
+        "transferBytes": 482,
+        "decodedBytes": 291
+      },
+      {
+        "pathname": "/api/session/modelCatalog",
+        "type": "fetch",
+        "durationMs": 136.39999997615814,
+        "transferBytes": 730,
+        "decodedBytes": 2656
+      },
+      {
+        "pathname": "/api/settings/describe",
+        "type": "fetch",
+        "durationMs": 99.79999995231628,
+        "transferBytes": 11055,
+        "decodedBytes": 52724
+      },
+      {
+        "pathname": "/api/dynamicCordisRunner/syncInspectManifest",
+        "type": "fetch",
+        "durationMs": 99.40000003576279,
+        "transferBytes": 415,
+        "decodedBytes": 107
+      },
+      {
+        "pathname": "/api/credentials/describe",
+        "type": "fetch",
+        "durationMs": 8,
+        "transferBytes": 457,
+        "decodedBytes": 160
+      },
+      {
+        "pathname": "/api/credentials/describe",
+        "type": "fetch",
+        "durationMs": 7.899999976158142,
+        "transferBytes": 456,
+        "decodedBytes": 160
+      },
+      {
+        "pathname": "/api/credentials/describe",
+        "type": "fetch",
+        "durationMs": 7.900000035762787,
+        "transferBytes": 456,
+        "decodedBytes": 160
+      },
+      {
+        "pathname": "/api/session/projections",
+        "type": "fetch",
+        "durationMs": 6.199999988079071,
+        "transferBytes": 988,
+        "decodedBytes": 1252
+      },
+      {
+        "pathname": "/api/llm/listProviders",
+        "type": "fetch",
+        "durationMs": 4.400000035762787,
+        "transferBytes": 474,
+        "decodedBytes": 231
+      },
+      {
+        "pathname": "/api/llm/listConfigurableProviders",
+        "type": "fetch",
+        "durationMs": 5,
+        "transferBytes": 2296,
+        "decodedBytes": 11150
+      },
+      {
+        "pathname": "/api/session/create",
+        "type": "fetch",
+        "durationMs": 5.800000011920929,
+        "transferBytes": 465,
+        "decodedBytes": 188
+      },
+      {
+        "pathname": "/api/session/modelCatalog",
+        "type": "fetch",
+        "durationMs": 42,
+        "transferBytes": 732,
+        "decodedBytes": 2656
+      },
+      {
+        "pathname": "/api/agentPresets/list",
+        "type": "fetch",
+        "durationMs": 12.299999952316284,
+        "transferBytes": 483,
+        "decodedBytes": 291
+      },
+      {
+        "pathname": "/api/dshx-c8f0617b/context",
+        "type": "fetch",
+        "durationMs": 156.60000002384186,
+        "transferBytes": 676,
+        "decodedBytes": 553
+      },
+      {
+        "pathname": "/api/commands/list",
+        "type": "fetch",
+        "durationMs": 6.5,
+        "transferBytes": 778,
+        "decodedBytes": 1048
+      },
+      {
+        "pathname": "/api/skills/list",
+        "type": "fetch",
+        "durationMs": 10.200000047683716,
+        "transferBytes": 584,
+        "decodedBytes": 358
+      },
+      {
+        "pathname": "/api/credentials/describe",
+        "type": "fetch",
+        "durationMs": 4,
+        "transferBytes": 951,
+        "decodedBytes": 3928
+      },
+      {
+        "pathname": "/api/credentials/describe",
+        "type": "fetch",
+        "durationMs": 3.200000047683716,
+        "transferBytes": 507,
+        "decodedBytes": 529
+      },
+      {
+        "pathname": "/api/dshx-7e63fa87/state",
+        "type": "fetch",
+        "durationMs": 5.399999976158142,
+        "transferBytes": 462,
+        "decodedBytes": 191
+      },
+      {
+        "pathname": "/api/dshx-e1cc781b/classifyWorkspaces",
+        "type": "fetch",
+        "durationMs": 5.200000047683716,
+        "transferBytes": 329,
+        "decodedBytes": 9
+      },
+      {
+        "pathname": "/api/dshx-6b371122/registerRepository",
+        "type": "fetch",
+        "durationMs": 41.5,
+        "transferBytes": 537,
+        "decodedBytes": 282
+      },
+      {
+        "pathname": "/api/dshx-6b371122/load",
+        "type": "fetch",
+        "durationMs": 154.80000001192093,
+        "transferBytes": 1092,
+        "decodedBytes": 1925
+      },
+      {
+        "pathname": "/api/dshx-6b371122/graphNavigation",
+        "type": "fetch",
+        "durationMs": 176.30000001192093,
+        "transferBytes": 0,
+        "decodedBytes": 0
+      },
+      {
+        "pathname": "/api/dshx-6b371122/graphNavigation",
+        "type": "fetch",
+        "durationMs": 289.9000000357628,
+        "transferBytes": 988,
+        "decodedBytes": 1961
+      },
+      {
+        "pathname": "/api/dshx-6b371122/revisionRelationship",
+        "type": "fetch",
+        "durationMs": 327.7000000476837,
+        "transferBytes": 0,
+        "decodedBytes": 0
+      },
+      {
+        "pathname": "/api/dshx-2c5a0dae/usage",
+        "type": "fetch",
+        "durationMs": 13.699999988079071,
+        "transferBytes": 470,
+        "decodedBytes": 185
+      },
+      {
+        "pathname": "/api/dshx-6b371122/load",
+        "type": "fetch",
+        "durationMs": 159.0999999642372,
+        "transferBytes": 1092,
+        "decodedBytes": 1925
+      },
+      {
+        "pathname": "/api/dshx-6b371122/graphNavigation",
+        "type": "fetch",
+        "durationMs": 225.80000001192093,
+        "transferBytes": 985,
+        "decodedBytes": 1961
+      }
+    ]
+  }
+}

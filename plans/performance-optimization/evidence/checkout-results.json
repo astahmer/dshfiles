@@ -1,0 +1,53 @@
+{
+  "recordedAt": "2026-10-18T02:21:29.519Z",
+  "kind": "read-only-checkout-planner-no-changed-files",
+  "node": "v22.23.3",
+  "platform": "darwin",
+  "architecture": "arm64",
+  "implementation": "/Users/astahmer/dev/dshfiles/tooling/dshx/packages/dshx/dist/checkout/rebuild.js",
+  "samples": [
+    {
+      "iteration": 0,
+      "elapsedMs": 297.445542,
+      "mapReads": 74,
+      "mapBytes": 53913303,
+      "selectedPlugins": 0
+    },
+    {
+      "iteration": 1,
+      "elapsedMs": 171.82791600000002,
+      "mapReads": 74,
+      "mapBytes": 53913303,
+      "selectedPlugins": 0
+    },
+    {
+      "iteration": 2,
+      "elapsedMs": 167.72983299999999,
+      "mapReads": 74,
+      "mapBytes": 53913303,
+      "selectedPlugins": 0
+    },
+    {
+      "iteration": 3,
+      "elapsedMs": 177.81104099999993,
+      "mapReads": 74,
+      "mapBytes": 53913303,
+      "selectedPlugins": 0
+    },
+    {
+      "iteration": 4,
+      "elapsedMs": 166.14433399999996,
+      "mapReads": 74,
+      "mapBytes": 53913303,
+      "selectedPlugins": 0
+    },
+    {
+      "iteration": 5,
+      "elapsedMs": 171.09337500000015,
+      "mapReads": 74,
+      "mapBytes": 53913303,
+      "selectedPlugins": 0
+    }
+  ],
+  "p50WarmMs": 171.09337500000015
+}
