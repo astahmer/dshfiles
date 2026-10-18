@@ -113,7 +113,12 @@ if (globalThis[KEY] !== true && typeof globalThis.EventSource === 'function' && 
       fellBack = true
       globalThis.EventSource = Native
       console.warn('[shared-events] falling back to one EventSource per tab:', reason)
-      for (const group of groups.values()) for (const instance of [...group]) instance.__attachNative()
+      // The worker stops serving this page, so release the subscriptions it still holds before
+      // the proxies take ownership of real sockets.
+      try { port.postMessage({ kind: 'disconnect' }) } catch {}
+      const instances = [...groups.values()].flatMap(group => [...group])
+      groups.clear()
+      for (const instance of instances) instance.__attachNative()
     }
 
     port.onmessage = event => {
@@ -144,6 +149,7 @@ if (globalThis[KEY] !== true && typeof globalThis.EventSource === 'function' && 
         this.__url = this.url
         this.__types = new Set()
         this.__listeners = new Map()
+        this.__native = null
         this.withCredentials = config?.withCredentials === true
         this.readyState = 0
         this.onopen = null
@@ -159,7 +165,19 @@ if (globalThis[KEY] !== true && typeof globalThis.EventSource === 'function' && 
         if (readyTimer === undefined && !ready && !fellBack) {
           readyTimer = setTimeout(() => fallbackAll('no worker ready frame'), READY_TIMEOUT_MS)
         }
-        post({ kind: 'subscribe', url: this.__url, types: [...this.__types] })
+        this.__publishTypes()
+      }
+
+      /** A page has one worker port, so it carries the union of its instances' event types. */
+      __publishTypes() {
+        const group = groups.get(this.__url)
+        if (group === undefined) {
+          post({ kind: 'unsubscribe', url: this.__url })
+          return
+        }
+        const types = new Set()
+        for (const instance of group) for (const type of instance.__types) types.add(type)
+        post({ kind: 'subscribe', url: this.__url, types: [...types] })
       }
 
       addEventListener(type, listener, options) {
@@ -171,19 +189,32 @@ if (globalThis[KEY] !== true && typeof globalThis.EventSource === 'function' && 
             this.__types.add(type)
             this.__subscribe()
           }
+          if (this.__native !== null) this.__native.addEventListener(type, listener)
         }
         return super.addEventListener(type, listener, options)
       }
 
       removeEventListener(type, listener, options) {
-        this.__listeners.get(type)?.delete(listener)
+        if (typeof type === 'string' && typeof listener === 'function') {
+          this.__listeners.get(type)?.delete(listener)
+          this.__native?.removeEventListener(type, listener)
+        }
         return super.removeEventListener(type, listener, options)
       }
 
       close() {
+        if (this.readyState === 2) return
         this.readyState = 2
-        groups.get(this.__url)?.delete(this)
-        post({ kind: 'unsubscribe', url: this.__url })
+        const group = groups.get(this.__url)
+        group?.delete(this)
+        if (group !== undefined && group.size === 0) groups.delete(this.__url)
+        if (this.__native !== null) {
+          try { this.__native.close() } catch {}
+          this.__native = null
+        }
+        // Only the page's last instance releases the port's subscription; siblings keep it alive.
+        if (group === undefined || group.size === 0) post({ kind: 'unsubscribe', url: this.__url })
+        else this.__publishTypes()
       }
 
       /** Worker frame -> the same surface a native EventSource exposes. */
@@ -199,8 +230,9 @@ if (globalThis[KEY] !== true && typeof globalThis.EventSource === 'function' && 
 
       /** Last resort: proxy one real per-tab EventSource through this instance. */
       __attachNative() {
-        if (this.readyState === 2) return
+        if (this.readyState === 2 || this.__native !== null) return
         const source = new Native(this.__url, this.withCredentials ? { withCredentials: true } : undefined)
+        this.__native = source
         source.onopen = () => this.__receive({ kind: 'open' })
         source.onerror = () => this.__receive({ kind: 'error' })
         source.onmessage = event => this.__receive({ kind: 'event', event: 'message', data: event.data, lastEventId: event.lastEventId })

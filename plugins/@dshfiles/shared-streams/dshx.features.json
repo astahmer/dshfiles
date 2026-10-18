@@ -53,6 +53,24 @@
           "id": "shared-streams.injects-before-entry",
           "file": "plugins/@dshfiles/shared-streams/src/host.test.ts",
           "testName": "places the shim before the app entry module"
+        },
+        {
+          "kind": "unit-test",
+          "id": "shared-streams.page-fallback-lifecycle",
+          "file": "plugins/@dshfiles/shared-streams/src/shim-lifecycle.test.ts",
+          "testName": "closes the native socket a fallback opened when the proxy closes"
+        },
+        {
+          "kind": "unit-test",
+          "id": "shared-streams.sibling-subscriptions",
+          "file": "plugins/@dshfiles/shared-streams/src/shim-lifecycle.test.ts",
+          "testName": "keeps a sibling alive when one of two same-URL proxies closes"
+        },
+        {
+          "kind": "unit-test",
+          "id": "shared-streams.worker-socket-lifetime",
+          "file": "plugins/@dshfiles/shared-streams/src/shim-lifecycle.test.ts",
+          "testName": "serves two tabs of one URL from one socket and closes it after the last tab leaves"
         }
       ]
     }

@@ -27,16 +27,21 @@ with a proxy backed by a `SharedWorker`:
 - Each tab keeps a normal `EventSource` surface — `addEventListener`, `onopen`,
   `onmessage`, `onerror`, `readyState`, `close()` — and receives frames relayed
   from the worker over its port.
-- The worker attaches exactly the event types some tab listens for (plus
-  unnamed `message`), and closes a URL once its last subscriber goes away, so a
-  stream is not kept open by a tab that has closed.
+- A page has one worker port, so each subscription carries the union of the
+  event types its live instances listen for. The worker attaches exactly those
+  types (plus unnamed `message`), and closes a URL once its last subscriber goes
+  away, so a stream is not kept open by a tab that has closed.
+- Instances of one URL form a group: closing one leaves its siblings subscribed,
+  and only the group's last `close()` releases the URL.
 
 ## Fallback
 
 The proxy is only installed when `SharedWorker` exists and the Blob worker
 starts. If the worker errors, or no `ready` frame arrives within three seconds
-of the first subscription, every proxied instance is re-attached to a real
-per-tab `EventSource` and the global is restored — the behaviour the profile
+of the first subscription, the page tells the worker to disconnect — releasing
+every subscription it still held — and each proxied instance takes ownership of
+its own per-tab `EventSource`. `close()` then closes that socket, so a fallback
+cannot leak a connection, and the global is restored: the behaviour the profile
 had before this plugin existed, never silence.
 
 ## Configuration
