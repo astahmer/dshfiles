@@ -40,13 +40,15 @@ import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { errorMessage, useIsMutating, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useApi } from '@dshfiles/dshx/client'
 import { useMachine } from '@dshfiles/plugin-ui/machine'
-import { useCallback, useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useId, useMemo, useState, useSyncExternalStore } from 'react'
 import { jjIntegrationApi, type ThreadView, type WorkspaceSyncView } from './api.js'
 import { sessionPreviewMessages } from './session-preview.js'
 import { useDiscardConfirmation } from './discard-machine.js'
 import { announceRepositoryChange, describeLandResult } from './land-feedback.js'
 import type { JjIntegrationTranslate } from './locales.js'
 import { integrationQueueMachine, type IntegrationJob, type IntegrationJobPhase } from './integration-queue-machine.js'
+import { indexSessionActivity } from './panel-session-activity.js'
+import { createProjectionRefreshQueue } from './projection-refresh-queue.js'
 import { ThreadRebaseEligibilityModel } from './thread-rebase-eligibility.js'
 import {
   ThreadIntegrationModel,
@@ -814,27 +816,39 @@ export const ThreadWorkspacesPanel = (props: {
     () => repositoriesWithThreads?.flatMap(repository => repository.threads.map(thread => ({ repository, thread }))) ?? [],
     [repositoriesWithThreads],
   )
-  const requestedProjections = useRef(new Set<string>())
-  useEffect(() => {
-    for (const { thread } of threads) {
-      for (const sessionId of thread.sessionIds) {
-        if (requestedProjections.current.has(sessionId)) continue
-        requestedProjections.current.add(sessionId)
+  const projectionRefresh = useMemo(
+    () =>
+      createProjectionRefreshQueue({
         // The turn/step figures live in the sessionStats projection; a push frame carries them without opening the log.
-        void props.sessions.refreshProjections(SessionId(sessionId)).catch(() => undefined)
-      }
-    }
-  }, [props.sessions, threads])
+        refresh: sessionId => props.sessions.refreshProjections(SessionId(sessionId)),
+      }),
+    [props.sessions],
+  )
+  useEffect(() => () => projectionRefresh.cancel(), [projectionRefresh])
   /**
    * The client merges the Host's eligibility verdict with the sessions it can see. An id the client cannot read
    * stays unverified rather than passing silently: the Host re-checks when the integration runs either way.
    */
+  /** One pass over the session store per snapshot: a row reads its cwd's activity instead of rescanning every session. */
+  const sessionActivity = useMemo(
+    () =>
+      indexSessionActivity(
+        [...sessionById.values()].map(session => ({
+          cwd: session.cwd,
+          running: session.running,
+          waitingForInput: ThreadRebaseEligibilityModel.hasPendingUserQuestion(session.projectionValues) === true,
+        })),
+      ),
+    [sessionById],
+  )
   const entries = useMemo<readonly ThreadEntry[]>(
     () =>
       threads.map(({ repository, thread }) => {
-        const related = [...sessionById.values()].filter(session => thread.sessionIds.includes(session.id) || session.cwd === thread.path)
-        const running = related.some(session => session.running)
-        const waitingForInput = related.some(session => ThreadRebaseEligibilityModel.hasPendingUserQuestion(session.projectionValues) === true)
+        const cwdActivity = sessionActivity.activityAt(thread.path)
+        const running = cwdActivity.running || thread.sessionIds.some(sessionId => sessionById.get(sessionId)?.running === true)
+        const waitingForInput =
+          cwdActivity.waitingForInput ||
+          thread.sessionIds.some(sessionId => ThreadRebaseEligibilityModel.hasPendingUserQuestion(sessionById.get(sessionId)?.projectionValues) === true)
         const clientCanRebase = ThreadRebaseEligibilityModel.canRebase(thread.sessionIds, sessionId => {
           const session = sessionById.get(sessionId)
           return session === undefined
@@ -862,7 +876,7 @@ export const ThreadWorkspacesPanel = (props: {
           hostEligibilityStale: thread.canRebase === false && clientCanRebase === true,
         }
       }),
-    [integrationJobs, sessionById, threads],
+    [integrationJobs, sessionActivity, sessionById, threads],
   )
   const lifecycleMatches = (entry: ThreadEntry): boolean => {
     if (lifecycleFilter === 'any') return true
@@ -922,6 +936,22 @@ export const ThreadWorkspacesPanel = (props: {
     if (filter === 'blocked') return entry.assessment.category === 'blocked' || entry.assessment.category === 'unknown'
     return !entry.assessment.needsAttention
   })
+  useEffect(() => {
+    // Rows on screen first: a group shows GROUP_LIMIT rows until it is expanded, and the rest fill in behind them.
+    const priority = new Set<string>()
+    const shownPerGroup = new Map<RowGroup, number>()
+    for (const entry of visibleEntries) {
+      const group = rowGroupOf(entry.assessment.category)
+      const shown = shownPerGroup.get(group) ?? 0
+      if (showAll[group] !== true && shown >= GROUP_LIMIT) continue
+      shownPerGroup.set(group, shown + 1)
+      for (const sessionId of entry.thread.sessionIds) priority.add(sessionId)
+    }
+    const background: string[] = []
+    for (const { thread } of threads) for (const sessionId of thread.sessionIds) if (!priority.has(sessionId)) background.push(sessionId)
+    projectionRefresh.request([...priority], 'visible')
+    projectionRefresh.request(background, 'background')
+  }, [projectionRefresh, showAll, threads, visibleEntries])
   const groups: readonly {
     readonly id: RowGroup
     readonly title: string
