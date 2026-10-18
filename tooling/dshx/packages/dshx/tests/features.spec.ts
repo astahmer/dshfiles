@@ -73,4 +73,19 @@ describe('plugin feature metadata', () => {
       expect.arrayContaining([expect.stringContaining('seed steps come first')]),
     )
   })
+
+  it('accepts a pointer step that hits a point of the element box, and only a well-formed point', () => {
+    const withReach = (reach: readonly string[]) => featureCatalogIssues({ schemaVersion: 1, kind: 'bundle', features: [{ ...feature, reach }] })
+    expect(withReach(['rightclick text "Mute target" at 24,16', 'expect menuitem "Mute"'])).toEqual([])
+    expect(withReach(['click button "Pin" at 0,0', 'expect img "Unread"'])).toEqual([])
+    expect(withReach(['hover text "Row" at 24,16', 'expect text "x"'])).toEqual([])
+    for (const malformed of [
+      'rightclick text "Mute target" at 24',
+      'rightclick text "Mute target" at 24,',
+      'expect text "x" at 24,16',
+      'fill textbox "Name" "x" at 24,16',
+    ]) {
+      expect(withReach([malformed, 'expect text "x"'])).toEqual(expect.arrayContaining([expect.stringContaining('reach steps are')]))
+    }
+  })
 })

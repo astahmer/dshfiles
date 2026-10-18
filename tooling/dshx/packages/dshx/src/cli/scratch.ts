@@ -76,6 +76,9 @@ Notice and provider-setup dialogs, then runs the feature's "reach" steps:
   expect <role|text|label|title> "<name>"      seed <rebase-ready-thread|pending-restart|tool-call-thread|credential-recovery|fake-secret-cli>
   attach "<file>"                              (a repository file, to the page's file input)
 Names match exactly; "name*" matches a case-insensitive substring. "text" without "*" is exact too.
+A click, rightclick or hover may end with "at <x>,<y>" to hit that point of the element's own box
+instead of its centre: a row that seats a hover-only action strip over its right half is still
+clicked from its left half with 'rightclick text "Mute target" at 24,16'.
 Seed steps come first and run once per instance: rebase-ready-thread starts a thread in its own jj
 workspace through the New thread screen and describes a revision there; pending-restart changes
 thread-sidebar's Host entry on disk, as a rebuild would ("down" restores it); tool-call-thread

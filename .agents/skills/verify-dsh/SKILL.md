@@ -64,7 +64,10 @@ aliases; needs `up --fake-secret-cli`, which puts the e2e fake `secret` first on
 the Host's PATH so Secret Catalog never reaches a real vault). `attach "<repo file>"` hands a fixture
 such as `tooling/dshx/e2e/fixtures/attachments/red.png` to the composer's file
 input. `hover <role> "<name>"` leaves the pointer on hover-only UI for the next
-`shot`. The browser keeps its page between commands, so
+`shot`. A `click`, `rightclick` or `hover` step may end with `at <x>,<y>` to hit
+that point of the element's own box instead of its centre; use it when an overlay
+the element reveals on hover — a thread row's action strip — covers the centre:
+`rightclick text "Mute target" at 24,16`. The browser keeps its page between commands, so
 `shot` captures where `open` stopped. A failing step exits 1 with a screenshot:
 decide drift vs regression with `maintain-verification-skill`. To drive something
 ad hoc, add `reach` to its catalog entry rather than scripting Playwright.

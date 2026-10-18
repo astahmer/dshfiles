@@ -1,7 +1,7 @@
 import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises'
 import { join, relative, resolve } from 'node:path'
 import type { Browser, Page } from 'playwright'
-import { DshxFeatureCatalogSchema, parseReachStep } from '../project/features.js'
+import { DshxFeatureCatalogSchema, parseReachStep, type ReachPosition } from '../project/features.js'
 import { DSHFILES_ROOT } from '../project/local-bundles.js'
 import { StartupDialogs } from '../project/startup-dialogs.js'
 import { ScratchSeedRuntime } from './seed.js'
@@ -89,6 +89,10 @@ const locate = (page: Page, by: string, rawName: string) => {
   return page.getByRole(by as Parameters<Page['getByRole']>[0], { name, exact }).first()
 }
 
+/** A reach `at <x>,<y>` picks a point of the element's own box; Playwright's default is its centre. */
+const pointerPosition = (parsed: { readonly position?: ReachPosition }): { readonly position?: ReachPosition } =>
+  parsed.position === undefined ? {} : { position: parsed.position }
+
 export interface OpenStepResult {
   readonly step: string
   readonly ok: boolean
@@ -159,17 +163,17 @@ export const scratchOpen = async (state: ScratchState, reference: string, timeou
         else if (parsed.action === 'press') await (filled === undefined ? page.keyboard.press(parsed.key) : filled.press(parsed.key, { timeout: timeoutMs }))
         else if (parsed.action === 'click') {
           filled = undefined
-          await locate(page, parsed.by, parsed.name).click({ timeout: timeoutMs })
+          await locate(page, parsed.by, parsed.name).click({ timeout: timeoutMs, ...pointerPosition(parsed) })
         } else if (parsed.action === 'hover') {
           filled = undefined
-          await locate(page, parsed.by, parsed.name).hover({ timeout: timeoutMs })
+          await locate(page, parsed.by, parsed.name).hover({ timeout: timeoutMs, ...pointerPosition(parsed) })
         } else if (parsed.action === 'rightclick') {
           filled = undefined
           // A row that re-renders under the pointer (a new thread, a status change) closes its context menu at once.
           const target = locate(page, parsed.by, parsed.name)
           const deadline = Date.now() + timeoutMs
           for (;;) {
-            await target.click({ button: 'right', timeout: timeoutMs })
+            await target.click({ button: 'right', timeout: timeoutMs, ...pointerPosition(parsed) })
             const opened = await page
               .getByRole('menu')
               .first()

@@ -49,21 +49,30 @@ export const REACH_SEEDS = [
 ] as const
 export type ReachSeed = (typeof REACH_SEEDS)[number]
 
+/** One point inside a locator's own box, in CSS pixels from its top-left corner. */
+export interface ReachPosition {
+  readonly x: number
+  readonly y: number
+}
+
 /**
  * One user step toward a feature, run by `dshx dev open` from the app root:
  * `click|rightclick|hover <role|text|label|title> "<name>"`, `fill <role|label> "<name>" "<value>"`,
  * `expect <role|text|label|title> "<name>"`, `press <key>` (Playwright key names, e.g. `Meta+K`), `attach "<file>"`, which
  * hands a repository file (path from the repository root) to the page's file input as the composer's file picker does,
  * or `seed <seed>` (before every other step). Names match exactly; a trailing `*` (`"sample*"`) matches a case-insensitive substring.
+ * A pointer step may end with `at <x>,<y>` to hit that point of the element's own box: an overlay a row reveals on hover
+ * (its action strip) intercepts the element's centre, while the row's left half is what a reader clicks.
  */
 const reachStepPattern = new RegExp(
-  `^(?:(?:click|rightclick|hover|expect) [a-z]+ "[^"]+"|fill [a-z]+ "[^"]+" "[^"]*"|press [A-Za-z0-9+]+|attach "(?!\\/)(?!.*\\.\\.)[^"]+"|seed (?:${REACH_SEEDS.join('|')}))$`,
+  `^(?:(?:click|rightclick|hover) [a-z]+ "[^"]+"(?: at \\d+,\\d+)?|expect [a-z]+ "[^"]+"|fill [a-z]+ "[^"]+" "[^"]*"|press [A-Za-z0-9+]+|attach "(?!\\/)(?!.*\\.\\.)[^"]+"|seed (?:${REACH_SEEDS.join('|')}))$`,
 )
 
 export const parseReachStep = (
   step: string,
 ):
-  | { readonly action: 'click' | 'rightclick' | 'hover' | 'expect' | 'fill'; readonly by: string; readonly name: string; readonly value?: string }
+  | { readonly action: 'click' | 'rightclick' | 'hover'; readonly by: string; readonly name: string; readonly position?: ReachPosition }
+  | { readonly action: 'expect' | 'fill'; readonly by: string; readonly name: string; readonly value?: string }
   | { readonly action: 'press'; readonly key: string }
   | { readonly action: 'seed'; readonly seed: ReachSeed }
   | { readonly action: 'attach'; readonly file: string }
@@ -75,11 +84,16 @@ export const parseReachStep = (
   if (press?.[1] !== undefined) return { action: 'press', key: press[1] }
   const seed = REACH_SEEDS.find(candidate => step === `seed ${candidate}`)
   if (seed !== undefined) return { action: 'seed', seed }
-  const match = /^(click|rightclick|hover|expect|fill) ([a-z]+) "([^"]+)"(?: "([^"]*)")?$/.exec(step)
+  const match = /^(click|rightclick|hover|expect|fill) ([a-z]+) "([^"]+)"(?: "([^"]*)")?(?: at (\d+),(\d+))?$/.exec(step)
   const action = match?.[1]
   if (match === null || match[2] === undefined || match[3] === undefined) return undefined
   if (action !== 'click' && action !== 'rightclick' && action !== 'hover' && action !== 'expect' && action !== 'fill') return undefined
   if (action === 'fill' && match[2] === 'text') return undefined
+  if (action === 'click' || action === 'rightclick' || action === 'hover') {
+    const x = match[5]
+    const y = match[6]
+    return { action, by: match[2], name: match[3], ...(x === undefined || y === undefined ? {} : { position: { x: Number(x), y: Number(y) } }) }
+  }
   return { action, by: match[2], name: match[3], ...(match[4] === undefined ? {} : { value: match[4] }) }
 }
 
@@ -89,7 +103,7 @@ const reachSchema = z
       .string()
       .refine(
         step => parseReachStep(step) !== undefined,
-        `reach steps are click/rightclick/hover/expect <role|text|label|title> "<name>", fill <role|label> "<name>" "<value>", press <key>, attach "<repository file>", or seed <${REACH_SEEDS.join('|')}>`,
+        `reach steps are click/rightclick/hover <role|text|label|title> "<name>" (optionally "at <x>,<y>"), fill <role|label> "<name>" "<value>", press <key>, attach "<repository file>", or seed <${REACH_SEEDS.join('|')}>`,
       ),
   )
   .min(1)
