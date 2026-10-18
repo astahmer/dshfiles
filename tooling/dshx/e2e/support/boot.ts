@@ -1,7 +1,7 @@
 import { type ChildProcess } from 'node:child_process'
 import { delimiter, join } from 'node:path'
 import { prepareComposedBootProfile, type PreparedBootProfile } from '../../packages/dshx/src/project/boot-profile.js'
-import { DSHFILES_ROOT, buildPlugin, findFreePort, listLocalBootBundles, resolveLocalBundles, withSharedStylesheet } from '../../packages/dshx/src/project/local-bundles.js'
+import { DSHFILES_ROOT, buildPlugin, findFreePort, LocalBundleModel } from '../../packages/dshx/src/project/local-bundles.js'
 import { compositionFailures, readProfileComposition } from '../../packages/dshx/src/project/profile-composition.js'
 import { spawnOwnedProcess, stopOwnedProcess } from '../../packages/dshx/src/project/owned-process.js'
 import { isolatedHostEnvironment, redactHostOutput } from './scratch-profile.js'
@@ -147,7 +147,7 @@ const buildBundleOnce = async (bundle: { readonly projectRoot: string; readonly 
 
 /** Boot a scratch composition of all owned bundles without touching the user's `web` profile. */
 export const bootProfile = async (profileLabel: string, timeoutMs = 90_000): Promise<BootedProfile> => {
-  const bundles = requireNonEmptyBundles(await listLocalBootBundles(), 'No owned plugin bundles were found for the composed scratch profile.')
+  const bundles = requireNonEmptyBundles(await LocalBundleModel.listLocalBootBundles(), 'No owned plugin bundles were found for the composed scratch profile.')
   for (const bundle of bundles) await buildBundleOnce(bundle)
   const prepared = await prepareComposedBootProfile(bundles, { sourceProfileRoot })
   const expectedClientEntries = bundles.filter(bundle => bundle.hasClient).map(bundle => bundle.packageId)
@@ -174,9 +174,9 @@ export const bootComposedPluginProfile = async ({
   readonly seedHome?: (homeRoot: string) => Promise<void | { readonly hostPathPrefix?: string }>
   readonly cordisPatch?: string
 }): Promise<BootedProfile> => {
-  const available = await listLocalBootBundles()
+  const available = await LocalBundleModel.listLocalBootBundles()
   const bundles = requireNonEmptyBundles(
-    withSharedStylesheet(resolveLocalBundles(packageIds, available), available),
+    LocalBundleModel.withSharedStylesheet(LocalBundleModel.resolveLocalBundles(packageIds, available), available),
     'No requested owned plugin bundles were found for the composed scratch profile.',
   )
   for (const bundle of bundles) await buildBundleOnce(bundle)

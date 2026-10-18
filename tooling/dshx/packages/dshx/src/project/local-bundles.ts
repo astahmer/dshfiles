@@ -41,7 +41,7 @@ export interface LocalBootBundle extends BootProfileBundle {
 }
 
 /** Owned Cordis bundles under plugins/@dshfiles, sorted by package id. */
-export const listLocalBootBundles = async (): Promise<LocalBootBundle[]> => {
+const listLocalBootBundles = async (): Promise<LocalBootBundle[]> => {
   const entries = await readdir(pluginsRoot, { withFileTypes: true })
   const bundles: LocalBootBundle[] = []
   for (const entry of entries) {
@@ -70,7 +70,7 @@ export const listLocalBootBundles = async (): Promise<LocalBootBundle[]> => {
 }
 
 /** The requested bundles plus the owned client bundles they load as externals, dependencies first. */
-export const resolveLocalBundles = (packageIds: readonly string[], available: readonly LocalBootBundle[]): LocalBootBundle[] => {
+const resolveLocalBundles = (packageIds: readonly string[], available: readonly LocalBootBundle[]): LocalBootBundle[] => {
   const ordered = new Map<string, LocalBootBundle>()
   const visiting = new Set<string>()
   const visit = (bundle: LocalBootBundle): void => {
@@ -96,7 +96,7 @@ export const resolveLocalBundles = (packageIds: readonly string[], available: re
  * Resolve the composition a client needs: a bundle that declares plugin-ui renders classes only the shared sheet
  * defines, so the owner loads first. The boot *check* keeps its per-bundle isolation and does not call this.
  */
-export const withSharedStylesheet = (bundles: readonly LocalBootBundle[], available: readonly LocalBootBundle[]): LocalBootBundle[] => {
+const withSharedStylesheet = (bundles: readonly LocalBootBundle[], available: readonly LocalBootBundle[]): LocalBootBundle[] => {
   if (bundles.some(bundle => bundle.packageId === SHARED_STYLES_BUNDLE_ID)) return [...bundles]
   if (!bundles.some(bundle => bundle.usesPluginUi)) return [...bundles]
   const owner = available.find(candidate => candidate.packageId === SHARED_STYLES_BUNDLE_ID)
@@ -168,3 +168,9 @@ export const findFreePort = async (): Promise<number> =>
       server.close(() => resolvePort(port))
     })
   })
+
+export class LocalBundleModel {
+  static readonly listLocalBootBundles = listLocalBootBundles
+  static readonly resolveLocalBundles = resolveLocalBundles
+  static readonly withSharedStylesheet = withSharedStylesheet
+}

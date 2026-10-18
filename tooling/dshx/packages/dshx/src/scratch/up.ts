@@ -3,7 +3,7 @@ import { mkdir, readFile, realpath, rm, stat, writeFile } from 'node:fs/promises
 import { basename, delimiter, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { prepareComposedBootProfile } from '../project/boot-profile.js'
-import { DSHFILES_ROOT, buildPlugin, findFreePort, listLocalBootBundles, resolveLocalBundles, withSharedStylesheet } from '../project/local-bundles.js'
+import { DSHFILES_ROOT, buildPlugin, findFreePort, LocalBundleModel } from '../project/local-bundles.js'
 import { compositionFailures, readProfileComposition } from '../project/profile-composition.js'
 import { ScratchProfileRuntime } from '../project/scratch-profile.js'
 import { ScratchSeedRuntime } from './seed.js'
@@ -117,9 +117,9 @@ export const scratchUp = async (options: ScratchUpOptions): Promise<ScratchState
     )
   }
 
-  const available = await listLocalBootBundles()
+  const available = await LocalBundleModel.listLocalBootBundles()
   const requested = options.plugins.length > 0 ? options.plugins : available.map(bundle => bundle.packageId)
-  const bundles = withSharedStylesheet(resolveLocalBundles(requested, available), available)
+  const bundles = LocalBundleModel.withSharedStylesheet(LocalBundleModel.resolveLocalBundles(requested, available), available)
   const [firstBundle, ...otherBundles] = bundles
   if (firstBundle === undefined) throw new ScratchError('no-bundles', 'No owned plugin bundles were selected.', 'Pass --plugin @dshfiles/<name>.')
   if (!options.skipBuild) {
