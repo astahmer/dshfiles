@@ -54,6 +54,10 @@ const MAX_STATE_BYTES = 16 * 1024 * 1024
 const MAX_SUBSCRIPTIONS = 5_000
 /** Bounds how long a cached read can serve state that retention would already have pruned. */
 const STATE_CACHE_TTL_MS = 30_000
+/** Telemetry buffers for at most this long, so a burst of tool calls costs one durable state write. */
+export const ACTIVITY_BATCH_DELAY_MS = 25
+/** A burst this large flushes immediately instead of growing the buffer. */
+export const ACTIVITY_BATCH_LIMIT = 100
 /** A publish fans out one recipient per subscriber, and a message carries at most 512 recipients. */
 const MAX_TOPIC_SUBSCRIBERS = 512
 const MAX_ACKNOWLEDGEMENTS = 100_000
@@ -101,6 +105,12 @@ const subscriptionInputSchema = z
 export interface CommunicationServiceOptions {
   readonly statePath?: string
   readonly now?: () => number
+}
+
+/** One principal's unread count, as a bulk read reports it. */
+export interface CommunicationUnreadCount {
+  readonly principal: CommunicationPrincipal
+  readonly count: number
 }
 
 export interface CommunicationPublishInput {
@@ -292,6 +302,8 @@ export class CommunicationService {
   readonly #statePath: string
   readonly #now: () => number
   #writes: Promise<void> = Promise.resolve()
+  readonly #queuedActivity: { readonly input: CommunicationActivityInput; readonly settle: () => void; readonly reject: (error: unknown) => void }[] = []
+  #activityTimer: ReturnType<typeof setTimeout> | undefined
   #cachedState: { readonly revision: string; readonly at: number; readonly state: CommunicationState } | undefined
 
   constructor(options: CommunicationServiceOptions = {}) {
@@ -347,25 +359,81 @@ export class CommunicationService {
   }
 
   async recordActivity(input: CommunicationActivityInput): Promise<void> {
-    const event: CommunicationActivityEvent = communicationActivityEventSchema.parse({
-      id: randomUUID(),
-      principal: input.principal,
-      operation: input.operation,
-      outcome: input.outcome,
-      occurredAt: input.occurredAt,
-      durationMs: input.durationMs,
-      callId: input.callId,
-      rootCallId: input.rootCallId ?? null,
-      errorCode: input.errorCode ?? null,
-    })
+    await this.recordActivities([input])
+  }
+
+  /**
+   * Append many telemetry records in one durable state write. Every write serializes and fsyncs the whole snapshot,
+   * so a burst that used one call per record paid one full write each.
+   * @param inputs - the activity records to append, in order.
+   */
+  async recordActivities(inputs: readonly CommunicationActivityInput[]): Promise<void> {
+    if (inputs.length === 0) return
+    const events: CommunicationActivityEvent[] = inputs.map(input =>
+      communicationActivityEventSchema.parse({
+        id: randomUUID(),
+        principal: input.principal,
+        operation: input.operation,
+        outcome: input.outcome,
+        occurredAt: input.occurredAt,
+        durationMs: input.durationMs,
+        callId: input.callId,
+        rootCallId: input.rootCallId ?? null,
+        errorCode: input.errorCode ?? null,
+      }),
+    )
     await this.#updateState(state => ({
       state: {
         ...state,
-        activityStartedAt: state.activityStartedAt ?? event.occurredAt,
-        activityEvents: [...state.activityEvents, event],
+        activityStartedAt: state.activityStartedAt ?? events[0]?.occurredAt ?? this.#now(),
+        activityEvents: [...state.activityEvents, ...events],
       },
       value: undefined,
     }))
+  }
+
+  /**
+   * Buffer one telemetry record into the next batch; its promise settles after that batch is durably written, so a
+   * burst costs one state write while each caller keeps the old durability contract. A crash can lose records that
+   * were still buffered, which is bounded by `ACTIVITY_BATCH_DELAY_MS`.
+   * @param input - the activity record to append.
+   */
+  enqueueActivity(input: CommunicationActivityInput): Promise<void> {
+    return new Promise((settle, reject) => {
+      this.#queuedActivity.push({ input, settle, reject })
+      if (this.#queuedActivity.length >= ACTIVITY_BATCH_LIMIT) {
+        void this.#flushActivity().catch(() => undefined)
+        return
+      }
+      if (this.#activityTimer === undefined) {
+        this.#activityTimer = setTimeout(() => {
+          this.#activityTimer = undefined
+          void this.#flushActivity().catch(() => undefined)
+        }, ACTIVITY_BATCH_DELAY_MS)
+      }
+    })
+  }
+
+  /** Write buffered telemetry now and wait for the writes already running; a shutdown awaits this. */
+  async drainActivity(): Promise<void> {
+    await this.#flushActivity().catch(() => undefined)
+    await this.#writes
+  }
+
+  async #flushActivity(): Promise<void> {
+    if (this.#activityTimer !== undefined) {
+      clearTimeout(this.#activityTimer)
+      this.#activityTimer = undefined
+    }
+    const batch = this.#queuedActivity.splice(0)
+    if (batch.length === 0) return
+    try {
+      await this.recordActivities(batch.map(item => item.input))
+      for (const item of batch) item.settle()
+    } catch (error) {
+      for (const item of batch) item.reject(error)
+      throw error
+    }
   }
 
   async diagnostics(input: { readonly agents: readonly CommunicationAgent[]; readonly limit?: number }): Promise<CommunicationDiagnostics> {
@@ -567,13 +635,44 @@ export class CommunicationService {
    * unacknowledged until it is explicitly acknowledged, so it does not count as new here.
    */
   async unreadCount(principalInput: CommunicationPrincipal): Promise<number> {
-    const principal = communicationPrincipalSchema.parse(principalInput)
-    const key = principalKey(principal)
+    const [reading] = await this.unreadCounts([principalInput])
+    return reading?.count ?? 0
+  }
+
+  /**
+   * The same count for many principals in one secured state read: acknowledgement sets are indexed once and the
+   * message/recipient sweep runs once, instead of once per principal. Counts are per message, so two recipients of
+   * one message for a principal still read as one unread message.
+   * @param principalsInput - the principals to report, in order.
+   * @returns one reading per input principal, duplicates included.
+   */
+  async unreadCounts(principalsInput: readonly CommunicationPrincipal[]): Promise<readonly CommunicationUnreadCount[]> {
+    const principals = principalsInput.map(principal => communicationPrincipalSchema.parse(principal))
+    if (principals.length === 0) return []
     const state = await this.#readState()
-    const acknowledged = new Set(state.acknowledgements.filter(entry => principalKey(entry.principal) === key).map(entry => entry.messageId))
-    return state.messages.filter(
-      message => !acknowledged.has(message.id) && message.recipients.some(recipient => principalKey(recipient.principal) === key && recipient.readAt === null),
-    ).length
+    const wanted = new Map<string, { readonly principal: CommunicationPrincipal; count: number; readonly acknowledged: Set<string> }>()
+    for (const principal of principals) {
+      const key = principalKey(principal)
+      if (!wanted.has(key)) wanted.set(key, { principal, count: 0, acknowledged: new Set() })
+    }
+    for (const entry of state.acknowledgements) wanted.get(principalKey(entry.principal))?.acknowledged.add(entry.messageId)
+    // Reused across messages so the sweep stays allocation-free per message.
+    const countedForMessage = new Set<string>()
+    for (const message of state.messages) {
+      countedForMessage.clear()
+      for (const recipient of message.recipients) {
+        if (recipient.readAt !== null) continue
+        const key = principalKey(recipient.principal)
+        const reading = wanted.get(key)
+        if (reading === undefined || reading.acknowledged.has(message.id) || countedForMessage.has(key)) continue
+        countedForMessage.add(key)
+        reading.count += 1
+      }
+    }
+    return principals.map(principal => {
+      const reading = wanted.get(principalKey(principal))
+      return { principal, count: reading?.count ?? 0 }
+    })
   }
 
   async unsubscribe(principalInput: CommunicationPrincipal, topicInput: string): Promise<{ readonly removed: boolean }> {

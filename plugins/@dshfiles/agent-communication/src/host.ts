@@ -519,16 +519,24 @@ const collectUnreadCounts = async (input: {
   readonly service: ReturnType<typeof createCommunicationService>
 }): Promise<Map<string, number>> => {
   const counts = new Map<string, number>()
-  await Promise.all(
-    input.context.agents.list().map(async agent => {
-      try {
-        const count = await input.service.unreadCount({ kind: 'agent', id: agent.id })
-        if (count > 0) counts.set(agent.id, count)
-      } catch {
-        return
-      }
-    }),
-  )
+  const principals: CommunicationPrincipal[] = input.context.agents.list().map(agent => ({ kind: 'agent', id: agent.id }))
+  if (principals.length === 0) return counts
+  // One secured state read and one sweep for the whole agent list; the per-principal reads only answer a
+  // batch failure so one broken read cannot hide every other agent's count.
+  const readings = await input.service.unreadCounts(principals).catch(async () => {
+    const perPrincipal = await Promise.all(
+      principals.map(principal =>
+        input.service
+          .unreadCount(principal)
+          .then(count => ({ principal, count }))
+          .catch(() => undefined),
+      ),
+    )
+    return perPrincipal.flatMap(reading => (reading === undefined ? [] : [reading]))
+  })
+  for (const reading of readings) {
+    if (reading.count > 0 && reading.principal.kind === 'agent') counts.set(reading.principal.id, reading.count)
+  }
   return counts
 }
 
@@ -558,7 +566,7 @@ const trackToolActivity = async <Value>(input: {
   const agent = input.execution.agent
   if (agent !== undefined) {
     try {
-      await requireService().recordActivity({
+      await requireService().enqueueActivity({
         principal: { kind: 'agent', id: agent.id },
         operation: input.operation,
         outcome: result.outcome,

@@ -1,7 +1,7 @@
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 import { createCommunicationService } from '../src/communication/service.js'
 import type { CommunicationPrincipal } from '../src/communication/types.js'
@@ -449,6 +449,70 @@ describe('durable Agent communication', () => {
 
     await service.acknowledge(recipient, first.id)
     expect(await service.unreadCount(recipient)).toBe(0)
+  })
+
+  it('reads many principals in one pass with the same counts as one at a time', async () => {
+    const service = createCommunicationService({ statePath: await statePath(), now: () => now })
+    const first: CommunicationPrincipal = { kind: 'agent', id: 'agent-first' }
+    const second: CommunicationPrincipal = { kind: 'agent', id: 'agent-second' }
+    const quiet: CommunicationPrincipal = { kind: 'agent', id: 'agent-quiet' }
+
+    await service.send({ sender: second, toAgentId: first.id, text: 'For the first agent.' })
+    const acknowledged = await service.send({ sender: first, toAgentId: second.id, text: 'For the second agent.' })
+    await service.send({ sender: first, toAgentId: second.id, text: 'A second one for the second agent.' })
+    await service.acknowledge(second, acknowledged.id)
+
+    const bulk = await service.unreadCounts([first, second, quiet])
+    expect(bulk.map(entry => [entry.principal.id, entry.count])).toEqual([
+      ['agent-first', 1],
+      ['agent-second', 1],
+      ['agent-quiet', 0],
+    ])
+    for (const entry of bulk) expect(entry.count).toBe(await service.unreadCount(entry.principal))
+    expect(await service.unreadCounts([])).toEqual([])
+    // The batch result equals the per-principal read, duplicates included.
+    expect((await service.unreadCounts([quiet, quiet])).map(entry => entry.count)).toEqual([0, 0])
+  })
+
+  it('writes a telemetry burst as one state update and resolves only after it is durable', async () => {
+    const path = await statePath()
+    const service = createCommunicationService({ statePath: path, now: () => now })
+    const writes = vi.spyOn(service, 'recordActivities')
+    const activity = (index: number) => ({
+      principal: { kind: 'agent' as const, id: 'agent-telemetry' },
+      operation: 'dshx_comm_inbox' as const,
+      outcome: 'success' as const,
+      occurredAt: now + index,
+      durationMs: index,
+      callId: `call-${String(index)}`,
+    })
+
+    await Promise.all(Array.from({ length: 25 }, (_unused, index) => service.enqueueActivity(activity(index))))
+    expect(writes).toHaveBeenCalledTimes(1)
+    expect(writes.mock.calls[0]?.[0]).toHaveLength(25)
+    const persisted = await readPersistedState(path)
+    expect(persisted.activityEvents).toHaveLength(25)
+
+    // A single record is durable by the time its promise settles, and a drain stores what is still buffered.
+    const buffered = service.enqueueActivity(activity(30))
+    await service.drainActivity()
+    await buffered
+    expect((await readPersistedState(path)).activityEvents).toHaveLength(26)
+  })
+
+  it('rejects every caller whose telemetry batch failed to flush', async () => {
+    const service = createCommunicationService({ statePath: await statePath(), now: () => now })
+    vi.spyOn(service, 'recordActivities').mockRejectedValue(new Error('disk full'))
+    await expect(
+      service.enqueueActivity({
+        principal: { kind: 'agent', id: 'agent-telemetry' },
+        operation: 'dshx_comm_send',
+        outcome: 'success',
+        occurredAt: now,
+        durationMs: 1,
+        callId: 'call-1',
+      }),
+    ).rejects.toThrow('disk full')
   })
 
   it('re-reads state another process wrote instead of serving its cached copy', async () => {
