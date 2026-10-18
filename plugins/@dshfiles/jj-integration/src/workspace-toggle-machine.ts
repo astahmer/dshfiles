@@ -56,10 +56,8 @@ interface ToggleContext {
   readonly settled: readonly string[]
   /** The New-thread visit waiting for its destination to decide whether it moves. */
   readonly arriving: string | null
-  /** The workspace a switch just opened for the same blank-thread visit. */
+  /** The workspace a switch just opened; the next blank Session to arrive there continues that switch's visit. */
   readonly opened: string | null
-  readonly openedFor: string | null
-  readonly switchingVisitId: string | null
 }
 
 interface ToggleInput {
@@ -76,7 +74,9 @@ type ToggleEvent =
   | { readonly type: 'toggle'; readonly request: ToggleRequest; readonly visitId?: string | undefined }
   /**
    * A blank New-thread Session showed in `workspaceId`. `visitId` names this showing: DSH reuses a workspace's blank
-   * Session, so the same Session can be a new thread again later. With isolation on by default, a submitted Send waits until the destination Session is open.
+   * Session, so the same Session can be a new thread again later. A switch has DSH open a fresh blank Session in the
+   * workspace it moved to, so the arrival that follows a switch carries a new visit id for the same thread. With
+   * isolation on by default, a submitted Send waits until the destination Session is open.
    */
   | { readonly type: 'arrive'; readonly visitId: string; readonly workspaceId: string; readonly isolateByDefault: boolean }
   /** Its destination is known: `request` moves it to where new threads start by default, null keeps it. */
@@ -194,8 +194,6 @@ export const workspaceToggleMachine = setup({
     settled: [],
     arriving: null,
     opened: null,
-    openedFor: null,
-    switchingVisitId: null,
   }),
   initial: 'idle',
   states: {
@@ -208,8 +206,6 @@ export const workspaceToggleMachine = setup({
             error: null,
             arriving: null,
             opened: null,
-            openedFor: null,
-            switchingVisitId: event.visitId ?? null,
             pending: pendingFor(context.client, event.request, null),
             settled: event.visitId === undefined ? context.settled : [...context.settled, event.visitId],
           })),
@@ -219,8 +215,11 @@ export const workspaceToggleMachine = setup({
             guard: ({ context, event }) => context.settled.includes(event.visitId),
           },
           {
-            guard: ({ context, event }) => context.opened === event.workspaceId && context.openedFor === event.visitId,
-            actions: assign(({ context, event }) => ({ settled: [...context.settled, event.visitId], opened: null, openedFor: null, error: null })),
+            // A switch has DSH open a fresh blank Session in the workspace it moved the visit to, so that arrival
+            // carries a new visit id. It continues the switch rather than starting a new thread: settle it, and let
+            // the next blank Session to arrive there be a new visit that follows the default destination again.
+            guard: ({ context, event }) => context.opened === event.workspaceId,
+            actions: assign(({ context, event }) => ({ settled: [...context.settled, event.visitId], opened: null, error: null })),
           },
           {
             guard: ({ event }) => event.isolateByDefault,
@@ -229,11 +228,10 @@ export const workspaceToggleMachine = setup({
               arriving: event.visitId,
               error: null,
               opened: null,
-              openedFor: null,
               pending: { isolate: true, spare: null, name: context.client.generateName() },
             })),
           },
-          { actions: assign({ arriving: ({ event }) => event.visitId, opened: null, openedFor: null, error: null }) },
+          { actions: assign({ arriving: ({ event }) => event.visitId, opened: null, error: null }) },
         ],
         resolved: [
           {
@@ -245,8 +243,6 @@ export const workspaceToggleMachine = setup({
               settled: [...context.settled, event.visitId],
               arriving: null,
               opened: null,
-              openedFor: null,
-              switchingVisitId: null,
             })),
           },
           {
@@ -259,8 +255,6 @@ export const workspaceToggleMachine = setup({
                 error: null,
                 arriving: null,
                 opened: null,
-                openedFor: null,
-                switchingVisitId: event.visitId,
                 settled: [...context.settled, event.visitId],
                 pending: pendingFor(context.client, request, null),
               }
@@ -278,8 +272,6 @@ export const workspaceToggleMachine = setup({
             pending: null,
             arriving: null,
             opened: null,
-            openedFor: null,
-            switchingVisitId: null,
             error: context.client.preparationTimeoutReason(),
             settled: [...context.settled, ...(context.arriving === null ? [] : [context.arriving])],
           })),
@@ -293,8 +285,6 @@ export const workspaceToggleMachine = setup({
             error: null,
             arriving: null,
             opened: null,
-            openedFor: null,
-            switchingVisitId: event.visitId ?? null,
             pending: pendingFor(context.client, event.request, null),
             settled: [...context.settled, ...(context.arriving === null ? [] : [context.arriving])],
           })),
@@ -308,8 +298,6 @@ export const workspaceToggleMachine = setup({
               pending: null,
               arriving: null,
               opened: null,
-              openedFor: null,
-              switchingVisitId: null,
               settled: [...context.settled, event.visitId],
             })),
           },
@@ -322,8 +310,6 @@ export const workspaceToggleMachine = setup({
                 request,
                 arriving: null,
                 opened: null,
-                openedFor: null,
-                switchingVisitId: event.visitId,
                 settled: [...context.settled, event.visitId],
                 pending: pendingFor(context.client, request, context.pending?.name ?? null),
               }
@@ -345,12 +331,10 @@ export const workspaceToggleMachine = setup({
           target: 'idle',
           actions: [
             emit(({ event }) => ({ type: 'switched' as const, workspaceId: event.output.workspaceId, destination: event.output.destination })),
-            assign(({ context, event }) => ({
+            assign(({ event }) => ({
               request: null,
               pending: null,
               opened: event.output.workspaceId,
-              openedFor: context.switchingVisitId,
-              switchingVisitId: null,
             })),
           ],
         },
@@ -360,8 +344,6 @@ export const workspaceToggleMachine = setup({
             request: null,
             pending: null,
             opened: null,
-            openedFor: null,
-            switchingVisitId: null,
             error: errorText(event.error),
           })),
         },

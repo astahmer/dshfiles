@@ -168,8 +168,26 @@ describe('workspaceToggleMachine', () => {
     await waitFor(toggle.actor, snapshot => snapshot.matches('idle'))
     expect(toggle.calls).toEqual(['provision isolate thread-abc123', 'open ws-thread-abc123'])
     expect(toggle.switched).toEqual(['ws-thread-abc123'])
-    toggle.actor.send({ type: 'arrive', visitId: 's1', workspaceId: 'ws-thread-abc123', isolateByDefault: true })
     expect(toggle.actor.getSnapshot().matches('idle')).toBe(true)
+  })
+
+  it('settles the fresh Session DSH opens in the workspace the switch created', async () => {
+    const toggle = startToggle()
+    toggle.actor.send({ type: 'arrive', visitId: 'session:project', workspaceId: 'project', isolateByDefault: true })
+    toggle.actor.send({
+      type: 'resolved',
+      visitId: 'session:project',
+      request: { isolate: true, base: 'main', projectWorkspaceId: 'project', leaving: null, leavingBase: null },
+    })
+    toggle.release()
+    await waitFor(toggle.actor, snapshot => snapshot.matches('idle'))
+
+    // DSH backs the moved thread with a fresh blank Session, so the client reports the new workspace under a new visit.
+    toggle.actor.send({ type: 'arrive', visitId: 'session:thread', workspaceId: 'ws-thread-abc123', isolateByDefault: true })
+
+    expect(toggle.actor.getSnapshot().matches('idle')).toBe(true)
+    expect(toggle.calls.filter(call => call.startsWith('provision'))).toEqual(['provision isolate thread-abc123'])
+    expect(toggle.switched).toEqual(['ws-thread-abc123'])
   })
 
   it('creates a fresh workspace when a new thread inherits another thread workspace', async () => {
@@ -237,7 +255,32 @@ describe('workspaceToggleMachine', () => {
     expect(toggle.calls).toEqual([])
   })
 
-  it('moves a reused blank Session from a workspace opened for an earlier visit', async () => {
+  it('keeps a manual isolation in the workspace its switch opened', async () => {
+    const toggle = startToggle()
+    toggle.release()
+    toggle.actor.send({
+      type: 'toggle',
+      visitId: 'session:project',
+      request: { isolate: true, base: 'main', projectWorkspaceId: 'project', leaving: null, leavingBase: null },
+    })
+    await waitFor(toggle.actor, snapshot => snapshot.matches('idle'))
+    expect(toggle.switched).toEqual(['ws-thread-abc123'])
+
+    // The switch makes DSH open a fresh blank Session in the new workspace, so the client reports that workspace
+    // under a new visit id; defaultDestinationMove would send it back to the project checkout.
+    toggle.actor.send({ type: 'arrive', visitId: 'session:thread', workspaceId: 'ws-thread-abc123', isolateByDefault: false })
+    toggle.actor.send({
+      type: 'resolved',
+      visitId: 'session:thread',
+      request: { isolate: false, projectWorkspaceId: 'project', leaving: null, leavingBase: null },
+    })
+
+    expect(toggle.actor.getSnapshot().matches('idle')).toBe(true)
+    expect(toggle.calls).toEqual(['provision isolate thread-abc123', 'open ws-thread-abc123'])
+    expect(toggle.switched).toEqual(['ws-thread-abc123'])
+  })
+
+  it('moves a later blank Session out of a workspace the toggle opened for an earlier visit', async () => {
     const toggle = startToggle()
     toggle.release()
     toggle.actor.send({
@@ -246,8 +289,11 @@ describe('workspaceToggleMachine', () => {
       request: { isolate: true, base: 'main', projectWorkspaceId: 'project', leaving: null, leavingBase: null },
     })
     await waitFor(toggle.actor, snapshot => snapshot.matches('idle'))
-    expect(toggle.actor.getSnapshot().context).toMatchObject({ opened: 'ws-thread-abc123', openedFor: 'session:0' })
+    // The Session the switch created continues that visit and stays.
+    toggle.actor.send({ type: 'arrive', visitId: 'session:created', workspaceId: 'ws-thread-abc123', isolateByDefault: false })
+    expect(toggle.actor.getSnapshot().matches('idle')).toBe(true)
 
+    // A blank Session a later visit opens there is not a continuation, so it returns to the project checkout.
     toggle.actor.send({ type: 'arrive', visitId: 'session:1', workspaceId: 'ws-thread-abc123', isolateByDefault: false })
     toggle.actor.send({
       type: 'resolved',
@@ -257,7 +303,7 @@ describe('workspaceToggleMachine', () => {
     await waitFor(toggle.actor, snapshot => snapshot.matches('idle'))
 
     expect(toggle.switched).toEqual(['ws-thread-abc123', 'project'])
-    expect(toggle.actor.getSnapshot().context).toMatchObject({ opened: 'project', openedFor: 'session:1' })
+    expect(toggle.actor.getSnapshot().context).toMatchObject({ opened: 'project' })
   })
 
   it('never moves a thread again once the user toggled it', async () => {

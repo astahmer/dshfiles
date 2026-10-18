@@ -123,7 +123,7 @@ const repositoryFor = (page: Page): ThreadRepository => {
 const projectButton = (page: Page) => page.getByRole('button', { name: 'Choose workspace', exact: true })
 const dismissGetStartedDialog = async (page: Page): Promise<void> => {
   const dialog = page.getByRole('dialog', { name: 'Get started', exact: true })
-  if (!await dialog.isVisible()) return
+  if (!(await dialog.isVisible())) return
   await dialog.getByRole('button', { name: 'Close', exact: true }).click()
   await expect(dialog).toBeHidden()
 }
@@ -222,6 +222,13 @@ When('the New thread workspace toggle is turned on', async ({ page }: { page: Pa
   await workspaceToggle(page).click()
   await expect(projectButton(page)).toHaveText(/^repo · thread-/)
   provisionedThreads.set(page, await currentThreadName(page))
+  // The switch makes DSH open a fresh blank Session in the new workspace; the thread must keep it instead of moving
+  // back to the project checkout, so hold the state for a moment before trusting it.
+  await expect(async () => {
+    await page.waitForTimeout(2_000)
+    await expect(projectButton(page)).toHaveText(new RegExp(`^repo · ${provisionedThreadName(page)}$`))
+    await expect(workspaceToggle(page)).toBeChecked()
+  }).toPass({ timeout: 10_000 })
 })
 
 When('the New thread workspace toggle is turned off', async ({ page }: { page: Page }) => {

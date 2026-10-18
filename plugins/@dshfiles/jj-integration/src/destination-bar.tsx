@@ -14,7 +14,7 @@ import { useApi, useSettings } from '@dshfiles/dshx/client'
 import { HostChip, multiHostApi } from '@dshfiles/multi-host/destination'
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { z } from 'zod'
-import { jjIntegrationApi, threadWorkspaceName } from './api.js'
+import { jjIntegrationApi, threadWorkspaceName, type DestinationView } from './api.js'
 import type { JjIntegrationTranslate } from './locales.js'
 import { mainViewSessionId, mainViewSessionVisitId } from './main-view-session.js'
 import { resolveNewThreadWorkspaceId } from './new-thread-workspace.js'
@@ -217,6 +217,12 @@ export const DestinationBar = (props: {
       }
     },
   })
+  // While a new thread is moving, its workspace changes mid-switch and the Host has not described the new one yet;
+  // keep the destination the thread is leaving so its bookmark and toggle stay in the row instead of blinking out.
+  const lastDestination = useRef<DestinationView | undefined>(undefined)
+  useEffect(() => {
+    if (destination.data !== undefined) lastDestination.current = destination.data
+  }, [destination.data])
   const settings = useSettings(jjIntegrationSettings).value
   const isolateByDefault = settings?.isolateByDefault ?? false
   const bookmark = settings?.bookmark ?? 'main'
@@ -247,7 +253,7 @@ export const DestinationBar = (props: {
     resolved(newThreadId, WorkspaceToggle.defaultDestinationMove({ destination: destination.data, workspaceId }))
   }, [destination.data, newThreadId, resolved, workspaceId])
 
-  const current = destination.data
+  const current = destination.data ?? (toggle.busy ? lastDestination.current : undefined)
   const rootSelectionHandledFor = useRef<string | null>(null)
   const rootSelectionVisitId = composerWorkspace?.visitId ?? mountId
   useEffect(() => {
