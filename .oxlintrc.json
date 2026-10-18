@@ -31,6 +31,8 @@
         "excludePaths": [
           "plugins/@dshfiles/plugin-ui/src/components/ui/**",
           "tooling/dshx/packages/**/src/**/index.ts",
+          "tooling/dshx/scripts/**",
+          "tooling/dshx/e2e/support/**",
           "**/test/**",
           "**/tests/**",
           "**/testing/**"
