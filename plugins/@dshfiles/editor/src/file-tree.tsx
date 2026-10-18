@@ -12,6 +12,9 @@ interface TreeProps {
   readonly onOpen: (path: string) => void
 }
 
+/** A save or build burst emits many frames; one invalidation per window keeps a listing fresh without refetching per frame. */
+const DIRECTORY_INVALIDATION_MS = 50
+
 const ROW =
   'dshx:flex dshx:h-6 dshx:w-full dshx:items-center dshx:gap-1 dshx:rounded-sm dshx:pr-1 dshx:text-left dshx:text-xs dshx:outline-none dshx:hover:bg-accent dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50'
 
@@ -26,16 +29,26 @@ const Directory = (props: TreeProps & { readonly path: string; readonly depth: n
   useEffect(() => {
     const controller = new AbortController()
     const watchPath = props.path === '' ? '.' : props.path
+    let flushTimer: ReturnType<typeof setTimeout> | undefined
+    const invalidate = (): void => {
+      flushTimer = undefined
+      void queryClient.invalidateQueries({ queryKey: ['dshfiles-editor', 'list', props.sessionId, props.path], exact: true })
+    }
     void (async () => {
       try {
         for await (const frame of props.remote.workspaceFiles.changes(props.sessionId, watchPath, controller.signal)) {
-          if (frame.kind === 'change') void queryClient.invalidateQueries({ queryKey: ['dshfiles-editor', 'list', props.sessionId, props.path], exact: true })
+          // Frames inside the open window coalesce into the one invalidation that fires when it closes.
+          if (frame.kind !== 'change' || flushTimer !== undefined) continue
+          flushTimer = setTimeout(invalidate, DIRECTORY_INVALIDATION_MS)
         }
       } catch {
         // No watch (unsupported, or the Host dropped it): the Refresh button and staleTime still apply.
       }
     })()
-    return () => controller.abort()
+    return () => {
+      controller.abort()
+      if (flushTimer !== undefined) clearTimeout(flushTimer)
+    }
   }, [props.remote, props.sessionId, props.path, queryClient])
   const listing = useQuery({
     queryKey,

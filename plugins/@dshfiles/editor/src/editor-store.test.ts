@@ -104,3 +104,114 @@ describe('editor store binary content', () => {
     store.dispose()
   })
 })
+
+/** A controllable change feed: a frame stays queued until the store's watcher asks for it. */
+const changeFeed = () => {
+  const queue: { readonly version: number }[] = []
+  let wake: (() => void) | undefined
+  const emit = (version: number) => {
+    queue.push({ version })
+    wake?.()
+    wake = undefined
+  }
+  const changes = (_sessionId: string, _path: string, signal?: AbortSignal) => ({
+    [Symbol.asyncIterator]: () => ({
+      next: async (): Promise<IteratorResult<{ readonly kind: 'change'; readonly change: { readonly version: number } }>> => {
+        while (queue.length === 0 && signal?.aborted !== true) await new Promise<void>(resolve => (wake = resolve))
+        const next = queue.shift()
+        return next === undefined ? { done: true, value: undefined } : { done: false, value: { kind: 'change', change: next } }
+      },
+    }),
+  })
+  return { changes, emit }
+}
+
+describe('editor store change coalescing', () => {
+  it('coalesces a burst of change frames into bounded reloads and lands on the last version', async () => {
+    let version = 1
+    let body = 'one'
+    const reads: string[] = []
+    let releaseRead: (() => void) | undefined
+    let gateRead = false
+    const feed = changeFeed()
+    const store = createEditorStore({
+      // SAFETY: the fake serves exactly the readBytes/changes calls the store makes.
+      remote: {
+        workspaceFiles: {
+          readBytes: async (_sessionId: SessionId, path: string) => {
+            reads.push(path)
+            // Build what this read will report before it waits, so a late read stays a late version.
+            const value = { absolutePath: `/real/w/${path}`, version, bytes: body.length, offset: 0, data: text(body), eof: true }
+            if (gateRead) {
+              gateRead = false
+              await new Promise<void>(resolve => (releaseRead = resolve))
+            }
+            return { ok: true as const, value }
+          },
+          changes: feed.changes,
+        },
+      } as never,
+      workspaceRoot: () => '/real/w',
+    })
+    store.open(session, { path: 'src/a.ts' })
+    await loaded(store)
+    expect(reads).toHaveLength(1)
+
+    gateRead = true
+    version = 2
+    body = 'two'
+    feed.emit(2)
+    await vi.waitFor(() => expect(reads).toHaveLength(2))
+    for (let next = 3; next <= 100; next += 1) {
+      version = next
+      body = `v${String(next)}`
+      feed.emit(next)
+    }
+    releaseRead?.()
+    await vi.waitFor(() => expect(store.getSnapshot().documents[0]?.version).toBe(100))
+    expect(store.getSnapshot().documents[0]?.text).toBe('v100')
+    // One reconcile for the frame that started it plus one trailing pass for the whole burst.
+    expect(reads.length).toBeLessThanOrEqual(3)
+    store.dispose()
+  })
+
+  it('discards a read that resolves after its document was reopened', async () => {
+    let body = 'stale'
+    const reads: string[] = []
+    let releaseRead: (() => void) | undefined
+    let gateRead = true
+    const feed = changeFeed()
+    const store = createEditorStore({
+      // SAFETY: as above.
+      remote: {
+        workspaceFiles: {
+          readBytes: async (_sessionId: SessionId, path: string) => {
+            reads.push(path)
+            const value = { absolutePath: `/real/w/${path}`, version: 1, bytes: body.length, offset: 0, data: text(body), eof: true }
+            if (gateRead) {
+              gateRead = false
+              await new Promise<void>(resolve => (releaseRead = resolve))
+            }
+            return { ok: true as const, value }
+          },
+          changes: feed.changes,
+        },
+      } as never,
+      workspaceRoot: () => '/real/w',
+    })
+    store.open(session, { path: 'src/a.ts' })
+    await vi.waitFor(() => expect(reads).toHaveLength(1))
+
+    const opened = store.getSnapshot().documents[0]
+    if (opened === undefined) throw new Error('fixture')
+    store.close(opened.id)
+    body = 'fresh'
+    store.open(session, { path: 'src/a.ts' })
+    await vi.waitFor(() => expect(store.getSnapshot().documents[0]?.text).toBe('fresh'))
+
+    releaseRead?.()
+    await new Promise(resolve => setTimeout(resolve, 0))
+    expect(store.getSnapshot().documents[0]?.text).toBe('fresh')
+    store.dispose()
+  })
+})

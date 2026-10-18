@@ -107,6 +107,10 @@ export const createEditorStore = (options: {
     set({ ...state, documents: state.documents.map(document => (document.id === id ? { ...document, ...change } : document)) })
   }
   const find = (id: string): OpenDocument | undefined => state.documents.find(document => document.id === id)
+  /** Bumped on every open and close, so a read that resolves later cannot patch a reopened tab. */
+  const loadGeneration = new Map<string, number>()
+  const generationOf = (id: string): number => loadGeneration.get(id) ?? 0
+  const superseded = (id: string, generation: number): boolean => generationOf(id) !== generation
 
   /** A second spelling of an open file resolved to the same Host path: keep the first tab, drop this one. */
   const mergeIntoTwin = (id: string, absolutePath: string): boolean => {
@@ -136,8 +140,9 @@ export const createEditorStore = (options: {
   const load = async (id: string, signal?: AbortSignal): Promise<void> => {
     const document = find(id)
     if (document === undefined) return
+    const generation = generationOf(id)
     const result = await remote.workspaceFiles.readBytes(document.sessionId, document.path, {}, signal)
-    if (find(id) === undefined) return
+    if (find(id) === undefined || superseded(id, generation)) return
     if (result.ok) {
       learnRoot(document.sessionId, document.path, result.value.absolutePath)
       if (mergeIntoTwin(id, result.value.absolutePath)) return
@@ -177,35 +182,63 @@ export const createEditorStore = (options: {
       patch(id, { status: 'error', error: `File is larger than ${MAX_EDITABLE_BYTES / 1024 / 1024} MB; the editor does not open it.` })
       return
     }
+    const digest = await sha256(result.value.data)
+    if (superseded(id, generation)) return
     patch(id, {
       content: { kind: 'text' },
       status: 'ready',
       absolutePath: result.value.absolutePath,
       text,
-      sha256: await sha256(result.value.data),
+      sha256: digest,
       version: result.value.version,
       dirty: false,
       diskChanged: false,
     })
   }
 
+  /**
+   * Follow one document's change feed. A burst only replaces the newest announced version while a reconcile is
+   * running, so a hundred save frames cost one read plus one trailing pass, and the last version always wins.
+   */
   const watch = (id: string, sessionId: SessionId, path: string): void => {
     const controller = new AbortController()
     watches.set(id, controller)
+    let pendingVersion: string | null | undefined
+    let draining = false
+    const reconcile = async (): Promise<void> => {
+      const document = find(id)
+      if (document === undefined) return
+      if (!document.dirty || document.content.kind !== 'text') {
+        await load(id, controller.signal)
+        return
+      }
+      // A dirty buffer keeps its edits; flag the change unless the disk now holds what this editor saved.
+      const current = await remote.workspaceFiles.readBytes(sessionId, path, {}, controller.signal)
+      if (current.ok && (await sha256(current.value.data)) === find(id)?.sha256) patch(id, { version: current.value.version })
+      else patch(id, { diskChanged: true })
+    }
+    const drain = async (): Promise<void> => {
+      if (draining) return
+      draining = true
+      try {
+        while (pendingVersion !== undefined && watches.get(id) === controller) {
+          if (pendingVersion !== null && pendingVersion === find(id)?.version) {
+            pendingVersion = undefined
+            continue
+          }
+          pendingVersion = undefined
+          await reconcile()
+        }
+      } finally {
+        draining = false
+      }
+    }
     void (async () => {
       try {
         for await (const frame of remote.workspaceFiles.changes(sessionId, path, controller.signal)) {
-          const document = find(id)
-          if (document === undefined || frame.kind !== 'change') continue
-          if ('absent' in frame.change || frame.change.version === document.version) continue
-          if (!document.dirty || document.content.kind !== 'text') {
-            await load(id, controller.signal)
-            continue
-          }
-          // A dirty buffer keeps its edits; flag the change unless the disk now holds what this editor saved.
-          const current = await remote.workspaceFiles.readBytes(sessionId, path, {}, controller.signal)
-          if (current.ok && (await sha256(current.value.data)) === find(id)?.sha256) patch(id, { version: current.value.version })
-          else patch(id, { diskChanged: true })
+          if (frame.kind !== 'change' || 'absent' in frame.change || find(id) === undefined) continue
+          pendingVersion = frame.change.version
+          void drain().catch(() => undefined)
         }
       } catch {
         // Watching is best effort: a file outside the workspace has no change feed.
@@ -253,6 +286,7 @@ export const createEditorStore = (options: {
         diskChanged: false,
         reveal,
       }
+      loadGeneration.set(id, generationOf(id) + 1)
       set({ documents: [...state.documents, document], activeBySession })
       void load(id).then(() => {
         if (find(id)?.status === 'ready') watch(id, sessionId, path)
@@ -262,6 +296,7 @@ export const createEditorStore = (options: {
     close: (id: string): void => {
       watches.get(id)?.abort()
       watches.delete(id)
+      loadGeneration.set(id, generationOf(id) + 1)
       const closing = find(id)
       releaseContent(closing)
       const documents = state.documents.filter(document => document.id !== id)
