@@ -865,6 +865,33 @@
       ]
     },
     {
+      "id": "client-reload-banner",
+      "title": "Offer a page reload when the running client bundles are behind",
+      "summary": "The sidebar foot reports the client bundle revisions the page runs against the Host's served graph; a page that missed a rebuild, reconnected to another release or lacks a newly added entry gets a Reload to apply updates banner naming the plugins a reload would load, with the button that does it.",
+      "surfaces": ["client", "host"],
+      "configuration": [],
+      "states": ["current", "stale-rebuild", "other-release", "added-entry"],
+      "failureModes": [
+        "A page that already hot-reloaded a rebuild reports the served revision and stays out of the banner.",
+        "A Host without the client module registry reports nothing instead of failing the query.",
+        "The banner leaves the restart banner's own list untouched."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.client-reload-banner-unit-stale-entries",
+          "file": "plugins/@dshfiles/thread-sidebar/src/plugin-updates.test.ts",
+          "testName": "a page reloads for the client bundles it runs at another revision, and for entries it never loaded"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "thread-sidebar.client-reload-banner-needs-external-rebuild",
+          "reason": "The banner only shows while the page runs an older bundle than the Host serves, and a browser journey can only reach that by rebuilding a client bundle while the page's hot-reload channel is down; the harness's in-process seeds keep that channel healthy, so the page applies the rebuild instead. Verified by unit tests plus a scripted scratch run with the channel blocked: the banner listed the rebuilt plugin and its reload button reloaded the page."
+        }
+      ]
+    },
+    {
       "id": "palette-search-history",
       "title": "Search threads, files, and recent navigation",
       "summary": "Search threads and files with frecency and keyboard chords, retain bounded recent results, and navigate backward or forward through history.",

@@ -1,6 +1,7 @@
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type { SessionReference } from '@deepseek-ai/dsh-api-session-controller/client'
 import type {} from '@deepseek-ai/dsh-client-resources/client'
+import type {} from '@deepseek-ai/dsh-client-modules/client'
 import type {} from '@dshfiles/input-trigger/client'
 import type { InputActions } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
@@ -125,6 +126,7 @@ export default defineClient({
     'remote.sessionReferenceResolver',
     'remote.skills',
     'inputTriggers',
+    'modules',
   ],
   // Every registered component reads Settings, so each one goes through decorate.
   setup(ctx, decorate) {
@@ -181,6 +183,11 @@ export default defineClient({
       ]
       return () => unsubscribe.forEach(stop => stop())
     }
+
+    // The revision each client bundle this page runs reports, compared against the Host's served graph to tell a
+    // page that missed a rebuild from one that hot-reloaded it: the rows advance as reloads are applied.
+    const readClientRevisionKey = (): string => JSON.stringify((ctx.modules.manifest.modules ?? []).map(row => [row.id, row.rev] as const))
+    const subscribeClientRevisions = (listener: () => void): (() => void) => ctx.modules.entries.state.subscribe(listener)
 
     // The native browser stays registered beneath ours; its injected share holds the
     // store that Host `session.search` (⌥⌘K web, ⌘K desktop) bumps, so follow it.
@@ -477,6 +484,8 @@ export default defineClient({
         {...props}
         readFooterSnapshot={readFooterSnapshot}
         subscribeFooterSnapshot={subscribeFooterSnapshot}
+        readClientRevisionKey={readClientRevisionKey}
+        subscribeClientRevisions={subscribeClientRevisions}
         openSession={openThread}
         runCommand={runCommand}
       />

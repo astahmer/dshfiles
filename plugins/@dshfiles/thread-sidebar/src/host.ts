@@ -15,7 +15,7 @@ import { threadSidebarMachineApi } from './machine-api.js'
 import { threadSidebarPendingQuestionsApi } from './pending-questions-api.js'
 import { threadSidebarPluginUpdatesApi } from './plugin-updates-api.js'
 import { threadSidebarRecoveryApi } from './recovery-api.js'
-import { createPluginUpdateWatch } from './plugin-updates.js'
+import { createPluginUpdateWatch, staleClientEntries, type ClientEntryRevision } from './plugin-updates.js'
 import { threadSidebarRestartApi } from './restart-api.js'
 import { threadSidebarSessionArchiveApi } from './session-archive-api.js'
 import { InflightTurns } from './inflight-turns.js'
@@ -112,7 +112,7 @@ const recoveryApi = threadSidebarRecoveryApi.host({
 
 const execFileAsync = promisify(execFile)
 
-const graphIdsSchema = z.object({ entries: z.array(z.object({ id: z.string() })) })
+const graphIdsSchema = z.object({ entries: z.array(z.object({ id: z.string(), rev: z.string().optional() })) })
 
 /** The Finder computer name ("MacBook Pro de Alexandre") on macOS; elsewhere the short hostname. */
 const readMachineName = async (): Promise<string> => {
@@ -132,8 +132,11 @@ const machineApi = threadSidebarMachineApi.host({
 })
 
 let pluginUpdates: ReturnType<typeof createPluginUpdateWatch> | undefined
+/** The client bundles the Host currently serves, read from the composition every page boots from. */
+let servedClientRevisions: (() => readonly ClientEntryRevision[]) | undefined
 const pluginUpdatesApi = threadSidebarPluginUpdatesApi.host({
   pending: async () => ({ plugins: (await pluginUpdates?.pending()) ?? [] }),
+  clientUpdates: async ({ input }) => staleClientEntries({ page: input.revisions, served: servedClientRevisions?.() ?? [] }),
 })
 
 /**
@@ -155,7 +158,7 @@ const pendingQuestionsApi = threadSidebarPendingQuestionsApi.host({
 
 // The slice of `@deepseek-ai/dsh-client-modules`' ClientModuleRegistry this plugin reads; older Hosts lack members.
 interface ClientModuleRegistrySurface {
-  readonly graph?: () => { readonly entries: ReadonlyArray<{ readonly id: string }> }
+  readonly graph?: () => { readonly entries: ReadonlyArray<{ readonly id: string; readonly rev?: string | undefined }> }
   readonly clientPath?: (id: string) => string | undefined
   readonly onGraphChanged?: (listener: () => void) => () => void
 }
@@ -222,21 +225,22 @@ export default defineHost({
     ctx.inject(['clientModules'], scoped => {
       const registry: ClientModuleRegistrySurface | undefined = scoped.get('clientModules')
       if (registry?.graph === undefined || registry.clientPath === undefined) return
+      const entries = (): readonly { readonly id: string; readonly rev?: string | undefined }[] =>
+        graphIdsSchema.catch({ entries: [] }).parse(registry.graph?.()).entries
+      const served = (): readonly ClientEntryRevision[] => entries().flatMap(entry => (entry.rev === undefined ? [] : [{ id: entry.id, rev: entry.rev }]))
       const watch = createPluginUpdateWatch({
-        ids: () =>
-          graphIdsSchema
-            .catch({ entries: [] })
-            .parse(registry.graph?.())
-            .entries.map(entry => entry.id),
+        ids: () => entries().map(entry => entry.id),
         clientPath: id => registry.clientPath?.(id),
       })
       watch.remember()
       scoped.effect(() => {
         pluginUpdates = watch
+        servedClientRevisions = served
         const stopWatching = registry.onGraphChanged?.(() => watch.remember())
         return () => {
           stopWatching?.()
           if (pluginUpdates === watch) pluginUpdates = undefined
+          if (servedClientRevisions === served) servedClientRevisions = undefined
         }
       }, 'thread-sidebar: plugin update watch')
     })

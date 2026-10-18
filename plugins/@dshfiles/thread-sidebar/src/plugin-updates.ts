@@ -68,3 +68,35 @@ export const createPluginUpdateWatch = (registry: PluginRegistry) => {
     },
   }
 }
+
+/** One client bundle revision: the entry id and the artifact revision a page runs for it. */
+export interface ClientEntryRevision {
+  readonly id: string
+  readonly rev: string
+}
+
+/**
+ * Which client bundles a page must reload for: the ones it runs at another revision than the Host serves, plus
+ * entries the Host serves that the page never loaded. A page that picked a rebuild up over hot reload reports the
+ * current revision and drops off this list, so the answer names only what a reload would actually change.
+ */
+export const staleClientEntries = ({
+  page,
+  served,
+}: {
+  readonly page: readonly ClientEntryRevision[]
+  readonly served: readonly ClientEntryRevision[]
+}): { readonly stale: string[]; readonly added: string[] } => {
+  const loaded = new Map(page.map(entry => [entry.id, entry.rev]))
+  const current = new Map(served.map(entry => [entry.id, entry.rev]))
+  return {
+    stale: page
+      .filter(entry => current.get(entry.id) !== undefined && current.get(entry.id) !== entry.rev)
+      .map(entry => entry.id)
+      .sort(),
+    added: served
+      .filter(entry => !loaded.has(entry.id))
+      .map(entry => entry.id)
+      .sort(),
+  }
+}

@@ -38,6 +38,7 @@ import {
   RefreshCwIcon,
   LinkIcon,
   CheckIcon,
+  RotateCwIcon,
   SlidersHorizontalIcon,
   TextCursorInputIcon,
 } from '@dshfiles/plugin-ui/icons'
@@ -50,6 +51,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
@@ -91,6 +93,9 @@ export interface FooterSnapshot {
 interface SidebarShellExtras {
   readFooterSnapshot: () => FooterSnapshot
   subscribeFooterSnapshot: (listener: () => void) => () => void
+  /** Stable key of the client bundle revisions this page runs; drives the reload banner. */
+  readClientRevisionKey: () => string
+  subscribeClientRevisions: (listener: () => void) => () => void
   openSession: (sessionId: SessionSummary['id']) => void
   /** Runs a Host shortcut command by id; null when this Host cannot run commands outside a key press. */
   runCommand: ((commandId: string) => void) | null
@@ -160,6 +165,23 @@ const FOOTER_GAP = 8
 const FOOTER_MORE_WIDTH = 28
 
 const text = (translate: SidebarShellTranslate, key: Parameters<SidebarShellTranslate>[0]): string => translate(key)
+
+/** Body of the page-reload banner: which client bundles this page is behind on, and the one button that applies them. */
+const ReloadPendingContent = (props: { readonly plugins: readonly string[]; readonly reload: () => void; readonly t: SidebarShellTranslate }): JSX.Element => (
+  <>
+    <div className="dshx:flex dshx:flex-col dshx:gap-1">
+      <p className="dshx:text-sm dshx:font-medium">{text(props.t, 'threadSidebarReloadApplied')}</p>
+      <ul className="dshx:max-h-40 dshx:overflow-y-auto dshx:font-mono dshx:text-xs dshx:text-muted-foreground">
+        {props.plugins.map(plugin => (
+          <li key={plugin}>{plugin}</li>
+        ))}
+      </ul>
+    </div>
+    <Button type="button" size="sm" onClick={props.reload}>
+      {text(props.t, 'threadSidebarReload')}
+    </Button>
+  </>
+)
 
 const toggleHidden = (ids: readonly string[], id: string): string[] => (ids.includes(id) ? ids.filter(item => item !== id) : [...ids, id])
 
@@ -485,7 +507,20 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   const pendingPlugins = pluginUpdates.data?.plugins ?? []
   const pluginUpdatesSupported = pluginUpdates.status !== 'error'
   const refetchPluginUpdates = pluginUpdates.refetch
+  const clientRevisionKey = useSyncExternalStore(props.subscribeClientRevisions, props.readClientRevisionKey, props.readClientRevisionKey)
+  const clientRevisions = useMemo(
+    () => (JSON.parse(clientRevisionKey) as ReadonlyArray<readonly [string, string]>).map(([id, rev]) => ({ id, rev })),
+    [clientRevisionKey],
+  )
+  const clientUpdates = useApiQuery(threadSidebarPluginUpdatesApi, 'clientUpdates', {
+    enabled: pluginUpdatesSupported && clientRevisions.length > 0,
+    input: { revisions: clientRevisions },
+  })
+  // Entries the page never loaded count too: a plugin added after this page booted needs the reload as well.
+  const staleClientPlugins = useMemo(() => [...(clientUpdates.data?.stale ?? []), ...(clientUpdates.data?.added ?? [])], [clientUpdates.data])
+  const refetchClientUpdates = clientUpdates.refetch
   const [updatesPopoverOpen, setUpdatesPopoverOpen] = useState(false)
+  const [reloadPopoverOpen, setReloadPopoverOpen] = useState(false)
   const [launchUrlCopied, setLaunchUrlCopied] = useState(false)
   const [previewHeaderHeight, setPreviewHeaderHeight] = useState<number | null>(null)
   const [splitBounds, setSplitBounds] = useState<SidebarSplitBounds>({
@@ -635,7 +670,9 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   useEffect(() => {
     if (!pluginUpdatesSupported) return
     const check = (): void => {
-      if (!document.hidden) refetchPluginUpdates()
+      if (document.hidden) return
+      refetchPluginUpdates()
+      refetchClientUpdates()
     }
     const timer = window.setInterval(check, PLUGIN_UPDATE_CHECK_MS)
     window.addEventListener('focus', check)
@@ -645,7 +682,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
       window.removeEventListener('focus', check)
       document.removeEventListener('visibilitychange', check)
     }
-  }, [pluginUpdatesSupported, refetchPluginUpdates])
+  }, [pluginUpdatesSupported, refetchPluginUpdates, refetchClientUpdates])
 
   useEffect(() => {
     const sync = (): void => setFooterSnapshot(props.readFooterSnapshot())
@@ -896,6 +933,11 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
     pendingPlugins.length === 0
       ? null
       : `${text(props.t, 'threadSidebarUpdatesPending')} (${String(pendingPlugins.length)} ${text(props.t, pendingPlugins.length === 1 ? 'threadSidebarUpdatesPlugin' : 'threadSidebarUpdatesPlugins')})`
+  const reloadPendingLabel =
+    staleClientPlugins.length === 0
+      ? null
+      : `${text(props.t, 'threadSidebarReloadPending')} (${String(staleClientPlugins.length)} ${text(props.t, staleClientPlugins.length === 1 ? 'threadSidebarUpdatesPlugin' : 'threadSidebarUpdatesPlugins')})`
+  const applyPageReload = (): void => globalThis.location.reload()
   const runCommand = props.runCommand
   const paletteActions = useMemo<PaletteAction[]>(
     () => [
@@ -1561,6 +1603,28 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
               </Popover>
             )}
             {props.renderSlot('sidebar.footer.above', {})}
+            {reloadPendingLabel === null ? null : (
+              <Popover open={reloadPopoverOpen} onOpenChange={setReloadPopoverOpen}>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    className="dshx:flex dshx:h-7 dshx:w-full dshx:min-w-0 dshx:items-center dshx:gap-1.5 dshx:border-t dshx:px-3 dshx:text-left dshx:text-xs dshx:text-warning dshx:outline-none dshx:hover:bg-accent dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:focus-visible:ring-inset"
+                    aria-label={reloadPendingLabel}
+                  >
+                    <RotateCwIcon className="dshx:size-3.5 dshx:shrink-0" aria-hidden="true" />
+                    <span className="dshx:truncate">{reloadPendingLabel}</span>
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent
+                  side="top"
+                  align="start"
+                  className="dshx-root dshx:flex dshx:w-72 dshx:max-w-[calc(100vw-16px)] dshx:flex-col dshx:gap-3"
+                  aria-label={text(props.t, 'threadSidebarReloadPending')}
+                >
+                  <ReloadPendingContent plugins={staleClientPlugins} reload={applyPageReload} t={props.t} />
+                </PopoverContent>
+              </Popover>
+            )}
           </div>
         ) : null}
 
@@ -1610,6 +1674,23 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
             >
               <RefreshCwIcon className="dshx:size-4" aria-hidden="true" />
             </Button>
+          ) : null}
+          {props.collapsed && reloadPendingLabel !== null ? (
+            <Popover open={reloadPopoverOpen} onOpenChange={setReloadPopoverOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="ghost" size="icon-sm" className="dshx:shrink-0 dshx:text-warning" aria-label={reloadPendingLabel} title={reloadPendingLabel}>
+                  <RotateCwIcon className="dshx:size-4" aria-hidden="true" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent
+                side="right"
+                align="start"
+                className="dshx-root dshx:flex dshx:w-72 dshx:max-w-[calc(100vw-16px)] dshx:flex-col dshx:gap-3"
+                aria-label={text(props.t, 'threadSidebarReloadPending')}
+              >
+                <ReloadPendingContent plugins={staleClientPlugins} reload={applyPageReload} t={props.t} />
+              </PopoverContent>
+            </Popover>
           ) : null}
           {launchUrl === null ? null : (
             <Button

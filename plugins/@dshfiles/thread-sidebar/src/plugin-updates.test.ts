@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'vitest'
-import { createPluginUpdateWatch } from './plugin-updates.js'
+import { createPluginUpdateWatch, staleClientEntries } from './plugin-updates.js'
 
 const writePackage = async (root: string, name: string): Promise<string> => {
   const directory = join(root, name)
@@ -37,4 +37,27 @@ test('only Host code or manifest changes since boot need a restart, not client r
   } finally {
     await rm(root, { recursive: true, force: true })
   }
+})
+
+test('a page reloads for the client bundles it runs at another revision, and for entries it never loaded', () => {
+  const page = [
+    { id: '@x/unchanged', rev: 'a1' },
+    { id: '@x/rebuilt', rev: 'b1' },
+    { id: '@x/removed', rev: 'c1' },
+  ]
+  const served = [
+    { id: '@x/unchanged', rev: 'a1' },
+    { id: '@x/rebuilt', rev: 'b2' },
+    { id: '@x/added', rev: 'd1' },
+  ]
+  assert.deepEqual(staleClientEntries({ page, served }), { stale: ['@x/rebuilt'], added: ['@x/added'] })
+})
+
+test('a page that already applied a rebuild over hot reload stays out of the reload banner', () => {
+  const served = [{ id: '@x/rebuilt', rev: 'b2' }]
+  assert.deepEqual(staleClientEntries({ page: served, served }), { stale: [], added: [] })
+})
+
+test('an empty page revision list reports every served entry as an addition', () => {
+  assert.deepEqual(staleClientEntries({ page: [], served: [{ id: '@x/one', rev: 'a1' }] }), { stale: [], added: ['@x/one'] })
 })
