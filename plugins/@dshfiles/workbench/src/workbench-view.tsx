@@ -61,6 +61,9 @@ export const WorkbenchView = (props: WorkbenchViewProps): JSX.Element => {
 
   const onReady = (event: DockviewReadyEvent): void => {
     WorkbenchLayout.restoreLayout(event.api, store, registry.list(), props.surface === 'dock')
+    // Dockview only reports layout changes for later gestures, so without this a freshly applied default layout would
+    // stay unsaved until the first drag: a reload would rebuild it from the default instead of restoring what it was.
+    store.set(event.api.toJSON())
     setApi(event.api)
     props.onApi?.(event.api)
   }
