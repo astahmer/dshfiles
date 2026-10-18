@@ -17,6 +17,8 @@ export type RightPanelMode = 'native' | 'dock'
 export interface RightPanelSeat {
   /** Hand the column to the global dock, or back to the native per-session surface. */
   readonly setMode: (mode: RightPanelMode) => void
+  /** The surface the column shows now, so a caller can toggle without tracking the setting itself. */
+  readonly mode: () => RightPanelMode
 }
 
 declare module '@deepseek-ai/cordis' {

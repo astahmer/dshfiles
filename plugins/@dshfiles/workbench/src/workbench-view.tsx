@@ -20,6 +20,14 @@ interface WorkbenchViewProps {
   readonly surface?: 'main' | 'side-panel' | 'dock'
   /** Header text; defaults to the workbench title. */
   readonly heading?: string
+  /**
+   * Per-surface actions in the view's header, given the live API and the open
+   * panel ids, so a surface can offer the moves it owns.
+   */
+  readonly headerActions?: (context: {
+    readonly api: DockviewApi | null
+    readonly openIds: readonly string[]
+  }) => JSX.Element | null
 }
 
 const usePanelDefinitions = (registry: WorkbenchPanelRegistry) => useSyncExternalStore(registry.subscribe, registry.list, registry.list)
@@ -90,6 +98,7 @@ export const WorkbenchView = (props: WorkbenchViewProps): JSX.Element => {
       <header className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-2 dshx:border-b dshx:border-border dshx:px-3 dshx:py-1.5">
         <h2 className="dshx:text-sm dshx:font-medium">{props.heading ?? t('title')}</h2>
         <div className="dshx:flex dshx:items-center dshx:gap-1">
+          {props.headerActions?.({ api, openIds })}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button size="sm" variant="ghost" disabled={api === null}>

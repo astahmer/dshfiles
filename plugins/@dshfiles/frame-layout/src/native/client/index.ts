@@ -170,6 +170,7 @@ export function apply(ctx: ClientContext): void {
     // the dock's own state.
     const rightPanel: RightPanelSeat = {
       setMode: mode => instance.actions.setMode(mode),
+      mode: () => instance.getSnapshot().layoutInfo.rightPanelMode,
     }
     const panelInfo: HostObservable<PanelInfo> = {
       getSnapshot: () => instance.getSnapshot().panelInfo,

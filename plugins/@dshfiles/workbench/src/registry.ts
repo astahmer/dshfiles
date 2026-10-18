@@ -18,6 +18,13 @@ export interface WorkbenchPanelDefinition {
    * saved layout always wins over this.
    */
   readonly dockDefault?: boolean
+  /**
+   * The `main` panel key the same feature registers, when it has one. A panel
+   * that names it can move between the dock and the full main view: the
+   * workbench selects that key to move it out, and offers the panel here to move
+   * it back in.
+   */
+  readonly mainPanelId?: string
 }
 
 export interface WorkbenchPanelRegistry {
