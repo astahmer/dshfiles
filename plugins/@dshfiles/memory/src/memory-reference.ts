@@ -51,6 +51,8 @@ export const memoryReferencePreviewRequestSchema = z
   .object({
     id: referenceId,
     range: eventSequence.optional(),
+    /** The decorated element the card follows: it re-measures this anchor instead of closing when the page scrolls. */
+    anchorId: z.number().int().positive(),
     anchor: z
       .object({
         left: coordinate,

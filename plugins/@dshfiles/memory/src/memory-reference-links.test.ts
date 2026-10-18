@@ -28,15 +28,18 @@ describe('memory reference links', () => {
 
   it('asks for a preview when one of those links is clicked', () => {
     document.body.innerHTML = '<div data-conversation-session="s"><p>Memory: t:9356abc7.</p></div>'
-    const requests: unknown[] = []
-    const onRequest = (event: Event): void => void requests.push((event as CustomEvent).detail)
+    const requests: { readonly id: string; readonly anchorId: number }[] = []
+    const onRequest = (event: Event): void => void requests.push((event as CustomEvent<{ id: string; anchorId: number }>).detail)
     window.addEventListener(memoryReferencePreviewEvent, onRequest)
     const stop = installMemoryReferenceLinks()
 
     document.querySelector('[data-dshfiles-memory-reference]')?.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 }))
 
     expect(requests).toHaveLength(1)
-    expect(requests[0]).toMatchObject({ id: 't:9356abc7' })
+    expect(requests[0]?.id).toBe('t:9356abc7')
+    // The request carries the anchor the card re-measures when the page scrolls.
+    expect(requests[0]?.anchorId).toBeGreaterThan(0)
+    expect(document.querySelector(`[data-dshfiles-memory-preview-anchor="${String(requests[0]?.anchorId)}"]`)).not.toBeNull()
     window.removeEventListener(memoryReferencePreviewEvent, onRequest)
     stop()
   })

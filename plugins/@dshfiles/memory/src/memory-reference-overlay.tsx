@@ -5,6 +5,7 @@ import { Popover, PopoverAnchor, PopoverContent, PopoverHeader, PopoverTitle } f
 import { errorMessage, useQuery } from '@dshfiles/plugin-ui/query'
 import { useEffect, useState } from 'react'
 
+import { MemoryAnchorModel } from './memory-anchor.ts'
 import { memoryApi } from './api.ts'
 import { memoryReferencePreviewEvent, memoryReferencePreviewRequestSchema, type MemoryReferencePreviewRequest } from './memory-reference.ts'
 
@@ -16,6 +17,7 @@ export const MemoryReferenceOverlay = (props: {
 }): JSX.Element | null => {
   const api = useApi(memoryApi)
   const [request, setRequest] = useState<MemoryReferencePreviewRequest | null>(null)
+  const [anchor, setAnchor] = useState<MemoryReferencePreviewRequest['anchor'] | null>(null)
   const preview = useQuery({
     queryKey: ['dshfiles-memory', 'reference-preview', request?.id, request?.range],
     enabled: request !== null,
@@ -31,22 +33,33 @@ export const MemoryReferenceOverlay = (props: {
     const open = (event: Event): void => {
       if (!(event instanceof CustomEvent)) return
       const parsed = memoryReferencePreviewRequestSchema.safeParse(event.detail)
-      if (parsed.success) setRequest(parsed.data)
+      if (!parsed.success) return
+      setAnchor(parsed.data.anchor)
+      setRequest(parsed.data)
     }
-    const closeOnScroll = (event: Event): void => {
-      if (event.target instanceof Element && event.target.closest('[data-dshfiles-memory-preview]') !== null) return
-      setRequest(null)
-    }
-    const close = (): void => setRequest(null)
     window.addEventListener(memoryReferencePreviewEvent, open)
-    window.addEventListener('scroll', closeOnScroll, true)
-    window.addEventListener('resize', close)
-    return () => {
-      window.removeEventListener(memoryReferencePreviewEvent, open)
-      window.removeEventListener('scroll', closeOnScroll, true)
-      window.removeEventListener('resize', close)
-    }
+    return () => window.removeEventListener(memoryReferencePreviewEvent, open)
   }, [])
+
+  // A landing message scrolls the conversation; the card follows the reference instead of disappearing under it.
+  useEffect(() => {
+    if (request === null) return
+    const remeasure = (): void => {
+      const measurement = MemoryAnchorModel.measure(request.anchorId, window.innerHeight)
+      if (measurement.kind === 'gone') return
+      if (measurement.kind === 'offscreen') {
+        setRequest(null)
+        return
+      }
+      setAnchor(measurement.rect)
+    }
+    window.addEventListener('scroll', remeasure, true)
+    window.addEventListener('resize', remeasure)
+    return () => {
+      window.removeEventListener('scroll', remeasure, true)
+      window.removeEventListener('resize', remeasure)
+    }
+  }, [request])
 
   if (request === null) return null
   return (
@@ -57,10 +70,10 @@ export const MemoryReferenceOverlay = (props: {
           style={{
             position: 'fixed',
             display: 'block',
-            left: request.anchor.left,
-            top: request.anchor.top,
-            width: Math.max(1, request.anchor.width),
-            height: Math.max(1, request.anchor.height),
+            left: (anchor ?? request.anchor).left,
+            top: (anchor ?? request.anchor).top,
+            width: Math.max(1, (anchor ?? request.anchor).width),
+            height: Math.max(1, (anchor ?? request.anchor).height),
             pointerEvents: 'none',
           }}
         />

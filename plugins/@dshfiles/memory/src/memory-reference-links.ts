@@ -1,3 +1,4 @@
+import { MemoryAnchorModel } from './memory-anchor.ts'
 import { memoryReferenceMatches, memoryReferencePreviewEvent, memoryReferencePreviewRequestSchema, type MemoryReferenceMatch } from './memory-reference.ts'
 
 const memoryReferenceSelector = '[data-dshfiles-memory-reference]'
@@ -64,9 +65,10 @@ const markMemoryReferences = (): void => {
 const previewAt = (element: Element): boolean => {
   const id = element.getAttribute('data-dshfiles-memory-reference')
   const range = element.getAttribute('data-dshfiles-memory-range')
+  const anchorId = MemoryAnchorModel.idOf(element)
   const rect = element.getBoundingClientRect()
   const anchor = { left: rect.left, top: rect.top, width: rect.width, height: rect.height }
-  const candidate = range === null ? { id, anchor } : { id, range, anchor }
+  const candidate = range === null ? { id, anchorId, anchor } : { id, range, anchorId, anchor }
   const parsed = memoryReferencePreviewRequestSchema.safeParse(candidate)
   if (!parsed.success) return false
   window.dispatchEvent(new CustomEvent(memoryReferencePreviewEvent, { detail: parsed.data }))
