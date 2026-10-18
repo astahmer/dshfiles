@@ -73,7 +73,7 @@ The compiler's one-client-chunk protocol and already-shared runtime/styles const
 
 ## C19 implementation receipt
 
-Implemented in `qkqlussz` (revision `e219da8c`, 2026-10-18) on base `fe8d8e24`; rebased onto `7759631763c6` with tests re-run afterwards.
+Implemented in revision `qkqlussz` on 2026-10-18, rebased onto the then-current main with tests re-run afterwards.
 
 1. **Reproduced first:** [shim-lifecycle.test.ts](../../../plugins/@dshfiles/shared-streams/src/shim-lifecycle.test.ts) executes the generated page and worker script strings inside a `node:vm` sandbox with stub `EventSource`, `SharedWorker`, `EventTarget`, `Event`, `MessageEvent`, `URL`, `console` and controllable timers. Against the pre-fix script, 4 of 5 behaviours failed: the fallback native socket stayed open, no `disconnect` reached the worker, closing one of two same-URL proxies unsubscribed the whole port, and a repeated `close()` sent a second unsubscribe.
 2. **Fixed** in [shim.ts](../../../plugins/@dshfiles/shared-streams/src/shim.ts): the proxy owns its native fallback; fallback disconnects the worker once before native attachment; a URL group publishes the union of its instances' event types and unsubscribes only on the group's last close; `close()` is idempotent and drops the empty group.
@@ -81,13 +81,32 @@ Implemented in `qkqlussz` (revision `e219da8c`, 2026-10-18) on base `fe8d8e24`; 
 4. **Scratch runtime:** `dshx dev up --name c19-5c0266 --plugin @dshfiles/shared-streams --skip-build` booted on `127.0.0.1:61391`; `dev doctor` reported 167 active entries, the bundle loaded, URL authenticated and no Host error lines. A CDP probe then loaded the real launch URL and a second tab: both reported `__dshSharedEventSource === true` and `EventSource.name === 'SharedEventSource'`, the app root rendered, and there were zero console/page errors. [Screenshot](c19-shared-streams.png), [summary](c19-shared-streams.json). `dev down` stopped both owned processes and left nothing running.
 5. **Still unmeasured:** multi-tab socket count and pending HTTP requests under real streaming load, and whether the fallback path ever fires in a normal browser. The catalog's multi-tab journey remains `not-applicable` on purpose.
 
+## T01 implementation receipt
+
+Implemented in revision `xlmxnrtl` on 2026-10-18, based on main `6ee7a86a`.
+
+1. **Compiler:** `CompilerKernel.dependencyManifestPlugin` writes `<entry>.deps.json` (`{ version: 1, face, sources }`, package-relative module paths) for the client bundle and the primary Host bundle. Generation builds skip it, because they publish a hashed chunk behind a wrapper and the planner reads `index.js.deps.json`.
+2. **Planner:** [rebuild.ts](../../../tooling/dshx/packages/dshx/src/checkout/rebuild.ts) reads the manifest first and falls back to the source map for artifacts built before this change; bundle sources are resolved lazily, so a plan with nothing to match never opens either file. `comparesSources` and the `memoizedSources` thunks are what make the no-change case free.
+3. **Focused checks:** 67/67 in `tests/checkout-sync.spec.ts` + `tests/client-build.spec.ts`, including three new cases — an unparseable map that is never opened when nothing changed, a manifest that wins over a corrupt map, and a fixture build asserting `src/client.tsx`/`src/helper.ts` are recorded. `check:diff` clean. Full `dshx` suite: 689 passed, 1 unrelated pre-existing failure (see below).
+4. **Probe:** [checkout-plan-probe.mjs](checkout-plan-probe.mjs) with [raw samples](checkout-plan-results.json), run against this workspace's built planner and two targets.
+
+| Case | Before (audit baseline) | After |
+|---|---|---|
+| No changed files (shared checkout, maps only) | 74 maps / 53,913,303 bytes, 171.09 ms warm median | **0 maps / 0 bytes**, 6–16 ms warm |
+| One changed source (shared checkout, maps only) | 74 maps / 53.9 MB | **2 maps / 4,099,100 bytes** (that package's own bundles), 20–114 ms |
+| One changed source (manifest-backed package) | n/a | **1 manifest / 1,414 bytes**, 0 maps |
+| Changed dshx runtime file | 74 maps / 53.9 MB | **1 manifest / 1,414 bytes** |
+
+Selection is byte-identical in the unit suite, `dshx dev up` still boots from existing artifacts, and the timing spread above is why the counts, not the milliseconds, are the primary evidence.
+
 ## Baseline failures on main (not caused by optimization work)
 
 Verify these against the revision you start from before attributing a red check to your own change:
 
-- `pnpm lint` fails with `antislop(require-safety-comment-for-type-assertion): 338 findings, cap 336`. The two changed `shared-streams` files contribute **0** of those findings, so the drift predates this work. Never raise the cap; fix the sites or leave main red as found.
+- `pnpm lint` fails with `antislop(require-safety-comment-for-type-assertion): 338 findings, cap 336`. The changed `shared-streams` files contribute **0** of those findings, so the drift predates this work. Never raise the cap; fix the sites or leave main red as found.
 - `pnpm --dir tooling/dshx run features:check` reports 8 issues in `jj-integration`, `pulls-review` and `thread-sidebar` (renamed/removed test references and one missing Gherkin tag). `shared-streams` reports none.
 - `pnpm --dir tooling/dshx run browser-tasks:check` reports drift in about a dozen `turbo.json` files that this change never touches.
+- `pnpm --dir tooling/dshx/packages/dshx exec vitest run` ends with one unrelated failure in `tests/compat.spec.ts` ("publishes a peer range accepted by package managers for every verified prerelease"): `satisfies` rejects a verified prerelease against `PROTOCOL_2_COMPATIBILITY.dshRange`. Neither optimization revision touches `src/compat`.
 
 ## Validation boundaries
 

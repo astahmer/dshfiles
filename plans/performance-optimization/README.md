@@ -31,10 +31,10 @@ Make expensive owned work proportional to changed, visible, requested data; boun
 | Static client/Host/tooling audit | Complete | Execute linked work packages only after their gates |
 | Bounded algorithm/planner measurements | Complete | Raw samples and repeatable probes in evidence |
 | Small scratch browser smoke | Complete with explicit composition limitation | Activity/Communication clean; Jujutsu owner omission recorded |
-| Comprehensive optimization implementation | In progress: C19 fixed and verified | C01/C06/C07/C10 or T01 next; M01 still required before latency claims |
+| Comprehensive optimization implementation | In progress: C19 and T01 fixed and verified | C01/C06/C07/C10 next; M01 still required before latency claims |
 | Full representative before/after acceptance | Not started | Required before claiming optimized behavior |
 
-**Resume here:** C19 is implemented and verified ([revision `e219da8c`](client.md#c19-correct-shared-stream-fallback-lifetime-and-refcounts-p1), receipt in [evidence](evidence/README.md#c19-implementation-receipt)). Next: run M01 on a fresh complete supported scratch composition (proving the synthetic stream first), then take C01, C06, C07 and C10 in that order, and T01 independently. Re-run the two pre-existing baseline failures noted in the evidence file before attributing any red check to new work.
+**Resume here:** C19 (`qkqlussz`) and T01 (`xlmxnrtl`) are implemented and verified; both receipts are in [evidence](evidence/README.md). Next: run M01 on a fresh complete supported scratch composition (proving the synthetic stream first), then take C01, C06, C07 and C10 in that order. Re-run the pre-existing baseline failures noted in the evidence file before attributing any red check to new work.
 
 ## Why
 
@@ -230,7 +230,7 @@ Every checkbox in the three registers is pending implementation. This table is o
 | H20 | Editor file-index lifecycle and relist batching (explicit C08/C09 cross-reference) | P2 | [Host](host.md#h20-editor-file-index-lifecycle-and-relist-batching-cross-reference-only) |
 | H21 | Avoid rehashing every plugin Host bundle on every update check | P1 | [Host](host.md#h21-avoid-rehashing-every-plugin-host-bundle-on-every-update-check-p1) |
 | H22 | Hydrate thread titles only for emitted unfiltered rows | P2 | [Host](host.md#h22-hydrate-thread-titles-only-for-emitted-unfiltered-rows-p2) |
-| T01 | Read compact build dependencies, not complete source maps (measured) | P1 | [tooling](tooling.md#t01-read-compact-build-dependencies-not-complete-source-maps-p1-measured) |
+| T01 | Read compact build dependencies, not complete source maps (measured) | P1 | [tooling](tooling.md#t01-read-compact-build-dependencies-not-complete-source-maps-p1-measured-done) |
 | T02 | Share compiler source analysis within a build generation | P2 | [tooling](tooling.md#t02-share-compiler-source-analysis-within-a-build-generation-p2) |
 | T03 | Reuse trustworthy TypeScript work without bypassing validation | P2 | [tooling](tooling.md#t03-reuse-trustworthy-typescript-work-without-bypassing-standalone-validation-p2) |
 | T04 | Scope browser-check prerequisites and digests to selected owners | P1/P2 | [tooling](tooling.md#t04-scope-browser-check-prerequisites-and-artifact-digests-to-selected-owners-p1p2) |

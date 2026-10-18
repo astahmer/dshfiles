@@ -1,5 +1,5 @@
 {
-  "recordedAt": "2026-10-18T12:44:53.213Z",
+  "recordedAt": "2026-10-18T12:47:23.969Z",
   "kind": "checkout-planner-probe-suite",
   "note": "Implementation is this workspace build; the shared checkout holds older artifacts that predate the dependency manifest, so it exercises the source-map fallback.",
   "baselineFromAudit": {
@@ -16,7 +16,7 @@
       "changedFiles": [],
       "samples": [
         {
-          "elapsedMs": 23.51,
+          "elapsedMs": 52.56,
           "mapReads": 0,
           "mapBytes": 0,
           "manifestReads": 0,
@@ -24,7 +24,7 @@
           "selectedPlugins": 0
         },
         {
-          "elapsedMs": 5.87,
+          "elapsedMs": 9.09,
           "mapReads": 0,
           "mapBytes": 0,
           "manifestReads": 0,
@@ -32,7 +32,7 @@
           "selectedPlugins": 0
         },
         {
-          "elapsedMs": 9.13,
+          "elapsedMs": 16.19,
           "mapReads": 0,
           "mapBytes": 0,
           "manifestReads": 0,
@@ -40,7 +40,7 @@
           "selectedPlugins": 0
         },
         {
-          "elapsedMs": 6.86,
+          "elapsedMs": 6.37,
           "mapReads": 0,
           "mapBytes": 0,
           "manifestReads": 0,
@@ -60,7 +60,7 @@
       ],
       "samples": [
         {
-          "elapsedMs": 43.79,
+          "elapsedMs": 58.58,
           "mapReads": 2,
           "mapBytes": 4099100,
           "manifestReads": 0,
@@ -68,7 +68,7 @@
           "selectedPlugins": 1
         },
         {
-          "elapsedMs": 24.49,
+          "elapsedMs": 53.02,
           "mapReads": 2,
           "mapBytes": 4099100,
           "manifestReads": 0,
@@ -76,7 +76,7 @@
           "selectedPlugins": 1
         },
         {
-          "elapsedMs": 20.92,
+          "elapsedMs": 113.87,
           "mapReads": 2,
           "mapBytes": 4099100,
           "manifestReads": 0,
@@ -84,7 +84,7 @@
           "selectedPlugins": 1
         },
         {
-          "elapsedMs": 26.87,
+          "elapsedMs": 35.55,
           "mapReads": 2,
           "mapBytes": 4099100,
           "manifestReads": 0,
@@ -106,7 +106,7 @@
       ],
       "samples": [
         {
-          "elapsedMs": 30.71,
+          "elapsedMs": 67.51,
           "mapReads": 0,
           "mapBytes": 0,
           "manifestReads": 1,
@@ -114,7 +114,7 @@
           "selectedPlugins": 44
         },
         {
-          "elapsedMs": 9.61,
+          "elapsedMs": 24.59,
           "mapReads": 0,
           "mapBytes": 0,
           "manifestReads": 1,
@@ -122,7 +122,7 @@
           "selectedPlugins": 44
         },
         {
-          "elapsedMs": 9.36,
+          "elapsedMs": 18.08,
           "mapReads": 0,
           "mapBytes": 0,
           "manifestReads": 1,
@@ -130,7 +130,7 @@
           "selectedPlugins": 44
         },
         {
-          "elapsedMs": 7.35,
+          "elapsedMs": 6.5,
           "mapReads": 0,
           "mapBytes": 0,
           "manifestReads": 1,
@@ -195,7 +195,7 @@
       ],
       "samples": [
         {
-          "elapsedMs": 17.83,
+          "elapsedMs": 37.48,
           "mapReads": 0,
           "mapBytes": 0,
           "manifestReads": 1,
@@ -203,7 +203,7 @@
           "selectedPlugins": 44
         },
         {
-          "elapsedMs": 8.09,
+          "elapsedMs": 14.87,
           "mapReads": 0,
           "mapBytes": 0,
           "manifestReads": 1,
@@ -211,7 +211,7 @@
           "selectedPlugins": 44
         },
         {
-          "elapsedMs": 6.28,
+          "elapsedMs": 9.65,
           "mapReads": 0,
           "mapBytes": 0,
           "manifestReads": 1,
@@ -219,7 +219,7 @@
           "selectedPlugins": 44
         },
         {
-          "elapsedMs": 5.99,
+          "elapsedMs": 9.38,
           "mapReads": 0,
           "mapBytes": 0,
           "manifestReads": 1,

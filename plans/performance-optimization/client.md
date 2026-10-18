@@ -162,7 +162,7 @@ The [earlier ADE baseline](../ade-performance/README.md#measurement-rules-and-ca
 
 ### C19 — Correct shared-stream fallback lifetime and refcounts · P1
 
-- [x] **Implemented and verified** in `qkqlussz` (revision `e219da8c`), 2026-10-18. Live fallback occurrence on a normal page remains unmeasured; the defect itself was reproduced first.
+- [x] **Implemented and verified** in revision `qkqlussz`, 2026-10-18. Live fallback occurrence on a normal page remains unmeasured; the defect itself was reproduced first.
 - **Sources / behavior:** [Fallback, subscription and close:111–117,152–186,200–209](../../plugins/@dshfiles/shared-streams/src/shim.ts#L111-L209). Fallback created a native EventSource in a local variable; proxy close could not close it. After fallback, `post` no-oped, so existing worker subscriptions did not receive disconnect. Same-URL proxy instances shared a page group, but each replaced the port's subscription types and each close unsubscribed the entire port/URL despite surviving siblings.
 - **Reproduction first:** the four page-half behaviours failed against the current script before the fix (`shim-lifecycle.test.ts` executes the generated page and worker strings in a `node:vm` sandbox with stub `EventSource`/`SharedWorker`/`EventTarget`). The worker-half socket test passed unchanged.
 - **Implement:** 1. Retain the native source and bridge/listener disposers on each proxy; attach once and close deterministically. 2. Disconnect worker subscriptions when falling back before enabling native ownership. 3. Publish the union of group event types and unsubscribe only the final member; remove empty groups and obsolete listeners.
