@@ -44,6 +44,11 @@ const openThreadRow = async (row: Locator): Promise<void> => {
     .first()
     .click({ position: { x: 24, y: 16 } })
 }
+// The same strip covers the row's centre for a context-menu click, which targets the row itself rather than its
+// trigger, so the menu is opened from the left half a reader would use too.
+const openThreadRowMenu = async (row: Locator): Promise<void> => {
+  await row.click({ button: 'right', position: { x: 24, y: 16 } })
+}
 
 const startBlankThread = async (page: Page): Promise<string> => {
   const createResponsePromise = page.waitForResponse(
@@ -106,7 +111,7 @@ When('a nonblank Host thread is archived and immediately undone', async ({ page,
   await expect(targetRow.getByRole('button', { name: 'Archive', exact: true })).toBeEnabled()
   const scrollPane = threadSidebar(page).getByTestId('thread-sidebar-scroll')
   const scrollPaneTopBeforeArchive = await scrollPane.evaluate(element => element.getBoundingClientRect().top)
-  await targetRow.click({ button: 'right' })
+  await openThreadRowMenu(targetRow)
   await page.getByRole('menuitem', { name: 'Archive', exact: true }).click()
   const transientNotice = threadSidebar(page).getByTestId('thread-sidebar-transient-notice')
   let screenshotClip: { x: number; y: number; width: number; height: number } | undefined
@@ -213,7 +218,7 @@ When('archive undo settings are changed and threads are archived', async ({ page
   await composer.press('Enter')
   const timedRow = threadSidebar(page).locator('article').filter({ hasText: timedPrompt })
   await expect(timedRow.getByRole('button', { name: 'Archive', exact: true })).toBeEnabled()
-  await timedRow.click({ button: 'right' })
+  await openThreadRowMenu(timedRow)
   await page.getByRole('menuitem', { name: 'Archive', exact: true }).click()
   const archivedNotice = threadSidebar(page).getByText('Thread archived.', { exact: true })
   await expect(archivedNotice).toBeVisible()
@@ -230,7 +235,7 @@ When('archive undo settings are changed and threads are archived', async ({ page
   await page.getByRole('textbox').first().press('Enter')
   const disabledRow = threadSidebar(page).locator('article').filter({ hasText: disabledPrompt })
   await expect(disabledRow.getByRole('button', { name: 'Archive', exact: true })).toBeEnabled()
-  await disabledRow.click({ button: 'right' })
+  await openThreadRowMenu(disabledRow)
   await page.getByRole('menuitem', { name: 'Archive', exact: true }).click()
   await expect(threadSidebar(page).getByRole('button', { name: 'Archived (2)', exact: true })).toBeVisible()
   await expect(threadSidebar(page).getByText('Thread archived.', { exact: true })).toHaveCount(0)
@@ -253,11 +258,11 @@ When('an archived thread is opened from the Archived section', async ({ page }: 
   if (archivedThreadId === null) throw new Error('The Host did not keep the selected thread after its first message.')
   const targetRow = threadRow(page, archivedThreadId)
   await expect(targetRow.getByRole('button', { name: 'Archive', exact: true })).toBeEnabled()
-  await targetRow.click({ button: 'right' })
+  await openThreadRowMenu(targetRow)
   await page.getByRole('menuitem', { name: 'Archive', exact: true }).click()
 
   await threadSidebar(page).getByRole('button', { name: 'Archived (1)', exact: true }).click()
-  await targetRow.click()
+  await openThreadRow(targetRow)
   const restoreButton = threadSidebar(page).getByTestId('thread-sidebar-transient-notice').getByRole('button', { name: 'Restore and open', exact: true })
   await expect(restoreButton).toBeVisible({ timeout: 15_000 })
   archivedOpenJourneys.set(page, archivedThreadId)
@@ -275,7 +280,7 @@ Then('the archived-open notice dismisses and returns on the next attempt', async
     await expect(transientNotice).toHaveCount(0)
   })
   await recordAssertion(page, 'thread-sidebar-archived-open-notice-returns', async () => {
-    await targetRow.click()
+    await openThreadRow(targetRow)
     await expect(restoreButton).toBeVisible({ timeout: 15_000 })
   })
   await finishJourneyAssertions(page)
@@ -293,7 +298,7 @@ When('a nonblank Host thread is parked from its context menu', async ({ page }: 
   parkedThreadId = threadId
   const targetRow = threadRow(page, threadId)
   await expect(targetRow).toHaveCount(1)
-  await targetRow.click({ button: 'right' })
+  await openThreadRowMenu(targetRow)
   await page.getByRole('menuitem', { name: 'Park', exact: true }).click()
   await expect(threadSidebar(page).getByRole('button', { name: 'Active (0)', exact: true })).toBeVisible()
   await expect(threadSidebar(page).getByRole('button', { name: 'Parked (1)', exact: true })).toBeVisible()
@@ -477,7 +482,7 @@ When('a Host thread is archived and the view is grouped and filtered', async ({ 
   await expect(threadSidebar(page).getByText('No threads are working right now.', { exact: true })).toBeVisible()
   await selectThreadViewValue(page, 'Filter: Working', 'All threads')
   await expect(targetRow).toBeVisible()
-  await targetRow.click({ button: 'right' })
+  await openThreadRowMenu(targetRow)
   const archiveItem = page.getByRole('menuitem', { name: 'Archive', exact: true })
   await expect(archiveItem).toBeEnabled()
   await archiveItem.click()
@@ -561,7 +566,7 @@ When('one thread is marked unread and another thread is opened', async ({ page }
 
   await openThreadRow(targetRow)
   await expect.poll(() => currentThreadId(page)).toBe(targetThreadId)
-  await targetRow.click({ button: 'right' })
+  await openThreadRowMenu(targetRow)
   await page.getByRole('menuitem', { name: 'Mark unread', exact: true }).click()
   await expect(targetRow.getByRole('img', { name: 'Unread', exact: true })).toBeVisible()
 
@@ -649,7 +654,7 @@ When('auto-archive is enabled for one thread while global auto-archive stays off
   await openSidebarSettings(page)
   await expect(sidebarSettings(page).getByRole('checkbox', { name: 'Auto-archive inactive threads' })).not.toBeChecked()
   await threadSidebar(page).getByRole('button', { name: 'Sidebar settings', exact: true }).click()
-  await targetRow.click({ button: 'right' })
+  await openThreadRowMenu(targetRow)
   await page.getByRole('menuitem', { name: 'Auto-settle behavior', exact: true }).click()
   const enableForThread = page.getByRole('menuitemradio', { name: 'Auto-archive after idle threshold', exact: true })
   await enableForThread.click()
@@ -666,7 +671,7 @@ Then('the per-thread override survives reload without changing the global settin
     await expect(sidebarSettings(page).getByRole('checkbox', { name: 'Auto-archive inactive threads' })).not.toBeChecked()
   })
   await threadSidebar(page).getByRole('button', { name: 'Sidebar settings', exact: true }).click()
-  await targetRow.click({ button: 'right' })
+  await openThreadRowMenu(targetRow)
   await page.getByRole('menuitem', { name: 'Auto-settle behavior', exact: true }).click()
   await recordAssertion(page, 'thread-sidebar-per-thread-auto-archive-survives-reload', async () => {
     await expect(page.getByRole('menuitemradio', { name: 'Auto-archive after idle threshold', exact: true })).toHaveAttribute('aria-checked', 'true')
@@ -912,7 +917,7 @@ When('a visible Host thread is mentioned from its context menu at the captured c
       diagnostics.push(JSON.stringify(values))
     })
   })
-  await targetRow.click({ button: 'right' })
+  await openThreadRowMenu(targetRow)
   const mentionMenuItem = page.getByRole('menuitem', { name: '@Mention thread', exact: true })
   await expect(mentionMenuItem).toBeVisible()
   await mentionMenuItem.click()
@@ -998,7 +1003,7 @@ When('a nonblank Host thread is opened in the side panel from its context menu',
   asideThreadId = threadId
   const targetRow = threadRow(page, threadId)
   await expect(targetRow).toHaveCount(1)
-  await targetRow.click({ button: 'right' })
+  await openThreadRowMenu(targetRow)
   await page.getByRole('menuitem', { name: 'Open in side panel', exact: true }).click()
 })
 
@@ -1091,7 +1096,7 @@ Then('the thread row keeps the context-menu action but drops the hover one', asy
     await expect(row.getByRole('button', { name: 'Open in side panel', exact: true })).toHaveCount(0)
   })
   await recordAssertion(page, 'thread-sidebar-aside-context-menu-action-stays', async () => {
-    await row.click({ button: 'right' })
+    await openThreadRowMenu(row)
     await expect(page.getByRole('menuitem', { name: 'Open in side panel', exact: true })).toBeVisible()
     await page.keyboard.press('Escape')
   })
@@ -1120,7 +1125,7 @@ When('another thread references a visible Host thread from its composer', async 
   const referencingThreadId = await startBlankThread(page)
   expect(referencingThreadId).not.toBe(targetThreadId)
 
-  await threadRow(page, targetThreadId).click({ button: 'right' })
+  await openThreadRowMenu(threadRow(page, targetThreadId))
   const mentionMenuItem = page.getByRole('menuitem', { name: '@Mention thread', exact: true })
   await expect(mentionMenuItem).toBeVisible()
   await mentionMenuItem.click()
@@ -1137,7 +1142,7 @@ Then('both menus list the referencing thread under Referenced by', async ({ page
   if (journey === undefined) throw new Error('No thread reference journey was recorded for this browser page.')
 
   await recordAssertion(page, 'thread-sidebar-row-menu-lists-the-referencing-thread', async () => {
-    await threadRow(page, journey.targetThreadId).click({ button: 'right' })
+    await openThreadRowMenu(threadRow(page, journey.targetThreadId))
     const trigger = page.getByRole('menuitem', { name: 'Referenced by', exact: true })
     await expect(trigger).toBeVisible()
     await trigger.hover()
@@ -1149,7 +1154,7 @@ Then('both menus list the referencing thread under Referenced by', async ({ page
   })
   await recordAssertion(page, 'thread-sidebar-header-menu-lists-the-referencing-thread', async () => {
     // The row's hover toolbar overlays its right half, so the title area is clicked by position, not by centre.
-    await threadRow(page, journey.targetThreadId).click({ position: { x: 24, y: 12 } })
+    await openThreadRow(threadRow(page, journey.targetThreadId))
     await expect.poll(() => currentThreadId(page)).toBe(journey.targetThreadId)
     const threadActions = page.getByRole('group', { name: 'Thread actions', exact: true })
     await threadActions.getByRole('button', { name: 'More thread actions', exact: true }).click()
