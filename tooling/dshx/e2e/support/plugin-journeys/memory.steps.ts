@@ -29,7 +29,11 @@ When('the Memory panel is opened', async ({ page }: { page: Page }) => {
 })
 
 When('a fresh thread cites memory {string}', async ({ page }: { page: Page }, id: string) => {
-  await page.getByRole('button', { name: /^New (thread|session)$/i }).filter({ visible: true }).first().click()
+  await page
+    .getByRole('button', { name: /^New (thread|session)$/i })
+    .filter({ visible: true })
+    .first()
+    .click()
   const composer = page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })
   await expect(composer).toBeVisible()
   await composer.fill(`memory: ${id}`)
@@ -41,8 +45,13 @@ Then('the inline memory preview shows {string}', async ({ page }: { page: Page }
   await recordAssertion(page, 'memory-reference-inline-preview', async () => {
     const reference = page.locator('[data-dshfiles-memory-reference="n:1"]')
     await expect(reference).toBeVisible()
-    await reference.click()
-    await expect(page.getByRole('dialog')).toContainText(text)
+    const preview = page.locator('[data-dshfiles-memory-preview]')
+    // A scroll closes the card by design, and the conversation can still settle right after the turn lands, so ask
+    // again rather than reading a card the page itself just took away.
+    await expect(async () => {
+      if ((await preview.count()) === 0) await reference.click()
+      await expect(preview).toContainText(text, { timeout: 1_500 })
+    }).toPass({ timeout: 30_000 })
   })
   await finishJourneyAssertions(page)
 })
