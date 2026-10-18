@@ -35,7 +35,12 @@ const engineConfigSchema = z.object({
 })
 export type SessionSearchEngineConfig = z.input<typeof engineConfigSchema>
 
-const cursorPayloadSchema = z.object({ version: z.literal(1), scope: z.enum(['sessions', 'events']), fingerprint: z.string(), offset: z.number().int().nonnegative() })
+const cursorPayloadSchema = z.object({
+  version: z.literal(1),
+  scope: z.enum(['sessions', 'events']),
+  fingerprint: z.string(),
+  offset: z.number().int().nonnegative(),
+})
 
 type CursorFingerprint =
   | { readonly scope: 'sessions'; readonly query: string; readonly limit: number; readonly sessionIds?: readonly string[] }
@@ -85,7 +90,12 @@ export class SessionSearchEngine extends SessionQueryEngine {
     // An id filter that matches nothing must answer empty, never fall back to the whole corpus.
     if (sessionIds !== undefined && sessionIds.length === 0) return { items: [] }
     const page = await this._client.searchSessions(
-      withoutUndefined({ query, limit, cursor: offset === 0 ? undefined : offset, sessionIds: sessionIds === undefined || sessionIds.length === 0 ? undefined : sessionIds }),
+      withoutUndefined({
+        query,
+        limit,
+        cursor: offset === 0 ? undefined : offset,
+        sessionIds: sessionIds === undefined || sessionIds.length === 0 ? undefined : sessionIds,
+      }),
     )
     exec?.signal?.throwIfAborted()
     return withoutUndefined({

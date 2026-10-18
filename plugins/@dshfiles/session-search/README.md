@@ -30,13 +30,13 @@ Bench: `pnpm bench:owned` (gated on `OWNED_BENCH=1`; it copies a byte-bounded su
 also knows into a temporary root, so the live corpus is only read). Runs on 2026-10-18 with the machine already at load
 20-40 from other work:
 
-| Signal | Owned backend | Stock backend (same corpus, same day) |
-|---|---|---|
-| Host event-loop gaps over 250 ms while indexing | **0** (worst gap 171-240 ms) | 24 gaps, worst 290 000 ms |
-| Worst external ping round trip | 249-395 ms | 290 490 ms |
-| Content search during the build | p50 5-34 ms, p95 25-148 ms | 43 500 ms on a warm index |
-| Ingest cost in isolation | 8.7 s for a 49.5 MB log (23 853 documents, ~2 700 docs/s) | — |
-| Stock recall (match-level, sampled stock hits asked back by session id) | **1.0** (15/15, 15/15, 15/15, 3/3) | 1.0 by definition |
+| Signal                                                                  | Owned backend                                             | Stock backend (same corpus, same day) |
+| ----------------------------------------------------------------------- | --------------------------------------------------------- | ------------------------------------- |
+| Host event-loop gaps over 250 ms while indexing                         | **0** (worst gap 171-240 ms)                              | 24 gaps, worst 290 000 ms             |
+| Worst external ping round trip                                          | 249-395 ms                                                | 290 490 ms                            |
+| Content search during the build                                         | p50 5-34 ms, p95 25-148 ms                                | 43 500 ms on a warm index             |
+| Ingest cost in isolation                                                | 8.7 s for a 49.5 MB log (23 853 documents, ~2 700 docs/s) | —                                     |
+| Stock recall (match-level, sampled stock hits asked back by session id) | **1.0** (15/15, 15/15, 15/15, 3/3)                        | 1.0 by definition                     |
 
 The ingest time above is measured with the machine otherwise idle-ish; under the load 20-40 of that day a first build
 takes minutes of wall clock in the worker, which is exactly the point: it is background work the Host never waits on.

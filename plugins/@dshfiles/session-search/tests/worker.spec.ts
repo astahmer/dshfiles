@@ -48,7 +48,10 @@ const waitForIndex = async (expected: number): Promise<void> => {
   for (;;) {
     const health = await client?.health()
     if (health !== undefined && health.sessions >= expected) return
-    if (Date.now() > deadline) throw new Error(`the worker indexed ${String(health?.sessions ?? 0)} of ${String(expected)} sessions in time (${String(health?.lastError ?? 'no error')})`)
+    if (Date.now() > deadline)
+      throw new Error(
+        `the worker indexed ${String(health?.sessions ?? 0)} of ${String(expected)} sessions in time (${String(health?.lastError ?? 'no error')})`,
+      )
     await new Promise(resolve => setTimeout(resolve, 50))
   }
 }
@@ -122,7 +125,10 @@ describe('owned search backend over the real worker', () => {
       data: { id: 'msg-9', role: 'user', content: [{ type: 'text', text: 'the afterthought marker' }], source: { kind: 'user' } },
     })
     await client?.nudge()
-    await waitFor(async () => (await context.sessionQuery.searchSessions({ query: 'afterthought', limit: 5 })).items.length > 0, 'the appended frame to be indexed')
+    await waitFor(
+      async () => (await context.sessionQuery.searchSessions({ query: 'afterthought', limit: 5 })).items.length > 0,
+      'the appended frame to be indexed',
+    )
   })
 
   it('restricts a search to the requested session ids', async () => {

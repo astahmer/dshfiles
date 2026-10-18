@@ -115,7 +115,12 @@ export const runIngestPass = async (options: IngestPassOptions): Promise<IngestP
   for (const log of logs) {
     const cursor = options.index.cursor(log.sessionId)
     const unchanged =
-      cursor !== undefined && cursor.dev === log.dev && cursor.ino === log.ino && cursor.size === log.size && cursor.mtimeNs === log.mtimeNs && cursor.offset >= log.size
+      cursor !== undefined &&
+      cursor.dev === log.dev &&
+      cursor.ino === log.ino &&
+      cursor.size === log.size &&
+      cursor.mtimeNs === log.mtimeNs &&
+      cursor.offset >= log.size
     if (unchanged) continue
     behindSessions += 1
     behindBytes += Math.max(0, log.size - (cursor?.offset ?? 0))

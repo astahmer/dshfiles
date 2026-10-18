@@ -105,7 +105,12 @@ const startProbe = async (socketPath: string) => {
 const stockIndexedSessions = (): ReadonlySet<string> => {
   const database = new DatabaseSync(stockIndex, { readOnly: true })
   try {
-    return new Set(database.prepare('SELECT id FROM persisted_sessions').all().map(row => sessionIdRowSchema.parse(row).id))
+    return new Set(
+      database
+        .prepare('SELECT id FROM persisted_sessions')
+        .all()
+        .map(row => sessionIdRowSchema.parse(row).id),
+    )
   } catch {
     return new Set()
   } finally {
@@ -117,7 +122,13 @@ const stockIndexedSessions = (): ReadonlySet<string> => {
  * Copy (never hardlink: the live Host keeps appending) a byte-bounded subset of the newest logs the stock index already
  * knows, so both backends have content for the same sessions and the ingest converges on frozen bytes.
  */
-const prepareSubset = async ({ target, known }: { readonly target: string; readonly known: ReadonlySet<string> }): Promise<{ readonly sessions: number; readonly bytes: number; readonly sessionIds: ReadonlySet<string> }> => {
+const prepareSubset = async ({
+  target,
+  known,
+}: {
+  readonly target: string
+  readonly known: ReadonlySet<string>
+}): Promise<{ readonly sessions: number; readonly bytes: number; readonly sessionIds: ReadonlySet<string> }> => {
   await rm(target, { recursive: true, force: true })
   const logs = await FrameLog.list(corpusRoot)
   const newest = [...logs]
@@ -204,7 +215,10 @@ describe.skipIf(process.env.OWNED_BENCH !== '1')('owned search backend bench', (
         const searchStartedAt = Date.now()
         const page = await context.sessionQuery.searchSessions({ query, limit: 20 })
         latencies.push(Date.now() - searchStartedAt)
-        results.set(query, page.items.map(item => item.header.id))
+        results.set(
+          query,
+          page.items.map(item => item.header.id),
+        )
         // Poll gently: the worker is single-threaded, so a per-150ms search would compete with the ingest it is measuring.
         await sleep(1_000)
       }
@@ -232,12 +246,19 @@ describe.skipIf(process.env.OWNED_BENCH !== '1')('owned search backend bench', (
         : []
       const report = {
         measuredAt: new Date().toISOString(),
-        parityNote: parityComparable ? 'match-level recall over a sample of the stock hits' : 'the index was still filling, so parity is not comparable in this round',
+        parityNote: parityComparable
+          ? 'match-level recall over a sample of the stock hits'
+          : 'the index was still filling, so parity is not comparable in this round',
         corpus: { source: corpusRoot, subsetSessions: subset.sessions, subsetMB: Number((subset.bytes / 1048576).toFixed(1)) },
         loadAverage: loadavg(),
         ingest: { ms: ingestMs, sessions: health.sessions, documents: health.documents, indexBytes: health.indexBytes, behindSessions: health.behindSessions },
         hostStall: { ...hostStall, inProcessMaxGapMs: percentile(hostGaps, 1), inProcessGapsOverBudget: hostGaps.filter(gap => gap > STALL_BUDGET_MS).length },
-        search: { samples: latencies.length, p50Ms: percentile(latencies, 0.5), p95Ms: percentile(latencies, 0.95), maxMs: latencies.length === 0 ? 0 : Math.max(...latencies) },
+        search: {
+          samples: latencies.length,
+          p50Ms: percentile(latencies, 0.5),
+          p95Ms: percentile(latencies, 0.95),
+          maxMs: latencies.length === 0 ? 0 : Math.max(...latencies),
+        },
         parity,
       }
       console.log(JSON.stringify(report, null, 2))

@@ -110,7 +110,14 @@ export interface DocumentRow {
 
 export interface BatchInput {
   readonly header: SessionHeaderRow
-  readonly cursor: { readonly logPath: string; readonly dev: string; readonly ino: string; readonly offset: number; readonly size: number; readonly mtimeNs: string }
+  readonly cursor: {
+    readonly logPath: string
+    readonly dev: string
+    readonly ino: string
+    readonly offset: number
+    readonly size: number
+    readonly mtimeNs: string
+  }
   readonly documents: readonly DocumentRow[]
   readonly replace: boolean
   readonly now: number
@@ -128,7 +135,9 @@ export type EventSearchRows = SearchRows & {
 type SessionRow = z.infer<typeof sessionRowSchema>
 type RankedRow = z.infer<typeof rankedRowSchema>
 
-const headerOf = (row: Pick<SessionRow, 'id' | 'version' | 'created_at' | 'cwd' | 'parent_session' | 'seed_length' | 'delegation_depth' | 'agent_preset'>): SessionHeaderRow =>
+const headerOf = (
+  row: Pick<SessionRow, 'id' | 'version' | 'created_at' | 'cwd' | 'parent_session' | 'seed_length' | 'delegation_depth' | 'agent_preset'>,
+): SessionHeaderRow =>
   withoutUndefined(
     sessionHeaderSchema.parse({
       version: row.version,
@@ -156,9 +165,7 @@ export class SearchIndex {
   }
 
   cursor(sessionId: string): SessionCursor | undefined {
-    const value = this.#database
-      .prepare('SELECT id, log_path, log_dev, log_ino, log_offset, log_size, log_mtime_ns FROM sessions WHERE id = ?')
-      .get(sessionId)
+    const value = this.#database.prepare('SELECT id, log_path, log_dev, log_ino, log_offset, log_size, log_mtime_ns FROM sessions WHERE id = ?').get(sessionId)
     const parsed = cursorRowSchema.safeParse(value)
     if (!parsed.success) return undefined
     return {
@@ -182,8 +189,11 @@ export class SearchIndex {
         this.#database.prepare('DELETE FROM sessions WHERE id = ?').run(header.id)
       }
       if (documents.length > 0) {
-        const insert = this.#database.prepare('INSERT INTO session_documents (text, session_id, seq, type, time, surface, truncated) VALUES (?, ?, ?, ?, ?, ?, ?)')
-        for (const document of documents) insert.run(document.text, document.sessionId, document.seq, document.type, document.time, document.surface, document.truncated ? 1 : 0)
+        const insert = this.#database.prepare(
+          'INSERT INTO session_documents (text, session_id, seq, type, time, surface, truncated) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        )
+        for (const document of documents)
+          insert.run(document.text, document.sessionId, document.seq, document.type, document.time, document.surface, document.truncated ? 1 : 0)
       }
       const truncated = documents.reduce((total, document) => total + (document.truncated ? 1 : 0), 0)
       this.#database
@@ -257,7 +267,14 @@ export class SearchIndex {
   }
 
   searchEvents(request: SessionEventSearchRequest): EventSearchRows {
-    const rows = this.#rankedRows({ filters: [], bindings: [], limit: request.limit + 1, offset: request.cursor ?? 0, sessionId: request.sessionId, query: request.query })
+    const rows = this.#rankedRows({
+      filters: [],
+      bindings: [],
+      limit: request.limit + 1,
+      offset: request.cursor ?? 0,
+      sessionId: request.sessionId,
+      query: request.query,
+    })
     const first = rows[0]
     return {
       header: first === undefined ? this.sessionHeader(request.sessionId) : this.#match(first).header,
@@ -283,7 +300,13 @@ export class SearchIndex {
     readonly sessionId: string | undefined
   }): readonly RankedRow[] {
     const where = ['session_documents MATCH ?', ...(input.sessionId === undefined ? [] : ['d.session_id = ?']), ...input.filters].join(' AND ')
-    const bindings: (string | number)[] = [input.query, ...(input.sessionId === undefined ? [] : [input.sessionId]), ...input.bindings, input.limit, input.offset]
+    const bindings: (string | number)[] = [
+      input.query,
+      ...(input.sessionId === undefined ? [] : [input.sessionId]),
+      ...input.bindings,
+      input.limit,
+      input.offset,
+    ]
     const sql = `
       WITH matched AS (
         SELECT d.session_id AS session_id, d.seq AS seq, d.type AS type, d.time AS time, d.surface AS surface,
@@ -321,7 +344,13 @@ export class SearchIndex {
     }
   }
 
-  health(input: { readonly behindSessions: number; readonly behindBytes: number; readonly ingesting: boolean; readonly lastIngestMs: number; readonly lastError: string | null }): IndexHealth {
+  health(input: {
+    readonly behindSessions: number
+    readonly behindBytes: number
+    readonly ingesting: boolean
+    readonly lastIngestMs: number
+    readonly lastError: string | null
+  }): IndexHealth {
     const sessions = countRowSchema.parse(this.#database.prepare('SELECT count(*) AS count FROM sessions').get()).count
     const documents = countRowSchema.parse(this.#database.prepare('SELECT count(*) AS count FROM session_documents').get()).count
     let indexBytes = 0

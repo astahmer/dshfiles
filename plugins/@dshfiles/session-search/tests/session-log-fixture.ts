@@ -33,7 +33,12 @@ export const writeSessionLog = async (input: {
     next('turn/start', { turn: index })
     next(
       'user/message',
-      { id: `msg-${String(index)}`, role: 'user', content: [{ type: 'text', text: `exchange ${String(index)} about the retry storm` }], source: { kind: 'user' } },
+      {
+        id: `msg-${String(index)}`,
+        role: 'user',
+        content: [{ type: 'text', text: `exchange ${String(index)} about the retry storm` }],
+        source: { kind: 'user' },
+      },
       'append',
     )
     next(
@@ -41,7 +46,12 @@ export const writeSessionLog = async (input: {
       {
         turn: index,
         step: 1,
-        message: { id: `answer-${String(index)}`, role: 'assistant', content: [{ type: 'text', text: `capped the retry storm in exchange ${String(index)}` }], source: { provider: 'fake', model: 'fake-model' } },
+        message: {
+          id: `answer-${String(index)}`,
+          role: 'assistant',
+          content: [{ type: 'text', text: `capped the retry storm in exchange ${String(index)}` }],
+          source: { provider: 'fake', model: 'fake-model' },
+        },
         stream: [],
       },
       'append',
@@ -65,7 +75,10 @@ export const writeSessionLog = async (input: {
 }
 
 /** Append one committed event as a new frame, the way the persistence writer appends a batch. */
-export const appendSessionLogEvent = async (path: string, event: { readonly type: string; readonly seq: number; readonly time: number; readonly data: JsonValue }): Promise<void> => {
+export const appendSessionLogEvent = async (
+  path: string,
+  event: { readonly type: string; readonly seq: number; readonly time: number; readonly data: JsonValue },
+): Promise<void> => {
   const frame = zstdCompressSync(Buffer.from(`${JSON.stringify(event)}\n`, 'utf8'), { params: { [constants.ZSTD_c_checksumFlag]: 1 } })
   await appendFile(path, frame)
 }

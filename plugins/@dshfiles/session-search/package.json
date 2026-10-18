@@ -3,6 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "description": "Owns the sessionQuery search backend: an off-thread FTS5 index fed incrementally from session logs, so a content search is a pure read that never blocks the Host event loop.",
+  "files": [
+    "dist",
+    "cordis.patch.yml",
+    "README.md"
+  ],
   "type": "module",
   "main": "./dist/index.js",
   "exports": {
@@ -14,23 +19,12 @@
       "default": "./dist/search-worker.js"
     }
   },
-  "files": [
-    "dist",
-    "cordis.patch.yml",
-    "README.md"
-  ],
-  "dsh": {
-    "bundle": {
-      "patch": "./cordis.patch.yml"
-    }
-  },
   "scripts": {
     "build": "dshx build",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test:boot": "node ../../../tooling/dshx/scripts/boot-check-web.mjs --plugin",
-    "test:e2e": "node ../../../tooling/dshx/scripts/run-e2e.mjs",
-    "bench:owned": "pnpm build && OWNED_BENCH=1 vitest run tests/owned-search.spec.ts"
+    "bench:owned": "pnpm build && OWNED_BENCH=1 vitest run tests/owned-search.spec.ts",
+    "test:boot": "node ../../../tooling/dshx/scripts/boot-check-web.mjs --plugin"
   },
   "dependencies": {
     "zod": "catalog:"
@@ -41,11 +35,11 @@
     "@deepseek-ai/dsh-home-paths": "catalog:",
     "@deepseek-ai/dsh-session": "catalog:",
     "@deepseek-ai/dsh-session-query": "catalog:",
+    "@deepseek-ai/dsh-tools": "catalog:",
     "@dshfiles/dshx": "workspace:*",
     "@types/node": "22.20.5",
     "typescript": "catalog:",
-    "vitest": "catalog:",
-    "@deepseek-ai/dsh-tools": "catalog:"
+    "vitest": "catalog:"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "~4.0.4",
@@ -54,5 +48,10 @@
     "@deepseek-ai/dsh-session": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-session-query": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-tools": ">=0.2.1-rc.2 <0.3.0-0"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
   }
 }

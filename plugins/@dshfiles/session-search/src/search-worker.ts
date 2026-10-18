@@ -12,7 +12,14 @@ import { runIngestPass } from './ingest.js'
 import type { JsonValue } from './protocol.js'
 import { workerRequestSchema, type IndexHealth, type WorkerReply } from './protocol.js'
 
-const workerConfigSchema = z.object({ indexPath: z.string().min(1), windowBytes: z.number().int().positive().default(16 * 1024 * 1024) })
+const workerConfigSchema = z.object({
+  indexPath: z.string().min(1),
+  windowBytes: z
+    .number()
+    .int()
+    .positive()
+    .default(16 * 1024 * 1024),
+})
 const config = workerConfigSchema.parse(workerData)
 
 const IDLE_SLEEP_MS = 5_000
@@ -29,7 +36,16 @@ interface WorkerState {
   behindBytes: number
 }
 
-const state: WorkerState = { index: undefined, root: undefined, ingesting: false, stopped: false, lastIngestMs: 0, lastError: null, behindSessions: 0, behindBytes: 0 }
+const state: WorkerState = {
+  index: undefined,
+  root: undefined,
+  ingesting: false,
+  stopped: false,
+  lastIngestMs: 0,
+  lastError: null,
+  behindSessions: 0,
+  behindBytes: 0,
+}
 
 const requireIndex = (): SearchIndex => {
   state.index ??= new SearchIndex(config.indexPath)
