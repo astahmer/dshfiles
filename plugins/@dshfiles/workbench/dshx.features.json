@@ -109,11 +109,10 @@
           "coveredBy": ["workbench.global-dock"]
         }
       ],
-      "states": ["native", "dock", "returned-to-native", "reloaded"],
+      "states": ["native", "dock", "rewired", "reloaded"],
       "failureModes": [
         "On a frame without the seat the registration is inert and the setting changes nothing.",
-        "A saved dock layout that Dockview rejects falls back to the dock's default panel.",
-        "While the on-screen Session has a native tab open, the column goes back to the native surface so the resource stays visible."
+        "A saved dock layout that Dockview rejects falls back to the dock's default panel."
       ],
       "externalDependencies": [
         {
@@ -139,12 +138,6 @@
           "id": "workbench.global-dock-unit-storage",
           "file": "plugins/@dshfiles/workbench/src/layout-store.test.ts",
           "testName": "keeps the global dock layout apart from the main-area and side-panel ones"
-        },
-        {
-          "kind": "unit-test",
-          "id": "workbench.global-dock-unit-native-fallback",
-          "file": "plugins/@dshfiles/workbench/src/right-panel-mode.test.ts",
-          "testName": "gives the column back to the native surface while the on-screen session has an open tab"
         }
       ]
     },

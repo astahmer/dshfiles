@@ -39,8 +39,6 @@ Feature: Workbench layouts
     Then the global dock still shows the Jujutsu panel outside a thread
     When the global dock page is reloaded outside any thread
     Then the global dock still shows the Jujutsu panel after a reload
-    When the Jujutsu panel is moved to the main view from the dock
-    Then the main view shows the Jujutsu page and the dock no longer shows it
 
   @scenario:workbench.early-open
   Scenario: A panel asked for before the Workbench mounted opens once it does

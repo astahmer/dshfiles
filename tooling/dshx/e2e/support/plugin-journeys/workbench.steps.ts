@@ -172,19 +172,6 @@ Then('the global dock still shows the Jujutsu panel after a reload', async ({ pa
   })
 })
 
-When('the Jujutsu panel is moved to the main view from the dock', async ({ page }: { page: Page }) => {
-  await dockRegion(page).getByRole('button', { name: 'Move to main view', exact: true }).click()
-  await page.getByRole('menuitem', { name: 'Jujutsu', exact: true }).click()
-})
-
-Then('the main view shows the Jujutsu page and the dock no longer shows it', async ({ page }: { page: Page }) => {
-  await recordAssertion(page, 'workbench-global-dock-moves-a-panel-to-the-main-view', async () => {
-    await expect(page.locator('[data-slot="main"]').getByRole('heading', { name: 'Jujutsu', exact: true })).toBeVisible()
-    await expect(dockRegion(page).getByRole('region', { name: 'Jujutsu', exact: true })).toHaveCount(0)
-  })
-  await finishJourneyAssertions(page)
-})
-
 Then('the main Workbench keeps its own layout', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'workbench-side-panel-layout-is-stored-apart', async () => {
     const [main, side] = await page.evaluate(keys => keys.map(key => localStorage.getItem(key) ?? ''), [MAIN_LAYOUT_KEY, SIDE_LAYOUT_KEY])

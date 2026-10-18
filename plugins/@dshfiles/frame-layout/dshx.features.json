@@ -3,6 +3,45 @@
   "kind": "bundle",
   "features": [
     {
+      "id": "right-column-seat",
+      "title": "Hand the right column to a global dock",
+      "summary": "The frame renders the native per-session right sidebar in its right column, or the global dock a plugin registered into the shell.dock seat and asked for through ctx.rightPanel. Swapping the surface keeps the column, its width, drag handle, collapse and fullscreen behaviour, while the occupant reports its own presentation.",
+      "reach": ["expect button \"New session\""],
+      "surfaces": ["client", "integration"],
+      "configuration": [],
+      "states": ["native", "dock"],
+      "failureModes": [
+        "A frame that offers no seat leaves ctx.rightPanel absent, so a dock plugin stays inert instead of failing.",
+        "The column keeps one owner at a time: taking it back restores the native surface."
+      ],
+      "externalDependencies": [
+        {
+          "id": "@deepseek-ai/dsh-client-ui-sidebar-right",
+          "boundary": "The native right sidebar is the column's default occupant; it reports its own presentation through ctx.layout.openRightbar and closeRightbar, exactly as the dock does.",
+          "deterministicFake": "The seat's store and mode action are exercised directly in src/right-panel.test.ts; the scratch journey swaps the surface in the browser."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "workbench.global-dock",
+          "featureFile": "tooling/dshx/e2e/features/workbench.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "frame-layout.right-column-seat-unit-mode",
+          "file": "plugins/@dshfiles/frame-layout/src/right-panel.test.ts",
+          "testName": "starts on the native surface and follows the reported mode"
+        },
+        {
+          "kind": "unit-test",
+          "id": "frame-layout.right-column-seat-unit-geometry",
+          "file": "plugins/@dshfiles/frame-layout/src/right-panel.test.ts",
+          "testName": "keeps the column geometry the occupant reported when the surface changes"
+        }
+      ]
+    },
+    {
       "id": "panel-width-persistence",
       "title": "Persist the frame's dragged panel widths",
       "summary": "The layout bundle keeps the dragged sidebar and right-panel widths in the browser, so a reload reopens the sidebar at its last open width and the right panel keeps its px preference while still booting hidden.",

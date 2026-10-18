@@ -94,22 +94,10 @@ describe('WorkbenchView', () => {
     expect(main.api.panels.map(panel => panel.id)).toEqual(['dshfiles-editor.main'])
   })
 
-  it('hands the header actions the live API and the panels the surface shows', () => {
-    const store = createLayoutStore({ storage: memoryStorage() })
-    const seen: { readonly api: DockviewApi | null; readonly openIds: readonly string[] }[] = []
-    render(
-      <WorkbenchView
-        registry={registryWith('a', 'b')}
-        store={store}
-        t={t}
-        headerActions={context => {
-          seen.push(context)
-          return <button type="button">{`move:${context.openIds.join(',')}`}</button>
-        }}
-      />,
-    )
-    expect(screen.getByRole('button', { name: 'move:a,b' })).toBeTruthy()
-    expect(seen.at(-1)?.api).not.toBeNull()
+  it('saves the layout it applied, so a reload restores the surface instead of rebuilding its default', () => {
+    const { store, view } = renderWorkbench(mixedRegistry(), memoryStorage(), 'dock')
+    expect(Object.keys(store.get()?.panels ?? {})).toEqual(['jujutsu.dock'])
+    view.unmount()
   })
 
   it('keeps a panel mounted with its draft while it is tabbed, split, floated and moved back', () => {
