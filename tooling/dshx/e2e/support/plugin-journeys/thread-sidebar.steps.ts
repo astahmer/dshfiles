@@ -742,6 +742,22 @@ Then('the selected attention color survives a browser reload', async ({ page }: 
   await recordAssertion(page, 'thread-sidebar-attention-color-survives-reload', async () => {
     await expect(sidebarSettings(page).getByRole('button', { name: 'Approval needed: Color Danger', exact: true })).toBeVisible()
   })
+  await recordAssertion(page, 'thread-sidebar-settings-panel-scrolls', async () => {
+    const region = sidebarSettings(page)
+    await expect(region).toHaveCSS('overflow-y', 'auto')
+    // The panel is taller than the sidebar it sits in, whose shell clips at `overflow: hidden`; only the
+    // panel's own scroll box can bring its last group into view.
+    const scrolled = await region.evaluate(element => {
+      element.scrollTop = element.scrollHeight
+      const lastGroup = [...element.querySelectorAll(':scope > fieldset')].at(-1)
+      if (!(lastGroup instanceof HTMLElement)) return null
+      const panel = element.getBoundingClientRect()
+      const group = lastGroup.getBoundingClientRect()
+      return { scrollTop: element.scrollTop, lastGroupInside: group.bottom <= panel.bottom + 1 && group.top >= panel.top - 1 }
+    })
+    expect(scrolled?.scrollTop ?? 0).toBeGreaterThan(0)
+    expect(scrolled?.lastGroupInside).toBe(true)
+  })
   await finishJourneyAssertions(page)
 })
 
