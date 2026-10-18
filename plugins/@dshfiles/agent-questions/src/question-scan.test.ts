@@ -1,5 +1,11 @@
 import { ToolCallId } from '@deepseek-ai/dsh-llm/brand'
-import { QuestionScan, type SessionQuestionFacts, type SessionQuestionFactsCache, type SessionQuestionTarget } from './question-scan.js'
+import {
+  QuestionScan,
+  type SessionQuestionFacts,
+  type SessionQuestionFactsCache,
+  type SessionQuestionLoad,
+  type SessionQuestionTarget,
+} from './question-scan.js'
 import { describe, expect, it } from 'vitest'
 
 const target = (sessionId: string, sessionLive = false): SessionQuestionTarget => ({
@@ -137,5 +143,84 @@ describe('session question scans', () => {
 
     expect(result.scanned).toBe(9)
     expect(peak).toBe(3)
+  })
+})
+
+describe('shared session question reads', () => {
+  it('shares one in-flight read among concurrent callers and keeps nothing afterwards', async () => {
+    const reads = QuestionScan.createReads()
+    let loads = 0
+    let release: (() => void) | undefined
+    const start = async (): Promise<SessionQuestionLoad> => {
+      loads += 1
+      await new Promise<void>(resolve => {
+        release = resolve
+      })
+      return { facts: factsFor('s1'), projectionUnavailable: false }
+    }
+    const callers = Array.from({ length: 20 }, () => reads.read({ key: 's1', start }))
+    expect(reads.inFlight).toBe(1)
+    expect(loads).toBe(1)
+
+    release?.()
+    const results = await Promise.all(callers)
+    expect(results.filter(result => result.facts !== undefined)).toHaveLength(20)
+    expect(reads.inFlight).toBe(0)
+
+    // Nothing is served from the settled read: the next caller starts a fresh one.
+    await reads.read({
+      key: 's1',
+      start: async () => {
+        loads += 1
+        return { projectionUnavailable: false }
+      },
+    })
+    expect(loads).toBe(2)
+  })
+
+  it('keeps a shared read alive for the callers that remain and cancels it with the last one', async () => {
+    const reads = QuestionScan.createReads()
+    const signals: AbortSignal[] = []
+    let release: (() => void) | undefined
+    const start = async (signal: AbortSignal): Promise<SessionQuestionLoad> =>
+      new Promise<SessionQuestionLoad>((resolve, reject) => {
+        signals.push(signal)
+        signal.addEventListener('abort', () => reject(new Error('read aborted')), { once: true })
+        release = () => resolve({ facts: factsFor('s1'), projectionUnavailable: false })
+      })
+
+    const first = new AbortController()
+    const second = new AbortController()
+    const firstRead = reads.read({ key: 's1', start, callerSignal: first.signal })
+    const secondRead = reads.read({ key: 's1', start, callerSignal: second.signal })
+    expect(signals).toHaveLength(1)
+
+    first.abort()
+    expect(signals[0]?.aborted).toBe(false)
+    release?.()
+    await expect(secondRead).resolves.toMatchObject({ projectionUnavailable: false })
+    await expect(firstRead).resolves.toMatchObject({ projectionUnavailable: false })
+
+    const solo = new AbortController()
+    const soloRead = reads.read({ key: 's2', start, callerSignal: solo.signal })
+    solo.abort()
+    expect(signals[1]?.aborted).toBe(true)
+    await expect(soloRead).rejects.toThrow('read aborted')
+    expect(reads.inFlight).toBe(0)
+  })
+
+  it('reads a different availability scope separately', async () => {
+    const reads = QuestionScan.createReads()
+    const loaded: string[] = []
+    const start = (key: string, sessionId: string) => async (): Promise<SessionQuestionLoad> => {
+      loaded.push(key)
+      return { facts: factsFor(sessionId), projectionUnavailable: false }
+    }
+    await Promise.all([
+      reads.read({ key: 's1:false:true:false', start: start('s1:false:true:false', 's1') }),
+      reads.read({ key: 's1:true:true:true', start: start('s1:true:true:true', 's1') }),
+    ])
+    expect(loaded).toEqual(['s1:false:true:false', 's1:true:true:true'])
+    expect(reads.inFlight).toBe(0)
   })
 })

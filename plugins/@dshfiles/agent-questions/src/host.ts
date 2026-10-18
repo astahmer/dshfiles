@@ -64,6 +64,7 @@ const QUESTION_SCAN_CONCURRENCY = 8
 const QUESTION_FACTS_CACHE_TTL_MS = 30_000
 const QUESTION_FACTS_CACHE_CAPACITY = 4_096
 const questionFactsCache = QuestionScan.createFactsCache({ capacity: QUESTION_FACTS_CACHE_CAPACITY, ttlMs: QUESTION_FACTS_CACHE_TTL_MS })
+const questionFactsReads = QuestionScan.createReads()
 
 const readNativeQuestionFacts = async (input: {
   readonly context: Context
@@ -375,8 +376,10 @@ const listThreadQuestionsTool = defineTool({
       })),
       concurrency: QUESTION_SCAN_CONCURRENCY,
       cache: questionFactsCache,
+      reads: questionFactsReads,
+      signal: execution.signal,
       now: observedAt,
-      load: target => readNativeQuestionFacts({ context, target, signal: execution.signal }),
+      load: (target, signal) => readNativeQuestionFacts({ context, target, signal: signal ?? execution.signal }),
     })
     const nativeQuestions = scan.reads.flatMap(read => {
       const facts = read.facts
