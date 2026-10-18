@@ -135,7 +135,7 @@ const listWorkspacePackages = async () => {
   return packages
 }
 
-const dependencyClosure = (names, packages) => {
+export const dependencyClosure = (names, packages) => {
   const seen = new Set()
   const visit = name => {
     const workspacePackage = packages.get(name)
@@ -178,11 +178,16 @@ export const runtimeDistDigest = async distRoot => {
   return hash.digest('hex')
 }
 
-/** Record a digest of every workspace package's runtime `dist`, the key the browser tasks read; run after building. */
-export const writeDistDigests = async () => {
+/**
+ * Record a digest of every workspace package's runtime `dist`, the key the browser tasks read; run after building.
+ * A scoped run passes the packages it just built, since a task only reads the digests of its own boot closure.
+ */
+export const writeDistDigests = async (input = {}) => {
   const packages = await listWorkspacePackages()
   await mkdir(resolve(workspaceRoot, distDigestDir), { recursive: true })
-  for (const { name, directory } of packages.values()) {
+  const selected =
+    input.names === undefined ? [...packages.values()] : input.names.flatMap(name => (packages.get(name) === undefined ? [] : [packages.get(name)]))
+  for (const { name, directory } of selected) {
     const digest = await runtimeDistDigest(resolve(workspaceRoot, directory, 'dist'))
     await writeFile(resolve(workspaceRoot, distDigestFile(name)), `${digest}\n`)
   }
@@ -269,6 +274,18 @@ export const planBrowserTasks = async () => {
     ...taskEnvironment,
   })
 
+  // The packages a scoped run must build and digest: a boot task reads the digests of its own boot closure, so
+  // neither may reach beyond the selection. A bundle's closure and its owner's closure are unioned, because an owner
+  // may boot several bundles while its boot task boots only itself.
+  const closures = new Map()
+  const addClosure = (name, seeds) => {
+    const next = dependencyClosure(seeds, packages)
+    const previous = closures.get(name)
+    closures.set(name, previous === undefined ? next : [...new Set([...previous, ...next])].sort())
+  }
+  for (const name of bundleNames) addClosure(name, [name, '@dshfiles/dshx'])
+  for (const owner of owners.values()) addClosure(owner.name, [...owner.booted, '@dshfiles/dshx'])
+
   const configs = new Map()
   const configFor = (name, directory) => configs.get(name) ?? configs.set(name, { directory, scripts: {}, tasks: {} }).get(name)
   for (const name of bundleNames) {
@@ -291,7 +308,30 @@ export const planBrowserTasks = async () => {
       config.tasks['test:e2e:smoke'] = e2eTask(owner)
     }
   }
-  return { owners, configs }
+  return { owners, configs, closures }
+}
+
+/**
+ * What one browser-check invocation actually needs: the Turbo task filters to run, and the packages to build and
+ * digest. A broad invocation (no names) keeps `undefined`, which means "every owned bundle".
+ */
+export const resolveBrowserSelection = async input => {
+  const { owners, closures } = await planBrowserTasks()
+  const packageFor = name => {
+    if (name.startsWith('@dshfiles/') || name === 'dshfiles-plugins') return name
+    const featureOwner = [...owners.values()].find(owner => owner.features.includes(name))
+    if (input.mode !== 'boot' && featureOwner !== undefined) return featureOwner.name
+    return `@dshfiles/${name}`
+  }
+  const filters = input.names.length === 0 ? ['--filter=./plugins', '--filter=./plugins/@dshfiles/*'] : input.names.map(name => `--filter=${packageFor(name)}`)
+  if (input.names.length === 0) return { filters, buildTargets: undefined }
+
+  const targets = new Set(['@dshfiles/dshx'])
+  for (const name of input.names) {
+    const selected = packageFor(name)
+    for (const dependency of closures.get(selected) ?? [selected]) targets.add(dependency)
+  }
+  return { filters, buildTargets: [...targets].sort() }
 }
 
 const renderTurboConfig = tasks => `${generatedNotice}\n${JSON.stringify({ $schema: 'https://turborepo.dev/schema.json', extends: ['//'], tasks }, null, 2)}\n`

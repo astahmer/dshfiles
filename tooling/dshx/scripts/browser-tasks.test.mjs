@@ -4,7 +4,15 @@ import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
-import { cucumberExpressionPattern, featureOwner, featureSteps, parseStepDefinitions, planBrowserTasks, runtimeDistDigest } from './browser-tasks.mjs'
+import {
+  cucumberExpressionPattern,
+  featureOwner,
+  featureSteps,
+  parseStepDefinitions,
+  planBrowserTasks,
+  resolveBrowserSelection,
+  runtimeDistDigest,
+} from './browser-tasks.mjs'
 
 const featuresDir = resolve(dirname(fileURLToPath(import.meta.url)), '../e2e/features')
 
@@ -82,4 +90,42 @@ test('a dist digest moves with the runtime JavaScript, never with source maps or
 
   await write('client.js', 'export const answer = 43\n//# sourceMappingURL=client.js.map\n')
   assert.notEqual(await runtimeDistDigest(dist), built)
+})
+
+test('a scoped browser run builds and digests only its own boot closure', async () => {
+  const scoped = await resolveBrowserSelection({ names: ['agent-communication'], mode: 'e2e' })
+  assert.deepEqual(scoped.filters, ['--filter=@dshfiles/agent-communication'])
+  assert.ok(scoped.buildTargets !== undefined)
+  assert.ok(scoped.buildTargets.includes('@dshfiles/agent-communication'))
+  assert.ok(scoped.buildTargets.includes('@dshfiles/dshx'))
+  assert.ok(!scoped.buildTargets.includes('@dshfiles/jujutsu'))
+  assert.ok(!scoped.buildTargets.includes('@dshfiles/ai-accounts'))
+  assert.ok(scoped.buildTargets.length < 20)
+})
+
+test('a feature file name resolves to the owner package, a boot run to the named bundle', async () => {
+  const byFeature = await resolveBrowserSelection({ names: ['thread-view-presets'], mode: 'e2e' })
+  assert.deepEqual(byFeature.filters, ['--filter=@dshfiles/thread-sidebar'])
+  assert.ok(byFeature.buildTargets.includes('@dshfiles/thread-sidebar'))
+
+  const boot = await resolveBrowserSelection({ names: ['agent-communication'], mode: 'boot' })
+  assert.deepEqual(boot.filters, ['--filter=@dshfiles/agent-communication'])
+  assert.ok(boot.buildTargets.includes('@dshfiles/dshx'))
+})
+
+test('a broad invocation keeps every owned bundle and no scoped target list', async () => {
+  const broad = await resolveBrowserSelection({ names: [], mode: 'e2e' })
+  assert.equal(broad.buildTargets, undefined)
+  assert.deepEqual(broad.filters, ['--filter=./plugins', '--filter=./plugins/@dshfiles/*'])
+})
+
+test('every owner closure stays scoped to the packages its own boot reads', async () => {
+  const { owners, closures } = await planBrowserTasks()
+  for (const owner of owners.values()) {
+    const closure = closures.get(owner.name)
+    assert.ok(closure !== undefined, `${owner.name} has no closure`)
+    // An owner that boots one bundle must not drag in every owned bundle, and every seeded bundling package stays in.
+    for (const booted of owner.booted) assert.ok(closure.includes(booted), `${owner.name} closure omits ${booted}`)
+    assert.ok(closure.includes('@dshfiles/dshx'))
+  }
 })

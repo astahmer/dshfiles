@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 
 /**
- * Cached browser checks: builds every bundle once, then runs the per-package Turbo tasks so a package whose built
- * bundles, journeys and harness did not change replays from the local Turbo cache. Journeys run one at a time; the
- * boot gate overlaps three checks off CI (`CHECK_BROWSER_CONCURRENCY` overrides either).
+ * Cached browser checks: builds the selected owners' boot closure once, then runs the per-package Turbo tasks so a
+ * package whose built bundles, journeys and harness did not change replays from the local Turbo cache. A named
+ * selection builds and digests only its own closure; a broad invocation (no names) still builds every owned bundle.
+ * Journeys run one at a time; the boot gate overlaps three checks off CI (`CHECK_BROWSER_CONCURRENCY` overrides
+ * either).
  *
  *   node scripts/check-browser.mjs e2e   [plugin|feature ...] [--force]   journeys      (pnpm check:e2e)
  *   node scripts/check-browser.mjs smoke [plugin|feature ...] [--force]   @smoke subset (pnpm check:e2e:smoke)
@@ -15,7 +17,7 @@
 import { spawn, spawnSync } from 'node:child_process'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { planBrowserTasks, writeDistDigests } from '../tooling/dshx/scripts/browser-tasks.mjs'
+import { resolveBrowserSelection, writeDistDigests } from '../tooling/dshx/scripts/browser-tasks.mjs'
 import { turboCacheDir } from './turbo-cache.mjs'
 
 const workspaceRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
@@ -40,14 +42,7 @@ if (force || forcedByEnv) {
 // and runs no journey, so three at a time measured ~2.7x faster on ten cores.
 const concurrency = process.env.CHECK_BROWSER_CONCURRENCY ?? (mode === 'boot' && process.env.CI === undefined ? '3' : '1')
 
-const { owners } = await planBrowserTasks()
-const packageFor = name => {
-  if (name.startsWith('@dshfiles/') || name === 'dshfiles-plugins') return name
-  const featureOwner = [...owners.values()].find(owner => owner.features.includes(name))
-  if (mode !== 'boot' && featureOwner !== undefined) return featureOwner.name
-  return `@dshfiles/${name}`
-}
-const filters = names.length === 0 ? ['--filter=./plugins', '--filter=./plugins/@dshfiles/*'] : names.map(name => `--filter=${packageFor(name)}`)
+const { filters, buildTargets } = await resolveBrowserSelection({ names, mode })
 
 const jj = spawnSync('jj', ['--version'], { encoding: 'utf8' })
 const toolVersions = jj.status === 0 ? jj.stdout.trim() : 'jj unavailable'
@@ -66,9 +61,12 @@ const turbo = (args, env = {}) =>
   })
 
 const startedAt = Date.now()
-const built = await turbo(['build', '--filter=./plugins/@dshfiles/*', '--filter=@dshfiles/dshx', '--output-logs=errors-only'])
+// A named selection builds only its own boot closure (Turbo still resolves shared dependencies through `^build`);
+// a broad invocation keeps building every owned bundle.
+const buildFilters = buildTargets === undefined ? ['--filter=./plugins/@dshfiles/*', '--filter=@dshfiles/dshx'] : buildTargets.map(name => `--filter=${name}`)
+const built = await turbo(['build', ...buildFilters, '--output-logs=errors-only'])
 if (built !== 0) process.exit(built)
-await writeDistDigests()
+await writeDistDigests(buildTargets === undefined ? {} : { names: buildTargets })
 if (mode === 'boot') {
   const ignores = spawnSync(process.execPath, ['tooling/dshx/scripts/boot-check-web.mjs', '--validate-ignores'], { cwd: workspaceRoot, stdio: 'inherit' })
   if (ignores.status !== 0) process.exit(ignores.status ?? 1)
