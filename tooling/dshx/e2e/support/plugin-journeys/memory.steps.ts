@@ -3,6 +3,9 @@ import { expect, type Page } from '@playwright/test'
 import { openMemoryStore } from '../../../../../plugins/@dshfiles/memory/src/store.ts'
 import { Given, Then, When } from '../bdd.js'
 import { finishJourneyAssertions, profileFor, recordAssertion } from '../steps.js'
+import { sendMessage, startThreadWithModel } from '../threads.js'
+
+const FAKE_MODEL = 'commandcode_work/gpt-6-luna'
 
 Given('memory holds the project note {string}', async ({ page }: { page: Page }, text: string) => {
   // The Host has the same SQLite file open in WAL mode; a second connection writes the note the way memory_note would.
@@ -28,17 +31,12 @@ When('the Memory panel is opened', async ({ page }: { page: Page }) => {
   await expect(page.getByRole('tablist', { name: 'Memory views' })).toBeVisible()
 })
 
-When('a fresh thread cites memory {string}', async ({ page }: { page: Page }, id: string) => {
-  await page
-    .getByRole('button', { name: /^New (thread|session)$/i })
-    .filter({ visible: true })
-    .first()
-    .click()
-  const composer = page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })
-  await expect(composer).toBeVisible()
-  await composer.fill(`memory: ${id}`)
-  await composer.press('Enter')
-  await expect(page.getByRole('textbox', { name: 'Message or run a task, / commands, @ files or sessions', exact: true })).toBeVisible()
+When('a thread on the fake model cites memory {string}', async ({ page }: { page: Page }, id: string) => {
+  // A provider-less profile ends the first turn immediately, and the client then drops the conversation for the New
+  // thread screen — taking the citation, and with it this journey's subject, out of the DOM. Run a real turn on the
+  // local fake provider and wait for it to settle, so the citation outlives the step that reads it.
+  await startThreadWithModel(page, { project: 'Default workspace', model: FAKE_MODEL })
+  await sendMessage(page, `memory: ${id}`)
 })
 
 Then('the inline memory preview shows {string}', async ({ page }: { page: Page }, text: string) => {

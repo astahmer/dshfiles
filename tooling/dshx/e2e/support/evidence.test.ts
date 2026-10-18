@@ -47,24 +47,27 @@ const manifest = (runId: string, outcome: EvidenceManifest['outcome'] = 'failed'
   ],
 })
 
-it('stores ordered screenshots and traces with stable checksums', async () => {
+it('stores ordered screenshots, traces and failure diagnostics with stable checksums', async () => {
   const root = await newRoot()
   const evidence = await persistEvidenceRun(root, manifest('11111111-1111-4111-8111-111111111111'), [
     { testKey: 'test-key', name: 'failure screenshot', contentType: 'image/png', body: Buffer.from('png-data') },
     { testKey: 'test-key', name: 'playwright trace', contentType: 'application/zip', body: Buffer.from('trace-data') },
+    { testKey: 'test-key', name: 'browser diagnostics', contentType: 'application/json', body: Buffer.from('{"events":[]}') },
   ])
 
   const references = evidence.manifest.tests[0]?.attachments ?? []
   assert.deepEqual(
     references.map(item => item.sequence),
-    [1, 2],
+    [1, 2, 3],
   )
   assert.deepEqual(
     references.map(item => item.kind),
-    ['screenshot', 'trace'],
+    ['screenshot', 'trace', 'diagnostics'],
   )
   assert.equal(await readFile(join(evidence.directory, references[0]?.file ?? ''), 'utf8'), 'png-data')
   assert.equal(await readFile(join(evidence.directory, references[1]?.file ?? ''), 'utf8'), 'trace-data')
+  assert.equal(await readFile(join(evidence.directory, references[2]?.file ?? ''), 'utf8'), '{"events":[]}')
+  assert.match(references[2]?.file ?? '', /\.json$/)
   assert.match(references[0]?.sha256 ?? '', /^[0-9a-f]{64}$/)
 })
 

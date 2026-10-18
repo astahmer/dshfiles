@@ -27,7 +27,7 @@ export interface EvidenceStep {
 export interface EvidenceAttachmentReference {
   readonly sequence: number
   readonly name: string
-  readonly kind: 'screenshot' | 'trace'
+  readonly kind: 'screenshot' | 'trace' | 'diagnostics'
   readonly contentType: string
   readonly file: string
   readonly sizeBytes: number
@@ -85,12 +85,18 @@ export interface EvidencePolicy {
 
 const RUN_DIRECTORY_PATTERN = /^\d+-[0-9a-f-]{36}$/i
 const RUN_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-const ALLOWED_CONTENT_TYPES = new Set(['image/png', 'image/jpeg', 'application/zip'])
-const ATTACHMENT_EXTENSIONS: Readonly<Record<string, string>> = {
-  'image/png': '.png',
-  'image/jpeg': '.jpg',
-  'application/zip': '.zip',
+/**
+ * What the harness retains from a run: Playwright's screenshot and trace, plus the failure diagnostics a journey
+ * attaches (host output, browser console, API traffic). Diagnostics used to be dropped for want of an entry here, so a
+ * flaky failure kept no evidence beyond its screenshot.
+ */
+const ATTACHMENT_FORMATS: Readonly<Record<string, { readonly extension: string; readonly kind: EvidenceAttachmentReference['kind'] }>> = {
+  'image/png': { extension: '.png', kind: 'screenshot' },
+  'image/jpeg': { extension: '.jpg', kind: 'screenshot' },
+  'application/zip': { extension: '.zip', kind: 'trace' },
+  'application/json': { extension: '.json', kind: 'diagnostics' },
 }
+const ALLOWED_CONTENT_TYPES: ReadonlySet<string> = new Set(Object.keys(ATTACHMENT_FORMATS))
 const MAX_MEASURED_FILES = 10_000
 
 const validatePolicy = (policy: EvidencePolicy): void => {
@@ -218,10 +224,10 @@ export const persistEvidenceRun = async (
       const contents = await readAttachment(candidate, policy)
       if (contents === undefined || totalAttachmentBytes + contents.byteLength > policy.maxRunAttachmentBytes) continue
 
-      const extension = ATTACHMENT_EXTENSIONS[candidate.contentType]
-      if (extension === undefined) continue
+      const format = ATTACHMENT_FORMATS[candidate.contentType]
+      if (format === undefined) continue
       persistedSequence += 1
-      const fileName = `${String(persistedSequence).padStart(3, '0')}-${safeArtifactName(candidate.name)}${extension}`
+      const fileName = `${String(persistedSequence).padStart(3, '0')}-${safeArtifactName(candidate.name)}${format.extension}`
       const relativeFile = `attachments/${fileName}`
       const filePath = join(finalDirectory, relativeFile)
       await writeFile(filePath, contents, { flag: 'wx' })
@@ -229,7 +235,7 @@ export const persistEvidenceRun = async (
       const reference: EvidenceAttachmentReference = {
         sequence: persistedSequence,
         name: safeArtifactName(candidate.name),
-        kind: candidate.contentType === 'application/zip' ? 'trace' : 'screenshot',
+        kind: format.kind,
         contentType: candidate.contentType,
         file: relativeFile,
         sizeBytes: contents.byteLength,

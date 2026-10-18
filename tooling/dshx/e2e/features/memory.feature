@@ -21,7 +21,8 @@ Feature: Thread memory panel
 
   @scenario:memory.reference-preview
   Scenario: Open a cited note inline from a conversation
-    Given the isolated plugin profile "@dshfiles/memory" is booted
+    Given the isolated plugin composition of "@dshfiles/memory, @dshfiles/ai-accounts" is booted
     And memory holds the project note "Deploys need the ops approval label."
-    When a fresh thread cites memory "n:1"
+    And a Command Code account backed by a local fake provider is added
+    When a thread on the fake model cites memory "n:1"
     Then the inline memory preview shows "Deploys need the ops approval label."
