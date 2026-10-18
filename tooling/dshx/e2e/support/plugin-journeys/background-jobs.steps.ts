@@ -4,8 +4,15 @@ import { fileURLToPath } from 'node:url'
 import { expect, type Page } from '@playwright/test'
 import { Then, When } from '../bdd.js'
 import { finishJourneyAssertions, profileFor, recordAssertion } from '../steps.js'
+import { createScratchDirectory, registerWorkspaceFolder, startThreadWithModel } from '../threads.js'
 
 const FIXTURE_SESSIONS = fileURLToPath(new URL('../../../../../plugins/@dshfiles/background-jobs/fixtures/sessions', import.meta.url))
+
+const THREAD_COMPOSER = /^(Describe what you want to build|Message or run a task), \/ commands, @ files or sessions$/
+const WIRE_BOUND = 2_000
+/** A running command whose registered label is longer than the row schema allows. */
+const OVERSIZED_COMMAND = `sleep 120; echo ${'oversized-label-'.repeat(160)}`
+const OVERSIZED_DIRECTIVE = `[[call bash ${JSON.stringify({ command: OVERSIZED_COMMAND, description: 'Hold one live job with an oversized label' })}]]`
 
 /** Every seeded label carries the fixture working directory, so unrelated live jobs never enter the assertions. */
 const fixtureRows = (page: Page) => page.locator('[data-job-id]').filter({ hasText: '/fixture' })
@@ -50,6 +57,32 @@ Then('the board lists the recorded jobs with their categories and statuses', asy
     await expect(unsettled).toContainText('interrupted')
     await expect(unsettled).toContainText('Process & network')
   })
+})
+
+When('a thread starts a running bash job whose label exceeds the wire bound', async ({ page }: { page: Page }) => {
+  const root = await createScratchDirectory('dshx-background-jobs-e2e-')
+  const workspace = join(root, 'oversized-label-project')
+  await mkdir(workspace)
+  await registerWorkspaceFolder(page, workspace)
+  await startThreadWithModel(page, { project: 'oversized-label-project', model: 'commandcode_work/gpt-6-luna' })
+  const composer = page.getByRole('textbox', { name: THREAD_COMPOSER })
+  await composer.fill(OVERSIZED_DIRECTIVE)
+  await composer.press('Enter')
+  await expect(page.locator('[data-chat-call-id]').first()).toBeVisible({ timeout: 45_000 })
+})
+
+Then('the board shows that job with its label clamped to the bound', async ({ page }: { page: Page }) => {
+  await openJobs(page)
+  await page.getByRole('radio', { name: 'Running', exact: true }).click()
+  await recordAssertion(page, 'background-jobs-clamps-an-oversized-live-label', async () => {
+    const row = page.locator('[data-job-id]').filter({ hasText: 'oversized-label' }).first()
+    await expect(row).toBeVisible({ timeout: 45_000 })
+    const label = await row.locator('code').getAttribute('title')
+    expect(label?.startsWith('sleep 120;')).toBe(true)
+    expect((label ?? '').length).toBeLessThanOrEqual(WIRE_BOUND)
+    await expect(page.getByRole('alert').filter({ hasText: 'API schema validation failed' })).toHaveCount(0)
+  })
+  await finishJourneyAssertions(page)
 })
 
 Then('the category filter, the scope and the search narrow the board', async ({ page }: { page: Page }) => {

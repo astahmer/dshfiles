@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 import type { JobHistorySource } from './history.js'
 import { JobsBoard } from './service.js'
 import type { HistoryJob, JobIndexing, JobSession } from './types.js'
+import { jobBoardSchema } from './types.js'
 
 const indexing: JobIndexing = { active: false, caughtUp: true, files: 1, indexedFiles: 1, historyRows: 0, lastIndexedAt: 1, lastError: null }
 
@@ -178,6 +179,34 @@ describe('background jobs board', () => {
       ),
     })
     expect(board.board({ scope: 'all' }).sessions).toEqual([{ id: 'session-eeee', title: 'Fix the delayed rebase button', cwd: '/x', project: '/x' }])
+  })
+
+  it('clamps an unbounded live view to the wire bounds so the board still parses', () => {
+    const board = new JobsBoard({ history: historySource([]) })
+    const registry = registryStub()
+    board.attachLive(registry)
+    registry.emit({
+      type: 'registered',
+      job: liveView({
+        id: jobId('bash-huge'),
+        kind: `bash${'x'.repeat(200)}`,
+        label: `pnpm test${'\r'.repeat(3)}\n${'y'.repeat(5_000)}`,
+        progress: 'p'.repeat(1_000),
+        detail: 'd'.repeat(1_000),
+        output: { total: 7, earliest: 0, spillPaths: Array.from({ length: 12 }, (_, index) => `${String(index)}-${'z'.repeat(1_500)}`) },
+      }),
+    })
+
+    const parsed = jobBoardSchema.safeParse(board.board({ scope: 'all' }))
+    expect(parsed.success).toBe(true)
+    const row = board.board({ scope: 'all' }).rows[0]
+    expect(row?.label).toHaveLength(2_000)
+    expect(row?.label.includes('\r')).toBe(false)
+    expect(row?.kind).toHaveLength(64)
+    expect(row?.progress).toHaveLength(300)
+    expect(row?.detail).toHaveLength(500)
+    expect(row?.spillPaths).toHaveLength(8)
+    expect(row?.category).toBe('tests')
   })
 
   it('keeps listing live jobs after the registry settles one', () => {

@@ -2,6 +2,7 @@ import { mkdir, readFile, readdir, rename, stat, writeFile } from 'node:fs/promi
 import { dirname, join } from 'node:path'
 import { readLogFrom } from '@dshfiles/usage/session-log'
 import { z } from 'zod'
+import { boundedLabel } from './bounds.js'
 import { historyJobSchema, jobSessionSchema, jobStateSchema, type HistoryJob, type JobIndexing, type JobSession } from './types.js'
 
 /**
@@ -14,7 +15,6 @@ import { historyJobSchema, jobSessionSchema, jobStateSchema, type HistoryJob, ty
 const DEFAULT_MAX_JOBS = 20_000
 const DEFAULT_FILES_PER_PASS = 40
 const DEFAULT_BUDGET_MS = 2_000
-const MAX_LABEL_LENGTH = 2_000
 
 const headerSchema = z.object({ id: z.string().min(1), cwd: z.string().min(1).optional() })
 const titleSchema = z.object({ title: z.string().min(1) })
@@ -58,11 +58,6 @@ export interface JobHistorySource {
   readonly historyRows: readonly HistoryJob[]
   readonly indexing: JobIndexing
   sessionOf(sessionId: string | null): JobSession | null
-}
-
-const boundedLabel = (label: string): string => {
-  const flat = label.replaceAll('\r', '').replaceAll('\u0000', '')
-  return flat.length > MAX_LABEL_LENGTH ? flat.slice(0, MAX_LABEL_LENGTH) : flat
 }
 
 const sessionIdOf = (directory: string): string => (directory.startsWith('session-') ? directory : `session-${directory}`)

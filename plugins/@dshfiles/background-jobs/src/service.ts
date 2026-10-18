@@ -1,5 +1,7 @@
 import { JobId } from '@deepseek-ai/dsh-jobs/brand'
+import type { JobView } from '@deepseek-ai/dsh-jobs'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
+import { boundedLabel, clampText, MAX_DETAIL_LENGTH, MAX_KIND_LENGTH, MAX_PROGRESS_LENGTH, MAX_SPILL_PATHS, MAX_SPILL_PATH_LENGTH } from './bounds.js'
 import { classifyJob, type JobCategory } from './classify.js'
 import type { JobHistorySource } from './history.js'
 import { LiveJobs, type JobRegistrySurface } from './live.js'
@@ -91,6 +93,32 @@ const rowFromHistory = (job: HistoryJob): JobRow => ({
   spillPaths: [],
 })
 
+/**
+ * A live view is producer-supplied and unbounded: a `bash` label is the whole
+ * command line, a `pty-send` label is everything the Session typed. Clamp at
+ * this boundary so one oversized producer cannot fail the whole board read.
+ */
+const rowFromLive = (view: JobView): JobRow => {
+  const kind = clampText({ text: view.kind, limit: MAX_KIND_LENGTH })
+  const label = boundedLabel(view.label)
+  return {
+    id: view.id,
+    kind,
+    label,
+    owner: view.owner ?? null,
+    status: view.status,
+    progress: view.progress === undefined ? null : clampText({ text: view.progress, limit: MAX_PROGRESS_LENGTH }),
+    detail: view.detail === undefined ? null : clampText({ text: view.detail, limit: MAX_DETAIL_LENGTH }),
+    startedAt: view.startedAt,
+    finishedAt: view.finishedAt ?? null,
+    durationMs: view.finishedAt === undefined ? null : Math.max(0, view.finishedAt - view.startedAt),
+    category: classifyJob({ kind, label }),
+    live: true,
+    outputTotal: view.output.total,
+    spillPaths: (view.output.spillPaths ?? []).slice(0, MAX_SPILL_PATHS).map(path => clampText({ text: path, limit: MAX_SPILL_PATH_LENGTH })),
+  }
+}
+
 export class JobsBoard {
   private readonly history: JobHistorySource
   private readonly now: () => number
@@ -136,24 +164,7 @@ export class JobsBoard {
     if (this.cachedRows !== null) return this.cachedRows
     const merged = new Map<string, JobRow>()
     for (const job of this.history.historyRows) merged.set(job.id, rowFromHistory(job))
-    for (const view of this.live?.values() ?? []) {
-      merged.set(view.id, {
-        id: view.id,
-        kind: view.kind,
-        label: view.label,
-        owner: view.owner ?? null,
-        status: view.status,
-        progress: view.progress ?? null,
-        detail: view.detail ?? null,
-        startedAt: view.startedAt,
-        finishedAt: view.finishedAt ?? null,
-        durationMs: view.finishedAt === undefined ? null : Math.max(0, view.finishedAt - view.startedAt),
-        category: categoryOf({ kind: view.kind, label: view.label }),
-        live: true,
-        outputTotal: view.output.total,
-        spillPaths: [...(view.output.spillPaths ?? [])],
-      })
-    }
+    for (const view of this.live?.values() ?? []) merged.set(view.id, rowFromLive(view))
     this.cachedRows = [...merged.values()]
     return this.cachedRows
   }

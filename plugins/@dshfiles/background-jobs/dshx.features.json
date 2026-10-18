@@ -37,6 +37,17 @@
           "featureFile": "tooling/dshx/e2e/features/background-jobs.feature"
         },
         {
+          "kind": "gherkin",
+          "id": "background-jobs.oversized-live-label",
+          "featureFile": "tooling/dshx/e2e/features/background-jobs.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "background-jobs.board.wire-bounds",
+          "file": "plugins/@dshfiles/background-jobs/src/service.test.ts",
+          "testName": "clamps an unbounded live view to the wire bounds so the board still parses"
+        },
+        {
           "kind": "unit-test",
           "id": "background-jobs.classify.commands",
           "file": "plugins/@dshfiles/background-jobs/src/classify.test.ts",
