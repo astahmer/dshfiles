@@ -23,13 +23,13 @@ browser is the wrong instrument; the checks below run a real one.
 
 Put each check at the earliest layer that can see the defect:
 
-| Defect | Layer | Tool |
-|---|---|---|
-| Expressible in types | Typecheck | `tsc` |
+| Defect                                         | Layer           | Tool                                                                               |
+| ---------------------------------------------- | --------------- | ---------------------------------------------------------------------------------- |
+| Expressible in types                           | Typecheck       | `tsc`                                                                              |
 | Decidable across packages without running them | Static contract | `dshx check` (reserved or colliding locale namespaces, undeclared Client services) |
-| Pure logic, no DOM or Host | Unit | Vitest |
-| Breaks at boot | Boot smoke | `check:plugin-boot`, one real browser per bundle and over the composed profile |
-| Breaks during use | Journey | Gherkin scenarios via `playwright-bdd` |
+| Pure logic, no DOM or Host                     | Unit            | Vitest                                                                             |
+| Breaks at boot                                 | Boot smoke      | `check:plugin-boot`, one real browser per bundle and over the composed profile     |
+| Breaks during use                              | Journey         | Gherkin scenarios via `playwright-bdd`                                             |
 
 Boot smoke and journeys share one harness (`e2e/support/boot.ts`): a browser
 launch is the expensive unit, so they differ in assertions, not in driver.
@@ -64,6 +64,11 @@ cell and a native entry was still registered behind it.
   models.dev price cache. Repositories, files, SQLite and commands
   are real, in temporary directories. No routine test calls a paid API, uses
   real credentials, or touches a user project.
+- **HTTP fakes are Hono apps first.** Fake services define explicit routes in
+  `create…App(state)` factories; route tests use `app.request()` without a
+  socket. `@hono/node-server` serves the same app only where a real client
+  needs a loopback URL. Keep protocol state injected so chat dispatch is tested
+  independently of the network adapter.
 - **Gherkin for journeys, plain specs for single assertions.** In a spec the
   intent of a journey is buried under selectors, and the shared setup (boot,
   open a thread, send) is the reusable part, which is what step definitions are
@@ -147,7 +152,7 @@ owner, `ai-accounts`). A fresh clone gets the pinned Chromium from
 A journey that sends a message needs a working provider route, and the scratch
 profile defaults to `deepseek-official`. In an environment without
 `DEEPSEEK_API_KEY` (or an account row serving that route) every turn ends with
-*no API key for provider route "deepseek-official"*, and the message-sending
+_no API key for provider route "deepseek-official"_, and the message-sending
 journeys then sit out their full 300 s timeout while the journeys that only
 drive the UI pass — an environment failure that reads like a product
 regression. Check for that Failed turn in the failure snapshot before believing

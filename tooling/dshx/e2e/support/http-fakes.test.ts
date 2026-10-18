@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import { test } from 'node:test'
 import { z } from 'zod'
-import { createFakeCommandCodeApp } from '../../packages/dshx/src/scratch/fake-command-code.ts'
+import { createFakeCommandCodeApp, startFakeCommandCode } from '../../packages/dshx/src/scratch/fake-command-code.ts'
 import type { FakeCommandCodeState } from '../../packages/dshx/src/scratch/fake-command-code.ts'
 import { card, createFakeHubApp, type FakeHubState } from './fake-hub.ts'
 import { createFakeOAuthMcpApp } from './fake-oauth-mcp.ts'
@@ -17,7 +17,7 @@ const createOAuthState = () => ({
 
 const origin = 'http://127.0.0.1:45678'
 
-const createCommandState = (): FakeCommandCodeState => ({ requests: [], summaries: 'answer', held: new Set(), hanging: new Set() })
+const createCommandState = (): FakeCommandCodeState => ({ requests: [], held: new Set(), oneShotCalls: new Set() })
 
 const sha256 = (value: string): string => createHash('sha256').update(value).digest('base64url')
 
@@ -49,7 +49,7 @@ test('Command Code routes use explicit paths and pure chat dispatch', async () =
   })
   assert.equal(response.status, 200)
   const stream = await response.text()
-  assert.equal(response.headers.get('content-type'), 'text/event-stream')
+  assert.match(response.headers.get('content-type') ?? '', /^text\/event-stream\b/)
   assert.match(stream, /call_0_read/)
   assert.match(stream, /"finish_reason":"tool_calls"/)
   assert.match(stream, /data: \[DONE\]/)
@@ -64,6 +64,30 @@ test('Command Code routes use explicit paths and pure chat dispatch', async () =
   assert.deepEqual(await missingCredential.json(), {
     error: { code: 'MISSING_CREDENTIAL', message: 'The fake account has no usable credential.', type: 'authentication_error' },
   })
+
+  const heldResponse = await app.request(`${origin}/provider/v1/chat/completions`, {
+    method: 'POST',
+    headers: { authorization: 'Bearer key-123456', 'content-type': 'application/json' },
+    body: JSON.stringify({ messages: [{ role: 'user', content: '[[hold]]' }] }),
+  })
+  const heldBody = heldResponse.text()
+  assert.equal(state.held.size, 1)
+  const release = [...state.held][0]
+  assert.ok(release)
+  release()
+  assert.match(await heldBody, /Held turn released\./)
+  assert.equal(state.held.size, 0)
+})
+
+test('loopback Command Code serves the same Hono app to a real client', async () => {
+  const fake = await startFakeCommandCode()
+  try {
+    const response = await fetch(`${fake.baseUrl}/provider/v1/models`)
+    assert.equal(response.status, 200)
+    assert.deepEqual(await response.json(), { data: [] })
+  } finally {
+    await fake.close()
+  }
 })
 
 test('Framework Hub routes filter, sort, fail and serve install detail', async () => {

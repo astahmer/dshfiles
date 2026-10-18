@@ -1,18 +1,20 @@
-import { createServer, type ServerResponse } from 'node:http'
-import { json } from 'node:stream/consumers'
+import { createAdaptorServer } from '@hono/node-server'
+import type { AddressInfo } from 'node:net'
+import { Hono } from 'hono'
+import { streamSSE, type SSEStreamingApi } from 'hono/streaming'
 import { z } from 'zod'
 
 /**
  * A loopback stand-in for Command Code, the one provider whose account base URL accepts a loopback address, so a
  * journey can drive real turns without a network or a subscription.
  *
- * The key decides the account: `-MISSING` keys reject chat, `-LIMITED` keys are rate limited on chat, `-BROKEN` keys
- * fail the billing read, and `-EXHAUSTED` keys exercise quota recovery. Every other key reports a 75%-left session
- * window and a 10%-left weekly window. A turn answers `Answered by <key suffix>` unless its latest message carries a directive:
+ * The key decides the account: `-LIMITED` keys are rate limited on chat, `-BROKEN` keys fail the billing read,
+ * and `-EXHAUSTED` keys exercise quota recovery. Every other key reports a 75%-left session window and a
+ * 10%-left weekly window. A turn answers `Answered by <key suffix>` unless its latest message carries a directive:
  * `[[call TOOL {json}]]` calls any tool; `[[once call TOOL {json}]]` calls it only on its first match; `[[read PATH]]`
  * and `[[memory_search QUERY]]` call tools; `[[empty]]` settles with reasoning but no answer; `[[hold]]` keeps the
  * turn running until `releaseHeldTurns`; `[[title NAME]]` sets the thread name; `[[answer TEXT]]` returns markdown;
- * `[[stream MS]]` emits that answer word by word with a bounded delay; the turn after a tool result answers `Tool finished.`.
+ * the turn after a tool result answers `Tool finished.`.
  *
  * E2E journeys start it per page; `dshx dev`'s `tool-call-thread` seed runs it as its own process.
  */
@@ -41,6 +43,12 @@ export interface FakeChatRequest {
   readonly messages: readonly { readonly role: string; readonly text: string }[]
 }
 
+export interface FakeCommandCodeState {
+  readonly requests: FakeChatRequest[]
+  readonly held: Set<() => void>
+  readonly oneShotCalls: Set<string>
+}
+
 export interface FakeCommandCode {
   readonly baseUrl: string
   readonly requests: FakeChatRequest[]
@@ -64,25 +72,35 @@ interface ChatDelta {
   readonly tool_calls?: readonly ToolCallDelta[]
 }
 
+type ChatCompletionResult =
+  | { readonly kind: 'response'; readonly response: Response }
+  | { readonly kind: 'stream'; readonly delta: ChatDelta; readonly delayBetweenWordsMs: number }
+  | { readonly kind: 'held' }
+
 let completionSequence = 0
 
-const streamAnswer = async (response: ServerResponse, delta: ChatDelta, delayBetweenWordsMs = 0): Promise<void> => {
+const writeStreamAnswer = async (stream: SSEStreamingApi, delta: ChatDelta, delayBetweenWordsMs = 0): Promise<void> => {
   const id = `fake-${String(++completionSequence).padStart(6, '0')}`
   const created = Math.floor(Date.now() / 1000)
   const chunk = (body: ChatDelta, finishReason: string | null): string =>
-    `data: ${JSON.stringify({ id, object: 'chat.completion.chunk', created, model: 'fake', choices: [{ index: 0, delta: body, finish_reason: finishReason }] })}\n\n`
-  response.writeHead(200, { 'content-type': 'text/event-stream' })
-  const contentChunks = delayBetweenWordsMs > 0 && typeof delta.content === 'string' ? (delta.content.match(/\S+\s*/gu) ?? [delta.content]) : undefined
+    JSON.stringify({
+      id,
+      object: 'chat.completion.chunk',
+      created,
+      model: 'fake',
+      choices: [{ index: 0, delta: body, finish_reason: finishReason }],
+    })
+  const contentChunks = delayBetweenWordsMs > 0 && typeof delta.content === 'string' ? delta.content.match(/\S+\s*/gu) ?? [delta.content] : undefined
   if (contentChunks === undefined) {
-    response.write(chunk({ role: 'assistant', ...delta }, null))
+    await stream.writeSSE({ data: chunk({ role: 'assistant', ...delta }, null) })
   } else {
     for (const [index, content] of contentChunks.entries()) {
-      response.write(chunk(index === 0 ? { role: 'assistant', content } : { content }, null))
+      await stream.writeSSE({ data: chunk(index === 0 ? { role: 'assistant', content } : { content }, null) })
       if (index < contentChunks.length - 1) await new Promise<void>(resolveDelay => setTimeout(resolveDelay, delayBetweenWordsMs))
     }
   }
-  response.write(chunk({}, delta.tool_calls === undefined ? 'stop' : 'tool_calls'))
-  response.end('data: [DONE]\n\n')
+  await stream.writeSSE({ data: chunk({}, delta.tool_calls === undefined ? 'stop' : 'tool_calls') })
+  await stream.writeSSE({ data: '[DONE]' })
 }
 
 /** `argumentsJson` is the raw JSON the model would stream for the call. */
@@ -95,113 +113,155 @@ const toolCalls = (calls: readonly { readonly name: string; readonly argumentsJs
     function: { name: call.name, arguments: call.argumentsJson },
   })),
 })
+
 const toolCall = (name: string, argumentsJson: string): ChatDelta => toolCalls([{ name, argumentsJson }])
+
+const streamAnswer = (delta: ChatDelta, delayBetweenWordsMs = 0): ChatCompletionResult => ({ kind: 'stream', delta, delayBetweenWordsMs })
+const responseAnswer = (payload: unknown, status: number): ChatCompletionResult => ({ kind: 'response', response: Response.json(payload, { status }) })
+
+const chatCompletionResponse = (input: { readonly state: FakeCommandCodeState; readonly key: string; readonly body: unknown }): ChatCompletionResult => {
+  const parsed = chatRequestSchema.safeParse(input.body)
+  if (!parsed.success) return responseAnswer({ error: 'unexpected chat request' }, 400)
+
+  const messages = parsed.data.messages.map(message => ({ role: message.role, text: message.content }))
+  const kind = messages.some(message => message.text.startsWith(TITLE_INSTRUCTION)) ? 'title' : 'turn'
+  input.state.requests.push({ key: input.key, kind, messages })
+
+  if (kind === 'title') {
+    const named = /\[\[title ([^\]]+)\]\]/.exec(messages.map(message => message.text).join('\n'))
+    return streamAnswer({ content: named?.[1] ?? 'Fake thread title' })
+  }
+  if (input.key.endsWith('-MISSING'))
+    return responseAnswer({ error: { code: 'MISSING_CREDENTIAL', message: 'The fake account has no usable credential.', type: 'authentication_error' } }, 401)
+  if (input.key.endsWith('-LIMITED')) return responseAnswer({ error: { message: 'Rate limit reached', type: 'rate_limit_error' } }, 429)
+  if (input.key.endsWith('-EXHAUSTED'))
+    return responseAnswer({ error: { message: 'Usage limit reached for this account.', type: 'insufficient_quota', code: 'USAGE_LIMIT_REACHED' } }, 400)
+
+  // DSH appends runtime context and turn-time snapshots after the user's message.
+  const last = messages.filter(message => !isRuntimeContextMessage(message.text)).at(-1)
+  const streamDirective = /\[\[stream (\d+)\]\]/.exec(last?.text ?? '')
+  const parsedDelay = streamDirective === null ? null : z.number().int().min(1).max(250).safeParse(Number(streamDirective[1]))
+  if (parsedDelay !== null && !parsedDelay.success) return responseAnswer({ error: { message: 'Stream delay must be between 1 and 250 ms.' } }, 400)
+  const streamDelayMs = parsedDelay?.success === true ? parsedDelay.data : 0
+  if (last?.role === 'tool') return streamAnswer({ content: 'Tool finished.' })
+  if (last?.text.includes('[[empty]]') === true) return streamAnswer({ reasoning_content: 'Thinking without an answer.' })
+  if (last?.text.includes('[[hold]]') === true) return { kind: 'held' }
+
+  const answer = /\[\[answer ([^\]]+)\]\]/.exec(last?.text ?? '')
+  if (answer?.[1] !== undefined) return streamAnswer({ content: answer[1] }, streamDelayMs)
+
+  const calls = [...(last?.text ?? '').matchAll(/\[\[(once )?call (\w+) (\{.*?\})\]\]/g)].flatMap(match => {
+    const directive = match[0] ?? ''
+    if (match[1] !== undefined) {
+      if (input.state.oneShotCalls.has(directive)) return []
+      input.state.oneShotCalls.add(directive)
+    }
+    const rawArguments = match[3] ?? '{}'
+    const argumentsJson = rawArguments.startsWith(String.raw`{\"`) ? z.string().parse(JSON.parse(`"${rawArguments}"`)) : rawArguments
+    return [{ name: match[2] ?? '', argumentsJson }]
+  })
+  if (calls.length > 0) return streamAnswer(toolCalls(calls))
+
+  const read = /\[\[read ([^\]]+)\]\]/.exec(last?.text ?? '')
+  if (read?.[1] !== undefined) return streamAnswer(toolCall('read', JSON.stringify({ file_path: read[1] })))
+
+  const search = /\[\[memory_search ([^\]]+?)(?: in ([a-z-]+))?\]\]/.exec(last?.text ?? '')
+  if (search?.[1] !== undefined) return streamAnswer(toolCall('memory_search', JSON.stringify(search[2] === undefined ? { query: search[1] } : { query: search[1], scope: search[2] })))
+
+  return streamAnswer({ content: `Answered by ${input.key.slice(-6)}` }, streamDelayMs)
+}
+
+export const createFakeCommandCodeApp = (state: FakeCommandCodeState): Hono => {
+  const app = new Hono()
+
+  app.get('/alpha/billing/credits', context => {
+    const key = (context.req.header('authorization') ?? '').replace(/^Bearer /, '')
+    if (key.endsWith('-BROKEN')) return context.json({ error: 'billing unavailable' }, 503)
+    const weeklyUsed = key.endsWith('-EXHAUSTED') ? 100 : 90
+    return context.json({
+      windowLimits: {
+        fiveHour: { used: 25, cap: 100, resetAt: Date.now() + HOUR_MS },
+        weekly: { used: weeklyUsed, cap: 100, resetAt: Date.now() + 72 * HOUR_MS },
+      },
+      credits: { planId: 'individual-pro' },
+    })
+  })
+
+  app.get('/alpha/whoami', context => {
+    const key = (context.req.header('authorization') ?? '').replace(/^Bearer /, '')
+    return context.json({ user: { userName: `fake-${key.slice(-6)}` } })
+  })
+  app.get('/alpha/billing/subscriptions', context => context.json({ data: { planId: 'individual-pro', status: 'active' } }))
+  app.get('/provider/v1/models', context => context.json({ data: [] }))
+  app.post('/provider/v1/chat/completions', async context => {
+    const key = (context.req.header('authorization') ?? '').replace(/^Bearer /, '')
+    const body = await context.req.json().catch(() => undefined)
+    const result = chatCompletionResponse({ state, key, body })
+    if (result.kind === 'response') return result.response
+
+    return streamSSE(context, async stream => {
+      if (result.kind === 'held') {
+        if (stream.aborted) return
+        await new Promise<void>(resolve => {
+          const release = (): void => {
+            state.held.delete(release)
+            resolve()
+          }
+          state.held.add(release)
+          stream.onAbort(() => {
+            state.held.delete(release)
+            resolve()
+          })
+        })
+        if (stream.aborted) return
+        await writeStreamAnswer(stream, { content: 'Held turn released.' })
+        return
+      }
+
+      await writeStreamAnswer(stream, result.delta, result.delayBetweenWordsMs)
+    })
+  })
+  app.notFound(context => context.json({ error: 'not found' }, 404))
+
+  return app
+}
+
+interface ListenableServer {
+  once(event: 'error', listener: (error: Error) => void): unknown
+  off(event: 'error', listener: (error: Error) => void): unknown
+  listen(port: number, host: string, listener: () => void): unknown
+  address(): AddressInfo | string | null
+  close(listener: () => void): unknown
+  closeAllConnections?(): void
+}
+
+const listen = (server: ListenableServer): Promise<void> =>
+  new Promise((resolve, reject) => {
+    server.once('error', reject)
+    server.listen(0, '127.0.0.1', () => {
+      server.off('error', reject)
+      resolve()
+    })
+  })
 
 /** Listens on a free loopback port until `close`. */
 export const startFakeCommandCode = async (): Promise<FakeCommandCode> => {
-  const requests: FakeChatRequest[] = []
-  const held = new Set<ServerResponse>()
-  const oneShotCalls = new Set<string>()
-  const server = createServer((request, response) => {
-    // Billing and model reads have no body; only a chat completion is decoded below.
-    void json(request)
-      .catch(() => undefined)
-      .then(body => {
-        const key = (request.headers.authorization ?? '').replace(/^Bearer /, '')
-        const reply = (status: number, payload: string): void => {
-          response.writeHead(status, { 'content-type': 'application/json' })
-          response.end(payload)
-        }
-        if (request.url === '/alpha/billing/credits') {
-          if (key.endsWith('-BROKEN')) return reply(503, JSON.stringify({ error: 'billing unavailable' }))
-          const weeklyUsed = key.endsWith('-EXHAUSTED') ? 100 : 90
-          return reply(
-            200,
-            JSON.stringify({
-              windowLimits: {
-                fiveHour: { used: 25, cap: 100, resetAt: Date.now() + HOUR_MS },
-                weekly: { used: weeklyUsed, cap: 100, resetAt: Date.now() + 72 * HOUR_MS },
-              },
-              credits: { planId: 'individual-pro' },
-            }),
-          )
-        }
-        if (request.url === '/alpha/whoami') return reply(200, JSON.stringify({ user: { userName: `fake-${key.slice(-6)}` } }))
-        if (request.url === '/alpha/billing/subscriptions') return reply(200, JSON.stringify({ data: { planId: 'individual-pro', status: 'active' } }))
-        if (request.url === '/provider/v1/models') return reply(200, JSON.stringify({ data: [] }))
-        if (request.url !== '/provider/v1/chat/completions') return reply(404, JSON.stringify({ error: 'not found' }))
-        const parsed = chatRequestSchema.safeParse(body)
-        if (!parsed.success) return reply(400, JSON.stringify({ error: 'unexpected chat request' }))
-        const messages = parsed.data.messages.map(message => ({ role: message.role, text: message.content }))
-        const kind = messages.some(message => message.text.startsWith(TITLE_INSTRUCTION)) ? 'title' : 'turn'
-        requests.push({ key, kind, messages })
-        if (kind === 'title') {
-          const named = /\[\[title ([^\]]+)\]\]/.exec(messages.map(message => message.text).join('\n'))
-          return streamAnswer(response, { content: named?.[1] ?? 'Fake thread title' })
-        }
-        if (key.endsWith('-MISSING')) {
-          return reply(401, JSON.stringify({ error: { message: 'Invalid API key', type: 'authentication_error', code: 'invalid_api_key' } }))
-        }
-        if (key.endsWith('-LIMITED')) return reply(429, JSON.stringify({ error: { message: 'Rate limit reached', type: 'rate_limit_error' } }))
-        if (key.endsWith('-EXHAUSTED')) {
-          return reply(
-            400,
-            JSON.stringify({ error: { message: 'Usage limit reached for this account.', type: 'insufficient_quota', code: 'USAGE_LIMIT_REACHED' } }),
-          )
-        }
-        // DSH appends runtime context and turn-time snapshots after the user's message.
-        const last = messages.filter(message => !isRuntimeContextMessage(message.text)).at(-1)
-        const streamDirective = /\[\[stream (\d+)\]\]/.exec(last?.text ?? '')
-        const parsedDelay = streamDirective === null ? null : z.number().int().min(1).max(250).safeParse(Number(streamDirective[1]))
-        if (parsedDelay !== null && !parsedDelay.success)
-          return reply(400, JSON.stringify({ error: { message: 'Stream delay must be between 1 and 250 ms.' } }))
-        const streamDelayMs = parsedDelay?.success === true ? parsedDelay.data : 0
-        if (last?.role === 'tool') return streamAnswer(response, { content: 'Tool finished.' })
-        if (last?.text.includes('[[empty]]') === true) return streamAnswer(response, { reasoning_content: 'Thinking without an answer.' })
-        if (last?.text.includes('[[hold]]') === true) {
-          held.add(response)
-          return
-        }
-        const answer = /\[\[answer ([^\]]+)\]\]/.exec(last?.text ?? '')
-        if (answer?.[1] !== undefined) return streamAnswer(response, { content: answer[1] }, streamDelayMs)
-        const calls = [...(last?.text ?? '').matchAll(/\[\[(once )?call (\w+) (\{.*?\})\]\]/g)].flatMap(match => {
-          const directive = match[0] ?? ''
-          if (match[1] !== undefined) {
-            if (oneShotCalls.has(directive)) return []
-            oneShotCalls.add(directive)
-          }
-          const rawArguments = match[3] ?? '{}'
-          const argumentsJson = rawArguments.startsWith(String.raw`{\"`) ? z.string().parse(JSON.parse(`"${rawArguments}"`)) : rawArguments
-          return [{ name: match[2] ?? '', argumentsJson }]
-        })
-        if (calls.length > 0) return streamAnswer(response, toolCalls(calls))
-        const read = /\[\[read ([^\]]+)\]\]/.exec(last?.text ?? '')
-        if (read?.[1] !== undefined) return streamAnswer(response, toolCall('read', JSON.stringify({ file_path: read[1] })))
-        const search = /\[\[memory_search ([^\]]+?)(?: in ([a-z-]+))?\]\]/.exec(last?.text ?? '')
-        if (search?.[1] !== undefined) {
-          return streamAnswer(
-            response,
-            toolCall('memory_search', JSON.stringify(search[2] === undefined ? { query: search[1] } : { query: search[1], scope: search[2] })),
-          )
-        }
-        return streamAnswer(response, { content: `Answered by ${key.slice(-6)}` }, streamDelayMs)
-      })
-  })
-  await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve))
-  const address = z.object({ port: z.number() }).safeParse(server.address())
-  if (!address.success) throw new Error('The fake Command Code server has no port.')
-  const fake: FakeCommandCode = {
-    baseUrl: `http://127.0.0.1:${String(address.data.port)}`,
-    requests,
+  const state: FakeCommandCodeState = { requests: [], held: new Set(), oneShotCalls: new Set() }
+  const server: ListenableServer = createAdaptorServer({ fetch: createFakeCommandCodeApp(state).fetch })
+  await listen(server)
+  const address = server.address()
+  if (address === null || typeof address === 'string') throw new Error('The fake Command Code server has no port.')
+
+  return {
+    baseUrl: `http://127.0.0.1:${String(address.port)}`,
+    requests: state.requests,
     releaseHeldTurns: () => {
-      for (const response of held) streamAnswer(response, { content: 'Held turn released.' })
-      held.clear()
+      for (const release of [...state.held]) release()
     },
     close: async () => {
-      for (const response of held) response.destroy()
-      server.closeAllConnections()
+      if (server.closeAllConnections !== undefined) server.closeAllConnections()
       await new Promise<void>(resolve => server.close(() => resolve()))
+      state.held.clear()
     },
   }
-  return fake
 }
