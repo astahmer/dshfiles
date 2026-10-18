@@ -1514,7 +1514,7 @@
     {
       "id": "open-thread-in-side-panel",
       "title": "Open a thread in the right side panel",
-      "summary": "A thread's row context menu, its hover action and the Open in side panel command palette action open that thread in the right sidebar instead of the main column: the row action routes through the entry's sidebar-right controller, which opens a threadaside resource tab. The tab retains the Session and hosts the same embedded Conversation a subagent chat does, so the thread streams and its composer works beside the thread the user is reading; closing the tab only releases the reference, and an already-open aside is focused instead of duplicated. The rebindable command threadSidebar.openInSidePanel ships unbound, and Customize sidebar > Hover actions stores hiddenRowActions and rowActionOrder so every row button is per-user in both visibility and left-to-right order.",
+      "summary": "A thread's row context menu, its hover action, the Open in side panel command palette action and a `@dshfiles/main-tabs` thread tab's own context menu open that thread in the right sidebar instead of the main column: the row action routes through the entry's sidebar-right controller, which opens a threadaside resource tab, and the tab menu asks for the same aside over the cancelable `dshfiles:open-thread-aside` window event this plugin answers. The tab retains the Session and hosts the same embedded Conversation a subagent chat does, so the thread streams and its composer works beside the thread the user is reading; closing the tab only releases the reference, and an already-open aside is focused instead of duplicated. The rebindable command threadSidebar.openInSidePanel ships unbound, and Customize sidebar > Hover actions stores hiddenRowActions and rowActionOrder so every row button is per-user in both visibility and left-to-right order.",
       "reach": [
         "click button \"New thread\"",
         "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Hover actions target\"",
@@ -1542,7 +1542,8 @@
       "states": ["closed", "open", "focused", "hover-action-hidden", "hover-action-reordered"],
       "failureModes": [
         "An aside tab closed while the thread is still running keeps running: nothing is archived.",
-        "An archived row offers no aside, because a stopped thread has nothing to show."
+        "An archived row offers no aside, because a stopped thread has nothing to show.",
+        "A `dshfiles:open-thread-aside` request is declined while no thread is on screen: there is no side panel to open an aside into, and the caller is expected to say so."
       ],
       "externalDependencies": [],
       "verification": [
@@ -1556,6 +1557,12 @@
           "id": "thread-sidebar.aside-address",
           "file": "plugins/@dshfiles/thread-sidebar/src/thread-aside.test.ts",
           "testName": "round-trips one session id"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.aside-request",
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-aside-request.test.ts",
+          "testName": "reads the session one cancelable request names"
         },
         {
           "kind": "unit-test",

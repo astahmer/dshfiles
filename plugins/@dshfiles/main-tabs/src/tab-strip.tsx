@@ -1,10 +1,11 @@
 import { writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from '@dshfiles/plugin-ui/components/ui/context-menu'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
-import { ChevronDownIcon, CopyIcon, PinIcon } from '@dshfiles/plugin-ui/icons'
+import { ChevronDownIcon, CopyIcon, PanelRightOpenIcon, PinIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactElement } from 'react'
 import type { MainTabsTranslate } from './locales.js'
+import { requestThreadAside } from './thread-aside.js'
 import { buildThreadTabLink } from './thread-link.js'
 import { CompassGlyph } from './start-page.js'
 import type { TabsEvent } from './tabs-machine.js'
@@ -83,15 +84,18 @@ export const TabStrip = (props: TabStripProps): ReactElement => {
   const scroller = useRef<HTMLDivElement>(null)
   const [overflowing, setOverflowing] = useState(false)
   const [dropIndex, setDropIndex] = useState<number | null>(null)
-  const [copyStatus, setCopyStatus] = useState('')
+  const [status, setStatus] = useState('')
   const dragged = useRef<string | null>(null)
   const activeId = tabs.find(tab => tab.active)?.id
   const copy = async (value: string, copiedKey: 'threadIdCopied' | 'threadLinkCopied'): Promise<void> => {
     try {
-      setCopyStatus(t((await writeClipboard(value)) ? copiedKey : 'clipboardFailure'))
+      setStatus(t((await writeClipboard(value)) ? copiedKey : 'clipboardFailure'))
     } catch {
-      setCopyStatus(t('clipboardFailure'))
+      setStatus(t('clipboardFailure'))
     }
+  }
+  const openAside = (sessionId: string): void => {
+    if (!requestThreadAside(sessionId)) setStatus(t('sidePanelUnavailable'))
   }
 
   useEffect(() => {
@@ -271,6 +275,10 @@ export const TabStrip = (props: TabStripProps): ReactElement => {
                 {tab.kind === 'start' && !tab.preview ? null : <ContextMenuSeparator />}
                 {tab.kind === 'thread' ? (
                   <>
+                    <ContextMenuItem onSelect={() => openAside(tab.sessionId)}>
+                      <PanelRightOpenIcon aria-hidden="true" />
+                      {t('openInSidePanel')}
+                    </ContextMenuItem>
                     <ContextMenuItem onSelect={() => void copy(tab.sessionId, 'threadIdCopied')}>
                       <CopyIcon aria-hidden="true" />
                       {t('copyThreadId')}
@@ -353,9 +361,9 @@ export const TabStrip = (props: TabStripProps): ReactElement => {
           </DropdownMenuContent>
         </DropdownMenu>
       ) : null}
-      {copyStatus ? (
+      {status ? (
         <span className="dshx:sr-only" role="status">
-          {copyStatus}
+          {status}
         </span>
       ) : null}
     </div>

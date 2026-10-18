@@ -5,8 +5,14 @@
     {
       "id": "main-view-tabs",
       "title": "Browser-like tabs above the main view",
-      "summary": "Every thread or global panel shown in the main view opens or focuses a tab above it. The strip looks like DSH's own right-panel tabs (28px pills, hairline separators, a close cross over a faded title end). Tabs close with × or a middle click, reorder by drag, pin to the start, close others or to the right from their context menu, scroll or list in a dropdown when they overflow, and show working, needs-you and unread dots on thread tabs. Thread tab menus also copy the thread ID or a clean deep link. Opening from outside the strip uses a VS Code-style preview tab by default; double-clicking a sidebar thread keeps its tab open.",
-      "reach": ["seed tool-call-thread", "rightclick tab \"*\"", "expect menuitem \"Copy thread ID\"", "expect menuitem \"Copy thread link\""],
+      "summary": "Every thread or global panel shown in the main view opens or focuses a tab above it. The strip looks like DSH's own right-panel tabs (28px pills, hairline separators, a close cross over a faded title end). Tabs close with × or a middle click, reorder by drag, pin to the start, close others or to the right from their context menu, scroll or list in a dropdown when they overflow, and show working, needs-you and unread dots on thread tabs. A thread tab's menu also opens that thread in the right side panel — through the cancelable `dshfiles:open-thread-aside` event `@dshfiles/thread-sidebar` answers, with the strip saying the panel is unavailable when no plugin takes it — and copies the thread ID or a clean deep link. Opening from outside the strip uses a VS Code-style preview tab by default; double-clicking a sidebar thread keeps its tab open.",
+      "reach": [
+        "seed tool-call-thread",
+        "rightclick tab \"*\"",
+        "expect menuitem \"Open in side panel\"",
+        "expect menuitem \"Copy thread ID\"",
+        "expect menuitem \"Copy thread link\""
+      ],
       "surfaces": ["client", "integration", "storage", "settings"],
       "configuration": [
         {
@@ -30,11 +36,12 @@
           "coveredBy": ["main-tabs.panels-and-threads", "main-tabs.machine-unit-preview", "main-tabs.machine-unit-replace"]
         }
       ],
-      "states": ["following", "navigating", "off", "preview", "pinned", "overflowing", "strip-unmounted"],
+      "states": ["following", "navigating", "off", "preview", "pinned", "overflowing", "strip-unmounted", "side-panel-unavailable"],
       "failureModes": [
         "A tab whose panel plugin is gone stays dimmed until the panel registers again; picking it does nothing.",
         "A navigation the Host never finishes stops being awaited after two seconds.",
         "Tabs of deleted threads are dropped.",
+        "Open in side panel leaves the thread alone and the strip announces that the side panel is unavailable there when no plugin offers an aside, and a request with no thread on screen is declined the same way.",
         "If DSH stops rendering the main slot outlet (`[data-slot=\"main\"]`) the strip stays hidden, tabs keep following the main view, and the console warns once at startup; if the strip lands anywhere but directly above the main panel, the console warns too."
       ],
       "externalDependencies": [],
@@ -47,6 +54,11 @@
         {
           "kind": "gherkin",
           "id": "main-tabs.sidebar-thread-double-click",
+          "featureFile": "tooling/dshx/e2e/features/main-tabs.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "main-tabs.thread-tab-side-panel",
           "featureFile": "tooling/dshx/e2e/features/main-tabs.feature"
         },
         {
@@ -154,6 +166,30 @@
           "id": "main-tabs.panel-copy-menu",
           "file": "plugins/@dshfiles/main-tabs/src/tab-strip.client.test.tsx",
           "testName": "omits thread copy actions from panel tab menus"
+        },
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.thread-aside-request",
+          "file": "plugins/@dshfiles/main-tabs/src/thread-aside.test.ts",
+          "testName": "asks for one thread through a cancelable window event and stays unanswered without a listener to take it"
+        },
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.thread-aside-handled",
+          "file": "plugins/@dshfiles/main-tabs/src/thread-aside.test.ts",
+          "testName": "reports the side panel as taking the thread when the request comes back cancelled"
+        },
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.thread-aside-menu",
+          "file": "plugins/@dshfiles/main-tabs/src/tab-strip.client.test.tsx",
+          "testName": "asks the side panel for a thread tab and stays quiet when it takes it"
+        },
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.thread-aside-unavailable",
+          "file": "plugins/@dshfiles/main-tabs/src/tab-strip.client.test.tsx",
+          "testName": "says the side panel is unavailable when no plugin takes the request"
         },
         {
           "kind": "unit-test",

@@ -8,7 +8,7 @@ This is an owned DSH bundle built with dshx (no port: nothing upstream does this
 
 - **New tab**: "+" after the last tab, or Mod+T (Web: Mod+Alt+T), opens a compact _Start_ tab: New thread and the five most recent threads (running ones first) sit beside the main panels and Settings in wide panes, and stack in one column in narrow panes. Arrow keys, Home/End and Enter move through the list. A picked thread or panel takes the Start tab's place (or focuses its existing tab); New thread and Settings close it. The Start tab is not saved.
 - **Open**: anything shown in the main view gets a tab. By default it is a _preview_ tab (italic) that the next thing you open replaces, VS Code style; double-click it, pin it or drag it to keep it.
-- **Close**: × on the tab, a middle click, or Delete on a focused tab. Closing the active tab shows its right neighbour. The context menu adds _Close other tabs_ and _Close tabs to the right_; pinned tabs survive both. Thread tabs also copy their ID or a clean deep link from this menu.
+- **Close**: × on the tab, a middle click, or Delete on a focused tab. Closing the active tab shows its right neighbour. The context menu adds _Close other tabs_ and _Close tabs to the right_; pinned tabs survive both. Thread tabs also open the thread in the right side panel and copy their ID or a clean deep link from this menu.
 - **Pin**: from the context menu. Pinned tabs lead the strip and have no ×.
 - **Reorder**: drag a tab. Pinned and unpinned tabs stay in their own groups.
 - **Overflow**: the strip scrolls (mouse wheel works) and a ▾ button lists every tab once they do not fit.
@@ -16,6 +16,7 @@ This is an owned DSH bundle built with dshx (no port: nothing upstream does this
 - **Keyboard**: Closing the active tab without archiving its thread has no default chord: DSH's own `page.close` already owns Mod+W on every desktop shell and the Host's shortcut registry refuses two commands that claim one default, so `Close active tab` ships unbound and rebindable in Settings › Shortcuts. Desktop Mod+1…8 / Mod+9 (last), Ctrl+Tab / Ctrl+Shift+Tab (Ctrl+Shift+] / [ on Linux). The browser keeps those keys, so the Web defaults are Mod+Alt+1…9 and Mod+Alt+] / [. Mod+T (Web: Mod+Alt+T) opens a new tab. All are listed and rebindable in Settings › Shortcuts. Arrow keys, Home/End, Enter and Delete work inside the focused strip.
 
 - **From other plugins**: a cancelable `dshfiles:open-thread` window event with `{ sessionId, newTab }` opens a thread in a tab; `newTab: true` keeps every tab whatever `openMode` says (Cmd/Ctrl-click on a thread reference in `@dshfiles/mentions`). The dispatch comes back cancelled when a tab took it; otherwise the caller opens the thread itself.
+- **To other plugins**: a thread tab's _Open in side panel_ dispatches the cancelable `dshfiles:open-thread-aside` window event with `{ sessionId }`; `@dshfiles/thread-sidebar` cancels it once it put the thread in the right panel. An uncancelled dispatch leaves the thread alone and the strip announces that the side panel is not available there, so a profile without an aside owner never looks broken.
 
 ## Settings (`dshfiles-main-tabs`)
 

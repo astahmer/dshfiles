@@ -144,6 +144,15 @@ Then('the thread tab context menu copies its ID and clean link', async ({ page }
   })
 })
 
+Then('that menu reports an unavailable side panel while no plugin offers one', async ({ page }: { page: Page }) => {
+  await strip(page).locator('[data-tab-id^="thread:"]').first().click({ button: 'right' })
+  await page.getByRole('menuitem', { name: 'Open in side panel', exact: true }).click()
+  await recordAssertion(page, 'main-tabs-tab-menu-reports-a-missing-side-panel', async () => {
+    await expect(page.getByRole('status').filter({ hasText: /^The side panel is not available here\.$/ })).toHaveText('The side panel is not available here.')
+    await expect(page.locator('[data-dshfiles-thread-aside]')).toHaveCount(0)
+  })
+})
+
 When('the Workbench tab is pinned and the thread tab is dragged before Jujutsu', async ({ page }: { page: Page }) => {
   await tab(page, 'Workbench').click({ button: 'right' })
   await page.getByRole('menuitem', { name: 'Pin tab', exact: true }).click()
@@ -241,6 +250,20 @@ Then('its tab stays open beside the next preview tab', async ({ page }: { page: 
     await expect.poll(() => tabSummary(page)).toHaveLength(2)
     await expect(page.locator('[data-tab-id^="thread:"]')).toHaveCount(2)
     await expect(page.locator('[data-tab-id][data-preview="true"]')).toHaveCount(1)
+  })
+  await finishJourneyAssertions(page)
+})
+
+When("a thread tab's context menu opens it in the side panel", async ({ page }: { page: Page }) => {
+  const sessionId = await startSidebarThread(page, 'tab aside thread')
+  await threadTab(page, sessionId).click({ button: 'right' })
+  await page.getByRole('menuitem', { name: 'Open in side panel', exact: true }).click()
+})
+
+Then('the side panel hosts that thread beside the main view', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'main-tabs-tab-menu-opens-thread-aside', async () => {
+    await expect(page.locator('[data-dshfiles-thread-aside]')).toHaveCount(1)
+    await expect(page.locator('[data-dockkit-tab]').filter({ hasText: 'tab aside thread' })).toHaveCount(1)
   })
   await finishJourneyAssertions(page)
 })

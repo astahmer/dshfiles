@@ -12,6 +12,7 @@ Feature: Main view tabs
     When the Jujutsu tab is kept, the Workbench is opened again and a thread is started
     Then each of them has its own tab and the thread tab is active
     And the thread tab context menu copies its ID and clean link
+    And that menu reports an unavailable side panel while no plugin offers one
     When the Workbench tab is pinned and the thread tab is dragged before Jujutsu
     Then the pinned tab leads and the thread tab moved
     When the Jujutsu tab is closed with a middle click and other tabs are closed from the thread tab
@@ -62,3 +63,9 @@ Feature: Main view tabs
     Given the isolated plugin composition of "@dshfiles/main-tabs, @dshfiles/thread-sidebar" is booted
     When a thread is double-clicked in the sidebar before another is opened
     Then its tab stays open beside the next preview tab
+
+  @scenario:main-tabs.thread-tab-side-panel
+  Scenario: A thread tab's menu opens that thread in the side panel
+    Given the isolated plugin composition of "@dshfiles/main-tabs, @dshfiles/thread-sidebar" is booted
+    When a thread tab's context menu opens it in the side panel
+    Then the side panel hosts that thread beside the main view

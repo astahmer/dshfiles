@@ -30,6 +30,7 @@ import { NS as SUBAGENT_LOCALE_NAMESPACE } from './subagent-provenance/locales.j
 import { subagentChatAddress } from './subagent-provenance/resource.js'
 import { ThreadAsideConversation } from './thread-aside-panel.js'
 import { THREAD_ASIDE_CONVERSATION_SLOT, THREAD_ASIDE_ID, THREAD_ASIDE_KIND, threadAsideAddress, threadAsideSessionId } from './thread-aside.js'
+import { OPEN_THREAD_ASIDE_EVENT, readThreadAsideRequest } from './thread-aside-request.js'
 import type { SubagentAddress } from '@deepseek-ai/dsh-subagent/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { sidebarChildren } from './sidebar-contract.js'
@@ -392,9 +393,22 @@ export default defineClient({
 
     const ASK_SHORTCUT_ID = 'threadSidebar.openInSidePanel'
     /** One stable identity: a fresh arrow each render would defeat the memoized thread rows. */
-    const openAside = (sessionId: SessionId): void => {
+    const openAside = (sessionId: string): void => {
       ctx.sidebarRight.openResource(threadAsideAddress(sessionId), { kind: THREAD_ASIDE_KIND })
     }
+
+    // A main-tabs tab menu asks through this cancelable event. Declining leaves the request unanswered, which tells
+    // the caller the panel is unavailable: without a thread on screen there is no side panel to open an aside into.
+    ctx.effect(() => {
+      const onOpenThreadAside = (event: Event): void => {
+        const sessionId = readThreadAsideRequest(event)
+        if (sessionId === undefined || ctx.sidebarRight.mounted.getSnapshot() === undefined) return
+        event.preventDefault()
+        openAside(sessionId)
+      }
+      window.addEventListener(OPEN_THREAD_ASIDE_EVENT, onOpenThreadAside)
+      return () => window.removeEventListener(OPEN_THREAD_ASIDE_EVENT, onOpenThreadAside)
+    }, 'thread-sidebar: open an aside for another plugin')
     /** The thread the main column shows, skipping blank drafts; undefined on a panel or the New thread screen. */
     const mainViewThread = (): SessionId | undefined => {
       const sessions = ctx.sessions.list.getSnapshot()
