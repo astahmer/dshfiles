@@ -284,6 +284,9 @@ catalogs:
     '@deepseek-ai/dsh-session-query-sqlite':
       specifier: 0.2.1-rc.2
       version: 0.2.1-rc.2
+    '@deepseek-ai/dsh-session-reference':
+      specifier: 0.2.1-rc.2
+      version: 0.2.1-rc.2
     '@deepseek-ai/dsh-session-turn-outline':
       specifier: 0.2.1-rc.2
       version: 0.2.1-rc.2
@@ -2192,7 +2195,7 @@ importers:
         specifier: 0.2.1-rc.2
         version: 0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-agent@0.2.1-rc.2(3bb27a3380dabe8aa6c4edfe696d286a))
       '@deepseek-ai/dsh-session-reference':
-        specifier: 0.2.1-rc.2
+        specifier: 'catalog:'
         version: 0.2.1-rc.2(f60b4a1060d11bcc7adfb672501bf6a9)
       '@types/node':
         specifier: 22.20.5
@@ -3757,6 +3760,9 @@ importers:
 
   plugins/@dshfiles/thread-sidebar:
     dependencies:
+      '@deepseek-ai/dsh-session-reference':
+        specifier: '>=0.2.1-rc.2 <0.3.0-0'
+        version: 0.2.1-rc.2(dfca3541e2a91076c3693b9fa7437f28)
       '@deepseek-ai/dsh-tools':
         specifier: '>=0.2.1-rc.2 <0.3.0-0'
         version: 0.2.1-rc.2(0ab00a8eb09daf0ab308290e757fa426)

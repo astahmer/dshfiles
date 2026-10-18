@@ -47,8 +47,9 @@ export class ThreadReferencesModel {
   static readonly maxLimit = 20
 
   /**
-   * The token phrase the referenced-context snapshot stores for one session id. Dashes are FTS
-   * separators, so the bare uuid matches both the `session-<id>` and the bare recorded form.
+   * The bare session id, the form a message recorded when the mentioned thread had no title yet. A mention of a
+   * titled thread serializes only its label, so the lookup tries the canonical `dsh-session:` payload first and
+   * keeps this as the fallback.
    */
   static readonly mentionQuery = (sessionId: string): string => sessionId.replace(/^session-/u, '')
 

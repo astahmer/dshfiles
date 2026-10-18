@@ -1,3 +1,5 @@
+import { encodeSessionReferenceUri } from '@deepseek-ai/dsh-session-reference'
+import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { PluginApiError, type ApiCaller } from '@dshfiles/dshx/api'
 import { z } from 'zod'
 import { ThreadReferencesModel, type ThreadReferenceMention, type ThreadReferenceThread } from './thread-references.js'
@@ -225,15 +227,41 @@ const waitBeforeRetry = (signal: AbortSignal): Promise<void> =>
     signal.addEventListener('abort', onAbort, { once: true })
   })
 
-/** Threads whose indexed message pulled `sessionId` in as referenced context; null when the search could not answer. */
-const mentionThreads = async (deps: ThreadActionDeps, sessionId: string, signal: AbortSignal): Promise<readonly ThreadReferenceMention[] | null> => {
-  const query = ThreadReferencesModel.mentionQuery(sessionId)
+/** One query with the first-search retries: null when the search could not answer at all. */
+const searchWithRetries = async (deps: ThreadActionDeps, query: string, signal: AbortSignal): Promise<readonly ThreadReferenceMention[] | null> => {
   for (let attempt = 0; attempt < REFERENCE_SEARCH_ATTEMPTS; attempt += 1) {
     if (attempt > 0) await waitBeforeRetry(signal)
     const mentions = await searchWithinDeadline(deps, query, signal)
     if (mentions !== null || signal.aborted) return mentions
   }
   return null
+}
+
+/**
+ * How a message that pulled `sessionId` in as referenced context records it. A composer mention serializes the
+ * canonical `@[label](dsh-session:<payload>)` URI, whose payload carries the id whatever label the mention used,
+ * so a titled thread is found too; the bare id is the older form, kept as the fallback.
+ */
+const mentionQueries = (sessionId: string): readonly string[] => [
+  encodeSessionReferenceUri(SessionId(sessionId)),
+  ThreadReferencesModel.mentionQuery(sessionId),
+]
+
+/**
+ * Threads whose indexed message pulled `sessionId` in as referenced context; null when no query could answer.
+ * A query that answers with rows wins; one that answers empty falls through to the next query.
+ */
+const mentionThreads = async (deps: ThreadActionDeps, sessionId: string, signal: AbortSignal): Promise<readonly ThreadReferenceMention[] | null> => {
+  let unanswered = false
+  for (const query of mentionQueries(sessionId)) {
+    const mentions = await searchWithRetries(deps, query, signal)
+    if (mentions === null) {
+      unanswered = true
+      continue
+    }
+    if (mentions.length > 0) return mentions
+  }
+  return unanswered ? null : []
 }
 
 /** Builds the thread and project actions over the injected Host services. */

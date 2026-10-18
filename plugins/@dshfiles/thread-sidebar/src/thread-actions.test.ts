@@ -341,7 +341,42 @@ describe('thread actions: references', () => {
       omitted: 0,
       degraded: false,
     })
-    expect(searched).toEqual([{ query: 'seed', limit: 20 }])
+    expect(searched).toEqual([{ query: 'dsh-session:InNlc3Npb24tc2VlZCI', limit: 20 }])
+  })
+
+  test('a mention of a titled thread is found through its canonical URI, before the bare id', async () => {
+    const searched: string[] = []
+    const actions = createThreadActions(
+      createDeps({
+        listSessions: async () => [summary('session-seed'), summary('session-mention', { updatedAt: 90 })],
+        searchThreadContent: async query => {
+          searched.push(query)
+          // A titled mention records only its label, so the bare id matches nothing: the URI payload is the handle.
+          return query.startsWith('dsh-session:') ? [{ sessionId: 'session-mention' }] : []
+        },
+      }),
+    )
+
+    const result = await actions.references({ input: { sessionId: 'session-seed' }, caller: agent('session-a'), signal })
+    expect(result.references).toEqual([{ sessionId: 'session-mention', relation: 'mention', updatedAt: 90, title: 'title session-mention' }])
+    expect(searched).toEqual(['dsh-session:InNlc3Npb24tc2VlZCI'])
+  })
+
+  test('an older message that recorded the bare id still answers after the URI query comes back empty', async () => {
+    const searched: string[] = []
+    const actions = createThreadActions(
+      createDeps({
+        listSessions: async () => [summary('session-seed'), summary('session-mention', { updatedAt: 90 })],
+        searchThreadContent: async query => {
+          searched.push(query)
+          return query.startsWith('dsh-session:') ? [] : [{ sessionId: 'session-mention' }]
+        },
+      }),
+    )
+
+    const result = await actions.references({ input: { sessionId: 'session-seed' }, caller: agent('session-a'), signal })
+    expect(result.references).toEqual([{ sessionId: 'session-mention', relation: 'mention', updatedAt: 90, title: 'title session-mention' }])
+    expect(searched).toEqual(['dsh-session:InNlc3Npb24tc2VlZCI', 'seed'])
   })
 
   test('a failed or slow content search still answers with lineage, marked degraded', async () => {
