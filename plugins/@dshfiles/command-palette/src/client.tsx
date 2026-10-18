@@ -17,7 +17,7 @@ import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
 import { CirclePlusIcon, FolderOpenIcon, MoonIcon, SunIcon, SunMoonIcon } from '@dshfiles/plugin-ui/icons'
 import { COMMAND_PALETTE_LOCALE_NAMESPACE, commandPaletteLocale } from './locales.js'
 import { newThreadShortcutDefaults } from './new-thread-shortcut.js'
-import { PaletteApi, PALETTE_EVENT, type PaletteAction, type PaletteActionContext } from './palette-api.js'
+import { PaletteApi, PALETTE_EVENT, type PaletteAction, type PaletteActionContext, type PaletteMode, type PaletteWorkspace } from './palette-api.js'
 import { ThreadPalette } from './thread-palette.js'
 
 const isShortcutCommandId = (value: string): value is ShortcutCommandId => /^[a-z][a-zA-Z0-9-]*(?:\.[a-zA-Z][a-zA-Z0-9-]*)+$/u.test(value)
@@ -48,9 +48,14 @@ const workspaceForSession = (
   return undefined
 }
 
-const PaletteOverlay = (props: PaletteOverlayProps): JSX.Element | null => {
-  const paletteSnapshot = useSyncExternalStore(PaletteApi.subscribe, PaletteApi.getSnapshot, PaletteApi.getSnapshot)
-  const { mode, recentLimit } = paletteSnapshot
+interface PaletteCatalogProps extends PaletteOverlayProps {
+  readonly mode: PaletteMode
+  readonly recentLimit: number
+}
+
+/** Mounted only while the palette is open, so a closed palette derives nothing at all. */
+const PaletteCatalog = (props: PaletteCatalogProps): JSX.Element => {
+  const { mode, recentLimit } = props
   const sessionState = props.useSessions(state => state)
   const workspaceState = props.useWorkspaces(state => state)
   const themeSnapshot = useSyncExternalStore(props.themeStore.subscribe, props.themeStore.getSnapshot, props.themeStore.getSnapshot)
@@ -66,9 +71,17 @@ const PaletteOverlay = (props: PaletteOverlayProps): JSX.Element | null => {
   const selectedSession = sessions.find(session => (session.retainedBy.mainView ?? 0) > 0 && !session.blank)
   const selectedWorkspaceId = workspaceForSession(selectedSession, sessionState.byId, workspaceBySession)
   const workspaces = useMemo(() => workspaceState.items.map(workspace => ({ id: workspace.workspaceId, title: workspace.title })), [workspaceState.items])
+  const workspaceById = useMemo<ReadonlyMap<string, PaletteWorkspace>>(
+    () => new Map<string, PaletteWorkspace>(workspaces.map(workspace => [String(workspace.id), workspace])),
+    [workspaces],
+  )
+  const workspaceTitleById = useMemo<ReadonlyMap<string, string>>(
+    () => new Map<string, string>(workspaces.map(workspace => [String(workspace.id), workspace.title])),
+    [workspaces],
+  )
+  const archivedSessionIds = useMemo(() => new Set(workspaceState.archivedSessionIds), [workspaceState.archivedSessionIds])
   const context = useMemo<PaletteActionContext>(() => {
-    const workspace = workspaces.find(candidate => candidate.id === selectedWorkspaceId) ?? null
-    const archived = new Set(workspaceState.archivedSessionIds)
+    const workspace = (selectedWorkspaceId === undefined ? undefined : workspaceById.get(selectedWorkspaceId)) ?? null
     const pinned = new Set(workspaceState.pinnedSessionIds)
     return {
       thread:
@@ -80,22 +93,22 @@ const PaletteOverlay = (props: PaletteOverlayProps): JSX.Element | null => {
               cwd: selectedSession.cwd ?? '',
               workspaceId: selectedWorkspaceId,
               pinned: pinned.has(selectedSession.id),
-              archived: archived.has(selectedSession.id),
+              archived: archivedSessionIds.has(selectedSession.id),
             },
       workspace,
       workspaces,
       themePreference: themeSnapshot.preference,
     }
-  }, [selectedSession, selectedWorkspaceId, themeSnapshot.preference, workspaces, workspaceState.archivedSessionIds, workspaceState.pinnedSessionIds])
+  }, [archivedSessionIds, selectedSession, selectedWorkspaceId, themeSnapshot.preference, workspaceById, workspaceState.pinnedSessionIds, workspaces])
   const threads = useMemo(
     () =>
       sessions.flatMap(session => {
-        if (session.blank || workspaceState.archivedSessionIds.includes(session.id)) return []
+        if (session.blank || archivedSessionIds.has(session.id)) return []
         const workspaceId = workspaceForSession(session, sessionState.byId, workspaceBySession)
-        const project = workspaces.find(workspace => workspace.id === workspaceId)?.title ?? ''
+        const project = workspaceId === undefined ? '' : (workspaceTitleById.get(workspaceId) ?? '')
         return [{ id: session.id, title: session.displayTitle, project, cwd: session.cwd ?? '', updatedAt: session.updatedAt }]
       }),
-    [sessionState.byId, sessions, workspaceBySession, workspaceState.archivedSessionIds, workspaces],
+    [archivedSessionIds, sessionState.byId, sessions, workspaceBySession, workspaceTitleById],
   )
   const openWorkspace = props.openWorkspace
   const workspaceActions = useMemo<readonly PaletteAction[]>(
@@ -113,7 +126,6 @@ const PaletteOverlay = (props: PaletteOverlayProps): JSX.Element | null => {
         })),
     [openWorkspace, workspaceState.items],
   )
-  if (mode === null) return null
   return (
     <ThreadPalette
       mode={mode}
@@ -177,6 +189,17 @@ const PaletteOverlay = (props: PaletteOverlayProps): JSX.Element | null => {
       onClose={PaletteApi.close}
     />
   )
+}
+
+/**
+ * The overlay gate: it reads nothing but the palette snapshot, so a closed palette runs no
+ * subscription, join or projection over the session and workspace stores.
+ */
+export const PaletteOverlay = (props: PaletteOverlayProps): JSX.Element | null => {
+  const paletteSnapshot = useSyncExternalStore(PaletteApi.subscribe, PaletteApi.getSnapshot, PaletteApi.getSnapshot)
+  const { mode, recentLimit } = paletteSnapshot
+  if (mode === null) return null
+  return <PaletteCatalog {...props} mode={mode} recentLimit={recentLimit} />
 }
 
 export default defineClient({
