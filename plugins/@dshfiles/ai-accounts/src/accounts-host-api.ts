@@ -18,6 +18,7 @@ import { readAccountUsage } from './account-usage.js'
 import { resolveKeyFromContext } from './credentials.js'
 import { createUsageHistoryService } from './usage-recorder.js'
 import { knownQuotaResetAt } from './quota-reset.js'
+import { mapRolling } from './rolling-concurrency.js'
 import { readNativeProviders, setNativeProviderEnabled } from './native-providers.js'
 import { PricingCatalogModel } from './pricing-catalog.js'
 import { AccountSettingsModel } from './settings.js'
@@ -223,6 +224,9 @@ export const accountsHostApi = aiAccountsApi.host({
   snoozeQuotaContinuation: async ({ input, ctx }) => quotaContinuationServiceFor(ctx).snooze(input.continuationId, input.duration),
 })
 
+/** Provider reads are independent; bound them so a profile with 64 accounts is not a 64-request burst. */
+const ACCOUNT_USAGE_READ_CONCURRENCY = 4
+
 const readQuotaResetAt = async (ctx: Context, accountId: string): Promise<number | null> => {
   const file = await accountsFile(ctx)
   const account = file.accounts.find(profile => profile.instanceId === accountId)
@@ -242,15 +246,17 @@ const readAccountsUsage = async (ctx: Context): Promise<AccountsUsage> => {
   // panel already shows, not a re-derived guess.
   const file = await accountsFile(ctx)
   const resolveCredential = resolveKeyFromContext(ctx)
-  const cards = await Promise.all(
-    file.accounts.map(async account => ({
+  const cards = await mapRolling({
+    items: file.accounts,
+    concurrency: ACCOUNT_USAGE_READ_CONCURRENCY,
+    map: async account => ({
       instanceId: account.instanceId,
       displayName: account.displayName,
       kind: account.kind,
       enabled: account.enabled,
       usage: await readAccountUsage({ account, shadowRoot: file.shadowRoot, resolveCredential }),
-    })),
-  )
+    }),
+  })
   return { readAt: Date.now(), hostName: hostname(), cards }
 }
 

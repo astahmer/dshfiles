@@ -1,6 +1,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { readAccountUsage } from './account-usage.js'
 import { USAGE_HISTORY_DOMAIN, UsageHistoryModel, usageHistoryDomain, type QuotaSnapshot } from './usage-history.js'
+import { mapRollingUntilAborted } from './rolling-concurrency.js'
 import { usageMetaSchema, type UsageMeta, type UsageHistorySettings } from './usage-history-model.js'
 import type { AccountProfile, UsageCard } from './api.js'
 import type { CredentialValueResolver } from './credentials.js'
@@ -99,26 +100,23 @@ const collectUsageHistory = async (ctx: Context, accounts: readonly AccountProfi
   const quota = domain.table('quota')
   const settings = domain.global.get()
 
-  let written = 0
   const enabled = accounts.filter(account => account.enabled)
   // Provider reads are independent, but bound concurrency to avoid an
   // unbounded burst of authenticated requests for profiles with many accounts.
-  for (let offset = 0; offset < enabled.length; offset += PROVIDER_READ_CONCURRENCY) {
-    if (signal?.aborted) break
-    const batch = enabled.slice(offset, offset + PROVIDER_READ_CONCURRENCY)
-    const results = await Promise.all(
-      batch.map(async account => {
-        try {
-          return { account, usage: signal?.aborted ? undefined : await readUsage(account, signal) }
-        } catch {
-          return { account, usage: undefined }
-        }
-      }),
-    )
-    if (signal?.aborted) break
-
-    for (const { account, usage } of results) {
-      if (usage === undefined || usage.status !== 'ok') continue
+  // Rolling: an account starts as soon as a slot frees, so one slow provider no
+  // longer delays every account queued behind its batch.
+  const results = await mapRollingUntilAborted({
+    items: enabled,
+    concurrency: PROVIDER_READ_CONCURRENCY,
+    signal,
+    map: async account => {
+      let usage: UsageCard | undefined
+      try {
+        usage = signal?.aborted === true ? undefined : await readUsage(account, signal)
+      } catch {
+        usage = undefined
+      }
+      if (signal?.aborted === true || usage === undefined || usage.status !== 'ok') return 0
       const at = Date.now()
       const windows: Record<string, number> = {}
       const resetsAt: Record<string, number> = {}
@@ -135,9 +133,11 @@ const collectUsageHistory = async (ctx: Context, accounts: readonly AccountProfi
         bankedResetExpiries: usage.bankedResetExpiries,
       }
       await quota.put(UsageHistoryModel.bucketKey(account.instanceId, at, settings.intervalMinutes), snapshot)
-      written += 1
-    }
-  }
+      return 1
+    },
+  })
+  let written = 0
+  for (const result of results) written += result ?? 0
 
   if (signal?.aborted) return written
   const attemptedAt = Date.now()
