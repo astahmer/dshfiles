@@ -1,5 +1,5 @@
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
-import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
+import type { SessionListState, SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
 import type {} from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type {} from '@deepseek-ai/dsh-client-connection/client'
 import type { ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client'
@@ -32,6 +32,33 @@ interface PaletteOverlayProps extends PropsRuntime<'shell.overlay'>, PropsLocale
   readonly translate: TranslateNS<typeof COMMAND_PALETTE_LOCALE_NAMESPACE>
 }
 
+/**
+ * The palette renders thread summaries, so it selects them by content: the Host
+ * rebuilds every summary per projection, and comparing the fields the palette
+ * shows keeps a projection that changed none of them from re-rendering it.
+ */
+const selectPaletteSessions = (state: SessionListState): readonly SessionSummary[] =>
+  state.ids.flatMap(id => {
+    const session = state.byId[id]
+    return session === undefined ? [] : [session]
+  })
+
+const samePaletteSession = (left: SessionSummary, right: SessionSummary): boolean =>
+  left.id === right.id &&
+  left.displayTitle === right.displayTitle &&
+  left.cwd === right.cwd &&
+  left.parentId === right.parentId &&
+  left.blank === right.blank &&
+  left.updatedAt === right.updatedAt &&
+  (left.retainedBy.mainView ?? 0) === (right.retainedBy.mainView ?? 0)
+
+const samePaletteSessions = (left: readonly SessionSummary[], right: readonly SessionSummary[]): boolean =>
+  left.length === right.length &&
+  left.every((session, index) => {
+    const candidate = right[index]
+    return candidate !== undefined && samePaletteSession(session, candidate)
+  })
+
 const workspaceForSession = (
   session: SessionSummary | undefined,
   byId: Readonly<Record<string, SessionSummary>>,
@@ -56,21 +83,20 @@ interface PaletteCatalogProps extends PaletteOverlayProps {
 /** Mounted only while the palette is open, so a closed palette derives nothing at all. */
 const PaletteCatalog = (props: PaletteCatalogProps): JSX.Element => {
   const { mode, recentLimit } = props
-  const sessionState = props.useSessions(state => state)
-  const workspaceState = props.useWorkspaces(state => state)
+  const sessions = props.useSessions(selectPaletteSessions, samePaletteSessions)
+  const workspaceItems = props.useWorkspaces(state => state.items)
+  const archivedWorkspaceSessionIds = props.useWorkspaces(state => state.archivedSessionIds)
+  const pinnedWorkspaceSessionIds = props.useWorkspaces(state => state.pinnedSessionIds)
   const themeSnapshot = useSyncExternalStore(props.themeStore.subscribe, props.themeStore.getSnapshot, props.themeStore.getSnapshot)
-  const sessions = useMemo(
-    () => sessionState.ids.flatMap(id => (sessionState.byId[id] === undefined ? [] : [sessionState.byId[id]])),
-    [sessionState.byId, sessionState.ids],
-  )
+  const sessionsById = useMemo(() => Object.fromEntries(sessions.map(session => [session.id, session])), [sessions])
   const workspaceBySession = useMemo(
-    () => new Map(workspaceState.items.flatMap(workspace => workspace.sessionIds.map(id => [id, workspace.workspaceId] as const))),
-    [workspaceState.items],
+    () => new Map(workspaceItems.flatMap(workspace => workspace.sessionIds.map(id => [id, workspace.workspaceId] as const))),
+    [workspaceItems],
   )
   // The New-thread screen holds a blank Session in the main view; it is not a thread, so it gets no thread actions.
   const selectedSession = sessions.find(session => (session.retainedBy.mainView ?? 0) > 0 && !session.blank)
-  const selectedWorkspaceId = workspaceForSession(selectedSession, sessionState.byId, workspaceBySession)
-  const workspaces = useMemo(() => workspaceState.items.map(workspace => ({ id: workspace.workspaceId, title: workspace.title })), [workspaceState.items])
+  const selectedWorkspaceId = workspaceForSession(selectedSession, sessionsById, workspaceBySession)
+  const workspaces = useMemo(() => workspaceItems.map(workspace => ({ id: workspace.workspaceId, title: workspace.title })), [workspaceItems])
   const workspaceById = useMemo<ReadonlyMap<string, PaletteWorkspace>>(
     () => new Map<string, PaletteWorkspace>(workspaces.map(workspace => [String(workspace.id), workspace])),
     [workspaces],
@@ -79,10 +105,10 @@ const PaletteCatalog = (props: PaletteCatalogProps): JSX.Element => {
     () => new Map<string, string>(workspaces.map(workspace => [String(workspace.id), workspace.title])),
     [workspaces],
   )
-  const archivedSessionIds = useMemo(() => new Set(workspaceState.archivedSessionIds), [workspaceState.archivedSessionIds])
+  const archivedSessionIds = useMemo(() => new Set(archivedWorkspaceSessionIds), [archivedWorkspaceSessionIds])
   const context = useMemo<PaletteActionContext>(() => {
     const workspace = (selectedWorkspaceId === undefined ? undefined : workspaceById.get(selectedWorkspaceId)) ?? null
-    const pinned = new Set(workspaceState.pinnedSessionIds)
+    const pinned = new Set(pinnedWorkspaceSessionIds)
     return {
       thread:
         selectedSession === undefined
@@ -99,21 +125,21 @@ const PaletteCatalog = (props: PaletteCatalogProps): JSX.Element => {
       workspaces,
       themePreference: themeSnapshot.preference,
     }
-  }, [archivedSessionIds, selectedSession, selectedWorkspaceId, themeSnapshot.preference, workspaceById, workspaceState.pinnedSessionIds, workspaces])
+  }, [archivedSessionIds, selectedSession, selectedWorkspaceId, themeSnapshot.preference, workspaceById, pinnedWorkspaceSessionIds, workspaces])
   const threads = useMemo(
     () =>
       sessions.flatMap(session => {
         if (session.blank || archivedSessionIds.has(session.id)) return []
-        const workspaceId = workspaceForSession(session, sessionState.byId, workspaceBySession)
+        const workspaceId = workspaceForSession(session, sessionsById, workspaceBySession)
         const project = workspaceId === undefined ? '' : (workspaceTitleById.get(workspaceId) ?? '')
         return [{ id: session.id, title: session.displayTitle, project, cwd: session.cwd ?? '', updatedAt: session.updatedAt }]
       }),
-    [archivedSessionIds, sessionState.byId, sessions, workspaceBySession, workspaceTitleById],
+    [archivedSessionIds, sessions, sessionsById, workspaceBySession, workspaceTitleById],
   )
   const openWorkspace = props.openWorkspace
   const workspaceActions = useMemo<readonly PaletteAction[]>(
     () =>
-      workspaceState.items
+      workspaceItems
         .filter(workspace => !EntityLabels.isThreadWorkspace(workspace.path))
         .map(workspace => ({
           id: `@dshfiles/command-palette/workspace/${workspace.workspaceId}`,
@@ -124,7 +150,7 @@ const PaletteCatalog = (props: PaletteCatalogProps): JSX.Element => {
           isSelected: current => current.workspace?.id === workspace.workspaceId,
           run: () => openWorkspace(workspace.workspaceId),
         })),
-    [openWorkspace, workspaceState.items],
+    [openWorkspace, workspaceItems],
   )
   return (
     <ThreadPalette

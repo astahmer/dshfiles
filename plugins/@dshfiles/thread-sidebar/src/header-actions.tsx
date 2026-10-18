@@ -14,6 +14,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
+import { HostSnapshotsModel } from './snapshots.js'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { ArchiveIcon, ArchiveRestoreIcon, BellIcon, BellOffIcon, CopyIcon, EllipsisIcon, PauseIcon, PinIcon, PinOffIcon } from '@dshfiles/plugin-ui/icons'
@@ -88,22 +89,24 @@ export const HeaderThreadActions = ({
   openThread,
   t,
 }: HeaderThreadActionsProps) => {
-  const sessionState = useSessions(state => state)
+  const sessionState = useSessions(HostSnapshotsModel.selectStableSessionListState)
   const session = sessionState.byId[sessionId]
-  const workspaceState = useWorkspaces(state => state)
+  const workspaceItems = useWorkspaces(state => state.items)
+  const archivedSessionIds = useWorkspaces(state => state.archivedSessionIds)
+  const pinnedSessionIds = useWorkspaces(state => state.pinnedSessionIds)
   const { preferences, updatePreferences } = usePreferences()
   const [actionFailed, setActionFailed] = useState(false)
   const [copyStatus, setCopyStatus] = useState('')
   const [bar, setBar] = useState<HTMLElement | null>(null)
   const crowded = useCrowdedHeader(bar)
   const workspaceBySession = useMemo(
-    () => SidebarOrganization.workspaceForSessions({ workspaces: workspaceState.items, sessions: Object.values(sessionState.byId) }),
-    [sessionState.byId, workspaceState.items],
+    () => SidebarOrganization.workspaceForSessions({ workspaces: workspaceItems, sessions: Object.values(sessionState.byId) }),
+    [sessionState.byId, workspaceItems],
   )
   if (session === undefined || session.blank) return null
 
-  const archived = workspaceState.archivedSessionIds.includes(sessionId)
-  const pinned = workspaceState.pinnedSessionIds.includes(sessionId)
+  const archived = archivedSessionIds.includes(sessionId)
+  const pinned = pinnedSessionIds.includes(sessionId)
   const parked = preferences.parkedSessionIds.includes(sessionId)
   const muted = ThreadMuteModel.isSessionMuted(preferences.mutedThreads, sessionId, Date.now())
   const actionThreads = Object.values(sessionState.byId).filter(candidate => !candidate.blank)
@@ -126,10 +129,10 @@ export const HeaderThreadActions = ({
   const updateThreadOperation = async (operation: 'pin' | 'unpin' | 'archive' | 'unarchive'): Promise<void> => {
     setActionFailed(false)
     const needsChange = targetIds.filter(targetId => {
-      if (operation === 'pin') return !workspaceState.pinnedSessionIds.includes(targetId)
-      if (operation === 'unpin') return workspaceState.pinnedSessionIds.includes(targetId)
-      if (operation === 'archive') return !workspaceState.archivedSessionIds.includes(targetId)
-      return workspaceState.archivedSessionIds.includes(targetId)
+      if (operation === 'pin') return !pinnedSessionIds.includes(targetId)
+      if (operation === 'unpin') return pinnedSessionIds.includes(targetId)
+      if (operation === 'archive') return !archivedSessionIds.includes(targetId)
+      return archivedSessionIds.includes(targetId)
     })
     if (operation === 'archive' && needsChange.some(targetId => sessionState.byId[targetId]?.running === true)) return
     const actionHandler = { pin: pinSession, unpin: unpinSession, archive: archiveSession, unarchive: unarchiveSession }[operation]

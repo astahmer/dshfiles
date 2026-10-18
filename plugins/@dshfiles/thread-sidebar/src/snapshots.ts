@@ -2,10 +2,14 @@ import type { SessionListState, SessionSummary } from '@deepseek-ai/dsh-api-sess
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 
 /**
- * The Host rebuilds every summary object on each list projection, so a row whose
- * data did not change still arrives as a new object and invalidates every memo
- * downstream of it. Comparing field values and reusing the previous object keeps
- * the change set proportional to what actually changed.
+ * The Session Controller rebuilds every summary object on each list projection, so
+ * a row whose data did not change still arrives as a new object and invalidates
+ * every memo downstream of it. Comparing field values and reusing the previous
+ * object keeps each consumer's change set proportional to what actually changed.
+ *
+ * Every plugin that lists threads passes these selectors to its injected
+ * `useSessions` / `useSessionStatus` hooks instead of an identity selector
+ * (`state => state`).
  */
 
 /** Structural equality for the JSON values a summary carries (projection values, retain counts). */
@@ -78,24 +82,51 @@ const stabilizeSessionListState = (previous: SessionListState | null, next: Sess
   return { ids, byId, phase: next.phase, projectionsBySession }
 }
 
-let lastSnapshot: SessionListState | null = null
-let lastStable: SessionListState | null = null
-
-/**
- * Selector for `useSessions`: a projection that changed nothing visible hands the
- * previous state object back, which stops the store notification from re-rendering
- * the list at all.
- */
-const selectStableSessionListState = (snapshot: SessionListState): SessionListState => {
-  if (snapshot === lastSnapshot && lastStable !== null) return lastStable
-  const stable = stabilizeSessionListState(lastStable, snapshot)
-  lastSnapshot = snapshot
-  lastStable = stable
-  return stable
+/** Reuse every unchanged status row; a status change for one session must not rebuild the others. */
+const stabilizeStatusMap = <Status>(previous: ReadonlyMap<SessionId, Status> | null, next: ReadonlyMap<SessionId, Status>): ReadonlyMap<SessionId, Status> => {
+  if (previous === null) return next
+  if (previous.size !== next.size) return next
+  const entries: [SessionId, Status][] = []
+  let reused = true
+  for (const [id, status] of next) {
+    const before = previous.get(id)
+    const stable = before !== undefined && sameJsonValue(before, status) ? before : status
+    if (stable !== before) reused = false
+    entries.push([id, stable])
+  }
+  return reused ? previous : new Map(entries)
 }
 
-export class SessionListCacheModel {
+const createStableSelector = <Snapshot extends object>(stabilize: (previous: Snapshot | null, next: Snapshot) => Snapshot): ((next: Snapshot) => Snapshot) => {
+  // Keyed by the raw snapshot, so two components holding different generations in
+  // the same tick each get one stable object instead of regenerating each other's.
+  const stabilized = new WeakMap<Snapshot, Snapshot>()
+  let lastStable: Snapshot | null = null
+  return next => {
+    const cached = stabilized.get(next)
+    if (cached !== undefined) return cached
+    const stable = stabilize(lastStable, next)
+    stabilized.set(next, stable)
+    lastStable = stable
+    return stable
+  }
+}
+
+/**
+ * Selectors for the injected snapshot hooks: a projection that changed nothing
+ * visible hands the previous snapshot object back, which stops the store
+ * notification from re-rendering the consumer at all.
+ */
+const selectStableStatusMap = createStableSelector(stabilizeStatusMap)
+
+export class HostSnapshotsModel {
+  static readonly sameJsonValue = sameJsonValue
   static readonly sameSessionSummary = sameSessionSummary
   static readonly stabilizeSessionListState = stabilizeSessionListState
-  static readonly selectStableSessionListState = selectStableSessionListState
+  static readonly stabilizeStatusMap = stabilizeStatusMap
+  static readonly selectStableSessionListState = createStableSelector(stabilizeSessionListState)
+  /** Selector for `useSessionStatus`; keeps the caller's status value type. */
+  static readonly selectStableSessionStatus = <Status>(next: ReadonlyMap<SessionId, Status>): ReadonlyMap<SessionId, Status> =>
+    // SAFETY: the cache returns `next` itself or a previous map whose every entry compared equal to `next`.
+    selectStableStatusMap(next) as ReadonlyMap<SessionId, Status>
 }

@@ -4,8 +4,8 @@ import type { WorkspaceBrowserProps } from '@deepseek-ai/dsh-client-ui-workspace
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
+import { HostSnapshotsModel } from './snapshots.js'
 import { RemoteThreadsSection } from './remote-threads-section.js'
-import { SessionListCacheModel } from './session-list-cache.js'
 import { StableValueModel, useStableValue } from './stable-value.js'
 import { createThreadChildRowCache, type ThreadChildRowCache } from './thread-child-rows.js'
 import { useApi, useApiQuery } from '@dshfiles/dshx/client'
@@ -1004,7 +1004,7 @@ export const ThreadSidebar = (props: ThreadSidebarProps): JSX.Element => (
 )
 
 const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
-  const sessionState = props.useSessions(SessionListCacheModel.selectStableSessionListState)
+  const sessionState = props.useSessions(HostSnapshotsModel.selectStableSessionListState)
   const sessionStatus = props.useSessionStatus(state => state)
   const workspaceState = props.useWorkspaces(state => state)
   const { preferences, updatePreferences, storageWarning, hostBacked, setSelectedThreadId, threadTitle } = useSidebarState()

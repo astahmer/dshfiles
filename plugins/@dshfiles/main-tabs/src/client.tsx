@@ -8,6 +8,7 @@ import { resolveSlotLabel } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { defineClient, useApiQuery, useSettings } from '@dshfiles/dshx/client'
 import { threadSidebarAttentionApi } from '@dshfiles/thread-sidebar/attention-api'
+import { HostSnapshotsModel } from '@dshfiles/thread-sidebar/snapshots'
 import { MessageSquareIcon, MessageSquarePlusIcon, PanelsTopLeftIcon, SettingsIcon } from '@dshfiles/plugin-ui/icons'
 import { createActor } from '@dshfiles/plugin-ui/machine'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
@@ -197,14 +198,14 @@ export default defineClient({
               return entry.options.id === undefined || label === undefined ? [] : [[entry.options.id, label] as const]
             }),
           )
-          const byId = props.useSessions(state => state.byId)
+          const byId = props.useSessions(HostSnapshotsModel.selectStableSessionListState).byId
           const sessions = useMemo(() => new Map<string, SessionSummary>(Object.values(byId).map(session => [session.id, session])), [byId])
           const workspaceItems = props.useWorkspaces(state => state.items)
           const workspaceForThread = useMemo(
             () => createThreadWorkspaceResolver({ sessions: Object.values(byId), workspaces: workspaceItems }),
             [byId, workspaceItems],
           )
-          const statuses = props.useSessionStatus(state => state)
+          const statuses = props.useSessionStatus(HostSnapshotsModel.selectStableSessionStatus)
           // Attention is Host-owned now, so the dot follows the same record the sidebar acknowledges.
           const attention = useApiQuery(threadSidebarAttentionApi, 'state')
           const attentionRefresh = attention.refetch

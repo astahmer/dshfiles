@@ -5,7 +5,8 @@ export default defineConfig({
   name: '@dshfiles/thread-sidebar',
   host: { entry: 'src/host.ts' },
   client: { entry: 'src/client-entry.tsx', shared: '@dshfiles/shared-runtime', vite: { plugins: [pluginUiVite()] } },
-  // Other plugins read the same attention records through this contract.
-  modules: { 'attention-api': 'src/attention-api.ts' },
+  // Other plugins read the same attention records through this contract, and
+  // thread-listing plugins share the Host snapshot selectors.
+  modules: { 'attention-api': 'src/attention-api.ts', snapshots: 'src/snapshots.ts' },
   build: { sourcemap: true, declarations: true, minify: true },
 })

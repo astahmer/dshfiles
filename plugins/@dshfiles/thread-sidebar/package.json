@@ -20,6 +20,10 @@
     "./attention-api": {
       "types": "./src/attention-api.ts",
       "default": "./dist/attention-api.js"
+    },
+    "./snapshots": {
+      "types": "./src/snapshots.ts",
+      "default": "./dist/snapshots.js"
     }
   },
   "scripts": {

@@ -11,6 +11,7 @@ import {
   Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale, PropsRuntime, TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
+import { HostSnapshotsModel } from '../snapshots.js'
 import { NS } from './locales.js'
 import { SubagentRouteLabelModel } from './route-label.js'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
@@ -440,9 +441,10 @@ function CatalogDropdown({
   t,
 }: CatalogDropdownProps) {
   const ancestorSwitcher = variant === 'switcher' && openTitle !== undefined
-  const projections = useSessions(state => state.projectionsBySession)
-  const summaries = useSessions(state => state.byId)
-  const statuses = useSessionStatus(value => value)
+  const sessionState = useSessions(HostSnapshotsModel.selectStableSessionListState)
+  const projections = sessionState.projectionsBySession
+  const summaries = sessionState.byId
+  const statuses = useSessionStatus(HostSnapshotsModel.selectStableSessionStatus)
   const catalogs = useMemo<Catalogs>(
     () =>
       Object.fromEntries(

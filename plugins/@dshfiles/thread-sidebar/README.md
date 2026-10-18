@@ -357,12 +357,16 @@ full re-render per store update.
 Three pieces keep the work proportional to what actually changed, all on the
 client side — no Host change is involved:
 
-- `src/session-list-cache.ts` is the selector the sidebar passes to
-  `useSessions`. It reuses the previous summary whenever every field is equal
-  (including `retainedBy` and `projectionValues`), reuses the `ids` array and the
-  projection map when their content is equal, and returns the **previous state
-  object** when a projection changed nothing at all, so the store notification
-  does not re-render the sidebar.
+- `src/snapshots.ts` is the selector thread-listing plugins pass to
+  `useSessions` and `useSessionStatus` (this plugin's own components, and
+  main-tabs through the `@dshfiles/thread-sidebar/snapshots` module). It reuses
+  the previous summary whenever every field is equal (including `retainedBy` and
+  `projectionValues`), reuses the `ids` array, the projection map and each status
+  row by content, and returns the **previous state object** when a projection
+  changed nothing at all, so the store notification does not re-render the
+  consumer. Its cache is keyed by the raw snapshot generation, so two components
+  holding different generations in one tick cannot regenerate each other's
+  stable object.
 - `src/stable-value.ts` keeps a derived `Set` or `Map` when its content is
   equal. The unread, waiting and attention id sets and the inline attention
   label map are row props, so without this every row re-renders although none of
