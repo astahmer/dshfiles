@@ -28,6 +28,7 @@ Checkboxes and receipts in a plan are history, not fresh verification.
 |---|---|
 | [Plugin E2E coverage](plugin-e2e-coverage.md) | Run journeys in CI, a fresh baseline, Host egress, catalog scaffolding. |
 | [Host loop freezes](host-loop-freezes/README.md) | Measurement-gated fixes for the session-search Host stall: harness, L0 escape hatch, L1 coalescing, L2 warm index, L3 measured plugin tax, L4 off-loop engine. |
+| [Slot assembly crash safety](slot-assembly-crash-safety/README.md) | A recomposition gap in the sole `root` slot owner blanks the Web UI (`SlotAssemblyError`): ship a shadowed fallback entry, record the renderer/shell half as a Host gap. |
 | [Guardrails](guardrails.md) | Lint ratchets, ast-grep rules, knip, exact pins, a shared plugin tsconfig, XState and namespace-class refactors. |
 | [Guardrails: refactors](guardrails-refactors.md) | Steps 10–12: Hono e2e fakes, the `no-export-bag` rule in emilint, XState and namespace classes per plugin. |
 | [Host gaps](dsh-host-gaps.md) | Behaviors our plugins cannot build until DSH exposes a capability. A standing list, not a task plan. |
