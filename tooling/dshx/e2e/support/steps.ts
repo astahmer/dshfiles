@@ -97,6 +97,8 @@ export const openSettingsDialog = async (page: Page, options?: { readonly timeou
   await page.getByRole('menuitem', { name: /^Settings/ }).click(clickOptions)
 }
 
+export const reloadPastProviderSetup = async (page: Page): Promise<void> => StartupDialogs.reloadPastProviderSetup(page)
+
 export const finishJourneyAssertions = async (page: Page): Promise<void> => {
   const run = evidenceRunFor(page)
   completeEvidenceStep(run, 'assertion-complete')
