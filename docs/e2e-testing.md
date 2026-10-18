@@ -109,6 +109,15 @@ bytes and retained runs are capped. Prompts, page text, Host stdout and
 tokenized URLs are never written. Frame order stays inside the Playwright
 trace; the receipt does not invent a step-to-frame mapping.
 
+Failure diagnostics are retained beside them as
+`attachments/NNN-browser-diagnostics.json` (`kind: diagnostics`): the scratch
+Host's output and pid/exit state, browser console and page errors, failed
+requests, HTTP ≥ 400, the `/api` traffic and WebSocket lifecycle, and whatever
+in-page trace the journey recorded. Read that file before the test error — it
+separates "the page never asked" from "the page asked, and something else
+removed what the assertion was reading". (`application/json` used to have no
+entry in the receipt's format table, so this file was silently dropped.)
+
 ## Commands
 
 From `tooling/dshx`:
@@ -145,6 +154,21 @@ regression. Check for that Failed turn in the failure snapshot before believing
 one. Run a single stack at a time for the same reason `check:e2e` uses
 `--concurrency=1`: parallel Hosts and Chromiums make the timing-sensitive
 journeys flaky.
+
+A profile without a working route loses the conversation, not just the turn:
+the turn ends immediately, and the client then puts the New thread screen back
+and unmounts the messages. A journey that reads something inside a message — a
+citation, a reference — after sending one is therefore racing a DOM that is
+about to disappear, and re-asking does not help because the element it clicks
+is gone. `memory.reference-preview` measured it: five of five failing runs lost
+the citation outright and eight of eight passing runs kept it, while the
+preview RPC answered `200` and rendered the note text in both. A journey that
+needs a message to outlive its own assertion runs a real turn on the local fake
+provider and waits for it to settle: boot the composition with
+`@dshfiles/ai-accounts`, add the fake Command Code account
+(`startFakeCommandCode`), then `startThreadWithModel` + `sendMessage` before
+asserting — `jujutsu.chat-references` and `memory.reference-preview` are the
+pattern.
 
 `pnpm check` runs `check:plugin-boot` and then `check:e2e:smoke`: the
 `@smoke` scenarios, about ten journeys spanning boot, the shared stylesheet and
