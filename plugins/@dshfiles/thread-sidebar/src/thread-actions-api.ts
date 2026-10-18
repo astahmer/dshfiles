@@ -121,7 +121,7 @@ export const threadActionsApi = defineApi({
         })
         .strict(),
       output: z.object({ sessionId: z.string(), title: z.string().optional(), agentPreset: z.string().optional() }).strict(),
-      description: `Start a new thread, optionally inside a project (projectId) or a directory (cwd) and with a title. Returns the new thread id. ${ONLY_WHEN_ASKED}`,
+      description: `Start a new thread in a project (projectId) or in a directory (cwd), which uses the project that owns it so the thread groups correctly, and with an optional title. Returns the new thread id. ${ONLY_WHEN_ASKED}`,
       tool: {
         name: 'thread_create',
         render: output =>

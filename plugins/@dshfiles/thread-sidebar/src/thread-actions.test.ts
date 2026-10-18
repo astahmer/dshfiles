@@ -222,6 +222,25 @@ describe('thread actions: lifecycle', () => {
     expect(stopped).toEqual(['session-b'])
   })
 
+  test('creates a thread in the project that owns the directory, and keeps a bare cwd ungrouped', async () => {
+    const created: Array<{ projectId?: string; cwd?: string }> = []
+    const actions = createThreadActions(
+      createDeps({
+        projects: () => [project('project-1', [])],
+        create: async input => {
+          created.push(input)
+          return { sessionId: 'session-new' }
+        },
+      }),
+    )
+
+    await actions.create({ input: { cwd: '/work/project-1' }, caller: agent('session-a'), signal })
+    await actions.create({ input: { cwd: '/work/elsewhere' }, caller: agent('session-a'), signal })
+    await actions.create({ input: { projectId: 'project-2', cwd: '/work/project-1' }, caller: agent('session-a'), signal })
+
+    expect(created).toEqual([{ projectId: 'project-1' }, { cwd: '/work/elsewhere' }, { projectId: 'project-2' }])
+  })
+
   test('creates and names a thread, and keeps the new id when the title is refused', async () => {
     const created: Array<{ projectId?: string }> = []
     const actions = createThreadActions(

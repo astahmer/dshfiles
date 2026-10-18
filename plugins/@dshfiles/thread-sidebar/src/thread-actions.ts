@@ -186,6 +186,16 @@ const matches = (query: string, summary: ThreadSummary, title: string | undefine
   (project?.title ?? '').toLowerCase().includes(query)
 
 /** Builds the thread and project actions over the injected Host services. */
+/** The registered project that owns a directory, if any; the lookup is best-effort and never blocks creating a thread. */
+const projectIdForPath = (deps: ThreadActionDeps, cwd: string | undefined): string | undefined => {
+  if (cwd === undefined) return undefined
+  try {
+    return deps.projects().find(project => project.path === cwd)?.projectId
+  } catch {
+    return undefined
+  }
+}
+
 export const createThreadActions = (deps: ThreadActionDeps) => ({
   list: async ({ input, signal }: ThreadActionContext<ThreadListInput>) => {
     const sessions = await deps.listSessions(signal)
@@ -297,11 +307,14 @@ export const createThreadActions = (deps: ThreadActionDeps) => ({
   },
 
   create: async ({ input }: ThreadActionContext<ThreadCreateInput>) => {
+    // The Host accounts a Session to a workspace or to a bare cwd, never both, and a bare cwd leaves it ungrouped:
+    // when the directory is a registered project, create the thread in that project instead.
+    const projectId = input.projectId ?? projectIdForPath(deps, input.cwd)
     let created: { readonly sessionId: string; readonly agentPreset?: string }
     try {
       created = await deps.create({
-        ...(input.projectId === undefined ? undefined : { projectId: input.projectId }),
-        ...(input.cwd === undefined ? undefined : { cwd: input.cwd }),
+        ...(projectId === undefined ? undefined : { projectId }),
+        ...(projectId === undefined && input.cwd !== undefined ? { cwd: input.cwd } : undefined),
         ...(input.agentPreset === undefined ? undefined : { agentPreset: input.agentPreset }),
       })
     } catch (error) {
