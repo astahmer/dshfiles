@@ -1,10 +1,12 @@
 import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
 import { useSettings } from '@dshfiles/dshx/client'
+import { useMachine } from '@dshfiles/plugin-ui/machine'
 import { PaletteApi, type PaletteMode } from '@dshfiles/command-palette/api'
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import type { MutableRefObject, ReactNode } from 'react'
 import { DEFAULT_PREFERENCES, type SidebarPreferences } from './organization.js'
 import { SidebarPreferencesModel, storedPreferences } from './preferences.js'
+import { SidebarPreferencesMachine, type SidebarPreferencesMachineClient } from './preferences-machine.js'
 import { threadSidebarSettings } from './settings.js'
 
 interface PreferencesSnapshot {
@@ -40,55 +42,64 @@ export const usePreferences = (): PreferencesSnapshot & {
 } => {
   const settings = useOptionalSettings()
   const localPreferences = storedPreferences.useValue() ?? DEFAULT_PREFERENCES
-  const [localWriteFailed, setLocalWriteFailed] = useState(false)
-  const [pending, setPending] = useState<Partial<SidebarPreferences>>({})
-  const [writeFailed, setWriteFailed] = useState(false)
   const hostPreferences = useMemo(() => (settings?.value === undefined ? null : SidebarPreferencesModel.decode(settings.value)), [settings?.value])
   const hostBacked = settings !== null && settings.status === 'ready' && settings.writable && hostPreferences !== null
   const settingsRef = useRef(settings)
   settingsRef.current = settings
-
+  const client = useMemo<SidebarPreferencesMachineClient>(
+    () => ({
+      readLocal: () => storedPreferences.get(),
+      readHost: () => {
+        const current = settingsRef.current
+        if (current === null || current.status !== 'ready' || !current.writable || current.value === undefined) return null
+        return SidebarPreferencesModel.decode(current.value)
+      },
+      writeHost: async patch => {
+        const current = settingsRef.current
+        if (current === null || current.status !== 'ready' || !current.writable || current.value === undefined) return false
+        if (SidebarPreferencesModel.decode(current.value) === null) return false
+        const writeKey = <Key extends keyof SidebarPreferences>(key: Key): Promise<boolean> => {
+          const value = patch[key]
+          return value === undefined ? Promise.resolve(true) : current.set(key, value)
+        }
+        const keys = Object.keys(patch).filter(SidebarPreferencesModel.isPreferenceKey)
+        const results = await Promise.all(keys.map(writeKey))
+        return !results.includes(false)
+      },
+      removeLocal: () => storedPreferences.remove(),
+    }),
+    [settingsRef],
+  )
+  const [snapshot, send] = useMachine(SidebarPreferencesMachine.machine, { input: { client } })
   const updatePreferences = useCallback(
     (patch: Partial<SidebarPreferences>) => {
       if (!hostBacked) {
-        setLocalWriteFailed(!storedPreferences.set({ ...(storedPreferences.get() ?? DEFAULT_PREFERENCES), ...patch }))
+        send({
+          type: 'local.write.result',
+          success: storedPreferences.set({ ...(storedPreferences.get() ?? DEFAULT_PREFERENCES), ...patch }),
+        })
         return
       }
-      setPending(current => ({ ...current, ...patch }))
-      const writeKey = <Key extends keyof SidebarPreferences>(key: Key): Promise<boolean> => {
-        const value = patch[key]
-        const current = settingsRef.current
-        return value === undefined || current === null ? Promise.resolve(true) : current.set(key, value)
-      }
-      const keys = Object.keys(patch).filter(SidebarPreferencesModel.isPreferenceKey)
-      void Promise.all(keys.map(writeKey))
-        .then(results => setWriteFailed(results.includes(false)))
-        .catch(() => setWriteFailed(true))
-        .finally(() =>
-          setPending(current => {
-            const next = { ...current }
-            for (const key of keys) if (Object.is(next[key], patch[key])) delete next[key]
-            return next
-          }),
-        )
+      send({ type: 'host.update', patch })
     },
-    [hostBacked],
+    [hostBacked, send],
   )
 
   useEffect(() => {
-    if (!hostBacked || hostPreferences === null) return
-    const stored = storedPreferences.get()
-    if (stored === null) return
-    storedPreferences.remove()
-    const patch = SidebarPreferencesModel.preferencesToMigrate(stored, hostPreferences)
-    if (Object.keys(patch).length > 0) updatePreferences(patch)
-  }, [hostBacked, hostPreferences, updatePreferences])
+    if (!hostBacked || hostPreferences === null || storedPreferences.get() === null) return
+    send({ type: 'migration.requested' })
+  }, [hostBacked, hostPreferences, send])
 
   const preferences = useMemo(
-    () => (hostBacked ? { ...hostPreferences, ...pending } : localPreferences),
-    [hostBacked, hostPreferences, pending, localPreferences],
+    () => (hostBacked ? { ...hostPreferences, ...snapshot.context.pending } : localPreferences),
+    [hostBacked, hostPreferences, snapshot.context.pending, localPreferences],
   )
-  return { preferences, storageWarning: hostBacked ? writeFailed : localWriteFailed, hostBacked, updatePreferences }
+  return {
+    preferences,
+    storageWarning: hostBacked ? snapshot.context.hostWriteFailed : snapshot.context.localWriteFailed,
+    hostBacked,
+    updatePreferences,
+  }
 }
 
 interface SidebarState {
