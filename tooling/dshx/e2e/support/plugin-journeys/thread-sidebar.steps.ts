@@ -36,9 +36,11 @@ const paletteInput = (page: Page) => paletteDialog(page).getByRole('combobox')
 const currentThreadId = (page: Page): string | null => new URL(page.url()).searchParams.get('thread')
 // The Host shortens display titles to their first words, so rows are found by thread id, not by the prompt.
 const threadRow = (page: Page, threadId: string) => threadSidebar(page).locator(`article[data-thread-id="${threadId}"]`)
-// A row also seats hover-only action buttons, so its first button is not the trigger any more: the body's own
-// first button is the one that opens the thread.
-const threadRowOpenButton = (row: Locator): Locator => row.locator(':scope > div > button').first()
+// A row seats a hover-only action strip over its right half, so a click at the row's centre lands on an action
+// button once the pointer reveals the strip: open the thread from the left half of its trigger instead.
+const openThreadRow = async (row: Locator): Promise<void> => {
+  await row.locator(':scope > div > button').first().click({ position: { x: 24, y: 16 } })
+}
 
 const startBlankThread = async (page: Page): Promise<string> => {
   const createResponsePromise = page.waitForResponse(
@@ -554,17 +556,17 @@ When('one thread is marked unread and another thread is opened', async ({ page }
   const otherRow = threadSidebar(page).locator('article').filter({ hasText: 'thread sidebar sibling unread' })
   await expect(otherRow).toHaveCount(1)
 
-  await threadRowOpenButton(targetRow).click()
+  await openThreadRow(targetRow)
   await expect.poll(() => currentThreadId(page)).toBe(targetThreadId)
   await targetRow.click({ button: 'right' })
   await page.getByRole('menuitem', { name: 'Mark unread', exact: true }).click()
   await expect(targetRow.getByRole('img', { name: 'Unread', exact: true })).toBeVisible()
 
-  await threadRowOpenButton(otherRow).click()
+  await openThreadRow(otherRow)
   await expect.poll(() => currentThreadId(page)).toBe(otherThreadId)
   await expect(targetRow.getByRole('img', { name: 'Unread', exact: true })).toBeVisible()
 
-  await threadRowOpenButton(targetRow).click()
+  await openThreadRow(targetRow)
   await expect.poll(() => currentThreadId(page)).toBe(targetThreadId)
 })
 
@@ -621,7 +623,7 @@ Then('every open tab shows the finished turn until one tab opens it', async ({ p
       await expect(finishedLabel(otherTab)).toBeVisible({ timeout: 30_000 })
     })
     await recordAssertion(page, 'thread-sidebar-turn-finished-clears-in-every-tab', async () => {
-      await threadRowOpenButton(threadRow(otherTab, journey.targetThreadId)).click()
+      await openThreadRow(threadRow(otherTab, journey.targetThreadId))
       await expect(finishedLabel(otherTab)).toHaveCount(0, { timeout: 15_000 })
       await page.bringToFront()
       await page.reload()
