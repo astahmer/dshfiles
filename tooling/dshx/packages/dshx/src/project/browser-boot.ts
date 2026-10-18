@@ -104,7 +104,7 @@ interface BootPage {
  * E2E scenarios share one launch across every assertion. That is also why the
  * caller captures console text: only it can attach before the first navigation.
  */
-const readClientBootOutcome = async (page: BootPage, options: BrowserBootOptions): Promise<BrowserBootOutcome> => {
+export const readClientBootOutcome = async (page: BootPage, options: BrowserBootOptions): Promise<BrowserBootOutcome> => {
   const nativeReadiness = NativeReadinessSchema.parse(
     await page.evaluate(
       async ({ expectedClientEntries, timeoutMs, bootCardSelector, appOutletSelector }) => {
