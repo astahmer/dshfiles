@@ -103,6 +103,19 @@ caps):
 - settings-shell's `src/native/` is a port of DSH's compiled shell. Refactor only our additions, so the port stays
   diffable against upstream on DSH upgrades.
 
+### Progress — 2026-10-18
+
+| Slice                 | Status            | Evidence / next                                                                                                                                                                                                                                                                                       |
+| --------------------- | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 12a — thread-sidebar  | In progress       | Preferences sync is actor-owned; Host writes serialize, migration retains local data on failure, local fallback stays synchronous. 245 tests, typecheck, 26/26 journeys, scratch `notification-delivery`, and 93 plugin tasks pass. Remaining: usage-limit Resume all and auto-archive orchestration. |
+| 12b — settings-shell  | Audited           | `SettingsDocumentStore` is smallest next slice; preserve ported native shell boundaries.                                                                                                                                                                                                              |
+| 12c–12f               | Pending           | Continue per-plugin audit and one flow per machine; leave Query polling and presentation-only state in their proper owners.                                                                                                                                                                           |
+| 11a — emilint release | Awaiting approval | Requires user approval to push; no push performed.                                                                                                                                                                                                                                                    |
+
+**Gate notes:** broad `node --run check` stops at the unchanged DSHX peer-range test: verified `0.2.1-rc.2` is rejected by `>=0.2.0-rc.1 <0.3.0-0`. `features:check` still reports the 10 catalog issues recorded above; root lint and format checks also have unrelated baseline findings. Changed paths pass `check:diff` and targeted format validation.
+
+**Resume here:** implement usage-limit Resume all with bounded concurrency, per-item outcomes and teardown/collision coverage; then handle auto-archive before continuing with settings-shell `SettingsDocumentStore`.
+
 ## Checklist
 
 - [ ] Step 10 done (10a–10e)
