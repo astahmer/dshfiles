@@ -16,7 +16,7 @@ export const SUMMARY_SYSTEM_PROMPT = [
   'Use exactly the scope keys you were given, once each; do not invent scopes.',
 ].join(' ')
 
-export const buildSummaryInput = (review: OkReview): string => {
+const buildSummaryInput = (review: OkReview): string => {
   const patch = review.patch.length > MAX_SUMMARY_PATCH_CHARS ? `${review.patch.slice(0, MAX_SUMMARY_PATCH_CHARS)}\n… (patch truncated)` : review.patch
   const scopes = review.scopes
     .map(scope => `${scope.key} (${scope.label}) — ${scope.summary}\n${scope.filePaths.map(path => `  ${path}`).join('\n')}`)
@@ -35,7 +35,7 @@ const cleanFragment = (value: string): string => value.replace(/^["'`\s]+/u, '')
  * scope continues the previous one, so a wrapped sentence survives; unknown
  * keys and a missing scope are dropped rather than invented.
  */
-export const parseSummaryResponse = (text: string, keys: readonly string[]): Record<string, string> | undefined => {
+const parseSummaryResponse = (text: string, keys: readonly string[]): Record<string, string> | undefined => {
   const known = new Set(keys)
   const summaries: Record<string, string> = {}
   let current: string | undefined
@@ -115,7 +115,7 @@ const messages = {
 const failure = (reason: SummaryFailureReason, message = messages[reason]): SummarizeResult => ({ status: 'failed', reason, message })
 
 /** Read the workspace again and let the thread's own model summarize each scope. */
-export const summarizeWorkspace = async (input: SummarizeWorkspaceInput): Promise<SummarizeResult> => {
+const summarizeWorkspace = async (input: SummarizeWorkspaceInput): Promise<SummarizeResult> => {
   const review = await reviewWorkspace({ run: input.run, path: input.path, base: input.base, signal: input.signal })
   if (review.status === 'failed') return failure('review-failed', review.message)
   if (review.fileCount === 0) return failure('no-changes')
@@ -134,4 +134,10 @@ export const summarizeWorkspace = async (input: SummarizeWorkspaceInput): Promis
     review.scopes.map(scope => scope.key),
   )
   return summaries === undefined ? failure('unparsed') : { status: 'ok', route: { provider: resolved.provider, model: resolved.model }, summaries }
+}
+
+export class PullsReviewSummaryModel {
+  static readonly buildInput = buildSummaryInput
+  static readonly parseResponse = parseSummaryResponse
+  static readonly summarize = summarizeWorkspace
 }

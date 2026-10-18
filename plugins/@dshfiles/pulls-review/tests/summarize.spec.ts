@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { JjRun, JjRunInput } from '../src/jj.js'
-import { buildSummaryInput, parseSummaryResponse, summarizeWorkspace } from '../src/summarize.js'
+import { PullsReviewSummaryModel } from '../src/summarize.js'
 
 const PATCH = [
   'diff --git a/src/app.ts b/src/app.ts',
@@ -25,27 +25,27 @@ const answer = (text: string) => async () => text
 describe('parseSummaryResponse', () => {
   it('reads one keyed line per scope', () => {
     const text = 'code: Adds a second answer.\ndocs: Tidies the docs.\n'
-    expect(parseSummaryResponse(text, ['code', 'docs'])).toEqual({ code: 'Adds a second answer.', docs: 'Tidies the docs.' })
+    expect(PullsReviewSummaryModel.parseResponse(text, ['code', 'docs'])).toEqual({ code: 'Adds a second answer.', docs: 'Tidies the docs.' })
   })
 
   it('tolerates bullets, case, wrapped sentences and quotes, and drops unknown scopes', () => {
     const text = ['- Code: "Adds a second answer",', '  and keeps the old one working.', 'Docs: 7', 'never-heard-of: ignored'].join('\n')
-    expect(parseSummaryResponse(text, ['code', 'docs'])).toEqual({
+    expect(PullsReviewSummaryModel.parseResponse(text, ['code', 'docs'])).toEqual({
       code: 'Adds a second answer and keeps the old one working.',
       docs: '7',
     })
   })
 
   it('returns undefined for prose, an empty answer and a JSON-only answer', () => {
-    expect(parseSummaryResponse('I could not summarize this.', ['code'])).toBeUndefined()
-    expect(parseSummaryResponse('code:    ', ['code'])).toBeUndefined()
-    expect(parseSummaryResponse('{"code":"Adds a second answer."}', ['code'])).toBeUndefined()
+    expect(PullsReviewSummaryModel.parseResponse('I could not summarize this.', ['code'])).toBeUndefined()
+    expect(PullsReviewSummaryModel.parseResponse('code:    ', ['code'])).toBeUndefined()
+    expect(PullsReviewSummaryModel.parseResponse('{"code":"Adds a second answer."}', ['code'])).toBeUndefined()
   })
 })
 
 describe('buildSummaryInput', () => {
   it('names every scope with its files and carries the patch', () => {
-    const input = buildSummaryInput({
+    const input = PullsReviewSummaryModel.buildInput({
       status: 'ok',
       path: '/work',
       base: 'main',
@@ -81,7 +81,7 @@ describe('summarizeWorkspace', () => {
 
   it('uses the thread provider with the first model it offers, and lends it the session id', async () => {
     const seen: { route: string; sessionId?: string | undefined }[] = []
-    const result = await summarizeWorkspace({
+    const result = await PullsReviewSummaryModel.summarize({
       ...common(),
       complete: async request => {
         seen.push({ route: `${request.provider}/${request.model}`, sessionId: request.sessionId })
@@ -93,7 +93,7 @@ describe('summarizeWorkspace', () => {
   })
 
   it('honours an explicit provider and model over the thread route', async () => {
-    const result = await summarizeWorkspace({
+    const result = await PullsReviewSummaryModel.summarize({
       ...common(),
       provider: 'other',
       model: 'other-large',
@@ -103,7 +103,7 @@ describe('summarizeWorkspace', () => {
   })
 
   it('reports no route when neither the caller nor the thread names a provider', async () => {
-    const result = await summarizeWorkspace({
+    const result = await PullsReviewSummaryModel.summarize({
       run,
       path: workspace,
       sessionId: 'session-1',
@@ -114,24 +114,28 @@ describe('summarizeWorkspace', () => {
   })
 
   it('reports no route when the provider offers no model', async () => {
-    const result = await summarizeWorkspace({ ...common(), routes: { ...routes, modelsOf: async () => [] }, complete: answer('code: no') })
+    const result = await PullsReviewSummaryModel.summarize({ ...common(), routes: { ...routes, modelsOf: async () => [] }, complete: answer('code: no') })
     expect(result).toMatchObject({ status: 'failed', reason: 'no-route' })
   })
 
   it('reports an unusable answer instead of inventing summaries', async () => {
-    const result = await summarizeWorkspace({ ...common(), complete: answer('Sorry, I cannot.') })
+    const result = await PullsReviewSummaryModel.summarize({ ...common(), complete: answer('Sorry, I cannot.') })
     expect(result).toMatchObject({ status: 'failed', reason: 'unparsed' })
   })
 
   it('names the real reason instead of blaming the model', async () => {
-    const empty = await summarizeWorkspace({
+    const empty = await PullsReviewSummaryModel.summarize({
       ...common(),
       run: async input => (input.args[0] === 'log' ? { stdout: 'abc1234\n', truncated: false } : { stdout: '', truncated: false }),
       complete: answer('code: never called'),
     })
     expect(empty).toMatchObject({ status: 'failed', reason: 'no-changes' })
 
-    const broken = await summarizeWorkspace({ ...common(), run: async () => ({ stdout: '', truncated: false }), complete: answer('code: never called') })
+    const broken = await PullsReviewSummaryModel.summarize({
+      ...common(),
+      run: async () => ({ stdout: '', truncated: false }),
+      complete: answer('code: never called'),
+    })
     expect(broken).toMatchObject({ status: 'failed', reason: 'review-failed' })
   })
 })

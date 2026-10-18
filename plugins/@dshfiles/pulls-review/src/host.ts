@@ -10,7 +10,7 @@ import { pullsReviewApi, type SummarizeResult } from './api.js'
 import { createJjRun } from './jj.js'
 import { renderScopeReport } from './report.js'
 import { reviewWorkspace } from './review.js'
-import { summarizeWorkspace } from './summarize.js'
+import { PullsReviewSummaryModel } from './summarize.js'
 
 /** The thread's own provider, as its last request recorded it. */
 const providerOf = async (ctx: Context, sessionId: string): Promise<string | undefined> => {
@@ -73,7 +73,7 @@ export default definePlugin({
           const llm = ctx.get('llm')
           if (llm === undefined) return { status: 'failed', reason: 'llm-unavailable', message: 'The Host has no language-model service to summarize with.' }
           try {
-            return await summarizeWorkspace({
+            return await PullsReviewSummaryModel.summarize({
               run,
               path: input.path,
               base: input.base,
