@@ -89,6 +89,66 @@
       ]
     },
     {
+      "id": "global-dock",
+      "title": "Keep one docking surface in the right column across threads",
+      "summary": "With the right column set to the global dock, the workbench renders its Dockview in the frame's own right-column seat instead of a session's right sidebar, so the same panel set and layout serve every thread and survive a reload. Jujutsu marks itself as the dock's default panel, and the native per-thread surface stays one setting away.",
+      "reach": [
+        "click button \"Plugins\"",
+        "click button \"View @dshfiles/workbench\"",
+        "expect text \"Right panel\"",
+        "expect heading \"Panels\"",
+        "expect region \"Jujutsu\""
+      ],
+      "surfaces": ["client", "integration", "storage", "settings"],
+      "configuration": [
+        {
+          "key": "rightPanel",
+          "defaultValue": "native",
+          "constraints": "One of native or dock; applies live and chooses which surface fills the frame's right column.",
+          "choices": ["native", "dock"],
+          "coveredBy": ["workbench.global-dock"]
+        }
+      ],
+      "states": ["native", "dock", "returned-to-native", "reloaded"],
+      "failureModes": [
+        "On a frame without the seat the registration is inert and the setting changes nothing.",
+        "A saved dock layout that Dockview rejects falls back to the dock's default panel.",
+        "While the on-screen Session has a native tab open, the column goes back to the native surface so the resource stays visible."
+      ],
+      "externalDependencies": [
+        {
+          "id": "@dshfiles/frame-layout",
+          "boundary": "The frame owns the right column and renders the shell.dock seat; the workbench contributes the surface there and reports the mode through ctx.rightPanel.",
+          "deterministicFake": "Unit tests render WorkbenchView with the dock surface over memory storage; the scratch journey boots the isolated composition of frame-layout, workbench and jujutsu."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "workbench.global-dock",
+          "featureFile": "tooling/dshx/e2e/features/workbench.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workbench.global-dock-unit-default-panel",
+          "file": "plugins/@dshfiles/workbench/src/workbench-view.test.tsx",
+          "testName": "leads the dock default layout with the dock panel, and the main one with the Editor"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workbench.global-dock-unit-storage",
+          "file": "plugins/@dshfiles/workbench/src/layout-store.test.ts",
+          "testName": "keeps the global dock layout apart from the main-area and side-panel ones"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workbench.global-dock-unit-native-fallback",
+          "file": "plugins/@dshfiles/workbench/src/right-panel-mode.test.ts",
+          "testName": "gives the column back to the native surface while the on-screen session has an open tab"
+        }
+      ]
+    },
+    {
       "id": "early-panel-registration",
       "title": "Queue panel-open requests before mount",
       "summary": "Retain stable panel registrations and early open requests until the matching dock view mounts.",

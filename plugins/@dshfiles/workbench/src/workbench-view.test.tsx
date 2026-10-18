@@ -61,14 +61,8 @@ const renderWorkbench = (registry: WorkbenchPanelRegistry, storage = memoryStora
   return { api, store, storage, view }
 }
 
-/**
- * Dockview buffers layout-change events to the next task, and the view then persists inside its coalescing window,
- * so a test that reads the storage waits for both.
- */
-const flushLayoutChange = async () => {
-  await act(() => new Promise(resolve => setTimeout(resolve, 0)))
-  await act(() => new Promise(resolve => setTimeout(resolve, 300)))
-}
+/** Dockview buffers layout-change events to the next task, and the store saves on that event. */
+const flushLayoutChange = () => act(() => new Promise(resolve => setTimeout(resolve, 0)))
 
 const draftOf = (id: string): HTMLTextAreaElement => {
   const element = screen.getByLabelText(`draft ${id}`)
@@ -98,6 +92,24 @@ describe('WorkbenchView', () => {
 
     const main = renderWorkbench(mixedRegistry())
     expect(main.api.panels.map(panel => panel.id)).toEqual(['dshfiles-editor.main'])
+  })
+
+  it('hands the header actions the live API and the panels the surface shows', () => {
+    const store = createLayoutStore({ storage: memoryStorage() })
+    const seen: { readonly api: DockviewApi | null; readonly openIds: readonly string[] }[] = []
+    render(
+      <WorkbenchView
+        registry={registryWith('a', 'b')}
+        store={store}
+        t={t}
+        headerActions={context => {
+          seen.push(context)
+          return <button type="button">{`move:${context.openIds.join(',')}`}</button>
+        }}
+      />,
+    )
+    expect(screen.getByRole('button', { name: 'move:a,b' })).toBeTruthy()
+    expect(seen.at(-1)?.api).not.toBeNull()
   })
 
   it('keeps a panel mounted with its draft while it is tabbed, split, floated and moved back', () => {
@@ -135,38 +147,6 @@ describe('WorkbenchView', () => {
     const second = renderWorkbench(registryWith('a', 'b'), storage)
     expect(second.api.groups).toHaveLength(1)
     expect(second.api.panels.map(panel => panel.id).sort()).toEqual(['a', 'b'])
-  })
-
-  it('coalesces a burst of layout changes into one persisted layout', async () => {
-    const writes: string[] = []
-    const base = memoryStorage()
-    const storage = () => {
-      const inner = base()
-      return {
-        ...inner,
-        setItem: (key: string, value: string) => {
-          writes.push(value)
-          return inner.setItem(key, value)
-        },
-      }
-    }
-    const { api } = renderWorkbench(registryWith('a', 'b'), storage)
-    await flushLayoutChange()
-    writes.length = 0
-
-    const b = api.getPanel('b')
-    const target = api.getPanel('a')?.group
-    if (b === undefined || target === undefined) throw new Error('default layout is missing a panel')
-    // A drag emits a burst of layout events inside one window.
-    act(() => {
-      for (let index = 0; index < 6; index += 1) b.api.moveTo({ group: target, position: index % 2 === 0 ? 'center' : 'left' })
-    })
-    await flushLayoutChange()
-
-    expect(writes.length).toBeGreaterThan(0)
-    expect(writes.length).toBeLessThanOrEqual(2)
-    const persisted = JSON.parse(writes.at(-1) ?? '{}') as { readonly panels?: Record<string, unknown> }
-    expect(Object.keys(persisted.panels ?? {}).sort()).toEqual(['a', 'b'])
   })
 
   it('resets to the default layout and saves it', async () => {

@@ -6,16 +6,20 @@ import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import { defineClient, useSettings } from '@dshfiles/dshx/client'
+import type { RightPanelMode } from '@dshfiles/frame-layout/right-panel'
 // Type-only: the frame's right-column seat and the `shell.dock` slot it declares.
 import type {} from '@dshfiles/frame-layout/right-panel'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { LayoutGridIcon } from '@dshfiles/plugin-ui/icons'
+import type { DockviewApi } from 'dockview-react'
 import dockviewSheet from 'virtual:dshfiles-workbench/dockview-css'
-import { useEffect, useLayoutEffect } from 'react'
+import { useEffect, useLayoutEffect, useState, useSyncExternalStore } from 'react'
 import { demoPanels } from './demo-panels.js'
-import { createLayoutStore } from './layout-store.js'
+import { createLayoutStore, WorkbenchLayout } from './layout-store.js'
 import { WORKBENCH_LOCALE_NAMESPACE, workbenchLocale } from './locales.js'
 import { workbenchPanels, type WORKBENCH_MAIN_PANEL_ID } from './registry.js'
+import { effectiveRightPanelMode } from './right-panel-mode.js'
 import { workbenchSettings } from './settings.js'
 import { WorkbenchView } from './workbench-view.js'
 
@@ -80,8 +84,9 @@ export default defineClient({
     ctx.effect(
       () =>
         registry.subscribe(() => {
-          // Subscribed before the view mounts, so this sees a request first and brings the workbench to front.
-          if (registry.hasOpenRequests() && isMainPanelId(PANEL_ID)) ctx.layout.selectPanel(PANEL_ID)
+          // Subscribed before the view mounts, so this sees a request first and brings the workbench to front. While
+          // the dock owns the right column the dock's own view takes the request instead, and the main view stays put.
+          if (registry.hasOpenRequests() && isMainPanelId(PANEL_ID) && ctx.get('rightPanel')?.mode() !== 'dock') ctx.layout.selectPanel(PANEL_ID)
         }),
       'workbench: open requests',
     )
@@ -98,7 +103,17 @@ export default defineClient({
         decorate(props => {
           useDockviewSheet()
           useDemoPanels()
-          return <WorkbenchView registry={registry} store={store} t={props.t} />
+          return (
+            <WorkbenchView
+              registry={registry}
+              store={store}
+              t={props.t}
+              onApi={api => {
+                mainApi = api
+              }}
+              headerActions={context => <MainMoveToDock {...context} />}
+            />
+          )
         }),
       ),
     )
@@ -122,6 +137,85 @@ export default defineClient({
         }),
       'workbench: right pane tab type',
     )
+    // The two docking surfaces keep their own Dockview instances, so moving a
+    // panel between them is this plugin's business: close it in the source, then
+    // select the feature's own main panel (or open the panel in the dock) and the
+    // other surface shows it.
+    let dockApi: DockviewApi | null = null
+    let mainApi: DockviewApi | null = null
+    let pendingDockOpen: string | null = null
+
+    const moveToMainView = (api: DockviewApi, panelId: string): void => {
+      const target = registry.get(panelId)?.mainPanelId
+      if (target === undefined || !isMainPanelId(target)) return
+      api.getPanel(panelId)?.api.close()
+      ctx.layout.selectPanel(target)
+    }
+
+    const openInDock = (panelId: string): void => {
+      const definition = registry.get(panelId)
+      if (definition === undefined) return
+      if (dockApi === null) {
+        pendingDockOpen = panelId
+        switchRightPanel?.('dock')
+        return
+      }
+      WorkbenchLayout.openPanel(dockApi, definition)
+    }
+
+    const moveToDock = (api: DockviewApi, panelId: string): void => {
+      api.getPanel(panelId)?.api.close()
+      openInDock(panelId)
+    }
+
+    /**
+     * The dock's move menu. The header actions hand it the live api and the ids
+     * the surface shows: this component mounts with the header, before Dockview
+     * reports ready, so a captured instance would still be null on first render.
+     */
+    const DockMoveToMain = decorate((props: { readonly api: DockviewApi | null; readonly openIds: readonly string[] }) => {
+      const api = props.api
+      const movable = props.openIds.filter(id => {
+        const target = registry.get(id)?.mainPanelId
+        return target !== undefined && isMainPanelId(target)
+      })
+      if (api === null || movable.length === 0) return null
+      return (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button size="sm" variant="ghost">{translate('moveToMainView')}</Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {movable.map(id => (
+              <DropdownMenuItem key={id} onSelect={() => moveToMainView(api, id)}>
+                {registry.get(id)?.title ?? id}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )
+    })
+
+    /** The main workbench's move menu: everything it shows can go back to the dock. */
+    const MainMoveToDock = decorate((props: { readonly api: DockviewApi | null; readonly openIds: readonly string[] }) => {
+      const api = props.api
+      if (api === null || props.openIds.length === 0) return null
+      return (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button size="sm" variant="ghost">{translate('moveToDock')}</Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {props.openIds.map(id => (
+              <DropdownMenuItem key={id} onSelect={() => moveToDock(api, id)}>
+                {registry.get(id)?.title ?? id}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )
+    })
+
     ctx.slots.inject('sidebar.right.pane.tab', () =>
       ctx.slots.register(
         { name: 'sidebar.right.pane.tab', key: RIGHT_PANE_ID, locale: WORKBENCH_LOCALE_NAMESPACE },
@@ -148,15 +242,49 @@ export default defineClient({
             ctx.layout.openRightbar(true, false)
             return () => ctx.layout.closeRightbar()
           }, [])
-          return <WorkbenchView registry={registry} store={dockStore} surface="dock" t={props.t} heading={props.t('dockHeading')} />
+          return (
+            <WorkbenchView
+              registry={registry}
+              store={dockStore}
+              surface="dock"
+              t={props.t}
+              heading={props.t('dockHeading')}
+              onApi={api => {
+                dockApi = api
+                if (pendingDockOpen === null) return
+                const definition = registry.get(pendingDockOpen)
+                pendingDockOpen = null
+                if (definition !== undefined) WorkbenchLayout.openPanel(api, definition)
+              }}
+              headerActions={context => <DockMoveToMain {...context} />}
+            />
+          )
         }),
       ),
     )
 
-    // Reports the setting that chooses the column's surface. `ctx.get` keeps the
-    // workbench loadable on a frame that offers no such seat (the stock layout).
+    // Reports which surface fills the right column. The setting decides; the
+    // native surface takes the column back while the on-screen Session has a tab
+    // open, because only it can render the resources other plugins send there.
+    // A component owns the report because settings are readable from components,
+    // and `ctx.get` keeps the workbench loadable on a frame with no such seat
+    // (the stock layout), where the report lands nowhere.
+    let switchRightPanel: ((mode: RightPanelMode) => void) | undefined
     const RightPanelModeReporter = decorate(() => {
-      const mode = useSettings(workbenchSettings).value?.rightPanel ?? 'native'
+      const settings = useSettings(workbenchSettings)
+      const setting = settings.value?.rightPanel ?? 'native'
+      const mounted = useSyncExternalStore(ctx.sidebarRight.mounted.subscribe, ctx.sidebarRight.mounted.getSnapshot, ctx.sidebarRight.mounted.getSnapshot)
+      const openTabs = useSyncExternalStore(ctx.sidebarRight.openTabs.subscribe, ctx.sidebarRight.openTabs.getSnapshot, ctx.sidebarRight.openTabs.getSnapshot)
+      const mode = effectiveRightPanelMode({
+        setting,
+        nativeTabsOnScreen: mounted !== undefined && openTabs.some(tab => tab.sessionId === mounted),
+      })
+      useEffect(() => {
+        switchRightPanel = next => void settings.set('rightPanel', next)
+        return () => {
+          switchRightPanel = undefined
+        }
+      }, [settings])
       useEffect(() => {
         ctx.get('rightPanel')?.setMode(mode)
       }, [mode])
@@ -182,16 +310,27 @@ export default defineClient({
       sidebar.openTab(RIGHT_PANE_KIND, { revealIfOpened: true })
     }
 
+    // The column's global surface when the setting asks for it; otherwise the
+    // per-thread tab type above, which is what the header button and the command
+    // fall back to on a frame that offers no seat.
+    const toggleRightPanel = (): void => {
+      if (switchRightPanel === undefined) {
+        toggleSidePanel()
+        return
+      }
+      switchRightPanel(ctx.get('rightPanel')?.mode() === 'dock' ? 'native' : 'dock')
+    }
+
     const HeaderToggle = decorate(() => {
       const settings = useSettings(workbenchSettings)
       // Absent until a DSH restart registers the namespace; the toggle stays on by default.
       if (settings.value?.headerToggle === false) return null
-      const label = translate('toggleSidePanel')
+      const label = translate('toggleRightPanel')
       return (
         <Button
           aria-label={label}
           className="dshx-root dshx:text-muted-foreground"
-          onClick={toggleSidePanel}
+          onClick={toggleRightPanel}
           size="icon-sm"
           title={label}
           type="button"
@@ -212,18 +351,18 @@ export default defineClient({
         try {
           return ctx.shortcuts.register({
             id: TOGGLE_COMMAND_ID,
-            label: () => translate('toggleSidePanel'),
-            aliases: ['workbench', 'dock', 'panels', 'side panel'],
+            label: () => translate('toggleRightPanel'),
+            aliases: ['workbench', 'dock', 'panels', 'side panel', 'global dock'],
             defaults: {},
             regions: ['page', 'editable'],
             modals: [],
-            resolve: () => ({ status: 'handled', run: toggleSidePanel }),
+            resolve: () => ({ status: 'handled', run: toggleRightPanel }),
           })
         } catch (error) {
-          console.warn('workbench: the side panel toggle command could not be registered', error)
+          console.warn('workbench: the right panel toggle command could not be registered', error)
           return () => undefined
         }
-      }, 'workbench: side panel toggle command')
+      }, 'workbench: right panel toggle command')
     }
   },
 })
