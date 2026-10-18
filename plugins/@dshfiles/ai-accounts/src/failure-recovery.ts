@@ -25,7 +25,7 @@ const OVERSIZED_TEXT = /\b(?:request|payload|body)(?: entity)? (?:is )?too large
 const SPENT_PLAN_HINT = /\byou(?:'ve| have)\s+(?:hit|reached)\s+(?:your|the)\s+(?:(?:\w+\s+){0,2}(?:usage|weekly|daily|plan|message)\s+)?limits?\b/i
 
 /** `undefined` for failures this plugin leaves alone (image offload, empty responses, cancellations…). */
-export const classifyFailure = (failure: Pick<LlmFailure, 'code' | 'message' | 'status'>): FailureKind | undefined => {
+const classifyFailure = (failure: Pick<LlmFailure, 'code' | 'message' | 'status'>): FailureKind | undefined => {
   if (
     failure.code === 'CONTEXT_WINDOW_EXCEEDED' ||
     failure.status === 413 ||
@@ -69,7 +69,7 @@ export type RecoveryAction =
  * — fail-over is only skipped when no other account could take the request — so
  * a spent plan ends the turn whether or not fail-over is switched on.
  */
-export const quotaRecoveryFor = (input: {
+const quotaRecoveryFor = (input: {
   readonly failureKind: FailureKind
   readonly rescued: boolean
   readonly autoRetryDefault: boolean
@@ -104,7 +104,7 @@ interface StepState {
  * conversation, who is cooling, and where a fail-over goes. One state per
  * conversation, reset whenever a new step fails.
  */
-export const createFailureRecovery = (deps: {
+const createFailureRecovery = (deps: {
   readonly pool: Pick<AccountPool, 'isHealthy' | 'noteRateLimited' | 'bindRoute' | 'routeFor' | 'unbind'>
   readonly isAccountRoute: (provider: string) => boolean
   readonly readPolicy: () => RecoveryPolicy
@@ -213,7 +213,7 @@ export type FailureRecovery = ReturnType<typeof createFailureRecovery>
  * The newest input keeps its images; the session log is untouched. Returns the
  * same array when nothing was re-sent.
  */
-export const offloadResentImages = (messages: readonly Message[]): readonly Message[] => {
+const offloadResentImages = (messages: readonly Message[]): readonly Message[] => {
   const lastAnswer = messages.findLastIndex(message => message.role === 'assistant')
   let changed = false
   const next = messages.map((message, index) => {
@@ -225,4 +225,11 @@ export const offloadResentImages = (messages: readonly Message[]): readonly Mess
     }
   })
   return changed ? next : messages
+}
+
+export class FailureRecoveryModel {
+  static readonly classifyFailure = classifyFailure
+  static readonly quotaRecoveryFor = quotaRecoveryFor
+  static readonly create = createFailureRecovery
+  static readonly offloadResentImages = offloadResentImages
 }

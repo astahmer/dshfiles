@@ -3,7 +3,7 @@ import { createAssistantMessage, createUserMessage, type LlmFailure, type Messag
 import { describe, expect, it } from 'vitest'
 import { createAccountPool } from './account-pool.js'
 import { DEFAULT_RECOVERY_POLICY, type RecoveryPolicy } from './failure-policy.js'
-import { classifyFailure, createFailureRecovery, offloadResentImages, quotaRecoveryFor } from './failure-recovery.js'
+import { FailureRecoveryModel } from './failure-recovery.js'
 
 const NOW = 1_000_000
 
@@ -21,7 +21,7 @@ const setup = (options: { readonly policy?: RecoveryPolicy; readonly lunaReserve
   ])
   const engaged: string[] = []
   let retryIds = 0
-  const recovery = createFailureRecovery({
+  const recovery = FailureRecoveryModel.create({
     pool,
     isAccountRoute: provider => kinds.has(provider),
     readPolicy: () => options.policy ?? DEFAULT_RECOVERY_POLICY,
@@ -49,44 +49,44 @@ const spentPlan: readonly LlmFailure[] = [
 
 describe('classifyFailure', () => {
   it('sorts provider failures into the kinds the settings name', () => {
-    expect(classifyFailure(transport)).toBe('transport')
-    expect(classifyFailure({ message: 'bad gateway', code: 'PI_AI_ERROR', status: 502 })).toBe('transport')
-    expect(classifyFailure(codexRetryHint)).toBe('transport')
-    expect(classifyFailure({ message: 'unsupported parameter', code: 'PI_AI_ERROR' })).toBeUndefined()
-    expect(classifyFailure(rateLimit)).toBe('rateLimit')
-    expect(classifyFailure(quota)).toBe('exhausted')
-    expect(classifyFailure({ message: 'token expired', code: 'AUTH', status: 401 })).toBe('auth')
-    expect(classifyFailure({ message: 'context too long', code: 'CONTEXT_WINDOW_EXCEEDED' })).toBe('oversized')
-    expect(classifyFailure({ message: 'Request Entity Too Large', code: 'PI_AI_ERROR', status: 413 })).toBe('oversized')
-    expect(classifyFailure({ message: 'images must be offloaded', code: 'IMAGE_OFFLOAD_REQUIRED' })).toBeUndefined()
+    expect(FailureRecoveryModel.classifyFailure(transport)).toBe('transport')
+    expect(FailureRecoveryModel.classifyFailure({ message: 'bad gateway', code: 'PI_AI_ERROR', status: 502 })).toBe('transport')
+    expect(FailureRecoveryModel.classifyFailure(codexRetryHint)).toBe('transport')
+    expect(FailureRecoveryModel.classifyFailure({ message: 'unsupported parameter', code: 'PI_AI_ERROR' })).toBeUndefined()
+    expect(FailureRecoveryModel.classifyFailure(rateLimit)).toBe('rateLimit')
+    expect(FailureRecoveryModel.classifyFailure(quota)).toBe('exhausted')
+    expect(FailureRecoveryModel.classifyFailure({ message: 'token expired', code: 'AUTH', status: 401 })).toBe('auth')
+    expect(FailureRecoveryModel.classifyFailure({ message: 'context too long', code: 'CONTEXT_WINDOW_EXCEEDED' })).toBe('oversized')
+    expect(FailureRecoveryModel.classifyFailure({ message: 'Request Entity Too Large', code: 'PI_AI_ERROR', status: 413 })).toBe('oversized')
+    expect(FailureRecoveryModel.classifyFailure({ message: 'images must be offloaded', code: 'IMAGE_OFFLOAD_REQUIRED' })).toBeUndefined()
   })
 
   it('treats a spent plan as exhausted even without the upstream exceeded wording', () => {
-    for (const failure of spentPlan) expect(classifyFailure(failure)).toBe('exhausted')
+    for (const failure of spentPlan) expect(FailureRecoveryModel.classifyFailure(failure)).toBe('exhausted')
   })
 
   it('leaves warnings and unrelated wording alone', () => {
-    expect(classifyFailure({ message: 'You are approaching your usage limit', code: 'PI_AI_ERROR' })).toBeUndefined()
-    expect(classifyFailure({ message: 'You have hit your rate limit', code: 'PI_AI_ERROR' })).toBeUndefined()
-    expect(classifyFailure({ message: 'the limit was reached by the tool', code: 'PI_AI_ERROR' })).toBeUndefined()
+    expect(FailureRecoveryModel.classifyFailure({ message: 'You are approaching your usage limit', code: 'PI_AI_ERROR' })).toBeUndefined()
+    expect(FailureRecoveryModel.classifyFailure({ message: 'You have hit your rate limit', code: 'PI_AI_ERROR' })).toBeUndefined()
+    expect(FailureRecoveryModel.classifyFailure({ message: 'the limit was reached by the tool', code: 'PI_AI_ERROR' })).toBeUndefined()
   })
 })
 
 describe('quotaRecoveryFor', () => {
   it('records a spent plan even though fail-over is on by default', () => {
-    expect(quotaRecoveryFor({ failureKind: 'exhausted', rescued: false, autoRetryDefault: true })).toEqual({ autoRetry: true })
-    expect(quotaRecoveryFor({ failureKind: 'exhausted', rescued: false, autoRetryDefault: false })).toEqual({ autoRetry: false })
+    expect(FailureRecoveryModel.quotaRecoveryFor({ failureKind: 'exhausted', rescued: false, autoRetryDefault: true })).toEqual({ autoRetry: true })
+    expect(FailureRecoveryModel.quotaRecoveryFor({ failureKind: 'exhausted', rescued: false, autoRetryDefault: false })).toEqual({ autoRetry: false })
   })
 
   it('lets a rescued step stay with DSH and sets rate limits to retry themselves', () => {
-    expect(quotaRecoveryFor({ failureKind: 'exhausted', rescued: true, autoRetryDefault: false })).toBeUndefined()
-    expect(quotaRecoveryFor({ failureKind: 'rateLimit', rescued: false, autoRetryDefault: false })).toEqual({ autoRetry: true })
+    expect(FailureRecoveryModel.quotaRecoveryFor({ failureKind: 'exhausted', rescued: true, autoRetryDefault: false })).toBeUndefined()
+    expect(FailureRecoveryModel.quotaRecoveryFor({ failureKind: 'rateLimit', rescued: false, autoRetryDefault: false })).toEqual({ autoRetry: true })
   })
 
   it('leaves kinds without a stored recovery alone', () => {
-    expect(quotaRecoveryFor({ failureKind: 'transport', rescued: false, autoRetryDefault: false })).toBeUndefined()
-    expect(quotaRecoveryFor({ failureKind: 'auth', rescued: false, autoRetryDefault: false })).toBeUndefined()
-    expect(quotaRecoveryFor({ failureKind: 'oversized', rescued: false, autoRetryDefault: false })).toBeUndefined()
+    expect(FailureRecoveryModel.quotaRecoveryFor({ failureKind: 'transport', rescued: false, autoRetryDefault: false })).toBeUndefined()
+    expect(FailureRecoveryModel.quotaRecoveryFor({ failureKind: 'auth', rescued: false, autoRetryDefault: false })).toBeUndefined()
+    expect(FailureRecoveryModel.quotaRecoveryFor({ failureKind: 'oversized', rescued: false, autoRetryDefault: false })).toBeUndefined()
   })
 })
 
@@ -232,10 +232,10 @@ describe('offloadResentImages', () => {
       createUserMessage({ content: [image('new')], source: { kind: 'user' } }),
     ]
 
-    const shrunk = offloadResentImages(messages)
+    const shrunk = FailureRecoveryModel.offloadResentImages(messages)
     expect(shrunk).not.toBe(messages)
     expect(shrunk[0]?.content[1]).toMatchObject({ type: 'image', offloaded: true })
     expect(shrunk[2]).toBe(messages[2])
-    expect(offloadResentImages(shrunk)).toBe(shrunk)
+    expect(FailureRecoveryModel.offloadResentImages(shrunk)).toBe(shrunk)
   })
 })

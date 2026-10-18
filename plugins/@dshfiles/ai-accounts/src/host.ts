@@ -34,7 +34,7 @@ import { LlmError, resolveImageAttachmentAccess } from '@deepseek-ai/dsh-llm'
 import type { ResolvedPiAiProviderProfile } from '@deepseek-ai/dsh-llm-pi-ai'
 import { createAccountPool, creditServedAttempt } from './account-pool.js'
 import { explainSilentRejections } from './silent-rejection.js'
-import { createFailureRecovery, offloadResentImages, quotaRecoveryFor } from './failure-recovery.js'
+import { FailureRecoveryModel } from './failure-recovery.js'
 import { isRetryId, retryNotice } from './retry-notice.js'
 import { failoverAccountIds, selectRequestAccount } from './request-account-routing.js'
 // Types the `llm/retry` rows this plugin writes, so a fail-over shows in the turn like DSH's own retries.
@@ -277,7 +277,7 @@ export default definePlugin({
         JSON.stringify(source.thinkingLevelMap ?? null) === JSON.stringify(candidate.thinkingLevelMap ?? null)
       )
     }
-    const recovery = createFailureRecovery({
+    const recovery = FailureRecoveryModel.create({
       pool,
       isAccountRoute: provider => routes.has(provider),
       readPolicy: () => AccountSettingsModel.readRecoverySettings().policy,
@@ -603,7 +603,7 @@ export default definePlugin({
             })
             const offRequestMessages = agent.ctx.on('agent/request-messages', async ({ turn, step }, next) => {
               const messages = await next()
-              return recovery.shrinkActive(id, turn, step) ? offloadResentImages(messages) : messages
+              return recovery.shrinkActive(id, turn, step) ? FailureRecoveryModel.offloadResentImages(messages) : messages
             })
             // Prepended so the account policy decides before DSH's provider-wide retry,
             // which would otherwise spend its retries on an account that is already spent.
@@ -621,7 +621,7 @@ export default definePlugin({
                   ...(routedAccountId === undefined ? {} : { routedAccountId }),
                   model: agent.session.requestHeader()?.config.model,
                   failure,
-                  canShrink: offloadResentImages(surface) !== surface,
+                  canShrink: FailureRecoveryModel.offloadResentImages(surface) !== surface,
                 })
                 if (action.kind === 'retry' && action.step.kind === 'failover' && routedAccountId !== undefined && active !== undefined) {
                   active.accountId = action.step.to
@@ -631,7 +631,7 @@ export default definePlugin({
                   const decision = action.then === 'dsh' ? await next() : undefined
                   const requestConfig = agent.session.requestHeader()?.config
                   const failedSelection = requestConfig === undefined ? undefined : { provider: requestConfig.provider, model: requestConfig.model }
-                  const recovery = quotaRecoveryFor({
+                  const recovery = FailureRecoveryModel.quotaRecoveryFor({
                     failureKind: action.failureKind,
                     rescued: decision !== undefined,
                     autoRetryDefault: AccountSettingsModel.readQuotaRetrySettings().autoRetryDefault,
