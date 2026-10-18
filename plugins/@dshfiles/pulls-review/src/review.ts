@@ -35,7 +35,7 @@ const resolves = async (run: JjRun, input: { path: string; revision: string; sig
   }
 }
 
-export const resolveBase = async (
+const resolveBase = async (
   run: JjRun,
   input: { path: string; requested?: string | undefined; signal?: AbortSignal | undefined },
 ): Promise<string | undefined> => {
@@ -56,12 +56,12 @@ export interface ReviewWorkspaceInput {
 }
 
 /** The argv the Host builds for a review; exported so a test can drive the same one. */
-export const revisionArgs = (revision: string): readonly string[] => ['log', '-r', revision, '--no-graph', '-T', REVISION_TEMPLATE]
+const revisionArgs = (revision: string): readonly string[] => ['log', '-r', revision, '--no-graph', '-T', REVISION_TEMPLATE]
 
-export const diffArgs = (base: string): readonly string[] => ['diff', '--git', '--from', base, '--to', HEAD_REVISION]
+const diffArgs = (base: string): readonly string[] => ['diff', '--git', '--from', base, '--to', HEAD_REVISION]
 
 /** Read one thread workspace's changes since its base bookmark and group them. */
-export const reviewWorkspace = async (input: ReviewWorkspaceInput): Promise<ReviewResult> => {
+const reviewWorkspace = async (input: ReviewWorkspaceInput): Promise<ReviewResult> => {
   if (!(await isDirectory(input.path))) return failure(input.path, 'workspace-missing', 'That thread workspace is no longer on disk.')
   try {
     const base = await resolveBase(input.run, { path: input.path, requested: input.base, signal: input.signal })
@@ -107,4 +107,11 @@ export const reviewWorkspace = async (input: ReviewWorkspaceInput): Promise<Revi
     }
     throw error
   }
+}
+
+export class ReviewWorkspaceModel {
+  static readonly resolveBase = resolveBase
+  static readonly revisionArgs = revisionArgs
+  static readonly diffArgs = diffArgs
+  static readonly review = reviewWorkspace
 }

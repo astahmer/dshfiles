@@ -1,6 +1,6 @@
 import type { ReviewResult, SummarizeResult, SummaryFailureReason } from './api.js'
 import type { JjRun } from './jj.js'
-import { reviewWorkspace } from './review.js'
+import { ReviewWorkspaceModel } from './review.js'
 
 type OkReview = Extract<ReviewResult, { readonly status: 'ok' }>
 
@@ -116,7 +116,7 @@ const failure = (reason: SummaryFailureReason, message = messages[reason]): Summ
 
 /** Read the workspace again and let the thread's own model summarize each scope. */
 const summarizeWorkspace = async (input: SummarizeWorkspaceInput): Promise<SummarizeResult> => {
-  const review = await reviewWorkspace({ run: input.run, path: input.path, base: input.base, signal: input.signal })
+  const review = await ReviewWorkspaceModel.review({ run: input.run, path: input.path, base: input.base, signal: input.signal })
   if (review.status === 'failed') return failure('review-failed', review.message)
   if (review.fileCount === 0) return failure('no-changes')
   const resolved = await resolveRoute(input)

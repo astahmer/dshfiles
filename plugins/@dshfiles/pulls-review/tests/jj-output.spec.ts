@@ -6,7 +6,7 @@ import { promisify } from 'node:util'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { reviewResultSchema } from '../src/api.js'
 import type { JjRun } from '../src/jj.js'
-import { diffArgs, reviewWorkspace, revisionArgs } from '../src/review.js'
+import { ReviewWorkspaceModel } from '../src/review.js'
 
 const run = promisify(execFile)
 
@@ -50,7 +50,7 @@ describe('jj diff output', () => {
   })
 
   it.skipIf(!available)('reviews a real workspace through the argv the Host builds', async () => {
-    const result = await reviewWorkspace({ run: createRealRunner(), path: workspace })
+    const result = await ReviewWorkspaceModel.review({ run: createRealRunner(), path: workspace })
     expect(result).toMatchObject({ status: 'ok', base: 'main', range: 'main..@', fileCount: 2, additions: 2, deletions: 1, truncated: false })
     const parsed = reviewResultSchema.safeParse(result)
     expect(parsed.success ? undefined : parsed.error.issues).toBeUndefined()
@@ -59,7 +59,7 @@ describe('jj diff output', () => {
   })
 
   it.skipIf(!available)('builds the revision and diff argv the review passes to jj', () => {
-    expect(revisionArgs('@')).toEqual(['log', '-r', '@', '--no-graph', '-T', 'commit_id.short()'])
-    expect(diffArgs('main')).toEqual(['diff', '--git', '--from', 'main', '--to', '@'])
+    expect(ReviewWorkspaceModel.revisionArgs('@')).toEqual(['log', '-r', '@', '--no-graph', '-T', 'commit_id.short()'])
+    expect(ReviewWorkspaceModel.diffArgs('main')).toEqual(['diff', '--git', '--from', 'main', '--to', '@'])
   })
 })

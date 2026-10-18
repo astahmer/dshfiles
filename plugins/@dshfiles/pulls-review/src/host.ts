@@ -9,7 +9,7 @@ import { definePlugin, defineTool } from '@dshfiles/dshx/host'
 import { pullsReviewApi, type SummarizeResult } from './api.js'
 import { createJjRun } from './jj.js'
 import { renderScopeReport } from './report.js'
-import { reviewWorkspace } from './review.js'
+import { ReviewWorkspaceModel } from './review.js'
 import { PullsReviewSummaryModel } from './summarize.js'
 
 /** The thread's own provider, as its last request recorded it. */
@@ -68,7 +68,7 @@ export default definePlugin({
 
     void api.rpc.register(
       pullsReviewApi.host({
-        review: ({ input, signal }) => reviewWorkspace({ run, path: input.path, base: input.base, signal }),
+        review: ({ input, signal }) => ReviewWorkspaceModel.review({ run, path: input.path, base: input.base, signal }),
         summarize: async ({ input, signal }): Promise<SummarizeResult> => {
           const llm = ctx.get('llm')
           if (llm === undefined) return { status: 'failed', reason: 'llm-unavailable', message: 'The Host has no language-model service to summarize with.' }
@@ -100,7 +100,7 @@ export default definePlugin({
       handler: async invocation => {
         const cwd = invocation.agent.session.header.cwd
         if (cwd === undefined || cwd.length === 0) return { kind: 'error', text: 'This thread has no workspace folder to review.' }
-        const result = await reviewWorkspace({ run, path: cwd, signal: invocation.signal })
+        const result = await ReviewWorkspaceModel.review({ run, path: cwd, signal: invocation.signal })
         if (result.status === 'failed') return { kind: 'error', text: result.message }
         if (result.fileCount === 0) return { kind: 'success', text: `pulls.review · ${result.range} — no changes yet.` }
         return { kind: 'success', text: renderScopeReport(result) }
@@ -122,7 +122,7 @@ export default definePlugin({
         },
         async execute(input: { readonly path: string; readonly base?: string }, execution) {
           execution.signal.throwIfAborted()
-          const result = await reviewWorkspace({ run, path: input.path, base: input.base, signal: execution.signal })
+          const result = await ReviewWorkspaceModel.review({ run, path: input.path, base: input.base, signal: execution.signal })
           if (result.status === 'failed') throw new Error(result.message)
           if (result.fileCount === 0) return `pulls.review · ${result.range} — no changes yet.`
           return renderScopeReport(result)
