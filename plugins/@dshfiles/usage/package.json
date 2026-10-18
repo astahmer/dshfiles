@@ -13,7 +13,11 @@
     ".": "./dist/index.js",
     "./client": "./dist/client.js",
     "./package.json": "./package.json",
-    "./cordis.patch.yml": "./cordis.patch.yml"
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./session-log": {
+      "types": "./src/session-log.ts",
+      "default": "./dist/session-log.js"
+    }
   },
   "scripts": {
     "build": "dshx build",
