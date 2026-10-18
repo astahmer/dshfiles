@@ -1,0 +1,8 @@
+# The owned search backend replaces the stock session-content index: one process
+# may own the `sessionQuery` service and each derived-index path, so the seed
+# profile disables `@deepseek-ai/dsh-session-query-sqlite` and inserts this row.
+# Top-level Loader ids share one namespace across every bundle in a profile, so
+# the scope stays in the id.
+- insert:
+    - id: dshfiles-session-search
+      name: '@dshfiles/session-search'

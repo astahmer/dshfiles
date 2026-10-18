@@ -1,0 +1,117 @@
+{
+  "measuredAt": "2026-10-18T12:39:12.124Z",
+  "corpus": {
+    "sessions": 808,
+    "bytes": 1255051856
+  },
+  "liveIndex": {
+    "sessions": 682,
+    "documents": 356823,
+    "generation": 12
+  },
+  "backlog": {
+    "changedSessions": 204,
+    "changedBytes": 459782498,
+    "neverIndexed": 127,
+    "neverIndexedBytes": 198489418
+  },
+  "loadAverage": [
+    18.35546875,
+    23.18212890625,
+    19.6396484375
+  ],
+  "scenarios": [
+    {
+      "name": "S1 cold catch-up",
+      "wallMs": 336755,
+      "hostStallMs": 290490,
+      "inProcessMaxGapMs": 290507.4,
+      "inProcessGapsOver250Ms": 40,
+      "index": {
+        "sessionsIndexed": 127,
+        "documentsIndexed": 111047,
+        "generations": 1
+      },
+      "coldReads": {
+        "count": 204,
+        "compressedMB": 438.6,
+        "decodedMB": 1430.1,
+        "frames": 134652,
+        "ioMs": 1985,
+        "scanMs": 56,
+        "decodeMs": 11961,
+        "parseMs": 11186,
+        "betweenReadsMs": 21034
+      }
+    },
+    {
+      "name": "S3 warm search",
+      "wallMs": 43567,
+      "hostStallMs": 43477,
+      "inProcessMaxGapMs": 43570,
+      "inProcessGapsOver250Ms": 1,
+      "index": {
+        "sessionsIndexed": 0,
+        "documentsIndexed": 0,
+        "generations": 0
+      },
+      "coldReads": {
+        "count": 0,
+        "compressedMB": 0,
+        "decodedMB": 0,
+        "frames": 0,
+        "ioMs": 0,
+        "scanMs": 0,
+        "decodeMs": 0,
+        "parseMs": 0,
+        "betweenReadsMs": 0
+      }
+    },
+    {
+      "name": "S4 giant log changed",
+      "wallMs": 44269,
+      "hostStallMs": 44167,
+      "inProcessMaxGapMs": 44197.8,
+      "inProcessGapsOver250Ms": 1,
+      "index": {
+        "sessionsIndexed": 0,
+        "documentsIndexed": 12588,
+        "generations": 1
+      },
+      "coldReads": {
+        "count": 1,
+        "compressedMB": 49.5,
+        "decodedMB": 157.2,
+        "frames": 18691,
+        "ioMs": 78,
+        "scanMs": 8,
+        "decodeMs": 2933,
+        "parseMs": 2176,
+        "betweenReadsMs": 0
+      }
+    },
+    {
+      "name": "S6 restart catch-up",
+      "wallMs": 132370,
+      "hostStallMs": 129823,
+      "inProcessMaxGapMs": 129819,
+      "inProcessGapsOver250Ms": 4,
+      "index": {
+        "sessionsIndexed": 0,
+        "documentsIndexed": 19296,
+        "generations": 1
+      },
+      "coldReads": {
+        "count": 20,
+        "compressedMB": 41.9,
+        "decodedMB": 134.3,
+        "frames": 19338,
+        "ioMs": 69,
+        "scanMs": 6,
+        "decodeMs": 750,
+        "parseMs": 576,
+        "betweenReadsMs": 1160
+      }
+    }
+  ]
+}

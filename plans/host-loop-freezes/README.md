@@ -337,5 +337,11 @@ No new persisted user data in L0–L3. L4 owns a worker-side index generation re
 | M0 harness | Done | [bench](../../plugins/@dshfiles/memory/bench/host-loop-freezes.ts) + [README](harness/README.md) + [baseline](harness/baseline-2026-10-18.json); two instrumentation traps found and fixed (first-frame-only zstd decode; probes torn down before the starved timer drained) |
 | M0.5 baseline round | Done | S1 290.5 s stall, S3 43.5 s warm, S4 44.2 s one log, S6 129.8 s restart |
 | M0.6 feasibility spikes | Done | service replacement works; incremental frame resume is byte-exact; 200 k docs / ~800 MB indexed in a worker with a 109.5 ms worst Host gap |
-| Keep content search? (L0 vs L1+L2+L4) | **Pending decision** | L4 redesigned as our own backend; see open question 7 |
-| L0–L4 | Not started | Each gated on its measurement |
+| Keep content search? | **Decided: build L4** | User decision 2026-10-18; L0 stays as the escape hatch and the 916 MB stock index is kept for now |
+| L4.1 skeleton | Done | `@dshfiles/session-search` registers the `sessionQuery` service from a `SessionQueryEngine` subclass; `cordis.patch.yml` inserts the row |
+| L4.2 worker + index + search | Done | worker-owned FTS5 index, pure-read search, opaque cursors, refused (not ignored) filters; build, typecheck, 8 tests green |
+| L4.3 ingest | Done | frame-cursor resume, bounded batches, per-kind text caps, health counters |
+| Lint and antislop pass | Done | `check:diff` reports 0 errors and 0 warnings for the plugin: namespace classes, schema-decoded rows, one `withoutUndefined` helper, documented assertions |
+| L4.4 live feed + health tool | Done | a committed `session/event` nudges the ingest loop (500 ms coalesced), appended frames index in a bounded batch, and `session_search_health` exposes the index state (read-only) |
+| L4.5 bench + parity | Not started | re-run the freeze scenarios against the new backend; parity vs the stock index on the frozen snapshot |
+| L4.6 docs + seed switch | Not started | seed profile disables the stock row and adds the bundle (only after parity) |
