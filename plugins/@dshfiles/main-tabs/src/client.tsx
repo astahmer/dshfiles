@@ -13,7 +13,6 @@ import { createActor } from '@dshfiles/plugin-ui/machine'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { z } from 'zod'
 import { createPortal } from 'react-dom'
-import { closeActiveTabShortcutBinding, closeActiveTabShortcutDefaults } from './close-active-tab-shortcut.js'
 import { createThreadWorkspaceResolver, readHostView } from './host-target.js'
 import { MAIN_TABS_LOCALE_NAMESPACE, mainTabsLocale } from './locales.js'
 import { mainTabsSettings } from './settings.js'
@@ -371,7 +370,8 @@ export default defineClient({
     interface TabCommand {
       readonly id: string
       readonly label: () => string
-      readonly desktop: ShortcutBinding
+      /** Absent when another registered command already owns this chord on every desktop shell. */
+      readonly desktop?: ShortcutBinding
       /** Desktop Linux reserves Tab, so cycling uses Ctrl+Shift+] / [ there. */
       readonly linux?: ShortcutBinding
       readonly web?: ShortcutBinding
@@ -387,10 +387,11 @@ export default defineClient({
         event: { type: 'tab.new' },
       },
       {
+        // DSH's own page.close owns Mod+W on every desktop shell, and the Host's shortcut registry
+        // refuses two commands that claim one default, so this command ships without a default and
+        // stays rebindable in Settings › Shortcuts instead of failing to register on every launch.
         id: 'mainTabs.closeActive',
         label: () => translate('closeActiveTab'),
-        desktop: closeActiveTabShortcutBinding,
-        defaults: closeActiveTabShortcutDefaults,
         event: { type: 'tab.closeActive' },
       },
       {
@@ -419,6 +420,7 @@ export default defineClient({
     ]
     const defaultsFor = (command: TabCommand): ShortcutCommand['defaults'] => {
       if (command.defaults !== undefined) return command.defaults
+      if (command.desktop === undefined) return {}
       const defaults: ShortcutCommand['defaults'] = {
         'desktop:macos': command.desktop,
         'desktop:windows': command.desktop,
