@@ -31,6 +31,15 @@ routes error-prone. pandwind's pattern: a pure `create…App()` Hono app plus a 
 `pnpm check:e2e` for diff-viewed, tool-meta, memory, mcp-servers, plugin-marketplace and `dshx dev` seeds that
 use the provider fake are green.
 
+**Verified (2026-10-18):** `dev-scratch.spec.ts` (15/15) and `fake-command-code.spec.ts` (2/2) pass; dshx
+typecheck/build and `check:diff` pass. Provider-backed `dshx dev open` paths pass for main-tabs, activity-timeline,
+tool-meta, Jujutsu chat references and AI Accounts credential recovery. `check:e2e` passes for diff-viewed (3),
+tool-meta (2), memory (3), mcp-servers (5), plugin-marketplace (4), ai-accounts (14) and jujutsu (11). Scratch
+doctor passed with all seven requested bundles loaded and no host-log errors; shots still record HTTP 404 probes
+for `/api/dshx-2113d713/state`, `/api/dshx-e1cc781b/destination` and
+`/api/dshx-e1cc781b/classifyWorkspaces`, but zero page errors. Feature coverage still reports the same 10
+catalog issues in jj-integration, pulls-review and thread-sidebar; changed catalogs add none.
+
 ## Step 11 — `no-export-bag` lint rule (in emilint)
 
 **Why:** the repo rule is "one namespace class with static members, not a bag of peer exports". Today it is enforced
