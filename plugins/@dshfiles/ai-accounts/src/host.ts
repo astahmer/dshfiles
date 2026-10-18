@@ -8,7 +8,7 @@ import { createUsageCache } from './account-usage.js'
 import { createCopilotLoginService } from './copilot-login.js'
 import { claudeAccountService } from './claude-account.js'
 import { readCommandCodeKey } from './commandcode-usage.js'
-import { aiAccountsHostSettings, readLunaReserveRouting, readPricingSettings, readQuotaRetrySettings, readRecoverySettings } from './settings.js'
+import { AccountSettingsModel, aiAccountsHostSettings } from './settings.js'
 import { shouldUseLunaReserve, withLunaReserve } from './codex-luna-reserve.js'
 import { createPricingCatalog, DEFAULT_PRICING_PATH } from './pricing-catalog.js'
 import { installCostProjection } from './cost-projection.js'
@@ -109,7 +109,7 @@ export default definePlugin({
     const pricing = createPricingCatalog({ path: DEFAULT_PRICING_PATH })
     runtime.pricing = pricing
     const refreshStalePricing = (): void => {
-      const settings = readPricingSettings()
+      const settings = AccountSettingsModel.readPricingSettings()
       if (settings.costEstimates) void pricing.ensureFresh(settings.pricingRefreshHours * HOUR_MS)
     }
     ctx.effect(() => {
@@ -208,7 +208,7 @@ export default definePlugin({
           return withLunaReserve({
             upstream: codexUpstream,
             onReserve: () =>
-              readLunaReserveRouting() &&
+              AccountSettingsModel.readLunaReserveRouting() &&
               (lunaReserveHeld(id, Date.now()) ||
                 shouldUseLunaReserve(runtime.usageCache?.latest()?.cards.find(card => card.instanceId === id)?.usage, Date.now())),
           })
@@ -281,9 +281,9 @@ export default definePlugin({
     const recovery = createFailureRecovery({
       pool,
       isAccountRoute: provider => routes.has(provider),
-      readPolicy: () => readRecoverySettings().policy,
+      readPolicy: () => AccountSettingsModel.readRecoverySettings().policy,
       failoverCandidates: ({ from, model }) => {
-        const settings = readRecoverySettings()
+        const settings = AccountSettingsModel.readRecoverySettings()
         return failoverAccountIds({
           from,
           model,
@@ -296,7 +296,7 @@ export default definePlugin({
       },
       lunaReserve: {
         available: id => {
-          if (routes.get(id)?.kind !== CODEX_KIND || !readLunaReserveRouting()) return false
+          if (routes.get(id)?.kind !== CODEX_KIND || !AccountSettingsModel.readLunaReserveRouting()) return false
           const now = Date.now()
           const usage = runtime.usageCache?.latest()?.cards.find(card => card.instanceId === id)?.usage
           if (lunaReserveHeld(id, now) || shouldUseLunaReserve(usage, now)) return false
@@ -635,7 +635,7 @@ export default definePlugin({
                   const recovery = quotaRecoveryFor({
                     failureKind: action.failureKind,
                     rescued: decision !== undefined,
-                    autoRetryDefault: readQuotaRetrySettings().autoRetryDefault,
+                    autoRetryDefault: AccountSettingsModel.readQuotaRetrySettings().autoRetryDefault,
                   })
                   if (recovery !== undefined) await quotaContinuations.recordFailure(agent, action.account, recovery.autoRetry, failedSelection)
                   return decision

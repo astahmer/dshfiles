@@ -20,7 +20,7 @@ import { createUsageHistoryService } from './usage-recorder.js'
 import { knownQuotaResetAt } from './quota-reset.js'
 import { readNativeProviders, setNativeProviderEnabled } from './native-providers.js'
 import { PricingCatalogModel } from './pricing-catalog.js'
-import { readPricingSettings } from './settings.js'
+import { AccountSettingsModel } from './settings.js'
 import { createCopilotCredentialsService } from './copilot-credentials.js'
 
 /**
@@ -195,7 +195,7 @@ export const accountsHostApi = aiAccountsApi.host({
   refreshPricing: async ({ ctx }) => pricingFor(ctx).refresh(),
   quoteRoutes: async ({ input, ctx }) => {
     const pricing = pricingFor(ctx)
-    const settings = readPricingSettings()
+    const settings = AccountSettingsModel.readPricingSettings()
     if (pricing.current() === null && settings.costEstimates) void pricing.ensureFresh(0)
     const file = await accountStoreService.readAccountFile()
     const kinds = new Map(file.accounts.map(account => [account.instanceId.trim() || account.kind, account.kind]))
