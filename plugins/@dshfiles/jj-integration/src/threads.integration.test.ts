@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { z } from 'zod'
 import { JsonText } from './json-text.js'
-import { checkoutSyncArgv, createThreads, defaultThreadsDirectory, isSecondaryWorkspace, type JjExecutor } from './threads.js'
+import { createThreads, ThreadWorkspaceModel, type JjExecutor } from './threads.js'
 
 const jjAvailable = spawnSync('jj', ['--version']).status === 0
 
@@ -32,7 +32,7 @@ const changeIdAt = (cwd: string, revset: string): string =>
 describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
   let root: string
   let repo: string
-  const threads = createThreads({ executor, bookmark: () => 'main', threadsDirectory: defaultThreadsDirectory })
+  const threads = createThreads({ executor, bookmark: () => 'main', threadsDirectory: ThreadWorkspaceModel.defaultThreadsDirectory })
 
   beforeEach(() => {
     root = realpathSync(mkdtempSync(join(tmpdir(), 'jj-threads-')))
@@ -46,7 +46,7 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
   })
 
   afterEach(() => {
-    rmSync(defaultThreadsDirectory(repo), { recursive: true, force: true })
+    rmSync(ThreadWorkspaceModel.defaultThreadsDirectory(repo), { recursive: true, force: true })
     rmSync(root, { recursive: true, force: true })
   })
 
@@ -66,8 +66,8 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
     const rootLocation = await threads.locate(repo)
     const secondaryLocation = await threads.locate(secondaryPath)
 
-    expect(isSecondaryWorkspace(rootLocation)).toBe(false)
-    expect(isSecondaryWorkspace(secondaryLocation)).toBe(true)
+    expect(ThreadWorkspaceModel.isSecondaryWorkspace(rootLocation)).toBe(false)
+    expect(ThreadWorkspaceModel.isSecondaryWorkspace(secondaryLocation)).toBe(true)
     expect(secondaryLocation).toMatchObject({ repoRoot: repo, workspaceRoot: secondaryPath, threadName: undefined })
   })
 
@@ -111,7 +111,7 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
         return executor(input)
       },
       bookmark: () => 'main',
-      threadsDirectory: defaultThreadsDirectory,
+      threadsDirectory: ThreadWorkspaceModel.defaultThreadsDirectory,
     })
 
     const status = await focusedThreads.status(repo, target.name)
@@ -168,7 +168,7 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
   it('reads legacy rebase timestamps without a stored tip revision', async () => {
     const thread = await threads.provision(repo)
     const rebasedAt = Date.now()
-    writeFileSync(join(defaultThreadsDirectory(repo), '.dshfiles-rebase-timestamps.json'), JSON.stringify({ [thread.name]: rebasedAt }))
+    writeFileSync(join(ThreadWorkspaceModel.defaultThreadsDirectory(repo), '.dshfiles-rebase-timestamps.json'), JSON.stringify({ [thread.name]: rebasedAt }))
 
     const status = await threads.status(repo, thread.name)
 
@@ -431,7 +431,11 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
       if (input.args.includes('bookmark') && input.args.includes('move')) controller.abort()
       return result
     }
-    const guardedThreads = createThreads({ executor: abortAfterMoveExecutor, bookmark: () => 'main', threadsDirectory: defaultThreadsDirectory })
+    const guardedThreads = createThreads({
+      executor: abortAfterMoveExecutor,
+      bookmark: () => 'main',
+      threadsDirectory: ThreadWorkspaceModel.defaultThreadsDirectory,
+    })
 
     const outcome = await guardedThreads.landVerified({
       path: thread.path,
@@ -459,7 +463,7 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
       const result = await executor(input)
       return input.args.some(argument => argument.includes('change_id ++')) ? { ...result, stdoutLossy: true } : result
     }
-    const guardedThreads = createThreads({ executor: lossyExecutor, bookmark: () => 'main', threadsDirectory: defaultThreadsDirectory })
+    const guardedThreads = createThreads({ executor: lossyExecutor, bookmark: () => 'main', threadsDirectory: ThreadWorkspaceModel.defaultThreadsDirectory })
 
     await expect(
       guardedThreads.landVerified({
@@ -483,7 +487,11 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
       const result = await executor(input)
       return input.args.some(argument => argument.includes('change_id ++')) ? { ...result, stdout: 'malformed\\tmetadata\\n' } : result
     }
-    const guardedThreads = createThreads({ executor: malformedExecutor, bookmark: () => 'main', threadsDirectory: defaultThreadsDirectory })
+    const guardedThreads = createThreads({
+      executor: malformedExecutor,
+      bookmark: () => 'main',
+      threadsDirectory: ThreadWorkspaceModel.defaultThreadsDirectory,
+    })
 
     await expect(
       guardedThreads.landVerified({
@@ -518,7 +526,7 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
     const [status] = await threads.list(repo)
     const tipChangeId = changeIdAt(repo, 'main')
     expect(status).toMatchObject({ unlanded: [], behind: false, rebasedAt: expect.any(Number), rebasedTipChangeId: tipChangeId })
-    const reloaded = createThreads({ executor, bookmark: () => 'main', threadsDirectory: defaultThreadsDirectory })
+    const reloaded = createThreads({ executor, bookmark: () => 'main', threadsDirectory: ThreadWorkspaceModel.defaultThreadsDirectory })
     expect((await reloaded.list(repo))[0]?.rebasedAt).toBe(status?.rebasedAt)
     expect((await reloaded.list(repo))[0]?.rebasedTipChangeId).toBe(tipChangeId)
   })
@@ -540,7 +548,7 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
     const laterBookmarkTarget = bookmarkTargetCommitId(repo)
     expect(laterBookmarkTarget).not.toBe(landedCommitId)
 
-    const [command = '', ...args] = checkoutSyncArgv({
+    const [command = '', ...args] = ThreadWorkspaceModel.checkoutSyncArgv({
       repoRoot: repo,
       workspace: 'default',
       bookmark: 'main',
@@ -569,7 +577,7 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
         return executor(input)
       },
       bookmark: () => 'main',
-      threadsDirectory: defaultThreadsDirectory,
+      threadsDirectory: ThreadWorkspaceModel.defaultThreadsDirectory,
     })
     const location = await threads.locate(thread.path)
     const threadName = location.threadName

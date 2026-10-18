@@ -42,7 +42,7 @@ export interface ThreadLocation {
   readonly threadName: string | undefined
 }
 
-export const isSecondaryWorkspace = (location: ThreadLocation): boolean => location.workspaceRoot !== location.repoRoot
+const isSecondaryWorkspace = (location: ThreadLocation): boolean => location.workspaceRoot !== location.repoRoot
 
 export interface ThreadStatus {
   readonly name: string
@@ -1211,10 +1211,10 @@ export const createThreads = (options: {
 
 export type Threads = ReturnType<typeof createThreads>
 
-export const defaultThreadsDirectory = (repoRoot: string): string => `${repoRoot}-threads`
+const defaultThreadsDirectory = (repoRoot: string): string => `${repoRoot}-threads`
 
 /** `dshx checkout sync` from the dshx this plugin builds with; accepts an exact landed commit or the bookmark tip. */
-export const checkoutSyncArgv = (input: {
+const checkoutSyncArgv = (input: {
   readonly repoRoot: string
   readonly workspace: string
   readonly bookmark: string
@@ -1233,3 +1233,9 @@ export const checkoutSyncArgv = (input: {
   input.repoRoot,
   '--json',
 ]
+
+export class ThreadWorkspaceModel {
+  static readonly isSecondaryWorkspace = isSecondaryWorkspace
+  static readonly defaultThreadsDirectory = defaultThreadsDirectory
+  static readonly checkoutSyncArgv = checkoutSyncArgv
+}

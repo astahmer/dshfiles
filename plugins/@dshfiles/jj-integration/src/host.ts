@@ -20,17 +20,7 @@ import { isolatesNewThreadsByDefault, jjIntegrationSettings, mayAutoIntegrateWor
 import { ThreadRebaseEligibilityModel, type ThreadSessionActivity } from './thread-rebase-eligibility.js'
 import { workspaceHasOtherSession } from './thread-session-ownership.js'
 import { registeredProjects } from './registered-projects.js'
-import {
-  checkoutSyncArgv,
-  createThreads,
-  defaultThreadsDirectory,
-  isSecondaryWorkspace,
-  ThreadError,
-  type JjExecutor,
-  type ThreadLocation,
-  type ThreadStatus,
-  type Threads,
-} from './threads.js'
+import { createThreads, ThreadWorkspaceModel, ThreadError, type JjExecutor, type ThreadLocation, type ThreadStatus, type Threads } from './threads.js'
 
 declare module '@deepseek-ai/cordis' {
   interface Events {
@@ -94,7 +84,7 @@ const readSettings = (): JjIntegrationSettings => {
 
 const threadsDirectory = (repoRoot: string): string => {
   const configured = readSettings().threadsDirectory.trim()
-  if (configured === '') return defaultThreadsDirectory(repoRoot)
+  if (configured === '') return ThreadWorkspaceModel.defaultThreadsDirectory(repoRoot)
   const expanded = configured.startsWith('~/') ? join(homedir(), configured.slice(2)) : configured
   return join(expanded, basename(repoRoot))
 }
@@ -432,7 +422,7 @@ const runWorkspaceSync = async (input: WorkspaceSyncInput): Promise<WorkspaceSyn
   const failed = (message: string): WorkspaceSyncView => workspaceSyncView(input, 'failed', message)
   let argv: readonly string[]
   try {
-    argv = checkoutSyncArgv(input)
+    argv = ThreadWorkspaceModel.checkoutSyncArgv(input)
   } catch {
     return failed('dshx is not installed beside jj-integration; run `pnpm --dir plugins install --frozen-lockfile` in the repository.')
   }
@@ -739,7 +729,7 @@ const api = jjIntegrationApi.host({
       const workspace = registry.get(WorkspaceId(workspaceId))
       if (workspace === undefined || !existsSync(workspace.path)) continue
       const location = await active.locate(workspace.path).catch(() => undefined)
-      if (location !== undefined && isSecondaryWorkspace(location)) jjWorkspaceIds.push(workspaceId)
+      if (location !== undefined && ThreadWorkspaceModel.isSecondaryWorkspace(location)) jjWorkspaceIds.push(workspaceId)
     }
     return { jjWorkspaceIds }
   },
@@ -752,7 +742,7 @@ const api = jjIntegrationApi.host({
         const location = await requireThreads()
           .locate(path)
           .catch(() => undefined)
-        return location !== undefined && isSecondaryWorkspace(location)
+        return location !== undefined && ThreadWorkspaceModel.isSecondaryWorkspace(location)
       },
     })
     return { projects: [...projects] }
