@@ -239,7 +239,7 @@ const configureFakeProviderThread = async (input: {
   await baseUrl.blur()
   await page
     .getByRole('status')
-    .filter({ hasText: /^Saved/ })
+    .filter({ hasText: /^(Saved|Changes save automatically)$/ })
     .first()
     .waitFor({ state: 'visible', timeout: timeoutMs })
   await page.getByRole('button', { name: 'Set up key…', exact: true }).click({ timeout: timeoutMs })
