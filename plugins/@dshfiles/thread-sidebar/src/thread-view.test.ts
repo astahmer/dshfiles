@@ -147,6 +147,12 @@ describe('thread view filters', () => {
     expect(
       ThreadViewModel.matchesStatusFilter({ filters: ['not-working'], running: false, needsAttention: false, archived: false, settled: false, muted: true }),
     ).toBe(false)
+    expect(
+      ThreadViewModel.matchesStatusFilter({ filters: ['not-working'], running: false, needsAttention: true, archived: false, settled: true, muted: false }),
+    ).toBe(false)
+    expect(
+      ThreadViewModel.matchesStatusFilter({ filters: ['not-working'], running: false, needsAttention: false, archived: false, settled: true, muted: false }),
+    ).toBe(false)
   })
 
   it('filters main and subagent sources using Host lineage metadata', () => {

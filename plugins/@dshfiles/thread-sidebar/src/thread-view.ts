@@ -55,7 +55,9 @@ const matchesThreadStatusFilter = (options: {
   return options.filters.some(filter => {
     if (filter === 'muted') return options.muted
     if (filter === 'working') return options.running
-    if (filter === 'not-working') return !options.archived && !options.muted && (!options.running || options.needsAttention)
+    // Settled threads are storage, like archived ones: they belong to the settled section of the unfiltered list,
+    // never to a working view that happens to clip running threads out.
+    if (filter === 'not-working') return !options.archived && !options.settled && !options.muted && (!options.running || options.needsAttention)
     if (filter === 'attention') return options.needsAttention
     if (filter === 'settled') return options.settled
     return options.archived
