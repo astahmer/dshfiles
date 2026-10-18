@@ -5,13 +5,14 @@
     {
       "id": "registered-project-search",
       "title": "Search projects and browse folder paths",
-      "summary": "Match registered project labels and canonical directories, browse absolute or home-relative paths through the Host, mark confirmed secondary JJ workspaces when classification is available, and preserve project identity in returned choices.",
+      "summary": "Match registered project labels and canonical directories, browse absolute or home-relative paths through the Host, automatically enter one unique matching folder, mark confirmed secondary JJ workspaces when classification is available, and preserve project identity in returned choices.",
       "surfaces": ["client", "integration"],
       "configuration": [],
       "states": ["empty", "matched", "selected"],
       "failureModes": [
         "An empty result remains selectable-safe.",
         "Home-relative paths resolve against the Host-reported home before listing.",
+        "A unique folder match browses automatically; ambiguous matches and truncated listings never guess.",
         "Canonical path is returned separately from display name.",
         "Unavailable JJ classification leaves rows unmarked."
       ],
@@ -34,6 +35,12 @@
           "id": "project-folder-picker.home-relative-paths",
           "file": "plugins/@dshfiles/project-folder-picker/src/project-folder-picker-model.test.ts",
           "testName": "resolves home-relative queries using the Host-reported home path"
+        },
+        {
+          "kind": "unit-test",
+          "id": "project-folder-picker.unique-folder-browse",
+          "file": "plugins/@dshfiles/project-folder-picker/src/project-folder-picker-model.test.ts",
+          "testName": "browses one matching directory and keeps ambiguous or incomplete listings explicit"
         }
       ]
     },

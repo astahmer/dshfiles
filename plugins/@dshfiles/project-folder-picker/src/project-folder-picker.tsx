@@ -7,7 +7,7 @@ import { Kbd, KbdGroup } from '@dshfiles/plugin-ui/components/ui/kbd'
 import { FolderIcon, FolderOpenIcon, HistoryIcon, SearchIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { keepPreviousData, useMutation, useQuery } from '@dshfiles/plugin-ui/query'
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { ProjectFolderPickerModel, type PickerEntry } from './project-folder-picker-model.js'
 
 export interface RegisteredProject {
@@ -105,10 +105,12 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
   const listing = browseTarget === null ? null : (listingQuery.data ?? null)
   const absolutePath = query.trim()
   const hasAbsolutePath = absolutePath.startsWith('/')
+  const requestedPath = listing === null ? null : ProjectFolderPickerModel.resolvePathQuery(query, listing.home)
   const canUseTypedPath =
     pathMode && hasAbsolutePath && listing?.path !== absolutePath && (props.mode !== 'directories' || props.onUseAbsolutePath !== undefined)
-  const showListingActions = listing !== null && (!hasAbsolutePath || listing.path === absolutePath)
-  const folderEntries = pathMode ? (listing?.entries ?? []) : []
+  const showListingActions = listing !== null && (!ProjectFolderPickerModel.isPathQuery(query) || requestedPath === listing.path)
+  const matchingFolderPaths = listing === null ? null : ProjectFolderPickerModel.matchingDirectoryPaths(listing, query)
+  const folderEntries = pathMode ? (listing?.entries.filter(entry => matchingFolderPaths === null || matchingFolderPaths.includes(entry.path)) ?? []) : []
   const itemCount = pathMode ? folderEntries.length : entries.length
   const pickMutation = useMutation({
     mutationFn: () => {
@@ -135,17 +137,28 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
   useEffect(() => {
     if (listingQuery.data === undefined || listingQuery.isPlaceholderData || browseTarget === null) return
     const currentListing = listingQuery.data
-    setQuery(currentQuery =>
-      browseTarget.path === undefined && ProjectFolderPickerModel.isHomeRelativePathQuery(currentQuery) ? currentQuery : currentListing.path,
-    )
+    setQuery(currentQuery => {
+      if (ProjectFolderPickerModel.matchingDirectoryPaths(currentListing, currentQuery) !== null) return currentQuery
+      return browseTarget.path === undefined && ProjectFolderPickerModel.isPathQuery(currentQuery) ? currentQuery : currentListing.path
+    })
   }, [listingQuery.data, listingQuery.isPlaceholderData, browseTarget])
 
-  const browse = (path: string | undefined): void => {
-    pickMutation.reset()
-    registerMutation.reset()
-    createMutation.reset()
-    setBrowseTarget({ path })
-  }
+  const browse = useCallback(
+    (path: string | undefined): void => {
+      pickMutation.reset()
+      registerMutation.reset()
+      createMutation.reset()
+      setBrowseTarget({ path })
+    },
+    [createMutation, pickMutation, registerMutation],
+  )
+
+  useEffect(() => {
+    if (listingQuery.data === undefined || listingQuery.isPlaceholderData || browseTarget === null || !pathMode) return
+    const matchedPath = ProjectFolderPickerModel.uniqueMatchingDirectoryPath(listingQuery.data, query)
+    if (matchedPath === null || matchedPath === listingQuery.data.path) return
+    browse(matchedPath)
+  }, [browse, browseTarget, listingQuery.data, listingQuery.isPlaceholderData, pathMode, query])
 
   const chooseWithSystemPicker = (): void => {
     registerMutation.reset()
@@ -220,6 +233,12 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
       event.preventDefault()
       const pathQuery = query.trim()
       if (pathMode && pathQuery.length > 0) {
+        const matchingPaths = listing === null ? null : ProjectFolderPickerModel.matchingDirectoryPaths(listing, pathQuery)
+        if (matchingPaths !== null && matchingPaths.length > 0) {
+          const entry = folderEntries[selectedIndex]
+          if (entry !== undefined) browse(entry.path)
+          return
+        }
         const requestedPath = ProjectFolderPickerModel.resolvePathQuery(pathQuery, listing?.home)
         if (ProjectFolderPickerModel.isHomeRelativePathQuery(pathQuery) && requestedPath === null) return
         const path = requestedPath ?? pathQuery
@@ -252,8 +271,8 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
         <DialogTitle className="dshx:sr-only">{title}</DialogTitle>
         <DialogDescription className="dshx:sr-only">
           {props.mode === 'directories'
-            ? 'Browse folders and choose one to add as a workspace.'
-            : 'Search registered projects, or type an absolute or ~/ path to browse folders.'}
+            ? 'Browse folders, or type a path to open a unique folder match automatically.'
+            : 'Search registered projects, or type an absolute or ~/ path to browse folders; a unique match opens automatically.'}
         </DialogDescription>
         <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:border-b dshx:p-2">
           <div className="dshx:relative dshx:flex-1">
@@ -267,15 +286,30 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
               className="dshx:h-9 dshx:pl-8"
               onChange={event => {
                 const nextQuery = event.currentTarget.value
+                const nextPath = ProjectFolderPickerModel.resolvePathQuery(nextQuery, listing?.home)
                 setQuery(nextQuery)
-                if (ProjectFolderPickerModel.isHomeRelativePathQuery(nextQuery)) setBrowseTarget({ path: undefined })
-                if (!ProjectFolderPickerModel.isPathQuery(nextQuery)) setBrowseTarget(null)
+                if (ProjectFolderPickerModel.isHomeRelativePathQuery(nextQuery)) {
+                  if (listing === null || nextPath === null || !ProjectFolderPickerModel.isPathAtOrWithin(nextPath, listing.path)) {
+                    setBrowseTarget(current => (current !== null && current.path === undefined ? current : { path: undefined }))
+                  }
+                } else if (nextQuery.trim().startsWith('/')) {
+                  if (
+                    listing === null ||
+                    (nextPath !== null &&
+                      ProjectFolderPickerModel.isPathAtOrWithin(nextPath, listing.home) &&
+                      !ProjectFolderPickerModel.isPathAtOrWithin(nextPath, listing.path))
+                  ) {
+                    setBrowseTarget(current => (current !== null && current.path === undefined ? current : { path: undefined }))
+                  }
+                } else if (!ProjectFolderPickerModel.isPathQuery(nextQuery)) {
+                  setBrowseTarget(null)
+                }
                 pickMutation.reset()
                 registerMutation.reset()
                 createMutation.reset()
               }}
               onKeyDown={onKeyDown}
-              placeholder={props.placeholder ?? (props.mode === 'directories' ? 'Enter a folder path…' : 'Search projects or type a path to browse folders…')}
+              placeholder={props.placeholder ?? (props.mode === 'directories' ? 'Type a folder path…' : 'Search projects or type a path to browse folders…')}
               ref={searchInput}
               value={query}
             />
@@ -292,7 +326,7 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
             {listing !== null && (
               <p className="dshx:px-4 dshx:pt-3 dshx:pb-1.5 dshx:font-mono dshx:text-xs dshx:break-all dshx:text-muted-foreground">{listing.path}</p>
             )}
-            <div aria-label="Folders" className={cn(listClassName, listing === null && 'dshx:pt-2')} role="listbox">
+            <div aria-busy={listingQuery.isFetching} aria-label="Folders" className={cn(listClassName, listing === null && 'dshx:pt-2')} role="listbox">
               {folderEntries.map((entry, index) => (
                 <button
                   aria-selected={index === selectedIndex}
@@ -311,8 +345,10 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
                   {entry.hidden && <Badge variant="muted">Hidden</Badge>}
                 </button>
               ))}
-              {listing === null && <p className={emptyClassName}>Enter an absolute or ~/ folder path, then press Enter.</p>}
-              {listing !== null && folderEntries.length === 0 && <p className={emptyClassName}>No folders here.</p>}
+              {listing === null && <p className={emptyClassName}>Type an absolute or ~/ folder path to browse.</p>}
+              {listing !== null && folderEntries.length === 0 && (
+                <p className={emptyClassName}>{matchingFolderPaths === null ? 'No folders here.' : 'No matching folders in this listing.'}</p>
+              )}
             </div>
             {canUseTypedPath && (
               <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:border-t dshx:p-2">

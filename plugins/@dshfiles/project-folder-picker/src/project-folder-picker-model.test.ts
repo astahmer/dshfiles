@@ -25,8 +25,40 @@ describe('project and folder selection', () => {
     expect(ProjectFolderPickerModel.resolvePathQuery('~', '/Users/me')).toBe('/Users/me')
     expect(ProjectFolderPickerModel.resolvePathQuery('~/dev', '/')).toBe('/dev')
     expect(ProjectFolderPickerModel.resolvePathQuery('/Users/me/dev', '/Other/home')).toBe('/Users/me/dev')
+    expect(ProjectFolderPickerModel.resolvePathQuery('/Users/me/dev/', '/Other/home')).toBe('/Users/me/dev')
     expect(ProjectFolderPickerModel.resolvePathQuery('~/dev', undefined)).toBeNull()
     expect(ProjectFolderPickerModel.resolvePathQuery('dev', '/Users/me')).toBeNull()
+  })
+
+  it('browses one matching directory and keeps ambiguous or incomplete listings explicit', () => {
+    const listing = {
+      path: '/Users/me',
+      home: '/Users/me',
+      entries: [
+        { name: 'dev', path: '/Users/me/dev' },
+        { name: 'developer', path: '/Users/me/developer' },
+        { name: 'docs', path: '/Users/me/docs' },
+      ],
+      truncated: false,
+    }
+
+    expect(ProjectFolderPickerModel.matchingDirectoryPaths(listing, '~/dev')).toEqual(['/Users/me/dev', '/Users/me/developer'])
+    expect(ProjectFolderPickerModel.uniqueMatchingDirectoryPath(listing, '~/dev')).toBeNull()
+    expect(ProjectFolderPickerModel.uniqueMatchingDirectoryPath(listing, '~/dev/')).toBe('/Users/me/dev')
+    expect(ProjectFolderPickerModel.uniqueMatchingDirectoryPath(listing, '~/doc')).toBe('/Users/me/docs')
+    expect(ProjectFolderPickerModel.uniqueMatchingDirectoryPath({ ...listing, truncated: true }, '~/doc')).toBeNull()
+    expect(
+      ProjectFolderPickerModel.uniqueMatchingDirectoryPath(
+        { ...listing, path: '/Users/me/dev', entries: [{ name: 'repository', path: '/Users/me/dev/repository' }] },
+        '~/dev/repository',
+      ),
+    ).toBe('/Users/me/dev/repository')
+  })
+
+  it('checks path ancestry on directory boundaries', () => {
+    expect(ProjectFolderPickerModel.isPathAtOrWithin('/Users/me/dev', '/Users/me')).toBe(true)
+    expect(ProjectFolderPickerModel.isPathAtOrWithin('/Users/me', '/Users/me')).toBe(true)
+    expect(ProjectFolderPickerModel.isPathAtOrWithin('/Users/meteor', '/Users/me')).toBe(false)
   })
 
   it('searches registered project names and canonical paths', () => {

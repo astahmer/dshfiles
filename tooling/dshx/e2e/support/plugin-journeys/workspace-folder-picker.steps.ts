@@ -54,6 +54,26 @@ Then('a new folder can be created and registered as a workspace', async ({ page 
   }
 })
 
+Then('a unique typed folder path opens without pressing Enter', async ({ page }: { page: Page }) => {
+  const dialog = folderPickerDialog(page)
+  const homePath = await dialog.locator('p').filter({ hasText: /^\// }).first().textContent()
+  if (homePath === null) throw new Error('The Host home directory is not visible.')
+  const normalizedHomePath = homePath.trim()
+  const pathInput = dialog.getByRole('textbox', { name: 'Enter a folder path' })
+
+  await pathInput.fill('~/s')
+  await recordAssertion(page, 'ambiguous-folder-prefix-stays-in-home', async () => {
+    await expect(dialog.locator('p').filter({ hasText: normalizedHomePath }).first()).toBeVisible()
+    await expect(dialog.getByRole('option', { name: /sessions/ })).toBeVisible()
+    await expect(dialog.getByRole('option', { name: /storages/ })).toBeVisible()
+  })
+  await pathInput.fill('~/pr')
+  await recordAssertion(page, 'unique-folder-prefix-auto-browses-without-enter', () =>
+    expect(dialog.locator('p').filter({ hasText: join(normalizedHomePath, 'profiles') }).first()).toBeVisible(),
+  )
+  await finishJourneyAssertions(page)
+})
+
 Then('a typed absolute folder path can be registered without browsing', async ({ page }: { page: Page }) => {
   const scratchRoot = await mkdtemp(join(tmpdir(), 'dsh-folder-picker-e2e-'))
   const workspaceName = 'typed-path-workspace'

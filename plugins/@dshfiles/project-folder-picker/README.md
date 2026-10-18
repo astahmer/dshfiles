@@ -19,7 +19,9 @@ port, and a workspace registration callback.
 Optional props: `title`, `machineName`, `placeholder`, `recentFolders`,
 `disabled`, `mode`, `showNativePicker`, and `onUseAbsolutePath`. The default
 `projects` mode shows registered projects and switches to browsing when the
-query starts with `/` or `~/`. Home-relative paths resolve against the Host's
+query starts with `/` or `~/`. A unique matching folder opens as the path is
+typed; ambiguous matches remain available for keyboard selection, and truncated
+listings never trigger a guess. Home-relative paths resolve against the Host's
 reported home directory. While an absolute query is not the current listing,
 its direct-path action uses the workspace-registration callback, which returns
 the Host-canonical path.
