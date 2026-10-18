@@ -269,6 +269,30 @@ for dependent, `echo "---LABEL---"` between sections) and pipe noisy output
 through `head`/`tail` inside that call. Prefer `read` for single files; it runs
 concurrently.
 
+One exception is worth a dedicated call anyway: `node scripts/jj-state.mjs`
+prints this workspace's `@`, working copy, conflicts, `main | main@origin` and
+the revisions above `main` in one process. Prefer it over four or five separate
+`jj status` / `jj log` calls — the 2026-10-15..18 sessions logged 10k+ `jj`
+invocations, p50 1s each. Add `--read-only` (implies `--ignore-working-copy`)
+before inspecting another workspace, and `--repo <path>` to target one.
+
+## Waiting
+
+Never `sleep` to wait for work, and never loop a discovery tool to pass time;
+both hold the turn with nothing running.
+
+- Long command? Run it as a background job and collect it with `job_output`;
+  keep its `wait` timeout short (a minute or two), do other work between polls,
+  and let the completion notice wake you rather than blocking for 10+ minutes.
+  Blocking `job_output` waits cost 16h across the 2026-10-15..18 window.
+- Waiting for another agent or the user? End the turn, or set a `schedule_*`
+  reminder; a pending question or the next user message resumes you anyway.
+  `list_thread_questions` projects every Session in the corpus (~50s per call
+  before reuse caching), so call it once per check, never in a poll loop, and
+  pass `sessionId` when you already know which Session you care about.
+- `sleep` in a bash command (81 calls, 2.2h in that window) is the same waste
+  wearing a different hat, including inside a retry loop.
+
 ## Verifying
 
 A plugin that installs is not a plugin that works.

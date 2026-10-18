@@ -10,6 +10,7 @@
     "check": "pnpm run check:green && pnpm run lint && pnpm run fmt:check",
     "check:green": "pnpm run typecheck:scripts && pnpm run test:scripts && pnpm run verify:web-profile-contract && pnpm run check:dshx && pnpm run check:plugins && pnpm run check:desktop && pnpm run knip && pnpm run check:plugin-boot && pnpm run check:e2e:smoke",
     "check:diff": "node scripts/check-diff.mjs",
+    "jj:state": "node scripts/jj-state.mjs",
     "knip": "pnpm --dir tooling/dshx exec knip --directory ../.. --config \"$PWD/knip.jsonc\" --no-config-hints",
     "lint": "node scripts/lint-ratchet.ts oxlint && node scripts/lint-ratchet.ts ast-grep",
     "sg": "ast-grep scan tooling/dshx/packages plugins scripts apps/desktop/src --globs=!plugins/@dshfiles/rich-composer/src/native/** --globs=!plugins/@dshfiles/frame-layout/src/native/**",
