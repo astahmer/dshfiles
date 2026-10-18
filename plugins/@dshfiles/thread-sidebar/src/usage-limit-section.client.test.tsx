@@ -45,7 +45,12 @@ const translate = (key: ThreadSidebarLocaleKey, params?: Readonly<Record<string,
   return template
 }
 
-const fill = (input: { readonly continuations: readonly QuotaContinuation[]; readonly titles?: readonly string[]; readonly busy?: readonly string[] }) => {
+const fill = (input: {
+  readonly continuations: readonly QuotaContinuation[]
+  readonly titles?: readonly string[]
+  readonly busy?: readonly string[]
+  readonly selectedSessionId?: string | undefined
+}) => {
   const onResume = vi.fn()
   const onResumeAll = vi.fn()
   const open = vi.fn()
@@ -59,6 +64,7 @@ const fill = (input: { readonly continuations: readonly QuotaContinuation[]; rea
       onResumeAll={onResumeAll}
       onSnooze={vi.fn()}
       open={open}
+      selectedSessionId={input.selectedSessionId}
       resumeAllBusy={false}
       rows={input.continuations.map((item, index) => ({
         continuation: item,
@@ -112,6 +118,15 @@ describe('usage limit section', () => {
     expect(screen.getByText('First')).toBeDefined()
     expect(screen.getByText('Resets in 1h 30m')).toBeDefined()
     expect(screen.getByText('Ready to resume')).toBeDefined()
+  })
+
+  it('marks selected recovery rows as keyboard-navigable active threads', () => {
+    fill({ continuations: [continuation()], selectedSessionId: 'blocked' })
+
+    const button = screen.getByText('Blocked 1').closest('button')
+    expect(button?.dataset.threadMainAction).toBe('')
+    expect(button?.dataset.threadId).toBe('blocked')
+    expect(button?.getAttribute('aria-current')).toBe('page')
   })
 
   it('reads a snooze, an unknown reset, and the auto-retry switch off the record', () => {

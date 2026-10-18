@@ -30,6 +30,7 @@ export interface UsageLimitSectionProps<Thread extends UsageLimitThread> {
   readonly resumeAllBusy: boolean
   readonly translate: (key: ThreadSidebarLocaleKey, params?: Readonly<Record<string, string | number>>) => string
   readonly open: (sessionId: Thread['id']) => void
+  readonly selectedSessionId?: Thread['id'] | undefined
   readonly onResume: (input: { readonly continuationId: string; readonly sessionId: string }) => void
   readonly onSnooze: (input: { readonly continuationId: string; readonly duration: UsageLimitSnooze }) => void
   readonly onAutoRetry: (input: { readonly continuationId: string; readonly sessionId: string; readonly enabled: boolean }) => void
@@ -91,7 +92,15 @@ export const UsageLimitSection = <Thread extends UsageLimitThread>(props: UsageL
             className="dshx:group/usage dshx:flex dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:px-2.5 dshx:py-1.5 dshx:hover:bg-accent/40"
             key={row.continuation.continuationId}
           >
-            <button className="dshx:min-w-0 dshx:flex-1 dshx:text-left" onClick={() => props.open(row.session.id)} type="button">
+            <button
+              className="dshx:min-w-0 dshx:flex-1 dshx:text-left"
+              data-thread-id={row.session.id}
+              data-thread-main-action=""
+              data-selected={row.session.id === props.selectedSessionId}
+              aria-current={row.session.id === props.selectedSessionId ? 'page' : undefined}
+              onClick={() => props.open(row.session.id)}
+              type="button"
+            >
               <span className={cn('dshx:block dshx:truncate dshx:text-sm', snoozed && 'dshx:text-muted-foreground')}>
                 {row.session.displayTitle.length > 0 ? row.session.displayTitle : t('threadSidebarUntitledThread')}
               </span>

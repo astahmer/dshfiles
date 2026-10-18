@@ -128,6 +128,7 @@ import { UsageLimitRowsModel, type QuotaContinuation } from './usage-limit-rows.
 import { UsageLimitSection, type UsageLimitSnooze } from './usage-limit-section.js'
 import { groupThreadChildren, partitionFinishedChildren, shouldOpenChildThreadList, threadActionTargetIds, visibleChildren } from './thread-children.js'
 import { buildThreadUrl, clearThreadUrl, readThreadUrl } from './thread-url.js'
+import { ThreadListNavigationModel } from './thread-list-navigation.js'
 import { workingThreadIds } from './working-threads.js'
 import { indexRebasedThreadSessions, rebasedThreadSettleDelayMs } from './rebased-threads.js'
 import {
@@ -180,6 +181,7 @@ type InjectedActions = {
 type ThreadSidebarProps = Pick<WorkspaceBrowserProps, 'open' | 'useSessions' | 'useSessionStatus' | 'useWorkspaces'> &
   InjectedActions & {
     tSidebar: TranslateNS<typeof THREAD_SIDEBAR_LOCALE_NAMESPACE>
+    onNavigationLookahead?: (sessionIds: readonly SessionSummary['id'][]) => void
   }
 
 type ThreadSidebarTranslate = ThreadSidebarProps['tSidebar']
@@ -500,7 +502,10 @@ const ChildThreadList = (props: {
         <button
           type="button"
           className={cn(lineClass, 'dshx:data-[selected=true]:bg-accent')}
+          data-thread-id={child.id}
+          data-thread-main-action=""
           data-selected={child.id === props.selectedChildId}
+          aria-current={child.id === props.selectedChildId ? 'page' : undefined}
           title={new Date(child.updatedAt).toLocaleString()}
           onClick={() => props.actions.open(child.id)}
           onDoubleClick={() => keepThreadTab(child.id)}
@@ -830,6 +835,9 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
               'dshx:flex dshx:w-full dshx:min-w-0 dshx:flex-col dshx:rounded-md dshx:text-left dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50 dshx:disabled:cursor-default',
               compact ? 'dshx:gap-0.5 dshx:px-2 dshx:py-1.5' : 'dshx:gap-1 dshx:px-2.5 dshx:py-2.5',
             )}
+            data-thread-id={session.id}
+            data-thread-main-action=""
+            aria-current={props.selected ? 'page' : undefined}
             title={new Date(session.updatedAt).toLocaleString()}
             onClick={() => props.actions.open(session.id)}
             onDoubleClick={() => keepThreadTab(session.id)}
@@ -3127,7 +3135,28 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           </div>
         ) : null}
 
-        <div data-testid="thread-sidebar-scroll" className="dshx:min-h-0 dshx:flex-1 dshx:overflow-auto dshx:overscroll-y-contain dshx:px-2 dshx:pb-3">
+        <div
+          data-testid="thread-sidebar-scroll"
+          className="dshx:min-h-0 dshx:flex-1 dshx:overflow-auto dshx:overscroll-y-contain dshx:px-2 dshx:pb-3"
+          onKeyDown={event =>
+            ThreadListNavigationModel.navigate({
+              event: event.nativeEvent,
+              list: event.currentTarget,
+              open: sessionId => {
+                const session = sessionState.byId[SessionId(sessionId)]
+                if (session !== undefined) openThread(session.id)
+              },
+              onLookahead: sessionIds => {
+                if (props.onNavigationLookahead === undefined) return
+                const lookaheadSessions = sessionIds.flatMap(sessionId => {
+                  const session = sessionState.byId[SessionId(sessionId)]
+                  return session === undefined ? [] : [session.id]
+                })
+                props.onNavigationLookahead(lookaheadSessions)
+              },
+            })
+          }
+        >
           {sessionState.phase !== 'ready' || workspaceState.phase !== 'ready' ? (
             <div className="dshx:flex dshx:items-center dshx:justify-center dshx:gap-2 dshx:py-6 dshx:text-sm dshx:text-muted-foreground">
               <Spinner />
@@ -3197,6 +3226,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
             onResumeAll={() => void resumeAllUsageLimits()}
             onSnooze={input => void changeUsageLimitRecovery(input)}
             open={openThread}
+            selectedSessionId={selectedSessionId}
             resumeAllBusy={usageLimitResumeAllBusy}
             rows={statusFilteredUsageLimitRows}
             translate={props.tSidebar}

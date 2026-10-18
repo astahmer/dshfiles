@@ -17,11 +17,12 @@ import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { defineClient } from '@dshfiles/dshx/client'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ArchivedThreadDock } from './archived-thread-dock.js'
 import { SettledThreadDock } from './settled-thread-dock.js'
 import { SidebarRoot, type FooterSnapshot, type SidebarShellBaseProps } from './sidebar-shell.js'
 import { ThreadAsideOpenProvider, ThreadSidebar } from './client.js'
+import { ThreadListNavigationModel } from './thread-list-navigation.js'
 import { HeaderThreadActions } from './header-actions.js'
 import { SubagentCatalogAction, SubagentHeaderLineage, type SubagentCatalogInjected } from './subagent-provenance/SubagentHeaderLineage.js'
 import { SubagentProvenanceToolRow } from './subagent-provenance/subagent-tool-row.js'
@@ -54,6 +55,7 @@ declare module '@deepseek-ai/dsh-api-session-controller/client' {
   interface SessionReferenceSourceMap {
     threadSidebarArchivedView: unknown
     threadSidebarSkillAutocomplete: unknown
+    threadSidebarNavigation: unknown
     /** One thread shown in its own right-sidebar tab (opened from the row menu). */
     threadSidebarAside: unknown
   }
@@ -591,6 +593,31 @@ export default defineClient({
       ),
     )
 
+    const ThreadSidebarWithHistoryLookahead = (props: Parameters<typeof ThreadSidebar>[0]): JSX.Element => {
+      const [lookaheadSessionIds, setLookaheadSessionIds] = useState<readonly SessionSummary['id'][]>([])
+      useEffect(
+        () =>
+          ThreadListNavigationModel.retainLookahead({
+            sessionIds: lookaheadSessionIds,
+            retain: (sessionId, signal) => ctx.sessions.retain(sessionId, { source: 'threadSidebarNavigation', signal }),
+          }),
+        [lookaheadSessionIds],
+      )
+      const updateLookaheadSessionIds = (sessionIds: readonly SessionSummary['id'][]): void => {
+        setLookaheadSessionIds(current =>
+          current.length === sessionIds.length && current.every((sessionId, index) => sessionId === sessionIds[index]) ? current : sessionIds,
+        )
+      }
+
+      return (
+        <PluginQueryProvider>
+          <ThreadAsideOpenProvider value={openAside}>
+            <ThreadSidebar {...props} onNavigationLookahead={updateLookaheadSessionIds} />
+          </ThreadAsideOpenProvider>
+        </PluginQueryProvider>
+      )
+    }
+
     ctx.slots.inject('sidebar.workspaces', () =>
       ctx.slots.register(
         {
@@ -615,13 +642,7 @@ export default defineClient({
             openRemoteThreads: () => ctx.layout.selectPanel('dshfiles-multi-host-thread' as MainPanelId),
           }),
         },
-        decorate((props: Parameters<typeof ThreadSidebar>[0]) => (
-          <PluginQueryProvider>
-            <ThreadAsideOpenProvider value={openAside}>
-              <ThreadSidebar {...props} />
-            </ThreadAsideOpenProvider>
-          </PluginQueryProvider>
-        )),
+        decorate(ThreadSidebarWithHistoryLookahead),
       ),
     )
 
