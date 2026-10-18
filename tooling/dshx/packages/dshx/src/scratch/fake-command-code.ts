@@ -6,9 +6,9 @@ import { z } from 'zod'
  * A loopback stand-in for Command Code, the one provider whose account base URL accepts a loopback address, so a
  * journey can drive real turns without a network or a subscription.
  *
- * The key decides the account: `-LIMITED` keys are rate limited on chat, `-BROKEN` keys fail the billing read,
- * and `-EXHAUSTED` keys exercise quota recovery. Every other key reports a 75%-left session window and a
- * 10%-left weekly window. A turn answers `Answered by <key suffix>` unless its latest message carries a directive:
+ * The key decides the account: `-MISSING` keys reject chat, `-LIMITED` keys are rate limited on chat, `-BROKEN` keys
+ * fail the billing read, and `-EXHAUSTED` keys exercise quota recovery. Every other key reports a 75%-left session
+ * window and a 10%-left weekly window. A turn answers `Answered by <key suffix>` unless its latest message carries a directive:
  * `[[call TOOL {json}]]` calls any tool; `[[once call TOOL {json}]]` calls it only on its first match; `[[read PATH]]`
  * and `[[memory_search QUERY]]` call tools; `[[empty]]` settles with reasoning but no answer; `[[hold]]` keeps the
  * turn running until `releaseHeldTurns`; `[[title NAME]]` sets the thread name; `[[answer TEXT]]` returns markdown;
@@ -138,6 +138,9 @@ export const startFakeCommandCode = async (): Promise<FakeCommandCode> => {
         if (kind === 'title') {
           const named = /\[\[title ([^\]]+)\]\]/.exec(messages.map(message => message.text).join('\n'))
           return streamAnswer(response, { content: named?.[1] ?? 'Fake thread title' })
+        }
+        if (key.endsWith('-MISSING')) {
+          return reply(401, JSON.stringify({ error: { message: 'Invalid API key', type: 'authentication_error', code: 'invalid_api_key' } }))
         }
         if (key.endsWith('-LIMITED')) return reply(429, JSON.stringify({ error: { message: 'Rate limit reached', type: 'rate_limit_error' } }))
         if (key.endsWith('-EXHAUSTED')) {
