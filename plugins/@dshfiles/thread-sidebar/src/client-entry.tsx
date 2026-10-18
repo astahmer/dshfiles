@@ -38,6 +38,7 @@ import { SidebarOrganization } from './organization.js'
 import { NAVIGATION_EVENT } from './navigation-history.js'
 import { PALETTE_EVENT } from '@dshfiles/command-palette/api'
 import { SettingsTab } from './settings-tab.js'
+import { ThreadNotificationAudioModel } from './thread-notification-audio.js'
 import { createSkillMentionSource } from './skill-mention.js'
 import {
   buildThreadReferenceInsert,
@@ -367,6 +368,20 @@ export default defineClient({
         decorate(({ t }: { t: TranslateNS<typeof THREAD_SIDEBAR_LOCALE_NAMESPACE> }) => <SettingsTab t={t} hostShortcuts={ctx.shortcuts.catalog} />),
       ),
     )
+
+    // Notification sounds fire in a background tab, where no gesture can resume an audio context:
+    // unlock it on the first interaction so a later alert still rings.
+    ctx.effect(() => {
+      const unlockNotificationAudio = (): void => {
+        void ThreadNotificationAudioModel.unlock()
+      }
+      window.addEventListener('pointerdown', unlockNotificationAudio, { capture: true, once: true })
+      window.addEventListener('keydown', unlockNotificationAudio, { capture: true, once: true })
+      return () => {
+        window.removeEventListener('pointerdown', unlockNotificationAudio, { capture: true })
+        window.removeEventListener('keydown', unlockNotificationAudio, { capture: true })
+      }
+    }, 'thread-sidebar: notification audio')
 
     ctx.effect(() => ctx.slots.subscribe('sidebar.panellist', syncPanels), 'thread-sidebar: panel links')
     ctx.effect(() => ctx.locale.subscribe(syncPanels), 'thread-sidebar: panel labels')
