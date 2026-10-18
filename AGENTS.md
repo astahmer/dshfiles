@@ -302,6 +302,15 @@ A plugin that installs is not a plugin that works.
   `~/.dsh/logs/startup-*.log`; "did not activate" warnings only go to stdout.
 - A bare `curl` gets **401**; use the tokenized URL. `EADDRINUSE` means a stale
   process holds the port (`lsof -nP -iTCP:<port> -sTCP:LISTEN`).
+- **Ask the running instance what it is before trusting it.** `dshx status`
+  reports the live DSH's pid, port, profile, launch time, the checkout revision
+  it was launched on (read back from the jj operation log), whether the checkout
+  moved since, how many plugin bundles were rebuilt after launch, and which
+  owned bundles have unbuilt edits. `dshx status --json` gives the same facts
+  (plus the full stale-bundle list) for comparing two runs, and
+  `dshx plugins list` lists every loaded plugin entry with its activation phase.
+  A plugin whose sources are newer than its `dist/`, or a served bundle older
+  than your edit, explains a change that "is not there" before any code reading.
 - `dsh --profile web --dump-config` shows what a profile actually loads.
 - After every build, import-check the Host bundle with the DSH Node:
   `fnm exec --using="$(cat .node-version)" node -e "import('./dist/index.js')"`.

@@ -6,6 +6,7 @@ import { runPlatformCli } from '../src/cli/platform.js'
 import type { PlatformCliRuntime } from '../src/cli/platform.js'
 import { connectDshPlatformClient, createDshPlatformClientFromTransport, DshPlatformError } from '../src/platform/client.js'
 import type { DshPlatformClient, DshPlatformTransport } from '../src/platform/client.js'
+import type { LiveInstanceFacts } from '../src/platform/live-instance.js'
 
 const capturedIO = () => {
   const stdout = new PassThrough()
@@ -28,18 +29,21 @@ const run = async ({
   argv,
   client,
   connect,
+  inspectInstance = async () => undefined,
   readDshVersion = async () => 'dsh 0.2.0-rc.2',
 }: {
   readonly argv: readonly string[]
   readonly client?: DshPlatformClient
   readonly connect?: PlatformCliRuntime['connect']
   readonly readDshVersion?: () => Promise<string | undefined>
+  readonly inspectInstance?: PlatformCliRuntime['inspectInstance']
 }) => {
   const captured = capturedIO()
   const runtime: PlatformCliRuntime = {
     io: captured.io,
     dshxVersion: 'test-version',
     readDshVersion,
+    inspectInstance,
     connect: connect ?? (async () => client ?? clientWith({ rpc: async () => null })),
   }
   const code = await runPlatformCli(parseCliArgs([...argv]), runtime)
@@ -87,6 +91,23 @@ const settingsDescription = ({ writable = true }: { readonly writable?: boolean 
       secrets: [],
       revision: 3,
     },
+  ],
+})
+
+const liveInstance = (): LiveInstanceFacts => ({
+  pid: 42847,
+  port: 3080,
+  profile: 'web',
+  startedAt: Date.parse('2026-10-18T01:30:32.000Z'),
+  uptimeMs: 12 * 60_000,
+  command: 'node /Users/someone/.local/share/pnpm/bin/dsh web --port 3080',
+  directory: '/Users/someone/dev/dshfiles',
+  startRevision: { changeId: 'nvlkrlxlmoyk', commitId: '2a36696844a2', bookmarks: ['main'], description: 'wip' },
+  currentRevision: { changeId: 'vrmuluomuulx', commitId: '0f946ce835e4', bookmarks: [], description: 'test(e2e): follow the shell settings menu' },
+  staleBundles: [
+    { name: '@dshfiles/ai-accounts', builtAt: 1_700_000_000_000, sourcesAt: 1_700_000_001_000, reason: 'sources-newer' },
+    { name: '@dshfiles/home', builtAt: 1_700_000_002_000, sourcesAt: 1_700_000_000_000, reason: 'built-after-start' },
+    { name: '@dshfiles/editor', builtAt: 1_700_000_003_000, sourcesAt: 1_700_000_000_000, reason: 'built-after-start' },
   ],
 })
 
@@ -165,11 +186,46 @@ describe('dshx doctor', () => {
 })
 
 describe('dshx status', () => {
-  it('counts sessions, plugins, and bundles', async () => {
-    const result = await run({ argv: ['status', '--json'], client: clientWith({ rpc: inventoryRpc() }) })
+  it('counts sessions, plugins, and bundles, and carries the whole instance for comparison', async () => {
+    const result = await run({ argv: ['status', '--json'], client: clientWith({ rpc: inventoryRpc() }), inspectInstance: async () => liveInstance() })
 
     expect(result.code).toBe(0)
-    expect(envelopeSchema.parse(JSON.parse(result.stdout)).data).toMatchObject({ connected: true, sessions: 0, plugins: 1, bundles: 1 })
+    expect(envelopeSchema.parse(JSON.parse(result.stdout)).data).toMatchObject({
+      connected: true,
+      sessions: 0,
+      plugins: 1,
+      bundles: 1,
+      pluginActivation: { total: 1, active: 1, enabledButInactive: [] },
+      instance: { pid: 42847, port: 3080, profile: 'web', startRevision: { changeId: 'nvlkrlxlmoyk' } },
+    })
+  })
+
+  it('names the process, its launch revision, and the checkout it left behind', async () => {
+    const result = await run({ argv: ['status'], client: clientWith({ rpc: inventoryRpc() }), inspectInstance: async () => liveInstance() })
+
+    expect(result.code).toBe(0)
+    expect(result.stdout).toContain('Instance: pid 42847, port 3080, profile web')
+    expect(result.stdout).toContain('Started: 2026-10-18T01:30:32.000Z (12m 0s ago)')
+    expect(result.stdout).toContain('Checkout: /Users/someone/dev/dshfiles')
+    expect(result.stdout).toContain('Started on: nvlkrlxlmoyk 2a36696844a2 main wip')
+    expect(result.stdout).toContain('Now: vrmuluomuulx 0f946ce835e4 test(e2e): follow the shell settings menu')
+    expect(result.stdout).toContain('Rebuilt since start: 2 bundles built after launch')
+    expect(result.stdout).toContain('Unbuilt edits: @dshfiles/ai-accounts (sources newer than dist)')
+    expect(result.stdout).toContain('Plugins: 1 (1 active)')
+  })
+
+  it('reports the live instance even when the Host does not answer', async () => {
+    const result = await run({
+      argv: ['status'],
+      inspectInstance: async () => liveInstance(),
+      connect: async () => {
+        throw new DshPlatformError('connection-failed', 'Could not reach the local DSH launch URL.')
+      },
+    })
+
+    expect(result.code).toBe(1)
+    expect(result.stdout).toContain('Instance: pid 42847, port 3080, profile web')
+    expect(result.stderr).toBe('error [connection-failed]: Could not reach the local DSH launch URL.\n')
   })
 
   it.each([

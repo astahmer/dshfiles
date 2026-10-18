@@ -292,7 +292,7 @@ export const cliCommandMetadata = {
   checkout: 'Bring the jj checkout that runs DSH onto main, then reinstall and rebuild what changed (dshx checkout sync --help).',
   inspect: 'Inspect Slots, Tools, Services, or Events.',
   add: 'Scaffold a slot, a panel, an API, a Tool, a Command, or a Hook contribution.',
-  status: 'Check the authenticated local DSH Host connection.',
+  status: 'Report the running local DSH: process, launch revision, plugin activation, and bundles.',
   info: 'Show local DSHX and Node runtime information.',
   doctor: 'Diagnose local DSHX and reachable DSH APIs.',
   presets: 'List or inspect DSH Agent presets.',

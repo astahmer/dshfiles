@@ -188,11 +188,21 @@ loopback HTTP in this first client. The token is not sent to API endpoints,
 written to disk, or included in output.
 
 `status` checks Host connectivity and reports API-visible Session/plugin/bundle
-counts. `info` reports local DSHX and Node versions without connecting. `doctor`
+counts, and describes the live instance behind the launch URL: its pid, port and
+profile, its launch time, the checkout revision it was launched on, whether that
+checkout moved since, how many plugin bundles were rebuilt after launch, and
+which owned bundles have sources newer than their `dist/`. Those facts come from
+the process table and, when a checkout is present, from the jj operation log at
+the launch time (`--ignore-working-copy`, so inspecting never snapshots the
+checkout); they are reported even when the Host does not answer. `--json` adds
+`instance` (with every stale bundle, and the reason for each) and
+`pluginActivation` (total, active, enabled but inactive).
+`info` reports local DSHX and Node versions without connecting. `doctor`
 also checks local DSH, failed/duplicate plugin entries, bundle errors, settings
 availability, and RPC connectivity. DSH does not expose the selected profile,
 Host version, Client build state, or declared plugin compatibility through the
-inspected Remote APIs; `doctor` labels those facts unknown.
+inspected Remote APIs; `status` and `doctor` read the profile from the process
+command line and label the rest unknown.
 
 `sessions show` preserves Session metadata and projection hints returned by DSH.
 Search prefers the composed finder from `@dshfiles/memory` when the installed

@@ -127,10 +127,14 @@ dshx check --runtime       # additionally require Profile, Composition, bridge, 
 dshx build                 # typecheck, then build Host and Client artifacts
 dshx dev                   # Vite build-watch plus official DSH development session
 dshx inspect slots
+dshx status                # what the running local DSH is: process, launch revision, plugins, bundles
+dshx plugins list          # every loaded plugin entry with its activation phase
 dshx add ui --slot <slot-name>
 ```
 
 `check` is read-only unless `--fix` is explicit. `build` does not rewrite source or manifest metadata. `inspect` requires a supported running Composition. See the [CLI reference](./docs/cli-reference.md) for all commands and JSON fields.
+
+`status` reads the launch URL from `DSHX_URL` or `~/.dsh/runtime/web-url`, finds the process that owns that port, and reports its launch time, the checkout revision it was launched on (reconstructed from the jj operation log), whether the checkout moved since, the plugin activation counts, and two build signals: bundles rebuilt after launch (client HMR may serve them, the running Host has not loaded them) and owned bundles whose sources are newer than their `dist/`. It still reports the instance when the Host does not answer, and `--json` carries the full list.
 
 Also see the [CLI reference](./docs/cli-reference.md),
 [Compatibility](./docs/compatibility.md), [Architecture](./docs/architecture.md),

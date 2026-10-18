@@ -6,7 +6,9 @@ import semver from 'semver'
 import { z } from 'zod'
 import type { CliArgs } from './args.js'
 import { renderCliUsage } from './usage.js'
-import { createDshPlatformClientFromTransport, DshPlatformError, connectDshPlatformClient } from '../platform/client.js'
+import { createDshPlatformClientFromTransport, DshPlatformError, connectDshPlatformClient, DshPlatformLaunchUrl } from '../platform/client.js'
+import { inspectLiveInstance } from '../platform/live-instance.js'
+import type { LiveInstanceFacts } from '../platform/live-instance.js'
 import { SessionSearchModel } from '../platform/session-search.js'
 import type { BundleSummary, DshPlatformClient, DshPlatformTransport, JsonValue, PluginSummary, SessionSummary } from '../platform/client.js'
 import type { CommunicationClient, ConnectCommunicationClientOptions } from '../communication/bridge.js'
@@ -29,6 +31,7 @@ export interface PlatformCliRuntime {
   readonly connectCommunication?: (options?: ConnectCommunicationClientOptions) => Promise<CommunicationClient>
   readonly readDshVersion?: () => Promise<string | undefined>
   readonly connectMultiHost?: (options: { readonly url?: string }) => Promise<MultiHost>
+  readonly inspectInstance?: typeof inspectLiveInstance
 }
 
 interface DoctorCheck {
@@ -398,11 +401,67 @@ async function runDoctor(args: CliArgs, runtime: PlatformCliRuntime): Promise<nu
   return checks.some(item => item.status === 'fail') ? 1 : 0
 }
 
+interface PluginActivation {
+  readonly total: number
+  readonly active: number
+  readonly enabledButInactive: readonly string[]
+}
+
+const summarizeActivation = (plugins: readonly PluginSummary[]): PluginActivation => ({
+  total: plugins.length,
+  active: plugins.filter(plugin => plugin.phase === 'active').length,
+  enabledButInactive: plugins.filter(plugin => plugin.enabled && plugin.phase !== 'active').map(plugin => plugin.id),
+})
+
+const durationText = (milliseconds: number): string => {
+  const seconds = Math.max(0, Math.round(milliseconds / 1000))
+  if (seconds < 60) return `${seconds}s`
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return `${minutes}m ${seconds % 60}s`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}h ${minutes % 60}m`
+  return `${Math.floor(hours / 24)}d ${hours % 24}h`
+}
+
+const revisionText = (revision: LiveInstanceFacts['startRevision']): string => {
+  if (revision === null) return 'unknown'
+  const bookmarks = revision.bookmarks.length === 0 ? '' : ` ${revision.bookmarks.join(' ')}`
+  const description = revision.description === '' ? '' : ` ${revision.description}`
+  return `${revision.changeId} ${revision.commitId}${bookmarks}${description}`
+}
+
+/**
+ * What a debugging agent needs before it trusts anything the Host reports: which process, which build, which revision,
+ * and whether the checkout moved out from under it since launch.
+ */
+const instanceLines = (facts: LiveInstanceFacts): readonly string[] => {
+  const profile = facts.profile === null ? '' : `, profile ${facts.profile}`
+  const moved = facts.startRevision?.commitId !== facts.currentRevision?.commitId
+  const unbuilt = facts.staleBundles.filter(bundle => bundle.reason === 'sources-newer').map(bundle => bundle.name)
+  const rebuilt = facts.staleBundles.filter(bundle => bundle.reason === 'built-after-start').length
+  return [
+    `Instance: pid ${facts.pid}, port ${facts.port}${profile}`,
+    `Started: ${new Date(facts.startedAt).toISOString()} (${durationText(facts.uptimeMs)} ago)`,
+    `Checkout: ${facts.directory}`,
+    `Started on: ${revisionText(facts.startRevision)}`,
+    ...(moved ? [`Now: ${revisionText(facts.currentRevision)}`] : []),
+    ...(rebuilt === 0
+      ? []
+      : [
+          `Rebuilt since start: ${rebuilt} bundle${rebuilt === 1 ? '' : 's'} built after launch; client HMR may already serve them, the running Host has not loaded them`,
+        ]),
+    ...(unbuilt.length === 0 ? [] : [`Unbuilt edits: ${unbuilt.join(', ')} (sources newer than dist)`]),
+  ]
+}
+
 async function runStatus(args: CliArgs, runtime: PlatformCliRuntime): Promise<number> {
   const connect = runtime.connect ?? connectDshPlatformClient
+  const launchUrl = args.url ?? DshPlatformLaunchUrl.resolveLaunchUrl(undefined)
+  const instance = await (runtime.inspectInstance ?? inspectLiveInstance)({ launchUrl }).catch(() => undefined)
   try {
     const client = await connect(args.url === undefined ? {} : { url: args.url })
     const [sessions, plugins, bundles] = await Promise.all([client.sessions.list(), client.plugins.list(), client.bundles.list()])
+    const activation = summarizeActivation(plugins)
     const data = {
       connected: true,
       dshxVersion: runtime.dshxVersion,
@@ -411,15 +470,21 @@ async function runStatus(args: CliArgs, runtime: PlatformCliRuntime): Promise<nu
       sessions: sessions.length,
       plugins: plugins.length,
       bundles: bundles.length,
+      pluginActivation: activation,
+      instance: instance ?? null,
     }
-    emitResult(
-      args,
-      runtime.io,
-      data,
-      `DSH Host connected\nSessions: ${sessions.length}\nPlugins: ${plugins.length}\nBundles: ${bundles.length}\nHost version: not exposed by DSH API`,
-    )
+    const message = [
+      ...(instance === undefined ? [] : instanceLines(instance)),
+      'DSH Host connected',
+      `Sessions: ${sessions.length}`,
+      `Plugins: ${plugins.length} (${activation.active} active${activation.enabledButInactive.length === 0 ? '' : `, enabled but inactive: ${activation.enabledButInactive.join(', ')}`})`,
+      `Bundles: ${bundles.length}`,
+      'Host version: not exposed by DSH API',
+    ].join('\n')
+    emitResult(args, runtime.io, data, message)
     return 0
   } catch (error) {
+    if (instance !== undefined && !args.json) write(runtime.io.stdout, `${instanceLines(instance).join('\n')}\n`)
     return emitError(args, runtime.io, error)
   }
 }

@@ -184,7 +184,7 @@ describe('CLI commands', () => {
     const rootOutput = await text(rootStreams.out)
     expect(rootOutput).toContain('USAGE dshx [OPTIONS] create|test|package')
     expect(rootOutput).toContain('sessions')
-    expect(rootOutput).toContain('Check the authenticated local DSH Host connection.')
+    expect(rootOutput).toContain('Report the running local DSH: process, launch revision, plugin activation, and bundles.')
 
     const targetStreams = io()
     expect(await runCli(['add', 'panel', '--help'], { io: targetStreams })).toBe(0)
