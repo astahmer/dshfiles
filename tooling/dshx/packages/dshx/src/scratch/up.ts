@@ -7,18 +7,7 @@ import { DSHFILES_ROOT, buildPlugin, findFreePort, LocalBundleModel } from '../p
 import { compositionFailures, readProfileComposition } from '../project/profile-composition.js'
 import { ScratchProfileRuntime } from '../project/scratch-profile.js'
 import { ScratchSeedRuntime } from './seed.js'
-import {
-  LIVE_DSH_HOME,
-  LIVE_DSH_PORT,
-  ScratchError,
-  isWithin,
-  ownedProcessStatus,
-  readScratchState,
-  redactUrls,
-  spawnDetached,
-  writeScratchState,
-  type ScratchState,
-} from './state.js'
+import { LIVE_DSH_HOME, LIVE_DSH_PORT, ScratchError, ScratchStateRuntime, type ScratchState } from './state.js'
 
 export interface ScratchUpOptions {
   readonly name: string
@@ -89,8 +78,8 @@ const stopGroup = async (pid: number): Promise<void> => {
 }
 
 export const scratchUp = async (options: ScratchUpOptions): Promise<ScratchState> => {
-  const existing = await readScratchState(options.stateDir, options.name).catch(() => undefined)
-  if (existing !== undefined && ownedProcessStatus(existing.host) === 'running') {
+  const existing = await ScratchStateRuntime.read(options.stateDir, options.name).catch(() => undefined)
+  if (existing !== undefined && ScratchStateRuntime.ownedProcessStatus(existing.host) === 'running') {
     throw new ScratchError(
       'already-up',
       `A scratch DSH named "${options.name}" is already up at ${existing.origin} (pid ${existing.host.pid}).`,
@@ -100,7 +89,7 @@ export const scratchUp = async (options: ScratchUpOptions): Promise<ScratchState
   if (options.port === LIVE_DSH_PORT) {
     throw new ScratchError('live-port', `Port ${LIVE_DSH_PORT} belongs to the live DSH.`, 'Omit --port to take a free port.')
   }
-  if (options.project !== undefined && isWithin(LIVE_DSH_HOME, resolve(options.project))) {
+  if (options.project !== undefined && ScratchStateRuntime.isWithin(LIVE_DSH_HOME, resolve(options.project))) {
     throw new ScratchError('live-home', 'The project lies inside the live DSH home.', 'Pass a project folder outside ~/.dsh.')
   }
   if (
@@ -166,14 +155,14 @@ export const scratchUp = async (options: ScratchUpOptions): Promise<ScratchState
     const port = options.port ?? (await findFreePort())
     options.onProgress(`starting dsh on 127.0.0.1:${port}`)
     const hostArgs = ['--profile', prepared.profile, '--port', String(port), '--no-open']
-    hostPid = spawnDetached('dsh', hostArgs, {
+    hostPid = ScratchStateRuntime.spawnDetached('dsh', hostArgs, {
       cwd: DSHFILES_ROOT,
       env: ScratchProfileRuntime.hostEnvironment(home, prepared.profileRoot, hostSource),
       log: hostLog,
     })
     const launchUrl = await waitFor(
       async () => {
-        if (ownedProcessStatus({ pid: hostPid ?? 0, signature: ['--port'] }) === 'gone')
+        if (ScratchStateRuntime.ownedProcessStatus({ pid: hostPid ?? 0, signature: ['--port'] }) === 'gone')
           throw new ScratchError('host-exited', 'dsh exited before announcing its URL.', `Read ${hostLog} (it holds the launch token; do not paste it).`)
         return URL_PATTERN.exec(await readFile(hostLog, 'utf8').catch(() => ''))?.[0]
       },
@@ -181,14 +170,14 @@ export const scratchUp = async (options: ScratchUpOptions): Promise<ScratchState
       async () =>
         new ScratchError(
           'host-timeout',
-          `dsh did not announce a URL within ${options.timeoutMs} ms:\n${redactUrls((await readFile(hostLog, 'utf8').catch(() => '')).slice(-2_000))}`,
+          `dsh did not announce a URL within ${options.timeoutMs} ms:\n${ScratchStateRuntime.redactUrls((await readFile(hostLog, 'utf8').catch(() => '')).slice(-2_000))}`,
           'Raise --timeout, or read the host log for activation failures.',
         ),
     )
 
     const cdpPort = await findFreePort()
     options.onProgress('starting headless Chromium')
-    browserPid = spawnDetached(
+    browserPid = ScratchStateRuntime.spawnDetached(
       process.execPath,
       [browserHostScript, '--cdp-port', String(cdpPort), '--user-data-dir', join(home, 'browser'), '--events', browserEvents, '--ready', browserReady],
       { cwd: options.stateDir, env: process.env, log: browserLog },
@@ -225,7 +214,7 @@ export const scratchUp = async (options: ScratchUpOptions): Promise<ScratchState
       evidenceDir: join(options.stateDir, 'evidence'),
     }
     if (fakeSecretCli !== undefined) state.fakeSecretCli = fakeSecretCli
-    await writeScratchState(state)
+    await ScratchStateRuntime.write(state)
     return state
   } catch (error) {
     if (browserPid !== undefined) await stopGroup(browserPid)

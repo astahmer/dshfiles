@@ -7,7 +7,7 @@ import { z } from 'zod'
 import type { ReachSeed } from '../project/features.js'
 import { DSHFILES_ROOT } from '../project/local-bundles.js'
 import { FAKE_COMMAND_CODE_MODEL } from './fake-command-code.js'
-import { ScratchError, spawnDetached, type ScratchState } from './state.js'
+import { ScratchError, ScratchStateRuntime, type ScratchState } from './state.js'
 
 const NEW_THREAD_COMPOSER = 'Describe what you want to build, / commands, @ files or sessions'
 export const NEW_THREAD_START_BUTTON_NAME = /^(?:New thread|New session)$/i
@@ -153,7 +153,7 @@ const startFakeProvider = async (
 ): Promise<{ readonly baseUrl: string; readonly process: NonNullable<ScratchState['fakeProvider']> }> => {
   const readyFile = join(state.stateDir, 'fake-provider.ready')
   await rm(readyFile, { force: true })
-  const pid = spawnDetached(process.execPath, [fakeProviderScript, readyFile], {
+  const pid = ScratchStateRuntime.spawnDetached(process.execPath, [fakeProviderScript, readyFile], {
     cwd: state.stateDir,
     env: process.env,
     log: join(state.stateDir, 'fake-provider.log'),
