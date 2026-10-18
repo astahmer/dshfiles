@@ -356,7 +356,7 @@
         "seed chat-reference-thread",
         "hover link \"main\"",
         "expect text \"Revision graph · main\"",
-        "expect text \"default@\"",
+        "expect text \"default@*\"",
         "press Escape",
         "click link \"main\"",
         "expect button \"Jujutsu view settings\"",
