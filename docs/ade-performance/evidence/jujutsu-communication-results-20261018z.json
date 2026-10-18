@@ -5,8 +5,20 @@
   "rawSampleRecordsIncluded": false,
   "samplesPerPanel": 10,
   "panels": [
-    { "name": "Agent Communication", "target": "Message a thread… combobox", "contentVisibleMs": { "p50": 80.3, "p95": 112.7 }, "longTaskCount": 0, "maxFrameGapMs": 16.8 },
-    { "name": "Jujutsu", "target": "visible (no description) graph row", "contentVisibleMs": { "p50": 97.2, "p95": 125.2 }, "longTaskCount": 0, "maxFrameGapMs": 16.8 }
+    {
+      "name": "Agent Communication",
+      "target": "Message a thread… combobox",
+      "contentVisibleMs": { "p50": 80.3, "p95": 112.7 },
+      "longTaskCount": 0,
+      "maxFrameGapMs": 16.8
+    },
+    {
+      "name": "Jujutsu",
+      "target": "visible (no description) graph row",
+      "contentVisibleMs": { "p50": 97.2, "p95": 125.2 },
+      "longTaskCount": 0,
+      "maxFrameGapMs": 16.8
+    }
   ],
   "measurement": "Warm panel navigation in a full-profile scratch; exact target content followed by two requestAnimationFrame callbacks.",
   "provenance": "Aggregates retained from the completed full-profile scratch run; per-sample records were not preserved in the final workspace."

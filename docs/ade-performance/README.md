@@ -41,10 +41,10 @@ Only trust a run after `doctor` passes and exact feature paths reach their targe
 `contentVisibleMs` records exact target content after two `requestAnimationFrame` callbacks. It is a content-visible proxy, not compositor paint, viewport intersection, or occlusion proof. Conversation switches used 40 samples per load (20 in each direction); panel paths used 10 samples each. With `n=10`, p95 is the maximum and remains noisy.
 
 | Visible working rows | Session rows | DOM nodes | Conversation switch p50/p95 | Activity open p50/p95 | AI Accounts open p50/p95 | Activity return p50/p95 |
-|---:|---:|---:|---:|---:|---:|---:|
-| 1 | 2 | 754 | 144.6 / 164.5 ms | 82.0 / 82.5 ms | 98.1 / 129.4 ms | 65.8 / 81.8 ms |
-| 5 | 6 | 906 | 143.7 / 213.0 ms | 81.1 / 164.9 ms | 102.7 / 115.8 ms | 64.6 / 82.4 ms |
-| 20 | 21 | 1,476 | 145.8 / 163.0 ms | 98.0 / 108.3 ms | 97.3 / 130.5 ms | 97.7 / 102.5 ms |
+| -------------------: | -----------: | --------: | --------------------------: | --------------------: | -----------------------: | ----------------------: |
+|                    1 |            2 |       754 |            144.6 / 164.5 ms |        82.0 / 82.5 ms |          98.1 / 129.4 ms |          65.8 / 81.8 ms |
+|                    5 |            6 |       906 |            143.7 / 213.0 ms |       81.1 / 164.9 ms |         102.7 / 115.8 ms |          64.6 / 82.4 ms |
+|                   20 |           21 |     1,476 |            145.8 / 163.0 ms |       98.0 / 108.3 ms |          97.3 / 130.5 ms |         97.7 / 102.5 ms |
 
 Switch latency did not trend upward from one to 20 visible working rows. Conversation switching recorded no long tasks at one row, two at five rows (maximum 66 ms), and one at 20 rows (maximum 52 ms); panel navigation had none. Chromium reported about 157 MB heap at each snapshot; these coarse `performance.memory` values, without forced GC, do not prove memory is flat.
 
@@ -64,11 +64,11 @@ Warm navigation used 10 samples per panel. The Agent Communication `Message a th
 
 A standalone fixed-height 1,000-row prototype compared eager DOM, CSS containment, and windowing. Each mode used 10 samples at 1440×900 and rendered the correct content. This is ordinary JavaScript/DOM, not React, TanStack Virtual, or the production DSH transcript.
 
-| Mode | Initial content p50/p95 | Scroll-to-newest p50/p95 | Mounted rows / card DOM nodes |
-|---|---:|---:|---:|
-| Eager | 28.6 / 35.6 ms | 28.3 / 42.3 ms | 1,000 / 4,007 |
-| Contained | 21.5 / 30.1 ms | 34.4 / 35.4 ms | 1,000 / 4,007 |
-| Windowed | 18.6 / 26.2 ms | 49.2 / 50.0 ms | 15 / 70 |
+| Mode      | Initial content p50/p95 | Scroll-to-newest p50/p95 | Mounted rows / card DOM nodes |
+| --------- | ----------------------: | -----------------------: | ----------------------------: |
+| Eager     |          28.6 / 35.6 ms |           28.3 / 42.3 ms |                 1,000 / 4,007 |
+| Contained |          21.5 / 30.1 ms |           34.4 / 35.4 ms |                 1,000 / 4,007 |
+| Windowed  |          18.6 / 26.2 ms |           49.2 / 50.0 ms |                       15 / 70 |
 
 All modes had a 16.8 ms maximum frame gap and no observed long tasks. Windowing reduced mounted rows by 98.5% and card DOM nodes by 98.3%; initial p95 improved, while scroll-to-newest p95 was slower than eager. Fixed-height simple cards and lack of React/streaming make this a mechanism comparison, not a production performance claim.
 
@@ -76,13 +76,13 @@ All modes had a 16.8 ms maximum frame gap and no observed long tasks. Windowing 
 
 React and TanStack Query already fit the DSH boundary: Host owns sessions and history; Query is the plugin UI's async-data cache, with Host-fed updates and optimistic mutation/rollback. TanStack Virtual is available for list use. A second authoritative store or renderer replacement adds coordination and compatibility costs without evidence that it fixes the measured path. See [plugin Query setup](../../plugins/@dshfiles/plugin-ui/src/query.tsx), [state ownership](../../plugins/@dshfiles/plugin-ui/docs/state-ownership.md), and the [DSH extension boundary](../../tooling/dshx/docs/sdk/getting-started.md).
 
-| Candidate | Fit | Recommendation |
-|---|---|---|
-| React + TanStack Query | Already integrated; Host remains authoritative; cache, prefetch, and rollback are available. | Keep. If profiling isolates a query wait, test prefetch of the existing query/key before adding state. |
-| TanStack DB | README labels it beta and advertises sub-millisecond live queries; those are vendor claims, not DSH measurements. No adapter or measured cross-view join bottleneck was found. | Defer; consider only as a bounded read-only projection after evidence ([README](https://raw.githubusercontent.com/TanStack/db/main/README.md)). |
-| LiveStore | Local event log is the source of truth; fit guidance identifies remote-server-primary systems as a non-fit. | Reject for current Host-authoritative ownership ([fit guidance](https://docs.livestore.dev/overview/when-livestore/)). |
-| TinyBase | npm `10.0.1` declares an optional React peer `^19.3.0`, outside DSH's React 18 range; another projection adds invalidation and normalization work. | Defer; do not add persistence or CRDT authority ([package metadata](https://registry.npmjs.org/tinybase/latest)). |
-| Preact/compat or Solid | DSH plugin slots rely on React context/hooks and expose no supported renderer replacement. | Reject as a performance-first migration ([Preact differences](https://preactjs.com/guide/v11/differences-to-react/), [Solid overview](https://docs.solidjs.com/)). |
+| Candidate              | Fit                                                                                                                                                                            | Recommendation                                                                                                                                                     |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| React + TanStack Query | Already integrated; Host remains authoritative; cache, prefetch, and rollback are available.                                                                                   | Keep. If profiling isolates a query wait, test prefetch of the existing query/key before adding state.                                                             |
+| TanStack DB            | README labels it beta and advertises sub-millisecond live queries; those are vendor claims, not DSH measurements. No adapter or measured cross-view join bottleneck was found. | Defer; consider only as a bounded read-only projection after evidence ([README](https://raw.githubusercontent.com/TanStack/db/main/README.md)).                    |
+| LiveStore              | Local event log is the source of truth; fit guidance identifies remote-server-primary systems as a non-fit.                                                                    | Reject for current Host-authoritative ownership ([fit guidance](https://docs.livestore.dev/overview/when-livestore/)).                                             |
+| TinyBase               | npm `10.0.1` declares an optional React peer `^19.3.0`, outside DSH's React 18 range; another projection adds invalidation and normalization work.                             | Defer; do not add persistence or CRDT authority ([package metadata](https://registry.npmjs.org/tinybase/latest)).                                                  |
+| Preact/compat or Solid | DSH plugin slots rely on React context/hooks and expose no supported renderer replacement.                                                                                     | Reject as a performance-first migration ([Preact differences](https://preactjs.com/guide/v11/differences-to-react/), [Solid overview](https://docs.solidjs.com/)). |
 
 ## Static hot-path hypotheses
 
