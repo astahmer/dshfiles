@@ -141,7 +141,12 @@ const buildWatcher = (result: unknown, face: 'host' | 'client', errorCode: strin
  * affects without reading a full source map (which also carries every source's contents). Real
  * files only: a virtual id cannot be matched against a changed checkout path.
  */
-const dependencyManifestPlugin = (options: { readonly face: 'host' | 'client'; readonly root: string; readonly outDir: string; readonly entryFile: string }): Plugin => {
+const dependencyManifestPlugin = (options: {
+  readonly face: 'host' | 'client'
+  readonly root: string
+  readonly outDir: string
+  readonly entryFile: string
+}): Plugin => {
   let modules: readonly string[] = []
   return {
     name: `dshx-${options.face}-dependency-manifest`,
@@ -153,7 +158,11 @@ const dependencyManifestPlugin = (options: { readonly face: 'host' | 'client'; r
     async writeBundle() {
       const sources = [...new Set(modules.flatMap(id => (id.startsWith('\0') || !isAbsolute(id) ? [] : [relative(options.root, id)])))].sort()
       await mkdir(options.outDir, { recursive: true })
-      await writeFile(resolve(options.outDir, `${options.entryFile}.deps.json`), `${JSON.stringify({ version: 1, face: options.face, sources }, null, 2)}\n`, 'utf8')
+      await writeFile(
+        resolve(options.outDir, `${options.entryFile}.deps.json`),
+        `${JSON.stringify({ version: 1, face: options.face, sources }, null, 2)}\n`,
+        'utf8',
+      )
     },
   }
 }

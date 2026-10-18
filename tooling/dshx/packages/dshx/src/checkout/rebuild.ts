@@ -139,8 +139,7 @@ const planRebuild = (input: { readonly root: string; readonly changedFiles: read
       .filter(
         pluginPackage =>
           changed.some(path => owns(pluginPackage, path)) ||
-          (dshxOutputs.size > 0 &&
-            [...dshxOutputs].some(output => pluginPackage.hostSources().has(output) || pluginPackage.clientSources().has(output))),
+          (dshxOutputs.size > 0 && [...dshxOutputs].some(output => pluginPackage.hostSources().has(output) || pluginPackage.clientSources().has(output))),
       )
       .map(pluginPackage => pluginPackage.name),
   )
@@ -166,9 +165,7 @@ const planRebuild = (input: { readonly root: string; readonly changedFiles: read
     .map(pluginPackage => {
       const own = changed.filter(path => owns(pluginPackage, path))
       const manifestChanged = own.some(path => /\/(package\.json|cordis\.patch\.yml)$/.test(path))
-      const unmapped = own.some(
-        path => /\.[cm]?[jt]sx?$/.test(path) && !pluginPackage.hostSources().has(path) && !pluginPackage.clientSources().has(path),
-      )
+      const unmapped = own.some(path => /\.[cm]?[jt]sx?$/.test(path) && !pluginPackage.hostSources().has(path) && !pluginPackage.clientSources().has(path))
       const hits = (sources: () => ReadonlySet<string>): boolean =>
         comparesSources && [...sources()].some(source => changedSet.has(source) || dshxOutputs.has(source))
       // A source the last build never saw could land in either bundle; assume the Host so a restart is not missed.
