@@ -36,10 +36,12 @@ also knows into a temporary root, so the live corpus is only read). Runs on 2026
 | Worst external ping round trip | 249-395 ms | 290 490 ms |
 | Content search during the build | p50 5-34 ms, p95 25-148 ms | 43 500 ms on a warm index |
 | Ingest cost in isolation | 8.7 s for a 49.5 MB log (23 853 documents, ~2 700 docs/s) | — |
-| Stock recall (queries whose matches the stock index also held) | **1.0** on every query | 1.0 by definition |
+| Stock recall (match-level, sampled stock hits asked back by session id) | **1.0** (15/15, 15/15, 15/15, 3/3) | 1.0 by definition |
 
 The ingest time above is measured with the machine otherwise idle-ish; under the load 20-40 of that day a first build
 takes minutes of wall clock in the worker, which is exactly the point: it is background work the Host never waits on.
+One 300 MB round at load 20-27 recorded two Host gaps of ~306 ms and search p50 236 ms while the worker was saturated,
+so the 250 ms budget holds on quiet rounds and is only marginally exceeded under extreme load.
 The bench deliberately polls at 1 s because the worker is single-threaded: a per-150 ms poll competes with the ingest
 it is measuring.
 
