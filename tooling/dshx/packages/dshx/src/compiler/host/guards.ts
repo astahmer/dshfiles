@@ -16,7 +16,7 @@ const dshPackageName = (specifier: string): string | undefined => {
 const HOST_RUNTIME_OPTIONAL_IMPORTS = new Set(['@deepseek-ai/dsh-client-connection', '@deepseek-ai/dsh-cordis-host-runner', '@deepseek-ai/dsh-tool-cordis'])
 
 /** Keep external DSH Host imports on the Host installation's module identity. */
-export function hostPeerDependencyPlugin(root: string): Plugin {
+function hostPeerDependencyPlugin(root: string): Plugin {
   const packageFile = resolve(root, 'package.json')
   let declaredPeers = new Set<string>()
   return {
@@ -69,7 +69,7 @@ export function hostPeerDependencyPlugin(root: string): Plugin {
 }
 
 /** Keep package imports and Node protocols available for the Host runtime. */
-export function isHostExternal(source: string): boolean {
+function isHostExternal(source: string): boolean {
   if (source.startsWith('\0') || source.startsWith('.') || isAbsolute(source)) return false
   if (/^[A-Za-z]:[/\\]/.test(source)) return false
   if (source === 'create-dshx/capabilities' || source === 'create-dshx/runtime-capabilities') return false
@@ -77,7 +77,7 @@ export function isHostExternal(source: string): boolean {
 }
 
 /** Enforce the stable single-file Host artifact surface. */
-export function singleHostChunkPlugin(expectedEntry: string | ((fileName: string) => boolean) = 'index.js'): Plugin {
+function singleHostChunkPlugin(expectedEntry: string | ((fileName: string) => boolean) = 'index.js'): Plugin {
   const matchesEntry = typeof expectedEntry === 'function' ? expectedEntry : (fileName: string): boolean => fileName === expectedEntry
   const expectedLabel = typeof expectedEntry === 'function' ? 'content-addressed' : expectedEntry
   return {
@@ -109,4 +109,10 @@ export function singleHostChunkPlugin(expectedEntry: string | ((fileName: string
       },
     },
   }
+}
+
+export class HostCompilerGuards {
+  static readonly hostPeerDependencyPlugin = hostPeerDependencyPlugin
+  static readonly isHostExternal = isHostExternal
+  static readonly singleHostChunkPlugin = singleHostChunkPlugin
 }

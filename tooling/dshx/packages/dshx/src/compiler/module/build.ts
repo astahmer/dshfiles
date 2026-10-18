@@ -2,7 +2,7 @@ import { realpath } from 'node:fs/promises'
 import { isAbsolute, relative, resolve } from 'node:path'
 import { build } from 'vite'
 import { DshxError } from '../../diagnostics.js'
-import { isHostExternal } from '../host/guards.js'
+import { HostCompilerGuards } from '../host/guards.js'
 
 /** Options for one shared module other plugins import. */
 export interface BuildModuleOptions {
@@ -61,7 +61,7 @@ export async function buildModule(options: BuildModuleOptions): Promise<ModuleBu
       sourcemap: options.sourcemap ?? true,
       watch: null,
       lib: { entry, formats: ['es'], fileName: () => `${options.name}.js` },
-      rollupOptions: { external: isHostExternal, preserveEntrySignatures: 'strict' },
+      rollupOptions: { external: HostCompilerGuards.isHostExternal, preserveEntrySignatures: 'strict' },
     },
   })
   const outputs = Array.isArray(result) ? result : [result]

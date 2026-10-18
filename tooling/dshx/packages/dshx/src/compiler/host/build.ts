@@ -6,9 +6,9 @@ import { build, type InlineConfig, type Plugin } from 'vite'
 import { DshxError } from '../../diagnostics.js'
 import type { DshCompatibility } from '../../compat/types.js'
 import { HOST_GENERATION_DIRECTORY, HOST_GENERATION_MANIFEST } from '../../host/generation-contract.js'
-import { artifactDeclarationPlugin, buildReport, buildWatcher, kernelBoundaryPlugin, resolveUserPlugins } from '../kernel.js'
+import { CompilerKernel } from '../kernel.js'
 import type { BuildArtifact, BuildReport, BuildWatcher, ViteExtensionOptions } from '../types.js'
-import { hostPeerDependencyPlugin, isHostExternal, singleHostChunkPlugin } from './guards.js'
+import { HostCompilerGuards } from './guards.js'
 
 const VIRTUAL_HOST_ENTRY = '\0virtual:dshx-host-entry'
 const VIRTUAL_HOST_PUBLIC = '\0virtual:dshx-host-public'
@@ -281,7 +281,7 @@ async function hostConfig(paths: Awaited<ReturnType<typeof resolveOptions>>, opt
   const external = (source: string): boolean => {
     if (VIRTUAL_DSHX_PUBLIC_MODULES.has(source)) return false
     const bundled = bundleDependencies.some(dependency => source === dependency || source.startsWith(`${dependency}/`))
-    return !bundled && isHostExternal(source)
+    return !bundled && HostCompilerGuards.isHostExternal(source)
   }
   const assetsInlineLimit = (): boolean => true
   const generation = options.generation
@@ -292,7 +292,7 @@ async function hostConfig(paths: Awaited<ReturnType<typeof resolveOptions>>, opt
     codeSplitting: false,
     exports: 'named',
   } as const
-  const userPlugins = await resolveUserPlugins(options.vite?.plugins, watch)
+  const userPlugins = await CompilerKernel.resolveUserPlugins(options.vite?.plugins, watch)
   return {
     root: paths.root,
     configFile: false,
@@ -303,9 +303,9 @@ async function hostConfig(paths: Awaited<ReturnType<typeof resolveOptions>>, opt
     plugins: [
       hostEntryPlugin(paths, options),
       ...userPlugins,
-      artifactDeclarationPlugin('host', paths.outDir, options.declarations ?? true),
-      hostPeerDependencyPlugin(paths.root),
-      kernelBoundaryPlugin({
+      CompilerKernel.artifactDeclarationPlugin('host', paths.outDir, options.declarations ?? true),
+      HostCompilerGuards.hostPeerDependencyPlugin(paths.root),
+      CompilerKernel.boundaryPlugin({
         face: 'host',
         root: paths.root,
         input: VIRTUAL_HOST_ENTRY,
@@ -314,7 +314,7 @@ async function hostConfig(paths: Awaited<ReturnType<typeof resolveOptions>>, opt
         external,
         output,
       }),
-      singleHostChunkPlugin(generation === undefined ? 'index.js' : () => true),
+      HostCompilerGuards.singleHostChunkPlugin(generation === undefined ? 'index.js' : () => true),
       ...(generation === undefined ? [] : [hostGenerationPublishPlugin(paths.outDir, generation)]),
     ],
     ssr: { noExternal: [...bundleDependencies] },
@@ -350,7 +350,7 @@ async function hostConfig(paths: Awaited<ReturnType<typeof resolveOptions>>, opt
 export async function watchHost(options: BuildHostOptions): Promise<BuildWatcher> {
   const paths = await resolveOptions(options)
   const config = await hostConfig(paths, options, true)
-  return buildWatcher(
+  return CompilerKernel.buildWatcher(
     await build({
       ...config,
       build: { ...config.build, watch: {} },
@@ -365,6 +365,6 @@ export async function buildHost(options: BuildHostOptions): Promise<HostBuildRes
   const paths = await resolveOptions(options)
   const config = await hostConfig(paths, options, false)
   const declarations = options.declarations ?? true
-  const report = buildReport(await build(config), 'host', 'index.js', paths.outDir, declarations, 'DSHX1304')
+  const report = CompilerKernel.buildReport(await build(config), 'host', 'index.js', paths.outDir, declarations, 'DSHX1304')
   return options.generation === undefined ? report : hostGenerationReport(report, declarations)
 }
