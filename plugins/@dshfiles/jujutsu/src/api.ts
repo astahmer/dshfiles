@@ -165,7 +165,15 @@ export const revisionRelationshipSchema = graphSliceSchema.extend({
   differenceIds: z.array(commitIdSchema).max(500),
 })
 
+export const referenceGraphSchema = z.object({
+  label: z.string().min(1).max(255),
+  commitId: commitIdSchema.nullable(),
+  changeId: z.string().min(1).max(64).nullable(),
+  graph: z.string().max(20_000),
+})
+
 export type GraphSlice = z.infer<typeof graphSliceSchema>
+export type ReferenceGraph = z.infer<typeof referenceGraphSchema>
 export type GraphLandmark = z.infer<typeof graphNavigationSchema>['landmarks'][number]
 export type GraphNavigation = z.infer<typeof graphNavigationSchema>
 export type RevisionRelationship = z.infer<typeof revisionRelationshipSchema>
@@ -236,6 +244,17 @@ export const jujutsuApi = defineApi({
       output: z.union([graphSliceSchema, readFailureSchema]),
       description: 'One bounded graph slice: one revision history, or the history exclusive of other heads, bookmarks and workspaces. Read-only.',
       tool: { name: 'jj_graph_slice', readOnly: true, render: compactJson },
+    }),
+    referenceGraph: method({
+      input: z.object({ repoId: repoIdSchema, reference: z.string().min(1).max(255) }),
+      output: z.union([referenceGraphSchema, readFailureSchema]),
+      description:
+        'A small revision graph around one chat reference — a revision or a bookmark — with its neighbourhood and the working copy, main, main@origin and default-workspace landmarks. Read-only.',
+      tool: {
+        name: 'jj_reference_graph',
+        readOnly: true,
+        render: output => ('graph' in output ? `${output.label}\n${output.graph}` : readFailureText(output)),
+      },
     }),
     details: method({
       input: z.object({ repoId: repoIdSchema, commitId: commitIdSchema }),

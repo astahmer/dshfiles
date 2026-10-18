@@ -40,7 +40,7 @@ backing verb; `host-gap` counts capabilities no verb can reach yet.
 | btw                                                                                                                                               | 8                    | 0                                                                                                        | 3             | 1         |
 | shortcuts                                                                                                                                         | 4                    | 0                                                                                                        | 2             | 1         |
 | jj-integration                                                                                                                                    | 22                   | 8                                                                                                        | 5             | 3         |
-| jujutsu                                                                                                                                           | 28                   | 11                                                                                                       | 0             | 3         |
+| jujutsu                                                                                                                                           | 29                   | 12                                                                                                       | 0             | 3         |
 | project-checks                                                                                                                                    | 8                    | 4                                                                                                        | 1             | 2         |
 | project-folder-picker / workspace-folder-picker                                                                                                   | 9                    | 0                                                                                                        | 4             | 2         |
 | workbench                                                                                                                                         | 8                    | 0                                                                                                        | 2             | 6         |
@@ -172,10 +172,10 @@ Still missing:
 ### jujutsu
 
 Bound now (sibling revision `feat(jujutsu): expose the revision graph and Source
-Control as agent tools`), with eleven tools covering all 28 capabilities: the nine
+Control as agent tools`), with twelve tools covering all 29 capabilities: the ten
 read-only ones are `jj_register_repository`, `jj_load`, `jj_graph_page`,
-`jj_graph_navigation`, `jj_revision_relationship`, `jj_graph_slice`, `jj_details`,
-`jj_revision_files` and `jj_working_diff`.
+`jj_graph_navigation`, `jj_revision_relationship`, `jj_graph_slice`,
+`jj_reference_graph`, `jj_details`, `jj_revision_files` and `jj_working_diff`.
 
 The writes keep the product's two-step shape rather than one tool per action:
 `jj_prepare_action` prepares one of the seventeen mutation kinds (describe, split,

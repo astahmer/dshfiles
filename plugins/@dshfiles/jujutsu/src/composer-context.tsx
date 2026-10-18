@@ -396,6 +396,7 @@ export const ConversationHeaderToggle = (props: ComposerSlotProps & { readonly i
     const behavior = preferences.chatReferenceClickBehavior
     return installChatReferenceLinks({
       sessionId: props.sessionId,
+      cwd,
       bookmarks,
       onOpen: reference => props.jujutsu.openJujutsuReference(cwd, { ...reference, behavior }),
     })

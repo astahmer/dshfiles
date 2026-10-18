@@ -1,3 +1,5 @@
+import { z } from 'zod'
+
 export interface ChatReference {
   readonly value: string
   readonly kind: 'revision' | 'bookmark'
@@ -57,6 +59,22 @@ const resolveChatReference = <
   )
   return matches.length === 1 ? matches.at(0) : undefined
 }
+
+/**
+ * Hovering a reference asks the overlay for a graph; leaving it takes the request back. Both travel as window events
+ * because the reference is a native `<code>` node this plugin decorated, not a React element it owns.
+ */
+export const chatReferencePreviewEvent = 'dshfiles:jujutsu-reference-preview'
+export const chatReferencePreviewDismissEvent = 'dshfiles:jujutsu-reference-preview-dismiss'
+
+export const chatReferencePreviewRequestSchema = z.object({
+  /** The Session repository the reference is read in; the Host resolves its repoId from this path. */
+  cwd: z.string().min(1).max(2048),
+  reference: z.object({ value: z.string().min(1).max(255), kind: z.enum(['revision', 'bookmark']) }),
+  anchor: z.object({ left: z.number(), top: z.number(), width: z.number(), height: z.number() }),
+})
+
+export type ChatReferencePreviewRequest = z.infer<typeof chatReferencePreviewRequestSchema>
 
 export class ChatReferenceModel {
   static readonly fromCode = chatReferenceFromCode

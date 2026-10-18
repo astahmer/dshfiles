@@ -1,11 +1,23 @@
-import { CHAT_REFERENCE_PREFIX, ChatReferenceModel, type ChatReference } from './chat-reference.js'
+import {
+  CHAT_REFERENCE_PREFIX,
+  ChatReferenceModel,
+  chatReferencePreviewDismissEvent,
+  chatReferencePreviewEvent,
+  chatReferencePreviewRequestSchema,
+  type ChatReference,
+} from './chat-reference.js'
 
 export interface ChatReferenceLinkOptions {
   readonly sessionId: string
   /** Local bookmark names the Session repository really has; other words never become links. */
   readonly bookmarks: readonly string[]
+  /** The Session repository the preview reads: the Host turns this path into a repoId. */
+  readonly cwd: string
   readonly onOpen: (reference: ChatReference) => void
 }
+
+/** A pointer sweeping across a line of text should not flash a card, so hovering waits. */
+const PREVIEW_OPEN_DELAY_MS = 160
 
 const MARKER = 'data-dshfiles-jj-reference'
 const PREFIXED = 'data-dshfiles-jj-prefixed'
@@ -47,6 +59,54 @@ export const installChatReferenceLinks = (options: ChatReferenceLinkOptions): ((
     if (reference === undefined) return false
     options.onOpen(reference)
     return true
+  }
+  const previewAt = (element: HTMLElement): boolean => {
+    const reference = referenceIn(element)
+    if (reference === undefined) return false
+    const rect = element.getBoundingClientRect()
+    const parsed = chatReferencePreviewRequestSchema.safeParse({
+      cwd: options.cwd,
+      reference,
+      anchor: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
+    })
+    if (!parsed.success) return false
+    window.dispatchEvent(new CustomEvent(chatReferencePreviewEvent, { detail: parsed.data }))
+    return true
+  }
+  let openTimer: number | undefined
+  let hovered: HTMLElement | null = null
+  const cancelPreview = (): void => {
+    if (openTimer === undefined) return
+    window.clearTimeout(openTimer)
+    openTimer = undefined
+  }
+  const dismissPreview = (): void => {
+    hovered = null
+    cancelPreview()
+    window.dispatchEvent(new Event(chatReferencePreviewDismissEvent))
+  }
+  const onPointerOver = (event: PointerEvent): void => {
+    const link = linkOf(event.target)
+    if (link === null || link === hovered) return
+    hovered = link
+    cancelPreview()
+    openTimer = window.setTimeout(() => {
+      openTimer = undefined
+      previewAt(link)
+    }, PREVIEW_OPEN_DELAY_MS)
+  }
+  const onPointerOut = (event: PointerEvent): void => {
+    const link = linkOf(event.target)
+    if (link === null || link !== hovered) return
+    if (event.relatedTarget instanceof Node && link.contains(event.relatedTarget)) return
+    dismissPreview()
+  }
+  const onFocusIn = (event: FocusEvent): void => {
+    const link = linkOf(event.target)
+    if (link !== null) previewAt(link)
+  }
+  const onFocusOut = (event: FocusEvent): void => {
+    if (linkOf(event.target) !== null) dismissPreview()
   }
   const onClick = (event: MouseEvent): void => {
     if (event.button !== 0 || document.getSelection()?.isCollapsed === false) return
@@ -91,11 +151,20 @@ export const installChatReferenceLinks = (options: ChatReferenceLinkOptions): ((
   markLinks()
   window.addEventListener('click', onClick)
   window.addEventListener('keydown', onKeyDown)
+  window.addEventListener('pointerover', onPointerOver)
+  window.addEventListener('pointerout', onPointerOut)
+  window.addEventListener('focusin', onFocusIn)
+  window.addEventListener('focusout', onFocusOut)
   return () => {
     observer.disconnect()
     cancelAnimationFrame(frame)
+    cancelPreview()
     window.removeEventListener('click', onClick)
     window.removeEventListener('keydown', onKeyDown)
+    window.removeEventListener('pointerover', onPointerOver)
+    window.removeEventListener('pointerout', onPointerOut)
+    window.removeEventListener('focusin', onFocusIn)
+    window.removeEventListener('focusout', onFocusOut)
     for (const element of ownConversation(options.sessionId)?.querySelectorAll(`[${MARKER}]`) ?? []) {
       const restorePrefix = element.hasAttribute(PREFIXED)
       unmark(element)

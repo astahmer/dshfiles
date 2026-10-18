@@ -9,6 +9,7 @@ import { JujutsuMutationModel, JujutsuOutputModel, JujutsuPathModel, PreviewStor
 import { EVOLUTION_TEMPLATE, OPERATION_TEMPLATE, REVISION_TEMPLATE } from './jj-templates.js'
 import { RevisionReads, type JjRun } from './revision-reads.js'
 import { GraphNavigationReads } from './graph-navigation-reads.js'
+import { ReferenceGraphModel } from './reference-graph.js'
 import { composerContextHost } from './composer-context-host.js'
 import { closeReviewProgress, jujutsuReviewProgressApiHost, reviewProgressFor } from './review-progress-host.js'
 import { jujutsuSettings } from './settings.js'
@@ -718,6 +719,14 @@ const jujutsuHostApi = jujutsuApi.host({
       return await GraphNavigationReads.readGraphSlice({ run: repoRun(ctx, repo, signal), commitId: input.commitId, mode: input.mode })
     } catch (error) {
       return RevisionReads.failure(error, 'Could not read revision history.')
+    }
+  },
+  referenceGraph: async ({ input, ctx, signal }) => {
+    try {
+      const repo = await resolveRepo(ctx, input.repoId, signal)
+      return await ReferenceGraphModel.read({ run: repoRun(ctx, repo, signal), reference: input.reference })
+    } catch (error) {
+      return RevisionReads.failure(error, 'Could not read a graph around that reference.')
     }
   },
   details: async ({ input, ctx, signal }) => {

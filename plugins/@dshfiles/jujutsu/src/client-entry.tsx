@@ -11,6 +11,7 @@ import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
 import { PluginQueryProvider, pluginQueryClient, useQuery } from '@dshfiles/plugin-ui/query'
 import type { DirectoryPickerPort, RegisteredProject } from '@dshfiles/project-folder-picker'
 import { useCallback, useMemo, useSyncExternalStore } from 'react'
+import { ChatReferenceOverlay } from './chat-reference-overlay.js'
 import { JujutsuPanel } from './client.js'
 import { ComposerChangesBar, ComposerChips, ConversationHeaderToggle, type ComposerJujutsuServices, type ComposerSlotProps } from './composer-context.js'
 import { sidePanelRepository } from './side-panel-repository.js'
@@ -157,6 +158,17 @@ export default defineClient({
         return () => undefined
       }
     }, 'dshfiles-jujutsu: toggle command')
+    // One overlay serves every message: a chat reference is a native `<code>` node, so the request arrives as an event.
+    ctx.slots.inject('shell.overlay', () =>
+      ctx.slots.register(
+        { name: 'shell.overlay', id: 'dshfiles-jujutsu-reference-preview', order: 60 },
+        decorate(() => (
+          <PluginQueryProvider>
+            <ChatReferenceOverlay />
+          </PluginQueryProvider>
+        )),
+      ),
+    )
     ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: PANEL_ID }, panelForSurface('main')))
     ctx.slots.inject('sidebar.right.pane.tab', () => ctx.slots.register({ name: 'sidebar.right.pane.tab', key: RIGHT_PANE_ID }, panelForSurface('side-panel')))
   },

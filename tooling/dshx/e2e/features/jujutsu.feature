@@ -84,5 +84,6 @@ Feature: Jujutsu revision interactions
     When a disposable Jujutsu repository with two authors is opened in the Jujutsu panel
     And a Command Code account backed by a local fake provider is added
     And the repository is registered and its thread answers "[[answer Trunk is `jj:main` here]]"
-    Then clicking the reference opens the panel focused on that revision
+    Then hovering the reference previews the revision graph around it
+    And clicking the reference opens the panel focused on that revision
     And the Agent prompt tells it to write Jujutsu references with the jj: prefix

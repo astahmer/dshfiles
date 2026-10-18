@@ -66,7 +66,10 @@ contracts.
   name that really is a local bookmark of the Session repository. The prefix is
   the writing convention: the Host adds a system-prompt section telling every
   Agent to write references that way, it needs no repository lookup, and the
-  reader sees the bare name (`jj:main` renders as a linked `main`). A click
+  reader sees the bare name (`jj:main` renders as a linked `main`). Hovering
+  one lazily previews a bounded revision graph around it: the reference, its
+  neighbours, and the working copy, main, main@origin and default workspace
+  landmarks, with the referenced row marked `>`. A click
   opens the Jujutsu side panel on that repository and either
   focuses the revision or compares it with main/default while showing its
   history path (`chatReferenceClickBehavior`); `chatReferenceLinks` turns the

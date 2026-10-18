@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 // @vitest-environment-options {"pretendToBeVisual":true}
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { chatReferencePreviewDismissEvent, chatReferencePreviewEvent } from './chat-reference.js'
 import { installChatReferenceLinks } from './chat-reference-links.js'
 
 const sessionMarkup = (inner: string): string => `<div data-conversation-session="session-1">${inner}</div>`
@@ -10,7 +11,9 @@ const marked = (): readonly (string | null)[] => [...document.querySelectorAll('
 const click = (element: Element | null | undefined): void => void element?.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 }))
 
 const install = (onOpen: (reference: { readonly value: string; readonly kind: string }) => void) =>
-  installChatReferenceLinks({ sessionId: 'session-1', bookmarks: ['main'], onOpen })
+  installChatReferenceLinks({ sessionId: 'session-1', cwd: '/repo', bookmarks: ['main'], onOpen })
+
+const settlePreview = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 220))
 
 const settleMarks = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 60))
 
@@ -48,6 +51,31 @@ describe('chat reference links', () => {
 
     click(document.querySelectorAll('code')[1])
     expect(onOpen).toHaveBeenCalledTimes(2)
+    stop()
+  })
+
+  it('previews a hovered reference and takes the request back when the pointer leaves', async () => {
+    const onOpen = vi.fn()
+    const requests: unknown[] = []
+    let dismissals = 0
+    const onRequest = (event: Event): void => void requests.push((event as CustomEvent).detail)
+    const onDismiss = (): void => void (dismissals += 1)
+    window.addEventListener(chatReferencePreviewEvent, onRequest)
+    window.addEventListener(chatReferencePreviewDismissEvent, onDismiss)
+    document.body.innerHTML = sessionMarkup('<code>jj:main</code>')
+    const stop = install(onOpen)
+    const link = document.querySelector('code')
+
+    link?.dispatchEvent(new MouseEvent('pointerover', { bubbles: true }))
+    await settlePreview()
+    expect(requests).toEqual([{ cwd: '/repo', reference: { value: 'main', kind: 'bookmark' }, anchor: { left: 0, top: 0, width: 0, height: 0 } }])
+    expect(onOpen).not.toHaveBeenCalled()
+
+    link?.dispatchEvent(new MouseEvent('pointerout', { bubbles: true }))
+    expect(dismissals).toBe(1)
+
+    window.removeEventListener(chatReferencePreviewEvent, onRequest)
+    window.removeEventListener(chatReferencePreviewDismissEvent, onDismiss)
     stop()
   })
 

@@ -258,6 +258,20 @@ When('the repository is registered and its thread answers {string}', async ({ pa
   await sendMessage(page, prompt)
 })
 
+Then('hovering the reference previews the revision graph around it', async ({ page }: { page: Page }) => {
+  const link = page.getByRole('link', { name: 'main', exact: true })
+  await expect(link).toBeVisible({ timeout: 30_000 })
+  await link.hover()
+  await recordAssertion(page, 'jujutsu-chat-reference-hover-previews-revision-graph', async () => {
+    await expect(page.getByText('Revision graph · main', { exact: true })).toBeVisible()
+    const graph = page.locator('pre[aria-label="Revision graph"]')
+    await expect(graph).toBeVisible()
+    await expect(graph).toContainText('main')
+    await expect(graph).toContainText('default@')
+  })
+  await page.keyboard.press('Escape')
+})
+
 Then('clicking the reference opens the panel focused on that revision', async ({ page }: { page: Page }) => {
   const link = page.getByRole('link', { name: 'main', exact: true })
   await expect(link).toBeVisible({ timeout: 30_000 })

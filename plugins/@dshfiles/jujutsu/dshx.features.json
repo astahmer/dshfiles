@@ -351,9 +351,13 @@
     {
       "id": "chat-references",
       "title": "Open Jujutsu references from a chat message",
-      "summary": "Inline code in a message becomes a link when it is an explicit JJ identity — a revision-shaped token, a repository bookmark, or a `jj:`-prefixed name — and clicking it opens the side panel on the Session repository, focused on that revision or comparing it with main/default along its history path. The `jj:` prefix is the writing convention Agents are told to use, and the reader sees the bare name.",
+      "summary": "Inline code in a message becomes a link when it is an explicit JJ identity — a revision-shaped token, a repository bookmark, or a `jj:`-prefixed name — hovering it previews a bounded revision graph around it — its neighbourhood plus the working copy, main, main@origin and the default workspace — and clicking it opens the side panel on the Session repository, focused on that revision or comparing it with main/default along its history path. The `jj:` prefix is the writing convention Agents are told to use, and the reader sees the bare name.",
       "reach": [
         "seed chat-reference-thread",
+        "hover link \"main\"",
+        "expect text \"Revision graph · main\"",
+        "expect text \"default@\"",
+        "press Escape",
         "click link \"main\"",
         "expect button \"Jujutsu view settings\"",
         "click button \"Jujutsu view settings\"",
