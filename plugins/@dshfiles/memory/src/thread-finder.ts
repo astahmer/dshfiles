@@ -465,7 +465,12 @@ export const createThreadFinder = (deps: ThreadFinderDeps) => {
     }
 
     const contentLimit = Math.min(40, limit * 4)
-    const content = await contentSearch(text, contentLimit)
+    // Content search and memory retrieval are independent: start both, then merge in this fixed order so the ranking
+    // stays deterministic. `Promise.all` attaches its handlers to both, so a rejected source is not an unhandled one.
+    const [content, memoryHits] = await Promise.all([
+      contentSearch(text, contentLimit),
+      deps.searchMemory({ query: text, limit: contentLimit, projects: query.projects }, deps.signal),
+    ])
     if (content.failure === null) sources.add('session-content')
     const contentRank = new Map(content.hits.map((hit, index) => [hit.sessionId, index]))
     for (const hit of content.hits) {
@@ -480,7 +485,6 @@ export const createThreadFinder = (deps: ThreadFinderDeps) => {
       })
     }
 
-    const memoryHits = await deps.searchMemory({ query: text, limit: contentLimit, projects: query.projects }, deps.signal)
     const memoryRank = new Map(memoryHits.map((hit, index) => [hit.kind === 'note' ? `n:${hit.noteId}` : hit.sessionId, index]))
     for (const hit of memoryHits) {
       const bonus = Math.round(80 * (1 - (memoryRank.get(hit.kind === 'note' ? `n:${hit.noteId}` : hit.sessionId) ?? 0) / Math.max(1, memoryHits.length)))

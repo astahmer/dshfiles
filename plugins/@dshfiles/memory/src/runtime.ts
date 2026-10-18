@@ -478,8 +478,10 @@ export const createMemoryRuntime = (options: {
     const sessions = await services.listSessions()
     const titled = await services.readSessionTitles(sessions.slice(0, titleReadLimit).map(session => session.header.id)).catch(() => [])
     const titles = new Map(titled.map(entry => [entry.sessionId, entry]))
+    // Project resolution is a per-cwd lookup that may await a Host call; resolve the distinct ones together, in order.
+    const projects = await Promise.all(sessions.map(session => projectOf(session.header)))
     const records: ThreadFinderRecord[] = []
-    for (const session of sessions) {
+    for (const [index, session] of sessions.entries()) {
       const digest = store.thread(session.header.id)
       const title = titles.get(session.header.id)
       records.push({
@@ -488,7 +490,7 @@ export const createMemoryRuntime = (options: {
         createdAt: session.header.createdAt,
         updatedAt: Math.max(session.header.createdAt, title?.updatedAt ?? 0, digest?.updatedAt ?? 0),
         cwd: session.header.cwd ?? null,
-        project: await projectOf(session.header),
+        project: projects[index] ?? 'unknown',
         live: session.live,
         persisted: session.persisted,
         parentSessionId: session.header.parentSession ?? null,
@@ -586,7 +588,9 @@ export const createMemoryRuntime = (options: {
         logger.info(`memory: session-content index reconciled in ${Date.now() - startedAt} ms`)
       })
       .catch((error: unknown) => {
-        logger.warn(`memory: session-content reconciliation failed after ${Date.now() - startedAt} ms: ${error instanceof Error ? error.message : String(error)}`)
+        logger.warn(
+          `memory: session-content reconciliation failed after ${Date.now() - startedAt} ms: ${error instanceof Error ? error.message : String(error)}`,
+        )
       })
   }
 

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { createThreadFinder, ThreadFinderError, type ThreadFinderMemoryHit, type ThreadFinderRecord, type ThreadFinderSource } from './thread-finder.ts'
 
@@ -35,6 +35,43 @@ const finder = (options: {
   })
 
 const titles = (...sources: readonly (readonly ThreadFinderSource[])[]): readonly string[] => sources.flat().sort()
+
+describe('thread finder source overlap', () => {
+  it('starts content search and memory retrieval together instead of one after the other', async () => {
+    const started: string[] = []
+    let releaseContent: (() => void) | undefined
+    let releaseMemory: (() => void) | undefined
+    const concurrent = createThreadFinder({
+      listSessions: async () => [record({ sessionId: 'session-a', title: 'checkpoint notes' })],
+      searchContent: () => {
+        started.push('content')
+        return new Promise(resolve => {
+          releaseContent = () => resolve({ hits: [], hasMore: false })
+        })
+      },
+      searchMemory: () => {
+        started.push('memory')
+        return new Promise(resolve => {
+          releaseMemory = () => resolve([])
+        })
+      },
+      readDigest: async () => null,
+      now: () => now,
+      correlationId: () => 'test-correlation',
+      retry: { attempts: 1, delaysMs: [0], sleep: async () => {} },
+    })
+
+    const pending = concurrent.find({ query: 'checkpoint', projects: [], ownProject: '/dev/dshfiles', limit: 5 })
+    // Both requests are in flight before either answers; a sequential await would leave memory unstarted here.
+    await vi.waitFor(() => expect(started).toEqual(['content', 'memory']))
+
+    releaseContent?.()
+    releaseMemory?.()
+    // The title still matches the query, so this only asserts that the overlapped sources produced a page.
+    const page = await pending
+    expect(page.hits.map(hit => hit.sessionId)).toEqual(['session-a'])
+  })
+})
 
 describe('thread finder', () => {
   it('ranks an exact title above every weaker match and names its source and evidence', async () => {
