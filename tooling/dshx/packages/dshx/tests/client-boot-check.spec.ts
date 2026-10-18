@@ -5,13 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { checkClientBoot, waitForHostResponse } from '../src/project/client-boot-check.js'
 import { clientEntryFailures, compositionFailures, parseBootText } from '../src/project/client-boot-check.js'
-import {
-  readClientBootOutcome,
-  slotCrashesFromConsole,
-  slotRenderFailures,
-  type BrowserBootEvidence,
-  type BrowserBootOutcome,
-} from '../src/project/browser-boot.js'
+import { BrowserBootModel, type BrowserBootEvidence, type BrowserBootOutcome } from '../src/project/browser-boot.js'
 
 /**
  * The boot card is the only surface that records why a client entry did not
@@ -99,22 +93,22 @@ describe('pending Client entries', () => {
  */
 describe('slot render failures', () => {
   it('reports nothing when every Slot rendered its entry', () => {
-    expect(slotRenderFailures([])).toEqual([])
+    expect(BrowserBootModel.slotRenderFailures([])).toEqual([])
   })
 
   it('reports the Slot named by the boundary marker', () => {
-    expect(slotRenderFailures(['sidebar'])).toEqual([{ slot: 'sidebar', source: 'boundary' }])
+    expect(BrowserBootModel.slotRenderFailures(['sidebar'])).toEqual([{ slot: 'sidebar', source: 'boundary' }])
   })
 
   it('reports every failing Slot, not just the first', () => {
-    expect(slotRenderFailures(['sidebar', 'conversation.input.overlay'])).toEqual([
+    expect(BrowserBootModel.slotRenderFailures(['sidebar', 'conversation.input.overlay'])).toEqual([
       { slot: 'sidebar', source: 'boundary' },
       { slot: 'conversation.input.overlay', source: 'boundary' },
     ])
   })
 
   it('ignores a marker with no Slot name', () => {
-    expect(slotRenderFailures([null, 'sidebar', ''])).toEqual([{ slot: 'sidebar', source: 'boundary' }])
+    expect(BrowserBootModel.slotRenderFailures([null, 'sidebar', ''])).toEqual([{ slot: 'sidebar', source: 'boundary' }])
   })
 })
 
@@ -127,26 +121,26 @@ describe('slot render failures', () => {
  */
 describe('slot crashes read from the console', () => {
   it('names the Slot from the entry crash line', () => {
-    expect(slotCrashesFromConsole(["slot entry crashed in 'sidebar.workspaces': Error: No QueryClient set, use QueryClientProvider to set one"])).toEqual([
-      { slot: 'sidebar.workspaces', source: 'crash' },
-    ])
+    expect(
+      BrowserBootModel.slotCrashesFromConsole(["slot entry crashed in 'sidebar.workspaces': Error: No QueryClient set, use QueryClientProvider to set one"]),
+    ).toEqual([{ slot: 'sidebar.workspaces', source: 'crash' }])
   })
 
   it('names the Slot from a Factory occurrence crash line', () => {
-    expect(slotCrashesFromConsole(["slot factory occurrence crashed in 'sidebar': TypeError: x is not a function"])).toEqual([
+    expect(BrowserBootModel.slotCrashesFromConsole(["slot factory occurrence crashed in 'sidebar': TypeError: x is not a function"])).toEqual([
       { slot: 'sidebar', source: 'crash' },
     ])
   })
 
   it('reads past the diagnostics prefix the E2E harness adds', () => {
-    expect(slotCrashesFromConsole(["console.error: slot entry crashed in 'conversation.chat.turnTail': Error: boom"])).toEqual([
+    expect(BrowserBootModel.slotCrashesFromConsole(["console.error: slot entry crashed in 'conversation.chat.turnTail': Error: boom"])).toEqual([
       { slot: 'conversation.chat.turnTail', source: 'crash' },
     ])
   })
 
   it('ignores every other console line and reports each Slot once', () => {
     expect(
-      slotCrashesFromConsole([
+      BrowserBootModel.slotCrashesFromConsole([
         'Failed to load plugin @dshfiles/demo',
         "slot entry crashed in 'sidebar.workspaces': Error: boom",
         "slot entry crashed in 'sidebar.workspaces': Error: boom again",
@@ -256,28 +250,28 @@ describe('client boot outcome reader', () => {
   const options = { timeoutMs: 400, expectedClientEntries: [] }
 
   it('passes when the native readiness signal and application outlet are ready', async () => {
-    const outcome = await readClientBootOutcome(page(nativeOutcome('app-outlet', true)), options)
+    const outcome = await BrowserBootModel.readOutcome(page(nativeOutcome('app-outlet', true)), options)
     expect(outcome).toMatchObject({ ok: true, ready: true, evidence: 'app-outlet', text: '' })
   })
 
   it('keeps the boot-card handoff evidence while requiring native readiness', async () => {
-    const outcome = await readClientBootOutcome(page(nativeOutcome('boot-card-cleared', false)), options)
+    const outcome = await BrowserBootModel.readOutcome(page(nativeOutcome('boot-card-cleared', false)), options)
     expect(outcome).toMatchObject({ ok: true, ready: false, evidence: 'boot-card-cleared' })
   })
 
   it('reports a blank page as a failed outcome', async () => {
-    const outcome = await readClientBootOutcome(page(nativeOutcome('blank', false)), options)
+    const outcome = await BrowserBootModel.readOutcome(page(nativeOutcome('blank', false)), options)
     expect(outcome).toMatchObject({ ok: false, ready: false, evidence: 'blank', text: '' })
   })
 
   it('reports a stalled boot card with its text', async () => {
-    const outcome = await readClientBootOutcome(page(nativeOutcome('stalled', false, 'Loading plugins…')), options)
+    const outcome = await BrowserBootModel.readOutcome(page(nativeOutcome('stalled', false, 'Loading plugins…')), options)
     expect(outcome).toMatchObject({ ok: false, ready: false, evidence: 'stalled', text: 'Loading plugins…' })
   })
 
   it('reports a failure card and the Slot error markers', async () => {
     const text = 'Failed to load plugins\n@dshfiles/demo: failed'
-    const outcome = await readClientBootOutcome(page(nativeOutcome('failure-card', false, text), ['settings']), options)
+    const outcome = await BrowserBootModel.readOutcome(page(nativeOutcome('failure-card', false, text), ['settings']), options)
     expect(outcome).toMatchObject({
       ok: false,
       ready: false,
@@ -288,7 +282,7 @@ describe('client boot outcome reader', () => {
   })
 
   it('reports a retired Slot entry the DOM no longer marks', async () => {
-    const outcome = await readClientBootOutcome(page(nativeOutcome('app-outlet', true)), {
+    const outcome = await BrowserBootModel.readOutcome(page(nativeOutcome('app-outlet', true)), {
       ...options,
       consoleMessages: ["slot entry crashed in 'sidebar.workspaces': Error: No QueryClient set, use QueryClientProvider to set one"],
     })
@@ -299,7 +293,7 @@ describe('client boot outcome reader', () => {
   })
 
   it('keeps the mounted boundary when a Slot appears in both traces', async () => {
-    const outcome = await readClientBootOutcome(page(nativeOutcome('app-outlet', true), ['sidebar.workspaces']), {
+    const outcome = await BrowserBootModel.readOutcome(page(nativeOutcome('app-outlet', true), ['sidebar.workspaces']), {
       ...options,
       consoleMessages: ["slot entry crashed in 'sidebar.workspaces': Error: boom"],
     })

@@ -256,8 +256,8 @@ export const checkClientBoot = async (options: ClientBootCheckOptions): Promise<
                 if (message.type() === 'error') consoleErrors.push(message.text())
               })
               await page.goto(launchUrl, { waitUntil: 'domcontentloaded' })
-              const { readClientBootOutcome } = await import('./browser-boot.js')
-              const outcome = await readClientBootOutcome(page, {
+              const { BrowserBootModel } = await import('./browser-boot.js')
+              const outcome = await BrowserBootModel.readOutcome(page, {
                 timeoutMs,
                 expectedClientEntries: options.expectedClientEntries,
                 inspectSlotFailures: options.expectedClientEntries.length > 0,
@@ -267,7 +267,7 @@ export const checkClientBoot = async (options: ClientBootCheckOptions): Promise<
               // shell render, then read the Slot traces once more without disturbing the audit read above.
               await StartupDialogs.dismissProviderSetupIfShown(page)
               await new Promise(resolve => setTimeout(resolve, SLOT_SETTLE_MS))
-              const mounted = await readClientBootOutcome(page, {
+              const mounted = await BrowserBootModel.readOutcome(page, {
                 timeoutMs,
                 expectedClientEntries: options.expectedClientEntries,
                 inspectSlotFailures: options.expectedClientEntries.length > 0,

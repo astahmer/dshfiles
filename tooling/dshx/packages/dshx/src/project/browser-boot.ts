@@ -104,7 +104,7 @@ interface BootPage {
  * E2E scenarios share one launch across every assertion. That is also why the
  * caller captures console text: only it can attach before the first navigation.
  */
-export const readClientBootOutcome = async (page: BootPage, options: BrowserBootOptions): Promise<BrowserBootOutcome> => {
+const readClientBootOutcome = async (page: BootPage, options: BrowserBootOptions): Promise<BrowserBootOutcome> => {
   const nativeReadiness = NativeReadinessSchema.parse(
     await page.evaluate(
       async ({ expectedClientEntries, timeoutMs, bootCardSelector, appOutletSelector }) => {
@@ -247,7 +247,7 @@ export const readClientBootOutcome = async (page: BootPage, options: BrowserBoot
  * Separated from the evaluate call so the mapping is testable without a browser:
  * the callback runs in the page, so a stub could never exercise it directly.
  */
-export const slotRenderFailures = (slotNames: readonly (string | null)[]): readonly SlotRenderFailure[] =>
+const slotRenderFailures = (slotNames: readonly (string | null)[]): readonly SlotRenderFailure[] =>
   slotNames.filter((slot): slot is string => slot !== null && slot !== '').map(slot => ({ slot, source: 'boundary' }))
 
 /**
@@ -265,7 +265,7 @@ const SLOT_CRASH_PATTERNS = [/slot entry crashed in '([^']+)'/, /slot factory oc
  * as clean while the panel still shows the wrong component. The console line is
  * what stays, which is why the DOM-only reader called this class invisible.
  */
-export const slotCrashesFromConsole = (messages: readonly string[]): readonly SlotRenderFailure[] => {
+const slotCrashesFromConsole = (messages: readonly string[]): readonly SlotRenderFailure[] => {
   const crashed = new Map<string, SlotRenderFailure>()
   for (const message of messages) {
     for (const pattern of SLOT_CRASH_PATTERNS) {
@@ -319,4 +319,10 @@ const slotFailures = async (page: BootPage): Promise<readonly SlotRenderFailure[
   const parsedSlotNames = SlotFailureNamesSchema.safeParse(slotNames)
   if (!parsedSlotNames.success) throw new Error('The browser returned invalid Slot error-boundary data.')
   return slotRenderFailures(parsedSlotNames.data)
+}
+
+export class BrowserBootModel {
+  static readonly readOutcome = readClientBootOutcome
+  static readonly slotRenderFailures = slotRenderFailures
+  static readonly slotCrashesFromConsole = slotCrashesFromConsole
 }

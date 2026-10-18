@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { chromium, type Browser } from 'playwright'
-import { readClientBootOutcome } from '../src/project/browser-boot.js'
+import { BrowserBootModel } from '../src/project/browser-boot.js'
 
 describe('native browser boot outcome', () => {
   let browser: Browser
@@ -24,7 +24,7 @@ describe('native browser boot outcome', () => {
         Reflect.set(globalThis, '__DSH_BOOT_READY__', { promise: Promise.resolve() })
       })
 
-      const outcome = await readClientBootOutcome(page, {
+      const outcome = await BrowserBootModel.readOutcome(page, {
         expectedClientEntries: ['@dshfiles/demo'],
         timeoutMs: 1_000,
       })
@@ -55,7 +55,7 @@ describe('native browser boot outcome', () => {
         console.error("slot entry crashed in 'sidebar.workspaces':", new Error('No QueryClient set'))
       })
 
-      const outcome = await readClientBootOutcome(page, {
+      const outcome = await BrowserBootModel.readOutcome(page, {
         expectedClientEntries: ['@dshfiles/demo'],
         timeoutMs: 1_000,
         consoleMessages: consoleErrors,
