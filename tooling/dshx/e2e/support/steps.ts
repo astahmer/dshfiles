@@ -255,6 +255,7 @@ const sessionContentSearchPatch = `- id: session-query-sqlite
   config:
     path: !!js (process.env.DSH_HOME || process.env.HOME + '/.dsh') + '/plugins/session-query-sqlite/index.sqlite'
     openAt: first-search
+    persistedReadConcurrency: 4
 `
 
 Given('the isolated plugin profile {string} is booted with session content search', async ({ page }: { page: Page }, packageId: string) => {
@@ -318,6 +319,7 @@ const sessionContentIndexPatch = `- id: session-query-sqlite
   config:
     path: !!js (process.env.DSH_HOME || process.env.HOME + '/.dsh') + '/plugins/session-query-sqlite/index.sqlite'
     openAt: first-search
+    persistedReadConcurrency: 4
 `
 
 Given('the isolated plugin profile {string} is booted with the session-content index', async ({ page }: { page: Page }, packageId: string) => {

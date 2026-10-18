@@ -1,6 +1,7 @@
 import { expect, type Page } from '@playwright/test'
 import { Then, When } from '../bdd.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
+import { selectModelForNewThread } from '../threads.js'
 
 const paletteDialog = (page: Page) => page.getByRole('dialog', { name: 'Command palette' })
 const paletteInput = (page: Page) => paletteDialog(page).getByRole('combobox')
@@ -125,10 +126,7 @@ When('a searchable user message is sent to a new thread', async ({ page }: { pag
   await paletteInput(page).fill('New thread')
   await paletteOption(page, /New thread/).click()
   await expect(paletteDialog(page)).not.toBeVisible()
-  await page.getByRole('button', { name: /^Select model/ }).click()
-  await page.getByRole('menuitem', { name: /^Model / }).click()
-  await page.getByRole('menuitemradio', { name: 'commandcode_work/gpt-6-luna', exact: true }).click()
-  await expect(page.getByRole('button', { name: /^Select model, current commandcode_work\/gpt-6-luna/ })).toBeVisible()
+  await selectModelForNewThread(page, 'commandcode_work/gpt-6-luna')
 
   const composer = page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions' })
   await composer.fill(marker)
@@ -146,7 +144,7 @@ Then('thread content search finds the message and opens its thread', async ({ pa
   await matchingResult.click()
   await recordAssertion(page, 'thread-content-search-opens-the-matching-session', async () => {
     await expect(paletteDialog(page)).not.toBeVisible()
-    await expect(page.getByRole('treeitem', { name: new RegExp(journey.marker) })).toHaveAttribute('aria-selected', 'true')
+    await expect(page.getByRole('treeitem', { name: /^Fake thread title/ })).toHaveAttribute('aria-selected', 'true')
     await expect(page.getByText(journey.marker, { exact: true }).last()).toBeVisible()
   })
   await finishJourneyAssertions(page)

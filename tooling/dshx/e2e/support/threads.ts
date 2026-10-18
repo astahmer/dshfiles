@@ -36,9 +36,20 @@ export const sendMessage = async (page: Page, text: string): Promise<void> => {
   await expect(settled).toHaveCount(before + 1, { timeout: 60_000 })
 }
 
+export const selectModelForNewThread = async (page: Page, model: string): Promise<void> => {
+  // A just-added account publishes its route a moment later, so the picker is reopened until the model is listed.
+  await expect(async () => {
+    await page.keyboard.press('Escape')
+    await page.getByRole('button', { name: /^Select model/ }).click()
+    const option = page.getByRole('menuitemradio', { name: model, exact: true })
+    if ((await option.count()) === 0) await page.getByRole('menuitem', { name: /^Model / }).click({ timeout: 2_000 })
+    await option.click({ timeout: 2_000 })
+  }).toPass({ timeout: 30_000 })
+  await expect(page.getByRole('button', { name: new RegExp(`^Select model, current ${model.replaceAll('/', '\\/')}`) })).toBeVisible()
+}
+
 /** Start a New thread in a registered project with a model from the picker, before its first message. */
 export const startThreadWithModel = async (page: Page, input: { readonly project: string; readonly model: string }): Promise<void> => {
-  const model = input.model
   await page.getByRole('button', { name: 'New session', exact: true }).first().click()
   await expect(page.getByRole('textbox', { name: NEW_THREAD_COMPOSER, exact: true })).toBeVisible()
   const projectButton = page.getByRole('button', { name: 'Choose workspace', exact: true })
@@ -47,16 +58,5 @@ export const startThreadWithModel = async (page: Page, input: { readonly project
     await page.getByRole('menuitem', { name: input.project, exact: true }).click()
   }
   await expect(projectButton).toHaveText(input.project)
-  // A just-added account publishes its route a moment later, so the picker is reopened until the model is listed.
-  await expect(async () => {
-    await page.keyboard.press('Escape')
-    await page.getByRole('button', { name: /^Select model/ }).click()
-    // The picker opens straight on the model radios only while the session has no
-    // model yet; once one is selected the root pane shows Model/Effort cells, so
-    // the `Model …` cell has to open that list first.
-    const option = page.getByRole('menuitemradio', { name: model, exact: true })
-    if ((await option.count()) === 0) await page.getByRole('menuitem', { name: /^Model / }).click({ timeout: 2_000 })
-    await option.click({ timeout: 2_000 })
-  }).toPass({ timeout: 30_000 })
-  await expect(page.getByRole('button', { name: new RegExp(`^Select model, current ${model.replaceAll('/', '\\/')}`) })).toBeVisible()
+  await selectModelForNewThread(page, input.model)
 }
