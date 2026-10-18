@@ -44,6 +44,24 @@ describe('account provider profiles', () => {
     expect((await adapter.resolveModel('codex-emialex', 'gpt-6.1-codex-spark')).inputModalities).toEqual(['text'])
   })
 
+  it('bounds a silent OpenCode Go route sooner than a silently reasoning Codex route', () => {
+    const opencodeGo = buildProfile({
+      upstream: opencodeGoProvider(),
+      provider: 'opencode-go-alex',
+      displayName: 'OpenCode Go Alex',
+      additionalModelIds: [],
+    })
+    const codex = buildProfile({
+      upstream: openaiCodexProvider(),
+      provider: 'codex-alex2',
+      displayName: 'Codex Alex2',
+      additionalModelIds: [],
+    })
+
+    expect(opencodeGo.streamIdleTimeoutMs).toBe(120_000)
+    expect(codex.streamIdleTimeoutMs).toBe(300_000)
+  })
+
   it('publishes each Codex account model pin as that route model default', async () => {
     const modelId = 'gpt-6-luna'
     const profiles = new Map([

@@ -35,6 +35,24 @@ const offerThinkingOff = <Model extends ThinkingCatalogModel>(model: Model): Mod
   return offered
 }
 
+/**
+ * pi-ai's own default. High/max-effort Codex models can reason silently for
+ * minutes before the first answer token, so this route keeps the long bound.
+ */
+const SILENT_REASONING_STREAM_IDLE_TIMEOUT_MS = 300_000
+/**
+ * OpenCode Go answers or dies within seconds: first-token p90 on this route is
+ * ~11s, and every 300s stall in the 2026-10-15..18 window was this route (four
+ * `TIMEOUT` failures plus 309s and 404s first-token stalls that only completed
+ * after the full pi-ai bound). A 2-minute silence here is a dead route, and
+ * failing at 2 minutes lets the retry policy fail over instead of burning five
+ * minutes of the turn per attempt.
+ */
+const OPENCODE_GO_STREAM_IDLE_TIMEOUT_MS = 120_000
+
+const streamIdleTimeoutMsFor = (upstreamId: string): number =>
+  upstreamId === 'opencode-go' ? OPENCODE_GO_STREAM_IDLE_TIMEOUT_MS : SILENT_REASONING_STREAM_IDLE_TIMEOUT_MS
+
 export const buildProfile = (params: {
   /** Per-model default effort ids this account pins. */
   readonly reasoningDefaults?: Readonly<Record<string, string>> | undefined
@@ -109,8 +127,7 @@ export const buildProfile = (params: {
     displayName: params.displayName,
     ...(Object.keys(modelOverrides).length === 0 ? {} : { modelOverrides }),
     transport: 'sse',
-    // 5 min (pi-ai's default): high/max-effort models can reason silently for > 2 min before the first answer token.
-    streamIdleTimeoutMs: 300_000,
+    streamIdleTimeoutMs: streamIdleTimeoutMsFor(params.upstream.id),
     maxRequestImageBytes: 20_971_520,
     requestImagePixelBudget: 4_194_304,
     requestImageMaxBytes: 1_048_576,
