@@ -436,11 +436,12 @@ const revisionText = (revision: LiveInstanceFacts['startRevision']): string => {
  */
 const instanceLines = (facts: LiveInstanceFacts): readonly string[] => {
   const profile = facts.profile === null ? '' : `, profile ${facts.profile}`
+  const dsh = facts.dshVersion === null ? '' : `, dsh ${facts.dshVersion}`
   const moved = facts.startRevision?.commitId !== facts.currentRevision?.commitId
   const unbuilt = facts.staleBundles.filter(bundle => bundle.reason === 'sources-newer').map(bundle => bundle.name)
   const rebuilt = facts.staleBundles.filter(bundle => bundle.reason === 'built-after-start').length
   return [
-    `Instance: pid ${facts.pid}, port ${facts.port}${profile}`,
+    `Instance: pid ${facts.pid}, port ${facts.port}${profile}${dsh}`,
     `Started: ${new Date(facts.startedAt).toISOString()} (${durationText(facts.uptimeMs)} ago)`,
     `Checkout: ${facts.directory}`,
     `Started on: ${revisionText(facts.startRevision)}`,

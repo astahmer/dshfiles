@@ -102,6 +102,7 @@ const liveInstance = (): LiveInstanceFacts => ({
   uptimeMs: 12 * 60_000,
   command: 'node /Users/someone/.local/share/pnpm/bin/dsh web --port 3080',
   directory: '/Users/someone/dev/dshfiles',
+  dshVersion: '0.2.1-rc.2',
   startRevision: { changeId: 'nvlkrlxlmoyk', commitId: '2a36696844a2', bookmarks: ['main'], description: 'wip' },
   currentRevision: { changeId: 'vrmuluomuulx', commitId: '0f946ce835e4', bookmarks: [], description: 'test(e2e): follow the shell settings menu' },
   staleBundles: [
@@ -204,7 +205,7 @@ describe('dshx status', () => {
     const result = await run({ argv: ['status'], client: clientWith({ rpc: inventoryRpc() }), inspectInstance: async () => liveInstance() })
 
     expect(result.code).toBe(0)
-    expect(result.stdout).toContain('Instance: pid 42847, port 3080, profile web')
+    expect(result.stdout).toContain('Instance: pid 42847, port 3080, profile web, dsh 0.2.1-rc.2')
     expect(result.stdout).toContain('Started: 2026-10-18T01:30:32.000Z (12m 0s ago)')
     expect(result.stdout).toContain('Checkout: /Users/someone/dev/dshfiles')
     expect(result.stdout).toContain('Started on: nvlkrlxlmoyk 2a36696844a2 main wip')
@@ -224,7 +225,7 @@ describe('dshx status', () => {
     })
 
     expect(result.code).toBe(1)
-    expect(result.stdout).toContain('Instance: pid 42847, port 3080, profile web')
+    expect(result.stdout).toContain('Instance: pid 42847, port 3080, profile web, dsh 0.2.1-rc.2')
     expect(result.stderr).toBe('error [connection-failed]: Could not reach the local DSH launch URL.\n')
   })
 

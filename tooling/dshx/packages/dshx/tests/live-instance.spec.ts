@@ -28,6 +28,16 @@ describe('LiveInstanceModel', () => {
     expect(LiveInstanceModel.parseProfile('node .../dsh doctor')).toBeNull()
   })
 
+  it('finds the installed dsh package in the command line, however pnpm nested it', () => {
+    expect(LiveInstanceModel.dshPackageRoot('node /Users/x/.local/share/pnpm/global/v11/hash/node_modules/@deepseek-ai/dsh/lib/bin.js web --port 3080')).toBe(
+      '/Users/x/.local/share/pnpm/global/v11/hash/node_modules/@deepseek-ai/dsh',
+    )
+    expect(LiveInstanceModel.dshPackageRoot('node /Users/x/node_modules/.pnpm/@deepseek-ai+dsh@0.2.1-rc.2/node_modules/@deepseek-ai/dsh/lib/bin.js web')).toBe(
+      '/Users/x/node_modules/.pnpm/@deepseek-ai+dsh@0.2.1-rc.2/node_modules/@deepseek-ai/dsh',
+    )
+    expect(LiveInstanceModel.dshPackageRoot('node /usr/local/bin/dsh web')).toBeUndefined()
+  })
+
   it('picks the newest operation at or before the launch, and skips malformed rows', () => {
     const startedAt = Date.parse('2026-10-18T03:30:31+02:00')
     const page = [

@@ -1,8 +1,10 @@
 import { execFile } from 'node:child_process'
 import { existsSync, readdirSync, statSync } from 'node:fs'
+import { createRequire } from 'node:module'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
+import { z } from 'zod'
 import { DshPlatformLaunchUrl } from './client.js'
 
 const runFile = promisify(execFile)
@@ -87,15 +89,16 @@ const parseJjTimestamp = (value: string): number | undefined => {
 }
 
 /** The installed `@deepseek-ai/dsh` package root inside a `dsh` command line, however pnpm laid the store out. */
-const dshPackageRoot = (commandLine: string): string | undefined => /(.*node_modules\/@deepseek-ai\/dsh)\/lib\/bin\.js/.exec(commandLine)?.[1]
+const dshPackageRoot = (commandLine: string): string | undefined => /(?:^|\s)(\S*node_modules\/@deepseek-ai\/dsh)\/lib\/bin\.js/.exec(commandLine)?.[1]
+
+const installedPackageSchema = z.object({ version: z.string().min(1) })
 
 const dshVersionOf = (commandLine: string): string | null => {
   const root = dshPackageRoot(commandLine)
   if (root === undefined) return null
   try {
-    const parsed: unknown = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'))
-    const version = typeof parsed === 'object' && parsed !== null && 'version' in parsed ? parsed.version : undefined
-    return typeof version === 'string' ? version : null
+    const parsed = installedPackageSchema.safeParse(createRequire(import.meta.url)(join(root, 'package.json')))
+    return parsed.success ? parsed.data.version : null
   } catch {
     return null
   }
@@ -182,6 +185,7 @@ export class LiveInstanceModel {
   static readonly parseJjTimestamp = parseJjTimestamp
   static readonly operationBefore = operationBefore
   static readonly staleBundles = staleBundles
+  static readonly dshPackageRoot = dshPackageRoot
 }
 
 const jjBinary = (): string | undefined => {
@@ -310,6 +314,7 @@ const inspect = async (launchUrl: string | undefined, now: number): Promise<Live
     uptimeMs: Math.max(0, now - startedAt),
     command: (commandOutput ?? '').trim().slice(0, 512),
     directory: directory ?? '',
+    dshVersion: dshVersionOf(commandOutput ?? ''),
     startRevision: startRevision ?? null,
     currentRevision: currentRevision ?? null,
     staleBundles: staleBundles(directory === undefined ? [] : ownedBundleTimes(directory), startedAt),
