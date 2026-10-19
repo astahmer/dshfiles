@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
 import { Textarea } from '@dshfiles/plugin-ui/components/ui/textarea'
 import { ArrowUpRightIcon, RefreshCwIcon } from '@dshfiles/plugin-ui/icons'
-import { useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
+import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { relativeTime } from '@deepseek-ai/dsh-client-ui-primitives'
 import { useId, useState, type ReactNode } from 'react'
 import { aiAccountsKeys, aiAccountsQueries } from './accounts-queries.js'
@@ -148,19 +148,27 @@ export const AiAccountsSettingsSection = (props: { readonly close: () => void; r
   const updateHistoryCache = (next: UsageHistoryMeta): void => {
     queryClient.setQueryData(aiAccountsKeys.historySettings, next)
   }
-
+  const showSaveError = (cause: unknown): void => setNotice(`Could not save: ${errorMessage(cause, 'Unknown error')}`)
   const write = (task: Promise<unknown>): void => {
     setNotice(null)
-    void task.catch((cause: unknown) => setNotice(`Could not save: ${cause instanceof Error ? cause.message : String(cause)}`))
+    void task.catch(showSaveError)
   }
+  const distributionMutation = useMutation({
+    mutationFn: (distribution: AccountsFile['distribution']) => accounts.setDistribution({ distribution }),
+    onMutate: () => setNotice(null),
+    onSuccess: updateFileCache,
+    onError: showSaveError,
+  })
+  const historyMutation = useMutation({
+    mutationFn: (input: Pick<UsageHistoryMeta, 'intervalMinutes' | 'retentionDays'>) => accounts.saveHistorySettings(input),
+    onMutate: () => setNotice(null),
+    onSuccess: updateHistoryCache,
+    onError: showSaveError,
+  })
 
   const saveHistory = (patch: Partial<Pick<UsageHistoryMeta, 'intervalMinutes' | 'retentionDays'>>): void => {
     if (history === null) return
-    write(
-      accounts
-        .saveHistorySettings({ intervalMinutes: patch.intervalMinutes ?? history.intervalMinutes, retentionDays: patch.retentionDays ?? history.retentionDays })
-        .then(updateHistoryCache),
-    )
+    historyMutation.mutate({ intervalMinutes: patch.intervalMinutes ?? history.intervalMinutes, retentionDays: patch.retentionDays ?? history.retentionDays })
   }
 
   const readOnly = !settings.writable
@@ -246,7 +254,7 @@ export const AiAccountsSettingsSection = (props: { readonly close: () => void; r
               <Select
                 onValueChange={value => {
                   const distribution = DISTRIBUTIONS.find(candidate => candidate === value)
-                  if (distribution !== undefined) write(accounts.setDistribution({ distribution }).then(updateFileCache))
+                  if (distribution !== undefined) distributionMutation.mutate(distribution)
                 }}
                 value={file.distribution}
               >
