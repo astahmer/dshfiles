@@ -12,11 +12,13 @@ import { CoverageBoardView, type CoverageSelection } from './quota-coverage-boar
 import { QuotaCoverageModel } from './quota-coverage-model.js'
 import { ForecastBoardView } from './quota-forecast-board.js'
 import { HandoffBoardView } from './quota-handoff-board.js'
+import { PaceBoardView } from './quota-pace-board.js'
+import { QuotaPaceModel } from './quota-pace-model.js'
 import { QuotaForecastModel } from './quota-forecast-model.js'
 import { useAccountsUsage } from './use-accounts-usage.js'
 import { usePreferences } from './use-preferences.js'
 
-type View = 'forecast' | 'table' | 'coverage' | 'handoff'
+type View = 'forecast' | 'pace' | 'table' | 'coverage' | 'handoff'
 
 /**
  * Where each account's quota is heading at the current pace, whether accounts
@@ -48,19 +50,27 @@ export const QuotaForecastPanel = (props: { readonly onBack: () => void }): JSX.
     points: histories[index]?.data?.points ?? [],
   }))
   const board = QuotaForecastModel.board({ accounts: inputs, now })
+  const pace = QuotaPaceModel.current(board)
+  const pointsById = new Map(inputs.map(input => [input.instanceId, input.points]))
   const forecasts = new Map(board.accounts.map(account => [account.instanceId, account]))
   const coverageInputs = inputs.map(input => ({ ...input, forecast: forecasts.get(input.instanceId) }))
   const report = QuotaCoverageModel.report({ accounts: coverageInputs, now, workHours })
   const plans = QuotaCoverageModel.handoffs({ accounts: coverageInputs, now, workHours })
 
   const headline =
-    view === 'coverage' ? CoverageBoardView.headline(report) : view === 'handoff' ? HandoffBoardView.headline(plans, now) : ForecastBoardView.headline(board)
+    view === 'coverage'
+      ? CoverageBoardView.headline(report)
+      : view === 'handoff'
+        ? HandoffBoardView.headline(plans, now)
+        : view === 'pace'
+          ? PaceBoardView.headline(pace, now)
+          : ForecastBoardView.headline(board)
 
   return (
     <main className="dshx-root dshx:@container dshx:flex dshx:h-full dshx:min-h-0 dshx:w-full dshx:flex-col dshx:gap-5 dshx:overflow-auto dshx:px-6 dshx:py-5 dshx:@max-pane-narrow:px-3">
       <Tabs
         className="dshx:mx-auto dshx:flex dshx:w-full dshx:max-w-[1500px] dshx:flex-col dshx:gap-5"
-        onValueChange={value => setView(value === 'table' || value === 'coverage' || value === 'handoff' ? value : 'forecast')}
+        onValueChange={value => setView(value === 'pace' || value === 'table' || value === 'coverage' || value === 'handoff' ? value : 'forecast')}
         value={view}
       >
         <header className="dshx:flex dshx:flex-wrap dshx:items-end dshx:justify-between dshx:gap-4">
@@ -79,6 +89,7 @@ export const QuotaForecastPanel = (props: { readonly onBack: () => void }): JSX.
             </Button>
             <TabsList>
               <TabsTrigger value="forecast">Forecast</TabsTrigger>
+              <TabsTrigger value="pace">Pace</TabsTrigger>
               <TabsTrigger value="table">Table</TabsTrigger>
               <TabsTrigger value="coverage">Coverage</TabsTrigger>
               <TabsTrigger value="handoff">Hand-off</TabsTrigger>
@@ -101,6 +112,9 @@ export const QuotaForecastPanel = (props: { readonly onBack: () => void }): JSX.
           <>
             <TabsContent value="forecast">
               <ForecastBoardView.Board board={board} onSelect={setSelectedId} selectedId={selectedId} />
+            </TabsContent>
+            <TabsContent value="pace">
+              <PaceBoardView.Board accounts={pace} now={now} pointsById={pointsById} />
             </TabsContent>
             <TabsContent value="table">
               <ForecastBoardView.Table board={board} />

@@ -73,6 +73,12 @@ snapshots of every enabled account.
   falling back to the window average; it assumes that pace holds. Selecting a
   row shows used against even pace, the projection, the lock, and the points
   used per day over the last week against the window's daily allowance.
+- **Pace** draws every account on one window axis, from its start to its
+  reset, against the even-pace diagonal: the use so far, the projection if the
+  pace holds, where it runs out and how long it then stays locked. The ratio is
+  the use so far against the share of the window elapsed (1.5x means 72% used
+  when even pace would be at 48%). **Past windows** overlays the selected
+  account's finished windows from the stored history and says how many ran out.
 - **Table** lists the same projection.
 - **Coverage** replays five weeks per provider kind with two or more accounts:
   one lane per account plus an "accounts free" lane, and the work hours when

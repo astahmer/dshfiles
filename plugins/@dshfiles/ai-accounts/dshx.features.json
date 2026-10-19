@@ -338,7 +338,7 @@
     {
       "id": "quota-forecast",
       "title": "Forecast when each account runs out, whether a kind kept an account free, and the order to use them in",
-      "summary": "A Quota forecast panel projects every account's binding window over seven days of six-hour cells at the current pace (runs out, locked until reset, new window), with a Table view and a detail of used versus even pace and recent daily use. Coverage replays five weeks of stored snapshots per provider kind and counts the work hours with no account of that kind free, continuing the current week on pace. Hand-off plans the coming week per kind: each hour goes to the free account that resets soonest, showing when to hand off and when the kind runs dry.",
+      "summary": "A Quota forecast panel projects every account's binding window over seven days of six-hour cells at the current pace (runs out, locked until reset, new window), with a Table view and a detail of used versus even pace and recent daily use. Coverage replays five weeks of stored snapshots per provider kind and counts the work hours with no account of that kind free, continuing the current week on pace. Hand-off plans the coming week per kind: each hour goes to the free account that resets soonest, showing when to hand off and when the kind runs dry. Pace overlays every account's current window on one start-to-reset axis against even pace, with past windows for the selected account.",
       "reach": ["click button \"Quota forecast\"", "expect tab \"Forecast\"", "click tab \"Hand-off\"", "expect text \"Work on\""],
       "surfaces": ["client", "host", "storage", "settings"],
       "configuration": [
@@ -397,6 +397,24 @@
           "id": "ai-accounts.handoff-plan",
           "file": "plugins/@dshfiles/ai-accounts/src/quota-coverage-model.test.ts",
           "testName": "hands off to the account that resets soonest and marks the hours when every account is spent"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.pace-current",
+          "file": "plugins/@dshfiles/ai-accounts/src/quota-pace-model.test.ts",
+          "testName": "measures each account against even pace on one window axis, fastest first"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.pace-past",
+          "file": "plugins/@dshfiles/ai-accounts/src/quota-pace-model.test.ts",
+          "testName": "replays finished windows newest first and marks where one ran out"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.pace-early-reset",
+          "file": "plugins/@dshfiles/ai-accounts/src/quota-pace-model.test.ts",
+          "testName": "ends a window at the next one when a banked reset restarted it early"
         }
       ]
     },
