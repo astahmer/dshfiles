@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 export const PROMPT_LIBRARY_STORAGE_KEY = 'dshfiles.prompt-stash.v1'
+export const PROMPT_LIBRARY_LOCAL_STORAGE_KEY = 'dshfiles.prompt-stash.library-local.v2'
 export const MAX_PROMPTS = 50
 export const MAX_PROMPT_TITLE_LENGTH = 100
 export const MAX_PROMPT_TEXT_LENGTH = 20_000
@@ -38,6 +39,14 @@ const librarySchema = z
 const legacyDraftsSchema = z.object({ schemaVersion: z.literal(1), drafts: z.array(z.unknown()) })
 
 export type SavedPrompt = z.infer<typeof promptSchema>
+export type PromptLibraryStore = z.infer<typeof librarySchema>
+export type PromptLibraryStoredRead =
+  | { readonly kind: 'missing'; readonly store: PromptLibraryStore }
+  | { readonly kind: 'library'; readonly store: PromptLibraryStore }
+  | { readonly kind: 'legacy-drafts'; readonly store: PromptLibraryStore }
+  | { readonly kind: 'invalid' }
+
+const emptyPromptLibraryStore = (): PromptLibraryStore => ({ version: 1, prompts: [] })
 
 const defaultPromptTitle = (text: string): string => {
   const firstLine = text.split(/\r?\n/, 1)[0]?.trim() ?? ''
@@ -51,20 +60,39 @@ export type PromptMutation =
   | { readonly kind: 'applied'; readonly prompts: readonly SavedPrompt[] }
   | { readonly kind: 'conflict'; readonly prompts: readonly SavedPrompt[] }
 
-const readPromptLibrary = (serialized: string | null): PromptLibraryRead => {
-  if (serialized === null) return { ok: true, prompts: [] }
+const readPromptLibraryWithSource = (serialized: string | null): PromptLibraryStoredRead => {
+  if (serialized === null) return { kind: 'missing', store: emptyPromptLibraryStore() }
 
   let value: unknown
   try {
     value = JSON.parse(serialized)
   } catch {
-    return { ok: false }
+    return { kind: 'invalid' }
   }
 
   const parsed = librarySchema.safeParse(value)
-  if (!parsed.success) return legacyDraftsSchema.safeParse(value).success ? { ok: true, prompts: [] } : { ok: false }
+  if (parsed.success) return { kind: 'library', store: parsed.data }
+  if (legacyDraftsSchema.safeParse(value).success) return { kind: 'legacy-drafts', store: emptyPromptLibraryStore() }
+  return { kind: 'invalid' }
+}
 
-  return { ok: true, prompts: parsed.data.prompts }
+const readPromptLibrary = (serialized: string | null): PromptLibraryRead => {
+  const result = readPromptLibraryWithSource(serialized)
+  return result.kind === 'invalid' ? { ok: false } : { ok: true, prompts: result.store.prompts }
+}
+
+const clearStoredPromptLibrary = (input: {
+  readonly storage: Pick<Storage, 'getItem' | 'removeItem'>
+  readonly key: string
+  readonly serialized: string | null
+  readonly storeFingerprint: string | null
+  readonly expectedStore: PromptLibraryStore
+}): boolean => {
+  if (input.serialized === null || input.storeFingerprint !== JSON.stringify(input.expectedStore) || input.storage.getItem(input.key) !== input.serialized) {
+    return false
+  }
+  input.storage.removeItem(input.key)
+  return true
 }
 
 const serializePromptLibrary = (prompts: readonly SavedPrompt[]): string | null => {
@@ -96,11 +124,15 @@ const removePromptIfCurrent = (prompts: readonly SavedPrompt[], id: string, expe
 }
 
 export class PromptLibrary {
+  static readonly schema = librarySchema
+  static readonly emptyStore = emptyPromptLibraryStore
   static readonly maxPrompts = MAX_PROMPTS
   static readonly maxPromptTitleLength = MAX_PROMPT_TITLE_LENGTH
   static readonly maxPromptTextLength = MAX_PROMPT_TEXT_LENGTH
   static readonly defaultTitle = defaultPromptTitle
   static readonly read = readPromptLibrary
+  static readonly readStoredWithSource = readPromptLibraryWithSource
+  static readonly clearStoredIfUnchanged = clearStoredPromptLibrary
   static readonly serialize = serializePromptLibrary
   static readonly writeIfCurrent = writePromptIfCurrent
   static readonly removeIfCurrent = removePromptIfCurrent

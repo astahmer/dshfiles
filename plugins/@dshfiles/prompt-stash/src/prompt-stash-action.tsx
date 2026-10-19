@@ -35,12 +35,12 @@ type DeleteConfirmation = {
 
 const PromptStashAction = (props: ComposerActionProps): JSX.Element => {
   const input = props.useInput(state => state)
-  const library = usePromptLibrary()
+  const [isOpen, setIsOpen] = useState(false)
+  const library = usePromptLibrary({ pollWhileOpen: isOpen })
   const libraryState = library.state
   const prompts = library.prompts
   const promptSignature = prompts.map(prompt => `${prompt.id}:${prompt.revision}`).join('|')
   const lastPromptSignature = useRef(promptSignature)
-  const [isOpen, setIsOpen] = useState(false)
   const [activeSource, setActiveSource] = useState<'saved' | 'recent'>('saved')
   const [editor, setEditor] = useState<PromptEditor | null>(null)
   const [deleteConfirmation, setDeleteConfirmation] = useState<DeleteConfirmation | null>(null)
@@ -75,12 +75,6 @@ const PromptStashAction = (props: ComposerActionProps): JSX.Element => {
   const triggerId = useId()
   const titleId = useId()
   const textId = useId()
-
-  useEffect(() => {
-    if (!isOpen) return
-    const timer = window.setInterval(library.refresh, 2_000)
-    return () => window.clearInterval(timer)
-  }, [isOpen, library.refresh])
 
   useEffect(() => {
     if (promptSignature === lastPromptSignature.current) return

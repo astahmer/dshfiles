@@ -20,6 +20,9 @@ export const promptStashMutationSchema = z
   })
   .strict()
 
+export type PromptStashSnapshot = z.infer<typeof promptStashStateSchema>
+export type PromptStashMutation = z.infer<typeof promptStashMutationSchema>
+
 export const draftSnapshotSchema = z
   .object({
     revision: revisionSchema,

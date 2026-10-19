@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { MAX_PROMPT_TEXT_LENGTH, PromptLibrary, type SavedPrompt } from './library.js'
+import {
+  MAX_PROMPT_TEXT_LENGTH,
+  PROMPT_LIBRARY_LOCAL_STORAGE_KEY,
+  PROMPT_LIBRARY_STORAGE_KEY,
+  PromptLibrary,
+  type PromptLibraryStore,
+  type SavedPrompt,
+} from './library.js'
 
 const firstPrompt: SavedPrompt = {
   id: '11f94d55-8639-4f42-94ca-7b218778e4a1',
@@ -65,5 +72,59 @@ describe('saved prompt library', () => {
     const drafts = JSON.stringify({ schemaVersion: 1, drafts: [{ id: 'x' }] })
     expect(PromptLibrary.read(drafts)).toEqual({ ok: true, prompts: [] })
     expect(PromptLibrary.read(JSON.stringify({ schemaVersion: 2 }))).toEqual({ ok: false })
+    expect(PromptLibrary.readStoredWithSource(drafts).kind).toBe('legacy-drafts')
+    expect(PromptLibrary.readStoredWithSource('{').kind).toBe('invalid')
+  })
+
+  it('clears only the unchanged valid library payload during migration', () => {
+    const storageOf = (initial: Record<string, string>) => {
+      const values = new Map(Object.entries(initial))
+      return {
+        getItem: (key: string) => values.get(key) ?? null,
+        removeItem: (key: string) => void values.delete(key),
+        values,
+      }
+    }
+    const store: PromptLibraryStore = { version: 1, prompts: [firstPrompt] }
+    const serialized = JSON.stringify(store)
+    const fingerprint = JSON.stringify(store)
+    const unchangedStorage = storageOf({ [PROMPT_LIBRARY_LOCAL_STORAGE_KEY]: serialized })
+
+    expect(
+      PromptLibrary.clearStoredIfUnchanged({
+        storage: unchangedStorage,
+        key: PROMPT_LIBRARY_LOCAL_STORAGE_KEY,
+        serialized,
+        storeFingerprint: fingerprint,
+        expectedStore: store,
+      }),
+    ).toBe(true)
+    expect(unchangedStorage.values.has(PROMPT_LIBRARY_LOCAL_STORAGE_KEY)).toBe(false)
+
+    const changed = JSON.stringify({ version: 1, prompts: [{ ...firstPrompt, text: 'Newer local prompt' }] })
+    const changedStorage = storageOf({ [PROMPT_LIBRARY_LOCAL_STORAGE_KEY]: changed })
+    expect(
+      PromptLibrary.clearStoredIfUnchanged({
+        storage: changedStorage,
+        key: PROMPT_LIBRARY_LOCAL_STORAGE_KEY,
+        serialized,
+        storeFingerprint: fingerprint,
+        expectedStore: store,
+      }),
+    ).toBe(false)
+    expect(changedStorage.values.get(PROMPT_LIBRARY_LOCAL_STORAGE_KEY)).toBe(changed)
+
+    const legacyDrafts = JSON.stringify({ schemaVersion: 1, drafts: [{ id: 'draft' }] })
+    const sharedKeyStorage = storageOf({ [PROMPT_LIBRARY_STORAGE_KEY]: legacyDrafts })
+    expect(
+      PromptLibrary.clearStoredIfUnchanged({
+        storage: sharedKeyStorage,
+        key: PROMPT_LIBRARY_STORAGE_KEY,
+        serialized: null,
+        storeFingerprint: null,
+        expectedStore: PromptLibrary.emptyStore(),
+      }),
+    ).toBe(false)
+    expect(sharedKeyStorage.values.get(PROMPT_LIBRARY_STORAGE_KEY)).toBe(legacyDrafts)
   })
 })

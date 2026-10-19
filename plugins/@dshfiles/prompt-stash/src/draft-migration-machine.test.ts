@@ -33,6 +33,7 @@ describe('prompt draft migration', () => {
     const first = savedDraft(1)
     const second = savedDraft(2)
     const calls: string[] = []
+    const migratedLocalStore = localStore(first, second)
     let hostDrafts: SavedDraft[] = []
     const client: PromptDraftMigrationClient = {
       saveDraft: async ({ draft }, { signal }) => {
@@ -47,11 +48,12 @@ describe('prompt draft migration', () => {
     }
     const actor = actorFor(client)
 
-    actor.send({ type: 'host.snapshot', snapshot: snapshot(1), localStore: localStore(first, second) })
+    actor.send({ type: 'host.snapshot', snapshot: snapshot(1), localStore: migratedLocalStore })
     await vi.waitFor(() => expect(actor.getSnapshot().matches('complete')).toBe(true))
 
     expect(calls).toEqual([first.id, second.id])
     expect(client.completeMigration).toHaveBeenCalledOnce()
+    expect(client.completeMigration).toHaveBeenCalledWith(migratedLocalStore)
     expect(client.refresh).toHaveBeenCalledOnce()
     actor.stop()
   })
@@ -120,6 +122,42 @@ describe('prompt draft migration', () => {
 
     expect(calls).toBe(3)
     expect(client.completeMigration).toHaveBeenCalledOnce()
+    actor.stop()
+  })
+
+  it('restarts an in-flight migration against the latest local store', async () => {
+    const first = savedDraft(1)
+    const second = savedDraft(2)
+    const latestStore = localStore(first, second)
+    let firstCall = true
+    let activeSignal: AbortSignal | undefined
+    let hostDrafts: SavedDraft[] = []
+    const calls: string[] = []
+    const client: PromptDraftMigrationClient = {
+      saveDraft: async ({ draft }, { signal }) => {
+        calls.push(draft.id)
+        if (firstCall) {
+          firstCall = false
+          activeSignal = signal
+          await new Promise<void>((_resolve, reject) => signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true }))
+        }
+        const saved = { id: draft.id, title: draft.title, text: draft.text, createdAt: draft.now, updatedAt: draft.now }
+        hostDrafts = [...hostDrafts, saved]
+        return applied(hostDrafts.length + 1, ...hostDrafts)
+      },
+      completeMigration: vi.fn(),
+      refresh: vi.fn(),
+    }
+    const actor = actorFor(client)
+
+    actor.send({ type: 'host.snapshot', snapshot: snapshot(1), localStore: localStore(first) })
+    await vi.waitFor(() => expect(activeSignal).toBeDefined())
+    actor.send({ type: 'host.snapshot', snapshot: snapshot(1), localStore: latestStore })
+    await vi.waitFor(() => expect(actor.getSnapshot().matches('complete')).toBe(true))
+
+    expect(activeSignal?.aborted).toBe(true)
+    expect(calls).toEqual([first.id, first.id, second.id])
+    expect(client.completeMigration).toHaveBeenCalledWith(latestStore)
     actor.stop()
   })
 

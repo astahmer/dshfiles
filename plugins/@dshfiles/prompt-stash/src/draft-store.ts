@@ -113,8 +113,12 @@ const readStoredDraftsWithSource = (storage: { getItem(key: string): string | nu
 const readStoredDrafts = (storage: { getItem(key: string): string | null; setItem(key: string, value: string): void }): DraftStore =>
   readStoredDraftsWithSource(storage).store
 
-const clearStoredDrafts = (storage: { getItem(key: string): string | null; removeItem(key: string): void }, importedLegacySerialized: string | null): void => {
-  storage.removeItem(DRAFT_STORE_KEY)
+const clearStoredDrafts = (
+  storage: { getItem(key: string): string | null; removeItem(key: string): void },
+  importedLegacySerialized: string | null,
+  expectedStore: DraftStore,
+): void => {
+  if (storage.getItem(DRAFT_STORE_KEY) === JSON.stringify(expectedStore)) storage.removeItem(DRAFT_STORE_KEY)
   if (importedLegacySerialized !== null && storage.getItem(LEGACY_DRAFT_STORE_KEY) === importedLegacySerialized) {
     storage.removeItem(LEGACY_DRAFT_STORE_KEY)
   }

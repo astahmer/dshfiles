@@ -7,7 +7,7 @@ export interface PromptDraftMigrationClient {
     input: { readonly draft: { readonly id: string; readonly title: string; readonly text: string; readonly now: string } },
     options: { readonly signal: AbortSignal },
   ) => Promise<DraftMutation>
-  readonly completeMigration: () => void
+  readonly completeMigration: (expectedStore: DraftStore) => void
   readonly refresh: () => void
 }
 
@@ -79,7 +79,7 @@ const migratePromptDrafts = fromPromise<
   }
 
   signal.throwIfAborted()
-  input.client.completeMigration()
+  input.client.completeMigration(input.request.localStore)
   return { operationId: input.request.operationId, status: 'complete', snapshot }
 })
 
@@ -178,12 +178,21 @@ const promptDraftMigrationMachine = setup({
         },
       },
       on: {
-        'host.snapshot': {
-          actions: assign(({ context, event }) => ({
-            lastSnapshotRevision: Math.max(context.lastSnapshotRevision, event.snapshot.revision),
-            lastLocalStore: event.localStore,
-          })),
-        },
+        'host.snapshot': [
+          {
+            guard: ({ context, event }) =>
+              context.request !== null && (event.snapshot.revision > context.request.snapshot.revision || event.localStore !== context.request.localStore),
+            target: 'migrating',
+            reenter: true,
+            actions: assign(({ context, event }) => requestFromSnapshot({ context, event })),
+          },
+          {
+            actions: assign(({ context, event }) => ({
+              lastSnapshotRevision: Math.max(context.lastSnapshotRevision, event.snapshot.revision),
+              lastLocalStore: event.localStore,
+            })),
+          },
+        ],
       },
     },
     complete: {

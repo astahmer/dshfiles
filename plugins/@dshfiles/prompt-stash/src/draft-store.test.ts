@@ -123,7 +123,7 @@ describe('draft storage key', () => {
   it('clears an imported legacy draft value only when it is still the same value', () => {
     const unchangedStorage = storageOf({ [LEGACY_DRAFT_STORE_KEY]: JSON.stringify(stored) })
     const unchanged = PromptDrafts.readStoredWithSource(unchangedStorage)
-    PromptDrafts.clearStored(unchangedStorage, unchanged.legacySerialized)
+    PromptDrafts.clearStored(unchangedStorage, unchanged.legacySerialized, unchanged.store)
     expect(unchangedStorage.values.has(LEGACY_DRAFT_STORE_KEY)).toBe(false)
 
     const legacySerialized = JSON.stringify(stored)
@@ -132,7 +132,7 @@ describe('draft storage key', () => {
     expect(read).toEqual({ store: stored, importedLegacy: true, legacySerialized })
 
     storage.setItem(LEGACY_DRAFT_STORE_KEY, library)
-    PromptDrafts.clearStored(storage, read.legacySerialized)
+    PromptDrafts.clearStored(storage, read.legacySerialized, read.store)
 
     expect(storage.values.has(DRAFT_STORE_KEY)).toBe(false)
     expect(storage.values.get(LEGACY_DRAFT_STORE_KEY)).toBe(library)
@@ -140,8 +140,21 @@ describe('draft storage key', () => {
 
   it('does not clear the prompt library legacy value when clearing drafts', () => {
     const storage = storageOf({ [LEGACY_DRAFT_STORE_KEY]: library, [DRAFT_STORE_KEY]: JSON.stringify(stored) })
-    PromptDrafts.clearStored(storage, null)
+    PromptDrafts.clearStored(storage, null, stored)
     expect(storage.values.has(DRAFT_STORE_KEY)).toBe(false)
     expect(storage.values.get(LEGACY_DRAFT_STORE_KEY)).toBe(library)
+  })
+
+  it('preserves newer local drafts written while Host migration runs', () => {
+    const next = draft(2)
+    const newerStore = {
+      schemaVersion: 1,
+      drafts: [...stored.drafts, { id: next.id, title: next.title, text: next.text, createdAt: next.now, updatedAt: next.now }],
+    }
+    const storage = storageOf({ [DRAFT_STORE_KEY]: JSON.stringify(newerStore) })
+
+    PromptDrafts.clearStored(storage, null, stored)
+
+    expect(storage.values.get(DRAFT_STORE_KEY)).toBe(JSON.stringify(newerStore))
   })
 })

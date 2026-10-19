@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo } from 'react'
 import { PromptDraftMigration, type PromptDraftMigrationClient } from './draft-migration-machine.js'
 import { PromptDraftQueries } from './draft-queries.js'
 import { draftMutationSchema, draftSnapshotSchema, promptStashApi, type DraftMutation, type DraftSnapshot } from './library-api.js'
-import { DRAFT_STORE_KEY, PromptDrafts, type SavedDraft, type SaveDraftResult } from './draft-store.js'
+import { DRAFT_STORE_KEY, PromptDrafts, type DraftStore, type SavedDraft, type SaveDraftResult } from './draft-store.js'
 
 export type SavedDraftsState = 'loading' | 'ready' | 'unavailable'
 export type DraftRejectionReason = Extract<SaveDraftResult, { ok: false }>['reason']
@@ -57,15 +57,7 @@ const localDraftStorage = () => {
           return JSON.stringify(result.store)
         }),
       setItem: (key: string, value: string) => withLocalStorage(storage, () => storage.setItem(key, value)),
-      removeItem: (key: string) =>
-        withLocalStorage(storage, () => {
-          if (key === DRAFT_STORE_KEY) {
-            PromptDrafts.clearStored(storage, importedLegacySerialized)
-            importedLegacySerialized = null
-            return
-          }
-          storage.removeItem(key)
-        }),
+      removeItem: (key: string) => withLocalStorage(storage, () => storage.removeItem(key)),
     }
   } catch {
     localDraftStorageAvailable = false
@@ -80,6 +72,17 @@ const storedDrafts = createStoredValue({
   storage: localDraftStorage,
 })
 
+const completeDraftMigration = (expectedStore: DraftStore): void => {
+  try {
+    PromptDrafts.clearStored(window.localStorage, importedLegacySerialized, expectedStore)
+    importedLegacySerialized = null
+    localDraftStorageAvailable = true
+  } catch {
+    localDraftStorageAvailable = false
+  }
+  storedDrafts.reload()
+}
+
 /** The Host snapshot owns shared drafts; this value is only the browser fallback until Host writes succeed. */
 export const useSavedDrafts = (): SavedDraftsClient => {
   const api = useApi(promptStashApi)
@@ -87,7 +90,8 @@ export const useSavedDrafts = (): SavedDraftsClient => {
   const localStore = storedDrafts.useValue()
   const query = useQuery({
     queryKey: PromptDraftQueries.key,
-    queryFn: ({ signal }) => api.drafts(undefined, { signal }),
+    queryFn: async ({ signal }) =>
+      PromptDraftQueries.newest(queryClient.getQueryData<DraftSnapshot>(PromptDraftQueries.key), await api.drafts(undefined, { signal })),
   })
   const saveMutation = useMutation<DraftMutation, Error, SaveDraftVariables>({
     mutationFn: async input =>
@@ -116,7 +120,7 @@ export const useSavedDrafts = (): SavedDraftsClient => {
   const migrationClient = useMemo<PromptDraftMigrationClient>(
     () => ({
       saveDraft: saveDraftForMigration,
-      completeMigration: () => storedDrafts.remove(),
+      completeMigration: completeDraftMigration,
       refresh: () => void queryClient.invalidateQueries({ queryKey: PromptDraftQueries.key, exact: true }),
     }),
     [queryClient, saveDraftForMigration],
