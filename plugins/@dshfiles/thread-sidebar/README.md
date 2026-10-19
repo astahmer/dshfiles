@@ -405,6 +405,37 @@ of `ThreadSidebarContent`, rebuild the plugin, and read both from
 `page.evaluate`. Wall-clock numbers depend on the machine's load; the render
 counts and the long-task count do not.
 
+**What is not rendered.** A collapsed section and a closed child list already
+render no rows at all (measured: collapsing Active took the list from 12 rows to
+0 in the DOM, and reopening restored them). Offscreen rows are a different
+problem: they must stay in the DOM so scroll height, `data-thread-id` lookups,
+scroll-into-view and text assertions keep working. `src/use-near-viewport.ts`
+therefore keeps every row and its content, but mounts a row's hover actions and
+their tooltips only once it comes within 600px of the viewport, and leaves them
+mounted afterwards. At 602 rows on a scratch DSH, loading the page cost 5,803
+DOM nodes (9.6 per row), 13.8-14.2 ms layout, 60.6-62.4 ms style and 215-253 ms
+script with the gate, against 15,629 nodes (26 per row), 21.2-23.9 ms layout,
+167.3-175.1 ms style and 494-514 ms script with every row mounted (measured by
+removing `IntersectionObserver` before load, so both runs used the same build).
+Without an `IntersectionObserver` — a test environment — every row mounts.
+
+CSS `content-visibility: auto` was measured as an alternative and is **not**
+used: at 602 rows it saved nothing at load (the browser still styled every row)
+and moved 19-27 ms of layout and 86-132 ms of style into the scroll frames, so
+the same work happened later, in the frames where jank is most visible.
+
+**React Compiler (measured, not enabled).** `dshx` gained an opt-in
+`client.reactCompiler` option (Vite's `@vitejs/plugin-react` `compiler` path with
+`{ target: '18' }`, so the compiler emits `react-compiler-runtime` calls) and
+this plugin was built with it at 602 rows. It compiled the components and the
+app ran, but nothing improved: page-load script went from 287-301 ms to
+307-339 ms, the New-thread click from 73-103 ms to 74-164 ms of script, and the
+bundle grew from 445,406 to 496,363 bytes (+11.4%) for the inlined runtime. The
+hand-memoized structure described above — a `memo` row, content-stable derived
+containers, cached child rows — already covers what the compiler adds, so the
+experiment was reverted: the option, its two build dependencies and this
+plugin's `react-compiler-runtime` dependency are gone.
+
 ## Agent tools
 
 One dshx API (`thread-actions`, owner `@dshfiles/thread-sidebar`, defined in

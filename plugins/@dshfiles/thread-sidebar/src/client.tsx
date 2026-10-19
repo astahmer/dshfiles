@@ -5,6 +5,7 @@ import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
 import { HostSnapshotsModel } from './snapshots.js'
+import { useNearViewport } from './use-near-viewport.js'
 import { RemoteThreadsSection } from './remote-threads-section.js'
 import { StableValueModel, useStableValue } from './stable-value.js'
 import { createThreadChildRowCache, type ThreadChildRowCache } from './thread-child-rows.js'
@@ -683,6 +684,9 @@ const ThreadContextMenu = (props: ThreadContextMenuProps): JSX.Element => {
 /** Memoized so a session update re-renders only its own row, not the whole list. */
 const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
   const { session, archived, pinned, parked, settled, rowStyle } = props
+  const rowRef = useRef<HTMLElement | null>(null)
+  // Offscreen rows keep their content and layout box; only their menus and hover actions wait for the viewport.
+  const nearViewport = useNearViewport(rowRef)
   const t = props.actions.translate
   const unread = props.unread
   const compact = rowStyle.density === 'compact'
@@ -828,6 +832,7 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
       actions={props.actions}
     >
       <article
+        ref={rowRef}
         className="dshx:group/row dshx:relative dshx:min-w-0"
         data-thread-id={session.id}
         data-selected={props.selected}
@@ -968,14 +973,16 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
               )}
             </button>
           ) : null}
-          <div
-            data-testid="thread-row-actions"
-            className="dshx:pointer-events-none dshx:absolute dshx:top-1 dshx:right-1.5 dshx:flex dshx:gap-0.5 dshx:rounded-md dshx:border dshx:bg-popover dshx:p-0.5 dshx:opacity-0 dshx:shadow-xs dshx:transition-opacity dshx:group-hover/row:pointer-events-auto dshx:group-hover/row:opacity-100 dshx:focus-within:pointer-events-auto dshx:focus-within:opacity-100"
-          >
-            {props.rowActions.map(action => (
-              <Fragment key={action}>{renderRowAction(action)}</Fragment>
-            ))}
-          </div>
+          {nearViewport ? (
+            <div
+              data-testid="thread-row-actions"
+              className="dshx:pointer-events-none dshx:absolute dshx:top-1 dshx:right-1.5 dshx:flex dshx:gap-0.5 dshx:rounded-md dshx:border dshx:bg-popover dshx:p-0.5 dshx:opacity-0 dshx:shadow-xs dshx:transition-opacity dshx:group-hover/row:pointer-events-auto dshx:group-hover/row:opacity-100 dshx:focus-within:pointer-events-auto dshx:focus-within:opacity-100"
+            >
+              {props.rowActions.map(action => (
+                <Fragment key={action}>{renderRowAction(action)}</Fragment>
+              ))}
+            </div>
+          ) : null}
         </div>
         {childCount > 0 && props.childrenOpen ? (
           <ChildThreadList
