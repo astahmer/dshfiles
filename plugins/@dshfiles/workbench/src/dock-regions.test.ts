@@ -22,6 +22,17 @@ describe('workbench region registry', () => {
     expect(registry.get('right')).toBeUndefined()
   })
 
+  it('keeps a surface whose newer registration outlived the older disposer', () => {
+    const registry = createWorkbenchRegionRegistry()
+    const api = surface(['a']) as unknown as DockviewApi
+
+    const disposeFirst = registry.set('bottom', api)
+    registry.set('bottom', api)
+    disposeFirst()
+
+    expect(registry.get('bottom')).toBe(api)
+  })
+
   it('tells whether any mounted region already shows a panel', () => {
     const registry = createWorkbenchRegionRegistry()
     registry.set('right', surface(['jujutsu.dock']) as unknown as DockviewApi)

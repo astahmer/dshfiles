@@ -16,21 +16,25 @@ export interface WorkbenchRegionRegistry {
 const REGION_ORDER: readonly WorkbenchRegionId[] = ['main', 'right', 'bottom']
 
 export const createWorkbenchRegionRegistry = (): WorkbenchRegionRegistry => {
-  const apis = new Map<WorkbenchRegionId, DockviewApi>()
+  // Each registration carries its own token: a surface that remounts with the
+  // same Dockview instance (a settings flip re-renders it) registers again, and
+  // the old disposer must not delete the newer registration.
+  const slots = new Map<WorkbenchRegionId, { readonly api: DockviewApi; readonly token: object }>()
   return {
     set: (region, api) => {
-      apis.set(region, api)
+      const token = {}
+      slots.set(region, { api, token })
       return () => {
-        if (apis.get(region) === api) apis.delete(region)
+        if (slots.get(region)?.token === token) slots.delete(region)
       }
     },
-    get: region => apis.get(region),
+    get: region => slots.get(region)?.api,
     entries: () =>
       REGION_ORDER.flatMap(region => {
-        const api = apis.get(region)
-        return api === undefined ? [] : [[region, api] as const]
+        const slot = slots.get(region)
+        return slot === undefined ? [] : [[region, slot.api] as const]
       }),
-    holds: panelId => [...apis.values()].some(api => api.getPanel(panelId) !== undefined),
+    holds: panelId => [...slots.values()].some(slot => slot.api.getPanel(panelId) !== undefined),
   }
 }
 
