@@ -6,12 +6,12 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
 import { Separator } from '@dshfiles/plugin-ui/components/ui/separator'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
-import { ChevronDownIcon, FolderGit2Icon, PanelRightIcon, RefreshCwIcon } from '@dshfiles/plugin-ui/icons'
+import { ChevronDownIcon, ClockIcon, FolderGit2Icon, PanelRightIcon, RefreshCwIcon, Undo2Icon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { errorMessage, useIsMutating, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useCallback, useMemo, useSyncExternalStore } from 'react'
-import { jjIntegrationApi } from './api.js'
+import { jjIntegrationApi, type ThreadView } from './api.js'
 import type { JjIntegrationTranslate } from './locales.js'
 import { announceRepositoryChange, describeLandResult } from './land-feedback.js'
 import { threadQueryKeys, threadRebaseMutationKey } from './panel.js'
@@ -68,6 +68,32 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
       if (result !== undefined && result !== null) toast.show({ text: describeLandResult(props.t, result), success: result.status === 'landed' })
     },
   })
+  /** The status refetch runs jj and can take seconds, so the menu shows the Host's answer at once and refreshes behind it. */
+  const showQueued = (path: string, integrationQueuedAt: number | undefined): void => {
+    queryClient.setQueryData(threadQueryKeys.threadAt(path), (previous: { readonly thread: ThreadView | null } | undefined) => {
+      if (previous?.thread === null || previous?.thread === undefined) return previous
+      const { integrationQueuedAt: _previousQueuedAt, ...thread } = previous.thread
+      return { thread: integrationQueuedAt === undefined ? thread : { ...thread, integrationQueuedAt } }
+    })
+    void queryClient.invalidateQueries({ queryKey: threadQueryKeys.threadAt(path) })
+  }
+  const queueIntegration = useMutation({
+    mutationFn: (path: string) => runHostRequest({ timeoutMs: 30_000, request: signal => api.queueLand({ path, sessionId: props.sessionId }, { signal }) }),
+    onSuccess: (result, path) => showQueued(path, result.queuedAt),
+    onError: error => toast.show({ text: errorMessage(error, props.t('loadFailed')), success: false }),
+  })
+  const undoQueuedIntegration = useMutation({
+    mutationFn: (path: string) => runHostRequest({ timeoutMs: 30_000, request: signal => api.cancelQueuedLand({ path }, { signal }) }),
+    onSuccess: (result, path) => {
+      if (result.status === 'integrating') {
+        toast.show({ text: props.t('queuedIntegrationAlreadyRunning'), success: false })
+        void queryClient.invalidateQueries({ queryKey: threadQueryKeys.threadAt(path) })
+        return
+      }
+      showQueued(path, undefined)
+    },
+    onError: error => toast.show({ text: errorMessage(error, props.t('loadFailed')), success: false }),
+  })
   const current = thread.data?.thread
   const sessionIds = useMemo(() => current?.sessionIds ?? [props.sessionId], [current?.sessionIds, props.sessionId])
   const readSessionRunning = useCallback(
@@ -111,6 +137,8 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
   const label = props.t('rebaseThread', { bookmark: props.bookmark })
   const triggerLabel = isThread ? props.t('currentThreadWorkspace', { name }) : props.t('workspaceMenuShared', { name })
   const rebaseDisabled = rebasesPending || !isThread || unlanded === 0 || !canRebase
+  const integrationQueued = current?.integrationQueuedAt !== undefined
+  const canQueueIntegration = isThread && unlanded > 0 && !canRebase && !rebasesPending
   const blockedReason = isThread && !canRebase ? props.t(clientCanRebase === undefined ? 'rebaseActivityUnknown' : 'rebaseBlocked') : undefined
   const statusText = (): string => {
     if (loading) return props.t('workspaceStatusLoading')
@@ -144,6 +172,7 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
       {glyph}
       <span className="dshx:min-w-0 dshx:truncate dshx:font-mono dshx:text-xs">{name}</span>
       {countBadge}
+      {integrationQueued ? <ClockIcon aria-hidden="true" className="dshx:size-3.5 dshx:shrink-0 dshx:text-muted-foreground" /> : null}
       <ChevronDownIcon aria-hidden="true" className="dshx:size-3.5 dshx:shrink-0 dshx:opacity-60" />
     </Button>
   )
@@ -168,7 +197,46 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
               </span>
             </div>
             <p className="dshx:px-3 dshx:pt-2 dshx:pb-3 dshx:text-xs dshx:text-muted-foreground">{statusText()}</p>
-            {!isThread ? null : (
+            {!isThread ? null : integrationQueued ? (
+              <div className="dshx:px-3 dshx:pb-3">
+                <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:rounded-md dshx:border dshx:border-border dshx:py-1 dshx:pr-1 dshx:pl-2">
+                  <ClockIcon aria-hidden="true" className="dshx:size-3.5 dshx:shrink-0 dshx:text-muted-foreground" />
+                  <p className="dshx:min-w-0 dshx:flex-1 dshx:text-xs">{props.t('integrationQueuedHint', { bookmark: props.bookmark })}</p>
+                  <Button
+                    aria-label={props.t('undoQueuedIntegrationLabel', { bookmark: props.bookmark })}
+                    className="dshx-root dshx:shrink"
+                    disabled={undoQueuedIntegration.isPending}
+                    onClick={() => undoQueuedIntegration.mutate(current.path)}
+                    size="sm"
+                    title={props.t('undoQueuedIntegrationLabel', { bookmark: props.bookmark })}
+                    type="button"
+                    variant="ghost"
+                  >
+                    {undoQueuedIntegration.isPending ? <Spinner /> : <Undo2Icon aria-hidden="true" className="dshx:size-3.5" />}
+                    {props.t('undoQueuedIntegration')}
+                  </Button>
+                </div>
+              </div>
+            ) : canQueueIntegration ? (
+              <div className="dshx:px-3 dshx:pb-3">
+                <Button
+                  aria-label={props.t('queueIntegration', { bookmark: props.bookmark })}
+                  className="dshx-root dshx:w-full"
+                  disabled={queueIntegration.isPending}
+                  onClick={() => queueIntegration.mutate(current.path)}
+                  size="sm"
+                  title={props.t('queueIntegrationHint')}
+                  type="button"
+                  variant="outline"
+                >
+                  {queueIntegration.isPending ? <Spinner /> : <ClockIcon aria-hidden="true" className="dshx:size-3.5" />}
+                  {props.t('queueIntegration', { bookmark: props.bookmark })}
+                </Button>
+                <p className="dshx:pt-2 dshx:text-xs dshx:text-muted-foreground">
+                  {blockedReason === undefined ? props.t('queueIntegrationHint') : `${blockedReason} ${props.t('queueIntegrationHint')}`}
+                </p>
+              </div>
+            ) : (
               <div className="dshx:px-3 dshx:pb-3">
                 <Button
                   aria-label={label}

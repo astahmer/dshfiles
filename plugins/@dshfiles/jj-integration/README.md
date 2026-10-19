@@ -61,9 +61,14 @@ One control in the conversation header carries the workspace state:
   cannot lose the only way to the thread's workspace actions.
 - Its menu shows the workspace path, what the workspace state is (ready to
   integrate, up to date, behind `main`, conflicted, shared checkout, or blocked),
-  **Integrate into `main`** disabled with the reason when a session is running or a
-  question waits, **Open thread workspaces in side panel**, and **Download
-  session log**.
+  **Integrate into `main`**, **Open thread workspaces in side panel**, and
+  **Download session log**.
+- While a session is running or a question waits, **Integrate** becomes
+  **Queue integration into `main`**: the Host keeps the request and runs the
+  regular guarded integration as soon as every thread Session is idle (woken by
+  Session events, with a 30 s fallback). The menu then says it is queued, the
+  trigger shows a clock, and **Undo** cancels it until the rebase actually
+  starts. The queue lives in Host memory, so a Host restart drops it.
 
 ### Session-log export
 
