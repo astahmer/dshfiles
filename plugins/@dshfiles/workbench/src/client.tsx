@@ -6,19 +6,20 @@ import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import { defineClient, useSettings } from '@dshfiles/dshx/client'
-import type { RightPanelMode } from '@dshfiles/frame-layout/right-panel'
+import type { RightPanelMode } from '@dshfiles/frame-layout/regions'
 // Type-only: the frame's right-column seat and the `shell.dock` slot it declares.
-import type {} from '@dshfiles/frame-layout/right-panel'
+import type {} from '@dshfiles/frame-layout/regions'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { LayoutGridIcon } from '@dshfiles/plugin-ui/icons'
-import type { DockviewApi } from 'dockview-react'
+import type { DockviewApi, DockviewDidDropEvent, DockviewUnhandledDragOverEvent } from 'dockview-react'
 import dockviewSheet from 'virtual:dshfiles-workbench/dockview-css'
 import { useEffect, useLayoutEffect, useSyncExternalStore } from 'react'
 import { demoPanels } from './demo-panels.js'
-import { createLayoutStore, WorkbenchLayout } from './layout-store.js'
+import { workbenchRegions, type WorkbenchRegionId } from './dock-regions.js'
+import { createLayoutStore, WorkbenchLayout, WORKBENCH_COMPONENT } from './layout-store.js'
 import { WORKBENCH_LOCALE_NAMESPACE, workbenchLocale } from './locales.js'
-import { workbenchPanels, type WORKBENCH_MAIN_PANEL_ID } from './registry.js'
+import { workbenchPanels, type WORKBENCH_MAIN_PANEL_ID, type WorkbenchPanelDefinition } from './registry.js'
 import { effectiveRightPanelMode } from './right-panel-mode.js'
 import { workbenchSettings } from './settings.js'
 import { WorkbenchView } from './workbench-view.js'
@@ -54,6 +55,7 @@ export default defineClient({
     const store = createLayoutStore()
     const sideStore = createLayoutStore({ surface: 'side-panel' })
     const dockStore = createLayoutStore({ surface: 'dock' })
+    const bottomStore = createLayoutStore({ surface: 'bottom' })
 
     // The slot ledger erases the brand; an id is a MainPanelId exactly when `main` registers it.
     const isMainPanelId = (id: string): id is MainPanelId => ctx.slots.entriesOfSlot('main').some(entry => entry.options.key === id)
@@ -103,7 +105,18 @@ export default defineClient({
         decorate(props => {
           useDockviewSheet()
           useDemoPanels()
-          return <WorkbenchView registry={registry} store={store} t={props.t} headerActions={context => <MainMoveToDock {...context} />} />
+          return (
+            <WorkbenchView
+              registry={registry}
+              store={store}
+              region="main"
+              t={props.t}
+              onOpenPanel={openIn('main')}
+              onDrop={handleDrop('main')}
+              onUnhandledDragOver={acceptsForeignPanel}
+              headerActions={context => <MainMoveToDock {...context} />}
+            />
+          )
         }),
       ),
     )
@@ -127,12 +140,54 @@ export default defineClient({
         }),
       'workbench: right pane tab type',
     )
-    // The two docking surfaces keep their own Dockview instances, so moving a
-    // panel between them is this plugin's business: close it in the source, then
-    // select the feature's own main panel (or open the panel in the dock) and the
-    // other surface shows it.
-    let dockApi: DockviewApi | null = null
+    // Every region keeps its own Dockview instance, so moving a panel between
+    // them is this plugin's business: a panel lives in exactly one region, and
+    // adopting it somewhere else drops the copy the source held. A drag inside
+    // one instance is Dockview's own business; a drag onto another arrives as a
+    // foreign PanelTransfer, which the target accepts here and then adopts.
+    const regions = workbenchRegions()
     let pendingDockOpen: string | null = null
+
+    const closeElsewhere = (region: WorkbenchRegionId, panelId: string): void => {
+      for (const [id, api] of regions.entries()) {
+        if (id !== region) api.getPanel(panelId)?.api.close()
+      }
+    }
+
+    const adoptPanel = (input: {
+      readonly region: WorkbenchRegionId
+      readonly api: DockviewApi
+      readonly panelId: string
+      readonly position?: { readonly referenceGroup: NonNullable<DockviewDidDropEvent['group']>; readonly direction: 'within' }
+    }): void => {
+      const definition = registry.get(input.panelId)
+      if (definition === undefined || input.api.getPanel(input.panelId) !== undefined) return
+      input.api.addPanel({
+        id: input.panelId,
+        component: WORKBENCH_COMPONENT,
+        title: definition.title,
+        ...(input.position === undefined ? {} : { position: input.position }),
+      })
+      closeElsewhere(input.region, input.panelId)
+    }
+
+    const handleDrop = (region: WorkbenchRegionId) => (event: DockviewDidDropEvent): void => {
+      const panelId = event.getData()?.panelId
+      const api = regions.get(region)
+      if (panelId === undefined || panelId === null || api === undefined) return
+      const group = event.group
+      adoptPanel({
+        region,
+        api,
+        panelId,
+        ...(group === undefined ? {} : { position: { referenceGroup: group, direction: 'within' as const } }),
+      })
+    }
+
+    const acceptsForeignPanel = (event: DockviewUnhandledDragOverEvent): void => {
+      const panelId = event.getData()?.panelId
+      if (panelId !== undefined && panelId !== null && regions.holds(panelId)) event.accept()
+    }
 
     const moveToMainView = (api: DockviewApi, panelId: string): void => {
       const target = registry.get(panelId)?.mainPanelId
@@ -144,18 +199,32 @@ export default defineClient({
     const openInDock = (panelId: string): void => {
       const definition = registry.get(panelId)
       if (definition === undefined) return
-      if (dockApi === null) {
+      const dock = regions.get('right')
+      if (dock === undefined) {
         pendingDockOpen = panelId
         switchRightPanel?.('dock')
         return
       }
-      WorkbenchLayout.openPanel(dockApi, definition)
+      closeElsewhere('right', panelId)
+      WorkbenchLayout.openPanel(dock, definition)
     }
 
     const moveToDock = (api: DockviewApi, panelId: string): void => {
       api.getPanel(panelId)?.api.close()
       openInDock(panelId)
     }
+
+    /** Where an "Add panel" goes: the definition moves here if another region shows it. */
+    const openIn = (region: WorkbenchRegionId) => (definition: WorkbenchPanelDefinition, api: DockviewApi): void => {
+      closeElsewhere(region, definition.id)
+      WorkbenchLayout.openPanel(api, definition)
+    }
+
+    /**
+     * The dock's move menu. The header actions hand it the live api and the ids
+     * the surface shows: this component mounts with the header, before Dockview
+     * reports ready, so a captured instance would still be null on first render.
+     */
 
     /**
      * The dock's move menu. The header actions hand it the live api and the ids
@@ -184,6 +253,18 @@ export default defineClient({
             ))}
           </DropdownMenuContent>
         </DropdownMenu>
+      )
+    })
+
+    /** Show or hide the bottom panel from the dock's own header. */
+    const ToggleBottomPanel = decorate(() => {
+      const settings = useSettings(workbenchSettings)
+      const shown = settings.value?.bottomPanel === 'shown'
+      const label = shown ? translate('hideBottomPanel') : translate('toggleBottomPanel')
+      return (
+        <Button size="sm" variant="ghost" aria-label={label} title={label} onClick={() => switchBottomPanel?.(!shown)}>
+          {label}
+        </Button>
       )
     })
 
@@ -239,17 +320,51 @@ export default defineClient({
             <WorkbenchView
               registry={registry}
               store={dockStore}
+              region="right"
               surface="dock"
               t={props.t}
               heading={props.t('dockHeading')}
+              onOpenPanel={openIn('right')}
+              onDrop={handleDrop('right')}
+              onUnhandledDragOver={acceptsForeignPanel}
               onApi={api => {
-                dockApi = api
                 if (pendingDockOpen === null) return
                 const definition = registry.get(pendingDockOpen)
                 pendingDockOpen = null
                 if (definition !== undefined) WorkbenchLayout.openPanel(api, definition)
               }}
-              headerActions={context => <DockMoveToMain {...context} />}
+              headerActions={context => (
+                <>
+                  <ToggleBottomPanel />
+                  <DockMoveToMain {...context} />
+                </>
+              )}
+            />
+          )
+        }),
+      ),
+    )
+
+    // The bottom panel: the same panels in the frame's full-width row, opened
+    // and closed through the frame's seat so its height belongs to the frame.
+    ctx.slots.inject('shell.bottom', () =>
+      ctx.slots.register(
+        { name: 'shell.bottom', locale: WORKBENCH_LOCALE_NAMESPACE },
+        decorate(props => {
+          useDockviewSheet()
+          useDemoPanels()
+          return (
+            <WorkbenchView
+              registry={registry}
+              store={bottomStore}
+              region="bottom"
+              surface="bottom"
+              t={props.t}
+              heading={props.t('bottomHeading')}
+              onOpenPanel={openIn('bottom')}
+              onDrop={handleDrop('bottom')}
+              onUnhandledDragOver={acceptsForeignPanel}
+              onClose={() => switchBottomPanel?.(false)}
             />
           )
         }),
@@ -289,8 +404,37 @@ export default defineClient({
       )
       return null
     })
+    // The row's presence lives outside the seat: the frame renders `shell.bottom`
+    // only while the row is open, so the component that opens it must be mounted
+    // regardless. `set` is what the header action and the command call.
+    let switchBottomPanel: ((shown: boolean) => void) | undefined
+    const BottomPanelPresence = decorate(() => {
+      const settings = useSettings(workbenchSettings)
+      const shown = settings.value?.bottomPanel === 'shown'
+      useEffect(() => {
+        switchBottomPanel = next => void settings.set('bottomPanel', next ? 'shown' : 'hidden')
+        return () => {
+          switchBottomPanel = undefined
+        }
+      }, [settings])
+      useEffect(() => {
+        const seat = ctx.get('frameBottom')
+        if (shown) seat?.open()
+        else seat?.close()
+      }, [shown])
+      useEffect(
+        () => () => {
+          ctx.get('frameBottom')?.close()
+        },
+        [],
+      )
+      return null
+    })
     ctx.slots.inject('shell.overlay', () =>
       ctx.slots.register({ name: 'shell.overlay', id: 'dshfiles-workbench-right-panel', order: 44 }, RightPanelModeReporter),
+    )
+    ctx.slots.inject('shell.overlay', () =>
+      ctx.slots.register({ name: 'shell.overlay', id: 'dshfiles-workbench-bottom-panel', order: 45 }, BottomPanelPresence),
     )
 
     // Same shape as the Jujutsu toggle: close the side panel when it already shows the workbench, otherwise show it.
@@ -337,7 +481,26 @@ export default defineClient({
       ctx.slots.register({ name: 'conversation.session.header.utilities', id: 'dshfiles-workbench-toggle', order: 41 }, HeaderToggle),
     )
 
+    const BOTTOM_COMMAND_ID = 'workbench.toggleBottomPanel'
     const isShortcutCommandId = (value: string): value is ShortcutCommandId => /^[a-z][a-zA-Z0-9-]*(?:\.[a-zA-Z][a-zA-Z0-9-]*)+$/u.test(value)
+    if (isShortcutCommandId(BOTTOM_COMMAND_ID)) {
+      ctx.effect(() => {
+        try {
+          return ctx.shortcuts.register({
+            id: BOTTOM_COMMAND_ID,
+            label: () => translate('toggleBottomPanel'),
+            aliases: ['workbench', 'dock', 'panel', 'bottom panel'],
+            defaults: {},
+            regions: ['page', 'editable'],
+            modals: [],
+            resolve: () => ({ status: 'handled', run: () => switchBottomPanel?.(ctx.get('frameBottom')?.height() === 0) }),
+          })
+        } catch (error) {
+          console.warn('workbench: the bottom panel toggle command could not be registered', error)
+          return () => undefined
+        }
+      }, 'workbench: bottom panel toggle command')
+    }
     if (isShortcutCommandId(TOGGLE_COMMAND_ID)) {
       // No default chord: listed under Settings › Shortcuts and in the command palette for the user to bind.
       ctx.effect(() => {

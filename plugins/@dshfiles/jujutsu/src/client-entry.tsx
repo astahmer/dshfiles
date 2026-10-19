@@ -8,7 +8,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import { defineClient, useApi } from '@dshfiles/dshx/client'
 // Type-only: `ctx.rightPanel`, the frame's right-column seat.
-import type {} from '@dshfiles/frame-layout/right-panel'
+import type {} from '@dshfiles/frame-layout/regions'
 import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
 import { PluginQueryProvider, pluginQueryClient, useQuery } from '@dshfiles/plugin-ui/query'
 import type { DirectoryPickerPort, RegisteredProject } from '@dshfiles/project-folder-picker'

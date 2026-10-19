@@ -1,4 +1,4 @@
-import type { RightPanelMode } from '@dshfiles/frame-layout/right-panel'
+import type { RightPanelMode } from '@dshfiles/frame-layout/regions'
 
 /**
  * Which surface the right column renders.

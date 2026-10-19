@@ -10,6 +10,7 @@ const LAYOUT_STORAGE_KEYS = {
   main: 'dshfiles.workbench.layout.v1',
   'side-panel': 'dshfiles.workbench.side-panel-layout.v1',
   dock: 'dshfiles.workbench.dock-layout.v1',
+  bottom: 'dshfiles.workbench.bottom-layout.v1',
 } as const
 
 const serializedPanelSchema = z.looseObject({ id: z.string(), contentComponent: z.literal(WORKBENCH_COMPONENT), title: z.string().optional() })
@@ -22,7 +23,7 @@ const serializedDockviewSchema = z.looseObject({
 /** The outer shape Dockview reads; anything deeper that it rejects makes `restoreLayout` fall back to the default. */
 const layoutSchema = z.custom<SerializedDockview>(value => serializedDockviewSchema.safeParse(value).success)
 
-/** The main-area and side-panel workbenches keep separate layouts, so docking in one never rearranges the other. */
+/** Every region keeps its own layout, so docking in one never rearranges another. */
 export const createLayoutStore = (options?: {
   readonly surface?: keyof typeof LAYOUT_STORAGE_KEYS
   readonly storage?: () => Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> | null

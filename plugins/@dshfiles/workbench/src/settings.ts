@@ -12,6 +12,12 @@ export const workbenchSettings = defineSettings({
       .description(
         'Which surface fills the right column: the native per-thread right sidebar, or the global dock, whose layout and panel set are the same in every thread.',
       ),
+    bottomPanel: Schema.union([
+      Schema.const('hidden').description('Hidden'),
+      Schema.const('shown').description('Shown below the columns'),
+    ])
+      .default('hidden')
+      .description('The global bottom panel: a full-width row under the columns that holds dockable panels, drag one there from the right column or the main workbench.'),
     headerToggle: Schema.boolean()
       .default(false)
       .description(
