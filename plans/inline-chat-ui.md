@@ -35,16 +35,18 @@ All of them are shadcn + Vercel AI SDK `UIMessage` shaped. Port the **view**, th
 
 ## Shared kit first (`@dshfiles/plugin-ui`)
 
-One PR each; every later card is built from these.
+The Host already ships most of what the libraries offer, in `@deepseek-ai/dsh-client-ui-primitives`: `CodeBlock`,
+`CodeToolbar`, `TerminalBlock` (ANSI), `DisclosureRow` (the native 24px process row), `TextShimmer` and
+`useCodeHighlighter` (Shiki themed by the Host's `--shiki-token-*` variables). The kit wraps those instead of
+porting library code, so cards look native and follow the theme.
 
-| Piece                      | Port from                                         | Replaces                                              |
-| -------------------------- | ------------------------------------------------- | ----------------------------------------------------- |
-| `ToolCard` shell           | AI Elements `tool`, prompt-kit `tool`             | Ad-hoc header/chevron/status markup in `test-runs`    |
-| `StatusTone` + `LiveTimer` | affectUI Tool Call Card (reference)               | Per-plugin icon/colour switches; `tool-meta` duration |
-| `CodeBlock`                | AI Elements `code-block`, prompt-kit `code-block` | `test-runs` plain code frames                         |
-| `StackTrace`               | AI Elements `stack-trace`                         | `test-runs` frames list                               |
-| `Terminal`                 | AI Elements `terminal`                            | Colour-stripped bash output (ANSI → spans)            |
-| `FileTree`                 | AI Elements `file-tree`                           | Flat path lists (glob, change summary)                |
+| Piece                                 | Status                               | Built on                                                                                   |
+| ------------------------------------- | ------------------------------------ | ------------------------------------------------------------------------------------------ |
+| `ToolCard`, `StatusIcon`              | done (`components/tool-card`)        | `DisclosureRow`; status glyphs for a step (`row`) or a file/run (`group`)                  |
+| `CodeFrame`, `StackTrace`, `FilePath` | done (`components/stack-trace`)      | `useCodeHighlighter`; keeps the file's own line numbers, which the Host `CodeBlock` cannot |
+| Terminal                              | not needed                           | Use the Host `TerminalBlock` directly                                                      |
+| `LiveTimer`                           | with the tool-group summary (step 3) | First real caller; `tool-meta`'s timing line is the model                                  |
+| `FileTree`                            | with the turn summary (step 6)       | AI Elements `file-tree` as reference                                                       |
 
 ## Cards, ranked
 
@@ -70,7 +72,7 @@ One PR each; every later card is built from these.
 
 ## Order
 
-1. Kit: `ToolCard` + `StatusTone`/`LiveTimer`, then `CodeBlock`, `StackTrace`, `Terminal`; move `test-runs` onto them.
+1. ~~Kit: `ToolCard`, `StatusIcon`, `CodeFrame`, `StackTrace`; `test-runs` moved onto them.~~ Done.
 2. Edit card (new `edit-cards` plugin).
 3. Tool group summary (inside `tool-meta`, which already owns the tree wrapper).
 4. Plan/todo progress card + pinned step.
@@ -81,8 +83,11 @@ One PR each; every later card is built from these.
 Each step: a scratch-DSH screenshot through the fake provider (`[[call <tool> {...}]]` directives, see `test-runs`
 verification) and a catalog `reach`.
 
+## Decisions
+
+1. Build on the Host primitives and `plugin-ui`'s Radix parts; no new dependencies from the libraries (`streamdown`, full Shiki, `motion`).
+2. Turn summary is a footer under each turn (`assistant-actions`).
+
 ## Open questions
 
-1. Port AI Elements onto `plugin-ui`'s Radix parts, or add their deps (`streamdown`, `shiki` full, `motion`) as needed? Recommendation: Radix + existing slim Shiki, no new deps without asking.
-2. Turn summary: footer under each turn (`assistant-actions`) or one sticky strip for the latest turn only?
-3. Should the live activity strip replace the native `input.activity` content or sit beside it?
+1. Should the live activity strip replace the native `input.activity` content or sit beside it?
