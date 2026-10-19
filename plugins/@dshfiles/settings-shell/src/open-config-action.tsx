@@ -1,4 +1,3 @@
-import type { SessionWorkspacePathApplication } from '@deepseek-ai/dsh-api-session-controller/types'
 import { writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
 import {
   DropdownMenu,
@@ -9,39 +8,12 @@ import {
   DropdownMenuTrigger,
 } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { ChevronDownIcon, ClipboardCopyIcon, CodeIcon, FolderOpenIcon, LoaderIcon } from '@dshfiles/plugin-ui/icons'
-import { useEffect, useState } from 'react'
-import type { ObservableSnapshot } from '@deepseek-ai/dsh-client-store'
-import type { SettingsDocumentState } from './native/document-action.js'
+import { useMachine } from '@dshfiles/plugin-ui/machine'
 import type { ShellTranslate } from './native/locales.js'
 import { useObservable } from './native/use-observable.js'
+import { openConfigMachine, type ConfigFileOpeners, type SettingsDocumentController } from './open-config-machine.js'
 
-/** The Host desktop operations the split button needs, over the Session Remote's path opener (the native open-in service). */
-export interface ConfigFileOpeners {
-  readonly documentPath: () => Promise<DocumentLocation | null>
-  readonly canOpenPaths: () => Promise<boolean>
-  readonly applications: (path: string) => Promise<readonly SessionWorkspacePathApplication[] | null>
-  readonly openDefault: (path: string) => Promise<boolean>
-  readonly openWith: (path: string, applicationId: string) => Promise<boolean>
-  readonly reveal: (path: string) => Promise<boolean>
-  /** Hands the file to the in-app Editor; false when it is not loaded or has no thread to open it in. */
-  readonly openInEditor: ((path: string) => boolean) | undefined
-}
-
-interface DocumentLocation {
-  readonly path: string
-  /** False until the native action first creates the document; only the path can be copied then. */
-  readonly exists: boolean
-}
-
-interface SettingsDocumentController {
-  readonly store: ObservableSnapshot<SettingsDocumentState>
-  load(): Promise<void>
-  open(): Promise<void>
-}
-
-type Feedback = { readonly kind: 'error'; readonly message: string } | { readonly kind: 'copied' } | null
-
-const FEEDBACK_MS = 2_500
+export type { ConfigFileOpeners } from './open-config-machine.js'
 
 const isMac = (): boolean => /Mac/u.test(navigator.platform)
 
@@ -56,72 +28,18 @@ export const OpenConfigAction = (props: {
   readonly openers: ConfigFileOpeners
   readonly t: ShellTranslate
 }): JSX.Element | null => {
+  const [snapshot, send] = useMachine(openConfigMachine, {
+    input: { controller: props.controller, openers: props.openers, copyPath: writeClipboard },
+  })
   const state = useObservable(props.controller.store)
-  const [location, setLocation] = useState<DocumentLocation | null>(null)
-  const [desktop, setDesktop] = useState<boolean | undefined>(undefined)
-  const [opening, setOpening] = useState(false)
-  const [apps, setApps] = useState<readonly SessionWorkspacePathApplication[] | null | undefined>(undefined)
-  const [feedback, setFeedback] = useState<Feedback>(null)
-  const { t, openers } = props
-
-  useEffect(() => {
-    void props.controller.load()
-  }, [props.controller])
-  useEffect(() => {
-    let live = true
-    void openers.documentPath().then(next => live && setLocation(next))
-    void openers.canOpenPaths().then(next => live && setDesktop(next))
-    return () => {
-      live = false
-    }
-  }, [openers])
-  useEffect(() => {
-    if (feedback === null) return
-    const timeout = window.setTimeout(() => setFeedback(null), FEEDBACK_MS)
-    return () => window.clearTimeout(timeout)
-  }, [feedback])
+  const { t } = props
+  const { apps, desktop, feedback, location, openers } = snapshot.context
 
   if (state.status !== 'ready') return null
-  const failed = (): void => setFeedback({ kind: 'error', message: t('config.failed') })
-  const settle = (outcome: Promise<boolean>): void => {
-    void outcome.then(ok => {
-      if (!ok) failed()
-    }, failed)
-  }
   const path = location?.path ?? null
   const onDisk = location?.exists === true && desktop === true
-  const openPrimary = async (): Promise<void> => {
-    if (state.opening || opening) return
-    setOpening(true)
-    try {
-      const next = await openers.documentPath()
-      setLocation(next)
-      if (next === null || !next.exists) {
-        await props.controller.open()
-        return
-      }
-      const canOpen = desktop ?? (await openers.canOpenPaths())
-      if (desktop === undefined) setDesktop(canOpen)
-      if (!canOpen) {
-        await props.controller.open()
-        return
-      }
-      if (!(await openers.openDefault(next.path))) failed()
-    } catch {
-      failed()
-    } finally {
-      setOpening(false)
-    }
-  }
-  // The main button may have just created the document, so each menu opening reads its location again.
-  const onMenu = (open: boolean): void => {
-    if (!open) return
-    void openers.documentPath().then(next => {
-      setLocation(next)
-      if (next !== null && next.exists && desktop === true && apps === undefined) void openers.applications(next.path).then(setApps, () => setApps(null))
-    })
-  }
-  const errorText = feedback?.kind === 'error' ? feedback.message : state.error === null ? null : t('openDocument.error')
+  const busy = snapshot.matches({ active: 'primaryLoading' }) || snapshot.matches({ active: 'menuLoading' }) || snapshot.matches({ active: 'menuAction' })
+  const errorText = feedback?.kind === 'error' ? t(feedback.key) : state.error === null ? null : t('openDocument.error')
 
   return (
     <div className="dshx-root dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
@@ -138,15 +56,15 @@ export const OpenConfigAction = (props: {
       <div className="dshx:inline-flex dshx:h-7 dshx:items-stretch dshx:overflow-hidden dshx:rounded-md dshx:border dshx:border-border dshx:bg-background dshx:shadow-xs">
         <button
           className="dshx:inline-flex dshx:cursor-pointer dshx:items-center dshx:border-none dshx:bg-transparent dshx:px-2.5 dshx:text-[12px] dshx:font-medium dshx:whitespace-nowrap dshx:text-foreground dshx:hover:bg-accent dshx:disabled:cursor-default dshx:disabled:opacity-60"
-          disabled={state.opening || opening}
-          onClick={() => void openPrimary()}
+          disabled={state.opening || busy}
+          onClick={() => send({ type: 'primary' })}
           title={path ?? undefined}
           type="button"
         >
           {t('openDocument')}
         </button>
         {path !== null && (
-          <DropdownMenu onOpenChange={onMenu}>
+          <DropdownMenu onOpenChange={open => open && send({ type: 'menu.open' })}>
             <DropdownMenuTrigger asChild>
               <button
                 aria-label={t('config.more')}
@@ -168,7 +86,7 @@ export const OpenConfigAction = (props: {
                   )}
                   {apps !== undefined && (apps === null || apps.length === 0) && <DropdownMenuItem disabled>{t('config.noApps')}</DropdownMenuItem>}
                   {apps?.map(app => (
-                    <DropdownMenuItem key={app.id} onSelect={() => settle(openers.openWith(path, app.id))}>
+                    <DropdownMenuItem key={app.id} onSelect={() => send({ type: 'open.with', applicationId: app.id })}>
                       {app.icon === null ? <CodeIcon /> : <img alt="" className="dshx:size-4" src={app.icon} />}
                       <span className="dshx:flex-1 dshx:truncate">{app.name.replace(/\.app$/u, '')}</span>
                       {app.default && <span className="dshx:text-[11px] dshx:text-muted-foreground">{t('config.default')}</span>}
@@ -177,26 +95,18 @@ export const OpenConfigAction = (props: {
                 </>
               )}
               {openers.openInEditor !== undefined && (
-                <DropdownMenuItem
-                  onSelect={() => {
-                    if (openers.openInEditor?.(path) !== true) setFeedback({ kind: 'error', message: t('config.editorNeedsThread') })
-                  }}
-                >
+                <DropdownMenuItem onSelect={() => send({ type: 'open.editor' })}>
                   <CodeIcon />
                   {t('config.editor')}
                 </DropdownMenuItem>
               )}
               <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onSelect={() => {
-                  void writeClipboard(path).then(ok => setFeedback(ok ? { kind: 'copied' } : { kind: 'error', message: t('config.failed') }))
-                }}
-              >
+              <DropdownMenuItem onSelect={() => send({ type: 'copy.path' })}>
                 <ClipboardCopyIcon />
                 {t('config.copyPath')}
               </DropdownMenuItem>
               {onDisk && (
-                <DropdownMenuItem onSelect={() => settle(openers.reveal(path))}>
+                <DropdownMenuItem onSelect={() => send({ type: 'reveal' })}>
                   <FolderOpenIcon />
                   {isMac() ? t('config.reveal') : t('config.showInFolder')}
                 </DropdownMenuItem>
