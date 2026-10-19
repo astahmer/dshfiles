@@ -20,6 +20,7 @@ export interface SecretRowActions {
   readonly revealed: RevealedSecret | null
   readonly canActOnRow: (row: SecretMetadata) => boolean
   readonly isRowBusy: (row: SecretMetadata) => boolean
+  readonly copyPending: boolean
   readonly isRevealing: (row: SecretMetadata) => boolean
   readonly onReveal: (row: SecretMetadata) => void
   /** The revealed value lost focus; hide it when the user set hide-on-blur. */
@@ -173,7 +174,12 @@ const ActionsCell = (props: { readonly row: SecretMetadata }): JSX.Element => {
   const hint = allowed ? undefined : t('actionBlockedHint')
   return (
     <div className="dshx:flex dshx:items-center dshx:justify-end dshx:gap-0.5">
-      <RowActionButton disabled={disabled} hint={hint ?? t('copyHint')} label={t('copyAlias', { alias: row.alias })} onClick={() => actions.onCopy(row)}>
+      <RowActionButton
+        disabled={disabled || actions.copyPending}
+        hint={hint ?? t('copyHint')}
+        label={t('copyAlias', { alias: row.alias })}
+        onClick={() => actions.onCopy(row)}
+      >
         <CopyIcon aria-hidden />
       </RowActionButton>
       <RowActionButton disabled={disabled} hint={hint} label={t('editAlias', { alias: row.alias })} onClick={() => actions.onEdit(row)}>

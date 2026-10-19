@@ -65,6 +65,13 @@ const secretListQueryKey = (cwd: string | null): readonly ['secret-catalog', 'li
 const secretMachineQueryKey = ['secret-catalog', 'machine'] as const
 
 type ActiveDialog = { readonly mode: 'create' } | { readonly mode: 'edit' | 'remove'; readonly row: SecretMetadata }
+type SecretCopyVariables = {
+  readonly rowId: string
+  readonly alias: string
+  readonly cwd: string | null
+  readonly scope: SecretMutationScope
+  readonly environment: SecretMetadata['environment']
+}
 
 export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element => {
   const api = useApi(secretCatalogApi)
@@ -90,8 +97,6 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
   const [pickerOpen, setPickerOpen] = useState(false)
   const [scope, setScope] = useState<SecretScopeFilter>('all')
   const [search, setSearch] = useState('')
-  const [actionError, setActionError] = useState<string | null>(null)
-  const [busyRow, setBusyRow] = useState<{ readonly id: string; readonly action: 'copy' } | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [dialog, setDialog] = useState<ActiveDialog | null>(null)
   const [draftIds, setDraftIds] = useState<readonly number[]>([])
@@ -126,6 +131,17 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
   }, [workspaceSnapshot, workspaceClassification.data])
 
   const clearRevealed = useCallback((): void => sendReveal({ type: 'hide' }), [sendReveal])
+  const copyMutation = useMutation({
+    mutationFn: (input: SecretCopyVariables) => api.copy({ alias: input.alias, cwd: input.cwd, scope: input.scope, environment: input.environment }),
+    onMutate: () => {
+      clearRevealed()
+      setNotice(null)
+    },
+    onSuccess: (_result, input) => setNotice(t('copied', { alias: input.alias })),
+  })
+  const resetCopyMutation = (): void => {
+    if (!copyMutation.isPending) copyMutation.reset()
+  }
 
   const listQuery = useQuery({
     queryKey: secretListQueryKey(cwd),
@@ -142,7 +158,7 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
   const loading = listQuery.isFetching
   const listFailed = listQuery.isError && !listQuery.isFetching
   const showCatalog = !(listFailed && rows.length === 0)
-  const error = actionError ?? (revealSnapshot.matches('failed') ? t('revealFailed') : listFailed ? t('loadFailed') : null)
+  const error = copyMutation.isError ? t('copyFailed') : revealSnapshot.matches('failed') ? t('revealFailed') : listFailed ? t('loadFailed') : null
   const machineName = machineQuery.data?.name ?? null
 
   useEffect(() => {
@@ -181,7 +197,7 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
     if (!canActOnRow(row)) return
     const rowScope = mutationScopeFor(row)
     if (rowScope === null) return
-    setActionError(null)
+    resetCopyMutation()
     sendReveal({
       type: 'toggle',
       rowId: row.id,
@@ -190,22 +206,11 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
     })
   }
 
-  const onCopy = async (row: SecretMetadata): Promise<void> => {
-    if (!canActOnRow(row)) return
+  const onCopy = (row: SecretMetadata): void => {
+    if (copyMutation.isPending || !canActOnRow(row)) return
     const rowScope = mutationScopeFor(row)
     if (rowScope === null) return
-    clearRevealed()
-    setBusyRow({ id: row.id, action: 'copy' })
-    setNotice(null)
-    setActionError(null)
-    try {
-      await api.copy({ alias: row.alias, cwd, scope: rowScope, environment: row.environment })
-      setNotice(t('copied', { alias: row.alias }))
-    } catch {
-      setActionError(t('copyFailed'))
-    } finally {
-      setBusyRow(null)
-    }
+    copyMutation.mutate({ rowId: row.id, alias: row.alias, cwd, scope: rowScope, environment: row.environment })
   }
 
   const afterMutation = async (message: string): Promise<void> => {
@@ -241,6 +246,7 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
     createMutation.reset()
     updateMutation.reset()
     removeMutation.reset()
+    resetCopyMutation()
   }
 
   const onRemove = (target: SecretRemoveTarget, row: SecretMetadata): void => {
@@ -276,7 +282,7 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
 
   const selectFolder = (next: ProjectFolderSelection): void => {
     clearRevealed()
-    setActionError(null)
+    resetCopyMutation()
     setSelection(next)
     setPickerOpen(false)
   }
@@ -297,7 +303,7 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
               disabled={loading}
               onClick={() => {
                 clearRevealed()
-                setActionError(null)
+                resetCopyMutation()
                 void listQuery.refetch()
               }}
               type="button"
@@ -377,7 +383,7 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
           {error !== null && (
             <Alert className="dshx:pr-24" variant="destructive">
               <AlertDescription>{error}</AlertDescription>
-              {listFailed && actionError === null && (
+              {listFailed && !copyMutation.isError && (
                 <Button
                   className="dshx:absolute dshx:top-1/2 dshx:right-2 dshx:-translate-y-1/2"
                   disabled={loading}
@@ -414,14 +420,17 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
                 t,
                 revealed,
                 canActOnRow,
-                isRowBusy: row => busyRow?.id === row.id || (revealSnapshot.matches('loading') && revealSnapshot.context.request?.rowId === row.id),
+                isRowBusy: row =>
+                  (copyMutation.isPending && copyMutation.variables?.rowId === row.id && copyMutation.variables?.cwd === cwd) ||
+                  (revealSnapshot.matches('loading') && revealSnapshot.context.request?.rowId === row.id),
+                copyPending: copyMutation.isPending,
                 isRevealing: row => revealSnapshot.matches('loading') && revealSnapshot.context.request?.rowId === row.id,
                 onReveal: row => void onReveal(row),
                 onRevealedBlur: () => {
                   if (hideOnBlur) clearRevealed()
                 },
                 onHide: clearRevealed,
-                onCopy: row => void onCopy(row),
+                onCopy,
                 onEdit: row => openDialog({ mode: 'edit', row }),
                 onRemove: row => openDialog({ mode: 'remove', row }),
               }}
