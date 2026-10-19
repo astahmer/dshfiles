@@ -288,10 +288,27 @@ node tooling/dshx/scripts/browser-tasks.mjs --impact @dshfiles/command-palette
 | `@dshfiles/pulls-review`            |                                    3 |                                2 |
 
 So a mid-fan-out bundle re-runs roughly half the scenarios its tasks hold, and a
-bundle every plugin-ui consumer boots (`ui-styles`) really is everywhere. A
-per-scenario result cache keyed on those steps is
-[planned](../plans/e2e-speed/README.md); today the impact tool is how you decide
-what to run by hand.
+bundle every plugin-ui consumer boots (`ui-styles`) really is everywhere.
+
+### The per-scenario cache
+
+`.turbo/e2e-scenario-receipts.json` closes that gap. Each scenario is keyed on its
+own steps plus the `dist` digests of every bundle those steps reach — content
+only, so a rebase that leaves the files alone keeps its receipts, and so does a
+formatting-only edit that keeps a bundle byte-identical. The runner replays the
+scenarios whose receipt is still fresh and runs the rest:
+
+```text
+run-e2e: replaying 22 of 26 scenarios whose inputs did not move
+```
+
+A replayed scenario reports as `skipped` in the summary, and the count is printed
+every time on purpose: a green run that skipped two thirds of its scenarios
+should be legible, not suspicious. `DSHX_E2E_SCENARIO_CACHE=0` runs everything
+(what `--force` sets), and `node tooling/dshx/scripts/browser-tasks.mjs --impact
+<bundle>` shows which scenarios a change reaches. Measured on `frame-layout`:
+cold 2 passed in 57s, warm 2 skipped in 7s, and with one scenario's key moved
+1 passed + 1 skipped — per scenario, not per task.
 
 ### Provider credentials
 

@@ -1,10 +1,12 @@
-import { expect, type Page } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
 import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { After, Before, Given, Then, readBootOutcome } from './bdd.js'
 import { bootComposedPluginProfile, bootPluginProfile, bootProfile, prewarmSibling, traceBootPhase, type BootedProfile } from './boot.js'
 import { redactHostOutput } from './scratch-profile.js'
+import { readScenarioKeys, recordScenarioPass, scenarioIdOfTest } from './scenario-cache.mjs'
 import { ClientBootCheckModel } from '../../packages/dshx/src/project/client-boot-check.js'
+import { DSHFILES_ROOT } from '../../packages/dshx/src/project/local-bundles.js'
 import { StartupDialogs } from '../../packages/dshx/src/project/startup-dialogs.js'
 import {
   capturePageEvidenceFrame,
@@ -116,6 +118,13 @@ const evidenceStatus = (status: string | undefined): EvidenceStatus => {
 // `prewarmSibling`/`closePrewarmedProfiles` in boot.ts, which also stop the last one on process exit.
 
 Before(async ({ page, $testInfo }) => {
+  const scenarioId = scenarioIdOfTest($testInfo)
+  const replayable = (process.env.DSHX_E2E_SKIP_SCENARIOS ?? '').split(',').filter(Boolean)
+  if (scenarioId !== undefined && replayable.includes(scenarioId)) {
+    // Its own steps and every bundle they reach are unchanged since a pass: replay the receipt instead of the journey.
+    test.skip(true, `replayed from the scenario cache: ${scenarioId}`)
+    return
+  }
   const run = await createEvidenceRun({
     suiteId: 'client-plugin-boot',
     scenarioPath: $testInfo.titlePath,
@@ -435,7 +444,8 @@ Then('the Web UI is torn down cleanly', async ({ page }: { page: Page }) => {
 After(async ({ page, $testInfo }) => {
   const run = evidenceRuns.get(page)
   let cleanupError: unknown
-  if ($testInfo.status !== 'passed') {
+  // A skipped test never booted anything: its diagnostics would describe an untouched page.
+  if ($testInfo.status !== 'passed' && $testInfo.status !== 'skipped') {
     const browserState = await page
       .evaluate(() => {
         const isVisible = (element: HTMLElement): boolean => {
@@ -489,6 +499,13 @@ After(async ({ page, $testInfo }) => {
     if (cleanupError === undefined) completeEvidenceStep(run, 'host-cleanup')
     await finishEvidenceRun(run, cleanupError === undefined ? evidenceStatus($testInfo.status) : 'failed')
     evidenceRuns.delete(page)
+  }
+  // Remember a scenario that really ran and passed: its own steps plus the dists they reach are what the next run
+  // compares, so a change nothing in this scenario can see replays it instead of running it.
+  const passedScenarioId = cleanupError === undefined && $testInfo.status === 'passed' ? scenarioIdOfTest($testInfo) : undefined
+  if (passedScenarioId !== undefined && process.env.DSHX_E2E_SCENARIO_CACHE !== '0') {
+    const key = (await readScenarioKeys(DSHFILES_ROOT))[passedScenarioId]
+    if (key !== undefined) await recordScenarioPass({ workspaceRoot: DSHFILES_ROOT, key }).catch(() => undefined)
   }
   if (cleanupError !== undefined) throw cleanupError
 })

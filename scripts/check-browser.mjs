@@ -131,6 +131,8 @@ if (mode === 'boot') {
 }
 const taskEnvironment = { DSHX_TOOL_VERSIONS: toolVersions }
 if (mode !== 'boot') taskEnvironment.DSHX_E2E_GENERATED = '1'
+// `--force` means "run everything", so it drops the per-scenario receipts too; an ambient value wins otherwise.
+if (force && mode !== 'boot') taskEnvironment.DSHX_E2E_SCENARIO_CACHE = '0'
 if (maxFailures !== '') taskEnvironment.DSHX_E2E_MAX_FAILURES = maxFailures
 const status = await turbo(
   [task, ...filters, `--concurrency=${concurrency}`, ...(keepGoing ? ['--continue'] : []), '--output-logs=new-only', ...(force ? ['--force'] : [])],

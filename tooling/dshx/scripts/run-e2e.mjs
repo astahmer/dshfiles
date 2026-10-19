@@ -18,17 +18,53 @@ import { existsSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { planBrowserTasks } from './browser-tasks.mjs'
+import { readScenarioReceipts, replayableScenarioIds, writeScenarioKeys } from '../e2e/support/scenario-cache.mjs'
+import { distDigestFile, planBrowserTasks } from './browser-tasks.mjs'
 
 const dshxRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+const workspaceRoot = resolve(dshxRoot, '../..')
 const smoke = process.argv.includes('--smoke')
 const maxFailures = process.env.DSHX_E2E_MAX_FAILURES ?? ''
 const workers = process.env.DSHX_E2E_WORKERS ?? '1'
+const scenarioCacheEnabled = process.env.DSHX_E2E_SCENARIO_CACHE !== '0'
 const { name } = JSON.parse(await readFile(resolve(process.cwd(), 'package.json'), 'utf8'))
 const owner = (await planBrowserTasks()).owners.get(name)
 const features = smoke ? owner?.smokeFeatures : owner?.features
 if (features === undefined || features.length === 0)
   throw new Error(`${name} owns no ${smoke ? '@smoke ' : ''}journeys; regenerate with browser-tasks.mjs --write.`)
+
+/**
+ * The scenarios this task would run, keyed the way their receipts are stored: what their own steps say plus the built
+ * JavaScript of every bundle those steps reach. A scenario whose key did not move is replayed, not run.
+ */
+const scenarioKeysForTask = async () => {
+  const scenarios = (owner.scenarios ?? []).filter(scenario => features.includes(scenario.feature))
+  const entries = await Promise.all(
+    scenarios.map(async scenario => {
+      const digests = Object.fromEntries(
+        await Promise.all(
+          scenario.booted.map(async bundle => {
+            const digest = await readFile(resolve(workspaceRoot, distDigestFile(bundle)), 'utf8').catch(() => 'missing')
+            return [bundle, digest.trim()]
+          }),
+        ),
+      )
+      return [scenario.id, { id: scenario.id, steps: scenario.stepsHash, digests }]
+    }),
+  )
+  return Object.fromEntries(entries)
+}
+
+const scenarioKeys = scenarioCacheEnabled ? await scenarioKeysForTask() : {}
+let replayable = []
+if (Object.keys(scenarioKeys).length > 0) {
+  await writeScenarioKeys(workspaceRoot, scenarioKeys)
+  replayable = replayableScenarioIds(scenarioKeys, await readScenarioReceipts(workspaceRoot))
+  if (replayable.length > 0) {
+    process.env.DSHX_E2E_SKIP_SCENARIOS = replayable.join(',')
+    console.log(`run-e2e: replaying ${String(replayable.length)} of ${String(Object.keys(scenarioKeys).length)} scenarios whose inputs did not move`)
+  }
+}
 
 const run = (command, args) =>
   new Promise((resolveRun, reject) => {

@@ -65,7 +65,7 @@ about the _assertions_ is the bottleneck.
 | E1  | Bound every wait, refuse an unscoped broad run, fail fast, one BDD generation, reap leaked Hosts                                                                                                             | Landed as `jj:znlyqmymomlv` |
 | E2  | Boot-phase trace and the composition-validation cache                                                                                                                                                        | Landed (below)              |
 | E3  | Route-interception cost (the network boundary round-trips every request of every page load)                                                                                                                  | Rejected with numbers       |
-| E4  | Scenario-level result cache: key each scenario by its own steps plus the dists it reaches, so a change re-runs the scenarios that can see it and replays the rest — rebase-proof because it is content-keyed | Slice 1 landed (below)      |
+| E4  | Scenario-level result cache: key each scenario by its own steps plus the dists it reaches, so a change re-runs the scenarios that can see it and replays the rest — rebase-proof because it is content-keyed | Landed (below)              |
 | E5  | Boot reuse: hide the Host startup behind the previous scenario                                                                                                                                               | Landed (below)              |
 | E6  | Wall-time budget ratchet (warn-only first)                                                                                                                                                                   | Optional                    |
 
@@ -117,9 +117,19 @@ prints the scenarios a change to that bundle can see. Measured task-level vs sce
 | `@dshfiles/command-palette`         |    30 |        19 |
 | `@dshfiles/pulls-review`            |     3 |         2 |
 
-Slice 2 is the receipt store plus enforcement: key each scenario on its own steps and the dists they
-reach, keep a pass receipt, and let the runner skip the scenarios whose key is unchanged — reporting the
-replayed count in the summary. Until that lands, `--impact` is how a person decides what to run.
+Slice 2 landed: `.turbo/e2e-scenario-receipts.json` stores a pass per scenario keyed on its own steps plus
+the `dist` digests of every bundle those steps reach. `run-e2e.mjs` writes the current keys, replays the
+fresh ones (`run-e2e: replaying N of M scenarios whose inputs did not move`) and the harness skips them;
+a passing scenario records its receipt in the `After` hook. `DSHX_E2E_SCENARIO_CACHE=0` (what `--force`
+sets) runs everything.
+
+Measured on `frame-layout` (two scenarios): cold 2 passed in 57s; warm 2 skipped in 7s and 3s through
+`check:e2e`; with one receipt's steps hash moved on purpose, `replaying 1 of 2` with 1 passed and
+1 skipped. Both keys are content, so a rebase that leaves the files alone cannot invalidate a receipt.
+
+One trap worth remembering: Playwright parses `@scenario:` out of the title into `testInfo.tags`, so the
+harness reads the id from the tags, the title and the title path (`scenarioIdOfTest`) rather than assuming
+which one kept it.
 
 ### E5 receipt
 
@@ -146,9 +156,9 @@ idle-slot host memory and the discard rate before making it the default.
 
 ## Resume here
 
-E1, E2, E3 (rejected), E4 slice 1 and E5 are done. Next: **E4 slice 2**, the per-scenario receipt store
-and its enforcement in the runner — key each scenario on its own steps plus the dist digests they reach,
-store a pass receipt, skip the unchanged ones, and report how many were replayed. Two measurements worth
-taking alongside it: a browser pool is worth ~58ms per context (median, measured — not the bottleneck),
-and the prewarm's cost when consecutive scenarios change composition (one wasted sibling boot, overlapped,
-seen on `activity-timeline`).
+E1-E5 have landed (E3 rejected with numbers, E6 dropped by request). The per-scenario cache now decides
+what runs, so the remaining wins are structural: a browser pool is worth only ~58ms per context
+(measured), and the Host's startup is the cost left — either warm more compositions ahead than the single
+sibling prewarm does today, or share one Host across scenarios that can tolerate shared state. 194
+scenarios hold 65 distinct compositions and 163 of them share a composition with another, which is the
+ceiling for warming.
