@@ -72,7 +72,7 @@ import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useMachine } from '@dshfiles/plugin-ui/machine'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
-import { useApi, useApiQuery } from '@dshfiles/dshx/client'
+import { useApi } from '@dshfiles/dshx/client'
 import { ProjectFolderPicker, type DirectoryPickerPort, type RegisteredProject } from '@dshfiles/project-folder-picker'
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent, type ReactNode } from 'react'
 import { z } from 'zod'
@@ -92,7 +92,9 @@ import { repositoryLoadingState } from './repository-loading.js'
 import { JUJUTSU_QUERY_GC_TIME, JUJUTSU_QUERY_STALE_TIME, jujutsuQueryKeys } from './repository-query-cache.js'
 import { ANCESTOR_COUNT_OPTIONS, usePreferences, type GraphDensity } from './preferences.js'
 import { jujutsuReviewProgressApi, type ReviewProgressSnapshot, type ReviewProgressToggle } from './review-progress-api.js'
-import { ReviewProgressModel, type ReviewChange, type ReviewStore } from './review-progress.js'
+import { MAX_REVIEW_STORE_BYTES, ReviewProgressModel, reviewStoreSchema, type ReviewChange, type ReviewStore } from './review-progress.js'
+import { ReviewProgressMigration, type ReviewProgressMigrationClient } from './review-progress-migration-machine.js'
+import { latestReviewProgressSnapshot } from './review-progress-queries.js'
 import { descendantCommitIds, emptyAncestorCandidates } from './source-control.js'
 import { SourceControlView } from './source-control-view.js'
 import { WorkspaceProvisionerDialog } from './workspace-provisioner.js'
@@ -149,38 +151,48 @@ const throwReadFailure = <Output extends object>(result: Output | ReadFailure): 
   return result
 }
 
-const readLocalReviewStore = (): ReviewStore => {
+const emptyReviewStore: ReviewStore = { schemaVersion: 1, marks: [] }
+
+const reviewStoreStorage = (): Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> | null => {
   try {
-    return ReviewProgressModel.readStore(localStorage.getItem(REVIEW_PROGRESS_KEY))
+    const storage = globalThis.localStorage
+    return {
+      getItem: key => {
+        const value = storage.getItem(key)
+        return value !== null && new TextEncoder().encode(value).byteLength > MAX_REVIEW_STORE_BYTES ? null : value
+      },
+      setItem: (key, value) => {
+        if (new TextEncoder().encode(value).byteLength > MAX_REVIEW_STORE_BYTES) throw new Error('Review progress exceeds the browser storage bound.')
+        storage.setItem(key, value)
+      },
+      removeItem: key => storage.removeItem(key),
+    }
   } catch {
-    return ReviewProgressModel.readStore(null)
+    return null
   }
 }
+
+const storedReviewProgress = createStoredValue({
+  key: REVIEW_PROGRESS_KEY,
+  schema: reviewStoreSchema,
+  fallback: emptyReviewStore,
+  storage: reviewStoreStorage,
+})
+
+const storedReviewMigration = createStoredValue({ key: REVIEW_PROGRESS_MIGRATED_KEY, schema: z.literal(1), fallback: 0 })
 
 const writeLocalReviewStore = (store: ReviewStore): boolean => {
-  try {
-    localStorage.setItem(REVIEW_PROGRESS_KEY, JSON.stringify(store))
-    return true
-  } catch {
-    return false
-  }
+  const saved = storedReviewProgress.set(store)
+  if (!saved) storedReviewProgress.reload()
+  return saved
 }
 
-const reviewMigrationDone = (): boolean => {
-  try {
-    return localStorage.getItem(REVIEW_PROGRESS_MIGRATED_KEY) === '1'
-  } catch {
-    return false
-  }
-}
-
-const rememberReviewMigration = (): void => {
-  try {
-    localStorage.setItem(REVIEW_PROGRESS_MIGRATED_KEY, '1')
-  } catch {
-    // The Host holds the marks; only this browser's fallback copy is unavailable.
-  }
-}
+const applyLocalReviewChanges = (input: {
+  readonly store: ReviewStore
+  readonly changes: readonly ReviewChange[]
+  readonly repositoryRoot: string
+  readonly commitId: string
+}): ReviewStore => ReviewProgressModel.apply({ ...input, reviewedAt: new Date().toISOString() })
 
 const RELATIVE_TIME_SUFFIX = { now: '', minutes: 'm', hours: 'h', days: 'd', months: 'mo', years: 'y' } as const
 
@@ -246,69 +258,69 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   const [selection, setSelection] = useState<RevisionSelection | null>(null)
   const [comparisonSelection, setComparisonSelection] = useState<RevisionSelection | null>(null)
   const [editingDescription, setEditingDescription] = useState<string | null>(null)
-  const [reviewStore, setReviewStore] = useState<ReviewStore>(readLocalReviewStore)
   const reviewApi = useApi(jujutsuReviewProgressApi)
-  const reviewQuery = useApiQuery(jujutsuReviewProgressApi, 'state')
-  const [reviewAvailable, setReviewAvailable] = useState(false)
-  const reviewRevision = useRef(0)
-  const reviewMigrated = useRef(false)
+  const reviewQuery = useQuery({
+    queryKey: jujutsuQueryKeys.reviewProgress(),
+    queryFn: async ({ signal, client }) => {
+      const snapshot = await reviewApi.state(undefined, { signal })
+      return latestReviewProgressSnapshot(client.getQueryData<ReviewProgressSnapshot>(jujutsuQueryKeys.reviewProgress()), snapshot)
+    },
+    retry: false,
+    staleTime: JUJUTSU_QUERY_STALE_TIME,
+    gcTime: JUJUTSU_QUERY_GC_TIME,
+    refetchOnWindowFocus: false,
+  })
+  const localReviewStore = storedReviewProgress.useValue()
+  const reviewMigrationDone = storedReviewMigration.useValue() === 1
+  const reviewStore = reviewQuery.data?.store ?? localReviewStore
   const [hideReviewedFiles, setHideReviewedFiles] = useState(false)
   const [reviewNotice, setReviewNotice] = useState('')
 
-  const adoptReviewSnapshot = useCallback((snapshot: ReviewProgressSnapshot) => {
-    if (snapshot.revision < reviewRevision.current) return
-    reviewRevision.current = snapshot.revision
-    setReviewStore(snapshot.store)
-  }, [])
-
-  const toggleReviews = useCallback(
-    async (toggles: readonly ReviewProgressToggle[]): Promise<ReviewProgressSnapshot | undefined> => {
-      let latest: ReviewProgressSnapshot | undefined
-      for (const toggle of toggles) latest = await reviewApi.toggle(toggle)
-      return latest
+  const adoptReviewSnapshot = useCallback(
+    (snapshot: ReviewProgressSnapshot): ReviewProgressSnapshot => {
+      return (
+        queryClient.setQueryData<ReviewProgressSnapshot>(jujutsuQueryKeys.reviewProgress(), current => latestReviewProgressSnapshot(current, snapshot)) ??
+        snapshot
+      )
     },
-    [reviewApi],
+    [queryClient],
   )
 
-  // The Host owns review progress; the browser store is the fallback until it answers, then migrates once.
+  const reviewMigrationClient = useMemo<ReviewProgressMigrationClient>(
+    () => ({
+      toggle: (toggle, options) => reviewApi.toggle(toggle, options),
+      adoptSnapshot: adoptReviewSnapshot,
+      completeMigration: snapshot => {
+        const latest = adoptReviewSnapshot(snapshot)
+        if (storedReviewMigration.get() !== 1) storedReviewMigration.set(1)
+        writeLocalReviewStore(latest.store)
+      },
+    }),
+    [adoptReviewSnapshot, reviewApi],
+  )
+  useEffect(() => ReviewProgressMigration.retain(), [])
+
   useEffect(() => {
     const snapshot = reviewQuery.data
-    if (snapshot === undefined) return
-    setReviewAvailable(true)
-    adoptReviewSnapshot(snapshot)
-    if (reviewMigrated.current) return
-    reviewMigrated.current = true
-    if (reviewMigrationDone()) {
-      writeLocalReviewStore(snapshot.store)
-      return
-    }
-    const pending = readLocalReviewStore().marks.filter(
-      mark => !ReviewProgressModel.isReviewed(snapshot.store, mark.repositoryRoot, mark.commitId, { path: mark.path, contentDigest: mark.contentDigest }),
-    )
-    if (pending.length === 0) {
-      rememberReviewMigration()
-      writeLocalReviewStore(snapshot.store)
-      return
-    }
-    void (async () => {
-      try {
-        const latest = await toggleReviews(
-          pending.map(mark => ({
-            repositoryRoot: mark.repositoryRoot,
-            commitId: mark.commitId,
-            file: { path: mark.path, contentDigest: mark.contentDigest },
-            reviewed: true,
-          })),
-        )
-        if (latest === undefined) return
-        adoptReviewSnapshot(latest)
-        rememberReviewMigration()
-        writeLocalReviewStore(latest.store)
-      } catch {
-        // The browser copy survives, so a later load retries the migration.
-      }
-    })()
-  }, [adoptReviewSnapshot, reviewQuery.data, toggleReviews])
+    if (snapshot === undefined || reviewMigrationDone) return
+    ReviewProgressMigration.dispatch({ client: reviewMigrationClient, snapshot, localStore: localReviewStore, migrationDone: false })
+  }, [localReviewStore, reviewMigrationClient, reviewMigrationDone, reviewQuery.data])
+
+  useEffect(() => {
+    const snapshot = reviewQuery.data
+    if (snapshot === undefined || !reviewMigrationDone) return
+    ReviewProgressMigration.dispatch({ client: reviewMigrationClient, snapshot, localStore: emptyReviewStore, migrationDone: true })
+  }, [reviewMigrationClient, reviewMigrationDone, reviewQuery.data])
+
+  const reviewMutation = useMutation({
+    mutationFn: async (input: { readonly toggles: readonly ReviewProgressToggle[]; readonly successNotice: string }) => {
+      // The Host API is per-file, and applying each returned snapshot preserves its monotone revision.
+      for (const toggle of input.toggles) adoptReviewSnapshot(await reviewApi.toggle(toggle))
+      return input.successNotice
+    },
+    onSuccess: successNotice => setReviewNotice(successNotice),
+    onError: () => setReviewNotice('Review progress could not be saved to the Host.'),
+  })
   const [describeDrafts, setDescribeDrafts] = useState<Readonly<Record<string, string>>>({})
   const [remote, setRemote] = useState('')
   const [bookmark, setBookmark] = useState('')
@@ -791,31 +803,23 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     const repositoryRoot = state.root
     const commitId = selectedRevision.commitId
     const saved = changes.some(change => change.reviewed) ? 'Review progress saved.' : 'Review mark cleared.'
-    if (!reviewAvailable) {
-      const next = ReviewProgressModel.apply({ store: reviewStore, changes, repositoryRoot, commitId, reviewedAt: new Date().toISOString() })
-      setReviewStore(next)
+    if (reviewQuery.data === undefined) {
+      const next = applyLocalReviewChanges({ store: localReviewStore, changes, repositoryRoot, commitId })
       const fallbackSaved = changes.some(change => change.reviewed) ? 'Review progress saved in this browser.' : 'Review mark cleared.'
-      setReviewNotice(writeLocalReviewStore(next) ? fallbackSaved : 'Browser storage is unavailable. Review progress was not changed.')
+      setReviewNotice(writeLocalReviewStore(next) ? fallbackSaved : 'Browser storage is unavailable. Review progress could not be persisted.')
       return
     }
-    void (async () => {
-      try {
-        const latest = await toggleReviews(
-          changes.flatMap(change =>
-            change.file.contentDigest === null
-              ? []
-              : [{ repositoryRoot, commitId, file: { path: change.file.path, contentDigest: change.file.contentDigest }, reviewed: change.reviewed }],
-          ),
-        )
-        if (latest !== undefined) {
-          adoptReviewSnapshot(latest)
-          writeLocalReviewStore(latest.store)
-        }
-        setReviewNotice(saved)
-      } catch {
-        setReviewNotice('Review progress could not be saved to the Host.')
-      }
-    })()
+
+    const toggles = changes.flatMap(change =>
+      change.file.contentDigest === null
+        ? []
+        : [{ repositoryRoot, commitId, file: { path: change.file.path, contentDigest: change.file.contentDigest }, reviewed: change.reviewed }],
+    )
+    if (toggles.length === 0) {
+      setReviewNotice(saved)
+      return
+    }
+    reviewMutation.mutate({ toggles, successNotice: saved })
   }
 
   const endDrag = (): void => sendAction({ type: 'drag.end' })
