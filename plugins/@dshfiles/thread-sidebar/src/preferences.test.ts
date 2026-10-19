@@ -48,6 +48,17 @@ test('older preferences default rebase-triggered auto-settle to disabled', () =>
   assert.equal(SidebarPreferencesModel.decode({ ...DEFAULT_PREFERENCES, rebasedThreadSettleDelay: 'after-5-minutes' }), null)
 })
 
+test('older preferences default settled-thread auto-archive to disabled and record no settle times', () => {
+  const { settledArchiveDelay, settledAt: _settledAt, ...older } = DEFAULT_PREFERENCES
+  assert.equal(settledArchiveDelay, 'disabled')
+  const parsed = SidebarPreferencesModel.decode(older)
+  assert.ok(parsed)
+  assert.equal(parsed.settledArchiveDelay, 'disabled')
+  assert.deepEqual(parsed.settledAt, {})
+  assert.equal(SidebarPreferencesModel.decode({ ...DEFAULT_PREFERENCES, settledArchiveDelay: 'after-1-hour' })?.settledArchiveDelay, 'after-1-hour')
+  assert.equal(SidebarPreferencesModel.decode({ ...DEFAULT_PREFERENCES, settledArchiveDelay: 'after-5-minutes' }), null)
+})
+
 test('auto-archive preference keys from an older document decode as their auto-settle replacements', () => {
   const legacy = {
     ...DEFAULT_PREFERENCES,

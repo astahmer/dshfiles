@@ -510,7 +510,7 @@ export default defineClient({
         { name: 'conversation.input.dock', id: 'thread-sidebar-settled-banner', order: 6, inject: sessionId => ({ sessionId }) },
         decorate((props: { readonly sessionId: SessionSummary['id'] }) => (
           <PluginQueryProvider>
-            <SettledThreadDock sessionId={props.sessionId} blocks={ctx.conversation.blocks} t={translate} />
+            <SettledThreadDock sessionId={props.sessionId} workspaces={ctx.workspaces} blocks={ctx.conversation.blocks} t={translate} />
           </PluginQueryProvider>
         )),
       ),

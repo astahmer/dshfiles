@@ -31,7 +31,9 @@ writes `settledSessionIds`. It skips running, blank, archived, pinned, parked,
 already-settled, excluded-session, excluded-project, and still-running-descendant
 entries. A thread menu can inherit the global setting, explicitly settle that
 thread, or exclude it; explicit per-thread enables still honor excluded projects
-and other safety checks.
+and other safety checks. Settling records the instant in `settledAt`, which is
+what the composer banner dates and what the separate settled auto-archive delay
+counts from.
 
 Sidebar preferences live in DSH Settings under the Host-synced `thread-sidebar`
 namespace (`src/settings.ts`, registered by `src/host.ts`). The plugin draws its
@@ -90,12 +92,24 @@ blocks its composer behind a **Restore to reply** banner. Persistent warnings �
 storage failures and restart requests — stay in the list flow instead.
 
 **Settled composer.** A settled thread opens normally and reads as history: the
-composer carries an **Unsettle to reply** banner (`src/settled-thread-dock.tsx`),
-because the Host rejects the next model step while the thread is settled. The
-rejection is a `agent/pre-step` listener in `src/host.ts` over
-`src/settled-gate.ts`: a settled Session, or a subagent descendant of one, runs
-no model step until it is unsettled, so a late wake (subagent settlement, queued
-follow-up, reminder) proposes a step that ends as `blocked` without a request.
+composer carries a **This thread is settled.** banner
+(`src/settled-thread-dock.tsx`) with the settle time on the right, an **Archive**
+button and **Unsettle to reply**, because the Host rejects the next model step
+while the thread is settled. The rejection is a `agent/pre-step` listener in
+`src/host.ts` over `src/settled-gate.ts`: a settled Session, or a subagent
+descendant of one, runs no model step until it is unsettled, so a late wake
+(subagent settlement, queued follow-up, reminder) proposes a step that ends as
+`blocked` without a request.
+
+**Settled auto-archive.** `settledArchiveDelay` (Never by default, otherwise
+immediately, after 1 hour, 1 day or 1 week) archives a settled thread once that
+delay has passed, counted from the instant recorded in `settledAt` when it was
+settled. The scan lives in `src/settled-threads.ts` and archives through the
+`auto-archive-machine` actor, which serializes Host archive writes and coalesces
+overlapping scans; the shared `now` clock wakes at the first due instant. An
+archived, pinned, running, waiting or newly changed thread is skipped, and a
+thread settled before this policy existed (no recorded instant) never becomes
+due. The banner shows the archive time whenever a delay will archive it.
 
 **Command palette.** Search threads, the ⌘ button in the header, and the
 keyboard all open a shadcn `CommandDialog`: fuzzy search over thread title,

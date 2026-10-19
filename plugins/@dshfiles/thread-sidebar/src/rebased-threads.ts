@@ -1,5 +1,3 @@
-import type { RebasedThreadSettleDelay } from './organization.js'
-
 export interface RebasedThread {
   readonly sessionIds: readonly string[]
   readonly rebasedAt?: number | undefined
@@ -11,14 +9,6 @@ export interface RebasedSessionState {
   readonly running: boolean
   readonly pendingInteraction: boolean | undefined
   readonly updatedAt: number
-}
-
-export const rebasedThreadSettleDelayMs = (delay: RebasedThreadSettleDelay): number => {
-  if (delay === 'immediately') return 0
-  if (delay === 'after-1-hour') return 60 * 60_000
-  if (delay === 'after-1-day') return 24 * 60 * 60_000
-  if (delay === 'after-1-week') return 7 * 24 * 60 * 60_000
-  return Number.POSITIVE_INFINITY
 }
 
 export interface RebasedThreadSessionIndex {

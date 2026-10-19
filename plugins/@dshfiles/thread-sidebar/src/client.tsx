@@ -94,13 +94,11 @@ import {
 } from 'react'
 import { z } from 'zod'
 import {
-  REBASED_THREAD_SETTLE_DELAYS,
   SidebarOrganization,
   type AutoSettleOverride,
   type AttentionColor,
   type AttentionColorKey,
   type AttentionColors,
-  type RebasedThreadSettleDelay,
   type SidebarPreferences,
   type SidebarSection,
   type ThreadRowAction,
@@ -131,7 +129,10 @@ import { groupThreadChildren, partitionFinishedChildren, shouldOpenChildThreadLi
 import { buildThreadUrl, clearThreadUrl, readThreadUrl } from './thread-url.js'
 import { ThreadListNavigationModel } from './thread-list-navigation.js'
 import { workingThreadIds } from './working-threads.js'
-import { indexRebasedThreadSessions, rebasedThreadSettleDelayMs } from './rebased-threads.js'
+import { indexRebasedThreadSessions } from './rebased-threads.js'
+import { SettledThreadsModel, type SettledSessionState } from './settled-threads.js'
+import { THREAD_DELAYS, threadDelayMs, type ThreadDelay } from './thread-delays.js'
+import { useAutoArchive, type AutoArchiveClient } from './auto-archive-machine.js'
 import {
   THREAD_GROUP_BY_OPTIONS,
   THREAD_SOURCE_FILTER_OPTIONS,
@@ -211,13 +212,14 @@ const attentionPreferenceRows: readonly {
 
 const attentionColorOptions: readonly AttentionColor[] = ['muted', 'primary', 'info', 'success', 'warning', 'danger']
 
-const rebasedSettleDelayLabelKeys = {
-  disabled: 'threadSidebarRebasedArchiveDisabled',
-  immediately: 'threadSidebarRebasedArchiveImmediate',
-  'after-1-hour': 'threadSidebarRebasedArchiveHour',
-  'after-1-day': 'threadSidebarRebasedArchiveDay',
-  'after-1-week': 'threadSidebarRebasedArchiveWeek',
-} satisfies Record<RebasedThreadSettleDelay, Parameters<ThreadSidebarTranslate>[0]>
+/** Both delay settings offer the same five choices, so they share one label map. */
+const threadDelayLabelKeys = {
+  disabled: 'threadSidebarDelayNever',
+  immediately: 'threadSidebarDelayImmediate',
+  'after-1-hour': 'threadSidebarDelayHour',
+  'after-1-day': 'threadSidebarDelayDay',
+  'after-1-week': 'threadSidebarDelayWeek',
+} satisfies Record<ThreadDelay, Parameters<ThreadSidebarTranslate>[0]>
 
 type ThreadSidebarLabelKey = Parameters<ThreadSidebarTranslate>[0]
 
@@ -236,7 +238,7 @@ const finishNotificationMessageKeys = {
   failed: { title: 'threadSidebarFailedNotificationTitle', body: 'threadSidebarFailedNotificationBody' },
 } as const satisfies Record<ThreadFinishNotificationCategory, { readonly title: ThreadSidebarLabelKey; readonly body: ThreadSidebarLabelKey }>
 
-const rebasedSettleDelayFromValue = (value: string): RebasedThreadSettleDelay | undefined => REBASED_THREAD_SETTLE_DELAYS.find(option => option === value)
+const threadDelayFromValue = (value: string): ThreadDelay | undefined => THREAD_DELAYS.find(option => option === value)
 
 const attentionColorLabelKeys = {
   muted: 'threadSidebarColorMuted',
@@ -1184,10 +1186,78 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         pinnedSessionIds,
         settledSessionIds,
         now,
-        delayMs: rebasedThreadSettleDelayMs(preferences.rebasedThreadSettleDelay),
+        delayMs: threadDelayMs(preferences.rebasedThreadSettleDelay),
       }),
     [archivedSessionIds, jjRepositories.data, now, pinnedSessionIds, preferences.rebasedThreadSettleDelay, sessionStatus, sessions, settledSessionIds],
   )
+  const settledSessionStates = useMemo(
+    () =>
+      new Map<string, SettledSessionState>(
+        sessions.map(session => {
+          const status = sessionStatus.get(session.id)
+          return [
+            session.id,
+            {
+              running: session.running,
+              pendingInteraction: status === undefined ? undefined : status.pendingInteraction !== undefined,
+              updatedAt: session.updatedAt,
+            },
+          ]
+        }),
+      ),
+    [sessionStatus, sessions],
+  )
+  const settledStatus = useMemo(
+    () => ({ settledSessionIds: preferences.settledSessionIds, settledAt: preferences.settledAt }),
+    [preferences.settledAt, preferences.settledSessionIds],
+  )
+  const dueSettledArchiveSessionIds = useMemo(
+    () =>
+      SettledThreadsModel.dueArchiveSessionIds({
+        status: settledStatus,
+        sessions: settledSessionStates,
+        archivedSessionIds,
+        pinnedSessionIds,
+        now,
+        delayMs: threadDelayMs(preferences.settledArchiveDelay),
+      }),
+    [archivedSessionIds, now, pinnedSessionIds, preferences.settledArchiveDelay, settledSessionStates, settledStatus],
+  )
+  const settledArchiveEnabled = preferences.settledArchiveDelay !== 'disabled'
+  /** The first instant a settled thread becomes due, so the shared `now` clock wakes for it. */
+  const nextSettledArchiveAt = useMemo(() => {
+    if (!settledArchiveEnabled) return null
+    const delayMs = threadDelayMs(preferences.settledArchiveDelay)
+    let next: number | null = null
+    for (const sessionId of preferences.settledSessionIds) {
+      const settledAt = preferences.settledAt[sessionId]
+      if (settledAt === undefined) continue
+      const archiveAt = settledAt + delayMs
+      if (archiveAt <= now || (next !== null && next <= archiveAt)) continue
+      next = archiveAt
+    }
+    return next
+  }, [now, preferences.settledArchiveDelay, preferences.settledAt, preferences.settledSessionIds, settledArchiveEnabled])
+  const archiveScan = useRef<readonly SessionSummary['id'][]>([])
+  archiveScan.current = dueSettledArchiveSessionIds.map(SessionId)
+  const archiveClient = useMemo<AutoArchiveClient>(
+    () => ({
+      archiveSession: sessionId => props.archiveSession(sessionId),
+      getCandidateSessionIds: () => archiveScan.current,
+    }),
+    [props.archiveSession],
+  )
+  const { requestScan, refreshCandidates } = useAutoArchive({
+    client: archiveClient,
+    enabled: settledArchiveEnabled,
+    intervalMs: preferences.scanIntervalMinutes * 60_000,
+    onSettled: () => refreshCandidates('all'),
+  })
+  const dueArchiveSessionIdsKey = dueSettledArchiveSessionIds.join(',')
+  useEffect(() => {
+    if (!settledArchiveEnabled || dueArchiveSessionIdsKey === '') return
+    requestScan('all')
+  }, [dueArchiveSessionIdsKey, requestScan, settledArchiveEnabled])
   const questionCandidates = useMemo(
     () =>
       sessions
@@ -1775,7 +1845,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   /** One Settings write per scan rather than one per thread; the status is ours, not a Host verb. */
   const settleSessions = (sessionIds: readonly string[]): void => {
     if (sessionIds.length === 0) return
-    changePreferences({ settledSessionIds: [...new Set([...preferences.settledSessionIds, ...sessionIds])] })
+    const status = { settledSessionIds: preferences.settledSessionIds, settledAt: preferences.settledAt }
+    changePreferences(SettledThreadsModel.settle(status, sessionIds, Date.now()))
   }
 
   const toggleSettled = (sessionId: SessionSummary['id']): void => {
@@ -1784,16 +1855,13 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       setNotice({ tone: 'warning', message: props.tSidebar('threadSidebarRunningNotice') })
       return
     }
-    const next = new Set(preferences.settledSessionIds)
-    for (const targetId of threadActionTargetIds({
+    const targets = threadActionTargetIds({
       threadId: sessionId,
       threads: Object.values(sessionState.byId).filter(session => !session.blank),
       cascadeToChildren: preferences.applyActionsToChildThreads,
-    })) {
-      if (shouldSettle) next.add(targetId)
-      else next.delete(targetId)
-    }
-    changePreferences({ settledSessionIds: [...next] })
+    })
+    const status = { settledSessionIds: preferences.settledSessionIds, settledAt: preferences.settledAt }
+    changePreferences(shouldSettle ? SettledThreadsModel.settle(status, targets, Date.now()) : SettledThreadsModel.unsettle(status, targets))
     setNotice(shouldSettle ? { tone: 'success', message: props.tSidebar('threadSidebarSettledNotice') } : null)
   }
 
@@ -1802,6 +1870,50 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       collapsedSections: SidebarPreferencesModel.toggleCollapsedSection(preferences.collapsedSections, section),
     })
   }
+
+  // Archiving outranks settled: an archived thread keeps no settled status, so restoring it comes back usable
+  // instead of waiting for the archive delay that already fired. Covers every archive path, the Agent's included.
+  useEffect(() => {
+    const archivedStillSettled = preferences.settledSessionIds.filter(sessionId => archivedSessionIds.has(sessionId))
+    if (archivedStillSettled.length === 0) return
+    const status = { settledSessionIds: preferences.settledSessionIds, settledAt: preferences.settledAt }
+    changePreferences(SettledThreadsModel.unsettle(status, archivedStillSettled))
+  }, [archivedSessionIds, changePreferences, preferences.settledAt, preferences.settledSessionIds])
+
+  /** Both delay settings carry the same five choices, so one control renders each of them. */
+  const threadDelayControl = (input: {
+    readonly labelKey: ThreadSidebarLabelKey
+    readonly hintKey: ThreadSidebarLabelKey
+    readonly value: ThreadDelay
+    readonly onChange: (delay: ThreadDelay) => void
+  }): JSX.Element => (
+    <div className="dshx:grid dshx:min-w-0 dshx:gap-1" role="group" aria-label={props.tSidebar(input.labelKey)}>
+      <span className="dshx:text-xs">{props.tSidebar(input.labelKey)}</span>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button size="sm" variant="outline" className="dshx:min-w-0 dshx:justify-start">
+            {props.tSidebar(threadDelayLabelKeys[input.value])}
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start">
+          <DropdownMenuRadioGroup
+            value={input.value}
+            onValueChange={value => {
+              const delay = threadDelayFromValue(value)
+              if (delay !== undefined) input.onChange(delay)
+            }}
+          >
+            {THREAD_DELAYS.map(delay => (
+              <DropdownMenuRadioItem key={delay} value={delay}>
+                {props.tSidebar(threadDelayLabelKeys[delay])}
+              </DropdownMenuRadioItem>
+            ))}
+          </DropdownMenuRadioGroup>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <p className="dshx:text-xs dshx:text-muted-foreground">{props.tSidebar(input.hintKey)}</p>
+    </div>
+  )
 
   const runAutoSettle = async (): Promise<void> => {
     const latest = latestAutoSettle.current
@@ -1980,11 +2092,13 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   )
 
   useEffect(() => {
-    const nextBoundary = [nextIdleAt, nextMuteWake].filter((value): value is number => value !== null).sort((left, right) => left - right)[0]
+    const nextBoundary = [nextIdleAt, nextMuteWake, nextSettledArchiveAt]
+      .filter((value): value is number => value !== null)
+      .sort((left, right) => left - right)[0]
     if (nextBoundary === undefined) return
     const timer = window.setTimeout(() => setNow(Date.now()), Math.max(0, nextBoundary - Date.now() + 1))
     return () => window.clearTimeout(timer)
-  }, [nextIdleAt, nextMuteWake])
+  }, [nextIdleAt, nextMuteWake, nextSettledArchiveAt])
 
   // A snooze that ran out wakes the thread at once (through `now`); dropping its entry keeps the settings small.
   const mutesAwake = useMemo(() => withoutExpiredMutes(mutedThreads, now), [mutedThreads, now])
@@ -2962,32 +3076,18 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
               <Checkbox checked={preferences.autoSettleEnabled} onCheckedChange={checked => changePreferences({ autoSettleEnabled: checked === true })} />
               {props.tSidebar('threadSidebarAutoArchive')}
             </Label>
-            <div className="dshx:grid dshx:min-w-0 dshx:gap-1" role="group" aria-label={props.tSidebar('threadSidebarArchiveRebased')}>
-              <span className="dshx:text-xs">{props.tSidebar('threadSidebarArchiveRebased')}</span>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button size="sm" variant="outline" className="dshx:min-w-0 dshx:justify-start">
-                    {props.tSidebar(rebasedSettleDelayLabelKeys[preferences.rebasedThreadSettleDelay])}
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start">
-                  <DropdownMenuRadioGroup
-                    value={preferences.rebasedThreadSettleDelay}
-                    onValueChange={value => {
-                      const delay = rebasedSettleDelayFromValue(value)
-                      if (delay !== undefined) changePreferences({ rebasedThreadSettleDelay: delay })
-                    }}
-                  >
-                    {REBASED_THREAD_SETTLE_DELAYS.map(delay => (
-                      <DropdownMenuRadioItem key={delay} value={delay}>
-                        {props.tSidebar(rebasedSettleDelayLabelKeys[delay])}
-                      </DropdownMenuRadioItem>
-                    ))}
-                  </DropdownMenuRadioGroup>
-                </DropdownMenuContent>
-              </DropdownMenu>
-              <p className="dshx:text-xs dshx:text-muted-foreground">{props.tSidebar('threadSidebarArchiveRebasedHint')}</p>
-            </div>
+            {threadDelayControl({
+              labelKey: 'threadSidebarArchiveRebased',
+              hintKey: 'threadSidebarArchiveRebasedHint',
+              value: preferences.rebasedThreadSettleDelay,
+              onChange: delay => changePreferences({ rebasedThreadSettleDelay: delay }),
+            })}
+            {threadDelayControl({
+              labelKey: 'threadSidebarArchiveSettled',
+              hintKey: 'threadSidebarArchiveSettledHint',
+              value: preferences.settledArchiveDelay,
+              onChange: delay => changePreferences({ settledArchiveDelay: delay }),
+            })}
             <Label className="dshx:font-normal dshx:leading-snug">
               <Checkbox
                 checked={preferences.applyActionsToChildThreads}

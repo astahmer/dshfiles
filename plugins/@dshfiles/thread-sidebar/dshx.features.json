@@ -556,6 +556,64 @@
       ]
     },
     {
+      "id": "settled-auto-archive",
+      "title": "Archive a settled thread once its delay passes",
+      "summary": "Archive a settled thread after a configurable delay counted from the instant it was settled. The settled composer banner dates the thread, shows when the delay will archive it, and offers Archive and Unsettle to reply; archived, pinned, running, waiting or newly changed threads, and threads settled before the timestamps existed, are never archived by the policy.",
+      "reach": [
+        "click button \"All threads\"",
+        "click button \"New thread\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Settled archive target\"",
+        "click button \"Send message\"",
+        "expect text \"This turn failed*\"",
+        "rightclick text \"Settled archive target\" at 8,8",
+        "click menuitem \"Settle\"",
+        "expect text \"This thread is settled.\""
+      ],
+      "surfaces": ["client", "settings"],
+      "configuration": [
+        {
+          "key": "settledArchiveDelay",
+          "defaultValue": "disabled",
+          "constraints": "Never, immediately, after 1 hour, after 1 day or after 1 week; counted from the recorded settle instant.",
+          "choices": ["disabled", "immediately", "after-1-hour", "after-1-day", "after-1-week"],
+          "coveredBy": ["thread-sidebar.settled-auto-archive"]
+        }
+      ],
+      "states": ["disabled", "waiting", "due", "archived", "skipped"],
+      "failureModes": [
+        "An archived, pinned, running, waiting or newly changed thread is never automatically archived.",
+        "A settled id with no recorded settle instant is never automatically archived.",
+        "A refused Host archive leaves the thread settled and keeps the archive again for the next scan.",
+        "Auto-archive is off by default: no thread is archived until the delay is set."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "thread-sidebar.settled-auto-archive",
+          "featureFile": "tooling/dshx/e2e/features/thread-sidebar.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.settled-auto-archive-unit-due-ids",
+          "file": "plugins/@dshfiles/thread-sidebar/src/settled-threads.test.ts",
+          "testName": "returns a settled thread once its delay has passed"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.settled-auto-archive-unit-settle-store",
+          "file": "plugins/@dshfiles/thread-sidebar/src/settled-threads.test.ts",
+          "testName": "records when each thread was settled and keeps the first instant on a repeated settle"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.settled-auto-archive-unit-default-off",
+          "file": "plugins/@dshfiles/thread-sidebar/src/preferences.test.ts",
+          "testName": "older preferences default settled-thread auto-archive to disabled and record no settle times"
+        }
+      ]
+    },
+    {
       "id": "thread-mute",
       "title": "Mute or snooze a thread",
       "summary": "Mute a thread for 1 h, 8 h, 24 h, until tomorrow morning (09:00), a week, or until unmuted, from its row, its context menu or the session header. A muted thread raises no desktop alert, attention group, label or unread dot and keeps its place instead of rising on new activity; a bell-off marker's tooltip gives the time left, and it wakes on its own. Mutes are Host-synced sidebar settings; the Muted filter lists them.",

@@ -86,6 +86,7 @@ Each row is a tool worth building today: the backing verb already exists.
 | `thread_sidebar_settings_update` | Row display, attention groups, colours, subagent folding | `settings/update`, `thread-sidebar` (`src/settings.ts:10-21, 27-68, 123-126`)    |
 | `thread_auto_settle_settings`    | Auto-settle idle threads, interval, exclusions           | `settings/update`, `thread-sidebar` (`src/settings.ts:77-90`)                    |
 | `thread_archive_rebased`         | Archive rebased threads after a delay                    | `workspace/archiveSession` + jj `/threadAt`                                      |
+| `thread_settled_auto_archive`    | Archive a settled thread after a delay                   | `settings/update`, `settledArchiveDelay` in `thread-sidebar` (`src/settings.ts`) |
 | `thread_children_list`           | Child/subagent rows with fold state                      | `thread_references` lists the children of one thread; fold state is client-only  |
 | `remote_thread_list`             | Threads on other hosts                                   | `multi-host.threadList` (no `tool` binding)                                      |
 | `dsh_restart`                    | Restart DSH / copy launch URL                            | own `requestRestart` host service (`src/host.ts:18-28`)                          |

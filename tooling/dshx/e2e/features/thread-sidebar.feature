@@ -27,6 +27,14 @@ Feature: Thread sidebar journeys
     When a nonblank Host thread is settled from its context menu
     Then the thread is settled, opens read-only and unsettles to reply
 
+  @scenario:thread-sidebar.settled-auto-archive
+  Scenario: A settled thread archives itself once its archive delay has passed
+    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
+    When a thread is settled with a one-week settled-archive delay
+    Then the settled banner shows the archive time it is waiting for
+    When the settled-archive delay is shortened to immediately
+    Then the settled thread archives itself without a click
+
   @smoke
   @scenario:thread-sidebar.park-context-menu
   Scenario: Park a thread from its context menu and keep it parked

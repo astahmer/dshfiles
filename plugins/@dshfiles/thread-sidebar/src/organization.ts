@@ -2,6 +2,7 @@ import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/cli
 import { z } from 'zod'
 import type { WorkspaceView } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { FinishedSubagentsMode } from './thread-children.js'
+import type { ThreadDelay } from './thread-delays.js'
 import type { ThreadMutes } from './thread-mute.js'
 import { DEFAULT_THREAD_NOTIFICATION_CATEGORIES, type ThreadNotificationCategories } from './thread-notifications.js'
 import { DEFAULT_THREAD_VIEW_SETTINGS, type ThreadViewSettings } from './thread-view-preferences.js'
@@ -21,8 +22,6 @@ export const ATTENTION_COLOR_OPTIONS = ['muted', 'primary', 'info', 'success', '
 export type AttentionColor = (typeof ATTENTION_COLOR_OPTIONS)[number]
 export type AttentionColorKey = 'approvalNeeded' | 'inputNeeded' | 'turnFinished'
 export type AttentionColors = Record<AttentionColorKey, AttentionColor>
-export const REBASED_THREAD_SETTLE_DELAYS = ['disabled', 'immediately', 'after-1-hour', 'after-1-day', 'after-1-week'] as const
-export type RebasedThreadSettleDelay = (typeof REBASED_THREAD_SETTLE_DELAYS)[number]
 
 /** Every hover action a thread row can offer; the Customize sidebar panel toggles and orders them. */
 export const THREAD_ROW_ACTIONS = ['resume', 'resumeDismiss', 'aside', 'pin', 'park', 'settle', 'mute', 'archive', 'restore'] as const
@@ -46,7 +45,9 @@ export interface SidebarPreferences {
   archiveUndoDurationSeconds: number
   /** Auto-settle idle threads: our own soft status, which never calls the native archive verb. */
   autoSettleEnabled: boolean
-  rebasedThreadSettleDelay: RebasedThreadSettleDelay
+  rebasedThreadSettleDelay: ThreadDelay
+  /** Archive a settled thread once this delay has passed; disabled keeps every settled thread listed. */
+  settledArchiveDelay: ThreadDelay
   idleMinutes: number
   scanIntervalMinutes: number
   excludedWorkspaceIds: string[]
@@ -56,6 +57,8 @@ export interface SidebarPreferences {
   parkedSessionIds: string[]
   /** Settled threads by session id: listed and openable, but no model step starts until unsettled. */
   settledSessionIds: string[]
+  /** When each settled thread was settled, by session id: the banner's date and the archive delay. */
+  settledAt: Record<string, number>
   /** Muted or snoozed threads by session id; Host-synced so every browser stays quiet. */
   mutedThreads: ThreadMutes
   collapsedSections: SidebarSection[]
@@ -112,6 +115,7 @@ export const DEFAULT_PREFERENCES: SidebarPreferences = {
   archiveUndoDurationSeconds: 5,
   autoSettleEnabled: false,
   rebasedThreadSettleDelay: 'disabled',
+  settledArchiveDelay: 'disabled',
   idleMinutes: 120,
   scanIntervalMinutes: 10,
   excludedWorkspaceIds: [],
@@ -120,6 +124,7 @@ export const DEFAULT_PREFERENCES: SidebarPreferences = {
   autoSettleDisabledSessionIds: [],
   parkedSessionIds: [],
   settledSessionIds: [],
+  settledAt: {},
   mutedThreads: {},
   // Keep every working section open; archived and settled threads stay folded until requested.
   collapsedSections: ['archived', 'settled'],

@@ -1,6 +1,8 @@
 import Schema from '@deepseek-ai/schemastery'
 import { defineSettings } from '@dshfiles/dshx/settings'
-import { ATTENTION_COLOR_OPTIONS, DEFAULT_PREFERENCES, REBASED_THREAD_SETTLE_DELAYS, THREAD_ROW_ACTIONS } from './organization.js'
+import { ATTENTION_COLOR_OPTIONS, DEFAULT_PREFERENCES, THREAD_ROW_ACTIONS } from './organization.js'
+import { SettledThreadsModel, type SettledStatus } from './settled-threads.js'
+import { THREAD_DELAYS } from './thread-delays.js'
 import { threadNotificationCategoriesSchema } from './thread-notifications.js'
 import { DEFAULT_THREAD_VIEW_SETTINGS } from './thread-view-preferences.js'
 
@@ -92,9 +94,14 @@ export const threadSidebarSettings = defineSettings({
     autoSettleEnabled: Schema.boolean()
       .default(DEFAULT_PREFERENCES.autoSettleEnabled)
       .description('Settle idle threads automatically: they stay listed and openable, but run no model step until unsettled.'),
-    rebasedThreadSettleDelay: Schema.union(REBASED_THREAD_SETTLE_DELAYS)
+    rebasedThreadSettleDelay: Schema.union(THREAD_DELAYS)
       .default(DEFAULT_PREFERENCES.rebasedThreadSettleDelay)
       .description('Settle successfully rebased threads immediately or after a delay. Running or waiting threads are never settled.'),
+    settledArchiveDelay: Schema.union(THREAD_DELAYS)
+      .default(DEFAULT_PREFERENCES.settledArchiveDelay)
+      .description('Archive a settled thread once this delay has passed. Running, waiting, pinned or newly changed threads are never archived.'),
+    // Written with the settled ids; the banner and the archive delay read it back.
+    settledAt: Schema.dict(Schema.natural()).default({}).hidden(),
     idleMinutes: Schema.natural()
       .min(15)
       .max(10080)
@@ -148,8 +155,8 @@ export const threadSidebarSettings = defineSettings({
   applies: 'live',
 })
 
-let readSettledSessionIds: (() => readonly string[]) | undefined
-let writeSettledSessionIds: ((next: readonly string[]) => Promise<void>) | undefined
+let readSettledStatus: (() => SettledStatus) | undefined
+let writeSettledStatus: ((next: SettledStatus) => Promise<void>) | undefined
 
 /**
  * The Host half of the namespace. It remembers its live scope so the settled-thread gate and the Agent's
@@ -157,16 +164,16 @@ let writeSettledSessionIds: ((next: readonly string[]) => Promise<void>) | undef
  */
 export const threadSidebarHostSettings = threadSidebarSettings.host({
   setup: scope => {
-    const read = (): readonly string[] => scope.get().settledSessionIds
-    const write = async (next: readonly string[]): Promise<void> => {
-      await scope.update({ settledSessionIds: [...next] })
+    const read = (): SettledStatus => ({ settledSessionIds: scope.get().settledSessionIds, settledAt: scope.get().settledAt })
+    const write = async (next: SettledStatus): Promise<void> => {
+      await scope.update({ settledSessionIds: [...next.settledSessionIds], settledAt: { ...next.settledAt } })
     }
-    readSettledSessionIds = read
-    writeSettledSessionIds = write
+    readSettledStatus = read
+    writeSettledStatus = write
     return () => {
-      if (readSettledSessionIds !== read) return
-      readSettledSessionIds = undefined
-      writeSettledSessionIds = undefined
+      if (readSettledStatus !== read) return
+      readSettledStatus = undefined
+      writeSettledStatus = undefined
     }
   },
 })
@@ -174,19 +181,19 @@ export const threadSidebarHostSettings = threadSidebarSettings.host({
 /** Settled Session ids on this Host; empty while the namespace is unregistered (desktop shells, older builds). */
 export const settledSessionIdsFromHost = (): readonly string[] => {
   try {
-    return readSettledSessionIds?.() ?? []
+    return readSettledStatus?.().settledSessionIds ?? []
   } catch {
     return []
   }
 }
 
-/** Add or drop one settled Session id, returning the set the Host now holds. */
+/** Add or drop one settled Session id, returning the ids the Host now holds. */
 export const setSessionSettled = async (sessionId: string, settled: boolean): Promise<readonly string[]> => {
-  if (readSettledSessionIds === undefined || writeSettledSessionIds === undefined) {
+  if (readSettledStatus === undefined || writeSettledStatus === undefined) {
     throw new Error('The thread-sidebar settings namespace is unavailable on this Host.')
   }
-  const current = readSettledSessionIds()
-  const next = settled ? [...new Set([...current, sessionId])] : current.filter(candidate => candidate !== sessionId)
-  await writeSettledSessionIds(next)
-  return next
+  const current = readSettledStatus()
+  const next = settled ? SettledThreadsModel.settle(current, [sessionId], Date.now()) : SettledThreadsModel.unsettle(current, [sessionId])
+  await writeSettledStatus(next)
+  return next.settledSessionIds
 }

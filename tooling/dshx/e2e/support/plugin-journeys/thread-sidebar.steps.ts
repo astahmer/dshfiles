@@ -309,7 +309,8 @@ Then('the thread is settled, opens read-only and unsettles to reply', async ({ p
     // Settled opens folded, so its rows appear after the section is expanded.
     await threadSidebar(page).getByRole('button', { name: 'Settled (1)', exact: true }).click()
     await expect(targetRow).toHaveCount(1)
-    await expect(page.getByRole('status', { name: 'This thread is settled.' })).toBeVisible()
+    const banner = page.getByRole('status', { name: 'This thread is settled.' })
+    await expect(banner).toBeVisible()
     await expect(page.getByRole('button', { name: 'Unsettle to reply', exact: true })).toBeVisible()
   })
   await recordAssertion(page, 'thread-sidebar-settled-stays-out-of-not-working', async () => {
@@ -319,6 +320,18 @@ Then('the thread is settled, opens read-only and unsettles to reply', async ({ p
     await expect(threadSidebar(page).getByText('No stopped or waiting threads right now.', { exact: true })).toBeVisible()
     await setThreadStatusFilters(page, 'Filter: Not working', [])
     await expect(targetRow).toHaveCount(1)
+  })
+  await recordAssertion(page, 'thread-sidebar-settled-banner-carries-time-and-archive', async () => {
+    const banner = page.getByRole('status', { name: 'This thread is settled.' })
+    // The settle instant is recorded, so the banner dates it; no archive delay is set here, so it shows no archive time.
+    await expect(banner.locator('time')).toHaveCount(1)
+    await expect(banner.getByRole('button', { name: 'Archive', exact: true })).toBeVisible()
+    // The banner reads like the jj rebase notice: capped and centred, never the dock's full width.
+    const maxWidth = await banner.evaluate(element => Number.parseFloat(getComputedStyle(element).maxWidth))
+    const bounds = await banner.boundingBox()
+    if (bounds === null) throw new Error('The settled banner has no layout box.')
+    expect(Number.isFinite(maxWidth)).toBe(true)
+    expect(bounds.width).toBeLessThanOrEqual(maxWidth + 1)
   })
   await page.getByRole('button', { name: 'Unsettle to reply', exact: true }).click()
   await recordAssertion(page, 'thread-sidebar-unsettle-restores-the-composer', async () => {
@@ -332,6 +345,59 @@ Then('the thread is settled, opens read-only and unsettles to reply', async ({ p
   await recordAssertion(page, 'thread-sidebar-unsettle-survives-reload', async () => {
     await expect(page.getByRole('status', { name: 'This thread is settled.' })).toHaveCount(0)
     await expect(threadSidebar(page).getByRole('button', { name: 'Settled (0)', exact: true })).toHaveCount(0)
+  })
+  await finishJourneyAssertions(page)
+})
+
+let settledArchiveThreadId: string | null = null
+
+/** One dropdown per delay setting; the group's accessible name is the label above its trigger. */
+const selectSettledArchiveDelay = async (page: Page, value: string): Promise<void> => {
+  await openSidebarSettings(page)
+  const delayGroup = sidebarSettings(page).getByRole('group', { name: 'Archive settled threads' })
+  await delayGroup.getByRole('button').click()
+  await page.getByRole('menuitemradio', { name: value, exact: true }).click()
+  await expect(delayGroup.getByRole('button', { name: value, exact: true })).toBeVisible()
+  await threadSidebar(page).getByRole('button', { name: 'Sidebar settings', exact: true }).click()
+}
+
+When('a thread is settled with a one-week settled-archive delay', async ({ page }: { page: Page }) => {
+  if (currentThreadId(page) === null) await startBlankThread(page)
+  const composer = page.getByRole('textbox').first()
+  await composer.fill('thread sidebar settled archive e2e target')
+  await composer.press('Enter')
+  // The profile has no provider credentials, so the turn fails: only an idle thread can be settled.
+  await expect(page.getByText('This turn failed', { exact: false })).toBeVisible({ timeout: 30_000 })
+  const threadId = currentThreadId(page)
+  if (threadId === null) throw new Error('The Host did not keep the selected thread after its first message.')
+  settledArchiveThreadId = threadId
+  await selectSettledArchiveDelay(page, 'After 1 week')
+  const targetRow = threadRow(page, threadId)
+  await expect(targetRow).toHaveCount(1)
+  await openThreadRowMenu(targetRow)
+  await page.getByRole('menuitem', { name: 'Settle', exact: true }).click()
+  await expect(threadSidebar(page).getByRole('button', { name: 'Settled (1)', exact: true })).toBeVisible()
+})
+
+Then('the settled banner shows the archive time it is waiting for', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'thread-sidebar-settled-banner-shows-archive-time', async () => {
+    const banner = page.getByRole('status', { name: 'This thread is settled.' })
+    // Two instants: when it was settled, and when the one-week delay will archive it.
+    await expect(banner.locator('time')).toHaveCount(2)
+    await expect(banner).toContainText('Settled')
+    await expect(banner).toContainText('Archives')
+  })
+})
+
+When('the settled-archive delay is shortened to immediately', async ({ page }: { page: Page }) => {
+  await selectSettledArchiveDelay(page, 'Immediately')
+})
+
+Then('the settled thread archives itself without a click', async ({ page }: { page: Page }) => {
+  if (settledArchiveThreadId === null) throw new Error('No thread was settled for auto-archive.')
+  await recordAssertion(page, 'thread-sidebar-settled-auto-archive', async () => {
+    await expect(threadSidebar(page).getByRole('button', { name: 'Archived (1)', exact: true })).toBeVisible({ timeout: 30_000 })
+    await expect(threadSidebar(page).getByRole('button', { name: 'Settled (1)', exact: true })).toHaveCount(0)
   })
   await finishJourneyAssertions(page)
 })

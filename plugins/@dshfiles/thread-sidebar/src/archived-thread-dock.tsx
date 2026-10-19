@@ -33,7 +33,7 @@ export const ArchivedThreadDock = (props: {
     <div
       role="status"
       aria-label={t('threadSidebarArchivedBanner')}
-      className="dshx-root dshx:flex dshx:items-center dshx:gap-2 dshx:rounded-md dshx:border dshx:border-border dshx:bg-muted dshx:px-3 dshx:py-1.5 dshx:text-sm dshx:text-muted-foreground"
+      className="dshx-root dshx:mx-auto dshx:my-3 dshx:flex dshx:w-full dshx:max-w-3xl dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:rounded-md dshx:border dshx:border-border dshx:bg-muted dshx:px-3 dshx:py-2 dshx:text-sm dshx:text-muted-foreground"
     >
       <ArchiveIcon className="dshx:size-4 dshx:shrink-0" aria-hidden />
       <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{t('threadSidebarArchivedBanner')}</span>

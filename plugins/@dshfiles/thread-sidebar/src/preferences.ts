@@ -4,12 +4,12 @@ import { threadMutesSchema } from './thread-mute.js'
 import {
   ATTENTION_COLOR_OPTIONS,
   DEFAULT_PREFERENCES,
-  REBASED_THREAD_SETTLE_DELAYS,
   SidebarOrganization,
   THREAD_ROW_ACTIONS,
   type SidebarPreferences,
   type SidebarSection,
 } from './organization.js'
+import { THREAD_DELAYS } from './thread-delays.js'
 import { threadViewSettingsSchema } from './thread-view-preferences.js'
 import { DEFAULT_THREAD_NOTIFICATION_CATEGORIES, ThreadNotificationModel, threadNotificationCategoriesSchema } from './thread-notifications.js'
 
@@ -51,7 +51,8 @@ const preferencesInputSchema = z
     archiveUndoEnabled: z.boolean().default(DEFAULT_PREFERENCES.archiveUndoEnabled),
     archiveUndoDurationSeconds: z.number().int().min(1).max(30).default(DEFAULT_PREFERENCES.archiveUndoDurationSeconds),
     autoSettleEnabled: z.boolean(),
-    rebasedThreadSettleDelay: z.enum(REBASED_THREAD_SETTLE_DELAYS).default(DEFAULT_PREFERENCES.rebasedThreadSettleDelay),
+    rebasedThreadSettleDelay: z.enum(THREAD_DELAYS).default(DEFAULT_PREFERENCES.rebasedThreadSettleDelay),
+    settledArchiveDelay: z.enum(THREAD_DELAYS).default(DEFAULT_PREFERENCES.settledArchiveDelay),
     idleMinutes: z.number().int().min(15).max(10080),
     scanIntervalMinutes: z.number().int().min(1).max(120),
     excludedWorkspaceIds: z.array(z.string().min(1).max(256)).max(500),
@@ -60,6 +61,7 @@ const preferencesInputSchema = z
     autoSettleDisabledSessionIds: z.array(z.string().min(1).max(256)).max(5000).default(DEFAULT_PREFERENCES.autoSettleDisabledSessionIds),
     parkedSessionIds: z.array(z.string().min(1).max(256)).max(5000),
     settledSessionIds: z.array(z.string().min(1).max(256)).max(5000).default(DEFAULT_PREFERENCES.settledSessionIds),
+    settledAt: z.record(z.string(), z.number().int().nonnegative()).default(DEFAULT_PREFERENCES.settledAt),
     mutedThreads: threadMutesSchema.default(DEFAULT_PREFERENCES.mutedThreads),
     collapsedSections: z.array(sidebarSectionSchema).max(6),
     workspaceFilter: z.string().max(256).nullable().default(DEFAULT_PREFERENCES.workspaceFilter),

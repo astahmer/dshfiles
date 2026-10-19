@@ -19,8 +19,9 @@ tabs disagreed and a reload forgot it. It now lives in the Host's
 ## Host-owned today
 
 Most of the sidebar's own state already went this way, and is the pattern to
-copy: `@dshfiles/thread-sidebar` keeps `mutedThreads`, `parkedSessionIds`,
-auto-archive policy and overrides, header/footer composition, workspace filter,
+copy: `@dshfiles/thread-sidebar` keeps `mutedThreads`, `parkedSessionIds`, the
+settle/archive policy with its per-thread overrides and settle times,
+header/footer composition, workspace filter,
 row options and attention display in its Host settings namespace, and now
 attention itself in a storage domain. `@dshfiles/ai-accounts`,
 `@dshfiles/project-checks`, `@dshfiles/agent-questions` and
