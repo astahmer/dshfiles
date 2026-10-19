@@ -1,0 +1,60 @@
+{
+  "corpus": "welii@be37644993",
+  "tasks": [
+    {
+      "id": "class-definition",
+      "prompt": "Which file defines the class `CommitmentV2LifecycleRules`?",
+      "expect": ["apps/backend/src/commitments-v2/lifecycle-rules.ts"]
+    },
+    {
+      "id": "static-usages",
+      "prompt": "List every non-test source file (exclude *.spec.ts, *.test.ts, *.e2e-spec.ts) that calls a static member of `CommitmentV2LifecycleRules` (i.e. contains `CommitmentV2LifecycleRules.`).",
+      "recall": [
+        "list-commitments-v2.kysely.adapter.ts",
+        "commitment-v2-cycle.ts",
+        "commitment-v2-do-not-renew.ts",
+        "commitment-v2-let-auto-renew.ts",
+        "commitment-v2-let-expire.ts",
+        "commitment-v2-reactivate.ts",
+        "commitment-v2-start-negotiation.ts",
+        "commitment-v2-stop-contract.ts",
+        "lifecycle-rules.ts",
+        "commitment-v2-status-to-confirm.service.ts",
+        "confirm-commitment-status.use-case.ts",
+        "confirm-past-end-date-status.use-case.ts",
+        "create-agreement.use-case.ts",
+        "get-commitment-v2-details.use-case.ts",
+        "preview-auto-renewal-confirmation.use-case.ts",
+        "preview-commitment-v2-reactivation.use-case.ts",
+        "record-non-renewal-notice.use-case.ts",
+        "run-commitments-v2-lifecycle-transitions.use-case.ts",
+        "update-cycle.use-case.ts"
+      ]
+    },
+    {
+      "id": "fuzzy-migration",
+      "prompt": "Find the database migration that drops the renewal/payment columns from commitment v2.",
+      "expect": ["Migration20260915082256_drop_commitment_v2_renewal_payment_columns"]
+    },
+    {
+      "id": "queue-literal",
+      "prompt": "Which file subscribes to the AMQP queue named `purchase-project.created.send-notification`?",
+      "expect": ["purchase-project-created-notification.subscriber.ts"]
+    },
+    {
+      "id": "middleware-implementation",
+      "prompt": "Where is the `organizationIdChecker` auth middleware implemented (not where it is used)? Give file and line.",
+      "expect": ["apps/backend/src/auth/lib/middlewares.ts"]
+    },
+    {
+      "id": "frontend-config-value",
+      "prompt": "In apps/frontend, what is the default `staleTime` for queries on the app's TanStack Query client, and in which file is it set?",
+      "expect": ["apps/frontend/src/rpc/query-client.tsx", "3"]
+    },
+    {
+      "id": "error-thrower",
+      "prompt": "Which entity file throws `LetAutoRenewBlockedByNonRenewalNoticeError`?",
+      "expect": ["commitment-v2-let-auto-renew.ts"]
+    }
+  ]
+}
