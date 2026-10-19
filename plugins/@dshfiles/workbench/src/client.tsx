@@ -10,9 +10,7 @@ import type { RightPanelMode } from '@dshfiles/frame-layout/regions'
 // Type-only: the frame's right-column seat and the `shell.dock` slot it declares.
 import type {} from '@dshfiles/frame-layout/regions'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
-import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger,
-} from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { LayoutGridIcon } from '@dshfiles/plugin-ui/icons'
 import type { DockviewApi, DockviewDidDropEvent, DockviewUnhandledDragOverEvent } from 'dockview-react'
 import dockviewSheet from 'virtual:dshfiles-workbench/dockview-css'
@@ -265,34 +263,37 @@ export default defineClient({
      */
     const MoveMenu = decorate((props: { readonly api: DockviewApi | null; readonly openIds: readonly string[]; readonly from: WorkbenchRegionId }) => {
       const api = props.api
-      const movable = props.openIds.filter(id => registry.get(id) !== undefined)
+      const movable = props.openIds.flatMap(id => {
+        const definition = registry.get(id)
+        return definition === undefined ? [] : [{ definition, panelId: id }]
+      })
       if (api === null || movable.length === 0) return null
       const destinations = (['right', 'bottom', 'main'] as const).filter(destination => destination !== props.from)
+      // One flat list: a submenu per panel costs a hover for a choice that is
+      // almost always one panel and one destination. The panel's title only
+      // appears when more than one panel could move.
+      const entries = destinations.flatMap(destination =>
+        movable.flatMap(({ definition, panelId }) => {
+          const target = definition.mainPanelId
+          if (destination === 'main' && (target === undefined || !isMainPanelId(target))) return []
+          const label = movable.length === 1
+            ? destinationLabel(destination)
+            : `${definition.title}: ${destinationLabel(destination)}`
+          return [{ key: `${destination}:${panelId}`, label, run: () => movePanelTo(props.from, api, destination, panelId) }]
+        }),
+      )
+      if (entries.length === 0) return null
       return (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button size="sm" variant="ghost">{translate('movePanel')}</Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            {movable.map(id => {
-              const definition = registry.get(id)
-              const target = definition?.mainPanelId
-              const options = destinations.filter(destination =>
-                destination === 'main' ? target !== undefined && isMainPanelId(target) : true)
-              if (options.length === 0) return null
-              return (
-                <DropdownMenuSub key={id}>
-                  <DropdownMenuSubTrigger>{definition?.title ?? id}</DropdownMenuSubTrigger>
-                  <DropdownMenuSubContent>
-                    {options.map(destination => (
-                      <DropdownMenuItem key={destination} onSelect={() => movePanelTo(props.from, api, destination, id)}>
-                        {destinationLabel(destination)}
-                      </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuSubContent>
-                </DropdownMenuSub>
-              )
-            })}
+            {entries.map(entry => (
+              <DropdownMenuItem key={entry.key} onSelect={entry.run}>
+                {entry.label}
+              </DropdownMenuItem>
+            ))}
           </DropdownMenuContent>
         </DropdownMenu>
       )

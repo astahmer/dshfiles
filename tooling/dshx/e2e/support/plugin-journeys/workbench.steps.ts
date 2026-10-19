@@ -158,6 +158,10 @@ When('the right column is set to the global dock in the plugin settings', async 
   await setRightPanel(page, 'Global dock (persistent panels in the right column)')
 })
 
+When('the right column is set back to the per-thread panel in the plugin settings', async ({ page }: { page: Page }) => {
+  await setRightPanel(page, 'Per-thread (the native right sidebar)')
+})
+
 When('a thread is started and the New Session screen opens again', async ({ page }: { page: Page }) => {
   await page.getByRole('button', { name: 'New session', exact: true }).first().click()
   await sendMessage(page, 'dock thread one')
@@ -194,7 +198,6 @@ Then('the global dock still shows the Jujutsu panel after a reload', async ({ pa
 
 When('the Jujutsu panel is moved to the main view from the dock', async ({ page }: { page: Page }) => {
   await dockRegion(page).getByRole('button', { name: 'Move', exact: true }).click()
-  await page.getByRole('menuitem', { name: 'Jujutsu', exact: true }).click()
   await page.getByRole('menuitem', { name: 'Move to main view', exact: true }).click()
 })
 
@@ -219,7 +222,6 @@ Then('the bottom panel is open below the columns', async ({ page }: { page: Page
 
 When('the Jujutsu panel is moved to the bottom panel', async ({ page }: { page: Page }) => {
   await dockRegion(page).getByRole('button', { name: 'Move', exact: true }).click()
-  await page.getByRole('menuitem', { name: 'Jujutsu', exact: true }).click()
   await page.getByRole('menuitem', { name: 'Move to the bottom panel', exact: true }).click()
 })
 
