@@ -1,7 +1,7 @@
 # Session open and the 250 ms request budget
 
-> **Status: W1–W2 landed (2026-10-20).**
-> **Resume here:** the opening window's data (W7), then W3–W4.
+> **Status: W1–W4 and W6 landed (2026-10-20); W7 is Host gaps 67–68.**
+> **Resume here:** nothing owned is left; durable findings live in [docs/performance.md](../../docs/performance.md).
 
 ## Goal
 

@@ -15,6 +15,7 @@ Load the matching skill from `.agents/skills/` before the work it covers:
 - `plugin-ui` — any plugin UI or styling; adding shadcn components to the kit.
 - `plugin-state` — Query / Form / xstate / localStorage in plugin clients.
 - `dsh-plugin-verify` — after changing a plugin, before saying it works.
+- `live-performance-audit` — before planning any performance work, and to prove a fix with before/after numbers.
 - `verify-dsh` — launch, drive and screenshot a scratch DSH (`dshx dev up|doctor|open|shot|down`).
 - `maintain-verify-dsh` — after changing how DSH is launched, seeded, driven or verified (e2e support, `dshx dev`, catalog schema, profile seeding, a feature's UI path).
 - `dsh-sessions` — review, watch or debug another DSH thread (digest, tail, export) from a shell.
@@ -31,6 +32,24 @@ Shared skills (`~/.agents/skills/`) for the same kinds of work:
 - `jj-merge-workspaces` — landing several workspaces onto `main`.
 - `disk-space-cleanup` — stale workspaces, `node_modules` and build output.
 
+## Performance work: measure the live GUI first
+
+Slow requests, laggy thread switches and slow New thread have been "fixed" several
+times from source reading, request logs and scratch fixtures, and each time the
+plan was a helper plugin or a core patch. The real costs (a dshx settings read
+recomposing the profile per Session event, 42k DOM nodes from hidden collapsed
+groups, `warm()` catalogs on every composer mount) only showed up on the live
+instance. So, before proposing any fix:
+
+1. Run the `live-performance-audit` probes on :3080: Host lag, per-click switch
+   probe (DOM, long tasks, bytes, requests), and a CPU profile of the running
+   Host. Attribute every interaction over 250 ms to Host stall, browser queue,
+   payload or rendering.
+2. Fix the owner the numbers name: an owned plugin, dshx, or a fork of the native
+   Loader row. Record a Host gap only for Host-side costs, with the numbers.
+3. Prove it with the same probe before and after, and keep the table in
+   [docs/performance.md](docs/performance.md).
+
 ## Adopt, port, or build
 
 - **Adopt** a plugin from [dshmarket.com](https://dshmarket.com) whenever one
@@ -46,7 +65,10 @@ Shared skills (`~/.agents/skills/`) for the same kinds of work:
   Loader row in profile composition, fill its supported slots from the owned
   plugin, and keep the upstream license, source/version provenance, and an
   explicit update policy. This is not a blanket fork of core; see
-  [native plugin overrides](docs/native-plugin-overrides.md).
+  [native plugin overrides](docs/native-plugin-overrides.md). When the
+  behavior lives in a native client package's private state (no slot can
+  reach it), fork the whole package as `rich-composer` and `chat` do. That is
+  the supported route, not a core patch, and it is often the only real fix.
 
 Say which option you chose and why. Two rules keep the choice honest:
 
