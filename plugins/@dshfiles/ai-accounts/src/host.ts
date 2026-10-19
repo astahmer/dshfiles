@@ -4,6 +4,11 @@ export { Config } from './account-config.js'
 // Brings in the CSS-module declarations a plugin would otherwise restate.
 import type {} from '@dshfiles/dshx/client'
 import { AccountsHostApiModel, accountsHostApi } from './accounts-host-api.js'
+import { closeModelFallbacks, modelFallbackHostApi, modelFallbacksFor } from './model-fallback-host.js'
+import { createModelFallbackRouter } from './model-fallback-router.js'
+import { ModelFallbackModel } from './model-fallback.js'
+import type { ModelFallbackStore } from './model-fallback-store.js'
+import type { FallbackRoute } from './model-fallback-api.js'
 import { createUsageCache } from './account-usage.js'
 import { createCopilotLoginService } from './copilot-login.js'
 import { claudeAccountService } from './claude-account.js'
@@ -30,7 +35,7 @@ import type { AdapterRegistrationHandle, DirectoryRegistrationHandle, GenerateOp
 // Value imports, not `import type {}`: an empty type-only import is elided and
 // never loads the package's cordis module augmentation, which is what makes
 // `ctx.on('llm/stream')` and the agent-scoped listeners typecheck here.
-import { LlmError, resolveImageAttachmentAccess } from '@deepseek-ai/dsh-llm'
+import { LlmError, ReasoningEffortId, resolveImageAttachmentAccess } from '@deepseek-ai/dsh-llm'
 import type { ResolvedPiAiProviderProfile } from '@deepseek-ai/dsh-llm-pi-ai'
 import { createAccountPool, creditServedAttempt } from './account-pool.js'
 import { explainSilentRejections } from './silent-rejection.js'
@@ -80,7 +85,7 @@ const PRICING_CHECK_MS = 30 * 60_000
 export default definePlugin({
   id: 'llm-ai-accounts',
   inject: ['llm', 'connection', 'webServer', 'storageDomain', 'sessionController', 'credentials'],
-  apis: [accountsHostApi],
+  apis: [accountsHostApi, modelFallbackHostApi],
   tools: [aiAccountsTool],
   settings: [aiAccountsHostSettings],
   setup: api => {
@@ -120,6 +125,17 @@ export default definePlugin({
       }
     })
     installCostProjection(ctx)
+    let fallbackStore: ModelFallbackStore | undefined
+    ctx.effect(() => {
+      void modelFallbacksFor(ctx)
+        .then(store => {
+          fallbackStore = store
+        })
+        .catch(() => ctx.logger.warn('ai-accounts: model fallback storage could not open; threads keep account-level fail-over'))
+      return () => {
+        void closeModelFallbacks().catch(() => ctx.logger.warn('ai-accounts: model fallback storage could not close cleanly'))
+      }
+    })
     const quotaContinuations = createQuotaContinuationService({ context: ctx, readResetAt: accountId => AccountsHostApiModel.readQuotaResetAt(ctx, accountId) })
     runtime.quotaContinuations = quotaContinuations
     ctx.effect(() => {
@@ -277,6 +293,23 @@ export default definePlugin({
         JSON.stringify(source.thinkingLevelMap ?? null) === JSON.stringify(candidate.thinkingLevelMap ?? null)
       )
     }
+    const fallbackAvailable = (route: { readonly provider: string }, now: number): boolean =>
+      routes.has(route.provider)
+        ? pool.isHealthy(route.provider, now)
+        : (ctx
+            .get('llm')
+            ?.listProviders()
+            .some(provider => provider.id === route.provider) ?? false)
+    const fallbackRouter = createModelFallbackRouter({
+      store: () => fallbackStore,
+      distribution: () => pool.distribution(),
+      available: fallbackAvailable,
+      onError: message => ctx.logger.warn(`ai-accounts: ${message}`),
+    })
+    runtime.modelFallbackRouter = fallbackRouter
+    ctx.effect(() => () => {
+      if (runtime.modelFallbackRouter === fallbackRouter) delete runtime.modelFallbackRouter
+    })
     const recovery = FailureRecoveryModel.create({
       pool,
       isAccountRoute: provider => routes.has(provider),
@@ -306,6 +339,10 @@ export default definePlugin({
           lunaReserveHolds.set(id, Date.now() + LUNA_RESERVE_HOLD_MS)
           runtime.usageCache?.invalidate()
         },
+      },
+      chain: {
+        candidates: ({ conversationKey, current, now }) => fallbackRouter.candidates({ sessionId: conversationKey, current, now }),
+        bind: ({ conversationKey, to }) => fallbackRouter.bind({ sessionId: conversationKey, to }),
       },
       newRetryId: () => randomUUID(),
     })
@@ -579,15 +616,24 @@ export default definePlugin({
             const offRequest = agent.ctx.on(
               'agent/request',
               async ({ turn, step }, next) => {
-                const request = await next()
+                const proposed = await next()
+                const fallback = fallbackRouter.routeRequest({ sessionId: id, turn, request: proposed })
+                let request: typeof proposed = proposed
+                if (fallback !== undefined) {
+                  // The proposed effort belongs to the route the fallback replaces.
+                  const { reasoningEffort: _replacedEffort, ...proposedRest } = proposed
+                  request = { ...proposedRest, provider: fallback.provider, model: fallback.model }
+                  if (fallback.reasoningEffort !== undefined) request = { ...request, reasoningEffort: ReasoningEffortId(fallback.reasoningEffort) }
+                }
                 if (!routes.has(request.provider)) {
                   activeAccountRoutes.delete(id)
                   return request
                 }
                 const distribution = pool.distribution()
                 if (distribution !== 'sticky') pool.bindRoute(id, request.provider, request.provider)
+                // A fallback chain is the whole fail-over order, so its routes are not spread across accounts.
                 const accountId =
-                  distribution === 'sticky'
+                  distribution === 'sticky' || fallbackRouter.walksChain(id)
                     ? recovery.routeFor(id, request.provider)
                     : selectRequestAccount({
                         provider: request.provider,
@@ -604,6 +650,14 @@ export default definePlugin({
             )
             const offTurnStopping = agent.ctx.on('agent/turn-stopping', () => {
               activeAccountRoutes.delete(id)
+              const restored = fallbackRouter.turnEnded(id)
+              if (restored === undefined) return
+              void ctx
+                .get('sessionController')
+                ?.selectModel({ sessionId: agent.session.id, ...ModelFallbackModel.selectionFor(restored) })
+                .catch((error: unknown) =>
+                  ctx.logger.warn(`ai-accounts: thread stayed on its fallback instead of returning to ${restored.provider}: ${String(error)}`),
+                )
             })
             const offRequestMessages = agent.ctx.on('agent/request-messages', async ({ turn, step }, next) => {
               const messages = await next()
@@ -627,7 +681,13 @@ export default definePlugin({
                   failure,
                   canShrink: FailureRecoveryModel.offloadResentImages(surface) !== surface,
                 })
-                if (action.kind === 'retry' && action.step.kind === 'failover' && routedAccountId !== undefined && active !== undefined) {
+                if (
+                  action.kind === 'retry' &&
+                  action.step.kind === 'failover' &&
+                  routes.has(action.step.to) &&
+                  routedAccountId !== undefined &&
+                  active !== undefined
+                ) {
                   active.accountId = action.step.to
                 }
                 if (action.kind === 'pass') return next()
@@ -652,7 +712,13 @@ export default definePlugin({
                   step,
                   provider: requestProvider,
                   failure,
-                  label: accountId => routes.get(accountId)?.displayName ?? accountId,
+                  label: target => {
+                    // Chain targets are `provider/model`; account ids never hold a slash.
+                    const slash = target.indexOf('/')
+                    const provider = slash < 0 ? target : target.slice(0, slash)
+                    const name = routes.get(provider)?.displayName ?? provider
+                    return slash < 0 ? name : `${name} · ${target.slice(slash + 1)}`
+                  },
                 })
                 ctx.logger.info(`ai-accounts: ${notice.failure.message}`)
                 agent.session.append('llm/retry', notice)
@@ -660,7 +726,10 @@ export default definePlugin({
                 if (!(await cancellableDelay(delayMs, signal))) return undefined
                 agent.session.append('llm/retry-started', { retryId: notice.retryId, turn, step, retry: notice.retry })
                 // The retry re-reads the Session selection, so it opens on the stand-in route and the picker follows.
-                const followed = FailureRecoveryModel.selectionAfter({ action, config: agent.session.requestHeader()?.config })
+                const followed =
+                  action.step.kind === 'failover' && !routes.has(action.step.to)
+                    ? chainSelection(fallbackRouter.active(id))
+                    : FailureRecoveryModel.selectionAfter({ action, config: agent.session.requestHeader()?.config })
                 if (followed !== undefined) {
                   await ctx
                     .get('sessionController')
@@ -676,6 +745,7 @@ export default definePlugin({
             agent.ctx.on('agent/disposed', () => {
               activeAccountRoutes.delete(id)
               recovery.forget(id)
+              fallbackRouter.forget(id)
             })
             return () => {
               activeAccountRoutes.delete(id)
@@ -712,6 +782,8 @@ export default definePlugin({
     })
   },
 })
+
+const chainSelection = (route: FallbackRoute | undefined) => (route === undefined ? undefined : ModelFallbackModel.selectionFor(route))
 
 const cancellableDelay = (delayMs: number, signal: AbortSignal): Promise<boolean> => {
   if (signal.aborted) return Promise.resolve(false)

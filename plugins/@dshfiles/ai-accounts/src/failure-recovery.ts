@@ -127,6 +127,18 @@ const createFailureRecovery = (deps: {
   /** Ordered, compatible, visible accounts that could take over from `from` for `model`; health is checked here. */
   readonly failoverCandidates: (input: { readonly from: string; readonly model: string | undefined }) => readonly string[]
   readonly lunaReserve: { readonly available: (accountId: string) => boolean; readonly engage: (accountId: string) => void }
+  /**
+   * A conversation's model fallback chain. `candidates` answers the ordered, available route keys after the failing
+   * route, or `undefined` when the conversation walks compatible accounts instead; `bind` puts the chosen route on.
+   */
+  readonly chain?: {
+    readonly candidates: (input: {
+      readonly conversationKey: string
+      readonly current: { readonly provider: string; readonly model: string | undefined }
+      readonly now: number
+    }) => readonly string[] | undefined
+    readonly bind: (input: { readonly conversationKey: string; readonly to: string }) => void
+  }
   readonly newRetryId: () => string
 }) => {
   const steps = new Map<string, StepState>()
@@ -168,16 +180,17 @@ const createFailureRecovery = (deps: {
       readonly canShrink: boolean
       readonly now?: number
     }): RecoveryAction => {
-      if (!deps.isAccountRoute(input.provider)) return { kind: 'pass' }
+      const now = input.now ?? Date.now()
+      const chainCandidates = deps.chain?.candidates({ conversationKey: input.conversationKey, current: { provider: input.provider, model: input.model }, now })
+      if (!deps.isAccountRoute(input.provider) && chainCandidates === undefined) return { kind: 'pass' }
       const failureKind = classifyFailure(input.failure)
       if (failureKind === undefined) return { kind: 'pass' }
-      const now = input.now ?? Date.now()
       const account = input.routedAccountId ?? deps.pool.routeFor(input.conversationKey, input.provider, now)
       const policy = deps.readPolicy()[failureKind]
       const state = stateFor(input.conversationKey, input.turn, input.step)
-      const candidates = policy.failover
-        ? deps.failoverCandidates({ from: account, model: input.model }).filter(id => id !== account && deps.pool.isHealthy(id, now))
-        : []
+      const candidates = !policy.failover
+        ? []
+        : (chainCandidates ?? deps.failoverCandidates({ from: account, model: input.model }).filter(id => id !== account && deps.pool.isHealthy(id, now)))
       const chain = chainFor(state, failureKind)
       const decision = decideRecovery({
         policy,
@@ -197,7 +210,8 @@ const createFailureRecovery = (deps: {
       if (step.kind === 'luna-reserve') deps.lunaReserve.engage(account)
       if (step.kind === 'failover') {
         deps.pool.noteRateLimited(account, input.failure.providerRetryAfterMs, now)
-        deps.pool.bindRoute(input.conversationKey, input.provider, step.to, account)
+        if (chainCandidates === undefined) deps.pool.bindRoute(input.conversationKey, input.provider, step.to, account)
+        else deps.chain?.bind({ conversationKey: input.conversationKey, to: step.to })
       }
       if (step.kind === 'shrink') state.shrink = true
       chain.attempts += 1

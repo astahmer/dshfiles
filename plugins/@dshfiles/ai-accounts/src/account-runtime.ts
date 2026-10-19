@@ -6,6 +6,7 @@ import type { QuotaContinuationService } from './quota-continuation.js'
 import type { AccountsUsage } from './api.js'
 import type { PricingCatalog } from './pricing-catalog.js'
 import type { CopilotLoginService } from './copilot-login.js'
+import type { ModelFallbackRouter } from './model-fallback-router.js'
 
 interface AccountRuntime {
   accounts?: { config: AiAccountsConfig; pool: ReturnType<typeof createAccountPool> }
@@ -18,6 +19,7 @@ interface AccountRuntime {
   usageCache?: { get(): Promise<AccountsUsage>; refresh(): Promise<AccountsUsage>; latest(): AccountsUsage | undefined; invalidate(): void }
   pricing?: PricingCatalog
   copilotLogin?: CopilotLoginService
+  modelFallbackRouter?: ModelFallbackRouter
 }
 
 const runtimes = new WeakMap<Context, AccountRuntime>()

@@ -290,6 +290,12 @@ as agent tools`): read-only `ai_accounts_identity`, `ai_accounts_catalog`,
 `ai_accounts_set_auto_retry`, `ai_accounts_set_native_provider` and
 `ai_accounts_refresh_pricing`.
 
+The model fallback chain (`ai-accounts-model-fallback` API, imported by the
+composer picker through the `model-fallback-api` module) binds every verb the
+picker's Fallbacks section uses: read-only `model_fallback_state`, and the
+writes `set_model_fallback_chain`, `set_model_fallback_return` and
+`return_to_selected_model`.
+
 Still missing, because they write secrets or need a browser:
 
 | Proposed tool                                                                                  | Capability                                                 | Backing verb                                                                            |

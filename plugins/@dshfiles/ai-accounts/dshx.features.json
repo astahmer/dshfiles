@@ -74,11 +74,12 @@
           "coveredBy": ["ai-accounts.model-curation"]
         }
       ],
-      "states": ["available", "cooling-down", "rebound", "no-eligible-account", "priority-order"],
+      "states": ["available", "cooling-down", "rebound", "no-eligible-account", "priority-order", "fallback-serving", "fallback-returned"],
       "failureModes": [
         "A provider rate limit cools the account that served the request and may rebind its retry.",
         "All eligible accounts are cooling down and no route can be selected.",
-        "Distribution never mixes provider kinds or models with incompatible request capabilities."
+        "Distribution never mixes provider kinds or models with incompatible request capabilities.",
+        "Under Priority, a thread with a model fallback chain fails over along that chain (any provider, enabled and healthy routes only) instead of across compatible accounts."
       ],
       "externalDependencies": [
         {
@@ -102,6 +103,12 @@
           "kind": "gherkin",
           "id": "ai-accounts.priority-routing",
           "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.model-fallback-routing",
+          "file": "plugins/@dshfiles/ai-accounts/src/model-fallback-router.test.ts",
+          "testName": "puts the fallback on the retry after a failure and stays there by default"
         },
         {
           "kind": "unit-test",

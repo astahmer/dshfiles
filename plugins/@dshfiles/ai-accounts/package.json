@@ -16,6 +16,10 @@
     "./package.json": "./package.json",
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./client": "./dist/client.js",
+    "./model-fallback-api": {
+      "types": "./src/model-fallback-api.ts",
+      "default": "./dist/model-fallback-api.js"
+    },
     "./locale/en.json": "./locale/en.json",
     "./pricing-catalog": {
       "types": "./src/pricing-catalog.ts",

@@ -238,6 +238,85 @@ describe('selectionAfter', () => {
   })
 })
 
+describe('failure recovery through a model fallback chain', () => {
+  const chainSetup = () => {
+    const pool = createAccountPool({ cooldownMs: 60_000 })
+    pool.put({ id: 'codex', kind: 'codex', label: 'Codex' })
+    pool.put({ id: 'codex_work', kind: 'codex', label: 'Codex Work' })
+    const bound: string[] = []
+    const recovery = FailureRecoveryModel.create({
+      pool,
+      isAccountRoute: provider => provider.startsWith('codex'),
+      readPolicy: () => DEFAULT_RECOVERY_POLICY,
+      failoverCandidates: () => ['codex_work'],
+      lunaReserve: { available: () => false, engage: () => undefined },
+      chain: {
+        candidates: ({ conversationKey, current }) =>
+          conversationKey === 'walks-chain'
+            ? ['claude/claude-opus-5-5', 'deepseek/deepseek-chat'].filter(key => !key.startsWith(`${current.provider}/`))
+            : undefined,
+        bind: ({ to }) => bound.push(to),
+      },
+      newRetryId: () => 'retry',
+    })
+    return { pool, recovery, bound }
+  }
+
+  it('fails over to the next chain route across providers instead of a same-kind account', () => {
+    const { pool, recovery, bound } = chainSetup()
+    const action = recovery.recover({
+      conversationKey: 'walks-chain',
+      turn: 1,
+      step: 1,
+      provider: 'codex',
+      model: 'gpt-6',
+      failure: quota,
+      canShrink: false,
+      now: NOW,
+    })
+
+    expect(action).toMatchObject({ kind: 'retry', account: 'codex', step: { kind: 'failover', to: 'claude/claude-opus-5-5' } })
+    expect(bound).toEqual(['claude/claude-opus-5-5'])
+    expect(pool.isHealthy('codex', NOW)).toBe(false)
+    expect(recovery.routeFor('walks-chain', 'codex', NOW)).toBe('codex')
+  })
+
+  it('walks the chain from a provider it does not own and leaves other conversations on accounts', () => {
+    const { recovery } = chainSetup()
+    expect(
+      recovery.recover({
+        conversationKey: 'walks-chain',
+        turn: 1,
+        step: 1,
+        provider: 'claude',
+        model: 'claude-opus-5-5',
+        failure: rateLimit,
+        canShrink: false,
+        now: NOW,
+      }),
+    ).toMatchObject({ kind: 'retry', step: { kind: 'failover', to: 'deepseek/deepseek-chat' } })
+    expect(
+      recovery.recover({ conversationKey: 'other', turn: 1, step: 1, provider: 'codex', model: 'gpt-6', failure: rateLimit, canShrink: false, now: NOW }),
+    ).toMatchObject({ kind: 'retry', step: { kind: 'failover', to: 'codex_work' } })
+  })
+
+  it('leaves auth failures to DSH even with a chain', () => {
+    const { recovery } = chainSetup()
+    expect(
+      recovery.recover({
+        conversationKey: 'walks-chain',
+        turn: 1,
+        step: 1,
+        provider: 'codex',
+        model: 'gpt-6',
+        failure: { message: 'signed out', code: 'AUTH' },
+        canShrink: false,
+        now: NOW,
+      }),
+    ).toMatchObject({ kind: 'give-up', then: 'dsh' })
+  })
+})
+
 describe('offloadResentImages', () => {
   const image = (attachmentId: string) => ({
     type: 'image' as const,

@@ -178,6 +178,29 @@ Sessions. Switch back from the picker once the failed account recovers. Each
 step shows as a retry row in the turn. Large
 tool outputs are never trimmed.
 
+### Model fallback chain
+
+Under Priority, a thread can carry an ordered fallback chain: provider route
+(any account, or a native provider the Host serves), model and optional
+reasoning effort, across provider kinds (Codex, then Claude, then OpenCode). Edit
+it from the **Fallbacks** section of the composer model picker: **Add current
+selection**, move rungs up or down, remove them, or switch to **Default** to edit
+the chain every thread without its own follows (**Use default** drops a
+thread's own chain). When a chain has routes it replaces the same-provider
+fail-over step above: a failure whose kind fails over (connection, rate limit,
+exhausted by default) moves the turn to the next enabled, healthy rung after the
+current one, never one the turn already tried. Sticky distribution never walks
+the chain. The fail-over selects the fallback for the Session like an account
+fail-over does. **After a fallback answers** chooses whether the thread stays
+there (default; the provider's prompt cache stays warm) or returns to its
+selection when the turn ends; **Return to selection** goes back by hand. The
+chain and the fallback serving each thread live in Host storage. Agents read and
+change them through `model_fallback_state`, `set_model_fallback_chain`,
+`set_model_fallback_return` and `return_to_selected_model`; other plugins import
+the contract from `@dshfiles/ai-accounts/model-fallback-api`. A native provider
+has no cooldown signal, so a spent native rung is only skipped for the rest of
+the turn that hit it.
+
 When a turn stops on an exhausted quota, the Session is listed under **Quota
 recovery** in the account's panel. **Resume now** queues a recovery prompt;
 **Snooze** (1 h, 4 h, 1 day) pushes it back. If the provider declared a reset
