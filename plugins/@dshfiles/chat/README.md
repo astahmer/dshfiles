@@ -1,7 +1,8 @@
 # @dshfiles/chat
 
 Owned fork of DSH's native Chat client plugin. It keeps the native transcript, its Slots, renderers, settings and
-scroll behaviour, and changes how many transcript rows are mounted at once (see Local delta).
+scroll behaviour, and mounts only the newest transcript rows plus the ones the reader scrolls up to (see Local delta):
+on the live profile a single thread used to mount up to 42k DOM nodes on open.
 
 ## Upstream and license
 
@@ -23,11 +24,13 @@ its `cordis.patch.yml` disables `ui-chat` and inserts `dshfiles-chat`.
 
 Every other vendored file is byte-identical to the pinned revision.
 
-| File                                     | Change                                                                                                                                                       |
-| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `src/chat-settings.ts`                   | `CHAT_SETTINGS_NAMESPACE` is `dshfiles-chat`, the replacement row's id, so the settings form follows the row                                                 |
-| `src/native/chat/MessageIconActions.tsx` | `window.setTimeout` → `setTimeout`: this repository type-checks with Node timer types, under which the ref's `ReturnType<typeof setTimeout>` is not a number |
-| `src/client-entry.tsx`                   | new: dshx client entry calling the native `apply`                                                                                                            |
+| File                                     | Change                                                                                                                                                                                                            |
+| ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/chat-settings.ts`                   | `CHAT_SETTINGS_NAMESPACE` is `dshfiles-chat`, the replacement row's id, so the settings form follows the row                                                                                                      |
+| `src/native/chat/MessageIconActions.tsx` | `window.setTimeout` → `setTimeout`: this repository type-checks with Node timer types, under which the ref's `ReturnType<typeof setTimeout>` is not a number                                                      |
+| `src/native/chat/ChatView.tsx`           | mounts the rows `useTranscriptWindow` selects; the scroll hook gets the mounted order, first sequence and window-aware `hasMore`/`loadOlder`/`loadThrough`; an `OlderRowsSentinel` mounts older rows near the top |
+| `src/transcript-window.ts`               | new: which rows are mounted (latest 24, +24 per step, anchored by the first mounted row's identity, widened to a restored anchor or a Turn jump before the Host is asked for older pages)                         |
+| `src/client-entry.tsx`                   | new: dshx client entry calling the native `apply`                                                                                                                                                                 |
 
 ### Build
 

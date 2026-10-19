@@ -14,6 +14,7 @@ import { isAtOrOutside } from '../contract/group-tree.ts'
 import type { ChatFlowHookContext, ChatViewSlotProps, OpenFileOptions } from '../contract/slots.ts'
 import type { ChatSnapshot } from '../contract/snapshot.ts'
 import { TurnNavigator } from './TurnNavigator.tsx'
+import { useTranscriptWindow } from '../../transcript-window.ts'
 import { mergeTurnRailItems } from './turn-rail-items.ts'
 import { useChatScroll } from './use-chat-scroll.ts'
 import { fileMediaUrl, resolveWorkspacePath } from '@deepseek-ai/dsh-util-workspace-path'
@@ -63,7 +64,8 @@ export function ChatView({
   usePresentation, useProjection, t,
 }: ChatViewSlotProps) {
   const order = useChat(s => s.order)
-  const groupedEntries = useConversation(snapshot => snapshot.views.grouped('chat')?.entries)
+  const groupedView = useConversation(snapshot => snapshot.views.grouped('chat'))
+  const groupedEntries = groupedView?.entries
   const entries = useMemo<readonly RenderEntry[]>(() => groupedEntries
     ?? order.map(key => ({ kind: 'node', key: key as NodeKey })), [groupedEntries, order])
   const nodeStore = useChat(s => s.nodes)
@@ -109,6 +111,26 @@ export function ChatView({
   const openError = useSession(s => s.openError)
   const hasMore = useSession(s => s.hasMore)
   const loadingOlder = useSession(s => s.loadingOlder)
+  const groupMembers = useCallback((groupKey: string) => (
+    groupedView?.groupSource(groupKey as Parameters<NonNullable<typeof groupedView>['groupSource']>[0]).getSnapshot()?.members.map(member => member.key) ?? []
+  ), [groupedView])
+  const transcript = useTranscriptWindow({
+    ready: openState === 'open',
+    entries,
+    seqOf: useCallback((entry: RenderEntry) => {
+      const key = entry.kind === 'node' ? entry.key : groupMembers(entry.key)[0]
+      return key === undefined ? undefined : nodeStore.get(key as NodeKey)?.anchorSeq
+    }, [groupMembers, nodeStore]),
+    members: groupMembers,
+    savedAnchor: useCallback(() => chatScroll.read()?.anchorKey ?? null, [chatScroll]),
+    hasMore, loadOlder, loadThrough,
+  })
+  // The scroll owner measures the rows it can see, so it follows the mounted window, not the whole Chat order.
+  const mountedOrder = useMemo(() => {
+    const firstMounted = transcript.firstSeq
+    if (transcript.hidden === 0 || firstMounted === null) return order
+    return order.filter(key => (nodeStore.get(key)?.anchorSeq ?? firstMounted) >= firstMounted)
+  }, [order, nodeStore, transcript.hidden, transcript.firstSeq])
   const [fileOpenError, setFileOpenError] = useState<{ path: string; message: string } | null>(null)
   const [fileOpenBusy, setFileOpenBusy] = useState(false)
   // Close/retry must ignore a settlement that started before the latest
@@ -177,15 +199,15 @@ export function ChatView({
   const deferCollapse = deferCompletedTurns
     && !pendingInputs.some(item => 'requestId' in item && item.placement === 'transcript')
 
-  const firstKey = order[0]
-  const firstSeq = firstKey === undefined ? null : nodeStore.get(firstKey)?.anchorSeq ?? null
+  const firstSeq = transcript.firstSeq
   const lastKey = order.at(-1) ?? null
   const latestSteering = pendingInputs.findLast(item => 'source' in item)
   const steeringId = latestSteering?.source.kind === 'user' && 'rpcId' in latestSteering.source
     ? latestSteering.source.rpcId : latestSteering?.id ?? null
   const scroll = useChatScroll({
     ready: openState === 'open',
-    order, firstSeq, lastKey, running, loadingOlder, hasMore, chatScroll, loadOlder, loadThrough, deferCompletedTurns,
+    order: mountedOrder, firstSeq, lastKey, running, loadingOlder, hasMore: transcript.hasMore, chatScroll,
+    loadOlder: transcript.loadOlder, loadThrough: transcript.loadThrough, deferCompletedTurns,
     lastIsUser: lastKey !== null && nodeStore.get(lastKey)?.kind === 'user',
     steeringId,
     submissionId: visibleSubmissions.at(-1)?.requestId ?? null,
@@ -216,7 +238,10 @@ export function ChatView({
                 {t('chat.loadError', { message: openError.message, code: openError.code })}
               </div>
             )}
-            {hasMore && (
+            {transcript.hidden > 0 && scroll.initialized && (
+              <OlderRowsSentinel listRef={scroll.listRef} hidden={transcript.hidden} onVisible={scroll.loadEarlier} />
+            )}
+            {transcript.hasMore && (
               <div className={css.older}>
                 <button type="button" disabled={loadingOlder} onClick={scroll.loadEarlier}>
                   {loadingOlder ? t('loading') : t('chat.loadOlder')}
@@ -225,7 +250,7 @@ export function ChatView({
             )}
             <MarkdownDelegateProvider openFile={requestOpenFile} openExternalLink={openExternalLink} fileImages={fileImages}>
               {renderSlot('conversation.chat.flow', {
-                entries, pendingInputs, lastInputTurn, deferCollapse,
+                entries: transcript.entries, pendingInputs, lastInputTurn, deferCollapse,
                 cwd, openFile: requestOpenFile, inspectCall, forkAt, loadImage, fileMentions,
               }, { hookContext: flowContext })}
             </MarkdownDelegateProvider>
@@ -260,6 +285,26 @@ export function ChatView({
       )}
     </div>
   )
+}
+
+/** Mounts the next older rows once the reader nears the top of the mounted ones. */
+function OlderRowsSentinel({ listRef, hidden, onVisible }: {
+  listRef: { readonly current: HTMLDivElement | null }
+  hidden: number
+  onVisible: () => void
+}) {
+  const ref = useRef<HTMLDivElement>(null)
+  // Observed again after every step: a step that still leaves the sentinel in view must take the next one.
+  useEffect(() => {
+    const target = ref.current
+    if (target === null || typeof IntersectionObserver !== 'function') return
+    const observer = new IntersectionObserver((records) => {
+      if (records.some(record => record.isIntersecting)) onVisible()
+    }, { root: listRef.current, rootMargin: '1200px 0px 0px 0px' })
+    observer.observe(target)
+    return () => { observer.disconnect() }
+  }, [listRef, hidden, onVisible])
+  return <div ref={ref} aria-hidden="true" data-chat-older-rows="" />
 }
 
 /** In-page Host open-path refusal: the wire reason plus a retry of the same path. */
