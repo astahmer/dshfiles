@@ -22,5 +22,10 @@ playwright-report/
 .bench/
 .fork-history/
 
+# Personal verification scripts and screenshots, jj gate receipts, Finder metadata.
+.local/
+.jj-gates/
+.DS_Store
+
 # The global gitignore drops .envrc; this repo's flake shell needs it.
 !.envrc
