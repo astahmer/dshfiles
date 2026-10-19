@@ -5,21 +5,23 @@ import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { ArchiveIcon, CheckCircleIcon } from '@dshfiles/plugin-ui/icons'
 import { useMutation } from '@dshfiles/plugin-ui/query'
-import { useCallback, useEffect, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
+import { DockNotice } from './dock-notice.js'
 import type { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
 import { SidebarOrganization } from './organization.js'
+import { formatAge, formatRemaining } from './relative-age.js'
 import { SettledThreadsModel } from './settled-threads.js'
 import { usePreferences } from './sidebar-state.js'
 import { threadDelayMs } from './thread-delays.js'
 
 /**
- * Above a settled thread's composer: a "This thread is settled." banner, while the composer itself is
- * blocked. The Host refuses the model step a settled Session proposes, so the click that lifts the
- * status has to be here rather than a message that would end as `blocked`. It reads like the jj rebase
- * notice: the settle date and the archive time on the right, the actions beside them.
+ * Above a settled thread's composer: a "This thread is settled." notice, while the composer itself is blocked. The Host
+ * refuses the model step a settled Session proposes, so the click that lifts the status has to be here rather than a
+ * message that would end as `blocked`. It reads like the jj rebase notice beside it: one centred status card with the
+ * settle age and the archive deadline, then the actions.
  *
- * It reads the sidebar's own preference source: the same Host settings when the Client has them, and
- * the same browser copy when a Host without the Settings namespace is serving the panel.
+ * It reads the sidebar's own preference source: the same Host settings when the Client has them, and the same browser
+ * copy when a Host without the Settings namespace is serving the panel.
  */
 export const SettledThreadDock = (props: {
   readonly sessionId: SessionSummary['id']
@@ -39,6 +41,15 @@ export const SettledThreadDock = (props: {
   const settled = preferences.settledSessionIds.includes(sessionId) && !archived
   const settledAt = preferences.settledAt[sessionId]
   const archiveAt = SettledThreadsModel.archiveTime({ settledAt, delayMs: threadDelayMs(preferences.settledArchiveDelay) })
+  const dated = settledAt !== undefined || archiveAt !== undefined
+  // Both readings are relative ("3h", "in 22h"), so a long-open tab has to redraw them instead of freezing the age it
+  // first rendered: one tick a minute is enough for either bucket.
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    if (!settled || !dated) return
+    const timer = window.setInterval(() => setNow(Date.now()), 60_000)
+    return () => window.clearInterval(timer)
+  }, [dated, settled])
   const composerReason = t('threadSidebarSettledComposer')
   useEffect(() => {
     if (!settled) return
@@ -50,36 +61,38 @@ export const SettledThreadDock = (props: {
   })
   if (!settled) return null
   return (
-    <div
-      role="status"
-      aria-label={t('threadSidebarSettledBanner')}
-      className="dshx-root dshx:mx-auto dshx:my-3 dshx:flex dshx:w-full dshx:max-w-3xl dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:rounded-md dshx:border dshx:border-border dshx:bg-muted dshx:px-3 dshx:py-2 dshx:text-sm dshx:text-muted-foreground"
-    >
-      <CheckCircleIcon className="dshx:size-4 dshx:shrink-0" aria-hidden />
-      <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{t('threadSidebarSettledBanner')}</span>
-      {settledAt === undefined ? null : (
-        <time className="dshx:shrink-0 dshx:text-xs dshx:tabular-nums" dateTime={new Date(settledAt).toISOString()}>
-          {t('threadSidebarSettledAt', { when: new Date(settledAt).toLocaleString() })}
-        </time>
-      )}
-      {archiveAt === undefined ? null : (
-        <time className="dshx:shrink-0 dshx:text-xs dshx:tabular-nums" dateTime={new Date(archiveAt).toISOString()}>
-          {t('threadSidebarSettledArchiveAt', { when: new Date(archiveAt).toLocaleString() })}
-        </time>
-      )}
-      <Button size="sm" variant="outline" disabled={archive.isPending} onClick={() => archive.mutate()}>
-        <ArchiveIcon className="dshx:size-4" aria-hidden />
-        {t('threadSidebarArchive')}
-      </Button>
-      <Button
-        size="sm"
-        variant="outline"
-        onClick={() =>
-          updatePreferences(SettledThreadsModel.unsettle({ settledSessionIds: preferences.settledSessionIds, settledAt: preferences.settledAt }, [sessionId]))
-        }
-      >
-        {t('threadSidebarUnsettleToReply')}
-      </Button>
-    </div>
+    <DockNotice
+      label={t('threadSidebarSettledBanner')}
+      icon={<CheckCircleIcon className="dshx:size-4 dshx:shrink-0" aria-hidden />}
+      meta={
+        <>
+          {settledAt === undefined ? null : (
+            <time dateTime={new Date(settledAt).toISOString()}>{t('threadSidebarSettledAt', { when: formatAge(settledAt, now) })}</time>
+          )}
+          {archiveAt === undefined ? null : (
+            <time dateTime={new Date(archiveAt).toISOString()}>{t('threadSidebarSettledArchiveAt', { when: formatRemaining(archiveAt, now) })}</time>
+          )}
+        </>
+      }
+      actions={
+        <>
+          <Button size="sm" variant="ghost" disabled={archive.isPending} onClick={() => archive.mutate()}>
+            <ArchiveIcon className="dshx:size-3.5" aria-hidden />
+            {t('threadSidebarArchive')}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() =>
+              updatePreferences(
+                SettledThreadsModel.unsettle({ settledSessionIds: preferences.settledSessionIds, settledAt: preferences.settledAt }, [sessionId]),
+              )
+            }
+          >
+            {t('threadSidebarUnsettleToReply')}
+          </Button>
+        </>
+      }
+    />
   )
 }

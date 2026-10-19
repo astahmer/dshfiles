@@ -7,6 +7,7 @@ import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
 import { HostSnapshotsModel } from './snapshots.js'
 import { storedCollapsedGroups, toggleCollapsedGroup } from './collapsed-groups.js'
 import { useNearViewport } from './use-near-viewport.js'
+import { formatAge } from './relative-age.js'
 import { RemoteThreadsSection } from './remote-threads-section.js'
 import { StableValueModel, useStableValue } from './stable-value.js'
 import { createThreadChildRowCache, type ThreadChildRowCache } from './thread-child-rows.js'
@@ -26,7 +27,6 @@ import {
   IconPinOutlineRegular,
   IconPlayOutlineRegular,
   IconUnarchiveOutlineRegular,
-  relativeTime,
   writeClipboard,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
@@ -326,16 +326,8 @@ const sessionsForAutoArchive = (ids: readonly SessionSummary['id'][], byId: Read
     return session === undefined ? [] : [session]
   })
 
-const RELATIVE_TIME_SUFFIX = { now: '', minutes: 'm', hours: 'h', days: 'd', months: 'mo', years: 'y' } as const
-
 const keepThreadTab = (sessionId: string): void => {
   window.dispatchEvent(new CustomEvent('dshfiles:main-tabs:keep-thread', { detail: { sessionId } }))
-}
-
-/** Row age ("22h") read off updatedAt; Host buckets keep it in step with other session surfaces. */
-const formatAge = (updatedAt: number): string => {
-  const age = relativeTime(updatedAt, Date.now())
-  return age.unit === 'now' ? 'now' : `${age.n}${RELATIVE_TIME_SUFFIX[age.unit]}`
 }
 
 /** Short readable form of a session id for a row that cannot show the thread's own title. */
