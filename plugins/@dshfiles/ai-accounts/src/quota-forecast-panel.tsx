@@ -11,21 +11,23 @@ import { aiAccountsApi } from './api.js'
 import { CoverageBoardView, type CoverageSelection } from './quota-coverage-board.js'
 import { QuotaCoverageModel } from './quota-coverage-model.js'
 import { ForecastBoardView } from './quota-forecast-board.js'
+import { HandoffBoardView } from './quota-handoff-board.js'
 import { QuotaForecastModel } from './quota-forecast-model.js'
 import { useAccountsUsage } from './use-accounts-usage.js'
 import { usePreferences } from './use-preferences.js'
 
-type View = 'forecast' | 'table' | 'coverage'
+type View = 'forecast' | 'table' | 'coverage' | 'handoff'
 
 /**
- * Where each account's quota is heading at the current pace, and whether
- * accounts of one kind kept covering for each other week by week. Both views
+ * Where each account's quota is heading at the current pace, whether accounts
+ * of one kind kept covering for each other week by week, and the order to use
+ * them in over the coming week. Every view
  * read the stored quota snapshots, so the forecast needs the collector to have
  * run for a while before it says anything.
  */
 export const QuotaForecastPanel = (props: { readonly onBack: () => void }): JSX.Element => {
   const accounts = useApi(aiAccountsApi)
-  const { usageRefreshMs } = usePreferences()
+  const { usageRefreshMs, workHours } = usePreferences()
   const { usage, refresh, refreshing } = useAccountsUsage()
   const [view, setView] = useState<View>('forecast')
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -47,15 +49,18 @@ export const QuotaForecastPanel = (props: { readonly onBack: () => void }): JSX.
   }))
   const board = QuotaForecastModel.board({ accounts: inputs, now })
   const forecasts = new Map(board.accounts.map(account => [account.instanceId, account]))
-  const report = QuotaCoverageModel.report({ accounts: inputs.map(input => ({ ...input, forecast: forecasts.get(input.instanceId) })), now })
+  const coverageInputs = inputs.map(input => ({ ...input, forecast: forecasts.get(input.instanceId) }))
+  const report = QuotaCoverageModel.report({ accounts: coverageInputs, now, workHours })
+  const plans = QuotaCoverageModel.handoffs({ accounts: coverageInputs, now, workHours })
 
-  const headline = view === 'coverage' ? CoverageBoardView.headline(report) : ForecastBoardView.headline(board)
+  const headline =
+    view === 'coverage' ? CoverageBoardView.headline(report) : view === 'handoff' ? HandoffBoardView.headline(plans, now) : ForecastBoardView.headline(board)
 
   return (
     <main className="dshx-root dshx:@container dshx:flex dshx:h-full dshx:min-h-0 dshx:w-full dshx:flex-col dshx:gap-5 dshx:overflow-auto dshx:px-6 dshx:py-5 dshx:@max-pane-narrow:px-3">
       <Tabs
         className="dshx:mx-auto dshx:flex dshx:w-full dshx:max-w-[1500px] dshx:flex-col dshx:gap-5"
-        onValueChange={value => setView(value === 'table' || value === 'coverage' ? value : 'forecast')}
+        onValueChange={value => setView(value === 'table' || value === 'coverage' || value === 'handoff' ? value : 'forecast')}
         value={view}
       >
         <header className="dshx:flex dshx:flex-wrap dshx:items-end dshx:justify-between dshx:gap-4">
@@ -76,6 +81,7 @@ export const QuotaForecastPanel = (props: { readonly onBack: () => void }): JSX.
               <TabsTrigger value="forecast">Forecast</TabsTrigger>
               <TabsTrigger value="table">Table</TabsTrigger>
               <TabsTrigger value="coverage">Coverage</TabsTrigger>
+              <TabsTrigger value="handoff">Hand-off</TabsTrigger>
             </TabsList>
           </div>
         </header>
@@ -100,12 +106,10 @@ export const QuotaForecastPanel = (props: { readonly onBack: () => void }): JSX.
               <ForecastBoardView.Table board={board} />
             </TabsContent>
             <TabsContent value="coverage">
-              <CoverageBoardView.Board
-                onSelect={setCoverageSelection}
-                report={report}
-                selection={coverageSelection}
-                workHours={QuotaCoverageModel.defaultWorkHours}
-              />
+              <CoverageBoardView.Board onSelect={setCoverageSelection} report={report} selection={coverageSelection} workHours={workHours} />
+            </TabsContent>
+            <TabsContent value="handoff">
+              <HandoffBoardView.Board now={now} plans={plans} workHours={workHours} />
             </TabsContent>
           </>
         )}

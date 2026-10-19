@@ -75,10 +75,17 @@ snapshots of every enabled account.
   used per day over the last week against the window's daily allowance.
 - **Table** lists the same projection.
 - **Coverage** replays five weeks per provider kind with two or more accounts:
-  one lane per account plus an "accounts free" lane, and the work hours
-  (weekdays 09:00 to 18:00) when every account of the kind was spent at once.
-  The current week continues on pace. A kind with one account is listed as
-  having no cover.
+  one lane per account plus an "accounts free" lane, and the work hours when
+  every account of the kind was spent at once. The current week continues on
+  pace. A kind with one account is listed as having no cover.
+- **Hand-off** plans the next seven days per kind with two or more accounts:
+  each hour goes to the free account whose window resets soonest (quota left
+  at a reset is lost), so the bar shows which account to work on, when to hand
+  off, and when the kind runs dry. Every account keeps its own current pace;
+  the plan does not move work between accounts.
+
+Work hours default to Monday to Friday, 09:00 to 18:00; change them under
+Settings › AI Accounts › Work hours.
 
 The panel asks the Host for 36 days of history thinned to one reading per half
 hour, keeping every reading where a reset time or a spent window changes. An

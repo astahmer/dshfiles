@@ -290,9 +290,111 @@ const spentEpisodes = (points: readonly UsageHistoryPoint[]): number => {
   return episodes
 }
 
+export interface HandoffSegment {
+  readonly start: number
+  readonly end: number
+  /** The account to work on; `null` while no account of the kind is free. */
+  readonly instanceId: string | null
+  readonly workHours: number
+}
+
+export interface HandoffLane {
+  readonly instanceId: string
+  readonly displayName: string
+  /** One flag per hour of the plan: whether the account has quota left. */
+  readonly free: readonly boolean[]
+}
+
+export interface HandoffPlan {
+  readonly kind: AccountKind
+  readonly start: number
+  readonly hours: number
+  readonly lanes: readonly HandoffLane[]
+  readonly segments: readonly HandoffSegment[]
+  readonly noneFreeHours: number
+  readonly noneFreeWorkHours: number
+  /** Accounts of this kind without a forecast, left out of the plan. */
+  readonly unread: readonly string[]
+}
+
+const HANDOFF_HOURS = 168
+
+/**
+ * The coming week for one kind: each hour goes to the free account whose
+ * window resets soonest, since quota left at a reset is lost. Every account
+ * keeps its own projected pace, so the plan shows when the kind runs dry, not
+ * how a different split of the work would move that.
+ */
+const handoffPlan = (input: {
+  readonly kind: AccountKind
+  readonly accounts: readonly CoverageAccountInput[]
+  readonly now: number
+  readonly workHours: WorkHours
+}): HandoffPlan => {
+  const start = new Date(input.now)
+  start.setMinutes(0, 0, 0)
+  const hourStarts = Array.from({ length: HANDOFF_HOURS }, (_, index) => addHours(start.getTime(), index))
+  const forecasted = input.accounts.flatMap(account => (account.forecast?.status === 'forecast' ? [{ account, window: account.forecast.window }] : []))
+  const lanes = forecasted.map(({ account, window }) => ({
+    instanceId: account.instanceId,
+    displayName: account.displayName,
+    free: hourStarts.map(at => !(window.runsOutAt !== null && at + HOUR_MS > window.runsOutAt && (window.resetsAt === null || at < window.resetsAt))),
+  }))
+  const nextReset = (index: number, at: number): number => {
+    const window = forecasted[index]?.window
+    if (window === undefined || window.resetsAt === null) return Number.POSITIVE_INFINITY
+    if (at < window.resetsAt) return window.resetsAt
+    return window.lengthMs === null ? Number.POSITIVE_INFINITY : window.resetsAt + window.lengthMs
+  }
+  const serving = hourStarts.map((at, hour) => {
+    const candidates = lanes.map((lane, index) => ({ lane, index })).filter(entry => entry.lane.free[hour] === true)
+    candidates.sort((left, right) => nextReset(left.index, at) - nextReset(right.index, at) || left.index - right.index)
+    return candidates[0]?.lane.instanceId ?? null
+  })
+
+  const segments: HandoffSegment[] = []
+  // With no account forecast there is nothing to plan, not a week with nothing free.
+  for (const [hour, at] of lanes.length === 0 ? [] : hourStarts.entries()) {
+    const instanceId = serving[hour] ?? null
+    const work = isWorkHour(at, input.workHours) ? 1 : 0
+    const last = segments.at(-1)
+    if (last !== undefined && last.instanceId === instanceId) {
+      segments[segments.length - 1] = { ...last, end: at + HOUR_MS, workHours: last.workHours + work }
+      continue
+    }
+    segments.push({ start: at, end: at + HOUR_MS, instanceId, workHours: work })
+  }
+  const gaps = segments.filter(segment => segment.instanceId === null)
+  return {
+    kind: input.kind,
+    start: start.getTime(),
+    hours: HANDOFF_HOURS,
+    lanes,
+    segments,
+    noneFreeHours: gaps.reduce((total, gap) => total + (gap.end - gap.start) / HOUR_MS, 0),
+    noneFreeWorkHours: gaps.reduce((total, gap) => total + gap.workHours, 0),
+    unread: input.accounts.filter(account => account.forecast?.status !== 'forecast').map(account => account.displayName),
+  }
+}
+
 export class QuotaCoverageModel {
   static readonly defaultWorkHours: WorkHours = { days: [1, 2, 3, 4, 5], startHour: 9, endHour: 18 }
   static readonly weekCount = 5
+
+  /** A hand-off plan for every kind with two or more accounts, driest first. */
+  static handoffs = (input: {
+    readonly accounts: readonly CoverageAccountInput[]
+    readonly now: number
+    readonly workHours?: WorkHours
+  }): readonly HandoffPlan[] => {
+    const workHours = input.workHours ?? QuotaCoverageModel.defaultWorkHours
+    const kinds = [...new Set(input.accounts.map(account => account.kind))]
+    return kinds
+      .map(kind => ({ kind, accounts: input.accounts.filter(account => account.kind === kind) }))
+      .filter(group => group.accounts.length > 1)
+      .map(group => handoffPlan({ ...group, now: input.now, workHours }))
+      .sort((left, right) => right.noneFreeWorkHours - left.noneFreeWorkHours || right.noneFreeHours - left.noneFreeHours)
+  }
 
   /**
    * Whether each provider kind kept an account free, week by week. Accounts of

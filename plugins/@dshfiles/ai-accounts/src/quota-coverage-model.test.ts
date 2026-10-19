@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { UsageHistoryPoint } from './api.js'
 import { QuotaCoverageModel, type CoverageAccountInput } from './quota-coverage-model.js'
+import type { AccountForecast, WindowForecast } from './quota-forecast-model.js'
 
 const HOUR = 3_600_000
 // Monday 5 October 2026; the report runs on the following Wednesday, so this is last week.
@@ -49,5 +50,61 @@ describe('QuotaCoverageModel.report', () => {
     const report = QuotaCoverageModel.report({ accounts: [copilot], now })
 
     expect(report.groups).toEqual([{ status: 'single', kind: 'github-copilot', instanceId: 'Copilot', displayName: 'Copilot', spentEpisodes: 1 }])
+  })
+
+  it('hands off to the account that resets soonest and marks the hours when every account is spent', () => {
+    const monday = new Date(2026, 9, 12, 9).getTime()
+    const forecast = (instanceId: string, window: Partial<WindowForecast>): AccountForecast => ({
+      status: 'forecast',
+      instanceId,
+      displayName: instanceId,
+      kind: 'claude',
+      others: [],
+      cells: [],
+      window: {
+        label: 'Weekly limit',
+        used: 50,
+        resetsAt: null,
+        startsAt: null,
+        lengthMs: 7 * 24 * HOUR,
+        pacePerHour: 1,
+        evenPerHour: null,
+        elapsedFraction: null,
+        runsOutAt: null,
+        lockedMs: null,
+        usedAtReset: null,
+        series: [],
+        daily: [],
+        allowedPerDay: null,
+        ...window,
+      },
+    })
+    const withForecast = (instanceId: string, window: Partial<WindowForecast>): CoverageAccountInput => ({
+      ...account(instanceId, []),
+      forecast: forecast(instanceId, window),
+    })
+    const max = withForecast('Max', { runsOutAt: monday + 8 * HOUR, resetsAt: monday + 50 * HOUR })
+    const proSide = withForecast('Pro Side', { runsOutAt: monday + 26 * HOUR, resetsAt: monday + 100 * HOUR })
+    const signedOut = { ...account('Signed out', []), forecast: undefined }
+
+    const [plan] = QuotaCoverageModel.handoffs({ accounts: [proSide, max, signedOut], now: monday })
+
+    expect(plan?.segments.map(segment => [segment.instanceId, (segment.end - segment.start) / HOUR])).toEqual([
+      ['Max', 8],
+      ['Pro Side', 18],
+      [null, 24],
+      ['Max', 118],
+    ])
+    // The gap runs Tuesday 11:00 to Wednesday 11:00: 7 work hours on Tuesday, 2 on Wednesday.
+    expect(plan?.noneFreeWorkHours).toBe(9)
+    expect(plan?.unread).toEqual(['Signed out'])
+  })
+
+  it('plans nothing for a kind whose accounts have no forecast instead of calling it dry', () => {
+    const [plan] = QuotaCoverageModel.handoffs({ accounts: [account('One', []), account('Two', [])], now })
+
+    expect(plan?.segments).toEqual([])
+    expect(plan?.noneFreeHours).toBe(0)
+    expect(plan?.unread).toEqual(['One', 'Two'])
   })
 })

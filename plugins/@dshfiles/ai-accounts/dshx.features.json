@@ -337,12 +337,19 @@
     },
     {
       "id": "quota-forecast",
-      "title": "Forecast when each account runs out, and whether a kind kept an account free",
-      "summary": "A Quota forecast panel projects every account's binding window over seven days of six-hour cells at the current pace (runs out, locked until reset, new window), with a Table view and a detail of used versus even pace and recent daily use. Coverage replays five weeks of stored snapshots per provider kind and counts the work hours with no account of that kind free, continuing the current week on pace.",
-      "reach": ["click button \"Quota forecast\"", "expect tab \"Forecast\"", "expect tab \"Coverage\""],
-      "surfaces": ["client", "host", "storage"],
-      "configuration": [],
-      "states": ["insufficient-history", "runs-out-before-reset", "reset-before-depletion", "unavailable", "pool-covered", "pool-none-free"],
+      "title": "Forecast when each account runs out, whether a kind kept an account free, and the order to use them in",
+      "summary": "A Quota forecast panel projects every account's binding window over seven days of six-hour cells at the current pace (runs out, locked until reset, new window), with a Table view and a detail of used versus even pace and recent daily use. Coverage replays five weeks of stored snapshots per provider kind and counts the work hours with no account of that kind free, continuing the current week on pace. Hand-off plans the coming week per kind: each hour goes to the free account that resets soonest, showing when to hand off and when the kind runs dry.",
+      "reach": ["click button \"Quota forecast\"", "expect tab \"Forecast\"", "click tab \"Hand-off\"", "expect text \"Work on\""],
+      "surfaces": ["client", "host", "storage", "settings"],
+      "configuration": [
+        {
+          "key": "workHours",
+          "defaultValue": "{\"days\":[1,2,3,4,5],\"startHour\":9,\"endHour\":18}",
+          "constraints": "Days are Date.getDay() values (0 = Sunday); startHour 0–23, endHour 1–24 and after startHour.",
+          "coveredBy": ["ai-accounts.coverage-none-free", "ai-accounts.handoff-plan"]
+        }
+      ],
+      "states": ["insufficient-history", "runs-out-before-reset", "reset-before-depletion", "unavailable", "pool-covered", "pool-none-free", "handoff-gap"],
       "failureModes": [
         "An account without a quota reading shows \"Reconnect to forecast\" or \"Quota not reported\" instead of an invented projection.",
         "An older Host ignores the history bucket and returns its bounded series; the forecast still draws."
@@ -384,6 +391,12 @@
           "id": "ai-accounts.history-thinning",
           "file": "plugins/@dshfiles/ai-accounts/src/usage-history-analysis.test.ts",
           "testName": "thins a read to one reading per bucket but keeps the readings where a limit is spent or resets"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.handoff-plan",
+          "file": "plugins/@dshfiles/ai-accounts/src/quota-coverage-model.test.ts",
+          "testName": "hands off to the account that resets soonest and marks the hours when every account is spent"
         }
       ]
     },
