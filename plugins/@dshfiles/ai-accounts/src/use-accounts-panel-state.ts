@@ -3,6 +3,7 @@ import { useApi } from '@dshfiles/dshx/client'
 import { useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AccountDraftModel } from './account-draft.js'
+import type { AccountRemovalTarget } from './account-remove-machine.js'
 import { useAutoSaver } from './auto-save.js'
 import { connectHintFor } from './account-labels.js'
 import { aiAccountsKeys, aiAccountsQueries } from './accounts-queries.js'
@@ -125,11 +126,24 @@ export const useAccountsPanelState = (credentialSetup?: CredentialSetupPort) => 
     onSuccess: next => setFile(next),
     onError: error => setNotice(`Could not reorder account: ${String(error)}`),
   })
+  const removeMutation = useMutation({
+    mutationFn: async (target: AccountRemovalTarget) => {
+      const next = await accounts.remove({ instanceId: target.instanceId })
+      setFile(next)
+      return next
+    },
+    onMutate: () => setNotice(null),
+    onSuccess: (_next, target) => {
+      setSelectedId(current => (current === target.instanceId ? null : current))
+      setNotice(`Removed ${target.displayName}. Credentials were left on disk.`)
+    },
+  })
 
   const save = async (next: AccountDraft): Promise<boolean> => {
     const previousInstanceId = selectedId !== null && selectedId !== next.instanceId ? selectedId : undefined
     try {
-      await saveMutation.mutateAsync({ draft: next, ...(previousInstanceId === undefined ? {} : { previousInstanceId }) })
+      const input = previousInstanceId === undefined ? { draft: next } : { draft: next, previousInstanceId }
+      await saveMutation.mutateAsync(input)
       saver.markSaved(next)
       setNotice(previousInstanceId === undefined ? 'Saved. New sessions use the updated route settings.' : `Renamed to ${next.instanceId}.`)
       return true
@@ -235,10 +249,8 @@ export const useAccountsPanelState = (credentialSetup?: CredentialSetupPort) => 
     setFile(await accounts.save({ draft: { ...AccountDraftModel.toDraft(profile), enabled: !profile.enabled } }))
   }
 
-  const remove = async (profile: AccountProfile) => {
-    setFile(await accounts.remove({ instanceId: profile.instanceId }))
-    setSelectedId(current => (current === profile.instanceId ? null : current))
-    setNotice(`Removed ${profile.displayName}. Credentials were left on disk.`)
+  const remove = async (target: AccountRemovalTarget): Promise<void> => {
+    await removeMutation.mutateAsync(target)
   }
 
   /**

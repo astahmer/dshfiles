@@ -10,6 +10,12 @@ Feature: AI Accounts
     When a Codex account draft is edited in manual save mode
     Then the manual draft saves and persists when AI Accounts is reopened
 
+  @scenario:ai-accounts.account-removal
+  Scenario: Cancel and confirm account removal
+    Given the isolated plugin profile "@dshfiles/ai-accounts" is booted
+    When a Codex account is ready for removal
+    Then account removal can be canceled and confirmed
+
   @scenario:ai-accounts.failure-recovery
   Scenario: Configure rate-limit failover from AI Accounts settings
     Given the isolated plugin profile "@dshfiles/ai-accounts" is booted

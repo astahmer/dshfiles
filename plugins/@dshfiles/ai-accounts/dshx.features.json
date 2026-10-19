@@ -4,7 +4,8 @@
     {
       "id": "account-lifecycle",
       "title": "Manage provider account drafts",
-      "summary": "Add, edit, enable, and persist account profiles while preserving unsaved edits across validation and save failures.",
+      "summary": "Add, edit, enable, and persist account profiles; confirm removals, keep canceled profiles, and retry failed removals.",
+      "reach": ["click button \"AI Accounts\"", "expect complementary \"Provider accounts\""],
       "surfaces": ["client", "host", "settings", "storage"],
       "configuration": [
         {
@@ -21,8 +22,12 @@
           "coveredBy": ["ai-accounts.save-policy"]
         }
       ],
-      "states": ["clean", "dirty", "saving", "saved", "validation-error", "save-error"],
-      "failureModes": ["Invalid account path or environment alias is rejected.", "A failed write preserves the draft and supports retry or revert."],
+      "states": ["clean", "dirty", "saving", "saved", "validation-error", "save-error", "confirming-removal", "removing", "remove-error", "removed"],
+      "failureModes": [
+        "Invalid account path or environment alias is rejected.",
+        "A failed write preserves the draft and supports retry or revert.",
+        "Canceling removal keeps the profile intact; a failed removal stays visible and supports retry."
+      ],
       "externalDependencies": [],
       "verification": [
         {
@@ -33,6 +38,11 @@
         {
           "kind": "gherkin",
           "id": "ai-accounts.save-policy",
+          "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "ai-accounts.account-removal",
           "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature"
         }
       ]

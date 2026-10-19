@@ -50,7 +50,14 @@ export const AccountsPanel = (props: {
         <AccountRail file={state.file} state={state} />
 
         {state.draft !== null ? (
-          <AccountDetail draft={state.draft} file={state.file} folderPicker={props.folderPicker} onOpenUsageHistory={props.onOpenUsageHistory} state={state} />
+          <AccountDetail
+            key={state.selectedId ?? 'none'}
+            draft={state.draft}
+            file={state.file}
+            folderPicker={props.folderPicker}
+            onOpenUsageHistory={props.onOpenUsageHistory}
+            state={state}
+          />
         ) : (
           <Empty>
             <EmptyHeader>

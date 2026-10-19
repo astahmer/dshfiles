@@ -11,10 +11,12 @@ import {
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Label } from '@dshfiles/plugin-ui/components/ui/label'
 import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
+import { useMachine } from '@dshfiles/plugin-ui/machine'
 import { ArrowUpRightIcon, RefreshCwIcon, Trash2Icon } from '@dshfiles/plugin-ui/icons'
-import { useId, useState } from 'react'
+import { useId } from 'react'
 import { AccountIdentitySection } from './account-identity-section.js'
 import { KIND_SUBSCRIPTION, routedKind } from './account-labels.js'
+import { accountRemoveMachine } from './account-remove-machine.js'
 import { AutoSaveIndicator } from './auto-save-indicator.js'
 import type { AccountDraft, AccountsFile } from './api.js'
 import { ModelCuration } from './model-curation.js'
@@ -34,7 +36,9 @@ export const AccountDetail = (props: {
 }): JSX.Element => {
   const draft = props.draft
   const { catalog, refreshingCatalog, refreshCatalog, selected, setDraft, persist, save, remove, dirty, saving, notice, problem } = props.state
-  const [confirmingRemove, setConfirmingRemove] = useState(false)
+  const [removeSnapshot, sendRemove] = useMachine(accountRemoveMachine, { input: { removeAccount: remove } })
+  const removalInProgress = removeSnapshot.matches('removing')
+  const removeDialogOpen = removeSnapshot.matches('confirming') || removalInProgress || removeSnapshot.matches('error')
   const enabledSwitchId = useId()
   return (
     <section className="dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-col dshx:overflow-hidden dshx:px-5 dshx:py-3.5">
@@ -133,7 +137,10 @@ export const AccountDetail = (props: {
         <Button
           className="dshx:text-destructive dshx:hover:text-destructive"
           disabled={selected === null}
-          onClick={() => setConfirmingRemove(true)}
+          onClick={() => {
+            if (selected === null) return
+            sendRemove({ type: 'request', target: { instanceId: selected.instanceId, displayName: selected.displayName } })
+          }}
           size="sm"
           type="button"
           variant="ghost"
@@ -143,21 +150,26 @@ export const AccountDetail = (props: {
         </Button>
       </footer>
 
-      <AlertDialog onOpenChange={setConfirmingRemove} open={confirmingRemove}>
+      <AlertDialog
+        onOpenChange={open => {
+          if (!open && !removalInProgress) sendRemove({ type: 'cancel' })
+        }}
+        open={removeDialogOpen}
+      >
         <AlertDialogContent className="dshx-root" size="sm">
           <AlertDialogHeader>
-            <AlertDialogTitle>Remove {selected?.displayName ?? draft.displayName}?</AlertDialogTitle>
+            <AlertDialogTitle>Remove {removeSnapshot.context.target?.displayName ?? selected?.displayName ?? draft.displayName}?</AlertDialogTitle>
             <AlertDialogDescription>The route leaves the model picker. Credentials stay on disk.</AlertDialogDescription>
+            {removeSnapshot.matches('error') ? <p role="alert">Could not remove this profile. Try again or cancel.</p> : null}
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={removalInProgress}>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={() => {
-                if (selected !== null) void remove(selected)
-              }}
+              disabled={removalInProgress}
+              onClick={() => sendRemove({ type: removeSnapshot.matches('error') ? 'retry' : 'confirm' })}
               variant="destructive"
             >
-              Remove profile
+              {removalInProgress ? 'Removing…' : removeSnapshot.matches('error') ? 'Try again' : 'Remove profile'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

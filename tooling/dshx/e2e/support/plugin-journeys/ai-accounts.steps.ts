@@ -89,6 +89,30 @@ Then('the manual draft saves and persists when AI Accounts is reopened', async (
   await finishJourneyAssertions(page)
 })
 
+When('a Codex account is ready for removal', async ({ page }: { page: Page }) => {
+  await openAccountsPanel(page)
+  await providerAccounts(page).getByRole('button', { name: 'Add account', exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Codex account', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Codex 1', exact: true })).toBeVisible()
+})
+
+Then('account removal can be canceled and confirmed', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'ai-accounts-account-removal', async () => {
+    const removeButton = page.getByRole('button', { name: 'Remove profile', exact: true })
+    await removeButton.click()
+    const dialog = page.getByRole('alertdialog')
+    await expect(dialog.getByRole('heading', { name: 'Remove Codex 1?', exact: true })).toBeVisible()
+    await dialog.getByRole('button', { name: 'Cancel', exact: true }).click()
+    await expect(dialog).toBeHidden()
+    await expect(page.getByRole('heading', { name: 'Codex 1', exact: true })).toBeVisible()
+    await removeButton.click()
+    await dialog.getByRole('button', { name: 'Remove profile', exact: true }).click()
+    await expect(page.getByRole('status').filter({ hasText: 'Removed Codex 1. Credentials were left on disk.' })).toBeVisible()
+    await expect(page.getByText('Your accounts, side by side.', { exact: true })).toBeVisible()
+  })
+  await finishJourneyAssertions(page)
+})
+
 Then('the usage windows per account can be configured and restored', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'ai-accounts-usage-window-layout', async () => {
     const layout = page.getByRole('combobox', { name: 'Windows per account' })
