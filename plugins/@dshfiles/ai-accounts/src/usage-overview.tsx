@@ -5,35 +5,14 @@ import { Progress } from '@dshfiles/plugin-ui/components/ui/progress'
 import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
 import { ChevronDownIcon, RefreshCwIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { KIND_GROUPS, KIND_LABEL } from './account-labels.js'
 import type { AccountsUsage } from './api.js'
 import { ProviderGlyph } from './provider-glyph.js'
+import { useQuotaClock } from './quota-clock.js'
 import { QUOTA_TONE_PROGRESS, QUOTA_TONE_TEXT, quotaTone } from './quota-tone.js'
 import { ArrangeableAccount, useUsageLayout, type UsageArrangement } from './usage-arrangement.js'
 import { UsageOverviewModel, type OverviewCard, type ProviderTab } from './usage-overview-model.js'
-
-/** Ticks every second while the page is visible; a hidden tab stops re-rendering and catches up on return. */
-export const useNow = (): number => {
-  const [now, setNow] = useState(Date.now)
-  useEffect(() => {
-    let timer: ReturnType<typeof setInterval> | undefined
-    const sync = (): void => {
-      clearInterval(timer)
-      timer = undefined
-      if (document.hidden) return
-      setNow(Date.now())
-      timer = setInterval(() => setNow(Date.now()), 1_000)
-    }
-    sync()
-    document.addEventListener('visibilitychange', sync)
-    return () => {
-      clearInterval(timer)
-      document.removeEventListener('visibilitychange', sync)
-    }
-  }, [])
-  return now
-}
 
 const BankedResets = (props: { readonly count: number; readonly expiries: readonly (number | null)[] }): JSX.Element => {
   const ordered = UsageOverviewModel.bankedExpiries(props.expiries)
@@ -202,7 +181,7 @@ export const UsageOverview = (props: {
   readonly onOpenHistory: () => void
 }): JSX.Element => {
   const [tab, setTab] = useState<ProviderTab>('all')
-  const now = useNow()
+  const now = useQuotaClock({ resetsAt: [], precision: 'second' })
   const providers = UsageOverviewModel.overviewProviders(props.usage)
   const activeTab = tab !== 'all' && !providers.includes(tab) ? 'all' : tab
   const arrangement = useUsageLayout()
