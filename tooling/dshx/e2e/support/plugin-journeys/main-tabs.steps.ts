@@ -230,7 +230,9 @@ When('a thread is double-clicked in the sidebar before another is opened', async
   await expect(threadTab(page, firstThreadId)).toHaveAttribute('data-preview', 'true')
   await firstThreadButton.dblclick({ position: { x: 20, y: 16 } })
   await expect(threadTab(page, firstThreadId)).not.toHaveAttribute('data-preview')
-  await sidebarThreadRow(page, secondThreadId).locator('button[data-thread-main-action]').click({ position: { x: 20, y: 16 } })
+  await sidebarThreadRow(page, secondThreadId)
+    .locator('button[data-thread-main-action]')
+    .click({ position: { x: 20, y: 16 } })
   await expect(threadTab(page, secondThreadId)).toHaveAttribute('data-preview', 'true')
 })
 
