@@ -8,10 +8,12 @@ import { SESSION_FORMAT_VERSION } from '@deepseek-ai/dsh-session'
 import { SessionId, SessionSeq } from '@deepseek-ai/dsh-session/types'
 import type { SessionHeader } from '@deepseek-ai/dsh-session/types'
 import {
+  materializeSessionEventResultFilters,
   SessionQueryEngine,
   SessionQueryError,
   SessionSearchCursor,
   type SessionResultFilter,
+  type SessionEventResultFilter,
   type SessionEventSearchHit,
   type SessionEventSearchPage,
   type SessionEventSearchRequest,
@@ -22,7 +24,7 @@ import {
 } from '@deepseek-ai/dsh-session-query'
 import { z } from 'zod'
 import { withoutUndefined } from './optional-fields.js'
-import type { SearchMatch, SessionHeaderRow } from './protocol.js'
+import type { EventFilters, SearchMatch, SessionHeaderRow } from './protocol.js'
 import { SearchWorkerClient } from './worker-client.js'
 
 const engineConfigSchema = z.object({
@@ -43,8 +45,14 @@ const cursorPayloadSchema = z.object({
 })
 
 type CursorFingerprint =
-  | { readonly scope: 'sessions'; readonly query: string; readonly limit: number; readonly sessionIds?: readonly string[] }
-  | { readonly scope: 'events'; readonly sessionId: string; readonly query: string; readonly limit: number }
+  | {
+      readonly scope: 'sessions'
+      readonly query: string
+      readonly limit: number
+      readonly sessionIds?: readonly string[]
+      readonly filters?: EventFilters
+    }
+  | { readonly scope: 'events'; readonly sessionId: string; readonly query: string; readonly limit: number; readonly filters?: EventFilters }
 
 const toHeader = (row: SessionHeaderRow): SessionHeader =>
   withoutUndefined({
@@ -80,11 +88,11 @@ export class SessionSearchEngine extends SessionQueryEngine {
   }
 
   override async searchSessions(request: SessionSearchRequest, exec?: SessionSearchExecContext): Promise<SessionSearchPage<SessionSearchHit>> {
-    if (request.eventFilters !== undefined && request.eventFilters.length > 0) unsupportedFilters('event filters')
     const query = request.query
     const limit = Math.min(this._maxLimit, Math.max(1, request.limit ?? this._defaultLimit))
     const sessionIds = this._sessionIds(request.sessionFilters)
-    const fingerprint = this._fingerprint(sessionIds === undefined ? { scope: 'sessions', query, limit } : { scope: 'sessions', query, limit, sessionIds })
+    const filters = this._eventFilters(request.eventFilters)
+    const fingerprint = this._fingerprint(withoutUndefined({ scope: 'sessions', query, limit, sessionIds, filters }))
     const offset = this._decodeCursor(request.cursor, 'sessions', fingerprint)
     exec?.signal?.throwIfAborted()
     // An id filter that matches nothing must answer empty, never fall back to the whole corpus.
@@ -95,6 +103,7 @@ export class SessionSearchEngine extends SessionQueryEngine {
         limit,
         cursor: offset === 0 ? undefined : offset,
         sessionIds: sessionIds === undefined || sessionIds.length === 0 ? undefined : sessionIds,
+        filters,
       }),
     )
     exec?.signal?.throwIfAborted()
@@ -105,13 +114,15 @@ export class SessionSearchEngine extends SessionQueryEngine {
   }
 
   override async searchEvents(request: SessionEventSearchRequest, exec?: SessionSearchExecContext): Promise<SessionEventSearchPage> {
-    if (request.filters !== undefined && request.filters.length > 0) unsupportedFilters('event filters')
     const query = request.query
     const limit = Math.min(this._maxLimit, Math.max(1, request.limit ?? this._defaultLimit))
-    const fingerprint = this._fingerprint({ scope: 'events', sessionId: request.sessionId, query, limit })
+    const filters = this._eventFilters(request.filters)
+    const fingerprint = this._fingerprint(withoutUndefined({ scope: 'events', sessionId: request.sessionId, query, limit, filters }))
     const offset = this._decodeCursor(request.cursor, 'events', fingerprint)
     exec?.signal?.throwIfAborted()
-    const page = await this._client.searchEvents(withoutUndefined({ sessionId: request.sessionId, query, limit, cursor: offset === 0 ? undefined : offset }))
+    const page = await this._client.searchEvents(
+      withoutUndefined({ sessionId: request.sessionId, query, limit, cursor: offset === 0 ? undefined : offset, filters }),
+    )
     exec?.signal?.throwIfAborted()
     if (page.header === null) throw new SessionQueryError(`stored session "${request.sessionId}" is not in the search index`, 'SESSION_QUERY_SESSION_NOT_FOUND')
     return withoutUndefined({
@@ -119,6 +130,29 @@ export class SessionSearchEngine extends SessionQueryEngine {
       items: page.matches.map(match => this._eventHit(match)),
       nextCursor: page.hasMore ? this._encodeCursor('events', fingerprint, offset + limit) : undefined,
     })
+  }
+
+  /**
+   * Core validates and copies the clauses, then they map one-to-one onto SQL predicates. `text` is a literal scan over
+   * untruncated documents, which no FTS5 index can serve, so it stays refused instead of silently ignored.
+   */
+  _eventFilters(filters: readonly SessionEventResultFilter[] | undefined): EventFilters | undefined {
+    if (filters === undefined || filters.length === 0) return undefined
+    const mapped = materializeSessionEventResultFilters(filters).map(filter => {
+      switch (filter.kind) {
+        case 'type':
+          return { kind: 'type' as const, values: filter.values.map(value => String(value)) }
+        case 'surface':
+          return { kind: 'surface' as const, values: filter.values.map(value => String(value)) }
+        case 'seq':
+          return withoutUndefined({ kind: 'seq' as const, from: filter.from, to: filter.to })
+        case 'time':
+          return withoutUndefined({ kind: 'time' as const, from: filter.from, to: filter.to })
+        case 'text':
+          return unsupportedFilters('literal text event filters')
+      }
+    })
+    return mapped.length === 0 ? undefined : mapped
   }
 
   /** Translate the `id` clause the callers use; every other session filter stays refused rather than ignored. */

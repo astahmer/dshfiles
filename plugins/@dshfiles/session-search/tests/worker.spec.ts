@@ -104,11 +104,41 @@ describe('owned search backend over the real worker', () => {
     })
   })
 
-  it('refuses filters it does not implement instead of returning wrong results', async () => {
+  it('applies the event filters the finder and the session controller send', async () => {
+    const context = await boot()
+    await waitForIndex(2)
+    const filtered = await context.sessionQuery.searchSessions({
+      query: 'retry storm',
+      limit: 10,
+      eventFilters: [
+        { kind: 'type', values: ['user/message'] },
+        { kind: 'surface', values: ['current'] },
+      ],
+    })
+    expect(filtered.items).toHaveLength(2)
+    expect(filtered.items.every(item => item.bestMatch.type === 'user/message')).toBe(true)
+    expect(filtered.items.every(item => item.bestMatch.surface === 'current')).toBe(true)
+
+    const excluded = await context.sessionQuery.searchSessions({ query: 'retry storm', limit: 10, eventFilters: [{ kind: 'type', values: ['tool/result'] }] })
+    expect(excluded.items).toHaveLength(0)
+
+    const ranged = await context.sessionQuery.searchSessions({ query: 'retry storm', limit: 10, eventFilters: [{ kind: 'seq', from: 1, to: 1 }] })
+    expect(ranged.items.map(item => item.bestMatch.seq)).toEqual([1, 1])
+  })
+
+  it('refuses the filters it cannot apply instead of returning wrong results', async () => {
     const context = await boot()
     await waitForIndex(2)
     await expect(
       context.sessionQuery.searchSessions({ query: 'retry', limit: 5, sessionFilters: [{ kind: 'cwd', values: ['/dev/dshfiles'] }] }),
+    ).rejects.toMatchObject({ code: 'SESSION_QUERY_INVALID_FILTER' })
+    await expect(
+      context.sessionQuery.searchEvents({
+        sessionId: 'session-11111111-0000-4000-8000-000000000000',
+        query: 'retry',
+        limit: 5,
+        filters: [{ kind: 'text', text: 'retry' }],
+      }),
     ).rejects.toMatchObject({ code: 'SESSION_QUERY_INVALID_FILTER' })
   })
 

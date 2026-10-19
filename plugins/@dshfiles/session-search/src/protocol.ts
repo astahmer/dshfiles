@@ -12,6 +12,20 @@ export const jsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
  * protocol, which is the whole reason a content search cannot block the Host event loop.
  */
 
+/**
+ * One event metadata predicate as SQL can apply it before ranking: clauses are ANDed, values inside a clause are ORed.
+ * The host maps core's own filter clauses onto these, so the two callers that matter (`@dshfiles/memory` and the
+ * session controller) filter exactly as they do against the stock backend.
+ */
+export const eventFilterClauseSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('type'), values: z.array(z.string().min(1)).readonly() }),
+  z.object({ kind: z.literal('surface'), values: z.array(z.string().min(1)).readonly() }),
+  z.object({ kind: z.literal('seq'), from: z.number().int().optional(), to: z.number().int().optional() }).readonly(),
+  z.object({ kind: z.literal('time'), from: z.number().optional(), to: z.number().optional() }).readonly(),
+])
+export const eventFiltersSchema = z.array(eventFilterClauseSchema).readonly()
+export type EventFilters = z.infer<typeof eventFiltersSchema>
+
 export const sessionSearchRequestSchema = z.object({
   query: z.string().min(1),
   limit: z.number().int().min(1).max(100),
@@ -19,6 +33,7 @@ export const sessionSearchRequestSchema = z.object({
   cursor: z.number().int().nonnegative().optional(),
   sessionIds: z.array(z.string().min(1)).readonly().optional(),
   cwd: z.string().min(1).optional(),
+  filters: eventFiltersSchema.optional(),
 })
 export type SessionSearchRequest = z.infer<typeof sessionSearchRequestSchema>
 
@@ -27,6 +42,7 @@ export const sessionEventSearchRequestSchema = z.object({
   query: z.string().min(1),
   limit: z.number().int().min(1).max(100),
   cursor: z.number().int().nonnegative().optional(),
+  filters: eventFiltersSchema.optional(),
 })
 export type SessionEventSearchRequest = z.infer<typeof sessionEventSearchRequestSchema>
 

@@ -8,7 +8,7 @@ import { dirname } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { z } from 'zod'
 import { withoutUndefined } from './optional-fields.js'
-import type { IndexHealth, SearchMatch, SessionEventSearchRequest, SessionHeaderRow, SessionSearchRequest } from './protocol.js'
+import type { EventFilters, IndexHealth, SearchMatch, SessionEventSearchRequest, SessionHeaderRow, SessionSearchRequest } from './protocol.js'
 import { sessionHeaderSchema } from './protocol.js'
 import { DocumentText } from './text.js'
 
@@ -159,6 +159,46 @@ const headerOf = (
     }),
   )
 
+/** Translate host-side event clauses into SQL that runs before ranking; clauses are ANDed, values inside one are ORed. */
+const eventFilterClauses = (filters: EventFilters | undefined) => {
+  const clauses: string[] = []
+  const bindings: (string | number)[] = []
+  for (const filter of filters ?? []) {
+    switch (filter.kind) {
+      case 'type':
+      case 'surface': {
+        const column = filter.kind === 'type' ? 'd.type' : 'd.surface'
+        clauses.push(`${column} IN (${filter.values.map(() => '?').join(', ')})`)
+        bindings.push(...filter.values)
+        break
+      }
+      case 'seq': {
+        if (filter.from !== undefined) {
+          clauses.push('d.seq >= ?')
+          bindings.push(filter.from)
+        }
+        if (filter.to !== undefined) {
+          clauses.push('d.seq <= ?')
+          bindings.push(filter.to)
+        }
+        break
+      }
+      case 'time': {
+        if (filter.from !== undefined) {
+          clauses.push('d.time >= ?')
+          bindings.push(filter.from)
+        }
+        if (filter.to !== undefined) {
+          clauses.push('d.time <= ?')
+          bindings.push(filter.to)
+        }
+        break
+      }
+    }
+  }
+  return { clauses, bindings }
+}
+
 export class SearchIndex {
   readonly #database: DatabaseSync
   readonly #path: string
@@ -294,14 +334,18 @@ export class SearchIndex {
       filters.push('s.cwd = ?')
       bindings.push(request.cwd)
     }
+    const events = eventFilterClauses(request.filters)
+    filters.push(...events.clauses)
+    bindings.push(...events.bindings)
     const rows = this.#rankedRows({ filters, bindings, limit: request.limit + 1, offset: request.cursor ?? 0, sessionId: undefined, query: request.query })
     return { matches: rows.slice(0, request.limit).map(row => this.#match(row)), hasMore: rows.length > request.limit }
   }
 
   searchEvents(request: SessionEventSearchRequest): EventSearchRows {
+    const events = eventFilterClauses(request.filters)
     const rows = this.#rankedRows({
-      filters: [],
-      bindings: [],
+      filters: events.clauses,
+      bindings: events.bindings,
       limit: request.limit + 1,
       offset: request.cursor ?? 0,
       sessionId: request.sessionId,
