@@ -56,6 +56,10 @@ export class SkillMentionModel {
   static readonly skillMentionPick = skillMentionPick
 }
 
+/**
+ * The skill catalog is read on the first `@` query in a Session, not when its composer mounts: warming it made every
+ * thread switch spend a Host `skills/list` (0.3-5.7 s under load) that most switches never use.
+ */
 export const createSkillMentionSource = (options: SkillMentionSourceOptions) => {
   const catalogs = new Map<SkillSessionId, SkillCatalogEntry>()
   const fetchCatalog = (sessionId: SkillSessionId): SkillCatalogEntry => {
@@ -99,10 +103,6 @@ export const createSkillMentionSource = (options: SkillMentionSourceOptions) => 
       } catch {
         return []
       }
-    },
-    warm(session) {
-      if (options.isSubagent(session.sessionId)) return
-      fetchCatalog(session.sessionId).promise.catch(() => undefined)
     },
     onPick({ candidate }) {
       return SkillMentionModel.skillMentionPick(candidate)
