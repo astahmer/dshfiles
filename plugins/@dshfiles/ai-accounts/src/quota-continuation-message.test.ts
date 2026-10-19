@@ -1,3 +1,4 @@
+import { ScheduleId, createAfterScheduleRecord, renderReminderFraming } from '@deepseek-ai/dsh-schedule'
 import { describe, expect, it } from 'vitest'
 import { QuotaContinuationMessage, type ContinuationMessage } from './quota-continuation-message.js'
 
@@ -17,6 +18,14 @@ describe('quota continuation message identity', () => {
     expect(QuotaContinuationMessage.userActivityForMessage(manual)).toEqual({ continuationId, queueSource: 'manual' })
     expect(QuotaContinuationMessage.continuationIdOf(scheduled)).toBe(continuationId)
     expect(QuotaContinuationMessage.userActivityForMessage(scheduled)).toEqual({ continuationId, queueSource: 'schedule' })
+  })
+
+  it('recognizes the continuation inside the reminder framing the Schedule service delivers', () => {
+    const record = createAfterScheduleRecord(ScheduleId('schedule-quota'), QuotaContinuationMessage.promptFor(continuationId), 60, 1_000_000, 'Quota recovery')
+    const delivered = message({ kind: 'schedule' }, renderReminderFraming(record))
+
+    expect(QuotaContinuationMessage.continuationIdOf(delivered)).toBe(continuationId)
+    expect(QuotaContinuationMessage.userActivityForMessage(delivered)).toEqual({ continuationId, queueSource: 'schedule' })
   })
 
   it('rejects marker lookalikes, altered prompts, and mismatched request ids', () => {
