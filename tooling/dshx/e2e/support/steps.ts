@@ -2,7 +2,7 @@ import { expect, type Page } from '@playwright/test'
 import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { After, Before, Given, Then, readBootOutcome } from './bdd.js'
-import { bootComposedPluginProfile, bootPluginProfile, bootProfile, traceBootPhase, type BootedProfile } from './boot.js'
+import { bootComposedPluginProfile, bootPluginProfile, bootProfile, prewarmSibling, traceBootPhase, type BootedProfile } from './boot.js'
 import { redactHostOutput } from './scratch-profile.js'
 import { ClientBootCheckModel } from '../../packages/dshx/src/project/client-boot-check.js'
 import { StartupDialogs } from '../../packages/dshx/src/project/startup-dialogs.js'
@@ -112,6 +112,9 @@ const evidenceStatus = (status: string | undefined): EvidenceStatus => {
   return 'interrupted'
 }
 
+// A prewarmed sibling exists for the *next* scenario of this worker and is dropped when nobody takes it: see
+// `prewarmSibling`/`closePrewarmedProfiles` in boot.ts, which also stop the last one on process exit.
+
 Before(async ({ page, $testInfo }) => {
   const run = await createEvidenceRun({
     suiteId: 'client-plugin-boot',
@@ -154,8 +157,10 @@ Before(async ({ page, $testInfo }) => {
   )
 })
 
-/** Admit one loopback fake (an OAuth provider page) through the browser network boundary for this scenario. */
-export const allowLoopbackBrowserOrigin = (page: Page, origin: string): void => {
+/** Admit one loopback fake (an OAuth provider page) through the browser network boundary for this scenario. */ export const allowLoopbackBrowserOrigin = (
+  page: Page,
+  origin: string,
+): void => {
   const url = new URL(origin)
   if (url.hostname !== '127.0.0.1' && url.hostname !== 'localhost') throw new Error('Only a loopback fake may pass the E2E network boundary.')
   const allowedOrigins = allowedBrowserOrigins.get(page)
@@ -228,6 +233,8 @@ export const visitIsolatedPluginProfile = async (page: Page, profile: BootedProf
     traceBootPhase('profile-interactive', readyStartedAt, profile.profile)
     completeEvidenceStep(evidenceRunFor(page), 'profile-booted')
     await capturePageEvidenceFrame(evidenceRunFor(page), page, 'profile-booted')
+    // The scenario's steps run for seconds; booting the next scenario's Host now hides that startup behind them.
+    prewarmSibling(profile)
   } catch (error) {
     await profile.close()
     profiles.delete(page)

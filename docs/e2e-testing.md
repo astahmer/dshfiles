@@ -203,9 +203,14 @@ and 23 of the 26 `thread-sidebar` scenarios share one — measured `481 ms` then
 `1 ms` on two consecutive scenarios.
 
 One scenario still owns one Host per scenario, so the Host's startup is paid
-per scenario; reusing it across scenarios is tracked in
-[`plans/e2e-speed/README.md`](../plans/e2e-speed/README.md) together with a
-per-scenario result cache.
+per scenario — except that a worker prewarms a sibling of the iteration's
+composition while the current scenario runs (`DSHX_E2E_PREWARM=0` disables it),
+so the next scenario of the same composition takes a ready Host: measured on
+`frame-layout`, the second scenario's trace has no `prepare` or `host-url` at
+all and finished in 6.3 s against 8.7 s for the first, with the file's task 63 s
+→ 40 s on a loaded machine. Reusing it across _different_ compositions is
+tracked in [`plans/e2e-speed/README.md`](../plans/e2e-speed/README.md) together
+with a per-scenario result cache.
 
 ### Parallelism
 

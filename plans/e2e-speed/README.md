@@ -66,7 +66,7 @@ about the _assertions_ is the bottleneck.
 | E2  | Boot-phase trace and the composition-validation cache                                                                                                                                                        | Landed (below)              |
 | E3  | Route-interception cost (the network boundary round-trips every request of every page load)                                                                                                                  | Pending measurement         |
 | E4  | Scenario-level result cache: key each scenario by its own steps plus the dists it reaches, so a change re-runs the scenarios that can see it and replays the rest — rebase-proof because it is content-keyed | Pending design              |
-| E5  | Boot reuse: hide the Host startup behind the previous scenario                                                                                                                                               | Pending                     |
+| E5  | Boot reuse: hide the Host startup behind the previous scenario                                                                                                                                               | Landed (below)              |
 | E6  | Wall-time budget ratchet (warn-only first)                                                                                                                                                                   | Optional                    |
 
 ### E2 receipt
@@ -94,7 +94,22 @@ scenario those owners hold — the fan-out table above. Split the key per scenar
    cache, evidence receipts must say which scenarios were replayed rather than run, and the step-body
    mapping stays conservative (a step that boots every bundle keeps its whole task keyed).
 
-### E5 design sketch
+### E5 receipt
+
+`prewarmSibling(profile)` starts a sibling boot of the same composition while the current scenario runs
+its steps, and the next scenario that asks for that composition takes it (`prewarmed-take`); at most one
+spare is kept, an untaken spare is dropped when the next prewarm starts, and a spare still alive when
+the worker exits is killed by its pid from a synchronous `exit` handler. Isolation is untouched: the
+sibling has its own home, Host and port. `DSHX_E2E_PREWARM=0` disables it.
+
+Measured on `frame-layout` (two scenarios, one composition): the first scenario booted in 6.0s
+(prepare 1.2s, dump 0.28s, host-url 3.0s, page-load 0.15s, interactive 1.4s) and started a sibling that
+finished in 4.1s while it ran; the second scenario's trace shows `prewarmed-take` and no
+prepare/host-url at all, 6.3s end to end against 8.7s for the first. On the loaded machine the same
+file went 63s → 40s, and the run leaves zero orphaned Hosts. A file whose scenarios change composition
+each time pays the sibling's CPU for nothing — that is the cost to watch before widening this.
+
+### E5 design notes (superseded by the receipt above)
 
 `host-url` is 4-12s and cannot be cached — only avoided. A worker's scenarios share a composition, so
 while scenario N runs, prepare and boot the Host for a spare slot of the _same_ composition, and hand
@@ -104,6 +119,7 @@ idle-slot host memory and the discard rate before making it the default.
 
 ## Resume here
 
-E2 landed: the phase trace works and a composition is validated once per worker. Next is E3 (measure
-the network boundary's per-request cost on a quiet machine, then narrow or reject it), then **E4**, the
-scenario-level cache — it pays off on every change, while E5 only shortens a cold run.
+E1, E2 and E5 landed. Left: E3 (measure the network boundary's per-request cost on a quiet machine, then
+narrow or reject it), **E4** — the per-scenario result cache, which is what keeps a rebase from re-running
+scenarios whose inputs did not change, and is the piece the user asked for next — and the optional E6
+budget ratchet.

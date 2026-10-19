@@ -214,14 +214,106 @@ export const bootProfile = async (profileLabel: string, timeoutMs = 90_000): Pro
   }
 }
 
-export const bootComposedPluginProfile = async ({
-  packageIds,
-  profileLabel,
-  timeoutMs = 90_000,
-  additionalBundleIds = [],
-  seedHome,
-  cordisPatch,
-}: {
+interface ComposedBootRequest {
+  readonly packageIds: readonly [string, ...string[]]
+  readonly profileLabel: string
+  readonly timeoutMs: number
+  readonly additionalBundleIds: readonly string[]
+  readonly seedHome?: (homeRoot: string) => Promise<void | { readonly hostPathPrefix?: string }>
+  readonly cordisPatch?: string
+}
+
+/**
+ * A Host's startup is 4-12s and cannot be cached, only overlapped: a worker's scenarios overwhelmingly share one
+ * composition (23 of 26 in thread-sidebar.feature), so while a scenario runs its steps, boot a sibling of the same
+ * composition and hand it to the next scenario that asks for one. Isolation is untouched — the sibling owns its own
+ * home, Host and port, exactly as an on-demand boot would — and an unused sibling is closed in the `After` hook.
+ */
+const prewarmRecipes = new Map<string, ComposedBootRequest>()
+const prewarmSlots = new Map<string, { readonly startedAt: number; readonly pending: Promise<BootedProfile | undefined> }>()
+const profileCompositionKeys = new WeakMap<BootedProfile, string>()
+/** Hosts a prewarm owns right now: the worker's exit is synchronous, so they are killed by pid, not awaited. */
+const prewarmedHostPids = new Set<number>()
+
+const killPrewarmedHostsOnExit = (): void => {
+  for (const pid of prewarmedHostPids) {
+    for (const target of [-pid, pid]) {
+      try {
+        process.kill(target, 'SIGKILL')
+      } catch {
+        // Already gone.
+      }
+    }
+  }
+  prewarmedHostPids.clear()
+}
+
+process.once('exit', killPrewarmedHostsOnExit)
+
+const compositionKeyOf = (request: ComposedBootRequest): string | undefined => {
+  if (request.seedHome !== undefined) return undefined
+  const hash = createHash('sha256')
+  hash.update(`${[...request.packageIds].sort().join(',')}\0${[...request.additionalBundleIds].sort().join(',')}\0${request.cordisPatch ?? ''}`)
+  return hash.digest('hex')
+}
+
+/**
+ * Boot a sibling of this profile in the background, so the next scenario of the same composition starts instantly. At
+ * most one spare is kept: a worker's next scenario usually wants the same composition, and one it does not want is
+ * dead weight, so an untaken spare is dropped before a new one starts.
+ */
+export const prewarmSibling = (profile: BootedProfile): void => {
+  const key = profileCompositionKeys.get(profile)
+  if (key === undefined || process.env.DSHX_E2E_PREWARM === '0' || prewarmSlots.has(key)) return
+  const recipe = prewarmRecipes.get(key)
+  if (recipe === undefined) return
+  void closePrewarmedProfiles()
+  const pending = bootComposedProfile(recipe)
+    .then(booted => {
+      if (booted.host.pid !== undefined) prewarmedHostPids.add(booted.host.pid)
+      return booted
+    })
+    .catch(() => undefined)
+  prewarmSlots.set(key, { startedAt: Date.now(), pending })
+}
+
+/** Close whatever the worker prewarmed and no scenario consumed. */
+export const closePrewarmedProfiles = async (): Promise<void> => {
+  const slots = [...prewarmSlots.values()]
+  prewarmSlots.clear()
+  prewarmedHostPids.clear()
+  for (const slot of slots) {
+    const profile = await slot.pending
+    await profile?.close().catch(() => undefined)
+  }
+}
+
+const bootComposedProfile = async (request: ComposedBootRequest): Promise<BootedProfile> => {
+  const available = await LocalBundleModel.listLocalBootBundles()
+  const bundles = requireNonEmptyBundles(
+    LocalBundleModel.withSharedStylesheet(LocalBundleModel.resolveLocalBundles(request.packageIds, available), available),
+    'No requested owned plugin bundles were found for the composed scratch profile.',
+  )
+  for (const bundle of bundles) await buildBundleOnce(bundle)
+  const prepareStartedAt = Date.now()
+  const prepared = await prepareComposedBootProfile(
+    bundles,
+    request.cordisPatch === undefined
+      ? { additionalBundleIds: request.additionalBundleIds, sourceProfileRoot }
+      : { additionalBundleIds: request.additionalBundleIds, sourceProfileRoot, cordisPatch: request.cordisPatch },
+  )
+  traceBootPhase('prepare', prepareStartedAt, request.profileLabel)
+  const expectedClientEntries = bundles.filter(bundle => bundle.hasClient).map(bundle => bundle.packageId)
+  try {
+    const seededHome = await request.seedHome?.(prepared.homeRoot)
+    return await startScratchProfile(prepared, request.profileLabel, expectedClientEntries, request.timeoutMs, seededHome?.hostPathPrefix)
+  } catch (error) {
+    await prepared.dispose()
+    throw error
+  }
+}
+
+export const bootComposedPluginProfile = async (request: {
   readonly packageIds: readonly [string, ...string[]]
   readonly profileLabel: string
   readonly timeoutMs?: number
@@ -229,26 +321,34 @@ export const bootComposedPluginProfile = async ({
   readonly seedHome?: (homeRoot: string) => Promise<void | { readonly hostPathPrefix?: string }>
   readonly cordisPatch?: string
 }): Promise<BootedProfile> => {
-  const available = await LocalBundleModel.listLocalBootBundles()
-  const bundles = requireNonEmptyBundles(
-    LocalBundleModel.withSharedStylesheet(LocalBundleModel.resolveLocalBundles(packageIds, available), available),
-    'No requested owned plugin bundles were found for the composed scratch profile.',
-  )
-  for (const bundle of bundles) await buildBundleOnce(bundle)
-  const prepareStartedAt = Date.now()
-  const prepared = await prepareComposedBootProfile(
-    bundles,
-    cordisPatch === undefined ? { additionalBundleIds, sourceProfileRoot } : { additionalBundleIds, sourceProfileRoot, cordisPatch },
-  )
-  traceBootPhase('prepare', prepareStartedAt, profileLabel)
-  const expectedClientEntries = bundles.filter(bundle => bundle.hasClient).map(bundle => bundle.packageId)
-  try {
-    const seededHome = await seedHome?.(prepared.homeRoot)
-    return await startScratchProfile(prepared, profileLabel, expectedClientEntries, timeoutMs, seededHome?.hostPathPrefix)
-  } catch (error) {
-    await prepared.dispose()
-    throw error
+  const composed: ComposedBootRequest = {
+    packageIds: request.packageIds,
+    profileLabel: request.profileLabel,
+    timeoutMs: request.timeoutMs ?? 90_000,
+    additionalBundleIds: request.additionalBundleIds ?? [],
   }
+  if (request.seedHome !== undefined) composed.seedHome = request.seedHome
+  if (request.cordisPatch !== undefined) composed.cordisPatch = request.cordisPatch
+  const compositionKey = compositionKeyOf(composed)
+  if (compositionKey !== undefined) {
+    const slot = prewarmSlots.get(compositionKey)
+    if (slot !== undefined) {
+      prewarmSlots.delete(compositionKey)
+      const prewarmed = await slot.pending
+      if (prewarmed !== undefined) {
+        // The scenario owns this Host now: the exit guard must not kill it, and only one spare is ever kept.
+        prewarmedHostPids.clear()
+        traceBootPhase('prewarmed-take', slot.startedAt, composed.profileLabel)
+        return prewarmed
+      }
+    }
+  }
+  const profile = await bootComposedProfile(composed)
+  if (compositionKey !== undefined) {
+    prewarmRecipes.set(compositionKey, composed)
+    profileCompositionKeys.set(profile, compositionKey)
+  }
+  return profile
 }
 
 export const bootPluginProfile = async (packageId: string, timeoutMs = 90_000): Promise<BootedProfile> =>
