@@ -327,6 +327,36 @@ describe('Host runtime adapter', () => {
     expect(setup).toHaveBeenCalledOnce()
   })
 
+  it('describes Settings again only after the Loader entry receives a new config', () => {
+    const contract = defineSettings({ namespace: 'example', schema: Schema.object({ enabled: Schema.boolean().default(true) }) })
+    const fiber = { state: 2, config: { enabled: false } }
+    const entry = { options: { id: 'example', config: { enabled: false } }, fiber }
+    const describe = vi.fn(() => [{ ns: 'example', value: fiber.config }])
+    let scope: { get(): Record<string, unknown> } | undefined
+    const plugin = createHostPlugin({ settings: [contract.host({ setup: settingsScope => void (scope = settingsScope) })] }, { packageId: '@test/plugin' })
+    const ctx = new Context()
+    ctx.provide('settings', { configure: () => () => undefined, describe })
+    ctx.provide('loader', { entries: () => [entry][Symbol.iterator]() })
+    plugin.apply(ctx)
+
+    expect(scope?.get()).toEqual({ enabled: false })
+    expect(scope?.get()).toEqual({ enabled: false })
+    expect(describe).toHaveBeenCalledOnce()
+
+    fiber.config = { enabled: true }
+    expect(scope?.get()).toEqual({ enabled: true })
+    expect(describe).toHaveBeenCalledTimes(2)
+
+    fiber.config.enabled = false
+    entry.options = { id: 'example', config: { enabled: false } }
+    expect(scope?.get()).toEqual({ enabled: false })
+    expect(describe).toHaveBeenCalledTimes(3)
+
+    fiber.state = 4
+    scope?.get()
+    expect(describe).toHaveBeenCalledTimes(4)
+  })
+
   it('does not inject Settings for an empty list and rejects multiple native owners', () => {
     const empty = createHostPlugin({ settings: [] }, { packageId: '@test/plugin' })
     expect(empty.inject).toEqual([])

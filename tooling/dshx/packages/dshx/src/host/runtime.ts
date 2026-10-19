@@ -1,5 +1,6 @@
 import { SdkSetupRuntime } from '../sdk/setup.js'
-import type { Context, Inject } from '@deepseek-ai/cordis'
+import type { Context, Fiber, Inject } from '@deepseek-ai/cordis'
+import type { Entry } from '@deepseek-ai/cordis-plugin-loader'
 import type { StandardSchemaV1 } from '@standard-schema/spec'
 import process from 'node:process'
 import type { CommandRuntime } from '@deepseek-ai/dsh-commands'
@@ -177,21 +178,50 @@ function validateSettingsContribution(value: unknown, metadata: HostPluginMetada
   return value as SettingsHostContribution
 }
 
+// FiberState.ACTIVE; cordis declares the enum ambient-const, so it has no runtime value to import.
+const ACTIVE_FIBER_STATE = 2
+
 /** Protocol 2 derives its editable form from Config; this registers only page policy and cleanup. */
 function registerSettings(ctx: Context, contribution: SettingsContribution): void {
   const contract = settingsContract(contribution)
   const options = SettingsDefinitionModel.isHostContribution(contribution) ? SettingsDefinitionModel.hostContributionParts(contribution).options : undefined
   const namespace = contract.namespace as SettingsNamespace
+  // describe() re-reads and recomposes the whole profile from disk for every
+  // namespace, and plugins read their settings on every Session event. Its
+  // value for this namespace is a projection of the Loader entry's live fiber
+  // config. An ordinary update replaces that config; a volatile-only update
+  // writes it in place but always installs a new raw `options.config`, so the
+  // three identities together key an exact cache.
+  let entry: Entry | undefined
+  let cached: { readonly fiber: Fiber; readonly config: unknown; readonly options: unknown; readonly value: Record<string, unknown> } | undefined
   const scope: SettingsScope = {
     namespace: contract.namespace,
     raw: ctx.settings,
     get() {
+      const fiber = entry?.fiber
+      if (
+        cached !== undefined &&
+        fiber === cached.fiber &&
+        fiber.config === cached.config &&
+        entry?.options.config === cached.options &&
+        fiber.state === ACTIVE_FIBER_STATE
+      )
+        return structuredClone(cached.value)
       const descriptor = ctx.settings.describe().find(item => item.ns === namespace)
       if (descriptor === undefined)
         throw new Error(
           `Settings entry ${JSON.stringify(namespace)} is unavailable. Match defineSettings.namespace to the native Loader entry id in cordis.patch.yml.`,
         )
-      return contract.schema(descriptor.value)
+      const value = contract.schema(descriptor.value)
+      if (entry === undefined) {
+        const matches = [...(ctx.get('loader')?.entries() ?? [])].filter(candidate => candidate.options.id === namespace)
+        entry = matches.length === 1 ? matches[0] : undefined
+      }
+      cached =
+        entry?.fiber === undefined
+          ? undefined
+          : { fiber: entry.fiber, config: entry.fiber.config, options: entry.options.config, value: structuredClone(value) }
+      return value
     },
     update: (patch, revision) => ctx.settings.update(namespace, patch, revision),
     replace: (value, revision) => ctx.settings.replace(namespace, value, revision),
