@@ -13,6 +13,7 @@ This directory holds repository-wide operational guidance. Product and API docum
 | [Community plugin audit](community-plugin-audit.md)          | Dated 308-entry audit, decision tables, first-party alternatives, and disposable-probe screenshots.                         |
 | [`scripts/README.md`](../scripts/README.md)                  | Repository-level scripts and their owning workflows.                                                                        |
 | [Agent tool parity](agent-tool-parity.md)                    | Every user-facing capability's agent tool, what is missing, and which gaps need a Host verb.                                |
+| [Native forks](native-forks.md)                              | Vendored native DSH packages, their pinned upstream and delta, and the drift/upgrade diff script.                           |
 | [Performance](performance.md)                                | What made the live GUI slow, what fixed it, before/after numbers, and what is still open.                                   |
 | [ADE interaction performance](ade-performance/README.md)     | Runtime audit, full-profile benchmarks, transcript prototype, architecture decision, and reversible roadmap.                |
 | [Self-improvement from Session history](self-improvement.md) | `/self-improve`: mining past Sessions into candidate signals, deterministic harness validation, and the improvement ledger. |

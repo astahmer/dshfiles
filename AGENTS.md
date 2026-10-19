@@ -67,8 +67,11 @@ instance. So, before proposing any fix:
   explicit update policy. This is not a blanket fork of core; see
   [native plugin overrides](docs/native-plugin-overrides.md). When the
   behavior lives in a native client package's private state (no slot can
-  reach it), fork the whole package as `rich-composer` and `chat` do. That is
-  the supported route, not a core patch, and it is often the only real fix.
+  reach it), fork the whole package as `rich-composer`, `chat` and
+  `session-controller` (Host side included) do. That is the supported route,
+  not a core patch, and it is often the only real fix. Every fork is listed in
+  [native forks](docs/native-forks.md) with a `native-fork.json`; run
+  `node scripts/native-fork-diff.mjs` after touching one.
 
 Say which option you chose and why. Two rules keep the choice honest:
 

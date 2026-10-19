@@ -1,0 +1,24 @@
+{
+  "$comment": "Provenance of this native fork; scripts/native-fork-diff.mjs reads it. Update it with every upstream bump or delta change.",
+  "upstream": {
+    "repository": "https://github.com/deepseek-ai/deepseek-harness.git",
+    "package": "@deepseek-ai/dsh-client-ui-layout",
+    "version": "0.2.0-rc.2",
+    "ref": "c1b47e41fcd54d20a0f061df28683bfc29ee24e5",
+    "path": "packages/client/ui-layout"
+  },
+  "files": [
+    {
+      "upstream": "src",
+      "local": "src/native"
+    }
+  ],
+  "delta": [
+    "src/native/client/index.ts",
+    "src/native/client/stores.ts",
+    "src/native/client/AppFrame.tsx",
+    "src/native/client/AppFrame.module.css",
+    "src/native/client/columns.ts",
+    "src/native/client/theme-presenter.ts"
+  ]
+}

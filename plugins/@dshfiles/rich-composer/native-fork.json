@@ -1,0 +1,32 @@
+{
+  "$comment": "Provenance of this native fork; scripts/native-fork-diff.mjs reads it. Update it with every upstream bump or delta change.",
+  "upstream": {
+    "repository": "https://github.com/deepseek-ai/deepseek-harness.git",
+    "package": "@deepseek-ai/dsh-client-ui-conversation",
+    "version": "0.2.1-rc.2",
+    "ref": "dsh-v0.2.1-rc.2",
+    "path": "packages/client/ui-conversation"
+  },
+  "files": [
+    {
+      "upstream": "src/client",
+      "local": "src/native"
+    },
+    {
+      "upstream": "src/submission-settings.ts",
+      "local": "src/submission-settings.ts"
+    }
+  ],
+  "delta": [
+    "src/native/contract/slots.ts",
+    "src/native/apply.ts",
+    "src/native/locales.ts",
+    "src/native/skeleton/InputBar.tsx",
+    "src/native/input/editor/keymap.ts",
+    "src/native/input/editor/view-binding.ts",
+    "src/native/input/editor/runtime.ts",
+    "src/native/input/editor/projection.ts",
+    "src/native/user-text/session-reference-rule.ts",
+    "src/native/conversation/location-index.ts"
+  ]
+}
