@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "turn-summary-line",
+      "title": "A summary line under each finished turn",
+      "summary": "Under each finished turn, one line says what the agent did with tools: commands run, files edited, files read and searches. When commands failed, a red count opens a list naming each failed command and how it ended (exit code, signal, or a call the tool rejected). Each part can be switched off.",
+      "reach": ["seed tool-call-thread", "expect text \"Tool finished.\""],
+      "surfaces": ["client", "settings"],
+      "configuration": [
+        {
+          "key": "enabled",
+          "defaultValue": "true",
+          "constraints": "Boolean; show the summary line under finished turns.",
+          "choices": ["true", "false"],
+          "coveredBy": ["turn-summary.model-commands"]
+        },
+        {
+          "key": "includeReads",
+          "defaultValue": "true",
+          "constraints": "Boolean; count file reads and searches as well as commands and edits.",
+          "choices": ["true", "false"],
+          "coveredBy": ["turn-summary.model-parts"]
+        },
+        {
+          "key": "listFailures",
+          "defaultValue": "true",
+          "constraints": "Boolean; let the failed-command count open the list of failed commands.",
+          "choices": ["true", "false"],
+          "coveredBy": ["turn-summary.model-commands"]
+        }
+      ],
+      "states": ["no-tools", "all-succeeded", "commands-failed", "disabled"],
+      "failureModes": [
+        "A turn whose tool calls fell outside the loaded history summarises only the calls still loaded.",
+        "The summary sits under the turn, not in each \"Ran commands\" group header: the Host draws that header with no plugin seam."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "turn-summary.model-commands",
+          "file": "plugins/@dshfiles/turn-summary/src/turn-activity.test.ts",
+          "testName": "counts commands and names the ones that exited non-zero, were killed or were rejected"
+        },
+        {
+          "kind": "unit-test",
+          "id": "turn-summary.model-parts",
+          "file": "plugins/@dshfiles/turn-summary/src/turn-activity.test.ts",
+          "testName": "lists each successfully edited file once and leaves a still-running command unjudged"
+        }
+      ]
+    }
+  ]
+}
