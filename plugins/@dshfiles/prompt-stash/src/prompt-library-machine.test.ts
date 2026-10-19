@@ -122,12 +122,17 @@ describe('prompt library workflow machine', () => {
     const library = createWorkflowClient([firstPrompt])
     const actor = createActor(promptLibraryMachine, { input: { client: library.client } }).start()
     openLibrary(actor)
-    actor.send({ type: 'editor.edit', target: { id: firstPrompt.id, expectedRevision: firstPrompt.revision } })
+    actor.send({
+      type: 'editor.edit',
+      target: { id: firstPrompt.id, expectedRevision: firstPrompt.revision },
+      initialValues: { title: firstPrompt.title, text: firstPrompt.text },
+    })
     library.setPrompts([updatedPrompt])
     actor.send({ type: 'editor.save', submission: { title: firstPrompt.title, text: 'My unsaved revision.', copy: false } })
     await vi.waitFor(() => expect(actor.getSnapshot().matches('editing')).toBe(true))
 
     expect(actor.getSnapshot().context.editorTarget).toEqual({ id: firstPrompt.id, expectedRevision: firstPrompt.revision })
+    expect(actor.getSnapshot().context.editorInitialValues).toEqual({ title: firstPrompt.title, text: firstPrompt.text })
     expect(actor.getSnapshot().context.notice).toContain('changed elsewhere')
 
     actor.send({ type: 'editor.save', submission: { title: firstPrompt.title, text: 'My unsaved revision.', copy: true } })
@@ -213,6 +218,7 @@ describe('prompt library workflow machine', () => {
 
     expect(activeSignal?.aborted).toBe(true)
     expect(actor.getSnapshot().context.editorTarget).toBeNull()
+    expect(actor.getSnapshot().context.editorInitialValues).toBeNull()
     expect(actor.getSnapshot().context.notice).toBe('')
     actor.stop()
   })

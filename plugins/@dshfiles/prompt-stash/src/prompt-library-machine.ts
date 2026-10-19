@@ -17,12 +17,18 @@ interface EditorSubmission {
   readonly copy: boolean
 }
 
+export interface PromptEditorInitialValues {
+  readonly title: string
+  readonly text: string
+}
+
 interface PromptLibraryContext {
   readonly client: PromptLibraryWorkflowClient
   readonly insertionSpan: PromptInsertionSpan | null
   readonly hasInserted: boolean
   readonly notice: string
   readonly editorTarget: PromptEditorTarget | null
+  readonly editorInitialValues: PromptEditorInitialValues | null
   readonly pendingEditor: EditorSubmission | null
   readonly deleteConfirmation: DeleteConfirmation | null
   readonly pendingDelete: DeleteConfirmation | null
@@ -39,7 +45,7 @@ type PromptLibraryEvent =
   | { readonly type: 'close' }
   | { readonly type: 'client.update'; readonly client: PromptLibraryWorkflowClient }
   | { readonly type: 'editor.new' }
-  | { readonly type: 'editor.edit'; readonly target: PromptEditorTarget }
+  | { readonly type: 'editor.edit'; readonly target: PromptEditorTarget; readonly initialValues: PromptEditorInitialValues }
   | { readonly type: 'editor.cancel' }
   | { readonly type: 'editor.save'; readonly submission: EditorSubmission }
   | { readonly type: 'current.save'; readonly text: string }
@@ -121,6 +127,7 @@ const editorSaveCompletion = (result: PromptOperationResult) => {
   if (result.kind === 'applied') {
     return {
       editorTarget: null,
+      editorInitialValues: null,
       pendingEditor: null,
       notice: result.copy ? 'Saved as a new prompt copy.' : 'Saved to the prompt library.',
     }
@@ -192,6 +199,7 @@ export const promptLibraryMachine = setup({
             hasInserted: false,
             notice: '',
             editorTarget: null,
+            editorInitialValues: null,
             pendingEditor: null,
             deleteConfirmation: null,
             pendingDelete: null,
@@ -205,17 +213,26 @@ export const promptLibraryMachine = setup({
       hasInserted: false,
       notice: '',
       editorTarget: null,
+      editorInitialValues: null,
       pendingEditor: null,
       deleteConfirmation: null,
       pendingDelete: null,
       pendingCurrentText: null,
       pendingSavedPrompt: null,
     })),
-    beginNewEditor: assign(() => ({ editorTarget: { id: null, expectedRevision: null }, pendingEditor: null, deleteConfirmation: null, notice: '' })),
+    beginNewEditor: assign(() => ({
+      editorTarget: { id: null, expectedRevision: null },
+      editorInitialValues: { title: '', text: '' },
+      pendingEditor: null,
+      deleteConfirmation: null,
+      notice: '',
+    })),
     beginEdit: assign(({ event }) =>
-      event.type === 'editor.edit' ? { editorTarget: event.target, pendingEditor: null, deleteConfirmation: null, notice: '' } : {},
+      event.type === 'editor.edit'
+        ? { editorTarget: event.target, editorInitialValues: event.initialValues, pendingEditor: null, deleteConfirmation: null, notice: '' }
+        : {},
     ),
-    cancelEditor: assign(() => ({ editorTarget: null, pendingEditor: null, notice: '' })),
+    cancelEditor: assign(() => ({ editorTarget: null, editorInitialValues: null, pendingEditor: null, notice: '' })),
     beginEditorSave: assign(({ event }) => (event.type === 'editor.save' ? { pendingEditor: event.submission, notice: '' } : {})),
     clearEditorSubmission: assign(() => ({ pendingEditor: null })),
     beginCurrentSave: assign(({ event }) => (event.type === 'current.save' ? { pendingCurrentText: event.text, notice: '' } : {})),
@@ -251,6 +268,7 @@ export const promptLibraryMachine = setup({
     hasInserted: false,
     notice: '',
     editorTarget: null,
+    editorInitialValues: null,
     pendingEditor: null,
     deleteConfirmation: null,
     pendingDelete: null,
