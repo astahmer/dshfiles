@@ -80,14 +80,36 @@ const reloadPastProviderSetup = async (page: Page, timeoutMs = 5_000): Promise<v
   await providerSetup.waitFor({ state: 'hidden', timeout: timeoutMs })
 }
 
-/** Isolated profiles without the web profile's settings show DSH's "Preview Notice" once per browser profile. */
+const clickContinue = (previewNotice: Locator, timeoutMs: number): Promise<void> =>
+  previewNotice
+    .getByRole('button', { name: 'Continue', exact: true })
+    .click({ timeout: timeoutMs })
+    .catch(() => undefined)
+
+/**
+ * Isolated profiles without the web profile's settings show DSH's "Preview Notice" once per browser profile. A Continue
+ * clicked while the dialog still animates in is dropped and the dialog stays, so it is clicked until the dialog closes.
+ */
 const dismissPreviewNotice = async (page: Page, timeoutMs = 5_000): Promise<boolean> => {
   if (!(await appears(previewNoticeDialog(page), timeoutMs))) return false
   const previewNotice = previewNoticeDialog(page)
-  await previewNotice.getByRole('button', { name: 'Continue', exact: true }).click()
-  await previewNotice.waitFor({ state: 'hidden', timeout: timeoutMs })
-  return true
+  const deadline = Date.now() + Math.max(timeoutMs, 15_000)
+  for (;;) {
+    await clickContinue(previewNotice, 2_000)
+    const closed = await previewNotice.waitFor({ state: 'hidden', timeout: 1_500 }).then(
+      () => true,
+      () => false,
+    )
+    if (closed) return true
+    if (Date.now() > deadline) throw new Error('Preview Notice stayed open after Continue.')
+  }
 }
+
+/** The notice can also open after startup, over a seed already driving the page; it is then dismissed when it blocks. */
+const registerPreviewNoticeDismissal = (page: Page): Promise<void> =>
+  page.addLocatorHandler(previewNoticeDialog(page), async previewNotice => {
+    await clickContinue(previewNotice, 5_000)
+  })
 
 export class StartupDialogs {
   static readonly registerProviderSetupDismissal = registerProviderSetupDismissal
@@ -95,4 +117,5 @@ export class StartupDialogs {
   static readonly dismissProviderSetupDuringStartup = dismissProviderSetupDuringStartup
   static readonly reloadPastProviderSetup = reloadPastProviderSetup
   static readonly dismissPreviewNotice = dismissPreviewNotice
+  static readonly registerPreviewNoticeDismissal = registerPreviewNoticeDismissal
 }

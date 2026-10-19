@@ -127,6 +127,7 @@ export const scratchOpen = async (state: ScratchState, reference: string, timeou
     )
   }
   const { browser, page } = await connect(state)
+  await StartupDialogs.registerPreviewNoticeDismissal(page)
   const steps: OpenStepResult[] = []
   const openAppRoot = async (): Promise<void> => {
     await page.goto(state.launchUrl, { waitUntil: 'domcontentloaded' })
