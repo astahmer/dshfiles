@@ -6,14 +6,11 @@ import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { defineClient } from '@dshfiles/dshx/client'
 import { TooltipProvider } from '@dshfiles/plugin-ui/components/ui/tooltip'
-import { MemoryStickIcon } from '@dshfiles/plugin-ui/icons'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { WORKTREE_MEMORY_LOCALE_NAMESPACE, worktreeMemoryLocale } from './locales.js'
-import { WorktreeMemoryPanel } from './panel.js'
+import { MemoryGlyph, WorktreeMemoryPanel } from './panel.js'
 
 const PANEL_ID = 'dshfiles-worktree-memory'
-
-const PanelGlyph = (props: { readonly size?: number }): JSX.Element => <MemoryStickIcon aria-hidden size={props.size ?? 18} strokeWidth={1.7} />
 
 export default defineClient({
   name: '@dshfiles/worktree-memory',
@@ -24,7 +21,11 @@ export default defineClient({
     ctx.slots.inject('sidebar.panellist', () =>
       ctx.slots.register(
         { name: 'sidebar.panellist', id: PANEL_ID, order: 7, label: () => translate('title'), locale: WORKTREE_MEMORY_LOCALE_NAMESPACE },
-        PanelGlyph,
+        decorate(props => (
+          <PluginQueryProvider>
+            <MemoryGlyph size={props.size} t={props.t} />
+          </PluginQueryProvider>
+        )),
       ),
     )
     ctx.slots.inject('main', () =>

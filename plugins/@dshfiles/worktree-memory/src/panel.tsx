@@ -1,5 +1,6 @@
 import type { ISessions, SessionTarget } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { UiWorkspace } from '@deepseek-ai/dsh-client-ui-workspace/client'
+import { isApiOwnerMissing } from '@dshfiles/dshx/api'
 import { useApi } from '@dshfiles/dshx/client'
 import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
@@ -35,6 +36,8 @@ import {
 
 const snapshotKey = ['worktree-memory', 'snapshot'] as const
 const POLL_MS = 5_000
+// The sidebar badge is always mounted, so it polls far less often than the open panel; both share one cache entry.
+const BADGE_POLL_MS = 30_000
 
 const CATEGORY_KEY = {
   'dev-server': 'categoryDevServer',
@@ -83,6 +86,53 @@ const formatAge = (since: number, now: number, t: WorktreeMemoryTranslate): stri
   const hours = Math.floor(minutes / 60)
   if (hours < 48) return `${String(hours)} h`
   return `${String(Math.floor(hours / 24))} d`
+}
+
+// One decimal of GB keeps the pill as narrow as the icon it sits on.
+const compactGigabytes = (bytes: number): string => `${Math.max(0.1, bytes / 1024 ** 3).toFixed(1)}G`
+
+/**
+ * The RAM sidebar icon: a dot when the system is under memory pressure and a pill with the detached total, so a
+ * leak is visible without opening the panel. A Host without this plugin's API stops the poll instead of retrying.
+ */
+export const MemoryGlyph = (props: { readonly size?: number; readonly t: WorktreeMemoryTranslate }): JSX.Element => {
+  const api = useApi(worktreeMemoryApi)
+  const snapshot = useQuery({
+    queryKey: snapshotKey,
+    queryFn: async ({ signal }) => api.snapshot({}, { signal }),
+    refetchInterval: query => (isApiOwnerMissing(query.state.error) ? false : BADGE_POLL_MS),
+    retry: false,
+  })
+  const pressure = snapshot.data?.pressure ?? 'unknown'
+  const strained = pressure === 'warning' || pressure === 'critical'
+  const detachedBytes = snapshot.data?.detachedBytes ?? 0
+  const status = [strained ? props.t(PRESSURE[pressure].key) : null, detachedBytes > 0 ? `${formatBytes(detachedBytes)} ${props.t('detachedTotal')}` : null]
+    .filter(part => part !== null)
+    .join(' · ')
+  return (
+    <span
+      className="dshx:relative dshx:inline-flex"
+      title={status.length === 0 ? undefined : status}
+      data-memory-badge-pressure={pressure}
+      data-memory-badge-detached-bytes={String(detachedBytes)}
+    >
+      <MemoryStickIcon aria-hidden size={props.size ?? 18} strokeWidth={1.7} />
+      {strained ? (
+        <span
+          aria-hidden
+          className={cn('dshx:absolute dshx:-top-0.5 dshx:-right-0.5 dshx:size-2 dshx:rounded-full dshx:ring-2 dshx:ring-background', PRESSURE[pressure].dot)}
+        />
+      ) : null}
+      {detachedBytes > 0 ? (
+        <span
+          aria-hidden
+          className="dshx:absolute dshx:-bottom-1.5 dshx:-left-0.5 dshx:rounded-sm dshx:bg-destructive dshx:px-0.5 dshx:text-[8px] dshx:leading-[10px] dshx:font-semibold dshx:text-white dshx:tabular-nums"
+        >
+          {compactGigabytes(detachedBytes)}
+        </span>
+      ) : null}
+    </span>
+  )
 }
 
 /** The store's own branded identity for a Session the Host has listed, or undefined when it is not open. */
