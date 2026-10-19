@@ -31,15 +31,7 @@
   background: var(--dsw-specific-sidebar-fill);
 }
 
-:global([data-windows-titlebar]) .bottomRow {
-  grid-column: 1 / -1;
-  min-height: 0;
-  overflow: hidden;
-  background: var(--dsw-alias-bg-base);
-  border-top: 0.5px solid var(--dsw-alias-border-l3);
-}
-
-.centerCol {
+:global([data-windows-titlebar]) .centerCol {
   background: var(--dsw-alias-bg-base);
   border-radius: var(--dsh-windows-content-radius) 0 0 0;
   corner-shape: round;
@@ -170,15 +162,7 @@
   }
 }
 
-:global([data-platform='darwin']) .bottomRow {
-  grid-column: 1 / -1;
-  min-height: 0;
-  overflow: hidden;
-  background: var(--dsw-alias-bg-base);
-  border-top: 0.5px solid var(--dsw-alias-border-l3);
-}
-
-.centerCol {
+:global([data-platform='darwin']) .centerCol {
   background: var(--dsw-alias-bg-base);
   border-left: 0.5px solid var(--dsw-alias-border-l3);
 }
@@ -194,15 +178,7 @@
 
 /* The darwin closed sidebar has no rail: the centre reaches the window edge,
    where a separator would draw a seam against nothing. */
-:global([data-platform='darwin']) [data-sidebar-collapsed] .bottomRow {
-  grid-column: 1 / -1;
-  min-height: 0;
-  overflow: hidden;
-  background: var(--dsw-alias-bg-base);
-  border-top: 0.5px solid var(--dsw-alias-border-l3);
-}
-
-.centerCol {
+:global([data-platform='darwin']) [data-sidebar-collapsed] .centerCol {
   border-left: none;
 }
 

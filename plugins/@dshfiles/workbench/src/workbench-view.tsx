@@ -124,7 +124,7 @@ export const WorkbenchView = (props: WorkbenchViewProps): JSX.Element => {
   const closed = definitions.filter(definition => !openIds.includes(definition.id) && !regions.holds(definition.id))
 
   return (
-    <div className="dshx-root dshx:flex dshx:h-full dshx:min-h-0 dshx:flex-col">
+    <div className="dshx-root dshx:flex dshx:h-full dshx:min-h-0 dshx:flex-1 dshx:flex-col">
       <header className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-2 dshx:border-b dshx:border-border dshx:px-3 dshx:py-1.5">
         <h2 className="dshx:text-sm dshx:font-medium">{props.heading ?? t('title')}</h2>
         <div className="dshx:flex dshx:items-center dshx:gap-1">
