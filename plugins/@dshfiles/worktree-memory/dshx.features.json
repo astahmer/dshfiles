@@ -5,11 +5,11 @@
     {
       "id": "memory-board",
       "title": "Process memory by workspace",
-      "summary": "One page shows the resident memory of every process tree the threads started, grouped by workspace: live background jobs with their owning thread, other children of this Host, and detached trees still running inside a workspace after their parent exited, with the memory-pressure level and a confirmed stop per tree, per workspace, or for every detached tree.",
-      "reach": ["click button \"Memory\"", "expect text \"What the threads started*\""],
+      "summary": "One page shows the resident memory of every process tree the threads started, grouped by workspace: live background jobs with their owning thread, other children of this Host, and detached trees still running inside a workspace after their parent exited, with the memory-pressure level and a confirmed stop per tree, per workspace, or for every detached tree. The sidebar entry carries a pressure dot and the detached total.",
+      "reach": ["click button \"RAM\"", "expect text \"What the threads started*\""],
       "surfaces": ["host", "tool", "client"],
       "configuration": [],
-      "states": ["loading", "empty", "grouped", "detached", "pressure", "unsupported-platform", "stop-armed", "stopped"],
+      "states": ["loading", "empty", "grouped", "detached", "pressure", "unsupported-platform", "stop-armed", "stopped", "sidebar-badge"],
       "failureModes": [
         "A supervisor that launched this Host is an orphan inside a workspace too; it is never listed, so it can never be stopped from here.",
         "A pid recycled between the snapshot and the stop is refused instead of signalling an unrelated process.",
@@ -30,6 +30,11 @@
         }
       ],
       "verification": [
+        {
+          "kind": "gherkin",
+          "id": "worktree-memory.stop-detached-decoy",
+          "featureFile": "tooling/dshx/e2e/features/worktree-memory.feature"
+        },
         {
           "kind": "unit-test",
           "id": "worktree-memory.job-attribution",
@@ -59,6 +64,12 @@
           "id": "worktree-memory.stop-order",
           "file": "plugins/@dshfiles/worktree-memory/src/process-table.test.ts",
           "testName": "orders a tree children first so a stop never leaves a parent to respawn a child"
+        },
+        {
+          "kind": "unit-test",
+          "id": "worktree-memory.subreaper-adopter",
+          "file": "plugins/@dshfiles/worktree-memory/src/process-table.test.ts",
+          "testName": "treats a systemd --user subreaper as the adopter of a detached tree"
         }
       ]
     }
