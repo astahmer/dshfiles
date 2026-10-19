@@ -4,6 +4,7 @@ import { threadMutesSchema } from './thread-mute.js'
 import {
   ATTENTION_COLOR_OPTIONS,
   DEFAULT_PREFERENCES,
+  SIDEBAR_SECTIONS,
   SidebarOrganization,
   THREAD_ROW_ACTIONS,
   type SidebarPreferences,
@@ -15,7 +16,7 @@ import { DEFAULT_THREAD_NOTIFICATION_CATEGORIES, ThreadNotificationModel, thread
 
 export const PREFERENCES_STORAGE_KEY = 'dshfiles.thread-sidebar.v1'
 
-const sidebarSectionSchema = z.enum(['pinned', 'active', 'parked', 'settled', 'inactive', 'archived'])
+const sidebarSectionSchema = z.enum(SIDEBAR_SECTIONS)
 const threadRowActionSchema = z.enum(THREAD_ROW_ACTIONS)
 export const attentionColorSchema = z.enum(ATTENTION_COLOR_OPTIONS)
 
@@ -63,8 +64,13 @@ const preferencesInputSchema = z
     settledSessionIds: z.array(z.string().min(1).max(256)).max(5000).default(DEFAULT_PREFERENCES.settledSessionIds),
     settledAt: z.record(z.string(), z.number().int().nonnegative()).default(DEFAULT_PREFERENCES.settledAt),
     mutedThreads: threadMutesSchema.default(DEFAULT_PREFERENCES.mutedThreads),
-    collapsedSections: z.array(sidebarSectionSchema).max(6),
+    collapsedSections: z.array(sidebarSectionSchema).max(SIDEBAR_SECTIONS.length),
     collapsedGroups: z.array(z.string().min(1).max(200)).max(200).default(DEFAULT_PREFERENCES.collapsedGroups),
+    sectionOrder: z
+      .array(sidebarSectionSchema)
+      .max(SIDEBAR_SECTIONS.length)
+      .default([...DEFAULT_PREFERENCES.sectionOrder])
+      .transform(order => SidebarOrganization.orderSections(order)),
     workspaceFilter: z.string().max(256).nullable().default(DEFAULT_PREFERENCES.workspaceFilter),
     headerMode: z.enum(['compact', 'expanded']),
     hideBrandLogo: z.boolean().default(DEFAULT_PREFERENCES.hideBrandLogo),

@@ -1,6 +1,6 @@
 import Schema from '@deepseek-ai/schemastery'
 import { defineSettings } from '@dshfiles/dshx/settings'
-import { ATTENTION_COLOR_OPTIONS, DEFAULT_PREFERENCES, THREAD_ROW_ACTIONS } from './organization.js'
+import { ATTENTION_COLOR_OPTIONS, DEFAULT_PREFERENCES, SIDEBAR_SECTIONS, THREAD_ROW_ACTIONS } from './organization.js'
 import { SettledThreadsModel, type SettledStatus } from './settled-threads.js'
 import { THREAD_DELAYS } from './thread-delays.js'
 import { threadNotificationCategoriesSchema } from './thread-notifications.js'
@@ -136,8 +136,9 @@ export const threadSidebarSettings = defineSettings({
     mutedThreads: Schema.dict(Schema.object({ until: Schema.union([Schema.const(null), Schema.natural()]), activityAt: Schema.natural() }))
       .default({})
       .hidden(),
-    collapsedSections: Schema.array(Schema.union(['pinned', 'active', 'parked', 'settled', 'inactive', 'archived'] as const))
-      .default(DEFAULT_PREFERENCES.collapsedSections)
+    collapsedSections: Schema.array(Schema.union(SIDEBAR_SECTIONS)).default(DEFAULT_PREFERENCES.collapsedSections).hidden(),
+    sectionOrder: Schema.array(Schema.union(SIDEBAR_SECTIONS))
+      .default([...DEFAULT_PREFERENCES.sectionOrder])
       .hidden(),
     collapsedGroups: Schema.array(Schema.string()).default(DEFAULT_PREFERENCES.collapsedGroups).hidden(),
     workspaceFilter: Schema.union([Schema.const(null), Schema.string()])

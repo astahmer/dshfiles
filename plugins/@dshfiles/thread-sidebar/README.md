@@ -2,9 +2,13 @@
 
 This bundle builds a full sidebar replacement with the repository's local
 `@dshfiles/dshx` fork. It groups the real DSH session list by project and
-activity, with pinned, active, parked, settled, inactive, and archived sections. Active
+activity, with pinned, active, parked, inactive, settled, and archived sections. Active
 includes running or recently updated threads; the idle threshold moves older,
-non-running threads to Inactive. The project picker scopes rows to one workspace
+non-running threads to Inactive. Sections render in the saved `sectionOrder`
+(preferences), shipped as pinned, active, parked, inactive, settled, archived:
+drag a section header to move it, or focus one and press Alt+↑/↓. A section with
+no rows folds away and keeps its saved slot while the shown ones reorder around
+it. The project picker scopes rows to one workspace
 or unassigned sessions.
 
 **Project attribution.** A `jj-integration` thread workspace

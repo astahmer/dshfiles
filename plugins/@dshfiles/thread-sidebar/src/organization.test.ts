@@ -9,6 +9,7 @@ import {
   type AutoSettleContext,
   DEFAULT_PREFERENCES,
   DEFAULT_THREAD_ROW_ACTION_ORDER,
+  SIDEBAR_SECTIONS,
   THREAD_ROW_ACTIONS,
   type SidebarPreferences,
   type SidebarSection,
@@ -72,8 +73,29 @@ test('archived and settled start folded and the working sections start open', ()
   assert.deepEqual(workingSections, [])
 })
 
+test('settled renders right before archived, after the sections a user works in', () => {
+  assert.deepEqual(SIDEBAR_SECTIONS, ['pinned', 'active', 'parked', 'inactive', 'settled', 'archived'])
+})
+
+test('a saved section order keeps its sequence and appends the sections it misses', () => {
+  assert.deepEqual(SidebarOrganization.orderSections(['archived', 'pinned']), ['archived', 'pinned', 'active', 'parked', 'inactive', 'settled'])
+  assert.deepEqual(SidebarOrganization.orderSections(['pinned', 'pinned', 'nope']), ['pinned', 'active', 'parked', 'inactive', 'settled', 'archived'])
+})
+
+test('reordering the sections on screen leaves an unrendered section in its saved slot', () => {
+  assert.deepEqual(
+    SidebarOrganization.reorderSections({
+      savedOrder: ['pinned', 'active', 'parked', 'inactive', 'settled', 'archived'],
+      shownSections: ['pinned', 'active', 'settled', 'archived'],
+      fromShownIndex: 2,
+      toShownIndex: 0,
+    }),
+    ['settled', 'pinned', 'parked', 'inactive', 'active', 'archived'],
+  )
+})
+
 test('every default collapsed section is one the sidebar can actually render', () => {
-  const known = new Set<SidebarSection>(['pinned', 'active', 'parked', 'settled', 'inactive', 'archived'])
+  const known = new Set<SidebarSection>(SIDEBAR_SECTIONS)
   for (const section of DEFAULT_PREFERENCES.collapsedSections) assert.ok(known.has(section), `unknown section ${section}`)
 })
 

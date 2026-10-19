@@ -27,6 +27,12 @@ Feature: Thread sidebar journeys
     When a nonblank Host thread is settled from its context menu
     Then the thread is settled, opens read-only and unsettles to reply
 
+  @scenario:thread-sidebar.section-order
+  Scenario: Reorder the sidebar sections by dragging a header
+    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
+    When an archived thread and a settled thread fill the bottom sections
+    Then dragging the Archived header above Active reorders the sections and survives a reload
+
   @scenario:thread-sidebar.settled-auto-archive
   Scenario: A settled thread archives itself once its archive delay has passed
     Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted

@@ -349,6 +349,60 @@ Then('the thread is settled, opens read-only and unsettles to reply', async ({ p
   await finishJourneyAssertions(page)
 })
 
+When('an archived thread and a settled thread fill the bottom sections', async ({ page }: { page: Page }) => {
+  // Both threads are created while a workspace is still selected: the picker resets once the only
+  // active thread is archived, so organizing happens after the second one exists.
+  const sendPrompt = async (prompt: string): Promise<string> => {
+    // startBlankThread waits for the new session's own composer: clicking New thread alone can leave the
+    // previous thread's composer mounted, which queues the prompt into the wrong thread.
+    const threadId = await startBlankThread(page)
+    const composer = page.getByRole('textbox').first()
+    await composer.fill(prompt)
+    await composer.press('Enter')
+    // No provider credentials in this profile, so the turn fails and the thread is idle enough to organize.
+    await expect(page.getByText('This turn failed', { exact: false }).first()).toBeVisible({ timeout: 30_000 })
+    return threadId
+  }
+  const archivedId = await sendPrompt('thread sidebar section order archived')
+  const settledId = await sendPrompt('thread sidebar section order settled')
+
+  const archivedRow = threadRow(page, archivedId)
+  await expect(archivedRow).toHaveCount(1)
+  await openThreadRowMenu(archivedRow)
+  await page.getByRole('menuitem', { name: 'Archive', exact: true }).click()
+  await expect(threadSidebar(page).getByRole('button', { name: 'Archived (1)', exact: true })).toBeVisible()
+
+  const settledRow = threadRow(page, settledId)
+  await expect(settledRow).toHaveCount(1)
+  await openThreadRowMenu(settledRow)
+  await page.getByRole('menuitem', { name: 'Settle', exact: true }).click()
+  await expect(threadSidebar(page).getByRole('button', { name: 'Settled (1)', exact: true })).toBeVisible()
+})
+
+Then('dragging the Archived header above Active reorders the sections and survives a reload', async ({ page }: { page: Page }) => {
+  const headers = threadSidebar(page).locator('section > button')
+  const headerNames = (): Promise<string[]> => headers.evaluateAll(buttons => buttons.map(button => button.textContent.trim()))
+  await recordAssertion(page, 'thread-sidebar-section-drag-reorders', async () => {
+    expect(await headerNames()).toEqual(['Active(0)', 'Settled(1)', 'Archived(1)'])
+    const dragged = await headers.last().boundingBox()
+    const target = await headers.first().boundingBox()
+    if (dragged === null || target === null) throw new Error('A section header has no layout box to drag.')
+    await page.mouse.move(dragged.x + 60, dragged.y + dragged.height / 2)
+    await page.mouse.down()
+    for (const step of [0.25, 0.5, 0.75, 1]) {
+      await page.mouse.move(dragged.x + 60, dragged.y + (target.y - dragged.y) * step, { steps: 4 })
+    }
+    await page.mouse.up()
+    await expect.poll(headerNames).toEqual(['Archived(1)', 'Active(0)', 'Settled(1)'])
+  })
+  await page.reload()
+  await recordAssertion(page, 'thread-sidebar-section-order-survives-reload', async () => {
+    await expect(threadSidebar(page)).toBeVisible()
+    await expect.poll(headerNames).toEqual(['Archived(1)', 'Active(0)', 'Settled(1)'])
+  })
+  await finishJourneyAssertions(page)
+})
+
 let settledArchiveThreadId: string | null = null
 
 /** One dropdown per delay setting; the group's accessible name is the label above its trigger. */

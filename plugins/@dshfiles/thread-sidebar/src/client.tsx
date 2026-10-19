@@ -70,6 +70,7 @@ import {
   ChevronDownIcon,
   ChevronUpIcon,
   CirclePauseIcon,
+  GripVerticalIcon,
   LinkIcon,
   MonitorIcon,
   PanelRightOpenIcon,
@@ -279,9 +280,9 @@ const ALL_PROJECTS = '__all__'
  * seconds, so a shorter schedule spent a full jj scan on every other tick.
  */
 const INVENTORY_REFRESH_INTERVAL_MS = 60_000
+/** Pointer travel before a press on a section header becomes a reorder drag instead of a fold. */
+const SECTION_DRAG_THRESHOLD_PX = 5
 const UNASSIGNED_PROJECT = '__unassigned__'
-
-const sections: readonly SidebarSection[] = ['pinned', 'active', 'parked', 'settled', 'inactive', 'archived']
 
 const sectionLabels: Record<SidebarSection, Parameters<ThreadSidebarTranslate>[0]> = {
   pinned: 'threadSidebarPinned',
@@ -2461,8 +2462,9 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     waitingSessionIds,
   ])
 
+  const orderedSections = useMemo(() => SidebarOrganization.orderSections(preferences.sectionOrder), [preferences.sectionOrder])
   const rowsBySection = useMemo(() => {
-    const rows = new Map<SidebarSection, SessionSummary[]>(sections.map(section => [section, []]))
+    const rows = new Map<SidebarSection, SessionSummary[]>(orderedSections.map(section => [section, []]))
     const activityAt = new Map(visibleThreadEntries.map(entry => [entry.session.id, entry.activity.updatedAt]))
     for (const { session, activity } of visibleThreadEntries) {
       if (threadView.groupBy === 'status' && attentionIds.has(session.id)) continue
@@ -2490,11 +2492,43 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     now,
     parkedSessionIds,
     pinnedSessionIds,
+    orderedSections,
     preferences.idleMinutes,
     threadView.groupBy,
     visibleThreadEntries,
     workspaceState.pinnedSessionIds,
   ])
+  // Empty sections fold away rather than render a header, so a drag only reorders the ones on screen.
+  const shownSections = useMemo(
+    () => orderedSections.filter(section => section === 'active' || (rowsBySection.get(section)?.length ?? 0) > 0),
+    [orderedSections, rowsBySection],
+  )
+  const sectionHeaderRefs = useRef<(HTMLButtonElement | null)[]>([])
+  const sectionDragRef = useRef<{ pointerId: number; from: number; startY: number; centers: number[] | null } | null>(null)
+  const suppressSectionClick = useRef(false)
+  const [sectionDrag, setSectionDrag] = useState<{ from: number; to: number } | null>(null)
+  const renderedSections = useMemo(
+    () =>
+      sectionDrag === null
+        ? shownSections
+        : SidebarOrganization.reorderSections({
+            savedOrder: orderedSections,
+            shownSections,
+            fromShownIndex: sectionDrag.from,
+            toShownIndex: sectionDrag.to,
+          }).filter(section => shownSections.includes(section)),
+    [orderedSections, sectionDrag, shownSections],
+  )
+  const endSectionDrag = (): void => {
+    sectionDragRef.current = null
+    setSectionDrag(null)
+  }
+  const commitSectionOrder = (fromShownIndex: number, toShownIndex: number): void => {
+    if (fromShownIndex === toShownIndex) return
+    changePreferences({
+      sectionOrder: SidebarOrganization.reorderSections({ savedOrder: orderedSections, shownSections, fromShownIndex, toShownIndex }),
+    })
+  }
   const groupedThreadEntries = useMemo(() => {
     if (threadView.groupBy === 'status') return []
     return ThreadViewModel.groupEntries({
@@ -3429,21 +3463,82 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
             </section>
           ) : null}
           {threadView.groupBy === 'status'
-            ? sections.map(section => {
+            ? renderedSections.map((section, index) => {
                 const rows = rowsBySection.get(section) ?? []
-                if (rows.length === 0 && section !== 'active') return null
                 const collapsed = preferences.collapsedSections.includes(section)
                 return (
                   <section className="dshx:mt-1" key={section}>
                     <button
+                      ref={element => {
+                        sectionHeaderRefs.current[index] = element
+                      }}
                       type="button"
+                      title={props.tSidebar('threadSidebarSectionReorderHint')}
                       className={cn(
                         stickyHeaderClass,
-                        'dshx:flex dshx:h-8 dshx:w-full dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-2.5 dshx:text-sm dshx:text-muted-foreground dshx:outline-none dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50',
+                        'dshx:group dshx:flex dshx:h-8 dshx:w-full dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-2.5 dshx:text-sm dshx:text-muted-foreground dshx:outline-none dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50',
+                        sectionDrag?.from === index && 'dshx:cursor-grabbing dshx:bg-accent dshx:opacity-70',
                       )}
                       aria-expanded={!collapsed}
-                      onClick={() => toggleSection(section)}
+                      onPointerDown={event => {
+                        if (event.button !== 0) return
+                        sectionDragRef.current = { pointerId: event.pointerId, from: index, startY: event.clientY, centers: null }
+                      }}
+                      onPointerMove={event => {
+                        const current = sectionDragRef.current
+                        if (current === null || current.pointerId !== event.pointerId) return
+                        if (current.centers === null) {
+                          if (Math.abs(event.clientY - current.startY) < SECTION_DRAG_THRESHOLD_PX) return
+                          current.centers = shownSections.map((_, position) => {
+                            const rect = sectionHeaderRefs.current[position]?.getBoundingClientRect()
+                            return rect === undefined ? Number.POSITIVE_INFINITY : rect.top + rect.height / 2
+                          })
+                          event.currentTarget.setPointerCapture(event.pointerId)
+                        }
+                        event.preventDefault()
+                        setSectionDrag({
+                          from: current.from,
+                          to: SidebarOrganization.dropIndexAt({ centers: current.centers, fromIndex: current.from, position: event.clientY }),
+                        })
+                      }}
+                      onPointerUp={event => {
+                        const current = sectionDragRef.current
+                        if (current === null || current.pointerId !== event.pointerId) return
+                        if (current.centers !== null) {
+                          suppressSectionClick.current = true
+                          commitSectionOrder(
+                            current.from,
+                            SidebarOrganization.dropIndexAt({ centers: current.centers, fromIndex: current.from, position: event.clientY }),
+                          )
+                        }
+                        endSectionDrag()
+                      }}
+                      onPointerCancel={endSectionDrag}
+                      onLostPointerCapture={() => {
+                        if (sectionDragRef.current?.centers !== null) endSectionDrag()
+                      }}
+                      onKeyDown={event => {
+                        if (!event.altKey || (event.key !== 'ArrowUp' && event.key !== 'ArrowDown')) return
+                        const fromShownIndex = shownSections.indexOf(section)
+                        const toShownIndex = fromShownIndex + (event.key === 'ArrowUp' ? -1 : 1)
+                        if (fromShownIndex < 0 || toShownIndex < 0 || toShownIndex >= shownSections.length) return
+                        event.preventDefault()
+                        commitSectionOrder(fromShownIndex, toShownIndex)
+                      }}
+                      onClick={() => {
+                        if (suppressSectionClick.current) {
+                          suppressSectionClick.current = false
+                          return
+                        }
+                        toggleSection(section)
+                      }}
                     >
+                      <span
+                        className="dshx:inline-flex dshx:shrink-0 dshx:opacity-0 dshx:transition-opacity dshx:group-hover:opacity-100 dshx:group-focus-visible:opacity-100"
+                        aria-hidden="true"
+                      >
+                        <GripVerticalIcon className="dshx:size-3 dshx:cursor-grab dshx:active:cursor-grabbing" />
+                      </span>
                       <span className="dshx:inline-flex dshx:shrink-0" aria-hidden="true">
                         {sectionIcons[section]}
                       </span>

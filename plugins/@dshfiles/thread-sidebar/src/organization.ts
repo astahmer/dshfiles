@@ -7,7 +7,9 @@ import type { ThreadMutes } from './thread-mute.js'
 import { DEFAULT_THREAD_NOTIFICATION_CATEGORIES, type ThreadNotificationCategories } from './thread-notifications.js'
 import { DEFAULT_THREAD_VIEW_SETTINGS, type ThreadViewSettings } from './thread-view-preferences.js'
 
-export type SidebarSection = 'pinned' | 'active' | 'parked' | 'settled' | 'inactive' | 'archived'
+/** Render order: settled sits right before archived, since both are storage rather than places to work. */
+export const SIDEBAR_SECTIONS = ['pinned', 'active', 'parked', 'inactive', 'settled', 'archived'] as const
+export type SidebarSection = (typeof SIDEBAR_SECTIONS)[number]
 
 export const SIDEBAR_HEADER_MIN_HEIGHT = 44
 export const SIDEBAR_THREAD_MIN_HEIGHT = 120
@@ -64,6 +66,8 @@ export interface SidebarPreferences {
   collapsedSections: SidebarSection[]
   /** Group headers a user keeps closed, by view group key (`project:<id>`, `date:<bucket>`). */
   collapsedGroups: string[]
+  /** Section header order; the sections themselves are fixed, only their sequence changes. */
+  sectionOrder: SidebarSection[]
   workspaceFilter: string | null
   headerMode: 'compact' | 'expanded'
   /** Drop the Host brand mark and name from the header; the collapse button stays. */
@@ -131,6 +135,7 @@ export const DEFAULT_PREFERENCES: SidebarPreferences = {
   // Keep every working section open; archived and settled threads stay folded until requested.
   collapsedSections: ['archived', 'settled'],
   collapsedGroups: [],
+  sectionOrder: [...SIDEBAR_SECTIONS],
   workspaceFilter: null,
   headerMode: 'compact',
   hideBrandLogo: false,
@@ -404,6 +409,48 @@ const reorderVisibleEntry = (options: {
 const dropIndexAt = (options: { readonly centers: readonly number[]; readonly fromIndex: number; readonly position: number }): number =>
   options.centers.filter((center, index) => index !== options.fromIndex && center < options.position).length
 
+const SECTION_IDS: ReadonlySet<string> = new Set(SIDEBAR_SECTIONS)
+const isSidebarSection = (value: string): value is SidebarSection => SECTION_IDS.has(value)
+
+/**
+ * A saved section order: unknown or repeated ids are dropped, and a section the
+ * saved order misses (one shipped after it was written) keeps its shipped place
+ * behind the saved ones.
+ */
+const orderSections = (savedOrder: readonly string[]): SidebarSection[] => {
+  const saved = [...new Set(savedOrder)].filter(isSidebarSection)
+  return [...saved, ...SIDEBAR_SECTIONS.filter(section => !saved.includes(section))]
+}
+
+/**
+ * Move one section to a drop index among the sections on screen. Empty sections
+ * are not rendered, so they keep their saved slot while the shown ones reorder
+ * around them.
+ */
+const reorderSections = (options: {
+  readonly savedOrder: readonly string[]
+  readonly shownSections: readonly SidebarSection[]
+  readonly fromShownIndex: number
+  readonly toShownIndex: number
+}): SidebarSection[] => {
+  const orderedSections = orderSections(options.savedOrder)
+  const movedId = options.shownSections[options.fromShownIndex]
+  if (movedId === undefined) return orderedSections
+  const shown = orderedSections.filter(section => options.shownSections.includes(section))
+  const movedShownIndex = shown.indexOf(movedId)
+  if (movedShownIndex < 0) return orderedSections
+  const nextShown = shown.filter(section => section !== movedId)
+  nextShown.splice(Math.min(options.toShownIndex, nextShown.length), 0, movedId)
+  const next = [...orderedSections]
+  let cursor = 0
+  for (const [index, section] of orderedSections.entries()) {
+    if (!options.shownSections.includes(section)) continue
+    next[index] = nextShown[cursor] ?? section
+    cursor += 1
+  }
+  return next
+}
+
 /** The client's WorkspaceArchiveError carries the Host refusal as `rpcError`. */
 const parkedRecoveryRefusal = z.object({
   rpcError: z.object({
@@ -555,6 +602,8 @@ export class SidebarOrganization {
   static readonly reorderSidebarEntry = reorderSidebarEntry
   static readonly reorderVisibleEntry = reorderVisibleEntry
   static readonly dropIndexAt = dropIndexAt
+  static readonly orderSections = orderSections
+  static readonly reorderSections = reorderSections
   static readonly archiveWithoutStopping = archiveWithoutStopping
   static readonly nextIdleTransitionAt = nextIdleTransitionAt
   static readonly isAutoSettleCandidate = isAutoSettleCandidate
