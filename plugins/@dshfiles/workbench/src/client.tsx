@@ -356,6 +356,12 @@ export default defineClient({
         decorate(props => {
           useDockviewSheet()
           useDemoPanels()
+          const bottomSettings = useSettings(workbenchSettings)
+          // The surface exists only while the setting asks for it and the owned
+          // frame carries the row: the stock frame renders this seat
+          // unconditionally, and a surface there would duplicate the panels the
+          // main workbench already shows.
+          if (bottomSettings.value?.bottomPanel !== 'shown' || ctx.get('frameBottom') === undefined) return null
           return (
             <WorkbenchView
               registry={registry}

@@ -11,6 +11,9 @@ const DOCK_LAYOUT_KEY = 'dshfiles.workbench.dock-layout.v1'
 /** The global dock lives in the frame's own right-column seat, not in a session's right sidebar. */
 const dockRegion = (page: Page) => page.locator('[data-slot="shell.dock"]')
 
+/** The bottom row is the frame's own seat too: full width below every column. */
+const bottomRegion = (page: Page) => page.locator('[data-slot="shell.bottom"]')
+
 const globalPanel = (page: Page, name: string) =>
   page.getByRole('navigation', { name: 'Global panels', exact: true }).getByRole('button', { name, exact: true })
 
@@ -93,6 +96,18 @@ Then('the default layout shows the Editor alone', async ({ page }: { page: Page 
 })
 
 Then('the closed panel stays closed and can be added back', async ({ page }: { page: Page }) => {
+  const where = await page.evaluate(() =>
+    [...document.querySelectorAll('[role="region"]')].map(region => ({
+      name: region.getAttribute('aria-label'),
+      slot: region.closest('[data-slot]')?.getAttribute('data-slot') ?? null,
+    })),
+  )
+  const setting = await page.evaluate(() => {
+    const list = document.querySelector('[role="tablist"][aria-label="Bottom panel"]')
+    const selected = list?.querySelector('[aria-selected="true"], [data-state="active"]')
+    return { tablist: list !== null, selected: selected?.textContent ?? null, body: document.body.innerText.match(/Bottom panel[\s\S]{0,80}/)?.[0] ?? null }
+  })
+  console.log('WHERE-DEBUG', JSON.stringify({ where, setting }))
   await recordAssertion(page, 'workbench-layout-survives-reload', () => expect.poll(() => regionNames(page)).toEqual([]))
   await page.getByRole('button', { name: 'Add panel', exact: true }).click()
   await page.getByRole('menuitem', { name: 'Editor', exact: true }).click()
@@ -130,12 +145,17 @@ Then('the Editor tab shows the editor again', async ({ page }: { page: Page }) =
   await finishJourneyAssertions(page)
 })
 
-When('the right column is set to the global dock in the plugin settings', async ({ page }: { page: Page }) => {
+/** The plugin's settings live behind the Plugins panel; the surface choice is one select plus Save. */
+const setRightPanel = async (page: Page, label: string): Promise<void> => {
   await globalPanel(page, 'Plugins').click()
   await page.getByRole('button', { name: 'View @dshfiles/workbench', exact: true }).click()
-  await page.getByRole('combobox', { name: 'Right panel', exact: true }).selectOption({ label: 'Global dock (persistent panels in the right column)' })
+  await page.getByRole('combobox', { name: 'Right panel', exact: true }).selectOption({ label })
   await page.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
+}
+
+When('the right column is set to the global dock in the plugin settings', async ({ page }: { page: Page }) => {
+  await setRightPanel(page, 'Global dock (persistent panels in the right column)')
 })
 
 When('a thread is started and the New Session screen opens again', async ({ page }: { page: Page }) => {
@@ -170,6 +190,50 @@ Then('the global dock still shows the Jujutsu panel after a reload', async ({ pa
     // The surface saves the layout it restored or applied, so the dock's own key holds the panel it shows.
     expect(await page.evaluate(key => localStorage.getItem(key) ?? '', DOCK_LAYOUT_KEY)).toContain('dshfiles-jujutsu.dock')
   })
+})
+
+When('the Jujutsu panel is moved to the main view from the dock', async ({ page }: { page: Page }) => {
+  await dockRegion(page).getByRole('button', { name: 'Move', exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Jujutsu', exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Move to main view', exact: true }).click()
+})
+
+Then('the main view shows the Jujutsu page and the dock no longer shows it', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'workbench-global-dock-moves-a-panel-to-the-main-view', async () => {
+    await expect(page.locator('[data-slot="main"]').getByRole('heading', { name: 'Jujutsu', exact: true })).toBeVisible()
+    await expect(dockRegion(page).getByRole('region', { name: 'Jujutsu', exact: true })).toHaveCount(0)
+  })
+})
+
+When('the bottom panel is shown from the dock header', async ({ page }: { page: Page }) => {
+  await dockRegion(page).getByRole('button', { name: 'Toggle the bottom panel', exact: true }).click()
+})
+
+Then('the bottom panel is open below the columns', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'workbench-bottom-panel-opens-under-the-columns', async () => {
+    await expect(bottomRegion(page)).toBeVisible()
+    await expect(bottomRegion(page).getByRole('heading', { name: 'Panel', exact: true })).toBeVisible()
+    await expect(dockRegion(page).getByRole('region', { name: 'Jujutsu', exact: true })).toBeVisible()
+  })
+})
+
+When('the Jujutsu panel is moved to the bottom panel', async ({ page }: { page: Page }) => {
+  await dockRegion(page).getByRole('button', { name: 'Move', exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Jujutsu', exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Move to the bottom panel', exact: true }).click()
+})
+
+Then('the bottom panel shows the Jujutsu panel and the dock no longer does', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'workbench-panel-moves-into-the-bottom-panel', async () => {
+    await expect(bottomRegion(page).getByRole('region', { name: 'Jujutsu', exact: true })).toBeVisible()
+    await expect(dockRegion(page).getByRole('region', { name: 'Jujutsu', exact: true })).toHaveCount(0)
+  })
+})
+
+When('the bottom panel is hidden again from the dock header', async ({ page }: { page: Page }) => {
+  await dockRegion(page).getByRole('button', { name: 'Hide the bottom panel', exact: true }).click()
+  await expect(bottomRegion(page)).toHaveCount(0)
+  await finishJourneyAssertions(page)
 })
 
 Then('the main Workbench keeps its own layout', async ({ page }: { page: Page }) => {

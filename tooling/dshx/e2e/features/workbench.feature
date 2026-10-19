@@ -39,6 +39,20 @@ Feature: Workbench layouts
     Then the global dock still shows the Jujutsu panel outside a thread
     When the global dock page is reloaded outside any thread
     Then the global dock still shows the Jujutsu panel after a reload
+    When the Jujutsu panel is moved to the main view from the dock
+    Then the main view shows the Jujutsu page and the dock no longer shows it
+    When the right column is set back to the per-thread panel in the plugin settings
+
+  @scenario:workbench.bottom-panel
+  Scenario: A panel moves from the right column into the bottom panel
+    Given the isolated plugin composition of "@dshfiles/frame-layout, @dshfiles/workbench, @dshfiles/jujutsu, @dshfiles/editor" is booted
+    When the right column is set to the global dock in the plugin settings
+    Then the global dock shows the Jujutsu panel
+    When the bottom panel is shown from the dock header
+    Then the bottom panel is open below the columns
+    When the Jujutsu panel is moved to the bottom panel
+    Then the bottom panel shows the Jujutsu panel and the dock no longer does
+    When the bottom panel is hidden again from the dock header
 
   @scenario:workbench.early-open
   Scenario: A panel asked for before the Workbench mounted opens once it does
