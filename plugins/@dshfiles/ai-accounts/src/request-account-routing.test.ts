@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createAccountPool } from './account-pool.js'
-import { failoverAccountIds, selectRequestAccount } from './request-account-routing.js'
+import { failoverAccountIds, selectRequestAccount, wireAccountFor } from './request-account-routing.js'
 
 const routes = new Map<string, { readonly kind: string; readonly enabled: boolean }>([
   ['codex-work', { kind: 'codex', enabled: true }],
@@ -108,5 +108,42 @@ describe('request account routing', () => {
         modelsCompatible,
       }),
     ).toEqual(['codex-alt'])
+  })
+
+  it('sends Priority side requests such as session titles past a cooling selected account', () => {
+    const pool = poolFor('priority')
+    pool.noteRateLimited('codex-work', 60_000, 1_000)
+    const wire = (purpose: string | undefined) =>
+      wireAccountFor({
+        provider: 'codex-work',
+        model: 'gpt-6',
+        purpose,
+        conversationKey: 'session-one',
+        active: undefined,
+        routes,
+        pool,
+        modelsCompatible,
+        now: 2_000,
+      })
+
+    expect(wire('session-title')).toBe('codex-personal')
+    expect(wire(undefined)).toBe('codex-work')
+  })
+
+  it('keeps the account a main request was routed to for every chunk of that request', () => {
+    const pool = poolFor('priority')
+
+    expect(
+      wireAccountFor({
+        provider: 'codex-personal',
+        model: 'gpt-6',
+        purpose: undefined,
+        conversationKey: 'session-one',
+        active: { provider: 'codex-personal', model: 'gpt-6', accountId: 'codex-alt' },
+        routes,
+        pool,
+        modelsCompatible,
+      }),
+    ).toBe('codex-alt')
   })
 })

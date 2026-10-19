@@ -36,7 +36,7 @@ import { createAccountPool, creditServedAttempt } from './account-pool.js'
 import { explainSilentRejections } from './silent-rejection.js'
 import { FailureRecoveryModel } from './failure-recovery.js'
 import { isRetryId, retryNotice } from './retry-notice.js'
-import { failoverAccountIds, selectRequestAccount } from './request-account-routing.js'
+import { failoverAccountIds, selectRequestAccount, wireAccountFor } from './request-account-routing.js'
 // Types the `llm/retry` rows this plugin writes, so a fail-over shows in the turn like DSH's own retries.
 import type { LlmRetryEventData, LlmRetryStartedEventData } from '@deepseek-ai/dsh-llm-retry'
 import type {} from '@dshfiles/request-messages'
@@ -319,13 +319,17 @@ export default definePlugin({
         accountId: string
       }
     >()
-    const accountForRequest = (options: GenerateOptions): string => {
-      const active = options.sessionId === undefined ? undefined : activeAccountRoutes.get(options.sessionId)
-      if (options.purpose === undefined && active?.provider === options.provider && active.model === options.model) {
-        return active.accountId
-      }
-      return recovery.routeFor(options.sessionId, options.provider)
-    }
+    const accountForRequest = (options: GenerateOptions): string =>
+      wireAccountFor({
+        provider: options.provider,
+        model: options.model,
+        purpose: options.purpose,
+        conversationKey: options.sessionId,
+        active: options.sessionId === undefined ? undefined : activeAccountRoutes.get(options.sessionId),
+        routes,
+        pool,
+        modelsCompatible,
+      })
 
     const llm = ctx.get('llm')
     if (llm === undefined) return

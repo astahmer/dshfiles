@@ -61,3 +61,34 @@ export const failoverAccountIds = (input: {
   const preferred = input.distribution === 'priority' ? compatible : [...new Set([...input.usageOrder, ...compatible])]
   return preferred.filter(provider => provider !== input.from && compatibleIds.has(provider) && !hiddenIds.has(provider))
 }
+
+/**
+ * The account that serves one request on the wire. A main request keeps the account its `agent/request` routing
+ * chose; a side request (session title, compaction) carries no such routing, so under Priority it takes the first
+ * healthy account itself instead of the selected route, which may be the one cooling down.
+ */
+export const wireAccountFor = (input: {
+  readonly provider: string
+  readonly model: string
+  readonly purpose: string | undefined
+  readonly conversationKey: string | undefined
+  readonly active: { readonly provider: string; readonly model: string; readonly accountId: string } | undefined
+  readonly routes: ReadonlyMap<string, RoutableAccount>
+  readonly pool: Pick<AccountPool, 'acquire' | 'distribution' | 'routeFor'>
+  readonly modelsCompatible: (sourceProvider: string, candidateProvider: string, model: string) => boolean
+  readonly now?: number
+}): string => {
+  const active = input.active
+  if (input.purpose === undefined && active?.provider === input.provider && active.model === input.model) return active.accountId
+  if (input.purpose !== undefined && input.pool.distribution() === 'priority') {
+    return selectRequestAccount({
+      provider: input.provider,
+      model: input.model,
+      routes: input.routes,
+      pool: input.pool,
+      modelsCompatible: input.modelsCompatible,
+      ...(input.now === undefined ? {} : { now: input.now }),
+    })
+  }
+  return input.pool.routeFor(input.conversationKey, input.provider, input.now)
+}
