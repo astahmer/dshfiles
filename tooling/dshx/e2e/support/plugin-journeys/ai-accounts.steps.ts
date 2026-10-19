@@ -397,10 +397,10 @@ Then('the healthy account answers and the rate-limited one cools down', async ({
   await finishJourneyAssertions(page)
 })
 
-When('an exhausted Command Code account fails a turn with failover off', async ({ page }: { page: Page }) => {
+const failTurnOnExhaustedAccount = async (page: Page, key: string): Promise<void> => {
   await startFakeCommandCode(page)
   await openAccountsPanel(page)
-  await addCommandCodeAccount(page, { name: 'Command Code 1', key: 'e2e-fake-key-EXHAUSTED' })
+  await addCommandCodeAccount(page, { name: 'Command Code 1', key })
   // The inline recovery choice exists only while automatic exhausted-limit failover is off.
   await openSettingsDialog(page)
   await page.getByRole('dialog').getByRole('button', { name: 'AI Accounts', exact: true }).click()
@@ -422,6 +422,26 @@ When('an exhausted Command Code account fails a turn with failover off', async (
   await selectAccountModel(page, 'commandcode_work/gpt-6-luna')
   await composer.fill('Recover this turn on another available route.')
   await composer.press('Enter')
+}
+
+When('an exhausted Command Code account fails a turn with failover off', async ({ page }: { page: Page }) => {
+  await failTurnOnExhaustedAccount(page, 'e2e-fake-key-EXHAUSTED')
+})
+
+When('a briefly exhausted Command Code account fails a turn with auto-resume on', async ({ page }: { page: Page }) => {
+  await failTurnOnExhaustedAccount(page, 'e2e-fake-key-RESETTING')
+  const autoResume = page.getByRole('checkbox', { name: 'Automatically resume 1 minute after reset' })
+  await expect(autoResume).toBeEnabled({ timeout: 30_000 })
+  await autoResume.click()
+  await expect(autoResume).toBeChecked()
+})
+
+Then('the turn resumes on its own one minute after the reset', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'ai-accounts-exhausted-turn-auto-resumes', async () => {
+    // The fake limit resets 5 seconds after the failed turn; the Host resumes 1 minute after that.
+    await expect(page.getByText('Answered by ETTING', { exact: true }).last()).toBeVisible({ timeout: 100_000 })
+  })
+  await finishJourneyAssertions(page)
 })
 
 Then('the exhausted turn offers an inline route switch and one-minute auto-resume', async ({ page }: { page: Page }) => {

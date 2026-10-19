@@ -99,3 +99,9 @@ Feature: AI Accounts
     Given the isolated plugin profile "@dshfiles/ai-accounts" is booted
     When an exhausted Command Code account fails a turn with failover off
     Then the exhausted turn offers an inline route switch and one-minute auto-resume
+
+  @scenario:ai-accounts.quota-auto-resume
+  Scenario: Resume an exhausted turn on its own after the limit resets
+    Given the isolated plugin profile "@dshfiles/ai-accounts" is booted
+    When a briefly exhausted Command Code account fails a turn with auto-resume on
+    Then the turn resumes on its own one minute after the reset

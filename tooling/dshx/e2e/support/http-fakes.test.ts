@@ -17,7 +17,7 @@ const createOAuthState = () => ({
 
 const origin = 'http://127.0.0.1:45678'
 
-const createCommandState = (): FakeCommandCodeState => ({ requests: [], held: new Set(), oneShotCalls: new Set() })
+const createCommandState = (): FakeCommandCodeState => ({ requests: [], held: new Set(), oneShotCalls: new Set(), quotaResetsAt: new Map() })
 
 const sha256 = (value: string): string => createHash('sha256').update(value).digest('base64url')
 

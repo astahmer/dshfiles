@@ -9,7 +9,8 @@ import { z } from 'zod'
  * journey can drive real turns without a network or a subscription.
  *
  * The key decides the account: `-LIMITED` keys are rate limited on chat, `-BROKEN` keys fail the billing read,
- * and `-EXHAUSTED` keys exercise quota recovery. Every other key reports a 75%-left session window and a
+ * `-EXHAUSTED` keys exercise quota recovery, and `-RESETTING` keys are exhausted until 5 seconds after their first turn,
+ * then answer. Every other key reports a 75%-left session window and a
  * 10%-left weekly window. A turn answers `Answered by <key suffix>` unless its latest message carries a directive:
  * `[[call TOOL {json}]]` calls any tool; `[[once call TOOL {json}]]` calls it only on its first match; `[[read PATH]]`
  * and `[[memory_search QUERY]]` call tools; `[[empty]]` settles with reasoning but no answer; `[[hold]]` keeps the
@@ -24,6 +25,7 @@ export const FAKE_COMMAND_CODE_MODEL_ID = 'gpt-6-luna'
 export const FAKE_COMMAND_CODE_MODEL = `commandcode_work/${FAKE_COMMAND_CODE_MODEL_ID}`
 
 const HOUR_MS = 3_600_000
+const RESETTING_QUOTA_MS = 5_000
 const TITLE_INSTRUCTION = 'Create a concise title for an AI coding-assistant session'
 const RUNTIME_CONTEXT_PREFIXES = ['Current runtime context.', 'Time sampled while preparing turn ']
 
@@ -48,6 +50,7 @@ export interface FakeCommandCodeState {
   readonly requests: FakeChatRequest[]
   readonly held: Set<() => void>
   readonly oneShotCalls: Set<string>
+  readonly quotaResetsAt: Map<string, number>
 }
 
 export interface FakeCommandCode {
@@ -135,6 +138,12 @@ const chatCompletionResponse = (input: { readonly state: FakeCommandCodeState; r
   if (input.key.endsWith('-MISSING'))
     return responseAnswer({ error: { code: 'MISSING_CREDENTIAL', message: 'The fake account has no usable credential.', type: 'authentication_error' } }, 401)
   if (input.key.endsWith('-LIMITED')) return responseAnswer({ error: { message: 'Rate limit reached', type: 'rate_limit_error' } }, 429)
+  if (input.key.endsWith('-RESETTING') && kind === 'turn') {
+    const resetsAt = input.state.quotaResetsAt.get(input.key) ?? Date.now() + RESETTING_QUOTA_MS
+    input.state.quotaResetsAt.set(input.key, resetsAt)
+    if (Date.now() < resetsAt)
+      return responseAnswer({ error: { message: 'Usage limit reached for this account.', type: 'insufficient_quota', code: 'USAGE_LIMIT_REACHED' } }, 400)
+  }
   if (input.key.endsWith('-EXHAUSTED'))
     return responseAnswer({ error: { message: 'Usage limit reached for this account.', type: 'insufficient_quota', code: 'USAGE_LIMIT_REACHED' } }, 400)
 
@@ -179,11 +188,13 @@ export const createFakeCommandCodeApp = (state: FakeCommandCodeState): Hono => {
   app.get('/alpha/billing/credits', context => {
     const key = (context.req.header('authorization') ?? '').replace(/^Bearer /, '')
     if (key.endsWith('-BROKEN')) return context.json({ error: 'billing unavailable' }, 503)
-    const weeklyUsed = key.endsWith('-EXHAUSTED') ? 100 : 90
+    const quotaResetsAt = state.quotaResetsAt.get(key)
+    const resetting = quotaResetsAt !== undefined && Date.now() < quotaResetsAt
+    const weeklyUsed = key.endsWith('-EXHAUSTED') || resetting ? 100 : 90
     return context.json({
       windowLimits: {
         fiveHour: { used: 25, cap: 100, resetAt: Date.now() + HOUR_MS },
-        weekly: { used: weeklyUsed, cap: 100, resetAt: Date.now() + 72 * HOUR_MS },
+        weekly: { used: weeklyUsed, cap: 100, resetAt: resetting ? quotaResetsAt : Date.now() + 72 * HOUR_MS },
       },
       credits: { planId: 'individual-pro' },
     })
@@ -248,7 +259,7 @@ const listen = (server: ListenableServer): Promise<void> =>
 
 /** Listens on a free loopback port until `close`. */
 export const startFakeCommandCode = async (): Promise<FakeCommandCode> => {
-  const state: FakeCommandCodeState = { requests: [], held: new Set(), oneShotCalls: new Set() }
+  const state: FakeCommandCodeState = { requests: [], held: new Set(), oneShotCalls: new Set(), quotaResetsAt: new Map() }
   const server: ListenableServer = createAdaptorServer({ fetch: createFakeCommandCodeApp(state).fetch })
   await listen(server)
   const address = server.address()
