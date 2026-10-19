@@ -83,6 +83,7 @@ owning plugin's README — this file is only the decision register.
 | 63  | Health of a native fallback route                   | ai-accounts                     | host   | upstream | No per-provider health or cooldown; a spent native route is skipped only within the turn that hit it.                      |
 | 64  | Summary on each Ran commands group header           | turn-summary                    | client | upstream | The step group header has no slot; the summary sits under the finished turn in `turnTail`.                                 |
 | 65  | Host native right-sidebar resources in the dock     | workbench, frame-layout         | client | upstream | File preview, diff and terminal bodies render only in the session-scoped right sidebar; a root dock seat cannot host them. |
+| 66  | Process identity of a background job                | worktree-memory                 | host   | upstream | `JobView` has no pid or cwd; worktree-memory pairs Host children to jobs by label and start time.                          |
 
 ## Upstream tracker
 
