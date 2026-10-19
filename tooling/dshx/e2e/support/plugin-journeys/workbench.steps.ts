@@ -148,7 +148,10 @@ Then('the Editor tab shows the editor again', async ({ page }: { page: Page }) =
 /** The plugin's settings live behind the Plugins panel; the surface choice is one select plus Save. */
 const setRightPanel = async (page: Page, label: string): Promise<void> => {
   await globalPanel(page, 'Plugins').click()
-  await page.getByRole('button', { name: 'View @dshfiles/workbench', exact: true }).click()
+  // The panel opens on whatever page was last shown: the plugin list, or this
+  // plugin's settings page already.
+  const view = page.getByRole('button', { name: 'View @dshfiles/workbench', exact: true })
+  if ((await view.count()) > 0) await view.click()
   await page.getByRole('combobox', { name: 'Right panel', exact: true }).selectOption({ label })
   await page.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
@@ -236,6 +239,34 @@ When('the bottom panel is hidden again from the dock header', async ({ page }: {
   await dockRegion(page).getByRole('button', { name: 'Hide the bottom panel', exact: true }).click()
   await expect(bottomRegion(page)).toHaveCount(0)
   await finishJourneyAssertions(page)
+})
+
+/** The Layouts dialog is one surface's own header button; its rows act on the browser store. */
+const layoutsDialog = (page: Page) => page.getByRole('dialog')
+
+When('the current layout is saved as {string}', async ({ page }: { page: Page }, name: string) => {
+  await dockRegion(page).getByRole('button', { name: 'Layouts', exact: true }).click()
+  await layoutsDialog(page).getByLabel('Layout name').fill(name)
+  await layoutsDialog(page).getByRole('button', { name: 'Save current layout', exact: true }).click()
+  await layoutsDialog(page).getByRole('button', { name: 'Done', exact: true }).click()
+  await expect(layoutsDialog(page)).toHaveCount(0)
+})
+
+When('the {string} layout is applied', async ({ page }: { page: Page }, name: string) => {
+  await dockRegion(page).getByRole('button', { name: 'Layouts', exact: true }).click()
+  await layoutsDialog(page).getByRole('button', { name: `Apply ${name}`, exact: true }).click()
+})
+
+When('the Jujutsu panel is moved back to the right column', async ({ page }: { page: Page }) => {
+  await bottomRegion(page).getByRole('button', { name: 'Move', exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Move to the dock', exact: true }).click()
+})
+
+Then('the dock shows the Jujutsu panel and the bottom panel does not', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'workbench-named-layout-saves-the-arrangement', async () => {
+    await expect(dockRegion(page).getByRole('region', { name: 'Jujutsu', exact: true })).toBeVisible()
+    await expect(bottomRegion(page).getByRole('region', { name: 'Jujutsu', exact: true })).toHaveCount(0)
+  })
 })
 
 Then('the main Workbench keeps its own layout', async ({ page }: { page: Page }) => {

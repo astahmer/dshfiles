@@ -446,7 +446,7 @@ export default defineClient({
                 {translate('saveLayout')}
               </Button>
               <DialogClose asChild>
-                <Button size="sm" variant="ghost">{translate('close')}</Button>
+                <Button size="sm" variant="ghost">{translate('done')}</Button>
               </DialogClose>
             </DialogFooter>
           </DialogContent>

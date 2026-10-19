@@ -36,7 +36,7 @@ const en = {
   deleteLayout: 'Delete',
   layoutEmpty: 'No saved layout yet.',
   cancel: 'Cancel',
-  close: 'Close',
+  done: 'Done',
   sidePanelGuide: 'Dock and arrange registered panels beside the thread.',
   dockHeading: 'Panels',
 }
@@ -74,7 +74,7 @@ const zh = {
   deleteLayout: '删除',
   layoutEmpty: '还没有保存的布局。',
   cancel: '取消',
-  close: '关闭',
+  done: '完成',
   sidePanelGuide: '在会话旁停靠和排列已注册的面板。',
   dockHeading: '面板',
 } satisfies Record<keyof typeof en, string>

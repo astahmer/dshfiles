@@ -1,6 +1,6 @@
 import type { SerializedDockview } from 'dockview-react'
 import { describe, expect, it } from 'vitest'
-import { layoutNames, renamedSavedLayout, savedSurface, withSavedLayout, withoutSavedLayout, type SavedLayout } from './saved-layouts.js'
+import { layoutNames, renamedSavedLayout, savedLayouts, savedSurface, withSavedLayout, withoutSavedLayout, type SavedLayout } from './saved-layouts.js'
 
 /** Test double: the store only round-trips these objects, it never renders them. */
 const arrangement = (panelId: string): SerializedDockview =>
@@ -10,6 +10,15 @@ const arrangement = (panelId: string): SerializedDockview =>
   }) as unknown as SerializedDockview
 
 describe('saved layouts', () => {
+  it('round-trips through browser storage', () => {
+    savedLayouts.remove()
+    const saved = savedLayouts.set(withSavedLayout({}, 'bottom jujutsu', { bottom: arrangement('jujutsu') }))
+
+    expect(saved).toBe(true)
+    expect(savedSurface(savedLayouts.get()['bottom jujutsu'] ?? {}, 'bottom')?.panels).toHaveProperty('jujutsu')
+    savedLayouts.remove()
+  })
+
   it('saves an arrangement under a name, replacing one it already holds', () => {
     const first = withSavedLayout({}, 'two panes', { dock: arrangement('jujutsu') })
     const replaced = withSavedLayout(first, 'two panes', { dock: arrangement('editor') })

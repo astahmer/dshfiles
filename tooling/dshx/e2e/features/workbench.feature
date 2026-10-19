@@ -54,6 +54,21 @@ Feature: Workbench layouts
     Then the bottom panel shows the Jujutsu panel and the dock no longer does
     When the bottom panel is hidden again from the dock header
 
+  @scenario:workbench.saved-layouts
+  Scenario: A named layout brings a panel back to where it was saved
+    Given the isolated plugin composition of "@dshfiles/frame-layout, @dshfiles/workbench, @dshfiles/jujutsu, @dshfiles/editor" is booted
+    When the right column is set to the global dock in the plugin settings
+    Then the global dock shows the Jujutsu panel
+    When the bottom panel is shown from the dock header
+    And the Jujutsu panel is moved to the bottom panel
+    And the current layout is saved as "bottom jujutsu"
+    And the Jujutsu panel is moved back to the right column
+    Then the dock shows the Jujutsu panel and the bottom panel does not
+    When the "bottom jujutsu" layout is applied
+    Then the bottom panel shows the Jujutsu panel and the dock no longer does
+    When the bottom panel is hidden again from the dock header
+    And the right column is set back to the per-thread panel in the plugin settings
+
   @scenario:workbench.early-open
   Scenario: A panel asked for before the Workbench mounted opens once it does
     Given the isolated plugin composition of "@dshfiles/workbench, @dshfiles/editor, @dshfiles/workspace-folder-picker, @dshfiles/command-palette" is booted
