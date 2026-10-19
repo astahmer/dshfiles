@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { SessionId } from '@deepseek-ai/dsh-session'
 import { test } from 'vitest'
 import { createSkillMentionSource, SkillMentionModel } from './skill-mention.js'
 
@@ -41,9 +42,8 @@ test('reads the skill catalog on the first @ query, not when a composer mounts, 
   assert.equal('warm' in mentions.source, false)
   assert.equal(reads, 0)
 
-  // SAFETY: the source reads only `sessionId` from the session and `query`, `quoted`, `signal` from the request.
-  const session = { sessionId: 'session-a' } as unknown as Parameters<typeof mentions.source.candidates>[0]
-  const request = { query: 'rev', quoted: false, signal: new AbortController().signal } as unknown as Parameters<typeof mentions.source.candidates>[1]
+  const session = { sessionId: SessionId('session-a') }
+  const request = { query: 'rev', quoted: false, position: 'inline' as const, drilled: false, signal: new AbortController().signal }
   await mentions.source.candidates(session, request)
   await mentions.source.candidates(session, request)
   assert.equal(reads, 1)
