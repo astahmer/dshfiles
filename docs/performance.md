@@ -22,12 +22,17 @@ repository already used for the composer.
 | Opening window of 26 MB on Anthropic threads                                            | `snapshot-bytes`: thinking signatures sent twice per assistant message, 65 % of the bytes                                        | —                                                                                                                                                                                                             | Host gap 67                               |
 | `session/list` 3–13 s                                                                   | 944 Sessions, Host 73 % idle: every call re-reads each Session header                                                            | —                                                                                                                                                                                                             | Host gap 70                               |
 
-Before and after on the same 10 threads (live, switch probe):
+Before and after on the same 10 threads (live, `switch-probe.mjs`):
 
-| Per click                | Before              | After the chat fork |
-| ------------------------ | ------------------- | ------------------- |
-| DOM nodes                | 1.9k–42k            | 1.9k–3.0k           |
-| Long tasks (total / max) | up to 2.3 s / 1.6 s | up to 1.5 s / 0.9 s |
+| Per click                | Before              | After                                                                |
+| ------------------------ | ------------------- | -------------------------------------------------------------------- |
+| DOM nodes                | 1.9k–42k            | 1.9k–3.0k                                                            |
+| Long tasks (total / max) | up to 2.3 s / 1.6 s | up to 1.5 s / 0.9 s; most clicks under 0.5 s                         |
+| Requests fired           | 18–36               | 9–14                                                                 |
+| History visible          | 0.4–2.7 s, one 14 s | 0.3–1.3 s for threads under 5 MB; 3.3 s at 5.4 MB and 6.2 s at 26 MB |
+| Host lag p99 (60 s)      | 522 ms              | 126 ms                                                               |
+
+The slow remainder tracks the bytes of the opening window, not rendering.
 
 ## Still open
 
