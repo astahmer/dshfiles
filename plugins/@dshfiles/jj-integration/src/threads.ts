@@ -1185,13 +1185,14 @@ export const createThreads = (options: {
 
   /** Local bookmarks, and the nearest one the workspace at `path` builds on. */
   const bookmarks = async (path: string): Promise<{ readonly current: string | null; readonly names: readonly string[] }> => {
-    const names = (await jj(['--ignore-working-copy', 'bookmark', 'list', '-T', 'if(remote, "", name ++ "\\n")'], path))
-      .split('\n')
-      .filter(name => name.length > 0)
-    const nearest = await jj(
-      ['--ignore-working-copy', 'log', '--no-graph', '-r', 'heads(::@ & bookmarks())', '-T', 'local_bookmarks.map(|b| b.name()).join("\\n") ++ "\\n"'],
-      path,
-    )
+    const [listed, nearest] = await Promise.all([
+      jj(['--ignore-working-copy', 'bookmark', 'list', '-T', 'if(remote, "", name ++ "\\n")'], path),
+      jj(
+        ['--ignore-working-copy', 'log', '--no-graph', '-r', 'heads(::@ & bookmarks())', '-T', 'local_bookmarks.map(|b| b.name()).join("\\n") ++ "\\n"'],
+        path,
+      ),
+    ])
+    const names = listed.split('\n').filter(name => name.length > 0)
     const preferred = options.bookmark()
     const candidates = nearest.split('\n').filter(name => name.length > 0)
     return { current: candidates.includes(preferred) ? preferred : (candidates[0] ?? null), names: [...new Set(names)] }

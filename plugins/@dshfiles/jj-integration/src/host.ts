@@ -754,11 +754,11 @@ const api = jjIntegrationApi.host({
       if (ownedByAnotherSession === undefined) return destination
       return { ...destination, ownedByAnotherSession }
     }
-    const destination = await destinationAt(
-      location.workspaceRoot,
-      location.threadName !== undefined,
-      (await registry.resolveByPath(location.repoRoot))?.id ?? null,
-    )
+    const [project, located] = await Promise.all([
+      registry.resolveByPath(location.repoRoot),
+      destinationAt(location.workspaceRoot, location.threadName !== undefined, null),
+    ])
+    const destination = { ...located, projectWorkspaceId: project?.id ?? null }
     if (ownedByAnotherSession === undefined) return destination
     return { ...destination, ownedByAnotherSession }
   },
