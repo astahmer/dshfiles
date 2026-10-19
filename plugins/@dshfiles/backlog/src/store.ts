@@ -2,6 +2,7 @@ import { defineDomain, type KvTable } from '@deepseek-ai/dsh-storage-domain'
 import type { BacklogDetailView, BacklogSummaryView } from './api.js'
 import {
   BacklogItems,
+  type BacklogAttention,
   type BacklogEvent,
   type BacklogFreshness,
   type BacklogHumanField,
@@ -11,6 +12,7 @@ import {
   type BacklogProposal,
   type BacklogStatus,
 } from './item.js'
+import { BacklogSearch, type SearchMatch } from './search.js'
 import { BacklogTriage } from './triage.js'
 
 export const backlogDomain = defineDomain({
@@ -32,11 +34,13 @@ export interface BacklogListQuery {
   readonly query?: string | undefined
   readonly statuses?: readonly BacklogStatus[] | undefined
   readonly kinds?: readonly BacklogKind[] | undefined
-  readonly project?: string | undefined
+  readonly project?: string | null | undefined
   readonly tag?: string | undefined
   readonly actor?: string | undefined
   /** `active` (fresh + stale, the feed), `all`, or one freshness state. */
   readonly freshness?: 'active' | 'all' | BacklogFreshness | undefined
+  /** Only items that want the user: attention set, or a triage suggestion waiting. Snoozed items are left out. */
+  readonly inbox?: boolean | undefined
   readonly limit?: number | undefined
 }
 
@@ -52,6 +56,9 @@ export interface BacklogUpdate {
   readonly project?: string | null | undefined
   readonly tags?: readonly string[] | undefined
   readonly pinned?: boolean | undefined
+  readonly attention?: BacklogAttention | undefined
+  /** A time to hide the item until, or null to wake it now. */
+  readonly snoozedUntil?: number | null | undefined
 }
 
 export type BacklogResult<T> = { readonly ok: true; readonly value: T } | { readonly ok: false; readonly reason: 'not-found' }
@@ -94,7 +101,17 @@ export interface BacklogStore {
     readonly link: BacklogLink
     readonly reason: string
   }): Promise<BacklogResult<BacklogDetail>>
+  /** Marks an item's request as seen; it stays in the Inbox until its attention is cleared. Not an activity. */
+  acknowledge(input: { readonly ids: readonly number[] }): Promise<void>
   dismissProposal(input: { readonly id: number; readonly actor: BacklogActor }): Promise<BacklogResult<BacklogDetail>>
+  /** Per-project counts over every item, so project progress never depends on how many rows a list returned. */
+  projects(): readonly {
+    readonly project: string | null
+    readonly counts: Readonly<Record<BacklogStatus, number>>
+    readonly needsYou: number
+    readonly actors: readonly string[]
+    readonly lastActivityAt: number
+  }[]
   list(query: BacklogListQuery): { readonly revision: number; readonly items: BacklogSummary[]; readonly total: number }
   get(id: number): BacklogResult<BacklogDetail>
   referencing(link: BacklogLink): BacklogSummary[]
@@ -102,7 +119,7 @@ export interface BacklogStore {
 }
 
 const DEFAULT_LIST_LIMIT = 100
-const MAX_LIST_LIMIT = 500
+const MAX_LIST_LIMIT = 2_000
 
 const actorIdOf = (actor: BacklogActor): string => {
   if (actor.kind !== 'agent') return actor.kind
@@ -115,7 +132,25 @@ const callerLinks = (actor: BacklogActor): BacklogLink[] =>
 const withActor = (actors: BacklogItem['actors'], id: string, role: 'owner' | 'contributor'): BacklogItem['actors'] =>
   actors.some(actor => actor.id === id) ? actors : [...actors, { id, role }]
 
-const summarize = (item: BacklogItem, now: number): BacklogSummary => ({
+/**
+ * One line of what happened since the item was created, so a feed shows each item once however many times agents
+ * touched it: the latest event, how many followed the capture, and how many distinct agents took part.
+ */
+const activityOf = (item: BacklogItem): BacklogSummary['activity'] => {
+  const after = item.events.slice(1)
+  const last = after.at(-1)
+  return {
+    count: after.length,
+    agents: new Set(item.events.filter(event => event.actor.startsWith('agent:')).map(event => event.actor)).size,
+    comments: after.filter(event => event.kind === 'commented').length,
+    last: last === undefined ? null : { at: last.at, actor: last.actor, kind: last.kind, detail: last.detail.slice(0, 200) },
+  }
+}
+
+const wantsUser = (item: BacklogItem, now: number): boolean =>
+  (item.snoozedUntil ?? 0) <= now && ((item.attention ?? 'none') !== 'none' || (item.proposal !== undefined && item.proposal !== null))
+
+const summarize = (item: BacklogItem, now: number, match: SearchMatch | null = null, dormantDays = BacklogItems.defaultDormantDays): BacklogSummary => ({
   id: item.id,
   title: item.title,
   kind: item.kind,
@@ -125,11 +160,16 @@ const summarize = (item: BacklogItem, now: number): BacklogSummary => ({
   links: item.links,
   actors: item.actors,
   pinned: item.pinned,
-  freshness: BacklogItems.freshness(item, now),
+  freshness: BacklogItems.freshness(item, now, dormantDays),
   createdAt: item.createdAt,
   lastActivityAt: item.lastActivityAt,
   preview: item.body.slice(0, 280),
   proposal: item.proposal ?? null,
+  attention: item.attention ?? 'none',
+  acknowledgedAt: item.acknowledgedAt ?? null,
+  snoozedUntil: item.snoozedUntil ?? null,
+  activity: activityOf(item),
+  match: match === null || match.fields.length === 0 ? null : { fields: [...match.fields], snippet: match.snippet },
 })
 
 /** Pinned first, then newest activity: the Discord order, where idle things sink on their own. */
@@ -139,10 +179,16 @@ const byActivity = (left: BacklogItem, right: BacklogItem): number =>
 const createBacklogStore = ({
   items,
   now = Date.now,
+  dormantDays = () => BacklogItems.defaultDormantDays,
+  onEvent = () => undefined,
   reportError = error => console.error('Backlog write failed', { error: error instanceof Error ? error.message.slice(0, 200) : String(error) }),
 }: {
   readonly items: ItemTable
   readonly now?: () => number
+  /** Idle days per kind before an open item goes dormant; read on every query so a settings change applies at once. */
+  readonly dormantDays?: () => Readonly<Record<BacklogKind, number>>
+  /** Told about every event after it is stored, for reporting elsewhere (the Activity timeline). */
+  readonly onEvent?: (item: BacklogItem, event: BacklogEvent) => void
   readonly reportError?: (error: unknown) => void
 }): BacklogStore => {
   const records = new Map<number, BacklogItem>([...items.entries()].map(([, item]) => [item.id, item]))
@@ -161,7 +207,7 @@ const createBacklogStore = ({
   const backlinksOf = (id: number): BacklogSummary[] => referencing({ type: 'item', target: String(id) })
 
   const detailOf = (item: BacklogItem): BacklogDetail => ({
-    item: { ...item, freshness: BacklogItems.freshness(item, now()) },
+    item: { ...item, freshness: BacklogItems.freshness(item, now(), dormantDays()) },
     backlinks: backlinksOf(item.id),
   })
 
@@ -169,7 +215,7 @@ const createBacklogStore = ({
     [...records.values()]
       .filter(item => item.links.some(candidate => BacklogItems.sameLink(candidate, link)))
       .sort(byActivity)
-      .map(item => summarize(item, now()))
+      .map(item => summarize(item, now(), null, dormantDays()))
 
   /** Applies a change and its event; touching an item is what keeps it fresh. */
   const touch = async (
@@ -188,6 +234,8 @@ const createBacklogStore = ({
       events: BacklogItems.appendEvent(item.events, { at, actor: actorId, ...event }),
     }
     await persist(next)
+    const stored = next.events.at(-1)
+    if (stored !== undefined) onEvent(next, stored)
     return detailOf(next)
   }
 
@@ -202,15 +250,22 @@ const createBacklogStore = ({
       .filter(item => query.project === undefined || item.project === query.project)
       .filter(item => query.tag === undefined || item.tags.includes(query.tag.toLowerCase().replace(/^#/, '')))
       .filter(item => query.actor === undefined || item.actors.some(actor => actor.id === query.actor))
+      .filter(item => query.inbox !== true || wantsUser(item, at))
+      .filter(item => query.inbox === true || freshnessFilter === 'all' || (item.snoozedUntil ?? 0) <= at)
       .filter(item => {
         if (freshnessFilter === 'all') return true
-        const state = BacklogItems.freshness(item, at)
+        const state = BacklogItems.freshness(item, at, dormantDays())
         return freshnessFilter === 'active' ? state === 'fresh' || state === 'stale' : state === freshnessFilter
       })
-      .filter(item => BacklogItems.matches(item, query.query ?? ''))
-      .sort(byActivity)
+    const search = BacklogSearch.parse(query.query ?? '')
+    const scored = matching.flatMap(item => {
+      const match = BacklogSearch.score(item, search, at)
+      return match === null ? [] : [{ item, match }]
+    })
+    // A text search ranks by relevance, then activity; browsing keeps the activity order.
+    scored.sort((left, right) => right.match.score - left.match.score || byActivity(left.item, right.item))
     const limit = Math.min(query.limit ?? DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT)
-    return { revision, total: matching.length, items: matching.slice(0, limit).map(item => summarize(item, at)) }
+    return { revision, total: scored.length, items: scored.slice(0, limit).map(entry => summarize(entry.item, at, entry.match, dormantDays())) }
   }
 
   return {
@@ -237,6 +292,8 @@ const createBacklogStore = ({
       }
       nextId += 1
       await persist(item)
+      const created = item.events[0]
+      if (created !== undefined) onEvent(item, created)
       return detailOf(item)
     },
     update: async ({ id, actor, ...fields }) => {
@@ -277,7 +334,18 @@ const createBacklogStore = ({
         change.pinned = fields.pinned
         changed.push('pinned')
       }
-      if (changed.length === 0) return { ok: true, value: detailOf(item) }
+      if (fields.attention !== undefined && fields.attention !== (item.attention ?? 'none')) {
+        change.attention = fields.attention
+        // A new request for attention is unread again, even if an older one was acknowledged.
+        change.acknowledgedAt = null
+        changed.push('attention')
+      }
+      if (fields.snoozedUntil !== undefined && fields.snoozedUntil !== (item.snoozedUntil ?? null)) change.snoozedUntil = fields.snoozedUntil
+      if (changed.length === 0 && change.snoozedUntil === undefined) return { ok: true, value: detailOf(item) }
+      if (changed.length === 0) {
+        const until = change.snoozedUntil ?? null
+        return { ok: true, value: await touch(item, actor, { kind: 'edited', detail: until === null ? 'woke it' : 'snoozed it' }, change) }
+      }
       if (actor.kind === 'user') change.humanFields = [...new Set([...item.humanFields, ...changed])]
       const detail =
         change.status === undefined
@@ -290,8 +358,11 @@ const createBacklogStore = ({
       if (item === undefined) return { ok: false, reason: 'not-found' }
       const present = item.links.some(candidate => BacklogItems.sameLink(candidate, link))
       if (remove === true ? !present : present) return { ok: true, value: detailOf(item) }
-      const links = remove === true ? item.links.filter(candidate => !BacklogItems.sameLink(candidate, link)) : BacklogItems.uniqueLinks([...item.links, link])
-      return { ok: true, value: await touch(item, actor, { kind: remove === true ? 'unlinked' : 'linked', detail: `${link.type}:${link.target}` }, { links }) }
+      const stamped = { ...link, provenance: link.provenance ?? (actor.kind === 'agent' ? 'agent' : actor.kind === 'user' ? 'user' : 'inferred') }
+      const links =
+        remove === true ? item.links.filter(candidate => !BacklogItems.sameLink(candidate, link)) : BacklogItems.uniqueLinks([...item.links, stamped])
+      const label = `${link.relation === undefined || link.relation === 'related' ? '' : `${link.relation} `}${link.type}:${link.target}`
+      return { ok: true, value: await touch(item, actor, { kind: remove === true ? 'unlinked' : 'linked', detail: label }, { links }) }
     },
     comment: async ({ id, text, actor }) => {
       const item = find(id)
@@ -359,6 +430,12 @@ const createBacklogStore = ({
       const detail = moves ? `${item.status} → ${status} (${reason})` : `${link.type}:${link.target} (${reason})`
       return { ok: true, value: await touch(item, { kind: 'system' }, { kind: moves ? 'moved' : 'linked', detail }, change) }
     },
+    acknowledge: async ({ ids }) => {
+      for (const id of ids) {
+        const item = find(id)
+        if (item !== undefined) await persist({ ...item, acknowledgedAt: now() })
+      }
+    },
     dismissProposal: async ({ id, actor }) => {
       const item = find(id)
       if (item === undefined) return { ok: false, reason: 'not-found' }
@@ -367,6 +444,23 @@ const createBacklogStore = ({
         ok: true,
         value: await touch(item, actor, { kind: 'triaged', detail: `dismissed ${BacklogTriage.describe(item.proposal)}` }, { proposal: null }),
       }
+    },
+    projects: () => {
+      const byProject = new Map<string | null, BacklogItem[]>()
+      for (const item of records.values()) byProject.set(item.project, [...(byProject.get(item.project) ?? []), item])
+      return [...byProject].map(([project, group]) => ({
+        project,
+        counts: {
+          inbox: group.filter(item => item.status === 'inbox').length,
+          todo: group.filter(item => item.status === 'todo').length,
+          doing: group.filter(item => item.status === 'doing').length,
+          done: group.filter(item => item.status === 'done').length,
+          dropped: group.filter(item => item.status === 'dropped').length,
+        },
+        needsYou: group.filter(item => (item.attention ?? 'none') !== 'none' || (item.proposal !== undefined && item.proposal !== null)).length,
+        actors: [...new Set(group.flatMap(item => item.actors.map(actor => actor.id)))],
+        lastActivityAt: Math.max(...group.map(item => item.lastActivityAt)),
+      }))
     },
     list,
     get: id => {

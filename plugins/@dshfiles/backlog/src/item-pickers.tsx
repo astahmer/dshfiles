@@ -11,7 +11,7 @@ import { CheckIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useState, type ReactNode } from 'react'
 
-import { BacklogItems, type BacklogKind, type BacklogStatus } from './item.js'
+import { BacklogItems, type BacklogAttention, type BacklogKind, type BacklogStatus } from './item.js'
 import { ItemGlyphs } from './item-glyphs.js'
 
 const triggerClass =
@@ -108,7 +108,28 @@ const KindPicker = (props: { readonly id: number; readonly kind: BacklogKind; re
   />
 )
 
+const AttentionPicker = (props: {
+  readonly id: number
+  readonly attention: BacklogAttention
+  readonly onPick: (attention: BacklogAttention) => void
+}): JSX.Element => (
+  <Picker
+    label={`Attention of b:${String(props.id)}`}
+    value={props.attention}
+    values={BacklogItems.attentions}
+    onPick={props.onPick}
+    triggerClassName="dshx:h-7 dshx:px-1.5 dshx:text-[13px]"
+    trigger={
+      props.attention === 'none' ? <span className="dshx:text-muted-foreground">Attention</span> : <ItemGlyphs.AttentionBadge attention={props.attention} />
+    }
+    render={attention =>
+      attention === 'none' ? <span className="dshx:text-muted-foreground">No attention</span> : <ItemGlyphs.AttentionBadge attention={attention} />
+    }
+  />
+)
+
 export class ItemPickers {
   static readonly Status = StatusPicker
   static readonly Kind = KindPicker
+  static readonly Attention = AttentionPicker
 }

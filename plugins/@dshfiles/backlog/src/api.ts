@@ -21,6 +21,21 @@ const summarySchema = z
     lastActivityAt: z.number(),
     preview: z.string(),
     proposal: BacklogItems.proposalSchema.nullable(),
+    attention: BacklogItems.attentionSchema,
+    acknowledgedAt: z.number().nullable(),
+    snoozedUntil: z.number().nullable(),
+    activity: z
+      .object({
+        count: z.number().int().nonnegative(),
+        agents: z.number().int().nonnegative(),
+        comments: z.number().int().nonnegative(),
+        last: z.object({ at: z.number(), actor: z.string(), kind: z.string(), detail: z.string() }).strict().nullable(),
+      })
+      .strict(),
+    match: z
+      .object({ fields: z.array(z.enum(['id', 'title', 'tag', 'body', 'comment', 'link', 'project', 'capture'])), snippet: z.string().nullable() })
+      .strict()
+      .nullable(),
   })
   .strict()
 
@@ -38,17 +53,24 @@ const detailResultSchema = z.discriminatedUnion('ok', [
 
 const listInputSchema = z
   .object({
-    query: z.string().max(500).optional().describe('Space-separated words that must all appear in the title, body, tags, project or link targets.'),
+    query: z
+      .string()
+      .max(500)
+      .optional()
+      .describe(
+        'Words that must all match (title, tags, body, comments, original capture, project, links; "quoted phrases" stay whole), plus optional operators: kind:bug status:doing is:blocked #tag project:name by:agent has:thread|revision|url updated:<7d updated:>30d. Results rank by relevance and say which fields matched.',
+      ),
     statuses: z.array(BacklogItems.statusSchema).optional(),
     kinds: z.array(BacklogItems.kindSchema).optional(),
-    project: z.string().max(BacklogItems.maxTargetChars).optional().describe('Absolute project path.'),
+    project: z.string().max(BacklogItems.maxTargetChars).nullable().optional().describe('Absolute project path; null lists items outside any project.'),
     tag: z.string().max(60).optional(),
     actor: BacklogItems.actorIdSchema.optional().describe('`user`, `system` or `agent:<sessionId>`.'),
     freshness: z
       .enum(['active', 'all', ...BacklogItems.freshnessStates])
       .optional()
       .describe('`active` (default) hides dormant and archived items, like the feed; `all` includes them.'),
-    limit: z.number().int().positive().max(500).optional(),
+    inbox: z.boolean().optional().describe('Only items that want the user: attention set, or a triage suggestion waiting.'),
+    limit: z.number().int().positive().max(2_000).optional(),
   })
   .strict()
 
@@ -68,6 +90,27 @@ export const backlogApi = defineApi({
       description:
         'List or search backlog items (tasks, bugs, ideas, notes, questions), newest activity first. Dormant and archived items are hidden unless `freshness` asks for them. Read-only.',
       tool: { name: 'backlog_list', readOnly: true },
+    }),
+    revision: method({
+      input: z.void(),
+      output: z.number(),
+      description: 'A number that changes whenever any item changes; the panel polls it instead of the lists. Not an agent tool.',
+    }),
+    projects: method({
+      input: z.void(),
+      output: z.array(
+        z
+          .object({
+            project: z.string().nullable(),
+            counts: z.object({ inbox: z.number(), todo: z.number(), doing: z.number(), done: z.number(), dropped: z.number() }).strict(),
+            needsYou: z.number().int().nonnegative(),
+            actors: z.array(z.string()),
+            lastActivityAt: z.number(),
+          })
+          .strict(),
+      ),
+      description: 'Every project items were captured in, with status counts over all items, how many need the user, and who worked on them. Read-only.',
+      tool: { name: 'backlog_projects', readOnly: true },
     }),
     get: method({
       input: z.object({ id: idSchema }).strict(),
@@ -115,10 +158,16 @@ export const backlogApi = defineApi({
           project: z.string().max(BacklogItems.maxTargetChars).nullable().optional(),
           tags: z.array(z.string().max(60)).max(20).optional(),
           pinned: z.boolean().optional(),
+          attention: BacklogItems.attentionSchema
+            .optional()
+            .describe(
+              '`needs-input` asks the user for a decision, `blocked` and `waiting` flag stalled work; `none` clears it. Pair it with a comment saying what is needed.',
+            ),
+          snoozedUntil: z.number().int().nonnegative().nullable().optional().describe('Hide the item until this epoch-ms time; null wakes it.'),
         })
         .strict(),
       output: detailResultSchema,
-      description: `Edit or move one backlog item. ${writeNote}`,
+      description: `Edit or move one backlog item, or ask the user for input with \`attention\`. ${writeNote}`,
       tool: { name: 'backlog_update', readOnly: false },
     }),
     link: method({
@@ -126,6 +175,11 @@ export const backlogApi = defineApi({
       output: detailResultSchema,
       description: `Link a backlog item to a thread, jj revision, branch, workspace, URL or another item (\`remove: true\` unlinks). ${writeNote}`,
       tool: { name: 'backlog_link', readOnly: false },
+    }),
+    acknowledge: method({
+      input: z.object({ ids: z.array(idSchema).max(500) }).strict(),
+      output: z.void(),
+      description: 'Mark Inbox items as seen by the user. Presentation state for the panel; not an agent tool.',
     }),
     triage: method({
       input: z.object({ id: idSchema }).strict(),

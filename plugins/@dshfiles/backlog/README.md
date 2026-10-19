@@ -98,8 +98,56 @@ thread and starts the item, just as typing `b:12` does.
 | `backlog_link`             | write: link or unlink                                                                 |
 | `backlog_comment`          | write                                                                                 |
 | `backlog_triage`           | write: run triage on one item now                                                     |
+| `backlog_projects`         | read: per-project counts, who needs you, people                                       |
 | `backlog_accept_proposal`  | write                                                                                 |
 | `backlog_dismiss_proposal` | write                                                                                 |
+
+## Search and saved views
+
+The header search ranks by relevance and says where each result matched (title, tag, description, comment,
+original capture, project, link), with the matching words highlighted. It covers dormant and archived
+items. Words must all match; `"quoted phrases"` stay whole. Operators combine freely:
+
+| Operator                | Example                                                  |
+| ----------------------- | -------------------------------------------------------- |
+| kind, status, attention | `kind:bug`, `status:doing`, `is:blocked`, `is:needs-you` |
+| tag, project            | `#composer`, `project:welii`                             |
+| who touched it          | `by:agent`, `by:me`                                      |
+| what it links           | `has:thread`, `has:revision`, `has:url`                  |
+| activity                | `updated:<7d`, `updated:>30d`                            |
+
+**Views** saves the current view and search under a name in the plugin's settings (`savedViews`), so every
+browser lists the same views.
+
+## Inbox and the rest of the ADE
+
+The Inbox holds items whose `attention` is set (`needs-input`, `blocked`, `waiting`, set by agents with
+`backlog_update` or by you) and items with a triage suggestion. With `inboxThreads` (`failures` by default)
+it also lists threads from the sidebar's unread list that are linked to an item and whose last turn was
+blocked or errored (`all` adds finished turns waiting for review); acknowledging one clears it in the
+sidebar too. Native `ask_user_question` forms stay in their threads: listing them across sessions is the
+expensive scan recorded as a Host gap.
+
+In the inspector, thread links show the thread's title and whether it is running, and a running linked
+thread shows as an **Execution** strip at the top.
+
+With `publishActivity` (on by default) item creation, moves, links, comments, triage and requests for
+input are reported to `@dshfiles/activity-timeline` as `backlog.*` events (requests for input at
+attention level), so the shared Activity room shows backlog work. The item's own event log stays the
+source of truth: the timeline keeps a bounded, observation-only copy.
+
+## Lifecycle and retention
+
+`dormantAfterDays` sets, per kind, how many idle days an open item stays in the default views (0 keeps a
+kind visible forever). Items asking for attention, pinned items and work in progress never go dormant; done
+and dropped items archive after 7 days. Snoozing hides an item until a chosen time, then it resurfaces.
+
+## Scale
+
+Lists poll a revision number and refetch only when it changes. Items is virtualized, the Feed mounts the
+newest 150 entries with older pages on request, Board columns mount 30 cards at a time, and project progress
+is counted on the Host over every item. Measured on 2,017 items (headless Chromium, warm): Items 104–313 ms,
+Board 208–269 ms, Feed 243–405 ms, search 82–550 ms, Projects 458–775 ms, first open 1.0–1.6 s.
 
 ## Storage
 

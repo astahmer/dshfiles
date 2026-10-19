@@ -19,20 +19,25 @@ export const useBacklogActions = () => {
   const client = useQueryClient()
   const invalidate = (): Promise<void> => client.invalidateQueries({ queryKey: [QUERY_KEY] })
 
+  /** Applies an update to every cached list and the item's detail at once, so a view transition can capture it. */
+  const patch = (input: UpdateInput): void => {
+    const { id, ...fields } = input
+    const changes = Object.fromEntries(Object.entries(fields).filter(([, value]) => value !== undefined))
+    client.setQueriesData<ListData>({ queryKey: [QUERY_KEY, 'list'] }, current =>
+      current === undefined
+        ? current
+        : { ...current, items: current.items.map(item => (item.id === id ? { ...item, ...changes, lastActivityAt: Date.now() } : item)) },
+    )
+    client.setQueryData<DetailData>([QUERY_KEY, 'item', id], current =>
+      current === undefined || !current.ok ? current : { ...current, value: { ...current.value, item: { ...current.value.item, ...changes } } },
+    )
+  }
+
   const update = useMutation({
     mutationFn: (input: UpdateInput) => api.update(input),
     onMutate: async input => {
       await client.cancelQueries({ queryKey: [QUERY_KEY] })
-      const { id, ...fields } = input
-      const patch = Object.fromEntries(Object.entries(fields).filter(([, value]) => value !== undefined))
-      client.setQueriesData<ListData>({ queryKey: [QUERY_KEY, 'list'] }, current =>
-        current === undefined
-          ? current
-          : { ...current, items: current.items.map(item => (item.id === id ? { ...item, ...patch, lastActivityAt: Date.now() } : item)) },
-      )
-      client.setQueryData<DetailData>([QUERY_KEY, 'item', id], current =>
-        current === undefined || !current.ok ? current : { ...current, value: { ...current.value, item: { ...current.value.item, ...patch } } },
-      )
+      patch(input)
     },
     onSettled: invalidate,
   })
@@ -42,7 +47,7 @@ export const useBacklogActions = () => {
   const triage = useMutation({ mutationFn: (id: number) => api.triage({ id }), onSuccess: invalidate })
   const applyProposal = useMutation({ mutationFn: (id: number) => api.applyProposal({ id }), onSuccess: invalidate })
   const dismissProposal = useMutation({ mutationFn: (id: number) => api.dismissProposal({ id }), onSuccess: invalidate })
-  return { update, capture, link, comment, triage, applyProposal, dismissProposal }
+  return { patch, update, capture, link, comment, triage, applyProposal, dismissProposal }
 }
 
 export class BacklogQueries {

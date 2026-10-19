@@ -1,10 +1,20 @@
-import { MarkdownText, relativeTime, type MarkdownLabels } from '@deepseek-ai/dsh-client-ui-primitives'
+import { MarkdownText, type MarkdownLabels } from '@deepseek-ai/dsh-client-ui-primitives'
 import { useApi } from '@dshfiles/dshx/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { Kbd } from '@dshfiles/plugin-ui/components/ui/kbd'
 import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
 import {
+  AlarmClockIcon,
   ArrowRightLeftIcon,
+  ChevronRightIcon,
   CornerDownLeftIcon,
   ExternalLinkIcon,
   FolderIcon,
@@ -12,11 +22,14 @@ import {
   GitCommitHorizontalIcon,
   HashIcon,
   LinkIcon,
+  Maximize2Icon,
   MessageSquareIcon,
   MessagesSquareIcon,
+  Minimize2Icon,
   PencilIcon,
   PinIcon,
   PlusIcon,
+  QuoteIcon,
   SparklesIcon,
   WandSparklesIcon,
   XIcon,
@@ -27,22 +40,17 @@ import { useQuery } from '@dshfiles/plugin-ui/query'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 
 import { backlogApi, type BacklogDetailView, type BacklogSummaryView } from './api.js'
-import { BacklogItems, type BacklogEvent, type BacklogLink, type BacklogProposal } from './item.js'
-import { BacklogTriage } from './triage.js'
+import type { ComposerThread } from './composer.js'
+import { BacklogItems, type BacklogAttention, type BacklogEvent, type BacklogLink, type BacklogProposal, type BacklogRelation } from './item.js'
 import { ItemGlyphs } from './item-glyphs.js'
 import { ItemPickers } from './item-pickers.js'
+import { BacklogTriage } from './triage.js'
 import { BacklogQueries, useBacklogActions } from './use-backlog-actions.js'
 
 type OpenThread = (sessionId: string) => void
 
 const markdownLabels: MarkdownLabels = { code: { copyLabel: 'Copy', copiedLabel: 'Copied' }, footnotes: 'Footnotes' }
-const AGO_SUFFIX = { minutes: 'm', hours: 'h', days: 'd', months: 'mo', years: 'y' } as const
-const ago = (time: number): string => {
-  const age = relativeTime(time, Date.now())
-  return age.unit === 'now' ? 'just now' : `${String(age.n)}${AGO_SUFFIX[age.unit]} ago`
-}
-const projectName = (project: string): string => project.split('/').filter(Boolean).at(-1) ?? project
-const actorName = (id: string): string => (id === 'user' ? 'You' : id === 'system' ? 'System' : `Agent ${id.replace(/^agent:(session-)?/, '').slice(0, 8)}`)
+const HOUR_MS = 3_600_000
 
 const linkIcons = {
   item: HashIcon,
@@ -53,6 +61,19 @@ const linkIcons = {
   url: ExternalLinkIcon,
 } satisfies Record<BacklogLink['type'], LucideIcon>
 
+const relationLabels = {
+  related: 'Related',
+  'depends-on': 'Depends on',
+  blocks: 'Blocks',
+  duplicates: 'Duplicates',
+  implements: 'Implemented by',
+  fixes: 'Fixed by',
+  'discovered-from': 'Discovered from',
+  'discussed-in': 'Discussed in',
+} satisfies Record<BacklogRelation, string>
+
+const provenanceLabels = { user: 'you', agent: 'agent', extracted: 'from text', inferred: 'suggested' } as const
+
 const linkLabel = (link: BacklogLink): string => {
   if (link.type === 'item') return `b:${link.target}`
   if (link.type === 'thread') return `Thread ${link.target.replace(/^session-/, '').slice(0, 8)}`
@@ -62,6 +83,7 @@ const linkLabel = (link: BacklogLink): string => {
 }
 
 const linkTypeOf = (value: string): BacklogLink['type'] | undefined => BacklogItems.linkTypes.find(type => type === value)
+const relationOf = (value: string): BacklogRelation | undefined => BacklogItems.relations.find(relation => relation === value)
 
 const eventIcons = {
   created: SparklesIcon,
@@ -73,36 +95,23 @@ const eventIcons = {
   triaged: WandSparklesIcon,
 } satisfies Record<BacklogEvent['kind'], LucideIcon>
 
-const eventSentence = (event: BacklogEvent): string => {
-  if (event.kind === 'created') return 'created the item'
-  if (event.kind === 'moved') return `moved it ${event.detail}`
-  if (event.kind === 'edited') return `edited ${event.detail}`
-  if (event.kind === 'linked') return `linked ${event.detail}`
-  if (event.kind === 'unlinked') return `unlinked ${event.detail}`
-  if (event.kind === 'triaged')
-    return event.actor === 'system' ? `triage ${event.detail}` : `${event.detail.split(' ')[0] ?? ''} triage: ${event.detail.split(' ').slice(1).join(' ')}`
-  return 'commented'
-}
-
-const Property = (props: { readonly label: string; readonly children: ReactNode }): JSX.Element => (
-  <div className="dshx:grid dshx:grid-cols-[88px_minmax(0,1fr)] dshx:items-center dshx:gap-2 dshx:text-[13px]">
-    <span className="dshx:text-muted-foreground">{props.label}</span>
-    <div className="dshx:flex dshx:min-w-0 dshx:items-center">{props.children}</div>
-  </div>
-)
-
-const SectionTitle = (props: { readonly children: ReactNode; readonly action?: ReactNode }): JSX.Element => (
-  <div className="dshx:flex dshx:items-center dshx:justify-between">
-    <h4 className="dshx:text-xs dshx:font-medium dshx:text-muted-foreground">{props.children}</h4>
-    {props.action}
-  </div>
+const Section = (props: { readonly title: string; readonly action?: ReactNode; readonly children: ReactNode }): JSX.Element => (
+  <section className="dshx:flex dshx:flex-col dshx:gap-2">
+    <div className="dshx:flex dshx:h-6 dshx:items-center dshx:justify-between">
+      <h4 className="dshx:text-[11px] dshx:font-semibold dshx:uppercase dshx:tracking-wider dshx:text-muted-foreground">{props.title}</h4>
+      {props.action}
+    </div>
+    {props.children}
+  </section>
 )
 
 const AddLink = (props: { readonly id: number }): JSX.Element => {
   const actions = useBacklogActions()
   const [open, setOpen] = useState(false)
   const [type, setType] = useState<BacklogLink['type']>('url')
+  const [relation, setRelation] = useState<BacklogRelation>('related')
   const [target, setTarget] = useState('')
+  const selectClass = 'dshx:h-7 dshx:rounded-md dshx:border dshx:border-input dshx:bg-background dshx:px-1.5 dshx:text-xs dshx:text-foreground'
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -110,33 +119,42 @@ const AddLink = (props: { readonly id: number }): JSX.Element => {
           <PlusIcon />
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="dshx-root dshx:w-80 dshx:p-2">
+      <PopoverContent align="end" className="dshx-root dshx:w-96 dshx:p-2">
         <form
-          className="dshx:flex dshx:items-center dshx:gap-1.5"
+          className="dshx:flex dshx:flex-col dshx:gap-2"
           onSubmit={event => {
             event.preventDefault()
             if (target.trim() === '') return
-            actions.link.mutate({ id: props.id, link: { type, target: target.trim() } }, { onSuccess: () => setTarget('') })
+            actions.link.mutate({ id: props.id, link: { type, target: target.trim(), relation } }, { onSuccess: () => setTarget('') })
             setOpen(false)
           }}
         >
-          <select
-            aria-label="Link type"
-            className="dshx:h-7 dshx:rounded-md dshx:border dshx:border-input dshx:bg-background dshx:px-1.5 dshx:text-xs dshx:text-foreground"
-            value={type}
-            onChange={event => setType(linkTypeOf(event.currentTarget.value) ?? 'url')}
-          >
-            {BacklogItems.linkTypes.map(value => (
-              <option key={value} value={value}>
-                {value}
-              </option>
-            ))}
-          </select>
+          <div className="dshx:flex dshx:gap-1.5">
+            <select
+              aria-label="Relation"
+              className={selectClass}
+              value={relation}
+              onChange={event => setRelation(relationOf(event.currentTarget.value) ?? 'related')}
+            >
+              {BacklogItems.relations.map(value => (
+                <option key={value} value={value}>
+                  {relationLabels[value]}
+                </option>
+              ))}
+            </select>
+            <select aria-label="Link type" className={selectClass} value={type} onChange={event => setType(linkTypeOf(event.currentTarget.value) ?? 'url')}>
+              {BacklogItems.linkTypes.map(value => (
+                <option key={value} value={value}>
+                  {value}
+                </option>
+              ))}
+            </select>
+          </div>
           <input
             aria-label="Link target"
             autoFocus
-            placeholder="URL, session id, revision, branch, b:…"
-            className="dshx:h-7 dshx:min-w-0 dshx:flex-1 dshx:rounded-md dshx:border dshx:border-input dshx:bg-background dshx:px-2 dshx:text-xs dshx:outline-none dshx:focus-visible:border-ring"
+            placeholder="URL, session id, jj revision, branch, item number…"
+            className="dshx:h-8 dshx:rounded-md dshx:border dshx:border-input dshx:bg-background dshx:px-2 dshx:text-xs dshx:outline-none dshx:focus-visible:border-ring"
             value={target}
             onChange={event => setTarget(event.currentTarget.value)}
           />
@@ -149,7 +167,9 @@ const AddLink = (props: { readonly id: number }): JSX.Element => {
 const TitleField = (props: { readonly id: number; readonly title: string }): JSX.Element => {
   const actions = useBacklogActions()
   const [title, setTitle] = useState(props.title)
-  useEffect(() => setTitle(props.title), [props.title])
+  useEffect(() => {
+    setTitle(props.title)
+  }, [props.title])
   const save = (): void => {
     if (title.trim() !== '' && title !== props.title) actions.update.mutate({ id: props.id, title })
   }
@@ -167,7 +187,7 @@ const TitleField = (props: { readonly id: number; readonly title: string }): JSX
         }
         if (event.key === 'Escape') setTitle(props.title)
       }}
-      className="dshx:field-sizing-content dshx:w-full dshx:resize-none dshx:bg-transparent dshx:text-lg dshx:font-semibold dshx:leading-snug dshx:tracking-tight dshx:text-foreground dshx:outline-none"
+      className="dshx:field-sizing-content dshx:w-full dshx:resize-none dshx:bg-transparent dshx:text-xl dshx:font-semibold dshx:leading-snug dshx:tracking-tight dshx:text-foreground dshx:outline-none"
     />
   )
 }
@@ -199,7 +219,7 @@ const BodyField = (props: { readonly id: number; readonly body: string }): JSX.E
             setEditing(false)
           }
         }}
-        className="dshx:field-sizing-content dshx:min-h-24 dshx:w-full dshx:resize-none dshx:rounded-md dshx:bg-transparent dshx:text-[13px] dshx:leading-relaxed dshx:text-foreground dshx:outline-none"
+        className="dshx:field-sizing-content dshx:min-h-28 dshx:w-full dshx:resize-none dshx:rounded-lg dshx:border dshx:border-input dshx:bg-transparent dshx:p-2.5 dshx:text-[13px] dshx:leading-relaxed dshx:text-foreground dshx:outline-none"
       />
     )
   return (
@@ -207,7 +227,7 @@ const BodyField = (props: { readonly id: number; readonly body: string }): JSX.E
       type="button"
       aria-label="Edit description"
       onClick={() => setEditing(true)}
-      className="dshx:-mx-2 dshx:rounded-md dshx:px-2 dshx:py-1 dshx:text-left dshx:text-[13px] dshx:leading-relaxed dshx:transition-colors dshx:hover:bg-accent/50"
+      className="dshx:-mx-2 dshx:rounded-lg dshx:px-2 dshx:py-1.5 dshx:text-left dshx:text-[13px] dshx:leading-relaxed dshx:transition-colors dshx:hover:bg-accent/40"
     >
       {props.body === '' ? (
         <span className="dshx:text-muted-foreground">Add a description…</span>
@@ -222,17 +242,17 @@ const TagsField = (props: { readonly id: number; readonly tags: readonly string[
   const actions = useBacklogActions()
   const [draft, setDraft] = useState('')
   return (
-    <div className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-center dshx:gap-1">
+    <span className="dshx:inline-flex dshx:flex-wrap dshx:items-center dshx:gap-1">
       {props.tags.map(tag => (
         <span
           key={tag}
-          className="dshx:group/tag dshx:inline-flex dshx:h-5 dshx:items-center dshx:gap-0.5 dshx:rounded-full dshx:border dshx:border-border dshx:pl-2 dshx:pr-1 dshx:text-[11px] dshx:text-muted-foreground"
+          className="dshx:group/tag dshx:inline-flex dshx:h-6 dshx:items-center dshx:gap-0.5 dshx:rounded-md dshx:border dshx:border-border dshx:pr-1 dshx:pl-1.5 dshx:text-xs dshx:text-muted-foreground"
         >
           #{tag}
           <button
             type="button"
             aria-label={`Remove tag ${tag}`}
-            className="dshx:rounded-full dshx:opacity-0 dshx:transition-opacity dshx:group-hover/tag:opacity-100 dshx:hover:text-foreground"
+            className="dshx:opacity-0 dshx:transition-opacity dshx:group-hover/tag:opacity-100 dshx:hover:text-foreground"
             onClick={() => actions.update.mutate({ id: props.id, tags: props.tags.filter(other => other !== tag) })}
           >
             <XIcon className="dshx:size-3" />
@@ -241,7 +261,7 @@ const TagsField = (props: { readonly id: number; readonly tags: readonly string[
       ))}
       <input
         aria-label="Add tag"
-        placeholder={props.tags.length === 0 ? 'Add tag' : '+'}
+        placeholder="+ tag"
         value={draft}
         onChange={event => setDraft(event.currentTarget.value)}
         onKeyDown={event => {
@@ -249,137 +269,27 @@ const TagsField = (props: { readonly id: number; readonly tags: readonly string[
           actions.update.mutate({ id: props.id, tags: [...props.tags, draft.trim()] })
           setDraft('')
         }}
-        className="dshx:h-5 dshx:w-16 dshx:bg-transparent dshx:text-[12px] dshx:outline-none dshx:placeholder:text-muted-foreground"
+        className="dshx:h-6 dshx:w-14 dshx:bg-transparent dshx:text-xs dshx:outline-none dshx:placeholder:text-muted-foreground"
       />
-    </div>
+    </span>
   )
 }
 
-const CommentBox = (props: { readonly id: number }): JSX.Element => {
-  const actions = useBacklogActions()
-  const [text, setText] = useState('')
-  const submit = (): void => {
-    if (text.trim() === '' || actions.comment.isPending) return
-    actions.comment.mutate({ id: props.id, text }, { onSuccess: () => setText('') })
-  }
-  return (
-    <form
-      onSubmit={event => {
-        event.preventDefault()
-        submit()
-      }}
-      className="dshx:flex dshx:items-end dshx:gap-2 dshx:rounded-lg dshx:border dshx:border-border dshx:bg-card dshx:p-2 dshx:transition-colors dshx:focus-within:border-input"
-    >
-      <textarea
-        aria-label="Comment"
-        rows={1}
-        placeholder="Leave a comment…"
-        value={text}
-        onChange={event => setText(event.currentTarget.value)}
-        onKeyDown={event => {
-          if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
-            event.preventDefault()
-            submit()
-          }
-        }}
-        className="dshx:field-sizing-content dshx:max-h-40 dshx:min-h-6 dshx:flex-1 dshx:resize-none dshx:bg-transparent dshx:text-[13px] dshx:outline-none dshx:placeholder:text-muted-foreground"
-      />
-      <Button type="submit" size="icon-xs" variant="ghost" aria-label="Send comment" disabled={text.trim() === ''}>
-        <CornerDownLeftIcon />
-      </Button>
-    </form>
-  )
-}
-
-const Activity = (props: { readonly events: readonly BacklogEvent[] }): JSX.Element => (
-  <ol aria-label="Activity" className="dshx:relative dshx:flex dshx:flex-col dshx:gap-3">
-    <span aria-hidden className="dshx:absolute dshx:inset-y-1 dshx:left-[9px] dshx:w-px dshx:bg-border" />
-    {props.events.map(event => {
-      const Icon = eventIcons[event.kind]
-      return (
-        <li key={`${String(event.at)}:${event.kind}:${event.detail.slice(0, 24)}`} className="dshx:relative dshx:flex dshx:gap-2.5">
-          <span className="dshx:z-10 dshx:inline-flex dshx:size-[19px] dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-full dshx:border dshx:border-border dshx:bg-background">
-            <Icon aria-hidden className="dshx:size-2.5 dshx:text-muted-foreground" />
-          </span>
-          <div className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-1 dshx:pt-px">
-            <p className="dshx:text-xs dshx:text-muted-foreground">
-              <span className="dshx:font-medium dshx:text-foreground">{actorName(event.actor)}</span> {eventSentence(event)} · {ago(event.at)}
-            </p>
-            {event.kind === 'commented' ? (
-              <div className="dshx:rounded-lg dshx:border dshx:border-border dshx:bg-card dshx:px-3 dshx:py-2 dshx:text-[13px]">
-                <MarkdownText text={event.detail} labels={markdownLabels} variant="compact" />
-              </div>
-            ) : null}
-          </div>
-        </li>
-      )
-    })}
-  </ol>
-)
-
-/** Triage's suggestion, shown until accepted or dismissed: each change as before → after, with its confidence. */
-const ProposalCard = (props: { readonly id: number; readonly proposal: BacklogProposal; readonly current: BacklogDetailView['item'] }): JSX.Element => {
+/** Triage's suggestion, shown until accepted or dismissed, with its confidence and reason. */
+const ProposalCard = (props: { readonly id: number; readonly proposal: BacklogProposal }): JSX.Element => {
   const actions = useBacklogActions()
   const proposal = props.proposal
-  const rows = [
-    proposal.kind === undefined
-      ? null
-      : {
-          label: 'Kind',
-          before: <ItemGlyphs.KindIcon kind={props.current.kind} />,
-          after: (
-            <>
-              <ItemGlyphs.KindIcon kind={proposal.kind} />
-              {ItemGlyphs.kindLabels[proposal.kind]}
-            </>
-          ),
-        },
-    proposal.status === undefined
-      ? null
-      : {
-          label: 'Status',
-          before: <ItemGlyphs.StatusIcon status={props.current.status} />,
-          after: (
-            <>
-              <ItemGlyphs.StatusIcon status={proposal.status} />
-              {ItemGlyphs.statusLabels[proposal.status]}
-            </>
-          ),
-        },
-    proposal.title === undefined ? null : { label: 'Title', before: null, after: <span className="dshx:truncate">{proposal.title}</span> },
-    proposal.tags === undefined
-      ? null
-      : { label: 'Tags', before: null, after: <span className="dshx:truncate">{proposal.tags.map(tag => `#${tag}`).join(' ')}</span> },
-    proposal.duplicateOf === undefined ? null : { label: 'Duplicate', before: null, after: <span>of b:{proposal.duplicateOf}</span> },
-  ].filter(row => row !== null)
   return (
     <section
       aria-label="Triage suggestion"
-      className="dshx:flex dshx:flex-col dshx:gap-2.5 dshx:rounded-lg dshx:border dshx:border-violet/30 dshx:bg-violet/5 dshx:p-3 dshx:animate-in dshx:fade-in-0"
+      className="dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-xl dshx:border dshx:border-violet/30 dshx:bg-violet/5 dshx:p-3 dshx:animate-in dshx:fade-in-0"
     >
       <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-xs">
         <WandSparklesIcon aria-hidden className="dshx:size-3.5 dshx:text-violet" />
         <span className="dshx:font-medium">Triage suggests</span>
-        <span className="dshx:text-muted-foreground">
-          {Math.round(proposal.confidence * 100)}% · {proposal.source}
-        </span>
+        <span className="dshx:min-w-0 dshx:truncate dshx:text-muted-foreground">{BacklogTriage.describe(proposal)}</span>
+        <span className="dshx:ml-auto dshx:text-muted-foreground">{Math.round(proposal.confidence * 100)}%</span>
       </div>
-      <ul className="dshx:flex dshx:flex-col dshx:gap-1">
-        {rows.map(row => (
-          <li key={row.label} className="dshx:grid dshx:grid-cols-[72px_minmax(0,1fr)] dshx:items-center dshx:gap-2 dshx:text-[13px]">
-            <span className="dshx:text-muted-foreground">{row.label}</span>
-            <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5">
-              {row.before === null ? null : (
-                <>
-                  <span className="dshx:opacity-50">{row.before}</span>
-                  <span className="dshx:text-muted-foreground">→</span>
-                </>
-              )}
-              {row.after}
-            </span>
-          </li>
-        ))}
-      </ul>
       {proposal.reason === '' ? null : <p className="dshx:text-xs dshx:text-muted-foreground">{proposal.reason}</p>}
       <div className="dshx:flex dshx:items-center dshx:gap-1.5">
         <Button size="xs" onClick={() => actions.applyProposal.mutate(props.id)} disabled={actions.applyProposal.isPending}>
@@ -388,17 +298,218 @@ const ProposalCard = (props: { readonly id: number; readonly proposal: BacklogPr
         <Button size="xs" variant="ghost" onClick={() => actions.dismissProposal.mutate(props.id)} disabled={actions.dismissProposal.isPending}>
           Dismiss
         </Button>
-        <span className="dshx:ml-auto dshx:text-[11px] dshx:text-muted-foreground" title={BacklogTriage.describe(proposal)}>
-          {ago(proposal.at)}
-        </span>
       </div>
     </section>
   )
 }
 
+type ConversationRun = { readonly kind: 'comment'; readonly event: BacklogEvent } | { readonly kind: 'changes'; readonly events: BacklogEvent[] }
+
+/** Comments read as messages; every other event folds into one "made N changes" line per actor run, opened on demand. */
+const Conversation = (props: { readonly events: readonly BacklogEvent[]; readonly attention: BacklogAttention }): JSX.Element => {
+  const attention = props.attention
+  const [open, setOpen] = useState<ReadonlySet<number>>(new Set())
+  const runs: ConversationRun[] = []
+  for (const event of props.events) {
+    const last = runs.at(-1)
+    if (event.kind === 'commented') runs.push({ kind: 'comment', event })
+    else if (last?.kind === 'changes' && last.events.at(-1)?.actor === event.actor) last.events.push(event)
+    else runs.push({ kind: 'changes', events: [event] })
+  }
+  return (
+    <ol aria-label="Activity" className="dshx:relative dshx:flex dshx:flex-col dshx:gap-3">
+      <span aria-hidden className="dshx:absolute dshx:inset-y-2 dshx:left-[9px] dshx:w-px dshx:bg-border" />
+      {runs.map((run, index) => {
+        if (run.kind === 'comment')
+          return (
+            <li key={`c:${String(index)}`} className="dshx:relative dshx:flex dshx:gap-2.5">
+              <ItemGlyphs.ActorAvatar actorId={run.event.actor} className="dshx:z-10 dshx:mt-0.5 dshx:size-5" />
+              <div className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-1">
+                <p className="dshx:text-xs dshx:text-muted-foreground">
+                  <span className="dshx:font-medium dshx:text-foreground">{ItemGlyphs.actorName(run.event.actor)}</span> · {ItemGlyphs.ago(run.event.at)}
+                </p>
+                <div className="dshx:rounded-lg dshx:border dshx:border-border dshx:bg-card dshx:px-3 dshx:py-2 dshx:text-[13px]">
+                  <MarkdownText text={run.event.detail} labels={markdownLabels} variant="compact" />
+                </div>
+              </div>
+            </li>
+          )
+        const first = run.events[0]
+        if (first === undefined) return null
+        const expanded = open.has(index) || run.events.length === 1
+        const Icon = eventIcons[first.kind]
+        return (
+          <li key={`e:${String(index)}`} className="dshx:relative dshx:flex dshx:gap-2.5">
+            <span className="dshx:z-10 dshx:inline-flex dshx:size-5 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-full dshx:border dshx:border-border dshx:bg-background">
+              <Icon aria-hidden className="dshx:size-2.5 dshx:text-muted-foreground" />
+            </span>
+            <div className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-1 dshx:pt-0.5 dshx:text-xs dshx:text-muted-foreground">
+              {expanded ? (
+                run.events.map((event, position) => (
+                  <p key={String(position)}>
+                    <span className="dshx:font-medium dshx:text-foreground">{ItemGlyphs.actorName(event.actor)}</span>{' '}
+                    {ItemGlyphs.describeEvent(event, attention)} · {ItemGlyphs.ago(event.at)}
+                  </p>
+                ))
+              ) : (
+                <button
+                  type="button"
+                  className="dshx:flex dshx:items-center dshx:gap-1 dshx:text-left dshx:hover:text-foreground"
+                  onClick={() => setOpen(new Set([...open, index]))}
+                >
+                  <span className="dshx:font-medium dshx:text-foreground">{ItemGlyphs.actorName(first.actor)}</span> made {run.events.length} changes ·{' '}
+                  {ItemGlyphs.ago(run.events.at(-1)?.at ?? first.at)}
+                  <ChevronRightIcon className="dshx:size-3" />
+                </button>
+              )}
+            </div>
+          </li>
+        )
+      })}
+    </ol>
+  )
+}
+
+const CommentBox = (props: { readonly id: number }): JSX.Element => {
+  const actions = useBacklogActions()
+  const [text, setText] = useState('')
+  const submit = (): void => {
+    if (text.trim() === '') return
+    setText('')
+    actions.comment.mutate({ id: props.id, text }, { onError: () => setText(current => (current === '' ? text : current)) })
+  }
+  return (
+    <form
+      onSubmit={event => {
+        event.preventDefault()
+        submit()
+      }}
+      className="dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-xl dshx:border dshx:border-border dshx:bg-card dshx:p-2.5 dshx:transition-colors dshx:focus-within:border-input"
+    >
+      <textarea
+        aria-label="Comment"
+        rows={1}
+        placeholder="Reply… b:12, jj:rev and URLs become links"
+        value={text}
+        onChange={event => setText(event.currentTarget.value)}
+        onKeyDown={event => {
+          if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+            event.preventDefault()
+            submit()
+          }
+        }}
+        className="dshx:field-sizing-content dshx:max-h-40 dshx:min-h-10 dshx:resize-none dshx:bg-transparent dshx:text-[13px] dshx:outline-none dshx:placeholder:text-muted-foreground"
+      />
+      <div className="dshx:flex dshx:items-center dshx:justify-between">
+        <span className="dshx:flex dshx:items-center dshx:gap-1 dshx:text-[11px] dshx:text-muted-foreground">
+          <Kbd>⌘</Kbd>
+          <Kbd>↵</Kbd> to send
+        </span>
+        <Button type="submit" size="xs" disabled={text.trim() === ''}>
+          <CornerDownLeftIcon /> Reply
+        </Button>
+      </div>
+    </form>
+  )
+}
+
+const SnoozeMenu = (props: { readonly id: number; readonly snoozedUntil: number | null }): JSX.Element => {
+  const actions = useBacklogActions()
+  const until = (hours: number): number => Date.now() + hours * HOUR_MS
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon-xs" aria-label="Snooze" className={cn(props.snoozedUntil !== null && 'dshx:text-info')}>
+          <AlarmClockIcon />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="dshx-root">
+        <DropdownMenuLabel className="dshx:text-xs dshx:font-normal dshx:text-muted-foreground">Hide until</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onSelect={() => actions.update.mutate({ id: props.id, snoozedUntil: until(3) })}>In 3 hours</DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => actions.update.mutate({ id: props.id, snoozedUntil: until(24) })}>Tomorrow</DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => actions.update.mutate({ id: props.id, snoozedUntil: until(24 * 7) })}>Next week</DropdownMenuItem>
+        {props.snoozedUntil === null ? null : (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={() => actions.update.mutate({ id: props.id, snoozedUntil: null })}>Wake now</DropdownMenuItem>
+          </>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
+const LinkRow = (props: {
+  readonly itemId: number
+  readonly link: BacklogLink
+  readonly thread: ComposerThread | undefined
+  readonly openThread: OpenThread
+  readonly select: (id: number) => void
+}): JSX.Element => {
+  const actions = useBacklogActions()
+  const link = props.link
+  const Icon = linkIcons[link.type]
+  const open =
+    link.type === 'thread'
+      ? () => props.openThread(link.target)
+      : link.type === 'item'
+        ? () => props.select(Number(link.target))
+        : link.type === 'url'
+          ? () => window.open(link.target, '_blank', 'noopener,noreferrer')
+          : undefined
+  return (
+    <li className="dshx:group/link dshx:flex dshx:h-8 dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-2 dshx:transition-colors dshx:hover:bg-accent/50">
+      <Icon aria-hidden className="dshx:size-3.5 dshx:shrink-0 dshx:text-muted-foreground" />
+      {open === undefined ? (
+        <span className="dshx:min-w-0 dshx:truncate dshx:font-mono! dshx:text-xs">{linkLabel(link)}</span>
+      ) : (
+        <button type="button" onClick={open} className="dshx:min-w-0 dshx:truncate dshx:text-left dshx:text-[13px] dshx:hover:underline">
+          {props.thread?.title ?? linkLabel(link)}
+        </button>
+      )}
+      {props.thread === undefined ? null : (
+        <span
+          className={cn(
+            'dshx:inline-flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:text-[10px]',
+            props.thread.running ? 'dshx:text-info' : 'dshx:text-muted-foreground',
+          )}
+        >
+          <span
+            aria-hidden
+            className={cn('dshx:size-1.5 dshx:rounded-full', props.thread.running ? 'dshx:animate-pulse dshx:bg-info' : 'dshx:bg-muted-foreground/50')}
+          />
+          {props.thread.running ? 'running' : 'idle'}
+        </span>
+      )}
+      {link.provenance === undefined ? null : (
+        <span
+          className={cn(
+            'dshx:shrink-0 dshx:rounded dshx:px-1 dshx:text-[10px]',
+            link.provenance === 'inferred' ? 'dshx:border dshx:border-dashed dshx:border-violet/50 dshx:text-violet' : 'dshx:text-muted-foreground',
+          )}
+        >
+          {provenanceLabels[link.provenance]}
+        </span>
+      )}
+      <button
+        type="button"
+        aria-label={`Unlink ${link.type} ${link.target}`}
+        className="dshx:ml-auto dshx:rounded dshx:text-muted-foreground dshx:opacity-0 dshx:transition-opacity dshx:group-hover/link:opacity-100 dshx:hover:text-foreground"
+        onClick={() => actions.link.mutate({ id: props.itemId, link, remove: true })}
+      >
+        <XIcon className="dshx:size-3.5" />
+      </button>
+    </li>
+  )
+}
+
 const PeekBody = (props: {
   readonly detail: BacklogDetailView
+  readonly threads: readonly ComposerThread[]
   readonly loading: boolean
+  readonly expanded: boolean
+  readonly toggleExpanded: () => void
   readonly openThread: OpenThread
   readonly select: (id: number) => void
   readonly close: () => void
@@ -406,22 +517,33 @@ const PeekBody = (props: {
   const actions = useBacklogActions()
   const item = props.detail.item
   const scroller = useRef<HTMLDivElement | null>(null)
-  useEffect(() => scroller.current?.scrollTo({ top: 0 }), [item.id])
+  useEffect(() => {
+    // Chromium's scrollTo returns a promise; an expression body would hand it to React as the effect's cleanup.
+    void scroller.current?.scrollTo({ top: 0 })
+  }, [item.id])
+  const captured = item.events.find(event => event.kind === 'created')?.detail.trim() ?? ''
+  const showCapture = captured !== '' && captured !== `${item.title}\n${item.body}`.trim() && captured !== item.title.trim()
+  const running = props.threads.filter(thread => thread.running && item.links.some(link => link.type === 'thread' && link.target === thread.id))
+  const groups = BacklogItems.relations
+    .map(relation => ({ relation, links: item.links.filter(link => (link.relation ?? 'related') === relation) }))
+    .filter(group => group.links.length > 0)
   return (
     <>
       <header className="dshx:flex dshx:h-11 dshx:shrink-0 dshx:items-center dshx:gap-2 dshx:border-b dshx:border-border dshx:px-4">
-        <span className="dshx:font-mono! dshx:text-xs dshx:text-muted-foreground">b:{item.id}</span>
-        {item.freshness === 'fresh' ? null : (
-          <span
-            className={cn(
-              'dshx:rounded-full dshx:px-1.5 dshx:text-[11px]',
-              item.freshness === 'stale' ? 'dshx:bg-warning/15 dshx:text-warning' : 'dshx:bg-muted dshx:text-muted-foreground',
-            )}
-          >
-            {item.freshness}
-          </span>
-        )}
-        <div className="dshx:ml-auto dshx:flex dshx:items-center dshx:gap-1">
+        <nav aria-label="Breadcrumb" className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5 dshx:text-xs dshx:text-muted-foreground">
+          {item.project === null ? null : (
+            <>
+              <ItemGlyphs.ProjectDot project={item.project} />
+              <span className="dshx:truncate" title={item.project}>
+                {ItemGlyphs.projectName(item.project)}
+              </span>
+              <span>/</span>
+            </>
+          )}
+          <span className="dshx:font-mono! dshx:text-foreground">b:{item.id}</span>
+          {item.freshness === 'fresh' ? null : <span className="dshx:rounded-full dshx:bg-muted dshx:px-1.5 dshx:text-[11px]">{item.freshness}</span>}
+        </nav>
+        <div className="dshx:ml-auto dshx:flex dshx:items-center dshx:gap-0.5">
           <Button
             variant="ghost"
             size="icon-xs"
@@ -433,6 +555,7 @@ const PeekBody = (props: {
           >
             <WandSparklesIcon />
           </Button>
+          <SnoozeMenu id={item.id} snoozedUntil={item.snoozedUntil ?? null} />
           <Button
             variant="ghost"
             size="icon-xs"
@@ -443,131 +566,137 @@ const PeekBody = (props: {
           >
             <PinIcon className={cn(item.pinned && 'dshx:fill-current')} />
           </Button>
+          <Button variant="ghost" size="icon-xs" aria-label={props.expanded ? 'Collapse' : 'Expand'} onClick={props.toggleExpanded}>
+            {props.expanded ? <Minimize2Icon /> : <Maximize2Icon />}
+          </Button>
           <Button variant="ghost" size="icon-xs" aria-label="Close" onClick={props.close}>
             <XIcon />
           </Button>
         </div>
       </header>
-      <div ref={scroller} className="dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col dshx:gap-5 dshx:overflow-y-auto dshx:px-5 dshx:py-4">
-        <div className="dshx:flex dshx:flex-col dshx:gap-2">
-          <TitleField id={item.id} title={item.title} />
-          {props.loading ? (
-            <p className="dshx:line-clamp-3 dshx:text-[13px] dshx:leading-relaxed dshx:text-muted-foreground">{item.body}</p>
-          ) : (
-            <BodyField id={item.id} body={item.body} />
+      <div ref={scroller} className="dshx:min-h-0 dshx:flex-1 dshx:overflow-y-auto">
+        <div className={cn('dshx:mx-auto dshx:flex dshx:flex-col dshx:gap-6 dshx:px-5 dshx:py-5', props.expanded && 'dshx:max-w-3xl dshx:px-8')}>
+          <div className="dshx:flex dshx:flex-col dshx:gap-3">
+            <TitleField id={item.id} title={item.title} />
+            <div className="dshx:-ml-1.5 dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-1">
+              <ItemPickers.Status id={item.id} status={item.status} withLabel onPick={status => actions.update.mutate({ id: item.id, status })} />
+              <ItemPickers.Kind id={item.id} kind={item.kind} onPick={kind => actions.update.mutate({ id: item.id, kind })} />
+              <ItemPickers.Attention
+                id={item.id}
+                attention={item.attention ?? 'none'}
+                onPick={attention => actions.update.mutate({ id: item.id, attention })}
+              />
+              <span className="dshx:ml-1">
+                <ItemGlyphs.ActorStack actorIds={item.actors.map(actor => actor.id)} />
+              </span>
+            </div>
+            <TagsField id={item.id} tags={item.tags} />
+          </div>
+          {running.length === 0 ? null : (
+            <section
+              aria-label="Execution"
+              className="dshx:flex dshx:flex-col dshx:gap-1.5 dshx:rounded-xl dshx:border dshx:border-info/30 dshx:bg-info/5 dshx:p-3"
+            >
+              {running.map(thread => (
+                <div key={thread.id} className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-xs">
+                  <span aria-hidden className="dshx:size-1.5 dshx:animate-pulse dshx:rounded-full dshx:bg-info" />
+                  <span className="dshx:text-muted-foreground">Running in</span>
+                  <span className="dshx:min-w-0 dshx:truncate dshx:font-medium">{thread.title}</span>
+                  <Button size="xs" variant="ghost" className="dshx:ml-auto" onClick={() => props.openThread(thread.id)}>
+                    Open thread
+                  </Button>
+                </div>
+              ))}
+            </section>
           )}
+          {item.proposal === undefined || item.proposal === null ? null : <ProposalCard id={item.id} proposal={item.proposal} />}
+          <div className="dshx:flex dshx:flex-col dshx:gap-2">
+            {props.loading ? (
+              <p className="dshx:line-clamp-3 dshx:text-[13px] dshx:leading-relaxed dshx:text-muted-foreground">{item.body}</p>
+            ) : (
+              <BodyField id={item.id} body={item.body} />
+            )}
+            {showCapture ? (
+              <details className="dshx:group/capture dshx:text-xs">
+                <summary className="dshx:flex dshx:cursor-pointer dshx:list-none dshx:items-center dshx:gap-1.5 dshx:text-muted-foreground dshx:hover:text-foreground">
+                  <QuoteIcon aria-hidden className="dshx:size-3" /> Original capture
+                  <ChevronRightIcon className="dshx:size-3 dshx:transition-transform dshx:group-open/capture:rotate-90" />
+                </summary>
+                <p className="dshx:mt-1.5 dshx:whitespace-pre-wrap dshx:rounded-r-lg dshx:border-l-2 dshx:border-border dshx:bg-muted/40 dshx:px-3 dshx:py-2 dshx:text-[13px] dshx:text-muted-foreground">
+                  {captured}
+                </p>
+              </details>
+            ) : null}
+          </div>
+          <Section title="Relationships" action={<AddLink id={item.id} />}>
+            {groups.length === 0 && props.detail.backlinks.length === 0 ? (
+              <p className="dshx:text-xs dshx:text-muted-foreground">
+                Nothing linked yet. Threads that mention b:{item.id} and revisions that close it link themselves.
+              </p>
+            ) : null}
+            {groups.map(group => (
+              <div key={group.relation} className="dshx:flex dshx:flex-col dshx:gap-0.5">
+                <span className="dshx:text-[11px] dshx:text-muted-foreground">{relationLabels[group.relation]}</span>
+                <ul aria-label={relationLabels[group.relation]} className="dshx:flex dshx:flex-col">
+                  {group.links.map(link => (
+                    <LinkRow
+                      key={`${link.type}:${link.target}`}
+                      itemId={item.id}
+                      link={link}
+                      thread={link.type === 'thread' ? props.threads.find(thread => thread.id === link.target) : undefined}
+                      openThread={props.openThread}
+                      select={props.select}
+                    />
+                  ))}
+                </ul>
+              </div>
+            ))}
+            {props.detail.backlinks.length === 0 ? null : (
+              <div className="dshx:flex dshx:flex-col dshx:gap-0.5">
+                <span className="dshx:text-[11px] dshx:text-muted-foreground">Referenced by</span>
+                <ul aria-label="Referenced by" className="dshx:flex dshx:flex-col">
+                  {props.detail.backlinks.map(backlink => (
+                    <li key={backlink.id}>
+                      <button
+                        type="button"
+                        onClick={() => props.select(backlink.id)}
+                        className="dshx:flex dshx:h-8 dshx:w-full dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-2 dshx:text-left dshx:text-[13px] dshx:transition-colors dshx:hover:bg-accent/50"
+                      >
+                        <ItemGlyphs.StatusIcon status={backlink.status} />
+                        <span className="dshx:font-mono! dshx:text-xs dshx:text-muted-foreground">b:{backlink.id}</span>
+                        <span className="dshx:min-w-0 dshx:truncate">{backlink.title}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </Section>
+          <Section title="Activity">
+            <Conversation events={item.events} attention={item.attention ?? 'none'} />
+            <CommentBox id={item.id} />
+          </Section>
         </div>
-        {item.proposal === undefined || item.proposal === null ? null : <ProposalCard id={item.id} proposal={item.proposal} current={item} />}
-        <div className="dshx:flex dshx:flex-col dshx:gap-1.5">
-          <Property label="Status">
-            <ItemPickers.Status id={item.id} status={item.status} withLabel onPick={status => actions.update.mutate({ id: item.id, status })} />
-          </Property>
-          <Property label="Kind">
-            <ItemPickers.Kind id={item.id} kind={item.kind} onPick={kind => actions.update.mutate({ id: item.id, kind })} />
-          </Property>
-          <Property label="Project">
-            <span className="dshx:truncate dshx:px-2 dshx:text-[13px]" title={item.project ?? undefined}>
-              {item.project === null ? <span className="dshx:text-muted-foreground">None</span> : projectName(item.project)}
-            </span>
-          </Property>
-          <Property label="Tags">
-            <div className="dshx:px-2">
-              <TagsField id={item.id} tags={item.tags} />
-            </div>
-          </Property>
-          <Property label="People">
-            <div className="dshx:flex dshx:items-center dshx:gap-1 dshx:px-2">
-              {item.actors.map(actor => (
-                <ItemGlyphs.ActorAvatar key={actor.id} actorId={actor.id} />
-              ))}
-            </div>
-          </Property>
-        </div>
-        <section className="dshx:flex dshx:flex-col dshx:gap-2">
-          <SectionTitle action={<AddLink id={item.id} />}>Links</SectionTitle>
-          {item.links.length === 0 ? <p className="dshx:text-xs dshx:text-muted-foreground">Nothing linked yet.</p> : null}
-          <ul aria-label="Links" className="dshx:flex dshx:flex-col dshx:gap-0.5">
-            {item.links.map(link => {
-              const Icon = linkIcons[link.type]
-              const open =
-                link.type === 'thread'
-                  ? () => props.openThread(link.target)
-                  : link.type === 'item'
-                    ? () => props.select(Number(link.target))
-                    : link.type === 'url'
-                      ? () => window.open(link.target, '_blank', 'noopener,noreferrer')
-                      : undefined
-              return (
-                <li
-                  key={`${link.type}:${link.target}`}
-                  className="dshx:group/link dshx:flex dshx:h-7 dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-2 dshx:hover:bg-accent/60"
-                >
-                  <Icon aria-hidden className="dshx:size-3.5 dshx:shrink-0 dshx:text-muted-foreground" />
-                  {open === undefined ? (
-                    <span className="dshx:min-w-0 dshx:truncate dshx:font-mono! dshx:text-xs">{linkLabel(link)}</span>
-                  ) : (
-                    <button type="button" onClick={open} className="dshx:min-w-0 dshx:truncate dshx:text-left dshx:text-[13px] dshx:hover:underline">
-                      {linkLabel(link)}
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    aria-label={`Unlink ${link.type} ${link.target}`}
-                    className="dshx:ml-auto dshx:rounded dshx:text-muted-foreground dshx:opacity-0 dshx:transition-opacity dshx:group-hover/link:opacity-100 dshx:hover:text-foreground"
-                    onClick={() => actions.link.mutate({ id: item.id, link, remove: true })}
-                  >
-                    <XIcon className="dshx:size-3.5" />
-                  </button>
-                </li>
-              )
-            })}
-          </ul>
-        </section>
-        {props.detail.backlinks.length === 0 ? null : (
-          <section className="dshx:flex dshx:flex-col dshx:gap-2">
-            <SectionTitle>Referenced by</SectionTitle>
-            <ul aria-label="Referenced by" className="dshx:flex dshx:flex-col dshx:gap-0.5">
-              {props.detail.backlinks.map(backlink => (
-                <li key={backlink.id}>
-                  <button
-                    type="button"
-                    onClick={() => props.select(backlink.id)}
-                    className="dshx:flex dshx:h-7 dshx:w-full dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-2 dshx:text-left dshx:text-[13px] dshx:hover:bg-accent/60"
-                  >
-                    <ItemGlyphs.StatusIcon status={backlink.status} />
-                    <span className="dshx:font-mono! dshx:text-xs dshx:text-muted-foreground">b:{backlink.id}</span>
-                    <span className="dshx:min-w-0 dshx:truncate">{backlink.title}</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
-        <section className="dshx:flex dshx:flex-col dshx:gap-3">
-          <SectionTitle>Activity</SectionTitle>
-          <Activity events={item.events} />
-          <CommentBox id={item.id} />
-          <p className="dshx:flex dshx:items-center dshx:gap-1 dshx:text-[11px] dshx:text-muted-foreground">
-            <Kbd>⌘</Kbd>
-            <Kbd>↵</Kbd> to send · <Kbd>Esc</Kbd> to close
-          </p>
-        </section>
       </div>
     </>
   )
 }
 
-/** Linear's issue peek: the selected item beside the list, editable in place. */
+/** The selected item, editable in place: a side panel beside the list, or the whole panel when expanded. */
 const ItemPeek = (props: {
   readonly id: number
+  readonly threads: readonly ComposerThread[]
   readonly summary: BacklogSummaryView | undefined
+  readonly expanded: boolean
+  readonly toggleExpanded: () => void
   readonly openThread: OpenThread
   readonly select: (id: number) => void
   readonly close: () => void
+  readonly embedded?: boolean
 }): JSX.Element => {
   const api = useApi(backlogApi)
   const summary = props.summary
-  // The list row already holds most of the item, so the peek opens filled and the full detail swaps in.
+  // The list row already holds most of the item, so the inspector opens filled and the full detail swaps in.
   const placeholder =
     summary === undefined
       ? undefined
@@ -575,16 +704,29 @@ const ItemPeek = (props: {
   const detail = useQuery({
     queryKey: [BacklogQueries.key, 'item', props.id],
     queryFn: ({ signal }) => api.get({ id: props.id }, { signal }),
-    refetchInterval: 5_000,
     placeholderData: () => placeholder,
   })
   return (
     <aside
       aria-label="Item detail"
-      className="dshx:flex dshx:min-h-0 dshx:w-[440px] dshx:max-w-[55%] dshx:shrink-0 dshx:flex-col dshx:border-l dshx:border-border dshx:bg-background dshx:animate-in dshx:fade-in-0 dshx:slide-in-from-right-4 dshx:duration-150 dshx:@max-pane-compact:absolute dshx:@max-pane-compact:inset-0 dshx:@max-pane-compact:z-20 dshx:@max-pane-compact:w-auto dshx:@max-pane-compact:max-w-none dshx:@max-pane-compact:border-l-0"
+      className={cn(
+        'dshx:flex dshx:min-h-0 dshx:flex-col dshx:bg-background',
+        props.expanded || props.embedded === true
+          ? 'dshx:min-w-0 dshx:flex-1'
+          : 'dshx:w-[460px] dshx:max-w-[55%] dshx:shrink-0 dshx:border-l dshx:border-border dshx:animate-in dshx:fade-in-0 dshx:slide-in-from-right-2 dshx:duration-150 dshx:@max-pane-compact:absolute dshx:@max-pane-compact:inset-0 dshx:@max-pane-compact:z-20 dshx:@max-pane-compact:w-auto dshx:@max-pane-compact:max-w-none dshx:@max-pane-compact:border-l-0',
+      )}
     >
       {detail.data === undefined ? null : detail.data.ok ? (
-        <PeekBody detail={detail.data.value} loading={detail.isPlaceholderData} openThread={props.openThread} select={props.select} close={props.close} />
+        <PeekBody
+          detail={detail.data.value}
+          threads={props.threads}
+          loading={detail.isPlaceholderData}
+          expanded={props.expanded}
+          toggleExpanded={props.toggleExpanded}
+          openThread={props.openThread}
+          select={props.select}
+          close={props.close}
+        />
       ) : (
         <p className="dshx:p-6 dshx:text-sm dshx:text-muted-foreground">b:{props.id} does not exist.</p>
       )}

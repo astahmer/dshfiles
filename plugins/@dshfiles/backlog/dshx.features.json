@@ -271,6 +271,108 @@
           "testName": "sends a chip as text naming b:<id>, so the thread signal sees it"
         }
       ]
+    },
+    {
+      "id": "search-and-views",
+      "title": "Search with reasons and saved views",
+      "summary": "Relevance-ranked search over titles, tags, descriptions, comments, original captures, projects and links, with kind/status/attention/tag/project/actor/link/recency operators; each result says where it matched. Views save a view and search to the plugin settings.",
+      "surfaces": ["client", "host", "settings", "tool"],
+      "configuration": [],
+      "states": ["browsing", "searching", "saved"],
+      "failureModes": ["A settings write that the Host refuses drops the optimistic saved view."],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "backlog.search-unit-rank",
+          "file": "plugins/@dshfiles/backlog/src/search.test.ts",
+          "testName": "ranks a title hit above a comment hit and says where each matched"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.search-unit-operators",
+          "file": "plugins/@dshfiles/backlog/src/search.test.ts",
+          "testName": "combines operators with free text"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.search-unit-recency",
+          "file": "plugins/@dshfiles/backlog/src/search.test.ts",
+          "testName": "filters by recency and matches ids exactly"
+        }
+      ]
+    },
+    {
+      "id": "attention-inbox",
+      "title": "Attention Inbox across items and threads",
+      "summary": "Items asking for input, blocked or waiting, items with a triage suggestion, and (setting inboxThreads) linked threads whose last turn was blocked or errored. Read state is separate from requiring action; snoozed items return later.",
+      "surfaces": ["client", "host", "settings", "integration"],
+      "configuration": [],
+      "states": ["unread", "acknowledged", "resolved", "snoozed"],
+      "failureModes": ["Without thread-sidebar's attention API the Inbox shows backlog items only."],
+      "externalDependencies": [
+        {
+          "id": "@dshfiles/thread-sidebar",
+          "boundary": "Reads thread-sidebar-attention state and acknowledges a thread through its published contract.",
+          "deterministicFake": "inboxThreadsFrom is unit-tested on fixed attention records in src/inbox-threads.test.ts."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "backlog.inbox-unit-threads",
+          "file": "plugins/@dshfiles/backlog/src/inbox-threads.test.ts",
+          "testName": "keeps only failed turns of threads linked to an item by default"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.inbox-unit-modes",
+          "file": "plugins/@dshfiles/backlog/src/inbox-threads.test.ts",
+          "testName": "adds finished turns waiting for review in all mode, and nothing when off"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.inbox-host-attention",
+          "file": "plugins/@dshfiles/backlog/src/store.test.ts",
+          "testName": "puts an item asking for input in the Inbox, keeps it visible, and keeps it there once acknowledged"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.inbox-host-snooze",
+          "file": "plugins/@dshfiles/backlog/src/store.test.ts",
+          "testName": "hides a snoozed item until its time, then lets it resurface"
+        }
+      ]
+    },
+    {
+      "id": "shared-activity",
+      "title": "Backlog work in the Activity timeline",
+      "summary": "Item creation, moves, links, comments, triage and requests for input are published as backlog.* events to @dshfiles/activity-timeline (setting publishActivity); the item log stays the source of truth and each item shows one condensed activity line.",
+      "surfaces": ["host", "settings", "integration"],
+      "configuration": [],
+      "states": ["published", "off"],
+      "failureModes": ["Without the timeline plugin the events have no listener and nothing changes."],
+      "externalDependencies": [
+        {
+          "id": "@dshfiles/activity-timeline",
+          "boundary": "Emits the strict backlog payload of dshfiles/activity/event; the timeline validates it with backlogActivitySchema.",
+          "deterministicFake": "plugins/@dshfiles/activity-timeline/src/backlog-activity.test.ts maps a fixed payload."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "host-test",
+          "id": "backlog.activity-host-summary",
+          "file": "plugins/@dshfiles/backlog/src/store.test.ts",
+          "testName": "summarizes many agent updates as one activity line"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.activity-host-provenance",
+          "file": "plugins/@dshfiles/backlog/src/store.test.ts",
+          "testName": "stamps who made a link"
+        }
+      ]
     }
   ],
   "kind": "bundle"

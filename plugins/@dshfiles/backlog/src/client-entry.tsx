@@ -25,6 +25,15 @@ export default defineClient({
     const PanelView = (): JSX.Element => (
       <PluginQueryProvider>
         <BacklogPanel
+          listThreads={() => {
+            const state = ctx.sessions.list.getSnapshot()
+            return state.ids.flatMap(id => {
+              const session = state.byId[id]
+              return session === undefined || session.blank || session.parentId !== undefined
+                ? []
+                : [{ id: session.id, title: session.displayTitle, running: session.running }]
+            })
+          }}
           openThread={sessionId => {
             const session = Object.values(ctx.sessions.list.getSnapshot().byId).find(candidate => candidate?.id === sessionId)
             if (session !== undefined) ctx.uiWorkspace.openSession(session.id)

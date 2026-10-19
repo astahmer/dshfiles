@@ -9,6 +9,7 @@ import type { SettingsScope } from '@dshfiles/dshx/settings'
 import { z } from 'zod'
 import { backlogApi } from './api.js'
 import { backlogSettings, type BacklogSettings } from './settings.js'
+import type { BacklogEvent, BacklogItem } from './item.js'
 import { BacklogModel, backlogDomain, type BacklogActor, type BacklogStore } from './store.js'
 import { BacklogSignals } from './signals.js'
 import { BacklogTriage, type TriageQuestion, type TriageServices } from './triage.js'
@@ -22,13 +23,42 @@ interface OpenedBacklog {
  * One store per Host process, not per Cordis context: the API handlers and the setup effect receive
  * different contexts, and a second store would allocate the same ids.
  */
+/** The `backlog` kind of `@dshfiles/activity-timeline`'s ingest event, matching its `backlogActivitySchema`. */
+interface BacklogActivityPayload {
+  readonly kind: 'backlog'
+  readonly value: {
+    readonly id: string
+    readonly at: number
+    readonly type: 'backlog.created' | 'backlog.moved' | 'backlog.linked' | 'backlog.commented' | 'backlog.attention' | 'backlog.triaged'
+    readonly level: 'routine' | 'notable' | 'attention'
+    readonly summary: string
+    readonly detail: string | null
+    readonly itemId: number
+    readonly sessionId: string | null
+    readonly revision: string | null
+  }
+}
+
+declare module '@deepseek-ai/cordis' {
+  interface Events {
+    'dshfiles/activity/event'(payload: BacklogActivityPayload): void
+  }
+}
+
 let opening: Promise<OpenedBacklog> | undefined
 
 const openBacklog = async (ctx: Context): Promise<OpenedBacklog> => {
   const storage = ctx.get('storageDomain')
   if (storage === undefined) throw new Error('Backlog storage is unavailable.')
   const domain = await storage.open(backlogDomain)
-  return { store: BacklogModel.createStore({ items: domain.table('items') }), close: () => domain.close() }
+  return {
+    store: BacklogModel.createStore({
+      items: domain.table('items'),
+      dormantDays: () => currentSettings().dormantAfterDays,
+      onEvent: (item, event) => publishActivity(ctx, item, event),
+    }),
+    close: () => domain.close(),
+  }
 }
 
 const backlogFor = (ctx: Context): Promise<BacklogStore> => {
@@ -140,6 +170,54 @@ const triageItem = async (ctx: Context, id: number) => {
 
 const logFailure = (what: string) => (error: unknown) => console.error(what, { error: error instanceof Error ? error.message.slice(0, 200) : String(error) })
 
+const activityType = (
+  event: BacklogEvent,
+): 'backlog.created' | 'backlog.moved' | 'backlog.linked' | 'backlog.commented' | 'backlog.attention' | 'backlog.triaged' | null => {
+  if (event.kind === 'created') return 'backlog.created'
+  if (event.kind === 'moved') return 'backlog.moved'
+  if (event.kind === 'linked') return 'backlog.linked'
+  if (event.kind === 'commented') return 'backlog.commented'
+  if (event.kind === 'triaged') return 'backlog.triaged'
+  if (event.kind === 'edited' && event.detail === 'attention') return 'backlog.attention'
+  return null
+}
+
+/** One timeline event per meaningful change; plain edits (titles, tags, unlinks) stay in the item's own history. */
+const publishActivity = (ctx: Context, item: BacklogItem, event: BacklogEvent): void => {
+  const type = activityType(event)
+  if (type === null || !currentSettings().publishActivity) return
+  const attention = item.attention ?? 'none'
+  const sessionId = event.actor.startsWith('agent:') ? event.actor.slice('agent:'.length) : null
+  const revision = /^(?:\S+ )?revision:(\S+)/.exec(event.detail)?.[1] ?? /closed by jj:(\S+)\)$/.exec(event.detail)?.[1] ?? null
+  const phrase =
+    type === 'backlog.attention'
+      ? attention === 'none'
+        ? 'cleared the request on'
+        : attention === 'needs-input'
+          ? 'asked for your input on'
+          : `marked ${attention}`
+      : type.slice('backlog.'.length)
+  ctx.emit('dshfiles/activity/event', {
+    kind: 'backlog',
+    value: {
+      id: `backlog:${String(item.id)}:${String(event.at)}:${event.kind}`,
+      at: event.at,
+      type,
+      level:
+        type === 'backlog.attention' && attention !== 'none' ? 'attention' : type === 'backlog.moved' || type === 'backlog.created' ? 'notable' : 'routine',
+      summary:
+        `${event.actor === 'user' ? 'You' : event.actor === 'system' ? 'Automatic' : `Agent ${(sessionId ?? '').replace(/^session-/, '').slice(0, 6)}`} ${phrase} b:${String(item.id)} ${item.title}`.slice(
+          0,
+          500,
+        ),
+      detail: event.kind === 'commented' || event.kind === 'moved' ? event.detail.slice(0, 2_000) : null,
+      itemId: item.id,
+      sessionId,
+      revision,
+    },
+  })
+}
+
 /** Background triage after a capture: the capture answers at once and never waits for Jev or the model. */
 const scheduleTriage = (ctx: Context, id: number): void => {
   if (!currentSettings().autoTriage) return
@@ -204,6 +282,8 @@ const actorOf = (caller: ApiCaller): BacklogActor =>
 const backlogApiHost = backlogApi.host({
   list: async ({ ctx, input }) => (await backlogFor(ctx)).list(input),
   get: async ({ ctx, input }) => (await backlogFor(ctx)).get(input.id),
+  revision: async ({ ctx }) => (await backlogFor(ctx)).revision(),
+  projects: async ({ ctx }) => (await backlogFor(ctx)).projects().map(entry => ({ ...entry, counts: { ...entry.counts }, actors: [...entry.actors] })),
   referencing: async ({ ctx, input }) => (await backlogFor(ctx)).referencing(input),
   capture: async ({ ctx, input, caller }) => {
     const detail = await (await backlogFor(ctx)).capture({ ...input, actor: actorOf(caller) })
@@ -211,6 +291,7 @@ const backlogApiHost = backlogApi.host({
     return detail
   },
   triage: async ({ ctx, input }) => triageItem(ctx, input.id),
+  acknowledge: async ({ ctx, input }) => (await backlogFor(ctx)).acknowledge(input),
   applyProposal: async ({ ctx, input, caller }) => (await backlogFor(ctx)).applyProposal({ id: input.id, actor: actorOf(caller) }),
   dismissProposal: async ({ ctx, input, caller }) => (await backlogFor(ctx)).dismissProposal({ id: input.id, actor: actorOf(caller) }),
   update: async ({ ctx, input, caller }) => (await backlogFor(ctx)).update({ ...input, actor: actorOf(caller) }),

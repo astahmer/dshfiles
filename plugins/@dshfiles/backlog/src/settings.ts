@@ -33,6 +33,36 @@ export const backlogSettings = defineSettings({
       .max(120)
       .default(5)
       .description('How often main is checked. A check that finds main unchanged costs one jj call.'),
+    dormantAfterDays: Schema.object({
+      note: Schema.natural().max(3_650).default(14),
+      idea: Schema.natural().max(3_650).default(30),
+      question: Schema.natural().max(3_650).default(30),
+      task: Schema.natural().max(3_650).default(30),
+      bug: Schema.natural().max(3_650).default(30),
+    }).description(
+      'Idle days before an open item of each kind leaves the default views (it stays searchable). 0 keeps that kind visible forever. Items asking for attention, pinned items and work in progress never go dormant.',
+    ),
+    inboxThreads: Schema.union([
+      Schema.const('off').description('Off: the Inbox shows backlog items only'),
+      Schema.const('failures').description('Failures: threads linked to an item whose last turn was blocked or errored'),
+      Schema.const('all').description('All: also linked threads whose turn finished and wait for review'),
+    ])
+      .default('failures')
+      .description("Which threads from the sidebar's unread list also appear in the Inbox, next to the backlog items they work on."),
+    publishActivity: Schema.boolean()
+      .default(true)
+      .description('Report item moves, links and requests for input to the Activity timeline, so the shared activity room shows backlog work.'),
+    savedViews: Schema.array(
+      Schema.object({
+        name: Schema.string().required(),
+        view: Schema.union([Schema.const('feed'), Schema.const('inbox'), Schema.const('items'), Schema.const('board'), Schema.const('projects')]).default(
+          'items',
+        ),
+        query: Schema.string().default(''),
+      }),
+    )
+      .default([])
+      .description('Searches saved from the Backlog panel, shared by every browser.'),
   }),
   applies: 'live',
 })

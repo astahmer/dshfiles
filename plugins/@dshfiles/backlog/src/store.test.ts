@@ -47,10 +47,10 @@ describe('triage', () => {
     expect(triaged.body).toBe('Seen in session-9f8e7d6c after jj:kvyxrlmk, see b:12 and https://github.com/o/r/pull/4.')
     expect(triaged.tags).toEqual(['composer'])
     expect(triaged.links).toEqual([
-      { type: 'item', target: '12' },
-      { type: 'revision', target: 'kvyxrlmk' },
-      { type: 'thread', target: 'session-9f8e7d6c' },
-      { type: 'url', target: 'https://github.com/o/r/pull/4' },
+      { type: 'item', target: '12', provenance: 'extracted' },
+      { type: 'revision', target: 'kvyxrlmk', provenance: 'extracted' },
+      { type: 'thread', target: 'session-9f8e7d6c', provenance: 'extracted' },
+      { type: 'url', target: 'https://github.com/o/r/pull/4', provenance: 'extracted' },
     ])
   })
 
@@ -227,5 +227,53 @@ describe('lifecycle signals', () => {
     })
     expect(signalled.ok && signalled.value.item.status).toBe('todo')
     expect(signalled.ok && signalled.value.item.links).toEqual([{ type: 'revision', target: 'ruwkyzntnvpp' }])
+  })
+})
+
+describe('attention and inbox', () => {
+  it('puts an item asking for input in the Inbox, keeps it visible, and keeps it there once acknowledged', async () => {
+    const time = clock(0)
+    const store = BacklogModel.createStore({ items: memoryTable(), now: time.now })
+    await store.capture({ text: 'note: deploy order', actor: user })
+    await store.update({ id: 1, attention: 'needs-input', actor: agent })
+    time.advance(60 * DAY_MS)
+
+    expect(store.list({}).items.map(item => [item.id, item.freshness, item.attention])).toEqual([[1, 'fresh', 'needs-input']])
+    await store.acknowledge({ ids: [1] })
+    expect(store.list({ inbox: true }).items.map(item => item.acknowledgedAt)).toEqual([60 * DAY_MS])
+
+    await store.update({ id: 1, attention: 'none', actor: user })
+    expect(store.list({ inbox: true }).total).toBe(0)
+  })
+
+  it('hides a snoozed item until its time, then lets it resurface', async () => {
+    const time = clock(0)
+    const store = BacklogModel.createStore({ items: memoryTable(), now: time.now })
+    await store.capture({ text: 'look at this later', actor: user })
+    await store.update({ id: 1, snoozedUntil: DAY_MS, actor: user })
+    expect(store.list({}).total).toBe(0)
+    time.advance(DAY_MS)
+    expect(store.list({}).total).toBe(1)
+  })
+
+  it('summarizes many agent updates as one activity line', async () => {
+    const store = BacklogModel.createStore({ items: memoryTable(), now: () => 3 })
+    await store.capture({ text: 'migrate users table', actor: user })
+    await store.comment({ id: 1, text: 'read the schema', actor: agent })
+    await store.comment({ id: 1, text: 'wrote the migration', actor: agent })
+    await store.update({ id: 1, status: 'doing', actor: agent })
+    expect(store.list({}).items[0]?.activity).toEqual({
+      count: 3,
+      agents: 1,
+      comments: 2,
+      last: { at: 3, actor: 'agent:session-abc123', kind: 'moved', detail: 'inbox → doing' },
+    })
+  })
+
+  it('stamps who made a link', async () => {
+    const store = BacklogModel.createStore({ items: memoryTable(), now: () => 3 })
+    await store.capture({ text: 'parent', actor: user })
+    const linked = await store.link({ id: 1, link: { type: 'revision', target: 'kvyxrlmkptyv', relation: 'implements' }, actor: agent })
+    expect(linked.ok && linked.value.item.links).toEqual([{ type: 'revision', target: 'kvyxrlmkptyv', relation: 'implements', provenance: 'agent' }])
   })
 })

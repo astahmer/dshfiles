@@ -1,0 +1,282 @@
+import { useApi } from '@dshfiles/dshx/client'
+import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { LinkIcon, LoaderCircleIcon, MessageSquareIcon, PlusIcon } from '@dshfiles/plugin-ui/icons'
+import { cn } from '@dshfiles/plugin-ui/lib/utils'
+import { useQuery } from '@dshfiles/plugin-ui/query'
+import { useState, type PointerEvent as ReactPointerEvent } from 'react'
+
+import { backlogApi, type BacklogSummaryView } from './api.js'
+import type { BacklogStatus } from './item.js'
+import { ItemGlyphs } from './item-glyphs.js'
+import { ItemPickers } from './item-pickers.js'
+import { BacklogQueries, useBacklogActions } from './use-backlog-actions.js'
+import { withViewTransition } from './view-transition.js'
+
+const boardStatuses: readonly BacklogStatus[] = ['inbox', 'todo', 'doing', 'done']
+const RECENT_EVENTS = 4
+/** Cards mounted per column before a "show more"; a long column scrolls without rendering every card. */
+const COLUMN_PAGE = 30
+
+type Drag = { readonly id: number; readonly x: number; readonly y: number; readonly offsetX: number; readonly offsetY: number; readonly width: number }
+
+/** The card's state line, as the video's footer: what it is doing now, not its metadata. */
+const StateLine = (props: { readonly item: BacklogSummaryView }): JSX.Element => {
+  const item = props.item
+  if (item.attention !== 'none') return <ItemGlyphs.AttentionBadge attention={item.attention} />
+  if (item.status === 'doing')
+    return (
+      <span className="dshx:flex dshx:items-center dshx:gap-1.5 dshx:text-[11px] dshx:text-muted-foreground">
+        <LoaderCircleIcon aria-hidden className="dshx:size-3 dshx:animate-spin dshx:text-info dshx:[animation-duration:2.4s]" />
+        {ItemGlyphs.ago(item.lastActivityAt)}
+      </span>
+    )
+  if (item.status === 'done')
+    return (
+      <span className="dshx:flex dshx:items-center dshx:gap-1.5 dshx:text-[11px] dshx:text-muted-foreground">
+        <span aria-hidden className="dshx:size-1.5 dshx:rounded-full dshx:bg-success" /> Done {ItemGlyphs.ago(item.lastActivityAt)}
+      </span>
+    )
+  return <span className="dshx:text-[11px] dshx:text-muted-foreground">{ItemGlyphs.ago(item.lastActivityAt)}</span>
+}
+
+const CardFace = (props: { readonly item: BacklogSummaryView; readonly onPickStatus?: (status: BacklogStatus) => void }): JSX.Element => {
+  const item = props.item
+  return (
+    <>
+      <div className="dshx:flex dshx:items-start dshx:gap-2">
+        {item.kind === 'task' ? null : (
+          <span className="dshx:mt-0.5">
+            <ItemGlyphs.KindIcon kind={item.kind} />
+          </span>
+        )}
+        <p className="dshx:line-clamp-2 dshx:min-w-0 dshx:flex-1 dshx:text-[13px] dshx:leading-snug dshx:font-medium">{item.title}</p>
+        {props.onPickStatus === undefined ? null : (
+          <span
+            className="dshx:-mt-1 dshx:-mr-1.5 dshx:opacity-0 dshx:transition-opacity dshx:group-hover/card:opacity-100"
+            onPointerDown={event => event.stopPropagation()}
+          >
+            <ItemPickers.Status id={item.id} status={item.status} onPick={props.onPickStatus} />
+          </span>
+        )}
+      </div>
+      {item.preview === '' ? null : <p className="dshx:line-clamp-2 dshx:text-xs dshx:leading-relaxed dshx:text-muted-foreground">{item.preview}</p>}
+      <div className="dshx:flex dshx:items-center dshx:gap-2">
+        <StateLine item={item} />
+        <span className="dshx:ml-auto dshx:flex dshx:items-center dshx:gap-2 dshx:text-[11px] dshx:text-muted-foreground">
+          {item.links.length === 0 ? null : (
+            <span className="dshx:flex dshx:items-center dshx:gap-0.5">
+              <LinkIcon aria-hidden className="dshx:size-3" />
+              {item.links.length}
+            </span>
+          )}
+          {item.activity.comments === 0 ? null : (
+            <span className="dshx:flex dshx:items-center dshx:gap-0.5">
+              <MessageSquareIcon aria-hidden className="dshx:size-3" />
+              {item.activity.comments}
+            </span>
+          )}
+          <span className="dshx:font-mono!">b:{item.id}</span>
+        </span>
+      </div>
+    </>
+  )
+}
+
+/** The expanded half of a card: the latest few events, then the actions that fit its state. */
+const CardDetail = (props: { readonly item: BacklogSummaryView; readonly open: (id: number) => void }): JSX.Element => {
+  const api = useApi(backlogApi)
+  const actions = useBacklogActions()
+  const item = props.item
+  const detail = useQuery({ queryKey: [BacklogQueries.key, 'item', item.id], queryFn: ({ signal }) => api.get({ id: item.id }, { signal }) })
+  const events = detail.data?.ok === true ? detail.data.value.item.events.slice(-RECENT_EVENTS) : []
+  const agent = item.actors.find(actor => actor.id.startsWith('agent:'))?.id
+  return (
+    <div
+      className="dshx:flex dshx:flex-col dshx:gap-2 dshx:border-t dshx:border-border/70 dshx:pt-2 dshx:animate-in dshx:fade-in-0 dshx:slide-in-from-top-1"
+      onPointerDown={event => event.stopPropagation()}
+    >
+      {agent === undefined ? null : <span className="dshx:text-[11px] dshx:text-muted-foreground">{ItemGlyphs.actorName(agent)}</span>}
+      <ol className="dshx:flex dshx:flex-col dshx:gap-1">
+        {events.map((event, index) => (
+          <li key={`${String(event.at)}:${String(index)}`} className="dshx:flex dshx:gap-2 dshx:text-xs">
+            <span
+              aria-hidden
+              className={cn(
+                'dshx:mt-1.5 dshx:size-1 dshx:shrink-0 dshx:rounded-full',
+                index === events.length - 1 ? 'dshx:bg-foreground' : 'dshx:bg-muted-foreground/50',
+              )}
+            />
+            <span
+              className={cn('dshx:line-clamp-2 dshx:min-w-0 dshx:flex-1', index === events.length - 1 ? 'dshx:text-foreground' : 'dshx:text-muted-foreground')}
+            >
+              {event.kind === 'commented' ? event.detail : `${ItemGlyphs.actorName(event.actor)} ${ItemGlyphs.describeEvent(event, item.attention)}`}
+            </span>
+            <span className="dshx:shrink-0 dshx:text-[11px] dshx:text-muted-foreground">{ItemGlyphs.ago(event.at)}</span>
+          </li>
+        ))}
+      </ol>
+      <div className="dshx:flex dshx:items-center dshx:justify-end dshx:gap-1.5">
+        {item.proposal === null ? null : (
+          <>
+            <Button size="xs" variant="ghost" onClick={() => actions.dismissProposal.mutate(item.id)}>
+              Dismiss
+            </Button>
+            <Button size="xs" onClick={() => actions.applyProposal.mutate(item.id)}>
+              Accept
+            </Button>
+          </>
+        )}
+        {item.attention === 'none' ? null : (
+          <Button
+            size="xs"
+            variant="outline"
+            onClick={() => {
+              withViewTransition(() => actions.patch({ id: item.id, attention: 'none' }))
+              actions.update.mutate({ id: item.id, attention: 'none' })
+            }}
+          >
+            Resolve
+          </Button>
+        )}
+        <Button size="xs" variant="outline" onClick={() => props.open(item.id)}>
+          Open
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+const cardClass =
+  'dshx:group/card dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-xl dshx:border dshx:bg-card dshx:p-3 dshx:shadow-xs dshx:transition-[border-color,box-shadow,opacity] dshx:duration-150 dshx:select-none'
+
+/**
+ * Columns by status. A click opens a card in place (recent activity and actions); dragging moves it, and the View
+ * Transition lets it glide into the new column. Every column is a drop target.
+ */
+export const BoardView = (props: {
+  readonly items: readonly BacklogSummaryView[]
+  readonly openId: number | null
+  readonly open: (id: number) => void
+  readonly captureInto: (status: BacklogStatus) => void
+}): JSX.Element => {
+  const actions = useBacklogActions()
+  const [drag, setDrag] = useState<Drag | null>(null)
+  const [over, setOver] = useState<BacklogStatus | null>(null)
+  const [expanded, setExpanded] = useState<number | null>(null)
+  const [pages, setPages] = useState<Partial<Record<BacklogStatus, number>>>({})
+  const dragged = drag === null ? undefined : props.items.find(item => item.id === drag.id)
+
+  const move = (id: number, status: BacklogStatus): void => {
+    withViewTransition(() => actions.patch({ id, status }))
+    actions.update.mutate({ id, status })
+  }
+
+  const columnAt = (x: number, y: number): BacklogStatus | null => {
+    const value = document.elementFromPoint(x, y)?.closest<HTMLElement>('[data-backlog-column]')?.dataset['backlogColumn']
+    return boardStatuses.find(status => status === value) ?? null
+  }
+
+  const startDrag = (event: ReactPointerEvent<HTMLElement>, item: BacklogSummaryView): void => {
+    if (event.button !== 0 || (event.target instanceof HTMLElement && event.target.closest('button') !== null)) return
+    const card = event.currentTarget.getBoundingClientRect()
+    const origin = { x: event.clientX, y: event.clientY }
+    let started = false
+    const onMove = (moveEvent: PointerEvent): void => {
+      if (!started && Math.hypot(moveEvent.clientX - origin.x, moveEvent.clientY - origin.y) < 4) return
+      started = true
+      setDrag({ id: item.id, x: moveEvent.clientX, y: moveEvent.clientY, offsetX: origin.x - card.left, offsetY: origin.y - card.top, width: card.width })
+      setOver(columnAt(moveEvent.clientX, moveEvent.clientY))
+    }
+    const onUp = (upEvent: PointerEvent): void => {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+      setDrag(null)
+      setOver(null)
+      if (!started) {
+        withViewTransition(() => setExpanded(current => (current === item.id ? null : item.id)))
+        return
+      }
+      const target = columnAt(upEvent.clientX, upEvent.clientY)
+      if (target !== null && target !== item.status) move(item.id, target)
+    }
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+  }
+
+  return (
+    <div className={cn('dshx:flex dshx:h-full dshx:min-h-0 dshx:gap-3 dshx:overflow-x-auto dshx:px-4 dshx:py-4', drag !== null && 'dshx:cursor-grabbing')}>
+      {boardStatuses.map(status => {
+        const column = props.items.filter(item => item.status === status).sort((left, right) => right.lastActivityAt - left.lastActivityAt)
+        const target = over === status && dragged?.status !== status
+        return (
+          <section
+            key={status}
+            data-backlog-column={status}
+            aria-label={`${ItemGlyphs.statusLabels[status]} column`}
+            className={cn(
+              'dshx:flex dshx:min-h-0 dshx:max-w-80 dshx:min-w-64 dshx:flex-1 dshx:flex-col dshx:rounded-2xl dshx:p-1.5 dshx:transition-[background-color,box-shadow] dshx:duration-150',
+              target ? 'dshx:bg-info/10 dshx:ring-1 dshx:ring-info/40' : 'dshx:bg-muted/45',
+            )}
+          >
+            <header className="dshx:flex dshx:h-8 dshx:shrink-0 dshx:items-center dshx:gap-2 dshx:px-2">
+              <ItemGlyphs.StatusIcon status={status} />
+              <h3 className="dshx:text-[11px] dshx:font-semibold dshx:uppercase dshx:tracking-wider dshx:text-muted-foreground">
+                {ItemGlyphs.statusLabels[status]}
+              </h3>
+              <span className="dshx:rounded-md dshx:bg-background/70 dshx:px-1.5 dshx:text-[11px] dshx:tabular-nums dshx:text-muted-foreground">
+                {column.length}
+              </span>
+              <button
+                type="button"
+                aria-label={`Add to ${ItemGlyphs.statusLabels[status]}`}
+                onClick={() => props.captureInto(status)}
+                className="dshx:ml-auto dshx:rounded-md dshx:p-1 dshx:text-muted-foreground dshx:transition-colors dshx:hover:bg-accent dshx:hover:text-foreground"
+              >
+                <PlusIcon className="dshx:size-3.5" />
+              </button>
+            </header>
+            <div className="dshx:flex dshx:min-h-16 dshx:flex-1 dshx:flex-col dshx:gap-1.5 dshx:overflow-y-auto dshx:p-0.5">
+              {column.length === 0 ? <p className="dshx:py-6 dshx:text-center dshx:text-xs dshx:text-muted-foreground/70">Nothing here</p> : null}
+              {column.slice(0, (pages[status] ?? 1) * COLUMN_PAGE).map(item => (
+                <article
+                  key={item.id}
+                  aria-label={`Card b:${String(item.id)}`}
+                  aria-expanded={expanded === item.id}
+                  onPointerDown={event => startDrag(event, item)}
+                  style={{ viewTransitionName: `backlog-item-${String(item.id)}` }}
+                  className={cn(
+                    cardClass,
+                    'dshx:cursor-grab dshx:hover:border-input dshx:hover:shadow-sm',
+                    item.id === props.openId ? 'dshx:border-info/60 dshx:ring-1 dshx:ring-info/25' : 'dshx:border-border',
+                    drag?.id === item.id && 'dshx:opacity-30',
+                  )}
+                >
+                  <CardFace item={item} onPickStatus={status => move(item.id, status)} />
+                  {expanded === item.id ? <CardDetail item={item} open={props.open} /> : null}
+                </article>
+              ))}
+              {column.length > (pages[status] ?? 1) * COLUMN_PAGE ? (
+                <button
+                  type="button"
+                  onClick={() => setPages({ ...pages, [status]: (pages[status] ?? 1) + 1 })}
+                  className="dshx:rounded-lg dshx:py-1.5 dshx:text-xs dshx:text-muted-foreground dshx:transition-colors dshx:hover:bg-accent dshx:hover:text-foreground"
+                >
+                  Show {Math.min(column.length - (pages[status] ?? 1) * COLUMN_PAGE, COLUMN_PAGE)} more
+                </button>
+              ) : null}
+            </div>
+          </section>
+        )
+      })}
+      {drag === null || dragged === undefined ? null : (
+        <article
+          aria-hidden
+          style={{ left: drag.x - drag.offsetX, top: drag.y - drag.offsetY, width: drag.width }}
+          className={cn(cardClass, 'dshx:pointer-events-none dshx:fixed dshx:z-[1100] dshx:rotate-[1.5deg] dshx:border-input dshx:shadow-xl')}
+        >
+          <CardFace item={dragged} />
+        </article>
+      )}
+    </div>
+  )
+}

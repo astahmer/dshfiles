@@ -18,6 +18,11 @@ const summary = (id: number, title: string): BacklogSummaryView => ({
   lastActivityAt: 1,
   preview: '',
   proposal: null,
+  attention: 'none',
+  acknowledgedAt: null,
+  snoozedUntil: null,
+  activity: { count: 0, agents: 0, comments: 0, last: null },
+  match: null,
 })
 
 const request = (query: string) => ({ query, quoted: false, signal: new AbortController().signal }) as const
