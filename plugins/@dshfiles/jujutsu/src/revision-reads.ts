@@ -2,7 +2,7 @@ import { PluginApiError } from '@dshfiles/dshx/api'
 import { z } from 'zod'
 import type { FileStat, ReadFailure, RevisionDetails } from './api.js'
 import { JujutsuMutationModel, JujutsuOutputModel } from './core.js'
-import { FILE_STATS_TEMPLATE } from './jj-templates.js'
+import { EDIT_TIME_TEMPLATE, FILE_STATS_TEMPLATE } from './jj-templates.js'
 
 export interface JjRunResult {
   readonly stdout: string
@@ -25,6 +25,20 @@ const fileStatsRowSchema = z.object({
     .max(20_000),
   conflicts: z.array(z.string().max(2048)).max(20_000).default([]),
 })
+
+const editTimeRowSchema = z.object({
+  commitId: z.string().regex(/^[a-f0-9]{40,64}$/),
+  changeId: z.string().regex(/^[a-f0-9]{20,64}$/),
+  edited: z.boolean(),
+  time: z.string().max(64),
+})
+
+/** A commit's edit time never changes, so it is kept by repository and commit id for the life of the Host. */
+const editTimeCache = new Map<string, string | null>()
+const EDIT_TIME_CACHE_LIMIT = 50_000
+/** A just-rewritten commit usually resolves from its newest entries or a cached predecessor; the full log is the last resort. */
+const EDIT_TIME_EVOLOG_LIMITS = [2, 32, undefined] as const
+const EDIT_TIME_CONCURRENCY = 4
 
 const SAFE_FAILURE_MESSAGE =
   /^(Choose |Invalid |Registered |Selected |Split |Jujutsu |Repository |Revision |Changed |Remote |Bookmark |Preview |Workspace |Descriptions )/
@@ -100,6 +114,62 @@ export class RevisionReads {
       truncated: patch.truncated,
       evolution: evolution.truncated ? evolution.stdout + '\n[evolution output truncated]' : evolution.stdout,
     }
+  }
+
+  /** When each commit's own content last changed: the newest evolution entry that edited it, or null when none did. */
+  static async editTimes(
+    run: JjRun,
+    input: { readonly repositoryRoot: string; readonly commitIds: readonly string[] },
+  ): Promise<{ readonly commitId: string; readonly editedAt: string | null }[]> {
+    const cacheKey = (commitId: string): string => input.repositoryRoot + '\0' + commitId
+    const remember = (commitIds: readonly string[], editedAt: string | null): string | null => {
+      for (const commitId of commitIds) {
+        if (editTimeCache.size >= EDIT_TIME_CACHE_LIMIT) editTimeCache.delete(editTimeCache.keys().next().value ?? '')
+        editTimeCache.set(cacheKey(commitId), editedAt)
+      }
+      return editedAt
+    }
+    const resolve = async (commitId: string): Promise<string | null> => {
+      const cached = editTimeCache.get(cacheKey(commitId))
+      if (cached !== undefined) return cached
+      for (const limit of EDIT_TIME_EVOLOG_LIMITS) {
+        const result = await run(
+          [
+            RevisionReads.ignoreWorkingCopy,
+            'evolog',
+            '--no-graph',
+            '--revisions',
+            commitId,
+            ...(limit === undefined ? [] : ['--limit', String(limit)]),
+            '--template',
+            EDIT_TIME_TEMPLATE,
+          ],
+          { outputLimit: 2_000_000 },
+        )
+        const completeOutput = result.truncated ? result.stdout.slice(0, result.stdout.lastIndexOf('\n') + 1) : result.stdout
+        const entries = JujutsuOutputModel.parseJsonLines(completeOutput, value => editTimeRowSchema.parse(value))
+        const changeId = entries[0]?.changeId
+        // Squashed-in revisions bring their own history into the log; only this change's versions count.
+        const versions = entries.filter(entry => entry.changeId === changeId)
+        const visited: string[] = []
+        for (const version of versions) {
+          const known = editTimeCache.get(cacheKey(version.commitId))
+          if (known !== undefined) return remember(visited, known)
+          visited.push(version.commitId)
+          if (version.edited) return remember(visited, version.time)
+        }
+        const complete = !result.truncated && (limit === undefined || entries.length < limit)
+        if (complete) return remember(visited, null)
+      }
+      return null
+    }
+    const commitIds = [...new Set(input.commitIds)]
+    const editTimes: { readonly commitId: string; readonly editedAt: string | null }[] = []
+    for (let start = 0; start < commitIds.length; start += EDIT_TIME_CONCURRENCY) {
+      const batch = commitIds.slice(start, start + EDIT_TIME_CONCURRENCY)
+      editTimes.push(...(await Promise.all(batch.map(async commitId => ({ commitId, editedAt: await resolve(commitId) })))))
+    }
+    return editTimes
   }
 
   /** Host messages are written for users and never carry stderr; anything else falls back to a generic message. */

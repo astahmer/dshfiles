@@ -180,10 +180,11 @@ Still missing:
 ### jujutsu
 
 Bound now (sibling revision `feat(jujutsu): expose the revision graph and Source
-Control as agent tools`), with twelve tools covering all 29 capabilities: the ten
+Control as agent tools`), with thirteen tools covering all 30 capabilities: the eleven
 read-only ones are `jj_register_repository`, `jj_load`, `jj_graph_page`,
 `jj_graph_navigation`, `jj_revision_relationship`, `jj_graph_slice`,
-`jj_reference_graph`, `jj_details`, `jj_revision_files` and `jj_working_diff`.
+`jj_reference_graph`, `jj_details`, `jj_revision_files`, `jj_edit_times` and
+`jj_working_diff`.
 
 The writes keep the product's two-step shape rather than one tool per action:
 `jj_prepare_action` prepares one of the seventeen mutation kinds (describe, split,

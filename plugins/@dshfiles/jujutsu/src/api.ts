@@ -8,6 +8,8 @@ export const revisionSchema = z.object({
   description: z.string().max(20_000),
   author: z.string().max(320),
   authorTime: z.string().max(64),
+  // Older Hosts omit it; day headings fall back to the author time.
+  committerTime: z.string().max(64).optional(),
   parents: z.array(z.string().regex(/^[a-f0-9]{40,64}$/)).max(16),
   bookmarks: z.array(z.string().max(256)).max(64),
   localBookmarks: z.array(z.string().max(256)).max(64),
@@ -289,6 +291,17 @@ export const jujutsuApi = defineApi({
                   .join(', ')}${revision.files.length > 20 ? ` (+${String(revision.files.length - 20)} more)` : ''}`,
             )
             .join('\n') + (output.truncated ? '\n(truncated)' : ''),
+      },
+    }),
+    editTimes: method({
+      input: z.object({ repoId: repoIdSchema, commitIds: z.array(commitIdSchema).min(1).max(100) }),
+      output: z.object({ revisions: z.array(z.object({ commitId: commitIdSchema, editedAt: z.string().max(64).nullable() })).max(100) }),
+      description:
+        "When each revision's own content last changed, from its evolution log: rebases and description edits do not count. editedAt is null when the content never changed after the revision was created. Read-only.",
+      tool: {
+        name: 'jj_edit_times',
+        readOnly: true,
+        render: output => output.revisions.map(revision => `${revision.commitId} ${revision.editedAt ?? 'never edited'}`).join('\n'),
       },
     }),
     workingDiff: method({

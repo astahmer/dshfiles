@@ -134,3 +134,40 @@ test('changed-file stats and revision details mark the files a rebase left confl
     ],
   )
 })
+
+test('edit times keep the last content change through rebases and describes, and count a squash into the revision', { timeout: 60_000 }, async () => {
+  const { repo, jj, run } = await scratchRepo()
+  const lastOperationTime = (): string => jj(['op', 'log', '--no-graph', '--limit', '1', '--template', 'self.time().end().utc().format("%+")']).trim()
+  const commitIdOf = (revision: string): string => jj(['--ignore-working-copy', 'log', '--no-graph', '--revisions', revision, '--template', 'commit_id']).trim()
+  const editedAt = async (revision: string): Promise<string | null> =>
+    (await RevisionReads.editTimes(run, { repositoryRoot: repo, commitIds: [commitIdOf(revision)] }))[0]?.editedAt ?? null
+
+  const changeIdOf = (revision: string): string => jj(['--ignore-working-copy', 'log', '--no-graph', '--revisions', revision, '--template', 'change_id']).trim()
+
+  await writeFile(join(repo, 'base.txt'), 'base\n')
+  jj(['describe', '--message', 'base'])
+  const base = changeIdOf('@')
+  jj(['new', '--message', 'side', 'root()'])
+  await writeFile(join(repo, 'side.txt'), 'side\n')
+  jj(['status'])
+  const side = changeIdOf('@')
+  jj(['new', '--message', 'feature', base])
+  await writeFile(join(repo, 'feature.txt'), 'one\n')
+  jj(['status'])
+  const featureEditedAt = lastOperationTime()
+  const feature = changeIdOf('@')
+
+  assert.equal(await editedAt(feature), featureEditedAt)
+  jj(['rebase', '--revisions', feature, '--onto', side])
+  jj(['describe', feature, '--message', 'feature, renamed'])
+  assert.equal(await editedAt(feature), featureEditedAt)
+
+  jj(['new', '--message', 'fixup', feature])
+  await writeFile(join(repo, 'fixup.txt'), 'fix\n')
+  jj(['squash', '--into', feature, '--use-destination-message'])
+  const squashedAt = lastOperationTime()
+  assert.equal(await editedAt(feature), squashedAt)
+
+  jj(['new', '--message', 'empty', 'root()'])
+  assert.equal(await editedAt('@'), null)
+})

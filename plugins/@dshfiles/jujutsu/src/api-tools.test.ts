@@ -7,6 +7,7 @@ describe('jujutsu tool exposure', () => {
     expect(tools.map(tool => tool.name).sort()).toEqual([
       'jj_confirm_action',
       'jj_details',
+      'jj_edit_times',
       'jj_graph_navigation',
       'jj_graph_page',
       'jj_graph_slice',
@@ -27,6 +28,7 @@ describe('jujutsu tool exposure', () => {
       .sort()
     expect(readOnly).toEqual([
       'jj_details',
+      'jj_edit_times',
       'jj_graph_navigation',
       'jj_graph_page',
       'jj_graph_slice',

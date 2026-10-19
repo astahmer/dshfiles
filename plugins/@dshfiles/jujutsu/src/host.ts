@@ -741,6 +741,10 @@ const jujutsuHostApi = jujutsuApi.host({
     const repo = await resolveRepo(ctx, input.repoId, signal)
     return RevisionReads.fileStats(repoRun(ctx, repo, signal), [...new Set(input.commitIds)])
   }),
+  editTimes: userFacing(async ({ input, ctx, signal }) => {
+    const repo = await resolveRepo(ctx, input.repoId, signal)
+    return { revisions: await RevisionReads.editTimes(repoRun(ctx, repo, signal), { repositoryRoot: repo.root, commitIds: input.commitIds }) }
+  }),
   workingDiff: userFacing(async ({ input, ctx, signal }) => {
     const repo = await resolveRepo(ctx, input.repoId, signal)
     const patch = await runAt(ctx, repo.root, repo.identity, ['diff', '--revisions', '@', '--git'], signal)

@@ -6,6 +6,7 @@ export const REVISION_TEMPLATE =
   '\',"description":\' ++ self.description().escape_json() ++ ' +
   '\',"author":\' ++ self.author().name().escape_json() ++ ' +
   '\',"authorTime":\' ++ self.author().timestamp().utc().format("%+").escape_json() ++ ' +
+  '\',"committerTime":\' ++ self.committer().timestamp().utc().format("%+").escape_json() ++ ' +
   '\',"parents":[\' ++ self.parents().map(|c| c.commit_id().short(64).escape_json()).join(",") ++ \']\' ++ ' +
   '\',"bookmarks":[\' ++ self.bookmarks().map(|b| b.name().escape_json()).join(",") ++ \']\' ++ ' +
   '\',"localBookmarks":[\' ++ self.local_bookmarks().map(|b| b.name().escape_json()).join(",") ++ \']\' ++ ' +
@@ -28,6 +29,18 @@ export const OPERATION_TEMPLATE =
 export const EVOLUTION_TEMPLATE =
   '\'{"commitId":\' ++ self.commit().commit_id().short(64).escape_json() ++ ' +
   '\',"predecessors":[\' ++ self.predecessors().map(|c| c.commit_id().short(64).escape_json()).join(",") ++ \']}\' ++ "\\n"'
+
+/**
+ * One evolution entry and whether it edited the revision's own content. Squashing another revision in counts; a
+ * version whose parents moved is a rebase, even when its tree changed with them.
+ */
+export const EDIT_TIME_TEMPLATE =
+  '\'{"commitId":\' ++ self.commit().commit_id().short(64).escape_json() ++ ' +
+  '\',"changeId":\' ++ self.commit().change_id().normal_hex().escape_json() ++ ' +
+  '\',"edited":\' ++ if(self.predecessors().len() > 1 || (' +
+  'self.predecessors().any(|p| stringify(p.parents().map(|c| c.commit_id().short(64)).join(",")) == stringify(self.commit().parents().map(|c| c.commit_id().short(64)).join(","))) ' +
+  '&& self.inter_diff().files()), "true", "false") ++ ' +
+  '\',"time":\' ++ self.operation().time().end().utc().format("%+").escape_json() ++ \'}\' ++ "\\n"'
 
 export const FILE_STATS_TEMPLATE =
   '\'{"commitId":\' ++ self.commit_id().short(64).escape_json() ++ ' +
