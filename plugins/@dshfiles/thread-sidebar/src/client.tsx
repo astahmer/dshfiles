@@ -1615,6 +1615,17 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     changePreferences({ threadViews: legacy })
   }, [changePreferences, hostBacked, preferences.threadViews])
 
+  // Group collapse moved from browser storage to Host settings: hand the browser copy over once, then drop it.
+  const groupsMigrationStarted = useRef(false)
+  useEffect(() => {
+    if (!hostBacked || groupsMigrationStarted.current) return
+    groupsMigrationStarted.current = true
+    const legacy = storedCollapsedGroups.get()
+    storedCollapsedGroups.remove()
+    if (legacy.length === 0 || preferences.collapsedGroups.length > 0) return
+    changePreferences({ collapsedGroups: [...legacy] })
+  }, [changePreferences, hostBacked, preferences.collapsedGroups])
+
   const attentionDisplayRow = (key: AttentionDisplayPreferenceKey, label: ThreadAttentionLabel, colorKey: AttentionColorKey): JSX.Element => {
     const mode = preferences[key]
     const modeLabel = mode === 'group' ? 'threadSidebarAttentionGroup' : 'threadSidebarAttentionLabel'
@@ -1866,9 +1877,9 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     setNotice(shouldSettle ? { tone: 'success', message: props.tSidebar('threadSidebarSettledNotice') } : null)
   }
 
-  const collapsedGroups = storedCollapsedGroups.useValue()
+  const collapsedGroups = preferences.collapsedGroups
   const toggleGroup = (key: string): void => {
-    storedCollapsedGroups.set(toggleCollapsedGroup(collapsedGroups, key))
+    changePreferences({ collapsedGroups: toggleCollapsedGroup(collapsedGroups, key) })
   }
 
   const toggleSection = (section: SidebarSection): void => {

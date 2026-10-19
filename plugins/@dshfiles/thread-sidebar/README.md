@@ -80,12 +80,12 @@ without opening the manager. **Not working** includes non-running threads even
 after their completion was seen, and threads waiting for attention; muted,
 archived, and settled threads are omitted, because all three are storage rather
 than work in progress. **Group headers collapse their rows** in the Project and
-Date groupings: a closed header renders no rows at all, and the collapse state is
-kept per browser in `dshfiles.thread-sidebar.collapsed-groups.v1`
-(`src/collapsed-groups.ts`). It is browser-local on purpose — the Host settings
-schema knows only the fixed section names, and a Host-synced key could not be
-written until the running Host restarts with the widened schema. For how working,
-attention, read state, groups, and filters fit together, see
+Date groupings: a closed header renders no rows at all. The collapse state is the
+Host-synced `collapsedGroups` preference (`src/collapsed-groups.ts` holds the
+group key helper and the browser copy an earlier build wrote there, which the
+sidebar hands over once and removes). Because the preference is Host-synced, a
+running Host that predates the field cannot persist it until DSH restarts. For how
+working, attention, read state, groups, and filters fit together, see
 [Thread sidebar states](sidebar-state.md).
 
 **Archive undo notice.** Archiving reports itself as a compact overlay anchored

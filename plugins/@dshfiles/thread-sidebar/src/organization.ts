@@ -62,6 +62,8 @@ export interface SidebarPreferences {
   /** Muted or snoozed threads by session id; Host-synced so every browser stays quiet. */
   mutedThreads: ThreadMutes
   collapsedSections: SidebarSection[]
+  /** Group headers a user keeps closed, by view group key (`project:<id>`, `date:<bucket>`). */
+  collapsedGroups: string[]
   workspaceFilter: string | null
   headerMode: 'compact' | 'expanded'
   /** Drop the Host brand mark and name from the header; the collapse button stays. */
@@ -128,6 +130,7 @@ export const DEFAULT_PREFERENCES: SidebarPreferences = {
   mutedThreads: {},
   // Keep every working section open; archived and settled threads stay folded until requested.
   collapsedSections: ['archived', 'settled'],
+  collapsedGroups: [],
   workspaceFilter: null,
   headerMode: 'compact',
   hideBrandLogo: false,

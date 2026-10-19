@@ -20,6 +20,12 @@ test('the settings schema and the preference decoder agree on every field', () =
   assert.equal(decoded.workspaceFilter, null)
 })
 
+test('older preferences without group collapse default to no collapsed groups', () => {
+  const { collapsedGroups, ...older } = DEFAULT_PREFERENCES
+  assert.ok(collapsedGroups.length === 0)
+  assert.deepEqual(SidebarPreferencesModel.decode(older)?.collapsedGroups, [])
+})
+
 test('older stored preferences default the header and thread split to natural height', () => {
   const stored = JSON.stringify({ ...DEFAULT_PREFERENCES, headerRegionHeight: undefined })
   assert.ok(stored)

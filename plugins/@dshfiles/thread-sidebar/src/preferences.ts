@@ -64,6 +64,7 @@ const preferencesInputSchema = z
     settledAt: z.record(z.string(), z.number().int().nonnegative()).default(DEFAULT_PREFERENCES.settledAt),
     mutedThreads: threadMutesSchema.default(DEFAULT_PREFERENCES.mutedThreads),
     collapsedSections: z.array(sidebarSectionSchema).max(6),
+    collapsedGroups: z.array(z.string().min(1).max(200)).max(200).default(DEFAULT_PREFERENCES.collapsedGroups),
     workspaceFilter: z.string().max(256).nullable().default(DEFAULT_PREFERENCES.workspaceFilter),
     headerMode: z.enum(['compact', 'expanded']),
     hideBrandLogo: z.boolean().default(DEFAULT_PREFERENCES.hideBrandLogo),

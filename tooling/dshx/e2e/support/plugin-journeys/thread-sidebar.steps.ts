@@ -623,6 +623,10 @@ When('a Host thread is archived and the view is grouped and filtered', async ({ 
   await selectThreadViewValue(page, 'Filter: Archived · Subagent threads', 'Main threads')
   await expect(targetRow).toBeVisible()
 
+  // Collapse the Today group so the reload below can prove the state is Host-synced.
+  await threadSidebar(page).getByRole('button', { name: /^Today/u }).click()
+  await expect(targetRow).toHaveCount(0)
+
   await page.reload()
   await expect(threadSidebar(page)).toBeVisible()
 })
@@ -631,6 +635,12 @@ Then('only matching rows remain visible after reload', async ({ page }: { page: 
   const displayTitle = 'thread sidebar view filter e2e'
   const targetRow = threadSidebar(page).locator('article').filter({ hasText: displayTitle })
   await recordAssertion(page, 'thread-sidebar-grouping-and-filter-preferences-survive-reload', async () => {
+    // The group was collapsed before the reload; a Host-synced preference is still collapsed, and expanding restores it.
+    const todayHeader = threadSidebar(page).getByRole('button', { name: /^Today/u })
+    await expect(todayHeader).toHaveAttribute('aria-expanded', 'false')
+    await expect(targetRow).toHaveCount(0)
+    await todayHeader.click()
+    await expect(targetRow).toBeVisible()
     await expect(threadSidebar(page).getByRole('button', { name: 'Group: Date', exact: true })).toBeVisible()
     await expect(threadSidebar(page).getByRole('button', { name: 'Filter: Archived · Main threads', exact: true })).toBeVisible()
     await expect(targetRow).toBeVisible()
@@ -639,12 +649,6 @@ Then('only matching rows remain visible after reload', async ({ page }: { page: 
     await expect(page.getByRole('menuitemcheckbox', { name: 'Archived', exact: true })).toHaveAttribute('aria-checked', 'true')
     await expect(page.getByRole('menuitemradio', { name: 'Main threads', exact: true })).toHaveAttribute('aria-checked', 'true')
     await page.keyboard.press('Escape')
-    // A date group header collapses its rows and expands them again; a closed group renders no rows at all.
-    const todayHeader = threadSidebar(page).getByRole('button', { name: /^Today/u })
-    await todayHeader.click()
-    await expect(targetRow).toHaveCount(0)
-    await todayHeader.click()
-    await expect(targetRow).toBeVisible()
   })
   await finishJourneyAssertions(page)
 })
