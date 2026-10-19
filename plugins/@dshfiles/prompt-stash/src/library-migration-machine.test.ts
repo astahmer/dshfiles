@@ -49,6 +49,32 @@ describe('saved prompt library migration', () => {
     actor.stop()
   })
 
+  it('ignores reloads that publish unchanged local library data', async () => {
+    const source = localStore()
+    let publishReload: () => void = () => undefined
+    const client: PromptLibraryMigrationClient = {
+      savePrompt: vi.fn(),
+      completeMigration: vi.fn(() => publishReload()),
+      refresh: vi.fn(),
+    }
+    const actor = actorFor(client)
+    let reloadPublished = false
+    publishReload = () => {
+      if (reloadPublished) return
+      reloadPublished = true
+      actor.send({ type: 'host.snapshot', snapshot: snapshot(1), localStore: localStore(), localStatus: 'ready' })
+    }
+
+    actor.send({ type: 'host.snapshot', snapshot: snapshot(1), localStore: source, localStatus: 'ready' })
+    await vi.waitFor(() => expect(actor.getSnapshot().matches('complete')).toBe(true))
+    expect(client.completeMigration).toHaveBeenCalledOnce()
+
+    actor.send({ type: 'host.snapshot', snapshot: snapshot(1), localStore: localStore(), localStatus: 'ready' })
+    expect(actor.getSnapshot().matches('complete')).toBe(true)
+    expect(client.completeMigration).toHaveBeenCalledOnce()
+    actor.stop()
+  })
+
   it('accepts only exact Host duplicates and preserves a conflicting local prompt', async () => {
     const prompt = savedPrompt(1)
     const exactClient: PromptLibraryMigrationClient = {

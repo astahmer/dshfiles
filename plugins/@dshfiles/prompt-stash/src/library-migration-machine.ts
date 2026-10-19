@@ -1,6 +1,6 @@
 import { assign, createActor, fromPromise, setup, type ActorRefFrom } from '@dshfiles/plugin-ui/machine'
 import type { PromptStashMutation, PromptStashSnapshot } from './library-api.js'
-import type { PromptLibraryStore, SavedPrompt } from './library.js'
+import { PromptLibrary, type PromptLibraryStore, type SavedPrompt } from './library.js'
 
 export type PromptLibraryLocalStatus = 'ready' | 'invalid' | 'unavailable'
 
@@ -49,6 +49,13 @@ type PromptLibraryMigrationEvent = PromptLibraryMigrationSnapshotEvent | { reado
 
 const matchesMigratedPrompt = (local: SavedPrompt, host: SavedPrompt): boolean =>
   local.id === host.id && local.revision === host.revision && local.title === host.title && local.text === host.text && local.updatedAt === host.updatedAt
+
+const sameLocalStore = (left: PromptLibraryStore, right: PromptLibraryStore | null): boolean => {
+  if (right === null) return false
+  const leftSerialized = PromptLibrary.serialize(left.prompts)
+  if (leftSerialized === null) return false
+  return leftSerialized === PromptLibrary.serialize(right.prompts)
+}
 
 const updateEvidence = (input: { readonly context: PromptLibraryMigrationContext; readonly event: PromptLibraryMigrationSnapshotEvent }) => ({
   lastSnapshotRevision: Math.max(input.context.lastSnapshotRevision, input.event.snapshot.revision),
@@ -208,7 +215,7 @@ const promptLibraryMigrationMachine = setup({
             guard: ({ context, event }) =>
               event.localStatus === 'ready' &&
               context.request !== null &&
-              (event.snapshot.revision > context.request.snapshot.revision || event.localStore !== context.request.localStore),
+              (event.snapshot.revision > context.request.snapshot.revision || !sameLocalStore(event.localStore, context.request.localStore)),
             target: 'migrating',
             reenter: true,
             actions: assign(({ context, event }) => requestFromSnapshot({ context, event })),
@@ -229,7 +236,7 @@ const promptLibraryMigrationMachine = setup({
         'host.snapshot': [
           {
             guard: ({ context, event }) =>
-              event.localStatus === 'ready' && (event.snapshot.revision > context.lastSnapshotRevision || event.localStore !== context.lastLocalStore),
+              event.localStatus === 'ready' && (event.snapshot.revision > context.lastSnapshotRevision || !sameLocalStore(event.localStore, context.lastLocalStore)),
             target: 'migrating',
             actions: assign(({ context, event }) => requestFromSnapshot({ context, event })),
           },
@@ -249,7 +256,7 @@ const promptLibraryMigrationMachine = setup({
         'host.snapshot': [
           {
             guard: ({ context, event }) =>
-              event.localStatus === 'ready' && (event.snapshot.revision > context.lastSnapshotRevision || event.localStore !== context.lastLocalStore),
+              event.localStatus === 'ready' && (event.snapshot.revision > context.lastSnapshotRevision || !sameLocalStore(event.localStore, context.lastLocalStore)),
             target: 'migrating',
             actions: assign(({ context, event }) => requestFromSnapshot({ context, event })),
           },
