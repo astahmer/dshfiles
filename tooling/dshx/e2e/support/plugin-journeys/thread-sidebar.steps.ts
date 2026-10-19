@@ -1464,3 +1464,18 @@ Then('the blocked session appears in the Usage limit group', async ({ page }: { 
   })
   await finishJourneyAssertions(page)
 })
+
+Then('the blocked session is listed only in the Usage limit group when grouped by date', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'thread-sidebar-usage-limit-group-by-date', async () => {
+    const sessionId = currentThreadId(page)
+    if (sessionId === null) throw new Error('The blocked thread is not selected.')
+
+    await selectThreadViewValue(page, 'Group: Status', 'Date')
+    await expect(threadSidebar(page).getByRole('button', { name: 'Group: Date', exact: true })).toBeVisible()
+    const group = page.getByRole('region', { name: 'Usage limit', exact: true })
+    await expect(group.locator(`[data-thread-id="${sessionId}"]`)).toBeVisible()
+    // A usage-limit row is a bare button, a list row an article: count the main action both carry.
+    await expect(threadSidebar(page).locator(`[data-thread-main-action][data-thread-id="${sessionId}"]`)).toHaveCount(1)
+  })
+  await finishJourneyAssertions(page)
+})

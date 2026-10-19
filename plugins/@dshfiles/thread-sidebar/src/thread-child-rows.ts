@@ -17,7 +17,6 @@ export interface ThreadChildRowInputs {
   readonly groupedAttentionIds: ReadonlySet<string>
   /** False under the `main` source filter, which lists no child rows. */
   readonly listChildren: boolean
-  readonly groupByStatus: boolean
   readonly mode: FinishedSubagentsMode
   readonly waitingSessionIds: ReadonlySet<string>
   readonly selectedSessionId: SessionSummary['id'] | undefined
@@ -32,7 +31,6 @@ const sameInputs = (left: ThreadChildRowInputs, right: ThreadChildRowInputs): bo
   left.children === right.children &&
   left.groupedAttentionIds === right.groupedAttentionIds &&
   left.listChildren === right.listChildren &&
-  left.groupByStatus === right.groupByStatus &&
   left.mode === right.mode &&
   left.waitingSessionIds === right.waitingSessionIds &&
   left.selectedSessionId === right.selectedSessionId
@@ -41,7 +39,7 @@ const EMPTY_ROW: ThreadChildRow = { listed: NO_CHILD_THREADS, live: NO_CHILD_THR
 
 const deriveRow = (inputs: ThreadChildRowInputs): ThreadChildRow => {
   if (!inputs.listChildren || inputs.children.length === 0) return EMPTY_ROW
-  const listed = listChildThreads({ children: inputs.children, groupedAttentionIds: inputs.groupedAttentionIds, groupByStatus: inputs.groupByStatus })
+  const listed = listChildThreads({ children: inputs.children, groupedAttentionIds: inputs.groupedAttentionIds })
   const selectedChildId =
     inputs.selectedSessionId !== undefined && listed.some(child => child.id === inputs.selectedSessionId) ? inputs.selectedSessionId : undefined
   const partition = partitionFinishedChildren({

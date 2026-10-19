@@ -2466,7 +2466,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       .map(([missingAncestorId, children]) => {
         const listed = children.filter(
           child =>
-            !(threadView.groupBy === 'status' && attentionIds.has(child.id)) &&
+            !attentionIds.has(child.id) &&
             ThreadViewModel.matchesStatusFilter({
               filters: threadView.statusFilters,
               running: child.running,
@@ -2495,7 +2495,6 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     preferences.finishedSubagents,
     selectedSession?.id,
     threadTree,
-    threadView.groupBy,
     threadView.sourceFilter,
     threadView.statusFilters,
     waitingSessionIds,
@@ -2506,7 +2505,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     const rows = new Map<SidebarSection, SessionSummary[]>(orderedSections.map(section => [section, []]))
     const activityAt = new Map(visibleThreadEntries.map(entry => [entry.session.id, entry.activity.updatedAt]))
     for (const { session, activity } of visibleThreadEntries) {
-      if (threadView.groupBy === 'status' && attentionIds.has(session.id)) continue
+      if (attentionIds.has(session.id)) continue
       const section = SidebarOrganization.sectionForSession({
         session: activity,
         archivedSessionIds,
@@ -2533,7 +2532,6 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     pinnedSessionIds,
     orderedSections,
     preferences.idleMinutes,
-    threadView.groupBy,
     visibleThreadEntries,
     workspaceState.pinnedSessionIds,
   ])
@@ -2572,7 +2570,9 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     if (threadView.groupBy === 'status') return []
     return ThreadViewModel.groupEntries({
       groupBy: threadView.groupBy,
-      entries: visibleThreadEntries.map(entry => ({ thread: entry.session, workspaceId: entry.workspaceId, activityAt: entry.activity.updatedAt })),
+      entries: visibleThreadEntries
+        .filter(entry => !attentionIds.has(entry.session.id))
+        .map(entry => ({ thread: entry.session, workspaceId: entry.workspaceId, activityAt: entry.activity.updatedAt })),
       workspaceTitles: new Map(displayWorkspaces.map(workspace => [workspace.id, workspace.title])),
       unassignedTitle: props.tSidebar('threadSidebarUnassigned'),
       dateTitles: {
@@ -2583,7 +2583,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       },
       now,
     })
-  }, [displayWorkspaces, now, props.tSidebar, threadView.groupBy, visibleThreadEntries])
+  }, [attentionIds, displayWorkspaces, now, props.tSidebar, threadView.groupBy, visibleThreadEntries])
 
   const rowStyle = useMemo<RowStyle>(
     () => ({
@@ -2856,7 +2856,6 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       children: threadTree.childrenByRoot.get(session.id) ?? NO_CHILDREN,
       groupedAttentionIds: attentionIds,
       listChildren: threadView.sourceFilter !== 'main',
-      groupByStatus: threadView.groupBy === 'status',
       mode: preferences.finishedSubagents,
       waitingSessionIds,
       selectedSessionId: selectedSession?.id,
@@ -3693,6 +3692,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           {sessionState.phase === 'ready' &&
           draftSessions.length === 0 &&
           detachedThreadGroups.length === 0 &&
+          statusFilteredRecoveryRows.length === 0 &&
           groupedAttentionRows.approvalNeeded.length === 0 &&
           groupedAttentionRows.inputNeeded.length === 0 &&
           groupedAttentionRows.turnFinished.length === 0 &&

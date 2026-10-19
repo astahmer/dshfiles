@@ -19,8 +19,8 @@ const empty = { groupedAttentionIds: new Set<string>(), waitingSessionIds: new S
 
 test('a parent without children shares the empty row', () => {
   const cache = createThreadChildRowCache()
-  const first = cache.resolve({ ...empty, children: NO_CHILD_THREADS, listChildren: true, groupByStatus: true, mode: 'collapse', selectedSessionId: undefined })
-  const second = cache.resolve({ ...empty, children: NO_CHILD_THREADS, listChildren: true, groupByStatus: true, mode: 'show', selectedSessionId: undefined })
+  const first = cache.resolve({ ...empty, children: NO_CHILD_THREADS, listChildren: true, mode: 'collapse', selectedSessionId: undefined })
+  const second = cache.resolve({ ...empty, children: NO_CHILD_THREADS, listChildren: true, mode: 'show', selectedSessionId: undefined })
   assert.equal(first.live, NO_CHILD_THREADS)
   assert.equal(first.listed, NO_CHILD_THREADS)
   assert.equal(second, first)
@@ -29,7 +29,7 @@ test('a parent without children shares the empty row', () => {
 test('an unchanged parent keeps the arrays its row already rendered', () => {
   const cache = createThreadChildRowCache()
   const children = [child('done'), child('live', { running: true })]
-  const inputs = { ...empty, children, listChildren: true, groupByStatus: true, mode: 'collapse' as const, selectedSessionId: undefined }
+  const inputs = { ...empty, children, listChildren: true, mode: 'collapse' as const, selectedSessionId: undefined }
   const first = cache.resolve(inputs)
   assert.deepEqual(
     first.live.map(item => item.id),
@@ -45,7 +45,7 @@ test('an unchanged parent keeps the arrays its row already rendered', () => {
 test('a changed child list and a new selection both invalidate the row', () => {
   const cache = createThreadChildRowCache()
   const children = [child('done')]
-  const inputs = { ...empty, children, listChildren: true, groupByStatus: true, mode: 'hide' as const, selectedSessionId: undefined }
+  const inputs = { ...empty, children, listChildren: true, mode: 'hide' as const, selectedSessionId: undefined }
   const first = cache.resolve(inputs)
   // The children array is the cache key: the tree only rebuilds it when that parent's children moved.
   assert.notEqual(cache.resolve({ ...inputs, children: [...children] }), first)
@@ -69,7 +69,7 @@ test('the main source filter lists no children', () => {
     ...empty,
     children: [child('done')],
     listChildren: false,
-    groupByStatus: false,
+
     mode: 'show',
     selectedSessionId: undefined,
   })

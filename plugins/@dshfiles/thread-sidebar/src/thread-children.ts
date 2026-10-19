@@ -120,15 +120,13 @@ export class ThreadChildrenModel {
   /**
    * The child rows a parent lists: every child it has, whatever the view filters. A
    * filter selects parent rows, never a child's place under its parent, so only an
-   * attention group that already renders a child takes that child off the list.
+   * group above the list that already renders a child takes that child off it.
    */
   static readonly listChildThreads = <Thread extends { readonly id: string }>(options: {
     readonly children: readonly Thread[]
     readonly groupedAttentionIds: ReadonlySet<string>
-    readonly groupByStatus: boolean
   }): readonly Thread[] => {
-    if (options.children.length === 0) return options.children
-    if (!options.groupByStatus || options.groupedAttentionIds.size === 0) return options.children
+    if (options.children.length === 0 || options.groupedAttentionIds.size === 0) return options.children
     const listed = options.children.filter(child => !options.groupedAttentionIds.has(child.id))
     return listed.length === options.children.length ? options.children : listed
   }

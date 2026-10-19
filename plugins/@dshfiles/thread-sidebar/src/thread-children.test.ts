@@ -56,13 +56,12 @@ test('thread action targets remain unique when parent links contain a cycle', ()
   assert.deepEqual(ThreadChildrenModel.threadActionTargetIds({ threadId: 'parent', threads, cascadeToChildren: true }), ['parent', 'child'])
 })
 
-test('a parent lists every child under it whatever the view filters, minus the children an attention group renders', () => {
+test('a parent lists every child under it whatever the view filters, minus the children a group above the list renders', () => {
   const children = ['live', 'finished', 'waiting'].map(id => ({ id }))
-  const listed = (options: { readonly groupedAttentionIds: ReadonlySet<string>; readonly groupByStatus: boolean }): string[] =>
+  const listed = (options: { readonly groupedAttentionIds: ReadonlySet<string> }): string[] =>
     ThreadChildrenModel.listChildThreads({ children, ...options }).map(child => child.id)
-  assert.deepEqual(listed({ groupedAttentionIds: new Set(), groupByStatus: true }), ['live', 'finished', 'waiting'])
-  assert.deepEqual(listed({ groupedAttentionIds: new Set(['waiting']), groupByStatus: true }), ['live', 'finished'])
-  assert.deepEqual(listed({ groupedAttentionIds: new Set(['waiting']), groupByStatus: false }), ['live', 'finished', 'waiting'])
+  assert.deepEqual(listed({ groupedAttentionIds: new Set() }), ['live', 'finished', 'waiting'])
+  assert.deepEqual(listed({ groupedAttentionIds: new Set(['waiting']) }), ['live', 'finished'])
 })
 
 test('children past the limit hide behind a count until every child is shown', () => {
@@ -122,10 +121,9 @@ test('parent groups expand by default only while a subagent is working and respe
 
 test('an unchanged child list keeps its array identity instead of being copied', () => {
   const children = [thread('a', 2), thread('b', 1)]
-  assert.equal(ThreadChildrenModel.listChildThreads({ children, groupedAttentionIds: new Set(), groupByStatus: true }), children)
-  assert.equal(ThreadChildrenModel.listChildThreads({ children, groupedAttentionIds: new Set(['elsewhere']), groupByStatus: true }), children)
-  assert.equal(ThreadChildrenModel.listChildThreads({ children, groupedAttentionIds: new Set(['elsewhere']), groupByStatus: false }), children)
-  assert.deepEqual(ids(ThreadChildrenModel.listChildThreads({ children, groupedAttentionIds: new Set(['a']), groupByStatus: true })), ['b'])
+  assert.equal(ThreadChildrenModel.listChildThreads({ children, groupedAttentionIds: new Set() }), children)
+  assert.equal(ThreadChildrenModel.listChildThreads({ children, groupedAttentionIds: new Set(['elsewhere']) }), children)
+  assert.deepEqual(ids(ThreadChildrenModel.listChildThreads({ children, groupedAttentionIds: new Set(['a']) })), ['b'])
 })
 
 test('nothing finished keeps the child list and one shared empty finished list', () => {
