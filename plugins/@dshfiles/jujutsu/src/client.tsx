@@ -3,16 +3,6 @@ import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import { relativeTime, writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
 import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@dshfiles/plugin-ui/components/ui/alert-dialog'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Checkbox } from '@dshfiles/plugin-ui/components/ui/checkbox'
@@ -790,6 +780,33 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   }
 
   const confirmPreview = (): void => sendAction({ type: 'confirm' })
+  const actionPreview = preview !== undefined && dropPresentation === null ? preview : undefined
+  const pendingAction = actionSnapshot.context.action
+  const confirmAnchorId = ((): string | null => {
+    if (actionPreview === undefined || pendingAction === null || view !== 'graph') return null
+    switch (pendingAction.kind) {
+      case 'fetch':
+      case 'push':
+        return null
+      case 'abandon':
+        return pendingAction.commitIds[0] ?? null
+      case 'squash':
+      case 'rebase':
+        return pendingAction.sourceId
+      case 'bookmark-move':
+      case 'bookmark-set':
+        return pendingAction.destinationId
+      case 'bookmark-delete':
+        return state?.revisions.find(revision => revision.localBookmarks.includes(pendingAction.bookmark))?.commitId ?? null
+      default:
+        return pendingAction.commitId
+    }
+  })()
+  const rowConfirmAnchorId = confirmAnchorId !== null && visibleRevisions.some(revision => revision.commitId === confirmAnchorId) ? confirmAnchorId : null
+  const inlineConfirm =
+    actionPreview === undefined ? null : (
+      <InlineActionConfirm busy={actionBusy} onCancel={() => sendAction({ type: 'cancel' })} onConfirm={confirmPreview} preview={actionPreview} />
+    )
 
   const refreshRepository = (): void => {
     if (repoId !== null) void queryClient.invalidateQueries({ queryKey: jujutsuQueryKeys.repository(path) })
@@ -1411,7 +1428,9 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
                       highlighted={locatedId === item.revision.commitId || connectionIds?.has(item.revision.commitId) === true}
                       dimmed={movingBranch?.has(item.revision.commitId) === true || previewBranchIds.has(item.revision.commitId)}
                       dropTarget={dropTarget === item.revision.commitId || rowDropPresentation !== null}
-                      expanded={selectedRevision?.commitId === item.revision.commitId || rowDropPresentation !== null}
+                      expanded={
+                        selectedRevision?.commitId === item.revision.commitId || rowDropPresentation !== null || rowConfirmAnchorId === item.revision.commitId
+                      }
                       graphLayout={item.layout}
                       graphWidth={graphWidth}
                       menu={revisionMenu(item.revision)}
@@ -1433,6 +1452,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
                     >
                       {selectedRevision?.commitId === item.revision.commitId && revisionDetails(item.revision)}
                       {rowDropPresentation !== null && dropPreviewAt(item.revision)}
+                      {rowConfirmAnchorId === item.revision.commitId && inlineConfirm}
                     </RevisionRow>
                   )}
                 </div>
@@ -1651,6 +1671,8 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
             </div>
           </header>
 
+          {rowConfirmAnchorId === null && inlineConfirm !== null && <div className="dshx:border-b dshx:p-2">{inlineConfirm}</div>}
+
           {(errorMessages.length > 0 || copyNotice !== null || provisionedPath !== null || (confirmResult !== null && confirmResult.output.length > 0)) && (
             <div className="dshx:flex dshx:max-h-48 dshx:flex-none dshx:flex-col dshx:gap-1.5 dshx:overflow-auto dshx:border-b dshx:px-3 dshx:py-2">
               {errorMessages.map(message => {
@@ -1791,34 +1813,6 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
             </DialogContent>
           )}
         </Dialog>
-
-        <AlertDialog
-          onOpenChange={open => {
-            if (!open) sendAction({ type: 'cancel' })
-          }}
-          open={preview !== undefined && dropPresentation === null}
-        >
-          {preview !== undefined && dropPresentation === null && (
-            <AlertDialogContent className="dshx-root">
-              <AlertDialogHeader className="dshx:place-items-start dshx:text-left">
-                <AlertDialogTitle className="dshx:text-base">Confirm {preview.title.toLocaleLowerCase()}</AlertDialogTitle>
-                <AlertDialogDescription className="dshx:font-medium dshx:text-foreground">{preview.summary}</AlertDialogDescription>
-              </AlertDialogHeader>
-              <pre className={cn(CODE_BLOCK, 'dshx:whitespace-pre-wrap')}>{preview.detail}</pre>
-              <AlertDialogFooter>
-                <AlertDialogCancel size="sm">Cancel</AlertDialogCancel>
-                <AlertDialogAction
-                  disabled={actionBusy}
-                  onClick={confirmPreview}
-                  size="sm"
-                  variant={preview.kind === 'abandon' || preview.kind === 'restore' || preview.kind === 'bookmark-delete' ? 'destructive' : 'default'}
-                >
-                  Confirm and run
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          )}
-        </AlertDialog>
       </TooltipProvider>
     </main>
   )
@@ -2199,6 +2193,52 @@ const InlineDropPreview = (props: InlineDropPreviewProps): JSX.Element => (
       </Button>
       <Button disabled={props.preview === undefined || props.busy} onClick={props.onConfirm} size="sm" type="button">
         Confirm and run
+      </Button>
+    </div>
+  </section>
+)
+
+const DESTRUCTIVE_ACTIONS: ReadonlySet<ActionPreview['kind']> = new Set(['abandon', 'restore', 'bookmark-delete'])
+
+interface InlineActionConfirmProps {
+  readonly preview: ActionPreview
+  readonly busy: boolean
+  readonly onCancel: () => void
+  readonly onConfirm: () => void
+}
+
+const InlineActionConfirm = (props: InlineActionConfirmProps): JSX.Element => (
+  <section
+    aria-label={`Confirm ${props.preview.title.toLocaleLowerCase()}`}
+    className="dshx-root dshx:mt-2 dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-md dshx:border dshx:border-primary/40 dshx:bg-primary/5 dshx:p-3"
+    onKeyDown={event => {
+      if (event.key !== 'Escape') return
+      event.stopPropagation()
+      props.onCancel()
+    }}
+    role="group"
+  >
+    <p className="dshx:text-xs dshx:font-medium" role="status">
+      {props.preview.summary}
+    </p>
+    {props.preview.detail.length > 0 && (
+      <pre className="dshx:max-h-40 dshx:overflow-auto dshx:rounded-sm dshx:bg-muted dshx:p-2 dshx:font-mono! dshx:text-[11px] dshx:whitespace-pre-wrap">
+        {props.preview.detail}
+      </pre>
+    )}
+    <div className="dshx:flex dshx:justify-end dshx:gap-2">
+      <Button onClick={props.onCancel} size="sm" type="button" variant="outline">
+        Cancel
+      </Button>
+      <Button
+        autoFocus
+        disabled={props.busy}
+        onClick={props.onConfirm}
+        size="sm"
+        type="button"
+        variant={DESTRUCTIVE_ACTIONS.has(props.preview.kind) ? 'destructive' : 'default'}
+      >
+        {props.preview.title}
       </Button>
     </div>
   </section>

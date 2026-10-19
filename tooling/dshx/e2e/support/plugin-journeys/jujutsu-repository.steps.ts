@@ -87,11 +87,11 @@ When('the Feature revision is opened', async ({ page }: { page: Page }) => {
 
 When('the Feature revision is previewed for squashing into its parent', async ({ page }: { page: Page }) => {
   await revisionRow(page, 'Feature work by Ada').getByRole('button', { name: 'Squash into parent', exact: true }).click()
-  await expect(page.getByRole('alertdialog', { name: 'Confirm squash changes', exact: true })).toBeVisible()
+  await expect(revisionRow(page, 'Feature work by Ada').getByRole('group', { name: 'Confirm squash changes', exact: true })).toBeVisible()
 })
 
 When('the squash preview is confirmed', async ({ page }: { page: Page }) => {
-  await page.getByRole('alertdialog', { name: 'Confirm squash changes', exact: true }).getByRole('button', { name: 'Confirm and run', exact: true }).click()
+  await page.getByRole('group', { name: 'Confirm squash changes', exact: true }).getByRole('button', { name: 'Squash changes', exact: true }).click()
 })
 
 When('a workspace {string} is provisioned at the Feature revision under the fixture root', async ({ page }: { page: Page }, name: string) => {
@@ -111,7 +111,10 @@ When('a workspace {string} is provisioned at the Feature revision under the fixt
   await picker.getByRole('button', { name: 'Select this folder', exact: true }).click()
   await expect(provision.getByText(repository.root, { exact: true })).toBeVisible()
   await provision.getByRole('button', { name: 'Preview workspace setup', exact: true }).click()
-  await page.getByRole('alertdialog').getByRole('button', { name: 'Confirm and run', exact: true }).click()
+  await page
+    .getByRole('group', { name: 'Confirm create isolated workspace', exact: true })
+    .getByRole('button', { name: 'Create isolated workspace', exact: true })
+    .click()
 })
 
 Then('searching, filtering by author and hiding immutable revisions narrow the graph', async ({ page }: { page: Page }) => {

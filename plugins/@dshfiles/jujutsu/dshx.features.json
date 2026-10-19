@@ -270,7 +270,7 @@
         "expect button \"Sample project*\"",
         "rightclick button \"Sample project*\"",
         "click menuitem \"New change here\"",
-        "expect button \"Confirm and run\""
+        "expect group \"Confirm new change\""
       ],
       "surfaces": ["client", "host", "settings", "integration"],
       "configuration": [],
