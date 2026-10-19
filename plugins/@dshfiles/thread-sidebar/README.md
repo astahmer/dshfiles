@@ -75,8 +75,9 @@ preferences migrate into that preset list once. **Customize views** opens
 `src/thread-view-manager.tsx`, where presets are saved, renamed, reordered,
 selected, and removed; the row's quick controls apply the selected preset
 without opening the manager. **Not working** includes non-running threads even
-after their completion was seen, and threads waiting for attention; muted and
-archived threads are omitted. For how working, attention, read state, groups,
+after their completion was seen, and threads waiting for attention; muted,
+archived, and settled threads are omitted, because all three are storage rather
+than work in progress. For how working, attention, read state, groups,
 and filters fit together, see [Thread sidebar states](sidebar-state.md).
 
 **Archive undo notice.** Archiving reports itself as a compact overlay anchored
@@ -121,11 +122,16 @@ unscrollable.
 
 `threadSidebar.openInSidePanel` is the rebindable command behind those paths. It
 ships **unbound**, so Settings › Shortcuts lists it without it owning a chord
-until the user picks one. Which buttons a row draws on hover is a preference:
-Customize sidebar › Hover actions lists every one (Resume, Dismiss, Open in side
-panel, Pin, Park, Mute, Archive, Restore) and `hiddenRowActions` stores the ones a
-row hides — absent means shown, so a new action ships visible. Hiding one removes
-only its hover button; the context menu keeps every action.
+until the user picks one. Which buttons a row draws on hover, and in which order,
+is a preference: Customize sidebar › Hover actions lists every one (Resume,
+Dismiss, Open in side panel, Pin, Park, Settle, Mute, Archive, Restore), each row
+carrying the button's own icon, a grip, Move up/Move down buttons and a visibility
+checkbox. Drag a row, or move it, to set the left-to-right order the buttons draw
+in; `rowActionOrder` stores that order and `hiddenRowActions` the ones a row hides
+— an absent id means shown, so a new action ships visible at the end of the saved
+order. The shipped order puts Settle in Archive's slot and Archive just before it,
+so a row that hides Archive ends on Settle. Hiding one removes only its hover
+button; the context menu keeps every action.
 
 **Pending restarts.** Client bundles hot-reload; Host code, `package.json` and
 `cordis.patch.yml` load only at boot. The Host half remembers a content hash of

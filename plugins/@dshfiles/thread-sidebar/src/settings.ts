@@ -44,8 +44,9 @@ export const threadSidebarSettings = defineSettings({
     threadRowPath: Schema.boolean().default(DEFAULT_PREFERENCES.threadRowPath).description('Show the full working directory path.'),
     threadRowTime: Schema.boolean().default(DEFAULT_PREFERENCES.threadRowTime).description('Show the last activity time.'),
     threadRowStatusDot: Schema.boolean().default(DEFAULT_PREFERENCES.threadRowStatusDot).description('Show the running / unread status dot.'),
-    // Toggled in Customize sidebar, so the generated form shows no raw list.
+    // Toggled and reordered in Customize sidebar, so the generated form shows no raw list.
     hiddenRowActions: Schema.array(Schema.union(THREAD_ROW_ACTIONS)).default(DEFAULT_PREFERENCES.hiddenRowActions).hidden(),
+    rowActionOrder: Schema.array(Schema.union(THREAD_ROW_ACTIONS)).default(DEFAULT_PREFERENCES.rowActionOrder).hidden(),
     approvalNeededDisplay: Schema.union(['group', 'label'] as const)
       .default(DEFAULT_PREFERENCES.approvalNeededDisplay)
       .description('Show approval requests in a separate attention group or as an inline thread-row label.'),

@@ -4,7 +4,15 @@ import assert from 'node:assert/strict'
 import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { WorkspaceView } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import { test, vi } from 'vitest'
-import { SidebarOrganization, type AutoSettleContext, DEFAULT_PREFERENCES, type SidebarPreferences, type SidebarSection } from './organization.js'
+import {
+  SidebarOrganization,
+  type AutoSettleContext,
+  DEFAULT_PREFERENCES,
+  DEFAULT_THREAD_ROW_ACTION_ORDER,
+  THREAD_ROW_ACTIONS,
+  type SidebarPreferences,
+  type SidebarSection,
+} from './organization.js'
 import { SidebarPreferencesModel, PREFERENCES_STORAGE_KEY, storedPreferences } from './preferences.js'
 
 interface SessionFixture extends Partial<Omit<SessionSummary, 'id' | 'parentId'>> {
@@ -398,4 +406,37 @@ test('a footer seat that renders nothing never overflows and takes no gap', () =
   assert.deepEqual(SidebarOrganization.fitItems({ widths: [190, 0, 0, 0], available: 150, gap: 8, reserve: 36 }), [false, true, true, true])
   assert.deepEqual(SidebarOrganization.fitItems({ widths: [0, 190], available: 150, gap: 8, reserve: 36 }), [true, false])
   assert.deepEqual(SidebarOrganization.fitItems({ widths: [190, 0], available: 200, gap: 8, reserve: 36 }), [true, true])
+})
+
+test('row hover actions keep the saved order and append an action the saved order missed', () => {
+  assert.deepEqual(SidebarOrganization.orderRowActions(DEFAULT_PREFERENCES.rowActionOrder), [...DEFAULT_PREFERENCES.rowActionOrder])
+  assert.deepEqual(SidebarOrganization.orderRowActions(['restore', 'pin', 'pin']), [
+    'restore',
+    'pin',
+    'resume',
+    'resumeDismiss',
+    'aside',
+    'park',
+    'settle',
+    'mute',
+    'archive',
+  ])
+  assert.deepEqual(SidebarOrganization.orderRowActions([]), [...THREAD_ROW_ACTIONS])
+  assert.deepEqual(SidebarOrganization.orderRowActions(['resume', 'aside']), [
+    'resume',
+    'aside',
+    'resumeDismiss',
+    'pin',
+    'park',
+    'settle',
+    'mute',
+    'archive',
+    'restore',
+  ])
+})
+
+test('the shipped row order lists every hover action once, with settle in archive slot', () => {
+  assert.deepEqual([...DEFAULT_THREAD_ROW_ACTION_ORDER].sort(), [...THREAD_ROW_ACTIONS].sort())
+  assert.equal(DEFAULT_THREAD_ROW_ACTION_ORDER.indexOf('settle'), THREAD_ROW_ACTIONS.indexOf('archive'))
+  assert.equal(DEFAULT_THREAD_ROW_ACTION_ORDER.at(-1), 'restore')
 })

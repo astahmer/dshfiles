@@ -2,11 +2,16 @@ import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/cli
 import type { SidebarPanelMetadata, SidebarRootComponentProps } from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type { PropsRenderSlots, TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import {
+  IconArchiveOutlineRegular,
+  IconCheckCircleOutlineRegular,
   IconEllipsisOutlineRegular,
   IconNewChatOutlineRegular,
+  IconPauseOutlineRegular,
+  IconPinOutlineRegular,
   IconSearchOutlineRegular,
   IconSettingsOutlineRegular,
   IconSlidersTwoOutlineRegular,
+  IconUnarchiveOutlineRegular,
   rankByName,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { useApi, useApiQuery } from '@dshfiles/dshx/client'
@@ -28,6 +33,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfi
 import {
   ArrowLeftIcon,
   ArrowRightIcon,
+  BellIcon,
   ChevronDownIcon,
   ChevronUpIcon,
   CommandIcon,
@@ -35,12 +41,14 @@ import {
   GripVerticalIcon,
   MessageSquareIcon,
   PanelLeftIcon,
+  PanelRightOpenIcon,
   RefreshCwIcon,
   LinkIcon,
   CheckIcon,
   RotateCwIcon,
   SlidersHorizontalIcon,
   TextCursorInputIcon,
+  XIcon,
 } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import {
@@ -62,7 +70,6 @@ import {
   SIDEBAR_ICON_ROW_THRESHOLD,
   SIDEBAR_SPLITTER_HEIGHT,
   SIDEBAR_THREAD_MIN_HEIGHT,
-  THREAD_ROW_ACTIONS,
   type NavigationDensity,
   type NavigationOverflow,
   type OrderedSidebarEntry,
@@ -112,7 +119,7 @@ const DRAG_THRESHOLD_PX = 5
 
 const rowActionLabelKeys = {
   resume: 'threadSidebarResume',
-  // Shorter than the button's tooltip so the two-column hover grid keeps one line per action.
+  // Shorter than the button's tooltip so the Customize list keeps one line per action.
   resumeDismiss: 'threadSidebarRowActionDismiss',
   aside: 'threadSidebarOpenInSidePanel',
   pin: 'threadSidebarPin',
@@ -122,6 +129,19 @@ const rowActionLabelKeys = {
   archive: 'threadSidebarArchive',
   restore: 'threadSidebarRestore',
 } as const satisfies Record<ThreadRowAction, Parameters<SidebarShellTranslate>[0]>
+
+/** The button each hover action draws, so Customize sidebar lists the action the row itself shows. */
+const rowActionIcons: Record<ThreadRowAction, ReactNode> = {
+  resume: <RefreshCwIcon size={14} />,
+  resumeDismiss: <XIcon size={14} />,
+  aside: <PanelRightOpenIcon size={14} />,
+  pin: <IconPinOutlineRegular size={14} />,
+  park: <IconPauseOutlineRegular size={14} />,
+  settle: <IconCheckCircleOutlineRegular size={14} />,
+  mute: <BellIcon size={14} />,
+  archive: <IconArchiveOutlineRegular size={14} />,
+  restore: <IconUnarchiveOutlineRegular size={14} />,
+}
 
 const rowFieldKeys = [
   ['threadRowProject', 'threadSidebarRowProject'],
@@ -791,6 +811,8 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
     [orderedHeaderEntries, preferences.hiddenHeaderIds],
   )
 
+  const orderedRowActions = useMemo(() => SidebarOrganization.orderRowActions(preferences.rowActionOrder), [preferences.rowActionOrder])
+
   const footerEntries = useMemo<FooterEntry[]>(
     () => [
       ...(footerSnapshot.settingsId === null
@@ -1059,10 +1081,12 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
     icon: ReactNode
     hidden: boolean
     control: 'checkbox' | 'switch'
+    /** Accessible name of the visibility control; defaults to the shared "Visibility: <label>" wording. */
+    toggleLabel?: string
     onReorder: (from: number, to: number) => void
     onToggle: () => void
   }): JSX.Element => {
-    const visibilityLabel = `${text(props.t, 'threadSidebarVisibility')}: ${options.entry.label}`
+    const visibilityLabel = options.toggleLabel ?? `${text(props.t, 'threadSidebarVisibility')}: ${options.entry.label}`
     return (
       <div
         className={cn(
@@ -1458,19 +1482,23 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
                 {text(props.t, 'threadSidebarRowActions')}
               </h3>
               <p className="dshx:text-xs dshx:text-muted-foreground">{text(props.t, 'threadSidebarRowActionsHint')}</p>
-              <div className="dshx:grid dshx:grid-cols-2 dshx:gap-x-3 dshx:gap-y-1.5 dshx:pt-1">
-                {THREAD_ROW_ACTIONS.map(action => (
-                  <label key={action} className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-sm">
-                    <Checkbox
-                      checked={!preferences.hiddenRowActions.includes(action)}
-                      onCheckedChange={checked =>
-                        // Checked means shown, so an unchecked box is the one that hides the action.
-                        updatePreferences({ hiddenRowActions: withRowActionHidden(preferences.hiddenRowActions, action, checked !== true) })
-                      }
-                    />
-                    {text(props.t, rowActionLabelKeys[action])}
-                  </label>
-                ))}
+              <div className="dshx:mt-1 dshx:divide-y dshx:rounded-lg dshx:border">
+                {orderedRowActions.map((action, index) =>
+                  renderCustomizeRow({
+                    entry: { id: action, label: text(props.t, rowActionLabelKeys[action]) },
+                    index,
+                    count: orderedRowActions.length,
+                    icon: rowActionIcons[action],
+                    hidden: preferences.hiddenRowActions.includes(action),
+                    control: 'checkbox',
+                    toggleLabel: text(props.t, rowActionLabelKeys[action]),
+                    onReorder: (from, to) => updatePreferences({ rowActionOrder: SidebarOrganization.reorderRowActions(orderedRowActions, from, to) }),
+                    onToggle: () =>
+                      updatePreferences({
+                        hiddenRowActions: withRowActionHidden(preferences.hiddenRowActions, action, !preferences.hiddenRowActions.includes(action)),
+                      }),
+                  }),
+                )}
               </div>
             </section>
             <section className="dshx:flex dshx:flex-col dshx:gap-0.5">

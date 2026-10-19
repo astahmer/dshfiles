@@ -24,9 +24,22 @@ export type AttentionColors = Record<AttentionColorKey, AttentionColor>
 export const REBASED_THREAD_SETTLE_DELAYS = ['disabled', 'immediately', 'after-1-hour', 'after-1-day', 'after-1-week'] as const
 export type RebasedThreadSettleDelay = (typeof REBASED_THREAD_SETTLE_DELAYS)[number]
 
-/** Every hover action a thread row can offer; the Customize sidebar panel toggles them one by one. */
+/** Every hover action a thread row can offer; the Customize sidebar panel toggles and orders them. */
 export const THREAD_ROW_ACTIONS = ['resume', 'resumeDismiss', 'aside', 'pin', 'park', 'settle', 'mute', 'archive', 'restore'] as const
 export type ThreadRowAction = (typeof THREAD_ROW_ACTIONS)[number]
+
+/** Shipped row order: settle sits in archive's slot, so a row that hides archive ends on settle. */
+export const DEFAULT_THREAD_ROW_ACTION_ORDER = [
+  'resume',
+  'resumeDismiss',
+  'aside',
+  'pin',
+  'park',
+  'mute',
+  'archive',
+  'settle',
+  'restore',
+] as const satisfies readonly ThreadRowAction[]
 
 export interface SidebarPreferences {
   archiveUndoEnabled: boolean
@@ -74,6 +87,8 @@ export interface SidebarPreferences {
   threadRowStatusDot: boolean
   /** Hover actions a row hides; an id that is absent keeps its button, so a new action ships visible. */
   hiddenRowActions: ThreadRowAction[]
+  /** Left-to-right order of the hover actions; an action the list misses keeps its shipped place at the end. */
+  rowActionOrder: ThreadRowAction[]
   approvalNeededDisplay: AttentionDisplayMode
   inputNeededDisplay: AttentionDisplayMode
   turnFinishedDisplay: AttentionDisplayMode
@@ -134,6 +149,7 @@ export const DEFAULT_PREFERENCES: SidebarPreferences = {
   threadRowTime: true,
   threadRowStatusDot: true,
   hiddenRowActions: [],
+  rowActionOrder: [...DEFAULT_THREAD_ROW_ACTION_ORDER],
   approvalNeededDisplay: 'group',
   inputNeededDisplay: 'group',
   turnFinishedDisplay: 'label',
@@ -320,6 +336,22 @@ const moveSidebarEntry = (orderedIds: readonly string[], id: string, direction: 
   next[index] = displaced
   return next
 }
+
+const ROW_ACTION_IDS: ReadonlySet<string> = new Set(THREAD_ROW_ACTIONS)
+const isThreadRowAction = (value: string): value is ThreadRowAction => ROW_ACTION_IDS.has(value)
+
+/**
+ * A row's hover actions in the saved order: unknown or repeated ids are dropped, and an action the
+ * saved order misses (one shipped after it was written) keeps its shipped place behind the saved ones.
+ */
+const orderRowActions = (savedOrder: readonly string[]): ThreadRowAction[] => {
+  const saved = [...new Set(savedOrder)].filter(isThreadRowAction)
+  return [...saved, ...THREAD_ROW_ACTIONS.filter(action => !saved.includes(action))]
+}
+
+/** Move one hover action to another slot, normalizing the saved order back into a full one. */
+const reorderRowActions = (savedOrder: readonly string[], fromIndex: number, toIndex: number): ThreadRowAction[] =>
+  orderRowActions(reorderSidebarEntry(orderRowActions(savedOrder), fromIndex, toIndex))
 
 /**
  * Reorder by drop index, the shape a pointer drag produces.
@@ -509,6 +541,8 @@ export class SidebarOrganization {
   static readonly workspaceForLineage = workspaceForLineage
   static readonly parseSessionIds = parseSessionIds
   static readonly orderSidebarEntries = orderSidebarEntries
+  static readonly orderRowActions = orderRowActions
+  static readonly reorderRowActions = reorderRowActions
   static readonly moveSidebarEntry = moveSidebarEntry
   static readonly reorderSidebarEntry = reorderSidebarEntry
   static readonly reorderVisibleEntry = reorderVisibleEntry

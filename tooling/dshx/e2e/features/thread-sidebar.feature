@@ -162,6 +162,8 @@ Feature: Thread sidebar journeys
     Then the side panel hosts that thread again
     When the side-panel hover action is switched off in Customize sidebar
     Then the thread row keeps the context-menu action but drops the hover one
+    When the settle hover action is moved to the front in Customize sidebar
+    Then the thread row draws the settle hover action first
 
   @scenario:thread-sidebar.referenced-by
   Scenario: See which thread references a thread from its row and header menus

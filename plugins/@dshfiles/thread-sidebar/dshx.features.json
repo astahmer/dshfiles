@@ -778,7 +778,7 @@
       "id": "navigation-layout",
       "title": "Customize sidebar navigation and sections",
       "summary": "Switch compact/expanded header and density, reorder and hide header/footer entries, and expose overflow through the selected menu or scrolling behavior.",
-      "reach": ["click button \"Customize sidebar\"", "expect heading \"Customize sidebar\""],
+      "reach": ["click button \"Customize sidebar\"", "expect heading \"Customize sidebar\"", "click button \"Move up: Settle\"", "expect checkbox \"Settle\""],
       "surfaces": ["client", "settings", "storage"],
       "configuration": [
         {
@@ -1514,7 +1514,15 @@
     {
       "id": "open-thread-in-side-panel",
       "title": "Open a thread in the right side panel",
-      "summary": "A thread's row context menu, its hover action and the Open in side panel command palette action open that thread in the right sidebar instead of the main column: the row action routes through the entry's sidebar-right controller, which opens a threadaside resource tab. The tab retains the Session and hosts the same embedded Conversation a subagent chat does, so the thread streams and its composer works beside the thread the user is reading; closing the tab only releases the reference, and an already-open aside is focused instead of duplicated. The rebindable command threadSidebar.openInSidePanel ships unbound, and Customize sidebar > Hover actions stores hiddenRowActions so every row button is per-user.",
+      "summary": "A thread's row context menu, its hover action and the Open in side panel command palette action open that thread in the right sidebar instead of the main column: the row action routes through the entry's sidebar-right controller, which opens a threadaside resource tab. The tab retains the Session and hosts the same embedded Conversation a subagent chat does, so the thread streams and its composer works beside the thread the user is reading; closing the tab only releases the reference, and an already-open aside is focused instead of duplicated. The rebindable command threadSidebar.openInSidePanel ships unbound, and Customize sidebar > Hover actions stores hiddenRowActions and rowActionOrder so every row button is per-user in both visibility and left-to-right order.",
+      "reach": [
+        "click button \"New thread\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Hover actions target\"",
+        "click button \"Send message\"",
+        "expect text \"This turn failed*\"",
+        "hover text \"Hover actions target\" at 8,8",
+        "expect button \"Settle\""
+      ],
       "surfaces": ["client"],
       "configuration": [
         {
@@ -1523,9 +1531,15 @@
           "constraints": "Which hover buttons a row hides: none, or any combination of resume, resumeDismiss, aside, pin, park, mute, archive and restore. A missing id keeps its button.",
           "choices": ["none", "resume", "resumeDismiss", "aside", "pin", "park", "mute", "archive", "restore"],
           "coveredBy": ["thread-sidebar.open-in-side-panel"]
+        },
+        {
+          "key": "rowActionOrder",
+          "defaultValue": "[resume, resumeDismiss, aside, pin, park, mute, archive, settle, restore]",
+          "constraints": "Left-to-right order the hover buttons draw in: every row action once, dragged or moved in Customize sidebar. An id the saved order misses keeps its shipped place after them; settle ships in archive's slot.",
+          "coveredBy": ["thread-sidebar.open-in-side-panel"]
         }
       ],
-      "states": ["closed", "open", "focused", "hover-action-hidden"],
+      "states": ["closed", "open", "focused", "hover-action-hidden", "hover-action-reordered"],
       "failureModes": [
         "An aside tab closed while the thread is still running keeps running: nothing is archived.",
         "An archived row offers no aside, because a stopped thread has nothing to show."
@@ -1548,6 +1562,24 @@
           "id": "thread-sidebar.aside-hover-actions-default",
           "file": "plugins/@dshfiles/thread-sidebar/src/preferences.test.ts",
           "testName": "older preferences show every thread-row hover action"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.aside-hover-action-order-default",
+          "file": "plugins/@dshfiles/thread-sidebar/src/preferences.test.ts",
+          "testName": "older preferences order every thread-row hover action with settle in archive slot"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.aside-hover-action-order-normalization",
+          "file": "plugins/@dshfiles/thread-sidebar/src/organization.test.ts",
+          "testName": "row hover actions keep the saved order and append an action the saved order missed"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.aside-hover-action-order-shipped",
+          "file": "plugins/@dshfiles/thread-sidebar/src/organization.test.ts",
+          "testName": "the shipped row order lists every hover action once, with settle in archive slot"
         }
       ]
     },

@@ -211,3 +211,33 @@ test('older preferences show every thread-row hover action', () => {
   assert.deepEqual(SidebarPreferencesModel.decode({ ...DEFAULT_PREFERENCES, hiddenRowActions: ['aside', 'mute'] })?.hiddenRowActions, ['aside', 'mute'])
   assert.equal(SidebarPreferencesModel.decode({ ...DEFAULT_PREFERENCES, hiddenRowActions: ['aside', 'nope'] }), null)
 })
+
+test('older preferences order every thread-row hover action with settle in archive slot', () => {
+  const { rowActionOrder, ...older } = DEFAULT_PREFERENCES
+  assert.deepEqual(rowActionOrder, ['resume', 'resumeDismiss', 'aside', 'pin', 'park', 'mute', 'archive', 'settle', 'restore'])
+  assert.deepEqual(SidebarPreferencesModel.decode(older)?.rowActionOrder, rowActionOrder)
+  const reordered = ['pin', 'aside', 'resume']
+  assert.deepEqual(SidebarPreferencesModel.decode({ ...DEFAULT_PREFERENCES, rowActionOrder: reordered })?.rowActionOrder, [
+    'pin',
+    'aside',
+    'resume',
+    'resumeDismiss',
+    'park',
+    'settle',
+    'mute',
+    'archive',
+    'restore',
+  ])
+  assert.deepEqual(SidebarPreferencesModel.decode({ ...DEFAULT_PREFERENCES, rowActionOrder: ['pin', 'pin'] })?.rowActionOrder, [
+    'pin',
+    'resume',
+    'resumeDismiss',
+    'aside',
+    'park',
+    'settle',
+    'mute',
+    'archive',
+    'restore',
+  ])
+  assert.equal(SidebarPreferencesModel.decode({ ...DEFAULT_PREFERENCES, rowActionOrder: ['pin', 'nope'] }), null)
+})

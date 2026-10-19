@@ -94,7 +94,6 @@ import {
 import { z } from 'zod'
 import {
   REBASED_THREAD_SETTLE_DELAYS,
-  THREAD_ROW_ACTIONS,
   SidebarOrganization,
   type AutoSettleOverride,
   type AttentionColor,
@@ -404,8 +403,8 @@ interface ThreadRowProps {
   readonly resumeBusy: boolean
   readonly childAttentionLabels: ReadonlyMap<SessionSummary['id'], ThreadAttentionLabel>
   readonly rowStyle: RowStyle
-  /** Hover actions this row hides; see SidebarPreferences.hiddenRowActions. */
-  readonly hiddenRowActions: readonly ThreadRowAction[]
+  /** Hover actions this row draws, already limited to the shown ones and ordered left to right. */
+  readonly rowActions: readonly ThreadRowAction[]
   readonly childThreads: readonly SessionSummary[]
   /** Finished subagents folded behind the "N finished" line; empty unless the setting collapses them. */
   readonly finishedChildThreads: readonly SessionSummary[]
@@ -973,7 +972,7 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
             data-testid="thread-row-actions"
             className="dshx:pointer-events-none dshx:absolute dshx:top-1 dshx:right-1.5 dshx:flex dshx:gap-0.5 dshx:rounded-md dshx:border dshx:bg-popover dshx:p-0.5 dshx:opacity-0 dshx:shadow-xs dshx:transition-opacity dshx:group-hover/row:pointer-events-auto dshx:group-hover/row:opacity-100 dshx:focus-within:pointer-events-auto dshx:focus-within:opacity-100"
           >
-            {THREAD_ROW_ACTIONS.filter(action => !props.hiddenRowActions.includes(action)).map(action => (
+            {props.rowActions.map(action => (
               <Fragment key={action}>{renderRowAction(action)}</Fragment>
             ))}
           </div>
@@ -2410,6 +2409,11 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     ],
   )
 
+  const rowActionButtons = useMemo(
+    () => SidebarOrganization.orderRowActions(preferences.rowActionOrder).filter(action => !preferences.hiddenRowActions.includes(action)),
+    [preferences.hiddenRowActions, preferences.rowActionOrder],
+  )
+
   const projectFilterValue =
     preferences.workspaceFilter === null ? ALL_PROJECTS : preferences.workspaceFilter.length === 0 ? UNASSIGNED_PROJECT : preferences.workspaceFilter
 
@@ -2679,7 +2683,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         resumeBusy={resumeBusySessionIds.has(session.id)}
         childAttentionLabels={inlineAttentionLabels}
         rowStyle={rowStyle}
-        hiddenRowActions={preferences.hiddenRowActions}
+        rowActions={rowActionButtons}
         childThreads={childRow.live}
         finishedChildThreads={childRow.finished}
         childrenOpen={shouldOpenChildThreadList({ children: childRow.listed, override: childrenOpenOverrides.get(session.id) })}

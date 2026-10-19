@@ -100,9 +100,13 @@ Turn finished defaults to an inline label; it can be changed to a group.
 
 The status sections are **Pinned**, **Active**, **Parked**, **Settled**,
 **Inactive**, and **Archived**. The separate filters are **All**, **Working**,
-**Attention**, **Muted**, **Settled**, and **Archived**. For example, the Working filter hides a finished
+**Not working**, **Attention**, **Muted**, **Settled**, and **Archived**. For
+example, the Working filter hides a finished
 thread when neither it nor its child work is running, even if its attention
-display is configured as a group. A listed thread keeps its own child list
+display is configured as a group. **Not working** lists stopped threads,
+including one waiting for attention, and hides muted, archived, and settled
+threads: all three are storage rather than work in progress, so only the
+unfiltered list shows them, each in its own section. A listed thread keeps its own child list
 whatever the filters say: children follow the parent row they belong to, folded
 while none of them is working and unfolded when a subagent runs. **Filter:
 None** means no additional status

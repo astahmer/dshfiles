@@ -312,6 +312,14 @@ Then('the thread is settled, opens read-only and unsettles to reply', async ({ p
     await expect(page.getByRole('status', { name: 'This thread is settled.' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Unsettle to reply', exact: true })).toBeVisible()
   })
+  await recordAssertion(page, 'thread-sidebar-settled-stays-out-of-not-working', async () => {
+    // A settled thread is storage, like an archived one: a working view never lists it.
+    await setThreadStatusFilters(page, 'Filter: None', ['Not working'])
+    await expect(targetRow).toHaveCount(0)
+    await expect(threadSidebar(page).getByText('No stopped or waiting threads right now.', { exact: true })).toBeVisible()
+    await setThreadStatusFilters(page, 'Filter: Not working', [])
+    await expect(targetRow).toHaveCount(1)
+  })
   await page.getByRole('button', { name: 'Unsettle to reply', exact: true }).click()
   await recordAssertion(page, 'thread-sidebar-unsettle-restores-the-composer', async () => {
     await expect(page.getByRole('status', { name: 'This thread is settled.' })).toHaveCount(0, { timeout: 15_000 })
@@ -1141,6 +1149,28 @@ Then('the thread row keeps the context-menu action but drops the hover one', asy
     await openThreadRowMenu(row)
     await expect(page.getByRole('menuitem', { name: 'Open in side panel', exact: true })).toBeVisible()
     await page.keyboard.press('Escape')
+  })
+})
+
+When('the settle hover action is moved to the front in Customize sidebar', async ({ page }: { page: Page }) => {
+  await page.getByRole('button', { name: 'Customize sidebar', exact: true }).first().click()
+  const customize = customizeSidebar(page)
+  await expect(customize).toBeVisible()
+  const moveUp = customize.getByRole('button', { name: 'Move up: Settle', exact: true })
+  await expect(moveUp).toBeVisible()
+  for (let step = 0; step < 12; step += 1) {
+    if (!(await moveUp.isEnabled())) break
+    await moveUp.click()
+  }
+  await customize.getByRole('button', { name: 'Done', exact: true }).click()
+})
+
+Then('the thread row draws the settle hover action first', async ({ page }: { page: Page }) => {
+  if (asideThreadId === null) throw new Error('No thread was opened aside.')
+  const row = threadRow(page, asideThreadId)
+  await row.hover()
+  await recordAssertion(page, 'thread-sidebar-row-action-order-follows-the-setting', async () => {
+    await expect(rowActionContainer(row).getByRole('button').first()).toHaveAttribute('aria-label', 'Settle')
   })
   await finishJourneyAssertions(page)
 })

@@ -342,7 +342,7 @@ const en = {
   threadSidebarRowStatusDot: 'Status dot',
   threadSidebarRowActions: 'Hover actions',
   threadSidebarRowActionDismiss: 'Dismiss reminder',
-  threadSidebarRowActionsHint: 'Buttons drawn on a thread row while the pointer is over it.',
+  threadSidebarRowActionsHint: 'Buttons drawn on a thread row while the pointer is over it; drag a row, or move it, to set their left-to-right order.',
   threadSidebarDragToReorder: 'Drag to reorder',
 }
 
@@ -682,7 +682,7 @@ const zh = {
   threadSidebarRowStatusDot: '状态点',
   threadSidebarRowActions: '悬停操作',
   threadSidebarRowActionDismiss: '忽略提醒',
-  threadSidebarRowActionsHint: '指针悬停在会话行上时显示的按钮。',
+  threadSidebarRowActionsHint: '指针悬停在会话行上时显示的按钮；拖动或移动列表项即可设置其从左到右的顺序。',
   threadSidebarDragToReorder: '拖动以重新排序',
 }
 

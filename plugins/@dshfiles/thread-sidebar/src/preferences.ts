@@ -5,6 +5,7 @@ import {
   ATTENTION_COLOR_OPTIONS,
   DEFAULT_PREFERENCES,
   REBASED_THREAD_SETTLE_DELAYS,
+  SidebarOrganization,
   THREAD_ROW_ACTIONS,
   type SidebarPreferences,
   type SidebarSection,
@@ -86,6 +87,11 @@ const preferencesInputSchema = z
     threadRowTime: z.boolean().default(DEFAULT_PREFERENCES.threadRowTime),
     threadRowStatusDot: z.boolean().default(DEFAULT_PREFERENCES.threadRowStatusDot),
     hiddenRowActions: z.array(threadRowActionSchema).max(THREAD_ROW_ACTIONS.length).default(DEFAULT_PREFERENCES.hiddenRowActions),
+    rowActionOrder: z
+      .array(threadRowActionSchema)
+      .max(THREAD_ROW_ACTIONS.length)
+      .default([...DEFAULT_PREFERENCES.rowActionOrder])
+      .transform(order => SidebarOrganization.orderRowActions(order)),
     approvalNeededDisplay: z.enum(['group', 'label']).default(DEFAULT_PREFERENCES.approvalNeededDisplay),
     inputNeededDisplay: z.enum(['group', 'label']).default(DEFAULT_PREFERENCES.inputNeededDisplay),
     turnFinishedDisplay: z.enum(['group', 'label']).default(DEFAULT_PREFERENCES.turnFinishedDisplay),
