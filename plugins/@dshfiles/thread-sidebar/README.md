@@ -79,8 +79,14 @@ selected, and removed; the row's quick controls apply the selected preset
 without opening the manager. **Not working** includes non-running threads even
 after their completion was seen, and threads waiting for attention; muted,
 archived, and settled threads are omitted, because all three are storage rather
-than work in progress. For how working, attention, read state, groups,
-and filters fit together, see [Thread sidebar states](sidebar-state.md).
+than work in progress. **Group headers collapse their rows** in the Project and
+Date groupings: a closed header renders no rows at all, and the collapse state is
+kept per browser in `dshfiles.thread-sidebar.collapsed-groups.v1`
+(`src/collapsed-groups.ts`). It is browser-local on purpose — the Host settings
+schema knows only the fixed section names, and a Host-synced key could not be
+written until the running Host restarts with the widened schema. For how working,
+attention, read state, groups, and filters fit together, see
+[Thread sidebar states](sidebar-state.md).
 
 **Archive undo notice.** Archiving reports itself as a compact overlay anchored
 to the sidebar (`data-testid="thread-sidebar-transient-notice"`), so the thread

@@ -639,6 +639,12 @@ Then('only matching rows remain visible after reload', async ({ page }: { page: 
     await expect(page.getByRole('menuitemcheckbox', { name: 'Archived', exact: true })).toHaveAttribute('aria-checked', 'true')
     await expect(page.getByRole('menuitemradio', { name: 'Main threads', exact: true })).toHaveAttribute('aria-checked', 'true')
     await page.keyboard.press('Escape')
+    // A date group header collapses its rows and expands them again; a closed group renders no rows at all.
+    const todayHeader = threadSidebar(page).getByRole('button', { name: /^Today/u })
+    await todayHeader.click()
+    await expect(targetRow).toHaveCount(0)
+    await todayHeader.click()
+    await expect(targetRow).toBeVisible()
   })
   await finishJourneyAssertions(page)
 })

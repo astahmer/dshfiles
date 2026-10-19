@@ -5,6 +5,7 @@ import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
 import { HostSnapshotsModel } from './snapshots.js'
+import { storedCollapsedGroups, toggleCollapsedGroup } from './collapsed-groups.js'
 import { useNearViewport } from './use-near-viewport.js'
 import { RemoteThreadsSection } from './remote-threads-section.js'
 import { StableValueModel, useStableValue } from './stable-value.js'
@@ -1865,6 +1866,11 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     setNotice(shouldSettle ? { tone: 'success', message: props.tSidebar('threadSidebarSettledNotice') } : null)
   }
 
+  const collapsedGroups = storedCollapsedGroups.useValue()
+  const toggleGroup = (key: string): void => {
+    storedCollapsedGroups.set(toggleCollapsedGroup(collapsedGroups, key))
+  }
+
   const toggleSection = (section: SidebarSection): void => {
     changePreferences({
       collapsedSections: SidebarPreferencesModel.toggleCollapsedSection(preferences.collapsedSections, section),
@@ -3449,20 +3455,32 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                   </section>
                 )
               })
-            : groupedThreadEntries.map(group => (
-                <section className="dshx:mt-1" key={group.key} aria-label={group.showHeader ? group.label : undefined}>
-                  {group.showHeader ? (
-                    <div
-                      className={cn(stickyHeaderClass, 'dshx:flex dshx:h-8 dshx:items-center dshx:gap-2 dshx:px-2.5 dshx:text-sm dshx:text-muted-foreground')}
-                    >
-                      <span className="dshx:whitespace-nowrap">{group.label}</span>
-                      <span className="dshx:text-xs dshx:tabular-nums">({group.threads.length})</span>
-                      <span className="dshx:h-px dshx:flex-1 dshx:bg-border" aria-hidden="true" />
-                    </div>
-                  ) : null}
-                  {group.threads.map(session => renderThreadRow(session, undefined))}
-                </section>
-              ))}
+            : groupedThreadEntries.map(group => {
+                const groupCollapsed = group.showHeader && collapsedGroups.includes(group.key)
+                return (
+                  <section className="dshx:mt-1" key={group.key} aria-label={group.showHeader ? group.label : undefined}>
+                    {group.showHeader ? (
+                      <button
+                        type="button"
+                        className={cn(
+                          stickyHeaderClass,
+                          'dshx:flex dshx:h-8 dshx:w-full dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-2.5 dshx:text-sm dshx:text-muted-foreground dshx:outline-none dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50',
+                        )}
+                        aria-expanded={!groupCollapsed}
+                        onClick={() => toggleGroup(group.key)}
+                      >
+                        <span className="dshx:whitespace-nowrap">{group.label}</span>
+                        <span className="dshx:text-xs dshx:tabular-nums">({group.threads.length})</span>
+                        <span className="dshx:h-px dshx:flex-1 dshx:bg-border" aria-hidden="true" />
+                        <span className="dshx:inline-flex dshx:shrink-0" aria-hidden="true">
+                          {groupCollapsed ? <IconChevronDownOutlineRegular size={12} /> : <IconChevronUpOutlineRegular size={12} />}
+                        </span>
+                      </button>
+                    ) : null}
+                    {groupCollapsed ? null : group.threads.map(session => renderThreadRow(session, undefined))}
+                  </section>
+                )
+              })}
           {detachedThreadGroups.map(group => (
             <section
               className="dshx:mt-1"
