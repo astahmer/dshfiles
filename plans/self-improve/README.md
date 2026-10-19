@@ -9,7 +9,8 @@ and the skill at [`.agents/skills/self-improve/SKILL.md`](../../.agents/skills/s
 ## Resume here
 
 Run the miner, read the evidence for the top signals, and work the oldest open
-entry before adding another one:
+entry before adding another one. The backlog is empty of validated work as of
+the first run; the one open entry cannot be closed from this repository.
 
 ```sh
 node scripts/self-improve.ts ledger list --status=proposed
@@ -24,10 +25,17 @@ node scripts/self-improve.ts mine --since=14d --top=25
 
 ## Done
 
-| Entry | Outcome |
-| --- | --- |
-| `si-2026-10-18-correction-misunderstood-requirement` | `validated` — prompt origin is read from `data.source.kind` instead of guessed from text; false corrections dropped 631 → 25 Sessions |
-| `si-2026-10-18-turn-end-completed` | `validated` — `turn-end` uses an allowlist of abnormal endings; 2 960 phantom hits gone |
+| Entry | Change | Outcome |
+| --- | --- | --- |
+| `si-2026-10-18-correction-misunderstood-requirement` | `jj:vxsrqkounvxs` | `validated` — prompt origin is read from `data.source.kind` and the opening brief is recognised by whether the agent has produced output; false corrections dropped 631 → 24 Sessions and 1 943 → 29 hits |
+| `si-2026-10-18-turn-end-completed` | `jj:vxsrqkounvxs` | `validated` — `turn-end` uses an allowlist of abnormal endings; 2 960 phantom hits gone |
+
+Two more defects in the miner were found and fixed in the same revision without
+their own entry, because a fixed gate cannot recur: the opening brief scored as
+pushback, and a file re-edited inside one Session read as a pattern (3 477
+`rework` signals, 2 284 of them one-Session). Measurements, conditions and the
+two control signals are in
+[`docs/self-improvement.md`](../../docs/self-improvement.md#the-correction-signal-defect).
 
 ## Not a backlog
 
