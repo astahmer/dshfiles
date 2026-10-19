@@ -200,6 +200,33 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
     expect(status).toMatchObject({ unlanded: [], behind: false, behindCount: 0, rebasedAt: expect.any(Number) })
   })
 
+  it('keeps every land of a thread that keeps working after it integrates', async () => {
+    const thread = await threads.provision(repo)
+    writeFileSync(join(thread.path, 'first.txt'), 'first\n')
+    jj(thread.path, 'describe', '-m', 'feat: first slice')
+    await threads.land(thread.path)
+    const firstTip = changeIdAt(repo, 'main')
+    jj(thread.path, 'new')
+    writeFileSync(join(thread.path, 'second.txt'), 'second\n')
+    jj(thread.path, 'describe', '-m', 'feat: second slice')
+
+    await threads.land(thread.path)
+    const status = await threads.status(repo, thread.name)
+
+    expect(status.integrations?.map(record => record.tipChangeId)).toEqual([firstTip, changeIdAt(repo, 'main')])
+    expect(status.integrations?.at(-1)?.at).toBe(status.rebasedAt)
+  })
+
+  it('reads a land recorded before the history existed as its only entry', async () => {
+    const thread = await threads.provision(repo)
+    writeFileSync(
+      join(ThreadWorkspaceModel.defaultThreadsDirectory(repo), '.dshfiles-rebase-timestamps.json'),
+      JSON.stringify({ [thread.name]: { at: 1_000, tipChangeId: 'tip' } }),
+    )
+
+    expect((await threads.status(repo, thread.name)).integrations).toEqual([{ at: 1_000, tipChangeId: 'tip' }])
+  })
+
   it('lists local bookmarks and starts a thread from the chosen one', async () => {
     jj(repo, 'bookmark', 'create', 'feature', '-r', '@')
     jj(repo, 'describe', '-m', 'feature base')

@@ -177,9 +177,11 @@ resolve conflicts and then rebase while its own turn still counts as running.
 Every other session of the thread must be idle, and the UI paths keep the caller
 in scope, so Rebase stays refused while a user's session works.
 
-After a successful rebase, the conversation notice shows the target bookmark and
-12-character tip change ID. Its **Archive** action archives only that Session
-and is disabled while the Session is running.
+Each successful rebase adds a row to the conversation, after the turn it
+followed, with the target bookmark and 12-character tip change ID; a thread that
+keeps working and lands again gets one row per land. The latest row's
+**Archive** action archives only that Session and is disabled while the Session
+is running.
 
 ### Verified automatic integration
 

@@ -63,6 +63,8 @@ export interface ThreadStatus {
   readonly rebasedAt?: number
   /** Change ID of the bookmark tip when this thread last landed. */
   readonly rebasedTipChangeId?: string
+  /** Every recorded land, oldest first; the last one matches `rebasedAt`. */
+  readonly integrations?: readonly IntegrationRecord[]
 }
 
 export type LandOutcome =
@@ -137,10 +139,14 @@ const PATCH_CANDIDATE_TEMPLATE = `commit_id ++ "\\t" ++ parents.len() ++ "\\t" +
 const PATCH_TARGET_TEMPLATE = `commit_id ++ "\\t" ++ parents.len() ++ "\\t" ++ conflict ++ "\\t" ++ ${PATCH_FINGERPRINT} ++ "\\n"`
 const PATCH_BODY_TEMPLATE = 'commit_id ++ "\\t" ++ json(stringify(diff.git(3))) ++ "\\n"'
 const rebaseTimestampSchema = z.number().int().nonnegative().safe()
-const rebaseMetadataEntrySchema = z.object({ at: rebaseTimestampSchema, tipChangeId: z.string().min(1).max(128).optional() }).strict()
+const integrationRecordSchema = z.object({ at: rebaseTimestampSchema, tipChangeId: z.string().min(1).max(128).optional() }).strict()
+const rebaseMetadataEntrySchema = integrationRecordSchema.extend({ history: z.array(integrationRecordSchema).optional() }).strict()
 const rebaseMetadataValueSchema = z.union([rebaseTimestampSchema, rebaseMetadataEntrySchema])
 const rebaseMetadataSchema = z.record(z.string(), rebaseMetadataValueSchema)
 type RebaseMetadataEntry = z.infer<typeof rebaseMetadataEntrySchema>
+type IntegrationRecord = z.infer<typeof integrationRecordSchema>
+/** A thread lands again and again while it keeps working; the oldest landings stop mattering long before this many. */
+const MAX_INTEGRATION_HISTORY = 50
 
 interface PatchCandidate {
   readonly commitId: string
@@ -653,22 +659,29 @@ export const createThreads = (options: {
       return {}
     }
   }
+  // An entry written before the history existed only knows its latest land.
+  const integrationHistory = (metadata: RebaseMetadataEntry | undefined): readonly IntegrationRecord[] => {
+    if (metadata === undefined) return []
+    if (metadata.history !== undefined) return metadata.history
+    return [metadata.tipChangeId === undefined ? { at: metadata.at } : { at: metadata.at, tipChangeId: metadata.tipChangeId }]
+  }
   const writeRebaseMetadata = async (repoRoot: string, name: string, tipChangeId: string | undefined): Promise<number> => {
     const at = Date.now()
     const directory = options.threadsDirectory(repoRoot)
     await mkdir(directory, { recursive: true })
     const path = timestampFile(repoRoot)
     const temporaryPath = `${path}.${randomBytes(4).toString('hex')}.tmp`
-    const metadataForThread: RebaseMetadataEntry = { at }
-    if (tipChangeId !== undefined) metadataForThread.tipChangeId = tipChangeId
-    const metadata = { ...(await readRebaseMetadata(repoRoot)), [name]: metadataForThread }
+    const record: IntegrationRecord = tipChangeId === undefined ? { at } : { at, tipChangeId }
+    const existing = await readRebaseMetadata(repoRoot)
+    const history = [...integrationHistory(existing[name]), record].slice(-MAX_INTEGRATION_HISTORY)
+    const metadata = { ...existing, [name]: { ...record, history } }
     await writeFile(temporaryPath, JSON.stringify(metadata), 'utf8')
     await rename(temporaryPath, path)
     return at
   }
   const withRebaseMetadata = (status: ThreadStatus, metadata: RebaseMetadataEntry | undefined): ThreadStatus => {
     if (metadata === undefined) return status
-    const statusWithTimestamp = { ...status, rebasedAt: metadata.at }
+    const statusWithTimestamp = { ...status, rebasedAt: metadata.at, integrations: integrationHistory(metadata) }
     if (metadata.tipChangeId === undefined) return statusWithTimestamp
     return { ...statusWithTimestamp, rebasedTipChangeId: metadata.tipChangeId }
   }

@@ -251,7 +251,11 @@ const threadView = (
   const integrationQueuedAt = deferredIntegrations.get(status.path)?.queuedAt
   const withQueue: ThreadView = integrationQueuedAt === undefined ? withEligibility : { ...withEligibility, integrationQueuedAt }
   if (status.rebasedAt === undefined) return withQueue
-  const viewWithRebaseTimestamp = { ...withQueue, rebasedAt: status.rebasedAt }
+  const viewWithRebaseTimestamp = {
+    ...withQueue,
+    rebasedAt: status.rebasedAt,
+    integrations: [...(status.integrations ?? [])],
+  }
   if (status.rebasedTipChangeId === undefined) return viewWithRebaseTimestamp
   return { ...viewWithRebaseTimestamp, rebasedTipChangeId: status.rebasedTipChangeId }
 }

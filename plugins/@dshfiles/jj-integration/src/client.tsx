@@ -1,6 +1,6 @@
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
-import type { EmptyWorkspaceOwnerProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type { EmptyWorkspaceOwnerProps, TurnLocation } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
@@ -11,17 +11,18 @@ import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-session-log-export/client'
 import { createApiClient, defineClient, useApi, useSettings } from '@dshfiles/dshx/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
-import { ArchiveIcon } from '@dshfiles/plugin-ui/icons'
+import { ArchiveIcon, GitMergeIcon } from '@dshfiles/plugin-ui/icons'
 import { hostDestination, multiHostApi, multiHostQueries, REMOTE_THREAD_PANEL, RemoteComposer } from '@dshfiles/multi-host/destination'
 import { errorMessage, PluginQueryProvider, pluginQueryClient, useMutation, useQuery } from '@dshfiles/plugin-ui/query'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { createWorkspacePickerPorts } from '@dshfiles/project-folder-picker'
-import { useCallback, useSyncExternalStore } from 'react'
+import { useCallback, useLayoutEffect, useSyncExternalStore } from 'react'
 import { startWorkspaceToggle, type DestinationBarServices } from './destination-bar.js'
 import { createComposerWorkspaceNavigation, type ComposerReferenceHandoff } from './composer-workspace-navigation.js'
 import { mainViewSessionId } from './main-view-session.js'
 import { jjIntegrationApi } from './api.js'
 import { HeroWorkspacePicker } from './hero-workspace-picker.js'
+import { IntegrationTimeline } from './integration-timeline.js'
 import { JJ_INTEGRATION_LOCALE_NAMESPACE, jjIntegrationLocale } from './locales.js'
 import { ThreadWorkspacesPanel } from './panel.js'
 import { prepareRemoteFolder } from './remote-destination.js'
@@ -200,21 +201,24 @@ export default defineClient({
         ),
     }
     const jjThreads = createApiClient(ctx, jjIntegrationApi)
-    const ThreadRebaseNotice = (props: { readonly sessionId: SessionSummary['id'] }): JSX.Element | null => {
+    const integrationTimeline = new IntegrationTimeline()
+    const ThreadIntegrationMarkers = (props: { readonly turn: TurnLocation; readonly sessionId: SessionSummary['id'] }): JSX.Element | null => {
       const api = useApi(jjIntegrationApi)
-      const subscribeToSessions = useCallback((listener: () => void) => ctx.sessions.list.subscribe(listener), [])
-      // A blank thread has no turn yet, so nothing of it can have been rebased: asking the Host for its workspace would
-      // spend one jj read on every New thread screen. The first send clears `blank`, which enables the query.
-      const blank = useSyncExternalStore(
-        subscribeToSessions,
-        () => ctx.sessions.list.getSnapshot().byId[props.sessionId]?.blank === true,
-        () => true,
+      const turnStartedAt = props.turn.start?.time ?? props.turn.end?.time
+      useLayoutEffect(() => {
+        if (turnStartedAt !== undefined) integrationTimeline.publishTurnStart({ sessionId: props.sessionId, turn: props.turn.turn, startedAt: turnStartedAt })
+      }, [props.sessionId, props.turn.turn, turnStartedAt])
+      const nextTurnStartedAt = useSyncExternalStore(
+        integrationTimeline.subscribe,
+        () => integrationTimeline.nextTurnStartedAt({ sessionId: props.sessionId, turn: props.turn.turn }),
+        () => undefined,
       )
-      const session = ctx.sessions.list.getSnapshot().byId[props.sessionId]
-      const path = session?.cwd
+      const subscribeToSessions = useCallback((listener: () => void) => ctx.sessions.list.subscribe(listener), [])
+      const path = ctx.sessions.list.getSnapshot().byId[props.sessionId]?.cwd
+      // Every Turn tail of a Session shares this query key, so one jj read serves the whole conversation.
       const status = useQuery({
         queryKey: ['jj-integration', 'thread', path],
-        enabled: path !== undefined && !blank,
+        enabled: path !== undefined,
         retry: false,
         queryFn: ({ signal }) =>
           path === undefined
@@ -240,55 +244,62 @@ export default defineClient({
         mutationFn: () => ctx.workspaces.archiveSession(props.sessionId),
         onError: error => archiveToast.show({ text: errorMessage(error, translate('archiveFailed')), success: false }),
       })
-      const rebasedAt = status.data?.thread?.rebasedAt
-      if (rebasedAt === undefined || rebasedAt === null) return archiveToast.element
-      const rebasedTipChangeId = status.data?.thread?.rebasedTipChangeId
-      const notice =
-        rebasedTipChangeId === undefined
-          ? translate('rebaseNotice', { bookmark })
-          : translate('rebaseNoticeWithTip', { bookmark, revisionId: rebasedTipChangeId })
+      const thread = status.data?.thread
+      if (thread === null || thread === undefined || thread.rebasedAt === undefined || turnStartedAt === undefined) return archiveToast.element
+      const integrations = thread.integrations ?? [{ at: thread.rebasedAt, tipChangeId: thread.rebasedTipChangeId }]
+      const markers = IntegrationTimeline.forTurn({ integrations, turnStartedAt, nextTurnStartedAt })
+      if (markers.length === 0) return archiveToast.element
       return (
         <>
-          <div
-            data-testid="jj-thread-rebased-notice"
-            className="dshx-root dshx:mx-auto dshx:my-3 dshx:flex dshx:w-full dshx:max-w-3xl dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:rounded-md dshx:border dshx:bg-muted/40 dshx:px-3 dshx:py-2 dshx:text-sm dshx:text-muted-foreground"
-          >
-            <span className="dshx:min-w-0 dshx:flex-1">{notice}</span>
-            <time className="dshx:shrink-0 dshx:text-xs dshx:tabular-nums" dateTime={new Date(rebasedAt).toISOString()}>
-              {new Date(rebasedAt).toLocaleString()}
-            </time>
-            {archived ? null : (
-              <Button
-                aria-label={translate('archiveRebasedThread')}
-                disabled={sessionRunning || archive.isPending}
-                onClick={() => archive.mutate()}
-                size="sm"
-                title={translate('archiveRebasedThread')}
-                type="button"
-                variant="outline"
-              >
-                {archive.isPending ? null : <ArchiveIcon aria-hidden="true" size={16} />}
-                {archive.isPending ? translate('archivingThread') : translate('archiveThread')}
-              </Button>
-            )}
-          </div>
+          {markers.map(marker => (
+            <div
+              key={marker.at}
+              data-testid="jj-thread-rebased-notice"
+              className="dshx-root dshx:my-3 dshx:flex dshx:w-full dshx:items-center dshx:gap-2 dshx:text-sm dshx:text-muted-foreground"
+            >
+              <GitMergeIcon aria-hidden="true" className="dshx:shrink-0" size={14} />
+              <span className="dshx:min-w-0">
+                {marker.tipChangeId === undefined
+                  ? translate('rebaseNotice', { bookmark })
+                  : translate('rebaseNoticeWithTip', { bookmark, revisionId: marker.tipChangeId })}
+              </span>
+              <time className="dshx:shrink-0 dshx:text-xs dshx:tabular-nums" dateTime={new Date(marker.at).toISOString()}>
+                {new Date(marker.at).toLocaleString()}
+              </time>
+              <span aria-hidden="true" className="dshx:h-px dshx:min-w-4 dshx:flex-1 dshx:bg-border" />
+              {archived || marker.at !== thread.rebasedAt ? null : (
+                <Button
+                  aria-label={translate('archiveRebasedThread')}
+                  disabled={sessionRunning || archive.isPending}
+                  onClick={() => archive.mutate()}
+                  size="sm"
+                  title={translate('archiveRebasedThread')}
+                  type="button"
+                  variant="ghost"
+                >
+                  {archive.isPending ? null : <ArchiveIcon aria-hidden="true" size={16} />}
+                  {archive.isPending ? translate('archivingThread') : translate('archiveThread')}
+                </Button>
+              )}
+            </div>
+          ))}
           {archiveToast.element}
         </>
       )
     }
-    // The notice describes the thread, not a turn: `conversation.chat.turnTail` would repeat
-    // it after every turn, so it belongs in the dock, beside the other thread-level banners.
-    ctx.slots.inject('conversation.input.dock', () =>
+    // A thread can land, keep working and land again, so each land reads inline after the Turn it followed, like the
+    // other Turn-end notes, instead of one thread-level banner that only knew the latest.
+    ctx.slots.inject('conversation.chat.turnTail', () =>
       ctx.slots.register(
         {
-          name: 'conversation.input.dock',
+          name: 'conversation.chat.turnTail',
           id: 'dshfiles-jj-integration-rebased-notice',
           order: 1,
           inject: sessionId => ({ sessionId: SessionId(sessionId) }),
         },
-        decorate((props: { readonly sessionId: SessionSummary['id'] }) => (
+        decorate((props: { readonly turn: TurnLocation; readonly sessionId: SessionSummary['id'] }) => (
           <PluginQueryProvider>
-            <ThreadRebaseNotice {...props} />
+            <ThreadIntegrationMarkers {...props} />
           </PluginQueryProvider>
         )),
       ),
