@@ -11,7 +11,7 @@ import { Textarea } from '@dshfiles/plugin-ui/components/ui/textarea'
 import { ArrowUpRightIcon, RefreshCwIcon } from '@dshfiles/plugin-ui/icons'
 import { useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { relativeTime } from '@deepseek-ai/dsh-client-ui-primitives'
-import { useEffect, useId, useState, type ReactNode } from 'react'
+import { useId, useState, type ReactNode } from 'react'
 import { aiAccountsKeys, aiAccountsQueries } from './accounts-queries.js'
 import { DISTRIBUTION_HINT, DISTRIBUTION_LABEL, DISTRIBUTIONS } from './account-labels.js'
 import { aiAccountsApi, type AccountsFile, type UsageHistoryMeta } from './api.js'
@@ -134,21 +134,20 @@ export const AiAccountsSettingsSection = (props: { readonly close: () => void; r
   const accounts = useApi(aiAccountsApi)
   const preferences = usePreferences()
   const settings = preferences.settings
-  const [history, setHistory] = useState<UsageHistoryMeta | null>(null)
-  const [file, setFile] = useState<AccountsFile | null>(null)
+  const queryClient = useQueryClient()
+  const fileQuery = useQuery(aiAccountsQueries.file(accounts))
+  const historyQuery = useQuery(aiAccountsQueries.historySettings(accounts))
+  const file = fileQuery.data ?? null
+  const history = historyQuery.data ?? null
+  const historyLoadNotice = historyQuery.isFetched && historyQuery.data === null ? 'The account host did not answer.' : null
   const [notice, setNotice] = useState<string | null>(null)
   const saveModeId = useId()
-
-  useEffect(() => {
-    void accounts
-      .historySettings()
-      .then(setHistory)
-      .catch(() => setNotice('The account host did not answer.'))
-    void accounts
-      .read()
-      .then(setFile)
-      .catch(() => undefined)
-  }, [accounts])
+  const updateFileCache = (next: AccountsFile): void => {
+    queryClient.setQueryData(aiAccountsKeys.file, next)
+  }
+  const updateHistoryCache = (next: UsageHistoryMeta): void => {
+    queryClient.setQueryData(aiAccountsKeys.historySettings, next)
+  }
 
   const write = (task: Promise<unknown>): void => {
     setNotice(null)
@@ -160,11 +159,12 @@ export const AiAccountsSettingsSection = (props: { readonly close: () => void; r
     write(
       accounts
         .saveHistorySettings({ intervalMinutes: patch.intervalMinutes ?? history.intervalMinutes, retentionDays: patch.retentionDays ?? history.retentionDays })
-        .then(setHistory),
+        .then(updateHistoryCache),
     )
   }
 
   const readOnly = !settings.writable
+  const shownNotice = notice ?? historyLoadNotice
 
   return (
     <div className="dshx-root dshx:flex dshx:min-h-0 dshx:flex-col dshx:gap-4 dshx:overflow-y-auto dshx:pb-4">
@@ -196,9 +196,9 @@ export const AiAccountsSettingsSection = (props: { readonly close: () => void; r
           <AlertDescription>These preferences are read-only in this browser.</AlertDescription>
         </Alert>
       ) : null}
-      {notice === null ? null : (
+      {shownNotice === null ? null : (
         <Alert role="status" variant="info">
-          <AlertDescription>{notice}</AlertDescription>
+          <AlertDescription>{shownNotice}</AlertDescription>
         </Alert>
       )}
 
@@ -246,7 +246,7 @@ export const AiAccountsSettingsSection = (props: { readonly close: () => void; r
               <Select
                 onValueChange={value => {
                   const distribution = DISTRIBUTIONS.find(candidate => candidate === value)
-                  if (distribution !== undefined) write(accounts.setDistribution({ distribution }).then(setFile))
+                  if (distribution !== undefined) write(accounts.setDistribution({ distribution }).then(updateFileCache))
                 }}
                 value={file.distribution}
               >
