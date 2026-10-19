@@ -24,8 +24,23 @@ const eventSchema = z
   .object({
     at: z.number().int().nonnegative(),
     actor: actorIdSchema,
-    kind: z.enum(['created', 'edited', 'moved', 'linked', 'unlinked', 'commented']),
+    kind: z.enum(['created', 'edited', 'moved', 'linked', 'unlinked', 'commented', 'triaged']),
     detail: z.string().max(MAX_BODY_CHARS),
+  })
+  .strict()
+
+/** What triage would change, with how sure it is; applied above the threshold, otherwise left for the user. */
+const proposalSchema = z
+  .object({
+    kind: kindSchema.optional(),
+    status: statusSchema.optional(),
+    title: z.string().min(1).max(MAX_TITLE_CHARS).optional(),
+    tags: z.array(z.string().max(60)).max(MAX_TAGS).optional(),
+    duplicateOf: z.number().int().positive().optional(),
+    confidence: z.number().min(0).max(1),
+    reason: z.string().max(500),
+    source: z.enum(['jev', 'model', 'jev+model']),
+    at: z.number().int().nonnegative(),
   })
   .strict()
 
@@ -45,9 +60,11 @@ const itemSchema = z
     createdAt: z.number().int().nonnegative(),
     lastActivityAt: z.number().int().nonnegative(),
     events: z.array(eventSchema).max(MAX_EVENTS),
+    proposal: proposalSchema.nullable().optional(),
   })
   .strict()
 
+export type BacklogProposal = z.infer<typeof proposalSchema>
 export type BacklogKind = z.infer<typeof kindSchema>
 export type BacklogStatus = z.infer<typeof statusSchema>
 export type BacklogLink = z.infer<typeof linkSchema>
@@ -151,6 +168,7 @@ export class BacklogItems {
   static readonly maxBodyChars = MAX_BODY_CHARS
   static readonly maxTargetChars = MAX_TARGET_CHARS
   static readonly itemSchema = itemSchema
+  static readonly proposalSchema = proposalSchema
   static readonly linkSchema = linkSchema
   static readonly kindSchema = kindSchema
   static readonly statusSchema = statusSchema

@@ -156,3 +156,44 @@ describe('store', () => {
     expect((await reopened.capture({ text: 'three', actor: user })).item.id).toBe(3)
   })
 })
+
+describe('triage proposals', () => {
+  it('applies automatic triage without touching fields the user set by hand', async () => {
+    const store = BacklogModel.createStore({ items: memoryTable(), now: () => 9 })
+    await store.capture({ text: 'Kodiak rebases FIFO', actor: user })
+    await store.update({ id: 1, status: 'doing', actor: user })
+
+    const applied = await store.applyProposal({
+      id: 1,
+      proposal: { kind: 'note', status: 'todo', confidence: 0.9, reason: '', source: 'jev', at: 9 },
+      actor: { kind: 'system' },
+    })
+    expect(applied.ok && applied.value.item.kind).toBe('note')
+    expect(applied.ok && applied.value.item.status).toBe('doing')
+    expect(applied.ok && applied.value.item.events.at(-1)).toEqual({ at: 9, actor: 'system', kind: 'triaged', detail: 'applied kind note' })
+  })
+
+  it('keeps a hesitant proposal until the user accepts it, then treats its values as theirs', async () => {
+    const store = BacklogModel.createStore({ items: memoryTable(), now: () => 9 })
+    await store.capture({ text: 'parent epic', actor: user })
+    await store.capture({ text: 'paste drops chips', actor: user })
+    await store.propose({ id: 2, proposal: { kind: 'bug', duplicateOf: 1, confidence: 0.5, reason: 'Broken.', source: 'model', at: 9 } })
+    expect(store.list({}).items.find(entry => entry.id === 2)?.proposal?.kind).toBe('bug')
+
+    const accepted = await store.applyProposal({ id: 2, actor: user })
+    expect(accepted.ok && accepted.value.item.kind).toBe('bug')
+    expect(accepted.ok && accepted.value.item.humanFields).toEqual(['kind'])
+    expect(accepted.ok && accepted.value.item.links).toEqual([{ type: 'item', target: '1' }])
+    expect(accepted.ok && accepted.value.item.proposal).toBeNull()
+  })
+
+  it('dismisses a proposal without changing the item', async () => {
+    const store = BacklogModel.createStore({ items: memoryTable(), now: () => 9 })
+    await store.capture({ text: 'an idea', actor: user })
+    await store.propose({ id: 1, proposal: { kind: 'idea', confidence: 0.4, reason: '', source: 'jev', at: 9 } })
+    const dismissed = await store.dismissProposal({ id: 1, actor: user })
+    expect(dismissed.ok && dismissed.value.item.kind).toBe('task')
+    expect(dismissed.ok && dismissed.value.item.proposal).toBeNull()
+    expect(dismissed.ok && dismissed.value.item.events.at(-1)?.detail).toBe('dismissed kind idea')
+  })
+})

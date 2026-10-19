@@ -48,17 +48,38 @@ with its actor (`user`, `system` or `agent:<sessionId>`). **Referenced by** list
 this one. Fields the user changes by hand are recorded in `humanFields`, so later automatic moves can
 leave them alone. Nothing is deleted; `dropped` closes an item.
 
+## Automatic triage
+
+Off by default (Settings → `dshfiles-backlog`). With `autoTriage` on, every capture is triaged in the
+background, so adding an item never waits:
+
+- **Jev** (`jevEnabled`, `TYPESAFE_API_KEY` in the Host environment) answers two cheap yes/no questions:
+  is this work to do (otherwise a plain capture becomes a `note`), and is it the same work as the closest
+  open item (a suspected duplicate).
+- **A cheap model** (`triageProvider` + `triageModel`) proposes kind, status, title, tags and a duplicate
+  among the similar items it is shown. Items whose applied triage you later corrected by hand are given
+  to it as examples; they are read from the event log, not stored separately.
+
+Agreement between the two raises the confidence, disagreement lowers it. At or above `applyThreshold`
+(0.8) the proposal applies as `system` and leaves every field you set by hand alone; a duplicate is only
+linked, never closed. Below it, the item shows a **Triage suggests** card (and a wand on its row) with
+**Accept** and **Dismiss**; accepting makes those values yours. The wand in the peek header runs triage
+on demand. A missing key, model or failing call is skipped and the item simply stays in the Inbox.
+
 ## Agent tools
 
-| Tool                  | Kind                                                                                  |
-| --------------------- | ------------------------------------------------------------------------------------- |
-| `backlog_list`        | read: search and filter (`statuses`, `kinds`, `project`, `tag`, `actor`, `freshness`) |
-| `backlog_get`         | read: one item with history and backlinks                                             |
-| `backlog_referencing` | read: items linking to a thread, revision, branch, workspace, URL or item             |
-| `backlog_capture`     | write                                                                                 |
-| `backlog_update`      | write: edit or move                                                                   |
-| `backlog_link`        | write: link or unlink                                                                 |
-| `backlog_comment`     | write                                                                                 |
+| Tool                       | Kind                                                                                  |
+| -------------------------- | ------------------------------------------------------------------------------------- |
+| `backlog_list`             | read: search and filter (`statuses`, `kinds`, `project`, `tag`, `actor`, `freshness`) |
+| `backlog_get`              | read: one item with history and backlinks                                             |
+| `backlog_referencing`      | read: items linking to a thread, revision, branch, workspace, URL or item             |
+| `backlog_capture`          | write                                                                                 |
+| `backlog_update`           | write: edit or move                                                                   |
+| `backlog_link`             | write: link or unlink                                                                 |
+| `backlog_comment`          | write                                                                                 |
+| `backlog_triage`           | write: run triage on one item now                                                     |
+| `backlog_accept_proposal`  | write                                                                                 |
+| `backlog_dismiss_proposal` | write                                                                                 |
 
 ## Storage
 

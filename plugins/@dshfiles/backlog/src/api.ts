@@ -20,6 +20,7 @@ const summarySchema = z
     createdAt: z.number(),
     lastActivityAt: z.number(),
     preview: z.string(),
+    proposal: BacklogItems.proposalSchema.nullable(),
   })
   .strict()
 
@@ -125,6 +126,25 @@ export const backlogApi = defineApi({
       output: detailResultSchema,
       description: `Link a backlog item to a thread, jj revision, branch, workspace, URL or another item (\`remove: true\` unlinks). ${writeNote}`,
       tool: { name: 'backlog_link', readOnly: false },
+    }),
+    triage: method({
+      input: z.object({ id: idSchema }).strict(),
+      output: detailResultSchema,
+      description:
+        'Run automatic triage on one item now (Jev and the configured cheap model). A confident answer applies, skipping fields the user set by hand; otherwise it is left as a proposal on the item.',
+      tool: { name: 'backlog_triage', readOnly: false },
+    }),
+    applyProposal: method({
+      input: z.object({ id: idSchema }).strict(),
+      output: detailResultSchema,
+      description: `Accept the triage proposal on an item: its kind, status, title and tags apply, and a suspected duplicate is linked. ${writeNote}`,
+      tool: { name: 'backlog_accept_proposal', readOnly: false },
+    }),
+    dismissProposal: method({
+      input: z.object({ id: idSchema }).strict(),
+      output: detailResultSchema,
+      description: `Dismiss the triage proposal on an item without changing it. ${writeNote}`,
+      tool: { name: 'backlog_dismiss_proposal', readOnly: false },
     }),
     comment: method({
       input: z.object({ id: idSchema, text: z.string().min(1).max(BacklogItems.maxBodyChars) }).strict(),

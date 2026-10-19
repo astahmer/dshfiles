@@ -15,7 +15,11 @@
       ],
       "externalDependencies": [],
       "verification": [
-        { "kind": "gherkin", "id": "backlog.capture-triage", "featureFile": "tooling/dshx/e2e/features/backlog.feature" },
+        {
+          "kind": "gherkin",
+          "id": "backlog.capture-triage",
+          "featureFile": "tooling/dshx/e2e/features/backlog.feature"
+        },
         {
           "kind": "unit-test",
           "id": "backlog.capture-and-triage-unit-triage",
@@ -82,7 +86,11 @@
       "failureModes": ["An unknown item id answers not-found without writing."],
       "externalDependencies": [],
       "verification": [
-        { "kind": "gherkin", "id": "backlog.board-links", "featureFile": "tooling/dshx/e2e/features/backlog.feature" },
+        {
+          "kind": "gherkin",
+          "id": "backlog.board-links",
+          "featureFile": "tooling/dshx/e2e/features/backlog.feature"
+        },
         {
           "kind": "host-test",
           "id": "backlog.board-host-actors",
@@ -94,6 +102,92 @@
           "id": "backlog.board-host-backlinks",
           "file": "plugins/@dshfiles/backlog/src/store.test.ts",
           "testName": "answers backlinks for items and for any linked target"
+        }
+      ]
+    },
+    {
+      "id": "auto-triage",
+      "title": "Triage new items automatically",
+      "summary": "With autoTriage on, each capture is triaged in the background: Jev answers whether it is work to do and whether it repeats the closest open item, a configured cheap model proposes kind, status, title, tags and duplicates using the user's past corrections as examples. A confident proposal applies as `system` and skips fields the user set by hand; a hesitant one waits on the item to be accepted or dismissed.",
+      "surfaces": ["client", "host", "settings", "tool"],
+      "configuration": [],
+      "states": ["off", "proposed", "applied", "dismissed"],
+      "failureModes": [
+        "A failing or missing Jev key or model is skipped; the item stays in the Inbox.",
+        "A model answer with invalid fields keeps only the valid ones; a duplicate it was not shown is ignored."
+      ],
+      "externalDependencies": [
+        {
+          "id": "typesafe-jev",
+          "boundary": "Optional POST to api.typesafe.ai/v1/systemone with the item text, behind jevEnabled and TYPESAFE_API_KEY; any failure is skipped.",
+          "deterministicFake": "An injected jev function answers fixed probabilities in src/triage.test.ts."
+        },
+        {
+          "id": "dsh-llm",
+          "boundary": "Optional cheap-model call through the DSH llm service on triageProvider/triageModel; the answer is decoded with a schema and invalid fields dropped.",
+          "deterministicFake": "An injected complete function returns fixed text in src/triage.test.ts."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "backlog.auto-triage-unit-jev-work",
+          "file": "plugins/@dshfiles/backlog/src/triage.test.ts",
+          "testName": "moves work out of the inbox with Jev alone and reports its confidence"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.auto-triage-unit-jev-note",
+          "file": "plugins/@dshfiles/backlog/src/triage.test.ts",
+          "testName": "turns a plain capture Jev reads as knowledge into a note"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.auto-triage-unit-duplicate",
+          "file": "plugins/@dshfiles/backlog/src/triage.test.ts",
+          "testName": "flags the closest open item as a duplicate when Jev says it is the same work"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.auto-triage-unit-model",
+          "file": "plugins/@dshfiles/backlog/src/triage.test.ts",
+          "testName": "takes the model answer, dropping invalid fields and duplicates it was not shown"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.auto-triage-unit-disagree",
+          "file": "plugins/@dshfiles/backlog/src/triage.test.ts",
+          "testName": "lowers confidence when Jev and the model disagree on the kind"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.auto-triage-unit-failures",
+          "file": "plugins/@dshfiles/backlog/src/triage.test.ts",
+          "testName": "proposes nothing when every service fails or nothing would change"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.auto-triage-unit-corrections",
+          "file": "plugins/@dshfiles/backlog/src/triage.test.ts",
+          "testName": "learns from items whose applied triage the user corrected by hand"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.auto-triage-host-human-fields",
+          "file": "plugins/@dshfiles/backlog/src/store.test.ts",
+          "testName": "applies automatic triage without touching fields the user set by hand"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.auto-triage-host-accept",
+          "file": "plugins/@dshfiles/backlog/src/store.test.ts",
+          "testName": "keeps a hesitant proposal until the user accepts it, then treats its values as theirs"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.auto-triage-host-dismiss",
+          "file": "plugins/@dshfiles/backlog/src/store.test.ts",
+          "testName": "dismisses a proposal without changing the item"
         }
       ]
     }

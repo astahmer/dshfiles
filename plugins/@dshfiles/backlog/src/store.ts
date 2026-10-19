@@ -8,8 +8,10 @@ import {
   type BacklogItem,
   type BacklogKind,
   type BacklogLink,
+  type BacklogProposal,
   type BacklogStatus,
 } from './item.js'
+import { BacklogTriage } from './triage.js'
 
 export const backlogDomain = defineDomain({
   name: 'backlog',
@@ -21,7 +23,10 @@ export const backlogDomain = defineDomain({
 
 type ItemTable = KvTable<string, BacklogItem>
 
-export type BacklogActor = { readonly kind: 'user' } | { readonly kind: 'agent'; readonly sessionId?: string | undefined; readonly cwd?: string | undefined }
+export type BacklogActor =
+  | { readonly kind: 'user' }
+  | { readonly kind: 'system' }
+  | { readonly kind: 'agent'; readonly sessionId?: string | undefined; readonly cwd?: string | undefined }
 
 export interface BacklogListQuery {
   readonly query?: string | undefined
@@ -67,6 +72,19 @@ export interface BacklogStore {
     readonly actor: BacklogActor
   }): Promise<BacklogResult<BacklogDetail>>
   comment(input: { readonly id: number; readonly text: string; readonly actor: BacklogActor }): Promise<BacklogResult<BacklogDetail>>
+  /** The item and every other item, for a triage pass to read. */
+  triageInput(id: number): { readonly item: BacklogItem; readonly others: readonly BacklogItem[] } | undefined
+  propose(input: { readonly id: number; readonly proposal: BacklogProposal }): Promise<BacklogResult<BacklogDetail>>
+  /**
+   * Applies a proposal. For `system` (automatic triage) fields the user set by hand are left alone; for a person or an
+   * agent accepting it, every field applies. A duplicate is linked and commented, never closed.
+   */
+  applyProposal(input: {
+    readonly id: number
+    readonly proposal?: BacklogProposal | undefined
+    readonly actor: BacklogActor
+  }): Promise<BacklogResult<BacklogDetail>>
+  dismissProposal(input: { readonly id: number; readonly actor: BacklogActor }): Promise<BacklogResult<BacklogDetail>>
   list(query: BacklogListQuery): { readonly revision: number; readonly items: BacklogSummary[]; readonly total: number }
   get(id: number): BacklogResult<BacklogDetail>
   referencing(link: BacklogLink): BacklogSummary[]
@@ -76,8 +94,10 @@ export interface BacklogStore {
 const DEFAULT_LIST_LIMIT = 100
 const MAX_LIST_LIMIT = 500
 
-const actorIdOf = (actor: BacklogActor): string =>
-  actor.kind === 'user' ? 'user' : actor.sessionId === undefined || actor.sessionId === '' ? 'agent:unknown' : `agent:${actor.sessionId}`
+const actorIdOf = (actor: BacklogActor): string => {
+  if (actor.kind !== 'agent') return actor.kind
+  return actor.sessionId === undefined || actor.sessionId === '' ? 'agent:unknown' : `agent:${actor.sessionId}`
+}
 
 const callerLinks = (actor: BacklogActor): BacklogLink[] =>
   actor.kind === 'agent' && actor.sessionId !== undefined && actor.sessionId !== '' ? [{ type: 'thread', target: actor.sessionId }] : []
@@ -99,6 +119,7 @@ const summarize = (item: BacklogItem, now: number): BacklogSummary => ({
   createdAt: item.createdAt,
   lastActivityAt: item.lastActivityAt,
   preview: item.body.slice(0, 280),
+  proposal: item.proposal ?? null,
 })
 
 /** Pinned first, then newest activity: the Discord order, where idle things sink on their own. */
@@ -267,6 +288,62 @@ const createBacklogStore = ({
       if (item === undefined) return { ok: false, reason: 'not-found' }
       const links = BacklogItems.uniqueLinks([...item.links, ...BacklogItems.extractLinks(text), ...callerLinks(actor)])
       return { ok: true, value: await touch(item, actor, { kind: 'commented', detail: text.slice(0, BacklogItems.maxBodyChars) }, { links }) }
+    },
+    triageInput: id => {
+      const item = find(id)
+      return item === undefined ? undefined : { item, others: [...records.values()] }
+    },
+    propose: async ({ id, proposal }) => {
+      const item = find(id)
+      if (item === undefined) return { ok: false, reason: 'not-found' }
+      return {
+        ok: true,
+        value: await touch(item, { kind: 'system' }, { kind: 'triaged', detail: `suggested ${BacklogTriage.describe(proposal)}` }, { proposal }),
+      }
+    },
+    applyProposal: async ({ id, proposal, actor }) => {
+      const item = find(id)
+      const chosen = proposal ?? item?.proposal ?? undefined
+      if (item === undefined) return { ok: false, reason: 'not-found' }
+      if (chosen === undefined) return { ok: true, value: detailOf(item) }
+      const locked = actor.kind === 'system' ? new Set(item.humanFields) : new Set<BacklogHumanField>()
+      const change: Partial<BacklogItem> = { proposal: null }
+      const applied: Pick<BacklogProposal, 'kind' | 'status' | 'title' | 'tags' | 'duplicateOf'> = {}
+      if (chosen.kind !== undefined && !locked.has('kind')) {
+        change.kind = chosen.kind
+        applied.kind = chosen.kind
+      }
+      if (chosen.status !== undefined && !locked.has('status')) {
+        change.status = chosen.status
+        applied.status = chosen.status
+      }
+      if (chosen.title !== undefined && !locked.has('title')) {
+        change.title = chosen.title.slice(0, BacklogItems.maxTitleChars)
+        applied.title = change.title
+      }
+      if (chosen.tags !== undefined && !locked.has('tags')) {
+        change.tags = chosen.tags
+        applied.tags = chosen.tags
+      }
+      if (chosen.duplicateOf !== undefined && records.has(chosen.duplicateOf)) {
+        change.links = BacklogItems.uniqueLinks([...item.links, { type: 'item', target: String(chosen.duplicateOf) }])
+        applied.duplicateOf = chosen.duplicateOf
+      }
+      // Accepting is a person or an agent choosing those values, so they become theirs.
+      if (actor.kind !== 'system') {
+        const owned = (['kind', 'status', 'title', 'tags'] as const).filter(field => applied[field] !== undefined)
+        change.humanFields = [...new Set([...item.humanFields, ...owned])]
+      }
+      return { ok: true, value: await touch(item, actor, { kind: 'triaged', detail: `applied ${BacklogTriage.describe(applied) || 'nothing'}` }, change) }
+    },
+    dismissProposal: async ({ id, actor }) => {
+      const item = find(id)
+      if (item === undefined) return { ok: false, reason: 'not-found' }
+      if (item.proposal === undefined || item.proposal === null) return { ok: true, value: detailOf(item) }
+      return {
+        ok: true,
+        value: await touch(item, actor, { kind: 'triaged', detail: `dismissed ${BacklogTriage.describe(item.proposal)}` }, { proposal: null }),
+      }
     },
     list,
     get: id => {

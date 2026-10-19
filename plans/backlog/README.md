@@ -1,6 +1,6 @@
 # Backlog
 
-Resume here: step 4 (agent triage). Steps 1–3 landed in `@dshfiles/backlog`; see its README.
+Resume here: step 5 (lifecycle signals). Steps 1–3 landed in `@dshfiles/backlog`; see its README.
 
 ## Why
 
@@ -68,7 +68,7 @@ backlinks. Touching one (edit, comment, link, move) makes it fresh again.
 
 1. **Deterministic triage (shipped):** kind prefix, `#project` hint, link extraction, caller session
    linked as contributor, caller `cwd` as project.
-2. **Agent triage (step 4):** a cheap model reads new `inbox` items and proposes kind, status, title,
+2. **Agent triage (shipped, off by default):** a cheap model reads new `inbox` items and proposes kind, status, title,
    duplicates and links through the same tools, with a confidence. Above threshold it applies; below,
    the item stays in `inbox` with the proposal attached. Jev (TypeSafe) answers the cheap yes/no
    questions first — "is this actionable?", "is this a duplicate of b:n?" — as memory already does.
@@ -85,7 +85,7 @@ User corrections of an automatic move are kept as labelled examples for step 4's
 | 1   | Host store, API, agent tools, deterministic triage, freshness                            | done  |
 | 2   | Panel: capture box, feed, board, facets, item detail with links and backlinks            | done  |
 | 3   | Web profile, feature catalog, e2e journey                                                | done  |
-| 4   | Agent triage: Jev + cheap model proposals in `inbox`, threshold, corrections as examples | open  |
+| 4   | Agent triage: Jev + cheap model proposals in `inbox`, threshold, corrections as examples | done  |
 | 5   | Lifecycle signals from threads, jj revisions and PRs                                     | open  |
 | 6   | `@b:` scope in `@dshfiles/mentions`; backlinks chip on threads and revisions; FTS index  | open  |
 | 7   | Rich body editing (rich-composer) and quoting a thread message into an item              | open  |

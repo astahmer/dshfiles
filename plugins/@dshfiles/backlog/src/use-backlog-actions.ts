@@ -39,7 +39,10 @@ export const useBacklogActions = () => {
   const capture = useMutation({ mutationFn: (input: Parameters<typeof api.capture>[0]) => api.capture(input), onSuccess: invalidate })
   const link = useMutation({ mutationFn: (input: Parameters<typeof api.link>[0]) => api.link(input), onSuccess: invalidate })
   const comment = useMutation({ mutationFn: (input: Parameters<typeof api.comment>[0]) => api.comment(input), onSuccess: invalidate })
-  return { update, capture, link, comment }
+  const triage = useMutation({ mutationFn: (id: number) => api.triage({ id }), onSuccess: invalidate })
+  const applyProposal = useMutation({ mutationFn: (id: number) => api.applyProposal({ id }), onSuccess: invalidate })
+  const dismissProposal = useMutation({ mutationFn: (id: number) => api.dismissProposal({ id }), onSuccess: invalidate })
+  return { update, capture, link, comment, triage, applyProposal, dismissProposal }
 }
 
 export class BacklogQueries {

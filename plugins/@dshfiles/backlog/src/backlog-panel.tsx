@@ -14,7 +14,18 @@ import { Kbd } from '@dshfiles/plugin-ui/components/ui/kbd'
 import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
 import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
-import { ChevronDownIcon, KanbanIcon, LinkIcon, ListFilterIcon, ListIcon, PinIcon, PlusIcon, SearchIcon, XIcon } from '@dshfiles/plugin-ui/icons'
+import {
+  WandSparklesIcon,
+  ChevronDownIcon,
+  KanbanIcon,
+  LinkIcon,
+  ListFilterIcon,
+  ListIcon,
+  PinIcon,
+  PlusIcon,
+  SearchIcon,
+  XIcon,
+} from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, keepPreviousData, useQuery } from '@dshfiles/plugin-ui/query'
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent, type RefObject } from 'react'
@@ -125,6 +136,7 @@ const ItemRow = (props: {
       <span className={cn('dshx:min-w-0 dshx:flex-1 dshx:truncate', (item.status === 'done' || item.status === 'dropped') && 'dshx:text-muted-foreground')}>
         {item.title}
       </span>
+      {item.proposal === null ? null : <WandSparklesIcon aria-label="Triage suggestion waiting" className="dshx:size-3 dshx:shrink-0 dshx:text-violet" />}
       {item.pinned ? <PinIcon aria-label="Pinned" className="dshx:size-3 dshx:shrink-0 dshx:fill-current dshx:text-warning" /> : null}
       <Freshness freshness={item.freshness} />
       <Tags tags={item.tags} />

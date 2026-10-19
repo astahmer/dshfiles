@@ -18,6 +18,7 @@ import {
   PinIcon,
   PlusIcon,
   SparklesIcon,
+  WandSparklesIcon,
   XIcon,
   type LucideIcon,
 } from '@dshfiles/plugin-ui/icons'
@@ -26,7 +27,8 @@ import { useQuery } from '@dshfiles/plugin-ui/query'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 
 import { backlogApi, type BacklogDetailView, type BacklogSummaryView } from './api.js'
-import { BacklogItems, type BacklogEvent, type BacklogLink } from './item.js'
+import { BacklogItems, type BacklogEvent, type BacklogLink, type BacklogProposal } from './item.js'
+import { BacklogTriage } from './triage.js'
 import { ItemGlyphs } from './item-glyphs.js'
 import { ItemPickers } from './item-pickers.js'
 import { BacklogQueries, useBacklogActions } from './use-backlog-actions.js'
@@ -68,6 +70,7 @@ const eventIcons = {
   linked: LinkIcon,
   unlinked: LinkIcon,
   commented: MessageSquareIcon,
+  triaged: WandSparklesIcon,
 } satisfies Record<BacklogEvent['kind'], LucideIcon>
 
 const eventSentence = (event: BacklogEvent): string => {
@@ -76,6 +79,8 @@ const eventSentence = (event: BacklogEvent): string => {
   if (event.kind === 'edited') return `edited ${event.detail}`
   if (event.kind === 'linked') return `linked ${event.detail}`
   if (event.kind === 'unlinked') return `unlinked ${event.detail}`
+  if (event.kind === 'triaged')
+    return event.actor === 'system' ? `triage ${event.detail}` : `${event.detail.split(' ')[0] ?? ''} triage: ${event.detail.split(' ').slice(1).join(' ')}`
   return 'commented'
 }
 
@@ -312,6 +317,85 @@ const Activity = (props: { readonly events: readonly BacklogEvent[] }): JSX.Elem
   </ol>
 )
 
+/** Triage's suggestion, shown until accepted or dismissed: each change as before → after, with its confidence. */
+const ProposalCard = (props: { readonly id: number; readonly proposal: BacklogProposal; readonly current: BacklogDetailView['item'] }): JSX.Element => {
+  const actions = useBacklogActions()
+  const proposal = props.proposal
+  const rows = [
+    proposal.kind === undefined
+      ? null
+      : {
+          label: 'Kind',
+          before: <ItemGlyphs.KindIcon kind={props.current.kind} />,
+          after: (
+            <>
+              <ItemGlyphs.KindIcon kind={proposal.kind} />
+              {ItemGlyphs.kindLabels[proposal.kind]}
+            </>
+          ),
+        },
+    proposal.status === undefined
+      ? null
+      : {
+          label: 'Status',
+          before: <ItemGlyphs.StatusIcon status={props.current.status} />,
+          after: (
+            <>
+              <ItemGlyphs.StatusIcon status={proposal.status} />
+              {ItemGlyphs.statusLabels[proposal.status]}
+            </>
+          ),
+        },
+    proposal.title === undefined ? null : { label: 'Title', before: null, after: <span className="dshx:truncate">{proposal.title}</span> },
+    proposal.tags === undefined
+      ? null
+      : { label: 'Tags', before: null, after: <span className="dshx:truncate">{proposal.tags.map(tag => `#${tag}`).join(' ')}</span> },
+    proposal.duplicateOf === undefined ? null : { label: 'Duplicate', before: null, after: <span>of b:{proposal.duplicateOf}</span> },
+  ].filter(row => row !== null)
+  return (
+    <section
+      aria-label="Triage suggestion"
+      className="dshx:flex dshx:flex-col dshx:gap-2.5 dshx:rounded-lg dshx:border dshx:border-violet/30 dshx:bg-violet/5 dshx:p-3 dshx:animate-in dshx:fade-in-0"
+    >
+      <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-xs">
+        <WandSparklesIcon aria-hidden className="dshx:size-3.5 dshx:text-violet" />
+        <span className="dshx:font-medium">Triage suggests</span>
+        <span className="dshx:text-muted-foreground">
+          {Math.round(proposal.confidence * 100)}% · {proposal.source}
+        </span>
+      </div>
+      <ul className="dshx:flex dshx:flex-col dshx:gap-1">
+        {rows.map(row => (
+          <li key={row.label} className="dshx:grid dshx:grid-cols-[72px_minmax(0,1fr)] dshx:items-center dshx:gap-2 dshx:text-[13px]">
+            <span className="dshx:text-muted-foreground">{row.label}</span>
+            <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5">
+              {row.before === null ? null : (
+                <>
+                  <span className="dshx:opacity-50">{row.before}</span>
+                  <span className="dshx:text-muted-foreground">→</span>
+                </>
+              )}
+              {row.after}
+            </span>
+          </li>
+        ))}
+      </ul>
+      {proposal.reason === '' ? null : <p className="dshx:text-xs dshx:text-muted-foreground">{proposal.reason}</p>}
+      <div className="dshx:flex dshx:items-center dshx:gap-1.5">
+        <Button size="xs" onClick={() => actions.applyProposal.mutate(props.id)} disabled={actions.applyProposal.isPending}>
+          Accept
+        </Button>
+        <Button size="xs" variant="ghost" onClick={() => actions.dismissProposal.mutate(props.id)} disabled={actions.dismissProposal.isPending}>
+          Dismiss
+        </Button>
+        <span className="dshx:ml-auto dshx:text-[11px] dshx:text-muted-foreground" title={BacklogTriage.describe(proposal)}>
+          {ago(proposal.at)}
+        </span>
+      </div>
+    </section>
+  )
+}
+
 const PeekBody = (props: {
   readonly detail: BacklogDetailView
   readonly loading: boolean
@@ -341,6 +425,17 @@ const PeekBody = (props: {
           <Button
             variant="ghost"
             size="icon-xs"
+            aria-label="Run triage"
+            title="Run triage"
+            disabled={actions.triage.isPending}
+            onClick={() => actions.triage.mutate(item.id)}
+            className={cn(actions.triage.isPending && 'dshx:animate-pulse')}
+          >
+            <WandSparklesIcon />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon-xs"
             aria-label={item.pinned ? 'Unpin' : 'Pin'}
             aria-pressed={item.pinned}
             className={cn(item.pinned && 'dshx:text-warning')}
@@ -362,6 +457,7 @@ const PeekBody = (props: {
             <BodyField id={item.id} body={item.body} />
           )}
         </div>
+        {item.proposal === undefined || item.proposal === null ? null : <ProposalCard id={item.id} proposal={item.proposal} current={item} />}
         <div className="dshx:flex dshx:flex-col dshx:gap-1.5">
           <Property label="Status">
             <ItemPickers.Status id={item.id} status={item.status} withLabel onPick={status => actions.update.mutate({ id: item.id, status })} />
