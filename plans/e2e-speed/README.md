@@ -214,6 +214,23 @@ definition, **zero** scenarios avoid `page` — every journey drives the real UI
 carry a gherkin verification. The pyramid is already thin (about four journeys per plugin), so deleting journeys here
 would trade coverage for seconds.
 
+## Host sharing trial (2026-10-19): rejected on evidence
+
+Sharing one booted Host across the consecutive scenarios of a composition was the last big lever: it removes
+`prepare` and `host-url` entirely (measured 1.4s + 1.6-7s) and leaves only the page load. It was implemented behind
+`DSHX_E2E_SHARE_PROFILE=1` with a lease whose `close()` releases the scenario's claim instead of stopping the Host, and
+prewarm disabled while it was on.
+
+`frame-layout`, two scenarios of one composition, sharing on: the second scenario logged `reused-shared-host 0ms` and
+then **failed** waiting for the `Preview Notice` dialog — the shared Host had already accepted it for scenario 1, and
+`visitIsolatedPluginProfile` waits for it as part of the boot contract. The lease itself worked; the harness's
+assumption did not: every journey is written against a fresh profile, and several of them reset settings or depend on
+one.
+
+Reverted rather than shipped behind a flag, because a flag that turns a green suite red on a state leak is a footgun
+with no upside. The remaining floor — a Host boot per scenario — is the price of that isolation, and the prewarm
+already hides it behind the previous scenario wherever a composition repeats.
+
 ## Resume here
 
 E1-E5 have landed (E3 rejected with numbers, E6 dropped by request). The per-scenario cache now decides
