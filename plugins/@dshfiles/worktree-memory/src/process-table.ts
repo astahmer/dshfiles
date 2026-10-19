@@ -61,6 +61,7 @@ interface ResolvedGroup {
 const PS_LINE = /^\s*(\d+)\s+(\d+)\s+(\d+)\s+(\w{3}\s+\w{3}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}\s+\d{4})\s+(.*)$/
 // Orphans living in these trees are apps and system agents, never something a thread started.
 const SYSTEM_PREFIXES = ['/Applications/', '/System/', '/Library/', '/usr/libexec/', '/usr/sbin/', '/sbin/', '/private/var/', '/opt/homebrew/Caskroom/']
+const ADOPTER = /^(?:\S*\/)?(?:systemd|init|tini|dumb-init|launchd)(?:\s+--user)?\s*$/
 const SHELL_WRAPPER = /^(?:\S*\/)?(?:ba|z|da)?sh\s+-l?c\s+/
 const RUNTIMES = new Set(['node', 'bun', 'deno', 'python', 'python3', 'ruby', 'java', 'tsx', 'npx', 'pnpm', 'fnm', 'comma', ','])
 const RUNTIME_VERBS = new Set(['exec', 'run', 'x', 'dlx'])
@@ -110,9 +111,19 @@ export class ProcessTable {
     for (let pid = input.hostPid; pid > 1 && !ancestors.has(pid) && ancestors.size < 64; pid = byPid.get(pid)?.ppid ?? 1) ancestors.add(pid)
     for (const row of input.rows) {
       if (row.ppid === input.hostPid) hostChildren.push(row.pid)
-      else if (row.ppid === 1 && !ancestors.has(row.pid) && !SYSTEM_PREFIXES.some(prefix => row.command.startsWith(prefix))) orphans.push(row.pid)
+      else if (
+        ProcessTable.isAdopter(byPid.get(row.ppid), row.ppid) &&
+        !ancestors.has(row.pid) &&
+        !SYSTEM_PREFIXES.some(prefix => row.command.startsWith(prefix))
+      )
+        orphans.push(row.pid)
     }
     return { hostChildren, orphans }
+  }
+
+  /** Init adopts orphans, unless a subreaper such as `systemd --user` on a Linux desktop is closer. */
+  private static isAdopter(parent: ProcessRow | undefined, ppid: number): boolean {
+    return ppid === 1 || (parent !== undefined && ADOPTER.test(parent.command))
   }
 
   /** The tree rooted at `rootPid`, children before parents, so a stop never leaves a parent to respawn a killed child. */

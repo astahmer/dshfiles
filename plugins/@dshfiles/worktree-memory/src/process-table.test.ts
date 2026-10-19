@@ -91,6 +91,20 @@ describe('ProcessTable', () => {
     expect(snapshot.detachedCount).toBe(1)
   })
 
+  it('treats a systemd --user subreaper as the adopter of a detached tree', () => {
+    const snapshot = ProcessTable.snapshot(
+      baseInput({
+        rows: [
+          row(HOST, 1, 1, 'dsh'),
+          row(300, 1, 8_000, '/usr/lib/systemd/systemd --user'),
+          row(301, 300, 50_000, 'node /dev/app/node_modules/vite/bin/vite.js'),
+        ],
+        cwds: new Map([[301, '/dev/app']]),
+      }),
+    )
+    expect(snapshot.groups[0]?.trees[0]).toMatchObject({ pid: 301, origin: 'detached', category: 'dev-server' })
+  })
+
   it('never offers the supervisor that launched this Host as a detached tree', () => {
     const snapshot = ProcessTable.snapshot(
       baseInput({
