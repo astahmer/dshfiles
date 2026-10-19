@@ -697,8 +697,8 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
   const openAside = useAsideOpen()
   /**
    * One hover action's button, or null when the row's own state rules it out: the recovery pair only on a thread that
-   * needs a resume, an archived row's Restore instead of the live actions, and the aside only when an entry provided
-   * its opener. The row's preference picks which of them render, and in which order.
+   * needs a resume, an archived row's Restore instead of the live actions, the aside only when an entry provided
+   * its opener, and no Park, Settle or Archive while the thread (or, for Settle, a child) is running. The row's preference picks which of them render, and in which order.
    */
   const renderRowAction = (action: ThreadRowAction): JSX.Element | null => {
     if (action === 'resume' || action === 'resumeDismiss') {
@@ -752,13 +752,13 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
       )
     }
     if (action === 'park') {
+      if (session.running) return null
       return withTooltip(
         t(parked ? 'threadSidebarUnpark' : 'threadSidebarPark'),
         <Button
           variant="ghost"
           size="icon-xs"
           aria-label={t(parked ? 'threadSidebarUnpark' : 'threadSidebarPark')}
-          disabled={session.running}
           onClick={() => props.actions.toggleParked(session.id)}
         >
           {parked ? <IconPlayOutlineRegular size={14} /> : <IconPauseOutlineRegular size={14} />}
@@ -766,13 +766,13 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
       )
     }
     if (action === 'settle') {
+      if (session.running || props.childThreads.some(child => child.running)) return null
       return withTooltip(
         t(settled ? 'threadSidebarUnsettle' : 'threadSidebarSettle'),
         <Button
           variant="ghost"
           size="icon-xs"
           aria-label={t(settled ? 'threadSidebarUnsettle' : 'threadSidebarSettle')}
-          disabled={session.running || props.childThreads.some(child => child.running)}
           onClick={() => props.actions.toggleSettled(session.id)}
         >
           {settled ? <IconPlayOutlineRegular size={14} /> : <IconCheckCircleOutlineRegular size={14} />}
@@ -802,15 +802,10 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
         </DropdownMenu>,
       )
     }
+    if (session.running) return null
     return withTooltip(
-      t(session.running ? 'threadSidebarRunningNotice' : 'threadSidebarArchive'),
-      <Button
-        variant="ghost"
-        size="icon-xs"
-        aria-label={t('threadSidebarArchive')}
-        disabled={session.running}
-        onClick={() => void props.actions.mutate(session.id, 'archive')}
-      >
+      t('threadSidebarArchive'),
+      <Button variant="ghost" size="icon-xs" aria-label={t('threadSidebarArchive')} onClick={() => void props.actions.mutate(session.id, 'archive')}>
         <IconArchiveOutlineRegular size={14} />
       </Button>,
     )
