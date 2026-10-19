@@ -21,7 +21,12 @@ const serializedDockviewSchema = z.looseObject({
 })
 
 /** The outer shape Dockview reads; anything deeper that it rejects makes `restoreLayout` fall back to the default. */
-const layoutSchema = z.custom<SerializedDockview>(value => serializedDockviewSchema.safeParse(value).success)
+export const layoutSchema = z.custom<SerializedDockview>(value => serializedDockviewSchema.safeParse(value).success)
+
+/** The regions a saved layout can carry, in the order the surfaces mount. */
+export const LAYOUT_SURFACES = ['main', 'dock', 'bottom'] as const
+
+export type LayoutSurface = (typeof LAYOUT_SURFACES)[number]
 
 /** Every region keeps its own layout, so docking in one never rearranges another. */
 export const createLayoutStore = (options?: {

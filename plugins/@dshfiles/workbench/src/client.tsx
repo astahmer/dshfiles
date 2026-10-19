@@ -10,17 +10,24 @@ import type { RightPanelMode } from '@dshfiles/frame-layout/regions'
 // Type-only: the frame's right-column seat and the `shell.dock` slot it declares.
 import type {} from '@dshfiles/frame-layout/regions'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import {
+  Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
+} from '@dshfiles/plugin-ui/components/ui/dialog'
+import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { LayoutGridIcon } from '@dshfiles/plugin-ui/icons'
-import type { DockviewApi, DockviewDidDropEvent, DockviewUnhandledDragOverEvent } from 'dockview-react'
+import type { DockviewApi, DockviewDidDropEvent, DockviewUnhandledDragOverEvent, SerializedDockview } from 'dockview-react'
 import dockviewSheet from 'virtual:dshfiles-workbench/dockview-css'
-import { useEffect, useLayoutEffect, useSyncExternalStore } from 'react'
+import { useEffect, useLayoutEffect, useState, useSyncExternalStore } from 'react'
 import { demoPanels } from './demo-panels.js'
 import { workbenchRegions, type WorkbenchRegionId } from './dock-regions.js'
-import { createLayoutStore, WorkbenchLayout, WORKBENCH_COMPONENT } from './layout-store.js'
+import { createLayoutStore, LAYOUT_SURFACES, WorkbenchLayout, WORKBENCH_COMPONENT, type LayoutSurface } from './layout-store.js'
 import { WORKBENCH_LOCALE_NAMESPACE, workbenchLocale } from './locales.js'
 import { workbenchPanels, type WORKBENCH_MAIN_PANEL_ID, type WorkbenchPanelDefinition } from './registry.js'
 import { effectiveRightPanelMode } from './right-panel-mode.js'
+import {
+  layoutNames, renamedSavedLayout, savedLayouts, withSavedLayout, withoutSavedLayout, type SavedLayout,
+} from './saved-layouts.js'
 import { workbenchSettings } from './settings.js'
 import { WorkbenchView } from './workbench-view.js'
 
@@ -115,7 +122,12 @@ export default defineClient({
               onDrop={handleDrop('main')}
               onUnhandledDragOver={acceptsForeignPanel}
               onApi={api => drainPendingOpen('main', api)}
-              headerActions={context => <MoveMenu from="main" {...context} />}
+              headerActions={context => (
+                <>
+                  <LayoutsDialog />
+                  <MoveMenu from="main" {...context} />
+                </>
+              )}
             />
           )
         }),
@@ -299,6 +311,149 @@ export default defineClient({
       )
     })
 
+    // Named layouts: one arrangement per region, captured from the live
+    // surfaces and written back through the same stores, so a region that is
+    // not mounted yet still receives the layout when it opens.
+    const REGION_BY_SURFACE: Record<LayoutSurface, WorkbenchRegionId> = { main: 'main', dock: 'right', bottom: 'bottom' }
+    const layoutStores: Record<LayoutSurface, ReturnType<typeof createLayoutStore>> = { main: store, dock: dockStore, bottom: bottomStore }
+
+    const captureLayout = (): SavedLayout => {
+      const captured: { -readonly [surface in LayoutSurface]?: SerializedDockview | undefined } = {}
+      for (const [region, api] of regions.entries()) {
+        const surface = LAYOUT_SURFACES.find(candidate => REGION_BY_SURFACE[candidate] === region)
+        if (surface !== undefined) captured[surface] = api.toJSON()
+      }
+      return captured
+    }
+
+    const applyLayout = (layout: SavedLayout): void => {
+      for (const surface of LAYOUT_SURFACES) {
+        const entry = layout[surface]
+        if (entry === undefined) continue
+        layoutStores[surface].set(entry)
+        const api = regions.get(REGION_BY_SURFACE[surface])
+        if (api !== undefined) {
+          api.fromJSON(entry)
+          continue
+        }
+        // The region is closed: open its surface so the layout can land.
+        if (surface === 'bottom') switchBottomPanel?.(true)
+        else if (surface === 'dock') switchRightPanel?.('dock')
+      }
+    }
+
+    const LayoutRow = decorate((props: { readonly name: string; readonly onApplied: () => void }) => {
+      const [editing, setEditing] = useState(false)
+      const [draft, setDraft] = useState(props.name)
+      const layouts = savedLayouts.useValue()
+      const confirmRename = (): void => {
+        const next = draft.trim()
+        if (next.length === 0) return
+        savedLayouts.set(renamedSavedLayout(layouts, props.name, next))
+        setEditing(false)
+      }
+      return (
+        <div className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-2 dshx:py-1">
+          {editing ? (
+            <>
+              <Input aria-label={translate('renameLayout')} value={draft} onChange={event => setDraft(event.target.value)} />
+              <div className="dshx:flex dshx:items-center dshx:gap-1">
+                <Button size="sm" variant="ghost" onClick={confirmRename}>
+                  {translate('renameLayout')}
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>
+                  {translate('cancel')}
+                </Button>
+              </div>
+            </>
+          ) : (
+            <>
+              <span className="dshx:truncate dshx:text-sm">{props.name}</span>
+              <div className="dshx:flex dshx:items-center dshx:gap-1">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  aria-label={`${translate('applyLayout')} ${props.name}`}
+                  onClick={() => {
+                    const layout = savedLayouts.get()[props.name]
+                    if (layout === undefined) return
+                    applyLayout(layout)
+                    props.onApplied()
+                  }}
+                >
+                  {translate('applyLayout')}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  aria-label={`${translate('renameLayout')} ${props.name}`}
+                  onClick={() => {
+                    setDraft(props.name)
+                    setEditing(true)
+                  }}
+                >
+                  {translate('renameLayout')}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  aria-label={`${translate('deleteLayout')} ${props.name}`}
+                  onClick={() => savedLayouts.set(withoutSavedLayout(savedLayouts.get(), props.name))}
+                >
+                  {translate('deleteLayout')}
+                </Button>
+              </div>
+            </>
+          )}
+        </div>
+      )
+    })
+
+    const LayoutsDialog = decorate(() => {
+      const [open, setOpen] = useState(false)
+      const [draft, setDraft] = useState('')
+      const layouts = savedLayouts.useValue()
+      const save = (): void => {
+        const name = draft.trim()
+        if (name.length === 0) return
+        savedLayouts.set(withSavedLayout(layouts, name, captureLayout()))
+        setDraft('')
+      }
+      return (
+        <Dialog open={open} onOpenChange={setOpen}>
+          <DialogTrigger asChild>
+            <Button size="sm" variant="ghost">{translate('layouts')}</Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{translate('layoutsTitle')}</DialogTitle>
+              <DialogDescription>{translate('layoutsHint')}</DialogDescription>
+            </DialogHeader>
+            <div className="dshx:flex dshx:flex-col dshx:gap-1">
+              {layoutNames(layouts).map(name => (
+                <LayoutRow key={name} name={name} onApplied={() => setOpen(false)} />
+              ))}
+              {layoutNames(layouts).length === 0 && <p className="dshx:text-sm dshx:text-muted-foreground">{translate('layoutEmpty')}</p>}
+            </div>
+            <DialogFooter>
+              <Input
+                aria-label={translate('layoutName')}
+                placeholder={translate('layoutName')}
+                value={draft}
+                onChange={event => setDraft(event.target.value)}
+              />
+              <Button size="sm" disabled={draft.trim().length === 0} onClick={save}>
+                {translate('saveLayout')}
+              </Button>
+              <DialogClose asChild>
+                <Button size="sm" variant="ghost">{translate('close')}</Button>
+              </DialogClose>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )
+    })
+
     ctx.slots.inject('sidebar.right.pane.tab', () =>
       ctx.slots.register(
         { name: 'sidebar.right.pane.tab', key: RIGHT_PANE_ID, locale: WORKBENCH_LOCALE_NAMESPACE },
@@ -340,6 +495,7 @@ export default defineClient({
               headerActions={context => (
                 <>
                   <ToggleBottomPanel />
+                  <LayoutsDialog />
                   <MoveMenu from="right" {...context} />
                 </>
               )}
@@ -376,7 +532,12 @@ export default defineClient({
               onUnhandledDragOver={acceptsForeignPanel}
               onApi={api => drainPendingOpen('bottom', api)}
               onClose={() => switchBottomPanel?.(false)}
-              headerActions={context => <MoveMenu from="bottom" {...context} />}
+              headerActions={context => (
+                <>
+                  <LayoutsDialog />
+                  <MoveMenu from="bottom" {...context} />
+                </>
+              )}
             />
           )
         }),
