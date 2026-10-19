@@ -244,6 +244,33 @@
           "testName": "links but does not move an item whose status the user chose"
         }
       ]
+    },
+    {
+      "id": "backlog-mentions",
+      "title": "Mention backlog items with @",
+      "summary": "`@b:`/`@backlog:` lists backlog items in the composer's @ menu, plain @ adds up to five matches; a picked chip is sent as `b:<id> \"title\"`, which the thread signal turns into a link and a start.",
+      "surfaces": ["client", "integration"],
+      "configuration": [],
+      "states": ["listed", "inserted", "sent"],
+      "failureModes": [
+        "A failing search returns no backlog rows; the other @ groups are unaffected.",
+        "An invalid chip reference blocks the send instead of sending broken text."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "backlog.mentions-unit-scopes",
+          "file": "plugins/@dshfiles/backlog/src/backlog-mentions.test.ts",
+          "testName": "lists the backlog alone under @b:, a few items under plain @, nothing under another scope"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.mentions-unit-serialize",
+          "file": "plugins/@dshfiles/backlog/src/backlog-mentions.test.ts",
+          "testName": "sends a chip as text naming b:<id>, so the thread signal sees it"
+        }
+      ]
     }
   ],
   "kind": "bundle"

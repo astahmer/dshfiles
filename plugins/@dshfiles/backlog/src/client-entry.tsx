@@ -2,17 +2,26 @@ import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
-import { defineClient } from '@dshfiles/dshx/client'
+import type {} from '@dshfiles/input-trigger/client'
+import { createApiClient, defineClient } from '@dshfiles/dshx/client'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 
+import { backlogApi } from './api.js'
+import { BacklogMentions } from './backlog-mentions.js'
 import { BacklogPanel } from './backlog-panel.js'
 
 const PANEL_ID = 'dshfiles-backlog-panel'
 
 export default defineClient({
   name: '@dshfiles/backlog',
-  inject: ['slots', 'sessions', 'uiWorkspace'],
+  inject: ['slots', 'sessions', 'uiWorkspace', 'inputTriggers'],
   setup(ctx, decorate) {
+    const api = createApiClient(ctx, backlogApi)
+    const mentions = BacklogMentions.createSource({
+      section: 'Backlog',
+      search: async (query, limit, signal) => (await api.list({ query, freshness: 'active', limit }, { signal })).items,
+    })
+    ctx.effect(() => ctx.inputTriggers.registerSource(mentions), 'backlog: @ mentions')
     const PanelView = (): JSX.Element => (
       <PluginQueryProvider>
         <BacklogPanel

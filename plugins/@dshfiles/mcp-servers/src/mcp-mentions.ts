@@ -65,8 +65,8 @@ const decodeMentionValue = (value: unknown): MentionValue | null => {
 
 const mentionClipboardText = (value: MentionValue): string => (value.kind === 'server' ? `MCP server: ${value.serverName}` : `MCP tool: ${value.name}`)
 
-// The @ scopes shared with @dshfiles/mentions: `@t:`/`@thread:`, `@f:`/`@file:`, `@skill:` and `@mcp:`.
-const MENTION_SCOPE = /^(thread|t|file|f|skill|mcp):/iu
+// The @ scopes shared with @dshfiles/mentions: `@t:`/`@thread:`, `@f:`/`@file:`, `@skill:`, `@mcp:` and `@b:`/`@backlog:`.
+const MENTION_SCOPE = /^(thread|t|file|f|skill|mcp|backlog|b):/iu
 
 /** The query this source ranks: the text after its own scope prefix, or undefined while another scope is typed. */
 export class McpMentionModel {

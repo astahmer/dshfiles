@@ -13,10 +13,11 @@ thread.
 - **Scopes:** `@thread:` / `@t:` lists threads only, `@file:` / `@f:` files
   only, plain `@` both. The section heading names the scope and the other
   prefixes. A directory drill keeps the typed prefix.
-- **Skills and MCP:** thread-sidebar's skill source and mcp-servers' MCP
-  source register their own `@` groups beside this one. `@skill:` and `@mcp:`
-  narrow the menu to them (this source stays empty), and `@t:` / `@f:` empty
-  theirs, so each scope lists one kind and nothing is listed twice.
+- **Skills, MCP and backlog:** thread-sidebar's skill source, mcp-servers'
+  MCP source and backlog's item source register their own `@` groups beside
+  this one. `@skill:`, `@mcp:` and `@b:` / `@backlog:` narrow the menu to them
+  (this source stays empty), and `@t:` / `@f:` empty theirs, so each scope
+  lists one kind and nothing is listed twice.
 - **Native chips:** candidates come from `remote.fileReferences.list` and
   `remote.sessionReferenceResolver.candidates`, and picks insert
   `source: "reference"` chips, so copy, paste, preview and send-time

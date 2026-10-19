@@ -10,8 +10,8 @@ const skillNameSchema = z
   .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/u)
 type SkillSessionId = ClientSessionContext['sessionId']
 
-// The @ scopes shared with @dshfiles/mentions: `@t:`/`@thread:`, `@f:`/`@file:`, `@skill:` and `@mcp:`.
-const MENTION_SCOPE = /^(thread|t|file|f|skill|mcp):/iu
+// The @ scopes shared with @dshfiles/mentions: `@t:`/`@thread:`, `@f:`/`@file:`, `@skill:`, `@mcp:` and `@b:`/`@backlog:`.
+const MENTION_SCOPE = /^(thread|t|file|f|skill|mcp|backlog|b):/iu
 
 /** The query this source ranks: the text after its own scope prefix, or undefined while another scope is typed. */
 const scopedMentionQuery = (query: string, ownScope: 'skill' | 'mcp'): string | undefined => {

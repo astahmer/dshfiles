@@ -9,7 +9,7 @@ Feature: Ranked @ mentions and thread links
     Given the isolated plugin profile "@dshfiles/mentions" is booted
     When threads named "deploy" and "fix the deploy script" are started
     And a new thread composer types "@deploy"
-    Then the first mention row is the thread "deploy" under the heading "Threads & files · @t: threads · @f: files · @skill: · @mcp:"
+    Then the first mention row is the thread "deploy" under the heading "Threads & files · @t: threads · @f: files · @skill: · @mcp: · @b: backlog"
     When a new thread composer types "@\"fix the"
     Then a mention row includes the thread "fix the deploy script"
     When a new thread composer types "@t:"

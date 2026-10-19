@@ -80,6 +80,12 @@ you set by hand; the link is recorded either way. Revisions are read with `jj lo
 on `main` every `revisionPollMinutes` (5) in each repository an open item names, plus
 `revisionRepositories`; an unchanged `main` costs one call.
 
+## `@` mentions
+
+In any composer, `@b:` (or `@backlog:`) searches the backlog, and plain `@` shows up to five matching
+items next to threads and files. The chip is sent as `b:12 "title"`, so the thread signal above links the
+thread and starts the item, just as typing `b:12` does.
+
 ## Agent tools
 
 | Tool                       | Kind                                                                                  |

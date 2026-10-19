@@ -1110,6 +1110,9 @@ importers:
       '@dshfiles/dshx':
         specifier: workspace:*
         version: link:../../../tooling/dshx/packages/dshx
+      '@dshfiles/input-trigger':
+        specifier: workspace:*
+        version: link:../input-trigger
       '@dshfiles/plugin-ui':
         specifier: workspace:*
         version: link:../plugin-ui

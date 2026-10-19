@@ -1,6 +1,6 @@
 # Backlog
 
-Resume here: step 6 (`@b:` mentions, backlinks on threads, search index). Steps 1–3 landed in `@dshfiles/backlog`; see its README.
+Resume here: step 6b (backlinks on threads and revisions). Steps 1–3 landed in `@dshfiles/backlog`; see its README.
 
 ## Why
 
@@ -81,16 +81,17 @@ User corrections of an automatic move are kept as labelled examples for step 4's
 
 ## Steps
 
-| #   | Step                                                                                     | State |
-| --- | ---------------------------------------------------------------------------------------- | ----- |
-| 1   | Host store, API, agent tools, deterministic triage, freshness                            | done  |
-| 2   | Panel: capture box, feed, board, facets, item detail with links and backlinks            | done  |
-| 3   | Web profile, feature catalog, e2e journey                                                | done  |
-| 4   | Agent triage: Jev + cheap model proposals in `inbox`, threshold, corrections as examples | done  |
-| 5   | Lifecycle signals from threads, jj revisions and PRs                                     | done  |
-| 6   | `@b:` scope in `@dshfiles/mentions`; backlinks chip on threads and revisions; FTS index  | open  |
-| 7   | Rich body editing (rich-composer) and quoting a thread message into an item              | open  |
-| 8   | One-off import of the Discord TODO channel (also a labelled set for step 4)              | open  |
+| #   | Step                                                                                        | State |
+| --- | ------------------------------------------------------------------------------------------- | ----- |
+| 1   | Host store, API, agent tools, deterministic triage, freshness                               | done  |
+| 2   | Panel: capture box, feed, board, facets, item detail with links and backlinks               | done  |
+| 3   | Web profile, feature catalog, e2e journey                                                   | done  |
+| 4   | Agent triage: Jev + cheap model proposals in `inbox`, threshold, corrections as examples    | done  |
+| 5   | Lifecycle signals from threads, jj revisions and PRs                                        | done  |
+| 6   | `@b:` scope in the composer's `@` menu (mentions, MCP and skill sources learn the scope)    | done  |
+| 6b  | Backlinks chip on threads and revisions; FTS index once the corpus outgrows the token match | open  |
+| 7   | Rich body editing (rich-composer) and quoting a thread message into an item                 | open  |
+| 8   | One-off import of the Discord TODO channel (also a labelled set for step 4)                 | open  |
 
 ## Decisions taken without the user
 
