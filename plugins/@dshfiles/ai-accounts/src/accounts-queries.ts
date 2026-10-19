@@ -128,6 +128,17 @@ export const aiAccountsQueries = {
       refetchInterval: input.refetchInterval,
     }),
 
+  /**
+   * Five weeks thinned to half-hour readings: enough for coverage weeks and a
+   * day of pace. An older Host ignores `bucketMinutes` and sends its bounded series.
+   */
+  forecastHistory: (accounts: Pick<AccountsClient, 'history'>, input: { readonly instanceId: string; readonly refetchInterval: number }) =>
+    queryOptions({
+      queryKey: [...aiAccountsKeys.history, input.instanceId, 'forecast'] as const,
+      queryFn: ({ signal }) => accounts.history({ instanceId: input.instanceId, days: 36, bucketMinutes: 30 }, { signal }),
+      refetchInterval: input.refetchInterval,
+    }),
+
   /** `null` from a Host without history settings, so the page still draws. */
   historySettings: (accounts: Pick<AccountsClient, 'historySettings'>) =>
     queryOptions({

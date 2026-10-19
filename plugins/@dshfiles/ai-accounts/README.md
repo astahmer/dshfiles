@@ -58,6 +58,32 @@ The account field stores only the variable name matching `^[A-Z][A-Z0-9_]*_API_K
 The DSH credential provider is the unversioned secret store fallback; no separate
 credential JSON file is needed.
 
+## Quota forecast
+
+The **Quota forecast** panel (its own sidebar row) reads the stored quota
+snapshots of every enabled account.
+
+- **Forecast** lays each account over the next seven days in six-hour cells,
+  most urgent first. The binding window is the first that runs out before its
+  reset, else the one closest to its limit; windows shorter than a day (the
+  5-hour session) only govern when nothing longer is reported. A cell is shaded
+  by projected use, red where the window runs out, hatched while it stays locked
+  until the reset, and dashed once a new window starts. Pace is the use over the
+  last day of the current cycle (a quarter of the window for shorter ones),
+  falling back to the window average; it assumes that pace holds. Selecting a
+  row shows used against even pace, the projection, the lock, and the points
+  used per day over the last week against the window's daily allowance.
+- **Table** lists the same projection.
+- **Coverage** replays five weeks per provider kind with two or more accounts:
+  one lane per account plus an "accounts free" lane, and the work hours
+  (weekdays 09:00 to 18:00) when every account of the kind was spent at once.
+  The current week continues on pace. A kind with one account is listed as
+  having no cover.
+
+The panel asks the Host for 36 days of history thinned to one reading per half
+hour, keeping every reading where a reset time or a spent window changes. An
+older Host ignores the bucket and returns its bounded series.
+
 ## Editing
 
 Edits save automatically after a short pause by default. A subtle indicator

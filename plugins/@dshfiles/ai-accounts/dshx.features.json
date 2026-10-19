@@ -336,6 +336,58 @@
       ]
     },
     {
+      "id": "quota-forecast",
+      "title": "Forecast when each account runs out, and whether a kind kept an account free",
+      "summary": "A Quota forecast panel projects every account's binding window over seven days of six-hour cells at the current pace (runs out, locked until reset, new window), with a Table view and a detail of used versus even pace and recent daily use. Coverage replays five weeks of stored snapshots per provider kind and counts the work hours with no account of that kind free, continuing the current week on pace.",
+      "reach": ["click button \"Quota forecast\"", "expect tab \"Forecast\"", "expect tab \"Coverage\""],
+      "surfaces": ["client", "host", "storage"],
+      "configuration": [],
+      "states": ["insufficient-history", "runs-out-before-reset", "reset-before-depletion", "unavailable", "pool-covered", "pool-none-free"],
+      "failureModes": [
+        "An account without a quota reading shows \"Reconnect to forecast\" or \"Quota not reported\" instead of an invented projection.",
+        "An older Host ignores the history bucket and returns its bounded series; the forecast still draws."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.forecast-lock",
+          "file": "plugins/@dshfiles/ai-accounts/src/quota-forecast-model.test.ts",
+          "testName": "reports the lock between running out and the reset"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.forecast-order",
+          "file": "plugins/@dshfiles/ai-accounts/src/quota-forecast-model.test.ts",
+          "testName": "projects use at reset when the pace lasts, and sorts by urgency with unreadable accounts last"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.forecast-governing-window",
+          "file": "plugins/@dshfiles/ai-accounts/src/quota-forecast-model.test.ts",
+          "testName": "lets a weekly limit govern the board over a session window that runs out first"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.coverage-none-free",
+          "file": "plugins/@dshfiles/ai-accounts/src/quota-coverage-model.test.ts",
+          "testName": "counts the working hours when every account of a kind was spent at once"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.coverage-single",
+          "file": "plugins/@dshfiles/ai-accounts/src/quota-coverage-model.test.ts",
+          "testName": "keeps a lone account out of the pools and counts how often it ran out"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.history-thinning",
+          "file": "plugins/@dshfiles/ai-accounts/src/usage-history-analysis.test.ts",
+          "testName": "thins a read to one reading per bucket but keeps the readings where a limit is spent or resets"
+        }
+      ]
+    },
+    {
       "id": "luna-reserve-routing",
       "title": "Route exhausted Luna accounts through Reserve",
       "summary": "Use the separate Reserve quota window and route to the Reserve model only after the weekly Luna window is spent.",

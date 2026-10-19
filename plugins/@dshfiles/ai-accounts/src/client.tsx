@@ -15,6 +15,7 @@ import { AccountsPanel } from './accounts-panel.js'
 import type { CredentialSetupPort } from './credential-setup-port.js'
 import { QuotaFooter, QuotaStrip } from './quota-footer.js'
 import { UsageHistoryPanel } from './usage-history-panel.js'
+import { QuotaForecastPanel } from './quota-forecast-panel.js'
 import { EdgeUsageWidget } from './edge-usage.js'
 import { ModelsPageAccounts } from './models-page-accounts.js'
 import { SessionCostDockEntry } from './session-cost.js'
@@ -31,6 +32,7 @@ import { useSyncExternalStore } from 'react'
  */
 const PANEL_ID = 'ai-accounts'
 const USAGE_PANEL_ID = 'ai-accounts-usage'
+const FORECAST_PANEL_ID = 'ai-accounts-forecast'
 const USAGE_STRIP_ID = 'ai-accounts-usage-strip'
 
 export default defineClientPlugin({
@@ -64,6 +66,7 @@ export default defineClientPlugin({
     const translate = ctx.locale.bind(AI_ACCOUNTS_LOCALE_NAMESPACE)
     const label = (): string => translate('aiAccountsPanel')
     const historyLabel = (): string => translate('aiAccountsUsageHistory')
+    const forecastLabel = (): string => translate('aiAccountsQuotaForecast')
     // SAFETY: This id is registered as a main-panel slot below.
     const openAccounts = (): void => ctx.layout.selectPanel(PANEL_ID as MainPanelId)
     // SAFETY: This id is registered as a main-panel slot below.
@@ -78,6 +81,11 @@ export default defineClientPlugin({
     const UsageHistoryPanelView = (): JSX.Element => (
       <PluginQueryProvider>
         <UsageHistoryPanel onBack={openAccounts} />
+      </PluginQueryProvider>
+    )
+    const QuotaForecastPanelView = (): JSX.Element => (
+      <PluginQueryProvider>
+        <QuotaForecastPanel onBack={openAccounts} />
       </PluginQueryProvider>
     )
     const subscribeStripSeat = (listener: () => void): (() => void) => ctx.slots.subscribe('sidebar.footer.above', listener)
@@ -198,7 +206,18 @@ export default defineClientPlugin({
       UsageHistoryGlyph,
     )
     api.ui.register({ name: 'main', key: PANEL_ID, locale: AI_ACCOUNTS_LOCALE_NAMESPACE }, AccountsPanelView)
+    api.ui.register(
+      {
+        name: 'sidebar.panellist',
+        id: FORECAST_PANEL_ID,
+        order: 3,
+        label: forecastLabel,
+        locale: AI_ACCOUNTS_LOCALE_NAMESPACE,
+      },
+      QuotaForecastGlyph,
+    )
     api.ui.register({ name: 'main', key: USAGE_PANEL_ID, locale: AI_ACCOUNTS_LOCALE_NAMESPACE }, UsageHistoryPanelView)
+    api.ui.register({ name: 'main', key: FORECAST_PANEL_ID, locale: AI_ACCOUNTS_LOCALE_NAMESPACE }, QuotaForecastPanelView)
   },
 })
 
@@ -235,5 +254,23 @@ const UsageHistoryGlyph = (props: { readonly size?: number; readonly active?: bo
   >
     <path d="M3 3v18h18" />
     <path d="m7 14 4-4 3 3 6-7" />
+  </svg>
+)
+
+const QuotaForecastGlyph = (props: { readonly size?: number; readonly active?: boolean }): JSX.Element => (
+  <svg
+    aria-hidden
+    width={props.size ?? 18}
+    height={props.size ?? 18}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.7"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <rect x="3" y="5" width="18" height="4" rx="1" />
+    <rect x="3" y="15" width="18" height="4" rx="1" />
+    <path d="M14 5v4M9 15v4" />
   </svg>
 )

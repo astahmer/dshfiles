@@ -8,12 +8,14 @@ const dictionaries = {
   en: {
     aiAccountsPanel: 'AI Accounts',
     aiAccountsUsageHistory: 'Usage history',
+    aiAccountsQuotaForecast: 'Quota forecast',
     credentialRecoveryHint: "Check the provider's API key or sign-in to continue.",
     credentialRecoveryAction: 'Add or fix credentials',
   },
   zh: {
     aiAccountsPanel: 'AI 账号',
     aiAccountsUsageHistory: '用量历史',
+    aiAccountsQuotaForecast: '额度预测',
     credentialRecoveryHint: '检查服务商 API 密钥或登录状态以继续。',
     credentialRecoveryAction: '添加或修复凭据',
   },
