@@ -384,7 +384,8 @@
         "needs-description",
         "conflicted",
         "shared-checkout-refused",
-        "checkout-synced"
+        "checkout-synced",
+        "integration-queued"
       ],
       "failureModes": [
         "The `/rebase` command refuses non-thread workspaces because they have no safe per-thread workspace boundary.",
@@ -405,6 +406,11 @@
         {
           "kind": "gherkin",
           "id": "jj-integration.rebase-browser-journey",
+          "featureFile": "tooling/dshx/e2e/features/jj-integration.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "jj-integration.queued-integration-browser-journey",
           "featureFile": "tooling/dshx/e2e/features/jj-integration.feature"
         },
         {

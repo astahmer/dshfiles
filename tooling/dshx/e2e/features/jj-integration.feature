@@ -154,6 +154,23 @@ Feature: jj thread workspaces
     When the rebase command is submitted in the thread composer
     Then the rebase command refuses the shared checkout without moving main
 
+  @scenario:jj-integration.queued-integration-browser-journey
+  Scenario: Queue an integration while the thread works, undo it, then let it land once idle
+    Given the isolated plugin composition of "@dshfiles/jj-integration, @dshfiles/workspace-folder-picker, @dshfiles/multi-host, @dshfiles/ai-accounts" is booted
+    When a Command Code account backed by a local fake provider is added
+    And the New thread screen is reopened
+    And a disposable jj repository is chosen as the New thread project
+    And the New thread workspace toggle is turned on
+    And the fake model keeps the thread workspace busy with a long bash call
+    And the thread workspace gains a revision described "Queued work"
+    Then the workspace menu offers to queue the integration while the thread works
+    When the integration is queued from the workspace menu
+    Then the workspace menu shows the queued integration with Undo
+    When the queued integration is undone
+    Then the undone integration leaves main in place and can be queued again
+    When the integration is queued from the workspace menu
+    Then main advances onto the work described "Queued work" once the thread is idle
+
   @scenario:jj-integration.thread-workspace-rebase-browser-journey
   Scenario: Thread workspaces update as soon as a rebase succeeds
     Given the isolated plugin composition of "@dshfiles/jj-integration, @dshfiles/workspace-folder-picker, @dshfiles/multi-host" is booted

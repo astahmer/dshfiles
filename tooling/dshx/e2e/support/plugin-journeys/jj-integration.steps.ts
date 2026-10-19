@@ -6,6 +6,7 @@ import { basename, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { After, Then, When } from '../bdd.js'
 import { finishJourneyAssertions, openSettingsDialog, recordAssertion } from '../steps.js'
+import { selectModelForNewThread } from '../threads.js'
 
 interface ThreadRepository {
   readonly temporaryRoot: string
@@ -661,6 +662,83 @@ Then('the thread appears in the Archived sidebar section', async ({ page }: { pa
 When('the Thread workspaces panel is opened', async ({ page }: { page: Page }) => {
   await page.getByRole('button', { name: 'Thread integration', exact: true }).click()
   await expect(page.getByRole('heading', { name: 'Thread integration', exact: true })).toBeVisible()
+})
+
+/** Long enough to queue, undo and queue again while the turn still runs, even on a loaded machine. */
+const BUSY_BASH_DIRECTIVE = `[[call bash ${JSON.stringify({ command: 'sleep 60 && echo queued-integration', description: 'Keep the thread busy' })}]]`
+const queueIntegrationButton = (page: Page) => page.getByRole('button', { name: 'Queue integration into main', exact: true })
+const undoQueuedIntegrationButton = (page: Page) => page.getByRole('button', { name: 'Cancel the queued integration into main', exact: true })
+
+When('the New thread screen is reopened', async ({ page }: { page: Page }) => {
+  await page.keyboard.press('Escape')
+  await page.getByRole('button', { name: 'New session', exact: true }).first().click()
+  await expect(newThreadComposer(page)).toBeVisible()
+})
+
+When('the fake model keeps the thread workspace busy with a long bash call', async ({ page }: { page: Page }) => {
+  await selectModelForNewThread(page, 'commandcode_work/gpt-6-luna')
+  await newThreadComposer(page).fill(BUSY_BASH_DIRECTIVE)
+  await newThreadComposer(page).press('Enter')
+  await expect(
+    page
+      .getByRole('timer', { name: /^Running for \d+ s/ })
+      .or(page.getByText('Keep the thread busy'))
+      .first(),
+  ).toBeVisible({ timeout: 30_000 })
+})
+
+Then('the workspace menu offers to queue the integration while the thread works', async ({ page }: { page: Page }) => {
+  const repository = repositoryFor(page)
+  await openWorkspaceMenu(page)
+  await recordAssertion(page, 'jj-integration-queue-offered-while-busy', async () => {
+    // The thread status reads jj while the turn's bash call also runs, so it answers slower than an idle thread's.
+    await expect(workspaceMenu(page)).toContainText('1 pending integration', { timeout: 45_000 })
+    await expect(queueIntegrationButton(page)).toBeEnabled()
+    await expect(rebaseButton(page)).toHaveCount(0)
+    expect(commitIdOf(repository, 'main')).toBe(repository.baseCommitId)
+  })
+})
+
+When('the integration is queued from the workspace menu', async ({ page }: { page: Page }) => {
+  await openWorkspaceMenu(page)
+  await queueIntegrationButton(page).click()
+})
+
+Then('the workspace menu shows the queued integration with Undo', async ({ page }: { page: Page }) => {
+  const repository = repositoryFor(page)
+  await openWorkspaceMenu(page)
+  await recordAssertion(page, 'jj-integration-queued-integration-shows-undo', async () => {
+    await expect(workspaceMenu(page)).toContainText('Queued: integrates into main as soon as this thread is idle.', { timeout: 10_000 })
+    await expect(undoQueuedIntegrationButton(page)).toBeEnabled()
+    expect(commitIdOf(repository, 'main')).toBe(repository.baseCommitId)
+  })
+})
+
+When('the queued integration is undone', async ({ page }: { page: Page }) => {
+  await openWorkspaceMenu(page)
+  await undoQueuedIntegrationButton(page).click()
+  await expect(undoQueuedIntegrationButton(page)).toHaveCount(0, { timeout: 10_000 })
+})
+
+Then('the undone integration leaves main in place and can be queued again', async ({ page }: { page: Page }) => {
+  const repository = repositoryFor(page)
+  await openWorkspaceMenu(page)
+  await recordAssertion(page, 'jj-integration-undone-integration-can-be-queued-again', async () => {
+    await expect(queueIntegrationButton(page)).toBeEnabled({ timeout: 10_000 })
+    await expect(workspaceMenu(page)).not.toContainText('Queued:')
+    expect(commitIdOf(repository, 'main')).toBe(repository.baseCommitId)
+  })
+})
+
+Then('main advances onto the work described {string} once the thread is idle', async ({ page }: { page: Page }, description: string) => {
+  const repository = repositoryFor(page)
+  await recordAssertion(page, 'jj-integration-queued-integration-lands-when-idle', async () => {
+    await expect.poll(() => descriptionOf(repository, 'main'), { timeout: 150_000, intervals: [1_000] }).toBe(description)
+    expect(commitIdOf(repository, 'main-')).toBe(repository.baseCommitId)
+    await openWorkspaceMenu(page)
+    await expect(workspaceMenu(page)).not.toContainText('Queued:', { timeout: 15_000 })
+  })
+  await finishJourneyAssertions(page)
 })
 
 Then('the thread row offers Integrate for its 1 revision', async ({ page }: { page: Page }) => {
