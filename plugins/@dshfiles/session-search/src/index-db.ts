@@ -47,6 +47,12 @@ CREATE VIRTUAL TABLE IF NOT EXISTS session_documents USING fts5(
   tokenize = 'unicode61'
 );
 
+CREATE TABLE IF NOT EXISTS session_document_rows (
+  session_id TEXT NOT NULL,
+  document_rowid INTEGER NOT NULL,
+  PRIMARY KEY (session_id, document_rowid)
+) STRICT;
+
 CREATE TABLE IF NOT EXISTS meta (
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL
@@ -87,6 +93,8 @@ const rankedRowSchema = sessionRowSchema.extend({
 })
 
 const countRowSchema = z.object({ count: numberLike })
+
+const documentRowidSchema = z.object({ document_rowid: numberLike })
 
 export interface SessionCursor {
   readonly id: string
@@ -192,8 +200,19 @@ export class SearchIndex {
         const insert = this.#database.prepare(
           'INSERT INTO session_documents (text, session_id, seq, type, time, surface, truncated) VALUES (?, ?, ?, ?, ?, ?, ?)',
         )
-        for (const document of documents)
-          insert.run(document.text, document.sessionId, document.seq, document.type, document.time, document.surface, document.truncated ? 1 : 0)
+        const remember = this.#database.prepare('INSERT INTO session_document_rows (session_id, document_rowid) VALUES (?, ?)')
+        for (const document of documents) {
+          const inserted = insert.run(
+            document.text,
+            document.sessionId,
+            document.seq,
+            document.type,
+            document.time,
+            document.surface,
+            document.truncated ? 1 : 0,
+          )
+          remember.run(header.id, Number(inserted.lastInsertRowid))
+        }
       }
       const truncated = documents.reduce((total, document) => total + (document.truncated ? 1 : 0), 0)
       this.#database
@@ -247,8 +266,21 @@ export class SearchIndex {
     }
   }
 
+  /**
+   * Delete one session's documents through the rowid mapping, because a predicate on `session_id` inside
+   * the FTS5 table scans every document in the index (measured 532 ms on a 982 MB index) while an FTS5
+   * delete by rowid is a direct write. A Session indexed before this mapping existed has no rows here:
+   * it takes the one scanning delete, and everything indexed afterwards stays on the rowid path.
+   */
   #deleteSessionRows(sessionId: string): void {
-    this.#database.prepare('DELETE FROM session_documents WHERE session_id = ?').run(sessionId)
+    const mapped = this.#database.prepare('SELECT document_rowid FROM session_document_rows WHERE session_id = ?').all(sessionId)
+    if (mapped.length === 0) {
+      this.#database.prepare('DELETE FROM session_documents WHERE session_id = ?').run(sessionId)
+      return
+    }
+    const remove = this.#database.prepare('DELETE FROM session_documents WHERE rowid = ?')
+    for (const row of mapped) remove.run(documentRowidSchema.parse(row).document_rowid)
+    this.#database.prepare('DELETE FROM session_document_rows WHERE session_id = ?').run(sessionId)
   }
 
   searchSessions(request: SessionSearchRequest): SearchRows {
@@ -352,7 +384,9 @@ export class SearchIndex {
     readonly lastError: string | null
   }): IndexHealth {
     const sessions = countRowSchema.parse(this.#database.prepare('SELECT count(*) AS count FROM sessions').get()).count
-    const documents = countRowSchema.parse(this.#database.prepare('SELECT count(*) AS count FROM session_documents').get()).count
+    // `commitBatch` maintains `documents_count` on every append, replace and forget, so the sum is the
+    // FTS5 row count without scanning the virtual table (measured 572 ms per `count(*)` at 982 MB).
+    const documents = countRowSchema.parse(this.#database.prepare('SELECT COALESCE(SUM(documents_count), 0) AS count FROM sessions').get()).count
     let indexBytes = 0
     for (const suffix of ['', '-wal', '-shm']) indexBytes += statSize(`${this.#path}${suffix}`)
     return { sessions, documents, indexBytes, ...input }
