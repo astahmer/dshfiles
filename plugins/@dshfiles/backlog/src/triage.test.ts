@@ -24,7 +24,7 @@ const item = (id: number, title: string, fields: Partial<BacklogItem> = {}): Bac
 const jevAnswering =
   (answers: { readonly actionable: number; readonly duplicate?: number }): TriageServices['jev'] =>
   async request =>
-    request.question.instructions.startsWith('Is `content` an actionable') ? answers.actionable : (answers.duplicate ?? 0)
+    request.question.instructions.startsWith('Is `content` work') ? answers.actionable : (answers.duplicate ?? 0)
 
 describe('triage', () => {
   it('moves work out of the inbox with Jev alone and reports its confidence', async () => {

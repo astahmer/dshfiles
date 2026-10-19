@@ -25,8 +25,8 @@ export interface TriageCorrection {
 
 const actionable: TriageQuestion = {
   instructions:
-    'Is `content` an actionable piece of work someone should do (a task, a fix, a change to make), rather than a note, an observation or a reference to keep?',
-  criteria: { true: 'Describes work to do', false: 'A note, fact, observation, link or thought to keep' },
+    'Is `content` work someone should do (a task, a change to make) or a problem someone should fix (a bug report, something broken or wrong), rather than a note, a tip or a reference to keep?',
+  criteria: { true: 'Work to do or a problem to fix, including a bug report', false: 'A note, tip, fact, link or thought to keep' },
 }
 
 const sameWork = (existing: string): TriageQuestion => ({
