@@ -1,4 +1,4 @@
-import { expect, type Page } from '@playwright/test'
+import { expect, type Locator, type Page } from '@playwright/test'
 import { StartupDialogs } from '../../../packages/dshx/src/project/startup-dialogs.js'
 import { Then, When } from '../bdd.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
@@ -7,12 +7,41 @@ import { sendMessage } from '../threads.js'
 const MAIN_LAYOUT_KEY = 'dshfiles.workbench.layout.v1'
 const SIDE_LAYOUT_KEY = 'dshfiles.workbench.side-panel-layout.v1'
 const DOCK_LAYOUT_KEY = 'dshfiles.workbench.dock-layout.v1'
+const BOTTOM_LAYOUT_KEY = 'dshfiles.workbench.bottom-layout.v1'
+const JUJUTSU_PANEL_ID = 'dshfiles-jujutsu.dock'
 
 /** The global dock lives in the frame's own right-column seat, not in a session's right sidebar. */
 const dockRegion = (page: Page) => page.locator('[data-slot="shell.dock"]')
 
 /** The bottom row is the frame's own seat too: full width below every column. */
 const bottomRegion = (page: Page) => page.locator('[data-slot="shell.bottom"]')
+
+/** The seat wrapper carries no box of its own, so a drag targets the Dockview surface it renders. */
+const surfaceOf = (region: Locator) => region.locator('.dv-dockview')
+
+/**
+ * Dockview starts a tab drag from the pointer gesture itself, so the journey
+ * drives real input rather than a synthetic drop: press on the tab, move in
+ * steps so the drag is intercepted and every drop target sees the drag-over,
+ * then release over the target.
+ */
+const dragTabOnto = async (page: Page, tab: Locator, target: Locator): Promise<void> => {
+  const from = await tab.boundingBox()
+  const to = await target.boundingBox()
+  if (from === null || to === null) throw new Error(`a drag endpoint is not visible: ${JSON.stringify({ from, to })}`)
+  const start = { x: from.x + from.width / 2, y: from.y + from.height / 2 }
+  const end = { x: to.x + to.width / 2, y: to.y + to.height / 2 }
+  const steps = 12
+  await page.mouse.move(start.x, start.y)
+  await page.mouse.down()
+  for (let step = 1; step <= steps; step += 1) {
+    await page.mouse.move(start.x + ((end.x - start.x) * step) / steps, start.y + ((end.y - start.y) * step) / steps)
+  }
+  await page.mouse.up()
+}
+
+const layoutKeys = (page: Page): Promise<readonly (string | null)[]> =>
+  page.evaluate(keys => keys.map(key => localStorage.getItem(key)), [BOTTOM_LAYOUT_KEY, DOCK_LAYOUT_KEY])
 
 const globalPanel = (page: Page, name: string) =>
   page.getByRole('navigation', { name: 'Global panels', exact: true }).getByRole('button', { name, exact: true })
@@ -236,6 +265,40 @@ Then('the bottom panel shows the Jujutsu panel and the dock no longer does', asy
   await recordAssertion(page, 'workbench-panel-moves-into-the-bottom-panel', async () => {
     await expect(bottomRegion(page).getByRole('region', { name: 'Jujutsu', exact: true })).toBeVisible()
     await expect(dockRegion(page).getByRole('region', { name: 'Jujutsu', exact: true })).toHaveCount(0)
+  })
+})
+
+When('the Jujutsu tab is dragged from the dock into the bottom panel', async ({ page }: { page: Page }) => {
+  await dragTabOnto(page, dockRegion(page).getByRole('tab', { name: 'Jujutsu', exact: true }), surfaceOf(bottomRegion(page)))
+})
+
+Then('the bottom row shows no panel of its own', async ({ page }: { page: Page }) => {
+  // A panel lives in exactly one region, so the row waits empty for one to arrive.
+  await expect(bottomRegion(page).getByRole('region')).toHaveCount(0)
+})
+
+Then('the bottom row took the dragged Jujutsu panel and the dock lost it', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'workbench-drag-moves-a-panel-into-the-bottom-row', async () => {
+    await expect(bottomRegion(page).getByRole('region', { name: 'Jujutsu', exact: true })).toBeVisible()
+    await expect(dockRegion(page).getByRole('region', { name: 'Jujutsu', exact: true })).toHaveCount(0)
+    // Each region saves its own layout, so the target holds the panel and the source no longer does.
+    const [bottomLayout, dockLayout] = await layoutKeys(page)
+    expect(bottomLayout ?? '').toContain(JUJUTSU_PANEL_ID)
+    expect(dockLayout ?? '').not.toContain(JUJUTSU_PANEL_ID)
+  })
+})
+
+When('the Jujutsu tab is dragged from the bottom panel back into the dock', async ({ page }: { page: Page }) => {
+  await dragTabOnto(page, bottomRegion(page).getByRole('tab', { name: 'Jujutsu', exact: true }), surfaceOf(dockRegion(page)))
+})
+
+Then('the dock took the dragged Jujutsu panel back and the bottom row lost it', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'workbench-drag-moves-a-panel-back-into-the-dock', async () => {
+    await expect(dockRegion(page).getByRole('region', { name: 'Jujutsu', exact: true })).toBeVisible()
+    await expect(bottomRegion(page).getByRole('region', { name: 'Jujutsu', exact: true })).toHaveCount(0)
+    const [bottomLayout, dockLayout] = await layoutKeys(page)
+    expect(dockLayout ?? '').toContain(JUJUTSU_PANEL_ID)
+    expect(bottomLayout ?? '').not.toContain(JUJUTSU_PANEL_ID)
   })
 })
 

@@ -142,6 +142,11 @@
         },
         {
           "kind": "gherkin",
+          "id": "workbench.drag-between-regions",
+          "featureFile": "tooling/dshx/e2e/features/workbench.feature"
+        },
+        {
+          "kind": "gherkin",
           "id": "workbench.saved-layouts",
           "featureFile": "tooling/dshx/e2e/features/workbench.feature"
         },
@@ -149,7 +154,7 @@
           "kind": "unit-test",
           "id": "workbench.global-dock-unit-default-panel",
           "file": "plugins/@dshfiles/workbench/src/workbench-view.test.tsx",
-          "testName": "leads the dock default layout with the dock panel, and the main one with the Editor"
+          "testName": "leads the dock default layout with the dock panel, the main one with the Editor, and opens the bottom row empty"
         },
         {
           "kind": "unit-test",

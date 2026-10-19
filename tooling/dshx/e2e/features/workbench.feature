@@ -54,12 +54,27 @@ Feature: Workbench layouts
     Then the bottom panel shows the Jujutsu panel and the dock no longer does
     When the bottom panel is hidden again from the dock header
 
+  @scenario:workbench.drag-between-regions
+  Scenario: A panel dragged by its tab lands in another region
+    Given the isolated plugin composition of "@dshfiles/frame-layout, @dshfiles/workbench, @dshfiles/jujutsu, @dshfiles/editor" is booted
+    When the right column is set to the global dock in the plugin settings
+    Then the global dock shows the Jujutsu panel
+    When the bottom panel is shown from the dock header
+    Then the bottom panel is open below the columns
+    And the bottom row shows no panel of its own
+    When the Jujutsu tab is dragged from the dock into the bottom panel
+    Then the bottom row took the dragged Jujutsu panel and the dock lost it
+    When the Jujutsu tab is dragged from the bottom panel back into the dock
+    Then the dock took the dragged Jujutsu panel back and the bottom row lost it
+    When the bottom panel is hidden again from the dock header
+
   @scenario:workbench.saved-layouts
   Scenario: A named layout brings a panel back to where it was saved
     Given the isolated plugin composition of "@dshfiles/frame-layout, @dshfiles/workbench, @dshfiles/jujutsu, @dshfiles/editor" is booted
     When the right column is set to the global dock in the plugin settings
     Then the global dock shows the Jujutsu panel
     When the bottom panel is shown from the dock header
+    Then the bottom panel is open below the columns
     And the Jujutsu panel is moved to the bottom panel
     And the current layout is saved as "bottom jujutsu"
     And the Jujutsu panel is moved back to the right column
