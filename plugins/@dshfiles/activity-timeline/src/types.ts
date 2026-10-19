@@ -151,3 +151,19 @@ export const activityStateSchema = z
   })
   .strict()
 export type ActivityState = z.infer<typeof activityStateSchema>
+
+/** The `backlog` payload of `dshfiles/activity/event`, as `@dshfiles/backlog` emits it. */
+export const backlogActivitySchema = z
+  .object({
+    id: z.string().min(1).max(256),
+    at: z.number().int().nonnegative(),
+    type: z.enum(['backlog.created', 'backlog.moved', 'backlog.linked', 'backlog.commented', 'backlog.attention', 'backlog.triaged']),
+    level: activityLevelSchema,
+    summary: z.string().min(1).max(500),
+    detail: z.string().max(2000).nullable(),
+    itemId: z.number().int().positive(),
+    sessionId: z.string().min(1).max(256).nullable(),
+    revision: z.string().min(1).max(256).nullable(),
+  })
+  .strict()
+export type BacklogActivityInput = z.infer<typeof backlogActivitySchema>

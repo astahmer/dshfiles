@@ -1,4 +1,4 @@
-import type { ActivityIngest, ActivityLevel, ActivityReference, VerificationReceiptSummary } from './types.js'
+import type { ActivityIngest, ActivityLevel, ActivityReference, BacklogActivityInput, VerificationReceiptSummary } from './types.js'
 
 const clamp = (value: string, max: number): string => (value.length <= max ? value : `${value.slice(0, max - 1)}…`)
 
@@ -153,6 +153,29 @@ export class ActivityTimelineAdapters {
     }
   }
 
+  /**
+   * Backlog item changes reported by `@dshfiles/backlog` (moves, links, comments, requests for input). The backlog keeps
+   * the item's full history; the timeline gets one event per change so the shared activity room shows backlog work.
+   */
+  static backlogActivity = (input: BacklogActivityInput): ActivityIngest => {
+    const references: ActivityReference[] = []
+    if (input.sessionId !== null) references.push({ kind: 'session', id: input.sessionId, label: null })
+    if (input.revision !== null) references.push({ kind: 'revision', id: input.revision, label: null })
+    return {
+      id: input.id,
+      at: input.at,
+      source: 'system',
+      type: input.type,
+      level: input.level,
+      summary: input.summary,
+      detail: input.detail,
+      sessionId: input.sessionId,
+      metadata: { itemId: input.itemId },
+      references,
+      provenance: 'reported',
+    }
+  }
+
   static workspaceActivity = (input: {
     readonly id: string
     readonly at: number
@@ -236,3 +259,4 @@ export const communicationMessage = ActivityTimelineAdapters.communicationMessag
 export const integrationActivity = ActivityTimelineAdapters.integrationActivity
 export const sessionActivity = ActivityTimelineAdapters.sessionActivity
 export const workspaceActivity = ActivityTimelineAdapters.workspaceActivity
+export const backlogActivity = ActivityTimelineAdapters.backlogActivity

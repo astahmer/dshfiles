@@ -2,6 +2,7 @@ import type { Context, Effect } from '@deepseek-ai/cordis'
 import { defineHost } from '@dshfiles/dshx/host'
 import { z } from 'zod'
 import {
+  backlogActivity,
   communicationActivity,
   communicationMessage,
   integrationActivity,
@@ -10,7 +11,7 @@ import {
   workspaceActivity,
 } from './adapters.js'
 import { activityTimelineApi } from './api.js'
-import { verificationReceiptEventSchema } from './types.js'
+import { backlogActivitySchema, verificationReceiptEventSchema } from './types.js'
 import { createActivityTimelineService, type ActivityTimelineService } from './service.js'
 
 declare module '@deepseek-ai/cordis' {
@@ -45,6 +46,7 @@ const activityEventPayloadSchema = z.discriminatedUnion('kind', [
       value: z.unknown(),
     })
     .strict(),
+  z.object({ kind: z.literal('backlog'), value: backlogActivitySchema }).strict(),
   verificationReceiptEventSchema,
 ])
 
@@ -92,6 +94,10 @@ const setupHost = (context: Context): Effect<void> => {
     if (parsed.data.kind === 'communication-message') void active.enqueue(communicationMessageSafe(parsed.data.value)).catch(() => undefined)
     if (parsed.data.kind === 'integration')
       void active.enqueue(integrationActivity(parsed.data.value as Parameters<typeof integrationActivity>[0])).catch(() => undefined)
+    if (parsed.data.kind === 'backlog') {
+      void active.enqueue(backlogActivity(parsed.data.value)).catch(() => undefined)
+      return undefined
+    }
     if (parsed.data.kind === 'workspace')
       void active.enqueue(workspaceActivity(parsed.data.value as Parameters<typeof workspaceActivity>[0])).catch(() => undefined)
     return undefined
