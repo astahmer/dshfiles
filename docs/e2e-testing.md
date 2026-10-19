@@ -271,6 +271,28 @@ journeys. It is also why a broad run is the post-merge gate and not the loop:
 editing one of those bundles re-runs a third of the suite, while editing a leaf
 plugin replays all but a handful of tasks in seconds.
 
+The same question one scenario at a time — the scenarios whose _own_ steps reach
+a bundle — is what a task-level key over-approximates:
+
+```sh
+node tooling/dshx/scripts/browser-tasks.mjs --impact @dshfiles/command-palette
+```
+
+| Changed bundle                      | Journey tasks (a whole task re-runs) | Scenarios that actually reach it |
+| ----------------------------------- | -----------------------------------: | -------------------------------: |
+| `@dshfiles/ui-styles`               |                                   38 |                       176 of 193 |
+| `@dshfiles/thread-sidebar`          |                                   10 |                               42 |
+| `@dshfiles/ai-accounts`             |                                   23 |                               41 |
+| `@dshfiles/workspace-folder-picker` |                                   30 |                               37 |
+| `@dshfiles/command-palette`         |                                   30 |                               19 |
+| `@dshfiles/pulls-review`            |                                    3 |                                2 |
+
+So a mid-fan-out bundle re-runs roughly half the scenarios its tasks hold, and a
+bundle every plugin-ui consumer boots (`ui-styles`) really is everywhere. A
+per-scenario result cache keyed on those steps is
+[planned](../plans/e2e-speed/README.md); today the impact tool is how you decide
+what to run by hand.
+
 ### Provider credentials
 
 A journey that sends a message needs a working provider route, and the scratch

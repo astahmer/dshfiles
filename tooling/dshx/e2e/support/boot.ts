@@ -284,6 +284,7 @@ export const closePrewarmedProfiles = async (): Promise<void> => {
   prewarmedHostPids.clear()
   for (const slot of slots) {
     const profile = await slot.pending
+    if (profile !== undefined) traceBootPhase('prewarm-dropped', slot.startedAt)
     await profile?.close().catch(() => undefined)
   }
 }

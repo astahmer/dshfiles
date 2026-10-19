@@ -64,8 +64,8 @@ about the _assertions_ is the bottleneck.
 | --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------- |
 | E1  | Bound every wait, refuse an unscoped broad run, fail fast, one BDD generation, reap leaked Hosts                                                                                                             | Landed as `jj:znlyqmymomlv` |
 | E2  | Boot-phase trace and the composition-validation cache                                                                                                                                                        | Landed (below)              |
-| E3  | Route-interception cost (the network boundary round-trips every request of every page load)                                                                                                                  | Pending measurement         |
-| E4  | Scenario-level result cache: key each scenario by its own steps plus the dists it reaches, so a change re-runs the scenarios that can see it and replays the rest — rebase-proof because it is content-keyed | Pending design              |
+| E3  | Route-interception cost (the network boundary round-trips every request of every page load)                                                                                                                  | Rejected with numbers       |
+| E4  | Scenario-level result cache: key each scenario by its own steps plus the dists it reaches, so a change re-runs the scenarios that can see it and replays the rest — rebase-proof because it is content-keyed | Slice 1 landed (below)      |
 | E5  | Boot reuse: hide the Host startup behind the previous scenario                                                                                                                                               | Landed (below)              |
 | E6  | Wall-time budget ratchet (warn-only first)                                                                                                                                                                   | Optional                    |
 
@@ -94,6 +94,33 @@ scenario those owners hold — the fan-out table above. Split the key per scenar
    cache, evidence receipts must say which scenarios were replayed rather than run, and the step-body
    mapping stays conservative (a step that boots every bundle keeps its whole task keyed).
 
+### E3 receipt: the network boundary is not a cost
+
+A/B on `frame-layout`, forced (knobs pass through and are not part of the task key, so an unforced A/B
+replays one side), two runs each side, four samples per side: with the boundary installed `page-load`
+median 92ms and `profile-interactive` median 954ms; with it skipped, 82ms and 1130ms. The differences are
+noise, and the "slower" side is the boundary-free one. **Keep the boundary as it is**; narrowing its
+`**/*` pattern would buy nothing and weaken a real guarantee.
+
+### E4 slice 1 receipt: per-scenario impact
+
+`featureScenarios` splits a feature into scenarios with their own step lines, the planner records what
+each scenario's own steps reach, and `node tooling/dshx/scripts/browser-tasks.mjs --impact @dshfiles/x`
+prints the scenarios a change to that bundle can see. Measured task-level vs scenario-level reach:
+
+| Bundle                              | Tasks | Scenarios |
+| ----------------------------------- | ----: | --------: |
+| `@dshfiles/ui-styles`               |    38 |       176 |
+| `@dshfiles/thread-sidebar`          |    10 |        42 |
+| `@dshfiles/ai-accounts`             |    23 |        41 |
+| `@dshfiles/workspace-folder-picker` |    30 |        37 |
+| `@dshfiles/command-palette`         |    30 |        19 |
+| `@dshfiles/pulls-review`            |     3 |         2 |
+
+Slice 2 is the receipt store plus enforcement: key each scenario on its own steps and the dists they
+reach, keep a pass receipt, and let the runner skip the scenarios whose key is unchanged — reporting the
+replayed count in the summary. Until that lands, `--impact` is how a person decides what to run.
+
 ### E5 receipt
 
 `prewarmSibling(profile)` starts a sibling boot of the same composition while the current scenario runs
@@ -119,7 +146,9 @@ idle-slot host memory and the discard rate before making it the default.
 
 ## Resume here
 
-E1, E2 and E5 landed. Left: E3 (measure the network boundary's per-request cost on a quiet machine, then
-narrow or reject it), **E4** — the per-scenario result cache, which is what keeps a rebase from re-running
-scenarios whose inputs did not change, and is the piece the user asked for next — and the optional E6
-budget ratchet.
+E1, E2, E3 (rejected), E4 slice 1 and E5 are done. Next: **E4 slice 2**, the per-scenario receipt store
+and its enforcement in the runner — key each scenario on its own steps plus the dist digests they reach,
+store a pass receipt, skip the unchanged ones, and report how many were replayed. Two measurements worth
+taking alongside it: a browser pool is worth ~58ms per context (median, measured — not the bottleneck),
+and the prewarm's cost when consecutive scenarios change composition (one wasted sibling boot, overlapped,
+seen on `activity-timeline`).

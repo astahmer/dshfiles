@@ -107,6 +107,33 @@ export const featureSteps = source =>
     .map(line => /^\s*(?:Given|When|Then|And|But|\*)\s+(.*\S)\s*$/.exec(line)?.[1])
     .filter(step => step !== undefined)
 
+/**
+ * One block per scenario: its `@scenario:` id and its own step lines. A task is one owner over its feature files, so a
+ * change to a widely booted bundle re-ran every scenario the owner holds; the scenarios' own steps are what say which
+ * of them can actually see that bundle.
+ */
+export const featureScenarios = source => {
+  const scenarios = []
+  let pendingId
+  for (const line of source.split('\n')) {
+    const tag = /^\s*@scenario:(\S+)\s*$/.exec(line)
+    if (tag !== null) {
+      pendingId = tag[1]
+      continue
+    }
+    const heading = /^\s*Scenario(?: Outline)?:\s*(.*\S)\s*$/.exec(line)
+    if (heading !== null) {
+      scenarios.push({ id: pendingId, title: heading[1], steps: [] })
+      pendingId = undefined
+      continue
+    }
+    const step = /^\s*(?:Given|When|Then|And|But|\*)\s+(.*\S)\s*$/.exec(line)
+    const current = scenarios.at(-1)
+    if (step !== null && current !== undefined) current.steps.push(step[1])
+  }
+  return scenarios
+}
+
 /** The package owning a feature: the one most of its `@scenario:` tags name, else the cross-plugin workspace. */
 export const featureOwner = (source, packageNames) => {
   const counts = new Map()
@@ -252,10 +279,39 @@ export const planBrowserTasks = async () => {
     )
     const booted = bootsEveryBundle ? bundleNames : mentioned.filter(name => packages.get(name)?.isBundle === true)
 
-    const owner = owners.get(ownerName) ?? { name: ownerName, features: [], smokeFeatures: [], booted: new Set(), journeyFiles: new Set(), unmatchedSteps: [] }
+    const owner = owners.get(ownerName) ?? {
+      name: ownerName,
+      features: [],
+      smokeFeatures: [],
+      booted: new Set(),
+      journeyFiles: new Set(),
+      unmatchedSteps: [],
+      scenarios: [],
+    }
     owner.features.push(featureName.replace(/\.feature$/, ''))
     if (hasSmokeScenario(source)) owner.smokeFeatures.push(featureName.replace(/\.feature$/, ''))
     owner.unmatchedSteps.push(...unmatchedSteps)
+    // Per scenario, what its *own* steps reach: the same analysis the feature gets, one scenario at a time, so a
+    // change can be answered with "these scenarios" instead of "this owner's whole file set".
+    for (const scenario of featureScenarios(source)) {
+      const scenarioDefinitions = scenario.steps
+        .map(step => definitions.find(candidate => candidate.pattern?.test(step)))
+        .filter(definition => definition !== undefined)
+      const scenarioUnmatched = scenarioDefinitions.length !== scenario.steps.length
+      const scenarioEveryBundle = scenarioUnmatched || scenarioDefinitions.some(definition => /\bbootProfile\(/.test(definition.body))
+      const scenarioMentioned = [...scenario.steps, ...scenarioDefinitions.map(definition => definition.body)].flatMap(text =>
+        [...text.matchAll(/@dshfiles\/[a-z0-9-]+/g)].map(match => match[0]),
+      )
+      const scenarioBooted = scenarioEveryBundle ? bundleNames : [...new Set(scenarioMentioned.filter(name => packages.get(name)?.isBundle === true))]
+      if (scenarioBooted.some(name => packages.get(name)?.usesPluginUi === true) && !scenarioBooted.includes(sharedStylesBundle))
+        scenarioBooted.push(sharedStylesBundle)
+      owner.scenarios.push({
+        id: scenario.id ?? `${featureName.replace(/\.feature$/, '')}:${scenario.title}`,
+        feature: featureName.replace(/\.feature$/, ''),
+        booted: [...scenarioBooted].sort(),
+        everyBundle: scenarioEveryBundle,
+      })
+    }
     for (const name of booted) owner.booted.add(name)
     // Every composed boot of a plugin-ui consumer carries the sheet owner, and a class change can change what the
     // journey asserts, so those tasks read its digest. The per-bundle boot check deliberately stays isolated.
@@ -393,7 +449,39 @@ const syncConfigs = async ({ write }) => {
   return drift
 }
 
+/** The scenarios a change to `name` can reach: every scenario whose own steps boot that bundle. */
+export const impactOfBundle = (owners, name) => {
+  const affected = []
+  for (const owner of owners.values()) {
+    for (const scenario of owner.scenarios) {
+      if (scenario.everyBundle || scenario.booted.includes(name)) affected.push({ owner: owner.name, ...scenario })
+    }
+  }
+  return affected
+}
+
+const printImpact = async name => {
+  const { owners } = await planBrowserTasks()
+  const total = [...owners.values()].reduce((sum, owner) => sum + owner.scenarios.length, 0)
+  const affected = impactOfBundle(owners, name)
+  const byOwner = new Map()
+  for (const scenario of affected) byOwner.set(scenario.owner, [...(byOwner.get(scenario.owner) ?? []), scenario.id])
+  console.log(`${name}: ${String(affected.length)} of ${String(total)} scenarios, in ${String(byOwner.size)} of ${String(owners.size)} journey tasks`)
+  for (const [owner, ids] of [...byOwner.entries()].sort(([, left], [, right]) => right.length - left.length)) {
+    console.log(`  ${owner} (${String(ids.length)}): ${ids.join(', ')}`)
+  }
+}
+
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  const impactIndex = process.argv.indexOf('--impact')
+  if (impactIndex !== -1) {
+    const name = process.argv[impactIndex + 1]
+    if (name === undefined) {
+      console.error('browser-tasks: --impact needs a bundle or plugin name, e.g. --impact @dshfiles/thread-sidebar')
+      process.exitCode = 2
+    } else await printImpact(name)
+    process.exit(process.exitCode ?? 0)
+  }
   const write = process.argv.includes('--write')
   const drift = await syncConfigs({ write })
   if (write) console.log(drift.length === 0 ? 'Browser task configs already up to date.' : `Rewrote:\n  ${drift.join('\n  ')}`)

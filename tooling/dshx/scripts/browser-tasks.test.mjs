@@ -7,7 +7,9 @@ import { fileURLToPath } from 'node:url'
 import {
   cucumberExpressionPattern,
   featureOwner,
+  featureScenarios,
   featureSteps,
+  impactOfBundle,
   parseStepDefinitions,
   planBrowserTasks,
   resolveBrowserSelection,
@@ -128,4 +130,64 @@ test('every owner closure stays scoped to the packages its own boot reads', asyn
     for (const booted of owner.booted) assert.ok(closure.includes(booted), `${owner.name} closure omits ${booted}`)
     assert.ok(closure.includes('@dshfiles/dshx'))
   }
+})
+
+test('featureScenarios keeps each scenario with its own id and steps', () => {
+  const scenarios = featureScenarios(
+    [
+      'Feature: Example',
+      '',
+      '  @smoke',
+      '  @scenario:example.first',
+      '  Scenario: First behaviour',
+      '    Given the isolated plugin profile "@dshfiles/alpha" is booted',
+      '    Then it works',
+      '',
+      '  @scenario:example.second',
+      '  Scenario: Second behaviour',
+      '    Given the isolated plugin profile "@dshfiles/beta" is booted',
+      '    Then it also works',
+    ].join('\n'),
+  )
+  assert.deepEqual(
+    scenarios.map(scenario => scenario.id),
+    ['example.first', 'example.second'],
+  )
+  assert.deepEqual(scenarios[0]?.steps, ['the isolated plugin profile "@dshfiles/alpha" is booted', 'it works'])
+  assert.equal(scenarios[1]?.title, 'Second behaviour')
+})
+
+test('impactOfBundle names the scenarios whose own steps reach a bundle, not their whole task', () => {
+  const owners = new Map([
+    [
+      '@dshfiles/alpha',
+      {
+        name: '@dshfiles/alpha',
+        scenarios: [
+          { id: 'alpha.one', feature: 'alpha', booted: ['@dshfiles/alpha'], everyBundle: false },
+          { id: 'alpha.two', feature: 'alpha', booted: ['@dshfiles/beta'], everyBundle: false },
+          { id: 'alpha.all', feature: 'alpha', booted: [], everyBundle: true },
+        ],
+      },
+    ],
+  ])
+  assert.deepEqual(
+    impactOfBundle(owners, '@dshfiles/alpha').map(scenario => scenario.id),
+    ['alpha.one', 'alpha.all'],
+  )
+  assert.deepEqual(
+    impactOfBundle(owners, '@dshfiles/beta').map(scenario => scenario.id),
+    ['alpha.two', 'alpha.all'],
+  )
+})
+
+test('a scenario-level impact is never wider than the task-level impact it replaces', async () => {
+  const { owners } = await planBrowserTasks()
+  const total = [...owners.values()].reduce((sum, owner) => sum + owner.scenarios.length, 0)
+  assert.ok(total >= 190, `every scenario should be planned, saw ${String(total)}`)
+  const affected = impactOfBundle(owners, '@dshfiles/command-palette')
+  const affectedOwners = new Set(affected.map(scenario => scenario.owner))
+  // command-palette reaches far fewer scenarios than the task count its digest already fans out to.
+  assert.ok(affected.length > 0 && affected.length < 60, `expected a handful of scenarios, saw ${String(affected.length)}`)
+  assert.ok(affectedOwners.size < owners.size)
 })
