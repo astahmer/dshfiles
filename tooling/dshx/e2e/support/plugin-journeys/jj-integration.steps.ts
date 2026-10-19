@@ -577,6 +577,12 @@ Then('Rebase moves main onto the work described {string}', async ({ page }: { pa
     await expect(notice).toBeVisible()
     await expect(notice).toContainText(`This thread was integrated into main (${changeIdOf(repository, 'main')}).`)
     await expect(notice.getByRole('button', { name: 'Archive this integrated thread', exact: true })).toBeEnabled()
+    // The notice sits in the composer dock, which spans the whole conversation: it must stay capped and centred.
+    const noticeMaxWidth = await notice.evaluate(element => Number.parseFloat(getComputedStyle(element).maxWidth))
+    const noticeBounds = await notice.boundingBox()
+    if (noticeBounds === null) throw new Error('The rebased notice has no layout box.')
+    expect(Number.isFinite(noticeMaxWidth)).toBe(true)
+    expect(noticeBounds.width).toBeLessThanOrEqual(noticeMaxWidth + 1)
     await expect(rebasedToast).toContainText('main is now at')
     await expect(rebasedToast).toContainText(`(${commitIdOf(repository, 'main').slice(0, 8)})`)
     expect(commitIdOf(repository, 'main-')).toBe(repository.baseCommitId)

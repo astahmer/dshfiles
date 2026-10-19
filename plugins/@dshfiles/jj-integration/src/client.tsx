@@ -250,7 +250,7 @@ export default defineClient({
         <>
           <div
             data-testid="jj-thread-rebased-notice"
-            className="dshx-root dshx:mx-auto dshx:my-3 dshx:flex dshx:max-w-3xl dshx:items-center dshx:gap-2 dshx:rounded-md dshx:border dshx:bg-muted/40 dshx:px-3 dshx:py-2 dshx:text-sm dshx:text-muted-foreground"
+            className="dshx-root dshx:mx-auto dshx:my-3 dshx:flex dshx:w-full dshx:max-w-3xl dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:rounded-md dshx:border dshx:bg-muted/40 dshx:px-3 dshx:py-2 dshx:text-sm dshx:text-muted-foreground"
           >
             <span className="dshx:min-w-0 dshx:flex-1">{notice}</span>
             <time className="dshx:shrink-0 dshx:text-xs dshx:tabular-nums" dateTime={new Date(rebasedAt).toISOString()}>
