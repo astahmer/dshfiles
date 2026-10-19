@@ -24,6 +24,8 @@ const en = {
   hidePanel: 'Hide panel',
   bottomHeading: 'Panel',
   moveToDock: 'Move to the dock',
+  moveToBottomPanel: 'Move to the bottom panel',
+  movePanel: 'Move',
   sidePanelGuide: 'Dock and arrange registered panels beside the thread.',
   dockHeading: 'Panels',
 }
@@ -49,6 +51,8 @@ const zh = {
   hidePanel: '隐藏面板',
   bottomHeading: '面板',
   moveToDock: '移到右栏',
+  moveToBottomPanel: '移到底部面板',
+  movePanel: '移动',
   sidePanelGuide: '在会话旁停靠和排列已注册的面板。',
   dockHeading: '面板',
 } satisfies Record<keyof typeof en, string>

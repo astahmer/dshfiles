@@ -10,7 +10,9 @@ import type { RightPanelMode } from '@dshfiles/frame-layout/regions'
 // Type-only: the frame's right-column seat and the `shell.dock` slot it declares.
 import type {} from '@dshfiles/frame-layout/regions'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger,
+} from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { LayoutGridIcon } from '@dshfiles/plugin-ui/icons'
 import type { DockviewApi, DockviewDidDropEvent, DockviewUnhandledDragOverEvent } from 'dockview-react'
 import dockviewSheet from 'virtual:dshfiles-workbench/dockview-css'
@@ -114,7 +116,8 @@ export default defineClient({
               onOpenPanel={openIn('main')}
               onDrop={handleDrop('main')}
               onUnhandledDragOver={acceptsForeignPanel}
-              headerActions={context => <MainMoveToDock {...context} />}
+              onApi={api => drainPendingOpen('main', api)}
+              headerActions={context => <MoveMenu from="main" {...context} />}
             />
           )
         }),
@@ -146,7 +149,8 @@ export default defineClient({
     // one instance is Dockview's own business; a drag onto another arrives as a
     // foreign PanelTransfer, which the target accepts here and then adopts.
     const regions = workbenchRegions()
-    let pendingDockOpen: string | null = null
+    /** A panel asked for a region that is not mounted yet, consumed when its surface reports ready. */
+    const pendingOpen = new Map<WorkbenchRegionId, string>()
 
     const closeElsewhere = (region: WorkbenchRegionId, panelId: string): void => {
       for (const [id, api] of regions.entries()) {
@@ -196,22 +200,40 @@ export default defineClient({
       ctx.layout.selectPanel(target)
     }
 
-    const openInDock = (panelId: string): void => {
+    const drainPendingOpen = (region: WorkbenchRegionId, api: DockviewApi): void => {
+      const panelId = pendingOpen.get(region)
+      if (panelId === undefined) return
+      pendingOpen.delete(region)
       const definition = registry.get(panelId)
-      if (definition === undefined) return
-      const dock = regions.get('right')
-      if (dock === undefined) {
-        pendingDockOpen = panelId
-        switchRightPanel?.('dock')
-        return
-      }
-      closeElsewhere('right', panelId)
-      WorkbenchLayout.openPanel(dock, definition)
+      if (definition !== undefined && api.getPanel(panelId) === undefined) WorkbenchLayout.openPanel(api, definition)
     }
 
-    const moveToDock = (api: DockviewApi, panelId: string): void => {
+    /**
+     * Show a panel in `region`, switching the region's surface on when it is not
+     * mounted yet: the row or the dock column opens, and its surface takes the
+     * pending panel as soon as it reports ready.
+     */
+    const openInRegion = (region: WorkbenchRegionId, panelId: string): void => {
+      const definition = registry.get(panelId)
+      if (definition === undefined) return
+      const api = regions.get(region)
+      if (api === undefined) {
+        pendingOpen.set(region, panelId)
+        if (region === 'bottom') switchBottomPanel?.(true)
+        else if (region === 'right') switchRightPanel?.('dock')
+        return
+      }
+      closeElsewhere(region, panelId)
+      WorkbenchLayout.openPanel(api, definition)
+    }
+
+    const movePanelTo = (from: WorkbenchRegionId, api: DockviewApi, to: WorkbenchRegionId, panelId: string): void => {
+      if (to === 'main') {
+        moveToMainView(api, panelId)
+        return
+      }
       api.getPanel(panelId)?.api.close()
-      openInDock(panelId)
+      openInRegion(to, panelId)
     }
 
     /** Where an "Add panel" goes: the definition moves here if another region shows it. */
@@ -220,43 +242,7 @@ export default defineClient({
       WorkbenchLayout.openPanel(api, definition)
     }
 
-    /**
-     * The dock's move menu. The header actions hand it the live api and the ids
-     * the surface shows: this component mounts with the header, before Dockview
-     * reports ready, so a captured instance would still be null on first render.
-     */
-
-    /**
-     * The dock's move menu. The header actions hand it the live api and the ids
-     * the surface shows: this component mounts with the header, before Dockview
-     * reports ready, so a captured instance would still be null on first render.
-     */
-    const DockMoveToMain = decorate((props: { readonly api: DockviewApi | null; readonly openIds: readonly string[] }) => {
-      const api = props.api
-      const movable = props.openIds.filter(id => {
-        const target = registry.get(id)?.mainPanelId
-        return target !== undefined && isMainPanelId(target)
-      })
-      if (api === null || movable.length === 0) return null
-      return (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button size="sm" variant="ghost">
-              {translate('moveToMainView')}
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            {movable.map(id => (
-              <DropdownMenuItem key={id} onSelect={() => moveToMainView(api, id)}>
-                {registry.get(id)?.title ?? id}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      )
-    })
-
-    /** Show or hide the bottom panel from the dock's own header. */
+    /** Show or hide the bottom panel from a surface's own header. */
     const ToggleBottomPanel = decorate(() => {
       const settings = useSettings(workbenchSettings)
       const shown = settings.value?.bottomPanel === 'shown'
@@ -268,23 +254,45 @@ export default defineClient({
       )
     })
 
-    /** The main workbench's move menu: everything it shows can go back to the dock. */
-    const MainMoveToDock = decorate((props: { readonly api: DockviewApi | null; readonly openIds: readonly string[] }) => {
+    const destinationLabel = (region: WorkbenchRegionId): string =>
+      region === 'main' ? translate('moveToMainView') : region === 'bottom' ? translate('moveToBottomPanel') : translate('moveToDock')
+
+    /**
+     * Move a panel to another region, or to its own full main-view page. The
+     * header actions hand the menu the live api and the ids the surface shows:
+     * this component mounts with the header, before Dockview reports ready, so a
+     * captured instance would still be null on first render.
+     */
+    const MoveMenu = decorate((props: { readonly api: DockviewApi | null; readonly openIds: readonly string[]; readonly from: WorkbenchRegionId }) => {
       const api = props.api
-      if (api === null || props.openIds.length === 0) return null
+      const movable = props.openIds.filter(id => registry.get(id) !== undefined)
+      if (api === null || movable.length === 0) return null
+      const destinations = (['right', 'bottom', 'main'] as const).filter(destination => destination !== props.from)
       return (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button size="sm" variant="ghost">
-              {translate('moveToDock')}
-            </Button>
+            <Button size="sm" variant="ghost">{translate('movePanel')}</Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            {props.openIds.map(id => (
-              <DropdownMenuItem key={id} onSelect={() => moveToDock(api, id)}>
-                {registry.get(id)?.title ?? id}
-              </DropdownMenuItem>
-            ))}
+            {movable.map(id => {
+              const definition = registry.get(id)
+              const target = definition?.mainPanelId
+              const options = destinations.filter(destination =>
+                destination === 'main' ? target !== undefined && isMainPanelId(target) : true)
+              if (options.length === 0) return null
+              return (
+                <DropdownMenuSub key={id}>
+                  <DropdownMenuSubTrigger>{definition?.title ?? id}</DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent>
+                    {options.map(destination => (
+                      <DropdownMenuItem key={destination} onSelect={() => movePanelTo(props.from, api, destination, id)}>
+                        {destinationLabel(destination)}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
+              )
+            })}
           </DropdownMenuContent>
         </DropdownMenu>
       )
@@ -327,16 +335,11 @@ export default defineClient({
               onOpenPanel={openIn('right')}
               onDrop={handleDrop('right')}
               onUnhandledDragOver={acceptsForeignPanel}
-              onApi={api => {
-                if (pendingDockOpen === null) return
-                const definition = registry.get(pendingDockOpen)
-                pendingDockOpen = null
-                if (definition !== undefined) WorkbenchLayout.openPanel(api, definition)
-              }}
+              onApi={api => drainPendingOpen('right', api)}
               headerActions={context => (
                 <>
                   <ToggleBottomPanel />
-                  <DockMoveToMain {...context} />
+                  <MoveMenu from="right" {...context} />
                 </>
               )}
             />
@@ -364,7 +367,9 @@ export default defineClient({
               onOpenPanel={openIn('bottom')}
               onDrop={handleDrop('bottom')}
               onUnhandledDragOver={acceptsForeignPanel}
+              onApi={api => drainPendingOpen('bottom', api)}
               onClose={() => switchBottomPanel?.(false)}
+              headerActions={context => <MoveMenu from="bottom" {...context} />}
             />
           )
         }),

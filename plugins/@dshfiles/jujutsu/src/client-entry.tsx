@@ -193,6 +193,8 @@ export default defineClient({
           id: DOCK_PANEL_ID,
           title: 'Jujutsu',
           dockDefault: true,
+          // The same feature's full main-view page, so the workbench offers "Move to main view" for the panel.
+          mainPanelId: PANEL_ID,
           component: panelForSurface('dock'),
         }),
       'dshfiles-jujutsu: dock panel',
