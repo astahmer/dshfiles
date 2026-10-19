@@ -50,4 +50,21 @@ describe('model picker selection rules', () => {
     expect(ModelPickerModel.effortName(nova, currentSelection)).toBe('Deep')
     expect(ModelPickerModel.effortName(nova, { ...currentSelection, reasoningEffort: 'retired' })).toBe('retired')
   })
+
+  it('drops the account prefix from the trigger and names the provider only when the model name is shared', () => {
+    const alex = { id: 'opencode-go-alex', name: 'OpenCode Go Alex', models: [{ id: 'deepseek-v4', name: 'opencode-go-alex/DeepSeek V4' }] }
+    const work = { id: 'opencode-go-work', name: 'OpenCode Go Work', models: [{ id: 'deepseek-v4', name: 'opencode-go-work/DeepSeek V4' }] }
+    const alexSelection: ModelSelection = { provider: 'opencode-go-alex', model: 'deepseek-v4' }
+
+    expect(ModelPickerModel.triggerLabel({ groups: [alex, redwood], current: alexSelection })).toEqual({
+      model: 'DeepSeek V4',
+      title: 'OpenCode Go Alex · DeepSeek V4',
+    })
+    expect(ModelPickerModel.triggerLabel({ groups: [alex, work], current: alexSelection })).toEqual({
+      model: 'DeepSeek V4',
+      providerTag: 'OGA',
+      title: 'OpenCode Go Alex · DeepSeek V4',
+    })
+    expect(ModelPickerModel.triggerLabel({ groups: [], current: alexSelection })).toBeUndefined()
+  })
 })

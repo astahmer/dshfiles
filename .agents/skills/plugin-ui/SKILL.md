@@ -55,9 +55,9 @@ Plugin surfaces render in 360–480 px panes, split layouts and the composer, so
 - A container's inline size cannot come from its content: give it a width (`w-80 max-w-full`) or let a parent size it.
   It also cannot query itself: put `@max-*` classes on its children, not on the `@container` element.
 - The composer row is a native container: composer slots query it directly. Order there: Drafts and Prompts lose their
-  labels (`@max-pane-compact`), the jj dock chips collapse to the working-copy chip, the model name truncates
-  (`100cqw`), and the row's own `data-model-compact` hides the name only when even that does not fit; the effort
-  never truncates.
+  labels (`@max-pane-compact`, or as soon as the row sets `data-model-compact`), the jj dock chips collapse to the
+  working-copy chip, the model name truncates (`100cqw`), and the row's own `data-model-compact` (query it with
+  `dshx:in-data-model-compact:`) hides the reasoning effort, never the model name.
 - Check 360, 480, 768 and 1024 px plus a split layout (see `verify-dsh`).
 
 ## Rebuild the sheet owner after any class change

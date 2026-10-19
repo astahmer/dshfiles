@@ -35,6 +35,37 @@ export class ModelPickerModel {
     ...(reasoningEffort === undefined ? {} : { reasoningEffort }),
   })
 
+  /** Account providers prefix every model name with their instance id; under its provider the prefix says nothing. */
+  static displayName = ({ group, model }: { readonly group: Pick<ModelGroup, 'id'>; readonly model: Pick<CatalogModel, 'name'> }): string =>
+    model.name.startsWith(`${group.id}/`) ? model.name.slice(group.id.length + 1) : model.name
+
+  /** The trigger names the provider (its initials) only when another provider offers the same model name. */
+  static triggerLabel = ({
+    groups,
+    current,
+  }: {
+    readonly groups: readonly ModelGroup[]
+    readonly current: ModelSelection
+  }): { readonly model: string; readonly providerTag?: string; readonly title: string } | undefined => {
+    const group = groups.find(candidate => candidate.id === current.provider)
+    const model = group?.models.find(candidate => candidate.id === current.model)
+    if (group === undefined || model === undefined) return undefined
+    const name = ModelPickerModel.displayName({ group, model })
+    const title = `${group.name} · ${name}`
+    const ambiguous = groups.some(
+      other => other.id !== group.id && other.models.some(candidate => ModelPickerModel.displayName({ group: other, model: candidate }) === name),
+    )
+    if (!ambiguous) return { model: name, title }
+    const initials = group.name
+      .split(/\s+/u)
+      .filter(Boolean)
+      .map(part => part[0])
+      .join('')
+      .slice(0, 3)
+      .toUpperCase()
+    return { model: name, providerTag: initials || group.id, title }
+  }
+
   static effortName = (model: CatalogModel, current: ModelSelection | null): string => {
     const selected = current?.reasoningEffort ?? model.reasoning?.defaultEffort
     if (selected === undefined) return 'Provider default'

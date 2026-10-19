@@ -34,7 +34,8 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select }
   const [sliderIndex, setSliderIndex] = useState(selectedEffortIndex)
   const busy = locked || state.status === 'selecting'
   const effortLabel = selectedModel === undefined ? (state.retainedEffort ?? 'Default') : ModelPickerModel.effortName(selectedModel, current)
-  const triggerLabel = selectedModel?.name ?? current?.model ?? (state.status === 'loading' ? 'Loading models…' : 'Choose model')
+  const shortLabel = current === null ? undefined : ModelPickerModel.triggerLabel({ groups: state.groups, current })
+  const triggerLabel = shortLabel?.model ?? current?.model ?? (state.status === 'loading' ? 'Loading models…' : 'Choose model')
 
   useEffect(() => {
     if (open && available) load()
@@ -64,7 +65,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select }
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
-          aria-label={`${triggerLabel}, reasoning ${effortLabel}`}
+          aria-label={`${shortLabel?.title ?? triggerLabel}, reasoning ${effortLabel}`}
           className="dshx-root dshx:h-8 dshx:max-w-72 dshx:min-w-0 dshx:justify-start dshx:gap-1.5 dshx:px-2 dshx:text-left dshx:@max-pane-narrow:gap-1 dshx:@max-pane-narrow:has-[>svg]:px-1.5"
           disabled={locked}
           size="sm"
@@ -76,20 +77,29 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select }
             <SparklesIcon aria-hidden="true" className="dshx:size-4 dshx:shrink-0 dshx:text-muted-foreground" />
           )}
           <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:gap-1.5 dshx:leading-none">
-            {/* The name truncates with the composer row (a native container) before the effort does; the row's own
-                compact flag hides it only when even the truncated name cannot share the line. */}
+            {shortLabel?.providerTag === undefined ? null : (
+              <span
+                className="dshx:shrink-0 dshx:text-[10px] dshx:font-semibold dshx:text-muted-foreground"
+                data-model-picker-provider
+                title={shortLabel.title}
+              >
+                {shortLabel.providerTag}
+              </span>
+            )}
+            {/* The name truncates with the composer row (a native container); the row's own compact flag drops the
+                effort instead of the name, so the trigger always says which model answers. */}
             <span
               className="dshx:max-w-[clamp(3rem,calc(100cqw-21rem),12rem)] dshx:min-w-0 dshx:truncate dshx:text-xs dshx:font-medium"
               data-model-picker-text
-              style={{ display: 'var(--dsh-composer-model-text-display, inline)' }}
+              title={shortLabel?.title}
             >
               {triggerLabel}
             </span>
-            <span aria-hidden="true" className="dshx:text-[10px] dshx:text-muted-foreground dshx:@max-pane-narrow:hidden">
+            <span aria-hidden="true" className="dshx:text-[10px] dshx:text-muted-foreground dshx:@max-pane-narrow:hidden dshx:in-data-model-compact:hidden">
               ·
             </span>
             <span
-              className="dshx:shrink-0 dshx:rounded-full dshx:bg-muted dshx:px-1.5 dshx:py-0.5 dshx:text-[10px] dshx:text-muted-foreground"
+              className="dshx:shrink-0 dshx:rounded-full dshx:bg-muted dshx:px-1.5 dshx:py-0.5 dshx:text-[10px] dshx:text-muted-foreground dshx:in-data-model-compact:hidden"
               data-model-picker-effort
             >
               {effortLabel}
@@ -137,7 +147,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select }
                         size="sm"
                         variant="ghost"
                       >
-                        <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{model.name}</span>
+                        <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{ModelPickerModel.displayName({ group, model })}</span>
                         <span className="dshx:max-w-28 dshx:truncate dshx:text-[10px] dshx:text-muted-foreground">{model.id}</span>
                         {active && <CheckIcon aria-hidden="true" className="dshx:size-4 dshx:shrink-0 dshx:text-primary" />}
                       </Button>
