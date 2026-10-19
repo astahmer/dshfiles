@@ -12,17 +12,21 @@ contributes an editor panel, and [`@dshfiles/jujutsu`](../jujutsu/README.md) one
   to the browser rather than to a thread, so switching threads never rearranges it — the persistent side panel. The
   workbench owns the surface; the frame owns the column and renders it while the seat asks for it.
 - **Bottom panel**: the same panels again in the frame's full-width bottom row, opened from the dock's header or the
-  `bottomPanel` setting. The frame owns the row's height and its resize handle, so it reopens where the user left it.
+  `bottomPanel` setting. The frame owns the row's height and its resize handle, so it reopens where the user left it. It
+  opens empty — a panel lives in exactly one region, so the row takes the one dragged or moved into it rather than
+  duplicating a panel the dock already shows.
 - **Per-thread side panel**: the old right-pane tab type, kept for the native per-thread surface. It is one tab inside
   the session's own right sidebar, so it changes with the thread.
 - **Move**: each surface's header lists where an open panel can go — the other docking regions, and the feature's own
   full main-view page when its definition names one. A panel lives in exactly one region, so moving it closes the copy
   the source held; asking for a region that is closed opens it first and hands the panel over when it reports ready.
-- **Drag**: a panel dragged from one region to another is adopted by the target through Dockview's own drop protocol.
-  The React wrapper exposes no `onUnhandledDragOver` prop, so the surface subscribes to `api.onUnhandledDragOver`
-  itself and accepts transfers whose `viewId` belongs to another region; the drop then adds the panel at the target
-  group and closes the source's copy. Drag is wired but not covered by a journey (a scripted tab drag leaves the panel
-  in the source region), so the Move menu is the path the journeys prove.
+- **Drag**: a panel dragged by its tab into another region is adopted there and leaves the source. Where Dockview's own
+  targets answer, the surface accepts the transfer through `api.onUnhandledDragOver` (the React wrapper exposes no such
+  prop), which is how a group or tab shows the drop overlay. Dockview's layout-edge target refuses a foreign view
+  outright, so over a region with no panel of its own no target answers at all: the view's own drop zone takes that
+  case, reading the same page-global `getPanelData()` transfer. Either way the embedder adds the panel — or activates
+  the copy the target already showed — and closes the source's copy. The `workbench.drag-between-regions` journey drives
+  real pointer input for a round trip between the dock and the bottom row.
 - **Layouts**: the header's Layouts dialog saves the arrangement of every region under a name, and applies, renames or
   deletes those names later. A layout only changes the regions it recorded, and applying one opens a region it needs.
   A saved layout captures every _mounted_ region: a region that was closed while saving is not part of that name.
