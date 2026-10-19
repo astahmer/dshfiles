@@ -35,8 +35,11 @@ is one, else a new one named by the client and created in the background);
 with it off, the project checkout when the thread started in another thread's
 workspace. The chip shows the workspace name with a spinner and Send waits
 until it is ready; typing does not. Each new thread is moved at most once, so a
-manual toggle sticks. The thread sidebar shows a thread workspace's sessions
-under its project.
+manual toggle sticks, and a blank thread already alone in a thread workspace is
+already at its destination: a page reload, or the fresh Session DSH opens in the
+workspace a switch moved it to, keeps that workspace instead of provisioning
+another. The thread sidebar shows a thread workspace's sessions under its
+project.
 
 Creating a thread workspace never runs dependency setup; any previously saved
 `setupCommand` is ignored. After the thread starts, check the project's single

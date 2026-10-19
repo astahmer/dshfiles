@@ -448,6 +448,20 @@ Then('the blank new thread uses a different jj workspace from the previous threa
   await finishJourneyAssertions(page)
 })
 
+Then('a reload keeps the blank thread in the jj workspace it already owns', async ({ page }: { page: Page }) => {
+  const repository = repositoryFor(page)
+  const ownedThread = await currentThreadName(page)
+  const before = workspaceNames(repository)
+  await page.reload()
+  await recordAssertion(page, 'jj-integration-reload-keeps-the-owned-workspace', async () => {
+    await expect(newThreadComposer(page)).toBeVisible({ timeout: 30_000 })
+    await expect(projectButton(page)).toHaveText(`repo · ${ownedThread}`, { timeout: 30_000 })
+    await expect(workspaceToggle(page)).toBeChecked()
+    expect(workspaceNames(repository)).toEqual(before)
+  })
+  await finishJourneyAssertions(page)
+})
+
 Then('the blank new thread returns to the owning project checkout', async ({ page }: { page: Page }) => {
   const repository = repositoryFor(page)
   await recordAssertion(page, 'jj-integration-new-thread-returns-to-project', async () => {

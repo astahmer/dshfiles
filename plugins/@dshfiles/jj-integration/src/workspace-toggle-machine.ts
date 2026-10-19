@@ -84,6 +84,15 @@ type ToggleEvent =
   | { readonly type: 'dismiss' }
 
 /**
+ * A thread workspace no other Session shares is already the destination of the blank thread sitting in it. The
+ * client forgets what it switched on a page reload, and a switch itself makes DSH open a fresh Session in the
+ * workspace it moved to; without this, each of those arrivals reads as a new thread and provisions another
+ * workspace, so one New thread could leave a trail of them. A Host predating the ownership field answers nothing,
+ * which keeps the old behaviour of moving the thread out.
+ */
+export const ownsIsolatedThreadWorkspace = (destination: DestinationView): boolean => destination.isolated && destination.ownedByAnotherSession === false
+
+/**
  * Where a blank New-thread Session should start: in its own workspace when isolation is the default, or in the
  * project checkout when it inherited another thread's workspace and isolation is off.
  */
@@ -93,6 +102,7 @@ const defaultDestinationMove = (input: { readonly destination: DestinationView; 
   const projectWorkspaceId = destination.projectWorkspaceId ?? input.workspaceId
   const move = { projectWorkspaceId, leaving: null, leavingBase: null }
   if (destination.isolateByDefault) {
+    if (ownsIsolatedThreadWorkspace(destination)) return null
     let isolateMove: ToggleRequest = { ...move, isolate: true }
     if (input.workspaceId !== projectWorkspaceId) isolateMove = { ...isolateMove, excludeSpareWorkspaceId: input.workspaceId }
     if (destination.bookmark === null) return isolateMove

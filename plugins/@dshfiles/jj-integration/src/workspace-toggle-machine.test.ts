@@ -316,6 +316,30 @@ describe('workspaceToggleMachine', () => {
     expect(toggle.actor.getSnapshot().matches('idle')).toBe(true)
     expect(toggle.calls.filter(call => call.startsWith('provision'))).toEqual([])
   })
+
+  it('provisions nothing when a reload shows a blank thread in the workspace it already owns', async () => {
+    // A reload starts a fresh actor with no memory of the switch that put the thread there; the Host still describes
+    // that workspace as isolated and unshared, which is the destination itself.
+    const toggle = startToggle()
+    const request = WorkspaceToggle.defaultDestinationMove({
+      destination: {
+        vcs: 'jj',
+        isolated: true,
+        ownedByAnotherSession: false,
+        projectWorkspaceId: 'project',
+        bookmark: 'main',
+        bookmarks: ['main'],
+        isolateByDefault: true,
+      },
+      workspaceId: 'ws-own',
+    })
+    toggle.actor.send({ type: 'arrive', visitId: 'session:reloaded', workspaceId: 'ws-own', isolateByDefault: true })
+    toggle.actor.send({ type: 'resolved', visitId: 'session:reloaded', request })
+
+    expect(toggle.actor.getSnapshot().matches('idle')).toBe(true)
+    expect(toggle.calls).toEqual([])
+    expect(toggle.switched).toEqual([])
+  })
 })
 
 describe('deferWorkspaceSubmit', () => {
@@ -513,6 +537,35 @@ describe('defaultDestinationMove', () => {
 
   it('keeps a new thread outside jj unchanged', () => {
     expect(WorkspaceToggle.defaultDestinationMove({ destination: destination({ vcs: 'none' }), workspaceId: 'project' })).toBeNull()
+  })
+
+  it('keeps a blank thread that already owns its isolated thread workspace', () => {
+    expect(
+      WorkspaceToggle.defaultDestinationMove({
+        destination: destination({ isolated: true, ownedByAnotherSession: false }),
+        workspaceId: 'ws-own',
+      }),
+    ).toBeNull()
+  })
+
+  it('moves a blank thread on a Host that predates the ownership field', () => {
+    expect(WorkspaceToggle.defaultDestinationMove({ destination: destination({ isolated: true }), workspaceId: 'ws-own' })).not.toBeNull()
+  })
+
+  it('moves a blank thread out of a thread workspace another Session shares', () => {
+    expect(
+      WorkspaceToggle.defaultDestinationMove({
+        destination: destination({ isolated: true, ownedByAnotherSession: true }),
+        workspaceId: 'ws-shared',
+      }),
+    ).toEqual({
+      isolate: true,
+      base: 'main',
+      projectWorkspaceId: 'project',
+      leaving: null,
+      leavingBase: null,
+      excludeSpareWorkspaceId: 'ws-shared',
+    })
   })
 })
 

@@ -48,6 +48,7 @@ Feature: jj thread workspaces
     And new threads start in their own jj workspace by default
     And New thread is clicked in the sidebar
     Then the blank new thread uses a different jj workspace from the previous thread
+    And a reload keeps the blank thread in the jj workspace it already owns
 
   @scenario:jj-integration.new-thread-background-browser-journey
   Scenario: New thread opens its composer at once and gets its own workspace in the background

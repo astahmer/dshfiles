@@ -21,6 +21,7 @@ import { resolveNewThreadWorkspaceId } from './new-thread-workspace.js'
 import { workspaceHasOtherSession } from './thread-session-ownership.js'
 import { jjIntegrationSettings } from './settings.js'
 import {
+  ownsIsolatedThreadWorkspace,
   WorkspaceToggle,
   workspaceToggleMachine,
   type ProvisionedDestination,
@@ -234,9 +235,18 @@ export const DestinationBar = (props: {
   // A New thread opens its composer at once wherever it was started; the machine then moves it, in the background,
   // to where new threads start by default (its own jj workspace, or the project checkout).
   const { arrive, resolved } = toggle
+  // The blank thread is already alone in a thread workspace: it has its destination, and settling here keeps the
+  // machine out of `preparing` — which disables the destination query and holds Send — while the Host would only
+  // answer that no move is needed. Without it the eager move below provisions a second workspace for that thread.
+  const ownsThreadWorkspace =
+    inThreadWorkspace === true && (composerWorkspace?.occupied === false || (destination.data !== undefined && ownsIsolatedThreadWorkspace(destination.data)))
   useEffect(() => {
     if (newThreadId === null || workspaceId === null) return
     arrive({ visitId: newThreadId, workspaceId, isolateByDefault })
+    if (ownsThreadWorkspace) {
+      resolved(newThreadId, null)
+      return
+    }
     if (!isolateByDefault || inThreadWorkspace === null) return
     // Use the owning checkout when known, and never reuse the inherited thread workspace as its own spare.
     resolved(
@@ -247,7 +257,7 @@ export const DestinationBar = (props: {
         bookmark,
       }),
     )
-  }, [arrive, bookmark, destination.data?.projectWorkspaceId, inThreadWorkspace, isolateByDefault, newThreadId, resolved, workspaceId])
+  }, [arrive, bookmark, destination.data, inThreadWorkspace, isolateByDefault, newThreadId, ownsThreadWorkspace, resolved, workspaceId])
   useEffect(() => {
     if (newThreadId === null || workspaceId === null || destination.data === undefined) return
     resolved(newThreadId, WorkspaceToggle.defaultDestinationMove({ destination: destination.data, workspaceId }))
