@@ -1,148 +1,85 @@
 import type { ComposerActionProps } from '@dshfiles/dshx/client'
-import { assign, fromCallback, fromPromise, setup } from '@dshfiles/plugin-ui/machine'
-import { PromptLibrary, type PromptMutation, type SavedPrompt } from './library.js'
+import { assign, fromPromise, setup } from '@dshfiles/plugin-ui/machine'
+import { PromptLibrary, type SavedPrompt } from './library.js'
+import type { PromptLibraryClient, PromptLibraryMutation, PromptLibraryRead } from './library-client.js'
 
-export type PromptLibraryState = 'loading' | 'ready' | 'invalid' | 'unavailable'
 export type PromptInsertionSpan = ReturnType<ComposerActionProps['inputActions']['captureInsertion']>
+export type PromptEditorTarget = { readonly id: string | null; readonly expectedRevision: string | null }
+export type DeleteConfirmation = { readonly id: string; readonly revision: string }
 
-export type PromptLibraryStorageRead =
-  | { readonly kind: 'ready'; readonly prompts: readonly SavedPrompt[] }
-  | { readonly kind: 'invalid' }
-  | { readonly kind: 'unavailable' }
-
-export interface PromptEditor {
-  readonly id: string | null
-  readonly originalRevision: string | null
-  readonly title: string
-  readonly text: string
-  readonly stale: boolean
-}
-
-export interface DeleteConfirmation {
-  readonly id: string
-  readonly revision: string
-}
-
-export interface PromptLibraryClient {
-  readonly read: () => PromptLibraryStorageRead
-  readonly subscribe: (listener: (serialized: string | null) => void) => () => void
-  readonly write: (serialized: string) => void
-  readonly createId: () => string
-  readonly now: () => number
+export interface PromptLibraryWorkflowClient extends Pick<PromptLibraryClient, 'save' | 'remove' | 'readLatest' | 'createId' | 'now'> {
   readonly insertText: (text: string, span: PromptInsertionSpan) => boolean
 }
 
+interface EditorSubmission {
+  readonly title: string
+  readonly text: string
+  readonly copy: boolean
+}
+
 interface PromptLibraryContext {
-  readonly client: PromptLibraryClient
-  readonly activeSource: 'saved' | 'recent'
-  readonly libraryState: PromptLibraryState
-  readonly prompts: readonly SavedPrompt[]
-  readonly editor: PromptEditor | null
-  readonly saveAsCopy: boolean
-  readonly deleteConfirmation: DeleteConfirmation | null
+  readonly client: PromptLibraryWorkflowClient
+  readonly insertionSpan: PromptInsertionSpan | null
   readonly hasInserted: boolean
   readonly notice: string
-  readonly insertionSpan: PromptInsertionSpan | null
+  readonly editorTarget: PromptEditorTarget | null
+  readonly pendingEditor: EditorSubmission | null
+  readonly deleteConfirmation: DeleteConfirmation | null
+  readonly pendingDelete: DeleteConfirmation | null
+  readonly pendingCurrentText: string | null
+  readonly pendingSavedPrompt: DeleteConfirmation | null
 }
 
 interface PromptLibraryInput {
-  readonly client: PromptLibraryClient
-}
-
-interface StorageChangedEvent {
-  readonly type: 'storage.changed'
-  readonly serialized: string | null
+  readonly client: PromptLibraryWorkflowClient
 }
 
 type PromptLibraryEvent =
   | { readonly type: 'open'; readonly span: PromptInsertionSpan | null }
   | { readonly type: 'close' }
-  | { readonly type: 'source.change'; readonly source: 'saved' | 'recent' }
-  | { readonly type: 'prompt.new' }
-  | { readonly type: 'prompt.edit'; readonly prompt: SavedPrompt }
-  | { readonly type: 'editor.change'; readonly field: 'title' | 'text'; readonly value: string }
+  | { readonly type: 'client.update'; readonly client: PromptLibraryWorkflowClient }
+  | { readonly type: 'editor.new' }
+  | { readonly type: 'editor.edit'; readonly target: PromptEditorTarget }
   | { readonly type: 'editor.cancel' }
-  | { readonly type: 'editor.save'; readonly copy: boolean }
+  | { readonly type: 'editor.save'; readonly submission: EditorSubmission }
   | { readonly type: 'current.save'; readonly text: string }
-  | { readonly type: 'delete.request'; readonly prompt: SavedPrompt }
+  | { readonly type: 'delete.request'; readonly confirmation: DeleteConfirmation }
   | { readonly type: 'delete.cancel' }
-  | { readonly type: 'saved.insert'; readonly prompt: SavedPrompt }
-  | { readonly type: 'recent.insert'; readonly prompt: { readonly id: string; readonly text: string } }
-  | { readonly type: 'notice'; readonly message: string }
-  | StorageChangedEvent
+  | { readonly type: 'saved.insert'; readonly prompt: DeleteConfirmation }
+  | { readonly type: 'recent.insert'; readonly text: string }
 
-type LibraryMutationResult =
-  | { readonly kind: 'applied'; readonly prompts: readonly SavedPrompt[]; readonly notice: string }
-  | { readonly kind: 'conflict'; readonly prompts: readonly SavedPrompt[]; readonly notice: string }
-  | { readonly kind: 'blocked'; readonly libraryState: 'ready' | 'invalid' | 'unavailable'; readonly prompts?: readonly SavedPrompt[]; readonly notice: string }
-
-type InsertResult =
-  | { readonly kind: 'inserted' }
-  | { readonly kind: 'stale'; readonly prompts: readonly SavedPrompt[] }
-  | { readonly kind: 'blocked'; readonly libraryState?: 'invalid' | 'unavailable'; readonly notice: string }
-
-const blockedRead = (read: PromptLibraryStorageRead, notice: string): LibraryMutationResult => {
-  if (read.kind === 'ready') return { kind: 'blocked', libraryState: 'ready', prompts: read.prompts, notice }
-  return { kind: 'blocked', libraryState: read.kind, notice }
+interface PromptOperationResult {
+  readonly kind: PromptLibraryMutation['kind']
+  readonly copy?: boolean
 }
 
-const persistPrompts = (client: PromptLibraryClient, prompts: readonly SavedPrompt[], successNotice: string): LibraryMutationResult => {
-  const serialized = PromptLibrary.serialize(prompts)
-  if (serialized === null)
-    return { kind: 'blocked', libraryState: 'ready', prompts, notice: 'This library reached its size limit. Edit or remove a saved prompt first.' }
-  try {
-    client.write(serialized)
-    return { kind: 'applied', prompts, notice: successNotice }
-  } catch {
-    return { kind: 'blocked', libraryState: 'unavailable', notice: 'The browser could not save this prompt. The current library is unchanged.' }
-  }
+type PromptInsertResult = { readonly kind: 'inserted' } | { readonly kind: 'stale' } | { readonly kind: 'unavailable' } | { readonly kind: 'blocked' }
+
+interface EditorSaveInput {
+  readonly client: PromptLibraryWorkflowClient
+  readonly target: PromptEditorTarget
+  readonly submission: EditorSubmission
 }
 
-const saveEditor = (input: { readonly client: PromptLibraryClient; readonly editor: PromptEditor | null; readonly copy: boolean }): LibraryMutationResult => {
-  if (input.editor === null) return { kind: 'blocked', libraryState: 'ready', notice: 'The prompt editor is no longer open.' }
-  if (input.editor.text.trim().length === 0) return { kind: 'blocked', libraryState: 'ready', notice: 'Add prompt text before saving.' }
-  const latest = input.client.read()
-  if (latest.kind !== 'ready') return blockedRead(latest, 'The saved library changed or became unavailable. Your editor text is still here.')
-
-  const makeCopy = input.copy || input.editor.id === null
-  if (makeCopy && latest.prompts.length >= PromptLibrary.maxPrompts) {
-    return { kind: 'blocked', libraryState: 'ready', prompts: latest.prompts, notice: 'The saved prompt limit is 50. Remove a prompt before saving another.' }
-  }
-
-  const nextPrompt: SavedPrompt = {
-    id: makeCopy ? input.client.createId() : (input.editor.id ?? input.client.createId()),
+const saveEditor = fromPromise<PromptOperationResult, EditorSaveInput>(async ({ input, signal }) => {
+  const makeCopy = input.submission.copy || input.target.id === null
+  const prompt: SavedPrompt = {
+    id: makeCopy ? input.client.createId() : (input.target.id ?? input.client.createId()),
     revision: input.client.createId(),
-    title: input.editor.title.trim() || PromptLibrary.defaultTitle(input.editor.text),
-    text: input.editor.text,
+    title: input.submission.title.trim() || PromptLibrary.defaultTitle(input.submission.text),
+    text: input.submission.text,
     updatedAt: input.client.now(),
   }
-  const result: PromptMutation = PromptLibrary.writeIfCurrent(latest.prompts, nextPrompt, makeCopy ? null : input.editor.originalRevision)
-  if (result.kind === 'conflict') {
-    return { kind: 'conflict', prompts: result.prompts, notice: 'This saved prompt changed in another tab. Your edits remain here; save a copy or reopen it.' }
-  }
-  return persistPrompts(input.client, result.prompts, 'Saved in this browser.')
+  const result = await input.client.save({ prompt, expectedRevision: makeCopy ? null : input.target.expectedRevision }, { signal })
+  return { kind: result.kind, copy: input.submission.copy }
+})
+
+interface SaveCurrentInput {
+  readonly client: PromptLibraryWorkflowClient
+  readonly text: string
 }
 
-const saveCurrentPrompt = (input: { readonly client: PromptLibraryClient; readonly text: string }): LibraryMutationResult => {
-  if (input.text.trim().length === 0) return { kind: 'blocked', libraryState: 'ready', notice: 'Enter text before saving a prompt.' }
-  if (input.text.length > PromptLibrary.maxPromptTextLength) {
-    return {
-      kind: 'blocked',
-      libraryState: 'ready',
-      notice: `Current text exceeds the ${PromptLibrary.maxPromptTextLength.toLocaleString()} character prompt limit.`,
-    }
-  }
-  const latest = input.client.read()
-  if (latest.kind !== 'ready') return blockedRead(latest, 'The saved library is unavailable. The composer text is unchanged.')
-  if (latest.prompts.length >= PromptLibrary.maxPrompts) {
-    return {
-      kind: 'blocked',
-      libraryState: 'ready',
-      prompts: latest.prompts,
-      notice: `The saved prompt limit is ${PromptLibrary.maxPrompts}. Remove a prompt before saving another.`,
-    }
-  }
-
+const saveCurrent = fromPromise<PromptOperationResult, SaveCurrentInput>(async ({ input, signal }) => {
   const prompt: SavedPrompt = {
     id: input.client.createId(),
     revision: input.client.createId(),
@@ -150,362 +87,250 @@ const saveCurrentPrompt = (input: { readonly client: PromptLibraryClient; readon
     text: input.text,
     updatedAt: input.client.now(),
   }
-  const result = PromptLibrary.writeIfCurrent(latest.prompts, prompt, null)
-  if (result.kind === 'conflict') return { kind: 'conflict', prompts: result.prompts, notice: 'The prompt library changed in another tab. Try saving again.' }
-  return persistPrompts(input.client, result.prompts, 'Current composer text saved as a prompt. The composer was not changed.')
+  const result = await input.client.save({ prompt, expectedRevision: null }, { signal })
+  return { kind: result.kind }
+})
+
+interface DeletePromptInput {
+  readonly client: PromptLibraryWorkflowClient
+  readonly confirmation: DeleteConfirmation
 }
 
-const deletePrompt = (input: { readonly client: PromptLibraryClient; readonly confirmation: DeleteConfirmation | null }): LibraryMutationResult => {
-  if (input.confirmation === null) return { kind: 'blocked', libraryState: 'ready', notice: 'Choose a prompt before confirming deletion.' }
-  const latest = input.client.read()
-  if (latest.kind !== 'ready') return blockedRead(latest, 'The saved library changed or became unavailable. Nothing was deleted.')
-  const result = PromptLibrary.removeIfCurrent(latest.prompts, input.confirmation.id, input.confirmation.revision)
-  if (result.kind === 'conflict') return { kind: 'conflict', prompts: result.prompts, notice: 'This prompt changed in another tab. Nothing was deleted.' }
-  return persistPrompts(input.client, result.prompts, 'Prompt removed.')
+const deletePrompt = fromPromise<PromptOperationResult, DeletePromptInput>(async ({ input, signal }) => {
+  const result = await input.client.remove({ id: input.confirmation.id, expectedRevision: input.confirmation.revision }, { signal })
+  return { kind: result.kind }
+})
+
+interface InsertSavedInput {
+  readonly client: PromptLibraryWorkflowClient
+  readonly span: PromptInsertionSpan
+  readonly prompt: DeleteConfirmation
 }
 
-const insertSavedPrompt = (input: {
-  readonly client: PromptLibraryClient
-  readonly span: PromptInsertionSpan | null
-  readonly prompt: SavedPrompt | null
-}): InsertResult => {
-  if (input.span === null || input.prompt === null) return { kind: 'blocked', notice: 'Close and reopen the prompt stash to choose a fresh insertion point.' }
-  const latest = input.client.read()
-  if (latest.kind !== 'ready') {
+const insertSaved = fromPromise<PromptInsertResult, InsertSavedInput>(async ({ input, signal }) => {
+  const latest: PromptLibraryRead = await input.client.readLatest({ signal })
+  signal.throwIfAborted()
+  if (latest.kind !== 'ready') return { kind: 'unavailable' }
+
+  const prompt = latest.prompts.find(item => item.id === input.prompt.id)
+  if (prompt === undefined || prompt.revision !== input.prompt.revision) return { kind: 'stale' }
+  return input.client.insertText(prompt.text, input.span) ? { kind: 'inserted' } : { kind: 'blocked' }
+})
+
+const editorSaveCompletion = (result: PromptOperationResult) => {
+  if (result.kind === 'applied') {
     return {
-      kind: 'blocked',
-      libraryState: latest.kind,
-      notice: 'The saved library changed or became unavailable. Nothing was inserted.',
+      editorTarget: null,
+      pendingEditor: null,
+      notice: result.copy ? 'Saved as a new prompt copy.' : 'Saved to the prompt library.',
     }
   }
-  const current = latest.prompts.find(prompt => prompt.id === input.prompt?.id)
-  if (current === undefined || current.revision !== input.prompt.revision) return { kind: 'stale', prompts: latest.prompts }
-  try {
-    return input.client.insertText(current.text, input.span)
-      ? { kind: 'inserted' }
-      : { kind: 'blocked', notice: 'The composer draft changed. Close and reopen the prompt stash before inserting.' }
-  } catch {
-    return { kind: 'blocked', notice: 'The composer draft changed. Close and reopen the prompt stash before inserting.' }
+  if (result.kind === 'conflict') {
+    return { pendingEditor: null, notice: 'This saved prompt changed elsewhere. Your edits remain here; save a copy or reopen it.' }
   }
+  if (result.kind === 'limit') return { pendingEditor: null, notice: 'This library reached its size limit. Edit or remove a saved prompt first.' }
+  return { pendingEditor: null, notice: 'The saved library changed or became unavailable. Your editor text is still here.' }
 }
 
-const insertRecentPrompt = (input: {
-  readonly client: PromptLibraryClient
-  readonly span: PromptInsertionSpan | null
-  readonly prompt: { readonly id: string; readonly text: string } | null
-}): Exclude<InsertResult, { readonly kind: 'stale' }> => {
-  if (input.span === null) return { kind: 'blocked', notice: 'Close and reopen the prompt stash to choose a fresh insertion point.' }
-  if (input.prompt === null) return { kind: 'blocked', notice: 'This message is no longer in the loaded conversation.' }
-  try {
-    return input.client.insertText(input.prompt.text, input.span)
-      ? { kind: 'inserted' }
-      : { kind: 'blocked', notice: 'The composer draft changed. Close and reopen the prompt stash before inserting.' }
-  } catch {
-    return { kind: 'blocked', notice: 'The composer draft changed. Close and reopen the prompt stash before inserting.' }
-  }
+const currentSaveCompletion = (result: PromptOperationResult) => {
+  const notice =
+    result.kind === 'applied'
+      ? 'Current composer text saved as a prompt. The composer was not changed.'
+      : result.kind === 'limit'
+        ? 'The saved prompt limit was reached. Remove a prompt before saving another.'
+        : result.kind === 'conflict'
+          ? 'The prompt library changed elsewhere. Try saving again.'
+          : 'The saved library is unavailable. The composer text is unchanged.'
+  return { pendingCurrentText: null, notice }
 }
 
-const applyStorage = (context: PromptLibraryContext, serialized: string | null) => {
-  const latest = PromptLibrary.read(serialized)
-  if (!latest.ok) {
-    return {
-      libraryState: 'invalid' as const,
-      deleteConfirmation: null,
-      notice: 'Saved prompts changed to data this version cannot read. Stored data was left untouched.',
-    }
-  }
-  return {
-    libraryState: 'ready' as const,
-    prompts: latest.prompts,
-    deleteConfirmation: null,
-    editor:
-      context.editor === null || context.editor.id === null
-        ? context.editor
-        : latest.prompts.find(prompt => prompt.id === context.editor?.id)?.revision === context.editor.originalRevision
-          ? context.editor
-          : { ...context.editor, stale: true },
-  }
+const deleteCompletion = (result: PromptOperationResult) => {
+  const notice =
+    result.kind === 'applied'
+      ? 'Prompt removed.'
+      : result.kind === 'conflict'
+        ? 'This prompt changed elsewhere. Nothing was deleted.'
+        : 'The saved library changed or became unavailable. Nothing was deleted.'
+  return { pendingDelete: null, deleteConfirmation: null, notice }
 }
 
-// SAFETY: XState uses these empty carriers for inference; nothing reads their values.
+const savedInsertCompletion = (result: PromptInsertResult) => {
+  if (result.kind === 'inserted')
+    return { pendingSavedPrompt: null, hasInserted: true, notice: 'Inserted at the saved cursor position. The message was not sent.' }
+  if (result.kind === 'stale') return { pendingSavedPrompt: null, notice: 'This prompt changed elsewhere. Choose it again from the refreshed list.' }
+  if (result.kind === 'blocked') return { pendingSavedPrompt: null, notice: 'The composer draft changed. Close and reopen the prompt stash before inserting.' }
+  return { pendingSavedPrompt: null, notice: 'The saved library changed or became unavailable. Nothing was inserted.' }
+}
+
 export const promptLibraryMachine = setup({
+  // SAFETY: XState uses these empty carriers for inference; nothing reads their values.
   types: {
     context: {} as PromptLibraryContext,
     input: {} as PromptLibraryInput,
     events: {} as PromptLibraryEvent,
   },
   actors: {
-    watchStorage: fromCallback<PromptLibraryEvent, PromptLibraryClient>(({ input, sendBack }) =>
-      input.subscribe(serialized => sendBack({ type: 'storage.changed', serialized })),
-    ),
-    load: fromPromise<PromptLibraryStorageRead, { readonly client: PromptLibraryClient }>(({ input }) => {
-      try {
-        return Promise.resolve(input.client.read())
-      } catch {
-        return Promise.resolve({ kind: 'unavailable' })
-      }
-    }),
-    saveEditor: fromPromise<LibraryMutationResult, { readonly client: PromptLibraryClient; readonly editor: PromptEditor | null; readonly copy: boolean }>(
-      ({ input }) => Promise.resolve(saveEditor(input)),
-    ),
-    saveCurrent: fromPromise<LibraryMutationResult, { readonly client: PromptLibraryClient; readonly text: string }>(({ input }) =>
-      Promise.resolve(saveCurrentPrompt(input)),
-    ),
-    deletePrompt: fromPromise<LibraryMutationResult, { readonly client: PromptLibraryClient; readonly confirmation: DeleteConfirmation | null }>(({ input }) =>
-      Promise.resolve(deletePrompt(input)),
-    ),
-    insertSaved: fromPromise<
-      InsertResult,
-      { readonly client: PromptLibraryClient; readonly span: PromptInsertionSpan | null; readonly prompt: SavedPrompt | null }
-    >(({ input }) => Promise.resolve(insertSavedPrompt(input))),
-    insertRecent: fromPromise<
-      Exclude<InsertResult, { readonly kind: 'stale' }>,
-      {
-        readonly client: PromptLibraryClient
-        readonly span: PromptInsertionSpan | null
-        readonly prompt: { readonly id: string; readonly text: string } | null
-      }
-    >(({ input }) => Promise.resolve(insertRecentPrompt(input))),
+    saveEditor,
+    saveCurrent,
+    deletePrompt,
+    insertSaved,
   },
   guards: {
-    canInsert: ({ context }) => !context.hasInserted,
     confirmsDelete: ({ context, event }) =>
-      event.type === 'delete.request' && context.deleteConfirmation?.id === event.prompt.id && context.deleteConfirmation.revision === event.prompt.revision,
+      event.type === 'delete.request' &&
+      context.deleteConfirmation?.id === event.confirmation.id &&
+      context.deleteConfirmation.revision === event.confirmation.revision,
+    canInsert: ({ context }) => !context.hasInserted && context.insertionSpan !== null,
+    missingSpan: ({ context }) => !context.hasInserted && context.insertionSpan === null,
   },
   actions: {
-    beginOpen: assign(({ event }) =>
+    updateClient: assign(({ event }) => (event.type === 'client.update' ? { client: event.client } : {})),
+    open: assign(({ event }) =>
       event.type === 'open'
         ? {
-            activeSource: 'saved' as const,
-            editor: null,
-            deleteConfirmation: null,
+            insertionSpan: event.span,
             hasInserted: false,
             notice: '',
-            insertionSpan: event.span,
-          }
-        : {},
-    ),
-    closeLibrary: assign(() => ({ editor: null, deleteConfirmation: null, notice: '', insertionSpan: null })),
-    changeSource: assign(({ event }) => (event.type === 'source.change' ? { activeSource: event.source } : {})),
-    beginNewPrompt: assign(() => ({ editor: { id: null, originalRevision: null, title: '', text: '', stale: false }, deleteConfirmation: null, notice: '' })),
-    beginEdit: assign(({ event }) =>
-      event.type === 'prompt.edit'
-        ? {
-            editor: { id: event.prompt.id, originalRevision: event.prompt.revision, title: event.prompt.title, text: event.prompt.text, stale: false },
+            editorTarget: null,
+            pendingEditor: null,
             deleteConfirmation: null,
-            notice: '',
+            pendingDelete: null,
+            pendingCurrentText: null,
+            pendingSavedPrompt: null,
           }
         : {},
     ),
-    updateEditor: assign(({ context, event }) =>
-      event.type !== 'editor.change' || context.editor === null ? {} : { editor: { ...context.editor, [event.field]: event.value } },
+    close: assign(() => ({
+      insertionSpan: null,
+      hasInserted: false,
+      notice: '',
+      editorTarget: null,
+      pendingEditor: null,
+      deleteConfirmation: null,
+      pendingDelete: null,
+      pendingCurrentText: null,
+      pendingSavedPrompt: null,
+    })),
+    beginNewEditor: assign(() => ({ editorTarget: { id: null, expectedRevision: null }, pendingEditor: null, deleteConfirmation: null, notice: '' })),
+    beginEdit: assign(({ event }) =>
+      event.type === 'editor.edit' ? { editorTarget: event.target, pendingEditor: null, deleteConfirmation: null, notice: '' } : {},
     ),
-    cancelEditor: assign(() => ({ editor: null, notice: '' })),
-    beginEditorSave: assign(({ event }) => (event.type === 'editor.save' ? { saveAsCopy: event.copy, notice: '' } : {})),
-    beginCurrentSave: assign(() => ({ notice: '' })),
-    beginDelete: assign(({ event }) =>
+    cancelEditor: assign(() => ({ editorTarget: null, pendingEditor: null, notice: '' })),
+    beginEditorSave: assign(({ event }) => (event.type === 'editor.save' ? { pendingEditor: event.submission, notice: '' } : {})),
+    clearEditorSubmission: assign(() => ({ pendingEditor: null })),
+    beginCurrentSave: assign(({ event }) => (event.type === 'current.save' ? { pendingCurrentText: event.text, notice: '' } : {})),
+    clearCurrentSave: assign(() => ({ pendingCurrentText: null })),
+    requestDelete: assign(({ event }) =>
       event.type === 'delete.request'
-        ? { deleteConfirmation: { id: event.prompt.id, revision: event.prompt.revision }, notice: 'Select Confirm delete to remove this saved prompt.' }
+        ? {
+            deleteConfirmation: event.confirmation,
+            pendingDelete: null,
+            notice: 'Select Confirm delete to remove this saved prompt.',
+          }
         : {},
     ),
+    beginDelete: assign(({ event }) => (event.type === 'delete.request' ? { pendingDelete: event.confirmation, deleteConfirmation: null, notice: '' } : {})),
+    clearDelete: assign(() => ({ pendingDelete: null, deleteConfirmation: null })),
     cancelDelete: assign(() => ({ deleteConfirmation: null, notice: '' })),
-    setNotice: assign(({ event }) => (event.type === 'notice' ? { notice: event.message } : {})),
-    syncStorage: assign(({ context, event }) => (event.type === 'storage.changed' ? applyStorage(context, event.serialized) : {})),
+    beginSavedInsert: assign(({ event }) => (event.type === 'saved.insert' ? { pendingSavedPrompt: event.prompt, notice: '' } : {})),
+    clearSavedInsert: assign(() => ({ pendingSavedPrompt: null })),
+    insertRecent: assign(({ context, event }) => {
+      if (event.type !== 'recent.insert' || context.insertionSpan === null) return {}
+      if (!context.client.insertText(event.text, context.insertionSpan)) {
+        return { notice: 'The composer draft changed. Close and reopen the prompt stash before inserting.' }
+      }
+      return { hasInserted: true, notice: 'Inserted at the saved cursor position. The message was not sent.' }
+    }),
+    noticeMissingSpan: assign(() => ({ notice: 'Close and reopen the prompt stash to choose a fresh insertion point.' })),
   },
 }).createMachine({
   id: 'promptLibrary',
   context: ({ input }) => ({
     client: input.client,
-    activeSource: 'saved',
-    libraryState: 'loading',
-    prompts: [],
-    editor: null,
-    saveAsCopy: false,
-    deleteConfirmation: null,
+    insertionSpan: null,
     hasInserted: false,
     notice: '',
-    insertionSpan: null,
+    editorTarget: null,
+    pendingEditor: null,
+    deleteConfirmation: null,
+    pendingDelete: null,
+    pendingCurrentText: null,
+    pendingSavedPrompt: null,
   }),
   initial: 'closed',
-  invoke: { src: 'watchStorage', input: ({ context }) => context.client },
-  on: { 'storage.changed': { actions: 'syncStorage' } },
+  on: {
+    'client.update': { actions: 'updateClient' },
+    close: { target: '#promptLibrary.closed', actions: 'close' },
+  },
   states: {
-    closed: { on: { open: { target: 'loading', actions: 'beginOpen' } } },
-    loading: {
-      invoke: {
-        src: 'load',
-        input: ({ context }) => ({ client: context.client }),
-        onDone: {
-          target: 'browse',
-          actions: assign(({ event }) => {
-            const result = event.output
-            return result.kind === 'ready'
-              ? { libraryState: 'ready' as const, prompts: result.prompts, notice: '' }
-              : {
-                  libraryState: result.kind,
-                  notice: result.kind === 'invalid' ? 'Saved prompts could not be read. Stored data was left untouched.' : 'Browser storage is unavailable.',
-                }
-          }),
-        },
-      },
-      on: {
-        close: { target: 'closed', actions: 'closeLibrary' },
-        'storage.changed': { target: 'browse', actions: 'syncStorage' },
-      },
+    closed: {
+      on: { open: { target: 'browsing', actions: 'open' } },
     },
-    browse: {
+    browsing: {
       on: {
-        close: { target: 'closed', actions: 'closeLibrary' },
-        'source.change': { actions: 'changeSource' },
-        'prompt.new': { target: 'editing', actions: 'beginNewPrompt' },
-        'prompt.edit': { target: 'editing', actions: 'beginEdit' },
+        'editor.new': { target: 'editing', actions: 'beginNewEditor' },
+        'editor.edit': { target: 'editing', actions: 'beginEdit' },
         'current.save': { target: 'savingCurrent', actions: 'beginCurrentSave' },
-        'delete.request': { target: 'confirmingDelete', actions: 'beginDelete' },
-        'saved.insert': { guard: 'canInsert', target: 'insertingSaved' },
-        'recent.insert': { guard: 'canInsert', target: 'insertingRecent' },
-        notice: { actions: 'setNotice' },
+        'delete.request': [{ guard: 'confirmsDelete', target: 'deleting', actions: 'beginDelete' }, { actions: 'requestDelete' }],
+        'delete.cancel': { actions: 'cancelDelete' },
+        'saved.insert': [
+          { guard: 'canInsert', target: 'insertingSaved', actions: 'beginSavedInsert' },
+          { guard: 'missingSpan', actions: 'noticeMissingSpan' },
+        ],
+        'recent.insert': [
+          { guard: 'canInsert', actions: 'insertRecent' },
+          { guard: 'missingSpan', actions: 'noticeMissingSpan' },
+        ],
       },
     },
     editing: {
       on: {
-        close: { target: 'closed', actions: 'closeLibrary' },
-        'editor.change': { actions: 'updateEditor' },
-        'editor.cancel': { target: 'browse', actions: 'cancelEditor' },
+        'editor.cancel': { target: 'browsing', actions: 'cancelEditor' },
         'editor.save': { target: 'savingEditor', actions: 'beginEditorSave' },
-        notice: { actions: 'setNotice' },
-        'storage.changed': { actions: 'syncStorage' },
       },
     },
     savingEditor: {
       invoke: {
         src: 'saveEditor',
-        input: ({ context }) => ({ client: context.client, editor: context.editor, copy: context.saveAsCopy }),
+        input: ({ context }) => ({
+          client: context.client,
+          target: context.editorTarget ?? { id: null, expectedRevision: null },
+          submission: context.pendingEditor ?? { title: '', text: '', copy: false },
+        }),
         onDone: [
-          {
-            guard: ({ event }) => event.output.kind === 'applied',
-            target: 'browse',
-            actions: assign(({ event }) => {
-              const result = event.output
-              return result.kind === 'applied' ? { prompts: result.prompts, libraryState: 'ready' as const, editor: null, notice: result.notice } : {}
-            }),
-          },
-          {
-            guard: ({ event }) => event.output.kind === 'conflict',
-            target: 'editing',
-            actions: assign(({ context, event }) => {
-              const result = event.output
-              return result.kind === 'conflict'
-                ? {
-                    prompts: result.prompts,
-                    libraryState: 'ready' as const,
-                    editor: context.editor === null ? null : { ...context.editor, stale: true },
-                    notice: result.notice,
-                  }
-                : {}
-            }),
-          },
-          {
-            target: 'editing',
-            actions: assign(({ context, event }) => {
-              const result = event.output
-              if (result.kind !== 'blocked') return {}
-              if (result.prompts === undefined) return { libraryState: result.libraryState, editor: context.editor, notice: result.notice }
-              return { libraryState: result.libraryState, prompts: result.prompts, editor: context.editor, notice: result.notice }
-            }),
-          },
+          { guard: ({ event }) => event.output.kind === 'applied', target: 'browsing', actions: assign(({ event }) => editorSaveCompletion(event.output)) },
+          { target: 'editing', actions: assign(({ event }) => editorSaveCompletion(event.output)) },
         ],
       },
-      on: { close: { target: 'closed', actions: 'closeLibrary' } },
+      always: { guard: ({ context }) => context.editorTarget === null, target: 'browsing', actions: 'cancelEditor' },
     },
     savingCurrent: {
       invoke: {
         src: 'saveCurrent',
-        input: ({ context, event }) => ({ client: context.client, text: event.type === 'current.save' ? event.text : '' }),
-        onDone: {
-          target: 'browse',
-          actions: assign(({ event }) => {
-            const result = event.output
-            return {
-              libraryState: result.kind === 'blocked' ? result.libraryState : 'ready',
-              ...(result.kind === 'blocked' ? (result.prompts === undefined ? {} : { prompts: result.prompts }) : { prompts: result.prompts }),
-              notice: result.notice,
-            }
-          }),
-        },
-      },
-      on: { close: { target: 'closed', actions: 'closeLibrary' } },
-    },
-    confirmingDelete: {
-      on: {
-        close: { target: 'closed', actions: 'closeLibrary' },
-        'delete.cancel': { target: 'browse', actions: 'cancelDelete' },
-        'delete.request': [
-          { guard: 'confirmsDelete', target: 'deleting' },
-          { target: 'confirmingDelete', actions: 'beginDelete' },
-        ],
-        'storage.changed': { target: 'browse', actions: 'syncStorage' },
+        input: ({ context }) => ({ client: context.client, text: context.pendingCurrentText ?? '' }),
+        onDone: { target: 'browsing', actions: assign(({ event }) => currentSaveCompletion(event.output)) },
       },
     },
     deleting: {
       invoke: {
         src: 'deletePrompt',
-        input: ({ context }) => ({ client: context.client, confirmation: context.deleteConfirmation }),
-        onDone: {
-          target: 'browse',
-          actions: assign(({ event }) => {
-            const result = event.output
-            const libraryState = result.kind === 'blocked' ? result.libraryState : 'ready'
-            if (result.prompts === undefined) return { libraryState, deleteConfirmation: null, notice: result.notice }
-            return { libraryState, prompts: result.prompts, deleteConfirmation: null, notice: result.notice }
-          }),
-        },
+        input: ({ context }) => ({
+          client: context.client,
+          confirmation: context.pendingDelete ?? { id: '', revision: '' },
+        }),
+        onDone: { target: 'browsing', actions: assign(({ event }) => deleteCompletion(event.output)) },
       },
-      on: { close: { target: 'closed', actions: 'closeLibrary' } },
     },
     insertingSaved: {
       invoke: {
         src: 'insertSaved',
-        input: ({ context, event }) => ({
+        input: ({ context }) => ({
           client: context.client,
-          span: context.insertionSpan,
-          prompt: event.type === 'saved.insert' ? event.prompt : null,
+          span: context.insertionSpan ?? { start: 0, end: 0, draftRev: 0 },
+          prompt: context.pendingSavedPrompt ?? { id: '', revision: '' },
         }),
-        onDone: {
-          target: 'browse',
-          actions: assign(({ event }) => {
-            const result = event.output
-            if (result.kind === 'inserted') return { hasInserted: true, notice: 'Inserted at the saved cursor position. The message was not sent.' }
-            if (result.kind === 'stale')
-              return {
-                prompts: result.prompts,
-                libraryState: 'ready' as const,
-                notice: 'This prompt changed in another tab. Choose it again from the refreshed list.',
-              }
-            if (result.libraryState === undefined) return { notice: result.notice }
-            return { libraryState: result.libraryState, notice: result.notice }
-          }),
-        },
+        onDone: { target: 'browsing', actions: assign(({ event }) => savedInsertCompletion(event.output)) },
       },
-      on: { close: { target: 'closed', actions: 'closeLibrary' } },
-    },
-    insertingRecent: {
-      invoke: {
-        src: 'insertRecent',
-        input: ({ context, event }) => ({
-          client: context.client,
-          span: context.insertionSpan,
-          prompt: event.type === 'recent.insert' ? event.prompt : null,
-        }),
-        onDone: {
-          target: 'browse',
-          actions: assign(({ event }) =>
-            event.output.kind === 'inserted'
-              ? { hasInserted: true, notice: 'Inserted at the saved cursor position. The message was not sent.' }
-              : { notice: event.output.notice },
-          ),
-        },
-      },
-      on: { close: { target: 'closed', actions: 'closeLibrary' } },
     },
   },
 })

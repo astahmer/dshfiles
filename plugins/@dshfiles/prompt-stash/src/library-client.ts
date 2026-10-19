@@ -24,9 +24,15 @@ export type PromptLibraryRead =
 export interface PromptLibraryClient {
   readonly state: PromptLibraryState
   readonly prompts: readonly SavedPrompt[]
-  readonly save: (input: { readonly prompt: SavedPrompt; readonly expectedRevision: string | null }) => Promise<PromptLibraryMutation>
-  readonly remove: (input: { readonly id: string; readonly expectedRevision: string }) => Promise<PromptLibraryMutation>
-  readonly readLatest: () => Promise<PromptLibraryRead>
+  readonly save: (
+    input: { readonly prompt: SavedPrompt; readonly expectedRevision: string | null },
+    options?: { readonly signal?: AbortSignal },
+  ) => Promise<PromptLibraryMutation>
+  readonly remove: (
+    input: { readonly id: string; readonly expectedRevision: string },
+    options?: { readonly signal?: AbortSignal },
+  ) => Promise<PromptLibraryMutation>
+  readonly readLatest: (options?: { readonly signal?: AbortSignal }) => Promise<PromptLibraryRead>
   readonly refresh: () => void
   readonly createId: () => string
   readonly now: () => number
@@ -284,10 +290,15 @@ export const usePromptLibrary = (options: { readonly pollWhileOpen: boolean } = 
   }, [localStatus.read, localStore, migrationClient, query.data])
 
   const save = useCallback(
-    async (input: { readonly prompt: SavedPrompt; readonly expectedRevision: string | null }): Promise<PromptLibraryMutation> => {
+    async (
+      input: { readonly prompt: SavedPrompt; readonly expectedRevision: string | null },
+      options?: { readonly signal?: AbortSignal },
+    ): Promise<PromptLibraryMutation> => {
+      if (options?.signal?.aborted) return { kind: 'unavailable', prompts: localStore.prompts }
       if (query.data !== undefined) {
         try {
-          const result = await savePromptMutation({ prompt: input.prompt, expectedRevision: input.expectedRevision })
+          const variables = options?.signal === undefined ? input : { ...input, signal: options.signal }
+          const result = await savePromptMutation(variables)
           return { kind: result.kind, prompts: result.prompts }
         } catch {
           return { kind: 'unavailable', prompts: queryClient.getQueryData<PromptStashSnapshot>(PromptLibraryQueries.key)?.prompts ?? [] }
@@ -307,10 +318,12 @@ export const usePromptLibrary = (options: { readonly pollWhileOpen: boolean } = 
     [localStatus, localStore, query.data, queryClient, savePromptMutation],
   )
   const remove = useCallback(
-    async (input: { readonly id: string; readonly expectedRevision: string }): Promise<PromptLibraryMutation> => {
+    async (input: { readonly id: string; readonly expectedRevision: string }, options?: { readonly signal?: AbortSignal }): Promise<PromptLibraryMutation> => {
+      if (options?.signal?.aborted) return { kind: 'unavailable', prompts: localStore.prompts }
       if (query.data !== undefined) {
         try {
-          const result = await removePromptMutation(input)
+          const variables = options?.signal === undefined ? input : { ...input, signal: options.signal }
+          const result = await removePromptMutation(variables)
           return { kind: result.kind, prompts: result.prompts }
         } catch {
           return { kind: 'unavailable', prompts: queryClient.getQueryData<PromptStashSnapshot>(PromptLibraryQueries.key)?.prompts ?? [] }
@@ -328,15 +341,30 @@ export const usePromptLibrary = (options: { readonly pollWhileOpen: boolean } = 
     },
     [localStatus, localStore, query.data, queryClient, removePromptMutation],
   )
-  const readLatest = useCallback(async (): Promise<PromptLibraryRead> => {
-    if (query.data !== undefined) {
-      const result = await refetchLibrary()
-      return result.isError || result.data === undefined ? { kind: 'unavailable' } : { kind: 'ready', prompts: result.data.prompts }
-    }
-    if (localStatus.read === 'invalid') return { kind: 'invalid' }
-    if (localStatus.read === 'unavailable' || !localStatus.writable) return { kind: 'unavailable' }
-    return { kind: 'ready', prompts: localStore.prompts }
-  }, [localStatus, localStore, query.data, refetchLibrary])
+  const readLatest = useCallback(
+    async (options?: { readonly signal?: AbortSignal }): Promise<PromptLibraryRead> => {
+      if (query.data !== undefined) {
+        try {
+          const incoming = promptStashStateSchema.parse(
+            await (options?.signal === undefined ? api.state(undefined) : api.state(undefined, { signal: options.signal })),
+          )
+          let newest = incoming
+          queryClient.setQueryData<PromptStashSnapshot>(PromptLibraryQueries.key, current => {
+            newest = PromptLibraryQueries.newest(current, incoming)
+            return newest
+          })
+          return { kind: 'ready', prompts: newest.prompts }
+        } catch {
+          return { kind: 'unavailable' }
+        }
+      }
+      if (options?.signal?.aborted) return { kind: 'unavailable' }
+      if (localStatus.read === 'invalid') return { kind: 'invalid' }
+      if (localStatus.read === 'unavailable' || !localStatus.writable) return { kind: 'unavailable' }
+      return { kind: 'ready', prompts: localStore.prompts }
+    },
+    [api, localStatus, localStore, query.data, queryClient],
+  )
   const refresh = useCallback(() => void refetchLibrary(), [refetchLibrary])
 
   const state: PromptLibraryState =
@@ -350,14 +378,9 @@ export const usePromptLibrary = (options: { readonly pollWhileOpen: boolean } = 
             ? 'unavailable'
             : 'ready'
 
-  return {
-    state,
-    prompts: query.data?.prompts ?? localStore.prompts,
-    save,
-    remove,
-    readLatest,
-    refresh,
-    createId: createPromptId,
-    now: nowMilliseconds,
-  }
+  const prompts = query.data?.prompts ?? localStore.prompts
+  return useMemo<PromptLibraryClient>(
+    () => ({ state, prompts, save, remove, readLatest, refresh, createId: createPromptId, now: nowMilliseconds }),
+    [state, prompts, save, remove, readLatest, refresh],
+  )
 }

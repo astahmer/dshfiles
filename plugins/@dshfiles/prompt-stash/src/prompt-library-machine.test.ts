@@ -1,7 +1,8 @@
 import { createActor, type ActorRefFrom } from '@dshfiles/plugin-ui/machine'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { PromptLibrary, type SavedPrompt } from './library.js'
-import { promptLibraryMachine, type PromptInsertionSpan, type PromptLibraryClient, type PromptLibraryStorageRead } from './prompt-library-machine.js'
+import type { PromptLibraryMutation, PromptLibraryRead } from './library-client.js'
+import { promptLibraryMachine, type PromptInsertionSpan, type PromptLibraryWorkflowClient } from './prompt-library-machine.js'
 
 const firstPrompt: SavedPrompt = {
   id: '11f94d55-8639-4f42-94ca-7b218778e4a1',
@@ -20,78 +21,89 @@ const updatedPrompt: SavedPrompt = {
 
 const insertionSpan: PromptInsertionSpan = { start: 0, end: 0, draftRev: 1 }
 
-const createLibraryClient = (initial: readonly SavedPrompt[] = []) => {
-  const values = new Map<string, string>()
-  const listeners = new Set<(serialized: string | null) => void>()
-  const insertions: string[] = []
-  let id = 0
-  const initialValue = PromptLibrary.serialize(initial)
-  if (initialValue !== null) values.set('library', initialValue)
-
-  const client: PromptLibraryClient = {
-    read: (): PromptLibraryStorageRead => {
-      const result = PromptLibrary.read(values.get('library') ?? null)
-      return result.ok ? { kind: 'ready', prompts: result.prompts } : { kind: 'invalid' }
+const createWorkflowClient = (initialPrompts: readonly SavedPrompt[] = []) => {
+  let prompts = [...initialPrompts]
+  let idCounter = 0
+  let nextSave: ((signal: AbortSignal | undefined) => Promise<PromptLibraryMutation>) | null = null
+  let latestRead: PromptLibraryRead = { kind: 'ready', prompts }
+  let insertionAllowed = true
+  const inserted: string[] = []
+  const saves: { readonly prompt: SavedPrompt; readonly expectedRevision: string | null }[] = []
+  const removals: { readonly id: string; readonly expectedRevision: string }[] = []
+  const client: PromptLibraryWorkflowClient = {
+    save: async (input, options) => {
+      saves.push(input)
+      if (nextSave !== null) {
+        const result = nextSave(options?.signal)
+        nextSave = null
+        return result
+      }
+      const result = PromptLibrary.writeIfCurrent(prompts, input.prompt, input.expectedRevision)
+      if (result.kind === 'applied') prompts = [...result.prompts]
+      return { kind: result.kind, prompts: result.prompts }
     },
-    subscribe: listener => {
-      listeners.add(listener)
-      return () => listeners.delete(listener)
+    remove: async (input, options) => {
+      removals.push(input)
+      if (options?.signal?.aborted) return { kind: 'unavailable', prompts }
+      const result = PromptLibrary.removeIfCurrent(prompts, input.id, input.expectedRevision)
+      if (result.kind === 'applied') prompts = [...result.prompts]
+      return { kind: result.kind, prompts: result.prompts }
     },
-    write: serialized => void values.set('library', serialized),
+    readLatest: async options => {
+      if (options?.signal?.aborted) return { kind: 'unavailable' }
+      return latestRead.kind === 'ready' ? { kind: 'ready', prompts: [...latestRead.prompts] } : latestRead
+    },
     createId: () => {
-      id += 1
-      return `11111111-1111-4111-8111-${String(id).padStart(12, '0')}`
+      idCounter += 1
+      return `11111111-1111-4111-8111-${String(idCounter).padStart(12, '0')}`
     },
     now: () => 42,
     insertText: text => {
-      insertions.push(text)
+      if (!insertionAllowed) return false
+      inserted.push(text)
       return true
     },
   }
 
   return {
     client,
-    insertions,
-    readPrompts: (): readonly SavedPrompt[] => {
-      const result = PromptLibrary.read(values.get('library') ?? null)
-      return result.ok ? result.prompts : []
+    inserted,
+    saves,
+    removals,
+    prompts: (): readonly SavedPrompt[] => prompts,
+    setPrompts: (next: readonly SavedPrompt[]) => {
+      prompts = [...next]
+      latestRead = { kind: 'ready', prompts }
     },
-    updateFromAnotherTab: (prompts: readonly SavedPrompt[]) => {
-      const serialized = PromptLibrary.serialize(prompts)
-      values.set('library', serialized ?? '')
-      for (const listener of listeners) listener(serialized)
+    setLatestRead: (read: PromptLibraryRead) => {
+      latestRead = read
+    },
+    setInsertionAllowed: (allowed: boolean) => {
+      insertionAllowed = allowed
+    },
+    deferNextSave: (operation: (signal: AbortSignal | undefined) => Promise<PromptLibraryMutation>) => {
+      nextSave = operation
     },
   }
 }
 
-const waitForState = (actor: ActorRefFrom<typeof promptLibraryMachine>, target: 'browse' | 'editing' | 'confirmingDelete'): Promise<void> => {
-  if (actor.getSnapshot().matches(target)) return Promise.resolve()
-  return new Promise(resolve => {
-    const subscription = actor.subscribe(snapshot => {
-      if (!snapshot.matches(target)) return
-      subscription.unsubscribe()
-      resolve()
-    })
-  })
-}
-
-const openLibrary = async (actor: ActorRefFrom<typeof promptLibraryMachine>, span: PromptInsertionSpan | null = null): Promise<void> => {
+const openLibrary = (actor: ActorRefFrom<typeof promptLibraryMachine>, span: PromptInsertionSpan | null = insertionSpan): void => {
   actor.send({ type: 'open', span })
-  await waitForState(actor, 'browse')
+  expect(actor.getSnapshot().matches('browsing')).toBe(true)
 }
 
-describe('prompt library machine', () => {
-  it('saves a new prompt through the injected local library client', async () => {
-    const library = createLibraryClient()
-    const actor = createActor(promptLibraryMachine, { input: { client: library.client } }).start()
-    await openLibrary(actor)
-    actor.send({ type: 'prompt.new' })
-    actor.send({ type: 'editor.change', field: 'title', value: '  Summarize  ' })
-    actor.send({ type: 'editor.change', field: 'text', value: 'Summarize the important changes.' })
-    actor.send({ type: 'editor.save', copy: false })
-    await waitForState(actor, 'browse')
+afterEach(() => vi.restoreAllMocks())
 
-    expect(library.readPrompts()).toEqual([
+describe('prompt library workflow machine', () => {
+  it('saves a new prompt through the injected Query client port', async () => {
+    const library = createWorkflowClient()
+    const actor = createActor(promptLibraryMachine, { input: { client: library.client } }).start()
+    openLibrary(actor)
+    actor.send({ type: 'editor.new' })
+    actor.send({ type: 'editor.save', submission: { title: '  Summarize  ', text: 'Summarize the important changes.', copy: false } })
+    await vi.waitFor(() => expect(actor.getSnapshot().matches('browsing')).toBe(true))
+
+    expect(library.prompts()).toEqual([
       {
         id: '11111111-1111-4111-8111-000000000001',
         revision: '11111111-1111-4111-8111-000000000002',
@@ -100,112 +112,108 @@ describe('prompt library machine', () => {
         updatedAt: 42,
       },
     ])
-    expect(actor.getSnapshot().context.editor).toBeNull()
-    expect(actor.getSnapshot().context.notice).toBe('Saved in this browser.')
+    expect(library.saves[0]?.expectedRevision).toBeNull()
+    expect(actor.getSnapshot().context.editorTarget).toBeNull()
+    expect(actor.getSnapshot().context.notice).toBe('Saved to the prompt library.')
     actor.stop()
   })
 
-  it('preserves conflicted edits and saves them as a new copy', async () => {
-    const library = createLibraryClient([firstPrompt])
+  it('retains conflicted editor target and saves changed text as a new copy', async () => {
+    const library = createWorkflowClient([firstPrompt])
     const actor = createActor(promptLibraryMachine, { input: { client: library.client } }).start()
-    await openLibrary(actor)
-    actor.send({ type: 'prompt.edit', prompt: firstPrompt })
-    actor.send({ type: 'editor.change', field: 'text', value: 'My unsaved revision.' })
-    library.updateFromAnotherTab([updatedPrompt])
+    openLibrary(actor)
+    actor.send({ type: 'editor.edit', target: { id: firstPrompt.id, expectedRevision: firstPrompt.revision } })
+    library.setPrompts([updatedPrompt])
+    actor.send({ type: 'editor.save', submission: { title: firstPrompt.title, text: 'My unsaved revision.', copy: false } })
+    await vi.waitFor(() => expect(actor.getSnapshot().matches('editing')).toBe(true))
 
-    expect(actor.getSnapshot().context.editor).toEqual({
-      id: firstPrompt.id,
-      originalRevision: firstPrompt.revision,
-      title: firstPrompt.title,
-      text: 'My unsaved revision.',
-      stale: true,
-    })
-    actor.send({ type: 'editor.save', copy: true })
-    await waitForState(actor, 'browse')
+    expect(actor.getSnapshot().context.editorTarget).toEqual({ id: firstPrompt.id, expectedRevision: firstPrompt.revision })
+    expect(actor.getSnapshot().context.notice).toContain('changed elsewhere')
 
-    expect(library.readPrompts()).toEqual([
-      {
-        id: '11111111-1111-4111-8111-000000000001',
-        revision: '11111111-1111-4111-8111-000000000002',
-        title: firstPrompt.title,
-        text: 'My unsaved revision.',
-        updatedAt: 42,
-      },
-      updatedPrompt,
-    ])
-    expect(actor.getSnapshot().context.editor).toBeNull()
+    actor.send({ type: 'editor.save', submission: { title: firstPrompt.title, text: 'My unsaved revision.', copy: true } })
+    await vi.waitFor(() => expect(actor.getSnapshot().matches('browsing')).toBe(true))
+
+    expect(library.saves[0]?.expectedRevision).toBe(firstPrompt.revision)
+    expect(library.saves[1]?.expectedRevision).toBeNull()
+    expect(library.prompts()).toHaveLength(2)
+    expect(actor.getSnapshot().context.editorTarget).toBeNull()
     actor.stop()
   })
 
-  it('deletes only after the matching confirmation', async () => {
-    const library = createLibraryClient([firstPrompt])
+  it('deletes only after the same prompt revision is confirmed twice', async () => {
+    const library = createWorkflowClient([firstPrompt])
     const actor = createActor(promptLibraryMachine, { input: { client: library.client } }).start()
-    await openLibrary(actor)
-    actor.send({ type: 'delete.request', prompt: firstPrompt })
-    expect(actor.getSnapshot().matches('confirmingDelete')).toBe(true)
-    actor.send({ type: 'delete.request', prompt: firstPrompt })
-    await waitForState(actor, 'browse')
+    openLibrary(actor)
+    const confirmation = { id: firstPrompt.id, revision: firstPrompt.revision }
+    actor.send({ type: 'delete.request', confirmation })
+    expect(actor.getSnapshot().context.deleteConfirmation).toEqual(confirmation)
+    expect(library.removals).toHaveLength(0)
+    actor.send({ type: 'delete.request', confirmation })
+    await vi.waitFor(() => expect(library.prompts()).toEqual([]))
+    await vi.waitFor(() => expect(actor.getSnapshot().matches('browsing')).toBe(true))
 
-    expect(library.readPrompts()).toEqual([])
+    expect(actor.getSnapshot().matches('browsing')).toBe(true)
+    expect(library.removals).toEqual([{ id: confirmation.id, expectedRevision: confirmation.revision }])
+    expect(library.prompts()).toEqual([])
     expect(actor.getSnapshot().context.deleteConfirmation).toBeNull()
     expect(actor.getSnapshot().context.notice).toBe('Prompt removed.')
     actor.stop()
   })
 
-  it('clears delete confirmation on external change without deleting', async () => {
-    const library = createLibraryClient([firstPrompt])
+  it('inserts only a current Host revision and only once per open', async () => {
+    const library = createWorkflowClient([firstPrompt])
     const actor = createActor(promptLibraryMachine, { input: { client: library.client } }).start()
-    await openLibrary(actor)
-    actor.send({ type: 'delete.request', prompt: firstPrompt })
-    expect(actor.getSnapshot().matches('confirmingDelete')).toBe(true)
-    expect(actor.getSnapshot().context.deleteConfirmation).toEqual({ id: firstPrompt.id, revision: firstPrompt.revision })
+    openLibrary(actor)
+    library.setLatestRead({ kind: 'ready', prompts: [updatedPrompt] })
+    actor.send({ type: 'saved.insert', prompt: { id: firstPrompt.id, revision: firstPrompt.revision } })
+    await vi.waitFor(() => expect(actor.getSnapshot().matches('browsing')).toBe(true))
 
-    library.updateFromAnotherTab([updatedPrompt])
-    expect(actor.getSnapshot().matches('browse')).toBe(true)
-    expect(actor.getSnapshot().context.deleteConfirmation).toBeNull()
-    actor.send({ type: 'delete.request', prompt: firstPrompt })
-    await waitForState(actor, 'confirmingDelete')
-    expect(library.readPrompts()).toEqual([updatedPrompt])
-    actor.stop()
-  })
-
-  it('rejects insertion when the saved cursor span has been cleared', async () => {
-    const library = createLibraryClient([firstPrompt])
-    const actor = createActor(promptLibraryMachine, { input: { client: library.client } }).start()
-    await openLibrary(actor)
-    actor.send({ type: 'saved.insert', prompt: firstPrompt })
-    await waitForState(actor, 'browse')
-
-    expect(library.insertions).toEqual([])
+    expect(library.inserted).toEqual([])
     expect(actor.getSnapshot().context.hasInserted).toBe(false)
-    expect(actor.getSnapshot().context.notice).toBe('Close and reopen the prompt stash to choose a fresh insertion point.')
+    expect(actor.getSnapshot().context.notice).toContain('changed elsewhere')
+
+    actor.send({ type: 'saved.insert', prompt: { id: updatedPrompt.id, revision: updatedPrompt.revision } })
+    await vi.waitFor(() => expect(actor.getSnapshot().context.hasInserted).toBe(true))
+    actor.send({ type: 'recent.insert', text: 'another prompt' })
+
+    expect(library.inserted).toEqual([updatedPrompt.text])
     actor.stop()
   })
 
-  it('inserts the current saved revision once at the captured span', async () => {
-    const library = createLibraryClient([firstPrompt])
+  it('inserts recent text through the captured span and reports composer conflicts', () => {
+    const library = createWorkflowClient()
     const actor = createActor(promptLibraryMachine, { input: { client: library.client } }).start()
-    await openLibrary(actor, insertionSpan)
-    actor.send({ type: 'saved.insert', prompt: firstPrompt })
-    await waitForState(actor, 'browse')
-    actor.send({ type: 'recent.insert', prompt: { id: '4', text: 'another prompt' } })
+    openLibrary(actor)
+    library.setInsertionAllowed(false)
+    actor.send({ type: 'recent.insert', text: 'Recent text.' })
 
-    expect(library.insertions).toEqual([firstPrompt.text])
-    expect(actor.getSnapshot().context.hasInserted).toBe(true)
+    expect(library.inserted).toEqual([])
+    expect(actor.getSnapshot().context.hasInserted).toBe(false)
+    expect(actor.getSnapshot().context.notice).toContain('composer draft changed')
     actor.stop()
   })
 
-  it('refreshes a saved prompt changed before insertion', async () => {
-    const library = createLibraryClient([firstPrompt])
+  it('cancels a pending save when the flow closes and ignores its late success', async () => {
+    const library = createWorkflowClient()
+    let activeSignal: AbortSignal | undefined
+    library.deferNextSave(
+      async signal =>
+        await new Promise(resolve => {
+          activeSignal = signal
+          signal?.addEventListener('abort', () => resolve({ kind: 'applied', prompts: [] }), { once: true })
+        }),
+    )
     const actor = createActor(promptLibraryMachine, { input: { client: library.client } }).start()
-    await openLibrary(actor, insertionSpan)
-    library.updateFromAnotherTab([updatedPrompt])
-    actor.send({ type: 'saved.insert', prompt: firstPrompt })
-    await waitForState(actor, 'browse')
+    openLibrary(actor)
+    actor.send({ type: 'editor.new' })
+    actor.send({ type: 'editor.save', submission: { title: 'Title', text: 'Text', copy: false } })
+    await vi.waitFor(() => expect(activeSignal).toBeDefined())
+    actor.send({ type: 'close' })
+    await vi.waitFor(() => expect(actor.getSnapshot().matches('closed')).toBe(true))
 
-    expect(library.insertions).toEqual([])
-    expect(actor.getSnapshot().context.prompts).toEqual([updatedPrompt])
-    expect(actor.getSnapshot().context.notice).toBe('This prompt changed in another tab. Choose it again from the refreshed list.')
+    expect(activeSignal?.aborted).toBe(true)
+    expect(actor.getSnapshot().context.editorTarget).toBeNull()
+    expect(actor.getSnapshot().context.notice).toBe('')
     actor.stop()
   })
 })
