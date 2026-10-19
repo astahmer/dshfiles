@@ -22,6 +22,7 @@ Checkboxes and receipts in a plan are history, not fresh verification.
 | [pulls.review-style thread review](pulls-review/README.md)           | Host API, review panel, command and palette action, scratch-DSH verification.                                                                                                                                                        |
 | [Desktop shell](desktop-shell/README.md)                             | Relaunch on Host exit, lifecycle test, signing, updates.                                                                                                                                                                             |
 | [HextaUI blocks](hextaui-blocks.md)                                  | Port MIT components; rebuild Pro blocks as references: shared CodeBlock/StackTrace, edit cards, bash stack traces, then P2 polish.                                                                                                   |
+| [Inline chat UI](inline-chat-ui.md)                                  | Shared tool-card kit, edit cards, tool-group summary, plan progress, live activity strip, turn summary; ported from AI Elements / prompt-kit, affectUI as reference.                                                                 |
 
 ## Testing, research and housekeeping
 
