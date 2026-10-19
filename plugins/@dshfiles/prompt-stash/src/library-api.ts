@@ -45,6 +45,9 @@ export const draftMutationSchema = z.discriminatedUnion('kind', [
     .strict(),
 ])
 
+export type DraftSnapshot = z.infer<typeof draftSnapshotSchema>
+export type DraftMutation = z.infer<typeof draftMutationSchema>
+
 const draftInputSchema = z
   .object({
     id: z.string().uuid(),

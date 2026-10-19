@@ -1,7 +1,11 @@
-import { useApi, useApiQuery } from '@dshfiles/dshx/client'
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { promptStashApi } from './library-api.js'
-import { DRAFT_STORE_KEY, LEGACY_DRAFT_STORE_KEY, PromptDrafts, type SavedDraft, type SaveDraftResult } from './draft-store.js'
+import { useApi } from '@dshfiles/dshx/client'
+import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
+import { useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
+import { useCallback, useEffect, useMemo } from 'react'
+import { PromptDraftMigration, type PromptDraftMigrationClient } from './draft-migration-machine.js'
+import { PromptDraftQueries } from './draft-queries.js'
+import { draftMutationSchema, draftSnapshotSchema, promptStashApi, type DraftMutation, type DraftSnapshot } from './library-api.js'
+import { DRAFT_STORE_KEY, PromptDrafts, type SavedDraft, type SaveDraftResult } from './draft-store.js'
 
 export type SavedDraftsState = 'loading' | 'ready' | 'unavailable'
 export type DraftRejectionReason = Extract<SaveDraftResult, { ok: false }>['reason']
@@ -19,145 +23,158 @@ export interface SavedDraftsClient {
   readonly refresh: () => void
 }
 
-type LocalDraftRead = { readonly kind: 'ready'; readonly drafts: readonly SavedDraft[] } | { readonly kind: 'unavailable' }
+type SaveDraftVariables = {
+  readonly draft: { readonly id: string; readonly title: string; readonly text: string; readonly now: string }
+  readonly signal?: AbortSignal
+}
 
-const readLocalDrafts = (): LocalDraftRead => {
+type RemoveDraftVariables = { readonly id: string; readonly signal?: AbortSignal }
+
+let localDraftStorageAvailable = true
+let importedLegacySerialized: string | null = null
+
+const withLocalStorage = <Result>(storage: Storage, operation: () => Result): Result => {
   try {
-    return { kind: 'ready', drafts: PromptDrafts.readStored(window.localStorage).drafts }
-  } catch {
-    return { kind: 'unavailable' }
+    const result = operation()
+    localDraftStorageAvailable = true
+    return result
+  } catch (error) {
+    localDraftStorageAvailable = false
+    throw error
   }
 }
 
-const writeLocalDrafts = (serialized: string): boolean => {
+const localDraftStorage = () => {
   try {
-    window.localStorage.setItem(DRAFT_STORE_KEY, serialized)
-    return true
+    const storage = window.localStorage
+    localDraftStorageAvailable = true
+    return {
+      getItem: (key: string) =>
+        withLocalStorage(storage, () => {
+          if (key !== DRAFT_STORE_KEY) return storage.getItem(key)
+          const result = PromptDrafts.readStoredWithSource(storage)
+          if (result.importedLegacy) importedLegacySerialized = result.legacySerialized
+          return JSON.stringify(result.store)
+        }),
+      setItem: (key: string, value: string) => withLocalStorage(storage, () => storage.setItem(key, value)),
+      removeItem: (key: string) =>
+        withLocalStorage(storage, () => {
+          if (key === DRAFT_STORE_KEY) {
+            PromptDrafts.clearStored(storage, importedLegacySerialized)
+            importedLegacySerialized = null
+            return
+          }
+          storage.removeItem(key)
+        }),
+    }
   } catch {
-    return false
+    localDraftStorageAvailable = false
+    return null
   }
 }
 
-const clearLocalDrafts = (): void => {
-  try {
-    window.localStorage.removeItem(DRAFT_STORE_KEY)
-    window.localStorage.removeItem(LEGACY_DRAFT_STORE_KEY)
-  } catch {
-    return
-  }
-}
+const storedDrafts = createStoredValue({
+  key: DRAFT_STORE_KEY,
+  schema: PromptDrafts.schema,
+  fallback: PromptDrafts.emptyStore(),
+  storage: localDraftStorage,
+})
 
-/**
- * The shared saved drafts. The Host owns them; browser storage stays the
- * fallback only while the API is unavailable, and its content moves to the
- * Host once on first load.
- */
+/** The Host snapshot owns shared drafts; this value is only the browser fallback until Host writes succeed. */
 export const useSavedDrafts = (): SavedDraftsClient => {
   const api = useApi(promptStashApi)
-  const query = useApiQuery(promptStashApi, 'drafts')
-  const [state, setState] = useState<SavedDraftsState>('loading')
-  const [drafts, setDrafts] = useState<readonly SavedDraft[]>([])
-  const host = useRef(false)
-  const revision = useRef(0)
-  const migrated = useRef(false)
-  const refetch = query.refetch
+  const queryClient = useQueryClient()
+  const localStore = storedDrafts.useValue()
+  const query = useQuery({
+    queryKey: PromptDraftQueries.key,
+    queryFn: ({ signal }) => api.drafts(undefined, { signal }),
+  })
+  const saveMutation = useMutation<DraftMutation, Error, SaveDraftVariables>({
+    mutationFn: async input =>
+      draftMutationSchema.parse(
+        await (input.signal === undefined ? api.saveDraft({ draft: input.draft }) : api.saveDraft({ draft: input.draft }, { signal: input.signal })),
+      ),
+    onSuccess: snapshot => queryClient.setQueryData<DraftSnapshot>(PromptDraftQueries.key, current => PromptDraftQueries.newest(current, snapshot)),
+  })
+  const removeMutation = useMutation<DraftSnapshot, Error, RemoveDraftVariables>({
+    mutationFn: async input =>
+      draftSnapshotSchema.parse(
+        await (input.signal === undefined ? api.removeDraft({ id: input.id }) : api.removeDraft({ id: input.id }, { signal: input.signal })),
+      ),
+    onSuccess: snapshot => queryClient.setQueryData<DraftSnapshot>(PromptDraftQueries.key, current => PromptDraftQueries.newest(current, snapshot)),
+  })
+  const saveDraftMutation = saveMutation.mutateAsync
+  const removeDraftMutation = removeMutation.mutateAsync
+  const refetchDrafts = query.refetch
+  const saveDraftForMigration = useCallback(
+    (
+      input: { readonly draft: { readonly id: string; readonly title: string; readonly text: string; readonly now: string } },
+      options: { readonly signal: AbortSignal },
+    ) => saveDraftMutation({ ...input, signal: options.signal }),
+    [saveDraftMutation],
+  )
+  const migrationClient = useMemo<PromptDraftMigrationClient>(
+    () => ({
+      saveDraft: saveDraftForMigration,
+      completeMigration: () => storedDrafts.remove(),
+      refresh: () => void queryClient.invalidateQueries({ queryKey: PromptDraftQueries.key, exact: true }),
+    }),
+    [queryClient, saveDraftForMigration],
+  )
 
-  const adopt = useCallback((snapshot: { readonly revision: number; readonly drafts: readonly SavedDraft[] }) => {
-    if (snapshot.revision < revision.current) return
-    revision.current = snapshot.revision
-    setDrafts(snapshot.drafts)
-  }, [])
-
+  useEffect(() => PromptDraftMigration.retain(), [])
   useEffect(() => {
-    if (query.data !== undefined) {
-      host.current = true
-      adopt(query.data)
-      setState('ready')
-      if (migrated.current) return
-      migrated.current = true
-      void (async () => {
-        const local = readLocalDrafts()
-        let migratedAll = local.kind === 'ready'
-        if (local.kind === 'ready') {
-          for (const draft of local.drafts) {
-            const result = await api.saveDraft({ draft: { id: draft.id, title: draft.title, text: draft.text, now: draft.updatedAt } })
-            if (result.kind === 'rejected' && result.reason !== 'duplicate-id') migratedAll = false
-          }
-        }
-        if (migratedAll) clearLocalDrafts()
-        refetch()
-      })().catch(() => {
-        migrated.current = false
-      })
-      return
-    }
-    if (query.error !== null) {
-      host.current = false
-      revision.current = 0
-      const local = readLocalDrafts()
-      setDrafts(local.kind === 'ready' ? local.drafts : [])
-      setState(local.kind === 'ready' ? 'ready' : 'unavailable')
-    }
-  }, [adopt, api, query.data, query.error, refetch])
+    if (query.data === undefined) return
+    PromptDraftMigration.dispatch({ client: migrationClient, snapshot: query.data, localStore })
+  }, [localStore, migrationClient, query.data])
 
   const save = useCallback(
     async (draft: { readonly id: string; readonly title: string; readonly text: string; readonly now: string }): Promise<DraftSaveOutcome> => {
-      if (host.current) {
+      if (query.data !== undefined) {
         try {
-          const result = await api.saveDraft({ draft })
-          adopt(result)
-          setState('ready')
+          const result = await saveDraftMutation({ draft })
           return result.kind === 'applied' ? { kind: 'applied' } : { kind: 'rejected', reason: result.reason }
         } catch {
-          setState('unavailable')
           return { kind: 'unavailable' }
         }
       }
-      const local = readLocalDrafts()
-      if (local.kind !== 'ready') {
-        setState('unavailable')
-        return { kind: 'unavailable' }
-      }
-      const result = PromptDrafts.save({ schemaVersion: 1, drafts: [...local.drafts] }, draft)
+
+      const result = PromptDrafts.save(localStore, draft)
       if (!result.ok) return { kind: 'rejected', reason: result.reason }
-      if (!writeLocalDrafts(result.serialized)) {
-        setState('unavailable')
+      if (!storedDrafts.set(result.store)) {
+        storedDrafts.reload()
         return { kind: 'unavailable' }
       }
-      setDrafts(result.store.drafts)
       return { kind: 'applied' }
     },
-    [adopt, api],
+    [localStore, query.data, saveDraftMutation],
   )
-
   const remove = useCallback(
     async (id: string): Promise<boolean> => {
-      if (host.current) {
+      if (query.data !== undefined) {
         try {
-          const result = await api.removeDraft({ id })
-          adopt(result)
-          setState('ready')
+          await removeDraftMutation({ id })
           return true
         } catch {
-          setState('unavailable')
           return false
         }
       }
-      const local = readLocalDrafts()
-      if (local.kind !== 'ready') {
-        setState('unavailable')
+
+      const next = PromptDrafts.remove(localStore, id)
+      if (!storedDrafts.set(next)) {
+        storedDrafts.reload()
         return false
       }
-      const next = PromptDrafts.remove({ schemaVersion: 1, drafts: [...local.drafts] }, id)
-      if (!writeLocalDrafts(JSON.stringify(next))) {
-        setState('unavailable')
-        return false
-      }
-      setDrafts(next.drafts)
       return true
     },
-    [adopt, api],
+    [localStore, query.data, removeDraftMutation],
   )
+  const refresh = useCallback(() => {
+    storedDrafts.reload()
+    void refetchDrafts()
+  }, [refetchDrafts])
 
-  return { state, drafts, save, remove, refresh: refetch }
+  const state: SavedDraftsState = query.data !== undefined ? 'ready' : query.isPending ? 'loading' : localDraftStorageAvailable ? 'ready' : 'unavailable'
+
+  return { state, drafts: query.data?.drafts ?? localStore.drafts, save, remove, refresh }
 }

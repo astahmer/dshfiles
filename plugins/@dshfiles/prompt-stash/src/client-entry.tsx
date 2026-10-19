@@ -3,6 +3,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-chat/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import { defineClientPlugin, type ComposerActionProps } from '@dshfiles/dshx/client'
+import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { createDraftAttachmentKeeper } from './draft-attachment-retention.js'
 import PromptLibraryAction from './prompt-stash-action.js'
 import { PromptStashAction as PromptDraftsAction } from './prompt-stash.js'
@@ -34,13 +35,21 @@ export default defineClientPlugin({
     api.composer.registerAction({
       id: 'prompt-stash-drafts',
       placement: 'left',
-      component: props => <PromptDraftsAction {...props} attachmentKeeper={attachmentKeeper} />,
+      component: props => (
+        <PluginQueryProvider>
+          <PromptDraftsAction {...props} attachmentKeeper={attachmentKeeper} />
+        </PluginQueryProvider>
+      ),
     })
     api.composer.registerAction({
       id: 'prompt-stash-action',
       placement: 'right',
       order: 60,
-      component: PromptLibraryAction,
+      component: props => (
+        <PluginQueryProvider>
+          <PromptLibraryAction {...props} />
+        </PluginQueryProvider>
+      ),
     })
   },
 })

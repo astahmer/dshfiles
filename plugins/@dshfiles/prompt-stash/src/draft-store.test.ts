@@ -88,7 +88,12 @@ describe('sent prompt history', () => {
 describe('draft storage key', () => {
   const storageOf = (initial: Record<string, string>) => {
     const values = new Map(Object.entries(initial))
-    return { getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => void values.set(key, value), values }
+    return {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => void values.set(key, value),
+      removeItem: (key: string) => void values.delete(key),
+      values,
+    }
   }
   const stored: DraftStore = {
     schemaVersion: 1,
@@ -112,5 +117,31 @@ describe('draft storage key', () => {
     const storage = storageOf({ [LEGACY_DRAFT_STORE_KEY]: library })
     expect(PromptDrafts.readStored(storage).drafts).toEqual([])
     expect(storage.values.has(DRAFT_STORE_KEY)).toBe(false)
+    expect(PromptDrafts.readStoredWithSource(storage).importedLegacy).toBe(false)
+  })
+
+  it('clears an imported legacy draft value only when it is still the same value', () => {
+    const unchangedStorage = storageOf({ [LEGACY_DRAFT_STORE_KEY]: JSON.stringify(stored) })
+    const unchanged = PromptDrafts.readStoredWithSource(unchangedStorage)
+    PromptDrafts.clearStored(unchangedStorage, unchanged.legacySerialized)
+    expect(unchangedStorage.values.has(LEGACY_DRAFT_STORE_KEY)).toBe(false)
+
+    const legacySerialized = JSON.stringify(stored)
+    const storage = storageOf({ [LEGACY_DRAFT_STORE_KEY]: legacySerialized })
+    const read = PromptDrafts.readStoredWithSource(storage)
+    expect(read).toEqual({ store: stored, importedLegacy: true, legacySerialized })
+
+    storage.setItem(LEGACY_DRAFT_STORE_KEY, library)
+    PromptDrafts.clearStored(storage, read.legacySerialized)
+
+    expect(storage.values.has(DRAFT_STORE_KEY)).toBe(false)
+    expect(storage.values.get(LEGACY_DRAFT_STORE_KEY)).toBe(library)
+  })
+
+  it('does not clear the prompt library legacy value when clearing drafts', () => {
+    const storage = storageOf({ [LEGACY_DRAFT_STORE_KEY]: library, [DRAFT_STORE_KEY]: JSON.stringify(stored) })
+    PromptDrafts.clearStored(storage, null)
+    expect(storage.values.has(DRAFT_STORE_KEY)).toBe(false)
+    expect(storage.values.get(LEGACY_DRAFT_STORE_KEY)).toBe(library)
   })
 })

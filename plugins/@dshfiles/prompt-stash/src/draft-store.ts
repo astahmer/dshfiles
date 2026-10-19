@@ -77,27 +77,47 @@ const draftSaveBlock = (input: {
   return null
 }
 
-const readDraftStore = (source: string | null): DraftStore => {
-  if (source === null || new TextEncoder().encode(source).byteLength > MAX_DRAFT_STORE_BYTES) return emptyDraftStore()
+const parseDraftStore = (source: string | null): DraftStore | null => {
+  if (source === null || new TextEncoder().encode(source).byteLength > MAX_DRAFT_STORE_BYTES) return null
   try {
     const decoded: unknown = JSON.parse(source)
     const result = draftStoreSchema.safeParse(decoded)
-    return result.success ? result.data : emptyDraftStore()
+    return result.success ? result.data : null
   } catch {
-    return emptyDraftStore()
+    return null
   }
 }
+
+const readDraftStore = (source: string | null): DraftStore => parseDraftStore(source) ?? emptyDraftStore()
 
 /**
  * Reads the drafts key. Drafts left under the key they once shared with the prompt library move to their own key
  * on first read, so a later library save cannot overwrite them.
  */
-const readStoredDrafts = (storage: { getItem(key: string): string | null; setItem(key: string, value: string): void }): DraftStore => {
+interface StoredDraftsRead {
+  readonly store: DraftStore
+  readonly importedLegacy: boolean
+  readonly legacySerialized: string | null
+}
+
+const readStoredDraftsWithSource = (storage: { getItem(key: string): string | null; setItem(key: string, value: string): void }): StoredDraftsRead => {
   const current = storage.getItem(DRAFT_STORE_KEY)
-  if (current !== null) return readDraftStore(current)
-  const legacy = readDraftStore(storage.getItem(LEGACY_DRAFT_STORE_KEY))
-  if (legacy.drafts.length > 0) storage.setItem(DRAFT_STORE_KEY, JSON.stringify(legacy))
-  return legacy
+  if (current !== null) return { store: readDraftStore(current), importedLegacy: false, legacySerialized: null }
+  const legacySerialized = storage.getItem(LEGACY_DRAFT_STORE_KEY)
+  const legacy = parseDraftStore(legacySerialized)
+  if (legacy === null || legacy.drafts.length === 0) return { store: legacy ?? emptyDraftStore(), importedLegacy: false, legacySerialized: null }
+  storage.setItem(DRAFT_STORE_KEY, JSON.stringify(legacy))
+  return { store: legacy, importedLegacy: true, legacySerialized }
+}
+
+const readStoredDrafts = (storage: { getItem(key: string): string | null; setItem(key: string, value: string): void }): DraftStore =>
+  readStoredDraftsWithSource(storage).store
+
+const clearStoredDrafts = (storage: { getItem(key: string): string | null; removeItem(key: string): void }, importedLegacySerialized: string | null): void => {
+  storage.removeItem(DRAFT_STORE_KEY)
+  if (importedLegacySerialized !== null && storage.getItem(LEGACY_DRAFT_STORE_KEY) === importedLegacySerialized) {
+    storage.removeItem(LEGACY_DRAFT_STORE_KEY)
+  }
 }
 
 const defaultDraftTitle = (text: string): string => {
@@ -141,9 +161,13 @@ const sentPromptFromNode = (source: unknown): SentPrompt | null => {
 }
 
 export class PromptDrafts {
+  static readonly schema = draftStoreSchema
+  static readonly emptyStore = emptyDraftStore
   static readonly saveBlock = draftSaveBlock
   static readonly read = readDraftStore
   static readonly readStored = readStoredDrafts
+  static readonly readStoredWithSource = readStoredDraftsWithSource
+  static readonly clearStored = clearStoredDrafts
   static readonly defaultTitle = defaultDraftTitle
   static readonly save = saveDraft
   static readonly remove = removeDraft
