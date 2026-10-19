@@ -1,0 +1,58 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.11 [39m[90m/repo/shop[39m
+
+ [31m❯[39m src/cart/sync.test.ts [2m([22m[2m2 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[33m 514[2mms[22m[39m
+   [32m✓[39m loads the cart from storage[32m 3[2mms[22m[39m
+[31m   [31m×[31m syncs the cart across tabs[39m[33m 509[2mms[22m[39m
+ [31m❯[39m src/cart/pricing.test.ts [2m([22m[2m4 tests[22m[2m | [22m[31m1 failed[39m[2m | [22m[33m1 skipped[39m[2m)[22m[32m 18[2mms[22m[39m
+     [32m✓[39m takes 10% off the subtotal[32m 3[2mms[22m[39m
+[31m     [31m×[31m applies a coupon only once[39m[32m 13[2mms[22m[39m
+     [2m[90m↓[39m[22m stacks with gift cards
+     [32m✓[39m rounds to the nearest cent[32m 0[2mms[22m[39m
+ [32m✓[39m src/lib/money.test.ts [2m([22m[2m2 tests[22m[2m)[22m[33m 554[2mms[22m[39m
+   [33m[2m✓[22m[39m slow conversion [33m 357[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 2 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m src/cart/pricing.test.ts[2m > [22mapplyCoupon[2m > [22mapplies a coupon only once
+[31m[1mAssertionError[22m: expected { subtotal: 4200, discount: 840, …(1) } to deeply equal { subtotal: 4200, discount: 420, …(1) }[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[2m  {[22m
+[32m-   "discount": 420,[39m
+[31m+   "discount": 840,[39m
+[2m    "subtotal": 4200,[22m
+[32m-   "total": 3780,[39m
+[31m+   "total": 3360,[39m
+[2m  }[22m
+
+[36m [2m❯[22m src/cart/pricing.test.ts:[2m8:75[22m[39m
+    [90m  6|[39m   [34mit[39m([32m'applies a coupon only once'[39m[33m,[39m () [33m=>[39m {
+    [90m  7|[39m     const repriced = applyCoupon(applyCoupon({ subtotal: 4200, discoun…
+    [90m  8|[39m     expect({ ...repriced, total: repriced.subtotal - repriced.discount…
+    [90m   |[39m                                                                           [31m^[39m
+    [90m  9|[39m   })
+    [90m 10|[39m   it[33m.[39m[34mskip[39m([32m'stacks with gift cards'[39m[33m,[39m () [33m=>[39m {})
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m src/cart/sync.test.ts[2m > [22msyncs the cart across tabs
+[31m[1mError[22m: Test timed out in 500ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".[39m
+[36m [2m❯[22m src/cart/sync.test.ts:[2m2:1[22m[39m
+    [90m  1|[39m [34mit[39m([32m'loads the cart from storage'[39m[33m,[39m () [33m=>[39m { [34mexpect[39m([34m1[39m)[33m.[39m[34mtoBe[39m([34m1[39m) })
+    [90m  2|[39m [34mit[39m([32m'syncs the cart across tabs'[39m[33m,[39m [35masync[39m () [33m=>[39m {
+    [90m   |[39m [31m^[39m
+    [90m  3|[39m   [35mawait[39m [35mnew[39m [33mPromise[39m(() [33m=>[39m {})
+    [90m  4|[39m })
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m2 failed[39m[22m[2m | [22m[1m[32m1 passed[39m[22m[90m (3)[39m
+[2m      Tests [22m [1m[31m2 failed[39m[22m[2m | [22m[1m[32m5 passed[39m[22m[2m | [22m[33m1 skipped[39m[90m (8)[39m
+[2m   Start at [22m 18:54:32
+[2m   Duration [22m 9.43s[2m (transform 2.89s, setup 0ms, import 4.55s, tests 1.09s, environment 1ms)[22m
+

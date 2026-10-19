@@ -1,0 +1,60 @@
+
+ RUN  v4.1.11 /repo/shop
+
+ ✓ src/cart/pricing.test.ts > applyCoupon > takes 10% off the subtotal 2ms
+ × src/cart/pricing.test.ts > applyCoupon > applies a coupon only once 12ms
+   → expected { subtotal: 4200, discount: 840, …(1) } to deeply equal { subtotal: 4200, discount: 420, …(1) }
+ ↓ src/cart/pricing.test.ts > applyCoupon > stacks with gift cards
+ ✓ src/cart/pricing.test.ts > formatTotal > rounds to the nearest cent 0ms
+ ✓ src/cart/sync.test.ts > loads the cart from storage 6ms
+ ✓ src/lib/money.test.ts > adds cents 5ms
+ × src/cart/sync.test.ts > syncs the cart across tabs 508ms
+   → Test timed out in 500ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ✓ src/lib/money.test.ts > slow conversion 324ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/cart/pricing.test.ts > applyCoupon > applies a coupon only once
+AssertionError: expected { subtotal: 4200, discount: 840, …(1) } to deeply equal { subtotal: 4200, discount: 420, …(1) }
+
+- Expected
++ Received
+
+  {
+-   "discount": 420,
++   "discount": 840,
+    "subtotal": 4200,
+-   "total": 3780,
++   "total": 3360,
+  }
+
+ ❯ src/cart/pricing.test.ts:9:75
+      7|   it('applies a coupon only once', () => {
+      8|     const repriced = applyCoupon(applyCoupon({ subtotal: 4200, discoun…
+      9|     expect({ ...repriced, total: repriced.subtotal - repriced.discount…
+       |                                                                           ^
+     10|   })
+     11|   it.skip('stacks with gift cards', () => {})
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  src/cart/sync.test.ts > syncs the cart across tabs
+Error: Test timed out in 500ms.
+If this is a long-running test, pass a timeout value as the last argument or configure it globally with "testTimeout".
+ ❯ src/cart/sync.test.ts:3:1
+      1| import { expect, it } from 'vitest'
+      2| it('loads the cart from storage', () => { expect(1).toBe(1) })
+      3| it('syncs the cart across tabs', async () => {
+       | ^
+      4|   await new Promise(() => {})
+      5| })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  2 failed | 1 passed (3)
+      Tests  2 failed | 5 passed | 1 skipped (8)
+   Start at  18:29:32
+   Duration  3.77s (transform 646ms, setup 0ms, import 1.55s, tests 868ms, environment 1ms)
+
