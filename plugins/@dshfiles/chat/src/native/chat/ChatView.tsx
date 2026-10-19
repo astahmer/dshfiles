@@ -114,8 +114,11 @@ export function ChatView({
   const groupMembers = useCallback((groupKey: string) => (
     groupedView?.groupSource(groupKey as Parameters<NonNullable<typeof groupedView>['groupSource']>[0]).getSnapshot()?.members.map(member => member.key) ?? []
   ), [groupedView])
+  // Read during render from the previous commit: the scroll owner needs the window's output to exist.
+  const followingTail = useRef(true)
   const transcript = useTranscriptWindow({
     ready: openState === 'open',
+    following: useCallback(() => followingTail.current, []),
     entries,
     seqOf: useCallback((entry: RenderEntry) => {
       const key = entry.kind === 'node' ? entry.key : groupMembers(entry.key)[0]
@@ -214,6 +217,7 @@ export function ChatView({
     loadedTurns: turnNavigationItems,
     transcriptView,
   })
+  followingTail.current = scroll.followingTail
   const flowContext = useMemo<ChatFlowHookContext>(() => ({ motion: scroll.motion }), [scroll.motion])
 
   return (

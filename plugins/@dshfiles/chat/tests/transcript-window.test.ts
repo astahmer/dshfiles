@@ -9,13 +9,14 @@ import { TranscriptWindow, useTranscriptWindow } from '../src/transcript-window.
 const rows = (count: number): RenderEntry[] => Array.from({ length: count }, (_, index) => ({ kind: 'node', key: `n${index}` }) as RenderEntry)
 const seqOf = (entry: RenderEntry): number => (Number(entry.key.slice(1)) + 1) * 10
 
-const renderWindow = (initial: { entries: RenderEntry[]; anchor?: string | null; hasMore?: boolean }) => {
+const renderWindow = (initial: { entries: RenderEntry[]; anchor?: string | null; hasMore?: boolean; following?: boolean }) => {
   const loadOlder = vi.fn()
   const loadThrough = vi.fn((_seq: SessionSeq) => Promise.resolve())
   const hook = renderHook(
     (props: { entries: RenderEntry[] }) =>
       useTranscriptWindow({
         ready: true,
+        following: () => initial.following ?? false,
         entries: props.entries,
         seqOf,
         members: () => [],
@@ -56,6 +57,13 @@ describe('TranscriptWindow', () => {
     view.rerender({ entries: rows(110) })
     expect(view.result.current.entries[0]?.key).toBe('n76')
     expect(view.result.current.entries).toHaveLength(34)
+  })
+
+  it('slides with the newest rows while the reader follows them', () => {
+    const view = renderWindow({ entries: rows(100), following: true })
+    view.rerender({ entries: rows(110) })
+    expect(view.result.current.entries[0]?.key).toBe('n86')
+    expect(view.result.current.entries).toHaveLength(24)
   })
 
   it('widens to a Turn jump target without asking the Host when the row is loaded', async () => {

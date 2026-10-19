@@ -48,8 +48,10 @@ export class TranscriptWindow {
 }
 
 interface WindowInput {
-  /** History is open; the opening window is fixed from then on. */
+  /** History is open. */
   readonly ready: boolean
+  /** Whether the reader follows the newest row; the window slides with the tail until they leave it. */
+  readonly following: () => boolean
   readonly entries: readonly RenderEntry[]
   /** First Session sequence a row shows; undefined while its Node is not loaded. */
   readonly seqOf: (entry: RenderEntry) => number | undefined
@@ -65,9 +67,10 @@ interface WindowInput {
  * @returns the mounted rows and history operations that treat unmounted rows as more history.
  */
 export const useTranscriptWindow = (input: WindowInput) => {
-  const { ready, entries, seqOf, members, savedAnchor, hasMore, loadOlder, loadThrough } = input
+  const { ready, following, entries, seqOf, members, savedAnchor, hasMore, loadOlder, loadThrough } = input
   // The first mounted row, by identity, so rows appended while the reader is up the transcript never unmount the rows
-  // they read; null mounts every row. Undefined until the first non-empty window opens.
+  // they read; null mounts every row. Undefined while the window slides with the tail: history and grouping arrive in
+  // several commits, and a reader at the newest row loses nothing when older rows leave.
   const [startKey, setStartKey] = useState<string | null | undefined>(undefined)
   const lastStart = useRef(0)
 
@@ -85,7 +88,7 @@ export const useTranscriptWindow = (input: WindowInput) => {
   lastStart.current = start
 
   const startRow = entries[start]
-  const openingKey = startKey === undefined && ready && startRow !== undefined ? (start === 0 ? null : chatRenderKey(startRow)) : undefined
+  const openingKey = startKey === undefined && ready && startRow !== undefined && !following() ? chatRenderKey(startRow) : undefined
   useLayoutEffect(() => {
     if (openingKey !== undefined) setStartKey(openingKey)
   }, [openingKey])

@@ -169,6 +169,9 @@ export const ChatGroupSeat = memo(function ChatGroupSeat({ groupKey, useChatGrou
   }, [outerHidden, rootRef, setOpen])
   const reveal = useCallback(() => { setOpen(true) }, [setOpen])
   const bodyRef = props.useGroupAction(grouped && !open, reveal)
+  // A collapsed historical Turn keeps hundreds of tool rows hidden; mount them the first time the body shows.
+  const [membersMounted, setMembersMounted] = useState(!grouped || open)
+  if (!membersMounted && (!grouped || open)) setMembersMounted(true)
   const contentRef = useRef<HTMLDivElement>(null)
   const bodyId = useId()
   const { edges, events, initialize } = useProcessScroll(bodyRef, contentRef, open, grouped)
@@ -195,7 +198,7 @@ export const ChatGroupSeat = memo(function ChatGroupSeat({ groupKey, useChatGrou
         data-scroll-up={edges.canScrollUp || undefined} data-scroll-down={edges.canScrollDown || undefined}
         {...events}>
         <div ref={contentRef} className={css.content} data-step-process-content data-chat-flow="">
-          <GroupMembers {...props} members={members} />
+          {membersMounted && <GroupMembers {...props} members={members} />}
         </div>
       </div>
     </div>
