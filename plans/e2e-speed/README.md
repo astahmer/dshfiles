@@ -154,6 +154,35 @@ it to scenario N+1 when its Given step asks for that composition; discard it oth
 survives because each scenario keeps its own home and Host; only the wall-clock overlaps. Measure the
 idle-slot host memory and the discard rate before making it the default.
 
+## Breakthrough candidates (investigated, not yet built)
+
+Ordered by expected win per unit of risk, with what is actually known:
+
+1. **Share one Host across scenarios.** The only way to _remove_ `host-url` (1.5-12s per scenario) rather than
+   overlap it. Ceiling is in the composition census: 194 scenarios, 65 distinct compositions, 163 of them share a
+   composition with at least one other. Blocked on an isolation policy, so the next step is static, not runtime:
+   the planner already matches each scenario's steps to definitions, so tag a scenario `mutates` when its steps
+   write settings, threads or stores, then measure what fraction could share a Host.
+2. **A warm Host pool keyed by composition.** Today exactly one sibling is prewarmed, so a file that switches
+   composition (jj-integration: 14 scenarios over 3 compositions) pays a fresh boot at each switch and wastes the
+   sibling it started. Keying the existing slot map by composition, with a small cap, removes the switch cost:
+   roughly 30-60 scenarios at 1.5-2s each on a cold broad run.
+3. **Stable origin + persistent browser context.** `profile-interactive` is 1.1s quiet and up to 5.8s loaded, and
+   every scenario navigates to a _new_ Host on a _new_ port, so the browser's HTTP cache is cold each time and the
+   client's ~50 bundles are fetched again. One port per worker plus a persistent context would reuse them — unless
+   the asset URLs carry the launch token, in which case nothing is cacheable and the idea dies. Bounded experiment:
+   log the resource URLs and their headers for one scenario, then compare `page-load`/`profile-interactive` for
+   scenarios 2..N with a pinned port. DSH 0.2.1's bundled client hides the route shape, so this needs the runtime
+   measurement, not a code read.
+4. **Fewer bundles per composition.** If `host-url` scales with the number of booted bundles, trimming the sheet or
+   optional companions for journeys that do not assert them is direct savings. The phase trace makes this cheap to
+   correlate now: collect `host-url` against composition size across a broad run.
+5. **Move assertions down the pyramid.** 194 browser journeys is the top of the pyramid doing work a Vitest test with
+   `createTestHost` can do; `docs/e2e-testing.md` already has the layer table. This is the structural answer, and it
+   shrinks every other number here.
+6. **Sharding in CI.** Parallel _owners_ measured 1.41x and flaked locally (thread-hierarchy race), but CI shards
+   across machines, where the flake is not a local-contention artifact. Orthogonal to everything above.
+
 ## Resume here
 
 E1-E5 have landed (E3 rejected with numbers, E6 dropped by request). The per-scenario cache now decides
