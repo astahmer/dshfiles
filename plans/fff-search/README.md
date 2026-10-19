@@ -18,15 +18,25 @@ Question: should DSH Agents search code through [fff](https://github.com/dmtrKov
   `node_modules`). fff-mcp `v0.11.0` prebuilt `aarch64-apple-darwin`, checksum
   verified, with per-run frecency and history databases so runs never warm each
   other.
-- Seven "find me X" tasks × 3 arms × 2 reps, Sonnet, 2026-10-19. Raw rows:
-  [`runs-sonnet-2026-10-19.jsonl`](runs-sonnet-2026-10-19.jsonl).
+- Claude Code: seven "find me X" tasks × 3 arms × 2 reps, Sonnet, 2026-10-19.
+  Raw rows: [`runs-sonnet-2026-10-19.jsonl`](runs-sonnet-2026-10-19.jsonl).
+- DSH: the same tasks through DSH Agents on a scratch DSH (`dshx dev up`),
+  OpenCode Go `opencode-go-alex` / `deepseek-v4.1-flash` (high), 3 parallel
+  sessions, 3 reps per arm, driven by
+  [`scripts/fff-bench-dsh.ts`](../../scripts/fff-bench-dsh.ts). Raw rows:
+  [`runs-dsh-flash-2026-10-19.jsonl`](runs-dsh-flash-2026-10-19.jsonl).
 
 ```sh
 node scripts/fff-bench.ts --corpus <checkout> --fff <fff-mcp binary> --out <dir> --reps 2 --model sonnet
+DSHX_URL=<scratch launch url> node scripts/fff-bench-dsh.ts --corpus <checkout> --arm <label> --out <dir> --reps 3
 node scripts/fff-bench.ts --report <dir>
 ```
 
-## Results
+The DSH arm is whatever the scratch profile loads. Seed the scratch home's
+`.credentials.yaml` and `plugins/ai-accounts/accounts.json` first, because
+`dshx dev up` passes no Host environment through.
+
+## Claude Code results
 
 | Arm        | Accuracy | Median session | Median API | Turns (total) | Input tokens | Tool output chars | Cost  |
 | ---------- | -------- | -------------- | ---------- | ------------- | ------------ | ----------------- | ----- |
@@ -58,44 +68,55 @@ machine was loaded, so absolute `rg` times are high):
 
 fff's first call pays the index build (4–8 s here).
 
-## Limits of this run
+## DSH results (DeepSeek V4.1 Flash)
 
-- Two reps per cell and one model; treat the differences as directional.
-- 11.5k files is a mid-size repository. fff claims its largest wins on very
-  large trees.
-- Claude Code's Grep, not DSH's, was the baseline. DSH `grep` also spawns
-  ripgrep for every call, caps at 250 matches, and its `glob` runs with
-  `--no-ignore --hidden`. DeepSeek models may use the tools differently.
+| Arm             | What the Agent has                                           | Accuracy | Median session | Search time per session (median) | `grep` per call (median / p90)    |
+| --------------- | ------------------------------------------------------------ | -------- | -------------- | -------------------------------- | --------------------------------- |
+| `stock`         | native `grep`/`glob`                                         | 21/21    | 37.2 s         | 5.5 s                            | 3.1 s / 9.4 s                     |
+| `stock-control` | native, same instance as the plugin runs                     | 20/21    | 32.8 s         | 5.6 s                            | 4.1 s / 6.3 s                     |
+| `fff-mcp`       | native plus the fff MCP row                                  | 21/21    | 39.5 s         | 4.9 s                            | native 4.1 s; fff 0.8 s (4 calls) |
+| `fff-only`      | fff MCP, `tool-fs-search` disabled                           | 21/21    | 34.2 s         | 0.3 s                            | 0.28 s / 1.7 s                    |
+| `fff-plugin-v3` | [`fff-search`](../../plugins/@dshfiles/fff-search/README.md) | 21/21    | 20.6 s         | 0.7 s                            | 0.36 s / 1.1 s                    |
+
+- **Native DSH `grep` is the slow part:** 3–4 s median per call with three
+  Agents searching, because every call spawns ripgrep. Session time is mostly
+  OpenCode Go latency, which swings by minutes (the control's 248 s p90 and its
+  one failure are provider stalls with 3–5 turns), so search time per session is
+  the number to compare.
+- **Flash behaves like Sonnet:** with both available it calls native `grep` 26
+  times and fff 8 times, so the MCP row alone changes little. Replacing the
+  native tools cuts search time per session from 5.5 s to 0.3–0.7 s.
+- **The plugin matches the MCP once warm.** v1 (fff on the Host thread, every
+  pattern wrapped in a regex group) measured 0.9 s per call. v3 moved the index
+  into a worker thread, sends plain literals in fff's plain mode, wraps only
+  constraint-shaped patterns and makes `glob` wait only for the file scan. A
+  fresh index still costs 5–15 s before the first content search; the plugin
+  warms it when an Agent starts. Rep 0 of v2 ran against a cold index and was
+  4 s per session.
+- `fff-only` loses the exhaustive-listing case less on Flash than on Sonnet. The
+  Agent falls back to `bash` rg, which the stock preset keeps.
+
+## Limits
+
+- Three reps per arm, one machine under load from other work, one corpus of
+  11.5k files. The plugin arm and its control ran on a later scratch instance
+  than the MCP arms.
 - The fff-mcp server stopped answering after about 20 identical back-to-back
-  `grep` calls in the micro-benchmark. Agents never repeat a query like that,
-  but report it upstream if it shows up in real use.
+  `grep` calls in a micro-benchmark. Agents never repeat a query like that.
 
-## Recommendation
+## Decision
 
-Choose **port**: an owned `fff-search` plugin that disables the stock
-`tool-fs-search` row and registers `grep`/`glob` backed by `@ff-labs/fff-node`.
-Do not just add the MCP server.
-
-- Replacing is where the gain is. MCP can only add `mcp__fff__*` next to native
-  `grep`/`glob`, which is the `fff` arm. A plugin keeps the tool names and
-  prompts Agents already know.
-- A dshx plugin can hold the index across calls: build it in `setup`, dispose it
-  in a `ctx.effect` cleanup, as `memory` and `session-search` do.
-- The plugin decides the output contract. Always print the total match count, and
-  return everything up to native's 250-match cap for listing-style queries.
-  That removes the cursor paging behind the 0.71.
-
-Zero-code trial meanwhile: add an `fff` stdio row through the `mcp-servers`
-plugin (`command: <abs fff-mcp>`, `args: [--no-update-check]`) and watch
-whether DeepSeek threads use it.
+Port, through the owned [`fff-search`](../../plugins/@dshfiles/fff-search/README.md)
+bundle. It registers `grep`/`glob` per Agent through `agent.ctx`, which shadows
+the stock tools without restating the standard preset. The MCP route needs the
+preset restated without `tool-fs-search` and renames the tools, and the MCP row
+next to the native tools does not change what the model calls.
 
 ## Open work
 
-1. Run the same tasks through a DSH Agent (DeepSeek), stock tools vs fff, with
-   the [`dsh-sessions`](../../.agents/skills/dsh-sessions) digest for turns and
-   tokens.
-2. Add a larger corpus (≥100k files) and more listing-style tasks, at 5 reps.
-3. Package fff-mcp / libfff from the prebuilt release in nixfiles before any
-   profile depends on it.
-4. Prototype the `fff-search` plugin behind a profile flag, then benchmark it
-   against stock `tool-fs-search`.
+1. Add `@dshfiles/fff-search` to the `web` profile. This needs a DSH restart,
+   which is the user's call.
+2. Benchmark a larger corpus (≥100k files) with more listing-style tasks at 5
+   reps, and a pass on a reasoning model, not only Flash.
+3. Watch for the fff-mcp hang on repeated identical `grep` calls through the
+   fff-node path, and report it upstream if it reproduces.
