@@ -60,6 +60,7 @@ backing verb; `host-gap` counts capabilities no verb can reach yet.
 | editor                                                                                                                                            | 7                    | 1                                                                                                        | 5             | 2         |
 | diff-viewed                                                                                                                                       | 3                    | 0                                                                                                        | 1             | 2         |
 | prompt-stash                                                                                                                                      | 6                    | 0                                                                                                        | 1             | 5         |
+| backlog                                                                                                                                           | 8                    | 7                                                                                                        | 0             | 0         |
 | queue-reorder                                                                                                                                     | 7                    | 2 (not installed)                                                                                        | 5             | 1         |
 | request-messages                                                                                                                                  | 1                    | 0                                                                                                        | 0             | 1         |
 | rich-composer                                                                                                                                     | 2                    | 0                                                                                                        | 0             | 2         |
@@ -300,6 +301,17 @@ Still missing, because they write secrets or need a browser:
 | `ai_accounts_quote_routes`                                                                     | Price the routes a Session used                            | `quoteRoutes`                                                                           |
 | `ai_accounts_set_history_schedule`                                                             | Usage-history interval and retention                       | `saveHistorySettings`                                                                   |
 | ~~`ai_accounts_get_settings` / `ai_accounts_set_settings` / `ai_accounts_set_failure_policy`~~ | Per-plugin settings                                        | Retired: `settings_set` / `settings_unset` write the `ai-accounts` namespace            |
+
+### backlog
+
+- `backlog`: every panel verb is its API method bound as a tool — read-only
+  `backlog_list`, `backlog_get` and `backlog_referencing`; writes
+  `backlog_capture`, `backlog_update`, `backlog_link` and `backlog_comment`.
+  Deliberate exception to "write tools say the user asked": the backlog exists
+  so agents record and progress their own work, so the write descriptions allow
+  that and nothing else. No verb destroys data; `dropped` closes an item and
+  every change is an event naming its actor. The Feed/Board switch and filters
+  are presentation-only.
 
 ### model-effort-picker, usage, memory, optmem
 
