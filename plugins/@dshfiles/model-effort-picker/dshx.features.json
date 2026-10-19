@@ -21,6 +21,54 @@
           "featureFile": "tooling/dshx/e2e/features/model-effort-picker.feature"
         }
       ]
+    },
+    {
+      "id": "account-swap",
+      "title": "Swap to the next account offering the same model",
+      "summary": "A swap button beside the composer model picker moves the Session to the next provider route, in catalog order, that offers the selected model id, keeping the reasoning effort when the target advertises it.",
+      "surfaces": ["client"],
+      "configuration": [
+        {
+          "key": "accountSwap",
+          "defaultValue": "true",
+          "constraints": "Boolean; show the swap button. It only renders when another route offers the selected model.",
+          "choices": ["true", "false"],
+          "coveredBy": ["model-effort-picker.account-swap-next"]
+        },
+        {
+          "key": "accountSwapRoutes",
+          "defaultValue": "[]",
+          "constraints": "Provider route ids to rotate through; empty rotates through every route that offers the selected model.",
+          "coveredBy": ["model-effort-picker.account-swap-routes"]
+        }
+      ],
+      "states": ["hidden", "idle", "selecting"],
+      "failureModes": [
+        "No other route offers the selected model, or every other one is excluded by accountSwapRoutes: the button stays hidden.",
+        "A target model without the current reasoning effort falls back to its own default effort.",
+        "The button stays disabled while a selection is pending, so a second click during a slow Host select does nothing."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "model-effort-picker.account-swap-next",
+          "file": "plugins/@dshfiles/model-effort-picker/tests/model-picker-model.spec.ts",
+          "testName": "moves to the next route offering the same model, skipping routes without it"
+        },
+        {
+          "kind": "unit-test",
+          "id": "model-effort-picker.account-swap-effort",
+          "file": "plugins/@dshfiles/model-effort-picker/tests/model-picker-model.spec.ts",
+          "testName": "wraps around and falls back to the target default when it lacks the current effort"
+        },
+        {
+          "kind": "unit-test",
+          "id": "model-effort-picker.account-swap-routes",
+          "file": "plugins/@dshfiles/model-effort-picker/tests/model-picker-model.spec.ts",
+          "testName": "rotates only through the configured routes, and offers nothing when no other route qualifies"
+        }
+      ]
     }
   ]
 }
