@@ -225,12 +225,12 @@ When('the Workbench tab is pinned and the page is reloaded', async ({ page }: { 
 When('a thread is double-clicked in the sidebar before another is opened', async ({ page }: { page: Page }) => {
   const firstThreadId = await startSidebarThread(page, 'sidebar double click first thread')
   const secondThreadId = await startSidebarThread(page, 'sidebar double click second thread')
-  const firstThreadButton = sidebarThreadRow(page, firstThreadId).getByRole('button').first()
-  await firstThreadButton.click()
+  const firstThreadButton = sidebarThreadRow(page, firstThreadId).locator('button[data-thread-main-action]')
+  await firstThreadButton.click({ position: { x: 20, y: 16 } })
   await expect(threadTab(page, firstThreadId)).toHaveAttribute('data-preview', 'true')
-  await firstThreadButton.dblclick()
+  await firstThreadButton.dblclick({ position: { x: 20, y: 16 } })
   await expect(threadTab(page, firstThreadId)).not.toHaveAttribute('data-preview')
-  await sidebarThreadRow(page, secondThreadId).getByRole('button').first().click()
+  await sidebarThreadRow(page, secondThreadId).locator('button[data-thread-main-action]').click({ position: { x: 20, y: 16 } })
   await expect(threadTab(page, secondThreadId)).toHaveAttribute('data-preview', 'true')
 })
 
