@@ -35,7 +35,7 @@ describe('QuotaForecastModel.board', () => {
   it('reports the lock between running out and the reset', () => {
     const resetsAt = now + 96 * HOUR
     const fast = account('fast', card([{ label: 'Weekly limit', percentRemaining: 40, resetsAt }]), [
-      point(now - 24 * HOUR, { 'Weekly limit': 64 }, { 'Weekly limit': resetsAt }),
+      point(now - 24 * HOUR, { 'Weekly limit': 64 }, { 'Weekly limit': resetsAt + 3_000 }),
     ])
 
     const board = QuotaForecastModel.board({ accounts: [fast], now })

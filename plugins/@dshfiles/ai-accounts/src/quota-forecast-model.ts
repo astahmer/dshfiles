@@ -102,7 +102,8 @@ const usedOf = (point: UsageHistoryPoint, label: string): number => 100 - clampP
 /** Readings since the last reset of `label`: by reported reset time, else since remaining last jumped up. */
 const currentCycle = (series: readonly UsageHistoryPoint[], label: string, resetsAt: number | null): readonly UsageHistoryPoint[] => {
   if (resetsAt !== null) {
-    const matching = series.filter(point => point.resetsAt[label] === resetsAt)
+    // Providers report the same reset a few seconds apart from one reading to the next.
+    const matching = series.filter(point => Math.abs((point.resetsAt[label] ?? Number.NEGATIVE_INFINITY) - resetsAt) <= HOUR_MS)
     if (matching.length > 0) return matching
   }
   let start = 0
