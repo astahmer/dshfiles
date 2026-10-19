@@ -292,6 +292,17 @@ const workspaceForSessions = (input: {
   return map
 }
 
+/**
+ * The workspace each Session is accounted to, without attributing a thread workspace to its project. A deep link has
+ * to name the workspace the Session really lives in: the project id restores the project checkout instead, where the
+ * Host opens (or mints) a different blank Session.
+ */
+const sessionWorkspaceIds = (workspaces: readonly WorkspaceView[]): Map<string, string> => {
+  const map = new Map<string, string>()
+  for (const workspace of workspaces) for (const sessionId of workspace.sessionIds) if (!map.has(sessionId)) map.set(sessionId, workspace.workspaceId)
+  return map
+}
+
 const projectWorkspaces = (workspaces: readonly WorkspaceView[]): readonly WorkspaceView[] => {
   const byPath = new Map(workspaces.map(workspace => [workspace.path, workspace]))
   return workspaces.filter(workspace => projectOfThreadWorkspace(workspace, byPath) === undefined)
@@ -592,6 +603,7 @@ export class SidebarOrganization {
   static readonly shouldScanForAutoSettle = shouldScanForAutoSettle
   static readonly sessionLineage = sessionLineage
   static readonly workspaceForSessions = workspaceForSessions
+  static readonly sessionWorkspaceIds = sessionWorkspaceIds
   static readonly projectWorkspaces = projectWorkspaces
   static readonly workspaceForLineage = workspaceForLineage
   static readonly parseSessionIds = parseSessionIds

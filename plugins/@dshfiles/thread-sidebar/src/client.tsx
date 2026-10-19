@@ -4,6 +4,7 @@ import type { WorkspaceBrowserProps } from '@deepseek-ai/dsh-client-ui-workspace
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
+import { DraftThreadsModel } from './draft-threads.js'
 import { HostSnapshotsModel } from './snapshots.js'
 import { storedCollapsedGroups, toggleCollapsedGroup } from './collapsed-groups.js'
 import { useNearViewport } from './use-near-viewport.js'
@@ -1052,6 +1053,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   // query waits, the schedule stops, and expanding the sidebar fetches once and arms it again.
   const jjInventoryVisible = props.wide !== false
   const jjRepositories = useApiQuery(jjIntegrationApi, 'repositories', { input: {}, enabled: jjInventoryVisible })
+  const jjThreads = useApi(jjIntegrationApi)
   const refetchJjRepositories = jjRepositories.refetch
   const jjOwnerMissing = isApiOwnerMissing(jjRepositories.error)
   useEffect(() => {
@@ -1148,6 +1150,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     () => SidebarOrganization.workspaceForSessions({ workspaces: workspaceState.items, sessions }),
     [sessions, workspaceState.items],
   )
+  /** The workspace a Session really lives in, for the deep link; grouping keeps using the project attribution. */
+  const realWorkspaceBySession = useMemo(() => SidebarOrganization.sessionWorkspaceIds(workspaceState.items), [workspaceState.items])
   const archivedSessionIds = useMemo(() => setIncludes(workspaceState.archivedSessionIds), [workspaceState.archivedSessionIds])
   const pinnedSessionIds = useMemo(() => setIncludes(workspaceState.pinnedSessionIds), [workspaceState.pinnedSessionIds])
   const settledSessionIds = useMemo(() => setIncludes(preferences.settledSessionIds), [preferences.settledSessionIds])
@@ -1234,12 +1238,13 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   }, [now, preferences.settledArchiveDelay, preferences.settledAt, preferences.settledSessionIds, settledArchiveEnabled])
   const archiveScan = useRef<readonly SessionSummary['id'][]>([])
   archiveScan.current = dueSettledArchiveSessionIds.map(SessionId)
+  const archiveSessionProp = props.archiveSession
   const archiveClient = useMemo<AutoArchiveClient>(
     () => ({
-      archiveSession: sessionId => props.archiveSession(sessionId),
+      archiveSession: sessionId => archiveSessionProp(sessionId),
       getCandidateSessionIds: () => archiveScan.current,
     }),
-    [props.archiveSession],
+    [archiveSessionProp],
   )
   const { requestScan, refreshCandidates } = useAutoArchive({
     client: archiveClient,
@@ -1286,6 +1291,22 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   )
   const selectedSession = useMemo(() => sessions.find(session => (session.retainedBy.mainView ?? 0) > 0), [sessions])
   const selectedSessionId = selectedSession?.id
+  /**
+   * Abandoned New threads. DSH mints the Session (and, when isolation is the default, a whole thread workspace) before
+   * the first prompt, so an abandoned attempt leaves an untitled idle thread whose folder name becomes its row title.
+   * They are folded into one "Empty drafts" row instead of posing as real threads.
+   */
+  const draftSessions = useMemo(
+    () =>
+      DraftThreadsModel.draftThreadsOf({
+        sessions,
+        exclusions: { archivedSessionIds, pinnedSessionIds, selectedSessionId },
+      }),
+    [archivedSessionIds, pinnedSessionIds, selectedSessionId, sessions],
+  )
+  const draftSessionIds = useMemo(() => new Set(draftSessions.map(draft => draft.id)), [draftSessions])
+  const [draftsOpen, setDraftsOpen] = useState(false)
+  const [draftsCleaning, setDraftsCleaning] = useState(false)
   const attentionSessions = useMemo(
     () => sessions.filter(session => SidebarOrganization.isAttentionSessionIncluded(session, preferences.includeSubagentAttention)),
     [preferences.includeSubagentAttention, sessions],
@@ -1587,14 +1608,18 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     if (selectedSession === undefined || routeRequest !== null) return
     if (suppressUrlForSession.current === selectedSession.id) return
     suppressUrlForSession.current = null
-    const workspaceId = SidebarOrganization.workspaceForLineage(selectedSession, sessionState.byId, workspaceBySession)
+    const workspaceId =
+      realWorkspaceBySession.get(selectedSession.id) ?? SidebarOrganization.workspaceForLineage(selectedSession, sessionState.byId, workspaceBySession)
     const next = buildThreadUrl(window.location.href, selectedSession.id, workspaceId)
     if (next !== window.location.href) window.history.replaceState(window.history.state, '', next)
-  }, [routeRequest, selectedSession, sessionState.byId, workspaceBySession])
+  }, [realWorkspaceBySession, routeRequest, selectedSession, sessionState.byId, workspaceBySession])
 
-  const changePreferences = (patch: Partial<SidebarPreferences>): void => {
-    updatePreferences(patch)
-  }
+  const changePreferences = useCallback(
+    (patch: Partial<SidebarPreferences>): void => {
+      updatePreferences(patch)
+    },
+    [updatePreferences],
+  )
 
   // Saved views moved from browser storage to Host settings: hand the browser copy over once, then drop it.
   const viewsMigrationStarted = useRef(false)
@@ -1766,7 +1791,10 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     openedRouteId.current = sessionId
     suppressUrlForSession.current = null
     const session = sessionState.byId[sessionId]
-    const workspaceId = session === undefined ? undefined : SidebarOrganization.workspaceForLineage(session, sessionState.byId, workspaceBySession)
+    const workspaceId =
+      session === undefined
+        ? undefined
+        : (realWorkspaceBySession.get(session.id) ?? SidebarOrganization.workspaceForLineage(session, sessionState.byId, workspaceBySession))
     window.history.replaceState(window.history.state, '', buildThreadUrl(window.location.href, sessionId, workspaceId))
     props.open(sessionId)
   }
@@ -1793,6 +1821,36 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         ? { tone: 'success', message: successMessage }
         : { tone: 'danger', message: props.tSidebar('threadSidebarClipboardFailure') },
     )
+  }
+
+  /**
+   * Archive every empty draft and forget the thread workspaces that hold nothing but drafts. Archiving is reversible
+   * from the archive section; jj-integration still refuses a workspace with unlanded revisions or uncommitted edits, so
+   * a folder that turns out to hold work stays.
+   */
+  const cleanUpDrafts = async (): Promise<void> => {
+    if (draftsCleaning) return
+    setDraftsCleaning(true)
+    try {
+      const plan = DraftThreadsModel.planCleanup({ drafts: draftSessions, workspaces: workspaceState.items })
+      let archived = 0
+      for (const sessionId of plan.sessionIds) {
+        try {
+          await props.archiveSession(sessionId)
+          archived += 1
+        } catch {
+          // One refused archive must not stop the rest of the cleanup.
+        }
+      }
+      for (const path of plan.workspacePaths) await jjThreads.discard({ path, force: false }).catch(() => undefined)
+      setNotice({ tone: 'success', message: props.tSidebar('threadSidebarDraftsCleaned', { count: archived }) })
+      setDraftsOpen(false)
+      void refetchJjRepositories()
+    } catch {
+      setNotice({ tone: 'danger', message: props.tSidebar('threadSidebarActionFailure') })
+    } finally {
+      setDraftsCleaning(false)
+    }
   }
 
   const notifyThread = (category: ThreadNotificationCategory, eventId: string, sessionId: SessionSummary['id'], title: string, fallbackBody: string): void => {
@@ -2008,13 +2066,13 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     const listed: SessionSummary[] = []
     for (const sessionId of sessionState.ids) {
       const session = sessionState.byId[sessionId]
-      if (session === undefined || session.blank || ThreadViewModel.isSideChat(session)) continue
+      if (session === undefined || session.blank || draftSessionIds.has(session.id) || ThreadViewModel.isSideChat(session)) continue
       const workspaceId = SidebarOrganization.workspaceForLineage(session, sessionState.byId, workspaceBySession)
       if (preferences.workspaceFilter !== null && (workspaceId ?? '') !== preferences.workspaceFilter) continue
       listed.push(session)
     }
     return groupThreadChildren({ threads: listed })
-  }, [preferences.workspaceFilter, sessionState.byId, sessionState.ids, workspaceBySession])
+  }, [draftSessionIds, preferences.workspaceFilter, sessionState.byId, sessionState.ids, workspaceBySession])
 
   useEffect(() => {
     if (threadToScrollTo === null) return
@@ -3404,7 +3462,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                 pinned={pinnedSessionIds.has(session.id)}
                 parked={parkedSessionIds.has(session.id)}
                 settled={settledSessionIds.has(session.id)}
-                workspaceId={SidebarOrganization.workspaceForLineage(session, sessionState.byId, workspaceBySession)}
+                workspaceId={realWorkspaceBySession.get(session.id) ?? SidebarOrganization.workspaceForLineage(session, sessionState.byId, workspaceBySession)}
                 actions={rowActions}
               >
                 {row}
@@ -3612,7 +3670,47 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
             </section>
           ))}
           {props.openRemoteThreads === undefined ? null : <RemoteThreadsSection headerClassName={stickyHeaderClass} onOpen={props.openRemoteThreads} />}
+          {draftSessions.length === 0 ? null : (
+            <section className="dshx:mt-1" key="drafts" aria-label={props.tSidebar('threadSidebarDrafts')}>
+              <div
+                className={cn(
+                  stickyHeaderClass,
+                  'dshx:flex dshx:h-8 dshx:min-w-0 dshx:items-center dshx:gap-1 dshx:px-1 dshx:text-sm dshx:text-muted-foreground',
+                )}
+              >
+                <button
+                  type="button"
+                  className="dshx:flex dshx:h-8 dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-1.5 dshx:outline-none dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50"
+                  aria-expanded={draftsOpen}
+                  onClick={() => setDraftsOpen(current => !current)}
+                >
+                  <span className="dshx:inline-flex dshx:shrink-0" aria-hidden="true">
+                    <IconArchiveOutlineRegular size={14} />
+                  </span>
+                  <span className="dshx:whitespace-nowrap">{props.tSidebar('threadSidebarDrafts')}</span>
+                  <span className="dshx:text-xs dshx:tabular-nums">({draftSessions.length})</span>
+                  <span className="dshx:h-px dshx:flex-1 dshx:bg-border" aria-hidden="true" />
+                  <span className="dshx:inline-flex dshx:shrink-0" aria-hidden="true">
+                    {draftsOpen ? <IconChevronUpOutlineRegular size={12} /> : <IconChevronDownOutlineRegular size={12} />}
+                  </span>
+                </button>
+                <Button
+                  size="icon-xs"
+                  variant="ghost"
+                  className="dshx:shrink-0"
+                  aria-label={props.tSidebar('threadSidebarDraftsCleanUp')}
+                  title={props.tSidebar('threadSidebarDraftsCleanUpHint')}
+                  disabled={draftsCleaning}
+                  onClick={() => void cleanUpDrafts()}
+                >
+                  <IconArchiveOutlineRegular size={13} />
+                </Button>
+              </div>
+              {draftsOpen ? draftSessions.map(session => renderThreadRow(session, undefined)) : null}
+            </section>
+          )}
           {sessionState.phase === 'ready' &&
+          draftSessions.length === 0 &&
           detachedThreadGroups.length === 0 &&
           groupedAttentionRows.approvalNeeded.length === 0 &&
           groupedAttentionRows.inputNeeded.length === 0 &&

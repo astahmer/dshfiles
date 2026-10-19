@@ -276,6 +276,15 @@ test('a session without a workspace falls back to the project its recorded cwd b
   assert.equal(map.get('no-cwd'), undefined)
 })
 
+test('a deep link names the thread workspace the session lives in, not its owning project', () => {
+  const project = workspaceView({ id: 'project', path: '/dev/dshfiles' })
+  const thread = workspaceView({ id: 'thread', path: '/dev/dshfiles-threads/thread-a', sessionIds: ['accounted', 'shared'] })
+  const deepLinks = SidebarOrganization.sessionWorkspaceIds([project, thread])
+  assert.equal(deepLinks.get('accounted'), 'thread')
+  assert.equal(deepLinks.get('shared'), 'thread')
+  assert.equal(deepLinks.get('unaccounted'), undefined)
+})
+
 test('invalid stored preference data is rejected without exposing the raw value', () => {
   const raw = '{"session":"private-session-id","newerVersion":true}'
   assert.equal(SidebarPreferencesModel.decode(JSON.parse(raw)), null)
