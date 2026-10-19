@@ -18,8 +18,14 @@ contributes an editor panel, and [`@dshfiles/jujutsu`](../jujutsu/README.md) one
 - **Move**: each surface's header lists where an open panel can go — the other docking regions, and the feature's own
   full main-view page when its definition names one. A panel lives in exactly one region, so moving it closes the copy
   the source held; asking for a region that is closed opens it first and hands the panel over when it reports ready.
+- **Drag**: a panel dragged from one region to another is adopted by the target through Dockview's own drop protocol.
+  The React wrapper exposes no `onUnhandledDragOver` prop, so the surface subscribes to `api.onUnhandledDragOver`
+  itself and accepts transfers whose `viewId` belongs to another region; the drop then adds the panel at the target
+  group and closes the source's copy. Drag is wired but not covered by a journey (a scripted tab drag leaves the panel
+  in the source region), so the Move menu is the path the journeys prove.
 - **Layouts**: the header's Layouts dialog saves the arrangement of every region under a name, and applies, renames or
   deletes those names later. A layout only changes the regions it recorded, and applying one opens a region it needs.
+  A saved layout captures every _mounted_ region: a region that was closed while saving is not part of that name.
 
 ## Settings (`dshfiles-workbench`)
 
