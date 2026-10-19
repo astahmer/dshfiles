@@ -53,6 +53,12 @@ export const PAGE_MESSAGES = 50
 
 const HISTORY_PAGE_OPTIONS = { maxMessages: 500, turnWindow: { minMessages: PAGE_MESSAGES, minTurns: 2 } }
 
+/**
+ * The window a thread opens with: the latest Turn, at least 20 messages, at most 120. Agent Turns hold hundreds of
+ * tool messages, and the transcript mounts only its newest rows, so older ones load as the reader scrolls up.
+ */
+const OPENING_PAGE_OPTIONS = { maxMessages: 120, turnWindow: { minMessages: 20, minTurns: 1 } }
+
 /** Minimum messages per page while a turn jump loops backwards. */
 export const JUMP_PAGE_MESSAGES = 200
 
@@ -628,7 +634,7 @@ export class Session implements SessionFace {
     })
     this.events = events
     try {
-      await events.open(HISTORY_PAGE_OPTIONS)
+      await events.open(OPENING_PAGE_OPTIONS)
       if (generation !== this.openGeneration || this.events !== events) return
       this.openState = 'open'
     } catch (error) {

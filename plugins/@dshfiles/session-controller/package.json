@@ -28,6 +28,10 @@
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.host.json --noEmit",
     "test:boot": "node ../../../tooling/dshx/scripts/boot-check-web.mjs --plugin"
   },
+  "dependencies": {
+    "mime-types": "^3.0.2",
+    "zod": "4.4.3"
+  },
   "devDependencies": {
     "@deepseek-ai/cordis": "catalog:",
     "@deepseek-ai/dsh": "0.2.1-rc.2",
@@ -131,9 +135,5 @@
   },
   "dshx": {
     "features": "./dshx.features.json"
-  },
-  "dependencies": {
-    "mime-types": "^3.0.2",
-    "zod": "4.4.3"
   }
 }

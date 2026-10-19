@@ -12,10 +12,16 @@ const root = dirname(dirname(fileURLToPath(import.meta.url)))
 const native = dirname(createRequire(join(root, 'package.json')).resolve(`${NATIVE}/package.json`))
 
 mkdirSync(join(root, 'typert'), { recursive: true })
-for (const [from, to] of [['lib/typert.host.js', 'typert/host.js'], ['lib/typert.host.d.ts', 'typert/host.d.ts']]) {
+for (const [from, to] of [
+  ['lib/typert.host.js', 'typert/host.js'],
+  ['lib/typert.host.d.ts', 'typert/host.d.ts'],
+]) {
   const source = readFileSync(join(native, from), 'utf8')
   const manifest = `  package: '${NATIVE}',`
   const count = source.split(manifest).length - 1
   if (from.endsWith('.js') && count !== 2) throw new Error(`derive-typert: expected 2 manifest package lines in ${from}, found ${count}`)
-  writeFileSync(join(root, to), `/* Derived by scripts/derive-typert.mjs from ${NATIVE}/${from} — do not edit. */\n${source.replaceAll(manifest, `  package: '${OWNED}',`)}`)
+  writeFileSync(
+    join(root, to),
+    `/* Derived by scripts/derive-typert.mjs from ${NATIVE}/${from} — do not edit. */\n${source.replaceAll(manifest, `  package: '${OWNED}',`)}`,
+  )
 }
