@@ -12,11 +12,11 @@
     "antislop(no-export-bag)": 0
   },
   "ast-grep": {
-    "no-deeply-nested-ternary": 7,
+    "no-deeply-nested-ternary": 2,
     "no-deeply-nested-ternary-tsx": 3,
-    "no-direct-json-parse": 185,
-    "no-direct-json-parse-tsx": 1,
-    "no-export-from": 172,
+    "no-direct-json-parse": 200,
+    "no-direct-json-parse-tsx": 3,
+    "no-export-from": 164,
     "no-wildcard-export": 1
   }
 }
