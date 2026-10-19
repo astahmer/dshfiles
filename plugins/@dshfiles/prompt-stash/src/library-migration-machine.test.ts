@@ -22,6 +22,17 @@ const limit = (revision: number, ...prompts: SavedPrompt[]): PromptStashMutation
 afterEach(() => PromptLibraryMigration.stop())
 
 describe('saved prompt library migration', () => {
+  it('completes without writing or refetching when there are no local prompts, as on every composer remount', () => {
+    const client: PromptLibraryMigrationClient = { savePrompt: vi.fn(), completeMigration: vi.fn(), refresh: vi.fn() }
+    const actor = actorFor(client)
+    actor.send({ type: 'host.snapshot', snapshot: snapshot(3), localStore: localStore(), localStatus: 'ready' })
+    expect(actor.getSnapshot().matches('complete')).toBe(true)
+    expect(client.savePrompt).not.toHaveBeenCalled()
+    expect(client.refresh).not.toHaveBeenCalled()
+    expect(client.completeMigration).toHaveBeenCalledOnce()
+    actor.stop()
+  })
+
   it('migrates local prompts sequentially and completes with the exact source store', async () => {
     const first = savedPrompt(1)
     const second = savedPrompt(2)

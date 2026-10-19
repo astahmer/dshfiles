@@ -118,10 +118,25 @@ const promptDraftMigrationMachine = setup({
   states: {
     waiting: {
       on: {
-        'host.snapshot': {
-          target: 'migrating',
-          actions: assign(({ context, event }) => requestFromSnapshot({ context, event })),
-        },
+        'host.snapshot': [
+          {
+            // Composers remount with every thread and restart this actor; with no local drafts there is nothing to
+            // migrate, and running anyway ended in a refresh that refetched the drafts on every switch.
+            guard: ({ event }) => event.localStore.drafts.length === 0,
+            target: 'complete',
+            actions: [
+              assign(({ context, event }) => ({
+                lastSnapshotRevision: Math.max(context.lastSnapshotRevision, event.snapshot.revision),
+                lastLocalStore: event.localStore,
+              })),
+              ({ context, event }) => context.client.completeMigration(event.localStore),
+            ],
+          },
+          {
+            target: 'migrating',
+            actions: assign(({ context, event }) => requestFromSnapshot({ context, event })),
+          },
+        ],
       },
     },
     migrating: {

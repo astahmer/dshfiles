@@ -140,6 +140,18 @@ const promptLibraryMigrationMachine = setup({
       on: {
         'host.snapshot': [
           {
+            // As for drafts: a remounted composer with no local prompts has nothing to migrate and must not refetch.
+            guard: ({ event }) => event.localStatus === 'ready' && event.localStore.prompts.length === 0,
+            target: 'complete',
+            actions: [
+              assign(({ context, event }) => ({
+                lastSnapshotRevision: Math.max(context.lastSnapshotRevision, event.snapshot.revision),
+                lastLocalStore: event.localStore,
+              })),
+              ({ context, event }) => context.client.completeMigration(event.localStore),
+            ],
+          },
+          {
             guard: ({ event }) => event.localStatus === 'ready',
             target: 'migrating',
             actions: assign(({ context, event }) => requestFromSnapshot({ context, event })),

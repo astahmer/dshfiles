@@ -29,6 +29,17 @@ const rejected = (reason: 'duplicate-id' | 'limit' | 'too-large' | 'invalid-titl
 afterEach(() => PromptDraftMigration.stop())
 
 describe('prompt draft migration', () => {
+  it('completes without writing or refetching when there are no local drafts, as on every composer remount', () => {
+    const client: PromptDraftMigrationClient = { saveDraft: vi.fn(), completeMigration: vi.fn(), refresh: vi.fn() }
+    const actor = actorFor(client)
+    actor.send({ type: 'host.snapshot', snapshot: snapshot(3), localStore: localStore() })
+    expect(actor.getSnapshot().matches('complete')).toBe(true)
+    expect(client.saveDraft).not.toHaveBeenCalled()
+    expect(client.refresh).not.toHaveBeenCalled()
+    expect(client.completeMigration).toHaveBeenCalledOnce()
+    actor.stop()
+  })
+
   it('migrates drafts in order and clears fallback only after every write succeeds', async () => {
     const first = savedDraft(1)
     const second = savedDraft(2)
