@@ -1,4 +1,5 @@
-import { isContextWindowExceededError, isQuotaExceededError, type LlmFailure, type Message } from '@deepseek-ai/dsh-llm'
+import { isContextWindowExceededError, isQuotaExceededError, type LlmCallConfig, type LlmFailure, type Message } from '@deepseek-ai/dsh-llm'
+import type { ModelSelection } from '@deepseek-ai/dsh-api-session-controller'
 import type { AccountPool } from './account-pool.js'
 import { decideRecovery, NO_PROGRESS, type FailureKind, type RecoveryPolicy, type RecoveryProgress, type RecoveryStep } from './failure-policy.js'
 
@@ -78,6 +79,21 @@ const quotaRecoveryFor = (input: {
   if (input.failureKind === 'rateLimit') return { autoRetry: true }
   if (input.failureKind === 'exhausted') return { autoRetry: input.autoRetryDefault }
   return undefined
+}
+
+/**
+ * The model selection a recovery step moves the Session to, so the picker names
+ * the account now serving the conversation. Only a fail-over changes account;
+ * retries, waits, Luna Reserve and shrinks keep the route the user chose.
+ */
+const selectionAfter = (input: {
+  readonly action: RecoveryAction
+  readonly config: Pick<LlmCallConfig, 'model' | 'reasoningEffort'> | undefined
+}): ModelSelection | undefined => {
+  if (input.action.kind !== 'retry' || input.action.step.kind !== 'failover' || input.config === undefined) return undefined
+  const provider = input.action.step.to
+  if (input.config.reasoningEffort === undefined) return { provider, model: input.config.model }
+  return { provider, model: input.config.model, reasoningEffort: input.config.reasoningEffort }
 }
 
 /**
@@ -230,6 +246,7 @@ const offloadResentImages = (messages: readonly Message[]): readonly Message[] =
 export class FailureRecoveryModel {
   static readonly classifyFailure = classifyFailure
   static readonly quotaRecoveryFor = quotaRecoveryFor
+  static readonly selectionAfter = selectionAfter
   static readonly create = createFailureRecovery
   static readonly offloadResentImages = offloadResentImages
 }

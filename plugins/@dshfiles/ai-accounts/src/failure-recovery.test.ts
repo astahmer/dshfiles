@@ -1,5 +1,5 @@
 import { AttachmentId } from '@deepseek-ai/dsh-attachment'
-import { createAssistantMessage, createUserMessage, type LlmFailure, type Message } from '@deepseek-ai/dsh-llm'
+import { createAssistantMessage, createUserMessage, ReasoningEffortId, type LlmFailure, type Message } from '@deepseek-ai/dsh-llm'
 import { describe, expect, it } from 'vitest'
 import { createAccountPool } from './account-pool.js'
 import { DEFAULT_RECOVERY_POLICY, type RecoveryPolicy } from './failure-policy.js'
@@ -216,6 +216,25 @@ describe('failure recovery through the account pool', () => {
     expect(recovery.shrinkActive('session', 1, 2)).toBe(false)
     recovery.forget('session')
     expect(recovery.shrinkActive('session', 1, 1)).toBe(false)
+  })
+})
+
+describe('selectionAfter', () => {
+  const config = { model: 'gpt-6', reasoningEffort: ReasoningEffortId('high') }
+
+  it('moves the picker to the stand-in account on fail-over and keeps model and effort', () => {
+    const { fail } = setup()
+    expect(FailureRecoveryModel.selectionAfter({ action: fail(rateLimit), config })).toEqual({
+      provider: 'codex_work',
+      model: 'gpt-6',
+      reasoningEffort: 'high',
+    })
+  })
+
+  it('keeps the chosen route through retries in place and Luna Reserve', () => {
+    const { fail } = setup({ lunaReserve: true })
+    expect(FailureRecoveryModel.selectionAfter({ action: fail(transport), config })).toBeUndefined()
+    expect(FailureRecoveryModel.selectionAfter({ action: fail(quota, 2), config })).toBeUndefined()
   })
 })
 

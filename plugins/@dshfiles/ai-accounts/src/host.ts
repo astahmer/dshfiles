@@ -655,6 +655,16 @@ export default definePlugin({
                 const delayMs = action.step.kind === 'retry' || action.step.kind === 'wait' ? action.step.delayMs : 0
                 if (!(await cancellableDelay(delayMs, signal))) return undefined
                 agent.session.append('llm/retry-started', { retryId: notice.retryId, turn, step, retry: notice.retry })
+                // The retry re-reads the Session selection, so it opens on the stand-in route and the picker follows.
+                const followed = FailureRecoveryModel.selectionAfter({ action, config: agent.session.requestHeader()?.config })
+                if (followed !== undefined) {
+                  await ctx
+                    .get('sessionController')
+                    ?.selectModel({ sessionId: agent.session.id, ...followed })
+                    .catch((error: unknown) =>
+                      ctx.logger.warn(`ai-accounts: picker kept ${requestProvider} after failing over to ${followed.provider}: ${String(error)}`),
+                    )
+                }
                 return { kind: 'retry' }
               },
               { prepend: true },
