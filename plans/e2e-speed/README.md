@@ -183,6 +183,29 @@ Ordered by expected win per unit of risk, with what is actually known:
 6. **Sharding in CI.** Parallel _owners_ measured 1.41x and flaked locally (thread-hierarchy race), but CI shards
    across machines, where the flake is not a local-contention artifact. Orthogonal to everything above.
 
+## Tried and rejected (2026-10-19)
+
+Each of these was measured, not argued, and each is a dead end or a non-win rather than unfinished work:
+
+- **Browser pool.** Chromium context creation measured 50-83ms (median 58ms) over ten samples: a pooled browser is
+  worth ~12s across the whole suite, while a Host boot is 1.5-12s per scenario. Not the bottleneck.
+- **Stable origin + persistent browser context.** The asset trace showed why caching cannot help by itself: the Host
+  serves plugin bundles `immutable, max-age=31536000` (URL shape `/<origin>/plugins/??<ids>/client.js&rev=...`, no
+  token in the asset path) but `index-*.js`, `vendor-*.js` and the two stylesheets carry _no_ cache header. Worse,
+  Playwright gives every test a fresh browser context, so its HTTP cache starts empty no matter which origin is used:
+  pinning one port per worker and A/B-ing it (forced, two runs a side) produced 258ms vs 152ms median page-load — noise,
+  in the wrong direction. Making the browser cache count needs a shared context, which is the same isolation decision
+  as sharing a Host, so it folds into item 1 above.
+- **A warm Host pool keyed by composition.** The waste it would recover is smaller than it looks: 17 of 48 feature
+  files switch composition, 40 switches in total, and only **14 wasted prewarm boots** across all 194 scenarios
+  (measured from the planned order). At 1.5-2s per boot that is ~30s of CPU suite-wide, already overlapped. Not worth a
+  pool.
+- **Template-cloned scratch profiles.** Installing a scratch profile costs ~1.2s per scenario and nothing in it depends
+  on the scenario, so the first profile for a content key was kept as a template and later ones cloned (`cp -Rc`,
+  measured 0.42s for a 21MB profile). The clone path did not pay: `cp -R into an existing directory` nested the copy,
+  and once that was fixed a cloned `node_modules` carries pnpm's absolute virtual-store paths, so the "fast" boots
+  measured 4-8s against a 1.2-2.8s install baseline. Reverted rather than shipped as a regression.
+
 ## Resume here
 
 E1-E5 have landed (E3 rejected with numbers, E6 dropped by request). The per-scenario cache now decides
