@@ -35,6 +35,10 @@ const fileRowSchema = z.object({ path: z.string().max(2048), status: z.string().
 const nameListSchema = z.array(z.string().max(256)).max(64)
 const MAX_FILES = 500
 
+/** A Session's cwd keeps its workspace root, so the composer resolves it once instead of spawning jj on every read. */
+const WORKSPACE_ROOT_TTL_MS = 60_000
+const workspaceRoots = new Map<string, { readonly root: string; readonly at: number }>()
+
 /** Canonical workspace root for a Session cwd, or null when the directory is not inside a JJ workspace. */
 const workspaceRoot = async (ctx: Context, run: RunJj, cwd: string, signal: AbortSignal | undefined): Promise<string | null> => {
   let canonical: string
@@ -43,11 +47,21 @@ const workspaceRoot = async (ctx: Context, run: RunJj, cwd: string, signal: Abor
   } catch {
     return null
   }
+  const known = workspaceRoots.get(canonical)
+  if (known !== undefined && Date.now() - known.at < WORKSPACE_ROOT_TTL_MS) {
+    // A forgotten workspace takes its directory with it; resolving the root again proves it still exists.
+    const root = await realpath(known.root).catch(() => null)
+    if (root !== null) return root
+    workspaceRoots.delete(canonical)
+  }
   try {
     const result = await run(ctx, canonical, ['workspace', 'root'], signal, { outputLimit: 8_000 })
     const root = result.stdout.trim()
     if (result.truncated || root.length === 0 || root.includes('\n') || !isAbsolute(root)) return null
-    return await realpath(root)
+    const resolved = await realpath(root)
+    workspaceRoots.set(canonical, { root: resolved, at: Date.now() })
+    if (workspaceRoots.size > 256) for (const [path, entry] of workspaceRoots) if (Date.now() - entry.at > WORKSPACE_ROOT_TTL_MS) workspaceRoots.delete(path)
+    return resolved
   } catch {
     if (signal?.aborted === true) throw new Error('Jujutsu request was cancelled.')
     return null
