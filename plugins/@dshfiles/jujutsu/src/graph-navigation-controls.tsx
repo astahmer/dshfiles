@@ -258,7 +258,7 @@ interface GraphViewStatusProps {
 
 export const GraphViewStatus = ({ navigation, filters, onReset }: GraphViewStatusProps): JSX.Element | null => {
   const active = navigation.view !== null || navigation.hidden.length > 0 || navigation.revealed.length > 0 || navigation.lens !== null || filters.length > 0
-  if (!active && !navigation.notice && !navigation.sliceMutation.isPending) return null
+  if (!active && !navigation.notice && !navigation.slicePending) return null
   return (
     <div aria-label="Graph view status" className="dshx:flex dshx:flex-none dshx:flex-col dshx:gap-1 dshx:border-b dshx:px-3 dshx:py-1.5 dshx:text-xs">
       {active && (
@@ -284,7 +284,7 @@ export const GraphViewStatus = ({ navigation, filters, onReset }: GraphViewStatu
           </Button>
         </div>
       )}
-      {navigation.sliceMutation.isPending && <p role="status">Reading graph view…</p>}
+      {navigation.slicePending && <p role="status">Reading graph view…</p>}
       {navigation.notice && (
         <div className="dshx:flex dshx:items-center dshx:gap-2">
           <p className="dshx:min-w-0 dshx:flex-1 dshx:text-muted-foreground" role="status">
@@ -295,7 +295,7 @@ export const GraphViewStatus = ({ navigation, filters, onReset }: GraphViewStatu
               onClick={() => {
                 const latest = navigation.hidden.at(-1)
                 if (latest !== undefined) navigation.removeHidden(latest.commitId)
-                navigation.setNotice('')
+                navigation.clearNotice()
               }}
               size="xs"
               type="button"
@@ -304,7 +304,7 @@ export const GraphViewStatus = ({ navigation, filters, onReset }: GraphViewStatu
               Undo hide
             </Button>
           )}
-          <Button aria-label="Dismiss graph notice" onClick={() => navigation.setNotice('')} size="icon-xs" type="button" variant="ghost">
+          <Button aria-label="Dismiss graph notice" onClick={() => navigation.clearNotice()} size="icon-xs" type="button" variant="ghost">
             <XIcon />
           </Button>
         </div>

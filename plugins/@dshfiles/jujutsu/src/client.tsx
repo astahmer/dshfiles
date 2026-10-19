@@ -908,10 +908,10 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
             <ContextMenuItem onSelect={() => compareRevision(revision, 'revision')}>Another revision…</ContextMenuItem>
           </ContextMenuSubContent>
         </ContextMenuSub>
-        <ContextMenuItem disabled={navigation.sliceMutation.isPending} onSelect={() => navigation.applySlice(revision, 'history')}>
+        <ContextMenuItem disabled={navigation.slicePending} onSelect={() => navigation.applySlice(revision, 'history')}>
           Focus history leading here
         </ContextMenuItem>
-        <ContextMenuItem disabled={navigation.sliceMutation.isPending} onSelect={() => navigation.applySlice(revision, 'exclusive')}>
+        <ContextMenuItem disabled={navigation.slicePending} onSelect={() => navigation.applySlice(revision, 'exclusive')}>
           Hide exclusive history leading here
         </ContextMenuItem>
         <ContextMenuSeparator />

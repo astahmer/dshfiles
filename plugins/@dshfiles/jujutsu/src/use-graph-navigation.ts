@@ -1,9 +1,17 @@
 import { useApi } from '@dshfiles/dshx/client'
-import { errorMessage, useMutation, useQuery } from '@dshfiles/plugin-ui/query'
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { jujutsuApi, type GraphLandmark, type Revision, type RevisionRelationship } from './api.js'
-import { GraphNavigationModel, type GraphViewFilter, type HiddenGraphHistory } from './graph-navigation.js'
+import { useMachine } from '@dshfiles/plugin-ui/machine'
+import { useQuery } from '@dshfiles/plugin-ui/query'
+import { useEffect, useMemo, useState } from 'react'
+import { jujutsuApi, type GraphLandmark, type Revision } from './api.js'
+import { GraphNavigationModel } from './graph-navigation.js'
 import { resolveGraphSelection } from './graph-selection.js'
+import {
+  graphNavigationMachine,
+  selectGraphNavigationViewState,
+  type GraphNavigationClient,
+  type GraphSliceMode,
+  type GraphSliceRequest,
+} from './graph-navigation-machine.js'
 import { JUJUTSU_QUERY_GC_TIME, JUJUTSU_QUERY_STALE_TIME } from './repository-query-cache.js'
 
 type ComparisonTarget = GraphLandmark['kind'] | 'revision'
@@ -25,29 +33,29 @@ const readResult = <Output extends object>(result: Output | { failure: { message
 export const useGraphNavigation = (input: GraphNavigationInput) => {
   const api = useApi(jujutsuApi)
   const scope = `${input.root}:${input.repoId ?? ''}`
-  const activeScope = useRef(scope)
-  activeScope.current = scope
-  const generation = useRef(0)
+  const sliceClient = useMemo<GraphNavigationClient>(
+    () => ({ graphSlice: async (request: GraphSliceRequest, options) => readResult(await api.graphSlice(request, options)) }),
+    [api],
+  )
+  const [navigationSnapshot, sendNavigation] = useMachine(graphNavigationMachine, {
+    input: { client: sliceClient, scope, repoId: input.repoId },
+  })
   const [targetKey, setTargetKey] = useState<ComparisonTarget>('main')
   const [comparisonOpen, setComparisonOpen] = useState(false)
   const [customTargetId, setCustomTargetId] = useState('')
-  const [view, setView] = useState<GraphViewFilter | null>(null)
-  const [hidden, setHidden] = useState<readonly HiddenGraphHistory[]>([])
-  const [revealed, setRevealed] = useState<readonly Revision[]>([])
-  const [lens, setLens] = useState<RevisionRelationship | null>(null)
-  const [notice, setNotice] = useState('')
 
   useEffect(() => {
-    generation.current += 1
-    setView(null)
-    setHidden([])
-    setRevealed([])
-    setLens(null)
-    setNotice('')
+    sendNavigation({ type: 'scope.change', scope, repoId: input.repoId })
     setTargetKey('main')
     setCustomTargetId('')
     setComparisonOpen(false)
-  }, [scope])
+  }, [scope, input.repoId, sendNavigation])
+  const navigation = navigationSnapshot.context
+  const scopeReady = navigation.scope === scope
+  const navigationView = selectGraphNavigationViewState(navigation, scope)
+  const scopedTargetKey = scopeReady ? targetKey : 'main'
+  const scopedComparisonOpen = scopeReady && comparisonOpen
+  const scopedCustomTargetId = scopeReady ? customTargetId : ''
 
   const landmarksQuery = useQuery({
     queryKey: ['jujutsu', input.root, 'graph-navigation', input.repoId, input.refreshedAt],
@@ -58,21 +66,25 @@ export const useGraphNavigation = (input: GraphNavigationInput) => {
     gcTime: JUJUTSU_QUERY_GC_TIME,
     refetchOnWindowFocus: false,
   })
-  const extraRevisions = useMemo(() => GraphNavigationModel.mergeGraphRevisions(view?.revisions ?? [], revealed), [view, revealed])
+  const extraRevisions = useMemo(
+    () => GraphNavigationModel.mergeGraphRevisions(navigationView.view?.revisions ?? [], navigationView.revealed),
+    [navigationView.view, navigationView.revealed],
+  )
   const selectedRevision = resolveGraphSelection({ selection: input.selected, revisions: input.revisions, extraRevisions })
   const comparisonRevision = resolveGraphSelection({ selection: input.comparison, revisions: input.revisions, extraRevisions })
   const landmarks = landmarksQuery.data?.landmarks ?? []
-  const targetLandmark = landmarks.find(landmark => landmark.kind === targetKey)
-  const targetRevision = targetKey === 'revision' ? undefined : targetLandmark?.status === 'resolved' ? targetLandmark.revisions[0] : undefined
-  const targetCommitId = targetKey === 'revision' ? customTargetId : (targetRevision?.commitId ?? '')
-  const targetLabel = targetKey === 'revision' ? customTargetId.slice(0, 12) : (targetLandmark?.label ?? targetKey)
-  const comparisonTarget = landmarks.find(landmark => landmark.kind === targetKey)
+  const targetLandmark = landmarks.find(landmark => landmark.kind === scopedTargetKey)
+  const targetRevision = scopedTargetKey === 'revision' ? undefined : targetLandmark?.status === 'resolved' ? targetLandmark.revisions[0] : undefined
+  const targetCommitId = scopedTargetKey === 'revision' ? scopedCustomTargetId : (targetRevision?.commitId ?? '')
+  const targetLabel = scopedTargetKey === 'revision' ? scopedCustomTargetId.slice(0, 12) : (targetLandmark?.label ?? scopedTargetKey)
+  const comparisonTarget = landmarks.find(landmark => landmark.kind === scopedTargetKey)
   const preferredTarget =
     landmarks.find(landmark => landmark.kind === 'main' && landmark.status === 'resolved') ??
     landmarks.find(landmark => landmark.kind === 'main-origin' && landmark.status === 'resolved') ??
     landmarks.find(landmark => landmark.kind === 'default' && landmark.status === 'resolved')
   const defaultTargetKey: ComparisonTarget = preferredTarget?.kind ?? 'main'
   const beginComparison = (target?: ComparisonTarget): void => {
+    if (!scopeReady) return
     const nextTarget = target ?? defaultTargetKey
     setTargetKey(nextTarget)
     if (nextTarget === 'revision') setCustomTargetId('')
@@ -80,12 +92,14 @@ export const useGraphNavigation = (input: GraphNavigationInput) => {
   }
 
   const chooseTarget = (value: string): void => {
-    if (value !== 'current' && value !== 'main-origin' && value !== 'main' && value !== 'default' && value !== 'revision') return
+    if (!scopeReady || (value !== 'current' && value !== 'main-origin' && value !== 'main' && value !== 'default' && value !== 'revision')) return
     setTargetKey(value)
     if (value === 'revision') setCustomTargetId('')
   }
 
-  const closeComparison = (): void => setComparisonOpen(false)
+  const closeComparison = (): void => {
+    if (scopeReady) setComparisonOpen(false)
+  }
 
   const relationshipQuery = useQuery({
     queryKey: ['jujutsu', input.root, 'relationship', input.repoId, comparisonRevision?.commitId, targetCommitId, input.refreshedAt],
@@ -100,136 +114,88 @@ export const useGraphNavigation = (input: GraphNavigationInput) => {
           { signal },
         ),
       ),
-    enabled: comparisonOpen && input.repoId !== null && comparisonRevision !== undefined && targetCommitId.length > 0,
+    enabled: scopedComparisonOpen && input.repoId !== null && comparisonRevision !== undefined && targetCommitId.length > 0,
     retry: false,
     staleTime: JUJUTSU_QUERY_STALE_TIME,
     gcTime: JUJUTSU_QUERY_GC_TIME,
     refetchOnWindowFocus: false,
   })
 
-  const sliceMutation = useMutation({
-    mutationFn: async (request: {
-      readonly revision: Revision
-      readonly mode: 'history' | 'exclusive'
-      readonly scope: string
-      readonly generation: number
-    }) => ({
-      request,
-      result: readResult(await api.graphSlice({ repoId: input.repoId ?? '', commitId: request.revision.commitId, mode: request.mode })),
-    }),
-    onSuccess: ({ request, result }) => {
-      if (request.scope !== activeScope.current || request.generation !== generation.current) return
-      const label = request.revision.shortestChangeId
-      if (request.mode === 'history') {
-        setView({
-          kind: 'history',
-          label: `History leading to ${label}`,
-          commitIds: new Set(result.revisions.map(row => row.commitId)),
-          revisions: result.revisions,
-          truncated: result.truncated,
-        })
-        setLens(null)
-        setRevealed([])
-        setNotice('')
-        return
-      }
-      if (result.revisions.length === 0) {
-        setNotice('Nothing exclusive to hide: this history is shared with retained descendants, bookmarks, or workspaces.')
-        return
-      }
-      setHidden(current => [
-        ...current.filter(item => item.commitId !== request.revision.commitId),
-        {
-          commitId: request.revision.commitId,
-          label,
-          commitIds: result.revisions.map(row => row.commitId),
-          truncated: result.truncated,
-        },
-      ])
-      setRevealed([])
-      setNotice(`Hidden exclusive history leading to ${label}. Shared history remains visible.`)
-    },
-    onError: (error, request) => {
-      if (request.scope === activeScope.current && request.generation === generation.current) setNotice(errorMessage(error, 'Graph view could not be loaded.'))
-    },
-  })
+  const relationship = scopeReady ? relationshipQuery.data : undefined
+  const lensSelection = navigationView.lensSelection
+  const lens =
+    lensSelection !== null &&
+    relationship !== undefined &&
+    relationship.commitId === lensSelection.commitId &&
+    relationship.targetCommitId === lensSelection.targetCommitId
+      ? relationship
+      : null
 
-  const applySlice = (revision: Revision, mode: 'history' | 'exclusive'): void => {
-    generation.current += 1
-    sliceMutation.mutate({ revision, mode, scope, generation: generation.current })
+  const applySlice = (revision: Revision, mode: GraphSliceMode): void => {
+    if (scopeReady) sendNavigation({ type: 'slice.apply', revision, mode })
   }
 
   const applyRelationship = (kind: 'difference' | 'connection'): void => {
-    const relationship = relationshipQuery.data
-    if (relationship === undefined) return
-    generation.current += 1
-    const ids = kind === 'difference' ? relationship.differenceIds : relationship.connectionIds
-    setView({
-      kind,
-      label: kind === 'difference' ? `Selected-only relative to ${targetLabel}` : `Connection to ${targetLabel}`,
-      commitIds: new Set(kind === 'difference' ? ids : [...ids, relationship.commitId, relationship.targetCommitId, ...relationship.commonAncestorIds]),
-      revisions: relationship.revisions,
-      truncated: relationship.truncated,
-    })
-    setLens(null)
-    setRevealed([])
-    setNotice('')
+    if (!scopeReady || relationship === undefined) return
+    sendNavigation({ type: 'relationship.apply', kind, relationship, targetLabel })
   }
 
   const showConnection = (): void => {
-    const relationship = relationshipQuery.data
-    if (relationship === undefined) return
-    generation.current += 1
-    setLens(relationship)
-    setNotice('Connection highlighted; unrelated revision text dimmed. Graph rails remain unchanged.')
+    if (!scopeReady || relationship === undefined) return
+    sendNavigation({ type: 'relationship.highlight', commitId: relationship.commitId, targetCommitId: relationship.targetCommitId })
   }
 
   const reset = (): void => {
-    generation.current += 1
-    setView(null)
-    setHidden([])
-    setRevealed([])
-    setLens(null)
-    setNotice('')
-    sliceMutation.reset()
+    if (scopeReady) sendNavigation({ type: 'reset' })
   }
 
   return {
     selectedRevision,
     comparisonRevision,
-    comparisonOpen,
+    comparisonOpen: scopedComparisonOpen,
     comparisonTarget,
     defaultTargetKey,
     landmarks,
     landmarksQuery,
-    targetKey,
+    targetKey: scopedTargetKey,
     chooseTarget,
     beginComparison,
     closeComparison,
-    customTargetId,
-    setCustomTargetId,
+    customTargetId: scopedCustomTargetId,
+    setCustomTargetId: (value: string) => {
+      if (scopeReady) setCustomTargetId(value)
+    },
     targetLabel,
     targetCommitId,
     relationshipQuery,
-    view,
-    hidden,
-    revealed,
+    view: navigationView.view,
+    hidden: navigationView.hidden,
+    revealed: navigationView.revealed,
     lens,
-    notice,
-    setNotice,
-    sliceMutation,
+    notice: navigationView.notice,
+    slicePending: scopeReady && navigationSnapshot.matches('loading'),
+    clearNotice: () => {
+      if (scopeReady) sendNavigation({ type: 'notice.clear' })
+    },
     applySlice,
     applyRelationship,
     showConnection,
     reset,
     clearView: () => {
-      generation.current += 1
-      setView(null)
+      if (scopeReady) sendNavigation({ type: 'view.clear' })
     },
-    clearLens: () => setLens(null),
-    removeHidden: (commitId: string) => setHidden(current => current.filter(item => item.commitId !== commitId)),
-    clearRevealed: () => setRevealed([]),
-    reveal: (revision: Revision) => setRevealed(current => GraphNavigationModel.mergeGraphRevisions(current, [revision])),
+    clearLens: () => {
+      if (scopeReady) sendNavigation({ type: 'lens.clear' })
+    },
+    removeHidden: (commitId: string) => {
+      if (scopeReady) sendNavigation({ type: 'hidden.remove', commitId })
+    },
+    clearRevealed: () => {
+      if (scopeReady) sendNavigation({ type: 'revealed.clear' })
+    },
+    reveal: (revision: Revision) => {
+      if (scopeReady) sendNavigation({ type: 'revision.reveal', revision })
+    },
     extraRevisions,
   }
 }
