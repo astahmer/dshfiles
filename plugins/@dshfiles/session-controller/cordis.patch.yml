@@ -1,0 +1,5 @@
+- id: session-controller
+  disabled: true
+- insert:
+    - id: dshfiles-session-controller
+      name: '@dshfiles/session-controller'

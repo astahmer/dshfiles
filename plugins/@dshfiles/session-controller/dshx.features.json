@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "lean-session-follow",
+      "title": "Send the browser only what a thread renders",
+      "summary": "Opening and following a thread sends its events without provider replay state, which only the Host needs to continue a conversation.",
+      "surfaces": ["host", "client"],
+      "configuration": [],
+      "states": ["thread-opened", "history-visible"],
+      "failureModes": ["The Host keeps replay state in the Session log; only the browser copy omits it."],
+      "externalDependencies": [],
+      "reach": ["click button \"New session\"", "expect textbox \"Describe what you want to build, / commands, @ files or sessions\""],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "session-controller.browser-event",
+          "file": "plugins/@dshfiles/session-controller/tests/browser-event.test.ts",
+          "testName": "drops provider replay state from assistant events and keeps everything else"
+        }
+      ]
+    }
+  ]
+}

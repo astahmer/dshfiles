@@ -1,0 +1,139 @@
+{
+  "name": "@dshfiles/session-controller",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Owned fork of DSH's native Session controller that sends the browser only what it renders.",
+  "license": "MIT",
+  "files": [
+    "dist",
+    "typert",
+    "cordis.patch.yml",
+    "locale",
+    "LICENSE",
+    "README.md",
+    "dshx.features.json"
+  ],
+  "type": "module",
+  "main": "./dist/index.js",
+  "exports": {
+    ".": "./dist/index.js",
+    "./client": "./dist/client.js",
+    "./typert": "./typert/host.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "node scripts/derive-typert.mjs && tsc -p tsconfig.host.json && dshx build",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.host.json --noEmit",
+    "test:boot": "node ../../../tooling/dshx/scripts/boot-check-web.mjs --plugin"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "catalog:",
+    "@deepseek-ai/dsh": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-agent": "catalog:",
+    "@deepseek-ai/dsh-agent-default-model": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-agent-preset-registry": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-api-gateway": "catalog:",
+    "@deepseek-ai/dsh-api-remote-access": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-api-session-controller": "catalog:",
+    "@deepseek-ai/dsh-attachment": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-brand": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-client-connection": "catalog:",
+    "@deepseek-ai/dsh-client-file-upload": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-client-store": "catalog:",
+    "@deepseek-ai/dsh-commands": "catalog:",
+    "@deepseek-ai/dsh-credentials": "catalog:",
+    "@deepseek-ai/dsh-deque": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-file-reference": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-fs": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-llm": "catalog:",
+    "@deepseek-ai/dsh-native-command": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-scope": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-session": "catalog:",
+    "@deepseek-ai/dsh-session-persistence": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-session-projection": "catalog:",
+    "@deepseek-ai/dsh-session-projection-cache": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-session-query": "catalog:",
+    "@deepseek-ai/dsh-session-title": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-settings": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-skill": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-subagent": "catalog:",
+    "@deepseek-ai/dsh-typert-protocol": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-typert-registry": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-util-crypto": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-util-time": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-util-values": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-util-workspace-path": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-working-directory": "catalog:",
+    "@deepseek-ai/dsh-workspace": "catalog:",
+    "@deepseek-ai/schemastery": "catalog:",
+    "@dshfiles/dshx": "workspace:*",
+    "@types/node": "catalog:",
+    "mime-types": "^3.0.2",
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "zod": "4.4.3"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "~4.0.4",
+    "@deepseek-ai/dsh": ">=0.2.0-rc.1 <0.3.0-0",
+    "@deepseek-ai/dsh-agent": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-agent-default-model": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-agent-preset-registry": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-api-gateway": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-attachment": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-brand": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-client-connection": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-client-file-upload": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-commands": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-credentials": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-deque": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-file-reference": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-fs": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-llm": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-native-command": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-scope": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-session": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-session-persistence": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-session-projection": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-session-projection-cache": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-session-query": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-session-title": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-settings": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-skill": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-subagent": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-typert-protocol": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-typert-registry": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-util-time": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-util-values": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-util-workspace-path": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-working-directory": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-workspace": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/schemastery": "^3.18.4"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-api-gateway",
+        "@deepseek-ai/dsh-client-file-upload"
+      ],
+      "external": [
+        "@deepseek-ai/dsh-api-gateway/client",
+        "@deepseek-ai/dsh-client-store"
+      ],
+      "immediately": false
+    }
+  },
+  "dshx": {
+    "features": "./dshx.features.json"
+  },
+  "dependencies": {
+    "mime-types": "^3.0.2",
+    "zod": "4.4.3"
+  }
+}

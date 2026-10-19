@@ -13,7 +13,7 @@
     "jj:state": "node scripts/jj-state.mjs",
     "knip": "pnpm --dir tooling/dshx exec knip --directory ../.. --config \"$PWD/knip.jsonc\" --no-config-hints",
     "lint": "node scripts/lint-ratchet.ts oxlint && node scripts/lint-ratchet.ts ast-grep",
-    "sg": "ast-grep scan tooling/dshx/packages plugins scripts apps/desktop/src --globs=!plugins/@dshfiles/rich-composer/src/native/** --globs=!plugins/@dshfiles/chat/src/native/** --globs=!plugins/@dshfiles/frame-layout/src/native/**",
+    "sg": "ast-grep scan tooling/dshx/packages plugins scripts apps/desktop/src --globs=!plugins/@dshfiles/rich-composer/src/native/** --globs=!plugins/@dshfiles/chat/src/native/** --globs=!plugins/@dshfiles/session-controller/src/native/** --globs=!plugins/@dshfiles/session-controller/typert/** --globs=!plugins/@dshfiles/frame-layout/src/native/**",
     "fmt": "oxfmt tooling/dshx/packages plugins scripts apps/desktop/src --config .oxfmtrc.json",
     "fmt:check": "oxfmt --check tooling/dshx/packages plugins scripts apps/desktop/src --config .oxfmtrc.json",
     "check:plugin-boot": "node scripts/check-browser.mjs boot",
