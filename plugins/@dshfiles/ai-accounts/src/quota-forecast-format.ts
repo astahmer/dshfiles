@@ -1,4 +1,9 @@
+import type { WorkHours } from './quota-coverage-model.js'
+
 const HOUR_MS = 3_600_000
+const WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0] as const
+// 5 October 2026 is a Monday; adding a day index names that weekday in the viewer's locale.
+const MONDAY = new Date(2026, 9, 5).getTime()
 const DAY_MS = 24 * HOUR_MS
 
 /** Wording shared by the forecast board and the coverage weeks. */
@@ -26,6 +31,18 @@ export class QuotaForecastFormat {
     const days = Math.floor(hours / 24)
     const rest = hours % 24
     return `${String(days)} day${days === 1 ? '' : 's'}${rest === 0 ? '' : ` ${String(rest)} h`}`
+  }
+
+  /** `Mon–Fri 09:00 to 18:00`, or the listed days when they are not one run. */
+  static workHours = (workHours: WorkHours): string => {
+    const ordered = WEEK_ORDER.filter(day => workHours.days.includes(day))
+    if (ordered.length === 0) return 'No work days'
+    const names = ordered.map(day => QuotaForecastFormat.weekday(MONDAY + ((day + 6) % 7) * DAY_MS))
+    const positions = ordered.map(day => WEEK_ORDER.indexOf(day))
+    const contiguous = positions.every((position, index) => index === 0 || position === (positions[index - 1] ?? -2) + 1)
+    const days = contiguous && names.length > 2 ? `${names[0] ?? ''}–${names.at(-1) ?? ''}` : names.join(', ')
+    const hour = (value: number): string => `${String(value).padStart(2, '0')}:00`
+    return `${days} ${hour(workHours.startHour)} to ${hour(workHours.endHour)}`
   }
 
   static percent = (value: number): string => `${String(Math.round(value))}%`

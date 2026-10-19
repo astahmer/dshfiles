@@ -428,6 +428,8 @@ export const AiAccountsSettingsSection = (props: { readonly close: () => void; r
 
       <CostEstimatesGroup readOnly={readOnly} write={write} />
 
+      <WorkHoursGroup readOnly={readOnly} write={write} />
+
       <Group description="The Host records one quota snapshot per enabled account on this schedule." title="Usage history">
         <Row label="Record every">
           {id => (
@@ -529,6 +531,74 @@ const ShortNameInput = (props: {
       placeholder={props.placeholder}
       value={draft ?? props.saved}
     />
+  )
+}
+
+const WEEKDAYS = [
+  { day: 1, label: 'Mon' },
+  { day: 2, label: 'Tue' },
+  { day: 3, label: 'Wed' },
+  { day: 4, label: 'Thu' },
+  { day: 5, label: 'Fri' },
+  { day: 6, label: 'Sat' },
+  { day: 0, label: 'Sun' },
+] as const
+const HOURS = Array.from({ length: 25 }, (_, hour) => hour)
+
+const WorkHoursGroup = (props: { readonly readOnly: boolean; readonly write: (task: Promise<unknown>) => void }): JSX.Element => {
+  const { settings, workHours } = usePreferences()
+  const save = (patch: Partial<typeof workHours>): void => {
+    const next = { ...workHours, ...patch }
+    props.write(settings.set('workHours', { days: [...next.days], startHour: next.startHour, endHour: Math.max(next.endHour, next.startHour + 1) }))
+  }
+  return (
+    <Group description="Quota forecast counts the gaps with no account free that fall in these hours." title="Work hours">
+      <Row label="Work days">
+        {id => (
+          <span className="dshx:flex dshx:flex-wrap dshx:gap-3" id={id}>
+            {WEEKDAYS.map(entry => (
+              <Label className="dshx:flex dshx:items-center dshx:gap-1.5 dshx:text-xs dshx:font-normal" key={entry.day}>
+                <Checkbox
+                  checked={workHours.days.includes(entry.day)}
+                  disabled={props.readOnly}
+                  onCheckedChange={checked =>
+                    save({
+                      days:
+                        checked === true ? [...workHours.days, entry.day].sort((left, right) => left - right) : workHours.days.filter(day => day !== entry.day),
+                    })
+                  }
+                />
+                {entry.label}
+              </Label>
+            ))}
+          </span>
+        )}
+      </Row>
+      <Row label="From">
+        {id => (
+          <NumberSelect
+            disabled={props.readOnly}
+            format={hour => `${String(hour).padStart(2, '0')}:00`}
+            id={id}
+            onChange={startHour => save({ startHour })}
+            options={HOURS.slice(0, 24)}
+            value={workHours.startHour}
+          />
+        )}
+      </Row>
+      <Row label="Until">
+        {id => (
+          <NumberSelect
+            disabled={props.readOnly}
+            format={hour => `${String(hour).padStart(2, '0')}:00`}
+            id={id}
+            onChange={endHour => save({ endHour })}
+            options={HOURS.filter(hour => hour > workHours.startHour)}
+            value={workHours.endHour}
+          />
+        )}
+      </Row>
+    </Group>
   )
 }
 

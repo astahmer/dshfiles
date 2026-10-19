@@ -1,12 +1,20 @@
 import { useSettings } from '@dshfiles/dshx/client'
 import { z } from 'zod'
 import { recoveryPolicySchema } from './failure-policy.js'
+import { QuotaCoverageModel } from './quota-coverage-model.js'
 import { DEFAULT_CLIENT_SETTINGS, aiAccountsSettings, type SaveMode } from './settings.js'
 
 const meterLabelSchema = z.enum(['both', 'percent', 'reset']).catch('both')
 export type MeterLabel = z.infer<typeof meterLabelSchema>
 const usageWindowLayoutSchema = z.enum(['binding', 'horizontal', 'vertical']).catch('binding')
 export type UsageWindowLayout = z.infer<typeof usageWindowLayoutSchema>
+const workHoursSchema = z
+  .object({
+    days: z.array(z.number().int().min(0).max(6)),
+    startHour: z.number().int().min(0).max(23),
+    endHour: z.number().int().min(1).max(24),
+  })
+  .catch(() => ({ ...QuotaCoverageModel.defaultWorkHours, days: [...QuotaCoverageModel.defaultWorkHours.days] }))
 
 /** The accounts preferences with defaults filled in while Settings loads or is unavailable. */
 export const usePreferences = () => {
@@ -36,5 +44,6 @@ export const usePreferences = () => {
     costPlacement: value?.costPlacement === 'separate' ? 'separate' : 'inside',
     pricingRefreshHours: value?.pricingRefreshHours ?? DEFAULT_CLIENT_SETTINGS.pricingRefreshHours,
     pricingOverrides: value?.pricingOverrides ?? {},
+    workHours: workHoursSchema.parse(value?.workHours),
   }
 }

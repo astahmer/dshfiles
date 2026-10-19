@@ -415,7 +415,7 @@ const CoverageDetail = (props: { readonly pool: Pool; readonly week: CoverageWee
   )
 }
 
-const CoverageLegend = (): JSX.Element => (
+const CoverageLegend = (props: { readonly workHours: WorkHours }): JSX.Element => (
   <div className="dshx:flex dshx:flex-col dshx:gap-1.5 dshx:text-xs dshx:text-muted-foreground">
     <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-x-4 dshx:gap-y-1">
       <span className="dshx:flex dshx:items-center dshx:gap-1.5">
@@ -462,7 +462,7 @@ const CoverageLegend = (): JSX.Element => (
         No reading or not yet
       </span>
     </div>
-    <span>One row per week, Monday to Sunday, 6 h cells. Work hours are weekdays 09:00 to 18:00. Select a row for detail.</span>
+    <span>One row per week, Monday to Sunday, 6 h cells. Work hours: {Format.workHours(props.workHours)}. Select a row for detail.</span>
   </div>
 )
 
@@ -525,7 +525,7 @@ export class CoverageBoardView {
             .map(group => (
               <SingleRow group={group} key={group.kind} />
             ))}
-          <CoverageLegend />
+          <CoverageLegend workHours={props.workHours} />
         </div>
         {pool === undefined || week === undefined ? null : (
           <div className="dshx:border-l dshx:pl-6 dshx:@max-5xl:max-w-2xl dshx:@max-5xl:border-t dshx:@max-5xl:border-l-0 dshx:@max-5xl:pt-4 dshx:@max-5xl:pl-0">

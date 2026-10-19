@@ -76,6 +76,13 @@ export const aiAccountsSettings = defineSettings({
     pricingRefreshHours: Schema.natural().min(1).max(720).default(24),
     /** `provider/model` or `provider/*` → a models.dev id, `free`, or `input=… output=… cacheRead=… cacheWrite=…` (USD per 1M tokens). */
     pricingOverrides: Schema.dict(Schema.string()).default({}),
+    /** When nobody being able to run an agent matters: Quota forecast counts the gaps that fall in these hours. */
+    workHours: Schema.object({
+      /** `Date.getDay()` values, 0 = Sunday. */
+      days: Schema.array(Schema.natural().max(6)).default([1, 2, 3, 4, 5]),
+      startHour: Schema.natural().max(23).default(9),
+      endHour: Schema.natural().min(1).max(24).default(18),
+    }),
     /** Display currency; models.dev publishes USD only. */
     currency: Schema.union(['USD']).default('USD'),
   }),
