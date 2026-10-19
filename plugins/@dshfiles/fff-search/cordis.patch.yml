@@ -1,0 +1,7 @@
+# Agents get `grep` and `glob` backed by a resident fff index. The stock tools
+# stay registered globally; this bundle registers its own per Agent, and an
+# Agent-scoped tool shadows the global one of the same name, so the standard
+# preset needs no restating.
+- insert:
+    - id: dshfiles-fff-search
+      name: '@dshfiles/fff-search'
