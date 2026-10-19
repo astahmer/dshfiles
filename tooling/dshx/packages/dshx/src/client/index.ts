@@ -8,6 +8,7 @@ export const defineSlot = ClientContributionModel.defineSlot
 export const declareLocaleNamespace = LocaleNamespaceModel.declareNamespace
 export const defineLocale = LocaleNamespaceModel.define
 export { CLIENT_SLOT_REFERENCES, findClientSlot, slotOwnerImports, type ClientSlotReference } from './slot-reference.js'
+export { hasHostCommandRegistry, runHostCommand } from './host-commands.js'
 export type {
   ClientConversationContribution,
   ClientContext,

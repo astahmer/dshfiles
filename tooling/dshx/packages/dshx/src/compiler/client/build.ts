@@ -36,6 +36,7 @@ const CLIENT_RUNTIME_PATH = fileURLToPath(new URL('../../client/runtime.js', imp
 const CLIENT_DEFINE_PATH = fileURLToPath(new URL('../../client/define.js', import.meta.url))
 const CLIENT_SDK_PATH = fileURLToPath(new URL('../../sdk/client.js', import.meta.url))
 const CLIENT_LOCALE_PATH = fileURLToPath(new URL('../../client/locale.js', import.meta.url))
+const CLIENT_HOST_COMMANDS_PATH = fileURLToPath(new URL('../../client/host-commands.js', import.meta.url))
 const CLIENT_API_PATH = fileURLToPath(new URL('../../api/client.js', import.meta.url))
 const API_DEFINE_PATH = fileURLToPath(new URL('../../api/define.js', import.meta.url))
 const API_RUNTIME_PATH = fileURLToPath(new URL('../../api/runtime.js', import.meta.url))
@@ -146,6 +147,7 @@ function clientEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, op
           `import { LocaleNamespaceModel } from ${JSON.stringify(CLIENT_LOCALE_PATH)}`,
           'export const declareLocaleNamespace = LocaleNamespaceModel.declareNamespace',
           'export const defineLocale = LocaleNamespaceModel.define',
+          `export { hasHostCommandRegistry, runHostCommand } from ${JSON.stringify(CLIENT_HOST_COMMANDS_PATH)}`,
           `export { useApi, useApiQuery } from ${JSON.stringify(VIRTUAL_CLIENT_API_HOOKS)}`,
           `import { ApiRuntimeModel } from ${JSON.stringify(API_RUNTIME_PATH)}`,
           'export const createApiClient = ApiRuntimeModel.createClient',

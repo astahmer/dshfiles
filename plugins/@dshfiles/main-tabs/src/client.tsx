@@ -6,7 +6,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type { ShortcutBinding, ShortcutCommand, ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client'
 import { resolveSlotLabel } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
-import { defineClient, useApiQuery, useSettings } from '@dshfiles/dshx/client'
+import { defineClient, runHostCommand, useApiQuery, useSettings } from '@dshfiles/dshx/client'
 import { threadSidebarAttentionApi } from '@dshfiles/thread-sidebar/attention-api'
 import { HostSnapshotsModel } from '@dshfiles/thread-sidebar/snapshots'
 import { MessageSquareIcon, MessageSquarePlusIcon, PanelsTopLeftIcon, SettingsIcon } from '@dshfiles/plugin-ui/icons'
@@ -39,10 +39,13 @@ const panelTitleFallback = (panelId: string): string => {
 const STRIP_MISSING_AFTER_MS = 3_000
 
 /**
- * Settings is a modal whose open action stays private to `ui-settings-general` (its shell store is not exported and
- * the shortcut registry cannot run a command), so the new-tab page presses the sidebar's own Settings trigger.
+ * Settings is a Host modal. Its command (`settings.open`) runs through the
+ * Shortcuts registry, which is what the Desktop menu uses; the launcher trigger
+ * below is only a fallback, because a Host whose `settings.launcher` slot is
+ * taken by the account menu no longer renders a plain Settings button.
  */
 const SETTINGS_TRIGGER_SELECTOR = '[data-slot="settings.launcher"] button[aria-haspopup="dialog"]'
+const SETTINGS_COMMAND_ID = 'settings.open'
 
 /** While the new-tab page shows, the main panel under it stays mounted but hidden, keeping a thread's scroll and state. */
 const useHiddenMainPanel = (host: HTMLElement | null, hidden: boolean): void => {
@@ -340,6 +343,7 @@ export default defineClient({
                     shortcut: shortcutOf('settings.open'),
                     pick: () => {
                       pick(null)
+                      if (runHostCommand(ctx.shortcuts, SETTINGS_COMMAND_ID)) return
                       document.querySelector<HTMLElement>(SETTINGS_TRIGGER_SELECTOR)?.click()
                     },
                   },

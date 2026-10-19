@@ -15,7 +15,7 @@ import { resolveSlotLabel, type PropsRenderSlots, type PropsRuntime, type Transl
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
-import { defineClient } from '@dshfiles/dshx/client'
+import { defineClient, hasHostCommandRegistry, runHostCommand } from '@dshfiles/dshx/client'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { useEffect, useRef, useState } from 'react'
 import { ArchivedThreadDock } from './archived-thread-dock.js'
@@ -92,19 +92,6 @@ const hasWorkspaceShortcuts = (hooks: unknown): hooks is { readonly workspaceSho
   typeof hooks.workspaceShortcuts.getSnapshot === 'function' &&
   'subscribe' in hooks.workspaceShortcuts &&
   typeof hooks.workspaceShortcuts.subscribe === 'function'
-
-interface ShortcutRegistry {
-  readonly invoke: (commandId: string, scope: { readonly region: 'page'; readonly modal: null; readonly target: Element | null }) => void
-}
-
-const hasShortcutRegistry = <Shortcuts,>(shortcuts: Shortcuts): shortcuts is Shortcuts & { readonly registry: ShortcutRegistry } =>
-  typeof shortcuts === 'object' &&
-  shortcuts !== null &&
-  'registry' in shortcuts &&
-  typeof shortcuts.registry === 'object' &&
-  shortcuts.registry !== null &&
-  'invoke' in shortcuts.registry &&
-  typeof shortcuts.registry.invoke === 'function'
 
 export default defineClient({
   name: '@dshfiles/thread-sidebar',
@@ -462,15 +449,7 @@ export default defineClient({
     // The public Shortcuts service lists commands but only runs them from a key press; its registry's `invoke` is what
     // the Desktop menu uses. Read it defensively so a Host without it simply leaves Host commands out of the palette.
     const shortcuts = ctx.shortcuts
-    const runCommand = hasShortcutRegistry(shortcuts)
-      ? (commandId: string): void => {
-          try {
-            shortcuts.registry.invoke(commandId, { region: 'page', modal: null, target: document.activeElement })
-          } catch (error) {
-            console.warn(`thread-sidebar: the ${commandId} command failed`, error)
-          }
-        }
-      : null
+    const runCommand = hasHostCommandRegistry(shortcuts) ? (commandId: string): void => void runHostCommand(shortcuts, commandId) : null
 
     const openThread = (sessionId: SessionSummary['id']): void => ctx.uiWorkspace.openSession(sessionId)
 
