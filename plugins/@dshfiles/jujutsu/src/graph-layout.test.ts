@@ -93,21 +93,22 @@ describe('branch layout', () => {
     ])
   })
 
-  test('the trunk keeps lane 0, branches reuse lane 1 once the one above has ended, and nothing crosses', () => {
+  test('the trunk keeps lane 0, the topmost child continues its parent line, other branches reuse lane 1, and nothing crosses', () => {
     expect(
       lanesOf(
         rows,
         trunk.map(row => row.commitId),
       ),
     ).toEqual([0])
-    for (const block of [secret, tool, snooze, editing, tabs, emptyHead, merge, feature])
+    for (const block of [secret, tool, editing, tabs, emptyHead, merge, feature])
       expect(
         lanesOf(
           rows,
           block.map(row => row.commitId),
         ),
       ).toEqual([1])
-    expect(lanesOf(rows, ['dates0', 'dates1'])).toEqual([2])
+    expect(lanesOf(rows, ['dates0', 'dates1', 'snooze1', 'snooze2'])).toEqual([0])
+    expect(lanesOf(rows, ['snooze0'])).toEqual([1])
     expect(Math.max(...rows.map(row => row.laneCount))).toBe(3)
     expect(crossings(rows)).toBe(0)
     expect(brokenLanes(rows)).toEqual([])
@@ -117,9 +118,9 @@ describe('branch layout', () => {
     expect(rowOf(rows, 'secret5').outgoing).toEqual([{ fromLane: 1, toLane: 0, color: rowOf(rows, 'secret5').color, dashed: false, terminal: false }])
     expect(rowOf(rows, 'tool0').incoming).toEqual([])
     expect(rowOf(rows, 'tool0').passing.map(link => [link.fromLane, link.toLane])).toEqual([[0, 0]])
-    // The nested branch forks below its parent's head, so it keeps its own lane down to the turn.
-    expect(rowOf(rows, 'dates1').outgoing.map(link => link.toLane)).toEqual([2])
-    expect(rowOf(rows, 'snooze0').passing.map(link => [link.fromLane, link.toLane])).toEqual([[2, 1]])
+    // snooze1 has two children, so it opens its own line: dates continues straight into it and snooze0 curves in.
+    expect(rowOf(rows, 'dates1').outgoing.map(link => [link.fromLane, link.toLane])).toEqual([[0, 0]])
+    expect(rowOf(rows, 'snooze0').outgoing.map(link => [link.fromLane, link.toLane])).toEqual([[1, 0]])
   })
 
   test('a merge opens its second parent to the right and that branch rejoins the trunk at its own fork', () => {
@@ -155,7 +156,7 @@ describe('lane allocation', () => {
     expect(rowOf(rows, 'main0').incoming).toEqual([{ fromLane: 0, toLane: 0, color: 0, dashed: false, terminal: false }])
   })
 
-  test('a branch forking deep in its parent keeps a lane right of it until the fork, then a later branch reuses that lane', () => {
+  test('a revision two branches share opens its own line: the topmost child continues it and the other curves in', () => {
     const rows = layout([
       ...chain('nested', 1, 'parent2'),
       ...chain('parent', 3, 'main0'),
@@ -163,10 +164,10 @@ describe('lane allocation', () => {
       ...chain('main', 3, undefined, index => ({ bookmarks: index === 0 ? ['main'] : [] })),
     ])
     expect(ids(rows)).toEqual(['nested0', 'parent0', 'parent1', 'parent2', 'main0', 'later0', 'later1', 'main1', 'main2'])
-    expect(lanesOf(rows, ['nested0'])).toEqual([2])
-    expect(lanesOf(rows, ['parent0', 'parent1', 'parent2'])).toEqual([1])
+    expect(lanesOf(rows, ['nested0', 'parent2'])).toEqual([0])
+    expect(lanesOf(rows, ['parent0', 'parent1'])).toEqual([1])
     expect(lanesOf(rows, ['later0', 'later1'])).toEqual([1])
-    expect(rowOf(rows, 'parent1').passing.map(link => [link.fromLane, link.toLane])).toEqual([[2, 1]])
+    expect(rowOf(rows, 'parent1').outgoing.map(link => [link.fromLane, link.toLane])).toEqual([[1, 0]])
     expect(crossings(rows)).toBe(0)
     expect(brokenLanes(rows)).toEqual([])
   })
@@ -207,7 +208,7 @@ describe('lane allocation', () => {
     const foreign = revision('foreign', ['trunk'])
     const trunkRow = revision('trunk', [], { bookmarks: ['main'], immutable: true })
     const rows = RevisionGraphModel.layoutRevisionGraph([feature, trunkRow], new Map([feature, foreign, trunkRow].map(row => [row.commitId, row])), false)
-    expect(rowOf(rows, 'feature').outgoing).toEqual([{ fromLane: 1, toLane: 0, color: rowOf(rows, 'feature').color, dashed: true, terminal: false }])
+    expect(rowOf(rows, 'feature').outgoing).toEqual([{ fromLane: 0, toLane: 0, color: rowOf(rows, 'feature').color, dashed: true, terminal: false }])
   })
 
   test('a group holding a merge goes above the newer group holding its other parent, and its second parent opens a lane to the right', () => {
@@ -218,8 +219,22 @@ describe('lane allocation', () => {
       ...chain('main', 2, undefined, index => ({ bookmarks: index === 0 ? ['main'] : [] })),
     ])
     expect(ids(rows)).toEqual(['merge', 'a0', 'b0', 'main0', 'main1'])
-    expect(rows.map(row => row.commitLane)).toEqual([1, 1, 2, 0, 0])
-    expect(rowOf(rows, 'merge').outgoing.map(link => link.toLane)).toEqual([1, 2])
+    expect(rows.map(row => row.commitLane)).toEqual([0, 0, 1, 0, 0])
+    expect(rowOf(rows, 'merge').outgoing.map(link => link.toLane)).toEqual([0, 1])
+    expect(crossings(rows)).toBe(0)
+    expect(brokenLanes(rows)).toEqual([])
+  })
+
+  test('many workspaces on one shared revision stack in a single lane and curve into its line', () => {
+    const heads = Array.from({ length: 10 }, (_, index) => chain(`head${index}-`, 1 + (index % 3), 'fork0'))
+    const rows = layout([
+      ...heads.flat(),
+      ...chain('fork', 3, 'main1'),
+      ...chain('main', 3, undefined, index => ({ bookmarks: index === 0 ? ['main'] : [] })),
+    ])
+    expect(Math.max(...rows.map(row => row.laneCount))).toBe(3)
+    expect(lanesOf(rows, ['head0-0', 'fork0', 'fork1', 'fork2'])).toEqual([1])
+    expect(lanesOf(rows, heads.slice(1).flat().map(row => row.commitId))).toEqual([2])
     expect(crossings(rows)).toBe(0)
     expect(brokenLanes(rows)).toEqual([])
   })

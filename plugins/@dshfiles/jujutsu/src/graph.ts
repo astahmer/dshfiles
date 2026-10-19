@@ -157,13 +157,16 @@ const orderBranches = (input: {
 }) => {
   const owner = new Map<string, Branch>()
   const branches: Branch[] = []
-  const claim = (head: string, recency: number): Branch => {
+  const claim = (head: string, recency: number, throughForks: boolean): Branch => {
     const branch: Branch = { revisions: [], recency, nested: [], parent: undefined, fork: undefined, groupRecency: recency }
     let current: string | undefined = head
     while (current !== undefined && !owner.has(current)) {
       owner.set(current, branch)
       branch.revisions.push(current)
       current = input.firstParent(current)
+      // A side branch stops above a revision several children share, so that revision opens its own line which
+      // every child joins, instead of one child owning it and the others running parallel lanes around it.
+      if (!throughForks && current !== undefined && (input.children.get(current) ?? []).length > 1) break
     }
     branch.fork = current
     branches.push(branch)
@@ -171,7 +174,7 @@ const orderBranches = (input: {
   }
 
   const trunkHead = input.revisions.find(revision => revision.bookmarks.some(name => TRUNK_BOOKMARKS.has(name)))
-  const trunk = trunkHead === undefined ? undefined : claim(trunkHead.commitId, Number.POSITIVE_INFINITY)
+  const trunk = trunkHead === undefined ? undefined : claim(trunkHead.commitId, Number.POSITIVE_INFINITY, true)
   if (trunk !== undefined) trunk.fork = undefined
 
   // `jj log --no-graph` lists the newest revisions first. Walking it backwards lets the older head keep a shared
@@ -182,13 +185,13 @@ const orderBranches = (input: {
     for (const [index, revision] of oldestFirst) {
       if (owner.has(revision.commitId)) continue
       if (!(input.children.get(revision.commitId) ?? []).every(child => owner.has(child))) continue
-      claim(revision.commitId, index)
+      claim(revision.commitId, index, false)
       claimed = true
     }
     if (!claimed) {
       const index = input.revisions.findIndex(revision => !owner.has(revision.commitId))
       const revision = input.revisions[index]
-      if (revision !== undefined) claim(revision.commitId, index)
+      if (revision !== undefined) claim(revision.commitId, index, false)
     }
   }
 
@@ -408,7 +411,16 @@ const layoutRevisionGraph = (
     const run = runs.get(branch)
     if (run !== undefined && branch !== trunk) {
       const parentRun = branch.parent === undefined ? undefined : runs.get(branch.parent)
-      allocate(run, run.minLane >= 0 ? run.minLane : Math.max(sideLaneFloor, (parentRun?.lane ?? -1) + 1))
+      // The branch whose turn opens its parent's line continues that line straight instead of curving into it.
+      const opensParentLine =
+        parentRun !== undefined &&
+        run.end === parentRun.start &&
+        turns.some(turn => turn.from === run && turn.to === parentRun && turn.band === run.end) &&
+        !allocated.some(other => other !== parentRun && other.lane === parentRun.lane && overlaps(other, run))
+      if (opensParentLine) {
+        run.lane = parentRun.lane
+        allocated.push(run)
+      } else allocate(run, run.minLane >= 0 ? run.minLane : Math.max(sideLaneFloor, (parentRun?.lane ?? -1) + 1))
       let color = 1 + (colorIndex % GRAPH_BRANCH_COLORS)
       if (color === parentRun?.color) color = 1 + (color % GRAPH_BRANCH_COLORS)
       run.color = color
