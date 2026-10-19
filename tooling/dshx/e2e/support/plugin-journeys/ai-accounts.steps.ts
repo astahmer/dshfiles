@@ -367,10 +367,13 @@ When('an exhausted Command Code account fails a turn with failover off', async (
   await failover.click()
   await expect(failover).not.toBeChecked()
   await page.keyboard.press('Escape')
-  const newThreadButton = page.getByRole('button', { name: /^(?:New thread|New session)$/i }).first()
-  if (await newThreadButton.isVisible()) await newThreadButton.click()
-  else await page.getByRole('treeitem', { name: 'New Session', exact: true }).click()
-  await expect.poll(() => new URL(page.url()).searchParams.get('thread'), { timeout: 15_000 }).not.toBeNull()
+  const threadSidebarNewThreadButton = page.getByRole('button', { name: 'New thread', exact: true })
+  if (await threadSidebarNewThreadButton.isVisible()) {
+    await threadSidebarNewThreadButton.click()
+    await expect.poll(() => new URL(page.url()).searchParams.get('thread'), { timeout: 15_000 }).not.toBeNull()
+  } else {
+    await page.getByRole('treeitem', { name: 'New Session', exact: true }).click()
+  }
   const composer = page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })
   await composer.waitFor({ state: 'visible', timeout: 15_000 })
   await page.getByRole('button', { name: /^Select model/ }).click()
