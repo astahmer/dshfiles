@@ -175,6 +175,7 @@
       "title": "Keep draft attachments across thread navigation",
       "summary": "While a thread's composer holds draft attachments, keep that thread's session scope retained so leaving the thread and coming back (sidebar Back, another thread) keeps the files and images with the draft text.",
       "reach": [
+        "seed tool-call-thread",
         "click button \"New thread\"",
         "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Attachment draft thread\"",
         "press Enter",

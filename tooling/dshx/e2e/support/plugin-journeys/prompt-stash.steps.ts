@@ -3,7 +3,9 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Then, When } from '../bdd.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
+import { FAKE_COMMAND_CODE_MODEL } from '../../../packages/dshx/src/scratch/fake-command-code.js'
 import { StartupDialogs } from '../../../packages/dshx/src/project/startup-dialogs.js'
+import { selectModelForNewThread } from '../threads.js'
 
 const COMPOSER_LABEL = 'Describe what you want to build, / commands, @ files or sessions'
 
@@ -211,6 +213,11 @@ Then('saving is disabled for an empty draft and sent history is empty', async ({
   })
 })
 
+Then('the empty draft panel is closed', async ({ page }: { page: Page }) => {
+  await page.getByRole('button', { name: 'Saved drafts', exact: true }).click()
+  await expect(page.getByRole('dialog', { name: 'Saved prompt drafts', exact: true })).toBeHidden()
+})
+
 When('the composer text {string} is saved as {string}', async ({ page }: { page: Page }, text: string, title: string) => {
   const composer = composerInput({ page })
   await composer.click()
@@ -229,6 +236,10 @@ Then('saving leaves the current composer text unchanged', async ({ page }: { pag
 
 When('the composer is cleared and the saved draft {string} is restored', async ({ page }: { page: Page }, title: string) => {
   const composer = composerInput({ page })
+  const panel = page.getByRole('dialog', { name: 'Saved prompt drafts', exact: true })
+  await expect(panel).toBeVisible()
+  await page.getByRole('button', { name: 'Saved drafts', exact: true }).click()
+  await expect(panel).toBeHidden()
   await composer.click()
   await composer.press('ControlOrMeta+A')
   await composer.press('Backspace')
@@ -256,6 +267,13 @@ const removeAttachment = ({ page, name }: { page: Page; name: string }) => page.
 
 const startThread = async ({ page, text }: { page: Page; text: string }): Promise<void> => {
   await page.getByRole('button', { name: 'New thread', exact: true }).first().click()
+  const projectButton = page.getByRole('button', { name: 'Choose workspace', exact: true })
+  if ((await projectButton.textContent())?.trim() !== 'Default workspace') {
+    await projectButton.click()
+    await page.getByRole('menuitem', { name: 'Default workspace', exact: true }).click()
+  }
+  await expect(projectButton).toHaveText('Default workspace')
+  await selectModelForNewThread(page, FAKE_COMMAND_CODE_MODEL)
   await composerInput({ page }).fill(text)
   await composerInput({ page }).press('Enter')
   await expect(threadComposer({ page })).toBeVisible()

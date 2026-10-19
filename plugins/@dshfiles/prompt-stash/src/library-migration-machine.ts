@@ -236,7 +236,8 @@ const promptLibraryMigrationMachine = setup({
         'host.snapshot': [
           {
             guard: ({ context, event }) =>
-              event.localStatus === 'ready' && (event.snapshot.revision > context.lastSnapshotRevision || !sameLocalStore(event.localStore, context.lastLocalStore)),
+              event.localStatus === 'ready' &&
+              (event.snapshot.revision > context.lastSnapshotRevision || !sameLocalStore(event.localStore, context.lastLocalStore)),
             target: 'migrating',
             actions: assign(({ context, event }) => requestFromSnapshot({ context, event })),
           },
@@ -256,7 +257,8 @@ const promptLibraryMigrationMachine = setup({
         'host.snapshot': [
           {
             guard: ({ context, event }) =>
-              event.localStatus === 'ready' && (event.snapshot.revision > context.lastSnapshotRevision || !sameLocalStore(event.localStore, context.lastLocalStore)),
+              event.localStatus === 'ready' &&
+              (event.snapshot.revision > context.lastSnapshotRevision || !sameLocalStore(event.localStore, context.lastLocalStore)),
             target: 'migrating',
             actions: assign(({ context, event }) => requestFromSnapshot({ context, event })),
           },

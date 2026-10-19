@@ -54,6 +54,7 @@ Feature: Prompt stash
     Given the isolated plugin profile "@dshfiles/prompt-stash" is booted
     When the empty draft panel is opened
     Then saving is disabled for an empty draft and sent history is empty
+    And the empty draft panel is closed
     When the composer text "Draft body to keep" is saved as "Planning prompt"
     Then saving leaves the current composer text unchanged
     When the composer is cleared and the saved draft "Planning prompt" is restored
@@ -61,8 +62,9 @@ Feature: Prompt stash
 
   @scenario:prompt-stash.draft-attachments-survive-back
   Scenario: Draft attachments survive leaving the thread and coming back
-    Given the isolated plugin composition of "@dshfiles/prompt-stash, @dshfiles/thread-sidebar" is booted
-    When a thread drafts "Draft with attachments" with an image and a file attached
+    Given the isolated plugin composition of "@dshfiles/prompt-stash, @dshfiles/thread-sidebar, @dshfiles/ai-accounts" is booted
+    When a Command Code account backed by a local fake provider is added
+    And a thread drafts "Draft with attachments" with an image and a file attached
     And another thread is opened
     And the sidebar goes back to the drafting thread
     Then the draft still reads "Draft with attachments" with its image and file attached
