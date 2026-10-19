@@ -3,13 +3,24 @@
   "kind": "bundle",
   "features": [
     {
-      "id": "right-column-seat",
-      "title": "Hand the right column to a global dock",
-      "summary": "The frame renders the native per-session right sidebar in its right column, or the global dock a plugin registered into the shell.dock seat and asked for through ctx.rightPanel. Swapping the surface keeps the column, its width, drag handle, collapse and fullscreen behaviour, while the occupant reports its own presentation.",
-      "reach": ["expect button \"New session\""],
-      "surfaces": ["client", "integration"],
+      "id": "panel-seats",
+      "title": "Hand the frame's regions to plugin surfaces",
+      "summary": "The frame renders the native per-session right sidebar in its right column, or the global dock a plugin registered into the shell.dock seat and asked for through ctx.rightPanel, and it renders a full-width bottom row below the columns when a plugin opens it through ctx.frameBottom. Swapping a surface keeps the region, its size, resize handle and collapse behaviour, while each occupant reports its own presentation.",
+      "reach": [
+        "expect button \"New session\""
+      ],
+      "surfaces": [
+        "client",
+        "integration"
+      ],
       "configuration": [],
-      "states": ["native", "dock"],
+      "states": [
+        "native",
+        "dock",
+        "bottom-hidden",
+        "bottom-open",
+        "bottom-resized"
+      ],
       "failureModes": [
         "A frame that offers no seat leaves ctx.rightPanel absent, so a dock plugin stays inert instead of failing.",
         "The column keeps one owner at a time: taking it back restores the native surface."
@@ -29,15 +40,27 @@
         },
         {
           "kind": "unit-test",
-          "id": "frame-layout.right-column-seat-unit-mode",
-          "file": "plugins/@dshfiles/frame-layout/src/right-panel.test.ts",
+          "id": "frame-layout.panel-seats-unit-mode",
+          "file": "plugins/@dshfiles/frame-layout/src/regions.test.ts",
           "testName": "starts on the native surface and follows the reported mode"
         },
         {
           "kind": "unit-test",
-          "id": "frame-layout.right-column-seat-unit-geometry",
-          "file": "plugins/@dshfiles/frame-layout/src/right-panel.test.ts",
+          "id": "frame-layout.panel-seats-unit-geometry",
+          "file": "plugins/@dshfiles/frame-layout/src/regions.test.ts",
           "testName": "keeps the column geometry the occupant reported when the surface changes"
+        },
+        {
+          "kind": "unit-test",
+          "id": "frame-layout.panel-seats-unit-bottom",
+          "file": "plugins/@dshfiles/frame-layout/src/regions.test.ts",
+          "testName": "opens, resizes and reopens the bottom row at the height the user dragged"
+        },
+        {
+          "kind": "unit-test",
+          "id": "frame-layout.panel-seats-unit-bottom-clamp",
+          "file": "plugins/@dshfiles/frame-layout/src/regions.test.ts",
+          "testName": "clamps the bottom row so it can never swallow the frame"
         }
       ]
     },
@@ -45,10 +68,19 @@
       "id": "panel-width-persistence",
       "title": "Persist the frame's dragged panel widths",
       "summary": "The layout bundle keeps the dragged sidebar and right-panel widths in the browser, so a reload reopens the sidebar at its last open width and the right panel keeps its px preference while still booting hidden.",
-      "reach": ["expect button \"New session\""],
-      "surfaces": ["client", "storage"],
+      "reach": [
+        "expect button \"New session\""
+      ],
+      "surfaces": [
+        "client",
+        "storage"
+      ],
       "configuration": [],
-      "states": ["default-width", "dragged", "reloaded"],
+      "states": [
+        "default-width",
+        "dragged",
+        "reloaded"
+      ],
       "failureModes": [
         "Malformed or blocked browser storage falls back to the contract default widths.",
         "A stored width outside the drag range is clamped instead of trusted."
@@ -84,10 +116,20 @@
       "id": "collapsed-state-persistence",
       "title": "Persist the collapsed sidebar",
       "summary": "Closing the left sidebar is remembered: a reload boots it collapsed, and reopening restores the last open width instead of the 280px contract default.",
-      "reach": ["expect button \"New session\""],
-      "surfaces": ["client", "storage"],
+      "reach": [
+        "expect button \"New session\""
+      ],
+      "surfaces": [
+        "client",
+        "storage"
+      ],
       "configuration": [],
-      "states": ["open", "collapsed", "reloaded", "reopened"],
+      "states": [
+        "open",
+        "collapsed",
+        "reloaded",
+        "reopened"
+      ],
       "failureModes": [
         "A narrow frame keeps its own responsive auto-collapse instead of restoring a stored wide-frame override.",
         "A record written before the collapsed flag boots open."

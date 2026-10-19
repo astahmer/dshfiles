@@ -31,7 +31,15 @@
   background: var(--dsw-specific-sidebar-fill);
 }
 
-:global([data-windows-titlebar]) .centerCol {
+:global([data-windows-titlebar]) .bottomRow {
+  grid-column: 1 / -1;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--dsw-alias-bg-base);
+  border-top: 0.5px solid var(--dsw-alias-border-l3);
+}
+
+.centerCol {
   background: var(--dsw-alias-bg-base);
   border-radius: var(--dsh-windows-content-radius) 0 0 0;
   corner-shape: round;
@@ -65,6 +73,14 @@
   overflow: hidden;
   background: var(--dsw-specific-sidebar-fill);
   border-right: 0.5px solid var(--dsw-alias-border-l3);
+}
+
+.bottomRow {
+  grid-column: 1 / -1;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--dsw-alias-bg-base);
+  border-top: 0.5px solid var(--dsw-alias-border-l3);
 }
 
 .centerCol {
@@ -154,7 +170,15 @@
   }
 }
 
-:global([data-platform='darwin']) .centerCol {
+:global([data-platform='darwin']) .bottomRow {
+  grid-column: 1 / -1;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--dsw-alias-bg-base);
+  border-top: 0.5px solid var(--dsw-alias-border-l3);
+}
+
+.centerCol {
   background: var(--dsw-alias-bg-base);
   border-left: 0.5px solid var(--dsw-alias-border-l3);
 }
@@ -170,7 +194,15 @@
 
 /* The darwin closed sidebar has no rail: the centre reaches the window edge,
    where a separator would draw a seam against nothing. */
-:global([data-platform='darwin']) [data-sidebar-collapsed] .centerCol {
+:global([data-platform='darwin']) [data-sidebar-collapsed] .bottomRow {
+  grid-column: 1 / -1;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--dsw-alias-bg-base);
+  border-top: 0.5px solid var(--dsw-alias-border-l3);
+}
+
+.centerCol {
   border-left: none;
 }
 
@@ -234,6 +266,19 @@
   cursor: col-resize;
   z-index: 11;
   touch-action: none;
+}
+
+/* The bottom row's handle rides the row's top edge, which the frame publishes
+   as --dsh-bottom-height while the row is open. */
+.handle[data-side='bottom'] {
+  top: auto;
+  bottom: var(--dsh-bottom-height, 0px);
+  left: 0;
+  right: 0;
+  width: auto;
+  height: 8px;
+  margin: -4px 0 0;
+  cursor: row-resize;
 }
 
 /* Rides the same curve as the tracks so the pill stays on the moving border

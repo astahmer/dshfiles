@@ -6,6 +6,6 @@ export default defineConfig({
   client: { entry: 'src/client-entry.tsx' },
   // The `shell.dock` seat's contract: a dock plugin registers into the frame's
   // right column through this module's SlotMap declaration.
-  modules: { 'right-panel': 'src/right-panel.ts' },
+  modules: { regions: 'src/regions.ts' },
   build: { sourcemap: true, declarations: true, minify: true },
 })

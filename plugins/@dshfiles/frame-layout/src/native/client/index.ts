@@ -13,7 +13,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 import type {} from '@deepseek-ai/dsh-client-ui-theme/client'
 import type { HostObservable, SnapshotSelectorHook } from '@deepseek-ai/dsh-client-ui-slots'
-import type { RightPanelSeat } from '../../right-panel.ts'
+import type { FrameBottomSeat, RightPanelSeat } from '../../regions.ts'
 import type { PanelInfo } from './service.ts'
 import { AppFrame } from './AppFrame.tsx'
 import { createLayoutStore } from './stores.ts'
@@ -172,6 +172,16 @@ export function apply(ctx: ClientContext): void {
       setMode: mode => instance.actions.setMode(mode),
       mode: () => instance.getSnapshot().layoutInfo.rightPanelMode,
     }
+    // The bottom row's seat: a plugin opens the row and the frame sizes it, so
+    // the height survives a reload and one occupant cannot outlive the row.
+    const frameBottom: FrameBottomSeat = {
+      open: height => instance.actions.openBottom(height),
+      close: () => instance.actions.closeBottom(),
+      height: () => {
+        const info = instance.getSnapshot().layoutInfo
+        return info.bottomShown ? (info.bottom ?? 0) : 0
+      },
+    }
     const panelInfo: HostObservable<PanelInfo> = {
       getSnapshot: () => instance.getSnapshot().panelInfo,
       subscribe: listener => instance.subscribe(listener),
@@ -181,6 +191,7 @@ export function apply(ctx: ClientContext): void {
     const disposePanelInfo = ctx.slots.provideRoot({ hooks: { panelInfo: layout.panelInfo } })
     const disposeService = ctx.reflect.provide('layout', layout)
     const disposeRightPanel = ctx.reflect.provide('rightPanel', rightPanel)
+    const disposeFrameBottom = ctx.reflect.provide('frameBottom', frameBottom)
     const disposeRegistration = ctx.slots.register({
       name: 'root',
       locale: 'common',
@@ -189,6 +200,7 @@ export function apply(ctx: ClientContext): void {
         'main': { kind: 'keyed', scope: 'root' },
         'rightbar': { kind: 'single', scope: 'root' },
         'shell.dock': { kind: 'single', scope: 'root' },
+        'shell.bottom': { kind: 'single', scope: 'root' },
         'shell.overlay': { kind: 'list', scope: 'root' },
         'shell.leading': { kind: 'single', scope: 'root' },
       },
@@ -218,6 +230,7 @@ export function apply(ctx: ClientContext): void {
       // provide()'s disposer settles asynchronously; teardown is synchronous fire-and-forget.
       void disposeService()
       void disposeRightPanel()
+      void disposeFrameBottom()
     }
   }, 'ui-layout: service + root registration')
 

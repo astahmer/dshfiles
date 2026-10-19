@@ -3,9 +3,10 @@
  * The registration supplies a fresh store and binds its actions to ctx.layout.
  */
 import { defineStore, type EngineStoreHandle } from '@deepseek-ai/dsh-client-store'
-import type { RightPanelMode } from '../../right-panel.ts'
+import type { RightPanelMode } from '../../regions.ts'
 import type { MainPanelId } from './service.ts'
 import {
+  BOTTOM_DEFAULT, BOTTOM_MAX_RATIO, BOTTOM_MIN,
   clampWidth, RIGHTBAR_DEFAULT_RATIO, RIGHTBAR_MAX_RATIO, RIGHTBAR_MIN,
   SIDEBAR_AUTO_COLLAPSE, SIDEBAR_DEFAULT, SIDEBAR_MAX, SIDEBAR_MIN,
 } from './columns.ts'
@@ -62,6 +63,14 @@ type LayoutInfo = {
    * column keeps one owner at a time.
    */
   rightPanelMode: RightPanelMode
+  /**
+   * Preferred bottom-row height in px, or null before its first opening. The
+   * frame owns this row (local delta; see README "Local delta"), because a full
+   * width row's height belongs to the frame's row solve, not to one occupant.
+   */
+  bottom: number | null
+  /** Whether the bottom row is drawn. Opened and closed through `ctx.frameBottom`. */
+  bottomShown: boolean
 }
 
 /**
@@ -78,6 +87,9 @@ type LayoutActions = {
   openRightbar: (draft: LayoutState, track: boolean, fullscreen: boolean) => void
   closeRightbar: (draft: LayoutState) => void
   setMode: (draft: LayoutState, mode: RightPanelMode) => void
+  setBottom: (draft: LayoutState, px: number) => void
+  openBottom: (draft: LayoutState, px?: number) => void
+  closeBottom: (draft: LayoutState) => void
 }
 /**
  * Create the layout panel store handle. For the sidebar the preference IS the
@@ -103,6 +115,8 @@ export function createLayoutStore(): EngineStoreHandle<LayoutState, LayoutAction
         rightbarFullscreen: false,
         rightbarInstant: false,
         rightPanelMode: 'native',
+        bottom: null,
+        bottomShown: false,
       },
     }),
     actions: {
@@ -161,6 +175,19 @@ export function createLayoutStore(): EngineStoreHandle<LayoutState, LayoutAction
       // over for its global dock, or hands it back to the native surface.
       setMode: (d, mode: RightPanelMode) => {
         d.layoutInfo.rightPanelMode = mode
+      },
+      // The bottom row's height lives here, so reopening restores what the user
+      // dragged instead of the contract default.
+      setBottom: (d, px: number) => {
+        d.layoutInfo.bottom = clampWidth(px, BOTTOM_MIN, Math.max(BOTTOM_MIN, Math.round(window.innerHeight * BOTTOM_MAX_RATIO)))
+      },
+      openBottom: (d, px?: number) => {
+        if (px !== undefined) d.layoutInfo.bottom = clampWidth(px, BOTTOM_MIN, Math.max(BOTTOM_MIN, Math.round(window.innerHeight * BOTTOM_MAX_RATIO)))
+        d.layoutInfo.bottom ??= BOTTOM_DEFAULT
+        d.layoutInfo.bottomShown = true
+      },
+      closeBottom: (d) => {
+        d.layoutInfo.bottomShown = false
       },
     },
   })

@@ -51,6 +51,20 @@ whole delta is:
 `src/native/index.ts` stays upstream's no-op Host body, re-exported by `src/host.ts` because the dshx Host entry lives at
 that path.
 
+### The panel seats
+
+The frame owns the whole geometry and exposes one seat per region to plugins:
+
+- **Right column** — `ctx.rightPanel.setMode('dock' | 'native')` hands the column to the plugin that
+  registered into `shell.dock`, or back to the native per-session right sidebar. Both receive the same
+  resolved geometry (`RightbarOwnerProps`) and report their presentation through `ctx.layout`.
+- **Bottom row** — `ctx.frameBottom.open(height?)` shows the full-width row below the columns and
+  `ctx.frameBottom.close()` hides it; the frame stores and clamps the height (`BOTTOM_MIN` …
+  `BOTTOM_MAX_RATIO` of the window) and publishes it as `--dsh-bottom-height`, so the row's resize
+  handle rides its top edge and a reload reopens it where the user left it. `ctx.frameBottom.height()`
+  reports the rendered height (0 while hidden). The occupant registers into the layout contract's own
+  `shell.bottom` slot and fills the row it is given.
+
 ### The right-column seat
 
 The right column has one owner at a time. A plugin that wants to keep panels on screen across threads registers into the

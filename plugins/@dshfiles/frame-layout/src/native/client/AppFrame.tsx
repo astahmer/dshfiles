@@ -19,7 +19,7 @@ import type { ReactNode } from 'react'
 import type {
   PropsLocale, PropsRenderSlots, PropsRuntime, PropsStore,
 } from '@deepseek-ai/dsh-client-ui-slots'
-import { CENTER_MIN, clampWidth, computeColumns, RIGHTBAR_DEFAULT_RATIO, RIGHTBAR_MAX_RATIO, RIGHTBAR_MIN, SIDEBAR_AUTO_COLLAPSE, SIDEBAR_COLLAPSED, SIDEBAR_DEFAULT } from './columns.ts'
+import { BOTTOM_DEFAULT, BOTTOM_MAX_RATIO, BOTTOM_MIN, CENTER_MIN, clampWidth, computeColumns, RIGHTBAR_DEFAULT_RATIO, RIGHTBAR_MAX_RATIO, RIGHTBAR_MIN, SIDEBAR_AUTO_COLLAPSE, SIDEBAR_COLLAPSED, SIDEBAR_DEFAULT } from './columns.ts'
 import { DocumentTitle } from './DocumentTitle.tsx'
 import type { createLayoutStore } from './stores.ts'
 import css from './AppFrame.module.css'
@@ -27,7 +27,7 @@ import css from './AppFrame.module.css'
 /** Full composed props: runtime share + child-slot render share + store share. */
 export type AppFrameProps =
   & PropsRuntime<'root'>
-  & PropsRenderSlots<'sidebar' | 'main' | 'rightbar' | 'shell.dock' | 'shell.overlay' | 'shell.leading'>
+  & PropsRenderSlots<'sidebar' | 'main' | 'rightbar' | 'shell.dock' | 'shell.bottom' | 'shell.overlay' | 'shell.leading'>
   & PropsStore<ReturnType<typeof createLayoutStore>>
   & PropsLocale<'common'>
 
@@ -55,14 +55,23 @@ function RightbarColumn(props: { children?: ReactNode }) {
  * One drag handle: pointer capture, rAF-throttled dx reports against the drag-start origin.
  * `side` keys the hover-reveal CSS to the owning column.
  */
-function DragHandle(props: { side: 'sidebar' | 'rightbar'; left: number; onStart: () => void; onDrag: (dx: number) => void; onEnd: () => void }) {
+function DragHandle(props: {
+  side: 'sidebar' | 'rightbar' | 'bottom'
+  axis?: 'x' | 'y'
+  left?: number
+  onStart: () => void
+  onDrag: (delta: number) => void
+  onEnd: () => void
+}) {
   const [dragging, setDragging] = useState(false)
   const origin = useRef(0)
   const latest = useRef(0)
   const frame = useRef<number | null>(null)
   const capture = useRef<{ element: HTMLDivElement; id: number } | null>(null)
-  const callbacks = useRef({ onStart: props.onStart, onDrag: props.onDrag, onEnd: props.onEnd })
-  callbacks.current = { onStart: props.onStart, onDrag: props.onDrag, onEnd: props.onEnd }
+  const callbacks = useRef({ onStart: props.onStart, onDrag: props.onDrag, onEnd: props.onEnd, axis: props.axis ?? 'x' })
+  callbacks.current = { onStart: props.onStart, onDrag: props.onDrag, onEnd: props.onEnd, axis: props.axis ?? 'x' }
+  const at = (event: { readonly clientX: number; readonly clientY: number }): number =>
+    callbacks.current.axis === 'y' ? event.clientY : event.clientX
 
   const endDrag = useCallback(() => {
     const active = capture.current
@@ -80,14 +89,14 @@ function DragHandle(props: { side: 'sidebar' | 'rightbar'; left: number; onStart
     e.preventDefault()
     e.currentTarget.setPointerCapture(e.pointerId)
     capture.current = { element: e.currentTarget, id: e.pointerId }
-    origin.current = e.clientX
-    latest.current = e.clientX
+    origin.current = at(e)
+    latest.current = at(e)
     callbacks.current.onStart()
     setDragging(true)
   }, [])
   const onPointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     if (capture.current?.id !== e.pointerId) return
-    latest.current = e.clientX
+    latest.current = at(e)
     frame.current ??= requestAnimationFrame(() => {
       frame.current = null
       callbacks.current.onDrag(latest.current - origin.current)
@@ -95,7 +104,7 @@ function DragHandle(props: { side: 'sidebar' | 'rightbar'; left: number; onStart
   }, [])
   const onPointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     if (capture.current?.id !== e.pointerId) return
-    callbacks.current.onDrag(e.clientX - origin.current)
+    callbacks.current.onDrag(at(e) - origin.current)
     endDrag()
   }, [endDrag])
   const onPointerCancel = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
@@ -105,7 +114,7 @@ function DragHandle(props: { side: 'sidebar' | 'rightbar'; left: number; onStart
   return (
     <div
       className={css.handle}
-      style={{ left: props.left }}
+      style={props.axis === 'y' ? undefined : { left: props.left }}
       data-side={props.side}
       data-dragging={dragging || undefined}
       onPointerDown={onPointerDown}
@@ -227,6 +236,14 @@ export function AppFrame({
     actions.setSidebar(sidebarBase.current + dx)
   }, [actions])
   const onRightbarStart = useCallback(() => { rightbarBase.current = rightbarWidth.current; setDragging(true) }, [])
+  const bottomBase = useRef(0)
+  const onBottomStart = useCallback(() => {
+    bottomBase.current = bottomHeight.current
+    setDragging(true)
+  }, [])
+  const onBottomDrag = useCallback((dy: number) => {
+    actions.setBottom(bottomBase.current - dy)
+  }, [actions])
   const onRightbarDrag = useCallback((dx: number) => {
     actions.setRightbar(rightbarBase.current - dx)
   }, [actions])
@@ -247,6 +264,17 @@ export function AppFrame({
     <MainPanel usePanelInfo={usePanelInfo} renderSlot={renderSlot} />
   ), [usePanelInfo, renderSlot])
   const overlays = useMemo(() => renderSlot('shell.overlay', {}), [renderSlot])
+  // The bottom row: full width below every column. Its height is the frame's,
+  // clamped against the window so a drag can never swallow the conversation.
+  const viewportHeight = typeof window === 'undefined' ? 0 : window.innerHeight
+  const bottomHeight = useRef(0)
+  bottomHeight.current = layoutInfo.bottomShown
+    ? clampWidth(layoutInfo.bottom ?? BOTTOM_DEFAULT, BOTTOM_MIN, Math.max(BOTTOM_MIN, viewportHeight * BOTTOM_MAX_RATIO))
+    : 0
+  const bottomRow = useMemo(
+    () => (layoutInfo.bottomShown ? renderSlot('shell.bottom', {}) : null),
+    [renderSlot, layoutInfo.bottomShown],
+  )
   // One owner at a time: the global dock a plugin registered into `shell.dock`,
   // or the native per-session occupant. Both receive the same resolved geometry
   // and report their own presentation back through ctx.layout.
@@ -271,6 +299,9 @@ export function AppFrame({
           ? { '--dsh-windows-sidebar-width': `${cols.sidebar}px` } : {}),
         gridTemplateColumns:
           `${cols.sidebar}px minmax(${cols.rightbar === 0 ? 0 : CENTER_MIN}px, 1fr) minmax(0px, ${rightbarMax}px)`,
+        ...(bottomHeight.current > 0
+          ? { gridTemplateRows: `minmax(0, 1fr) ${bottomHeight.current}px`, '--dsh-bottom-height': `${bottomHeight.current}px` }
+          : {}),
       }}
       data-sidebar-collapsed={sidebarCollapsed || undefined}
       data-rightbar-collapsed={cols.rightbar === 0 || undefined}
@@ -293,6 +324,11 @@ export function AppFrame({
           {rightColumn}
         </RightbarColumn>
       </>
+      {bottomHeight.current > 0 && (
+        <div className={css.bottomRow} data-shell-bottom>
+          {bottomRow}
+        </div>
+      )}
       <div className={css.overlayLayer} data-shell-overlay>
         {overlays}
       </div>
@@ -305,6 +341,9 @@ export function AppFrame({
       {!sidebarCollapsed && <DragHandle side="sidebar" left={cols.sidebar} onStart={onSidebarStart} onDrag={onSidebarDrag} onEnd={onDragEnd} />}
       {layoutInfo.rightbarShown && !layoutInfo.rightbarFullscreen && normal.rightbar > 0 && (
         <DragHandle side="rightbar" left={viewport - normal.rightbar} onStart={onRightbarStart} onDrag={onRightbarDrag} onEnd={onDragEnd} />
+      )}
+      {bottomHeight.current > 0 && (
+        <DragHandle axis="y" side="bottom" onStart={onBottomStart} onDrag={onBottomDrag} onEnd={onDragEnd} />
       )}
     </div>
   )

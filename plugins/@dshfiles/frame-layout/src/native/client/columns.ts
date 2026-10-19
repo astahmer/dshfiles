@@ -27,6 +27,12 @@ export const RIGHTBAR_MIN = 300
 export const RIGHTBAR_MAX_RATIO = 0.7
 /** First-open right panel preference as a fraction of the frame. */
 export const RIGHTBAR_DEFAULT_RATIO = 0.45
+/** Bottom row drag clamp floor. */
+export const BOTTOM_MIN = 120
+/** Bottom row height before any user drag. */
+export const BOTTOM_DEFAULT = 260
+/** Maximum bottom row height as a fraction of the frame. */
+export const BOTTOM_MAX_RATIO = 0.6
 
 /**
  * Clamp a panel width into its contract range.

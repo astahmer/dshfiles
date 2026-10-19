@@ -16,9 +16,9 @@
   "exports": {
     ".": "./dist/index.js",
     "./client": "./dist/client.js",
-    "./right-panel": {
-      "types": "./src/right-panel.ts",
-      "default": "./dist/right-panel.js"
+    "./regions": {
+      "types": "./src/regions.ts",
+      "default": "./dist/regions.js"
     },
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./package.json": "./package.json"
