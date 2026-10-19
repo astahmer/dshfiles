@@ -6,17 +6,22 @@ import { McpServerStatusModel } from './server-status.js'
 
 const snapshotQueryKey = ['mcp-servers', 'snapshot'] as const
 
+/** 30 s: a quick panel opened again within that reuses the snapshot instead of asking the Host on each thread switch. */
+const QUICK_PANEL_STALE_MS = 30_000
+
 /**
- * Reads through `refresh`, not `list`: refresh reconciles the native clients and
- * restarts an exited local helper, which every open of the manager has always done.
+ * The manager reads through `refresh`, not `list`: refresh reconciles the native clients and restarts an exited local
+ * helper, which every open of the manager has always done. The composer quick panel mounts with every thread, so it
+ * reads the stored snapshot and lets a recent one stand.
  */
-export const useServerSnapshot = () => {
+export const useServerSnapshot = (input: { readonly reconcile: boolean }) => {
   const api = useApi(mcpServersApi)
   return useQuery({
     queryKey: snapshotQueryKey,
-    queryFn: ({ signal }) => api.refresh(undefined, { signal }),
+    queryFn: ({ signal }) => (input.reconcile ? api.refresh(undefined, { signal }) : api.list(undefined, { signal })),
     select: decodeSnapshot,
-    refetchOnMount: 'always',
+    refetchOnMount: input.reconcile ? 'always' : true,
+    staleTime: input.reconcile ? 0 : QUICK_PANEL_STALE_MS,
   })
 }
 

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'vitest'
 import type { RegistryListing } from '@dshfiles/dshx/api'
-import { McpMentionModel } from './mcp-mentions.js'
+import { createMcpMentionSource, McpMentionModel } from './mcp-mentions.js'
 
 const registryListing = (tools: RegistryListing['tools']): RegistryListing => ({ apis: [], tools, skills: [] })
 
@@ -86,4 +86,29 @@ test('ranks @mcp: queries by their text and stays empty under another scope', ()
   assert.equal(McpMentionModel.scopedQuery({ query: 'mcp:figma', ownScope: 'mcp' }), 'figma')
   assert.equal(McpMentionModel.scopedQuery({ query: 'f:src/', ownScope: 'mcp' }), undefined)
   assert.equal(McpMentionModel.scopedQuery({ query: 'skill:review', ownScope: 'mcp' }), undefined)
+})
+
+test('reads the @mcp catalog on the first @ query, not when a composer mounts, and reuses it', async () => {
+  let reads = 0
+  const mentions = createMcpMentionSource({
+    rank: items => items,
+    list: async () => {
+      reads += 1
+      return { servers: [], tools: [] }
+    },
+    serverSection: 'Servers',
+    toolSection: 'Tools',
+    serverInstruction: '',
+    toolInstruction: '',
+    useWhenRelevant: '',
+  })
+  assert.equal('warm' in mentions.source, false)
+  assert.equal(reads, 0)
+
+  // SAFETY: the source reads only `sessionId` from the session and `query`, `quoted`, `signal` from the request.
+  const session = { sessionId: 'session-a' } as unknown as Parameters<typeof mentions.source.candidates>[0]
+  const request = { query: 'mcp:fig', quoted: false, signal: new AbortController().signal } as unknown as Parameters<typeof mentions.source.candidates>[1]
+  await mentions.source.candidates(session, request)
+  await mentions.source.candidates(session, request)
+  assert.equal(reads, 1)
 })

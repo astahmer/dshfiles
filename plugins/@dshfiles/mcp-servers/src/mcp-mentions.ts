@@ -146,6 +146,10 @@ export class McpMentionModel {
   }
 }
 
+/**
+ * The catalog (servers and the dshx tool registry) is read on the first `@` query in a Session, not when a composer
+ * mounts: warming it put two Host reads on every thread switch whether or not the user typed @.
+ */
 export const createMcpMentionSource = (options: MentionSourceOptions) => {
   const catalogs = new Map<ClientSessionContext['sessionId'], MentionCatalogEntry>()
   const fetchCatalog = (sessionId: ClientSessionContext['sessionId']): MentionCatalogEntry => {
@@ -203,9 +207,6 @@ export const createMcpMentionSource = (options: MentionSourceOptions) => {
       } catch {
         return []
       }
-    },
-    warm(session) {
-      fetchCatalog(session.sessionId).promise.catch(() => undefined)
     },
     onPick({ candidate }) {
       return McpMentionModel.pick(candidate)

@@ -32,7 +32,7 @@ interface EditorState {
 }
 
 export const ManagerView = ({ t }: { readonly t: McpServersTranslate }): JSX.Element => {
-  const snapshot = useServerSnapshot()
+  const snapshot = useServerSnapshot({ reconcile: true })
   const actions = useServerActions()
   const [editor, setEditor] = useState<EditorState>({ key: 0, values: McpServerFormModel.blankServerForm(), opened: false })
   const editorRef = useRef<HTMLDivElement>(null)

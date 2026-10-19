@@ -25,7 +25,7 @@ interface QuickPanelEditor {
 export const McpQuickPanel = (props: { readonly t: McpServersTranslate; readonly panel: QuickPanelState; readonly onManage: () => void }): JSX.Element => {
   const t = props.t
   const open = useSyncExternalStore(props.panel.subscribe, props.panel.getSnapshot)
-  const snapshot = useServerSnapshot()
+  const snapshot = useServerSnapshot({ reconcile: false })
   const actions = useServerActions()
   const [browsing, setBrowsing] = useState(false)
   const [editor, setEditor] = useState<QuickPanelEditor | null>(null)
@@ -90,7 +90,7 @@ interface QuickPanelContentProps {
 }
 
 const QuickPanelContent = ({ t, actions, ...props }: QuickPanelContentProps): JSX.Element => {
-  const snapshot = useServerSnapshot()
+  const snapshot = useServerSnapshot({ reconcile: true })
   const sectionRef = useRef<HTMLElement>(null)
   const [search, setSearch] = useState('')
   const onClose = props.onClose
