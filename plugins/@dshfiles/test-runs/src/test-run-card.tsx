@@ -110,9 +110,10 @@ const TestRow = (props: {
   readonly suitePrefix: string | undefined
   readonly actions: TestRunActions | undefined
   readonly openFile: OpenFile
+  readonly openFailures: boolean
 }) => {
   const failing = isFailing(props.test)
-  const [open, setOpen] = useState(failing)
+  const [open, setOpen] = useState(failing && props.openFailures)
   const expandable = props.test.failure !== undefined
   return (
     <li className="dshx:flex dshx:flex-col">
@@ -139,8 +140,14 @@ const TestRow = (props: {
   )
 }
 
-const FileRow = (props: { readonly file: TestFile; readonly filter: Filter; readonly actions: TestRunActions | undefined; readonly openFile: OpenFile }) => {
-  const [open, setOpen] = useState(props.file.status === 'failed')
+const FileRow = (props: {
+  readonly file: TestFile
+  readonly filter: Filter
+  readonly actions: TestRunActions | undefined
+  readonly openFile: OpenFile
+  readonly openFailures: boolean
+}) => {
+  const [open, setOpen] = useState(props.file.status === 'failed' && props.openFailures)
   const tests = props.file.tests.filter(test => matchesFilter(test, props.filter))
   const suitesNamed = tests.every(test => test.suitesKnown)
   const groups = new Map<string, TestCase[]>()
@@ -187,6 +194,7 @@ const FileRow = (props: { readonly file: TestFile; readonly filter: Filter; read
                     actions={props.actions}
                     file={props.file.path}
                     key={`${test.suites.join('>')}>${test.title}`}
+                    openFailures={props.openFailures}
                     openFile={props.openFile}
                     suitePrefix={suitesNamed ? undefined : test.suites.join(' › ')}
                     test={test}
@@ -207,10 +215,15 @@ const FileRow = (props: { readonly file: TestFile; readonly filter: Filter; read
 }
 
 /** Settled Vitest run: progress bar, filters, per-file results and failure detail. */
-export const TestRunCard = (props: { readonly run: TestRun; readonly actions: TestRunActions | undefined; readonly openFile: OpenFile }) => {
+export const TestRunCard = (props: {
+  readonly run: TestRun
+  readonly actions: TestRunActions | undefined
+  readonly openFile: OpenFile
+  readonly openFailures: boolean
+}) => {
   const tally = props.run.testTally
   const failing = tally.failed > 0 || props.run.fileTally.failed > 0
-  const [open, setOpen] = useState(failing)
+  const [open, setOpen] = useState(failing && props.openFailures)
   const [filter, setFilter] = useState<Filter>('all')
   const allTests = props.run.files.flatMap(file => file.tests)
   const counts = {
@@ -262,7 +275,7 @@ export const TestRunCard = (props: { readonly run: TestRun; readonly actions: Te
         </div>
         <ul className="dshx:flex dshx:flex-col">
           {files.map(file => (
-            <FileRow actions={props.actions} file={file} filter={filter} key={file.path} openFile={props.openFile} />
+            <FileRow actions={props.actions} file={file} filter={filter} key={file.path} openFailures={props.openFailures} openFile={props.openFile} />
           ))}
         </ul>
         {props.run.unlistedFiles > 0 && filter === 'all' && (

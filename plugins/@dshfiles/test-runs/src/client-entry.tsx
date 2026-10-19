@@ -1,9 +1,10 @@
 import type {} from '@deepseek-ai/dsh-client-ui-chat/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { ToolCallViewProps } from '@deepseek-ai/dsh-client-ui-tool/client'
-import { defineClientPlugin, type ComposerActionProps } from '@dshfiles/dshx/client'
+import { defineClientPlugin, useSettings, type ComposerActionProps } from '@dshfiles/dshx/client'
 import { createElement, useEffect, useMemo, type ComponentType } from 'react'
 import { z } from 'zod'
+import { testRunsSettings } from './settings.js'
 import { TestRunCard, TestRunPending, type TestRunActions } from './test-run-card.js'
 import { VitestReport } from './vitest-report.js'
 
@@ -56,6 +57,7 @@ export default defineClientPlugin({
       const output = props.phase === 'result' && !props.block.isError && props.block.content.length === 1 ? props.block.content[0] : undefined
       const run = useMemo(() => (output?.type === 'text' ? VitestReport.parse(output.text) : undefined), [output])
       const sessionId = props.sessionId
+      const settings = useSettings(testRunsSettings).value
       const actions = useMemo<TestRunActions | undefined>(
         () => ({
           askToFix: text => {
@@ -65,15 +67,17 @@ export default defineClientPlugin({
         }),
         [sessionId],
       )
-      if (run !== undefined)
+      if (run !== undefined && settings?.enabled !== false)
         return (
           <TestRunCard
-            actions={composers.has(sessionId) ? actions : undefined}
+            actions={settings?.composerActions !== false && composers.has(sessionId) ? actions : undefined}
+            openFailures={settings?.openFailures !== false}
             openFile={(path, options) => props.openFile(run.root === undefined || path.startsWith('/') ? path : `${run.root}/${path}`, options)}
             run={run}
           />
         )
-      if (props.phase === 'start' && command !== undefined && TEST_COMMAND.test(command)) return <TestRunPending command={command} />
+      if (props.phase === 'start' && settings?.enabled !== false && settings?.runningCard !== false && command !== undefined && TEST_COMMAND.test(command))
+        return <TestRunPending command={command} />
       const Native = nativeBashView()
       return Native === undefined ? null : createElement(Native, props)
     }

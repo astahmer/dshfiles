@@ -7,9 +7,38 @@
       "title": "Vitest runs as a test-results card",
       "summary": "A bash call whose output carries a Vitest summary renders as a test-results card instead of a terminal block: a pass/fail/skip bar, All/Failed/Skipped/Slow filters, one row per test file, and for each failing test its assertion diff, source location, code frame, Ask to fix, Rerun and Copy. While a Vitest command runs the card shows a running state; any other command keeps the native bash card.",
       "reach": ["seed tool-call-thread", "expect text \"Tool finished.\""],
-      "surfaces": ["client"],
-      "configuration": [],
-      "states": ["running", "passed", "failed", "timed-out", "not-vitest"],
+      "surfaces": ["client", "settings"],
+      "configuration": [
+        {
+          "key": "enabled",
+          "defaultValue": "true",
+          "constraints": "Boolean; show a Vitest run as a test-results card instead of the terminal output.",
+          "choices": ["true", "false"],
+          "coveredBy": ["test-runs.parse-other"]
+        },
+        {
+          "key": "runningCard",
+          "defaultValue": "true",
+          "constraints": "Boolean; show a running test card while a Vitest command runs.",
+          "choices": ["true", "false"],
+          "coveredBy": ["test-runs.parse-other"]
+        },
+        {
+          "key": "composerActions",
+          "defaultValue": "true",
+          "constraints": "Boolean; offer Ask to fix and Rerun on failing tests.",
+          "choices": ["true", "false"],
+          "coveredBy": ["test-runs.parse-default"]
+        },
+        {
+          "key": "openFailures",
+          "defaultValue": "true",
+          "constraints": "Boolean; open the card and its failing files and tests when the run settles.",
+          "choices": ["true", "false"],
+          "coveredBy": ["test-runs.parse-default"]
+        }
+      ],
+      "states": ["running", "passed", "failed", "timed-out", "not-vitest", "disabled"],
       "failureModes": [
         "The Host streams no shell output while a call runs, so the running state cannot count finished tests.",
         "Vitest's default reporter prints only files with failures; passing files show as a count and their tests stay hidden unless the run used --reporter=verbose.",

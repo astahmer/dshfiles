@@ -13,6 +13,17 @@ Built with dshx (no port). The design follows the "agent test runs" block from h
 
 Run `pnpm build`, `pnpm test` and `pnpm typecheck` from this package.
 
+## Settings (`dshfiles-test-runs`)
+
+All apply live.
+
+| Key               | Default | Meaning                                                                                 |
+| ----------------- | ------- | --------------------------------------------------------------------------------------- |
+| `enabled`         | `true`  | Show a Vitest run as a test-results card; off keeps the native bash card for every run. |
+| `runningCard`     | `true`  | While a Vitest command runs, show the running test card instead of the bash row.        |
+| `composerActions` | `true`  | Offer Ask to fix and Rerun on failing tests.                                            |
+| `openFailures`    | `true`  | Open the card, its failing files and their failing tests as soon as the run settles.    |
+
 ## How it takes over the bash card
 
 `tool.call.toolview` is keyed per tool. This plugin registers `key: 'bash'` at priority `-10`, below the native view's default `0`, so its entry renders. When the call is not a Vitest run it reads the native entry back from the slot ledger (`ctx.slots.entries('tool.call.toolview')`, any registrant but this one, lowest priority first) and renders it with the same props, so other commands look exactly as before. `tool-meta`'s timing line still frames the card, since it wraps the dispatch rather than a view.
