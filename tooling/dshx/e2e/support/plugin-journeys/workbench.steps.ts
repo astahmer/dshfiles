@@ -149,9 +149,12 @@ Then('the Editor tab shows the editor again', async ({ page }: { page: Page }) =
 const setRightPanel = async (page: Page, label: string): Promise<void> => {
   await globalPanel(page, 'Plugins').click()
   // The panel opens on whatever page was last shown: the plugin list, or this
-  // plugin's settings page already.
+  // plugin's settings page already. The list virtualizes, so give the row a
+  // chance to exist before deciding it is already open.
   const view = page.getByRole('button', { name: 'View @dshfiles/workbench', exact: true })
+  await view.first().waitFor({ state: 'visible', timeout: 15_000 }).catch(() => undefined)
   if ((await view.count()) > 0) await view.click()
+  await page.getByRole('combobox', { name: 'Right panel', exact: true }).waitFor({ state: 'visible', timeout: 15_000 })
   await page.getByRole('combobox', { name: 'Right panel', exact: true }).selectOption({ label })
   await page.getByRole('button', { name: 'Save', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled()
@@ -227,6 +230,7 @@ When('the Jujutsu panel is moved to the bottom panel', async ({ page }: { page: 
   await dockRegion(page).getByRole('button', { name: 'Move', exact: true }).click()
   await page.getByRole('menuitem', { name: 'Move to the bottom panel', exact: true }).click()
 })
+
 
 Then('the bottom panel shows the Jujutsu panel and the dock no longer does', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'workbench-panel-moves-into-the-bottom-panel', async () => {
