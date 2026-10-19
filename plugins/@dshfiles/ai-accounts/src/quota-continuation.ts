@@ -182,8 +182,8 @@ const createQuotaContinuationService = ({
       const ids = new Set(matches.map(task => task.id))
       if (record.scheduleId !== null) ids.add(scheduleIdFor(record.scheduleId))
       await Promise.all([...ids].map(id => scheduler.delete({ sessionId: SessionId(record.sessionId), id })))
-    } catch {
-      context.logger.warn('ai-accounts: could not remove a stale quota recovery schedule')
+    } catch (error) {
+      context.logger.warn(`ai-accounts: could not remove a stale quota recovery schedule: ${String(error)}`)
     }
   }
 
@@ -198,7 +198,10 @@ const createQuotaContinuationService = ({
       return
     }
     const scheduler = schedule()
-    if (scheduler === undefined) return
+    if (scheduler === undefined) {
+      context.logger.warn('ai-accounts: automatic quota recovery has no Schedule service to queue on')
+      return
+    }
     try {
       const matches = await scheduleMatches(record)
       const existing = matches[0]
@@ -220,8 +223,8 @@ const createQuotaContinuationService = ({
       await storage.update(record.continuationId, current => (current.state === 'waiting' ? { ...current, scheduleId: created.id } : current))
       const current = storage.get(record.continuationId)
       if (current?.state !== 'waiting') await scheduler.delete({ sessionId: SessionId(record.sessionId), id: created.id })
-    } catch {
-      context.logger.warn('ai-accounts: automatic quota recovery could not be scheduled')
+    } catch (error) {
+      context.logger.warn(`ai-accounts: automatic quota recovery could not be scheduled: ${String(error)}`)
     }
   }
 
@@ -416,8 +419,8 @@ const createQuotaContinuationService = ({
           isActive(current) ? { ...current, state: 'completed', scheduleId: null, queueSource: null } : current,
         )
         kept.push(message)
-      } catch {
-        context.logger.warn('ai-accounts: quota recovery failed closed before a Session step')
+      } catch (error) {
+        context.logger.warn(`ai-accounts: quota recovery failed closed before a Session step: ${String(error)}`)
         continue
       }
     }
@@ -440,8 +443,8 @@ const createQuotaContinuationService = ({
     try {
       if (source === 'clear' || source === 'compact') await stopSession(agent.id)
       else await reconcileAgent(agent)
-    } catch {
-      context.logger.warn('ai-accounts: quota recovery could not reconcile a restored Session')
+    } catch (error) {
+      context.logger.warn(`ai-accounts: quota recovery could not reconcile a restored Session: ${String(error)}`)
     }
   }
 
@@ -485,8 +488,8 @@ const createQuotaContinuationService = ({
         await storage.put(continuationId, record)
         if (record.state === 'waiting') await ensureScheduled(record)
       })
-    } catch {
-      context.logger.warn('ai-accounts: could not persist quota recovery')
+    } catch (error) {
+      context.logger.warn(`ai-accounts: could not persist quota recovery: ${String(error)}`)
     }
   }
 
