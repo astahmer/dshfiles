@@ -13,11 +13,13 @@ import {
 } from '@dshfiles/plugin-ui/components/ui/alert-dialog'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { ExternalLinkIcon, FileQuestionIcon, FolderOpenIcon, FolderTreeIcon, RefreshCwIcon, SaveIcon, XIcon } from '@dshfiles/plugin-ui/icons'
+import { useMachine } from '@dshfiles/plugin-ui/machine'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { CodeEditorEngine, CodeEditorHandle } from './code-editor.js'
 import type { EditorStore, OpenDocument } from './editor-store.js'
+import { editorEngineLoaderMachine } from './editor-engine-machine.js'
 import { FileTree } from './file-tree.js'
 import { useEditorSaveMachine } from './use-editor-save-machine.js'
 
@@ -120,9 +122,9 @@ export const EditorPanel = (props: EditorPanelProps): JSX.Element => {
   const active = sessionDocuments.find(document => document.id === activeId)
   const [showTree, setShowTree] = useState(true)
   const [discardDocument, setDiscardDocument] = useState<OpenDocument | null>(null)
-  const [engineStatus, setEngineStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
   const containerRef = useRef<HTMLDivElement>(null)
   const handleRef = useRef<CodeEditorHandle | null>(null)
+  const engineLoadStartedAt = useRef<number | undefined>(undefined)
   const appliedText = useRef(new Map<string, string>())
   const revealed = useRef(new Map<string, number>())
   const requestSaveRef = useRef<() => void>(() => undefined)
@@ -134,6 +136,10 @@ export const EditorPanel = (props: EditorPanelProps): JSX.Element => {
     [props.store],
   )
   const { snapshot: saveSnapshot, send: sendSave } = useEditorSaveMachine(onSaved)
+  const [engineSnapshot, sendEngine] = useMachine(editorEngineLoaderMachine, { input: { loadEngine: props.loadEngine } })
+  const engineNeedsLoad = engineSnapshot.matches('idle')
+  const engine = engineSnapshot.matches('ready') ? engineSnapshot.context.engine : null
+  const engineError = engineSnapshot.matches('error')
 
   useEffect(() => {
     sendSave({ type: 'document.changed', documentId: active?.id ?? null })
@@ -169,34 +175,40 @@ export const EditorPanel = (props: EditorPanelProps): JSX.Element => {
   const editable = active?.status === 'ready' && active.content.kind === 'text'
   const savePending = saveSnapshot.matches('writing')
   useEffect(() => {
-    if (!editable || engineStatus !== 'idle') return
-    setEngineStatus('loading')
-    const started = performance.now()
-    props.loadEngine().then(
-      engine => {
-        const container = containerRef.current
-        if (container === null) return
-        handleRef.current = engine.create(container, {
-          dark: isDarkTheme(),
-          onDirtyChange: (documentId, dirty) => props.store.setDirty(documentId, dirty),
-          onSave: () => requestSaveRef.current(),
-        })
-        container.dataset.firstOpenMs = String(Math.round(performance.now() - started))
-        setEngineStatus('ready')
-      },
-      () => setEngineStatus('error'),
-    )
-  }, [editable, engineStatus, props])
+    if (!editable) {
+      engineLoadStartedAt.current = undefined
+      sendEngine({ type: 'deactivate' })
+      return
+    }
+    if (engineNeedsLoad) engineLoadStartedAt.current = performance.now()
+    sendEngine({ type: 'activate' })
+  }, [editable, engineNeedsLoad, sendEngine])
 
-  useEffect(
-    () => () => {
-      handleRef.current?.dispose()
-      handleRef.current = null
-    },
-    [],
-  )
+  useEffect(() => {
+    if (engine === null) return
+    const container = containerRef.current
+    if (container === null) return
+    try {
+      const handle = engine.create(container, {
+        dark: isDarkTheme(),
+        onDirtyChange: (documentId, dirty) => props.store.setDirty(documentId, dirty),
+        onSave: () => requestSaveRef.current(),
+      })
+      handleRef.current = handle
+      const started = engineLoadStartedAt.current
+      if (started !== undefined) container.dataset.firstOpenMs = String(Math.round(performance.now() - started))
+      engineLoadStartedAt.current = undefined
+      return () => {
+        handle.dispose()
+        if (handleRef.current === handle) handleRef.current = null
+      }
+    } catch {
+      engineLoadStartedAt.current = undefined
+      sendEngine({ type: 'create.failed' })
+    }
+  }, [engine, props.store, sendEngine])
 
-  useEffect(() => handleRef.current?.setDark(dark), [dark, engineStatus])
+  useEffect(() => handleRef.current?.setDark(dark), [dark, engine])
 
   useEffect(() => {
     const handle = handleRef.current
@@ -217,7 +229,7 @@ export const EditorPanel = (props: EditorPanelProps): JSX.Element => {
       revealed.current.set(active.id, active.reveal.request)
       handle.reveal(active.id, active.reveal.line)
     }
-  }, [state.documents, active, engineStatus])
+  }, [state.documents, active, engine])
 
   if (props.sessionId === undefined) {
     return <p className="dshx-root dshx:p-3 dshx:text-xs dshx:text-muted-foreground">Open a session to browse and edit its files.</p>
@@ -339,7 +351,7 @@ export const EditorPanel = (props: EditorPanelProps): JSX.Element => {
         {active === undefined && <p className="dshx:p-3 dshx:text-xs dshx:text-muted-foreground">Pick a file in the tree, or open one from another panel.</p>}
         {active?.status === 'loading' && <p className="dshx:p-3 dshx:text-xs dshx:text-muted-foreground">Loading {active.name}…</p>}
         {active?.status === 'error' && <p className="dshx:p-3 dshx:text-xs dshx:text-destructive">{active.error}</p>}
-        {engineStatus === 'error' && <p className="dshx:p-3 dshx:text-xs dshx:text-destructive">The editor could not start.</p>}
+        {engineError && <p className="dshx:p-3 dshx:text-xs dshx:text-destructive">The editor could not start.</p>}
       </div>
       <div className="dshx:flex dshx:h-6 dshx:flex-none dshx:items-center dshx:gap-2 dshx:border-t dshx:px-2 dshx:text-[11px] dshx:text-muted-foreground">
         <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate" title={active?.path}>
