@@ -2192,7 +2192,7 @@ const InlineDropPreview = (props: InlineDropPreviewProps): JSX.Element => (
         Cancel
       </Button>
       <Button disabled={props.preview === undefined || props.busy} onClick={props.onConfirm} size="sm" type="button">
-        Confirm and run
+        {props.presentation.kind === 'rebase' ? 'Rebase revision' : 'Move bookmark'}
       </Button>
     </div>
   </section>

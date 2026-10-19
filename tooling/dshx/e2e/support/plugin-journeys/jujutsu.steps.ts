@@ -184,7 +184,7 @@ Then('revision and bookmark moves preview in the target context without changing
     await expect(branchPreview).toContainText(fixture.targetDescription)
     await expect(branchPreview).toContainText('Jujutsu will rebase this revision and its descendants.')
     await expect(branchPreview.locator('pre')).toBeVisible()
-    await expect(branchPreview.getByRole('button', { name: 'Confirm and run', exact: true })).toBeEnabled()
+    await expect(branchPreview.getByRole('button', { name: 'Rebase revision', exact: true })).toBeEnabled()
   })
   const revisionSearch = page.getByRole('textbox', { name: 'Search revisions', exact: true })
   if (!(await revisionSearch.isVisible())) await page.getByRole('button', { name: 'Show search', exact: true }).click()
