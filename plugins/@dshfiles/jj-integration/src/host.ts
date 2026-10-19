@@ -8,6 +8,7 @@ import type { SessionRequestId } from '@deepseek-ai/dsh-api-session-controller'
 import type {} from '@deepseek-ai/dsh-subprocess'
 import type {} from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-working-directory'
+import type {} from '@deepseek-ai/dsh-session/types'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import { WorkspaceId, type Workspace } from '@deepseek-ai/dsh-workspace'
 import { isApiOwnerMissing, PluginApiError, type ApiCaller } from '@dshfiles/dshx/api'
@@ -21,6 +22,7 @@ import { JsonText } from './json-text.js'
 import { isolatesNewThreadsByDefault, jjIntegrationSettings, mayAutoIntegrateWorkspace, type JjIntegrationSettings } from './settings.js'
 import { ThreadRebaseEligibilityModel, type ThreadSessionActivity } from './thread-rebase-eligibility.js'
 import { createSessionActivityCache } from './session-activity-cache.js'
+import { createDeferredIntegrations } from './deferred-integrations.js'
 import { ThreadIntegrationModel } from './thread-integration-state.js'
 import { workspaceHasOtherSession } from './thread-session-ownership.js'
 import { registeredProjects } from './registered-projects.js'
@@ -246,8 +248,10 @@ const threadView = (
   }
   const withWorkspaceTitle: ThreadView = workspace === undefined ? view : { ...view, workspaceTitle: workspace.title }
   const withEligibility: ThreadView = canRebase === undefined ? withWorkspaceTitle : { ...withWorkspaceTitle, canRebase }
-  if (status.rebasedAt === undefined) return withEligibility
-  const viewWithRebaseTimestamp = { ...withEligibility, rebasedAt: status.rebasedAt }
+  const integrationQueuedAt = deferredIntegrations.get(status.path)?.queuedAt
+  const withQueue: ThreadView = integrationQueuedAt === undefined ? withEligibility : { ...withEligibility, integrationQueuedAt }
+  if (status.rebasedAt === undefined) return withQueue
+  const viewWithRebaseTimestamp = { ...withQueue, rebasedAt: status.rebasedAt }
   if (status.rebasedTipChangeId === undefined) return viewWithRebaseTimestamp
   return { ...viewWithRebaseTimestamp, rebasedTipChangeId: status.rebasedTipChangeId }
 }
@@ -552,6 +556,8 @@ const landThread = async (input: {
   readonly sessionId: string | undefined
   readonly fromAgent: boolean
   readonly signal?: AbortSignal
+  /** A queued integration's last chance to be cancelled: read once the guard passed, right before the rebase. */
+  readonly stillQueued?: () => boolean
 }): Promise<LandResult> => {
   recordIntegrationProgress(input.path, 'queued')
   const bookmark = readSettings().bookmark
@@ -577,6 +583,7 @@ const landThread = async (input: {
         code: 'thread-active',
       })
     }
+    if (input.stillQueued?.() === false) throw new PluginApiError('The queued integration was cancelled.', { code: 'integration-cancelled' })
   }
   const threadName = location.threadName
   if (threadName === undefined) throw new PluginApiError('This workspace is not a thread.', { code: 'not-a-thread' })
@@ -620,6 +627,67 @@ const landThread = async (input: {
     correlationId,
   })
   return { ...result, agentAsked }
+}
+
+const isWaitingForIdleThread = (error: unknown): boolean =>
+  error instanceof PluginApiError && (error.code === 'thread-active' || error.code === 'thread-activity-unknown')
+
+const deferredIntegrations = createDeferredIntegrations({
+  land: ({ entry, stillQueued }) => landThread({ path: entry.path, sessionId: entry.sessionId, fromAgent: false, stillQueued }),
+  isWaitingError: isWaitingForIdleThread,
+  onSettled: (entry, settlement) => {
+    invalidateRepositories()
+    if (settlement.kind === 'result') return
+    emitActivity({
+      type: 'workspace.queued_integration_failed',
+      level: 'attention',
+      summary: `Queued integration of ${basename(entry.path)} stopped before rebasing`,
+      detail: settlement.error instanceof Error ? settlement.error.message : undefined,
+      path: entry.path,
+      sessionId: entry.sessionId,
+    })
+  },
+})
+
+/** Session events arrive in bursts while a turn streams; a queued integration retries once its thread went quiet. */
+const DEFERRED_INTEGRATION_SETTLE_MS = 1_500
+/** Catches idleness no Session event announced, e.g. a question dismissed from another client. */
+const DEFERRED_INTEGRATION_FALLBACK_MS = 30_000
+let deferredIntegrationWake: ReturnType<typeof setTimeout> | undefined
+
+const wakeDeferredIntegrations = (delayMs: number): void => {
+  if (deferredIntegrationWake !== undefined) clearTimeout(deferredIntegrationWake)
+  deferredIntegrationWake = setTimeout(() => {
+    deferredIntegrationWake = undefined
+    void deferredIntegrations.drain().catch(error => hostContext?.logger.warn('jj-integration: queued integration failed: %o', error))
+  }, delayMs)
+  deferredIntegrationWake.unref()
+}
+
+const queueIntegration = async (input: { readonly path: string; readonly sessionId: string | undefined }): Promise<{ readonly queuedAt: number }> => {
+  const location = await cachedLocation(requireThreads(), input.path)
+  if (location?.threadName === undefined) throw new PluginApiError('This workspace is not a thread.', { code: 'not-a-thread' })
+  const entry = deferredIntegrations.queue({ path: location.workspaceRoot, sessionId: input.sessionId })
+  // Queueing changes no jj state, only what the assembled repository views report.
+  repositoryViews = undefined
+  emitActivity({
+    type: 'workspace.integration_queued',
+    level: 'routine',
+    summary: `Queued integration of ${basename(entry.path)} until the thread is idle`,
+    path: entry.path,
+    sessionId: entry.sessionId,
+  })
+  wakeDeferredIntegrations(0)
+  return { queuedAt: entry.queuedAt }
+}
+
+const cancelQueuedIntegration = (path: string) => {
+  const status = deferredIntegrations.cancel(path)
+  if (status === 'cancelled') {
+    repositoryViews = undefined
+    emitActivity({ type: 'workspace.integration_unqueued', level: 'routine', summary: `Cancelled the queued integration of ${basename(path)}`, path })
+  }
+  return { status }
 }
 
 const discardThread = async (input: { readonly path: string; readonly force: boolean }) => {
@@ -821,6 +889,8 @@ const api = jjIntegrationApi.host({
   },
   revisionGraph: async ({ input }) => ({ graph: await requireThreads().revisionGraph(input.path) }),
   land: ({ input }) => landThread({ path: input.path, sessionId: input.sessionId, fromAgent: false }),
+  queueLand: ({ input }) => queueIntegration({ path: input.path, sessionId: input.sessionId }),
+  cancelQueuedLand: ({ input }) => cancelQueuedIntegration(input.path),
   integrationProgress: ({ input }) => ({ progress: readIntegrationProgress(input.path) }),
   threadStatus: async ({ input, caller }) => {
     const location = await requireThreads().locate(threadPath(input, caller))
@@ -1127,6 +1197,17 @@ const setupHost = (context: Context): Effect<void> => {
     },
     { prepend: true },
   )
+  context.on('session/event', session => {
+    const queued = deferredIntegrations.paths()
+    if (queued.length === 0) return
+    const touchesQueuedThread = [...registryOf().list()].some(workspace => queued.includes(workspace.path) && workspace.sessionIds.includes(session.id))
+    if (touchesQueuedThread || queued.some(path => isolatedSessionIdsAt(path).includes(String(session.id))))
+      wakeDeferredIntegrations(DEFERRED_INTEGRATION_SETTLE_MS)
+  })
+  const deferredFallback = setInterval(() => {
+    if (deferredIntegrations.paths().length > 0) wakeDeferredIntegrations(0)
+  }, DEFERRED_INTEGRATION_FALLBACK_MS)
+  deferredFallback.unref()
   const sweep = (): void => {
     void sweepFinishedThreads().catch(error => context.logger.warn('jj-integration: thread sweep failed: %o', error))
   }
@@ -1139,9 +1220,12 @@ const setupHost = (context: Context): Effect<void> => {
       yield async () => {
         clearTimeout(firstSweep)
         clearInterval(timer)
+        clearInterval(deferredFallback)
+        if (deferredIntegrationWake !== undefined) clearTimeout(deferredIntegrationWake)
         if (hostContext === context) {
           hostContext = undefined
           threads = undefined
+          deferredIntegrations.clear()
           locationCache.clear()
           invalidateRepositories()
         }

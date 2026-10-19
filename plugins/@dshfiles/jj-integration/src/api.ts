@@ -20,6 +20,8 @@ const threadSchema = z
     behindCount: z.number().int().nonnegative().optional(),
     rebasedAt: z.number().int().nonnegative().optional(),
     rebasedTipChangeId: z.string().min(1).max(128).optional(),
+    /** When the user queued an integration that waits for the thread to go idle; absent when none is queued. */
+    integrationQueuedAt: z.number().int().nonnegative().optional(),
     unlanded: z.array(revisionSchema),
   })
   .strict()
@@ -197,6 +199,17 @@ export const jjIntegrationApi = defineApi({
       output: landResultSchema,
       description:
         'Rebase the thread at a path: move its described revisions onto the target bookmark and advance the bookmark. Never pushes. Refuses while any thread session is running or waiting for input; the calling agent may rebase its own thread once it resolved a handed-back problem.',
+    }),
+    queueLand: method({
+      input: z.object({ path: z.string().min(1), sessionId: z.string().optional() }).strict(),
+      output: z.object({ queuedAt: z.number().int().nonnegative() }).strict(),
+      description:
+        'Queue an integration of the thread at a path that runs as soon as every thread Session is idle and no question waits. The rebase itself keeps every guard of `land`; cancelQueuedLand undoes the request until it starts.',
+    }),
+    cancelQueuedLand: method({
+      input: z.object({ path: z.string().min(1) }).strict(),
+      output: z.object({ status: z.enum(['cancelled', 'not-queued', 'integrating']) }).strict(),
+      description: 'Cancel a queued integration. Refused with `integrating` once its rebase has started.',
     }),
     integrationProgress: method({
       input: z.object({ path: z.string().min(1) }).strict(),
