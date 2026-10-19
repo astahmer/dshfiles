@@ -2,7 +2,7 @@ import { expect, type Page } from '@playwright/test'
 import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { After, Before, Given, Then, readBootOutcome } from './bdd.js'
-import { bootComposedPluginProfile, bootPluginProfile, bootProfile, type BootedProfile } from './boot.js'
+import { bootComposedPluginProfile, bootPluginProfile, bootProfile, traceBootPhase, type BootedProfile } from './boot.js'
 import { redactHostOutput } from './scratch-profile.js'
 import { ClientBootCheckModel } from '../../packages/dshx/src/project/client-boot-check.js'
 import { StartupDialogs } from '../../packages/dshx/src/project/startup-dialogs.js'
@@ -193,7 +193,9 @@ const visitScratchProfile = async (page: Page, profile: BootedProfile, url = pro
   if (allowedOrigins === undefined) throw new Error('the browser network boundary was not initialized')
   allowedOrigins.add(browserOriginKey(new URL(url)))
   try {
+    const loadStartedAt = Date.now()
     await page.goto(url, { waitUntil: 'domcontentloaded' })
+    traceBootPhase('page-load', loadStartedAt, profile.profile)
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     throw new Error(`Could not open the ${profile.profile} scratch profile: ${message.replaceAll(PRIVATE_URL, '<private-url>')}`)
@@ -215,6 +217,7 @@ export const restartScratchProfileInBrowser = async (page: Page): Promise<string
 
 export const visitIsolatedPluginProfile = async (page: Page, profile: BootedProfile): Promise<void> => {
   profiles.set(page, profile)
+  const readyStartedAt = Date.now()
   try {
     await visitScratchProfile(page, profile)
     const previewNotice = page.getByRole('dialog', { name: 'Preview Notice', exact: true })
@@ -222,6 +225,7 @@ export const visitIsolatedPluginProfile = async (page: Page, profile: BootedProf
     await previewNotice.getByRole('button', { name: 'Continue', exact: true }).click()
     await expect(previewNotice).toBeHidden()
     await StartupDialogs.dismissProviderSetupDuringStartup(page)
+    traceBootPhase('profile-interactive', readyStartedAt, profile.profile)
     completeEvidenceStep(evidenceRunFor(page), 'profile-booted')
     await capturePageEvidenceFrame(evidenceRunFor(page), page, 'profile-booted')
   } catch (error) {

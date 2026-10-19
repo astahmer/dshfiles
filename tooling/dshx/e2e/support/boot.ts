@@ -1,4 +1,6 @@
 import { type ChildProcess } from 'node:child_process'
+import { createHash } from 'node:crypto'
+import { readFile } from 'node:fs/promises'
 import { delimiter, join } from 'node:path'
 import { prepareComposedBootProfile, type PreparedBootProfile } from '../../packages/dshx/src/project/boot-profile.js'
 import { DSHFILES_ROOT, buildPlugin, findFreePort, LocalBundleModel } from '../../packages/dshx/src/project/local-bundles.js'
@@ -12,6 +14,46 @@ import { createScratchHostLifecycle, type ScratchHostInstance } from './scratch-
 // Turbo result) depends only on the repository.
 const sourceProfileRoot = join(DSHFILES_ROOT, 'profiles/web')
 const URL_PATTERN = /http:\/\/127\.0\.0\.1:\d+\/\S*/
+
+/**
+ * Phase timings for one scratch boot, printed when `DSHX_E2E_BOOT_TRACE=1`. A journey's dominant cost is its boot, so
+ * the phases are measured rather than assumed: preparation, the composition dump, the Host's own startup, the page
+ * load and the client-ready wait.
+ */
+export const traceBootPhase = (phase: string, startedAt: number, detail = ''): void => {
+  if (process.env.DSHX_E2E_BOOT_TRACE !== '1') return
+  process.stderr.write(`[boot-trace] ${phase} ${String(Date.now() - startedAt)}ms${detail === '' ? '' : ` ${detail}`}\n`)
+}
+
+/**
+ * Compositions already proven to load their bundles in this worker. A worker runs many scenarios of one composition
+ * (23 of them in thread-sidebar.feature) and the composition is a property of the profile files, not of the scratch
+ * home: re-dumping it per scenario spent 0.45-0.83s and a whole `dsh` process to prove the same thing again.
+ */
+const compositionValidations = new Map<string, Promise<void>>()
+
+const compositionKeyFor = async (prepared: PreparedBootProfile): Promise<string> => {
+  const hash = createHash('sha256')
+  for (const name of ['package.json', 'cordis.patch.yml', 'pnpm-workspace.yaml']) {
+    hash.update(`${name}\0`)
+    hash.update(await readFile(join(prepared.profileRoot, name)).catch(() => Buffer.from('<absent>')))
+  }
+  hash.update(`\0${[...prepared.expectedBundles].sort().join(',')}`)
+  return hash.digest('hex')
+}
+
+const validateComposition = async (prepared: PreparedBootProfile, timeoutMs: number): Promise<void> => {
+  const dump = await readProfileComposition({
+    projectRoot: DSHFILES_ROOT,
+    profile: prepared.profile,
+    profileRoot: prepared.profileRoot,
+    dshHome: prepared.homeRoot,
+    executable: 'dsh',
+    timeoutMs,
+  })
+  const missingBundles = compositionFailures(dump, prepared.expectedBundles)
+  if (missingBundles.length > 0) throw new Error(`The scratch profile did not compose expected bundles: ${missingBundles.join(', ')}.`)
+}
 
 export interface BootedProfile {
   /** Tokenized URL held only for navigation inside the browser test. */
@@ -67,16 +109,17 @@ export const startScratchProfile = async (
   timeoutMs: number,
   pathPrefix?: string,
 ): Promise<BootedProfile> => {
-  const dump = await readProfileComposition({
-    projectRoot: DSHFILES_ROOT,
-    profile: prepared.profile,
-    profileRoot: prepared.profileRoot,
-    dshHome: prepared.homeRoot,
-    executable: 'dsh',
-    timeoutMs,
-  })
-  const missingBundles = compositionFailures(dump, prepared.expectedBundles)
-  if (missingBundles.length > 0) throw new Error(`The scratch profile did not compose expected bundles: ${missingBundles.join(', ')}.`)
+  const validatedAt = Date.now()
+  const compositionKey = await compositionKeyFor(prepared)
+  const known = compositionValidations.get(compositionKey)
+  if (known === undefined) {
+    const validation = validateComposition(prepared, timeoutMs)
+    compositionValidations.set(compositionKey, validation)
+    // A failure must not be remembered: the next scenario of this composition re-proves it and reports it.
+    validation.catch(() => compositionValidations.delete(compositionKey))
+  }
+  await compositionValidations.get(compositionKey)
+  traceBootPhase('composition-validated', validatedAt, profileLabel)
 
   const start = async (port: number): Promise<ScratchHostInstance> => {
     const scratchEnvironment = isolatedHostEnvironment(prepared.homeRoot, prepared.profileRoot)
@@ -103,7 +146,9 @@ export const startScratchProfile = async (
       signature: `--profile ${prepared.profile} --port ${String(port)}`,
     })
     try {
+      const spawnStartedAt = Date.now()
       const url = await waitForHostUrl(host, () => output, profileLabel, timeoutMs)
+      traceBootPhase('host-url', spawnStartedAt, profileLabel)
       return { host, port, url, output: () => redactHostOutput(output) }
     } catch (error) {
       try {
@@ -157,7 +202,9 @@ const buildBundleOnce = async (bundle: { readonly projectRoot: string; readonly 
 export const bootProfile = async (profileLabel: string, timeoutMs = 90_000): Promise<BootedProfile> => {
   const bundles = requireNonEmptyBundles(await LocalBundleModel.listLocalBootBundles(), 'No owned plugin bundles were found for the composed scratch profile.')
   for (const bundle of bundles) await buildBundleOnce(bundle)
+  const prepareStartedAt = Date.now()
   const prepared = await prepareComposedBootProfile(bundles, { sourceProfileRoot })
+  traceBootPhase('prepare', prepareStartedAt, profileLabel)
   const expectedClientEntries = bundles.filter(bundle => bundle.hasClient).map(bundle => bundle.packageId)
   try {
     return await startScratchProfile(prepared, profileLabel, expectedClientEntries, timeoutMs)
@@ -188,10 +235,12 @@ export const bootComposedPluginProfile = async ({
     'No requested owned plugin bundles were found for the composed scratch profile.',
   )
   for (const bundle of bundles) await buildBundleOnce(bundle)
+  const prepareStartedAt = Date.now()
   const prepared = await prepareComposedBootProfile(
     bundles,
     cordisPatch === undefined ? { additionalBundleIds, sourceProfileRoot } : { additionalBundleIds, sourceProfileRoot, cordisPatch },
   )
+  traceBootPhase('prepare', prepareStartedAt, profileLabel)
   const expectedClientEntries = bundles.filter(bundle => bundle.hasClient).map(bundle => bundle.packageId)
   try {
     const seededHome = await seedHome?.(prepared.homeRoot)

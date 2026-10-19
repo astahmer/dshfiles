@@ -1,0 +1,109 @@
+# E2E speed and work-skipping plan
+
+## Context
+
+The browser suite is the repository's bottleneck: a broad `check:e2e` measured 2594s of owner-task
+time (43 journey tasks, 193 scenarios, 48 feature files) and one accidental invocation cost 50
+minutes of wall time. The requested outcome: a full suite that mostly _replays_ — after landing one
+or two plugins, only what that change can reach should run — plus a faster journey itself.
+
+The first revision landed on `main` as `jj:znlyqmymomlv` (bounded waits, an unscoped-run refusal,
+fail-fast broad runs, one BDD generation per run, a ledger-based scratch-Host reaper). This plan
+covers what is left.
+
+## Measured before the first revision
+
+| Fact                                       | Number                        | Source                                             |
+| ------------------------------------------ | ----------------------------- | -------------------------------------------------- |
+| Broad run owner-task time                  | 2594s across 32 fresh tasks   | `plugins/*/.turbo/turbo-test$colon$e2e.log`        |
+| Timeout tax (unbounded Playwright actions) | 1302s, 4 owners               | `locator.click: Test timeout of 300000ms exceeded` |
+| Per-scenario wall, median                  | 8.3s, of which 5-8s boot      | `output/e2e-evidence/run-*/manifest.json`          |
+| `pnpm install` per scratch profile         | 1.19s warm                    | leak sample, `--prefer-offline`                    |
+| `dsh --dump-config` per scenario           | 0.17s                         | same                                               |
+| APFS clone of a prepared profile           | 0.42s                         | `cp -Rc` of a 21 MB / 359-entry tree               |
+| `bddgen` per owner task                    | 3.6-4.8s, all 48 specs        | direct timing                                      |
+| No-change closure build                    | 1.03s, 48 tasks, `FULL TURBO` | Turbo                                              |
+| Dist digest pass, all packages             | 0.27s                         | `writeDistDigests`                                 |
+| Serial vs 3 owners at once                 | 155s vs 110s (1.41x), 1 flake | 8 owners, forced                                   |
+| Leaked scratch Hosts and providers         | 13 + 12, oldest 23h           | `ps`                                               |
+
+## Why the cache missed after the linearization
+
+Turbo keys a task on input _content_, and two different JJ workspaces produced byte-identical task
+hashes, so a rebase that keeps a file's content does not bust anything. The 50-minute run re-ran
+because the merged tree genuinely changed ~30 bundles' `dist`, because the run was the whole suite,
+and because half its wall time was the timeout tax. Fan-out is earned, not an artifact: the task key
+covers every bundle the journey's steps touch.
+
+## Fan-out (tasks re-run when this bundle's dist changes)
+
+`dshx` 43 · `plugin-ui` 39 · `ui-styles` 38 · `shared-runtime` 36 · `command-palette`,
+`workspace-folder-picker`, `project-folder-picker` 30 · `project-checks` 28 · `jj-integration`,
+`multi-host` 27 · `ai-accounts`, `request-messages`, `secret-catalog` 23 · `thread-sidebar` 10 ·
+a leaf plugin 3.
+
+## Where a scenario's time goes (measured 2026-10-19)
+
+`DSHX_E2E_BOOT_TRACE=1 pnpm run check:e2e pulls-review ui-styles editor frame-layout`, six scenarios,
+one worker, a machine at load 8-10:
+
+| Phase                 |         Range | What it is                                                                |
+| --------------------- | ------------: | ------------------------------------------------------------------------- |
+| `prepare`             |      2.1-3.8s | fresh scratch home: manifest write plus `pnpm install --prefer-offline`   |
+| `composition-dump`    |    0.45-0.83s | a whole `dsh --dump-config` process proving the profile loads its bundles |
+| `host-url`            | **4.0-12.1s** | spawning `dsh` until it announces its URL — the dominant cost             |
+| `page-load`           |    0.24-0.94s | `page.goto` to `domcontentloaded`                                         |
+| `profile-interactive` |      2.7-5.8s | client boot, first paint, onboarding dialog dismissed                     |
+
+So a scenario is 10-19s here, and ~12s of that is the Host: its startup and the client's boot. Nothing
+about the _assertions_ is the bottleneck.
+
+## Work packages
+
+| #   | Package                                                                                                                                                                                                      | Status                      |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------- |
+| E1  | Bound every wait, refuse an unscoped broad run, fail fast, one BDD generation, reap leaked Hosts                                                                                                             | Landed as `jj:znlyqmymomlv` |
+| E2  | Boot-phase trace and the composition-validation cache                                                                                                                                                        | Landed (below)              |
+| E3  | Route-interception cost (the network boundary round-trips every request of every page load)                                                                                                                  | Pending measurement         |
+| E4  | Scenario-level result cache: key each scenario by its own steps plus the dists it reaches, so a change re-runs the scenarios that can see it and replays the rest — rebase-proof because it is content-keyed | Pending design              |
+| E5  | Boot reuse: hide the Host startup behind the previous scenario                                                                                                                                               | Pending                     |
+| E6  | Wall-time budget ratchet (warn-only first)                                                                                                                                                                   | Optional                    |
+
+### E2 receipt
+
+`traceBootPhase` prints the five phases under `DSHX_E2E_BOOT_TRACE=1`, and the worker now validates a
+composition once instead of once per scenario: the composition is a property of the profile files, not
+of the scratch home. Measured on two scenarios of one composition: `composition-validated` **481ms then
+1ms**, and the `frame-layout` task 44s → 23s across two runs (only the dump is attributable — the
+machine was quieter for the second). 23 of the 26 `thread-sidebar` scenarios share one composition, so
+a heavy file now spends that cost once.
+
+### E4 design sketch
+
+A task is one owner × its feature files, so a change to a bundle booted by 30 owners re-runs every
+scenario those owners hold — the fan-out table above. Split the key per scenario instead:
+
+1. The planner already matches each feature's steps to definitions; do it per _scenario_ and record the
+   `@dshfiles/*` ids each scenario's own steps name, plus the harness and feature bytes.
+2. Key = sha256 of the scenario text, its steps' expressions and bodies, those bundles' dist digests,
+   and `pnpm-lock.yaml`. A change to a bundle a scenario never drives does not move its key.
+3. Store a pass receipt per key under `.turbo/e2e-scenarios/`, and let the runner select the scenarios
+   whose key is missing or failing. Report the reused count in the summary so a "green in 20s" run is
+   legible rather than suspicious.
+4. Risks to settle first: retries and flakes must invalidate the receipt, a `--force` must ignore the
+   cache, evidence receipts must say which scenarios were replayed rather than run, and the step-body
+   mapping stays conservative (a step that boots every bundle keeps its whole task keyed).
+
+### E5 design sketch
+
+`host-url` is 4-12s and cannot be cached — only avoided. A worker's scenarios share a composition, so
+while scenario N runs, prepare and boot the Host for a spare slot of the _same_ composition, and hand
+it to scenario N+1 when its Given step asks for that composition; discard it otherwise. Isolation
+survives because each scenario keeps its own home and Host; only the wall-clock overlaps. Measure the
+idle-slot host memory and the discard rate before making it the default.
+
+## Resume here
+
+E2 landed: the phase trace works and a composition is validated once per worker. Next is E3 (measure
+the network boundary's per-request cost on a quiet machine, then narrow or reject it), then **E4**, the
+scenario-level cache — it pays off on every change, while E5 only shortens a cold run.

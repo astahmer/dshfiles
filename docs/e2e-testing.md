@@ -189,6 +189,24 @@ The `DSHX_E2E_*` knobs (workers, failure ceiling, timeout override, generation
 flag) are passed through the generated task environment without being hashed:
 they change how a run is driven, not what it proves.
 
+### Inside one scenario
+
+`DSHX_E2E_BOOT_TRACE=1` prints the five boot phases per scenario, which is how
+the suite's real cost stays visible: measured 2026-10-19 on a machine at load
+8-10, `prepare` was 2.1-3.8 s (a fresh scratch home and its `pnpm install`),
+the composition dump 0.45-0.83 s, `host-url` **4.0-12.1 s** (spawning `dsh`
+until it announces its URL), `page-load` 0.24-0.94 s and `profile-interactive`
+2.7-5.8 s (client boot to first interactive). The assertions are nowhere in that
+list. A worker also validates a composition once rather than once per scenario
+— the composition is a property of the profile files, not of the scratch home,
+and 23 of the 26 `thread-sidebar` scenarios share one — measured `481 ms` then
+`1 ms` on two consecutive scenarios.
+
+One scenario still owns one Host per scenario, so the Host's startup is paid
+per scenario; reusing it across scenarios is tracked in
+[`plans/e2e-speed/README.md`](../plans/e2e-speed/README.md) together with a
+per-scenario result cache.
+
 ### Parallelism
 
 Journeys stay serial by default, and the measurement is why.
