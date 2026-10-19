@@ -29,8 +29,9 @@ import { prepareRemoteFolder } from './remote-destination.js'
 import { createSessionLogDownloadPort, SessionLogDownloadFeedback, type SessionLogDownloadService } from './session-log-download.js'
 import { ThreadWorkspaceControl } from './thread-workspace-control.js'
 import { useToast } from './toast.js'
-import { deferWorkspaceSubmit } from './workspace-submit.js'
-import { defersIsolationToSend } from './workspace-toggle-machine.js'
+import { DraftAttachmentCarry } from './draft-attachment-carry.js'
+import { deferWorkspaceSubmit, deliverFirstSend } from './workspace-submit.js'
+import { defersIsolationToSend, ownsIsolatedThreadWorkspace, WorkspaceToggle, type DeferredMove, type ToggleRequest } from './workspace-toggle-machine.js'
 import { jjIntegrationSettings } from './settings.js'
 
 const PANEL_ID = 'jj-integration'
@@ -328,6 +329,49 @@ export default defineClient({
       if (state.occurrences.length === 0) return undefined
       return { draft: state.draft, occurrences: state.occurrences.map(occurrence => ({ ...occurrence })) }
     }
+    /** Turn a moved draft's clipboard text back into the reference chips the source composer held. */
+    const rebuildReferences = (target: ReturnType<typeof ctx.conversation.input.for>, handoff: ComposerReferenceHandoff): boolean => {
+      for (const occurrence of handoff.occurrences.toReversed()) {
+        const current = target.state.getSnapshot()
+        const alreadyPresent = current.occurrences.some(
+          candidate =>
+            candidate.offset === occurrence.offset &&
+            candidate.source === occurrence.source &&
+            candidate.ref === occurrence.ref &&
+            candidate.clipboardText === occurrence.clipboardText,
+        )
+        if (alreadyPresent) continue
+        const text = current.draft.slice(occurrence.offset, occurrence.offset + occurrence.length)
+        if (text !== occurrence.clipboardText) return false
+        // Clipboard offsets expand earlier chips; editor spans count each existing chip as one position.
+        const collapsedPrefixLength = current.occurrences
+          .filter(candidate => candidate.offset < occurrence.offset)
+          .reduce((total, candidate) => total + candidate.length - 1, 0)
+        const detectOffset = occurrence.offset - collapsedPrefixLength
+        const reference =
+          occurrence.appearance === undefined
+            ? {
+                source: occurrence.source,
+                ref: occurrence.ref,
+                label: occurrence.label,
+                clipboardText: occurrence.clipboardText,
+              }
+            : {
+                source: occurrence.source,
+                ref: occurrence.ref,
+                label: occurrence.label,
+                appearance: occurrence.appearance,
+                clipboardText: occurrence.clipboardText,
+              }
+        const inserted = target.insertReference(reference, {
+          start: detectOffset,
+          end: detectOffset + occurrence.length,
+          draftRev: current.draftRev,
+        })
+        if (!inserted) return false
+      }
+      return true
+    }
     const restoreComposerReferences = (input: {
       readonly workspaceId: string
       readonly handoff: ComposerReferenceHandoff
@@ -378,53 +422,7 @@ export default defineClient({
               finish()
               return
             }
-            for (const occurrence of input.handoff.occurrences.toReversed()) {
-              const current = composer.input.state.getSnapshot()
-              const alreadyPresent = current.occurrences.some(
-                candidate =>
-                  candidate.offset === occurrence.offset &&
-                  candidate.source === occurrence.source &&
-                  candidate.ref === occurrence.ref &&
-                  candidate.clipboardText === occurrence.clipboardText,
-              )
-              if (alreadyPresent) continue
-              const text = current.draft.slice(occurrence.offset, occurrence.offset + occurrence.length)
-              if (text !== occurrence.clipboardText) {
-                composer.input.notify('error', translate('workspaceReferenceRestoreFailed'))
-                finish()
-                return
-              }
-              // Clipboard offsets expand earlier chips; editor spans count each existing chip as one position.
-              const collapsedPrefixLength = current.occurrences
-                .filter(candidate => candidate.offset < occurrence.offset)
-                .reduce((total, candidate) => total + candidate.length - 1, 0)
-              const detectOffset = occurrence.offset - collapsedPrefixLength
-              const reference =
-                occurrence.appearance === undefined
-                  ? {
-                      source: occurrence.source,
-                      ref: occurrence.ref,
-                      label: occurrence.label,
-                      clipboardText: occurrence.clipboardText,
-                    }
-                  : {
-                      source: occurrence.source,
-                      ref: occurrence.ref,
-                      label: occurrence.label,
-                      appearance: occurrence.appearance,
-                      clipboardText: occurrence.clipboardText,
-                    }
-              const inserted = composer.input.insertReference(reference, {
-                start: detectOffset,
-                end: detectOffset + occurrence.length,
-                draftRev: current.draftRev,
-              })
-              if (!inserted) {
-                composer.input.notify('error', translate('workspaceReferenceRestoreFailed'))
-                finish()
-                return
-              }
-            }
+            if (!rebuildReferences(composer.input, input.handoff)) composer.input.notify('error', translate('workspaceReferenceRestoreFailed'))
             finish()
           } catch (error) {
             cleanup()
@@ -440,6 +438,42 @@ export default defineClient({
         if (input.signal.aborted) abort()
         else changed()
       })
+    // The destination bar resolves a move from its own query, which unmounts (and is cancelled) when another New thread
+    // opens; a send asks the Host itself.
+    const resolveMove = async (move: DeferredMove, signal: AbortSignal): Promise<ToggleRequest | null> => {
+      const destination = await runHostRequest({
+        signal,
+        timeoutMs: 30_000,
+        request: hostSignal => jjThreads.destination({ workspaceId: move.workspaceId, sessionId: move.sessionId }, { signal: hostSignal }),
+      })
+      return ownsIsolatedThreadWorkspace(destination) ? null : WorkspaceToggle.defaultDestinationMove({ destination, workspaceId: move.workspaceId })
+    }
+    const releaseOnceSent = (sessionId: SessionId, release: () => void): void => {
+      let timer: ReturnType<typeof setTimeout> | undefined
+      let unsubscribe = (): void => undefined
+      const done = (): void => {
+        clearTimeout(timer)
+        unsubscribe()
+        release()
+      }
+      // A first send that fails before it reaches the target lets go of it after a minute.
+      timer = setTimeout(done, 60_000)
+      unsubscribe = ctx.sessions.list.subscribe(() => {
+        if (ctx.sessions.list.getSnapshot().byId[sessionId]?.blank === false) done()
+      })
+    }
+    /** The blank Session of a thread workspace, created or reused without changing what the main view shows. */
+    const threadComposerIn = async (workspaceId: string, signal: AbortSignal) => {
+      // SAFETY: the id names a workspace the Host's registry just provisioned or listed.
+      const sessionId = await ctx.uiWorkspace.connectWorkspace(workspaceId as Parameters<typeof ctx.uiWorkspace.connectWorkspace>[0])
+      // A Session has a scope only while something retains it; hold it until its first prompt is accepted.
+      const held = ctx.sessions.retain(sessionId, { source: 'controllerOperation', signal })
+      await held.ready
+      releaseOnceSent(sessionId, () => held.release())
+      const scoped = ctx.sessions.scope(sessionId)
+      if (scoped === undefined) throw new Error('The thread workspace Session is not available.')
+      return { sessionId, workspaceId, blank: true, input: ctx.conversation.input.for(scoped) }
+    }
     const stopSubmit = (event: Event): void => {
       event.preventDefault()
       event.stopImmediatePropagation()
@@ -461,9 +495,59 @@ export default defineClient({
       stopSubmit(event)
       const controller = new AbortController()
       pendingSubmissions.set(sessionId, controller)
-      // A New thread defers its isolation to its first send: start the move now and hold the draft until the Session
-      // the switch opens is ready, then deliver it there.
-      if (deferred) workspaceToggle.send({ type: 'commit', sessionId })
+      const settle = (): void => {
+        if (pendingSubmissions.get(sessionId) === controller) pendingSubmissions.delete(sessionId)
+      }
+      if (deferred && move !== undefined) {
+        // A New thread isolates on its first send. The send runs on its own and moves only its draft, so another New
+        // thread opened meanwhile, or a second thread sent before this one lands, keeps its own composer and move.
+        workspaceToggle.send({ type: 'claim', sessionId })
+        let request = move.request
+        const files = DraftAttachmentCarry.filesOf(ctx.conversation, state.attachmentIds)
+        // Keep the source registered while the send runs, so its draft survives the user opening another thread.
+        const sourceHeld = ctx.sessions.retain(sessionId, { source: 'controllerOperation' })
+        void deliverFirstSend({
+          source,
+          submitSource,
+          destination: async signal => {
+            request ??= await resolveMove(move, signal)
+            return request
+          },
+          isolate: signal => {
+            // SAFETY of the fallback: `destination` returned an isolating request before `isolate` runs.
+            const isolating = request ?? { isolate: true, projectWorkspaceId: move.workspaceId, leaving: null, leavingBase: null }
+            return WorkspaceToggle.isolateFirstSend({ client: workspaceToggle.getSnapshot().context.client, request: isolating, name: move.name, signal })
+          },
+          composerIn: (workspaceId, signal) => threadComposerIn(workspaceId, signal),
+          copyDraft: async (target, signal) => {
+            const snapshot = source.input.state.getSnapshot()
+            if (files === undefined) return false
+            const attachmentIds = await DraftAttachmentCarry.carry({ conversation: ctx.conversation, files, sessionId: target.sessionId, signal })
+            if (attachmentIds === undefined) return false
+            target.input.setDraft(snapshot.draft)
+            if (attachmentIds.length > 0 && !target.input.addAttachments(attachmentIds)) return false
+            return snapshot.occurrences.length === 0 || rebuildReferences(target.input, { draft: snapshot.draft, occurrences: snapshot.occurrences })
+          },
+          clearSource: () => {
+            const carried = source.input.state.getSnapshot().attachmentIds
+            source.input.setDraft('')
+            for (const id of carried) source.input.removeAttachment(id)
+          },
+          showsSource: () => mainViewSessionId(ctx.sessions.list.getSnapshot()) === sessionId,
+          show: targetSessionId => ctx.uiWorkspace.openSession(targetSessionId),
+          blocks: ctx.conversation.blocks,
+          reason: translate('preparingWorkspace', { name: move.name }),
+          failureMessage: translate('workspaceSendFailed'),
+          changedMessage: translate('workspaceSendChanged'),
+          signal: controller.signal,
+        })
+          .catch(() => source.input.notify('error', translate('workspaceSendFailed')))
+          .finally(() => {
+            sourceHeld.release()
+            settle()
+          })
+        return
+      }
       const name = workspaceToggle.getSnapshot().context.pending?.name ?? null
       const reason = name === null ? translate('switchingDestination') : translate('preparingWorkspace', { name })
       void deferWorkspaceSubmit({
@@ -478,9 +562,7 @@ export default defineClient({
         signal: controller.signal,
       })
         .catch(() => source.input.notify('error', translate('workspaceSendFailed')))
-        .finally(() => {
-          if (pendingSubmissions.get(sessionId) === controller) pendingSubmissions.delete(sessionId)
-        })
+        .finally(settle)
     }
     const onSubmitKeyDown = (event: KeyboardEvent): void => {
       const target = composerSessionOf(event.target)

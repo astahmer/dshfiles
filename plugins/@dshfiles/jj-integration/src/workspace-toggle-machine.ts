@@ -119,6 +119,8 @@ type ToggleEvent =
   | { readonly type: 'resolved'; readonly visitId: string; readonly request: ToggleRequest | null }
   /** The first send of that Session: start the move its arrival deferred. */
   | { readonly type: 'commit'; readonly sessionId: string }
+  /** That Session's first send isolates it outside the toggle; its deferred move is retired. */
+  | { readonly type: 'claim'; readonly sessionId: string }
   /** That Session was archived, discarded or stopped being blank, so its deferred move is dropped. */
   | { readonly type: 'cancel'; readonly sessionId: string }
   | { readonly type: 'dismiss' }
@@ -211,6 +213,43 @@ const provisionTolerant = async (client: WorkspaceToggleClient, input: Provision
   }
 }
 
+/** The workspace a move lands in, provisioned or reused and listed, without opening it. */
+const reachDestination = async (input: {
+  readonly client: WorkspaceToggleClient
+  readonly request: ToggleRequest
+  readonly pending: PendingDestination
+  readonly signal: AbortSignal
+}): Promise<ProvisionedDestination> => {
+  const { client, request, pending, signal } = input
+  if (request.leaving !== null) client.keepSpare(spareKey(request.projectWorkspaceId, request.leavingBase), request.leaving)
+  const target: ProvisionedDestination = !pending.isolate
+    ? { workspaceId: request.projectWorkspaceId }
+    : pending.spare !== null
+      ? { workspaceId: pending.spare.workspaceId }
+      : await provisionTolerant(client, provisionInputFor({ workspaceId: request.projectWorkspaceId, base: request.base, name: pending.name }), signal)
+  await client.listed(target.workspaceId)
+  signal.throwIfAborted()
+  return target
+}
+
+/**
+ * A first send that isolates its New thread moves only its own draft, so it runs beside the toggle instead of through
+ * it: two threads sent back to back, or a New thread opened while one is still being prepared, never share or wait for
+ * one switch. It lands in a workspace without opening it; the caller delivers the draft and decides whether to show it.
+ */
+const isolateFirstSend = async (input: {
+  readonly client: WorkspaceToggleClient
+  readonly request: ToggleRequest
+  readonly name: string
+  readonly signal: AbortSignal
+}): Promise<ProvisionedDestination> => {
+  const { client, request } = input
+  const pending = pendingFor(client, request, input.name)
+  const target = await reachDestination({ client, request, pending, signal: input.signal })
+  if (pending.spare !== null) client.consumeSpare(spareKey(request.projectWorkspaceId, request.base), pending.spare)
+  return target
+}
+
 /**
  * The new-thread workspace toggle: it flips at once (pending name shown while the composer stays usable), the Host creates or reuses
  * the thread workspace in the background, and `switched` hands the caller the Host's new destination so nothing is
@@ -238,14 +277,7 @@ export const workspaceToggleMachine = setup({
       { readonly client: WorkspaceToggleClient; readonly request: ToggleRequest; readonly pending: PendingDestination }
     >(async ({ input, signal }) => {
       const { client, request, pending } = input
-      if (request.leaving !== null) client.keepSpare(spareKey(request.projectWorkspaceId, request.leavingBase), request.leaving)
-      const target: ProvisionedDestination = !pending.isolate
-        ? { workspaceId: request.projectWorkspaceId }
-        : pending.spare !== null
-          ? { workspaceId: pending.spare.workspaceId }
-          : await provisionTolerant(client, provisionInputFor({ workspaceId: request.projectWorkspaceId, base: request.base, name: pending.name }), signal)
-      await client.listed(target.workspaceId)
-      signal.throwIfAborted()
+      const target = await reachDestination({ client, request, pending, signal })
       await client.open(target.workspaceId, signal)
       if (pending.spare !== null) client.consumeSpare(spareKey(request.projectWorkspaceId, request.base), pending.spare)
       return target
@@ -267,6 +299,19 @@ export const workspaceToggleMachine = setup({
     opened: null,
   }),
   initial: 'idle',
+  on: {
+    // A first send isolates its thread itself (`isolateFirstSend`): the toggle forgets the move and settles the visit,
+    // so neither a later arrival nor a timeout can move that thread again.
+    claim: {
+      actions: assign(({ context, event }) => {
+        const move = deferredMoveFor(context.deferred, event.sessionId)
+        return {
+          settled: settledWith(context.settled, move?.visitId),
+          deferred: withoutDeferredSession(context.deferred, event.sessionId),
+        }
+      }),
+    },
+  },
   states: {
     idle: {
       on: {
@@ -590,4 +635,5 @@ export class WorkspaceToggle {
     deferredMoveFor(snapshot.context.deferred, sessionId)
   static readonly spareKey = spareKey
   static readonly waitForWorkspaceToggle = waitForWorkspaceToggle
+  static readonly isolateFirstSend = isolateFirstSend
 }

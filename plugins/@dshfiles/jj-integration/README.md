@@ -32,10 +32,13 @@ palette and the project picker open the composer at once in the project (or
 current) checkout, and with `isolateByDefault` on the blank thread stays there:
 the destination bar shows the workspace it will take (the spare when there is
 one, else a workspace named by the client) without creating it. The first Send
-creates or claims that workspace, opens it, and delivers the message into the
-fresh Session with the same draft, attachments and structured references; typing
-never waits on jj, and a New thread the user abandons leaves no jj workspace
-behind. With isolation off, a thread that started in another thread's workspace
+creates or claims that workspace, gets its blank Session without changing the
+main view, copies the draft, attachments and structured references into it and
+sends there; the view follows only while it still shows the thread that sent.
+Each first send runs on its own, so opening another New thread right after Send,
+or sending two threads back to back, keeps every prompt in its own workspace.
+Typing never waits on jj, and a New thread the user abandons leaves no jj
+workspace behind. With isolation off, a thread that started in another thread's workspace
 returns to the project checkout on arrival, which creates nothing. The chip
 shows the workspace name with a spinner while the first-send switch runs. Each
 new thread is moved at most once, so a manual toggle sticks, and a blank thread

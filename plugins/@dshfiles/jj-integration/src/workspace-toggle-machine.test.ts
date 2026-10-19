@@ -3,7 +3,7 @@ import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { createActor, waitFor } from '@dshfiles/plugin-ui/machine'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { DestinationView } from './api.js'
-import { deferWorkspaceSubmit, type WorkspaceComposer } from './workspace-submit.js'
+import { deferWorkspaceSubmit, deliverFirstSend, type WorkspaceComposer } from './workspace-submit.js'
 import {
   defersIsolationToSend,
   WorkspaceToggle,
@@ -808,5 +808,122 @@ describe('defaultDestinationMove', () => {
       leavingBase: null,
       excludeSpareWorkspaceId: 'ws-shared',
     })
+  })
+})
+
+describe('first-send isolation', () => {
+  it('retires the deferred move so a later arrival of that visit is not moved again', () => {
+    const toggle = startToggle()
+    arriveAt(toggle, { sessionId: 'first', workspaceId: 'project' })
+    expect(WorkspaceToggle.deferredMoveFor(toggle.actor.getSnapshot(), 'first')).not.toBeNull()
+    toggle.actor.send({ type: 'claim', sessionId: 'first' })
+    arriveAt(toggle, { sessionId: 'first', workspaceId: 'project' })
+    expect(toggle.actor.getSnapshot().context.deferred).toEqual([])
+    expect(toggle.actor.getSnapshot().value).toBe('idle')
+  })
+
+  it('provisions the thread workspace without opening it', async () => {
+    const toggle = startToggle()
+    const landing = WorkspaceToggle.isolateFirstSend({
+      client: toggle.actor.getSnapshot().context.client,
+      request: isolateRequest(),
+      name: 'thread-abc123',
+      signal: new AbortController().signal,
+    })
+    toggle.release()
+    await expect(landing).resolves.toEqual({ workspaceId: 'ws-thread-abc123' })
+    expect(toggle.calls).toEqual(['provision isolate thread-abc123'])
+  })
+
+  it("takes this project's spare thread workspace and consumes it", async () => {
+    const toggle = startToggle()
+    toggle.spares.set(WorkspaceToggle.spareKey('project', 'main'), { workspaceId: 'ws-spare', name: 'thread-spare' })
+    const landed = await WorkspaceToggle.isolateFirstSend({
+      client: toggle.actor.getSnapshot().context.client,
+      request: isolateRequest(),
+      name: 'thread-abc123',
+      signal: new AbortController().signal,
+    })
+    expect(landed).toEqual({ workspaceId: 'ws-spare' })
+    expect(toggle.calls).toEqual([])
+    expect(toggle.spares.size).toBe(0)
+  })
+})
+
+describe('deliverFirstSend', () => {
+  const deliveryFixture = (
+    options: { readonly showsSource?: boolean; readonly targetDraft?: string; readonly copies?: boolean; readonly keeps?: boolean } = {},
+  ) => {
+    const sourceComposer = composerWithDraft('first prompt')
+    const targetComposer = composerWithDraft(options.targetDraft ?? '')
+    const source: WorkspaceComposer = { sessionId: SessionId('source'), workspaceId: 'project', blank: true, input: sourceComposer.input }
+    const target = { sessionId: SessionId('target'), workspaceId: 'ws-thread-abc123', blank: true, input: targetComposer.input }
+    const { blockCalls, blocks } = blocksRecorder()
+    const shown: string[] = []
+    const isolated: string[] = []
+    const copied: string[] = []
+    const delivery = deliverFirstSend({
+      source,
+      submitSource: 'enter',
+      destination: async () => (options.keeps === true ? null : isolateRequest()),
+      isolate: async () => {
+        isolated.push('ws-thread-abc123')
+        return { workspaceId: 'ws-thread-abc123' }
+      },
+      composerIn: async () => target,
+      copyDraft: async () => {
+        copied.push(target.sessionId)
+        if (options.copies === false) return false
+        targetComposer.edit(sourceComposer.input.state.getSnapshot().draft)
+        return true
+      },
+      clearSource: () => sourceComposer.edit(''),
+      showsSource: () => options.showsSource ?? false,
+      show: sessionId => void shown.push(sessionId),
+      blocks,
+      reason: 'Preparing thread-abc123…',
+      failureMessage: 'Workspace setup failed.',
+      changedMessage: 'The draft changed.',
+      signal: new AbortController().signal,
+    })
+    return { delivery, sourceComposer, targetComposer, blockCalls, shown, isolated, copied }
+  }
+
+  it('sends into the thread workspace and leaves the view on the New thread opened meanwhile', async () => {
+    const fixture = deliveryFixture({ showsSource: false })
+    await expect(fixture.delivery).resolves.toBe('sent')
+    expect(fixture.targetComposer.submissions).toEqual([{ mode: 'queue', source: 'enter' }])
+    expect(fixture.sourceComposer.submissions).toEqual([])
+    expect(fixture.sourceComposer.input.state.getSnapshot().draft).toBe('')
+    expect(fixture.shown).toEqual([])
+    expect(fixture.blockCalls).toEqual(['Preparing thread-abc123…', 'released'])
+  })
+
+  it('follows the thread into its workspace while the source is still shown', async () => {
+    const fixture = deliveryFixture({ showsSource: true })
+    await expect(fixture.delivery).resolves.toBe('sent')
+    expect(fixture.shown).toEqual(['target'])
+  })
+
+  it('sends in place when the destination keeps the thread where it is', async () => {
+    const fixture = deliveryFixture({ keeps: true })
+    await expect(fixture.delivery).resolves.toBe('kept')
+    expect(fixture.sourceComposer.submissions).toEqual([{ mode: 'queue', source: 'enter' }])
+    expect(fixture.isolated).toEqual([])
+  })
+
+  it('keeps the draft in the source when the thread workspace refuses it', async () => {
+    const fixture = deliveryFixture({ copies: false })
+    await expect(fixture.delivery).resolves.toBe('failed')
+    expect(fixture.sourceComposer.input.state.getSnapshot().draft).toBe('first prompt')
+    expect(fixture.sourceComposer.notices).toEqual(['Workspace setup failed.'])
+    expect(fixture.targetComposer.submissions).toEqual([])
+  })
+
+  it('never writes over a thread workspace Session that already holds a draft', async () => {
+    const fixture = deliveryFixture({ targetDraft: 'someone else' })
+    await expect(fixture.delivery).resolves.toBe('changed')
+    expect(fixture.copied).toEqual([])
+    expect(fixture.sourceComposer.input.state.getSnapshot().draft).toBe('first prompt')
   })
 })

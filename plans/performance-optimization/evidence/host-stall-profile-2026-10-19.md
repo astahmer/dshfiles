@@ -46,7 +46,11 @@ loses that prompt (repro: Send, then New thread at once; 4/4 prompts lost on a s
 3. `deferWorkspaceSubmit` delivers into the visible composer, not the landed workspace's Session.
 4. One `workspaceToggle` actor serializes all moves, so a second thread sent during the first switch is mis-routed.
 
-Fixing 1–3 locally made a single Send → New thread survive, but needs the source composer remounted to transfer the
-draft (yanking the user out of the thread they just opened) and still mis-routes overlapping sends. The durable fix
-moves the first-send isolation off the visible composer; see the Host gap "Move a blank Session's draft without its
-composer mounted".
+Fixed in jj-integration: a first send no longer goes through the toggle or the visible composer. It retires its
+deferred move (`claim`), resolves its destination itself, provisions or reuses the workspace without opening it
+(`isolateFirstSend`), gets that workspace's blank Session with `uiWorkspace.connectWorkspace`, copies the draft,
+re-registered attachments (draft attachments belong to one Session, and leaving it releases image drafts, so the
+files are read at Send time) and reference chips into that Session's input, and sends there. Scratch Host: 4/4
+prompts sent back to back with New thread clicked after each landed in 4 distinct `thread-*` workspaces, image
+attachments included; regression tests in `workspace-toggle-machine.test.ts` ("first-send isolation",
+"deliverFirstSend").
