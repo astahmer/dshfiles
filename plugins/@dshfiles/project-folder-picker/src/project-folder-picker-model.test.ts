@@ -87,17 +87,39 @@ describe('project and folder selection', () => {
     })
   })
 
-  it('offers unregistered recent folders after matching projects', () => {
-    const entries = ProjectFolderPickerModel.pickerEntries(projects, ['/Users/me/dev/dshfiles', '/Users/me/dev/bb-plugins', '/Users/me/dev/bb-plugins'], 'dev')
-    expect(entries.map(entry => (entry.kind === 'project' ? entry.project.title : entry.path))).toEqual(['dshfiles', 'emisoup', '/Users/me/dev/bb-plugins'])
-    expect(ProjectFolderPickerModel.pickerEntries(projects, ['/Users/me/dev/bb-plugins'], 'emi').map(entry => entry.kind)).toEqual(['project'])
-    expect(ProjectFolderPickerModel.pickerEntries(projects, ['/Users/me/dev/bb-plugins'], '/Users')).toEqual([])
-    expect(ProjectFolderPickerModel.pickerEntries(projects, ['/Users/me/dev/bb-plugins'], '~/dev')).toEqual([])
-    const recent = entries[2]
+  it('lists matching projects on the Projects tab and unregistered recent folders on the Recents tab', () => {
+    const recentFolders = ['/Users/me/dev/dshfiles', '/Users/me/dev/bb-plugins', '/Users/me/dev/bb-plugins']
+    const entriesOn = (tab: 'projects' | 'recents', query: string) =>
+      ProjectFolderPickerModel.pickerEntries({ projects, recentFolders, query, tab, excludeJjWorkspaces: false })
+    expect(entriesOn('projects', 'dev').map(entry => (entry.kind === 'project' ? entry.project.title : entry.path))).toEqual(['dshfiles', 'emisoup'])
+    expect(entriesOn('recents', 'dev').map(entry => (entry.kind === 'project' ? entry.project.title : entry.path))).toEqual(['/Users/me/dev/bb-plugins'])
+    expect(entriesOn('recents', 'emi')).toEqual([])
+    expect(entriesOn('projects', '/Users')).toEqual([])
+    expect(entriesOn('recents', '~/dev')).toEqual([])
+    const recent = entriesOn('recents', '')[0]
     expect(recent === undefined ? null : ProjectFolderPickerModel.pickerEntrySelection(recent)).toEqual({
       kind: 'directory',
       canonicalPath: '/Users/me/dev/bb-plugins',
       title: 'bb-plugins',
     })
+  })
+
+  it('hides JJ workspaces from the Projects tab only when excluded', () => {
+    const threadWorkspace: RegisteredProject = {
+      workspaceId: 'ws-3',
+      title: 'dshfiles · thread-07ef22',
+      canonicalPath: '/Users/me/dev/dshfiles-threads/thread-07ef22',
+      isJjWorkspace: true,
+    }
+    const titlesWith = (excludeJjWorkspaces: boolean) =>
+      ProjectFolderPickerModel.pickerEntries({
+        projects: [...projects, threadWorkspace],
+        recentFolders: [],
+        query: 'dshfiles',
+        tab: 'projects',
+        excludeJjWorkspaces,
+      }).map(entry => (entry.kind === 'project' ? entry.project.title : entry.path))
+    expect(titlesWith(true)).toEqual(['dshfiles'])
+    expect(titlesWith(false)).toEqual(['dshfiles', 'dshfiles · thread-07ef22'])
   })
 })

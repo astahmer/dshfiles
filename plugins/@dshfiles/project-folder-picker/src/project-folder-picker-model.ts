@@ -2,6 +2,7 @@ import type { ProjectFolderSelection, RegisteredProject } from './project-folder
 
 export type PickerDirection = 'up' | 'down'
 export type PickerEntry = { readonly kind: 'project'; readonly project: RegisteredProject } | { readonly kind: 'recent'; readonly path: string }
+export type PickerTab = 'projects' | 'recents'
 
 type DirectoryPathListing = {
   readonly path: string
@@ -87,14 +88,24 @@ export class ProjectFolderPickerModel {
     title: canonicalPath.split('/').filter(Boolean).at(-1) ?? canonicalPath,
   })
 
-  /** Matching projects first, then recent folders that are not already registered projects. */
-  static readonly pickerEntries = (projects: readonly RegisteredProject[], recentFolders: readonly string[], query: string): readonly PickerEntry[] => {
-    const matchingProjects = ProjectFolderPickerModel.filterRegisteredProjects(projects, query)
-    if (ProjectFolderPickerModel.isPathQuery(query)) return []
-    const search = query.trim().toLocaleLowerCase()
-    const projectPaths = new Set(projects.map(project => project.canonicalPath))
-    const recent = [...new Set(recentFolders)].filter(path => !projectPaths.has(path) && path.toLocaleLowerCase().includes(search))
-    return [...matchingProjects.map((project): PickerEntry => ({ kind: 'project', project })), ...recent.map((path): PickerEntry => ({ kind: 'recent', path }))]
+  /** Matching projects on the Projects tab; matching recent folders that are not registered projects on the Recents tab. */
+  static readonly pickerEntries = (input: {
+    readonly projects: readonly RegisteredProject[]
+    readonly recentFolders: readonly string[]
+    readonly query: string
+    readonly tab: PickerTab
+    readonly excludeJjWorkspaces: boolean
+  }): readonly PickerEntry[] => {
+    if (ProjectFolderPickerModel.isPathQuery(input.query)) return []
+    if (input.tab === 'projects') {
+      const visibleProjects = input.excludeJjWorkspaces ? input.projects.filter(project => project.isJjWorkspace !== true) : input.projects
+      return ProjectFolderPickerModel.filterRegisteredProjects(visibleProjects, input.query).map((project): PickerEntry => ({ kind: 'project', project }))
+    }
+    const search = input.query.trim().toLocaleLowerCase()
+    const projectPaths = new Set(input.projects.map(project => project.canonicalPath))
+    return [...new Set(input.recentFolders)]
+      .filter(path => !projectPaths.has(path) && path.toLocaleLowerCase().includes(search))
+      .map((path): PickerEntry => ({ kind: 'recent', path }))
   }
 
   static readonly pickerEntrySelection = (entry: PickerEntry): ProjectFolderSelection =>

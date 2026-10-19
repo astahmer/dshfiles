@@ -4,11 +4,14 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@dshfiles/plugin-ui/components/ui/dialog'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Kbd, KbdGroup } from '@dshfiles/plugin-ui/components/ui/kbd'
+import { Label } from '@dshfiles/plugin-ui/components/ui/label'
+import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
+import { Tabs, TabsList, TabsTrigger } from '@dshfiles/plugin-ui/components/ui/tabs'
 import { FolderIcon, FolderOpenIcon, HistoryIcon, SearchIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { keepPreviousData, useMutation, useQuery } from '@dshfiles/plugin-ui/query'
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
-import { ProjectFolderPickerModel, type PickerEntry } from './project-folder-picker-model.js'
+import { ProjectFolderPickerModel, type PickerEntry, type PickerTab } from './project-folder-picker-model.js'
 
 export interface RegisteredProject {
   readonly workspaceId: string
@@ -54,8 +57,10 @@ export interface ProjectFolderPickerProps {
    * caller that knows it rather than read here.
    */
   readonly machineName?: string
-  /** Previously chosen folders offered after the registered projects; selecting one yields a directory selection. */
+  /** Previously chosen folders offered on the Recents tab; selecting one yields a directory selection. */
   readonly recentFolders?: readonly string[]
+  /** Initial state of the "Hide JJ workspaces" switch, which drops projects flagged `isJjWorkspace` from the Projects tab. */
+  readonly excludeJjWorkspaces?: boolean
   /** Accessible list label and placeholder override for callers whose list is not only projects. */
   readonly placeholder?: string
 }
@@ -92,8 +97,20 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
   const pickRequest = useRef<AbortController | null>(null)
   const searchInput = useRef<HTMLInputElement | null>(null)
   const pathMode = props.mode === 'directories' || ProjectFolderPickerModel.isPathQuery(query)
+  const [tab, setTab] = useState<PickerTab>('projects')
+  const [excludeJjWorkspaces, setExcludeJjWorkspaces] = useState(props.excludeJjWorkspaces === true)
   const recentFolders = props.recentFolders
-  const entries = useMemo(() => ProjectFolderPickerModel.pickerEntries(props.projects, recentFolders ?? [], query), [props.projects, recentFolders, query])
+  const entries = useMemo(
+    () => ProjectFolderPickerModel.pickerEntries({ projects: props.projects, recentFolders: recentFolders ?? [], query, tab, excludeJjWorkspaces }),
+    [props.projects, recentFolders, query, tab, excludeJjWorkspaces],
+  )
+  const hasRecentFolders = useMemo(
+    () =>
+      ProjectFolderPickerModel.pickerEntries({ projects: props.projects, recentFolders: recentFolders ?? [], query: '', tab: 'recents', excludeJjWorkspaces })
+        .length > 0,
+    [props.projects, recentFolders, excludeJjWorkspaces],
+  )
+  const hasJjWorkspaces = props.projects.some(project => project.isJjWorkspace === true)
 
   const listingQuery = useQuery({
     queryKey: ['project-folder-picker', 'list', browseTarget?.path ?? null],
@@ -132,7 +149,7 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
 
   useEffect(() => () => pickRequest.current?.abort(), [])
 
-  useEffect(() => setSelectedIndex(0), [query, listing?.path])
+  useEffect(() => setSelectedIndex(0), [query, listing?.path, tab, excludeJjWorkspaces])
 
   useEffect(() => {
     if (listingQuery.data === undefined || listingQuery.isPlaceholderData || browseTarget === null) return
@@ -397,24 +414,50 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
           </>
         ) : (
           <>
-            <div aria-busy={props.loading === true} aria-label="Projects and recent folders" className={cn(listClassName, 'dshx:pt-2')} role="listbox">
-              {entries.map((entry, index) => {
-                const previous = entries[index - 1]
-                const heading = previous === undefined || previous.kind !== entry.kind ? (entry.kind === 'project' ? 'Projects' : 'Recent folders') : null
-                return (
-                  <PickerEntryRow
-                    active={index === selectedIndex}
-                    entry={entry}
-                    heading={heading}
-                    index={index}
-                    key={entry.kind === 'project' ? entry.project.workspaceId : 'recent:' + entry.path}
-                    machineName={props.machineName}
-                    onHover={() => setSelectedIndex(index)}
-                    onSelect={() => props.onSelect(ProjectFolderPickerModel.pickerEntrySelection(entry))}
-                  />
-                )
-              })}
-              {entries.length === 0 && <p className={emptyClassName}>{props.loading === true ? 'Loading projects…' : 'No registered projects match.'}</p>}
+            {(hasRecentFolders || hasJjWorkspaces) && (
+              <div className="dshx:flex dshx:items-center dshx:gap-3 dshx:px-4 dshx:pt-2">
+                {hasRecentFolders && (
+                  <Tabs onValueChange={(value: string) => setTab(value === 'recents' ? 'recents' : 'projects')} value={tab}>
+                    <TabsList className="dshx:h-7!">
+                      <TabsTrigger className="dshx:px-2.5 dshx:text-xs" value="projects">
+                        Projects
+                      </TabsTrigger>
+                      <TabsTrigger className="dshx:px-2.5 dshx:text-xs" value="recents">
+                        Recents
+                      </TabsTrigger>
+                    </TabsList>
+                  </Tabs>
+                )}
+                {hasJjWorkspaces && tab === 'projects' && (
+                  <Label className="dshx:ml-auto dshx:flex dshx:cursor-pointer dshx:items-center dshx:gap-2 dshx:text-xs dshx:font-normal dshx:text-muted-foreground">
+                    <Switch checked={excludeJjWorkspaces} onCheckedChange={(checked: boolean) => setExcludeJjWorkspaces(checked)} size="sm" />
+                    Hide JJ workspaces
+                  </Label>
+                )}
+              </div>
+            )}
+            <div
+              aria-busy={props.loading === true}
+              aria-label={tab === 'projects' ? 'Projects' : 'Recent folders'}
+              className={cn(listClassName, 'dshx:pt-2')}
+              role="listbox"
+            >
+              {entries.map((entry, index) => (
+                <PickerEntryRow
+                  active={index === selectedIndex}
+                  entry={entry}
+                  index={index}
+                  key={entry.kind === 'project' ? entry.project.workspaceId : 'recent:' + entry.path}
+                  machineName={props.machineName}
+                  onHover={() => setSelectedIndex(index)}
+                  onSelect={() => props.onSelect(ProjectFolderPickerModel.pickerEntrySelection(entry))}
+                />
+              ))}
+              {entries.length === 0 && (
+                <p className={emptyClassName}>
+                  {props.loading === true ? 'Loading projects…' : tab === 'projects' ? 'No registered projects match.' : 'No recent folders match.'}
+                </p>
+              )}
             </div>
           </>
         )}
@@ -449,7 +492,6 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
 
 interface PickerEntryRowProps {
   readonly entry: PickerEntry
-  readonly heading: string | null
   readonly index: number
   readonly active: boolean
   readonly machineName: string | undefined
@@ -461,51 +503,48 @@ const PickerEntryRow = (props: PickerEntryRowProps): JSX.Element => {
   const title = props.entry.kind === 'project' ? props.entry.project.title : (props.entry.path.split('/').filter(Boolean).at(-1) ?? props.entry.path)
   const path = props.entry.kind === 'project' ? props.entry.project.canonicalPath : props.entry.path
   return (
-    <>
-      {props.heading !== null && <p className="dshx:px-2 dshx:pt-1.5 dshx:pb-1 dshx:text-xs dshx:font-medium dshx:text-muted-foreground">{props.heading}</p>}
-      <button
-        aria-selected={props.active}
-        className={optionClassName(props.active)}
-        onClick={props.onSelect}
-        onMouseEnter={props.onHover}
-        role="option"
-        type="button"
-      >
-        {props.entry.kind === 'project' ? (
-          <span
-            aria-hidden
-            className={cn(
-              'dshx:flex dshx:size-7 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-md dshx:text-[11px] dshx:font-semibold',
-              projectGlyphTone(title),
-            )}
-          >
-            {title.slice(0, 2).toLocaleUpperCase()}
-          </span>
-        ) : (
-          <span
-            aria-hidden
-            className="dshx:flex dshx:size-7 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-md dshx:bg-muted dshx:text-muted-foreground"
-          >
-            <HistoryIcon className="dshx:size-3.5" />
-          </span>
-        )}
-        <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col">
-          <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
-            <span className="dshx:min-w-0 dshx:truncate dshx:text-sm dshx:font-medium">{title}</span>
-            {props.entry.kind === 'project' && props.entry.project.isJjWorkspace === true ? <Badge variant="muted">JJ workspace</Badge> : null}
-          </span>
-          <span className="dshx:truncate dshx:text-xs dshx:text-muted-foreground">
-            {props.machineName === undefined ? null : `${props.machineName} · `}
-            <span className="dshx:font-mono">{path}</span>
-          </span>
+    <button
+      aria-selected={props.active}
+      className={optionClassName(props.active)}
+      onClick={props.onSelect}
+      onMouseEnter={props.onHover}
+      role="option"
+      type="button"
+    >
+      {props.entry.kind === 'project' ? (
+        <span
+          aria-hidden
+          className={cn(
+            'dshx:flex dshx:size-7 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-md dshx:text-[11px] dshx:font-semibold',
+            projectGlyphTone(title),
+          )}
+        >
+          {title.slice(0, 2).toLocaleUpperCase()}
         </span>
-        {props.index < 9 && (
-          <KbdGroup>
-            <Kbd>⌘</Kbd>
-            <Kbd>{props.index + 1}</Kbd>
-          </KbdGroup>
-        )}
-      </button>
-    </>
+      ) : (
+        <span
+          aria-hidden
+          className="dshx:flex dshx:size-7 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-md dshx:bg-muted dshx:text-muted-foreground"
+        >
+          <HistoryIcon className="dshx:size-3.5" />
+        </span>
+      )}
+      <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col">
+        <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
+          <span className="dshx:min-w-0 dshx:truncate dshx:text-sm dshx:font-medium">{title}</span>
+          {props.entry.kind === 'project' && props.entry.project.isJjWorkspace === true ? <Badge variant="muted">JJ workspace</Badge> : null}
+        </span>
+        <span className="dshx:truncate dshx:text-xs dshx:text-muted-foreground">
+          {props.machineName === undefined ? null : `${props.machineName} · `}
+          <span className="dshx:font-mono">{path}</span>
+        </span>
+      </span>
+      {props.index < 9 && (
+        <KbdGroup>
+          <Kbd>⌘</Kbd>
+          <Kbd>{props.index + 1}</Kbd>
+        </KbdGroup>
+      )}
+    </button>
   )
 }

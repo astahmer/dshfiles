@@ -5,7 +5,7 @@
     {
       "id": "registered-project-search",
       "title": "Search projects and browse folder paths",
-      "summary": "Match registered project labels and canonical directories, browse absolute or home-relative paths through the Host, automatically enter one unique matching folder, mark confirmed secondary JJ workspaces when classification is available, and preserve project identity in returned choices.",
+      "summary": "Match registered project labels and canonical directories, browse absolute or home-relative paths through the Host, automatically enter one unique matching folder, split registered projects and recent folders into Projects and Recents tabs, mark confirmed secondary JJ workspaces when classification is available and let a switch hide them (initially on when the caller asks), and preserve project identity in returned choices.",
       "surfaces": ["client", "integration"],
       "configuration": [],
       "states": ["empty", "matched", "selected"],
