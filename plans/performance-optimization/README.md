@@ -25,15 +25,15 @@ Make expensive owned work proportional to changed, visible, requested data; boun
 
 ### Progress
 
-| Milestone | Status | Next action |
-|---|---|---|
-| Repository and prior-work map | Complete | Coverage and exclusions below |
-| Static client/Host/tooling audit | Complete | Execute linked work packages only after their gates |
-| Bounded algorithm/planner measurements | Complete | Raw samples and repeatable probes in evidence |
-| Small scratch browser smoke | Complete with explicit composition limitation | Activity/Communication clean; Jujutsu owner omission recorded |
-| Comprehensive optimization implementation | In progress: **27 register entries implemented with receipts** — client C19, C01, C03, C04, C06, C07, C08, C09, C10 (algorithm half), C11, C12, C13, C14, C16, C17, C20; Host H01, H02, H03, H04, H06 (rolling sweeps), H07 (SQL project scoping), H08 (statement reuse), H09 (overlapped sources), H21 (fingerprint cache); tooling T01, T04. Every receipt names its own remainder. | Next: C02, then C05/C15/C18, T02/T03/T05–T07, and Host H05, H10–H20, H22 |
-| Full representative before/after acceptance | Not started | Required before claiming optimized behavior |
-| Live request audit of the running GUI (this workspace, 2026-10-19) | Complete, first fix landed | [Evidence](evidence/live-request-audit-2026-10-19.md): `session/list` ships 857 Sessions in one 23.4 MB block (core), `jj-integration` `repositories` waited 15 s on that same fold before 1.7 s of jj work, and mount-time duplicates queue behind both. `repositories` now uses a bounded, single-flight activity read and a concurrent per-repository scan. |
+| Milestone                                                          | Status                                                                                                                                                                                                                                                                                                                                                                                | Next action                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Repository and prior-work map                                      | Complete                                                                                                                                                                                                                                                                                                                                                                              | Coverage and exclusions below                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| Static client/Host/tooling audit                                   | Complete                                                                                                                                                                                                                                                                                                                                                                              | Execute linked work packages only after their gates                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| Bounded algorithm/planner measurements                             | Complete                                                                                                                                                                                                                                                                                                                                                                              | Raw samples and repeatable probes in evidence                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| Small scratch browser smoke                                        | Complete with explicit composition limitation                                                                                                                                                                                                                                                                                                                                         | Activity/Communication clean; Jujutsu owner omission recorded                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| Comprehensive optimization implementation                          | In progress: **27 register entries implemented with receipts** — client C19, C01, C03, C04, C06, C07, C08, C09, C10 (algorithm half), C11, C12, C13, C14, C16, C17, C20; Host H01, H02, H03, H04, H06 (rolling sweeps), H07 (SQL project scoping), H08 (statement reuse), H09 (overlapped sources), H21 (fingerprint cache); tooling T01, T04. Every receipt names its own remainder. | Next: C02, then C05/C15/C18, T02/T03/T05–T07, and Host H05, H10–H20, H22                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| Full representative before/after acceptance                        | Not started                                                                                                                                                                                                                                                                                                                                                                           | Required before claiming optimized behavior                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| Live request audit of the running GUI (this workspace, 2026-10-19) | Complete, first fix landed                                                                                                                                                                                                                                                                                                                                                            | [Evidence](evidence/live-request-audit-2026-10-19.md): `session/list` ships 857 Sessions in one 23.4 MB block (core), `jj-integration` `repositories` waited 15 s on that same fold before 1.7 s of jj work, and mount-time duplicates queue behind both. `repositories` now uses a bounded, single-flight activity read and a concurrent per-repository scan. A follow-up experiment ([editor bundle](evidence/editor-bundle-experiment.md)) measured the 5.66 MB editor bundle: monaco is 98 % of it, a curated feature registration saves 168 B, dropping JSON saves 490 KB at the cost of JSON support, and lazy loading needs a Host chunk route that does not exist. |
 
 **Live audit first (2026-10-19):** the running GUI's own request log was measured directly — read [the audit](evidence/live-request-audit-2026-10-19.md) before picking the next entry, because it reorders the backlog: `session/list` (23.4 MB, 857 Sessions, unpaged) is the single largest cost and is core work, `@dshfiles/jj-integration` `repositories` was fixed here, and the next owned wins are `thread-sidebar`'s mount-time duplicate queries (×2) and the 24.8 MB of client bundles.
 
@@ -47,12 +47,12 @@ Several paths already bound rendering, request volume and background work, but o
 
 ### Strongest fresh measurements
 
-| Probe | Observed result | Interpretation |
-|---|---|---|
-| No-change checkout planning | 74 source-map reads; 53,913,303 bytes; first 297 ms, five warm calls median 171 ms | Direct measured redundant parsing; T01 |
-| Pure graph layout, linear 1,000 / 2,000 revisions | Seven post-warmup calls each: median 17.43 / 37.12 ms; maxima 20.41 / 75.15 ms | C10 has a measurable algorithm cost; Node timing is not browser/typing latency |
-| Pure graph layout, branchy 1,000 / 2,000 revisions | Median 4.43 / 7.04 ms | Topology matters; do not claim every branchy graph is slow |
-| Fresh seven-bundle scratch | Doctor: 173 active entries, all selected bundles loaded; Activity and Communication reaches zero errors | Smoke evidence only, not a full-profile performance distribution |
+| Probe                                              | Observed result                                                                                         | Interpretation                                                                 |
+| -------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| No-change checkout planning                        | 74 source-map reads; 53,913,303 bytes; first 297 ms, five warm calls median 171 ms                      | Direct measured redundant parsing; T01                                         |
+| Pure graph layout, linear 1,000 / 2,000 revisions  | Seven post-warmup calls each: median 17.43 / 37.12 ms; maxima 20.41 / 75.15 ms                          | C10 has a measurable algorithm cost; Node timing is not browser/typing latency |
+| Pure graph layout, branchy 1,000 / 2,000 revisions | Median 4.43 / 7.04 ms                                                                                   | Topology matters; do not claim every branchy graph is slow                     |
+| Fresh seven-bundle scratch                         | Doctor: 173 active entries, all selected bundles loaded; Activity and Communication reaches zero errors | Smoke evidence only, not a full-profile performance distribution               |
 
 Earlier warm thread-switch p95 was approximately 98–99 ms at 1/5/20 held turns, without token deltas or long transcripts. A later run of the same harness in another thread reported materially worse and more variable numbers on a different scratch (for example agent creation p50/p95 186.1/587.2 ms, AI Accounts 150.8/968.7 ms), so treat single-run warm results as unstable rather than a stable ~100 ms guarantee. That later run also stalled on repeated-turn output; one unproven hypothesis there is fake-provider completion-id reuse, which would invalidate any streaming benchmark built on it.
 
@@ -83,17 +83,17 @@ Optimize the owner that creates the cost. Every work package must declare:
 
 ### Tech choices
 
-| Choice | Decision | Rationale |
-|---|---|---|
-| Framework/state | Keep React, existing Query and domain actors | No evidence for a rewrite; Host stays authoritative |
-| Virtualization | Reuse existing Virtual boundary | Graph/diffs already use it; apply to remaining large owned lists with keyboard/scroll tests |
-| Cross-plugin sharing | Domain-owned typed API/projection | Per-plugin Query clients intentionally do not provide a cross-plugin cache |
-| Lazy loading | Separate activation, evaluation and transfer | Current dshx emits exactly one client JS chunk; `import()` alone does not reduce transferred bytes |
-| Workers/chunks | Conditional, after algorithm and profile evidence | No unsupported chunk output, private loader workarounds or speculative worker framework |
-| Caching | Bounded, versioned, owner-local; security checks preserved | TTL alone is insufficient for identity, credential or mutation safety |
-| Concurrency | Explicit rolling bounded workers | Avoid unbounded `Promise.all` and fixed-batch head-of-line blocking; keep causally ordered writes serial |
-| Database | Existing store/schema and migrations; query-plan-first | No new native vector dependency or blind index migration |
-| Observability | Typed, bounded, redacted work-unit counters | Do not log tokens, launch URLs, prompts, message bodies, credentials or full paths unnecessarily |
+| Choice               | Decision                                                   | Rationale                                                                                                |
+| -------------------- | ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| Framework/state      | Keep React, existing Query and domain actors               | No evidence for a rewrite; Host stays authoritative                                                      |
+| Virtualization       | Reuse existing Virtual boundary                            | Graph/diffs already use it; apply to remaining large owned lists with keyboard/scroll tests              |
+| Cross-plugin sharing | Domain-owned typed API/projection                          | Per-plugin Query clients intentionally do not provide a cross-plugin cache                               |
+| Lazy loading         | Separate activation, evaluation and transfer               | Current dshx emits exactly one client JS chunk; `import()` alone does not reduce transferred bytes       |
+| Workers/chunks       | Conditional, after algorithm and profile evidence          | No unsupported chunk output, private loader workarounds or speculative worker framework                  |
+| Caching              | Bounded, versioned, owner-local; security checks preserved | TTL alone is insufficient for identity, credential or mutation safety                                    |
+| Concurrency          | Explicit rolling bounded workers                           | Avoid unbounded `Promise.all` and fixed-batch head-of-line blocking; keep causally ordered writes serial |
+| Database             | Existing store/schema and migrations; query-plan-first     | No new native vector dependency or blind index migration                                                 |
+| Observability        | Typed, bounded, redacted work-unit counters                | Do not log tokens, launch URLs, prompts, message bodies, credentials or full paths unnecessarily         |
 
 ### Architecture
 
@@ -140,29 +140,29 @@ Use the same bounded data and row models at the existing narrow layout. Validate
 
 ### Common interactions
 
-| Action | Required result |
-|---|---|
-| Close a palette/panel or disable a feature | Replaceable reads/listeners stop after documented grace; durable jobs follow their explicit contract |
-| Reopen cached content | Correct current identity and data; one refresh if stale, not a duplicate poll storm |
-| Stream into a long conversation | Decoration work follows changed blocks; offscreen loaded history does not get rescanned every frame |
-| Filter/switch repository while a request is pending | Old completion cannot overwrite current results or revive released resources |
-| Navigate to an offscreen selected row | Scroll and focus reveal it without losing menu/selection behavior |
-| Mutate a repository, credential or stored note | Owner invalidates relevant generations before stale work can publish |
+| Action                                              | Required result                                                                                      |
+| --------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| Close a palette/panel or disable a feature          | Replaceable reads/listeners stop after documented grace; durable jobs follow their explicit contract |
+| Reopen cached content                               | Correct current identity and data; one refresh if stale, not a duplicate poll storm                  |
+| Stream into a long conversation                     | Decoration work follows changed blocks; offscreen loaded history does not get rescanned every frame  |
+| Filter/switch repository while a request is pending | Old completion cannot overwrite current results or revive released resources                         |
+| Navigate to an offscreen selected row               | Scroll and focus reveal it without losing menu/selection behavior                                    |
+| Mutate a repository, credential or stored note      | Owner invalidates relevant generations before stale work can publish                                 |
 
 ## Data model
 
 No new durable product data is mandated by this plan. Implement only the domain-local structures justified by each package:
 
-| Structure | Owner / key | Required bound and invalidation |
-|---|---|---|
-| Dirty decoration block set | Conversation decorator / live DOM root | Consume each frame; remove detached nodes; dispose with root |
-| Stable visible-row projection | Owning panel / collection+filter+row identities | Reuse unchanged rows; viewport+overscan DOM, pinned focus/menu exceptions |
-| Parsed durable read model | Owning Host service / secure file revision | Entry/byte cap, external replacement detection, publish after successful write |
-| Shared read flight | Owning domain / full scoped request identity | Independent waiter cancellation; timeout; remove on settle |
-| Idle file index | Editor / Session+resolved-root identity | Active entries pinned; idle TTL/LRU and total path/byte budget |
-| Batched durable events | Existing service / event/call identity | Queue cap, flush deadline, drain/cancel policy, per-call acknowledgement |
-| Provider quota result | AI Accounts / account+credential generation | Explicit fresh mode; bounded positive/negative TTL and auth invalidation |
-| Build source dependency manifest | dshx compiler / output+input identity | Derived output; regenerate from compiler, conservatively handle missing/stale manifest |
+| Structure                        | Owner / key                                     | Required bound and invalidation                                                        |
+| -------------------------------- | ----------------------------------------------- | -------------------------------------------------------------------------------------- |
+| Dirty decoration block set       | Conversation decorator / live DOM root          | Consume each frame; remove detached nodes; dispose with root                           |
+| Stable visible-row projection    | Owning panel / collection+filter+row identities | Reuse unchanged rows; viewport+overscan DOM, pinned focus/menu exceptions              |
+| Parsed durable read model        | Owning Host service / secure file revision      | Entry/byte cap, external replacement detection, publish after successful write         |
+| Shared read flight               | Owning domain / full scoped request identity    | Independent waiter cancellation; timeout; remove on settle                             |
+| Idle file index                  | Editor / Session+resolved-root identity         | Active entries pinned; idle TTL/LRU and total path/byte budget                         |
+| Batched durable events           | Existing service / event/call identity          | Queue cap, flush deadline, drain/cancel policy, per-call acknowledgement               |
+| Provider quota result            | AI Accounts / account+credential generation     | Explicit fresh mode; bounded positive/negative TTL and auth invalidation               |
+| Build source dependency manifest | dshx compiler / output+input identity           | Derived output; regenerate from compiler, conservatively handle missing/stale manifest |
 
 Any new persistent schema or generated artifact changes its source of truth, regenerates, and receives migration/derived-output tests. Never hand-edit generated output to force a green check.
 
@@ -174,16 +174,16 @@ Any new persistent schema or generated artifact changes its source of truth, reg
 - **P2:** scale/cold-path improvements; implement after measurement or alongside the same owner when cheap and behavior-preserving.
 - **Gate:** instrumentation/contract work required before choosing an optimization. No guessed percentage speedups or unmeasured universal SLOs.
 
-| Wave | Work / dependency | Completion evidence |
-|---|---|---|
-| 0 | M01–M03: representative baseline, budgets and resource accounting | Same-fixture cold/warm distributions, full-profile compatibility, bounded raw evidence |
-| 1A | C19 shared-stream lifecycle; C01 decorators; C06 closed palette; C07 composer; C10 graph | Leak reproduction fixed; input/stream frames improve without cold-open or correctness regression |
-| 1B | H01 timeline; H02/H03 communication; H04 questions; T01 source-map scans | Count/byte/write reductions and equal durability/authority; no-change planning does not parse full maps |
-| 2 | C02/C03 sidebar; C04/C05 shell projections; C12/C13 workspace eligibility | DOM and subscriptions bounded; safety guards remain current and fail closed |
-| 3 | H05/H06 accounts; H07/H08/H09/H10 memory | Provider/SQL/scan reductions, scoped recall and cancellation correct |
-| 4 | C08/C09 editor; C11/C14/C15/C18/C20 heavy lists and image I/O; C16/C17 idle and drag work | Stable retained-memory/DOM/resource counts during churn and pagination |
-| 5 | H11–H22 (usage/JJ/remote/MCP/secrets/marketplace/plugin-updates/titles) and T02–T07 tooling | Owner-specific metrics and focused regression receipts |
-| 6 | M04 soak, full affected journeys, benchmark comparison and documentation | Every work item fixed/rejected/deferred with evidence; no critical unknown hidden as complete |
+| Wave | Work / dependency                                                                           | Completion evidence                                                                                     |
+| ---- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| 0    | M01–M03: representative baseline, budgets and resource accounting                           | Same-fixture cold/warm distributions, full-profile compatibility, bounded raw evidence                  |
+| 1A   | C19 shared-stream lifecycle; C01 decorators; C06 closed palette; C07 composer; C10 graph    | Leak reproduction fixed; input/stream frames improve without cold-open or correctness regression        |
+| 1B   | H01 timeline; H02/H03 communication; H04 questions; T01 source-map scans                    | Count/byte/write reductions and equal durability/authority; no-change planning does not parse full maps |
+| 2    | C02/C03 sidebar; C04/C05 shell projections; C12/C13 workspace eligibility                   | DOM and subscriptions bounded; safety guards remain current and fail closed                             |
+| 3    | H05/H06 accounts; H07/H08/H09/H10 memory                                                    | Provider/SQL/scan reductions, scoped recall and cancellation correct                                    |
+| 4    | C08/C09 editor; C11/C14/C15/C18/C20 heavy lists and image I/O; C16/C17 idle and drag work   | Stable retained-memory/DOM/resource counts during churn and pagination                                  |
+| 5    | H11–H22 (usage/JJ/remote/MCP/secrets/marketplace/plugin-updates/titles) and T02–T07 tooling | Owner-specific metrics and focused regression receipts                                                  |
+| 6    | M04 soak, full affected journeys, benchmark comparison and documentation                    | Every work item fixed/rejected/deferred with evidence; no critical unknown hidden as complete           |
 
 The linked [client](client.md), [Host](host.md) and [tooling](tooling.md) registers specify exact sources, changes, risks and checks. Preserve one described Conventional Commit revision per logical change, with why and a Co-Authored-By trailer; `jj new` before the next logical change. Do not integrate or push during implementation unless requested.
 
@@ -191,57 +191,57 @@ The linked [client](client.md), [Host](host.md) and [tooling](tooling.md) regist
 
 Every checkbox in the three registers is pending implementation. This table is only a map from ID to owner and priority; the register entry is authoritative for behavior, safety and validation.
 
-| ID | Owner / subject | Pri | Register |
-|---|---|---|---|
-| C01 | Incremental transcript reference decoration (memory, JJ, mentions) | P1 | [client](client.md#c01-incremental-transcript-reference-decoration-p1) |
-| C02 | Virtualize the owned thread sidebar | P1 | [client](client.md#c02-virtualize-the-owned-thread-sidebar-p1) |
-| C03 | Preserve sidebar row identities | P1 | [client](client.md#c03-preserve-sidebar-row-identities-p1) |
-| C04 | Narrow sidebar JJ metadata reads and polling | P1 | [client](client.md#c04-narrow-sidebar-jj-metadata-reads-and-polling-p1) |
-| C05 | Narrow main-tabs subscriptions and disabled lifecycle | P2 | [client](client.md#c05-narrow-main-tabs-subscriptions-and-disabled-lifecycle-p2) |
-| C06 | Stop catalog derivation while the palette is closed | P1 | [client](client.md#c06-stop-catalog-derivation-while-the-palette-is-closed-p1) |
-| C07 | Reuse composer content projection for selection-only updates | P1 | [client](client.md#c07-reuse-composer-content-projection-for-selection-only-updates-p1) |
-| C08 | Bound editor file-index retention and cancel abandoned walks | P2 | [client](client.md#c08-bound-editor-file-index-retention-and-cancel-abandoned-walks-p2) |
-| C09 | Coalesce editor filesystem-refresh bursts | P2 | [client](client.md#c09-coalesce-editor-filesystem-refresh-bursts-p2) |
-| C10 | Reduce graph layout work on the search path (measured algorithm cost) | P1 | [client](client.md#c10-reduce-graph-layout-work-on-the-search-path-p1) |
-| C11 | Index and window large changed-file trees | P2 | [client](client.md#c11-index-and-window-large-changed-file-trees-p2) |
-| C12 | Index JJ workspace eligibility once per panel snapshot | P1 | [client](client.md#c12-index-jj-workspace-eligibility-once-per-panel-snapshot-p1) |
-| C13 | Bound workspace projection-refresh fan-out | P1 | [client](client.md#c13-bound-workspace-projection-refresh-fan-out-p1) |
-| C14 | Window accumulated Activity pages | P1 | [client](client.md#c14-window-accumulated-activity-pages-p1) |
-| C15 | Separate Memory read cards from editing and window lists | P2 | [client](client.md#c15-separate-memory-read-cards-from-editing-and-window-lists-p2) |
-| C16 | Localize quota clocks to displayed precision | P2 | [client](client.md#c16-localize-quota-clocks-to-displayed-precision-p2) |
-| C17 | Coalesce drag and layout persistence at the owner | P2 | [client](client.md#c17-coalesce-drag-and-layout-persistence-at-the-owner-p2) |
-| C18 | Lazy-load historical attachment bytes | P1 | [client](client.md#c18-lazy-load-historical-attachment-bytes-p1) |
-| C19 | Correct shared-stream fallback lifetime and refcounts | P1 | [client](client.md#c19-correct-shared-stream-fallback-lifetime-and-refcounts-p1) |
-| C20 | Separate live communication head refresh from loaded history | P1 | [client](client.md#c20-separate-live-communication-head-refresh-from-loaded-history-p1) |
-| H01 | Batch Activity Timeline ingestion and cache its read model | P1 | [Host](host.md#h01-batch-activity-timeline-ingestion-and-cache-its-read-model-p1) |
-| H02 | Aggregate Agent Communication unread counts once per state revision | P1 | [Host](host.md#h02-aggregate-agent-communication-unread-counts-once-per-state-revision-p1) |
-| H03 | Reduce durable communication telemetry write amplification | P1 | [Host](host.md#h03-reduce-durable-communication-telemetry-write-amplification-p1) |
-| H04 | Share concurrent native question fact reads without stale authority | P1 | [Host](host.md#h04-share-concurrent-native-question-fact-reads-without-stale-authority-p1) |
-| H05 | Make account reads revision-aware and route refreshes no-op when unchanged | P2 | [Host](host.md#h05-make-account-reads-revision-aware-and-route-refreshes-no-op-when-unchanged-p2) |
-| H06 | Share per-account quota reads and use rolling bounded workers | P1 | [Host](host.md#h06-share-per-account-quota-reads-and-use-rolling-bounded-workers-p1) |
-| H07 | Scope memory retrieval in SQL and bound vector ranking work | P1 | [Host](host.md#h07-scope-memory-retrieval-in-sql-and-bound-vector-ranking-work-p1) |
-| H08 | Reuse memory SQL statements and bound large maintenance batches | P2 | [Host](host.md#h08-reuse-memory-sql-statements-and-bound-large-maintenance-batches-p2) |
-| H09 | Run independent thread-finder sources concurrently and batch metadata hydration | P2 | [Host](host.md#h09-run-independent-thread-finder-sources-concurrently-and-batch-metadata-hydration-p2) |
-| H10 | Incrementalize and globally bound memory digest/classifier work | P1 | [Host](host.md#h10-incrementalize-and-globally-bound-memory-digestclassifier-work-p1) |
-| H11 | Avoid full idle usage discovery and enforce index IO/CPU budgets | P1 | [Host](host.md#h11-avoid-full-idle-usage-discovery-and-enforce-index-iocpu-budgets-p1) |
-| H12 | Cache or incrementally materialize usage chart projections | P2 | [Host](host.md#h12-cache-or-incrementally-materialize-usage-chart-projections-p2) |
-| H13 | Reduce cold JJ integration process fanout (measurement/CLI feasibility gate) | P2 | [Host](host.md#h13-reduce-cold-jj-integration-process-fanout-p2-measurementcli-feasibility-gate) |
-| H14 | Parallelize/lazily load immutable Jujutsu detail data | P1 | [Host](host.md#h14-parallelizelazily-load-immutable-jujutsu-detail-data-p1) |
-| H15 | Separate Jujutsu mutable snapshots from slow-changing adjunct reads | P1 | [Host](host.md#h15-separate-jujutsu-mutable-snapshots-from-slow-changing-adjunct-reads-p1) |
-| H16 | Share remote read snapshots within existing gateway lifetimes | P2 | [Host](host.md#h16-share-remote-read-snapshots-within-existing-gateway-lifetimes-p2) |
-| H17 | Coalesce MCP reconciliation and avoid unnecessary credential work | P2 | [Host](host.md#h17-coalesce-mcp-reconciliation-and-avoid-unnecessary-credential-work-p2) |
-| H18 | Cache only decoded Secret Catalog metadata | P2 | [Host](host.md#h18-cache-only-decoded-secret-catalog-metadata-p2) |
-| H19 | Cache public marketplace pages and bound catalog response bodies | P2 | [Host](host.md#h19-cache-public-marketplace-pages-and-bound-catalog-response-bodies-p2) |
-| H20 | Editor file-index lifecycle and relist batching (explicit C08/C09 cross-reference) | P2 | [Host](host.md#h20-editor-file-index-lifecycle-and-relist-batching-cross-reference-only) |
-| H21 | Avoid rehashing every plugin Host bundle on every update check | P1 | [Host](host.md#h21-avoid-rehashing-every-plugin-host-bundle-on-every-update-check-p1) |
-| H22 | Hydrate thread titles only for emitted unfiltered rows | P2 | [Host](host.md#h22-hydrate-thread-titles-only-for-emitted-unfiltered-rows-p2) |
-| T01 | Read compact build dependencies, not complete source maps (measured) | P1 | [tooling](tooling.md#t01-read-compact-build-dependencies-not-complete-source-maps-p1-measured-done) |
-| T02 | Share compiler source analysis within a build generation | P2 | [tooling](tooling.md#t02-share-compiler-source-analysis-within-a-build-generation-p2) |
-| T03 | Reuse trustworthy TypeScript work without bypassing validation | P2 | [tooling](tooling.md#t03-reuse-trustworthy-typescript-work-without-bypassing-standalone-validation-p2) |
-| T04 | Scope browser-check prerequisites and digests to selected owners | P1/P2 | [tooling](tooling.md#t04-scope-browser-check-prerequisites-and-artifact-digests-to-selected-owners-p1p2) |
-| T05 | Align shared CSS scanning and cache inputs | P2 | [tooling](tooling.md#t05-align-shared-css-scanning-and-cache-inputs-p2-measurement-gate) |
-| T06 | Remove repeated scratch preparation without sharing mutable test state | P2 | [tooling](tooling.md#t06-remove-repeated-scratch-preparation-without-sharing-mutable-test-state-p2) |
-| T07 | Lazy CLI command implementation imports | P2 | [tooling](tooling.md#t07-lazy-cli-command-implementation-imports-p2) |
+| ID  | Owner / subject                                                                    | Pri   | Register                                                                                                 |
+| --- | ---------------------------------------------------------------------------------- | ----- | -------------------------------------------------------------------------------------------------------- |
+| C01 | Incremental transcript reference decoration (memory, JJ, mentions)                 | P1    | [client](client.md#c01-incremental-transcript-reference-decoration-p1)                                   |
+| C02 | Virtualize the owned thread sidebar                                                | P1    | [client](client.md#c02-virtualize-the-owned-thread-sidebar-p1)                                           |
+| C03 | Preserve sidebar row identities                                                    | P1    | [client](client.md#c03-preserve-sidebar-row-identities-p1)                                               |
+| C04 | Narrow sidebar JJ metadata reads and polling                                       | P1    | [client](client.md#c04-narrow-sidebar-jj-metadata-reads-and-polling-p1)                                  |
+| C05 | Narrow main-tabs subscriptions and disabled lifecycle                              | P2    | [client](client.md#c05-narrow-main-tabs-subscriptions-and-disabled-lifecycle-p2)                         |
+| C06 | Stop catalog derivation while the palette is closed                                | P1    | [client](client.md#c06-stop-catalog-derivation-while-the-palette-is-closed-p1)                           |
+| C07 | Reuse composer content projection for selection-only updates                       | P1    | [client](client.md#c07-reuse-composer-content-projection-for-selection-only-updates-p1)                  |
+| C08 | Bound editor file-index retention and cancel abandoned walks                       | P2    | [client](client.md#c08-bound-editor-file-index-retention-and-cancel-abandoned-walks-p2)                  |
+| C09 | Coalesce editor filesystem-refresh bursts                                          | P2    | [client](client.md#c09-coalesce-editor-filesystem-refresh-bursts-p2)                                     |
+| C10 | Reduce graph layout work on the search path (measured algorithm cost)              | P1    | [client](client.md#c10-reduce-graph-layout-work-on-the-search-path-p1)                                   |
+| C11 | Index and window large changed-file trees                                          | P2    | [client](client.md#c11-index-and-window-large-changed-file-trees-p2)                                     |
+| C12 | Index JJ workspace eligibility once per panel snapshot                             | P1    | [client](client.md#c12-index-jj-workspace-eligibility-once-per-panel-snapshot-p1)                        |
+| C13 | Bound workspace projection-refresh fan-out                                         | P1    | [client](client.md#c13-bound-workspace-projection-refresh-fan-out-p1)                                    |
+| C14 | Window accumulated Activity pages                                                  | P1    | [client](client.md#c14-window-accumulated-activity-pages-p1)                                             |
+| C15 | Separate Memory read cards from editing and window lists                           | P2    | [client](client.md#c15-separate-memory-read-cards-from-editing-and-window-lists-p2)                      |
+| C16 | Localize quota clocks to displayed precision                                       | P2    | [client](client.md#c16-localize-quota-clocks-to-displayed-precision-p2)                                  |
+| C17 | Coalesce drag and layout persistence at the owner                                  | P2    | [client](client.md#c17-coalesce-drag-and-layout-persistence-at-the-owner-p2)                             |
+| C18 | Lazy-load historical attachment bytes                                              | P1    | [client](client.md#c18-lazy-load-historical-attachment-bytes-p1)                                         |
+| C19 | Correct shared-stream fallback lifetime and refcounts                              | P1    | [client](client.md#c19-correct-shared-stream-fallback-lifetime-and-refcounts-p1)                         |
+| C20 | Separate live communication head refresh from loaded history                       | P1    | [client](client.md#c20-separate-live-communication-head-refresh-from-loaded-history-p1)                  |
+| H01 | Batch Activity Timeline ingestion and cache its read model                         | P1    | [Host](host.md#h01-batch-activity-timeline-ingestion-and-cache-its-read-model-p1)                        |
+| H02 | Aggregate Agent Communication unread counts once per state revision                | P1    | [Host](host.md#h02-aggregate-agent-communication-unread-counts-once-per-state-revision-p1)               |
+| H03 | Reduce durable communication telemetry write amplification                         | P1    | [Host](host.md#h03-reduce-durable-communication-telemetry-write-amplification-p1)                        |
+| H04 | Share concurrent native question fact reads without stale authority                | P1    | [Host](host.md#h04-share-concurrent-native-question-fact-reads-without-stale-authority-p1)               |
+| H05 | Make account reads revision-aware and route refreshes no-op when unchanged         | P2    | [Host](host.md#h05-make-account-reads-revision-aware-and-route-refreshes-no-op-when-unchanged-p2)        |
+| H06 | Share per-account quota reads and use rolling bounded workers                      | P1    | [Host](host.md#h06-share-per-account-quota-reads-and-use-rolling-bounded-workers-p1)                     |
+| H07 | Scope memory retrieval in SQL and bound vector ranking work                        | P1    | [Host](host.md#h07-scope-memory-retrieval-in-sql-and-bound-vector-ranking-work-p1)                       |
+| H08 | Reuse memory SQL statements and bound large maintenance batches                    | P2    | [Host](host.md#h08-reuse-memory-sql-statements-and-bound-large-maintenance-batches-p2)                   |
+| H09 | Run independent thread-finder sources concurrently and batch metadata hydration    | P2    | [Host](host.md#h09-run-independent-thread-finder-sources-concurrently-and-batch-metadata-hydration-p2)   |
+| H10 | Incrementalize and globally bound memory digest/classifier work                    | P1    | [Host](host.md#h10-incrementalize-and-globally-bound-memory-digestclassifier-work-p1)                    |
+| H11 | Avoid full idle usage discovery and enforce index IO/CPU budgets                   | P1    | [Host](host.md#h11-avoid-full-idle-usage-discovery-and-enforce-index-iocpu-budgets-p1)                   |
+| H12 | Cache or incrementally materialize usage chart projections                         | P2    | [Host](host.md#h12-cache-or-incrementally-materialize-usage-chart-projections-p2)                        |
+| H13 | Reduce cold JJ integration process fanout (measurement/CLI feasibility gate)       | P2    | [Host](host.md#h13-reduce-cold-jj-integration-process-fanout-p2-measurementcli-feasibility-gate)         |
+| H14 | Parallelize/lazily load immutable Jujutsu detail data                              | P1    | [Host](host.md#h14-parallelizelazily-load-immutable-jujutsu-detail-data-p1)                              |
+| H15 | Separate Jujutsu mutable snapshots from slow-changing adjunct reads                | P1    | [Host](host.md#h15-separate-jujutsu-mutable-snapshots-from-slow-changing-adjunct-reads-p1)               |
+| H16 | Share remote read snapshots within existing gateway lifetimes                      | P2    | [Host](host.md#h16-share-remote-read-snapshots-within-existing-gateway-lifetimes-p2)                     |
+| H17 | Coalesce MCP reconciliation and avoid unnecessary credential work                  | P2    | [Host](host.md#h17-coalesce-mcp-reconciliation-and-avoid-unnecessary-credential-work-p2)                 |
+| H18 | Cache only decoded Secret Catalog metadata                                         | P2    | [Host](host.md#h18-cache-only-decoded-secret-catalog-metadata-p2)                                        |
+| H19 | Cache public marketplace pages and bound catalog response bodies                   | P2    | [Host](host.md#h19-cache-public-marketplace-pages-and-bound-catalog-response-bodies-p2)                  |
+| H20 | Editor file-index lifecycle and relist batching (explicit C08/C09 cross-reference) | P2    | [Host](host.md#h20-editor-file-index-lifecycle-and-relist-batching-cross-reference-only)                 |
+| H21 | Avoid rehashing every plugin Host bundle on every update check                     | P1    | [Host](host.md#h21-avoid-rehashing-every-plugin-host-bundle-on-every-update-check-p1)                    |
+| H22 | Hydrate thread titles only for emitted unfiltered rows                             | P2    | [Host](host.md#h22-hydrate-thread-titles-only-for-emitted-unfiltered-rows-p2)                            |
+| T01 | Read compact build dependencies, not complete source maps (measured)               | P1    | [tooling](tooling.md#t01-read-compact-build-dependencies-not-complete-source-maps-p1-measured-done)      |
+| T02 | Share compiler source analysis within a build generation                           | P2    | [tooling](tooling.md#t02-share-compiler-source-analysis-within-a-build-generation-p2)                    |
+| T03 | Reuse trustworthy TypeScript work without bypassing validation                     | P2    | [tooling](tooling.md#t03-reuse-trustworthy-typescript-work-without-bypassing-standalone-validation-p2)   |
+| T04 | Scope browser-check prerequisites and digests to selected owners                   | P1/P2 | [tooling](tooling.md#t04-scope-browser-check-prerequisites-and-artifact-digests-to-selected-owners-p1p2) |
+| T05 | Align shared CSS scanning and cache inputs                                         | P2    | [tooling](tooling.md#t05-align-shared-css-scanning-and-cache-inputs-p2-measurement-gate)                 |
+| T06 | Remove repeated scratch preparation without sharing mutable test state             | P2    | [tooling](tooling.md#t06-remove-repeated-scratch-preparation-without-sharing-mutable-test-state-p2)      |
+| T07 | Lazy CLI command implementation imports                                            | P2    | [tooling](tooling.md#t07-lazy-cli-command-implementation-imports-p2)                                     |
 
 Anchor links resolve against the register headings; a heading rename must update this table.
 
@@ -310,11 +310,11 @@ No user decision blocks starting the evidence-first work. User selected the `per
 
 ## Decisions log
 
-| Date | Decision | Rationale |
-|---|---|---|
-| 2026-10-18 | User chose `performance-optimization` | One repository-wide master plan |
-| 2026-10-18 | Audit and plan only; extend existing owned implementations | User requested a fix plan; avoid unreviewed product changes |
-| 2026-10-18 | Keep React, Query and Host authority | Existing integration and no demonstrated case for a migration |
+| Date       | Decision                                                                      | Rationale                                                         |
+| ---------- | ----------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| 2026-10-18 | User chose `performance-optimization`                                         | One repository-wide master plan                                   |
+| 2026-10-18 | Audit and plan only; extend existing owned implementations                    | User requested a fix plan; avoid unreviewed product changes       |
+| 2026-10-18 | Keep React, Query and Host authority                                          | Existing integration and no demonstrated case for a migration     |
 | 2026-10-18 | Preserve JJ/question/communication caches and bounded fan-out already present | Older hypotheses and broad scanner warnings are not current proof |
-| 2026-10-18 | Rank measured planner/graph costs separately from static opportunities | Prevent an empty/warm/synthetic result becoming a universal claim |
-| 2026-10-18 | Stop at supported Host/core boundaries | Repository contract forbids core patches and unsafe substitutes |
+| 2026-10-18 | Rank measured planner/graph costs separately from static opportunities        | Prevent an empty/warm/synthetic result becoming a universal claim |
+| 2026-10-18 | Stop at supported Host/core boundaries                                        | Repository contract forbids core patches and unsafe substitutes   |
