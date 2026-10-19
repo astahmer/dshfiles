@@ -83,6 +83,9 @@ const completeDraftMigration = (expectedStore: DraftStore): void => {
   storedDrafts.reload()
 }
 
+/** 30 s, so switching threads reuses the snapshot instead of asking the Host once per mounted control. */
+const SNAPSHOT_STALE_MS = 30_000
+
 /** The Host snapshot owns shared drafts; this value is only the browser fallback until Host writes succeed. */
 export const useSavedDrafts = (): SavedDraftsClient => {
   const api = useApi(promptStashApi)
@@ -92,6 +95,8 @@ export const useSavedDrafts = (): SavedDraftsClient => {
     queryKey: PromptDraftQueries.key,
     queryFn: async ({ signal }) =>
       PromptDraftQueries.newest(queryClient.getQueryData<DraftSnapshot>(PromptDraftQueries.key), await api.drafts(undefined, { signal })),
+    // Several composer controls read drafts and remount with every thread; this client's own writes update the cache.
+    staleTime: SNAPSHOT_STALE_MS,
   })
   const saveMutation = useMutation<DraftMutation, Error, SaveDraftVariables>({
     mutationFn: async input =>

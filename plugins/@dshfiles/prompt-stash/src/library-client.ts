@@ -228,6 +228,9 @@ const completeLocalLibraryMigration = (expectedStore: PromptLibraryStore): void 
 const createPromptId = (): string => globalThis.crypto.randomUUID()
 const nowMilliseconds = (): number => Date.now()
 
+/** 30 s, so switching threads reuses the library instead of asking the Host on every composer mount. */
+const LIBRARY_STALE_MS = 30_000
+
 /** The Host snapshot owns the shared library; validated local storage is only the offline/HMR fallback. */
 export const usePromptLibrary = (options: { readonly pollWhileOpen: boolean } = { pollWhileOpen: false }): PromptLibraryClient => {
   const api = useApi(promptStashApi)
@@ -242,6 +245,8 @@ export const usePromptLibrary = (options: { readonly pollWhileOpen: boolean } = 
         promptStashStateSchema.parse(await api.state(undefined, { signal })),
       ),
     refetchInterval: options.pollWhileOpen ? 2_000 : false,
+    // Composer controls remount with every thread; this client's own writes update the cache, and an open library polls.
+    staleTime: LIBRARY_STALE_MS,
   })
   const saveMutation = useMutation<PromptStashMutation, Error, SavePromptVariables>({
     mutationFn: async input =>
