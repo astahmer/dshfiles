@@ -1720,6 +1720,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
         {pickerOpen && (
           <ProjectFolderPicker
             directoryPicker={props.directoryPicker}
+            excludeJjWorkspaces
             onClose={() => setPickerOpen(false)}
             onRegisterWorkspace={props.registerWorkspace}
             onSelect={selected => {

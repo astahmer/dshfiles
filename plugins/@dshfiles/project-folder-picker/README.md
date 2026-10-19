@@ -17,7 +17,8 @@ port, and a workspace registration callback.
 ```
 
 Optional props: `title`, `machineName`, `placeholder`, `recentFolders`,
-`disabled`, `mode`, `showNativePicker`, and `onUseAbsolutePath`. The default
+`excludeJjWorkspaces`, `disabled`, `mode`, `showNativePicker`, and
+`onUseAbsolutePath`. The default
 `projects` mode shows registered projects and switches to browsing when the
 query starts with `/` or `~/`. A unique matching folder opens as the path is
 typed; ambiguous matches remain available for keyboard selection, and truncated
@@ -30,8 +31,16 @@ the Host-canonical path.
 registration. It offers direct path submission only when `onUseAbsolutePath` is
 provided, so the caller can validate the uncanonicalized path. Set
 `showNativePicker` to `false` when the injected Host backend has no native
-chooser. Recent folders (previously chosen paths listed after the projects)
-yield a `directory` selection.
+chooser.
+
+Project mode splits its list into small **Projects** and **Recents** tabs; the
+Recents tab appears only when there are recent folders (previously chosen paths
+that are not registered projects), and choosing one yields a `directory`
+selection. When any project carries `isJjWorkspace: true`, the Projects tab
+shows a **Hide JJ workspaces** switch; `excludeJjWorkspaces` sets its initial
+state. The secret catalog, the Jujutsu repository picker and the remote-host
+destination turn it on, since they want the project rather than a thread's
+workspace of it.
 
 `RegisteredProject` requires `workspaceId`, `title`, and the Host-canonical
 `canonicalPath`. Selection is a discriminated union:

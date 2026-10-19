@@ -25,7 +25,7 @@ Then('the picker starts in folder browsing mode without project actions', async 
   await recordAssertion(page, 'native-chooser-is-not-offered', () => expect(dialog.getByRole('button', { name: 'Browse…' })).toHaveCount(0))
   await recordAssertion(page, 'project-actions-are-not-offered', async () => {
     await expect(dialog.getByText('Register project', { exact: true })).toHaveCount(0)
-    await expect(dialog.getByRole('listbox', { name: 'Projects and recent folders' })).toHaveCount(0)
+    await expect(dialog.getByRole('listbox', { name: 'Projects', exact: true })).toHaveCount(0)
   })
   await finishJourneyAssertions(page)
 })
