@@ -99,6 +99,11 @@
           "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature"
         },
         {
+          "kind": "gherkin",
+          "id": "ai-accounts.priority-routing",
+          "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature"
+        },
+        {
           "kind": "unit-test",
           "id": "ai-accounts.request-distribution",
           "file": "plugins/@dshfiles/ai-accounts/src/request-account-routing.test.ts",

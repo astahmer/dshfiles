@@ -94,6 +94,14 @@ Feature: AI Accounts
     And a new thread asks the first account's model a question
     Then the healthy account answers and the rate-limited one cools down
 
+  @scenario:ai-accounts.priority-routing
+  Scenario: Priority serves each request from the first healthy account in list order
+    Given the isolated plugin profile "@dshfiles/ai-accounts" is booted
+    When a rate-limited and a healthy Command Code account share a local fake provider
+    And request distribution is set to Priority
+    And a new thread asks the second account's model a question
+    Then the first account is tried, the healthy one answers, and the next request goes straight to it
+
   @scenario:ai-accounts.quota-recovery-route
   Scenario: Recover an exhausted turn on another route
     Given the isolated plugin profile "@dshfiles/ai-accounts" is booted

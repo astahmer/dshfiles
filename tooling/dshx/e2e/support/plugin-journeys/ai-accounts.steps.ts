@@ -397,6 +397,44 @@ Then('the healthy account answers and the rate-limited one cools down', async ({
   await finishJourneyAssertions(page)
 })
 
+When('request distribution is set to Priority', async ({ page }: { page: Page }) => {
+  const distribution = page.getByRole('combobox', { name: 'Request distribution' })
+  await distribution.click()
+  await page.getByRole('option', { name: /Priority/ }).click()
+  await expect(distribution).toHaveText('Priority')
+})
+
+When("a new thread asks the second account's model a question", async ({ page }: { page: Page }) => {
+  await page.getByRole('button', { name: 'New session', exact: true }).first().click()
+  await page.getByRole('button', { name: /^Select model/ }).click()
+  await selectAccountModel(page, 'commandcode_work_2/gpt-6-luna')
+  await expect(page.getByRole('button', { name: /^Select model, current commandcode_work_2\/gpt-6-luna/ })).toBeVisible()
+  const composer = page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })
+  await composer.fill('Which account answers first?')
+  await composer.press('Enter')
+})
+
+Then('the first account is tried, the healthy one answers, and the next request goes straight to it', async ({ page }: { page: Page }) => {
+  const turnKeys = (): string[] =>
+    fakeCommandCodeFor(page)
+      .requests.filter(request => request.kind === 'turn')
+      .map(request => request.key)
+  await recordAssertion(page, 'ai-accounts-priority-tries-the-first-account', async () => {
+    await expect(page.getByText('Answered by BRAVO2', { exact: true }).last()).toBeVisible({ timeout: 30_000 })
+    expect(turnKeys()[0]).toBe('e2e-fake-key-LIMITED')
+    expect(turnKeys().at(-1)).toBe('e2e-fake-key-BRAVO2')
+  })
+  const before = turnKeys().length
+  const composer = page.getByRole('textbox', { name: /\/ commands, @ files or sessions$/ })
+  await composer.fill('And the next request?')
+  await composer.press('Enter')
+  await recordAssertion(page, 'ai-accounts-priority-skips-the-cooling-account', async () => {
+    await expect(page.getByText('Answered by BRAVO2', { exact: true })).toHaveCount(2, { timeout: 30_000 })
+    expect(turnKeys().slice(before)).toEqual(['e2e-fake-key-BRAVO2'])
+  })
+  await finishJourneyAssertions(page)
+})
+
 const failTurnOnExhaustedAccount = async (page: Page, key: string): Promise<void> => {
   await startFakeCommandCode(page)
   await openAccountsPanel(page)
