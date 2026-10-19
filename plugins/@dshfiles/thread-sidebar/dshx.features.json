@@ -567,7 +567,9 @@
         "expect text \"This turn failed*\"",
         "rightclick text \"Settled archive target\" at 8,8",
         "click menuitem \"Settle\"",
-        "expect text \"This thread is settled.\""
+        "expect text \"This thread is settled.\"",
+        "click button \"Sidebar settings\"",
+        "expect group \"Archive settled threads\""
       ],
       "surfaces": ["client", "settings"],
       "configuration": [
