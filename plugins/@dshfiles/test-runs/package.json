@@ -20,8 +20,7 @@
     "build": "dshx build",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test:boot": "node ../../../tooling/dshx/scripts/boot-check-web.mjs --plugin",
-    "test:e2e": "node ../../../tooling/dshx/scripts/run-e2e.mjs"
+    "test:boot": "node ../../../tooling/dshx/scripts/boot-check-web.mjs --plugin"
   },
   "dependencies": {
     "@dshfiles/dshx": "workspace:*",
@@ -35,14 +34,13 @@
     "@deepseek-ai/dsh-client-connection": "catalog:",
     "@deepseek-ai/dsh-client-ui-chat": "catalog:",
     "@deepseek-ai/dsh-client-ui-conversation": "catalog:",
+    "@deepseek-ai/dsh-client-ui-primitives": "catalog:",
     "@deepseek-ai/dsh-client-ui-renderer": "catalog:",
     "@deepseek-ai/dsh-client-ui-slots": "catalog:",
     "@deepseek-ai/dsh-client-ui-tool": "catalog:",
-    "@testing-library/react": "catalog:",
     "@types/node": "22.20.5",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
-    "jsdom": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
     "typescript": "catalog:",
@@ -54,6 +52,7 @@
     "@deepseek-ai/dsh-client-connection": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-client-ui-chat": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-client-ui-conversation": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-client-ui-primitives": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-client-ui-renderer": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-client-ui-slots": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-client-ui-tool": ">=0.2.1-rc.2 <0.3.0-0",
@@ -78,5 +77,8 @@
       ],
       "immediately": false
     }
+  },
+  "dshx": {
+    "features": "./dshx.features.json"
   }
 }
