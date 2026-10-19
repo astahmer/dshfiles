@@ -185,7 +185,7 @@ export const accountsHostApi = aiAccountsApi.host({
   refreshUsage: async ({ ctx }) => accountRuntime(ctx)?.usageCache?.refresh() ?? readAccountsUsage(ctx),
   history: async ({ input, ctx }) => ({
     instanceId: input.instanceId,
-    points: [...(await createUsageHistoryService(ctx).read(input.instanceId, Date.now() - input.days * 24 * 60 * 60_000))],
+    points: [...(await createUsageHistoryService(ctx).read(input.instanceId, Date.now() - input.days * 24 * 60 * 60_000, input.bucketMinutes))],
   }),
   historySettings: async ({ ctx }) => createUsageHistoryService(ctx).readSettings(),
   saveHistorySettings: async ({ input, ctx }) => createUsageHistoryService(ctx).saveSettings(input),

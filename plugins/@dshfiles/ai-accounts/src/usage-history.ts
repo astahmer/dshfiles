@@ -85,6 +85,30 @@ const boundUsageHistoryPoints = (points: readonly QuotaSnapshot[]): readonly Quo
     .filter((point): point is QuotaSnapshot => point !== undefined)
 }
 
+/**
+ * One reading per bucket (its last), plus every reading where a reset time or
+ * the set of spent windows changes, so a thinned series still shows when an
+ * account ran out and when it came back.
+ */
+const thinUsageHistoryPoints = (points: readonly QuotaSnapshot[], bucketMinutes: number): readonly QuotaSnapshot[] => {
+  const ordered = [...points].sort((left, right) => left.at - right.at)
+  const bucketOf = (at: number): number => Math.floor(at / (bucketMinutes * MINUTE_MS))
+  const signatureOf = (point: QuotaSnapshot): string =>
+    JSON.stringify([
+      Object.entries(point.resetsAt).sort(([left], [right]) => left.localeCompare(right)),
+      Object.entries(point.windows)
+        .filter(([, remaining]) => remaining <= 0.5)
+        .map(([label]) => label)
+        .sort(),
+    ])
+  return ordered.filter((point, index) => {
+    const next = ordered[index + 1]
+    const previous = ordered[index - 1]
+    if (next === undefined || previous === undefined || bucketOf(next.at) !== bucketOf(point.at)) return true
+    return signatureOf(previous) !== signatureOf(point)
+  })
+}
+
 export const usageHistoryDomain = defineDomain({
   name: USAGE_HISTORY_DOMAIN,
   version: 1,
@@ -143,4 +167,5 @@ export class UsageHistoryModel {
   static readonly boundPoints = boundUsageHistoryPoints
   static readonly bucketKey = usageBucketKey
   static readonly parseBucketKey = parseUsageBucketKey
+  static readonly thinPoints = thinUsageHistoryPoints
 }

@@ -28,6 +28,19 @@ describe('quota usage-history analysis', () => {
     expect(UsageHistoryModel.bucketKey('codex:personal', at, 5)).not.toBe(UsageHistoryModel.bucketKey('codex:personal', at, 15))
   })
 
+  it('thins a read to one reading per bucket but keeps the readings where a limit is spent or resets', () => {
+    const minute = 60_000
+    const snapshots = Array.from({ length: 120 }, (_, index) => ({
+      ...point(index * 5 * minute, index >= 40 && index < 50 ? 0 : 50, index < 90 ? 1_000_000_000 : 2_000_000_000),
+      instanceId: 'claude',
+    }))
+
+    const thinned = UsageHistoryModel.thinPoints(snapshots, 60)
+    const times = thinned.map(snapshot => snapshot.at / (5 * minute))
+
+    expect(times).toEqual([0, 11, 23, 35, 40, 47, 50, 59, 71, 83, 90, 95, 107, 119])
+  })
+
   it('bounds long history reads while preserving recent forecasts and reset-bank changes', () => {
     const snapshots = Array.from({ length: 10_000 }, (_, index) => ({
       ...point(index * 60_000, 100 - (index % 100), (Math.floor(index / 1_000) + 1) * 1_000_000, Math.floor(index / 200)),

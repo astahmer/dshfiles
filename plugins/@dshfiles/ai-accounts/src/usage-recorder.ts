@@ -169,7 +169,7 @@ const pruneUsageHistory = async (ctx: Context, retentionDays: number): Promise<n
 }
 
 /** Readings for one account, oldest first, so a chart reads left to right. */
-const readUsageHistory = async (ctx: Context, instanceId: string, sinceMs: number): Promise<readonly QuotaSnapshot[]> => {
+const readUsageHistory = async (ctx: Context, instanceId: string, sinceMs: number, bucketMinutes?: number): Promise<readonly QuotaSnapshot[]> => {
   const opening = usageDomain(ctx)
   if (opening === undefined) return []
   const domain = await opening
@@ -177,7 +177,7 @@ const readUsageHistory = async (ctx: Context, instanceId: string, sinceMs: numbe
     .filter(([key, value]) => UsageHistoryModel.parseBucketKey(key)?.instanceId === instanceId && value.at >= sinceMs)
     .map(([, value]) => value)
     .map(value => ({ ...value, bankedResetExpiries: value.bankedResetExpiries ?? [] }))
-  return UsageHistoryModel.boundPoints(rows)
+  return UsageHistoryModel.boundPoints(bucketMinutes === undefined ? rows : UsageHistoryModel.thinPoints(rows, bucketMinutes))
 }
 
 export interface UsageHistoryScheduler {

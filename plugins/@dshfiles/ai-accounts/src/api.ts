@@ -448,6 +448,8 @@ export const aiAccountsApi = defineApi({
       input: z.object({
         instanceId: z.string().min(1).max(64),
         days: z.number().int().min(1).max(365).default(7),
+        /** Keep one reading per bucket, plus every reset or spent-limit change, so a long range stays small. */
+        bucketMinutes: z.number().int().min(5).max(360).optional(),
       }),
       output: z.object({
         instanceId: z.string().min(1).max(64),
