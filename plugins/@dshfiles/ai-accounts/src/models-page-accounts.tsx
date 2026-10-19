@@ -5,9 +5,11 @@ import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
 import { ChevronDownIcon, PlusIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
+import { useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useEffect, useState } from 'react'
 import { AccountDraftModel } from './account-draft.js'
 import { KIND_GROUPS, KIND_LABEL, STATE_LABEL } from './account-labels.js'
+import { aiAccountsKeys, aiAccountsQueries } from './accounts-queries.js'
 import { aiAccountsApi, type AccountDraft, type AccountProfile, type AccountsFile } from './api.js'
 import { AutoSaveIndicator } from './auto-save-indicator.js'
 import { useAutoSaver } from './auto-save.js'
@@ -25,12 +27,13 @@ const CREDENTIAL_FIELD = {
   cursor: { key: 'apiKeyEnv', label: 'Token variable', placeholder: 'empty: cursor-agent login' },
 } as const satisfies Record<AccountDraft['kind'], { readonly key: 'homePath' | 'apiKeyEnv'; readonly label: string; readonly placeholder: string } | null>
 
-const QuickEditor = (props: { readonly profile: AccountProfile; readonly onSaved: (file: AccountsFile) => void }): JSX.Element => {
-  const accounts = useApi(aiAccountsApi)
+const QuickEditor = (props: { readonly profile: AccountProfile; readonly saveDraft: (draft: AccountDraft) => Promise<AccountsFile> }): JSX.Element => {
   const preferences = usePreferences()
   const [draft, setDraft] = useState<AccountDraft>(() => AccountDraftModel.toDraft(props.profile))
   const { saver, status } = useAutoSaver<AccountDraft>({
-    save: async next => props.onSaved(await accounts.save({ draft: next })),
+    save: async next => {
+      await props.saveDraft(next)
+    },
     equals: AccountDraftModel.sameDraft,
     delayMs: preferences.autoSaveDelayMs,
   })
@@ -108,27 +111,28 @@ const QuickEditor = (props: { readonly profile: AccountProfile; readonly onSaved
 export const ModelsPageAccounts = (): JSX.Element | null => {
   const accounts = useApi(aiAccountsApi)
   const preferences = usePreferences()
-  const [file, setFile] = useState<AccountsFile | null>(null)
+  const queryClient = useQueryClient()
+  const fileQuery = useQuery({ ...aiAccountsQueries.file(accounts), enabled: preferences.modelsPageAccounts, retry: false })
+  const file = fileQuery.data ?? null
   const [expanded, setExpanded] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
-
-  useEffect(() => {
-    void accounts
-      .read()
-      .then(setFile)
-      .catch(() => setNotice('The AI Accounts host did not answer.'))
-  }, [accounts])
+  const setFile = (next: AccountsFile): void => {
+    queryClient.setQueryData(aiAccountsKeys.file, next)
+  }
+  const saveMutation = useMutation({
+    mutationFn: (draft: AccountDraft) => accounts.save({ draft }),
+    onMutate: () => setNotice(null),
+    onSuccess: setFile,
+  })
+  const shownNotice = notice ?? (fileQuery.isError && file === null ? 'The AI Accounts host did not answer.' : null)
 
   if (!preferences.modelsPageAccounts) return null
 
   const create = (kind: AccountDraft['kind']): void => {
     const next = AccountDraftModel.newAccountDraft({ kind, existing: file?.accounts ?? [] })
-    void accounts
-      .save({ draft: next })
-      .then(saved => {
-        setFile(saved)
-        setExpanded(next.instanceId)
-      })
+    void saveMutation
+      .mutateAsync(next)
+      .then(() => setExpanded(next.instanceId))
       .catch((cause: unknown) => setNotice(`Could not add the account: ${String(cause)}`))
   }
 
@@ -156,7 +160,7 @@ export const ModelsPageAccounts = (): JSX.Element | null => {
           </DropdownMenuContent>
         </DropdownMenu>
       </header>
-      {notice === null ? null : <p className="dshx:text-xs dshx:text-destructive">{notice}</p>}
+      {shownNotice === null ? null : <p className="dshx:text-xs dshx:text-destructive">{shownNotice}</p>}
       <ul className="dshx:flex dshx:flex-col dshx:gap-1.5">
         {(file?.accounts ?? []).map(profile => {
           const open = expanded === profile.instanceId
@@ -180,9 +184,8 @@ export const ModelsPageAccounts = (): JSX.Element | null => {
                   aria-label={`${profile.enabled ? 'Disable' : 'Enable'} ${profile.displayName}`}
                   checked={profile.enabled}
                   onCheckedChange={enabled =>
-                    void accounts
-                      .save({ draft: { ...AccountDraftModel.toDraft(profile), enabled } })
-                      .then(setFile)
+                    void saveMutation
+                      .mutateAsync({ ...AccountDraftModel.toDraft(profile), enabled })
                       .catch((cause: unknown) => setNotice(`Could not save: ${String(cause)}`))
                   }
                   size="sm"
@@ -199,7 +202,7 @@ export const ModelsPageAccounts = (): JSX.Element | null => {
                   <ChevronDownIcon className={cn('dshx:transition-transform', open && 'dshx:rotate-180')} />
                 </Button>
               </div>
-              {open ? <QuickEditor onSaved={setFile} profile={profile} /> : null}
+              {open ? <QuickEditor profile={profile} saveDraft={draft => saveMutation.mutateAsync(draft)} /> : null}
             </li>
           )
         })}
