@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { brandStyle, projectOf } from './home-model.js'
+import { isNewThreadScreen } from './new-thread-screen.js'
 import { homeSettings } from './settings.js'
 
 const workspace = (path: string) => ({ workspaceId: path, path, title: path, sessionIds: [], createdAt: '', updatedAt: '' }) as never
@@ -11,6 +12,13 @@ describe('home model', () => {
     const other = workspace('/elsewhere/thing')
     expect(projectOf(thread, [project, thread, other])).toBe(project)
     expect(projectOf(other, [project, thread, other])).toBe(other)
+  })
+
+  it('keeps the strip on the New thread screen only', () => {
+    expect(isNewThreadScreen({ blank: true, running: false, promptAttempted: false })).toBe(true)
+    expect(isNewThreadScreen({ blank: true, running: true, promptAttempted: true })).toBe(false)
+    expect(isNewThreadScreen({ blank: true, running: false, promptAttempted: true })).toBe(false)
+    expect(isNewThreadScreen({ blank: false, running: false, promptAttempted: true })).toBe(false)
   })
 
   it('hides only the native pieces the settings replace', () => {

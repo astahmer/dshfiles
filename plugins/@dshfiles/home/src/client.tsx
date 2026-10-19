@@ -1,4 +1,4 @@
-import type { ISessions, SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
+import type { ISessions, SessionSnapshot, SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { IWorkspaces, WorkspaceView } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { HeroBrandMarkOwnerProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
@@ -13,6 +13,7 @@ import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
 import { HOME_LOCALE_NAMESPACE, homeLocale, type HomeTranslate } from './locales.js'
 import { NewThreadSettings } from './settings-section.js'
 import { brandStyle, projectOf } from './home-model.js'
+import { isNewThreadScreen } from './new-thread-screen.js'
 import { homeSettings, type HomeSettings } from './settings.js'
 
 const RECENT_THREADS = 3
@@ -69,6 +70,8 @@ const BrandMark = (props: HeroBrandMarkOwnerProps & { readonly stores: Stores; r
 }
 
 const HomeStrip = (props: {
+  /** The composer zone's own Session: the screen this strip is drawn under, not whichever Session the main view retained. */
+  readonly session: SessionSnapshot | undefined
   readonly sessionId: SessionSummary['id']
   readonly stores: Stores
   readonly t: HomeTranslate
@@ -77,15 +80,17 @@ const HomeStrip = (props: {
   readonly repositories: () => Promise<{ readonly repositories: readonly RepositoryView[] }>
 }) => {
   const settings = useSettings(homeSettings).value ?? defaults
-  const blank = useStores(props.stores, () => props.stores.sessions.list.getSnapshot().byId[props.sessionId]?.blank === true)
-  const [settledBlank, setSettledBlank] = useState(false)
+  const sessionId = props.session?.sessionId ?? props.sessionId
+  const summary = useStores(props.stores, () => props.stores.sessions.list.getSnapshot().byId[sessionId])
+  const onNewThreadScreen = props.session === undefined ? summary?.blank === true && summary.running !== true : isNewThreadScreen(props.session)
+  const [settledScreen, setSettledScreen] = useState(false)
   useEffect(() => {
-    setSettledBlank(false)
-    if (!blank) return
-    const timeout = window.setTimeout(() => setSettledBlank(true), EMPTY_SCREEN_SETTLE_MS)
+    setSettledScreen(false)
+    if (!onNewThreadScreen) return
+    const timeout = window.setTimeout(() => setSettledScreen(true), EMPTY_SCREEN_SETTLE_MS)
     return () => window.clearTimeout(timeout)
-  }, [blank, props.sessionId])
-  const project = useStores(props.stores, () => workspaceOfSession(props.stores, props.sessionId))
+  }, [onNewThreadScreen, sessionId])
+  const project = useStores(props.stores, () => workspaceOfSession(props.stores, sessionId))
   const recentKey = useStores(props.stores, () => {
     if (project === undefined) return ''
     const { items, archivedSessionIds } = props.stores.workspaces.list.getSnapshot()
@@ -94,14 +99,14 @@ const HomeStrip = (props: {
     return items
       .filter(item => projectOf(item, items).workspaceId === project.workspaceId)
       .flatMap(item => item.sessionIds)
-      .filter(id => id !== props.sessionId && !archived.has(id) && byId[id] !== undefined && byId[id]?.blank !== true)
+      .filter(id => id !== sessionId && !archived.has(id) && byId[id] !== undefined && byId[id]?.blank !== true)
       .sort((left, right) => (byId[right]?.updatedAt ?? 0) - (byId[left]?.updatedAt ?? 0))
       .slice(0, RECENT_THREADS)
       .join(',')
   })
   const rebaseWork = useQuery({
     queryKey: ['home', 'rebase-work', project?.path ?? ''],
-    enabled: blank && settings.showUnlandedWork && project !== undefined,
+    enabled: onNewThreadScreen && settings.showUnlandedWork && project !== undefined,
     // Reading every thread workspace is the costliest jj call on this screen; each New thread remounts it, and a
     // fresh read per mount competed with creating the thread's own workspace.
     staleTime: 60_000,
@@ -111,7 +116,7 @@ const HomeStrip = (props: {
           result.repositories.find(repository => repository.repoRoot === project?.path)?.threads.filter(thread => thread.unlanded.length > 0).length ?? 0,
       ),
   })
-  if (!blank || !settledBlank) return null
+  if (!onNewThreadScreen || !settledScreen) return null
   const recentIds = new Set(settings.showRecentThreads && recentKey !== '' ? recentKey.split(',') : [])
   const sessions = props.stores.sessions.list.getSnapshot()
   const recent = sessions.ids
@@ -163,9 +168,10 @@ export default defineClient({
     ctx.slots.inject('conversation.input.dock', () =>
       ctx.slots.register(
         { name: 'conversation.input.dock', id: 'dshfiles-home-strip', order: 20, inject: sessionId => ({ sessionId }) },
-        decorate((props: { readonly sessionId: SessionSummary['id'] }) => (
+        decorate((props: { readonly session: SessionSnapshot | undefined; readonly sessionId: SessionSummary['id'] }) => (
           <PluginQueryProvider>
             <HomeStrip
+              session={props.session}
               sessionId={props.sessionId}
               stores={stores}
               t={t}
