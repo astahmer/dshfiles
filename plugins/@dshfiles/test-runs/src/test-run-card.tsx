@@ -1,23 +1,10 @@
 import { writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
+import { FilePath, StackTrace } from '@dshfiles/plugin-ui/components/stack-trace'
+import { StatusIcon, ToolCard } from '@dshfiles/plugin-ui/components/tool-card'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
-import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
-import {
-  CheckIcon,
-  ChevronDownIcon,
-  ChevronRightIcon,
-  ChevronUpIcon,
-  CircleCheckIcon,
-  CircleMinusIcon,
-  CircleXIcon,
-  ClockAlertIcon,
-  CopyIcon,
-  MinusIcon,
-  RotateCwIcon,
-  SparklesIcon,
-  XIcon,
-} from '@dshfiles/plugin-ui/icons'
+import { ChevronDownIcon, ChevronUpIcon, CircleCheckIcon, CopyIcon, RotateCwIcon, SparklesIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { useState, type ReactNode } from 'react'
+import { useState } from 'react'
 import { VitestReport, type TestCase, type TestFailure, type TestFile, type TestRun } from './vitest-report.js'
 
 type Filter = 'all' | 'failed' | 'skipped' | 'slow'
@@ -26,12 +13,7 @@ export interface TestRunActions {
   readonly askToFix: (text: string) => boolean
 }
 
-const TEST_ICONS = {
-  timeout: <ClockAlertIcon className="dshx:size-4 dshx:text-destructive" />,
-  failed: <XIcon className="dshx:size-4 dshx:text-destructive" />,
-  skipped: <MinusIcon className="dshx:size-4 dshx:text-muted-foreground" />,
-  passed: <CheckIcon className="dshx:size-4 dshx:text-muted-foreground" />,
-} satisfies Record<TestCase['status'], ReactNode>
+type OpenFile = (path: string, options?: { readonly line?: number }) => void
 
 const isFailing = (test: TestCase): boolean => test.status === 'failed' || test.status === 'timeout'
 
@@ -48,23 +30,13 @@ const matchesFilter = (test: TestCase, filter: Filter): boolean => {
   return true
 }
 
-const SplitPath = ({ path }: { readonly path: string }) => {
-  const slash = path.lastIndexOf('/')
-  return (
-    <span className="dshx:min-w-0 dshx:truncate dshx:font-mono dshx:text-xs">
-      <span className="dshx:text-muted-foreground">{path.slice(0, slash + 1)}</span>
-      <span className="dshx:font-medium dshx:text-foreground">{path.slice(slash + 1)}</span>
-    </span>
-  )
-}
-
 const FailureDetail = (props: {
   readonly failure: TestFailure
   readonly file: string
   readonly test: TestCase
   readonly actions: TestRunActions | undefined
+  readonly openFile: OpenFile
 }) => {
-  const [framesOpen, setFramesOpen] = useState(false)
   const failure = props.failure
   const timedOut = props.test.status === 'timeout'
   return (
@@ -112,56 +84,7 @@ const FailureDetail = (props: {
           </div>
         </div>
       )}
-      {failure.location !== undefined && (
-        <span className="dshx:font-mono dshx:text-xs dshx:text-muted-foreground">
-          <SplitPath path={failure.location.file} />:{failure.location.line}:{failure.location.column}
-        </span>
-      )}
-      {failure.codeFrame.length > 0 && (
-        <div className="dshx:overflow-hidden dshx:rounded-lg dshx:border dshx:border-border">
-          <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:border-b dshx:border-border dshx:px-3 dshx:py-1.5">
-            <span className="dshx:rounded-sm dshx:bg-foreground dshx:px-1 dshx:font-mono dshx:text-[9px] dshx:font-bold dshx:text-background">TS</span>
-            <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:font-mono dshx:text-xs dshx:text-muted-foreground">
-              {failure.location?.file ?? props.file}
-            </span>
-            <Button
-              aria-label="Copy code"
-              onClick={() => void writeClipboard(failure.codeFrame.map(line => line.text).join('\n'))}
-              size="icon"
-              type="button"
-              variant="ghost"
-              className="dshx:size-6"
-            >
-              <CopyIcon />
-            </Button>
-          </div>
-          <div className="dshx:overflow-x-auto dshx:py-1.5 dshx:font-mono dshx:text-xs">
-            {failure.codeFrame.map(line => (
-              <div
-                className={cn('dshx:flex dshx:gap-4 dshx:px-3 dshx:whitespace-pre', line.number === failure.location?.line && 'dshx:bg-muted')}
-                key={line.number}
-              >
-                <span className="dshx:w-6 dshx:shrink-0 dshx:text-right dshx:text-muted-foreground">{line.number}</span>
-                <span>{line.text}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-      {failure.frames.length > 0 && (
-        <div className="dshx:flex dshx:flex-col dshx:gap-1 dshx:text-xs dshx:text-muted-foreground">
-          <button className="dshx:flex dshx:items-center dshx:gap-1 dshx:self-start" onClick={() => setFramesOpen(open => !open)} type="button">
-            {framesOpen ? <ChevronDownIcon className="dshx:size-3.5" /> : <ChevronRightIcon className="dshx:size-3.5" />}
-            {failure.frames.length} more {failure.frames.length === 1 ? 'frame' : 'frames'}
-          </button>
-          {framesOpen &&
-            failure.frames.map((frame, index) => (
-              <span className="dshx:pl-5 dshx:font-mono" key={index}>
-                {frame.file}:{frame.line}:{frame.column}
-              </span>
-            ))}
-        </div>
-      )}
+      <StackTrace codeFrame={failure.codeFrame} frames={failure.frames} location={failure.location} openFile={props.openFile} />
       <div className="dshx:flex dshx:items-center dshx:gap-1">
         {props.actions !== undefined && (
           <>
@@ -186,11 +109,11 @@ const TestRow = (props: {
   readonly file: string
   readonly suitePrefix: string | undefined
   readonly actions: TestRunActions | undefined
+  readonly openFile: OpenFile
 }) => {
   const failing = isFailing(props.test)
   const [open, setOpen] = useState(failing)
   const expandable = props.test.failure !== undefined
-  const icon = TEST_ICONS[props.test.status]
   return (
     <li className="dshx:flex dshx:flex-col">
       <button
@@ -200,7 +123,7 @@ const TestRow = (props: {
         onClick={() => setOpen(value => !value)}
         type="button"
       >
-        {icon}
+        <StatusIcon status={props.test.status} />
         <span className={cn('dshx:min-w-0 dshx:flex-1 dshx:truncate', !failing && 'dshx:text-muted-foreground')}>
           {props.suitePrefix !== undefined && props.suitePrefix !== '' && <span className="dshx:text-muted-foreground">{props.suitePrefix} › </span>}
           {props.test.title}
@@ -209,12 +132,14 @@ const TestRow = (props: {
         <span className="dshx:text-xs dshx:text-muted-foreground">{formatDuration(props.test.durationMs)}</span>
         {expandable && (open ? <ChevronUpIcon className="dshx:size-3.5" /> : <ChevronDownIcon className="dshx:size-3.5" />)}
       </button>
-      {open && props.test.failure !== undefined && <FailureDetail actions={props.actions} failure={props.test.failure} file={props.file} test={props.test} />}
+      {open && props.test.failure !== undefined && (
+        <FailureDetail actions={props.actions} failure={props.test.failure} file={props.file} openFile={props.openFile} test={props.test} />
+      )}
     </li>
   )
 }
 
-const FileRow = (props: { readonly file: TestFile; readonly filter: Filter; readonly actions: TestRunActions | undefined }) => {
+const FileRow = (props: { readonly file: TestFile; readonly filter: Filter; readonly actions: TestRunActions | undefined; readonly openFile: OpenFile }) => {
   const [open, setOpen] = useState(props.file.status === 'failed')
   const tests = props.file.tests.filter(test => matchesFilter(test, props.filter))
   const suitesNamed = tests.every(test => test.suitesKnown)
@@ -236,14 +161,8 @@ const FileRow = (props: { readonly file: TestFile; readonly filter: Filter; read
         onClick={() => setOpen(value => !value)}
         type="button"
       >
-        {props.file.status === 'failed' ? (
-          <CircleXIcon className="dshx:size-4 dshx:shrink-0 dshx:text-destructive" />
-        ) : props.file.status === 'skipped' ? (
-          <CircleMinusIcon className="dshx:size-4 dshx:shrink-0 dshx:text-muted-foreground" />
-        ) : (
-          <CircleCheckIcon className="dshx:size-4 dshx:shrink-0 dshx:text-success" />
-        )}
-        <SplitPath path={props.file.path} />
+        <StatusIcon status={props.file.status} variant="group" />
+        <FilePath path={props.file.path} />
         <span className="dshx:ml-auto dshx:shrink-0 dshx:text-xs dshx:text-foreground dshx:@max-pane-narrow:hidden">{meta.join(' · ')}</span>
         <span className="dshx:shrink-0 dshx:text-xs dshx:text-muted-foreground">{formatDuration(props.file.durationMs)}</span>
         {open ? <ChevronUpIcon className="dshx:size-3.5 dshx:shrink-0" /> : <ChevronDownIcon className="dshx:size-3.5 dshx:shrink-0" />}
@@ -255,6 +174,7 @@ const FileRow = (props: { readonly file: TestFile; readonly filter: Filter; read
               actions={props.actions}
               failure={props.file.error}
               file={props.file.path}
+              openFile={props.openFile}
               test={{ suites: [], suitesKnown: true, title: props.file.path, status: 'failed', durationMs: undefined, failure: props.file.error }}
             />
           )}
@@ -267,6 +187,7 @@ const FileRow = (props: { readonly file: TestFile; readonly filter: Filter; read
                     actions={props.actions}
                     file={props.file.path}
                     key={`${test.suites.join('>')}>${test.title}`}
+                    openFile={props.openFile}
                     suitePrefix={suitesNamed ? undefined : test.suites.join(' › ')}
                     test={test}
                   />
@@ -286,7 +207,7 @@ const FileRow = (props: { readonly file: TestFile; readonly filter: Filter; read
 }
 
 /** Settled Vitest run: progress bar, filters, per-file results and failure detail. */
-export const TestRunCard = (props: { readonly run: TestRun; readonly actions: TestRunActions | undefined }) => {
+export const TestRunCard = (props: { readonly run: TestRun; readonly actions: TestRunActions | undefined; readonly openFile: OpenFile }) => {
   const tally = props.run.testTally
   const failing = tally.failed > 0 || props.run.fileTally.failed > 0
   const [open, setOpen] = useState(failing)
@@ -306,75 +227,65 @@ export const TestRunCard = (props: { readonly run: TestRun; readonly actions: Te
     ? `${tally.failed} failed · ${tally.passed} passed${tally.skipped > 0 ? ` · ${tally.skipped} skipped` : ''}`
     : `${tally.passed} passed${tally.skipped > 0 ? ` · ${tally.skipped} skipped` : ''}`
   return (
-    <section className="dshx-root dshx:@container dshx:flex dshx:flex-col dshx:gap-2 dshx:py-1" data-test-runs-card="">
-      <button
-        aria-expanded={open}
-        className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:text-left dshx:text-sm"
-        onClick={() => setOpen(value => !value)}
-        type="button"
-      >
-        {failing ? (
-          <CircleXIcon className="dshx:size-4 dshx:shrink-0 dshx:text-destructive" />
-        ) : (
-          <CircleCheckIcon className="dshx:size-4 dshx:shrink-0 dshx:text-success" />
+    <ToolCard
+      className="dshx:@container"
+      meta={formatDuration(props.run.durationMs)}
+      onToggle={() => setOpen(value => !value)}
+      open={open}
+      status={failing ? 'failed' : 'passed'}
+      summary={headline}
+      title="Ran tests"
+    >
+      <div className="dshx:flex dshx:flex-col dshx:gap-2 dshx:py-1" data-test-runs-card="">
+        <div aria-hidden className="dshx:flex dshx:h-1 dshx:overflow-hidden dshx:rounded-full dshx:bg-muted">
+          <span className="dshx:bg-success" style={{ width: percent(tally.passed) }} />
+          <span className="dshx:bg-destructive" style={{ width: percent(tally.failed) }} />
+          <span className="dshx:bg-muted-foreground/30" style={{ width: percent(tally.skipped) }} />
+        </div>
+        <div className="dshx:flex dshx:flex-wrap dshx:gap-1" role="tablist">
+          {(['all', 'failed', 'skipped', 'slow'] as const).map(candidate => (
+            <button
+              aria-selected={filter === candidate}
+              className={cn(
+                'dshx:rounded-md dshx:px-2 dshx:py-0.5 dshx:text-sm dshx:capitalize',
+                filter === candidate ? 'dshx:bg-muted dshx:font-medium' : 'dshx:text-muted-foreground',
+                counts[candidate] === 0 && candidate !== 'all' && 'dshx:opacity-50',
+              )}
+              key={candidate}
+              onClick={() => setFilter(candidate)}
+              role="tab"
+              type="button"
+            >
+              {candidate} <span className="dshx:tabular-nums">{counts[candidate]}</span>
+            </button>
+          ))}
+        </div>
+        <ul className="dshx:flex dshx:flex-col">
+          {files.map(file => (
+            <FileRow actions={props.actions} file={file} filter={filter} key={file.path} openFile={props.openFile} />
+          ))}
+        </ul>
+        {props.run.unlistedFiles > 0 && filter === 'all' && (
+          <span className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-xs dshx:text-muted-foreground">
+            <CircleCheckIcon className="dshx:size-4 dshx:text-success" />
+            {props.run.unlistedFiles} more {props.run.unlistedFiles === 1 ? 'file' : 'files'} passed
+          </span>
         )}
-        <span className="dshx:shrink-0 dshx:text-muted-foreground">Ran tests</span>
-        <span className="dshx:min-w-0 dshx:truncate">{headline}</span>
-        <span className="dshx:ml-auto dshx:shrink-0 dshx:text-xs dshx:text-muted-foreground">{formatDuration(props.run.durationMs)}</span>
-        {open ? <ChevronUpIcon className="dshx:size-3.5 dshx:shrink-0" /> : <ChevronDownIcon className="dshx:size-3.5 dshx:shrink-0" />}
-      </button>
-      <div aria-hidden className="dshx:flex dshx:h-1 dshx:overflow-hidden dshx:rounded-full dshx:bg-muted">
-        <span className="dshx:bg-success" style={{ width: percent(tally.passed) }} />
-        <span className="dshx:bg-destructive" style={{ width: percent(tally.failed) }} />
-        <span className="dshx:bg-muted-foreground/30" style={{ width: percent(tally.skipped) }} />
       </div>
-      {open && (
-        <>
-          <div className="dshx:flex dshx:flex-wrap dshx:gap-1" role="tablist">
-            {(['all', 'failed', 'skipped', 'slow'] as const).map(candidate => (
-              <button
-                aria-selected={filter === candidate}
-                className={cn(
-                  'dshx:rounded-md dshx:px-2 dshx:py-0.5 dshx:text-sm dshx:capitalize',
-                  filter === candidate ? 'dshx:bg-muted dshx:font-medium' : 'dshx:text-muted-foreground',
-                  counts[candidate] === 0 && candidate !== 'all' && 'dshx:opacity-50',
-                )}
-                key={candidate}
-                onClick={() => setFilter(candidate)}
-                role="tab"
-                type="button"
-              >
-                {candidate} <span className="dshx:tabular-nums">{counts[candidate]}</span>
-              </button>
-            ))}
-          </div>
-          <ul className="dshx:flex dshx:flex-col">
-            {files.map(file => (
-              <FileRow actions={props.actions} file={file} filter={filter} key={file.path} />
-            ))}
-          </ul>
-          {props.run.unlistedFiles > 0 && filter === 'all' && (
-            <span className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-xs dshx:text-muted-foreground">
-              <CircleCheckIcon className="dshx:size-4 dshx:text-success" />
-              {props.run.unlistedFiles} more {props.run.unlistedFiles === 1 ? 'file' : 'files'} passed
-            </span>
-          )}
-        </>
-      )}
-    </section>
+    </ToolCard>
   )
 }
 
 /** While the shell call runs the Host streams no output, so the count of finished tests is unknown. */
 export const TestRunPending = (props: { readonly command: string }) => (
-  <section className="dshx-root dshx:flex dshx:flex-col dshx:gap-2 dshx:py-1" data-test-runs-card="running">
-    <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:text-sm">
-      <Spinner className="dshx:size-4 dshx:shrink-0 dshx:text-muted-foreground" />
-      <span className="dshx:shrink-0">Running tests</span>
-      <span className="dshx:min-w-0 dshx:truncate dshx:font-mono dshx:text-xs dshx:text-muted-foreground">{props.command}</span>
-    </div>
-    <div aria-hidden className="dshx:h-1 dshx:overflow-hidden dshx:rounded-full dshx:bg-muted">
-      <span className="dshx:block dshx:h-full dshx:w-1/3 dshx:animate-pulse dshx:rounded-full dshx:bg-success/60" />
-    </div>
-  </section>
+  <span data-test-runs-card="running">
+    <ToolCard
+      expandable={false}
+      onToggle={() => undefined}
+      open={false}
+      status="running"
+      summary={<span className="dshx:font-mono dshx:text-xs">{props.command}</span>}
+      title="Running tests"
+    />
+  </span>
 )

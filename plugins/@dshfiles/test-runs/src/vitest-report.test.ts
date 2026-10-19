@@ -11,6 +11,7 @@ describe('VitestReport.parse', () => {
     expect(run?.fileTally).toEqual({ passed: 1, failed: 2, skipped: 0, total: 3 })
     expect(run?.unlistedFiles).toBe(1)
     expect(run?.durationMs).toBe(4670)
+    expect(run?.root).toBe('/repo/shop')
     expect(run?.files.map(file => [file.path, file.status, file.testCount, file.failedCount, file.skippedCount])).toEqual([
       ['src/cart/pricing.test.ts', 'failed', 4, 1, 1],
       ['src/cart/sync.test.ts', 'failed', 2, 1, 0],

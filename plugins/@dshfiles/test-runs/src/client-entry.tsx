@@ -65,7 +65,14 @@ export default defineClientPlugin({
         }),
         [sessionId],
       )
-      if (run !== undefined) return <TestRunCard actions={composers.has(sessionId) ? actions : undefined} run={run} />
+      if (run !== undefined)
+        return (
+          <TestRunCard
+            actions={composers.has(sessionId) ? actions : undefined}
+            openFile={(path, options) => props.openFile(run.root === undefined || path.startsWith('/') ? path : `${run.root}/${path}`, options)}
+            run={run}
+          />
+        )
       if (props.phase === 'start' && command !== undefined && TEST_COMMAND.test(command)) return <TestRunPending command={command} />
       const Native = nativeBashView()
       return Native === undefined ? null : createElement(Native, props)

@@ -62,6 +62,8 @@ export interface TestRun {
   readonly durationMs: number | undefined
   /** The default reporter prints only files with failures; this many passing files never reached the output. */
   readonly unlistedFiles: number
+  /** Absolute project root from Vitest's `RUN` banner; file paths in the report are relative to it. */
+  readonly root: string | undefined
 }
 
 interface MutableFile {
@@ -88,6 +90,7 @@ const CARET_LINE = /^ +\| +\^/
 const ERROR_LINE = /^(\w*(?:Error|Exception)\w*|Error): ?(.*)$/
 const TIMEOUT_MESSAGE = /^Test timed out in (\d+)ms\.?$/
 const SUMMARY_LINE = /^ +(Test Files|Tests) {2}(.+) \((\d+)\)$/
+const RUN_BANNER = /^ RUN {2}v\S+ (\/.+)$/
 const DURATION_LINE = /^ +Duration {2}(\d+(?:\.\d+)?)(ms|s)\b/
 const DSH_EXIT_FOOTER = /\n\[(?:exit code: -?\d+|exit code: null|killed by signal: [^\]\n]+)\]$/
 
@@ -196,6 +199,10 @@ export class VitestReport {
       testTally: summary.tests,
       durationMs: summary.durationMs,
       unlistedFiles: Math.max(0, summary.files.total - listed.length),
+      root: lines
+        .map(line => RUN_BANNER.exec(line)?.[1])
+        .find(root => root !== undefined)
+        ?.trim(),
     }
   }
 
