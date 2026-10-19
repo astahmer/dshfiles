@@ -552,6 +552,36 @@
           "id": "thread-sidebar.idle-archive-policy-unit-archive-never-stops-host",
           "file": "plugins/@dshfiles/thread-sidebar/src/organization.test.ts",
           "testName": "archive adapter explicitly refuses to stop Host activity"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.idle-archive-policy-unit-auto-settle-machine",
+          "file": "plugins/@dshfiles/thread-sidebar/src/auto-settle-machine.test.ts",
+          "testName": "scans immediately when enabled and on its actor-owned interval"
+        }
+      ]
+    },
+    {
+      "id": "section-order",
+      "title": "Reorder thread sections",
+      "summary": "Drag visible section headers to reorder the sidebar; the saved order survives reload, and empty sections fold away instead of taking a drag position.",
+      "reach": ["click button \"All threads\"", "expect region \"Threads\""],
+      "surfaces": ["client"],
+      "configuration": [],
+      "states": ["default-order", "reordered", "empty-sections-folded"],
+      "failureModes": ["Empty sections can shift the drag position even though they are not rendered.", "A reordered section order does not survive a reload."],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "thread-sidebar.section-order",
+          "featureFile": "tooling/dshx/e2e/features/thread-sidebar.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.section-order-unit-saved-order",
+          "file": "plugins/@dshfiles/thread-sidebar/src/organization.test.ts",
+          "testName": "a saved section order keeps its sequence and appends the sections it misses"
         }
       ]
     },

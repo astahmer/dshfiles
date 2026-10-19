@@ -136,6 +136,7 @@ import { indexRebasedThreadSessions } from './rebased-threads.js'
 import { SettledThreadsModel, type SettledSessionState } from './settled-threads.js'
 import { THREAD_DELAYS, threadDelayMs, type ThreadDelay } from './thread-delays.js'
 import { useAutoArchive, type AutoArchiveClient } from './auto-archive-machine.js'
+import { useAutoSettle, type AutoSettleClient } from './auto-settle-machine.js'
 import {
   THREAD_GROUP_BY_OPTIONS,
   THREAD_SOURCE_FILTER_OPTIONS,
@@ -1126,7 +1127,6 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const [routeRequest, setRouteRequest] = useState<string | null>(() =>
     typeof window === 'undefined' ? null : (readThreadUrl(window.location.href)?.sessionId ?? null),
   )
-  const settleInFlight = useRef(false)
   const previousStatus = useRef<Readonly<Record<string, ThreadInteractionStatus>> | null>(null)
   const openedRouteId = useRef<string | null>(null)
   const suppressUrlForSession = useRef<string | null>(null)
@@ -1983,15 +1983,16 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     </div>
   )
 
-  const runAutoSettle = async (): Promise<void> => {
-    const latest = latestAutoSettle.current
-    if (settleInFlight.current || latest === null || !SidebarOrganization.shouldScanForAutoSettle(latest.preferences)) return
-    settleInFlight.current = true
-    try {
-      const now = Date.now()
-      const due = latest.sessions.filter(
-        session =>
-          SidebarOrganization.isAutoSettleCandidate({
+  const autoSettleClient: AutoSettleClient = {
+    scan: () => {
+      const latest = latestAutoSettle.current
+      if (latest === null) return
+      const dueSessionIds = new Set<string>()
+
+      if (SidebarOrganization.shouldScanForAutoSettle(latest.preferences)) {
+        const now = Date.now()
+        for (const session of latest.sessions) {
+          const isCandidate = SidebarOrganization.isAutoSettleCandidate({
             session,
             workspaceId: latest.workspaceBySession.get(session.id),
             now,
@@ -1999,27 +2000,22 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
             archivedSessionIds: latest.archived,
             pinnedSessionIds: latest.pinned,
             settledSessionIds: latest.settled,
-          }) && !SidebarOrganization.hasRunningDescendant({ sessionId: session.id, sessions: latest.sessions }),
-      )
-      if (due.length > 0) latest.settle(due.map(session => session.id))
-    } finally {
-      settleInFlight.current = false
-    }
-  }
+          })
+          if (!isCandidate || SidebarOrganization.hasRunningDescendant({ sessionId: session.id, sessions: latest.sessions })) continue
+          dueSessionIds.add(session.id)
+        }
+      }
 
-  const runRebasedAutoSettle = useCallback(async (): Promise<void> => {
-    const latest = latestAutoSettle.current
-    if (settleInFlight.current || latest === null || latest.dueRebasedSessionIds.length === 0) return
-    settleInFlight.current = true
-    try {
-      const due = latest.dueRebasedSessionIds.filter(
-        sessionId => !latest.settled.has(sessionId) && !SidebarOrganization.hasRunningDescendant({ sessionId, sessions: latest.sessions }),
-      )
-      if (due.length > 0) latest.settle(due)
-    } finally {
-      settleInFlight.current = false
-    }
-  }, [])
+      if (latest.preferences.rebasedThreadSettleDelay !== 'disabled') {
+        for (const sessionId of latest.dueRebasedSessionIds) {
+          if (latest.settled.has(sessionId) || SidebarOrganization.hasRunningDescendant({ sessionId, sessions: latest.sessions })) continue
+          dueSessionIds.add(sessionId)
+        }
+      }
+
+      latest.settle([...dueSessionIds])
+    },
+  }
 
   latestAutoSettle.current = {
     sessions,
@@ -2032,35 +2028,25 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     settle: settleSessions,
   }
 
-  useEffect(() => {
-    if (!SidebarOrganization.shouldScanForAutoSettle(preferences)) return
-    if (sessionState.phase !== 'ready' || workspaceState.phase !== 'ready') return
-    void runAutoSettle()
-    const timer = window.setInterval(() => void runAutoSettle(), preferences.scanIntervalMinutes * 60_000)
-    return () => window.clearInterval(timer)
-  }, [
-    preferences.autoSettleEnabled,
-    preferences.autoSettleDisabledSessionIds,
-    preferences.autoSettleSessionIds,
-    preferences.scanIntervalMinutes,
-    sessionState.phase,
-    workspaceState.phase,
-  ])
-
-  useEffect(() => {
-    if (preferences.rebasedThreadSettleDelay === 'disabled' || jjRepositories.data === undefined) return
-    if (sessionState.phase !== 'ready' || workspaceState.phase !== 'ready') return
-    void runRebasedAutoSettle()
-    const timer = window.setInterval(() => void runRebasedAutoSettle(), preferences.scanIntervalMinutes * 60_000)
-    return () => window.clearInterval(timer)
-  }, [
-    jjRepositories.data,
-    preferences.rebasedThreadSettleDelay,
-    preferences.scanIntervalMinutes,
-    runRebasedAutoSettle,
-    sessionState.phase,
-    workspaceState.phase,
-  ])
+  const autoSettleEnabled =
+    sessionState.phase === 'ready' &&
+    workspaceState.phase === 'ready' &&
+    (SidebarOrganization.shouldScanForAutoSettle(preferences) || (preferences.rebasedThreadSettleDelay !== 'disabled' && jjRepositories.data !== undefined))
+  const autoSettleRefreshKey = JSON.stringify({
+    autoSettleEnabled: preferences.autoSettleEnabled,
+    autoSettleDisabledSessionIds: preferences.autoSettleDisabledSessionIds,
+    autoSettleSessionIds: preferences.autoSettleSessionIds,
+    rebasedThreadSettleDelay: preferences.rebasedThreadSettleDelay,
+    dueRebasedSessionIds: rebasedIndex.dueSessionIds,
+    sessionPhase: sessionState.phase,
+    workspacePhase: workspaceState.phase,
+  })
+  useAutoSettle({
+    client: autoSettleClient,
+    enabled: autoSettleEnabled,
+    intervalMs: preferences.scanIntervalMinutes * 60_000,
+    refreshKey: autoSettleRefreshKey,
+  })
 
   const threadTree = useMemo(() => {
     const listed: SessionSummary[] = []
