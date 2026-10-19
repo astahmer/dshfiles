@@ -368,7 +368,7 @@ When('a rate-limited and a healthy Command Code account share a local fake provi
 })
 
 When("a new thread asks the first account's model a question", async ({ page }: { page: Page }) => {
-  await page.getByRole('treeitem', { name: 'New Session', exact: true }).click()
+  await page.getByRole('button', { name: 'New session', exact: true }).first().click()
   await page.getByRole('button', { name: /^Select model/ }).click()
   await selectAccountModel(page, 'commandcode_work/gpt-6-luna')
   await expect(page.getByRole('button', { name: /^Select model, current commandcode_work\/gpt-6-luna/ })).toBeVisible()
@@ -414,7 +414,7 @@ const failTurnOnExhaustedAccount = async (page: Page, key: string): Promise<void
     await threadSidebarNewThreadButton.click()
     await expect.poll(() => new URL(page.url()).searchParams.get('thread'), { timeout: 15_000 }).not.toBeNull()
   } else {
-    await page.getByRole('treeitem', { name: 'New Session', exact: true }).click()
+    await page.getByRole('button', { name: 'New session', exact: true }).first().click()
   }
   const composer = page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })
   await composer.waitFor({ state: 'visible', timeout: 15_000 })

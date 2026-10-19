@@ -8,7 +8,7 @@ const roundRequests = (page: Page): number => fakeCommandCodeFor(page).requests.
 
 When('a goal whose rounds come back empty is set in a new thread', async ({ page }: { page: Page }) => {
   await page.keyboard.press('Escape')
-  await page.getByRole('treeitem', { name: 'New Session', exact: true }).click()
+  await page.getByRole('button', { name: 'New session', exact: true }).first().click()
   await page.getByRole('button', { name: /^Select model/ }).click()
   await page.getByRole('menuitemradio', { name: 'commandcode_work/gpt-6-luna', exact: true }).click()
   const composer = page.getByRole('textbox', { name: 'Describe what you want to build, / commands, @ files or sessions', exact: true })
@@ -18,7 +18,7 @@ When('a goal whose rounds come back empty is set in a new thread', async ({ page
 
 When('three messages that come back empty are sent in a new thread without a goal', async ({ page }: { page: Page }) => {
   await page.keyboard.press('Escape')
-  await page.getByRole('treeitem', { name: 'New Session', exact: true }).click()
+  await page.getByRole('button', { name: 'New session', exact: true }).first().click()
   await page.getByRole('button', { name: /^Select model/ }).click()
   await page.getByRole('menuitemradio', { name: 'commandcode_work/gpt-6-luna', exact: true }).click()
   for (let message = 1; message <= 3; message += 1) {
@@ -69,7 +69,7 @@ Then('the guard pauses the goal after its third empty round', async ({ page }: {
 
 When('a one-round goal is started with a one-shot extension request', async ({ page }: { page: Page }) => {
   await page.keyboard.press('Escape')
-  await page.getByRole('treeitem', { name: 'New Session', exact: true }).click()
+  await page.getByRole('button', { name: 'New session', exact: true }).first().click()
   await page.getByRole('button', { name: /^Select model/ }).click()
   await page.getByRole('menuitemradio', { name: 'commandcode_work/gpt-6-luna', exact: true }).click()
   const encodedObjective = String.raw`Finish handoff [[once call extend_goal_budget \u007b\u0022additional_rounds\u0022:1,\u0022progress\u0022:\u0022Primary handoff completed and verified.\u0022,\u0022remaining_work\u0022:\u0022One final result check remains.\u0022,\u0022justification\u0022:\u0022The original request authorizes this monitoring window.\u0022\u007d]]`
