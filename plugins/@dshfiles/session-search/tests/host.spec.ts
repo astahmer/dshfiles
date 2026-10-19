@@ -121,9 +121,7 @@ describe('owned index document rows', () => {
         tokenize = 'unicode61'
       );
     `)
-    database.exec(
-      `INSERT INTO sessions VALUES ('${sessionId}', 4, 1, NULL, NULL, NULL, NULL, NULL, '/log', '1', '2', 10, 10, '3', 1, 1, 0)`,
-    )
+    database.exec(`INSERT INTO sessions VALUES ('${sessionId}', 4, 1, NULL, NULL, NULL, NULL, NULL, '/log', '1', '2', 10, 10, '3', 1, 1, 0)`)
     database.exec(
       `INSERT INTO session_documents (text, session_id, seq, type, time, surface, truncated) VALUES ('stale note', '${sessionId}', 1, 'user/message', 1, 'current', 0)`,
     )
