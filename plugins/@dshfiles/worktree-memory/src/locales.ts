@@ -4,7 +4,7 @@ import { defineLocale } from '@dshfiles/dshx/client'
 export const WORKTREE_MEMORY_LOCALE_NAMESPACE = 'dshfiles.worktreeMemory'
 
 const en = {
-  title: 'Memory',
+  title: 'RAM',
   subtitle: 'What the threads started, by workspace: background jobs, dev servers, and trees that kept running after their parent exited.',
   loading: 'Reading the process table…',
   loadFailed: 'The process table could not be read.',
@@ -49,7 +49,7 @@ const en = {
 } as const
 
 const zh = {
-  title: '内存',
+  title: '进程内存',
   subtitle: '各线程启动的进程，按工作区分组：后台任务、开发服务器，以及父进程退出后仍在运行的进程树。',
   loading: '正在读取进程表…',
   loadFailed: '无法读取进程表。',

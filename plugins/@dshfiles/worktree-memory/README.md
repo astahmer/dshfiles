@@ -9,7 +9,7 @@ clicks. Inspired by Fusebox, a menu-bar app built around Lovable's dev setup; no
 ```
 ps (pid, ppid, rss, lstart, args) ──► candidates ──► lsof cwd (macOS) / /proc/<pid>/cwd (Linux)
                                           │
-ctx.jobs live views ──────────────────────┼──► ProcessTable.snapshot ──► worktree-memory API ──► Memory panel
+ctx.jobs live views ──────────────────────┼──► ProcessTable.snapshot ──► worktree-memory API ──► RAM panel
 workspaceRegistry + sessionController ────┘
 ```
 
