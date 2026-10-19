@@ -123,7 +123,7 @@ export const PromptStashAction = (
           }}
         >
           <NotebookPenIcon />
-          <span className="dshx:@max-pane-compact:sr-only">Drafts</span>
+          <span className="dshx:@max-pane-compact:sr-only dshx:in-data-model-compact:sr-only">Drafts</span>
         </Button>
       </PopoverTrigger>
       <PopoverContent
