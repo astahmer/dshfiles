@@ -59,6 +59,22 @@ node scripts/dsh-lkg/cli.mjs list               # known-good snapshots
 - **Every turn fails with `unknown prompt variable`**: same cause, in the
   `preset-standard` row.
 - **A plugin `failed to import`**: rebuild it (`pnpm --filter <pkg> build`).
+- **The UI says `active Service "sessionController" is unavailable`, history
+  never loads, and every `/api/dshx-*/…` answers 404**: the running Host lost its
+  Session surface. `session-controller` waits for `sessionQuery`, and this
+  profile disables the stock `session-query-sqlite` row because
+  `@dshfiles/session-search` owns that service — so a surface that disappears
+  while the Host keeps serving HTTP means that plugin's registration was
+  dropped at runtime, which a failed hot reload after a `dist` rebuild does.
+  Nothing in the running process re-registers a lost service: restart `dsh web`
+  (Ctrl-C in the launcher terminal, then `dsh-web`). The same cascade printed
+  at **boot** is a profile problem instead — compare the live
+  `session-query-sqlite` and `session-search` rows with this repository's
+  `profiles/web/cordis.patch.yml`.
+  The launcher now probes that surface once the Host is up and restarts it when
+  it stays unavailable, and restarts it after an unexpected exit; both are
+  capped, and `DSH_WEB_HEALTH_PROBE=off` disables the probe (see
+  `modules/dsh.nix` and `assets/dsh/supervise-web.mjs` in nixfiles).
 - **`node-addon-require-builtin unsupported`**: the command ran on nixpkgs Node;
   use `dsh` through the shell function, or `fnm exec --using=v22.23.3 -- …`.
 
@@ -76,6 +92,43 @@ DSH_LKG_ADMIN=1 node scripts/dsh-lkg/cli.mjs snapshot --label "<what changed>"
 A refused candidate leaves the previous snapshot current and writes its Host
 output to `~/.dsh-lkg/logs/health-<id>.log`; set `DSH_LKG_KEEP_FAILED=1` to keep
 the candidate itself for inspection.
+
+## 4. A running Host can lose its Session surface
+
+This wedge is a *recomposition* casualty, not a bad build: a fresh boot of the
+same checkout and profile activates every entry (verified 2026-10-19 at 01:57
+and 11:24), while a running Host that hot-replaces its link-installed bundles
+does not. Confirm it after the fact by correlating four timestamps:
+
+| Evidence                                            | 2026-10-19 |
+| --------------------------------------------------- | ---------- |
+| Host `startedAt` (`dshx status --json`)              | 10:49:05   |
+| `plugins/@dshfiles/*/dist/index.js` mtime            | 11:12      |
+| `~/.dsh/profiles/web/cordis.patch.yml` mtime         | 11:13      |
+| `dshx status` reporting `gateway/service-unavailable` | 11:14      |
+
+Two inputs trigger it: DSH's `hmr` row watches the profile manifest and the user
+patch files, and a recomposition also replaces the plugins whose link-installed
+files changed on disk. A landing thread that rebases while the Host runs (checkout
+sync → rebuild) primes it, and the profile sync that then rewrites
+`cordis.patch.yml` fires it.
+
+Host HMR is therefore **off by default**: `- id: hmr` / `disabled: true` in this
+repository's `profiles/web/cordis.patch.yml` (inside the NIX-MANAGED region, so
+profile sync carries it to every live profile) and, until that seed row reaches
+the live file, as a local row in `~/.dsh/profiles/web/cordis.patch.yml`. Client
+HMR (`@deepseek-ai/dsh-client-hmr`) is a separate bundle and stays on. The
+accepted costs:
+
+- enabling or disabling a plugin in Settings now needs a restart;
+- a rebuild reaches the browser but not the running Host, so a new client bundle
+  can ask the old Host for a method it does not have until the next restart.
+
+Revisit when a Host replacement is proven safe (the suspect is
+`@dshfiles/session-search` registering `sessionQuery` through a nested async
+`ctx.plugin` inside a `ctx.effect`, where the stock provider registers at row
+level); see [dsh-host-gaps](../plans/dsh-host-gaps.md). Until then the launcher
+probes the Session surface and restarts the Host when it stays unavailable.
 
 ## Upgrading DSH
 

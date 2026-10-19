@@ -240,4 +240,11 @@
   disabled: true
 - id: session-log-download
   disabled: false
+# Host HMR recomposes a running Host whenever a linked bundle or a patch file changes, and a replacement can drop a
+# plugin service another row depends on — 2026-10-19 the live `web` profile lost `sessionQuery` on two bundle
+# rebuilds, which took `session-controller` and the whole Session surface with it, and only a restart cleared it.
+# Off by default until a replacement is proven safe; client HMR is a separate bundle and stays on, but enabling or
+# disabling a plugin in Settings now needs a restart. See docs/recovery.md.
+- id: hmr
+  disabled: true
 # END NIX-MANAGED DSH PLUGINS
