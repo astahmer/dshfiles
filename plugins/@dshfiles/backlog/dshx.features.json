@@ -1,0 +1,102 @@
+{
+  "schemaVersion": 1,
+  "features": [
+    {
+      "id": "capture-and-triage",
+      "title": "Capture anything and let it sort itself",
+      "summary": "One capture box and one agent tool take free text; kind, title, tags and links (items, threads, jj revisions, branches, URLs) are derived from it, and an agent capture links its thread and project.",
+      "reach": ["click button \"Backlog\"", "expect textbox \"Capture\""],
+      "surfaces": ["client", "host", "storage", "tool"],
+      "configuration": [],
+      "states": ["inbox", "triaged"],
+      "failureModes": [
+        "An unknown prefix stays in the title and the item becomes a task.",
+        "A storage write failure is logged and the in-memory item stays readable."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        { "kind": "gherkin", "id": "backlog.capture-triage", "featureFile": "tooling/dshx/e2e/features/backlog.feature" },
+        {
+          "kind": "unit-test",
+          "id": "backlog.capture-and-triage-unit-triage",
+          "file": "plugins/@dshfiles/backlog/src/store.test.ts",
+          "testName": "derives kind, title, body, tags and links from free text"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.capture-and-triage-unit-question",
+          "file": "plugins/@dshfiles/backlog/src/store.test.ts",
+          "testName": "makes a trailing question mark a question and keeps unknown prefixes in the title"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.capture-and-triage-host-agent-capture",
+          "file": "plugins/@dshfiles/backlog/src/store.test.ts",
+          "testName": "links an agent capture to its thread and project, and lists newest activity first"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.capture-and-triage-host-ids",
+          "file": "plugins/@dshfiles/backlog/src/store.test.ts",
+          "testName": "continues ids after a Host restart"
+        }
+      ]
+    },
+    {
+      "id": "activity-feed-and-freshness",
+      "title": "Feed ordered by activity, with idle items sinking",
+      "summary": "The feed lists pinned items, then newest activity first. Freshness is derived on read: notes go dormant after 14 days, other open items after 30, idle in-progress work is flagged stale, closed items archive after 7 days; any touch revives an item.",
+      "surfaces": ["client", "host"],
+      "configuration": [],
+      "states": ["fresh", "stale", "dormant", "archived"],
+      "failureModes": ["Dormant and archived items stay in search and backlinks; only the default feed hides them."],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "backlog.feed-unit-dormant",
+          "file": "plugins/@dshfiles/backlog/src/store.test.ts",
+          "testName": "lets notes sink after two weeks and tasks after a month, but never pinned items"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.feed-unit-stale",
+          "file": "plugins/@dshfiles/backlog/src/store.test.ts",
+          "testName": "flags idle in-progress work as stale instead of hiding it, and archives closed items after a week"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.feed-host-revive",
+          "file": "plugins/@dshfiles/backlog/src/store.test.ts",
+          "testName": "hides dormant items from the feed until something touches them"
+        }
+      ]
+    },
+    {
+      "id": "board-links-and-history",
+      "title": "Board, links, backlinks and history",
+      "summary": "A board groups the same items by status. An item's detail edits its fields, links it to threads, revisions, branches, workspaces, URLs or other items, lists the items that link to it, and shows every event with its actor; fields the user set are recorded as theirs.",
+      "surfaces": ["client", "host", "tool"],
+      "configuration": [],
+      "states": ["inbox", "todo", "doing", "done", "dropped"],
+      "failureModes": ["An unknown item id answers not-found without writing."],
+      "externalDependencies": [],
+      "verification": [
+        { "kind": "gherkin", "id": "backlog.board-links", "featureFile": "tooling/dshx/e2e/features/backlog.feature" },
+        {
+          "kind": "host-test",
+          "id": "backlog.board-host-actors",
+          "file": "plugins/@dshfiles/backlog/src/store.test.ts",
+          "testName": "records who moved an item and which fields the user owns"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.board-host-backlinks",
+          "file": "plugins/@dshfiles/backlog/src/store.test.ts",
+          "testName": "answers backlinks for items and for any linked target"
+        }
+      ]
+    }
+  ],
+  "kind": "bundle"
+}
