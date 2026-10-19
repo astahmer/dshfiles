@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "memory-board",
+      "title": "Process memory by workspace",
+      "summary": "One page shows the resident memory of every process tree the threads started, grouped by workspace: live background jobs with their owning thread, other children of this Host, and detached trees still running inside a workspace after their parent exited, with the memory-pressure level and a confirmed stop per tree, per workspace, or for every detached tree.",
+      "reach": ["click button \"Memory\"", "expect text \"What the threads started*\""],
+      "surfaces": ["host", "tool", "client"],
+      "configuration": [],
+      "states": ["loading", "empty", "grouped", "detached", "pressure", "unsupported-platform", "stop-armed", "stopped"],
+      "failureModes": [
+        "A supervisor that launched this Host is an orphan inside a workspace too; it is never listed, so it can never be stopped from here.",
+        "A pid recycled between the snapshot and the stop is refused instead of signalling an unrelated process.",
+        "A job is stopped through the job registry so its Session records the kill; only trees no live job owns are signalled directly.",
+        "Orphans outside every workspace (apps, system agents, unrelated daemons) are not listed.",
+        "A platform without ps/lsof or /proc reports itself unsupported instead of an empty board."
+      ],
+      "externalDependencies": [
+        {
+          "id": "ps/lsof (macOS) and /proc (Linux)",
+          "boundary": "Read-only process table, working directories and memory-pressure level, run through the Host subprocess service; the only writes are the confirmed SIGTERM/SIGKILL of listed trees.",
+          "deterministicFake": "src/process-table.test.ts feeds parsed ps rows, working directories, workspaces, Sessions and live jobs to the pure snapshot builder."
+        },
+        {
+          "id": "@deepseek-ai/dsh-jobs",
+          "boundary": "Read-only projection of live jobs to attribute process trees to their Session, plus the registry kill for a job tree.",
+          "deterministicFake": "src/process-table.test.ts passes live jobs as plain records with label, owner and start time."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "worktree-memory.job-attribution",
+          "file": "plugins/@dshfiles/worktree-memory/src/process-table.test.ts",
+          "testName": "accounts a job tree to its thread workspace and names the heaviest process"
+        },
+        {
+          "kind": "unit-test",
+          "id": "worktree-memory.detached-in-workspace",
+          "file": "plugins/@dshfiles/worktree-memory/src/process-table.test.ts",
+          "testName": "counts orphans inside a jj sibling checkout as detached and ignores orphans outside every workspace"
+        },
+        {
+          "kind": "unit-test",
+          "id": "worktree-memory.supervisor-excluded",
+          "file": "plugins/@dshfiles/worktree-memory/src/process-table.test.ts",
+          "testName": "never offers the supervisor that launched this Host as a detached tree"
+        },
+        {
+          "kind": "unit-test",
+          "id": "worktree-memory.job-label-first",
+          "file": "plugins/@dshfiles/worktree-memory/src/process-table.test.ts",
+          "testName": "does not hand one job to two process trees started in the same second"
+        },
+        {
+          "kind": "unit-test",
+          "id": "worktree-memory.stop-order",
+          "file": "plugins/@dshfiles/worktree-memory/src/process-table.test.ts",
+          "testName": "orders a tree children first so a stop never leaves a parent to respawn a child"
+        }
+      ]
+    }
+  ]
+}
