@@ -75,6 +75,27 @@ export class AccountDraftModel {
     AccountDraftModel.sameList(left.modelOrder, right.modelOrder) &&
     AccountDraftModel.sameRecord(left.reasoningDefaults, right.reasoningDefaults)
 
+  /**
+   * The draft the editor shows after the selection or the store changes; `followedId` is the stored account it last
+   * followed. Unsaved edits survive a re-read of that account, a half-typed slug included. While a rename lands, the
+   * store and the selection briefly disagree and the selected account is missing: a draft carrying the new slug is kept
+   * through that moment, so fields typed meanwhile survive. Any other missing account (a removal) closes the editor.
+   */
+  static followSelection = (input: {
+    readonly current: AccountDraft | null
+    readonly selected: AccountProfile | null
+    readonly selectedId: string | null
+    readonly followedId: string | null
+  }): AccountDraft | null => {
+    if (input.selected === null) {
+      const renaming = input.selectedId !== null && input.current !== null && input.current.instanceId !== input.followedId
+      return renaming ? input.current : null
+    }
+    if (input.current === null || AccountDraftModel.sameDraft(input.selected, input.current)) return AccountDraftModel.toDraft(input.selected)
+    if (input.followedId === input.selected.instanceId || input.current.instanceId === input.selected.instanceId) return input.current
+    return AccountDraftModel.toDraft(input.selected)
+  }
+
   /** Up to three initials, the same tag the reference page derives by default. */
   static badgeFromName = (displayName: string): string =>
     displayName

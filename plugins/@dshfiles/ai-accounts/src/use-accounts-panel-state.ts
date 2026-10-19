@@ -3,6 +3,7 @@ import { useApi } from '@dshfiles/dshx/client'
 import { useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AccountDraftModel } from './account-draft.js'
+import { AccountWriteQueue } from './account-write-queue.js'
 import type { AccountRemovalTarget } from './account-remove-machine.js'
 import { useAutoSaver } from './auto-save.js'
 import { connectHintFor } from './account-labels.js'
@@ -21,6 +22,12 @@ export const useAccountsPanelState = (credentialSetup?: CredentialSetupPort) => 
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [draft, setDraft] = useState<AccountDraft | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  const [enqueueWrite] = useState(() => AccountWriteQueue.create())
+  // The slug the store holds for the selection when a queued write runs; an earlier rename in the queue moves it.
+  const storedSelectionId = useRef<string | null>(null)
+  useEffect(() => {
+    storedSelectionId.current = selectedId
+  }, [selectedId])
 
   const fileQuery = useQuery(aiAccountsQueries.file(accounts))
   const file = fileQuery.data ?? null
@@ -62,18 +69,13 @@ export const useAccountsPanelState = (credentialSetup?: CredentialSetupPort) => 
 
   const selected = useMemo(() => file?.accounts.find(account => account.instanceId === selectedId) ?? null, [file, selectedId])
 
-  // The editor follows the selection, and keeps unsaved edits across re-reads.
+  // The editor follows the selection, and keeps unsaved edits across re-reads and renames.
+  const followedId = useRef<string | null>(null)
   useEffect(() => {
-    if (selected === null) {
-      setDraft(null)
-      return
-    }
-    setDraft(current =>
-      current !== null && current.instanceId === selected.instanceId && !AccountDraftModel.sameDraft(selected, current)
-        ? current
-        : AccountDraftModel.toDraft(selected),
-    )
-  }, [selected])
+    const previouslyFollowed = followedId.current
+    setDraft(current => AccountDraftModel.followSelection({ current, selected, selectedId, followedId: previouslyFollowed }))
+    if (selected !== null) followedId.current = selected.instanceId
+  }, [selected, selectedId])
 
   const dirty = selected !== null && draft !== null && !AccountDraftModel.sameDraft(selected, draft)
   const problem = draft === null ? null : AccountDraftModel.draftProblem(draft)
@@ -86,7 +88,7 @@ export const useAccountsPanelState = (credentialSetup?: CredentialSetupPort) => 
     retry: false,
   })
   const { saver, status: autoSave } = useAutoSaver<AccountDraft>({
-    save: async next => setFile(await accounts.save({ draft: next })),
+    save: async next => setFile(await enqueueWrite(() => accounts.save({ draft: next }))),
     equals: AccountDraftModel.sameDraft,
     delayMs: preferences.autoSaveDelayMs,
   })
@@ -112,23 +114,31 @@ export const useAccountsPanelState = (credentialSetup?: CredentialSetupPort) => 
   )
 
   // Explicit saves and new accounts show as busy; auto-save and switch toggles write quietly.
+  // A rename reads the slug it renames when it runs, so a save queued behind another rename renames nothing twice.
   const saveMutation = useMutation({
-    mutationFn: (input: { readonly draft: AccountDraft; readonly previousInstanceId?: string }) => accounts.save(input),
+    mutationFn: (input: { readonly draft: AccountDraft; readonly renamesSelection: boolean }) =>
+      enqueueWrite(async () => {
+        const storedId = storedSelectionId.current
+        const previousInstanceId = input.renamesSelection && storedId !== null && storedId !== input.draft.instanceId ? storedId : undefined
+        const file = await accounts.save(previousInstanceId === undefined ? { draft: input.draft } : { draft: input.draft, previousInstanceId })
+        storedSelectionId.current = input.draft.instanceId
+        return { file, renamed: previousInstanceId !== undefined }
+      }),
     onMutate: () => setNotice(null),
     onSuccess: (next, input) => {
-      setFile(next)
+      setFile(next.file)
       setSelectedId(input.draft.instanceId)
     },
   })
   const moveAccountMutation = useMutation({
-    mutationFn: (input: { readonly instanceId: string; readonly direction: AccountOrderDirection }) => accounts.moveAccount(input),
+    mutationFn: (input: { readonly instanceId: string; readonly direction: AccountOrderDirection }) => enqueueWrite(() => accounts.moveAccount(input)),
     onMutate: () => setNotice(null),
     onSuccess: next => setFile(next),
     onError: error => setNotice(`Could not reorder account: ${String(error)}`),
   })
   const removeMutation = useMutation({
     mutationFn: async (target: AccountRemovalTarget) => {
-      const next = await accounts.remove({ instanceId: target.instanceId })
+      const next = await enqueueWrite(() => accounts.remove({ instanceId: target.instanceId }))
       setFile(next)
       return next
     },
@@ -140,12 +150,10 @@ export const useAccountsPanelState = (credentialSetup?: CredentialSetupPort) => 
   })
 
   const save = async (next: AccountDraft): Promise<boolean> => {
-    const previousInstanceId = selectedId !== null && selectedId !== next.instanceId ? selectedId : undefined
     try {
-      const input = previousInstanceId === undefined ? { draft: next } : { draft: next, previousInstanceId }
-      await saveMutation.mutateAsync(input)
+      const { renamed } = await saveMutation.mutateAsync({ draft: next, renamesSelection: true })
       saver.markSaved(next)
-      setNotice(previousInstanceId === undefined ? 'Saved. New sessions use the updated route settings.' : `Renamed to ${next.instanceId}.`)
+      setNotice(renamed ? `Renamed to ${next.instanceId}.` : 'Saved. New sessions use the updated route settings.')
       return true
     } catch (error) {
       setNotice(`Could not save: ${String(error)}`)
@@ -233,7 +241,7 @@ export const useAccountsPanelState = (credentialSetup?: CredentialSetupPort) => 
     const next = { ...AccountDraftModel.toDraft(selected), ...patch }
     setDraft(current => (current === null ? next : { ...current, ...patch }))
     try {
-      setFile(await accounts.save({ draft: next }))
+      setFile(await enqueueWrite(() => accounts.save({ draft: next })))
       saver.markSaved(next)
     } catch (error) {
       setNotice(`Could not save: ${String(error)}`)
@@ -246,7 +254,7 @@ export const useAccountsPanelState = (credentialSetup?: CredentialSetupPort) => 
   }
 
   const toggleEnabled = async (profile: AccountProfile) => {
-    setFile(await accounts.save({ draft: { ...AccountDraftModel.toDraft(profile), enabled: !profile.enabled } }))
+    setFile(await enqueueWrite(() => accounts.save({ draft: { ...AccountDraftModel.toDraft(profile), enabled: !profile.enabled } })))
   }
 
   const remove = async (target: AccountRemovalTarget): Promise<void> => {
@@ -260,7 +268,7 @@ export const useAccountsPanelState = (credentialSetup?: CredentialSetupPort) => 
   const createAccount = async (kind: AccountProfile['kind']) => {
     const next = AccountDraftModel.newAccountDraft({ kind, existing: file?.accounts ?? [] })
     try {
-      await saveMutation.mutateAsync({ draft: next })
+      await saveMutation.mutateAsync({ draft: next, renamesSelection: false })
       setNotice(`Added ${next.displayName}. ${connectHintFor(kind)}`)
     } catch (error) {
       setNotice(`Could not add the account: ${String(error)}`)
