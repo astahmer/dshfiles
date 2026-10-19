@@ -1530,6 +1530,7 @@
       "id": "usage-limit-group",
       "title": "Group provider-blocked threads under Usage limit",
       "summary": "Threads whose last turn the provider refused for quota or a rate limit appear together with their reset countdown, a resume action, snooze choices and the auto-retry switch, reading the durable recoveries @dshfiles/ai-accounts owns.",
+      "reach": ["seed quota-blocked-thread", "expect region \"Usage limit\"", "expect button \"Resume this thread\""],
       "surfaces": ["client", "integration"],
       "configuration": [],
       "states": ["hidden", "waiting", "ready", "snoozed", "unknown-reset"],
@@ -1568,6 +1569,11 @@
           "id": "thread-sidebar.usage-limit-unit-section",
           "file": "plugins/@dshfiles/thread-sidebar/src/usage-limit-section.client.test.tsx",
           "testName": "resumes one thread, resumes all of them, and opens the thread behind a row"
+        },
+        {
+          "kind": "gherkin",
+          "id": "thread-sidebar.usage-limit-group",
+          "featureFile": "tooling/dshx/e2e/features/thread-sidebar-usage-limit.feature"
         }
       ]
     },

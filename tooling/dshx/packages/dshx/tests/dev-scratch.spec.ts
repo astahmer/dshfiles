@@ -8,7 +8,6 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { chromium } from 'playwright'
 import { runCli } from '../src/cli/run.js'
 import { StartupDialogs } from '../src/project/startup-dialogs.js'
-import { FAKE_COMMAND_CODE_MODEL } from '../src/scratch/fake-command-code.js'
 import { installFakeSecretCli, NEW_THREAD_START_BUTTON_NAME, ScratchSeedRuntime } from '../src/scratch/seed.js'
 import { ScratchStateRuntime, type ScratchState } from '../src/scratch/state.js'
 
@@ -71,38 +70,59 @@ describe('dshx dev scratch commands', () => {
     expect(NEW_THREAD_START_BUTTON_NAME.test('Settings')).toBe(false)
   })
 
-  it('opens AI Accounts and selects fake routes in both model picker variants', async () => {
+  it('opens AI Accounts through the sidebar or Settings, then selects fake routes', async () => {
+    const modelId = 'dshx_fake_commandcode/gpt-6-luna'
     const browser = await chromium.launch({ headless: true })
     try {
       const page = await browser.newPage()
       await page.setContent(`
         <button aria-label="AI Accounts" onclick="document.querySelector('#accounts').hidden = false">AI Accounts</button>
-        <section id="accounts" hidden>Provider accounts</section>
+        <aside id="accounts" role="complementary" aria-label="Provider accounts" hidden>Provider accounts</aside>
         <button aria-label="New session" onclick="const row = document.createElement('div'); row.setAttribute('role', 'treeitem'); row.textContent = 'New Session'; row.onclick = () => { document.querySelector('#composer').hidden = false }; document.body.append(row)"></button>
         <div id="composer" role="textbox" aria-label="Describe what you want to build, / commands, @ files or sessions" contenteditable="true" hidden></div>
         <button aria-label="Select model" onclick="document.querySelector('#models').hidden = false">Select model</button>
-        <div id="models" role="menu" aria-label="Model" hidden><div role="menuitemradio" aria-label="${FAKE_COMMAND_CODE_MODEL}" aria-checked="false" onclick="this.setAttribute('aria-checked', 'true')">${FAKE_COMMAND_CODE_MODEL}</div></div>
+        <div id="models" role="menu" aria-label="Model" hidden><div role="menuitemradio" aria-label="${modelId}" aria-checked="false" onclick="this.setAttribute('aria-checked', 'true')">${modelId}</div></div>
       `)
 
       await ScratchSeedRuntime.openAIAccountsPanel(page, 1_000)
       expect(await page.locator('#accounts').isVisible()).toBe(true)
       const composer = await ScratchSeedRuntime.openSeedThreadComposer(page, 1_000)
       expect(await composer.isVisible()).toBe(true)
-      await ScratchSeedRuntime.chooseFakeProviderModel(page, 1_000)
-      expect(await page.getByRole('menuitemradio', { name: FAKE_COMMAND_CODE_MODEL, exact: true }).getAttribute('aria-checked')).toBe('true')
+      await ScratchSeedRuntime.chooseFakeProviderModel({ page, timeoutMs: 1_000, modelId })
+      expect(await page.getByRole('menuitemradio', { name: modelId, exact: true }).getAttribute('aria-checked')).toBe('true')
+
+      await page.setContent(`
+        <button aria-label="Account menu" onclick="document.querySelector('#menu').hidden = false">Account</button>
+        <div id="menu" role="menu" hidden>
+          <button role="menuitem" aria-label="Settings ⌘," onclick="document.querySelector('#settings').hidden = false">Settings</button>
+        </div>
+        <div id="settings" role="dialog" hidden>
+          <button aria-label="AI Accounts" onclick="document.querySelector('#launch').hidden = false">AI Accounts</button>
+        </div>
+        <button id="launch" aria-label="Open AI Accounts" onclick="document.querySelector('#accounts').hidden = false" hidden>Open AI Accounts</button>
+        <aside id="accounts" role="complementary" aria-label="Provider accounts" hidden>Provider accounts</aside>
+      `)
+      await ScratchSeedRuntime.openAIAccountsPanel(page, 1_000)
+      expect(await page.getByRole('complementary', { name: 'Provider accounts', exact: true }).isVisible()).toBe(true)
 
       await page.setContent(`
         <button id="model-picker" aria-label="deepseek-flash, reasoning Default" onclick="document.querySelector('#models').showModal()">deepseek-flash</button>
         <dialog id="models" aria-label="Models">
-          <button aria-label="${FAKE_COMMAND_CODE_MODEL}, reasoning Provider default">${FAKE_COMMAND_CODE_MODEL} · Provider default</button>
+          <button aria-label="${modelId}, reasoning Provider default">${modelId} · Provider default</button>
           <div role="list" aria-label="Models grouped by provider">
-            <button id="route-option" onclick="this.dataset.selected = 'true'; document.querySelector('#model-picker').setAttribute('aria-label', '${FAKE_COMMAND_CODE_MODEL}, reasoning Provider default')">${FAKE_COMMAND_CODE_MODEL} gpt-6-luna</button>
+            <button id="route-option" onclick="this.dataset.selected = 'true'; document.querySelector('#model-picker').setAttribute('aria-label', '${modelId}, reasoning Provider default')">${modelId} gpt-6-luna</button>
           </div>
         </dialog>
       `)
-      await ScratchSeedRuntime.chooseFakeProviderModel(page, 1_000)
+      await ScratchSeedRuntime.chooseFakeProviderModel({ page, timeoutMs: 1_000, modelId })
       expect(await page.locator('#route-option').getAttribute('data-selected')).toBe('true')
       expect(await page.locator('#models').evaluate(element => element.hasAttribute('open'))).toBe(false)
+      await page.setContent(`
+        <button aria-label="New thread" onclick="setTimeout(() => { document.querySelector('#composer').hidden = false }, 50)">New thread</button>
+        <div id="composer" role="textbox" aria-label="Describe what you want to build, / commands, @ files or sessions" contenteditable="true" hidden></div>
+      `)
+      const delayedComposer = await ScratchSeedRuntime.openSeedThreadComposer(page, 1_000)
+      expect(await delayedComposer.isVisible()).toBe(true)
       await page.close()
     } finally {
       await browser.close()
@@ -115,6 +135,7 @@ describe('dshx dev scratch commands', () => {
     expect(help.stdout).toContain('dshx dev open <feature>')
     expect(help.stdout).toContain('click <role|text|label|title>')
     expect(help.stdout).toContain('provider-setup dialogs')
+    expect(help.stdout).toContain('quota-blocked-thread')
     expect(help.stdout).toContain('credential-recovery')
 
     const missingFeature = await run(['dev', 'open', '--json'])

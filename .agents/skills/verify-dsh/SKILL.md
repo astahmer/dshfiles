@@ -56,6 +56,11 @@ described revision, for Rebase), `pending-restart` (changes thread-sidebar's
 `dist/index.js`; `down` restores it), and `tool-call-thread` (an AI Accounts
 Command Code account on a loopback fake provider, which `down` stops, and a
 thread whose model ran a 3 s `bash` call; needs `@dshfiles/ai-accounts`),
+`quota-blocked-thread` (an exhausted Command Code turn whose stored recovery
+appears in the Usage limit group; needs `@dshfiles/ai-accounts` and
+`up --fake-secret-cli` to isolate its synthetic key. For a clean ThreadSidebar
+pass, also load `@dshfiles/multi-host` and `@dshfiles/jj-integration` for the
+sidebar's remote-thread and repository queries),
 `chat-reference-thread` (the same fake-provider account; a thread whose answer
 holds a `` `jj:main` `` code span, so a chat link is really rendered; needs
 `@dshfiles/ai-accounts` and `@dshfiles/jujutsu`), and `fake-secret-cli` (resets synthetic

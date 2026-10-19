@@ -1450,3 +1450,17 @@ Then('the JJ inventory is read again after the sidebar expands', async ({ page }
   })
   await finishJourneyAssertions(page)
 })
+
+Then('the blocked session appears in the Usage limit group', async ({ page }: { Page }) => {
+  await recordAssertion(page, 'thread-sidebar-usage-limit-group', async () => {
+    await expect.poll(() => currentThreadId(page), { timeout: 30_000 }).not.toBeNull()
+    const sessionId = currentThreadId(page)
+    if (sessionId === null) throw new Error('The blocked thread is not selected.')
+
+    const group = page.getByRole('region', { name: 'Usage limit', exact: true })
+    await expect(group).toBeVisible({ timeout: 30_000 })
+    await expect(group.locator(`[data-thread-id="${sessionId}"]`)).toBeVisible({ timeout: 30_000 })
+    await expect(group.getByRole('button', { name: 'Resume this thread', exact: true })).toBeVisible()
+  })
+  await finishJourneyAssertions(page)
+})

@@ -6,54 +6,76 @@ import type { Page } from 'playwright'
 import { z } from 'zod'
 import type { ReachSeed } from '../project/features.js'
 import { DSHFILES_ROOT } from '../project/local-bundles.js'
-import { FAKE_COMMAND_CODE_MODEL } from './fake-command-code.js'
+import { FAKE_COMMAND_CODE_MODEL, FAKE_COMMAND_CODE_MODEL_ID } from './fake-command-code.js'
 import { ScratchError, ScratchStateRuntime, type ScratchState } from './state.js'
 
 const NEW_THREAD_COMPOSER = 'Describe what you want to build, / commands, @ files or sessions'
 const AI_ACCOUNTS_BUTTON_NAME = 'AI Accounts'
+const FAKE_PROVIDER_ROUTE_SLUG = 'dshx_fake_commandcode'
+const FAKE_PROVIDER_KEY_REF = 'DSHX_FAKE_COMMANDCODE_API_KEY'
 export const NEW_THREAD_START_BUTTON_NAME = /^(?:New thread|New session)$/i
 const fakeProviderScript = fileURLToPath(new URL('./fake-provider-main.js', import.meta.url))
 
+const openSettingsDialog = async (page: Page, timeoutMs: number): Promise<void> => {
+  const launcher = page.locator('[data-slot="settings.launcher"] button').first()
+  if (await launcher.isVisible()) await launcher.click({ timeout: timeoutMs })
+  else await page.getByRole('button', { name: 'Account menu', exact: true }).click({ timeout: timeoutMs })
+  await page.getByRole('menuitem', { name: /^Settings/ }).click({ timeout: timeoutMs })
+}
+
 const openAIAccountsPanel = async (page: Page, timeoutMs: number): Promise<void> => {
-  await page.getByRole('button', { name: AI_ACCOUNTS_BUTTON_NAME, exact: true }).click({ timeout: timeoutMs })
+  const accounts = page.getByRole('complementary', { name: 'Provider accounts' })
+  if (await accounts.isVisible()) return
+
+  const globalPanel = page.getByRole('button', { name: AI_ACCOUNTS_BUTTON_NAME, exact: true })
+  if (await globalPanel.isVisible()) await globalPanel.click({ timeout: timeoutMs })
+  else {
+    await openSettingsDialog(page, timeoutMs)
+    await page.getByRole('dialog').getByRole('button', { name: AI_ACCOUNTS_BUTTON_NAME, exact: true }).click({ timeout: timeoutMs })
+    await page.getByRole('button', { name: 'Open AI Accounts', exact: true }).click({ timeout: timeoutMs })
+  }
+  await accounts.waitFor({ state: 'visible', timeout: timeoutMs })
 }
 
 const openSeedThreadComposer = async (page: Page, timeoutMs: number) => {
   const composer = page.getByRole('textbox', { name: NEW_THREAD_COMPOSER, exact: true })
   if (await composer.isVisible()) return composer
   await page.getByRole('button', { name: NEW_THREAD_START_BUTTON_NAME }).first().click({ timeout: timeoutMs })
-  if (!(await composer.isVisible())) {
-    await page.getByRole('treeitem').filter({ hasText: 'New Session' }).last().click({ timeout: timeoutMs })
-  }
+  const composerAppeared = await composer.waitFor({ state: 'visible', timeout: Math.min(timeoutMs, 1_000) }).then(
+    () => true,
+    error => {
+      if (error instanceof Error && error.name === 'TimeoutError') return false
+      throw error
+    },
+  )
+  if (!composerAppeared) await page.getByRole('treeitem').filter({ hasText: 'New Session' }).last().click({ timeout: timeoutMs })
   await composer.waitFor({ state: 'visible', timeout: timeoutMs })
   return composer
 }
 
-const chooseFakeProviderModel = async (page: Page, timeoutMs: number): Promise<void> => {
-  const modelPicker = page.getByRole('button', { name: /^(?:Select model|.+,\s*reasoning)/u }).first()
+const chooseFakeProviderModel = async (input: { readonly page: Page; readonly timeoutMs: number; readonly modelId?: string }): Promise<void> => {
+  const modelId = input.modelId ?? FAKE_COMMAND_CODE_MODEL
+  const modelPicker = input.page.getByRole('button', { name: /^(?:Select model|.+,\s*reasoning)/u }).first()
   const currentModelLabel = (await modelPicker.getAttribute('aria-label')) ?? ''
-  if (currentModelLabel.includes(FAKE_COMMAND_CODE_MODEL)) return
+  if (currentModelLabel.includes(modelId)) return
 
-  await modelPicker.click({ timeout: Math.min(timeoutMs, 5_000) })
-  const modelList = page.getByRole('list', { name: 'Models grouped by provider', exact: true })
+  await modelPicker.click({ timeout: Math.min(input.timeoutMs, 5_000) })
+  const modelList = input.page.getByRole('list', { name: 'Models grouped by provider', exact: true })
   const hasModelEffortPicker = (await modelList.count()) > 0
-  const routeOption = page
-    .getByRole('menuitemradio', { name: FAKE_COMMAND_CODE_MODEL, exact: true })
-    .or(modelList.getByRole('button').filter({ hasText: FAKE_COMMAND_CODE_MODEL }))
-  await routeOption.first().waitFor({ state: 'visible', timeout: timeoutMs })
-  await routeOption.first().click({ timeout: timeoutMs })
+  const routeOption = input.page.getByRole('menuitemradio', { name: modelId, exact: true }).or(modelList.getByRole('button').filter({ hasText: modelId }))
+  await routeOption.first().waitFor({ state: 'visible', timeout: input.timeoutMs })
+  await routeOption.first().click({ timeout: input.timeoutMs })
 
   if (hasModelEffortPicker) {
-    await page.keyboard.press('Escape')
-    await modelPicker.waitFor({ state: 'visible', timeout: timeoutMs })
+    await input.page.keyboard.press('Escape')
+    await modelPicker.waitFor({ state: 'visible', timeout: input.timeoutMs })
     const selectedModelLabel = (await modelPicker.getAttribute('aria-label')) ?? ''
-    if (!selectedModelLabel.includes(FAKE_COMMAND_CODE_MODEL)) {
+    if (!selectedModelLabel.includes(modelId)) {
       throw new ScratchError('seed-failed', `The model picker kept ${selectedModelLabel || 'no model'} selected.`, 'Check the AI Accounts panel.')
     }
   }
 }
 
-const FAKE_PROVIDER_ACCOUNT = 'Command Code 1'
 /** A call that runs long enough to watch a live tool-call counter, then settles. */
 const TOOL_CALL_DIRECTIVE = `[[call bash ${JSON.stringify({ command: 'sleep 3 && echo tool-call-thread', description: 'Wait three seconds' })}]]`
 const REBASE_READY_THREAD_MESSAGE = 'Seeded thread to rebase'
@@ -233,8 +255,16 @@ const configureFakeProviderThread = async (input: {
   const accounts = page.getByRole('complementary', { name: 'Provider accounts' })
   await accounts.getByRole('button', { name: 'Add account', exact: true }).click({ timeout: timeoutMs })
   await page.getByRole('menuitem', { name: 'Command Code account', exact: true }).click({ timeout: timeoutMs })
-  await page.getByRole('heading', { name: FAKE_PROVIDER_ACCOUNT, exact: true }).waitFor({ state: 'visible', timeout: timeoutMs })
-  const baseUrl = page.getByRole('textbox', { name: 'API base URL', exact: true })
+  const accountHeading = page.getByRole('heading', { name: /^Command Code \d+$/u }).last()
+  await accountHeading.waitFor({ state: 'visible', timeout: timeoutMs })
+  const accountName = (await accountHeading.innerText()).trim()
+  const routeSlug = page.getByRole('textbox', { name: 'Route slug', exact: true }).last()
+  await routeSlug.fill(FAKE_PROVIDER_ROUTE_SLUG, { timeout: timeoutMs })
+  await routeSlug.blur()
+  const keyVariable = page.getByRole('textbox', { name: 'API KEY reference name', exact: true }).last()
+  await keyVariable.fill(FAKE_PROVIDER_KEY_REF, { timeout: timeoutMs })
+  await keyVariable.blur()
+  const baseUrl = page.getByRole('textbox', { name: 'API base URL', exact: true }).last()
   await baseUrl.fill(fake.baseUrl, { timeout: timeoutMs })
   await baseUrl.blur()
   await page
@@ -242,11 +272,12 @@ const configureFakeProviderThread = async (input: {
     .filter({ hasText: /^(Saved|Changes save automatically)$/ })
     .first()
     .waitFor({ state: 'visible', timeout: timeoutMs })
-  await page.getByRole('button', { name: 'Set up key…', exact: true }).click({ timeout: timeoutMs })
-  const keyDialog = page.getByRole('dialog', { name: `Configure ${FAKE_PROVIDER_ACCOUNT} key`, exact: true })
+  await page.getByRole('button', { name: 'Set up key…', exact: true }).last().click({ timeout: timeoutMs })
+  const keyDialog = page.getByRole('dialog', { name: `Configure ${accountName} key`, exact: true })
   await keyDialog.getByRole('textbox', { name: 'API key value', exact: true }).fill(input.apiKey ?? 'dshx-dev-fake-key', { timeout: timeoutMs })
   await keyDialog.getByRole('button', { name: 'Store key', exact: true }).click({ timeout: timeoutMs })
   await keyDialog.waitFor({ state: 'hidden', timeout: timeoutMs })
+  await page.keyboard.press('Escape')
 
   await openSeedThreadComposer(page, timeoutMs)
   const projectName = basename(state.project.path)
@@ -262,7 +293,7 @@ const configureFakeProviderThread = async (input: {
       await page.keyboard.press('Enter')
     } else await page.getByRole('menuitem', { name: projectName, exact: true }).click({ timeout: timeoutMs })
   }
-  await chooseFakeProviderModel(page, timeoutMs)
+  await chooseFakeProviderModel({ page, timeoutMs, modelId: `${FAKE_PROVIDER_ROUTE_SLUG}/${FAKE_COMMAND_CODE_MODEL_ID}` })
   return fake.process
 }
 
@@ -286,6 +317,19 @@ const seedToolCallThread = async (state: ScratchState, page: Page, timeoutMs: nu
 }
 
 /** Seed a model-selected thread whose loopback provider rejects the key, so the next turn fails. */
+const seedQuotaBlockedThread = async (state: ScratchState, page: Page, timeoutMs: number): Promise<NonNullable<ScratchState['fakeProvider']>> => {
+  const process = await configureFakeProviderThread({
+    state,
+    page,
+    seed: 'quota-blocked-thread',
+    timeoutMs,
+    apiKey: 'dshx-dev-fake-key-EXHAUSTED',
+  })
+  await sendFakeProviderTurn(page, 'Recover this turn on another available route.', timeoutMs)
+  await page.getByText("Your current account's usage limit is exhausted", { exact: false }).waitFor({ state: 'visible', timeout: timeoutMs })
+  return process
+}
+
 const seedCredentialRecovery = (state: ScratchState, page: Page, timeoutMs: number): Promise<NonNullable<ScratchState['fakeProvider']>> =>
   configureFakeProviderThread({ state, page, seed: 'credential-recovery', timeoutMs, apiKey: 'dshx-dev-fake-MISSING' })
 
@@ -381,6 +425,7 @@ const applySeed = async (input: {
     await seedFakeSecretCli(input.state)
     return {}
   }
+  if (input.seed === 'quota-blocked-thread') return { fakeProvider: await seedQuotaBlockedThread(input.state, input.page, input.timeoutMs) }
   if (input.seed === 'credential-recovery') return { fakeProvider: await seedCredentialRecovery(input.state, input.page, input.timeoutMs) }
   if (input.seed === 'tool-call-thread') return { fakeProvider: await seedToolCallThread(input.state, input.page, input.timeoutMs) }
   if (input.seed === 'chat-reference-thread') return { fakeProvider: await seedChatReferenceThread(input.state, input.page, input.timeoutMs) }

@@ -19,8 +19,9 @@ import { z } from 'zod'
  * E2E journeys start it per page; `dshx dev`'s `tool-call-thread` seed runs it as its own process.
  */
 
-/** The only model the fake provider advertises, so journeys and the scratch seed pick the same route. */
-export const FAKE_COMMAND_CODE_MODEL = 'commandcode_work/gpt-6-luna'
+/** The fake provider's model id; journeys and scratch use separate account route slugs. */
+export const FAKE_COMMAND_CODE_MODEL_ID = 'gpt-6-luna'
+export const FAKE_COMMAND_CODE_MODEL = `commandcode_work/${FAKE_COMMAND_CODE_MODEL_ID}`
 
 const HOUR_MS = 3_600_000
 const TITLE_INSTRUCTION = 'Create a concise title for an AI coding-assistant session'

@@ -270,6 +270,14 @@ Given('the isolated plugin profile {string} is booted', async ({ page }: { page:
   await visitIsolatedPluginProfile(page, await bootPluginProfile(packageId))
 })
 
+Given('the isolated ThreadSidebar and AI Accounts plugin profile is booted', async ({ page }: { page: Page }) => {
+  const profile = await bootComposedPluginProfile({
+    packageIds: ['@dshfiles/thread-sidebar', '@dshfiles/ai-accounts'],
+    profileLabel: 'thread-sidebar-usage-limit',
+  })
+  await visitIsolatedPluginProfile(page, profile)
+})
+
 // The web profile carries its session-content index as a Loader row, not as a bundle, so a journey that reads
 // referenced-session context must ask for it explicitly. First-search keeps the SQLite module unloaded until then.
 const sessionContentSearchPatch = `- id: session-query-sqlite
