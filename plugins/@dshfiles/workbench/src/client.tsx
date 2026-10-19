@@ -11,7 +11,14 @@ import type { RightPanelMode } from '@dshfiles/frame-layout/regions'
 import type {} from '@dshfiles/frame-layout/regions'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import {
-  Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
 } from '@dshfiles/plugin-ui/components/ui/dialog'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
@@ -179,13 +186,15 @@ export default defineClient({
       closeElsewhere(input.region, input.panelId)
     }
 
-    const handleDrop = (region: WorkbenchRegionId) => (event: DockviewDidDropEvent): void => {
-      const panelId = event.getData()?.panelId
-      const api = regions.get(region)
-      if (panelId === undefined || panelId === null || api === undefined) return
-      const position = event.group === undefined ? undefined : { referenceGroup: event.group, direction: 'within' as const }
-      adoptPanel(position === undefined ? { region, api, panelId } : { region, api, panelId, position })
-    }
+    const handleDrop =
+      (region: WorkbenchRegionId) =>
+      (event: DockviewDidDropEvent): void => {
+        const panelId = event.getData()?.panelId
+        const api = regions.get(region)
+        if (panelId === undefined || panelId === null || api === undefined) return
+        const position = event.group === undefined ? undefined : { referenceGroup: event.group, direction: 'within' as const }
+        adoptPanel(position === undefined ? { region, api, panelId } : { region, api, panelId, position })
+      }
 
     const acceptsForeignPanel = (event: DockviewDndOverlayEvent): void => {
       const panelId = event.getData()?.panelId
@@ -236,10 +245,12 @@ export default defineClient({
     }
 
     /** Where an "Add panel" goes: the definition moves here if another region shows it. */
-    const openIn = (region: WorkbenchRegionId) => (definition: WorkbenchPanelDefinition, api: DockviewApi): void => {
-      closeElsewhere(region, definition.id)
-      WorkbenchLayout.openPanel(api, definition)
-    }
+    const openIn =
+      (region: WorkbenchRegionId) =>
+      (definition: WorkbenchPanelDefinition, api: DockviewApi): void => {
+        closeElsewhere(region, definition.id)
+        WorkbenchLayout.openPanel(api, definition)
+      }
 
     /** Show or hide the bottom panel from a surface's own header. */
     const ToggleBottomPanel = decorate(() => {
@@ -277,9 +288,7 @@ export default defineClient({
         movable.flatMap(({ definition, panelId }) => {
           const target = definition.mainPanelId
           if (destination === 'main' && (target === undefined || !isMainPanelId(target))) return []
-          const label = movable.length === 1
-            ? destinationLabel(destination)
-            : `${definition.title}: ${destinationLabel(destination)}`
+          const label = movable.length === 1 ? destinationLabel(destination) : `${definition.title}: ${destinationLabel(destination)}`
           return [{ key: `${destination}:${panelId}`, label, run: () => movePanelTo(props.from, api, destination, panelId) }]
         }),
       )
@@ -287,7 +296,9 @@ export default defineClient({
       return (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button size="sm" variant="ghost">{translate('movePanel')}</Button>
+            <Button size="sm" variant="ghost">
+              {translate('movePanel')}
+            </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             {entries.map(entry => (
@@ -411,7 +422,9 @@ export default defineClient({
       return (
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
-            <Button size="sm" variant="ghost">{translate('layouts')}</Button>
+            <Button size="sm" variant="ghost">
+              {translate('layouts')}
+            </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
@@ -435,7 +448,9 @@ export default defineClient({
                 {translate('saveLayout')}
               </Button>
               <DialogClose asChild>
-                <Button size="sm" variant="ghost">{translate('done')}</Button>
+                <Button size="sm" variant="ghost">
+                  {translate('done')}
+                </Button>
               </DialogClose>
             </DialogFooter>
           </DialogContent>

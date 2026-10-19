@@ -2,8 +2,13 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { PlusIcon, RotateCcwIcon, XIcon } from '@dshfiles/plugin-ui/icons'
 import {
-  DockviewReact, type DockviewApi, type DockviewDidDropEvent, type DockviewReadyEvent, type DockviewTheme,
-  type DockviewDndOverlayEvent, type IDockviewPanelProps,
+  DockviewReact,
+  type DockviewApi,
+  type DockviewDidDropEvent,
+  type DockviewReadyEvent,
+  type DockviewTheme,
+  type DockviewDndOverlayEvent,
+  type IDockviewPanelProps,
 } from 'dockview-react'
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { WorkbenchLayout, WORKBENCH_COMPONENT, type LayoutStore } from './layout-store.js'
