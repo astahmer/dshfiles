@@ -1,15 +1,14 @@
 import type { SerializedDockview } from 'dockview-react'
 import { describe, expect, it } from 'vitest'
+import { layoutSchema } from './layout-store.js'
 import { SavedLayouts, savedLayouts, type SavedLayout } from './saved-layouts.js'
 
-/** Test double: the store only round-trips these objects, it never renders them. */
+/** Test double: built through the store's own schema, so it is exactly what storage accepts. */
 const arrangement = (panelId: string): SerializedDockview =>
-  // SAFETY: the store validates the shape it stores with `layoutSchema`; this
-  // fixture carries exactly the fields that schema requires.
-  ({
+  layoutSchema.parse({
     grid: { root: { type: 'branch', data: [] }, width: 100, height: 100, orientation: 'HORIZONTAL' },
     panels: { [panelId]: { id: panelId, contentComponent: 'workbench-panel' } },
-  }) as unknown as SerializedDockview
+  })
 
 describe('saved layouts', () => {
   it('round-trips through browser storage', () => {

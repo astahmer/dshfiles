@@ -3,23 +3,26 @@ import type { DockviewApi } from 'dockview-react'
 /** The docking regions a panel can live in. */
 export type WorkbenchRegionId = 'main' | 'right' | 'bottom'
 
-export interface WorkbenchRegionRegistry {
+/** What the registry needs from a surface: which panels it holds. */
+export type WorkbenchRegionSurface = { readonly getPanel: (panelId: string) => unknown }
+
+export interface WorkbenchRegionRegistry<Surface extends WorkbenchRegionSurface = DockviewApi> {
   /** Register a live surface; the returned disposer removes it again. */
-  readonly set: (region: WorkbenchRegionId, api: DockviewApi) => () => void
-  readonly get: (region: WorkbenchRegionId) => DockviewApi | undefined
+  readonly set: (region: WorkbenchRegionId, api: Surface) => () => void
+  readonly get: (region: WorkbenchRegionId) => Surface | undefined
   /** Every live surface, in region order. */
-  readonly entries: () => readonly (readonly [WorkbenchRegionId, DockviewApi])[]
+  readonly entries: () => readonly (readonly [WorkbenchRegionId, Surface])[]
   /** Whether any live surface already shows the panel. */
   readonly holds: (panelId: string) => boolean
 }
 
 const REGION_ORDER: readonly WorkbenchRegionId[] = ['main', 'right', 'bottom']
 
-export const createWorkbenchRegionRegistry = (): WorkbenchRegionRegistry => {
+export const createWorkbenchRegionRegistry = <Surface extends WorkbenchRegionSurface = DockviewApi>(): WorkbenchRegionRegistry<Surface> => {
   // Each registration carries its own token: a surface that remounts with the
   // same Dockview instance (a settings flip re-renders it) registers again, and
   // the old disposer must not delete the newer registration.
-  const slots = new Map<WorkbenchRegionId, { readonly api: DockviewApi; readonly token: object }>()
+  const slots = new Map<WorkbenchRegionId, { readonly api: Surface; readonly token: object }>()
   return {
     set: (region, api) => {
       const token = {}
