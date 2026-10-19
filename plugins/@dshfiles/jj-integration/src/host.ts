@@ -2,10 +2,12 @@ import { randomUUID } from 'node:crypto'
 import { existsSync, statSync } from 'node:fs'
 import { mkdir } from 'node:fs/promises'
 import { homedir } from 'node:os'
-import { basename, join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 import type { Context, Effect } from '@deepseek-ai/cordis'
 import type { SessionRequestId } from '@deepseek-ai/dsh-api-session-controller'
 import type {} from '@deepseek-ai/dsh-subprocess'
+import type {} from '@deepseek-ai/dsh-system-prompt'
+import type {} from '@deepseek-ai/dsh-working-directory'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import { WorkspaceId, type Workspace } from '@deepseek-ai/dsh-workspace'
 import { isApiOwnerMissing, PluginApiError, type ApiCaller } from '@dshfiles/dshx/api'
@@ -655,6 +657,22 @@ const sweepFinishedThreads = async (): Promise<void> => {
   }
 }
 
+/** A deleted thread folder must not fail the next turn of a Session pinned to it: check the workspace out again first. */
+const restoreMissingThreadWorkspace = async (path: string, sessionId: string): Promise<void> => {
+  if (existsSync(join(path, '.jj'))) return
+  const activeThreads = requireThreads()
+  for (const workspace of registryOf().list()) {
+    if (!existsSync(workspace.path) || threadsDirectory(workspace.path) !== dirname(path)) continue
+    const location = await cachedLocation(activeThreads, workspace.path)
+    if (location === undefined || location.repoRoot !== location.workspaceRoot) continue
+    await activeThreads.restore(location.repoRoot, path)
+    locationCache.delete(path)
+    invalidateRepositories()
+    emitActivity({ type: 'workspace.restored', summary: `Restored deleted thread workspace ${basename(path)}`, path, sessionId })
+    return
+  }
+}
+
 const threadPath = (input: { readonly path?: string | undefined }, caller: ApiCaller): string => {
   const isolatedPath = caller.kind === 'agent' && caller.sessionId !== undefined ? isolatedSessionWorkspaces.get(caller.sessionId)?.path : undefined
   const path = input.path ?? isolatedPath ?? (caller.kind === 'agent' ? caller.cwd : undefined)
@@ -1092,6 +1110,23 @@ const setupHost = (context: Context): Effect<void> => {
     report('skipped', 'Automatic integration skipped because workspace ownership or completion verification could not be revalidated.', 'routine')
   }
   context.on('dshfiles/project-checks/verified', handleVerifiedTurn)
+  // Prepended so it runs before DSH's working-directory check, which fails the turn when the Session's folder is gone.
+  context.on(
+    'system-prompt/assemble',
+    async (_assembly, promptContext, next) => {
+      const agent = promptContext.agent
+      if (agent === undefined) return next()
+      const directories = new Set([context.get('workingDirectory')?.get(agent.session), agent.session.header.cwd])
+      for (const directory of directories) {
+        if (directory === undefined || directory === null) continue
+        await restoreMissingThreadWorkspace(directory, agent.session.id).catch(error =>
+          context.logger.warn('jj-integration: could not restore thread workspace %s: %o', directory, error),
+        )
+      }
+      return next()
+    },
+    { prepend: true },
+  )
   const sweep = (): void => {
     void sweepFinishedThreads().catch(error => context.logger.warn('jj-integration: thread sweep failed: %o', error))
   }

@@ -1,5 +1,5 @@
 import { execFileSync, spawnSync } from 'node:child_process'
-import { existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -75,6 +75,36 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
     const thread = await threads.provision(repo, undefined, 'thread-c0ffee')
     expect(thread).toEqual({ name: 'thread-c0ffee', path: join(`${repo}-threads`, 'thread-c0ffee') })
     expect((await threads.locate(thread.path)).threadName).toBe('thread-c0ffee')
+  })
+
+  it('checks a deleted thread workspace out again on its own working-copy revision, even into a re-created empty folder', async () => {
+    const thread = await threads.provision(repo)
+    writeFileSync(join(thread.path, 'thread.txt'), 'work\n')
+    jj(thread.path, 'describe', '-m', 'thread work')
+    const workingCopy = commitIdAt(repo, `${thread.name}@`)
+    rmSync(thread.path, { recursive: true, force: true })
+    mkdirSync(thread.path)
+
+    await threads.restore(repo, thread.path)
+
+    expect(readFileSync(join(thread.path, 'thread.txt'), 'utf8')).toBe('work\n')
+    expect(commitIdAt(repo, `${thread.name}@`)).toBe(workingCopy)
+    expect((await threads.locate(thread.path)).threadName).toBe(thread.name)
+  })
+
+  it('starts a deleted and forgotten thread workspace again from the bookmark', async () => {
+    const thread = await threads.provision(repo)
+    rmSync(thread.path, { recursive: true, force: true })
+    jj(repo, 'workspace', 'forget', thread.name)
+
+    await threads.restore(repo, thread.path)
+
+    expect(existsSync(join(thread.path, 'shared.txt'))).toBe(true)
+    expect(commitIdAt(repo, `${thread.name}@-`)).toBe(bookmarkTargetCommitId(repo))
+  })
+
+  it('refuses to restore a folder outside the threads directory', async () => {
+    await expect(threads.restore(repo, join(root, 'thread-abcdef'))).rejects.toMatchObject({ code: 'not-a-thread' })
   })
 
   it('can isolate from the current working-copy revision when explicitly requested', async () => {

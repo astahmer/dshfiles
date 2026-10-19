@@ -63,6 +63,7 @@ catalog:
   '@deepseek-ai/dsh-tool-cordis': 0.2.1-rc.2
   '@deepseek-ai/dsh-tools': 0.2.1-rc.2
   '@deepseek-ai/dsh-workspace': 0.2.1-rc.2
+  '@deepseek-ai/dsh-working-directory': 0.2.1-rc.2
   '@deepseek-ai/schemastery': 3.18.4
   '@hono/node-server': 2.1.5
   '@tanstack/query-core': 5.104.1

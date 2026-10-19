@@ -741,6 +741,50 @@ export const createThreads = (options: {
       return { name, path }
     })
 
+  /**
+   * Checks a thread workspace out again after its folder was deleted, so a Session pinned to it can still run.
+   * A workspace JJ still knows keeps its working-copy revision; a forgotten one starts again from the bookmark.
+   */
+  const restore = (repoRoot: string, path: string): Promise<void> =>
+    serialized(repoRoot, async () => {
+      if (existsSync(join(path, '.jj'))) return
+      const name = basename(path)
+      if (!THREAD_WORKSPACE_NAME.test(name) || dirname(path) !== options.threadsDirectory(repoRoot)) {
+        throw new ThreadError('not-a-thread', `${path} is not a managed thread workspace.`)
+      }
+      const [workingCopy] = (
+        await jj(
+          [
+            '--ignore-working-copy',
+            'log',
+            '--no-graph',
+            '-r',
+            `present(${name}@)`,
+            '-T',
+            'commit_id ++ "\\t" ++ parents.map(|p| p.commit_id()).join(",") ++ "\\t" ++ if(empty && !description, "discardable", "kept") ++ "\\n"',
+          ],
+          repoRoot,
+        )
+      )
+        .split('\n')
+        .filter(line => line.length > 0)
+        .map(line => {
+          const [commitId = '', parents = '', disposition] = line.split('\t')
+          return { commitId, parentIds: parents.split(',').filter(isCommitId), kept: disposition === 'kept' }
+        })
+      await mkdir(dirname(path), { recursive: true })
+      if (workingCopy === undefined) {
+        await jj(['workspace', 'add', path, '--name', name, '-r', options.bookmark()], repoRoot)
+        return
+      }
+      if (!isCommitId(workingCopy.commitId) || workingCopy.parentIds.length === 0) {
+        throw new ThreadError('jj-failed', `Could not read the working copy of ${name}; refusing to restore it.`)
+      }
+      await jj(['workspace', 'forget', name], repoRoot)
+      await jj(['workspace', 'add', path, '--name', name, ...workingCopy.parentIds.flatMap(commitId => ['-r', commitIdRevset(commitId)])], repoRoot)
+      if (workingCopy.kept) await jj(['edit', commitIdRevset(workingCopy.commitId)], path)
+    })
+
   const landVerified = async (input: VerifiedLandOptions): Promise<VerifiedLandOutcome> => {
     if (input.signal?.aborted) return { status: 'verification-cancelled' }
     const initialThread = await requireThread(input.path, input.signal)
@@ -1241,7 +1285,7 @@ export const createThreads = (options: {
     return (await readAtOperation(['log', '--no-pager', '--color=never', '--limit', '20', '-r', revset, '-T', template])).trimEnd()
   }
 
-  return { locate, list, status, provision, land, landAt, landVerified, discard, bookmarks, workingCopyCommitId, revisionGraph }
+  return { locate, list, status, provision, restore, land, landAt, landVerified, discard, bookmarks, workingCopyCommitId, revisionGraph }
 }
 
 export type Threads = ReturnType<typeof createThreads>
