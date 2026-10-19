@@ -130,6 +130,9 @@ A red journey is drift or a regression: triage it with `maintain-verification-sk
   so Activity Timeline verification can run
   without ThreadSidebar. If a path requires ThreadSidebar and `doctor` reports
   it pending on `workspaces`, record the Host gap instead of weakening the check.
+- Fake-provider seeds are rerunnable on the same instance: they reuse the running
+  fake provider and finish the `dshx_fake_commandcode` account a failed run left,
+  and fail with "AI Accounts never saved …" when the store disagrees with the panel.
 - Reaches share one browser and project selection persists. A reach that needs
   the project picker should run before another selects `sample` or use a separate
   `--name` instance. A reach that changes a sidebar view leaves it for the next

@@ -208,11 +208,59 @@ const restorePendingRestart = async (state: ScratchState, dryRun: boolean): Prom
   return hostEntry
 }
 
+const FAKE_PROVIDER_ACCOUNTS_FILE = z.object({
+  accounts: z.array(z.object({ instanceId: z.string(), displayName: z.string(), apiKeyEnv: z.string(), apiBaseUrl: z.string() })),
+})
+
+type FakeProviderAccount = z.infer<typeof FAKE_PROVIDER_ACCOUNTS_FILE>['accounts'][number]
+
+/** What ai-accounts persisted for the fake route, read from its store in the scratch home: the panel's draft can differ. */
+const readFakeProviderAccount = async (home: string): Promise<FakeProviderAccount | undefined> => {
+  const source = await readFile(join(home, 'plugins', 'ai-accounts', 'accounts.json'), 'utf8').catch(() => '')
+  let json: unknown
+  // The store is rewritten in place; a read mid-write is not JSON yet and counts as no account.
+  try {
+    json = JSON.parse(source)
+  } catch {
+    return undefined
+  }
+  const parsed = FAKE_PROVIDER_ACCOUNTS_FILE.safeParse(json)
+  return parsed.success ? parsed.data.accounts.find(account => account.instanceId === FAKE_PROVIDER_ROUTE_SLUG) : undefined
+}
+
+const waitForFakeProviderAccount = async (input: {
+  readonly home: string
+  readonly timeoutMs: number
+  readonly expected: string
+  readonly matches: (account: FakeProviderAccount | undefined) => boolean
+}): Promise<void> => {
+  const deadline = Date.now() + input.timeoutMs
+  for (;;) {
+    const account = await readFakeProviderAccount(input.home)
+    if (input.matches(account)) return
+    if (Date.now() > deadline) {
+      throw new ScratchError(
+        'seed-failed',
+        `AI Accounts never saved ${input.expected} for ${FAKE_PROVIDER_ROUTE_SLUG}.`,
+        `Read ${join(input.home, 'plugins', 'ai-accounts', 'accounts.json')} and the AI Accounts panel.`,
+      )
+    }
+    await new Promise(resolve => setTimeout(resolve, 100))
+  }
+}
+
+/** A second seed run reuses the provider the first one started: the account it configured points at that port. */
 const startFakeProvider = async (
   state: ScratchState,
   timeoutMs: number,
 ): Promise<{ readonly baseUrl: string; readonly process: NonNullable<ScratchState['fakeProvider']> }> => {
   const readyFile = join(state.stateDir, 'fake-provider.ready')
+  const readBaseUrl = async () => z.url().safeParse((await readFile(readyFile, 'utf8').catch(() => '')).trim())
+  const current = (await ScratchStateRuntime.read(state.stateDir, state.name)).fakeProvider
+  if (current !== undefined && ScratchStateRuntime.ownedProcessStatus(current) === 'running') {
+    const ready = await readBaseUrl()
+    if (ready.success) return { baseUrl: ready.data, process: current }
+  }
   await rm(readyFile, { force: true })
   const pid = ScratchStateRuntime.spawnDetached(process.execPath, [fakeProviderScript, readyFile], {
     cwd: state.stateDir,
@@ -224,7 +272,7 @@ const startFakeProvider = async (
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
     // The file holds one line once the server listens; a partial write fails the URL check and is read again.
-    const ready = z.url().safeParse((await readFile(readyFile, 'utf8').catch(() => '')).trim())
+    const ready = await readBaseUrl()
     if (ready.success) return { baseUrl: ready.data, process: providerProcess }
     await new Promise(resolve => setTimeout(resolve, 100))
   }
@@ -232,8 +280,45 @@ const startFakeProvider = async (
 }
 
 /**
+ * Open the fake route's account in the editor, adding it on the first run. A rename saves on blur and another field's
+ * blur saves the whole draft at once, so the slug must land before any other field is touched: two overlapping saves
+ * let the stale one win, leaving the account on the default key name and an empty base URL.
+ */
+const openFakeProviderAccount = async (input: { readonly state: ScratchState; readonly page: Page; readonly timeoutMs: number }): Promise<string> => {
+  const { page, timeoutMs } = input
+  const accounts = page.getByRole('complementary', { name: 'Provider accounts' })
+  const existing = await readFakeProviderAccount(input.state.home)
+  if (existing !== undefined) {
+    await accounts
+      .getByRole('listitem')
+      .filter({ has: page.getByText(existing.displayName, { exact: true }) })
+      .getByRole('button')
+      .first()
+      .click({ timeout: timeoutMs })
+    await page.getByRole('heading', { name: existing.displayName, exact: true }).last().waitFor({ state: 'visible', timeout: timeoutMs })
+    return existing.displayName
+  }
+  await accounts.getByRole('button', { name: 'Add account', exact: true }).click({ timeout: timeoutMs })
+  await page.getByRole('menuitem', { name: 'Command Code account', exact: true }).click({ timeout: timeoutMs })
+  const accountHeading = page.getByRole('heading', { name: /^Command Code \d+$/u }).last()
+  await accountHeading.waitFor({ state: 'visible', timeout: timeoutMs })
+  const accountName = (await accountHeading.innerText()).trim()
+  const routeSlug = page.getByRole('textbox', { name: 'Route slug', exact: true }).last()
+  await routeSlug.fill(FAKE_PROVIDER_ROUTE_SLUG, { timeout: timeoutMs })
+  await routeSlug.blur()
+  // The store holds the new slug before the panel applies the answer, and applying it rebuilds the draft from the store.
+  await page
+    .getByRole('status')
+    .filter({ hasText: `Renamed to ${FAKE_PROVIDER_ROUTE_SLUG}.` })
+    .first()
+    .waitFor({ state: 'visible', timeout: timeoutMs })
+  return accountName
+}
+
+/**
  * Point a Command Code account at a loopback fake provider (ai-accounts) and start a New thread whose model is that
- * account's, so a seed can drive one deterministic turn through the real provider path.
+ * account's, so a seed can drive one deterministic turn through the real provider path. Safe to rerun against the same
+ * instance: it finds the account a failed run left behind and finishes its configuration.
  */
 const configureFakeProviderThread = async (input: {
   readonly state: ScratchState
@@ -252,30 +337,36 @@ const configureFakeProviderThread = async (input: {
   }
   const fake = await startFakeProvider(state, timeoutMs)
   await openAIAccountsPanel(page, timeoutMs)
-  const accounts = page.getByRole('complementary', { name: 'Provider accounts' })
-  await accounts.getByRole('button', { name: 'Add account', exact: true }).click({ timeout: timeoutMs })
-  await page.getByRole('menuitem', { name: 'Command Code account', exact: true }).click({ timeout: timeoutMs })
-  const accountHeading = page.getByRole('heading', { name: /^Command Code \d+$/u }).last()
-  await accountHeading.waitFor({ state: 'visible', timeout: timeoutMs })
-  const accountName = (await accountHeading.innerText()).trim()
-  const routeSlug = page.getByRole('textbox', { name: 'Route slug', exact: true }).last()
-  await routeSlug.fill(FAKE_PROVIDER_ROUTE_SLUG, { timeout: timeoutMs })
-  await routeSlug.blur()
+  const accountName = await openFakeProviderAccount({ state, page, timeoutMs })
   const keyVariable = page.getByRole('textbox', { name: 'API KEY reference name', exact: true }).last()
-  await keyVariable.fill(FAKE_PROVIDER_KEY_REF, { timeout: timeoutMs })
-  await keyVariable.blur()
   const baseUrl = page.getByRole('textbox', { name: 'API base URL', exact: true }).last()
-  await baseUrl.fill(fake.baseUrl, { timeout: timeoutMs })
-  await baseUrl.blur()
+  const deadline = Date.now() + timeoutMs
+  // A re-read of the store can still replace the draft under the fields; the edit is typed again until it is saved.
+  for (;;) {
+    await keyVariable.fill(FAKE_PROVIDER_KEY_REF, { timeout: timeoutMs })
+    await baseUrl.fill(fake.baseUrl, { timeout: timeoutMs })
+    await baseUrl.blur()
+    const saved = await waitForFakeProviderAccount({
+      home: state.home,
+      timeoutMs: Math.min(5_000, Math.max(0, deadline - Date.now())),
+      expected: `key name ${FAKE_PROVIDER_KEY_REF} and base URL ${fake.baseUrl}`,
+      matches: account => account?.apiKeyEnv === FAKE_PROVIDER_KEY_REF && account.apiBaseUrl === fake.baseUrl,
+    }).then(
+      () => true,
+      (error: unknown) => {
+        if (Date.now() > deadline) throw error
+        return false
+      },
+    )
+    if (saved) break
+  }
   await page
-    .getByRole('status')
-    .filter({ hasText: /^(Saved|Changes save automatically)$/ })
-    .first()
-    .waitFor({ state: 'visible', timeout: timeoutMs })
-  await page.getByRole('button', { name: 'Set up key…', exact: true }).last().click({ timeout: timeoutMs })
+    .getByRole('button', { name: /^(?:Set up key…|Replace or import key…)$/u })
+    .last()
+    .click({ timeout: timeoutMs })
   const keyDialog = page.getByRole('dialog', { name: `Configure ${accountName} key`, exact: true })
   await keyDialog.getByRole('textbox', { name: 'API key value', exact: true }).fill(input.apiKey ?? 'dshx-dev-fake-key', { timeout: timeoutMs })
-  await keyDialog.getByRole('button', { name: 'Store key', exact: true }).click({ timeout: timeoutMs })
+  await keyDialog.getByRole('button', { name: /^(?:Store key|Replace key)$/u }).click({ timeout: timeoutMs })
   await keyDialog.waitFor({ state: 'hidden', timeout: timeoutMs })
   await page.keyboard.press('Escape')
 
@@ -441,4 +532,5 @@ export class ScratchSeedRuntime {
   static readonly openSeedThreadComposer = openSeedThreadComposer
   static readonly chooseFakeProviderModel = chooseFakeProviderModel
   static readonly applySeed = applySeed
+  static readonly startFakeProvider = startFakeProvider
 }

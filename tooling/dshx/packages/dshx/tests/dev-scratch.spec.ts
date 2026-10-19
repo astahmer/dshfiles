@@ -322,6 +322,48 @@ describe('dshx dev scratch commands', () => {
     })
   }
 
+  it('reuses the running fake model provider when a seed runs again', async () => {
+    const stateDir = await mkdtemp(join(tmpdir(), 'dshx-dev-spec-'))
+    const home = await mkdtemp(join(tmpdir(), 'dshx-boot-profile-'))
+    cleanups.push(
+      () => rm(stateDir, { recursive: true, force: true }),
+      () => rm(home, { recursive: true, force: true }),
+    )
+    const state: ScratchState = {
+      schemaVersion: 1,
+      name: 'default',
+      createdAt: new Date().toISOString(),
+      stateDir,
+      home,
+      profile: 'dshx-boot',
+      port: 45129,
+      origin: 'http://127.0.0.1:45129',
+      launchUrl: 'http://127.0.0.1:45129/?token=secret',
+      bundles: ['@dshfiles/ai-accounts'],
+      expectedClientEntries: ['@dshfiles/ai-accounts'],
+      project: { path: join(home, 'projects/sample'), workspaceId: 'workspace', ownedByScratch: true },
+      host: { pid: 999_999, signature: ['--profile dshx-boot', '--port 45129'] },
+      browser: { pid: 999_998, signature: ['browser-host.js'], cdpPort: 45130 },
+      hostLog: join(stateDir, 'host.log'),
+      browserLog: join(stateDir, 'browser.log'),
+      browserEvents: join(stateDir, 'browser-events.jsonl'),
+      evidenceDir: join(stateDir, 'evidence'),
+    }
+    await ScratchStateRuntime.write(state)
+    const readyFile = join(stateDir, 'fake-provider.ready')
+    const fakeProviderPid = await startProcess(['fake-provider-main.js', readyFile])
+    await ScratchStateRuntime.trackFakeProvider(state, { pid: fakeProviderPid, signature: ['fake-provider-main.js', readyFile] })
+    await writeFile(readyFile, 'http://127.0.0.1:45131\n')
+
+    const again = await ScratchSeedRuntime.startFakeProvider(state, 10_000)
+    expect(again.process.pid).toBe(fakeProviderPid)
+    expect(again.baseUrl).toBe('http://127.0.0.1:45131')
+
+    const down = await run(['dev', 'down', '--state-dir', stateDir, '--json'])
+    expect(down.code).toBe(0)
+    expect(alive(fakeProviderPid)).toBe(false)
+  })
+
   it('installs a fake secret CLI that serves synthetic aliases scoped to the scratch project', async () => {
     const home = await mkdtemp(join(tmpdir(), 'dshx-boot-profile-'))
     cleanups.push(() => rm(home, { recursive: true, force: true }))
