@@ -102,6 +102,17 @@ Feature: AI Accounts
     And a new thread asks the second account's model a question
     Then the first account is tried, the healthy one answers, and the next request goes straight to it
 
+  @scenario:ai-accounts.model-fallback-chain @scenario:model-effort-picker.fallbacks-browser-journey
+  Scenario: A thread's fallback chain takes over from a rate-limited account
+    Given the isolated AI Accounts and model effort picker plugin profile is booted
+    When a rate-limited and a healthy Command Code account share a local fake provider
+    And a third Command Code account is added
+    And request distribution is set to Priority
+    And a new thread falls back from the first account to the third one in the composer picker
+    And the thread asks a question
+    Then the third account answers instead of the next account in the list
+    And the picker offers to return the thread to its selection
+
   @scenario:ai-accounts.quota-recovery-route
   Scenario: Recover an exhausted turn on another route
     Given the isolated plugin profile "@dshfiles/ai-accounts" is booted

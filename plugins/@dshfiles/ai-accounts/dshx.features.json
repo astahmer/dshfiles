@@ -105,10 +105,15 @@
           "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature"
         },
         {
+          "kind": "gherkin",
+          "id": "ai-accounts.model-fallback-chain",
+          "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature"
+        },
+        {
           "kind": "unit-test",
           "id": "ai-accounts.model-fallback-routing",
           "file": "plugins/@dshfiles/ai-accounts/src/model-fallback-router.test.ts",
-          "testName": "puts the fallback on the retry after a failure and stays there by default"
+          "testName": "puts the fallback on a retry that still proposes the failed route and stays there by default"
         },
         {
           "kind": "unit-test",

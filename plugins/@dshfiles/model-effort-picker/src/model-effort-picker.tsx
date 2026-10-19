@@ -11,12 +11,13 @@ import { Slider } from '@dshfiles/plugin-ui/components/ui/slider'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { ArrowLeftRightIcon, CheckIcon, ChevronDownIcon, LoaderCircleIcon, RotateCcwIcon, SearchIcon, SparklesIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
+import { FallbacksSection } from './fallbacks-section.js'
 import { ModelPickerModel } from './model-picker-model.js'
 import { modelEffortPickerSettings } from './settings.js'
 
-type Props = ModelSelectInjected & { readonly locked: boolean }
+type Props = ModelSelectInjected & { readonly locked: boolean; readonly sessionId: string }
 
-export const ModelEffortPicker = ({ locked, available, directory, load, select }: Props) => {
+export const ModelEffortPicker = ({ locked, available, directory, load, select, sessionId }: Props) => {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [selectionError, setSelectionError] = useState<string | null>(null)
@@ -134,7 +135,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select }
         </PopoverTrigger>
         <PopoverContent
           align="start"
-          className="dshx-root dshx:max-h-[min(82vh,36rem)] dshx:w-[min(26rem,calc(100vw-1rem))] dshx:overflow-hidden dshx:p-0"
+          className="dshx-root dshx:max-h-[min(44rem,var(--radix-popover-content-available-height))] dshx:w-[min(26rem,calc(100vw-1rem))] dshx:overflow-y-auto dshx:p-0"
           side="top"
           sideOffset={8}
         >
@@ -302,6 +303,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select }
               </div>
             )}
           </section>
+          <FallbacksSection busy={busy} current={current} groups={state.groups} sessionId={sessionId} />
         </PopoverContent>
       </Popover>
       {nextAccount !== undefined && (

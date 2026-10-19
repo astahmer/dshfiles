@@ -1,8 +1,16 @@
 import type { ModelDirectoryState } from '@deepseek-ai/dsh-client-ui-model-selection/client'
 import type { ModelSelection } from '@deepseek-ai/dsh-api-session-controller/types'
+import type { FallbackRoute } from '@dshfiles/ai-accounts/model-fallback-api'
 
 type ModelGroup = ModelDirectoryState['groups'][number]
 type CatalogModel = ModelGroup['models'][number]
+
+/** A fallback rung named for display: catalog names when the catalog still lists the route, its ids otherwise. */
+interface FallbackLabel {
+  readonly provider: string
+  readonly model: string
+  readonly effort: string | undefined
+}
 
 export class ModelPickerModel {
   static filterGroups = (groups: readonly ModelGroup[], query: string): readonly ModelGroup[] => {
@@ -94,6 +102,36 @@ export class ModelPickerModel {
     const reasoningEffort = keepsEffort ? current.reasoningEffort : model.reasoning?.defaultEffort
     const route: ModelSelection = { provider: group.id, model: model.id }
     return { group, selection: reasoningEffort === undefined ? route : { ...route, reasoningEffort } }
+  }
+
+  /** The current selection as a fallback rung, keeping its explicit effort only. */
+  static fallbackFor = (current: ModelSelection): FallbackRoute =>
+    current.reasoningEffort === undefined
+      ? { provider: current.provider, model: current.model }
+      : { provider: current.provider, model: current.model, reasoningEffort: current.reasoningEffort }
+
+  /** Append a rung unless the chain already holds that provider and model. */
+  static withFallback = (chain: readonly FallbackRoute[], route: FallbackRoute): readonly FallbackRoute[] =>
+    chain.some(entry => entry.provider === route.provider && entry.model === route.model) ? chain : [...chain, route]
+
+  static withoutFallback = (chain: readonly FallbackRoute[], index: number): readonly FallbackRoute[] => chain.filter((_, position) => position !== index)
+
+  /** Swap one rung with its neighbour; a move past either end leaves the chain as it is. */
+  static movedFallback = (chain: readonly FallbackRoute[], index: number, offset: -1 | 1): readonly FallbackRoute[] => {
+    const target = index + offset
+    const moving = chain[index]
+    const displaced = chain[target]
+    if (moving === undefined || displaced === undefined) return chain
+    return chain.map((entry, position) => (position === index ? displaced : position === target ? moving : entry))
+  }
+
+  static fallbackLabel = (groups: readonly ModelGroup[], route: FallbackRoute): FallbackLabel => {
+    const group = groups.find(candidate => candidate.id === route.provider)
+    const model = group?.models.find(candidate => candidate.id === route.model)
+    const label: FallbackLabel = { provider: group?.name ?? route.provider, model: model?.name ?? route.model, effort: undefined }
+    const effort = route.reasoningEffort
+    if (effort === undefined) return label
+    return { ...label, effort: model?.reasoning?.efforts.find(entry => entry.id === effort)?.name ?? effort }
   }
 
   static effortName = (model: CatalogModel, current: ModelSelection | null): string => {

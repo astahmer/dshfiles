@@ -115,3 +115,26 @@ describe('model picker selection rules', () => {
     })
   })
 })
+
+describe('model picker fallback chain', () => {
+  const claude = { provider: 'redwood', model: 'r2' }
+  const deep = { provider: 'northstar', model: 'nova-3', reasoningEffort: 'deep' }
+
+  it('adds the current selection once, with its explicit effort', () => {
+    const route = ModelPickerModel.fallbackFor(currentSelection)
+    expect(route).toEqual(deep)
+    expect(ModelPickerModel.withFallback([deep], { provider: 'northstar', model: 'nova-3' })).toEqual([deep])
+    expect(ModelPickerModel.withFallback([deep], claude)).toEqual([deep, claude])
+  })
+
+  it('reorders and removes rungs without leaving the chain', () => {
+    expect(ModelPickerModel.movedFallback([deep, claude], 1, -1)).toEqual([claude, deep])
+    expect(ModelPickerModel.movedFallback([deep, claude], 0, -1)).toEqual([deep, claude])
+    expect(ModelPickerModel.withoutFallback([deep, claude], 0)).toEqual([claude])
+  })
+
+  it('names rungs from the catalog and keeps ids for routes it no longer lists', () => {
+    expect(ModelPickerModel.fallbackLabel(groups, deep)).toEqual({ provider: 'Northstar AI', model: 'Nova 3', effort: 'Deep' })
+    expect(ModelPickerModel.fallbackLabel(groups, { provider: 'gone', model: 'm1' })).toEqual({ provider: 'gone', model: 'm1', effort: undefined })
+  })
+})

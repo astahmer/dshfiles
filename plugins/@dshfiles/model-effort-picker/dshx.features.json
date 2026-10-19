@@ -69,6 +69,34 @@
           "testName": "rotates only through the configured routes, and offers nothing when no other route qualifies"
         }
       ]
+    },
+    {
+      "id": "model-fallbacks",
+      "title": "Edit the model fallback chain from the composer picker",
+      "summary": "A Fallbacks section in the composer model picker adds the current selection to the thread's or the default fallback chain, reorders and removes rungs, picks whether a thread stays on a fallback, and returns a thread to its selection. AI Accounts owns the chain on the Host and walks it under Priority distribution.",
+      "reach": ["click button \", reasoning *\"", "expect region \"Fallbacks\""],
+      "surfaces": ["client", "host"],
+      "configuration": [],
+      "states": ["unavailable", "follows-default", "thread-chain", "serving-fallback"],
+      "failureModes": [
+        "Without the AI Accounts fallback API (older Host or no AI Accounts) the section stays hidden and the picker works as before.",
+        "Outside Priority distribution the section says the chain does not run.",
+        "A failed Host write keeps the stored chain and shows the error inline."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "model-effort-picker.fallback-edits",
+          "file": "plugins/@dshfiles/model-effort-picker/tests/model-picker-model.spec.ts",
+          "testName": "reorders and removes rungs without leaving the chain"
+        },
+        {
+          "kind": "gherkin",
+          "id": "model-effort-picker.fallbacks-browser-journey",
+          "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature"
+        }
+      ]
     }
   ]
 }

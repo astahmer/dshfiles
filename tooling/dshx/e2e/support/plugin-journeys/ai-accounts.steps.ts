@@ -435,6 +435,70 @@ Then('the first account is tried, the healthy one answers, and the next request 
   await finishJourneyAssertions(page)
 })
 
+When('a third Command Code account is added', async ({ page }: { page: Page }) => {
+  await addCommandCodeAccount(page, { name: 'Command Code 3', key: 'e2e-fake-key-CHAIN3' })
+})
+
+const composerPicker = (page: Page) => page.getByRole('button', { name: /, reasoning / })
+const fallbacks = (page: Page) => page.getByRole('region', { name: 'Fallbacks', exact: true })
+
+const pickAccountModel = async (page: Page, account: string): Promise<void> => {
+  await page
+    .getByRole('region', { name: account, exact: true })
+    .getByRole('button', { name: /gpt-6-luna/ })
+    .click()
+  await expect(page.getByRole('region', { name: account, exact: true }).getByRole('button', { name: /gpt-6-luna/ })).toHaveAttribute('aria-pressed', 'true')
+}
+
+When('a new thread falls back from the first account to the third one in the composer picker', async ({ page }: { page: Page }) => {
+  await page.getByRole('button', { name: 'New session', exact: true }).first().click()
+  await composerPicker(page).click()
+  await pickAccountModel(page, 'Command Code 3')
+  await fallbacks(page).getByRole('button', { name: 'Add current selection', exact: true }).click()
+  await expect(fallbacks(page).getByRole('listitem')).toHaveCount(1)
+  await pickAccountModel(page, 'Command Code 1')
+  await page.keyboard.press('Escape')
+})
+
+When('the thread asks a question', async ({ page }: { page: Page }) => {
+  const composer = page.getByRole('textbox', { name: /\/ commands, @ files or sessions$/ })
+  await composer.fill('Who takes over?')
+  await composer.press('Enter')
+})
+
+Then('the third account answers instead of the next account in the list', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'ai-accounts-fallback-chain-takes-over', async () => {
+    await expect(page.getByText('Answered by CHAIN3', { exact: true }).last()).toBeVisible({ timeout: 30_000 })
+    const turnKeys = fakeCommandCodeFor(page)
+      .requests.filter(request => request.kind === 'turn')
+      .map(request => request.key)
+    expect(turnKeys[0]).toBe('e2e-fake-key-LIMITED')
+    expect(turnKeys).not.toContain('e2e-fake-key-BRAVO2')
+    expect(turnKeys.at(-1)).toBe('e2e-fake-key-CHAIN3')
+  })
+})
+
+Then('the picker offers to return the thread to its selection', async ({ page }: { page: Page }) => {
+  await composerPicker(page).click()
+  const serving = fallbacks(page).getByRole('status')
+  await recordAssertion(page, 'ai-accounts-fallback-chain-moves-the-picker', async () => {
+    await expect(serving).toContainText('Command Code 3')
+    await expect(page.getByRole('region', { name: 'Command Code 3', exact: true }).getByRole('button', { name: /gpt-6-luna/ })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+  })
+  await serving.getByRole('button', { name: 'Return to selection', exact: true }).click()
+  await recordAssertion(page, 'ai-accounts-fallback-chain-returns-to-the-selection', async () => {
+    await expect(serving).toHaveCount(0)
+    await expect(page.getByRole('region', { name: 'Command Code 1', exact: true }).getByRole('button', { name: /gpt-6-luna/ })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+  })
+  await finishJourneyAssertions(page)
+})
+
 const failTurnOnExhaustedAccount = async (page: Page, key: string): Promise<void> => {
   await startFakeCommandCode(page)
   await openAccountsPanel(page)
