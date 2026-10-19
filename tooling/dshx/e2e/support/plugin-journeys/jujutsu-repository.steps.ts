@@ -16,7 +16,11 @@ interface Repository {
 const repositories = new WeakMap<Page, Repository>()
 const UNICODE_PATH = 'dir with space/ünïcode file.txt'
 
-const jj = (repository: Repository, args: readonly string[], author = { name: 'Ada Author', email: 'ada@example.invalid' }): string => {
+const jj = (
+  repository: Repository,
+  args: readonly string[],
+  author: { readonly name: string; readonly email: string; readonly timestamp?: string } = { name: 'Ada Author', email: 'ada@example.invalid' },
+): string => {
   const result = spawnSync(process.env.JJ_TEST_EXECUTABLE ?? 'jj', ['--color=never', '--no-pager', ...args], {
     cwd: repository.path,
     env: {
@@ -25,6 +29,7 @@ const jj = (repository: Repository, args: readonly string[], author = { name: 'A
       XDG_CONFIG_HOME: join(repository.root, '.config'),
       JJ_USER: author.name,
       JJ_EMAIL: author.email,
+      ...(author.timestamp === undefined ? {} : { JJ_TIMESTAMP: author.timestamp }),
     },
     encoding: 'utf8',
     shell: false,
@@ -77,6 +82,16 @@ When('a revision {string} is committed outside DSH', async ({ page }: { page: Pa
   const repository = repositoryFor(page)
   jj(repository, ['describe', '-m', description])
   jj(repository, ['new'])
+})
+
+When('a revision {string} created in 2020 is edited outside DSH today', async ({ page }: { page: Page }, description: string) => {
+  const repository = repositoryFor(page)
+  jj(repository, ['new', 'main', '-m', description], { name: 'Ada Author', email: 'ada@example.invalid', timestamp: '2020-01-01T00:00:00Z' })
+  await writeFile(join(repository.path, 'long-ago.txt'), 'edited today\n')
+  jj(repository, ['status'])
+  jj(repository, ['new'])
+  await page.getByRole('button', { name: 'Refresh', exact: true }).click()
+  await expect(revisionRow(page, description)).toBeVisible()
 })
 
 When('the Feature revision is opened', async ({ page }: { page: Page }) => {
@@ -163,6 +178,29 @@ Then('searching, filtering by author and hiding immutable revisions narrow the g
   await recordAssertion(page, 'jujutsu-hide-immutable-drops-the-root', async () => {
     await expect(rootRow).toHaveCount(0)
     await expect(revisionRow(page, 'Feature work by Ada')).toBeVisible()
+  })
+  await finishJourneyAssertions(page)
+})
+
+Then('its row shows the edit, the creation, or both as the Revision date setting selects', async ({ page }: { page: Page }) => {
+  const age = revisionRow(page, 'Started long ago').locator('time').first()
+  const chooseRevisionDate = async (label: string): Promise<void> => {
+    await page.getByRole('button', { name: 'Jujutsu view settings', exact: true }).click()
+    await page.getByRole('menuitem', { name: 'Revision date', exact: true }).click()
+    await page.getByRole('menuitemradio', { name: label, exact: true }).click()
+    await page.keyboard.press('Escape')
+  }
+  await recordAssertion(page, 'jujutsu-row-age-is-the-last-content-edit', async () => {
+    await expect(age).toHaveText(/^(now|\d+m)$/)
+    await expect(age).toHaveAttribute('title', /Created .*\nLast edited .*\nLast rewritten /)
+  })
+  await chooseRevisionDate('Created')
+  await recordAssertion(page, 'jujutsu-row-age-can-show-the-creation', async () => {
+    await expect(age).toHaveText(/^\d+y$/)
+  })
+  await chooseRevisionDate('Last edited and created')
+  await recordAssertion(page, 'jujutsu-row-age-can-show-both', async () => {
+    await expect(age).toHaveText(/^(now|\d+m) · \d+y$/)
   })
   await finishJourneyAssertions(page)
 })

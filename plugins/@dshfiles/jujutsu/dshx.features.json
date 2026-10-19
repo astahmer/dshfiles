@@ -88,9 +88,16 @@
         {
           "key": "dateHeadings",
           "defaultValue": "false",
-          "constraints": "Boolean; group graph rows under date headings.",
+          "constraints": "Boolean; group graph rows under headings for the day they were last rewritten.",
           "choices": ["true", "false"],
           "coveredBy": ["jujutsu.graph-filters"]
+        },
+        {
+          "key": "revisionDate",
+          "defaultValue": "edited",
+          "constraints": "One of edited (last content change, ignoring rebases and descriptions), created, or both.",
+          "choices": ["edited", "created", "both"],
+          "coveredBy": ["jujutsu.revision-date"]
         },
         {
           "key": "refreshMode",
@@ -140,6 +147,11 @@
         {
           "kind": "gherkin",
           "id": "jujutsu.refresh-behavior",
+          "featureFile": "tooling/dshx/e2e/features/jujutsu.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "jujutsu.revision-date",
           "featureFile": "tooling/dshx/e2e/features/jujutsu.feature"
         }
       ]

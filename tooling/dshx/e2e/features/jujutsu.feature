@@ -34,6 +34,13 @@ Feature: Jujutsu revision interactions
     When a disposable Jujutsu repository with two authors is opened in the Jujutsu panel
     Then searching, filtering by author and hiding immutable revisions narrow the graph
 
+  @scenario:jujutsu.revision-date
+  Scenario: Graph rows date a revision by its last content edit, not its creation
+    Given the isolated plugin profile "@dshfiles/jujutsu" is booted
+    When a disposable Jujutsu repository with two authors is opened in the Jujutsu panel
+    And a revision "Started long ago" created in 2020 is edited outside DSH today
+    Then its row shows the edit, the creation, or both as the Revision date setting selects
+
   @scenario:jujutsu.refresh-behavior
   Scenario: Outside changes appear on refresh and when the page becomes visible
     Given the isolated plugin profile "@dshfiles/jujutsu" is booted

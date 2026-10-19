@@ -36,10 +36,21 @@ const filters = (overrides: Partial<GraphFilters> = {}): GraphFilters => ({
   view: null,
   hidden: [],
   revealed: new Set(),
+  editTimes: new Map(),
   ...overrides,
 })
 
 describe('graph navigation projection', () => {
+  it('dates a revision by its last content edit, falling back to its author time', () => {
+    const rebasedToday = revision('rebased', [], { authorTime: '2026-10-01T12:00:00Z' })
+    const editedToday = revision('edited', [], { authorTime: '2026-10-01T12:00:00Z' })
+    const neverEdited = revision('created', [], { authorTime: '2026-10-19T12:00:00Z' })
+    const result = GraphNavigationModel.filterGraphRevisions(
+      [rebasedToday, editedToday, neverEdited],
+      filters({ fromDate: '2026-10-19', editTimes: new Map([['edited', '2026-10-19T09:00:00Z']]) }),
+    )
+    expect(result.map(row => row.commitId)).toEqual(['edited', 'created'])
+  })
   it('preserves shared merge ancestry when supplied exclusive history is hidden', () => {
     const revisions = [revision('a', ['shared']), revision('b', ['shared']), revision('shared', ['root']), revision('root')]
     const result = GraphNavigationModel.filterGraphRevisions(

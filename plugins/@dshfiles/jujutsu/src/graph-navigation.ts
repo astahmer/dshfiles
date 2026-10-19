@@ -23,6 +23,8 @@ export interface GraphFilters {
   readonly text: string
   readonly fromDate: string
   readonly toDate: string
+  /** Last content edit by commit id; revisions without one are dated by their author time. */
+  readonly editTimes: ReadonlyMap<string, string>
   readonly view: GraphViewFilter | null
   readonly hidden: readonly HiddenGraphHistory[]
   readonly revealed: ReadonlySet<string>
@@ -47,7 +49,7 @@ export class GraphNavigationModel {
       if (filters.hideImmutable && revision.immutable) return false
       if (filters.author && !revision.author.toLocaleLowerCase().includes(filters.author.toLocaleLowerCase())) return false
       if (!RevisionGraphModel.matchesRevisionSearch(revision, filters.text)) return false
-      const timestamp = Date.parse(revision.authorTime)
+      const timestamp = Date.parse(filters.editTimes.get(revision.commitId) ?? revision.authorTime)
       if (filters.fromDate && Number.isFinite(timestamp) && timestamp < Date.parse(filters.fromDate + 'T00:00:00')) return false
       if (filters.toDate && Number.isFinite(timestamp) && timestamp > Date.parse(filters.toDate + 'T23:59:59')) return false
       return true

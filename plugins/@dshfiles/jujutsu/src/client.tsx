@@ -61,7 +61,7 @@ import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useMachine } from '@dshfiles/plugin-ui/machine'
-import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
+import { errorMessage, keepPreviousData, useMutation, useQueries, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useApi } from '@dshfiles/dshx/client'
 import { ProjectFolderPicker, type DirectoryPickerPort, type RegisteredProject } from '@dshfiles/project-folder-picker'
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent, type ReactNode } from 'react'
@@ -80,7 +80,7 @@ import { revisionActionMachine, type ActionPreview, type DropPresentation, type 
 import { BOOKMARK_MIME, BOOKMARK_SOURCE_MIME, resolveBookmarkDrop, resolveRevisionDrop, REVISION_MIME } from './revision-drop.js'
 import { repositoryLoadingState } from './repository-loading.js'
 import { JUJUTSU_QUERY_GC_TIME, JUJUTSU_QUERY_STALE_TIME, jujutsuQueryKeys } from './repository-query-cache.js'
-import { ANCESTOR_COUNT_OPTIONS, usePreferences, type GraphDensity } from './preferences.js'
+import { ANCESTOR_COUNT_OPTIONS, usePreferences, type GraphDensity, type RevisionDate } from './preferences.js'
 import { jujutsuReviewProgressApi, type ReviewProgressSnapshot, type ReviewProgressToggle } from './review-progress-api.js'
 import { MAX_REVIEW_STORE_BYTES, ReviewProgressModel, reviewStoreSchema, type ReviewChange, type ReviewStore } from './review-progress.js'
 import { ReviewProgressMigration, type ReviewProgressMigrationClient } from './review-progress-migration-machine.js'
@@ -200,12 +200,26 @@ const dayLabel = (value: string): string => {
     : 'Date unavailable'
 }
 
+const revisionDates = (revision: Revision, editedAt: string | undefined): string =>
+  [
+    `Created ${new Date(revision.authorTime).toLocaleString()}`,
+    ...(editedAt === undefined ? [] : [`Last edited ${new Date(editedAt).toLocaleString()}`]),
+    ...(revision.committerTime === undefined ? [] : [`Last rewritten ${new Date(revision.committerTime).toLocaleString()}`]),
+  ].join('\n')
+
+const EDIT_TIMES_PAGE_SIZE = 100
+
+const editTimesByCommitId = (
+  results: readonly { readonly data: { readonly revisions: readonly { readonly commitId: string; readonly editedAt: string | null }[] } | undefined }[],
+): ReadonlyMap<string, string> =>
+  new Map(results.flatMap(result => result.data?.revisions.flatMap(row => (row.editedAt === null ? [] : [[row.commitId, row.editedAt] as const])) ?? []))
+
 /** Consecutive runs of one day, so headings never reorder the graph rows they sit between. */
 const groupRows = (revisions: readonly Revision[], byDay: boolean): readonly { readonly day: string; readonly rows: readonly Revision[] }[] => {
   if (!byDay) return [{ day: '', rows: revisions }]
   const groups: { day: string; rows: Revision[] }[] = []
   for (const revision of revisions) {
-    const day = dayLabel(revision.authorTime)
+    const day = dayLabel(revision.committerTime ?? revision.authorTime)
     const current = groups.at(-1)
     if (current?.day === day) current.rows.push(revision)
     else groups.push({ day, rows: [revision] })
@@ -437,6 +451,27 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     [debouncedSearch, graphPageRevisions, state?.revisions],
   )
   const allRevisions = useMemo(() => mergeGraphRevisions(navigation.extraRevisions, graphRowsInput), [navigation.extraRevisions, graphRowsInput])
+  const editTimeCommitIds = useMemo(
+    () =>
+      preferences.revisionDate === 'created' && fromDate === '' && toDate === ''
+        ? []
+        : allRevisions.filter(revision => !revision.immutable).map(revision => revision.commitId),
+    [preferences.revisionDate, fromDate, toDate, allRevisions],
+  )
+  const editTimes = useQueries({
+    queries: Array.from({ length: Math.ceil(editTimeCommitIds.length / EDIT_TIMES_PAGE_SIZE) }, (_, page) => {
+      const commitIds = editTimeCommitIds.slice(page * EDIT_TIMES_PAGE_SIZE, (page + 1) * EDIT_TIMES_PAGE_SIZE)
+      return {
+        queryKey: jujutsuQueryKeys.editTimes(path, commitIds),
+        queryFn: ({ signal }: { readonly signal: AbortSignal }) => api.editTimes({ repoId: repoId ?? '', commitIds }, { signal }),
+        enabled: repoId !== null,
+        // A commit id names one immutable version, so its edit time never goes stale.
+        staleTime: Number.POSITIVE_INFINITY,
+        placeholderData: keepPreviousData,
+      }
+    }),
+    combine: editTimesByCommitId,
+  })
   const selectedRevision = navigation.selectedRevision
   const [locateRequest, setLocateRequest] = useState<Revision | null>(null)
   const [pendingLocateId, setPendingLocateId] = useState<string | null>(null)
@@ -514,6 +549,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
       text: textFilter,
       fromDate,
       toDate,
+      editTimes,
       view: navigation.view,
       hidden: navigation.hidden,
       revealed: new Set(navigation.revealed.map(row => row.commitId)),
@@ -528,6 +564,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     textFilter,
     fromDate,
     toDate,
+    editTimes,
     navigation.view,
     navigation.hidden,
     navigation.revealed,
@@ -653,7 +690,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
         setLocateRequest(revision)
         return
       }
-      setCollapsedDays(current => new Set([...current].filter(day => day !== dayLabel(revision.authorTime))))
+      setCollapsedDays(current => new Set([...current].filter(day => day !== dayLabel(revision.committerTime ?? revision.authorTime))))
       setPendingLocateId(revision.commitId)
     },
     [visibleRevisions],
@@ -1015,7 +1052,9 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
         <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-1.5 dshx:text-muted-foreground">
           <span>{revision.author || 'Unknown author'}</span>
           <span aria-hidden>·</span>
-          <time dateTime={revision.authorTime}>{new Date(revision.authorTime).toLocaleString()}</time>
+          <time dateTime={editTimes.get(revision.commitId) ?? revision.authorTime}>
+            {revisionDates(revision, editTimes.get(revision.commitId)).replaceAll('\n', ' · ')}
+          </time>
           <span aria-hidden>·</span>
           <button
             className="dshx:font-mono dshx:hover:text-foreground"
@@ -1433,6 +1472,8 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
                       }
                       graphLayout={item.layout}
                       graphWidth={graphWidth}
+                      editedAt={editTimes.get(item.revision.commitId)}
+                      revisionDate={preferences.revisionDate}
                       menu={revisionMenu(item.revision)}
                       onDragEnter={event => {
                         if (hasDragType(event, REVISION_MIME) || hasDragType(event, BOOKMARK_MIME))
@@ -1937,6 +1978,25 @@ const PreferencesMenu = (): JSX.Element => {
             </DropdownMenuRadioGroup>
           </DropdownMenuSubContent>
         </DropdownMenuSub>
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger className="dshx:text-xs">Revision date</DropdownMenuSubTrigger>
+          <DropdownMenuSubContent className="dshx-root">
+            <DropdownMenuRadioGroup
+              onValueChange={value => setPreference('revisionDate', value === 'created' || value === 'both' ? value : 'edited')}
+              value={preferences.revisionDate}
+            >
+              <DropdownMenuRadioItem className="dshx:text-xs" value="edited">
+                Last edited
+              </DropdownMenuRadioItem>
+              <DropdownMenuRadioItem className="dshx:text-xs" value="created">
+                Created
+              </DropdownMenuRadioItem>
+              <DropdownMenuRadioItem className="dshx:text-xs" value="both">
+                Last edited and created
+              </DropdownMenuRadioItem>
+            </DropdownMenuRadioGroup>
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
         <DropdownMenuCheckboxItem
           checked={preferences.dateHeadings}
           className="dshx:text-xs"
@@ -2255,6 +2315,8 @@ interface RevisionRowProps {
   readonly graphWidth: number
   readonly metrics: GraphMetrics
   readonly rowHeight: number
+  readonly editedAt: string | undefined
+  readonly revisionDate: RevisionDate
   readonly menu: ReactNode
   readonly bookmarkMenu: (name: string, local: boolean) => ReactNode
   readonly onToggle: () => void
@@ -2413,10 +2475,15 @@ const RevisionRow = (props: RevisionRowProps): JSX.Element => {
                 </button>
               )}
               <time
-                className="dshx:w-8 dshx:flex-none dshx:text-right dshx:text-[11px] dshx:text-muted-foreground/80 dshx:tabular-nums dshx:@max-xs:hidden"
-                dateTime={revision.authorTime}
+                className={cn(
+                  'dshx:flex-none dshx:text-right dshx:text-[11px] dshx:text-muted-foreground/80 dshx:tabular-nums dshx:@max-xs:hidden',
+                  props.revisionDate === 'both' ? 'dshx:w-16' : 'dshx:w-8',
+                )}
+                dateTime={props.revisionDate === 'created' ? revision.authorTime : (props.editedAt ?? revision.authorTime)}
+                title={revisionDates(revision, props.editedAt)}
               >
-                {formatAge(revision.authorTime)}
+                {formatAge(props.revisionDate === 'created' ? revision.authorTime : (props.editedAt ?? revision.authorTime))}
+                {props.revisionDate === 'both' && props.editedAt !== undefined && <span className="dshx:text-muted-foreground/50"> · {formatAge(revision.authorTime)}</span>}
               </time>
               <span
                 aria-hidden

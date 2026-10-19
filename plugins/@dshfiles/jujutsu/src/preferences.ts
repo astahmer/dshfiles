@@ -14,6 +14,7 @@ const preferencesSchema = z.object({
   hideImmutable: z.boolean().catch(false),
   mineOnly: z.boolean().catch(false),
   dateHeadings: z.boolean().catch(false),
+  revisionDate: z.enum(['edited', 'created', 'both']).catch('edited'),
   graphDensity: z.enum(['comfortable', 'compact']).catch('comfortable'),
   refreshMode: z.enum(['interval', 'manual']).catch('interval'),
   refreshIntervalSeconds: z.number().int().min(10).catch(60),
@@ -28,6 +29,7 @@ const preferencesSchema = z.object({
 
 export type JujutsuPreferences = z.infer<typeof preferencesSchema>
 export type GraphDensity = JujutsuPreferences['graphDensity']
+export type RevisionDate = JujutsuPreferences['revisionDate']
 
 export const ANCESTOR_COUNT_OPTIONS = [1, 2, 3, 5, 8, 10, 15, 20] as const
 

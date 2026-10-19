@@ -6,5 +6,6 @@ export const jujutsuQueryKeys = {
   state: (root: string, limit: number) => ['jujutsu', root, 'state', limit] as const,
   details: (root: string, commitId: string) => ['jujutsu', root, 'details', commitId] as const,
   revisionFiles: (root: string, commitIds: readonly string[]) => ['jujutsu', root, 'revision-files', commitIds.join(',')] as const,
+  editTimes: (root: string, commitIds: readonly string[]) => ['jujutsu', root, 'edit-times', commitIds.join(',')] as const,
   reviewProgress: () => ['jujutsu', 'review-progress'] as const,
 }

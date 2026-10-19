@@ -26,11 +26,14 @@ contracts.
   checkout's @) and boxed bookmark and tag labels on the branch's head row,
   then the description or a muted italic `(empty)` / `(no description)`
   truncated with an ellipsis, then fixed right-aligned columns for the
-  relative time (dropped below ~320 px) and the change ID as a small pill
+  relative time (dropped below ~320 px; **Revision date** picks the last
+  content edit, the creation time, or both, and hovering lists all three) and
+  the change ID as a small pill
   (`changeid/N` for divergent copies). Describe appears on hover for
   undescribed revisions, and the expand chevron on hover. Optional
   collapsible day
-  groups, author-name, text, mine, immutable and date filters, and a
+  groups dated by each revision's last rewrite, author-name, text, mine,
+  immutable and date filters, and a
   Comfortable / Compact density setting. The ideas (straight first-parent
   lanes, rounded corners, node styles) come from studying the jj-view VS Code
   extension (Apache-2.0); no code is copied from it.
