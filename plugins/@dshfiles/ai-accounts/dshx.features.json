@@ -169,6 +169,18 @@
           "coveredBy": ["ai-accounts.quota-display"]
         },
         {
+          "key": "usagePopoverWidth",
+          "defaultValue": "0",
+          "constraints": "Integer px from the popover's resize grip; 0 fits the default width. A wide popover lays account cards out as a grid.",
+          "coveredBy": ["ai-accounts.usage-popover-resize"]
+        },
+        {
+          "key": "usagePopoverHeight",
+          "defaultValue": "0",
+          "constraints": "Integer px from the popover's resize grip; 0 fits the content.",
+          "coveredBy": ["ai-accounts.usage-popover-resize"]
+        },
+        {
           "key": "edgeWidget",
           "defaultValue": "false",
           "constraints": "Boolean; enable the edge quota overlay (hidden while no account is set up).",
@@ -193,6 +205,11 @@
         {
           "kind": "gherkin",
           "id": "ai-accounts.quota-display",
+          "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "ai-accounts.usage-popover-resize",
           "featureFile": "tooling/dshx/e2e/features/ai-accounts.feature"
         },
         {

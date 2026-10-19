@@ -79,6 +79,14 @@ Feature: AI Accounts
     Then the usage strip shows its short name, renamed from AI Accounts settings
     And the strip's context menu hides and shows short names
 
+  @scenario:ai-accounts.usage-popover-resize
+  Scenario: Resize the usage popover until its accounts sit side by side
+    Given the isolated plugin profile "@dshfiles/ai-accounts" is booted
+    When a Command Code account backed by a local fake provider is added
+    And a second healthy Command Code account is added
+    Then widening the usage popover from its grip lays the accounts out side by side
+    And the usage popover keeps its size until its grip is double-clicked
+
   @scenario:ai-accounts.pool-failover
   Scenario: A rate-limited account hands the turn to a healthy one
     Given the isolated plugin profile "@dshfiles/ai-accounts" is booted

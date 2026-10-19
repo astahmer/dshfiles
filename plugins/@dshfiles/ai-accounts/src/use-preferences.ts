@@ -25,6 +25,7 @@ export const usePreferences = () => {
     hiddenUsageAccounts: Array.isArray(value?.hiddenUsageAccounts) ? value.hiddenUsageAccounts.filter(id => typeof id === 'string') : [],
     usageShortNames: value?.usageShortNames ?? true,
     usageShortNameOverrides: value?.usageShortNameOverrides ?? {},
+    usagePopoverSize: { width: value?.usagePopoverWidth ?? 0, height: value?.usagePopoverHeight ?? 0 },
     edgeWidget: value?.edgeWidget ?? DEFAULT_CLIENT_SETTINGS.edgeWidget,
     codexLunaReserve: value?.codexLunaReserve ?? true,
     autoRetryQuotaDefault: value?.autoRetryQuotaDefault ?? false,

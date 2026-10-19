@@ -201,7 +201,7 @@ export const EdgeUsageWidget = (props: { readonly onOpenUsageHistory: () => void
         </PopoverAnchor>
         <PopoverContent
           aria-label="Account quota"
-          className="dshx-root dshx:z-[10001] dshx:w-[min(420px,calc(100vw-16px))] dshx:p-0"
+          className="dshx-root dshx:z-[10001] dshx:w-auto dshx:p-0"
           collisionPadding={8}
           onInteractOutside={event => {
             if (event.target instanceof Node && triggerRef.current?.contains(event.target)) event.preventDefault()

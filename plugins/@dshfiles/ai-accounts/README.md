@@ -103,7 +103,9 @@ account with quota, each showing its machine, session, weekly and monthly bars,
 reset times and snapshot age; accounts with a spent window carry a "Limit
 reached" badge and sink below the usable ones until you order them. Accounts
 without quota data (signed out, failing) fold into one "N hidden" line that
-expands. Strip and popover share one order and one hidden list (Settings › AI
+expands. The grip in the popover's far corner resizes it both ways; wide
+enough, the cards sit side by side in a grid, and the size is kept until you
+double-click the grip. Strip and popover share one order and one hidden list (Settings › AI
 Accounts): drag a meter or card onto another to reorder, or right-click it
 (Shift+F10 / the menu key) to move it, hide it, or show every hidden account.
 Banked Codex resets can be expanded; spending one stays a manual "Reset usage"

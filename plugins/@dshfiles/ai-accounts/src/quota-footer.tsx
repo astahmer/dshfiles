@@ -151,7 +151,7 @@ const UsagePopoverContent = (props: {
   return (
     <PopoverContent
       align="start"
-      className="dshx-root dshx:w-[min(400px,calc(100vw-16px))] dshx:p-0"
+      className="dshx-root dshx:w-auto dshx:p-0"
       collisionPadding={8}
       onInteractOutside={event => {
         if (event.target instanceof Node && props.keepOpenWithin?.current?.contains(event.target) === true) event.preventDefault()

@@ -5,11 +5,12 @@ import { Progress } from '@dshfiles/plugin-ui/components/ui/progress'
 import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
 import { ChevronDownIcon, RefreshCwIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { useState } from 'react'
+import { useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type RefObject } from 'react'
 import { KIND_GROUPS, KIND_LABEL } from './account-labels.js'
 import type { AccountsUsage } from './api.js'
 import { ProviderGlyph } from './provider-glyph.js'
 import { useQuotaClock } from './quota-clock.js'
+import { usePreferences } from './use-preferences.js'
 import { QUOTA_TONE_PROGRESS, QUOTA_TONE_TEXT, quotaTone } from './quota-tone.js'
 import { ArrangeableAccount, useUsageLayout, type UsageArrangement } from './usage-arrangement.js'
 import { UsageOverviewModel, type OverviewCard, type ProviderTab } from './usage-overview-model.js'
@@ -168,10 +169,101 @@ const HiddenAccounts = (props: {
   )
 }
 
+const DEFAULT_WIDTH = 400
+const MIN_WIDTH = 280
+const MIN_HEIGHT = 160
+
+type GrowDirection = { readonly x: number; readonly y: number }
+
+/**
+ * Which way dragging grows the popover: away from the edge Radix pins to the
+ * anchor (`data-side`), and across it by `data-align` (a centred popover grows
+ * on both sides, so the pointer moves half as far as the size changes).
+ */
+const growDirection = (content: Element | null): GrowDirection => {
+  const side = content?.getAttribute('data-side') ?? 'top'
+  const align = content?.getAttribute('data-align') ?? 'start'
+  const across = align === 'end' ? -1 : align === 'center' ? 2 : 1
+  if (side === 'top') return { x: across, y: -1 }
+  if (side === 'bottom') return { x: across, y: 1 }
+  return { x: side === 'left' ? -1 : 1, y: across }
+}
+
+/** The corner grip that resizes the popover; double-click returns it to fitting its content. */
+const ResizeGrip = (props: {
+  readonly target: RefObject<HTMLElement | null>
+  readonly onResize: (size: { readonly width: number; readonly height: number }) => void
+  readonly onCommit: (size: { readonly width: number; readonly height: number }) => void
+  readonly onReset: () => void
+}): JSX.Element => {
+  const [direction, setDirection] = useState<GrowDirection>({ x: 1, y: -1 })
+  const drag = useRef<{ readonly x: number; readonly y: number; readonly width: number; readonly height: number; readonly direction: GrowDirection } | null>(
+    null,
+  )
+  const last = useRef<{ width: number; height: number } | null>(null)
+
+  useLayoutEffect(() => {
+    const content = props.target.current?.closest('[data-side]') ?? null
+    if (content === null) return
+    const read = (): void => setDirection(growDirection(content))
+    read()
+    const observer = new MutationObserver(read)
+    observer.observe(content, { attributes: true, attributeFilter: ['data-side', 'data-align'] })
+    return () => observer.disconnect()
+  }, [props.target])
+
+  const sizeAt = (event: ReactPointerEvent): { width: number; height: number } | null => {
+    const start = drag.current
+    if (start === null) return null
+    return {
+      width: Math.max(MIN_WIDTH, Math.min(window.innerWidth - 16, Math.round(start.width + (event.clientX - start.x) * start.direction.x))),
+      height: Math.max(MIN_HEIGHT, Math.min(window.innerHeight - 16, Math.round(start.height + (event.clientY - start.y) * start.direction.y))),
+    }
+  }
+
+  return (
+    <div
+      aria-label="Resize usage popover"
+      className={cn(
+        'dshx:absolute dshx:z-10 dshx:size-3 dshx:touch-none dshx:rounded-sm dshx:opacity-40 dshx:hover:bg-accent dshx:hover:opacity-100',
+        direction.y < 0 ? 'dshx:top-0' : 'dshx:bottom-0',
+        direction.x < 0 ? 'dshx:left-0' : 'dshx:right-0',
+        direction.x < 0 === direction.y < 0 ? 'dshx:cursor-nwse-resize' : 'dshx:cursor-nesw-resize',
+      )}
+      onDoubleClick={props.onReset}
+      onLostPointerCapture={() => {
+        drag.current = null
+        if (last.current !== null) props.onCommit(last.current)
+        last.current = null
+      }}
+      onPointerDown={event => {
+        const rect = props.target.current?.getBoundingClientRect()
+        if (rect === undefined || event.button !== 0) return
+        event.preventDefault()
+        event.currentTarget.setPointerCapture(event.pointerId)
+        drag.current = { x: event.clientX, y: event.clientY, width: rect.width, height: rect.height, direction }
+      }}
+      onPointerMove={event => {
+        const size = sizeAt(event)
+        if (size === null) return
+        last.current = size
+        props.onResize(size)
+      }}
+      role="separator"
+      title="Drag to resize · double-click to fit content"
+    >
+      <svg aria-hidden className={cn('dshx:size-3', direction.x < 0 && 'dshx:-scale-x-100', direction.y < 0 && 'dshx:-scale-y-100')} viewBox="0 0 12 12">
+        <path d="M11 4 4 11M11 8 8 11" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="1.2" />
+      </svg>
+    </div>
+  )
+}
+
 /**
  * The usage popover body, shared by the sidebar footer button and the edge
  * overlay: provider tabs, history and refresh actions, one card per enabled
- * account with quota in the user's order, then the ones it leaves out.
+ * account with quota in the user's order, then the ones it leaves out. Its
+ * grip resizes it, and a wide popover lays the cards out as a grid.
  */
 export const UsageOverview = (props: {
   readonly usage: AccountsUsage | null
@@ -187,8 +279,33 @@ export const UsageOverview = (props: {
   const arrangement = useUsageLayout()
   const sections = UsageOverviewModel.overviewSections(props.usage, activeTab, arrangement.layout)
   const shownIds = sections.cards.map(card => card.instanceId)
+  const { settings, usagePopoverSize } = usePreferences()
+  const [draggedSize, setDraggedSize] = useState<{ readonly width: number; readonly height: number } | null>(null)
+  const size = draggedSize ?? usagePopoverSize
+  const sectionRef = useRef<HTMLElement>(null)
   return (
-    <section aria-label="AI account usage" className="dshx-root dshx:flex dshx:max-h-[min(640px,75vh)] dshx:min-h-0 dshx:flex-col">
+    <section
+      aria-label="AI account usage"
+      className={cn('dshx-root dshx:relative dshx:flex dshx:min-h-0 dshx:flex-col', size.height === 0 && 'dshx:max-h-[min(640px,75vh)]')}
+      ref={sectionRef}
+      style={{
+        width: `min(${String(size.width === 0 ? DEFAULT_WIDTH : size.width)}px, calc(100vw - 16px))`,
+        height: size.height === 0 ? undefined : `min(${String(size.height)}px, var(--radix-popover-content-available-height, calc(100vh - 16px)))`,
+      }}
+    >
+      <ResizeGrip
+        onCommit={committed => {
+          void Promise.all([settings.set('usagePopoverWidth', committed.width), settings.set('usagePopoverHeight', committed.height)])
+            .catch(() => false)
+            .finally(() => setDraggedSize(null))
+        }}
+        onReset={() => {
+          setDraggedSize(null)
+          void Promise.all([settings.unset('usagePopoverWidth'), settings.unset('usagePopoverHeight')]).catch(() => false)
+        }}
+        onResize={setDraggedSize}
+        target={sectionRef}
+      />
       <header className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:border-b dshx:px-2 dshx:py-1.5">
         <ToggleGroup
           aria-label="Provider"
@@ -226,11 +343,13 @@ export const UsageOverview = (props: {
           <RefreshCwIcon className={props.refreshing ? 'dshx:animate-spin' : undefined} />
         </Button>
       </header>
-      <div className="dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col dshx:gap-2 dshx:overflow-y-auto dshx:overscroll-contain dshx:p-2">
+      <div className="dshx:grid dshx:min-h-0 dshx:flex-1 dshx:grid-cols-[repeat(auto-fill,minmax(min(340px,100%),1fr))] dshx:content-start dshx:gap-2 dshx:overflow-y-auto dshx:overscroll-contain dshx:p-2">
         {props.usage === null ? (
-          <p className="dshx:p-2 dshx:text-xs dshx:text-muted-foreground">{props.failed ? 'The account host did not answer.' : 'Reading usage…'}</p>
+          <p className="dshx:col-span-full dshx:p-2 dshx:text-xs dshx:text-muted-foreground">
+            {props.failed ? 'The account host did not answer.' : 'Reading usage…'}
+          </p>
         ) : sections.cards.length === 0 ? (
-          <p className="dshx:p-2 dshx:text-xs dshx:text-muted-foreground">
+          <p className="dshx:col-span-full dshx:p-2 dshx:text-xs dshx:text-muted-foreground">
             {sections.unavailable.length + sections.hidden.length === 0 ? 'No enabled account for this provider.' : 'No account with quota to show.'}
           </p>
         ) : (

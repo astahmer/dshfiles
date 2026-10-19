@@ -318,6 +318,48 @@ Then("the strip's context menu hides and shows short names", async ({ page }: { 
   await finishJourneyAssertions(page)
 })
 
+When('a second healthy Command Code account is added', async ({ page }: { page: Page }) => {
+  await addCommandCodeAccount(page, { name: 'Command Code 2', key: 'e2e-fake-key-BRAVO2' })
+})
+
+const usagePopover = (page: Page) => page.getByRole('region', { name: 'AI account usage', exact: true })
+const usageCardTop = async (page: Page, name: string): Promise<number> =>
+  (
+    await usagePopover(page)
+      .getByLabel(new RegExp(`^${name}: drag to reorder`))
+      .boundingBox()
+  )?.y ?? Number.NaN
+
+const expectUsageCards = async (page: Page, layout: 'stacked' | 'side by side'): Promise<void> =>
+  expect
+    .poll(async () => {
+      const [first, second] = [await usageCardTop(page, 'Command Code 1'), await usageCardTop(page, 'Command Code 2')]
+      return Math.abs(first - second) < 1 ? 'side by side' : 'stacked'
+    })
+    .toBe(layout)
+
+Then('widening the usage popover from its grip lays the accounts out side by side', async ({ page }: { page: Page }) => {
+  await stripMeter(page).click()
+  await expectUsageCards(page, 'stacked')
+  const grip = await usagePopover(page).getByRole('separator', { name: 'Resize usage popover', exact: true }).boundingBox()
+  if (grip === null) throw new Error('The usage popover grip is not laid out')
+  await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(grip.x + 420, grip.y - 40, { steps: 8 })
+  await page.mouse.up()
+  await recordAssertion(page, 'ai-accounts-wide-usage-popover-shows-a-grid', () => expectUsageCards(page, 'side by side'))
+})
+
+Then('the usage popover keeps its size until its grip is double-clicked', async ({ page }: { page: Page }) => {
+  await page.keyboard.press('Escape')
+  await expect(usagePopover(page)).toBeHidden()
+  await stripMeter(page).click()
+  await recordAssertion(page, 'ai-accounts-usage-popover-keeps-its-size', () => expectUsageCards(page, 'side by side'))
+  await usagePopover(page).getByRole('separator', { name: 'Resize usage popover', exact: true }).dblclick()
+  await recordAssertion(page, 'ai-accounts-usage-popover-fits-again', () => expectUsageCards(page, 'stacked'))
+  await finishJourneyAssertions(page)
+})
+
 When('a rate-limited and a healthy Command Code account share a local fake provider', async ({ page }: { page: Page }) => {
   await startFakeCommandCode(page)
   await openAccountsPanel(page)
