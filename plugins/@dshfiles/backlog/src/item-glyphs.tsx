@@ -1,4 +1,4 @@
-import { BotIcon, BugIcon, CircleHelpIcon, LightbulbIcon, SquareCheckIcon, StickyNoteIcon, type LucideIcon } from '@dshfiles/plugin-ui/icons'
+import { BotIcon, WandSparklesIcon, BugIcon, CircleHelpIcon, LightbulbIcon, SquareCheckIcon, StickyNoteIcon, type LucideIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 
 import type { BacklogKind, BacklogStatus } from './item.js'
@@ -57,18 +57,19 @@ const KindIcon = (props: { readonly kind: BacklogKind; readonly className?: stri
   return <Icon aria-hidden className={cn('dshx:size-3.5 dshx:shrink-0', kindTone[props.kind], props.className)} />
 }
 
-/** The owner as a tiny avatar: the user's initial, or a bot for an agent. */
+/** An actor as a tiny avatar: the user's initial, a bot for an agent, a wand for automatic triage and signals. */
 const ActorAvatar = (props: { readonly actorId: string | undefined }): JSX.Element => {
   const agent = props.actorId?.startsWith('agent:') === true
+  const system = props.actorId === 'system'
   return (
     <span
-      title={agent ? `Agent ${props.actorId?.slice('agent:'.length) ?? ''}` : 'You'}
+      title={agent ? `Agent ${props.actorId?.slice('agent:'.length) ?? ''}` : system ? 'Automatic' : 'You'}
       className={cn(
         'dshx:inline-flex dshx:size-[18px] dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-full dshx:text-[10px] dshx:font-semibold',
-        agent ? 'dshx:bg-violet/15 dshx:text-violet' : 'dshx:bg-info/15 dshx:text-info',
+        agent ? 'dshx:bg-violet/15 dshx:text-violet' : system ? 'dshx:bg-muted dshx:text-muted-foreground' : 'dshx:bg-info/15 dshx:text-info',
       )}
     >
-      {agent ? <BotIcon aria-hidden className="dshx:size-3" /> : 'Y'}
+      {agent ? <BotIcon aria-hidden className="dshx:size-3" /> : system ? <WandSparklesIcon aria-hidden className="dshx:size-3" /> : 'Y'}
     </span>
   )
 }

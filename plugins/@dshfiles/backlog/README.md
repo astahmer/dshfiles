@@ -66,6 +66,20 @@ linked, never closed. Below it, the item shows a **Triage suggests** card (and a
 **Accept** and **Dismiss**; accepting makes those values yours. The wand in the peek header runs triage
 on demand. A missing key, model or failing call is skipped and the item simply stays in the Inbox.
 
+## Lifecycle signals
+
+On by default (`lifecycleSignals`). Items move without anyone filing them:
+
+- A user message that mentions `b:12` links that thread to the item and moves it to In progress.
+- A revision on `main` whose description says `Closes b:12` (also `Fixes`, `Resolves`, `Completes`,
+  `Implements`; several ids with commas or `and`) links that revision and moves the item to Done. A bare
+  mention such as `part of b:12` closes nothing.
+
+Signals only move forward (never Done back to In progress, never out of Dropped) and never over a status
+you set by hand; the link is recorded either way. Revisions are read with `jj log --ignore-working-copy`
+on `main` every `revisionPollMinutes` (5) in each repository an open item names, plus
+`revisionRepositories`; an unchanged `main` costs one call.
+
 ## Agent tools
 
 | Tool                       | Kind                                                                                  |

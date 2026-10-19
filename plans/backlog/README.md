@@ -1,6 +1,6 @@
 # Backlog
 
-Resume here: step 5 (lifecycle signals). Steps 1–3 landed in `@dshfiles/backlog`; see its README.
+Resume here: step 6 (`@b:` mentions, backlinks on threads, search index). Steps 1–3 landed in `@dshfiles/backlog`; see its README.
 
 ## Why
 
@@ -72,9 +72,10 @@ backlinks. Touching one (edit, comment, link, move) makes it fresh again.
    duplicates and links through the same tools, with a confidence. Above threshold it applies; below,
    the item stays in `inbox` with the proposal attached. Jev (TypeSafe) answers the cheap yes/no
    questions first — "is this actionable?", "is this a duplicate of b:n?" — as memory already does.
-3. **Lifecycle signals (step 5):** a thread that links an item starts → `doing`; a jj revision or PR
-   with `Closes b:<n>` lands on `main` → `done`; a thread settled with no linked revision → back to
-   `todo`. Each signal is an event with actor `system`, and it skips `humanFields`.
+3. **Lifecycle signals (shipped):** a user message mentioning `b:<n>` starts the item; a jj revision on
+   `main` with `Closes b:<n>` finishes it. Each signal is an event with actor `system` and skips
+   `humanFields`. Open: a settled thread with no linked revision → back to `todo` (needs thread-sidebar's
+   settled state across plugins), and GitHub PR merges.
 
 User corrections of an automatic move are kept as labelled examples for step 4's few-shot prompt.
 
@@ -86,7 +87,7 @@ User corrections of an automatic move are kept as labelled examples for step 4's
 | 2   | Panel: capture box, feed, board, facets, item detail with links and backlinks            | done  |
 | 3   | Web profile, feature catalog, e2e journey                                                | done  |
 | 4   | Agent triage: Jev + cheap model proposals in `inbox`, threshold, corrections as examples | done  |
-| 5   | Lifecycle signals from threads, jj revisions and PRs                                     | open  |
+| 5   | Lifecycle signals from threads, jj revisions and PRs                                     | done  |
 | 6   | `@b:` scope in `@dshfiles/mentions`; backlinks chip on threads and revisions; FTS index  | open  |
 | 7   | Rich body editing (rich-composer) and quoting a thread message into an item              | open  |
 | 8   | One-off import of the Discord TODO channel (also a labelled set for step 4)              | open  |

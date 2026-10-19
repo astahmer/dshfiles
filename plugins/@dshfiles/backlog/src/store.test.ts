@@ -197,3 +197,35 @@ describe('triage proposals', () => {
     expect(dismissed.ok && dismissed.value.item.events.at(-1)?.detail).toBe('dismissed kind idea')
   })
 })
+
+describe('lifecycle signals', () => {
+  it('moves an item forward on a signal, records the link, and never moves it back', async () => {
+    const store = BacklogModel.createStore({ items: memoryTable(), now: () => 9 })
+    await store.capture({ text: 'ship the board', actor: user })
+
+    const started = await store.applySignal({ id: 1, status: 'doing', link: { type: 'thread', target: 'session-abc123' }, reason: 'mentioned in a thread' })
+    expect(started.ok && started.value.item.status).toBe('doing')
+    expect(started.ok && started.value.item.events.at(-1)).toEqual({ at: 9, actor: 'system', kind: 'moved', detail: 'inbox → doing (mentioned in a thread)' })
+
+    const closed = await store.applySignal({ id: 1, status: 'done', link: { type: 'revision', target: 'kvyxrlmkptyv' }, reason: 'closed by jj:kvyxrlmkptyv' })
+    expect(closed.ok && closed.value.item.status).toBe('done')
+
+    const late = await store.applySignal({ id: 1, status: 'doing', link: { type: 'thread', target: 'session-later99' }, reason: 'mentioned in a thread' })
+    expect(late.ok && late.value.item.status).toBe('done')
+    expect(late.ok && late.value.item.links.map(link => link.target)).toEqual(['session-abc123', 'kvyxrlmkptyv', 'session-later99'])
+  })
+
+  it('links but does not move an item whose status the user chose', async () => {
+    const store = BacklogModel.createStore({ items: memoryTable(), now: () => 9 })
+    await store.capture({ text: 'parked on purpose', actor: user })
+    await store.update({ id: 1, status: 'todo', actor: user })
+    const signalled = await store.applySignal({
+      id: 1,
+      status: 'done',
+      link: { type: 'revision', target: 'ruwkyzntnvpp' },
+      reason: 'closed by jj:ruwkyzntnvpp',
+    })
+    expect(signalled.ok && signalled.value.item.status).toBe('todo')
+    expect(signalled.ok && signalled.value.item.links).toEqual([{ type: 'revision', target: 'ruwkyzntnvpp' }])
+  })
+})

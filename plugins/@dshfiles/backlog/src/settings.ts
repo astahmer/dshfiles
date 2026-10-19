@@ -20,6 +20,19 @@ export const backlogSettings = defineSettings({
       .step(0.05)
       .default(0.8)
       .description('Confidence at or above which triage applies on its own. Below it, the suggestion waits on the item for you to accept or dismiss.'),
+    lifecycleSignals: Schema.boolean()
+      .default(true)
+      .description(
+        'Move items on their own: a user message mentioning b:12 links that thread and starts the item; a revision on main saying "Closes b:12" finishes it. Never overrides a status you set by hand.',
+      ),
+    revisionRepositories: Schema.array(Schema.string())
+      .default([])
+      .description('Repositories whose main bookmark is read for "Closes b:<n>", besides every project an open item names.'),
+    revisionPollMinutes: Schema.natural()
+      .min(1)
+      .max(120)
+      .default(5)
+      .description('How often main is checked. A check that finds main unchanged costs one jj call.'),
   }),
   applies: 'live',
 })

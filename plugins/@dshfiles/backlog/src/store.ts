@@ -84,6 +84,16 @@ export interface BacklogStore {
     readonly proposal?: BacklogProposal | undefined
     readonly actor: BacklogActor
   }): Promise<BacklogResult<BacklogDetail>>
+  /**
+   * A lifecycle signal from outside the panel (a thread mentioning the item, a revision closing it): the link is always
+   * recorded; the status moves only forward and never over a status the user set by hand.
+   */
+  applySignal(input: {
+    readonly id: number
+    readonly status: 'doing' | 'done'
+    readonly link: BacklogLink
+    readonly reason: string
+  }): Promise<BacklogResult<BacklogDetail>>
   dismissProposal(input: { readonly id: number; readonly actor: BacklogActor }): Promise<BacklogResult<BacklogDetail>>
   list(query: BacklogListQuery): { readonly revision: number; readonly items: BacklogSummary[]; readonly total: number }
   get(id: number): BacklogResult<BacklogDetail>
@@ -335,6 +345,19 @@ const createBacklogStore = ({
         change.humanFields = [...new Set([...item.humanFields, ...owned])]
       }
       return { ok: true, value: await touch(item, actor, { kind: 'triaged', detail: `applied ${BacklogTriage.describe(applied) || 'nothing'}` }, change) }
+    },
+    applySignal: async ({ id, status, link, reason }) => {
+      const item = find(id)
+      if (item === undefined) return { ok: false, reason: 'not-found' }
+      const linked = item.links.some(candidate => BacklogItems.sameLink(candidate, link))
+      const order = ['inbox', 'todo', 'doing', 'done']
+      const forward = item.status !== 'dropped' && order.indexOf(status) > order.indexOf(item.status)
+      const moves = forward && !item.humanFields.includes('status')
+      if (linked && !moves) return { ok: true, value: detailOf(item) }
+      const change: Partial<BacklogItem> = { links: BacklogItems.uniqueLinks([...item.links, link]) }
+      if (moves) change.status = status
+      const detail = moves ? `${item.status} → ${status} (${reason})` : `${link.type}:${link.target} (${reason})`
+      return { ok: true, value: await touch(item, { kind: 'system' }, { kind: moves ? 'moved' : 'linked', detail }, change) }
     },
     dismissProposal: async ({ id, actor }) => {
       const item = find(id)

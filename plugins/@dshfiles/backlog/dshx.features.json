@@ -190,6 +190,60 @@
           "testName": "dismisses a proposal without changing the item"
         }
       ]
+    },
+    {
+      "id": "lifecycle-signals",
+      "title": "Move items from thread and revision signals",
+      "summary": "A user message mentioning b:<n> links that thread and starts the item; a revision on main whose description says Closes/Fixes/Resolves b:<n> links the revision and finishes it. Signals only move forward and never over a status the user set by hand.",
+      "surfaces": ["host", "settings", "integration"],
+      "configuration": [],
+      "states": ["linked", "started", "finished"],
+      "failureModes": ["A repository without jj or a main bookmark is skipped.", "An unchanged main costs one read-only jj call and is not rescanned."],
+      "externalDependencies": [
+        {
+          "id": "jj",
+          "boundary": "Read-only `jj log --ignore-working-copy` on main in the repositories open items name (and revisionRepositories), bounded output and a 20s timeout.",
+          "deterministicFake": "src/signals.test.ts runs the shipped template against a throwaway jj repository."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "backlog.lifecycle-unit-mentions",
+          "file": "plugins/@dshfiles/backlog/src/signals.test.ts",
+          "testName": "finds item mentions without matching paths or longer words"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.lifecycle-unit-closing",
+          "file": "plugins/@dshfiles/backlog/src/signals.test.ts",
+          "testName": "closes only the items a magic word names"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.lifecycle-unit-log",
+          "file": "plugins/@dshfiles/backlog/src/signals.test.ts",
+          "testName": "reads jj log records, skipping malformed ones"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.lifecycle-jj",
+          "file": "plugins/@dshfiles/backlog/src/signals.test.ts",
+          "testName": "reads closing references from jj log with the shipped template"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.lifecycle-host-forward",
+          "file": "plugins/@dshfiles/backlog/src/store.test.ts",
+          "testName": "moves an item forward on a signal, records the link, and never moves it back"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.lifecycle-host-human",
+          "file": "plugins/@dshfiles/backlog/src/store.test.ts",
+          "testName": "links but does not move an item whose status the user chose"
+        }
+      ]
     }
   ],
   "kind": "bundle"

@@ -1,6 +1,8 @@
 import type { Context } from '@deepseek-ai/cordis'
 import { BlockAssembler, createUserMessage } from '@deepseek-ai/dsh-llm'
+import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
 import type {} from '@deepseek-ai/dsh-storage-domain'
+import type {} from '@deepseek-ai/dsh-subprocess'
 import type { ApiCaller } from '@dshfiles/dshx/api'
 import { defineHost } from '@dshfiles/dshx/host'
 import type { SettingsScope } from '@dshfiles/dshx/settings'
@@ -8,6 +10,7 @@ import { z } from 'zod'
 import { backlogApi } from './api.js'
 import { backlogSettings, type BacklogSettings } from './settings.js'
 import { BacklogModel, backlogDomain, type BacklogActor, type BacklogStore } from './store.js'
+import { BacklogSignals } from './signals.js'
 import { BacklogTriage, type TriageQuestion, type TriageServices } from './triage.js'
 
 interface OpenedBacklog {
@@ -135,12 +138,64 @@ const triageItem = async (ctx: Context, id: number) => {
   return store.propose({ id, proposal })
 }
 
+const logFailure = (what: string) => (error: unknown) => console.error(what, { error: error instanceof Error ? error.message.slice(0, 200) : String(error) })
+
 /** Background triage after a capture: the capture answers at once and never waits for Jev or the model. */
 const scheduleTriage = (ctx: Context, id: number): void => {
   if (!currentSettings().autoTriage) return
-  void triageItem(ctx, id).catch(error =>
-    console.error('Backlog triage failed', { id, error: error instanceof Error ? error.message.slice(0, 200) : String(error) }),
+  void triageItem(ctx, id).catch(logFailure('Backlog triage failed'))
+}
+
+/** A user naming `b:12` in a thread is working on it: link the thread and start the item. */
+const onSessionEvent = (ctx: Context, session: { readonly id: string }, event: SessionEvent): void => {
+  if (!currentSettings().lifecycleSignals || event.type !== 'user/message' || event.data.source.kind !== 'user') return
+  const ids = BacklogSignals.mentionsIn(event.data.content.flatMap(block => (block.type === 'text' ? [block.text] : [])).join('\n'))
+  if (ids.length === 0) return
+  void backlogFor(ctx)
+    .then(store =>
+      Promise.all(ids.map(id => store.applySignal({ id, status: 'doing', link: { type: 'thread', target: session.id }, reason: 'mentioned in a thread' }))),
+    )
+    .catch(logFailure('Backlog thread signal failed'))
+}
+
+/** Read-only and bounded: `--ignore-working-copy` never snapshots anyone's checkout. */
+const runJj = async (ctx: Context, cwd: string, args: readonly string[]): Promise<string> => {
+  const subprocess = ctx.get('subprocess')
+  if (subprocess === undefined) throw new Error('the DSH subprocess service is unavailable')
+  const binary = await subprocess.resolveExecutable('jj', undefined, AbortSignal.timeout(5_000))
+  const handle = subprocess.spawn({
+    argv: [binary, '--color=never', '--no-pager', '--ignore-working-copy', ...args],
+    cwd,
+    stdio: { stdin: 'ignore', stdout: { maxBytes: 400_000 }, stderr: { maxBytes: 4_000 } },
+    graceMs: 1_500,
+    signal: AbortSignal.timeout(20_000),
+  })
+  const outcome = await handle.done
+  if (outcome.exitCode !== 0) throw new Error(`jj exited ${String(outcome.exitCode)} in ${cwd}`)
+  return handle.collected.stdout?.readFrom(0)?.text ?? ''
+}
+
+const MAX_REPOSITORIES = 10
+const seenMain = new Map<string, string>()
+
+/** Finish items that a revision on main closes (`Closes b:12`), in every repository an open item names. */
+const pollRevisions = async (ctx: Context): Promise<void> => {
+  const store = await backlogFor(ctx)
+  const settings = currentSettings()
+  const open = store.list({ freshness: 'all', statuses: ['inbox', 'todo', 'doing'], limit: 500 }).items
+  const repositories = [...new Set([...settings.revisionRepositories, ...open.flatMap(item => (item.project === null ? [] : [item.project]))])].slice(
+    0,
+    MAX_REPOSITORIES,
   )
+  for (const repository of repositories) {
+    const head = await runJj(ctx, repository, ['log', '--no-graph', '-r', 'main', '-T', 'commit_id']).catch(() => undefined)
+    if (head === undefined || seenMain.get(repository) === head) continue
+    seenMain.set(repository, head)
+    const log = await runJj(ctx, repository, ['log', '--no-graph', '-r', 'ancestors(main, 50) ~ root()', '-T', BacklogSignals.logTemplate]).catch(() => '')
+    for (const revision of BacklogSignals.parseLog(log))
+      for (const id of BacklogSignals.closedBy(revision.description))
+        await store.applySignal({ id, status: 'done', link: { type: 'revision', target: revision.changeId }, reason: `closed by jj:${revision.changeId}` })
+  }
 }
 
 const actorOf = (caller: ApiCaller): BacklogActor =>
@@ -169,6 +224,18 @@ export default defineHost({
   apis: [backlogApiHost],
   settings: [ownedSettings],
   setup: ctx => {
+    ctx.on('session/event', (session, event) => onSessionEvent(ctx, session, event))
+    ctx.effect(() => {
+      let lastPoll = 0
+      // A one-minute tick so a changed poll interval applies without a restart.
+      const timer = setInterval(() => {
+        const settings = currentSettings()
+        if (!settings.lifecycleSignals || Date.now() - lastPoll < settings.revisionPollMinutes * 60_000) return
+        lastPoll = Date.now()
+        void pollRevisions(ctx).catch(logFailure('Backlog revision signal failed'))
+      }, 60_000)
+      return () => clearInterval(timer)
+    }, 'backlog: revision signals')
     ctx.effect(() => {
       void backlogFor(ctx).catch(() => undefined)
       return async () => {
