@@ -6,21 +6,10 @@
       "id": "panel-seats",
       "title": "Hand the frame's regions to plugin surfaces",
       "summary": "The frame renders the native per-session right sidebar in its right column, or the global dock a plugin registered into the shell.dock seat and asked for through ctx.rightPanel, and it renders a full-width bottom row below the columns when a plugin opens it through ctx.frameBottom. Swapping a surface keeps the region, its size, resize handle and collapse behaviour, while each occupant reports its own presentation.",
-      "reach": [
-        "expect button \"New session\""
-      ],
-      "surfaces": [
-        "client",
-        "integration"
-      ],
+      "reach": ["expect button \"New session\""],
+      "surfaces": ["client", "integration"],
       "configuration": [],
-      "states": [
-        "native",
-        "dock",
-        "bottom-hidden",
-        "bottom-open",
-        "bottom-resized"
-      ],
+      "states": ["native", "dock", "bottom-hidden", "bottom-open", "bottom-resized"],
       "failureModes": [
         "A frame that offers no seat leaves ctx.rightPanel absent, so a dock plugin stays inert instead of failing.",
         "The column keeps one owner at a time: taking it back restores the native surface."
@@ -36,6 +25,11 @@
         {
           "kind": "gherkin",
           "id": "workbench.global-dock",
+          "featureFile": "tooling/dshx/e2e/features/workbench.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "workbench.bottom-panel",
           "featureFile": "tooling/dshx/e2e/features/workbench.feature"
         },
         {
@@ -68,19 +62,10 @@
       "id": "panel-width-persistence",
       "title": "Persist the frame's dragged panel widths",
       "summary": "The layout bundle keeps the dragged sidebar and right-panel widths in the browser, so a reload reopens the sidebar at its last open width and the right panel keeps its px preference while still booting hidden.",
-      "reach": [
-        "expect button \"New session\""
-      ],
-      "surfaces": [
-        "client",
-        "storage"
-      ],
+      "reach": ["expect button \"New session\""],
+      "surfaces": ["client", "storage"],
       "configuration": [],
-      "states": [
-        "default-width",
-        "dragged",
-        "reloaded"
-      ],
+      "states": ["default-width", "dragged", "reloaded"],
       "failureModes": [
         "Malformed or blocked browser storage falls back to the contract default widths.",
         "A stored width outside the drag range is clamped instead of trusted."
@@ -116,20 +101,10 @@
       "id": "collapsed-state-persistence",
       "title": "Persist the collapsed sidebar",
       "summary": "Closing the left sidebar is remembered: a reload boots it collapsed, and reopening restores the last open width instead of the 280px contract default.",
-      "reach": [
-        "expect button \"New session\""
-      ],
-      "surfaces": [
-        "client",
-        "storage"
-      ],
+      "reach": ["expect button \"New session\""],
+      "surfaces": ["client", "storage"],
       "configuration": [],
-      "states": [
-        "open",
-        "collapsed",
-        "reloaded",
-        "reopened"
-      ],
+      "states": ["open", "collapsed", "reloaded", "reopened"],
       "failureModes": [
         "A narrow frame keeps its own responsive auto-collapse instead of restoring a stored wide-frame override.",
         "A record written before the collapsed flag boots open."

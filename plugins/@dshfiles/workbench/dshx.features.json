@@ -90,8 +90,8 @@
     },
     {
       "id": "global-dock",
-      "title": "Keep one docking surface in the right column across threads",
-      "summary": "With the right column set to the global dock, the workbench renders its Dockview in the frame's own right-column seat instead of a session's right sidebar, so the same panel set and layout serve every thread and survive a reload. Jujutsu marks itself as the dock's default panel, and the native per-thread surface stays one setting away.",
+      "title": "Keep one docking surface in the right column and a bottom panel",
+      "summary": "With the right column set to the global dock, the workbench renders its Dockview in the frame's own right-column seat instead of a session's right sidebar, and it opens a full-width bottom row from the same header. Panels can be moved between the two regions and the main workbench from each surface's Move menu; one named layout captures every region at once and brings the arrangement back later. Jujutsu marks itself as the dock's default panel.",
       "reach": [
         "click button \"Plugins\"",
         "click button \"View @dshfiles/workbench\"",
@@ -107,24 +107,42 @@
           "constraints": "One of native or dock; applies live and chooses which surface fills the frame's right column.",
           "choices": ["native", "dock"],
           "coveredBy": ["workbench.global-dock"]
+        },
+        {
+          "key": "bottomPanel",
+          "defaultValue": "hidden",
+          "constraints": "One of hidden or shown; applies live and opens or closes the frame's full-width bottom row.",
+          "choices": ["hidden", "shown"],
+          "coveredBy": ["workbench.bottom-panel"]
         }
       ],
-      "states": ["native", "dock", "rewired", "reloaded"],
+      "states": ["native", "dock", "bottom-open", "panel-moved", "layout-saved", "layout-applied", "reloaded"],
       "failureModes": [
-        "On a frame without the seat the registration is inert and the setting changes nothing.",
-        "A saved dock layout that Dockview rejects falls back to the dock's default panel."
+        "On a frame without the seats the registration is inert and the settings change nothing.",
+        "A saved dock layout that Dockview rejects falls back to the dock's default panel.",
+        "While the on-screen Session has a native tab open, the column goes back to the native surface so the resource stays visible."
       ],
       "externalDependencies": [
         {
           "id": "@dshfiles/frame-layout",
-          "boundary": "The frame owns the right column and renders the shell.dock seat; the workbench contributes the surface there and reports the mode through ctx.rightPanel.",
-          "deterministicFake": "Unit tests render WorkbenchView with the dock surface over memory storage; the scratch journey boots the isolated composition of frame-layout, workbench and jujutsu."
+          "boundary": "The frame owns the right column and the bottom row and reports their geometry; the workbench contributes the surfaces and reads the seats through ctx.rightPanel and ctx.frameBottom.",
+          "deterministicFake": "Unit tests render WorkbenchView with the dock surface over memory storage and exercise the region registry and the saved-layout record directly; the scratch journeys boot the isolated composition of frame-layout, workbench, jujutsu and editor."
         }
       ],
       "verification": [
         {
           "kind": "gherkin",
           "id": "workbench.global-dock",
+          "featureFile": "tooling/dshx/e2e/features/workbench.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "workbench.bottom-panel",
+          "featureFile": "tooling/dshx/e2e/features/workbench.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "workbench.saved-layouts",
           "featureFile": "tooling/dshx/e2e/features/workbench.feature"
         },
         {
@@ -138,6 +156,36 @@
           "id": "workbench.global-dock-unit-storage",
           "file": "plugins/@dshfiles/workbench/src/layout-store.test.ts",
           "testName": "keeps the global dock layout apart from the main-area and side-panel ones"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workbench.global-dock-unit-native-fallback",
+          "file": "plugins/@dshfiles/workbench/src/right-panel-mode.test.ts",
+          "testName": "gives the column back to the native surface while the on-screen session has an open tab"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workbench.global-dock-unit-regions",
+          "file": "plugins/@dshfiles/workbench/src/dock-regions.test.ts",
+          "testName": "tells whether any mounted region already shows a panel"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workbench.global-dock-unit-region-owners",
+          "file": "plugins/@dshfiles/workbench/src/dock-regions.test.ts",
+          "testName": "registers a surface, replaces it and lets only the owner remove it"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workbench.global-dock-unit-layout-save",
+          "file": "plugins/@dshfiles/workbench/src/saved-layouts.test.ts",
+          "testName": "round-trips through browser storage"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workbench.global-dock-unit-layout-rename",
+          "file": "plugins/@dshfiles/workbench/src/saved-layouts.test.ts",
+          "testName": "renames in place, keeping the arrangement, and ignores an absent source"
         }
       ]
     },

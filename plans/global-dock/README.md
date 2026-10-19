@@ -1,6 +1,6 @@
 # Global dock — persistent, movable panels across the shell
 
-**Resume here:** M1 works end to end and the browser journey `workbench.global-dock` passes
+**Resume here:** M1–M3 work end to end and the browser journey `workbench.global-dock` passes
 (the `feat(dock)` and `test(workbench)` revisions on this line). Next: the UI switch (rail entry,
 header toggle, agent tool), then M2's bottom region and cross-region moves.
 
@@ -14,16 +14,17 @@ surface or the global dock.
 
 ## Progress
 
-| Task                                                        | State       | Evidence                                                                                                                |
-| ----------------------------------------------------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------- |
-| Investigation of the native right sidebar and the workbench | done        | this document's _Today_ section                                                                                         |
-| M1 frame seat + dock occupant behind a setting              | landed      | the `feat(dock)` revision — frame `shell.dock` seat + `ctx.rightPanel`, workbench `rightPanel` setting and dock surface |
-| M1 Jujutsu panel contributed to the dock                    | landed      | same revision — `dshfiles-jujutsu.dock` with `dockDefault`                                                              |
-| M1 journey + catalog                                        | landed      | the `test(workbench)` revision — `workbench.global-dock` passes in Chromium; both catalogs carry their feature entry    |
-| M1 switch from the UI (rail, header, agent tool)            | not started | —                                                                                                                       |
-| M2 bottom region + cross-region moves                       | not started | —                                                                                                                       |
-| M3 saved layouts                                            | not started | —                                                                                                                       |
-| M4 native right-sidebar content in the dock                 | not started | —                                                                                                                       |
+| Task                                                         | State       | Evidence                                                                                                                                                       |
+| ------------------------------------------------------------ | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Investigation of the native right sidebar and the workbench  | done        | this document's _Today_ section                                                                                                                                |
+| M1 frame seat + dock occupant behind a setting               | landed      | the `feat(dock)` revision — frame `shell.dock` seat + `ctx.rightPanel`, workbench `rightPanel` setting and dock surface                                        |
+| M1 Jujutsu panel contributed to the dock                     | landed      | same revision — `dshfiles-jujutsu.dock` with `dockDefault`                                                                                                     |
+| M1 journey + catalog                                         | landed      | the `test(workbench)` revision — `workbench.global-dock` passes in Chromium; both catalogs carry their feature entry                                           |
+| M1 switch from the UI (header button, command, Settings row) | landed      | the UI-switch revision — the header button and `workbench.toggleSidePanel` write the setting                                                                   |
+| M2 bottom region + cross-region moves                        | landed      | the `feat(frame)` + `feat(workbench)` revisions — full-width bottom row, region registry, Move menu, `workbench.bottom-panel` journey                          |
+| M3 saved layouts                                             | landed      | the named-layouts revisions — one dialog to save, apply, rename and delete; `workbench.saved-layouts` journey                                                  |
+| Drag a panel between regions                                 | partial     | Dockview's drop protocol is wired through the api's `onUnhandledDragOver`; a scripted tab drag left the panel in the dock, so the journeys cover the menu path |
+| M4 native right-sidebar content in the dock                  | not started | today the column falls back to the native surface while a native tab (preview, diff, terminal) is open                                                         |
 
 ## Today (evidence)
 
@@ -119,6 +120,19 @@ listing the regions and their serialized trees, with a settings-backed UI.
 
 Decide from M1 evidence between owned panels for files/terminal/previews and a port of
 `ui-sidebar-right`; record the concrete gap in `plans/dsh-host-gaps.md` if neither is honest.
+
+## Verification notes (M2/M3)
+
+- `workbench.global-dock`, `workbench.bottom-panel` and `workbench.saved-layouts` pass in
+  Chromium; `pnpm check:e2e workbench` is 6 passed, 1 failed, and the failure is the
+  pre-existing `workbench.surface-layouts` journey (it fails on `main` in the same place).
+- `workbench.saved-layouts` is timing-sensitive in a long run (it fails once in a while in the
+  full suite and passes alone: two consecutive clean runs), so treat a red full run there as a
+  flake first.
+- `@dshfiles/frame-layout` 17 and `@dshfiles/workbench` 30 unit tests pass; boot checks are green
+  for frame-layout, workbench and jujutsu.
+- A new Tailwind utility only exists after `@dshfiles/ui-styles` is rebuilt — a missing
+  `dshx:flex-1` silently collapsed the workbench panel and swallowed tab clicks.
 
 ## Verification notes (M1)
 
