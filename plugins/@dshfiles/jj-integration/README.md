@@ -27,19 +27,22 @@ thread at the new destination. Leaving an unused thread workspace keeps it as
 the project's spare for that bookmark, so toggling back reuses it and its blank
 Session.
 
-**New thread never waits on jj.** The sidebar button, the palette and the
-project picker open the composer at once in the project (or current) checkout,
-and the destination bar then moves the blank thread to where new threads start
-by default: with `isolateByDefault` on, its own workspace (the spare when there
-is one, else a new one named by the client and created in the background);
-with it off, the project checkout when the thread started in another thread's
-workspace. The chip shows the workspace name with a spinner and Send waits
-until it is ready; typing does not. Each new thread is moved at most once, so a
-manual toggle sticks, and a blank thread already alone in a thread workspace is
-already at its destination: a page reload, or the fresh Session DSH opens in the
-workspace a switch moved it to, keeps that workspace instead of provisioning
-another. The thread sidebar shows a thread workspace's sessions under its
-project.
+**New thread provisions nothing until its first send.** The sidebar button, the
+palette and the project picker open the composer at once in the project (or
+current) checkout, and with `isolateByDefault` on the blank thread stays there:
+the destination bar shows the workspace it will take (the spare when there is
+one, else a workspace named by the client) without creating it. The first Send
+creates or claims that workspace, opens it, and delivers the message into the
+fresh Session with the same draft, attachments and structured references; typing
+never waits on jj, and a New thread the user abandons leaves no jj workspace
+behind. With isolation off, a thread that started in another thread's workspace
+returns to the project checkout on arrival, which creates nothing. The chip
+shows the workspace name with a spinner while the first-send switch runs. Each
+new thread is moved at most once, so a manual toggle sticks, and a blank thread
+already alone in a thread workspace is already at its destination: a page
+reload, or the fresh Session DSH opens in the workspace a switch moved it to,
+keeps that workspace instead of provisioning another. The thread sidebar shows a
+thread workspace's sessions under its project.
 
 Creating a thread workspace never runs dependency setup; any previously saved
 `setupCommand` is ignored. After the thread starts, check the project's single

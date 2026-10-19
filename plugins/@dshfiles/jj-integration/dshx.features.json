@@ -120,7 +120,7 @@
     {
       "id": "new-thread-project-default",
       "title": "New thread returns to its project",
-      "summary": "With isolation off, a blank thread inherited from a prior thread workspace returns to the owning project checkout; with isolation on, it gets a fresh workspace instead of reusing that prior folder.",
+      "summary": "With isolation off, a blank thread inherited from a prior thread workspace returns to the owning project checkout; with isolation on, it keeps that folder until its first send and then provisions its own workspace instead of reusing it.",
       "reach": [
         "click button \"New thread\"",
         "click button \"Choose workspace\"",
@@ -146,7 +146,7 @@
       "states": ["previous-thread-workspace", "project-checkout"],
       "failureModes": [
         "With isolation off, a blank new thread retains its previous thread workspace instead of returning to its owning project checkout.",
-        "With isolation on, a blank thread reuses its previous thread workspace instead of getting a fresh one."
+        "With isolation on, a blank thread reuses its previous thread workspace as its own destination on the first send instead of getting a fresh one."
       ],
       "externalDependencies": [
         {
@@ -194,8 +194,8 @@
     },
     {
       "id": "new-thread-background",
-      "title": "New thread never waits on jj",
-      "summary": "The sidebar's New thread, the palette and the project picker open the composer at once; with isolation on by default, the blank thread moves to its own jj workspace (a spare when available, but never the inherited source workspace) in the background while the chip names it. The composer stays editable; a submitted message waits only if that move is still in progress. A thread left in another thread's workspace moves back to the project checkout when isolation is off.",
+      "title": "New thread provisions nothing until its first send",
+      "summary": "The sidebar's New thread, the palette and the project picker open the composer at once and provision nothing: with isolation on by default the blank thread waits in the project (or inherited) checkout, and its own jj workspace (a spare when available, but never the inherited source workspace) is created only by its first send. That send waits for the new Session to open and delivers the same draft there. An abandoned New thread therefore leaves no jj workspace behind; a reload before the first send keeps it unprovisioned. A thread left in another thread's workspace moves back to the project checkout on arrival when isolation is off, which creates nothing.",
       "reach": [
         "click button \"New thread\"",
         "click button \"Choose workspace\"",
@@ -206,10 +206,11 @@
       ],
       "surfaces": ["client"],
       "configuration": [],
-      "states": ["opening", "preparing", "switching", "settled"],
+      "states": ["opening", "deferred", "committing", "switching", "settled"],
       "failureModes": [
-        "The composer stays editable during preparation; a submitted message is held until the destination Session opens, and native-picker navigation moves its draft, attachments, and structured references without leaving a stale source copy.",
-        "Each New-thread screen is moved at most once; a manual toggle afterwards is never undone.",
+        "Arriving creates no jj workspace and opens none, so a New thread the user abandons leaves the repository untouched.",
+        "The first send provisions or claims the workspace, holds the composer until the destination Session is open, and delivers the draft there; a failed provision keeps the draft and shows the send failure.",
+        "Each New-thread Session is settled once, keyed by Session: a manual toggle is never undone, and two New threads waiting at once never share one destination.",
         "An inherited thread workspace is not reused as the new thread's own destination, even when it is registered as a spare."
       ],
       "externalDependencies": [],
@@ -256,9 +257,45 @@
         },
         {
           "kind": "unit-test",
-          "id": "jj-integration.new-thread-background-unit-eager",
+          "id": "jj-integration.new-thread-background-unit-defers-isolation",
           "file": "plugins/@dshfiles/jj-integration/src/workspace-toggle-machine.test.ts",
-          "testName": "isolates before the Host answers and excludes an inherited thread workspace from spare reuse"
+          "testName": "arriving provisions nothing and holds the move for the first send"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.new-thread-background-unit-first-send",
+          "file": "plugins/@dshfiles/jj-integration/src/workspace-toggle-machine.test.ts",
+          "testName": "delivers the first send into the workspace the deferred isolation provisioned"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.new-thread-background-unit-manual-toggle-wins",
+          "file": "plugins/@dshfiles/jj-integration/src/workspace-toggle-machine.test.ts",
+          "testName": "a manual toggle wins over the move the arrival deferred"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.new-thread-background-unit-per-session",
+          "file": "plugins/@dshfiles/jj-integration/src/workspace-toggle-machine.test.ts",
+          "testName": "keeps one deferred move per Session and never crosses two New threads"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.new-thread-background-unit-cancelled",
+          "file": "plugins/@dshfiles/jj-integration/src/workspace-toggle-machine.test.ts",
+          "testName": "drops the deferred move when its Session stops being blank"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.new-thread-background-unit-switch-continuation",
+          "file": "plugins/@dshfiles/jj-integration/src/workspace-toggle-machine.test.ts",
+          "testName": "continues a switch with the blank Session DSH opens before the switch finishes"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.new-thread-background-unit-holds-send",
+          "file": "plugins/@dshfiles/jj-integration/src/workspace-toggle-machine.test.ts",
+          "testName": "holds the first send only when that Session is due its own workspace"
         }
       ]
     },

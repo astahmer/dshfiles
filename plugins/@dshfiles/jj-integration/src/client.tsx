@@ -29,6 +29,7 @@ import { createSessionLogDownloadPort, SessionLogDownloadFeedback, type SessionL
 import { ThreadWorkspaceControl } from './thread-workspace-control.js'
 import { useToast } from './toast.js'
 import { deferWorkspaceSubmit } from './workspace-submit.js'
+import { defersIsolationToSend } from './workspace-toggle-machine.js'
 import { jjIntegrationSettings } from './settings.js'
 
 const PANEL_ID = 'jj-integration'
@@ -439,7 +440,9 @@ export default defineClient({
         return
       }
       const toggleSnapshot = workspaceToggle.getSnapshot()
-      if (toggleSnapshot.matches('idle')) return
+      const move = toggleSnapshot.context.deferred.find(candidate => candidate.sessionId === sessionId)
+      const deferred = defersIsolationToSend(move)
+      if (toggleSnapshot.matches('idle') && !deferred) return
       const source = workspaceComposerFor(sessionId)
       if (source === undefined || !source.blank) return
       const state = source.input.state.getSnapshot()
@@ -447,7 +450,10 @@ export default defineClient({
       stopSubmit(event)
       const controller = new AbortController()
       pendingSubmissions.set(sessionId, controller)
-      const name = toggleSnapshot.context.pending?.name ?? null
+      // A New thread defers its isolation to its first send: start the move now and hold the draft until the Session
+      // the switch opens is ready, then deliver it there.
+      if (deferred) workspaceToggle.send({ type: 'commit', sessionId })
+      const name = workspaceToggle.getSnapshot().context.pending?.name ?? null
       const reason = name === null ? translate('switchingDestination') : translate('preparingWorkspace', { name })
       void deferWorkspaceSubmit({
         actor: workspaceToggle,
@@ -496,6 +502,27 @@ export default defineClient({
       }
     }, 'jj-integration: defer send until workspace is ready')
     ctx.effect(() => () => workspaceToggle.stop(), 'jj-integration: workspace toggle')
+    // A deferred isolation belongs to one blank Session. When that Session is archived or stops being blank (a send
+    // outside this plugin), drop the move so a stale first-send can never provision a workspace for it.
+    ctx.effect(() => {
+      const cancelStaleMoves = (): void => {
+        const moves = workspaceToggle.getSnapshot().context.deferred
+        if (moves.length === 0) return
+        const sessions = ctx.sessions.list.getSnapshot()
+        const archived = ctx.workspaces.list.getSnapshot().archivedSessionIds
+        for (const move of moves) {
+          const sessionId = SessionId(move.sessionId)
+          const stale = archived.includes(sessionId) || sessions.byId[sessionId]?.blank === false
+          if (stale) workspaceToggle.send({ type: 'cancel', sessionId: move.sessionId })
+        }
+      }
+      const unsubscribeSessions = ctx.sessions.list.subscribe(cancelStaleMoves)
+      const unsubscribeWorkspaces = ctx.workspaces.list.subscribe(cancelStaleMoves)
+      return () => {
+        unsubscribeSessions()
+        unsubscribeWorkspaces()
+      }
+    }, 'jj-integration: cancel a deferred isolation for a thread that is gone')
     const pickerPorts = createWorkspacePickerPorts(ctx.remote)
     ctx.slots.inject('conversation.hero.workspace', () =>
       ctx.slots.register(

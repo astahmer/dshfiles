@@ -47,6 +47,28 @@ export interface PendingDestination {
   readonly spare: SpareWorkspace | null
 }
 
+/**
+ * A blank New thread whose isolation starts on its first send: arriving creates no jj workspace and opens none, and
+ * abandoning it leaves nothing behind. The move is keyed by Session, so two New threads waiting at once never share
+ * one destination.
+ */
+export interface DeferredMove {
+  readonly sessionId: string
+  readonly visitId: string
+  /** The workspace the blank Session arrived in; a different one means the thread was moved before it sent. */
+  readonly workspaceId: string
+  readonly name: string
+  /** What the destination bar shows while the move waits, so a default-isolated New thread looks isolated. */
+  readonly wantsIsolation: boolean
+  /** Where the thread moves on its first send; null until the Host's destination names where new threads start. */
+  readonly request: ToggleRequest | null
+}
+
+interface SwitchArrival {
+  readonly visitId: string
+  readonly workspaceId: string
+}
+
 interface ToggleContext {
   readonly client: WorkspaceToggleClient
   readonly request: ToggleRequest | null
@@ -54,9 +76,17 @@ interface ToggleContext {
   readonly error: string | null
   /** New-thread visits whose destination was already settled, by the default or by the user; never moved again. */
   readonly settled: readonly string[]
-  /** The New-thread visit waiting for its destination to decide whether it moves. */
-  readonly arriving: string | null
-  /** The workspace a switch just opened; the next blank Session to arrive there continues that switch's visit. */
+  /** Blank New threads waiting for their first send, one entry per Session. */
+  readonly deferred: readonly DeferredMove[]
+  /** The workspace the last blank Session arrived in; a switch that opens it again moved nothing. */
+  readonly currentWorkspaceId: string | null
+  /** Blank Sessions that arrived while a switch ran; the one in the workspace it opened continues that visit. */
+  readonly switchArrivals: readonly SwitchArrival[]
+  /** The visit whose destination a committed first send waits for. */
+  readonly committing: string | null
+  /** The workspace the last switch opened or landed in; what a held send waits to deliver into. */
+  readonly landed: string | null
+  /** The workspace a switch opened whose continuing blank Session has not arrived yet; that arrival settles here. */
   readonly opened: string | null
 }
 
@@ -76,11 +106,21 @@ type ToggleEvent =
    * A blank New-thread Session showed in `workspaceId`. `visitId` names this showing: DSH reuses a workspace's blank
    * Session, so the same Session can be a new thread again later. A switch has DSH open a fresh blank Session in the
    * workspace it moved to, so the arrival that follows a switch carries a new visit id for the same thread. With
-   * isolation on by default, a submitted Send waits until the destination Session is open.
+   * isolation on by default, its isolation waits for the first send instead of creating a workspace here.
    */
-  | { readonly type: 'arrive'; readonly visitId: string; readonly workspaceId: string; readonly isolateByDefault: boolean }
+  | {
+      readonly type: 'arrive'
+      readonly visitId: string
+      readonly sessionId: string
+      readonly workspaceId: string
+      readonly isolateByDefault: boolean
+    }
   /** Its destination is known: `request` moves it to where new threads start by default, null keeps it. */
   | { readonly type: 'resolved'; readonly visitId: string; readonly request: ToggleRequest | null }
+  /** The first send of that Session: start the move its arrival deferred. */
+  | { readonly type: 'commit'; readonly sessionId: string }
+  /** That Session was archived, discarded or stopped being blank, so its deferred move is dropped. */
+  | { readonly type: 'cancel'; readonly sessionId: string }
   | { readonly type: 'dismiss' }
 
 /**
@@ -91,6 +131,13 @@ type ToggleEvent =
  * which keeps the old behaviour of moving the thread out.
  */
 export const ownsIsolatedThreadWorkspace = (destination: DestinationView): boolean => destination.isolated && destination.ownedByAnotherSession === false
+
+/**
+ * Whether the first send of that Session starts the isolation its arrival deferred: isolation on by default does, a
+ * New thread that starts in the project checkout and stays there does not, so its send goes straight through.
+ */
+export const defersIsolationToSend = (move: DeferredMove | null | undefined): boolean =>
+  move !== null && move !== undefined && (move.request?.isolate ?? move.wantsIsolation)
 
 /**
  * Where a blank New-thread Session should start: in its own workspace when isolation is the default, or in the
@@ -112,26 +159,34 @@ const defaultDestinationMove = (input: { readonly destination: DestinationView; 
   return null
 }
 
-/**
- * Starts isolation before the Host answers. When the composer inherited a thread workspace, exclude that workspace
- * from spare reuse so this New thread cannot keep using the previous thread's folder.
- */
-const eagerDestinationMove = (input: { readonly workspaceId: string; readonly projectWorkspaceId: string; readonly bookmark: string }): ToggleRequest => {
-  const request: ToggleRequest = {
-    isolate: true,
-    base: input.bookmark,
-    projectWorkspaceId: input.projectWorkspaceId,
-    leaving: null,
-    leavingBase: null,
-  }
-  if (input.workspaceId === input.projectWorkspaceId) return request
-  return { ...request, excludeSpareWorkspaceId: input.workspaceId }
-}
-
 const pendingFor = (client: WorkspaceToggleClient, request: ToggleRequest, name: string | null): PendingDestination => {
   const candidate = request.isolate ? client.findSpare(spareKey(request.projectWorkspaceId, request.base)) : undefined
   const spare = candidate?.workspaceId === request.excludeSpareWorkspaceId ? null : (candidate ?? null)
   return { isolate: request.isolate, spare, name: request.isolate ? (spare?.name ?? name ?? client.generateName()) : null }
+}
+
+const deferredMoveFor = (deferred: readonly DeferredMove[], sessionId: string): DeferredMove | null =>
+  deferred.find(move => move.sessionId === sessionId) ?? null
+
+const deferredVisitFor = (deferred: readonly DeferredMove[], visitId: string): DeferredMove | null => deferred.find(move => move.visitId === visitId) ?? null
+
+const withDeferred = (deferred: readonly DeferredMove[], move: DeferredMove): readonly DeferredMove[] => [
+  ...deferred.filter(candidate => candidate.sessionId !== move.sessionId),
+  move,
+]
+
+const withoutDeferredSession = (deferred: readonly DeferredMove[], sessionId: string): readonly DeferredMove[] =>
+  deferred.filter(move => move.sessionId !== sessionId)
+
+const withoutDeferredVisit = (deferred: readonly DeferredMove[], visitId: string): readonly DeferredMove[] => deferred.filter(move => move.visitId !== visitId)
+
+/** The ids `settled` gained, without duplicates; a visit settles at most once but may be named by two events. */
+const settledWith = (settled: readonly string[], ...visits: readonly (string | null | undefined)[]): readonly string[] => {
+  const next = [...settled]
+  for (const visit of visits) {
+    if (visit !== null && visit !== undefined && !next.includes(visit)) next.push(visit)
+  }
+  return next
 }
 
 const spareKey = (projectWorkspaceId: string, base: string | undefined | null): string => `${projectWorkspaceId}\u0000${base ?? ''}`
@@ -163,9 +218,11 @@ const provisionTolerant = async (client: WorkspaceToggleClient, input: Provision
  * Session instead of creating another.
  *
  * A New thread also arrives here: every entry point (sidebar, palette, project picker) opens the native composer at
- * once in the project or current checkout, and `arrive` / `resolved` move that blank Session to where new threads
- * start by default in the background, the same way as the toggle. Each Session is settled once, so a later manual
- * toggle is never undone.
+ * once in the project or current checkout. With isolation on by default the arrival only records the move it would
+ * make — `commit` on the first send starts it, and `deferWorkspaceSubmit` delivers that same draft into the Session
+ * the switch opens — so an abandoned New thread creates no workspace and opens none. Isolation off still moves the
+ * blank thread back to the project checkout on arrival, which creates nothing. Each Session is settled once, so a
+ * later manual toggle is never undone.
  */
 // SAFETY: xstate's `types` entries are empty type carriers; nothing reads their values.
 export const workspaceToggleMachine = setup({
@@ -202,7 +259,11 @@ export const workspaceToggleMachine = setup({
     pending: null,
     error: null,
     settled: [],
-    arriving: null,
+    deferred: [],
+    currentWorkspaceId: null,
+    switchArrivals: [],
+    committing: null,
+    landed: null,
     opened: null,
   }),
   initial: 'idle',
@@ -214,63 +275,137 @@ export const workspaceToggleMachine = setup({
           actions: assign(({ context, event }) => ({
             request: event.request,
             error: null,
-            arriving: null,
+            committing: null,
+            landed: null,
             opened: null,
             pending: pendingFor(context.client, event.request, null),
-            settled: event.visitId === undefined ? context.settled : [...context.settled, event.visitId],
+            settled: settledWith(context.settled, event.visitId),
+            deferred: event.visitId === undefined ? context.deferred : withoutDeferredVisit(context.deferred, event.visitId),
+            switchArrivals: [],
           })),
         },
         arrive: [
           {
             guard: ({ context, event }) => context.settled.includes(event.visitId),
+            actions: assign({ currentWorkspaceId: ({ event }) => event.workspaceId }),
           },
           {
             // A switch has DSH open a fresh blank Session in the workspace it moved the visit to, so that arrival
             // carries a new visit id. It continues the switch rather than starting a new thread: settle it, and let
             // the next blank Session to arrive there be a new visit that follows the default destination again.
             guard: ({ context, event }) => context.opened === event.workspaceId,
-            actions: assign(({ context, event }) => ({ settled: [...context.settled, event.visitId], opened: null, error: null })),
-          },
-          {
-            guard: ({ event }) => event.isolateByDefault,
-            target: 'preparing',
             actions: assign(({ context, event }) => ({
-              arriving: event.visitId,
-              error: null,
+              settled: settledWith(context.settled, event.visitId),
+              currentWorkspaceId: event.workspaceId,
               opened: null,
-              pending: { isolate: true, spare: null, name: context.client.generateName() },
+              error: null,
             })),
           },
-          { actions: assign({ arriving: ({ event }) => event.visitId, opened: null, error: null }) },
+          {
+            guard: ({ context, event }) => deferredMoveFor(context.deferred, event.sessionId)?.workspaceId === event.workspaceId,
+            // The same New thread re-reports its arrival (a settings or destination change); keep the move it already
+            // deferred, including a name the Host has since used, and only refresh what the destination bar shows.
+            actions: assign(({ context, event }) => ({
+              currentWorkspaceId: event.workspaceId,
+              deferred: context.deferred.map(move => (move.sessionId === event.sessionId ? { ...move, wantsIsolation: event.isolateByDefault } : move)),
+            })),
+          },
+          {
+            // A New thread that has not sent yet (or the same Session moved to another project): isolation on by
+            // default starts on the first send, so the composer stays in the project checkout and no jj workspace
+            // exists while the thread is empty.
+            actions: assign(({ context, event }) => ({
+              currentWorkspaceId: event.workspaceId,
+              error: null,
+              opened: null,
+              deferred: withDeferred(context.deferred, {
+                sessionId: event.sessionId,
+                visitId: event.visitId,
+                workspaceId: event.workspaceId,
+                name: context.client.generateName(),
+                wantsIsolation: event.isolateByDefault,
+                request: null,
+              }),
+            })),
+          },
         ],
         resolved: [
           {
-            guard: ({ context, event }) => context.settled.includes(event.visitId) || event.visitId !== context.arriving,
+            guard: ({ context, event }) => deferredVisitFor(context.deferred, event.visitId) === null,
           },
           {
             guard: ({ event }) => event.request === null,
             actions: assign(({ context, event }) => ({
-              settled: [...context.settled, event.visitId],
-              arriving: null,
+              settled: settledWith(context.settled, event.visitId),
               opened: null,
+              deferred: withoutDeferredVisit(context.deferred, event.visitId),
             })),
+          },
+          {
+            guard: ({ event }) => event.request?.isolate === true,
+            // Isolation is the default: keep the move for the first send instead of creating a workspace now.
+            actions: assign(({ context, event }) => ({
+              error: null,
+              deferred: context.deferred.map(move => (move.visitId === event.visitId ? { ...move, request: event.request } : move)),
+            })),
+          },
+          {
+            // Isolation off: a thread that inherited another thread's workspace moves back to the project checkout,
+            // which creates nothing.
+            target: 'switching',
+            actions: assign(({ context, event }) => ({
+              request: event.request,
+              error: null,
+              committing: null,
+              landed: null,
+              opened: null,
+              settled: settledWith(context.settled, event.visitId),
+              pending: event.request === null ? null : pendingFor(context.client, event.request, null),
+              deferred: withoutDeferredVisit(context.deferred, event.visitId),
+              switchArrivals: [],
+            })),
+          },
+        ],
+        commit: [
+          {
+            guard: ({ context, event }) => deferredMoveFor(context.deferred, event.sessionId) === null,
+          },
+          {
+            guard: ({ context, event }) => deferredMoveFor(context.deferred, event.sessionId)?.request === null,
+            target: 'preparing',
+            actions: assign(({ context, event }) => {
+              const move = deferredMoveFor(context.deferred, event.sessionId)
+              return {
+                request: null,
+                error: null,
+                opened: null,
+                committing: move?.visitId ?? null,
+                pending: move === null ? null : { isolate: true, name: move.name, spare: null },
+              }
+            }),
           },
           {
             target: 'switching',
             actions: assign(({ context, event }) => {
-              // SAFETY of the fallback: the previous branch took every null request.
-              const request = event.request ?? { isolate: false, projectWorkspaceId: '', leaving: null, leavingBase: null }
+              const move = deferredMoveFor(context.deferred, event.sessionId)
+              const request = move?.request ?? null
               return {
                 request,
                 error: null,
-                arriving: null,
+                committing: null,
+                landed: null,
                 opened: null,
-                settled: [...context.settled, event.visitId],
-                pending: pendingFor(context.client, request, null),
+                settled: settledWith(context.settled, move?.visitId),
+                pending: move === null || request === null ? null : pendingFor(context.client, request, move.name),
+                deferred: withoutDeferredSession(context.deferred, event.sessionId),
+                switchArrivals: [],
               }
             }),
           },
         ],
+        cancel: {
+          actions: assign(({ context, event }) => ({ deferred: withoutDeferredSession(context.deferred, event.sessionId) })),
+        },
         dismiss: { actions: assign({ error: null }) },
       },
     },
@@ -280,10 +415,11 @@ export const workspaceToggleMachine = setup({
           target: 'idle',
           actions: assign(({ context }) => ({
             pending: null,
-            arriving: null,
+            committing: null,
             opened: null,
             error: context.client.preparationTimeoutReason(),
-            settled: [...context.settled, ...(context.arriving === null ? [] : [context.arriving])],
+            settled: settledWith(context.settled, context.committing),
+            deferred: context.committing === null ? context.deferred : withoutDeferredVisit(context.deferred, context.committing),
           })),
         },
       },
@@ -293,47 +429,83 @@ export const workspaceToggleMachine = setup({
           actions: assign(({ context, event }) => ({
             request: event.request,
             error: null,
-            arriving: null,
+            committing: null,
+            landed: null,
             opened: null,
             pending: pendingFor(context.client, event.request, null),
-            settled: [...context.settled, ...(context.arriving === null ? [] : [context.arriving])],
+            settled: settledWith(context.settled, context.committing, event.visitId),
+            deferred: event.visitId === undefined ? context.deferred : withoutDeferredVisit(context.deferred, event.visitId),
+            switchArrivals: [],
           })),
         },
         resolved: [
-          { guard: ({ context, event }) => event.visitId !== context.arriving },
+          { guard: ({ context, event }) => event.visitId !== context.committing },
           {
             guard: ({ event }) => event.request === null,
             target: 'idle',
             actions: assign(({ context, event }) => ({
               pending: null,
-              arriving: null,
+              committing: null,
               opened: null,
-              settled: [...context.settled, event.visitId],
+              settled: settledWith(context.settled, event.visitId),
+              deferred: withoutDeferredVisit(context.deferred, event.visitId),
             })),
           },
           {
             target: 'switching',
             actions: assign(({ context, event }) => {
-              // SAFETY of the fallback: the previous branch took every null request.
-              const request = event.request ?? { isolate: false, projectWorkspaceId: '', leaving: null, leavingBase: null }
+              const move = deferredVisitFor(context.deferred, event.visitId)
               return {
-                request,
-                arriving: null,
+                request: event.request,
+                error: null,
+                committing: null,
+                landed: null,
                 opened: null,
-                settled: [...context.settled, event.visitId],
-                pending: pendingFor(context.client, request, context.pending?.name ?? null),
+                settled: settledWith(context.settled, event.visitId),
+                pending: event.request === null ? null : pendingFor(context.client, event.request, move?.name ?? null),
+                deferred: withoutDeferredVisit(context.deferred, event.visitId),
+                switchArrivals: [],
               }
             }),
+          },
+        ],
+        cancel: [
+          {
+            // The Session whose first send started this wait went away: drop its move and stop waiting.
+            guard: ({ context, event }) => context.committing !== null && deferredVisitFor(context.deferred, context.committing)?.sessionId === event.sessionId,
+            target: 'idle',
+            actions: assign(({ context, event }) => ({
+              pending: null,
+              committing: null,
+              opened: null,
+              error: null,
+              deferred: withoutDeferredSession(context.deferred, event.sessionId),
+            })),
+          },
+          {
+            actions: assign(({ context, event }) => ({ deferred: withoutDeferredSession(context.deferred, event.sessionId) })),
           },
         ],
       },
     },
     switching: {
+      on: {
+        // DSH opens the blank Session this switch moved the thread to before `open` resolves, so that arrival lands
+        // while the switch still runs. Remember it: the one in the workspace the switch opened continues this visit,
+        // and settling it on completion keeps `opened` from swallowing the next New thread there.
+        arrive: {
+          actions: assign(({ context, event }) => ({
+            currentWorkspaceId: event.workspaceId,
+            switchArrivals: [...context.switchArrivals, { visitId: event.visitId, workspaceId: event.workspaceId }],
+          })),
+        },
+      },
       invoke: {
         src: 'switchDestination',
         input: ({ context }) => ({
           client: context.client,
-          // SAFETY of the fallbacks: `switching` is only entered from `toggle` or `resolved`, which set both.
+          // SAFETY of the fallbacks: `switching` is only entered from `toggle` or a `resolved` / `commit` branch that
+          // carried a request and a pending destination.
           request: context.request ?? { isolate: false, projectWorkspaceId: '', leaving: null, leavingBase: null },
           pending: context.pending ?? { isolate: false, name: null, spare: null },
         }),
@@ -341,11 +513,21 @@ export const workspaceToggleMachine = setup({
           target: 'idle',
           actions: [
             emit(({ event }) => ({ type: 'switched' as const, workspaceId: event.output.workspaceId, destination: event.output.destination })),
-            assign(({ event }) => ({
-              request: null,
-              pending: null,
-              opened: event.output.workspaceId,
-            })),
+            assign(({ context, event }) => {
+              const continued = context.switchArrivals.filter(arrival => arrival.workspaceId === event.output.workspaceId)
+              const continuesNow = continued.length > 0 || event.output.workspaceId === context.currentWorkspaceId
+              return {
+                request: null,
+                pending: null,
+                landed: event.output.workspaceId,
+                // A continuing blank Session has already arrived (or the switch opened the workspace the thread is
+                // already in, which moves nothing and opens no Session), so no later arrival there continues it;
+                // treating one as a continuation would settle the next New thread's move away.
+                opened: continuesNow ? null : event.output.workspaceId,
+                settled: settledWith(context.settled, ...continued.map(arrival => arrival.visitId)),
+                switchArrivals: [],
+              }
+            }),
           ],
         },
         onError: {
@@ -355,6 +537,7 @@ export const workspaceToggleMachine = setup({
             pending: null,
             opened: null,
             error: errorText(event.error),
+            switchArrivals: [],
           })),
         },
       },
@@ -385,7 +568,7 @@ const waitForWorkspaceToggle = (input: { readonly actor: WorkspaceToggleActor; r
       settled = true
       unsubscribe()
       input.signal.removeEventListener('abort', abort)
-      resolve({ workspaceId: snapshot.context.opened, error: snapshot.context.error })
+      resolve({ workspaceId: snapshot.context.landed, error: snapshot.context.error })
     }
     input.signal.addEventListener('abort', abort, { once: true })
     if (input.signal.aborted) {
@@ -403,7 +586,8 @@ const waitForWorkspaceToggle = (input: { readonly actor: WorkspaceToggleActor; r
 
 export class WorkspaceToggle {
   static readonly defaultDestinationMove = defaultDestinationMove
-  static readonly eagerDestinationMove = eagerDestinationMove
+  static readonly deferredMoveFor = (snapshot: { readonly context: { readonly deferred: readonly DeferredMove[] } }, sessionId: string): DeferredMove | null =>
+    deferredMoveFor(snapshot.context.deferred, sessionId)
   static readonly spareKey = spareKey
   static readonly waitForWorkspaceToggle = waitForWorkspaceToggle
 }

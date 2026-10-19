@@ -40,29 +40,30 @@ Feature: jj thread workspaces
     Then the blank new thread returns to the owning project checkout
 
   @scenario:jj-integration.new-thread-from-thread-workspace-isolation-browser-journey
-  Scenario: A blank thread gets a fresh workspace instead of reusing the previous one
+  Scenario: An inherited thread workspace is replaced only on the first send
     Given the isolated plugin composition of "@dshfiles/jj-integration, @dshfiles/workspace-folder-picker, @dshfiles/home, @dshfiles/thread-sidebar, @dshfiles/multi-host" is booted
     When a disposable jj repository is chosen as the New thread project
     And the New thread workspace toggle is turned on
     And a message is sent in the thread workspace
     And new threads start in their own jj workspace by default
     And New thread is clicked in the sidebar
-    Then the blank new thread uses a different jj workspace from the previous thread
-    And a reload keeps the blank thread in the jj workspace it already owns
+    Then the blank new thread keeps the previous workspace until it sends
+    When the blank new thread sends its first message
+    Then the new thread provisioned its own jj workspace instead of the previous one
 
   @scenario:jj-integration.new-thread-background-browser-journey
-  Scenario: New thread opens its composer at once and gets its own workspace in the background
+  Scenario: A New thread provisions nothing until its first send
     Given the isolated plugin composition of "@dshfiles/jj-integration, @dshfiles/workspace-folder-picker, @dshfiles/home, @dshfiles/thread-sidebar, @dshfiles/multi-host" is booted
     When a disposable jj repository is chosen as the New thread project
     And a first message is sent from the shared checkout
     And new threads start in their own jj workspace by default
     And New thread is clicked in the sidebar
     Then the New thread composer opens before its workspace exists
-    And the New thread composer remains editable while its workspace is prepared
-    And the New thread moves to its own jj workspace on "main" in the background
+    And the blank New thread provisions no jj workspace
+    And a reload keeps the blank New thread unprovisioned
 
   @scenario:jj-integration.new-thread-deferred-submit-browser-journey
-  Scenario: A submitted message waits for background workspace allocation
+  Scenario: The first send allocates the thread workspace and delivers the message there
     Given the isolated plugin composition of "@dshfiles/jj-integration, @dshfiles/workspace-folder-picker, @dshfiles/home, @dshfiles/thread-sidebar, @dshfiles/multi-host" is booted
     When a disposable jj repository is chosen as the New thread project
     And a first message is sent from the shared checkout

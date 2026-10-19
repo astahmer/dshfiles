@@ -156,6 +156,16 @@ const currentThreadName = async (page: Page): Promise<string> => {
   return threadName
 }
 
+/** A started thread names its workspace in the conversation header, once the New thread composer is gone. */
+const currentHeaderThreadName = async (page: Page): Promise<string> => {
+  const header = page.getByRole('button', { name: /^Current thread workspace: thread-/ })
+  await expect(header).toBeVisible({ timeout: 30_000 })
+  const label = await header.getAttribute('aria-label')
+  const threadName = /^Current thread workspace: (thread-[\w-]+)$/.exec(label ?? '')?.[1]
+  if (threadName === undefined) throw new Error(`The thread header does not name a thread workspace: ${label ?? ''}`)
+  return threadName
+}
+
 const chooseProjectPath = async (page: Page, path: string): Promise<void> => {
   await dismissGetStartedDialog(page)
   await projectButton(page).click()
@@ -372,41 +382,41 @@ Then('the New thread composer opens before its workspace exists', async ({ page 
   })
 })
 
-Then('the New thread composer remains editable while its workspace is prepared', async ({ page }: { page: Page }) => {
+Then('the blank New thread provisions no jj workspace', async ({ page }: { page: Page }) => {
+  const repository = repositoryFor(page)
   const composer = newThreadComposer(page)
-  await recordAssertion(page, 'jj-composer-editable-while-preparing', async () => {
-    await expect(page.getByRole('status', { name: /^thread-/ })).toBeVisible({ timeout: 5_000 })
+  await recordAssertion(page, 'jj-integration-blank-new-thread-provisions-nothing', async () => {
     await expect(composer).toBeEditable()
     await composer.click()
     await expect(composer).toBeFocused()
-    await page.keyboard.type('typed during workspace preparation')
-    await expect(composer).toHaveText('typed during workspace preparation')
-  })
-})
-
-Then('the New thread moves to its own jj workspace on {string} in the background', async ({ page }: { page: Page }, bookmark: string) => {
-  const repository = repositoryFor(page)
-  await expect(projectButton(page)).toHaveText(/^repo · thread-/)
-  const threadName = await currentThreadName(page)
-  await recordAssertion(page, 'jj-integration-new-thread-moves-to-its-own-workspace', async () => {
+    await page.keyboard.type('typed before the thread has a workspace')
+    await expect(composer).toHaveText('typed before the thread has a workspace')
+    await expect(projectButton(page)).toHaveText('repo')
+    await expect(page.getByRole('button', { name: 'main', exact: true })).toBeVisible()
+    // The toggle shows the destination the thread will take, not a workspace that exists yet.
     await expect(workspaceToggle(page)).toBeChecked()
     await expect(workspaceToggle(page)).toBeEnabled()
-    await expect(page.getByRole('button', { name: bookmark, exact: true })).toBeVisible()
-    await expect.poll(() => workspaceNames(repository)).toEqual(['default', threadName])
-    await expect(newThreadComposer(page)).toHaveText('typed during workspace preparation')
-    expect(commitIdOf(repository, `${threadName}@-`)).toBe(repository.baseCommitId)
+    await expect(page.getByRole('status', { name: /^thread-/ })).toHaveCount(0)
+    // Give a provision that must not happen time to show up before trusting the jj workspace list.
+    await page.waitForTimeout(2_000)
+    expect(workspaceNames(repository)).toEqual(['default'])
   })
-  provisionedThreads.set(page, threadName)
+  await finishJourneyAssertions(page)
+})
+
+Then('a reload keeps the blank New thread unprovisioned', async ({ page }: { page: Page }) => {
+  const repository = repositoryFor(page)
+  await page.reload()
+  await recordAssertion(page, 'jj-integration-reload-keeps-the-blank-new-thread-unprovisioned', async () => {
+    await expect(newThreadComposer(page)).toBeVisible({ timeout: 30_000 })
+    await expect(projectButton(page)).toHaveText('repo', { timeout: 30_000 })
+    await expect(workspaceToggle(page)).toBeChecked()
+    expect(workspaceNames(repository)).toEqual(['default'])
+  })
   await finishJourneyAssertions(page)
 })
 
 When('a message is submitted before the new thread workspace is ready', async ({ page }: { page: Page }) => {
-  const pending = page.getByRole('status', { name: /^thread-/ })
-  await expect(pending).toBeVisible({ timeout: 5_000 })
-  const threadName = await pending.getAttribute('aria-label')
-  if (threadName === null) throw new Error('The pending workspace has no thread name.')
-  provisionedThreads.set(page, threadName)
-
   const composer = newThreadComposer(page)
   await expect(composer).toBeEditable()
   await composer.fill('message sent during workspace preparation')
@@ -416,13 +426,49 @@ When('a message is submitted before the new thread workspace is ready', async ({
 
 Then('the message is delivered from its new thread workspace', async ({ page }: { page: Page }) => {
   const repository = repositoryFor(page)
-  const threadName = provisionedThreadName(page)
-  await recordAssertion(page, 'jj-submit-waits-for-workspace-ready', async () => {
+  await recordAssertion(page, 'jj-submit-provisions-the-thread-workspace', async () => {
     await expect(newThreadComposer(page)).toHaveCount(0, { timeout: 45_000 })
     await expect(page.getByText('message sent during workspace preparation', { exact: true })).toBeVisible()
     await expect(page.getByRole('status', { name: /^thread-/ })).toHaveCount(0)
+    const threadName = await currentHeaderThreadName(page)
+    expect(threadName).toMatch(/^thread-/)
     await expect.poll(() => workspaceNames(repository)).toEqual(['default', threadName].sort())
   })
+  await finishJourneyAssertions(page)
+})
+
+Then('the blank new thread keeps the previous workspace until it sends', async ({ page }: { page: Page }) => {
+  const repository = repositoryFor(page)
+  const previousThread = provisionedThreadName(page)
+  await recordAssertion(page, 'jj-integration-empty-new-thread-defers-its-workspace', async () => {
+    await expect(newThreadComposer(page)).toBeVisible()
+    await expect(newThreadComposer(page)).toHaveText('')
+    await expect(projectButton(page)).toHaveText(`repo · ${previousThread}`)
+    await expect(workspaceToggle(page)).toBeChecked()
+    await expect(page.getByRole('status', { name: /^thread-/ })).toHaveCount(0)
+    expect(workspaceNames(repository)).toEqual(['default', previousThread])
+  })
+  await finishJourneyAssertions(page)
+})
+
+When('the blank new thread sends its first message', async ({ page }: { page: Page }) => {
+  const composer = newThreadComposer(page)
+  await composer.fill('first message from the inherited workspace')
+  await composer.press('Enter')
+  await expect(newThreadComposer(page)).toHaveCount(0, { timeout: 45_000 })
+})
+
+Then('the new thread provisioned its own jj workspace instead of the previous one', async ({ page }: { page: Page }) => {
+  const repository = repositoryFor(page)
+  const previousThread = provisionedThreadName(page)
+  await expect(page.getByText('first message from the inherited workspace', { exact: true })).toBeVisible({ timeout: 45_000 })
+  const threadName = await currentHeaderThreadName(page)
+  await recordAssertion(page, 'jj-integration-new-thread-provisions-its-own-workspace', async () => {
+    expect(threadName).not.toBe(previousThread)
+    await expect.poll(() => workspaceNames(repository)).toEqual(['default', previousThread, threadName].sort())
+    expect(commitIdOf(repository, `${threadName}@-`)).toBe(repository.baseCommitId)
+  })
+  provisionedThreads.set(page, threadName)
   await finishJourneyAssertions(page)
 })
 
@@ -431,35 +477,6 @@ When('the thread workspace gains a revision described {string}', async ({ page }
   const threadPath = join(repository.threadsPath, provisionedThreadName(page))
   await writeFile(join(threadPath, 'feature.txt'), `${description}\n`)
   jjAt(threadPath, repository.temporaryRoot, ['describe', '--message', description])
-})
-
-Then('the blank new thread uses a different jj workspace from the previous thread', async ({ page }: { page: Page }) => {
-  const repository = repositoryFor(page)
-  const previousThread = provisionedThreadName(page)
-  await recordAssertion(page, 'jj-integration-new-thread-does-not-reuse-previous-workspace', async () => {
-    await expect(newThreadComposer(page)).toBeVisible()
-    await expect(newThreadComposer(page)).toHaveText('')
-    await expect(projectButton(page)).not.toHaveText(`repo · ${previousThread}`, { timeout: 30_000 })
-    const nextThread = await currentThreadName(page)
-    expect(nextThread).not.toBe(previousThread)
-    await expect(workspaceToggle(page)).toBeChecked()
-    await expect.poll(() => workspaceNames(repository)).toEqual(['default', previousThread, nextThread].sort())
-  })
-  await finishJourneyAssertions(page)
-})
-
-Then('a reload keeps the blank thread in the jj workspace it already owns', async ({ page }: { page: Page }) => {
-  const repository = repositoryFor(page)
-  const ownedThread = await currentThreadName(page)
-  const before = workspaceNames(repository)
-  await page.reload()
-  await recordAssertion(page, 'jj-integration-reload-keeps-the-owned-workspace', async () => {
-    await expect(newThreadComposer(page)).toBeVisible({ timeout: 30_000 })
-    await expect(projectButton(page)).toHaveText(`repo · ${ownedThread}`, { timeout: 30_000 })
-    await expect(workspaceToggle(page)).toBeChecked()
-    expect(workspaceNames(repository)).toEqual(before)
-  })
-  await finishJourneyAssertions(page)
 })
 
 Then('the blank new thread returns to the owning project checkout', async ({ page }: { page: Page }) => {

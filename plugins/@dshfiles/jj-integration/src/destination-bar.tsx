@@ -131,20 +131,29 @@ export const startWorkspaceToggle = (input: {
   return actor.start()
 }
 
-const useWorkspaceToggle = (actor: WorkspaceToggleActor) => {
+const useWorkspaceToggle = (actor: WorkspaceToggleActor, sessionId: string | undefined) => {
   const pending = useSelector(actor, snapshot => snapshot.context.pending)
+  // A resolved destination is authoritative about isolation; until then the arrival's default says what it will take.
+  const deferredIsolation = useSelector(actor, snapshot => {
+    if (sessionId === undefined) return undefined
+    const move = snapshot.context.deferred.find(candidate => candidate.sessionId === sessionId)
+    return move === undefined ? undefined : (move.request?.isolate ?? move.wantsIsolation)
+  })
   const error = useSelector(actor, snapshot => snapshot.context.error)
   const busy = useSelector(actor, snapshot => !snapshot.matches('idle'))
+  // A committed first send whose destination the Host has not named yet still needs that answer, so its query must
+  // stay enabled while every other part of a switch may skip it.
+  const awaitingDestination = useSelector(actor, snapshot => snapshot.matches('preparing'))
   const events = useMemo(
     () => ({
       toggle: (request: ToggleRequest, visitId: string | undefined) => actor.send({ type: 'toggle', request, visitId }),
-      arrive: (input: { readonly visitId: string; readonly workspaceId: string; readonly isolateByDefault: boolean }) =>
+      arrive: (input: { readonly visitId: string; readonly sessionId: string; readonly workspaceId: string; readonly isolateByDefault: boolean }) =>
         actor.send({ type: 'arrive', ...input }),
       resolved: (visitId: string, request: ToggleRequest | null) => actor.send({ type: 'resolved', visitId, request }),
     }),
     [actor],
   )
-  return { ...events, pending, error, busy }
+  return { ...events, pending, deferredIsolation, awaitingDestination, error, busy }
 }
 
 /** The selected main-view Session and its workspace; only a blank Session can drive New-thread moves. */
@@ -193,13 +202,14 @@ export const DestinationBar = (props: {
   const { t, services } = props
   const api = useApi(jjIntegrationApi)
   const [branchOpen, setBranchOpen] = useState(false)
-  const toggle = useWorkspaceToggle(props.toggle)
   const composerWorkspace = useComposerWorkspace(services, props.workspaceId)
+  const toggle = useWorkspaceToggle(props.toggle, composerWorkspace?.sessionId)
   const workspaceId = props.workspaceId ?? composerWorkspace?.workspaceId ?? null
   const destination = useQuery({
     queryKey: ['jj-integration', 'destination', workspaceId ?? '', composerWorkspace?.sessionId ?? ''],
-    // While a new thread is moving, the destination it leaves does not matter; asking would only slow jj down.
-    enabled: workspaceId !== null && !toggle.busy,
+    // While a new thread is moving, the destination it leaves does not matter; asking would only slow jj down. A
+    // first send waiting for its destination still needs that answer.
+    enabled: workspaceId !== null && (!toggle.busy || toggle.awaitingDestination),
     queryFn: async ({ signal }) => {
       const input =
         composerWorkspace?.sessionId === undefined
@@ -226,38 +236,26 @@ export const DestinationBar = (props: {
   }, [destination.data])
   const settings = useSettings(jjIntegrationSettings).value
   const isolateByDefault = settings?.isolateByDefault ?? false
-  const bookmark = settings?.bookmark ?? 'main'
   const [mountId] = useState(() => crypto.randomUUID())
+  const newThreadSessionId = composerWorkspace?.sessionId ?? null
   const newThreadId = composerWorkspace?.sessionId === undefined ? null : composerWorkspace.visitId
   const occupied = destination.data?.ownedByAnotherSession ?? composerWorkspace?.occupied ?? true
   const inThreadWorkspace = composerWorkspace?.path === undefined ? null : threadNameOf(composerWorkspace.path) !== null
 
-  // A New thread opens its composer at once wherever it was started; the machine then moves it, in the background,
-  // to where new threads start by default (its own jj workspace, or the project checkout).
+  // A New thread opens its composer at once wherever it was started. With isolation on by default the move waits for
+  // its first send, so nothing is provisioned for a thread the user abandons; with it off a thread that inherited
+  // another thread's workspace moves back to the project checkout, which creates nothing.
   const { arrive, resolved } = toggle
   // The blank thread is already alone in a thread workspace: it has its destination, and settling here keeps the
-  // machine out of `preparing` — which disables the destination query and holds Send — while the Host would only
-  // answer that no move is needed. Without it the eager move below provisions a second workspace for that thread.
+  // machine out of the destination lookup — which disables its query and holds Send — when the Host would only answer
+  // that no move is needed.
   const ownsThreadWorkspace =
     inThreadWorkspace === true && (composerWorkspace?.occupied === false || (destination.data !== undefined && ownsIsolatedThreadWorkspace(destination.data)))
   useEffect(() => {
-    if (newThreadId === null || workspaceId === null) return
-    arrive({ visitId: newThreadId, workspaceId, isolateByDefault })
-    if (ownsThreadWorkspace) {
-      resolved(newThreadId, null)
-      return
-    }
-    if (!isolateByDefault || inThreadWorkspace === null) return
-    // Use the owning checkout when known, and never reuse the inherited thread workspace as its own spare.
-    resolved(
-      newThreadId,
-      WorkspaceToggle.eagerDestinationMove({
-        workspaceId,
-        projectWorkspaceId: destination.data?.projectWorkspaceId ?? workspaceId,
-        bookmark,
-      }),
-    )
-  }, [arrive, bookmark, destination.data, inThreadWorkspace, isolateByDefault, newThreadId, ownsThreadWorkspace, resolved, workspaceId])
+    if (newThreadId === null || newThreadSessionId === null || workspaceId === null) return
+    arrive({ visitId: newThreadId, sessionId: newThreadSessionId, workspaceId, isolateByDefault })
+    if (ownsThreadWorkspace) resolved(newThreadId, null)
+  }, [arrive, isolateByDefault, newThreadId, newThreadSessionId, ownsThreadWorkspace, resolved, workspaceId])
   useEffect(() => {
     if (newThreadId === null || workspaceId === null || destination.data === undefined) return
     resolved(newThreadId, WorkspaceToggle.defaultDestinationMove({ destination: destination.data, workspaceId }))
@@ -275,7 +273,7 @@ export const DestinationBar = (props: {
   }, [current, newThreadId, rootSelectionVisitId, services, toggle.busy, workspaceId])
   const projectId = current?.projectWorkspaceId ?? workspaceId ?? ''
   const isJj = current?.vcs === 'jj'
-  const isolated = toggle.pending?.isolate ?? current?.isolated === true
+  const isolated = toggle.pending?.isolate ?? toggle.deferredIsolation ?? current?.isolated === true
   const move = (request: { readonly isolate: boolean; readonly base?: string }): void => {
     const leavingPath =
       current?.isolated === true ? services.workspaces.list.getSnapshot().items.find(item => item.workspaceId === workspaceId)?.path : undefined

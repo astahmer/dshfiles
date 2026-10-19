@@ -4,7 +4,15 @@ import { createActor, waitFor } from '@dshfiles/plugin-ui/machine'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { DestinationView } from './api.js'
 import { deferWorkspaceSubmit, type WorkspaceComposer } from './workspace-submit.js'
-import { WorkspaceToggle, workspaceToggleMachine, type SpareWorkspace, type WorkspaceToggleClient } from './workspace-toggle-machine.js'
+import {
+  defersIsolationToSend,
+  WorkspaceToggle,
+  workspaceToggleMachine,
+  type DeferredMove,
+  type SpareWorkspace,
+  type ToggleRequest,
+  type WorkspaceToggleClient,
+} from './workspace-toggle-machine.js'
 
 const startToggle = (overrides: Partial<WorkspaceToggleClient> = {}) => {
   const calls: string[] = []
@@ -34,6 +42,58 @@ const startToggle = (overrides: Partial<WorkspaceToggleClient> = {}) => {
   return { actor, calls, spares, switched, release: () => gate() }
 }
 
+type Toggle = ReturnType<typeof startToggle>
+
+const visitOf = (sessionId: string): string => `new-thread:${sessionId}`
+
+const arriveAt = (
+  toggle: Toggle,
+  input: {
+    readonly sessionId: string
+    readonly workspaceId: string
+    readonly isolateByDefault?: boolean | undefined
+    readonly visitId?: string | undefined
+  },
+): void => {
+  toggle.actor.send({
+    type: 'arrive',
+    visitId: input.visitId ?? visitOf(input.sessionId),
+    sessionId: input.sessionId,
+    workspaceId: input.workspaceId,
+    isolateByDefault: input.isolateByDefault ?? true,
+  })
+}
+
+const resolveAt = (
+  toggle: Toggle,
+  input: {
+    readonly sessionId: string
+    readonly request: ToggleRequest | null
+    readonly visitId?: string | undefined
+  },
+): void => {
+  toggle.actor.send({ type: 'resolved', visitId: input.visitId ?? visitOf(input.sessionId), request: input.request })
+}
+
+const commit = (toggle: Toggle, sessionId: string): void => toggle.actor.send({ type: 'commit', sessionId })
+
+const isolateRequest = (overrides: Partial<ToggleRequest> = {}): ToggleRequest => ({
+  isolate: true,
+  base: 'main',
+  projectWorkspaceId: 'project',
+  leaving: null,
+  leavingBase: null,
+  ...overrides,
+})
+
+const sharedRequest = (overrides: Partial<ToggleRequest> = {}): ToggleRequest => ({
+  isolate: false,
+  projectWorkspaceId: 'project',
+  leaving: null,
+  leavingBase: null,
+  ...overrides,
+})
+
 afterEach(() => vi.useRealTimers())
 
 type TestComposerState = {
@@ -60,10 +120,18 @@ const composerWithDraft = (draft: string) => {
   }
 }
 
+const blocksRecorder = () => {
+  const blockCalls: string[] = []
+  const blocks: Pick<ComposerBlocks, 'set'> = {
+    set: (_sessionId, block) => blockCalls.push(block?.reason ?? 'released'),
+  }
+  return { blockCalls, blocks }
+}
+
 describe('workspaceToggleMachine', () => {
   it('shows the client-chosen name while the Host creates the workspace without blocking the composer', async () => {
     const toggle = startToggle()
-    toggle.actor.send({ type: 'toggle', request: { isolate: true, base: 'main', projectWorkspaceId: 'project', leaving: null, leavingBase: null } })
+    toggle.actor.send({ type: 'toggle', request: isolateRequest() })
     expect(toggle.actor.getSnapshot().context.pending).toEqual({ isolate: true, name: 'thread-abc123', spare: null })
     expect(toggle.calls).toEqual(['provision isolate thread-abc123'])
     toggle.release()
@@ -94,10 +162,10 @@ describe('workspaceToggleMachine', () => {
     const toggle = startToggle()
     toggle.release()
     const leaving = { workspaceId: 'ws-thread-abc123', name: 'thread-abc123' }
-    toggle.actor.send({ type: 'toggle', request: { isolate: false, projectWorkspaceId: 'project', leaving, leavingBase: 'main' } })
+    toggle.actor.send({ type: 'toggle', request: sharedRequest({ leaving, leavingBase: 'main' }) })
     await waitFor(toggle.actor, snapshot => snapshot.matches('idle'))
     expect(toggle.spares.get(WorkspaceToggle.spareKey('project', 'main'))).toEqual(leaving)
-    toggle.actor.send({ type: 'toggle', request: { isolate: true, base: 'main', projectWorkspaceId: 'project', leaving: null, leavingBase: null } })
+    toggle.actor.send({ type: 'toggle', request: isolateRequest() })
     await waitFor(toggle.actor, snapshot => snapshot.matches('idle'))
     expect(toggle.calls.filter(call => call.startsWith('provision'))).toEqual([])
     expect(toggle.switched).toEqual(['project', 'ws-thread-abc123'])
@@ -108,17 +176,7 @@ describe('workspaceToggleMachine', () => {
     toggle.release()
     const key = WorkspaceToggle.spareKey('project', 'main')
     toggle.spares.set(key, { workspaceId: 'ws-old', name: 'thread-old' })
-    toggle.actor.send({
-      type: 'toggle',
-      request: {
-        isolate: true,
-        base: 'main',
-        projectWorkspaceId: 'project',
-        leaving: null,
-        leavingBase: null,
-        excludeSpareWorkspaceId: 'ws-old',
-      },
-    })
+    toggle.actor.send({ type: 'toggle', request: isolateRequest({ excludeSpareWorkspaceId: 'ws-old' }) })
     await waitFor(toggle.actor, snapshot => snapshot.matches('idle'))
     expect(toggle.calls).toEqual(['provision isolate thread-abc123', 'open ws-thread-abc123'])
     expect(toggle.spares.get(key)).toEqual({ workspaceId: 'ws-old', name: 'thread-old' })
@@ -133,10 +191,7 @@ describe('workspaceToggleMachine', () => {
         return { workspaceId: 'ws-host-named' }
       },
     })
-    toggle.actor.send({
-      type: 'toggle',
-      request: { isolate: true, base: 'main', projectWorkspaceId: 'project', leaving: null, leavingBase: null },
-    })
+    toggle.actor.send({ type: 'toggle', request: isolateRequest() })
     await waitFor(toggle.actor, snapshot => snapshot.matches('idle'))
     expect(payloads).toStrictEqual([
       { workspaceId: 'project', isolate: true, base: 'main', name: 'thread-abc123' },
@@ -147,54 +202,123 @@ describe('workspaceToggleMachine', () => {
 
   it('reports a failed provision without blocking the composer', async () => {
     const toggle = startToggle({ provision: async () => Promise.reject(new Error('jj workspace add failed')) })
-    toggle.actor.send({ type: 'toggle', request: { isolate: true, projectWorkspaceId: 'project', leaving: null, leavingBase: null } })
+    toggle.actor.send({ type: 'toggle', request: isolateRequest() })
     await waitFor(toggle.actor, snapshot => snapshot.matches('idle'))
     expect(toggle.actor.getSnapshot().context).toMatchObject({ pending: null, error: 'jj workspace add failed' })
   })
 
-  it('moves a new thread to its default workspace in the background without blocking its composer', async () => {
+  it('arriving provisions nothing and holds the move for the first send', () => {
     const toggle = startToggle()
-    toggle.actor.send({ type: 'arrive', visitId: 's1', workspaceId: 'project', isolateByDefault: true })
-    expect(toggle.actor.getSnapshot().matches('preparing')).toBe(true)
-    expect(toggle.actor.getSnapshot().context.pending?.name).toBe('thread-abc123')
+    arriveAt(toggle, { sessionId: 's1', workspaceId: 'project' })
+    resolveAt(toggle, { sessionId: 's1', request: isolateRequest() })
+
+    expect(toggle.actor.getSnapshot().matches('idle')).toBe(true)
+    expect(toggle.actor.getSnapshot().context.pending).toBeNull()
+    expect(toggle.actor.getSnapshot().context.deferred).toEqual([
+      {
+        sessionId: 's1',
+        visitId: visitOf('s1'),
+        workspaceId: 'project',
+        name: 'thread-abc123',
+        wantsIsolation: true,
+        request: isolateRequest(),
+      },
+    ])
     expect(toggle.calls).toEqual([])
-    toggle.actor.send({
-      type: 'resolved',
-      visitId: 's1',
-      request: { isolate: true, base: 'main', projectWorkspaceId: 'project', leaving: null, leavingBase: null },
-    })
+    expect(toggle.switched).toEqual([])
+  })
+
+  it('starts the deferred isolation on the first send and opens the workspace it created', async () => {
+    const toggle = startToggle()
+    arriveAt(toggle, { sessionId: 's1', workspaceId: 'project' })
+    resolveAt(toggle, { sessionId: 's1', request: isolateRequest() })
+    expect(toggle.calls).toEqual([])
+
+    commit(toggle, 's1')
+    expect(toggle.actor.getSnapshot().matches('switching')).toBe(true)
+    expect(toggle.actor.getSnapshot().context.pending).toEqual({ isolate: true, name: 'thread-abc123', spare: null })
     expect(toggle.calls).toEqual(['provision isolate thread-abc123'])
     toggle.release()
     await waitFor(toggle.actor, snapshot => snapshot.matches('idle'))
+
     expect(toggle.calls).toEqual(['provision isolate thread-abc123', 'open ws-thread-abc123'])
     expect(toggle.switched).toEqual(['ws-thread-abc123'])
-    expect(toggle.actor.getSnapshot().matches('idle')).toBe(true)
+    expect(toggle.actor.getSnapshot().context.deferred).toEqual([])
+  })
+
+  it('waits for the destination before starting a committed first send', async () => {
+    const toggle = startToggle()
+    arriveAt(toggle, { sessionId: 's1', workspaceId: 'project' })
+    commit(toggle, 's1')
+
+    expect(toggle.actor.getSnapshot().matches('preparing')).toBe(true)
+    expect(toggle.actor.getSnapshot().context.pending).toEqual({ isolate: true, name: 'thread-abc123', spare: null })
+    expect(toggle.calls).toEqual([])
+
+    resolveAt(toggle, { sessionId: 's1', request: isolateRequest() })
+    expect(toggle.calls).toEqual(['provision isolate thread-abc123'])
+    toggle.release()
+    await waitFor(toggle.actor, snapshot => snapshot.matches('idle'))
+    expect(toggle.switched).toEqual(['ws-thread-abc123'])
   })
 
   it('settles the fresh Session DSH opens in the workspace the switch created', async () => {
     const toggle = startToggle()
-    toggle.actor.send({ type: 'arrive', visitId: 'session:project', workspaceId: 'project', isolateByDefault: true })
-    toggle.actor.send({
-      type: 'resolved',
-      visitId: 'session:project',
-      request: { isolate: true, base: 'main', projectWorkspaceId: 'project', leaving: null, leavingBase: null },
-    })
+    arriveAt(toggle, { sessionId: 'session:project', workspaceId: 'project' })
+    resolveAt(toggle, { sessionId: 'session:project', request: isolateRequest() })
+    commit(toggle, 'session:project')
     toggle.release()
     await waitFor(toggle.actor, snapshot => snapshot.matches('idle'))
 
     // DSH backs the moved thread with a fresh blank Session, so the client reports the new workspace under a new visit.
-    toggle.actor.send({ type: 'arrive', visitId: 'session:thread', workspaceId: 'ws-thread-abc123', isolateByDefault: true })
+    arriveAt(toggle, { sessionId: 'session:thread', workspaceId: 'ws-thread-abc123' })
 
     expect(toggle.actor.getSnapshot().matches('idle')).toBe(true)
+    expect(toggle.actor.getSnapshot().context.deferred).toEqual([])
     expect(toggle.calls.filter(call => call.startsWith('provision'))).toEqual(['provision isolate thread-abc123'])
     expect(toggle.switched).toEqual(['ws-thread-abc123'])
   })
 
+  it('continues a switch with the blank Session DSH opens before the switch finishes', async () => {
+    const calls: string[] = []
+    let releaseOpen = (): void => undefined
+    const openGate = new Promise<void>(resolve => (releaseOpen = resolve))
+    const toggle = startToggle({
+      open: async workspaceId => {
+        calls.push(`open ${workspaceId}`)
+        await openGate
+      },
+    })
+    toggle.release()
+    toggle.actor.send({ type: 'toggle', request: isolateRequest() })
+    expect(toggle.actor.getSnapshot().matches('switching')).toBe(true)
+
+    // DSH opens the fresh blank Session in the workspace the switch moved the thread to while `open` still runs.
+    arriveAt(toggle, { sessionId: 'session:created', workspaceId: 'ws-thread-abc123' })
+    releaseOpen()
+    await waitFor(toggle.actor, snapshot => snapshot.matches('idle'))
+
+    expect(toggle.actor.getSnapshot().context.opened).toBeNull()
+    expect(toggle.actor.getSnapshot().context.landed).toBe('ws-thread-abc123')
+    expect(toggle.actor.getSnapshot().context.settled).toContain(visitOf('session:created'))
+    expect(calls).toEqual(['open ws-thread-abc123'])
+
+    // The next New thread in that workspace is not a continuation, so its isolation waits for its first send.
+    arriveAt(toggle, { sessionId: 'session:next', workspaceId: 'ws-thread-abc123' })
+    resolveAt(toggle, { sessionId: 'session:next', request: isolateRequest() })
+    expect(toggle.actor.getSnapshot().context.deferred).toHaveLength(1)
+  })
+
   it('creates a fresh workspace when a new thread inherits another thread workspace', async () => {
     const toggle = startToggle()
-    toggle.actor.send({ type: 'arrive', visitId: 's1', workspaceId: 'ws-shared', isolateByDefault: true })
-    expect(toggle.actor.getSnapshot().matches('preparing')).toBe(true)
-    expect(WorkspaceToggle.eagerDestinationMove({ workspaceId: 'ws-shared', projectWorkspaceId: 'project', bookmark: 'main' })).toEqual({
+    arriveAt(toggle, { sessionId: 's1', workspaceId: 'ws-shared' })
+    expect(toggle.calls).toEqual([])
+
+    const request = WorkspaceToggle.defaultDestinationMove({
+      destination: { vcs: 'jj', isolated: true, projectWorkspaceId: 'project', bookmark: 'main', bookmarks: ['main'], isolateByDefault: true },
+      workspaceId: 'ws-shared',
+    })
+    expect(request).toEqual({
       isolate: true,
       base: 'main',
       projectWorkspaceId: 'project',
@@ -202,13 +326,10 @@ describe('workspaceToggleMachine', () => {
       leavingBase: null,
       excludeSpareWorkspaceId: 'ws-shared',
     })
+    resolveAt(toggle, { sessionId: 's1', request })
     expect(toggle.calls).toEqual([])
 
-    const request = WorkspaceToggle.defaultDestinationMove({
-      destination: { vcs: 'jj', isolated: true, projectWorkspaceId: 'project', bookmark: 'main', bookmarks: ['main'], isolateByDefault: true },
-      workspaceId: 'ws-shared',
-    })
-    toggle.actor.send({ type: 'resolved', visitId: 's1', request })
+    commit(toggle, 's1')
     toggle.release()
     await waitFor(toggle.actor, snapshot => snapshot.matches('idle'))
     expect(toggle.calls).toEqual(['provision isolate thread-abc123', 'open ws-thread-abc123'])
@@ -218,12 +339,10 @@ describe('workspaceToggleMachine', () => {
   it('reuses the spare workspace for a new thread instead of provisioning one', async () => {
     const toggle = startToggle()
     toggle.spares.set(WorkspaceToggle.spareKey('project', 'main'), { workspaceId: 'ws-spare', name: 'thread-5pa4e0' })
-    toggle.actor.send({ type: 'arrive', visitId: 's1', workspaceId: 'project', isolateByDefault: true })
-    toggle.actor.send({
-      type: 'resolved',
-      visitId: 's1',
-      request: { isolate: true, base: 'main', projectWorkspaceId: 'project', leaving: null, leavingBase: null },
-    })
+    arriveAt(toggle, { sessionId: 's1', workspaceId: 'project' })
+    resolveAt(toggle, { sessionId: 's1', request: isolateRequest() })
+    commit(toggle, 's1')
+
     expect(toggle.actor.getSnapshot().context.pending?.name).toBe('thread-5pa4e0')
     await waitFor(toggle.actor, snapshot => snapshot.matches('idle'))
     expect(toggle.calls.filter(call => call.startsWith('provision'))).toEqual([])
@@ -235,45 +354,40 @@ describe('workspaceToggleMachine', () => {
     const toggle = startToggle()
     toggle.release()
     toggle.spares.set(WorkspaceToggle.spareKey('project', 'main'), { workspaceId: 'ws-spare', name: 'thread-5pa4e0' })
-    const request = { isolate: true, base: 'main', projectWorkspaceId: 'project', leaving: null, leavingBase: null }
 
-    for (const visitId of ['s1', 's2']) {
-      toggle.actor.send({ type: 'arrive', visitId, workspaceId: 'project', isolateByDefault: true })
-      toggle.actor.send({ type: 'resolved', visitId, request })
-      await waitFor(toggle.actor, snapshot => snapshot.matches('idle'))
+    for (const sessionId of ['s1', 's2']) {
+      arriveAt(toggle, { sessionId, workspaceId: 'project' })
+      resolveAt(toggle, { sessionId, request: isolateRequest() })
     }
+    commit(toggle, 's1')
+    await waitFor(toggle.actor, snapshot => snapshot.matches('idle'))
+    commit(toggle, 's2')
+    await waitFor(toggle.actor, snapshot => snapshot.matches('idle'))
 
-    expect(toggle.calls.filter(call => call.startsWith('provision'))).toHaveLength(1)
+    expect(toggle.calls.filter(call => call.startsWith('provision'))).toEqual(['provision isolate thread-abc123'])
     expect(toggle.switched).toEqual(['ws-spare', 'ws-thread-abc123'])
   })
 
   it('settles a new thread already at its default destination without blocking Send', () => {
     const toggle = startToggle()
-    toggle.actor.send({ type: 'arrive', visitId: 's1', workspaceId: 'ws-thread', isolateByDefault: true })
-    toggle.actor.send({ type: 'resolved', visitId: 's1', request: null })
+    arriveAt(toggle, { sessionId: 's1', workspaceId: 'ws-thread' })
+    resolveAt(toggle, { sessionId: 's1', request: null })
     expect(toggle.actor.getSnapshot().matches('idle')).toBe(true)
+    expect(toggle.actor.getSnapshot().context.deferred).toEqual([])
     expect(toggle.calls).toEqual([])
   })
 
   it('keeps a manual isolation in the workspace its switch opened', async () => {
     const toggle = startToggle()
     toggle.release()
-    toggle.actor.send({
-      type: 'toggle',
-      visitId: 'session:project',
-      request: { isolate: true, base: 'main', projectWorkspaceId: 'project', leaving: null, leavingBase: null },
-    })
+    toggle.actor.send({ type: 'toggle', visitId: 'session:project', request: isolateRequest() })
     await waitFor(toggle.actor, snapshot => snapshot.matches('idle'))
     expect(toggle.switched).toEqual(['ws-thread-abc123'])
 
     // The switch makes DSH open a fresh blank Session in the new workspace, so the client reports that workspace
     // under a new visit id; defaultDestinationMove would send it back to the project checkout.
-    toggle.actor.send({ type: 'arrive', visitId: 'session:thread', workspaceId: 'ws-thread-abc123', isolateByDefault: false })
-    toggle.actor.send({
-      type: 'resolved',
-      visitId: 'session:thread',
-      request: { isolate: false, projectWorkspaceId: 'project', leaving: null, leavingBase: null },
-    })
+    arriveAt(toggle, { sessionId: 'session:thread', workspaceId: 'ws-thread-abc123', isolateByDefault: false })
+    resolveAt(toggle, { sessionId: 'session:thread', request: sharedRequest() })
 
     expect(toggle.actor.getSnapshot().matches('idle')).toBe(true)
     expect(toggle.calls).toEqual(['provision isolate thread-abc123', 'open ws-thread-abc123'])
@@ -283,23 +397,15 @@ describe('workspaceToggleMachine', () => {
   it('moves a later blank Session out of a workspace the toggle opened for an earlier visit', async () => {
     const toggle = startToggle()
     toggle.release()
-    toggle.actor.send({
-      type: 'toggle',
-      visitId: 'session:0',
-      request: { isolate: true, base: 'main', projectWorkspaceId: 'project', leaving: null, leavingBase: null },
-    })
+    toggle.actor.send({ type: 'toggle', visitId: 'session:0', request: isolateRequest() })
     await waitFor(toggle.actor, snapshot => snapshot.matches('idle'))
     // The Session the switch created continues that visit and stays.
-    toggle.actor.send({ type: 'arrive', visitId: 'session:created', workspaceId: 'ws-thread-abc123', isolateByDefault: false })
+    arriveAt(toggle, { sessionId: 'session:created', workspaceId: 'ws-thread-abc123', isolateByDefault: false })
     expect(toggle.actor.getSnapshot().matches('idle')).toBe(true)
 
     // A blank Session a later visit opens there is not a continuation, so it returns to the project checkout.
-    toggle.actor.send({ type: 'arrive', visitId: 'session:1', workspaceId: 'ws-thread-abc123', isolateByDefault: false })
-    toggle.actor.send({
-      type: 'resolved',
-      visitId: 'session:1',
-      request: { isolate: false, projectWorkspaceId: 'project', leaving: null, leavingBase: null },
-    })
+    arriveAt(toggle, { sessionId: 'session:1', workspaceId: 'ws-thread-abc123', isolateByDefault: false })
+    resolveAt(toggle, { sessionId: 'session:1', request: sharedRequest() })
     await waitFor(toggle.actor, snapshot => snapshot.matches('idle'))
 
     expect(toggle.switched).toEqual(['ws-thread-abc123', 'project'])
@@ -309,15 +415,83 @@ describe('workspaceToggleMachine', () => {
   it('never moves a thread again once the user toggled it', async () => {
     const toggle = startToggle()
     toggle.release()
-    toggle.actor.send({ type: 'arrive', visitId: 's1', workspaceId: 'project', isolateByDefault: false })
-    toggle.actor.send({ type: 'toggle', visitId: 's1', request: { isolate: false, projectWorkspaceId: 'project', leaving: null, leavingBase: null } })
+    arriveAt(toggle, { sessionId: 's1', workspaceId: 'project', isolateByDefault: false })
+    toggle.actor.send({ type: 'toggle', visitId: visitOf('s1'), request: sharedRequest() })
     await waitFor(toggle.actor, snapshot => snapshot.matches('idle'))
-    toggle.actor.send({ type: 'resolved', visitId: 's1', request: { isolate: true, projectWorkspaceId: 'project', leaving: null, leavingBase: null } })
+    resolveAt(toggle, { sessionId: 's1', request: isolateRequest() })
     expect(toggle.actor.getSnapshot().matches('idle')).toBe(true)
     expect(toggle.calls.filter(call => call.startsWith('provision'))).toEqual([])
   })
 
-  it('provisions nothing when a reload shows a blank thread in the workspace it already owns', async () => {
+  it('a manual toggle wins over the move the arrival deferred', async () => {
+    const toggle = startToggle()
+    arriveAt(toggle, { sessionId: 's1', workspaceId: 'project' })
+    resolveAt(toggle, { sessionId: 's1', request: isolateRequest() })
+    expect(toggle.actor.getSnapshot().context.deferred).toHaveLength(1)
+
+    toggle.actor.send({ type: 'toggle', visitId: visitOf('s1'), request: sharedRequest() })
+    await waitFor(toggle.actor, snapshot => snapshot.matches('idle'))
+    expect(toggle.actor.getSnapshot().context.deferred).toEqual([])
+
+    // The settled visit keeps both the committed move and a late destination from starting anything.
+    commit(toggle, 's1')
+    resolveAt(toggle, { sessionId: 's1', request: isolateRequest() })
+    expect(toggle.calls.filter(call => call.startsWith('provision'))).toEqual([])
+    expect(toggle.switched).toEqual(['project'])
+  })
+
+  it('drops the deferred move when its Session stops being blank', () => {
+    const toggle = startToggle()
+    arriveAt(toggle, { sessionId: 's1', workspaceId: 'project' })
+    resolveAt(toggle, { sessionId: 's1', request: isolateRequest() })
+
+    toggle.actor.send({ type: 'cancel', sessionId: 's1' })
+    expect(toggle.actor.getSnapshot().context.deferred).toEqual([])
+    commit(toggle, 's1')
+    expect(toggle.actor.getSnapshot().context.deferred).toEqual([])
+    expect(toggle.calls).toEqual([])
+    expect(toggle.switched).toEqual([])
+  })
+
+  it('stops waiting for a destination when the Session that committed it goes away', () => {
+    const toggle = startToggle()
+    arriveAt(toggle, { sessionId: 's1', workspaceId: 'project' })
+    commit(toggle, 's1')
+    expect(toggle.actor.getSnapshot().matches('preparing')).toBe(true)
+
+    toggle.actor.send({ type: 'cancel', sessionId: 's1' })
+    expect(toggle.actor.getSnapshot().matches('idle')).toBe(true)
+    expect(toggle.actor.getSnapshot().context.deferred).toEqual([])
+    expect(toggle.calls).toEqual([])
+  })
+
+  it('keeps one deferred move per Session and never crosses two New threads', async () => {
+    let generated = 0
+    const toggle = startToggle({ generateName: () => `thread-${String(++generated).padStart(2, '0')}` })
+    toggle.release()
+    arriveAt(toggle, { sessionId: 's1', workspaceId: 'project' })
+    arriveAt(toggle, { sessionId: 's2', workspaceId: 'project' })
+    const s1Name = toggle.actor.getSnapshot().context.deferred.find(move => move.sessionId === 's1')?.name
+    resolveAt(toggle, { sessionId: 's1', request: isolateRequest() })
+    resolveAt(toggle, { sessionId: 's2', request: isolateRequest({ base: 'release' }) })
+
+    // Re-reporting an arrival must not replace the move it already deferred.
+    arriveAt(toggle, { sessionId: 's1', workspaceId: 'project' })
+    const moves = toggle.actor.getSnapshot().context.deferred
+    expect(moves).toHaveLength(2)
+    expect(moves.find(move => move.sessionId === 's1')).toMatchObject({ name: s1Name, workspaceId: 'project', request: isolateRequest() })
+    expect(moves.find(move => move.sessionId === 's2')?.request?.base).toBe('release')
+
+    commit(toggle, 's1')
+    await waitFor(toggle.actor, snapshot => snapshot.matches('idle'))
+    commit(toggle, 's2')
+    await waitFor(toggle.actor, snapshot => snapshot.matches('idle'))
+
+    expect(toggle.calls).toEqual([`provision isolate ${s1Name ?? ''}`, `open ws-${s1Name ?? ''}`, 'provision isolate thread-02', 'open ws-thread-02'])
+    expect(toggle.switched).toHaveLength(2)
+  })
+
+  it('provisions nothing when a reload shows a blank thread in the workspace it already owns', () => {
     // A reload starts a fresh actor with no memory of the switch that put the thread there; the Host still describes
     // that workspace as isolated and unshared, which is the destination itself.
     const toggle = startToggle()
@@ -333,19 +507,35 @@ describe('workspaceToggleMachine', () => {
       },
       workspaceId: 'ws-own',
     })
-    toggle.actor.send({ type: 'arrive', visitId: 'session:reloaded', workspaceId: 'ws-own', isolateByDefault: true })
-    toggle.actor.send({ type: 'resolved', visitId: 'session:reloaded', request })
+    arriveAt(toggle, { sessionId: 'session:reloaded', workspaceId: 'ws-own' })
+    resolveAt(toggle, { sessionId: 'session:reloaded', request })
 
     expect(toggle.actor.getSnapshot().matches('idle')).toBe(true)
+    expect(toggle.actor.getSnapshot().context.deferred).toEqual([])
     expect(toggle.calls).toEqual([])
     expect(toggle.switched).toEqual([])
+  })
+
+  it('does not treat a switch that opened the workspace the thread is already in as a move to continue', async () => {
+    const toggle = startToggle()
+    toggle.release()
+    arriveAt(toggle, { sessionId: 's1', workspaceId: 'project' })
+    resolveAt(toggle, { sessionId: 's1', request: sharedRequest() })
+    await waitFor(toggle.actor, snapshot => snapshot.matches('idle'))
+    // Opening the project checkout moved nothing, so no fresh Session arrived and the next New thread there must
+    // still get its own workspace.
+    expect(toggle.actor.getSnapshot().context.opened).toBeNull()
+
+    arriveAt(toggle, { sessionId: 's2', workspaceId: 'project' })
+    resolveAt(toggle, { sessionId: 's2', request: isolateRequest() })
+    expect(toggle.actor.getSnapshot().context.deferred).toHaveLength(1)
   })
 })
 
 describe('deferWorkspaceSubmit', () => {
   it('holds only a requested send and submits it in the newly selected workspace', async () => {
     const toggle = startToggle()
-    toggle.actor.send({ type: 'toggle', request: { isolate: true, base: 'main', projectWorkspaceId: 'project', leaving: null, leavingBase: null } })
+    toggle.actor.send({ type: 'toggle', request: isolateRequest() })
     const sourceComposer = composerWithDraft('')
     sourceComposer.edit('send after setup')
     expect(sourceComposer.input.state.getSnapshot().draft).toBe('send after setup')
@@ -362,10 +552,7 @@ describe('deferWorkspaceSubmit', () => {
       blank: true,
       input: targetComposer.input,
     }
-    const blockCalls: string[] = []
-    const blocks: Pick<ComposerBlocks, 'set'> = {
-      set: (_sessionId, block) => blockCalls.push(block?.reason ?? 'released'),
-    }
+    const { blockCalls, blocks } = blocksRecorder()
     expect(blockCalls).toEqual([])
 
     const pending = deferWorkspaceSubmit({
@@ -387,9 +574,51 @@ describe('deferWorkspaceSubmit', () => {
     expect(blockCalls).toEqual(['Preparing thread-abc123…', 'released'])
   })
 
+  it('delivers the first send into the workspace the deferred isolation provisioned', async () => {
+    const toggle = startToggle()
+    arriveAt(toggle, { sessionId: 'source', workspaceId: 'project' })
+    resolveAt(toggle, { sessionId: 'source', request: isolateRequest() })
+    commit(toggle, 'source')
+
+    const sourceComposer = composerWithDraft('first message')
+    const targetComposer = composerWithDraft('first message')
+    const source: WorkspaceComposer = { sessionId: SessionId('source'), workspaceId: 'project', blank: true, input: sourceComposer.input }
+    const target: WorkspaceComposer = {
+      sessionId: SessionId('target'),
+      workspaceId: 'ws-thread-abc123',
+      blank: true,
+      input: targetComposer.input,
+    }
+    const { blockCalls, blocks } = blocksRecorder()
+    // What the client sees: the main view still holds the source composer until the switch opens its workspace.
+    let current = source
+    toggle.actor.subscribe(snapshot => {
+      if (snapshot.matches('idle') && snapshot.context.landed !== null) current = target
+    })
+    const pending = deferWorkspaceSubmit({
+      actor: toggle.actor,
+      source,
+      submitSource: 'enter',
+      current: () => current,
+      blocks,
+      reason: 'Preparing thread-abc123…',
+      failureMessage: 'Workspace setup failed.',
+      changedMessage: 'The draft changed.',
+      signal: new AbortController().signal,
+    })
+    expect(sourceComposer.submissions).toEqual([])
+    toggle.release()
+    await expect(pending).resolves.toBe('sent')
+    expect(targetComposer.submissions).toEqual([{ mode: 'queue', source: 'enter' }])
+    expect(sourceComposer.submissions).toEqual([])
+    expect(blockCalls).toEqual(['Preparing thread-abc123…', 'released'])
+  })
+
   it('leaves the draft unsent and releases the composer when provisioning fails', async () => {
     const toggle = startToggle({ provision: async () => Promise.reject(new Error('jj workspace add failed')) })
-    toggle.actor.send({ type: 'toggle', request: { isolate: true, projectWorkspaceId: 'project', leaving: null, leavingBase: null } })
+    arriveAt(toggle, { sessionId: 'source', workspaceId: 'project' })
+    resolveAt(toggle, { sessionId: 'source', request: isolateRequest() })
+    commit(toggle, 'source')
     const sourceComposer = composerWithDraft('send after setup')
     const source: WorkspaceComposer = {
       sessionId: SessionId('source'),
@@ -397,10 +626,7 @@ describe('deferWorkspaceSubmit', () => {
       blank: true,
       input: sourceComposer.input,
     }
-    const blockCalls: string[] = []
-    const blocks: Pick<ComposerBlocks, 'set'> = {
-      set: (_sessionId, block) => blockCalls.push(block?.reason ?? 'released'),
-    }
+    const { blockCalls, blocks } = blocksRecorder()
 
     await expect(
       deferWorkspaceSubmit({
@@ -417,13 +643,15 @@ describe('deferWorkspaceSubmit', () => {
     ).resolves.toBe('failed')
     expect(sourceComposer.submissions).toEqual([])
     expect(sourceComposer.notices).toEqual(['Workspace setup failed.'])
+    expect(sourceComposer.input.state.getSnapshot().draft).toBe('send after setup')
     expect(blockCalls).toEqual(['Preparing thread-abc123…', 'released'])
   })
 
   it('leaves the draft unsent when destination lookup times out', async () => {
     vi.useFakeTimers()
     const toggle = startToggle()
-    toggle.actor.send({ type: 'arrive', visitId: 's1', workspaceId: 'project', isolateByDefault: true })
+    arriveAt(toggle, { sessionId: 'source', workspaceId: 'project' })
+    commit(toggle, 'source')
     const sourceComposer = composerWithDraft('send after setup')
     const source: WorkspaceComposer = {
       sessionId: SessionId('source'),
@@ -431,10 +659,7 @@ describe('deferWorkspaceSubmit', () => {
       blank: true,
       input: sourceComposer.input,
     }
-    const blockCalls: string[] = []
-    const blocks: Pick<ComposerBlocks, 'set'> = {
-      set: (_sessionId, block) => blockCalls.push(block?.reason ?? 'released'),
-    }
+    const { blockCalls, blocks } = blocksRecorder()
     const pending = deferWorkspaceSubmit({
       actor: toggle.actor,
       source,
@@ -453,13 +678,13 @@ describe('deferWorkspaceSubmit', () => {
     expect(sourceComposer.submissions).toEqual([])
     expect(sourceComposer.notices).toEqual(['Workspace setup failed.'])
     expect(blockCalls).toEqual(['Preparing thread-abc123…', 'released'])
-    toggle.actor.send({ type: 'arrive', visitId: 's2', workspaceId: 'project', isolateByDefault: false })
+    arriveAt(toggle, { sessionId: 's2', workspaceId: 'project', isolateByDefault: false })
     expect(toggle.actor.getSnapshot().context.error).toBeNull()
   })
 
   it('cancels the deferred send and releases the composer on Escape', async () => {
     const toggle = startToggle()
-    toggle.actor.send({ type: 'toggle', request: { isolate: true, base: 'main', projectWorkspaceId: 'project', leaving: null, leavingBase: null } })
+    toggle.actor.send({ type: 'toggle', request: isolateRequest() })
     const sourceComposer = composerWithDraft('send after setup')
     const source: WorkspaceComposer = {
       sessionId: SessionId('source'),
@@ -467,10 +692,7 @@ describe('deferWorkspaceSubmit', () => {
       blank: true,
       input: sourceComposer.input,
     }
-    const blockCalls: string[] = []
-    const blocks: Pick<ComposerBlocks, 'set'> = {
-      set: (_sessionId, block) => blockCalls.push(block?.reason ?? 'released'),
-    }
+    const { blockCalls, blocks } = blocksRecorder()
     const controller = new AbortController()
     const pending = deferWorkspaceSubmit({
       actor: toggle.actor,
@@ -490,6 +712,26 @@ describe('deferWorkspaceSubmit', () => {
     expect(blockCalls).toEqual(['Preparing thread-abc123…', 'released'])
     toggle.release()
     toggle.actor.stop()
+  })
+})
+
+describe('defersIsolationToSend', () => {
+  const move = (overrides: Partial<DeferredMove>): DeferredMove => ({
+    sessionId: 'session',
+    visitId: 'new-thread:session',
+    workspaceId: 'project',
+    name: 'thread-abc123',
+    wantsIsolation: false,
+    request: null,
+    ...overrides,
+  })
+
+  it('holds the first send only when that Session is due its own workspace', () => {
+    expect(defersIsolationToSend(null)).toBe(false)
+    expect(defersIsolationToSend(move({}))).toBe(false)
+    expect(defersIsolationToSend(move({ wantsIsolation: true }))).toBe(true)
+    expect(defersIsolationToSend(move({ request: isolateRequest() }))).toBe(true)
+    expect(defersIsolationToSend(move({ wantsIsolation: true, request: sharedRequest() }))).toBe(false)
   })
 })
 
@@ -565,26 +807,6 @@ describe('defaultDestinationMove', () => {
       leaving: null,
       leavingBase: null,
       excludeSpareWorkspaceId: 'ws-shared',
-    })
-  })
-})
-
-describe('eagerDestinationMove', () => {
-  it('isolates before the Host answers and excludes an inherited thread workspace from spare reuse', () => {
-    expect(WorkspaceToggle.eagerDestinationMove({ workspaceId: 'project', projectWorkspaceId: 'project', bookmark: 'main' })).toEqual({
-      isolate: true,
-      base: 'main',
-      projectWorkspaceId: 'project',
-      leaving: null,
-      leavingBase: null,
-    })
-    expect(WorkspaceToggle.eagerDestinationMove({ workspaceId: 'ws-other', projectWorkspaceId: 'project', bookmark: 'main' })).toEqual({
-      isolate: true,
-      base: 'main',
-      projectWorkspaceId: 'project',
-      leaving: null,
-      leavingBase: null,
-      excludeSpareWorkspaceId: 'ws-other',
     })
   })
 })
