@@ -58,6 +58,6 @@ local storage; Enter sends instantly (optimistic), failure restores the draft wi
 | Inbox ignored agent questions      | Linked failed/finished threads from thread-sidebar's attention API (setting `inboxThreads`); native `ask_user_question` forms stay out (cross-session scan is a Host gap)                    |
 | Activity not shared                | Item log stays the source of truth (timeline is bounded and observation-only); backlog events published to the timeline (setting `publishActivity`); live thread state from the session list |
 | Lists not virtualized              | Items virtualized, Feed paged, Board columns capped, revision-gated polling, Host-side project counts; measured on 2,017 items                                                               |
-| Jev and model triage untested live | Still open: no Jev key on this machine, and the free models refuse calls outside OpenCode; check with a real account after landing                                                           |
+| Jev and model triage untested live | Jev checked live with the `jev-api-key-optmem` secret; its work question now counts bug reports as work. The model path is still unchecked: the free models refuse calls outside OpenCode    |
 
-Open: e2e journeys for every view (after approval), live triage check, a backlinks chip on threads.
+Open: see "Remaining" in [README.md](README.md).

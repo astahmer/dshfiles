@@ -1,6 +1,7 @@
 # Backlog
 
-Resume here: step 6b (backlinks on threads and revisions). Steps 1–3 landed in `@dshfiles/backlog`; see its README.
+Resume here: the e2e journeys under "Remaining" below, then step 6b. Steps 1–6 and the redesign
+([redesign.md](redesign.md)) landed in `@dshfiles/backlog`; see its README.
 
 ## Why
 
@@ -92,6 +93,17 @@ User corrections of an automatic move are kept as labelled examples for step 4's
 | 6b  | Backlinks chip on threads and revisions; FTS index once the corpus outgrows the token match | open  |
 | 7   | Rich body editing (rich-composer) and quoting a thread message into an item                 | open  |
 | 8   | One-off import of the Discord TODO channel (also a labelled set for step 4)                 | open  |
+
+## Remaining
+
+- [ ] e2e journeys, now that the UI is approved: Feed (paging, day separators), Inbox (filters, Acknowledge, thread
+      rows), Items (grouping, bulk move), Board (drag, card detail), Projects, search with operators, saved views,
+      composer (`#`/`@` autocomplete, optimistic send and Retry), inspector (pickers, links, proposal accept/dismiss).
+- [ ] Fix the `@b:` mentions journey (element not found, then `kill EPERM` on teardown); not investigated yet.
+- [ ] Live model triage: Jev is checked live (about 200 ms a call, bug/tip/task and a duplicate read correctly);
+      the model path still needs a provider that accepts calls outside OpenCode.
+- [ ] Load the landed plugin in the live DSH checkout (127.0.0.1:3080) at its next planned restart.
+- [ ] Steps 6b, 7 and 8 below.
 
 ## Decisions taken without the user
 
