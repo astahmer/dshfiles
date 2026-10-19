@@ -1,0 +1,5 @@
+- id: ui-chat
+  disabled: true
+- insert:
+    - id: dshfiles-chat
+      name: '@dshfiles/chat'

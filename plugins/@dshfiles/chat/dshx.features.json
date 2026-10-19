@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "windowed-transcript",
+      "title": "Open a thread on its latest messages",
+      "summary": "A thread opens with the rows that fill the viewport mounted; older rows mount as the transcript scrolls up.",
+      "surfaces": ["client"],
+      "configuration": [],
+      "states": ["thread-opened", "latest-rows-visible", "older-rows-mounted"],
+      "failureModes": ["A navigation or find target outside the mounted rows widens the window before it scrolls."],
+      "externalDependencies": [],
+      "reach": ["click button \"New session\"", "expect textbox \"Describe what you want to build, / commands, @ files or sessions\""],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "chat.transcript-window",
+          "file": "plugins/@dshfiles/chat/tests/transcript-window.test.ts",
+          "testName": "mounts the latest rows first and widens toward older rows"
+        }
+      ]
+    }
+  ]
+}

@@ -12,7 +12,11 @@ const astGrepBoundaries = [
 ]
 
 // Vendored upstream source: kept byte-comparable to its pinned revision, so this repository's rules do not apply.
-const astGrepVendored = ['plugins/@dshfiles/rich-composer/src/native/**', 'plugins/@dshfiles/frame-layout/src/native/**']
+const astGrepVendored = [
+  'plugins/@dshfiles/rich-composer/src/native/**',
+  'plugins/@dshfiles/chat/src/native/**',
+  'plugins/@dshfiles/frame-layout/src/native/**',
+]
 
 const ruleCapsSchema = z.record(z.string(), z.number().int().nonnegative())
 const capsSchema = z.object({ oxlint: ruleCapsSchema, 'ast-grep': ruleCapsSchema })

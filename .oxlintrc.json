@@ -64,7 +64,11 @@
     "output/**",
     "plugins/@dshfiles/frame-layout/src/native/**",
     "plugins/@dshfiles/rich-composer/src/native/**",
-    "plugins/@dshfiles/rich-composer/src/submission-settings.ts"
+    "plugins/@dshfiles/chat/src/native/**",
+    "plugins/@dshfiles/rich-composer/src/submission-settings.ts",
+    "plugins/@dshfiles/chat/src/chat-settings.ts",
+    "plugins/@dshfiles/chat/src/host.ts",
+    "plugins/@dshfiles/chat/src/css-modules.d.ts"
   ],
   "overrides": [
     {
