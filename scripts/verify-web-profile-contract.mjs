@@ -28,6 +28,32 @@ const readJson = async (path, schema) => schema.parse(JSON.parse(await readFile(
 const isOwnedPackage = packageId => /^@dshfiles\/[^/]+$/.test(packageId)
 const packageIdFromExternal = external => /^@dshfiles\/[^/]+/.exec(external)?.[0]
 
+/** A seeded profile reconciles only this region, so a stock-row override above it never reaches an existing profile. */
+const managedRegion = patch => {
+  const start = patch.indexOf('# BEGIN NIX-MANAGED DSH PLUGINS')
+  const end = patch.indexOf('# END NIX-MANAGED DSH PLUGINS', start)
+  return start === -1 || end === -1 ? '' : patch.slice(start, end)
+}
+const disablesStockRow = patch => /id:\s*['"]?session-query-sqlite['"]?[\s\S]{0,200}?disabled:\s*true/u.test(patch)
+
+/**
+ * One process may own the `sessionQuery` service, and the stock SQLite row registers before every owned bundle. While
+ * it stays enabled it wins the service, so content search silently runs on the read path that freezes the Host instead
+ * of the owned worker. Both layers are needed: the bundle patch covers a profile whose local layer never mentions the
+ * row, and the seed's managed region covers a profile seeded while the row was still enabled locally.
+ */
+export const sessionSearchOwnershipErrors = ({ seedPatch, bundlePatch, bundles }) => {
+  if (!bundles.includes('@dshfiles/session-search')) return []
+  const errors = []
+  if (!disablesStockRow(managedRegion(seedPatch))) {
+    errors.push('profiles/web/cordis.patch.yml must disable session-query-sqlite inside the managed region: an existing profile only reconciles that region.')
+  }
+  if (!disablesStockRow(bundlePatch)) {
+    errors.push('@dshfiles/session-search/cordis.patch.yml must disable session-query-sqlite so its own bundle wins the sessionQuery service.')
+  }
+  return errors
+}
+
 export const webProfileContractErrors = (profile, bundleManifests) => {
   const profileBundles = new Set(profile.dsh.profile.bundles)
   const sourceBundles = new Map(bundleManifests.map(manifest => [manifest.name, manifest]))
@@ -87,7 +113,14 @@ const verifyWebProfileContract = async () => {
     }
   }
 
-  return webProfileContractErrors(profile, bundleManifests)
+  return [
+    ...webProfileContractErrors(profile, bundleManifests),
+    ...sessionSearchOwnershipErrors({
+      seedPatch: await readFile(join(profileRoot, 'cordis.patch.yml'), 'utf8'),
+      bundlePatch: await readFile(join(pluginsRoot, 'session-search', 'cordis.patch.yml'), 'utf8'),
+      bundles: profile.dsh.profile.bundles,
+    }),
+  ]
 }
 
 if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

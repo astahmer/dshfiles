@@ -21,8 +21,18 @@ a tunable, so this plugin replaces the backend and inverts the split.
   batches, and resumes after a crash instead of restarting the corpus.
 - **Documents are bounded.** Text is capped per event type (conversation 64 KB, tool traffic 8 KB); the untruncated
   text stays in the session log. The giant 49.5 MB log in this corpus holds 157 MB of decoded events in 34 869 events.
-- **The profile has one owner.** `cordis.patch.yml` inserts this row and the seed disables the stock
-  `session-query-sqlite` row, because one process may own the `sessionQuery` service and each index path.
+- **Filters are translated, not dropped.** Core's own `materializeSessionEventResultFilters` validates the clauses and
+  this backend maps `type`, `surface`, `seq` and `time` onto SQL predicates applied before ranking. `text` (a literal
+  scan over untruncated documents) and the session filters it cannot serve are still refused with
+  `SESSION_QUERY_INVALID_FILTER` rather than silently ignored. Both real callers — the palette/session controller and
+  the `@dshfiles/memory` finder — send `type: ['user/message', 'assistant/message']` + `surface: ['current']`.
+- **The profile has one owner.** One process may own the `sessionQuery` service, and the stock row registers first
+  (base bundle), so while it stays enabled it wins and content search silently lands back on the read path that
+  freezes the Host. `plugins/@dshfiles/session-search/cordis.patch.yml` therefore disables it inside this bundle, and
+  `profiles/web/cordis.patch.yml` repeats that disable **inside the managed region** — an existing profile only
+  reconciles that region, so a top-level seed row never reaches it. `session_search_health` reports `ownsService`:
+  false plus zero counters when another backend holds the service, and the Host logs the conflict instead of building
+  an index nothing reads.
 
 ## Measured
 
@@ -63,9 +73,9 @@ Two gotchas worth knowing before editing:
 
 ## Current limitations
 
-- Session and event **filters are refused** with `SESSION_QUERY_INVALID_FILTER` rather than silently ignored, so a
-  caller never gets results that do not match its request. The palette and the `@dshfiles/memory` finder issue no
-  filters; add filter translation when a real caller needs it.
+- Refused filters are `text` event predicates and the session filters other than `id`; they raise
+  `SESSION_QUERY_INVALID_FILTER` rather than silently returning results that do not match the request. `type`,
+  `surface`, `seq` and `time` are served.
 - **Live sessions are indexed from their appended log frames.** A live session's newest events become searchable once
   they reach the log; a dedicated live-event feed is not wired yet.
 - No embeddings, no ranking changes: the ranking mirrors the stock shape (strongest match per session, shorter

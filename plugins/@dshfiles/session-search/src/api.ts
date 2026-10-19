@@ -15,9 +15,9 @@ export const sessionSearchApi = defineApi({
   methods: {
     health: method({
       input: z.object({}).strict(),
-      output: indexHealthSchema,
+      output: indexHealthSchema.extend({ ownsService: z.boolean() }),
       description:
-        'Read the owned session-search index health: indexed sessions and documents, index bytes, how many log sessions and bytes are still behind, whether an ingest pass is running, how long the last pass took, and the last error. Read-only.',
+        'Read the owned session-search index health: indexed sessions and documents, index bytes, how many log sessions and bytes are still behind, whether an ingest pass is running, how long the last pass took, and the last error. `ownsService` is false when another plugin owns the sessionQuery service, in which case content search runs on that backend and these counters stay zero. Read-only.',
       tool: { name: 'session_search_health', readOnly: true, render: compactJson },
     }),
   },

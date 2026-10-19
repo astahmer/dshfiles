@@ -215,6 +215,13 @@
     hideImmutable: false
     fileView: flat
 # BEGIN NIX-MANAGED DSH PLUGINS
+# A profile seeded before the owned search backend keeps the stock row enabled in
+# its own layer above, and only this region is reconciled into an existing
+# profile; so the disable is repeated here for those profiles. One process may own
+# the `sessionQuery` service: enabled, the stock row registers first, wins it, and
+# leaves content search on the read path that froze the Host for 290 s per search.
+- id: session-query-sqlite
+  disabled: true
 - id: our-free-model
   config:
     distribution: managed
