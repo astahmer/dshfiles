@@ -67,4 +67,51 @@ describe('model picker selection rules', () => {
     })
     expect(ModelPickerModel.triggerLabel({ groups: [], current: alexSelection })).toBeUndefined()
   })
+
+  describe('account swap', () => {
+    const luna = {
+      id: 'gpt-6-luna',
+      name: 'GPT-6 Luna',
+      reasoning: {
+        defaultEffort: 'medium',
+        efforts: [
+          { id: 'medium', name: 'Medium' },
+          { id: 'max', name: 'Max' },
+        ],
+      },
+    }
+    const lunaWithoutMax = { ...luna, reasoning: { defaultEffort: 'medium', efforts: [{ id: 'medium', name: 'Medium' }] } }
+    const alex1 = { id: 'codex-alex1', name: 'Codex alex1', models: [luna] }
+    const alex2 = { id: 'codex-alex2', name: 'Codex alex2', models: [luna] }
+    const other = { id: 'opencode', name: 'OpenCode', models: [{ id: 'kimi', name: 'Kimi' }] }
+    const alex3 = { id: 'codex-alex3', name: 'Codex alex3', models: [lunaWithoutMax] }
+    const accounts = [alex1, alex2, other, alex3] satisfies ModelDirectoryState['groups']
+    const onAlex2: ModelSelection = { provider: 'codex-alex2', model: 'gpt-6-luna', reasoningEffort: 'max' }
+
+    it('moves to the next route offering the same model, skipping routes without it', () => {
+      expect(ModelPickerModel.nextAccountSelection({ groups: accounts, current: { ...onAlex2, provider: 'codex-alex1' }, routes: [] })?.selection).toEqual(
+        onAlex2,
+      )
+      expect(ModelPickerModel.nextAccountSelection({ groups: accounts, current: onAlex2, routes: [] })?.group.id).toBe('codex-alex3')
+    })
+
+    it('wraps around and falls back to the target default when it lacks the current effort', () => {
+      expect(ModelPickerModel.nextAccountSelection({ groups: accounts, current: onAlex2, routes: [] })?.selection).toEqual({
+        provider: 'codex-alex3',
+        model: 'gpt-6-luna',
+        reasoningEffort: 'medium',
+      })
+      expect(ModelPickerModel.nextAccountSelection({ groups: accounts, current: { ...onAlex2, provider: 'codex-alex3' }, routes: [] })?.group.id).toBe(
+        'codex-alex1',
+      )
+    })
+
+    it('rotates only through the configured routes, and offers nothing when no other route qualifies', () => {
+      expect(ModelPickerModel.nextAccountSelection({ groups: accounts, current: onAlex2, routes: ['codex-alex1', 'codex-alex2'] })?.group.id).toBe(
+        'codex-alex1',
+      )
+      expect(ModelPickerModel.nextAccountSelection({ groups: accounts, current: onAlex2, routes: ['codex-alex2'] })).toBeUndefined()
+      expect(ModelPickerModel.nextAccountSelection({ groups: accounts, current: { provider: 'opencode', model: 'kimi' }, routes: [] })).toBeUndefined()
+    })
+  })
 })

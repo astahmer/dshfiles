@@ -66,6 +66,36 @@ export class ModelPickerModel {
     return { model: name, providerTag: initials || group.id, title }
   }
 
+  /**
+   * The next route, in catalog order, that offers the selected model id: an account rotation that never changes the
+   * model. `routes` narrows the rotation; empty means every route. The current effort carries over when the target
+   * model advertises it, else the target's own default applies.
+   */
+  static nextAccountSelection = (input: {
+    readonly groups: readonly ModelGroup[]
+    readonly current: ModelSelection | null
+    readonly routes: readonly string[]
+  }): { readonly group: ModelGroup; readonly selection: ModelSelection } | undefined => {
+    const current = input.current
+    if (current === null) return undefined
+    const candidates = input.groups.filter(
+      group =>
+        group.id === current.provider ||
+        ((input.routes.length === 0 || input.routes.includes(group.id)) && group.models.some(model => model.id === current.model)),
+    )
+    const currentIndex = candidates.findIndex(group => group.id === current.provider)
+    const group = [...candidates.slice(currentIndex + 1), ...candidates.slice(0, Math.max(currentIndex, 0))].find(
+      candidate => candidate.id !== current.provider,
+    )
+    const model = group?.models.find(candidate => candidate.id === current.model)
+    if (group === undefined || model === undefined) return undefined
+
+    const keepsEffort = current.reasoningEffort === undefined || model.reasoning?.efforts.some(effort => effort.id === current.reasoningEffort) === true
+    const reasoningEffort = keepsEffort ? current.reasoningEffort : model.reasoning?.defaultEffort
+    const route: ModelSelection = { provider: group.id, model: model.id }
+    return { group, selection: reasoningEffort === undefined ? route : { ...route, reasoningEffort } }
+  }
+
   static effortName = (model: CatalogModel, current: ModelSelection | null): string => {
     const selected = current?.reasoningEffort ?? model.reasoning?.defaultEffort
     if (selected === undefined) return 'Provider default'
