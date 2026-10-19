@@ -1,23 +1,34 @@
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { PlusIcon, RotateCcwIcon, XIcon } from '@dshfiles/plugin-ui/icons'
+import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import {
   DockviewReact,
+  getPanelData,
   type DockviewApi,
   type DockviewDidDropEvent,
+  type DockviewDndOverlayEvent,
+  type DockviewGroupPanel,
   type DockviewReadyEvent,
   type DockviewTheme,
-  type DockviewDndOverlayEvent,
   type IDockviewPanelProps,
 } from 'dockview-react'
-import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
-import { WorkbenchLayout, WORKBENCH_COMPONENT, type LayoutStore } from './layout-store.js'
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type DragEvent } from 'react'
+import { WorkbenchLayout, WORKBENCH_COMPONENT, type LayoutStore, type WorkbenchDefaultLayout } from './layout-store.js'
 import type { WorkbenchTranslate } from './locales.js'
 import { workbenchRegions, type WorkbenchRegionId } from './dock-regions.js'
 import type { WorkbenchPanelDefinition, WorkbenchPanelRegistry } from './registry.js'
 
 /** Variables live in the injected dockview sheet (`dockview-theme.css`), mapped to the Host `--dsw-*` tokens. */
 const workbenchTheme: DockviewTheme = { name: 'dshfiles', className: 'dshfiles-workbench-theme' }
+
+/** A panel dropped onto a surface, with that surface's own instance so the embedder can adopt it. */
+export interface WorkbenchPanelDrop {
+  readonly panelId: string
+  readonly api: DockviewApi
+  /** The group under the drop when a Dockview group target took it; absent over an empty surface. */
+  readonly group?: DockviewGroupPanel
+}
 
 interface WorkbenchViewProps {
   readonly registry: WorkbenchPanelRegistry
@@ -29,8 +40,8 @@ interface WorkbenchViewProps {
   readonly surface?: 'main' | 'side-panel' | 'dock' | 'bottom'
   /** The region this surface is, registered page-wide so a panel can move between regions. */
   readonly region?: WorkbenchRegionId
-  /** A drop from another region's drag: the embedder adopts the panel and drops the source's copy. */
-  readonly onDrop?: (event: DockviewDidDropEvent) => void
+  /** A panel dropped here from another region's drag: the embedder adopts it and drops the source's copy. */
+  readonly onDropPanel?: (drop: WorkbenchPanelDrop) => void
   /**
    * Whether a drag from another region is accepted over this surface. Dockview
    * asks through the api's own event, which has no React prop.
@@ -54,8 +65,13 @@ interface WorkbenchViewProps {
 
 const usePanelDefinitions = (registry: WorkbenchPanelRegistry) => useSyncExternalStore(registry.subscribe, registry.list, registry.list)
 
+/** What a surface with no saved layout of its own opens with, by the region it is. */
+const defaultLayoutOf = (surface: WorkbenchViewProps['surface']): WorkbenchDefaultLayout =>
+  surface === 'dock' ? 'dock-default' : surface === 'bottom' ? 'empty' : 'editor'
+
 export const WorkbenchView = (props: WorkbenchViewProps): JSX.Element => {
   const { registry, store, t } = props
+  const defaultLayout = defaultLayoutOf(props.surface)
   const definitions = usePanelDefinitions(registry)
   const [api, setApi] = useState<DockviewApi | null>(null)
   const [openIds, setOpenIds] = useState<readonly string[]>([])
@@ -86,7 +102,7 @@ export const WorkbenchView = (props: WorkbenchViewProps): JSX.Element => {
   }, [registry, t])
 
   const onReady = (event: DockviewReadyEvent): void => {
-    WorkbenchLayout.restoreLayout(event.api, store, registry.list(), props.surface === 'dock' || props.surface === 'bottom')
+    WorkbenchLayout.restoreLayout(event.api, store, registry.list(), defaultLayout)
     // Dockview only reports layout changes for later gestures, so without this a freshly applied default layout would
     // stay unsaved until the first drag: a reload would rebuild it from the default instead of restoring what it was.
     store.set(event.api.toJSON())
@@ -108,6 +124,76 @@ export const WorkbenchView = (props: WorkbenchViewProps): JSX.Element => {
     const subscription = api.onUnhandledDragOver(event => props.acceptDroppedPanel?.(event))
     return () => subscription.dispose()
   }, [api, props.acceptDroppedPanel])
+
+  /**
+   * `getPanelData()` is Dockview's own page-global transfer, so the panel id
+   * survives a drag between two instances. A transfer from this surface is
+   * Dockview's internal business and is left alone.
+   */
+  const foreignTransfer = (): { readonly panelId: string; readonly api: DockviewApi } | undefined => {
+    const transfer = getPanelData()
+    if (api === null || transfer === undefined || transfer.viewId === api.id || transfer.panelId === null) return undefined
+    return { panelId: transfer.panelId, api }
+  }
+
+  const onDidDrop = (event: DockviewDidDropEvent): void => {
+    const panelId = event.getData()?.panelId
+    if (api === null || panelId === undefined || panelId === null) return
+    props.onDropPanel?.(event.group === undefined ? { panelId, api } : { panelId, api, group: event.group })
+  }
+
+  // The wrapper answers for a foreign panel the surface's own targets refused:
+  // Dockview's group, tab and content targets accept one through
+  // `onUnhandledDragOver`, but its layout-edge target refuses a foreign view
+  // outright, so a drop over an empty surface reaches no Dockview handler at
+  // all. A drop one of its targets did take stops propagating before here. The
+  // depth counts the child boundaries a drag crosses, so the mark only shows
+  // while it is genuinely over the surface.
+  const foreignDragDepth = useRef(0)
+  const [foreignDragOver, setForeignDragOver] = useState(false)
+
+  const enterForeignDrag = (): void => {
+    foreignDragDepth.current += 1
+    if (foreignDragDepth.current === 1) setForeignDragOver(true)
+  }
+
+  const leaveForeignDrag = (): void => {
+    foreignDragDepth.current = Math.max(0, foreignDragDepth.current - 1)
+    if (foreignDragDepth.current === 0) setForeignDragOver(false)
+  }
+
+  const endForeignDrag = (): void => {
+    foreignDragDepth.current = 0
+    setForeignDragOver(false)
+  }
+
+  const onForeignDragOver = (event: DragEvent<HTMLDivElement>): void => {
+    if (foreignTransfer() === undefined) return
+    event.preventDefault()
+  }
+
+  const onForeignDragEnter = (event: DragEvent<HTMLDivElement>): void => {
+    if (foreignTransfer() === undefined) return
+    event.preventDefault()
+    enterForeignDrag()
+  }
+
+  const onForeignDrop = (event: DragEvent<HTMLDivElement>): void => {
+    const transfer = foreignTransfer()
+    if (transfer === undefined) return
+    event.preventDefault()
+    endForeignDrag()
+    props.onDropPanel?.(transfer)
+  }
+
+  useEffect(() => {
+    if (!foreignDragOver) return
+    // A drag that ends anywhere else (Escape, or a target that took the drop)
+    // must not leave the surface marked as the drop target.
+    const reset = (): void => endForeignDrag()
+    document.addEventListener('dragend', reset)
+    return () => document.removeEventListener('dragend', reset)
+  }, [foreignDragOver])
 
   const open = (definition: WorkbenchPanelDefinition): void => {
     if (api === null) return
@@ -170,7 +256,7 @@ export const WorkbenchView = (props: WorkbenchViewProps): JSX.Element => {
             onClick={() => {
               if (api === null) return
               store.remove()
-              WorkbenchLayout.applyDefaultLayout(api, registry.list(), props.surface === 'dock' || props.surface === 'bottom')
+              WorkbenchLayout.applyDefaultLayout(api, registry.list(), defaultLayout)
             }}
           >
             <RotateCcwIcon /> {t('resetLayout')}
@@ -182,14 +268,20 @@ export const WorkbenchView = (props: WorkbenchViewProps): JSX.Element => {
           )}
         </div>
       </header>
-      <div className="dshx:relative dshx:min-h-0 dshx:flex-1">
+      <div
+        className={cn('dshx:relative dshx:min-h-0 dshx:flex-1', foreignDragOver && 'dshx:ring-2 dshx:ring-ring/60 dshx:ring-inset')}
+        onDragEnter={onForeignDragEnter}
+        onDragOver={onForeignDragOver}
+        onDragLeave={leaveForeignDrag}
+        onDrop={onForeignDrop}
+      >
         <DockviewReact
           components={components}
           defaultRenderer="always"
           theme={workbenchTheme}
           watermarkComponent={Watermark}
           onReady={onReady}
-          onDidDrop={event => props.onDrop?.(event)}
+          onDidDrop={onDidDrop}
         />
       </div>
     </div>

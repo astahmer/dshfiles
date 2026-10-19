@@ -23,7 +23,7 @@ import {
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { LayoutGridIcon } from '@dshfiles/plugin-ui/icons'
-import type { DockviewApi, DockviewDndOverlayEvent, DockviewDidDropEvent, SerializedDockview } from 'dockview-react'
+import type { DockviewApi, DockviewDndOverlayEvent, DockviewGroupPanel, SerializedDockview } from 'dockview-react'
 import dockviewSheet from 'virtual:dshfiles-workbench/dockview-css'
 import { useEffect, useLayoutEffect, useState, useSyncExternalStore } from 'react'
 import { demoPanels } from './demo-panels.js'
@@ -34,7 +34,7 @@ import { workbenchPanels, type WORKBENCH_MAIN_PANEL_ID, type WorkbenchPanelDefin
 import { effectiveRightPanelMode } from './right-panel-mode.js'
 import { SavedLayouts, savedLayouts, type SavedLayout } from './saved-layouts.js'
 import { workbenchSettings } from './settings.js'
-import { WorkbenchView } from './workbench-view.js'
+import { WorkbenchView, type WorkbenchPanelDrop } from './workbench-view.js'
 
 // A literal so dshx's slot-occupancy check can read the id; `satisfies` keeps it equal to the exported contract.
 const PANEL_ID = 'dshfiles-workbench' satisfies typeof WORKBENCH_MAIN_PANEL_ID
@@ -124,7 +124,7 @@ export default defineClient({
               region="main"
               t={props.t}
               onOpenPanel={openIn('main')}
-              onDrop={handleDrop('main')}
+              onDropPanel={handleDrop('main')}
               acceptDroppedPanel={acceptsForeignPanel}
               onApi={api => drainPendingOpen('main', api)}
               headerActions={context => (
@@ -177,23 +177,25 @@ export default defineClient({
       readonly region: WorkbenchRegionId
       readonly api: DockviewApi
       readonly panelId: string
-      readonly position?: { readonly referenceGroup: NonNullable<DockviewDidDropEvent['group']>; readonly direction: 'within' }
+      readonly position?: { readonly referenceGroup: DockviewGroupPanel; readonly direction: 'within' }
     }): void => {
       const definition = registry.get(input.panelId)
-      if (definition === undefined || input.api.getPanel(input.panelId) !== undefined) return
-      const placement = { id: input.panelId, component: WORKBENCH_COMPONENT, title: definition.title }
-      input.api.addPanel(input.position === undefined ? placement : { ...placement, position: input.position })
+      if (definition === undefined) return
+      const existing = input.api.getPanel(input.panelId)
+      if (existing === undefined) {
+        const placement = { id: input.panelId, component: WORKBENCH_COMPONENT, title: definition.title }
+        input.api.addPanel(input.position === undefined ? placement : { ...placement, position: input.position })
+      } else existing.api.setActive()
+      // A panel lives in exactly one region: the source's copy goes whether this
+      // region had to add the panel or already showed it.
       closeElsewhere(input.region, input.panelId)
     }
 
     const handleDrop =
       (region: WorkbenchRegionId) =>
-      (event: DockviewDidDropEvent): void => {
-        const panelId = event.getData()?.panelId
-        const api = regions.get(region)
-        if (panelId === undefined || panelId === null || api === undefined) return
-        const position = event.group === undefined ? undefined : { referenceGroup: event.group, direction: 'within' as const }
-        adoptPanel(position === undefined ? { region, api, panelId } : { region, api, panelId, position })
+      (drop: WorkbenchPanelDrop): void => {
+        const position = drop.group === undefined ? undefined : { referenceGroup: drop.group, direction: 'within' as const }
+        adoptPanel(position === undefined ? { region, api: drop.api, panelId: drop.panelId } : { region, api: drop.api, panelId: drop.panelId, position })
       }
 
     const acceptsForeignPanel = (event: DockviewDndOverlayEvent): void => {
@@ -493,7 +495,7 @@ export default defineClient({
               t={props.t}
               heading={props.t('dockHeading')}
               onOpenPanel={openIn('right')}
-              onDrop={handleDrop('right')}
+              onDropPanel={handleDrop('right')}
               acceptDroppedPanel={acceptsForeignPanel}
               onApi={api => drainPendingOpen('right', api)}
               headerActions={context => (
@@ -532,7 +534,7 @@ export default defineClient({
               t={props.t}
               heading={props.t('bottomHeading')}
               onOpenPanel={openIn('bottom')}
-              onDrop={handleDrop('bottom')}
+              onDropPanel={handleDrop('bottom')}
               acceptDroppedPanel={acceptsForeignPanel}
               onApi={api => drainPendingOpen('bottom', api)}
               onClose={() => switchBottomPanel?.(false)}

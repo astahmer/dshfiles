@@ -48,15 +48,22 @@ const openPanel = (api: DockviewApi, definition: Pick<WorkbenchPanelDefinition, 
 /** The Editor's panel id: the workbench exists to host it, so it opens alone when it is registered. */
 const EDITOR_PANEL_ID = 'dshfiles-editor.main'
 
+/** What a surface shows when it has no saved layout of its own. */
+export type WorkbenchDefaultLayout = 'editor' | 'dock-default' | 'empty'
+
 /**
  * The Editor alone when registered; otherwise the first two panels side by side
  * and the rest as tabs of the first group. In the dock the panel a contributor
  * marked `dockDefault` leads instead, so the persistent side panel opens on the
- * panel it exists for.
+ * panel it exists for. The bottom row opens empty: a panel lives in exactly one
+ * region, so it waits for one to be dragged or moved into it rather than
+ * duplicating one another region already shows.
  */
-const applyDefaultLayout = (api: DockviewApi, panels: readonly WorkbenchPanelDefinition[], preferDockDefault = false): void => {
+const applyDefaultLayout = (api: DockviewApi, panels: readonly WorkbenchPanelDefinition[], defaultLayout: WorkbenchDefaultLayout = 'editor'): void => {
+  if (defaultLayout === 'empty') return
   api.clear()
-  const preferred = (preferDockDefault ? panels.find(panel => panel.dockDefault === true) : undefined) ?? panels.find(panel => panel.id === EDITOR_PANEL_ID)
+  const preferred =
+    (defaultLayout === 'dock-default' ? panels.find(panel => panel.dockDefault === true) : undefined) ?? panels.find(panel => panel.id === EDITOR_PANEL_ID)
   if (preferred !== undefined) {
     api.addPanel({ id: preferred.id, component: WORKBENCH_COMPONENT, title: preferred.title }).api.setActive()
     return
@@ -76,7 +83,7 @@ const restoreLayout = (
   api: DockviewApi,
   store: LayoutStore,
   panels: readonly WorkbenchPanelDefinition[],
-  preferDockDefault = false,
+  defaultLayout: WorkbenchDefaultLayout = 'editor',
 ): 'restored' | 'default' => {
   const saved = store.get()
   if (saved !== null) {
@@ -87,7 +94,7 @@ const restoreLayout = (
       store.remove()
     }
   }
-  applyDefaultLayout(api, panels, preferDockDefault)
+  applyDefaultLayout(api, panels, defaultLayout)
   return 'default'
 }
 

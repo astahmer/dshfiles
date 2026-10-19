@@ -1,7 +1,7 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { Orientation, type DockviewApi } from 'dockview-react'
+import { LocalSelectionTransfer, Orientation, PanelTransfer, type DockviewApi } from 'dockview-react'
 import { useEffect, useState } from 'react'
-import { afterEach, beforeAll, describe, expect, it } from 'vitest'
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { createLayoutStore } from './layout-store.js'
 import type { WorkbenchTranslate } from './locales.js'
 import { createWorkbenchPanelRegistry, type WorkbenchPanelProps, type WorkbenchPanelRegistry } from './registry.js'
@@ -53,7 +53,7 @@ const mixedRegistry = (): WorkbenchPanelRegistry => {
   return registry
 }
 
-const renderWorkbench = (registry: WorkbenchPanelRegistry, storage = memoryStorage(), surface?: 'main' | 'side-panel' | 'dock') => {
+const renderWorkbench = (registry: WorkbenchPanelRegistry, storage = memoryStorage(), surface?: 'main' | 'side-panel' | 'dock' | 'bottom') => {
   let api: DockviewApi | undefined
   const store = createLayoutStore({ storage })
   const view = render(<WorkbenchView registry={registry} store={store} t={t} onApi={ready => (api = ready)} {...(surface === undefined ? {} : { surface })} />)
@@ -63,6 +63,27 @@ const renderWorkbench = (registry: WorkbenchPanelRegistry, storage = memoryStora
 
 /** Dockview buffers layout-change events to the next task, and the store saves on that event. */
 const flushLayoutChange = () => act(() => new Promise(resolve => setTimeout(resolve, 0)))
+
+/** A surface wired to record the panels the embedder is asked to adopt, with its Dockview element. */
+const renderDropZone = (registry: WorkbenchPanelRegistry, surface: 'main' | 'dock' | 'bottom') => {
+  const dropped = vi.fn()
+  const store = createLayoutStore({ storage: memoryStorage() })
+  let api: DockviewApi | undefined
+  const view = render(<WorkbenchView registry={registry} store={store} t={t} surface={surface} onApi={ready => (api = ready)} onDropPanel={dropped} />)
+  const element = view.container.querySelector('.dv-dockview')
+  if (api === undefined || element === null) throw new Error('Dockview did not become ready')
+  return { api, dropped, element, view }
+}
+
+/** Dockview stores a drag's payload in its own page-global transfer, keyed by the transfer class. */
+const dragPayloadOf = (transfer: PanelTransfer, run: () => void): void => {
+  LocalSelectionTransfer.getInstance().setData([transfer], PanelTransfer.prototype)
+  try {
+    run()
+  } finally {
+    LocalSelectionTransfer.getInstance().clearData(PanelTransfer.prototype)
+  }
+}
 
 const draftOf = (id: string): HTMLTextAreaElement => {
   const element = screen.getByLabelText(`draft ${id}`)
@@ -84,14 +105,41 @@ describe('WorkbenchView', () => {
     expect(api.getPanel('dshfiles-editor.main')?.api.isActive).toBe(true)
   })
 
-  it('leads the dock default layout with the dock panel, and the main one with the Editor', () => {
+  it('leads the dock default layout with the dock panel, the main one with the Editor, and opens the bottom row empty', () => {
     const dock = renderWorkbench(mixedRegistry(), memoryStorage(), 'dock')
     expect(dock.api.panels.map(panel => panel.id)).toEqual(['jujutsu.dock'])
     expect(dock.api.getPanel('jujutsu.dock')?.api.isActive).toBe(true)
     dock.view.unmount()
 
+    // The dock already shows that panel, and a panel lives in exactly one
+    // region: the row waits for one to be dragged or moved into it.
+    const bottom = renderWorkbench(mixedRegistry(), memoryStorage(), 'bottom')
+    expect(bottom.api.panels).toEqual([])
+    bottom.view.unmount()
+
     const main = renderWorkbench(mixedRegistry())
     expect(main.api.panels.map(panel => panel.id)).toEqual(['dshfiles-editor.main'])
+  })
+
+  it('takes a panel dragged in from another region, even over a surface that shows none', () => {
+    const { dropped, element } = renderDropZone(registryWith('a'), 'bottom')
+    dragPayloadOf(new PanelTransfer('another-surface', 'another-group', 'a'), () => {
+      fireEvent.dragOver(element)
+      fireEvent.drop(element)
+    })
+
+    expect(dropped).toHaveBeenCalledTimes(1)
+    expect(dropped.mock.calls[0]?.[0]).toMatchObject({ panelId: 'a' })
+  })
+
+  it('leaves a drag started on its own surface to Dockview', () => {
+    const { api, dropped, element } = renderDropZone(registryWith('a'), 'main')
+    dragPayloadOf(new PanelTransfer(api.id, 'own-group', 'a'), () => {
+      fireEvent.dragOver(element)
+      fireEvent.drop(element)
+    })
+
+    expect(dropped).not.toHaveBeenCalled()
   })
 
   it('saves the layout it applied, so a reload restores the surface instead of rebuilding its default', () => {
