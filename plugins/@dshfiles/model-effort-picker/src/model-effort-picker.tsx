@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { ModelSelectInjected } from '@deepseek-ai/dsh-client-ui-model-selection/client'
 import type { ModelSelection } from '@deepseek-ai/dsh-api-session-controller/types'
 import { useSettings } from '@dshfiles/dshx/client'
@@ -20,6 +20,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select }
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [selectionError, setSelectionError] = useState<string | null>(null)
+  const modelListRef = useRef<HTMLDivElement>(null)
   const state = useSyncExternalStore(
     onStoreChange => directory.subscribe(onStoreChange),
     () => directory.getSnapshot(),
@@ -58,6 +59,14 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select }
   useEffect(() => {
     if (accountSwapEnabled && available) load()
   }, [accountSwapEnabled, available, load])
+
+  useEffect(() => {
+    if (!open) return
+    const frame = requestAnimationFrame(() => {
+      modelListRef.current?.querySelector('[data-model-picker-option][aria-pressed="true"]')?.scrollIntoView({ block: 'nearest' })
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [open, selectedGroup?.id, selectedModel?.id])
 
   useEffect(() => {
     setSliderIndex(selectedEffortIndex)
@@ -146,8 +155,18 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select }
               />
             </label>
 
+            {selectedModel !== undefined && selectedGroup !== undefined && (
+              <p className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5 dshx:px-1 dshx:text-xs dshx:text-muted-foreground" data-model-picker-current>
+                <CheckIcon aria-hidden="true" className="dshx:size-3.5 dshx:shrink-0 dshx:text-primary" />
+                <span className="dshx:shrink-0">Using</span>
+                <span className="dshx:min-w-0 dshx:truncate dshx:font-medium dshx:text-foreground">
+                  {selectedGroup.name} / {ModelPickerModel.displayName({ group: selectedGroup, model: selectedModel })}
+                </span>
+              </p>
+            )}
+
             <ScrollArea className="dshx:h-52 dshx:max-h-[36vh] dshx:min-h-24">
-              <div aria-label="Models grouped by provider" className="dshx:space-y-2 dshx:p-2" role="list">
+              <div aria-label="Models grouped by provider" className="dshx:space-y-2 dshx:p-2" ref={modelListRef} role="list">
                 {filteredGroups.map(group => (
                   <section aria-label={group.name} className="dshx:space-y-1" key={group.id}>
                     <div className="dshx:px-2 dshx:py-1 dshx:text-[10px] dshx:font-semibold dshx:uppercase dshx:tracking-wide dshx:text-muted-foreground">
@@ -159,6 +178,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select }
                         <Button
                           aria-pressed={active}
                           className={cn('dshx:w-full dshx:justify-start dshx:gap-2 dshx:text-left', active && 'dshx:bg-accent')}
+                          data-model-picker-option
                           disabled={busy}
                           key={`${group.id}:${model.id}`}
                           onClick={() => void submitSelection(ModelPickerModel.selectionForModel(group, model, current))}
