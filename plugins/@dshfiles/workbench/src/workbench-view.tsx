@@ -3,7 +3,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { PlusIcon, RotateCcwIcon, XIcon } from '@dshfiles/plugin-ui/icons'
 import {
   DockviewReact, type DockviewApi, type DockviewDidDropEvent, type DockviewReadyEvent, type DockviewTheme,
-  type DockviewUnhandledDragOverEvent, type IDockviewPanelProps,
+  type DockviewDndOverlayEvent, type IDockviewPanelProps,
 } from 'dockview-react'
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { WorkbenchLayout, WORKBENCH_COMPONENT, type LayoutStore } from './layout-store.js'
@@ -26,8 +26,11 @@ interface WorkbenchViewProps {
   readonly region?: WorkbenchRegionId
   /** A drop from another region's drag: the embedder adopts the panel and drops the source's copy. */
   readonly onDrop?: (event: DockviewDidDropEvent) => void
-  /** Whether a drag from another region is accepted over this surface. */
-  readonly onUnhandledDragOver?: (event: DockviewUnhandledDragOverEvent) => void
+  /**
+   * Whether a drag from another region is accepted over this surface. Dockview
+   * asks through the api's own event, which has no React prop.
+   */
+  readonly acceptDroppedPanel?: (event: DockviewDndOverlayEvent) => void
   /**
    * Where an "Add panel" or a queued open goes. The embedder routes it so a
    * panel already shown in another region moves here instead of being duplicated.
@@ -92,6 +95,14 @@ export const WorkbenchView = (props: WorkbenchViewProps): JSX.Element => {
     if (api === null || props.region === undefined) return
     return workbenchRegions().set(props.region, api)
   }, [api, props.region])
+
+  // Dockview checks the drop overlay against this event; accepting a transfer
+  // from another region is what lets a panel be dropped here at all.
+  useEffect(() => {
+    if (api === null || props.acceptDroppedPanel === undefined) return
+    const subscription = api.onUnhandledDragOver(event => props.acceptDroppedPanel?.(event))
+    return () => subscription.dispose()
+  }, [api, props.acceptDroppedPanel])
 
   const open = (definition: WorkbenchPanelDefinition): void => {
     if (api === null) return
@@ -173,8 +184,7 @@ export const WorkbenchView = (props: WorkbenchViewProps): JSX.Element => {
           theme={workbenchTheme}
           watermarkComponent={Watermark}
           onReady={onReady}
-          {...(props.onDrop === undefined ? {} : { onDidDrop: props.onDrop })}
-          {...(props.onUnhandledDragOver === undefined ? {} : { onUnhandledDragOver: props.onUnhandledDragOver })}
+          onDidDrop={event => props.onDrop?.(event)}
         />
       </div>
     </div>

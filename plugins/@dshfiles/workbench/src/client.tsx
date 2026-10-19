@@ -16,7 +16,7 @@ import {
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { LayoutGridIcon } from '@dshfiles/plugin-ui/icons'
-import type { DockviewApi, DockviewDidDropEvent, DockviewUnhandledDragOverEvent, SerializedDockview } from 'dockview-react'
+import type { DockviewApi, DockviewDndOverlayEvent, DockviewDidDropEvent, SerializedDockview } from 'dockview-react'
 import dockviewSheet from 'virtual:dshfiles-workbench/dockview-css'
 import { useEffect, useLayoutEffect, useState, useSyncExternalStore } from 'react'
 import { demoPanels } from './demo-panels.js'
@@ -25,9 +25,7 @@ import { createLayoutStore, LAYOUT_SURFACES, WorkbenchLayout, WORKBENCH_COMPONEN
 import { WORKBENCH_LOCALE_NAMESPACE, workbenchLocale } from './locales.js'
 import { workbenchPanels, type WORKBENCH_MAIN_PANEL_ID, type WorkbenchPanelDefinition } from './registry.js'
 import { effectiveRightPanelMode } from './right-panel-mode.js'
-import {
-  layoutNames, renamedSavedLayout, savedLayouts, withSavedLayout, withoutSavedLayout, type SavedLayout,
-} from './saved-layouts.js'
+import { SavedLayouts, savedLayouts, type SavedLayout } from './saved-layouts.js'
 import { workbenchSettings } from './settings.js'
 import { WorkbenchView } from './workbench-view.js'
 
@@ -120,7 +118,7 @@ export default defineClient({
               t={props.t}
               onOpenPanel={openIn('main')}
               onDrop={handleDrop('main')}
-              onUnhandledDragOver={acceptsForeignPanel}
+              acceptDroppedPanel={acceptsForeignPanel}
               onApi={api => drainPendingOpen('main', api)}
               headerActions={context => (
                 <>
@@ -176,12 +174,8 @@ export default defineClient({
     }): void => {
       const definition = registry.get(input.panelId)
       if (definition === undefined || input.api.getPanel(input.panelId) !== undefined) return
-      input.api.addPanel({
-        id: input.panelId,
-        component: WORKBENCH_COMPONENT,
-        title: definition.title,
-        ...(input.position === undefined ? {} : { position: input.position }),
-      })
+      const placement = { id: input.panelId, component: WORKBENCH_COMPONENT, title: definition.title }
+      input.api.addPanel(input.position === undefined ? placement : { ...placement, position: input.position })
       closeElsewhere(input.region, input.panelId)
     }
 
@@ -189,16 +183,11 @@ export default defineClient({
       const panelId = event.getData()?.panelId
       const api = regions.get(region)
       if (panelId === undefined || panelId === null || api === undefined) return
-      const group = event.group
-      adoptPanel({
-        region,
-        api,
-        panelId,
-        ...(group === undefined ? {} : { position: { referenceGroup: group, direction: 'within' as const } }),
-      })
+      const position = event.group === undefined ? undefined : { referenceGroup: event.group, direction: 'within' as const }
+      adoptPanel(position === undefined ? { region, api, panelId } : { region, api, panelId, position })
     }
 
-    const acceptsForeignPanel = (event: DockviewUnhandledDragOverEvent): void => {
+    const acceptsForeignPanel = (event: DockviewDndOverlayEvent): void => {
       const panelId = event.getData()?.panelId
       if (panelId !== undefined && panelId !== null && regions.holds(panelId)) event.accept()
     }
@@ -314,8 +303,8 @@ export default defineClient({
     // Named layouts: one arrangement per region, captured from the live
     // surfaces and written back through the same stores, so a region that is
     // not mounted yet still receives the layout when it opens.
-    const REGION_BY_SURFACE: Record<LayoutSurface, WorkbenchRegionId> = { main: 'main', dock: 'right', bottom: 'bottom' }
-    const layoutStores: Record<LayoutSurface, ReturnType<typeof createLayoutStore>> = { main: store, dock: dockStore, bottom: bottomStore }
+    const REGION_BY_SURFACE = { main: 'main', dock: 'right', bottom: 'bottom' } satisfies Record<LayoutSurface, WorkbenchRegionId>
+    const layoutStores = { main: store, dock: dockStore, bottom: bottomStore } satisfies Record<LayoutSurface, ReturnType<typeof createLayoutStore>>
 
     const captureLayout = (): SavedLayout => {
       const captured: { -readonly [surface in LayoutSurface]?: SerializedDockview | undefined } = {}
@@ -349,7 +338,7 @@ export default defineClient({
       const confirmRename = (): void => {
         const next = draft.trim()
         if (next.length === 0) return
-        savedLayouts.set(renamedSavedLayout(layouts, props.name, next))
+        savedLayouts.set(SavedLayouts.renamed(layouts, props.name, next))
         setEditing(false)
       }
       return (
@@ -398,7 +387,7 @@ export default defineClient({
                   size="sm"
                   variant="ghost"
                   aria-label={`${translate('deleteLayout')} ${props.name}`}
-                  onClick={() => savedLayouts.set(withoutSavedLayout(savedLayouts.get(), props.name))}
+                  onClick={() => savedLayouts.set(SavedLayouts.without(savedLayouts.get(), props.name))}
                 >
                   {translate('deleteLayout')}
                 </Button>
@@ -416,7 +405,7 @@ export default defineClient({
       const save = (): void => {
         const name = draft.trim()
         if (name.length === 0) return
-        savedLayouts.set(withSavedLayout(layouts, name, captureLayout()))
+        savedLayouts.set(SavedLayouts.with(layouts, name, captureLayout()))
         setDraft('')
       }
       return (
@@ -430,10 +419,10 @@ export default defineClient({
               <DialogDescription>{translate('layoutsHint')}</DialogDescription>
             </DialogHeader>
             <div className="dshx:flex dshx:flex-col dshx:gap-1">
-              {layoutNames(layouts).map(name => (
+              {SavedLayouts.names(layouts).map(name => (
                 <LayoutRow key={name} name={name} onApplied={() => setOpen(false)} />
               ))}
-              {layoutNames(layouts).length === 0 && <p className="dshx:text-sm dshx:text-muted-foreground">{translate('layoutEmpty')}</p>}
+              {SavedLayouts.names(layouts).length === 0 && <p className="dshx:text-sm dshx:text-muted-foreground">{translate('layoutEmpty')}</p>}
             </div>
             <DialogFooter>
               <Input
@@ -490,7 +479,7 @@ export default defineClient({
               heading={props.t('dockHeading')}
               onOpenPanel={openIn('right')}
               onDrop={handleDrop('right')}
-              onUnhandledDragOver={acceptsForeignPanel}
+              acceptDroppedPanel={acceptsForeignPanel}
               onApi={api => drainPendingOpen('right', api)}
               headerActions={context => (
                 <>
@@ -529,7 +518,7 @@ export default defineClient({
               heading={props.t('bottomHeading')}
               onOpenPanel={openIn('bottom')}
               onDrop={handleDrop('bottom')}
-              onUnhandledDragOver={acceptsForeignPanel}
+              acceptDroppedPanel={acceptsForeignPanel}
               onApi={api => drainPendingOpen('bottom', api)}
               onClose={() => switchBottomPanel?.(false)}
               headerActions={context => (
