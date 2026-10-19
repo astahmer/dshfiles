@@ -3,7 +3,8 @@ import type { Plugin, Rollup } from 'vite'
 import { DshxError } from '../../diagnostics.js'
 import { containsPrivateDshxImport } from '../private-imports.js'
 
-const INLINE_SAFE = /^@deepseek-ai\/dsh-(host-apiproxy|file-reference|session|llm|tools|brand)(\/|$)/
+// util-values (pure partial-JSON argument reader, no dependencies or globals) was added for @dshfiles/turn-summary.
+const INLINE_SAFE = /^@deepseek-ai\/dsh-(host-apiproxy|file-reference|session|llm|tools|brand|util-values)(\/|$)/
 const VENDORED_LIBRARY = /^@deepseek-ai\/(cosmokit|schemastery)(\/|$)/
 const GENERATED_REMOTE = /^@deepseek-ai\/dsh-[a-z0-9]+(?:-[a-z0-9]+)*\/remote$/
 
