@@ -1,0 +1,23 @@
+id: no-identity-hook-selector
+language: TypeScript
+message: A hook selector that returns its own argument hands the whole snapshot to every consumer; select the fields the component renders, or pass an explicit equality function.
+severity: error
+rule:
+  any:
+    - pattern: '$HOOK($PARAM => $PARAM)'
+    - pattern: '$HOOK(($PARAM) => $PARAM)'
+constraints:
+  HOOK:
+    regex: '^use[A-Z]'
+---
+id: no-identity-hook-selector-tsx
+language: Tsx
+message: A hook selector that returns its own argument hands the whole snapshot to every consumer; select the fields the component renders, or pass an explicit equality function.
+severity: error
+rule:
+  any:
+    - pattern: '$HOOK($PARAM => $PARAM)'
+    - pattern: '$HOOK(($PARAM) => $PARAM)'
+constraints:
+  HOOK:
+    regex: '^use[A-Z]'

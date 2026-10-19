@@ -1,2 +1,5 @@
 ruleDirs:
+  # Vendored emilint rules, kept byte-comparable to their pinned revision.
   - tooling/antislop/ast-grep/rules
+  # Rules this repository owns; see tooling/antislop/README.md.
+  - tooling/antislop/repo-rules

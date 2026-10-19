@@ -17,6 +17,8 @@
     "no-direct-json-parse": 200,
     "no-direct-json-parse-tsx": 3,
     "no-export-from": 164,
-    "no-wildcard-export": 1
+    "no-wildcard-export": 1,
+    "no-identity-hook-selector": 0,
+    "no-identity-hook-selector-tsx": 0
   }
 }
