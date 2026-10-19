@@ -293,8 +293,9 @@ bundle every plugin-ui consumer boots (`ui-styles`) really is everywhere.
 ### The per-scenario cache
 
 `.turbo/e2e-scenario-receipts.json` closes that gap. Each scenario is keyed on its
-own steps plus the `dist` digests of every bundle those steps reach — content
-only, so a rebase that leaves the files alone keeps its receipts, and so does a
+own steps, the **implementation of every step it matched** (a step body can
+change what a scenario proves without touching its text), plus the `dist`
+digests of every bundle those steps reach — content only, so a rebase that leaves the files alone keeps its receipts, and so does a
 formatting-only edit that keeps a bundle byte-identical. The runner replays the
 scenarios whose receipt is still fresh and runs the rest:
 

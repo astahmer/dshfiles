@@ -206,6 +206,14 @@ Each of these was measured, not argued, and each is a dead end or a non-win rath
   and once that was fixed a cloned `node_modules` carries pnpm's absolute virtual-store paths, so the "fast" boots
   measured 4-8s against a 1.2-2.8s install baseline. Reverted rather than shipped as a regression.
 
+## Pyramid audit (2026-10-19): no candidates
+
+The idea was to move assertions that do not need a browser down to Vitest plus `createTestHost` and delete those
+journeys. The data says there is nothing to move: across all 196 scenario blocks, matching every step to its
+definition, **zero** scenarios avoid `page` — every journey drives the real UI, and the repo requires each feature to
+carry a gherkin verification. The pyramid is already thin (about four journeys per plugin), so deleting journeys here
+would trade coverage for seconds.
+
 ## Resume here
 
 E1-E5 have landed (E3 rejected with numbers, E6 dropped by request). The per-scenario cache now decides

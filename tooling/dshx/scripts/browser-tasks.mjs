@@ -310,9 +310,14 @@ export const planBrowserTasks = async () => {
         feature: featureName.replace(/\.feature$/, ''),
         booted: [...scenarioBooted].sort(),
         everyBundle: scenarioEveryBundle,
-        // The scenario-level cache keys on these two facts: what its own steps say, and the built JavaScript of every
-        // bundle they reach. Both are content, so a rebase that leaves the files alone cannot invalidate a receipt.
-        stepsHash: createHash('sha256').update(scenario.steps.join('\n')).digest('hex'),
+        // The scenario-level cache keys on these facts: what its own steps say, the *implementation* of every step it
+        // matched (a step body can change what a scenario proves without touching its text), and the built JavaScript
+        // of every bundle it reaches. All content, so a rebase that leaves the files alone cannot invalidate a receipt.
+        stepsHash: createHash('sha256')
+          .update(scenario.steps.join('\n'))
+          .update('\0')
+          .update(scenarioDefinitions.map(definition => `${definition.file}\0${definition.expression}\0${definition.body}`).join('\0'))
+          .digest('hex'),
       })
     }
     for (const name of booted) owner.booted.add(name)

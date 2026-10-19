@@ -191,3 +191,17 @@ test('a scenario-level impact is never wider than the task-level impact it repla
   assert.ok(affected.length > 0 && affected.length < 60, `expected a handful of scenarios, saw ${String(affected.length)}`)
   assert.ok(affectedOwners.size < owners.size)
 })
+
+test('a scenario key moves when a step implementation changes, not only its text', async () => {
+  // The feature text is untouched here: only a definition body differs, which is exactly the case a text-only key
+  // would replay as a false pass.
+  const source = ['Feature: x', '  @scenario:x.one', '  Scenario: One', '    Given the isolated plugin profile "@dshfiles/alpha" is booted'].join('\n')
+  const scenario = featureScenarios(source)[0]
+  const definitions = parseStepDefinitions('Given("the isolated plugin profile {string} is booted", async ({ page }) => { await page.goto("a") })')
+  const keyFor = body => {
+    const matched = scenario.steps.map(step => definitions.find(definition => cucumberExpressionPattern(definition.expression)?.test(step)))
+    return matched.map(definition => definition.file + definition.body).join('\0') + body
+  }
+  assert.notEqual(keyFor('one implementation'), keyFor('another implementation'))
+  assert.equal(keyFor('same'), keyFor('same'))
+})
