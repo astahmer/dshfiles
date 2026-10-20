@@ -136,6 +136,85 @@ test('recent threads stay active until idle threshold; running and organization 
   assert.equal(classify(sessionSummary({ id: 'parked-beats-settled', updatedAt: now }), { parked: new Set(['parked-beats-settled']) }), 'parked')
 })
 
+test('dropping a row into a section plans exactly the statuses that section means', () => {
+  const plan = (section: SidebarSection) => SidebarOrganization.sectionDropPlan(section)
+  assert.deepEqual(plan('pinned'), {
+    archive: false,
+    unarchive: true,
+    pin: true,
+    unpin: false,
+    park: false,
+    unpark: true,
+    settle: false,
+    unsettle: true,
+    idleOverride: null,
+  })
+  assert.deepEqual(plan('parked'), {
+    archive: false,
+    unarchive: true,
+    pin: false,
+    unpin: true,
+    park: true,
+    unpark: false,
+    settle: false,
+    unsettle: true,
+    idleOverride: null,
+  })
+  assert.deepEqual(plan('settled'), {
+    archive: false,
+    unarchive: true,
+    pin: false,
+    unpin: true,
+    park: false,
+    unpark: true,
+    settle: true,
+    unsettle: false,
+    idleOverride: null,
+  })
+  // Archiving outranks every other status, so restoring a thread should bring back where it was.
+  assert.deepEqual(plan('archived'), {
+    archive: true,
+    unarchive: false,
+    pin: false,
+    unpin: false,
+    park: false,
+    unpark: false,
+    settle: false,
+    unsettle: false,
+    idleOverride: null,
+  })
+  assert.equal(plan('active').idleOverride, 'active')
+  assert.equal(plan('inactive').idleOverride, 'inactive')
+  for (const section of ['active', 'inactive'] as const) {
+    assert.equal(plan(section).pin, false)
+    assert.equal(plan(section).park, false)
+    assert.equal(plan(section).settle, false)
+    assert.equal(plan(section).unarchive, true)
+  }
+})
+
+test('a dropped Active or Inactive override outranks idleness only until the thread changes', () => {
+  const classify = (session: SessionSummary, idleSectionOverrides?: SidebarPreferences['idleSectionOverrides']) =>
+    SidebarOrganization.sectionForSession({
+      session,
+      archivedSessionIds: idSets.archivedSessionIds,
+      pinnedSessionIds: idSets.pinnedSessionIds,
+      parkedSessionIds: new Set<string>(),
+      settledSessionIds: new Set<string>(),
+      idleSectionOverrides,
+      now,
+      idleMinutes: 120,
+    })
+  const idle = sessionSummary({ id: 'idle', updatedAt: now - 240 * 60_000 })
+  const droppedActive = { idle: { section: 'active', at: now } } as const
+  const droppedInactive = { idle: { section: 'inactive', at: now } } as const
+  assert.equal(classify(idle, droppedActive), 'active')
+  assert.equal(classify(idle, droppedInactive), 'inactive')
+  // A turn bumps updatedAt past the drop, so the thread lands in the section its new activity means.
+  assert.equal(classify({ ...idle, updatedAt: now + 1 }, droppedActive), 'active')
+  assert.equal(classify(sessionSummary({ id: 'idle', updatedAt: now }), droppedInactive), 'inactive')
+})
+
 test('next idle transition ignores running sessions and returns earliest future boundary', () => {
   assert.equal(
     SidebarOrganization.nextIdleTransitionAt(

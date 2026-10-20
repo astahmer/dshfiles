@@ -71,6 +71,9 @@ const preferencesInputSchema = z
       .max(SIDEBAR_SECTIONS.length)
       .default([...DEFAULT_PREFERENCES.sectionOrder])
       .transform(order => SidebarOrganization.orderSections(order)),
+    idleSectionOverrides: z
+      .record(z.string().min(1).max(256), z.object({ section: z.enum(['active', 'inactive']), at: z.number().int().nonnegative() }).strict())
+      .default(DEFAULT_PREFERENCES.idleSectionOverrides),
     workspaceFilter: z.string().max(256).nullable().default(DEFAULT_PREFERENCES.workspaceFilter),
     headerMode: z.enum(['compact', 'expanded']),
     hideBrandLogo: z.boolean().default(DEFAULT_PREFERENCES.hideBrandLogo),

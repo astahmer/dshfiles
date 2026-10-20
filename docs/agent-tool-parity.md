@@ -79,6 +79,7 @@ Each row is a tool worth building today: the backing verb already exists.
 | Proposed tool                    | Capability                                               | Backing verb                                                                     |
 | -------------------------------- | -------------------------------------------------------- | -------------------------------------------------------------------------------- |
 | `thread_park` / `thread_unpark`  | Park a thread out of the active groups                   | host-gap: nothing but browser-local `parkedSessionIds` (`src/settings.ts:110`)   |
+| `thread_move_to_section`         | Drag a row into Pinned/Active/Parked/Inactive/Settled/Archived, including the idle override | composites the served `thread_pin`/`thread_unpin`/`thread_settle`/`thread_unsettle`/`thread_archive`/`thread_unarchive` tools; parking has no Host verb yet |
 | `thread_mute` / `thread_unmute`  | Snooze notifications 1h…forever                          | `settings/update`, namespace `thread-sidebar` (`src/settings.ts:111`)            |
 | `thread_mark_unread`             | Mark a thread manually unread                            | host-gap: browser-local (`src/thread-notifications.ts:24`)                       |
 | `thread_link`                    | Copy a thread id or link                                 | host-gap for the Agent: `writeClipboard` is client-only (`src/thread-url.ts:14`) |

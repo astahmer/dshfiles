@@ -24,7 +24,10 @@ and Settled sections take precedence. Otherwise, running threads are Active;
 non-running Parked threads are Parked; the rest remain Active until the idle
 threshold. Settling a thread clears its parked mark in the same write, so a
 settled thread is never also Parked. By default, a non-running thread becomes
-Inactive after two hours.
+Inactive after two hours. Dragging a row into another status section sets that
+section's status and clears the ones that outrank it; an Active or Inactive drop
+records `idleSectionOverrides` (section plus instant) so the choice outranks
+idleness until the thread's next turn.
 
 **Settled** is this plugin's own status, not DSH's archive: the thread stays
 listed and openable, but the Host refuses the model steps it proposes until it

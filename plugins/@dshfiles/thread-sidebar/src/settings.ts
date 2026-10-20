@@ -144,6 +144,9 @@ export const threadSidebarSettings = defineSettings({
       .default([...DEFAULT_PREFERENCES.sectionOrder])
       .hidden(),
     collapsedGroups: Schema.array(Schema.string()).default(DEFAULT_PREFERENCES.collapsedGroups).hidden(),
+    idleSectionOverrides: Schema.dict(Schema.object({ section: Schema.union(['active', 'inactive']), at: Schema.natural() }))
+      .default({})
+      .hidden(),
     workspaceFilter: Schema.union([Schema.const(null), Schema.string()])
       .default(DEFAULT_PREFERENCES.workspaceFilter)
       .hidden(),

@@ -11,6 +11,21 @@ no rows folds away and keeps its saved slot while the shown ones reorder around
 it. The project picker scopes rows to one workspace
 or unassigned sessions.
 
+**Moving a row between sections.** Drag a thread row onto another section header
+(or anywhere inside that section) to put it there; while a row is in flight every
+section shows, including the empty ones, and the target highlights. The section
+it lands in opens if it was folded, so the moved row stays visible. A section is
+a status, so entering one sets that status and clears the ones that outrank it:
+Pinned pins, Parked parks, Settled settles, and Active/Inactive unpin, unpark and
+unsettle. Dragging a settled thread out unsettles it and dragging an archived
+thread out restores it. Active and Inactive are otherwise derived from the idle
+threshold, so a drop there records `idleSectionOverrides` (with its instant) and
+keeps the row in that section until the thread's next turn; Archived keeps the
+thread's other statuses, so restoring brings it back where it was. Pin, settle
+and archive keep their usual refusals (a running thread cannot be parked, settled
+or archived), and every move honors Apply actions to child threads. The row
+context menu's Move to group submenu performs the same moves from the keyboard.
+
 **Keyboard and multi-select.** ↑/↓ move focus and open the focused thread (or
 only move focus when Sidebar settings says Move focus only); Shift+↑/↓ extends a
 range without opening, Home/End jump to the ends of the list, and Ctrl/Cmd+A

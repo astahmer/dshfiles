@@ -95,12 +95,14 @@ import {
   useRef,
   useState,
   type MouseEvent as ReactMouseEvent,
+  type PointerEvent as ReactPointerEvent,
   type ReactElement,
   type ReactNode,
 } from 'react'
 import { z } from 'zod'
 import {
   SidebarOrganization,
+  SIDEBAR_SECTIONS,
   type AutoSettleOverride,
   type AttentionColor,
   type AttentionColorKey,
@@ -290,6 +292,8 @@ const ALL_PROJECTS = '__all__'
 const INVENTORY_REFRESH_INTERVAL_MS = 60_000
 /** Pointer travel before a press on a section header becomes a reorder drag instead of a fold. */
 const SECTION_DRAG_THRESHOLD_PX = 5
+/** Pointer travel before a press on a thread row becomes a move-between-sections drag instead of a click. */
+const ROW_DRAG_THRESHOLD_PX = 5
 const UNASSIGNED_PROJECT = '__unassigned__'
 
 const sectionLabels: Record<SidebarSection, Parameters<ThreadSidebarTranslate>[0]> = {
@@ -300,6 +304,8 @@ const sectionLabels: Record<SidebarSection, Parameters<ThreadSidebarTranslate>[0
   inactive: 'threadSidebarInactive',
   archived: 'threadSidebarArchived',
 }
+
+const isSidebarSection = (value: string | undefined): value is SidebarSection => SIDEBAR_SECTIONS.some(section => section === value)
 
 const THREAD_TAB_FOCUS_EVENT = 'dshfiles:main-tabs:focus-thread'
 const threadTabFocusEventSchema = z.object({ sessionId: z.string().min(1) }).strict()
@@ -387,6 +393,7 @@ interface RowActions {
   readonly toggleChildren: (sessionId: SessionSummary['id'], currentlyOpen: boolean) => void
   /** Any parent id, including a missing ancestor only its detached children name. */
   readonly toggleAllChildren: (parentId: string) => void
+  readonly moveToSection: (sessionId: SessionSummary['id'], section: SidebarSection) => void
   readonly mute: (sessionId: SessionSummary['id'], option: ThreadMuteOption) => void
   readonly unmute: (sessionId: SessionSummary['id']) => void
   readonly markUnread: (sessionId: SessionSummary['id']) => void
@@ -419,6 +426,10 @@ interface ThreadRowProps {
   readonly parked: boolean
   readonly settled: boolean
   readonly selected: boolean
+  /** The status section this row renders in; undefined for the attention and draft rows no drop reaches. */
+  readonly section?: SidebarSection | undefined
+  /** Set only on the row whose drag is in flight, so it reads as picked up. */
+  readonly dragging: boolean
   readonly parentTitle: string | undefined
   readonly workspaceId: string | undefined
   readonly workspaceTitle: string | undefined
@@ -610,7 +621,7 @@ const ChildThreadList = (props: {
 
 type ThreadContextMenuProps = Pick<
   ThreadRowProps,
-  'session' | 'unread' | 'autoSettleOverride' | 'mute' | 'archived' | 'pinned' | 'parked' | 'settled' | 'workspaceId' | 'actions'
+  'session' | 'unread' | 'autoSettleOverride' | 'mute' | 'archived' | 'pinned' | 'parked' | 'settled' | 'section' | 'workspaceId' | 'actions'
 > & { readonly children: JSX.Element }
 
 /** One menu for the whole batch: every verb applies to each selected thread the verb can still change. */
@@ -733,6 +744,17 @@ const ThreadMenuBody = (props: ThreadContextMenuProps): JSX.Element => {
           <ContextMenuItem disabled={props.mute === undefined} onSelect={() => props.actions.unmute(session.id)}>
             {t('threadSidebarUnmute')}
           </ContextMenuItem>
+        </ContextMenuSubContent>
+      </ContextMenuSub>
+      <ContextMenuSeparator />
+      <ContextMenuSub>
+        <ContextMenuSubTrigger>{t('threadSidebarMoveToSection')}</ContextMenuSubTrigger>
+        <ContextMenuSubContent className="dshx-root dshx:min-w-44" aria-label={t('threadSidebarMoveToSection')}>
+          {SIDEBAR_SECTIONS.map(section => (
+            <ContextMenuItem key={section} disabled={section === props.section} onSelect={() => props.actions.moveToSection(session.id, section)}>
+              {t(sectionLabels[section])}
+            </ContextMenuItem>
+          ))}
         </ContextMenuSubContent>
       </ContextMenuSub>
       <ContextMenuSeparator />
@@ -910,14 +932,16 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
       pinned={pinned}
       parked={parked}
       settled={settled}
+      section={props.section}
       workspaceId={props.workspaceId}
       actions={props.actions}
     >
       <article
         ref={rowRef}
-        className="dshx:group/row dshx:relative dshx:min-w-0"
+        className={cn('dshx:group/row dshx:relative dshx:min-w-0', props.dragging && 'dshx:opacity-50')}
         data-thread-id={session.id}
         data-selected={props.selected}
+        data-thread-section-row={props.section === undefined ? undefined : ''}
         onContextMenu={captureThreadMentionInsertion}
       >
         <div className="dshx:relative dshx:rounded-md dshx:hover:bg-accent/60 dshx:focus-within:bg-accent/60 dshx:group-data-[selected=true]/row:bg-accent">
@@ -2198,6 +2222,59 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   }
 
   /**
+   * Drop a row into another status section. A section is a status, so entering one sets it and clears
+   * the statuses that outrank it: dragging a settled thread out unsettles it and dragging an archived
+   * thread out restores it. Active and Inactive are derived from idleness, so those drops record an
+   * override, which a later turn supersedes by moving the thread's `updatedAt` past it.
+   */
+  const moveThreadsToSection = async (sessionId: SessionSummary['id'], section: SidebarSection): Promise<void> => {
+    const plan = SidebarOrganization.sectionDropPlan(section)
+    const targets = threadActionTargetIds({
+      threadId: sessionId,
+      threads: Object.values(sessionState.byId).filter(session => !session.blank),
+      cascadeToChildren: preferences.applyActionsToChildThreads,
+    })
+    const running = targets.filter(targetId => sessionState.byId[targetId]?.running === true)
+    if ((plan.archive || plan.park || plan.settle) && running.length > 0) {
+      setNotice({ tone: 'warning', message: props.tSidebar('threadSidebarRunningNotice') })
+      return
+    }
+    if (plan.settle && targets.some(targetId => SidebarOrganization.hasRunningDescendant({ sessionId: targetId, sessions }))) {
+      setNotice({ tone: 'warning', message: props.tSidebar('threadSidebarRunningNotice') })
+      return
+    }
+    let failed = false
+    const archivedTargets = targets.filter(targetId => archivedSessionIds.has(SessionId(targetId)))
+    if (plan.unarchive && archivedTargets.length > 0) failed = !(await mutateThreads(archivedTargets, 'unarchive')) || failed
+    if (plan.archive) failed = !(await mutateThreads([sessionId], 'archive')) || failed
+    if (plan.pin) failed = !(await mutateThreads([sessionId], 'pin')) || failed
+    if (plan.unpin) failed = !(await mutateThreads([sessionId], 'unpin')) || failed
+
+    const nextParked = new Set(preferences.parkedSessionIds)
+    for (const targetId of targets) {
+      if (plan.park) nextParked.add(targetId)
+      if (plan.unpark) nextParked.delete(targetId)
+    }
+    const status = { settledSessionIds: preferences.settledSessionIds, settledAt: preferences.settledAt }
+    const idleSectionOverrides = { ...preferences.idleSectionOverrides }
+    for (const targetId of targets) {
+      if (plan.idleOverride === null) delete idleSectionOverrides[targetId]
+      else idleSectionOverrides[targetId] = { section: plan.idleOverride, at: Date.now() }
+    }
+    changePreferences({
+      parkedSessionIds: [...nextParked],
+      ...(plan.settle ? SettledThreadsModel.settle(status, targets, Date.now()) : plan.unsettle ? SettledThreadsModel.unsettle(status, targets) : {}),
+      idleSectionOverrides,
+      // The destination opens on a drop, so a row dropped into a folded Settled or Archived section is visible.
+      collapsedSections: preferences.collapsedSections.includes(section)
+        ? preferences.collapsedSections.filter(item => item !== section)
+        : preferences.collapsedSections,
+    })
+    if (failed) setNotice({ tone: 'danger', message: props.tSidebar('threadSidebarActionFailure') })
+    else if (!plan.archive) setNotice(null)
+  }
+
+  /**
    * The jj-integration notice asks this sidebar to settle the thread it just integrated. Settling writes our own
    * status, so the sidebar answers the request and the notice keeps no second copy of it.
    */
@@ -2806,6 +2883,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         pinnedSessionIds,
         parkedSessionIds,
         settledSessionIds,
+        idleSectionOverrides: preferences.idleSectionOverrides,
         now,
         idleMinutes: preferences.idleMinutes,
       })
@@ -2826,6 +2904,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     pinnedSessionIds,
     orderedSections,
     preferences.idleMinutes,
+    preferences.idleSectionOverrides,
     visibleThreadEntries,
     workspaceState.pinnedSessionIds,
   ])
@@ -2838,17 +2917,33 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const sectionDragRef = useRef<{ pointerId: number; from: number; startY: number; centers: number[] | null } | null>(null)
   const suppressSectionClick = useRef(false)
   const [sectionDrag, setSectionDrag] = useState<{ from: number; to: number } | null>(null)
+  // A row drag opens every section, including the empty ones, so there is always a header to drop on.
+  const [rowDrag, setRowDrag] = useState<{ sessionId: SessionSummary['id']; section: SidebarSection } | null>(null)
+  const [rowDropSection, setRowDropSection] = useState<SidebarSection | null>(null)
+  const rowDragRef = useRef<{
+    pointerId: number
+    sessionId: SessionSummary['id']
+    section: SidebarSection
+    startX: number
+    startY: number
+    active: boolean
+  } | null>(null)
+  const rowDropSectionRef = useRef<SidebarSection | null>(null)
+  const suppressRowClick = useRef(false)
+  const moveThreadsToSectionRef = useRef(moveThreadsToSection)
+  moveThreadsToSectionRef.current = moveThreadsToSection
+  const dropSections = rowDrag === null ? shownSections : orderedSections
   const renderedSections = useMemo(
     () =>
       sectionDrag === null
-        ? shownSections
+        ? dropSections
         : SidebarOrganization.reorderSections({
             savedOrder: orderedSections,
-            shownSections,
+            shownSections: dropSections,
             fromShownIndex: sectionDrag.from,
             toShownIndex: sectionDrag.to,
-          }).filter(section => shownSections.includes(section)),
-    [orderedSections, sectionDrag, shownSections],
+          }).filter(section => dropSections.includes(section)),
+    [dropSections, orderedSections, sectionDrag],
   )
   const endSectionDrag = (): void => {
     sectionDragRef.current = null
@@ -2860,6 +2955,67 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       sectionOrder: SidebarOrganization.reorderSections({ savedOrder: orderedSections, shownSections, fromShownIndex, toShownIndex }),
     })
   }
+  /**
+   * One window-level pointer gesture for row moves: a press on a row is a candidate, the first few pixels turn it
+   * into a drag (so a plain click still opens the thread), the section under the pointer is the target, and the
+   * release applies the move. Pointer capture is not needed because the listeners outlive the row.
+   */
+  useEffect(() => {
+    const sectionUnderPointer = (event: PointerEvent): SidebarSection | null => {
+      const element = document.elementFromPoint(event.clientX, event.clientY)
+      const section = element instanceof Element ? element.closest<HTMLElement>('[data-thread-section]')?.dataset.threadSection : undefined
+      return isSidebarSection(section) ? section : null
+    }
+    const handlePointerMove = (event: PointerEvent): void => {
+      const current = rowDragRef.current
+      if (current === null || current.pointerId !== event.pointerId) return
+      if (!current.active) {
+        if (Math.abs(event.clientX - current.startX) < ROW_DRAG_THRESHOLD_PX && Math.abs(event.clientY - current.startY) < ROW_DRAG_THRESHOLD_PX) return
+        current.active = true
+        window.getSelection()?.removeAllRanges()
+        setRowDrag({ sessionId: current.sessionId, section: current.section })
+      }
+      event.preventDefault()
+      const next = sectionUnderPointer(event)
+      rowDropSectionRef.current = next
+      setRowDropSection(currentDrop => (currentDrop === next ? currentDrop : next))
+      const list = scrollAreaRef.current
+      if (list === null) return
+      const rect = list.getBoundingClientRect()
+      if (event.clientY < rect.top + 36) list.scrollBy({ top: -14 })
+      else if (event.clientY > rect.bottom - 36) list.scrollBy({ top: 14 })
+    }
+    const handlePointerUp = (event: PointerEvent): void => {
+      const current = rowDragRef.current
+      if (current === null || current.pointerId !== event.pointerId) return
+      rowDragRef.current = null
+      const droppedOn = rowDropSectionRef.current
+      rowDropSectionRef.current = null
+      setRowDropSection(null)
+      if (!current.active) return
+      setRowDrag(null)
+      suppressRowClick.current = true
+      window.setTimeout(() => {
+        suppressRowClick.current = false
+      }, 0)
+      if (droppedOn !== null && droppedOn !== current.section) void moveThreadsToSectionRef.current(current.sessionId, droppedOn)
+    }
+    const handlePointerCancel = (event: PointerEvent): void => {
+      if (rowDragRef.current?.pointerId !== event.pointerId) return
+      rowDragRef.current = null
+      rowDropSectionRef.current = null
+      setRowDrag(null)
+      setRowDropSection(null)
+    }
+    window.addEventListener('pointermove', handlePointerMove)
+    window.addEventListener('pointerup', handlePointerUp)
+    window.addEventListener('pointercancel', handlePointerCancel)
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove)
+      window.removeEventListener('pointerup', handlePointerUp)
+      window.removeEventListener('pointercancel', handlePointerCancel)
+    }
+  }, [])
   const groupedThreadEntries = useMemo(() => {
     if (threadView.groupBy === 'status') return []
     return ThreadViewModel.groupEntries({
@@ -2998,6 +3154,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     toggleParked,
     toggleSettled,
     settleSessions,
+    moveThreadsToSection,
     copyContextValue,
     resumeRecoverySession,
     dismissRecoverySession,
@@ -3026,6 +3183,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     toggleParked,
     toggleSettled,
     settleSessions,
+    moveThreadsToSection,
     copyContextValue,
     resumeRecoverySession,
     dismissRecoverySession,
@@ -3129,6 +3287,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       mutate: (sessionId, operation) => latestRowActions.current.mutateSession(sessionId, operation),
       toggleParked: sessionId => latestRowActions.current.toggleParked(sessionId),
       toggleSettled: sessionId => latestRowActions.current.toggleSettled(sessionId),
+      moveToSection: (sessionId, section) => void latestRowActions.current.moveThreadsToSection(sessionId, section),
       copy: (value, successMessage) => latestRowActions.current.copyContextValue(value, successMessage),
       toggleChildren: (sessionId, currentlyOpen) => setChildrenOpenOverrides(current => new Map(current).set(sessionId, !currentlyOpen)),
       toggleAllChildren: sessionId => setExpandedParents(current => toggleSetMember(current, sessionId)),
@@ -3187,7 +3346,36 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
 
   const orderedVisibleThreadIds = (list: HTMLElement): string[] => ThreadListNavigationModel.visibleRows(list).map(row => row.id)
 
+  const startRowDragCandidate = (event: ReactPointerEvent<HTMLDivElement>): void => {
+    if (event.button !== 0 || event.pointerType === 'touch') return
+    const target = event.target
+    if (!(target instanceof Element)) return
+    const row = target.closest<HTMLElement>('article[data-thread-id]')
+    if (row === null || !event.currentTarget.contains(row) || !row.hasAttribute('data-thread-section-row')) return
+    // Hover actions keep their clicks: only the row's main button starts a move.
+    const button = target.closest('button')
+    if (button !== null && button.dataset.threadMainAction === undefined) return
+    const section = row.closest<HTMLElement>('[data-thread-section]')?.dataset.threadSection
+    const threadId = row.dataset.threadId
+    if (!isSidebarSection(section) || threadId === undefined) return
+    rowDragRef.current = {
+      pointerId: event.pointerId,
+      sessionId: SessionId(threadId),
+      section,
+      startX: event.clientX,
+      startY: event.clientY,
+      active: false,
+    }
+  }
+
   const handleSelectionClickCapture = (event: ReactMouseEvent<HTMLDivElement>): void => {
+    // The click a pointer drag produces on release belongs to the drag, not to the row it started on.
+    if (suppressRowClick.current) {
+      suppressRowClick.current = false
+      event.preventDefault()
+      event.stopPropagation()
+      return
+    }
     const target = event.target
     if (!(target instanceof Element)) return
     // Portalled menus and dialogs keep this React tree as their parent, so their clicks arrive here too.
@@ -3273,7 +3461,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     setThreadSelection(EMPTY_THREAD_SELECTION)
   }
 
-  const renderThreadRow = (session: SessionSummary, attentionLabel: ThreadRowProps['attentionLabel']): JSX.Element => {
+  const renderThreadRow = (session: SessionSummary, attentionLabel: ThreadRowProps['attentionLabel'], section?: SidebarSection): JSX.Element => {
     const lineage = SidebarOrganization.sessionLineage(session, sessionState.byId)
     const workspaceId = SidebarOrganization.workspaceForLineage(session, sessionState.byId, workspaceBySession)
     // Derived once per parent change: an untouched parent keeps the arrays its row already holds, so memo holds.
@@ -3297,6 +3485,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         pinned={pinnedSessionIds.has(session.id)}
         parked={parkedSessionIds.has(session.id)}
         settled={settledSessionIds.has(session.id)}
+        section={section}
+        dragging={rowDrag?.sessionId === session.id}
         selected={selectedSession?.id === session.id}
         parentTitle={lineage.parentTitle}
         workspaceId={workspaceId}
@@ -3768,6 +3958,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           className="dshx:min-h-0 dshx:flex-1 dshx:overflow-auto dshx:overscroll-y-contain dshx:px-2 dshx:pb-3"
           onClickCapture={handleSelectionClickCapture}
           onContextMenuCapture={handleSelectionContextMenuCapture}
+          onPointerDown={startRowDragCandidate}
           onKeyDown={event =>
             ThreadListNavigationModel.navigate({
               event: event.nativeEvent,
@@ -3937,7 +4128,14 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                 const rows = rowsBySection.get(section) ?? []
                 const collapsed = preferences.collapsedSections.includes(section)
                 return (
-                  <section className="dshx:mt-1" key={section}>
+                  <section
+                    className={cn(
+                      'dshx:mt-1 dshx:rounded-md',
+                      rowDrag !== null && rowDropSection === section && 'dshx:bg-accent/40 dshx:ring-1 dshx:ring-inset dshx:ring-ring/30',
+                    )}
+                    key={section}
+                    data-thread-section={section}
+                  >
                     <button
                       ref={element => {
                         sectionHeaderRefs.current[index] = element
@@ -3948,6 +4146,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                       className={cn(
                         stickyHeaderClass,
                         'dshx:group dshx:flex dshx:h-8 dshx:w-full dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-2.5 dshx:text-sm dshx:text-muted-foreground dshx:outline-none dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50',
+                        rowDrag !== null && 'dshx:ring-1 dshx:ring-ring/20',
+                        rowDropSection === section && 'dshx:bg-accent dshx:text-foreground dshx:ring-ring/50',
                         sectionDrag?.from === index && 'dshx:cursor-grabbing dshx:bg-accent dshx:opacity-70',
                       )}
                       aria-expanded={!collapsed}
@@ -4020,7 +4220,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                         {collapsed ? <IconChevronDownOutlineRegular size={12} /> : <IconChevronUpOutlineRegular size={12} />}
                       </span>
                     </button>
-                    {!collapsed ? rows.map(session => renderThreadRow(session, undefined)) : null}
+                    {!collapsed ? rows.map(session => renderThreadRow(session, undefined, section)) : null}
                   </section>
                 )
               })

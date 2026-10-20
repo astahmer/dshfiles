@@ -57,6 +57,31 @@ const openThreadRowMenu = async (row: Locator): Promise<void> => {
   await row.click({ button: 'right', position: { x: 24, y: 16 } })
 }
 
+/**
+ * Drag a row onto a section header with real pointer input: Chromium starts the row's native HTML5 drag on the first
+ * move past its threshold, and the drop lands on the section under the pointer.
+ */
+const dragRowToSectionHeader = async (page: Page, row: Locator, header: Locator): Promise<void> => {
+  await row.scrollIntoViewIfNeeded()
+  const from = await row.boundingBox()
+  if (from === null) throw new Error('A thread row has no layout box to drag.')
+  const startX = from.x + 24
+  const startY = from.y + 12
+  await page.mouse.move(startX, startY)
+  await page.mouse.down()
+  // The first travel starts the drag; the sidebar then reveals every empty section, which moves the header.
+  await page.mouse.move(startX + 12, startY + 12, { steps: 4 })
+  const to = await header.boundingBox()
+  if (to === null) throw new Error('A section header has no layout box to drop on.')
+  const targetY = to.y + to.height / 2
+  for (const step of [0.25, 0.5, 0.75, 1]) {
+    await page.mouse.move(startX + 12, startY + (targetY - startY) * step, { steps: 4 })
+  }
+  await page.mouse.up()
+}
+
+const sectionOfSidebar = (page: Page, section: string): Locator => threadSidebar(page).locator(`section[data-thread-section="${section}"]`)
+
 const startBlankThread = async (page: Page): Promise<string> => {
   const createResponsePromise = page.waitForResponse(
     response => {
@@ -498,6 +523,26 @@ Then('the Host thread stays parked after reload without an attention error', asy
     await expect(threadSidebar(page).getByRole('button', { name: 'Active (0)', exact: true })).toBeVisible()
     await expect(threadSidebar(page).getByRole('button', { name: 'Parked (1)', exact: true })).toBeVisible()
     await expect(targetRow).toHaveCount(1)
+  })
+  await finishJourneyAssertions(page)
+})
+
+Then('dragging its row onto the Active header unparks it and survives a reload', async ({ page }: { page: Page }) => {
+  if (parkedThreadId === null) throw new Error('No thread was parked.')
+  const threadId = parkedThreadId
+  const targetRow = threadRow(page, threadId)
+  const activeHeader = sectionOfSidebar(page, 'active').locator('[data-thread-section-header]')
+  await recordAssertion(page, 'thread-sidebar-row-drag-moves-to-another-section', async () => {
+    await expect(threadSidebar(page).getByRole('button', { name: 'Parked (1)', exact: true })).toBeVisible()
+    await dragRowToSectionHeader(page, targetRow, activeHeader)
+    await expect(sectionOfSidebar(page, 'active').locator(`article[data-thread-id="${threadId}"]`)).toHaveCount(1)
+    await expect(threadSidebar(page).getByRole('button', { name: 'Parked (1)', exact: true })).toHaveCount(0)
+  })
+  await page.reload()
+  await expect(threadSidebar(page)).toBeVisible()
+  await recordAssertion(page, 'thread-sidebar-row-drag-survives-reload', async () => {
+    await expect(sectionOfSidebar(page, 'active').locator(`article[data-thread-id="${threadId}"]`)).toHaveCount(1)
+    await expect(threadSidebar(page).getByRole('button', { name: 'Parked (1)', exact: true })).toHaveCount(0)
   })
   await finishJourneyAssertions(page)
 })

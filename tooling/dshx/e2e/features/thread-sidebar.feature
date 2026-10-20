@@ -48,6 +48,12 @@ Feature: Thread sidebar journeys
     When a nonblank Host thread is parked from its context menu
     Then the Host thread stays parked after reload without an attention error
 
+  @scenario:thread-sidebar.section-drop
+  Scenario: Drag a thread row into another section
+    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
+    When a nonblank Host thread is parked from its context menu
+    Then dragging its row onto the Active header unparks it and survives a reload
+
   @scenario:thread-sidebar.classification
   Scenario: Blank Host sessions stay out of classified thread rows
     Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted

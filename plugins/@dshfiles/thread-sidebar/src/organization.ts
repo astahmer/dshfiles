@@ -11,6 +11,25 @@ import { DEFAULT_THREAD_VIEW_SETTINGS, type ThreadViewSettings } from './thread-
 export const SIDEBAR_SECTIONS = ['pinned', 'active', 'parked', 'inactive', 'settled', 'archived'] as const
 export type SidebarSection = (typeof SIDEBAR_SECTIONS)[number]
 
+/** A section a user dropped a row in, with the instant it happened; see `sectionDropPlan`. */
+export interface IdleSectionOverride {
+  readonly section: 'active' | 'inactive'
+  readonly at: number
+}
+
+/** What moving a row into `section` writes: every status it clears or sets, in one place. */
+export interface SectionDropPlan {
+  readonly archive: boolean
+  readonly unarchive: boolean
+  readonly pin: boolean
+  readonly unpin: boolean
+  readonly park: boolean
+  readonly unpark: boolean
+  readonly settle: boolean
+  readonly unsettle: boolean
+  readonly idleOverride: 'active' | 'inactive' | null
+}
+
 export const SIDEBAR_HEADER_MIN_HEIGHT = 44
 export const SIDEBAR_THREAD_MIN_HEIGHT = 120
 export const SIDEBAR_SPLITTER_HEIGHT = 12
@@ -68,6 +87,12 @@ export interface SidebarPreferences {
   collapsedGroups: string[]
   /** Section header order; the sections themselves are fixed, only their sequence changes. */
   sectionOrder: SidebarSection[]
+  /**
+   * Active or Inactive as a row was dropped there, by session id. Both are otherwise derived from
+   * the idle threshold, so a drop has to outrank that derivation; `at` lets a later turn make the
+   * thread active again the normal way.
+   */
+  idleSectionOverrides: Record<string, IdleSectionOverride>
   workspaceFilter: string | null
   headerMode: 'compact' | 'expanded'
   /** Drop the Host brand mark and name from the header; the collapse button stays. */
@@ -138,6 +163,7 @@ export const DEFAULT_PREFERENCES: SidebarPreferences = {
   collapsedSections: ['archived', 'settled'],
   collapsedGroups: [],
   sectionOrder: [...SIDEBAR_SECTIONS],
+  idleSectionOverrides: {},
   workspaceFilter: null,
   headerMode: 'compact',
   hideBrandLogo: false,
@@ -551,12 +577,35 @@ const hasRunningDescendant = (input: {
   return false
 }
 
+/**
+ * What dropping a row into a section changes. A section is a status, so entering one sets its status
+ * and clears the statuses that outrank it; archived is the exception, since restoring should bring a
+ * thread back where it was. Both idle sections need an override because idleness is derived.
+ */
+const sectionDropPlan = (section: SidebarSection): SectionDropPlan => {
+  switch (section) {
+    case 'pinned':
+      return { archive: false, unarchive: true, pin: true, unpin: false, park: false, unpark: true, settle: false, unsettle: true, idleOverride: null }
+    case 'parked':
+      return { archive: false, unarchive: true, pin: false, unpin: true, park: true, unpark: false, settle: false, unsettle: true, idleOverride: null }
+    case 'settled':
+      return { archive: false, unarchive: true, pin: false, unpin: true, park: false, unpark: true, settle: true, unsettle: false, idleOverride: null }
+    case 'archived':
+      return { archive: true, unarchive: false, pin: false, unpin: false, park: false, unpark: false, settle: false, unsettle: false, idleOverride: null }
+    case 'inactive':
+      return { archive: false, unarchive: true, pin: false, unpin: true, park: false, unpark: true, settle: false, unsettle: true, idleOverride: 'inactive' }
+    case 'active':
+      return { archive: false, unarchive: true, pin: false, unpin: true, park: false, unpark: true, settle: false, unsettle: true, idleOverride: 'active' }
+  }
+}
+
 const sectionForSession = ({
   session,
   archivedSessionIds,
   pinnedSessionIds,
   parkedSessionIds,
   settledSessionIds,
+  idleSectionOverrides,
   now,
   idleMinutes,
 }: {
@@ -565,6 +614,7 @@ const sectionForSession = ({
   readonly pinnedSessionIds: ReadonlySet<string>
   readonly parkedSessionIds: ReadonlySet<string>
   readonly settledSessionIds: ReadonlySet<string>
+  readonly idleSectionOverrides?: Readonly<Record<string, IdleSectionOverride>> | undefined
   readonly now: number
   readonly idleMinutes: number
 }): SidebarSection => {
@@ -573,6 +623,8 @@ const sectionForSession = ({
   if (session.running) return 'active'
   if (parkedSessionIds.has(session.id)) return 'parked'
   if (settledSessionIds.has(session.id)) return 'settled'
+  const dropped = idleSectionOverrides?.[session.id]
+  if (dropped !== undefined && session.updatedAt <= dropped.at) return dropped.section
   return hasPassedIdleThreshold(session, now, idleMinutes) ? 'inactive' : 'active'
 }
 
@@ -624,5 +676,6 @@ export class SidebarOrganization {
   static readonly isAutoSettleCandidate = isAutoSettleCandidate
   static readonly hasRunningDescendant = hasRunningDescendant
   static readonly sectionForSession = sectionForSession
+  static readonly sectionDropPlan = sectionDropPlan
   static readonly fitItems = fitItems
 }
