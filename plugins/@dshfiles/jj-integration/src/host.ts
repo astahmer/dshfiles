@@ -972,9 +972,48 @@ const cleanupRunner = createCleanupJobRunner({
 })
 
 /** A finished run already reported itself as `workspace.cleaned`; only the runs that removed nothing by design or failed say so here. */
+/** A registered workspace whose folder changed recently counts as activity for the repository it belongs to. */
+const directoryModifiedAt = (path: string): number => {
+  const stats = statSync(path, { throwIfNoEntry: false })
+  if (stats === undefined) return 0
+  return Math.max(stats.mtimeMs, stats.ctimeMs)
+}
+
+/** Bounded activity probe: directory mtimes only, never a Session list or a jj process per workspace. */
+const activeRepositoryRoots = async (withinHours: number): Promise<readonly string[]> => {
+  const active = requireThreads()
+  const workspaces = presentWorkspaces(registryOf().list())
+  const locations = await mapBounded(workspaces, LOCATE_CONCURRENCY, workspace => cachedBestEffortLocation(active, workspace.path))
+  const lastUsedByRoot = new Map<string, number>()
+  workspaces.forEach((workspace, index) => {
+    const root = locations[index]?.repoRoot ?? workspace.path
+    const registered = Date.parse(workspace.updatedAt)
+    const lastUsed = Math.max(directoryModifiedAt(workspace.path), Number.isNaN(registered) ? 0 : registered)
+    lastUsedByRoot.set(root, Math.max(lastUsedByRoot.get(root) ?? 0, lastUsed))
+  })
+  const since = Date.now() - withinHours * HOUR_MS
+  return [...lastUsedByRoot].filter(([, lastUsed]) => lastUsed >= since).map(([root]) => root)
+}
+
+/** Every repository root the registry knows, so an automatic run can report the projects it skipped. */
+const knownRepositoryRoots = async (): Promise<readonly string[]> => {
+  const active = requireThreads()
+  const workspaces = presentWorkspaces(registryOf().list())
+  const locations = await mapBounded(workspaces, LOCATE_CONCURRENCY, workspace => cachedBestEffortLocation(active, workspace.path))
+  return [...new Set(workspaces.map((workspace, index) => locations[index]?.repoRoot ?? workspace.path))]
+}
+
 const reportAutoCleanup = (outcome: AutoCleanupOutcome): void => {
   if (outcome.status === 'busy') {
     hostContext?.logger.debug('jj-integration: automatic cleanup skipped while %s runs', outcome.jobId)
+    return
+  }
+  if (outcome.status === 'idle') {
+    hostContext?.logger.debug('jj-integration: no repository changed in the last %s h; automatic cleanup idles', outcome.activeWithinHours)
+    return
+  }
+  if (outcome.status === 'done') {
+    hostContext?.logger.debug('jj-integration: automatic cleanup ran in %s repository(ies), skipped %s inactive one(s)', outcome.runs.length, outcome.inactive)
     return
   }
   if (outcome.status !== 'failed') return
@@ -1552,6 +1591,8 @@ const setupHost = (context: Context): Effect<void> => {
     runner: cleanupRunner,
     settings: () => readSettings().autoCleanup,
     report: reportAutoCleanup,
+    activeProjects: activeRepositoryRoots,
+    knownProjects: knownRepositoryRoots,
   })
   const firstSweep = setTimeout(sweep, 30_000)
   const timer = setInterval(sweep, SWEEP_INTERVAL_MS)

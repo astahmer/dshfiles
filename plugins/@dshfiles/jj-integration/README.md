@@ -332,7 +332,7 @@ background trail.
 ### Automatic cleanup
 
 The Host also runs that same job on its own (setting `autoCleanup`, on by
-default): every `intervalMinutes` (60) it cleans every registered jj repository
+default): every `intervalMinutes` (60) it cleans the repositories used recently
 of the selected `kinds` (`empty` and `integrated`; `untracked` is opt-in) unused
 for `olderThanHours` (24). The first run waits five minutes after the Host
 starts, a run is skipped while any cleanup job is queued or running, and
@@ -344,6 +344,13 @@ timeline as `workspace.cleaned` — routine when nothing was removed, with the
 skip counts (`Skipped 41: 29 activity-unknown, 12 has-work.`) as its detail — or
 `workspace.cleanup-failed` when the job failed. An empty `kinds` list or
 `enabled: false` turns it off; settings are read at each run.
+
+A run is scoped to the projects in use: only repositories whose checkout or one
+of whose thread workspaces changed within `activeWithinHours` (2) are scanned,
+one job per repository, so an idle project keeps its trail clean. The signal is
+directory mtimes plus the workspace registry timestamps — never the Session
+list — so it stays cheap on a store with a thousand Sessions. `activeWithinHours:
+0` restores the old behaviour of one job over every registered repository.
 
 The activity read is the same bounded Session list a Rebase guard uses (15 s).
 When the Host's Session list takes longer, every Session reads as

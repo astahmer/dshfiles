@@ -71,8 +71,15 @@ export const jjIntegrationSettings = defineSettings({
         .max(24 * 60)
         .default(60)
         .description('Minutes between automatic runs. The first run waits a few minutes after DSH starts.'),
+      activeWithinHours: Schema.natural()
+        .min(0)
+        .max(24 * 7)
+        .default(2)
+        .description(
+          'Only repositories whose checkout or one of whose thread workspaces changed in this many hours. 0 covers every registered repository, like the manual button.',
+        ),
     }).description(
-      'Remove idle thread workspaces automatically in every registered jj repository, through the same cleanup job as the manual button. A workspace with unlanded revisions, a working or waiting thread, a thread whose activity cannot be read, or a queued integration is always kept.',
+      'Remove idle thread workspaces automatically, through the same cleanup job as the manual button. A workspace with unlanded revisions, a working or waiting thread, a thread whose activity cannot be read, or a queued integration is always kept.',
     ),
   }),
 })
