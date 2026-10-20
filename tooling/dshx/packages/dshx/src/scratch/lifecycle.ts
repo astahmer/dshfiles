@@ -3,7 +3,7 @@ import { basename, join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { connectDshPlatformClient } from '../platform/client.js'
 import { ScratchSeedRuntime } from './seed.js'
-import { LIVE_DSH_HOME, LIVE_DSH_PORT, ScratchStateRuntime, type ScratchState } from './state.js'
+import { DEFAULT_IDLE_TIMEOUT_MINUTES, LIVE_DSH_HOME, LIVE_DSH_PORT, ScratchStateRuntime, type ScratchState } from './state.js'
 
 export interface DoctorCheck {
   readonly id: string
@@ -38,6 +38,20 @@ export const scratchDoctor = async (state: ScratchState): Promise<readonly Docto
     detail: `pid ${state.browser.pid} ${browser}`,
     ...(browser === 'running' ? {} : { fix: 'Run "dshx dev down" then "dshx dev up".' }),
   })
+  const idleTimeoutMinutes = state.idleTimeoutMinutes ?? DEFAULT_IDLE_TIMEOUT_MINUTES
+  const watchdog = state.watchdog === undefined ? 'not recorded' : ScratchStateRuntime.ownedProcessStatus(state.watchdog)
+  const lease = idleTimeoutMinutes === 0 ? 'no idle timeout' : `stops after ${idleTimeoutMinutes} min without a dshx dev command`
+  const autoStopDetail = `watchdog ${state.watchdog === undefined ? '' : `pid ${state.watchdog.pid} `}${watchdog}; ${lease}`
+  checks.push(
+    watchdog === 'running'
+      ? { id: 'auto-stop', ok: true, detail: autoStopDetail }
+      : {
+          id: 'auto-stop',
+          ok: false,
+          detail: autoStopDetail,
+          fix: 'Nothing stops this instance on its own: run "dshx dev down" when done, then "dshx dev up" again.',
+        },
+  )
 
   let plugins: Awaited<ReturnType<Awaited<ReturnType<typeof connectDshPlatformClient>>['plugins']['list']>> | undefined
   try {
@@ -127,10 +141,16 @@ export const scratchDown = async (
   const actions: DownAction[] = []
   const leftRunning: number[] = []
   for (const [label, owned] of [
+    // The watchdog goes first: it would otherwise see the dsh process gone and run a second down beside this one.
+    ...(state.watchdog === undefined ? [] : ([['watchdog', state.watchdog]] as const)),
     ['browser', state.browser],
     ['dsh', state.host],
     ...(state.fakeProvider === undefined ? [] : ([['fake model provider', state.fakeProvider]] as const)),
   ] as const) {
+    if (owned.pid === process.pid) {
+      actions.push({ action: 'skip', target: `${label} pid ${owned.pid}`, reason: 'this watchdog is running down; it exits next' })
+      continue
+    }
     const status = ScratchStateRuntime.ownedProcessStatus(owned)
     if (status === 'gone') {
       actions.push({ action: 'skip', target: `${label} pid ${owned.pid}`, reason: 'already exited' })
@@ -152,22 +172,19 @@ export const scratchDown = async (
     actions.push({ action: 'skip', target: state.home, reason: 'not a dshx scratch home under the temp directory; left alone' })
   }
   const fakeProviderFiles = state.fakeProvider === undefined ? [] : [join(state.stateDir, 'fake-provider.ready'), join(state.stateDir, 'fake-provider.log')]
-  for (const file of [
+  const stateFiles = [
     state.hostLog,
     state.browserLog,
     state.browserEvents,
     join(state.stateDir, 'browser.ready'),
+    join(state.stateDir, 'watchdog.log'),
     ...fakeProviderFiles,
-    join(state.stateDir, 'state.json'),
-  ]) {
+  ]
+  for (const file of [...stateFiles, join(state.stateDir, 'state.json')]) {
     actions.push({ action: 'remove', target: file, reason: 'scratch state (the host log and state hold the launch token)' })
   }
   if (!dryRun) {
-    await Promise.all(
-      [state.hostLog, state.browserLog, state.browserEvents, join(state.stateDir, 'browser.ready'), ...fakeProviderFiles].map(file =>
-        rm(file, { force: true }),
-      ),
-    )
+    await Promise.all(stateFiles.map(file => rm(file, { force: true })))
     await ScratchStateRuntime.remove(state.stateDir)
   }
   if (!state.project.ownedByScratch) actions.push({ action: 'keep', target: state.project.path, reason: 'project passed with --project' })

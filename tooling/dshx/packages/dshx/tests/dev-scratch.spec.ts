@@ -1,13 +1,16 @@
 import { spawn, spawnSync } from 'node:child_process'
 import { once } from 'node:events'
-import { mkdir, mkdtemp, readFile, realpath, rm, stat, writeFile } from 'node:fs/promises'
+import { existsSync, mkdtempSync, rmSync } from 'node:fs'
+import { mkdir, mkdtemp, readFile, realpath, rm, stat, utimes, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { PassThrough } from 'node:stream'
-import { afterEach, describe, expect, it } from 'vitest'
+import { fileURLToPath } from 'node:url'
+import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import { chromium } from 'playwright'
 import { runCli } from '../src/cli/run.js'
 import { StartupDialogs } from '../src/project/startup-dialogs.js'
+import { ScratchReaperRuntime } from '../src/scratch/reaper.js'
 import { installFakeSecretCli, NEW_THREAD_START_BUTTON_NAME, ScratchSeedRuntime } from '../src/scratch/seed.js'
 import { ScratchStateRuntime, type ScratchState } from '../src/scratch/state.js'
 
@@ -33,6 +36,11 @@ const alive = (pid: number): boolean => {
     return false
   }
 }
+
+// `up` sweeps every stale instance under the state root: keep this file's runs away from the real $TMPDIR/dshx-dev.
+const isolatedStateRoot = mkdtempSync(join(tmpdir(), 'dshx-dev-spec-state-root-'))
+process.env.DSHX_DEV_STATE_ROOT = isolatedStateRoot
+afterAll(() => rmSync(isolatedStateRoot, { recursive: true, force: true }))
 
 const cleanups: (() => Promise<void>)[] = []
 afterEach(async () => {
@@ -379,5 +387,152 @@ describe('dshx dev scratch commands', () => {
     expect(aliases(secret(['print', 'global', '--json']))).toEqual(['GITHUB_TOKEN/global'])
     expect(aliases(secret(['print', '--all', '--json']))).toEqual(['GITHUB_TOKEN/global', 'DB_PASSWORD/project', 'DB_PASSWORD/project', 'LOCAL_TOKEN/local'])
     expect(secret(['get', 'DB_PASSWORD', '--env', 'dev'])).toBe('scratch-fake-db-dev-value\n')
+  })
+
+  describe('auto-stop', () => {
+    const watchdogScript = fileURLToPath(new URL('../dist/scratch/watchdog.js', import.meta.url))
+
+    /** A recorded instance whose dsh is a real detached process (or a gone pid), with its own scratch home. */
+    const recordInstance = async (options: {
+      readonly root: string
+      readonly name: string
+      readonly port: number
+      readonly hostRunning: boolean
+      readonly idleTimeoutMinutes?: number
+      readonly idleMinutes: number
+      readonly watched?: boolean
+    }): Promise<{ readonly state: ScratchState; readonly hostPid: number; readonly watchdogPid: number }> => {
+      const stateDir = join(options.root, options.name)
+      const home = await mkdtemp(join(tmpdir(), 'dshx-boot-profile-'))
+      cleanups.push(() => rm(home, { recursive: true, force: true }))
+      const hostPid = options.hostRunning ? await startProcess(['--profile', 'dshx-boot', '--port', String(options.port)]) : 999_997
+      const state: ScratchState = {
+        schemaVersion: 1,
+        name: options.name,
+        createdAt: new Date().toISOString(),
+        stateDir,
+        home,
+        profile: 'dshx-boot',
+        port: options.port,
+        origin: `http://127.0.0.1:${options.port}`,
+        launchUrl: `http://127.0.0.1:${options.port}/?token=secret`,
+        bundles: ['@dshfiles/home'],
+        expectedClientEntries: ['@dshfiles/home'],
+        project: { path: join(home, 'projects/sample'), workspaceId: 'workspace', ownedByScratch: true },
+        host: { pid: hostPid, signature: ['--profile dshx-boot', `--port ${options.port}`] },
+        browser: { pid: 999_998, signature: ['browser-host.js'], cdpPort: options.port + 1 },
+        hostLog: join(stateDir, 'host.log'),
+        browserLog: join(stateDir, 'browser.log'),
+        browserEvents: join(stateDir, 'browser-events.jsonl'),
+        evidenceDir: join(stateDir, 'evidence'),
+      }
+      if (options.idleTimeoutMinutes !== undefined) state.idleTimeoutMinutes = options.idleTimeoutMinutes
+      await ScratchStateRuntime.write(state)
+      const watchdogPid = options.watched === true ? await startWatchdog(state) : 0
+      const lastUsed = new Date(Date.now() - options.idleMinutes * 60_000)
+      await utimes(join(stateDir, 'state.json'), lastUsed, lastUsed)
+      return { state, hostPid, watchdogPid }
+    }
+
+    /** Started and recorded the way `up` does it; recording rewrites the state file, which renews the lease. */
+    const startWatchdog = async (state: ScratchState): Promise<number> => {
+      if (!existsSync(watchdogScript)) throw new Error(`${watchdogScript} is missing: build @dshfiles/dshx first`)
+      const pid = ScratchStateRuntime.spawnDetached(process.execPath, [watchdogScript, '--state-dir', state.stateDir, '--interval-ms', '100'], {
+        cwd: state.stateDir,
+        env: process.env,
+        log: join(state.stateDir, 'watchdog.log'),
+      })
+      cleanups.push(async () => {
+        if (alive(pid)) process.kill(-pid, 'SIGKILL')
+      })
+      await ScratchStateRuntime.write({ ...state, watchdog: { pid, signature: [watchdogScript, state.stateDir] } })
+      return pid
+    }
+
+    const stateRoot = async (): Promise<string> => {
+      const root = await mkdtemp(join(tmpdir(), 'dshx-dev-spec-root-'))
+      cleanups.push(() => rm(root, { recursive: true, force: true }))
+      return root
+    }
+
+    it('sweeps instances whose lease expired or whose dsh exited, and keeps the ones in use', async () => {
+      const root = await stateRoot()
+      const fresh = await recordInstance({ root, name: 'fresh', port: 45201, hostRunning: true, idleMinutes: 5 })
+      const expired = await recordInstance({ root, name: 'expired', port: 45203, hostRunning: true, idleTimeoutMinutes: 10, idleMinutes: 11 })
+      const legacy = await recordInstance({ root, name: 'legacy', port: 45205, hostRunning: true, idleMinutes: 31 })
+      const forever = await recordInstance({ root, name: 'forever', port: 45207, hostRunning: true, idleTimeoutMinutes: 0, idleMinutes: 600 })
+      const dead = await recordInstance({ root, name: 'dead', port: 45209, hostRunning: false, idleMinutes: 1 })
+      await mkdir(join(root, 'not-a-scratch'))
+
+      const swept = await ScratchReaperRuntime.sweepStaleScratches({ root })
+      expect(Object.fromEntries(swept.map(reaped => [reaped.name, reaped.reason]))).toEqual({
+        expired: 'idle 11 min, past its 10 min idle timeout',
+        legacy: 'idle 31 min, past its 30 min idle timeout',
+        dead: 'dsh pid 999997 exited',
+      })
+      expect(alive(expired.hostPid)).toBe(false)
+      expect(alive(legacy.hostPid)).toBe(false)
+      expect(alive(fresh.hostPid)).toBe(true)
+      expect(alive(forever.hostPid)).toBe(true)
+      await expect(stat(dead.state.home)).rejects.toThrow()
+      await expect(stat(join(dead.state.stateDir, 'state.json'))).rejects.toThrow()
+      expect((await stat(join(fresh.state.stateDir, 'state.json'))).isFile()).toBe(true)
+    })
+
+    it('renews the lease on every dshx dev command', async () => {
+      const root = await stateRoot()
+      const used = await recordInstance({ root, name: 'used', port: 45211, hostRunning: true, idleTimeoutMinutes: 10, idleMinutes: 11 })
+      await run(['dev', 'doctor', '--state-dir', used.state.stateDir, '--json'])
+      expect(await ScratchReaperRuntime.sweepStaleScratches({ root })).toEqual([])
+      expect(alive(used.hostPid)).toBe(true)
+    })
+
+    it('sweeps nothing when up refuses its options', async () => {
+      const expired = await recordInstance({ root: isolatedStateRoot, name: 'expired-elsewhere', port: 45219, hostRunning: true, idleMinutes: 45 })
+      const refused = await run(['dev', 'up', '--port', '3080', '--json'])
+      expect(envelope(refused.stdout).error?.code).toBe('live-port')
+      expect(alive(expired.hostPid)).toBe(true)
+    })
+
+    it('rejects a negative or fractional idle timeout before building anything', async () => {
+      const result = await run(['dev', 'up', '--idle-timeout', '1.5', '--json'])
+      expect(result.code).toBe(2)
+      expect(envelope(result.stdout).error?.code).toBe('usage')
+      expect((await run(['dev', 'up', '--help'])).stdout).toContain('--idle-timeout <min>')
+    })
+
+    it('runs down from the watchdog process once the lease expires', async () => {
+      const root = await stateRoot()
+      const instance = await recordInstance({ root, name: 'forgotten', port: 45213, hostRunning: true, idleTimeoutMinutes: 1, idleMinutes: 2, watched: true })
+      const watchdogPid = instance.watchdogPid
+      await vi.waitFor(() => expect(alive(watchdogPid)).toBe(false), { timeout: 15_000, interval: 100 })
+      expect(alive(instance.hostPid)).toBe(false)
+      await expect(stat(instance.state.home)).rejects.toThrow()
+      await expect(stat(join(instance.state.stateDir, 'state.json'))).rejects.toThrow()
+    })
+
+    it('cleans up from the watchdog process once dsh is gone', async () => {
+      const root = await stateRoot()
+      const instance = await recordInstance({ root, name: 'crashed', port: 45215, hostRunning: false, idleTimeoutMinutes: 30, idleMinutes: 0, watched: true })
+      const watchdogPid = instance.watchdogPid
+      await vi.waitFor(() => expect(alive(watchdogPid)).toBe(false), { timeout: 15_000, interval: 100 })
+      await expect(stat(instance.state.home)).rejects.toThrow()
+      await expect(stat(join(instance.state.stateDir, 'watchdog.log'))).rejects.toThrow()
+    })
+
+    it('keeps watching an instance in use, and down stops the watchdog first', async () => {
+      const root = await stateRoot()
+      const instance = await recordInstance({ root, name: 'busy', port: 45217, hostRunning: true, idleTimeoutMinutes: 30, idleMinutes: 0, watched: true })
+      const watchdogPid = instance.watchdogPid
+      const dryRun = await run(['dev', 'down', '--dry-run', '--state-dir', instance.state.stateDir])
+      expect(dryRun.stdout).toContain(`would stop watchdog pid ${watchdogPid} (process group)`)
+      expect(alive(watchdogPid)).toBe(true)
+      expect(alive(instance.hostPid)).toBe(true)
+
+      const down = await run(['dev', 'down', '--state-dir', instance.state.stateDir, '--json'])
+      expect(down.code).toBe(0)
+      expect(alive(watchdogPid)).toBe(false)
+      expect(alive(instance.hostPid)).toBe(false)
+    })
   })
 })

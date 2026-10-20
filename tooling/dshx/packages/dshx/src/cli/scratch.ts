@@ -1,6 +1,6 @@
 import { parseArgs } from 'node:util'
 import type { Writable } from 'node:stream'
-import { ScratchError, ScratchStateRuntime, scratchNameSchema } from '../scratch/state.js'
+import { DEFAULT_IDLE_TIMEOUT_MINUTES, ScratchError, ScratchStateRuntime, scratchNameSchema } from '../scratch/state.js'
 
 export const SCRATCH_ACTIONS: ReadonlySet<string> = new Set(['up', 'doctor', 'open', 'shot', 'down'])
 
@@ -16,6 +16,8 @@ const HELP: Readonly<Record<string, string>> = {
 A scratch DSH has its own temp DSH_HOME, a free port, the owned plugins under test, a registered
 project, and a headless Chromium that keeps its page between commands. It never touches the live
 DSH on 127.0.0.1:3080 or ~/.dsh. The launch URL is a secret: it stays in the mode-600 state file.
+A watchdog stops a forgotten instance ${DEFAULT_IDLE_TIMEOUT_MINUTES} min after its last dshx dev command (up
+--idle-timeout) or as soon as its dsh exits. Still run "dshx dev down" when done.
 
   dshx dev up [--plugin @dshfiles/<name>]...   start it (builds the plugins, seeds a jj project)
   dshx dev doctor                              read-only health check
@@ -44,6 +46,11 @@ from ~/.dsh/profiles/web's registry dependencies, seeds a jj project with a "mai
 registers --project) in the scratch workspace storage, starts dsh on a free port and a headless
 Chromium, and records pids, origin and paths in <state-dir>/state.json (mode 600).
 
+Auto-stop: up also starts a detached watchdog that runs "down" once the instance went
+--idle-timeout minutes without a dshx dev command (doctor, open and shot renew the lease; it is the
+state file's mtime) or once its dsh process is gone. Before starting, up runs "down" on every other
+instance under the state root whose lease expired or whose dsh exited, and reports each one.
+
 Options:
   --plugin <id>        Owned bundle to load, repeatable (default: every bundle under plugins/@dshfiles).
   --bundle <id>        Also load a registry bundle the web profile installs (e.g. dsh-our-free-model), repeatable.
@@ -52,6 +59,7 @@ Options:
   --skip-build         Use each plugin's existing dist/.
   --fake-secret-cli    Put the e2e fake secret CLI (synthetic aliases, no vault) first on the Host's PATH.
   --timeout <ms>       Boot timeout (default 120000).
+  --idle-timeout <min> Minutes without a dshx dev command before the watchdog runs down (default ${DEFAULT_IDLE_TIMEOUT_MINUTES}; 0 = never).
 
 Example:
   dshx dev up --plugin @dshfiles/jj-integration --plugin @dshfiles/home --json
@@ -59,9 +67,9 @@ Example:
 ${COMMON_HELP}`,
   doctor: `dshx dev doctor — read-only health check of a scratch DSH.
 
-Checks: isolated from the live DSH, dsh and Chromium still running (and still ours), the URL answers
-and authenticates, every plugin entry is active and every bundle under test loaded, and the host log
-has no error lines. Exit code 1 when any check fails; each failure carries a "fix".
+Checks: isolated from the live DSH, dsh and Chromium still running (and still ours), the auto-stop
+watchdog running, the URL answers and authenticates, every plugin entry is active and every bundle
+under test loaded, and the host log has no error lines. Like open and shot, it renews the idle lease. Exit code 1 when any check fails; each failure carries a "fix".
 
 ${COMMON_HELP}`,
   open: `dshx dev open <feature> — drive the scratch browser to a catalog feature.
@@ -106,8 +114,8 @@ Options:
 ${COMMON_HELP}`,
   down: `dshx dev down — stop exactly what up started.
 
-Stops the recorded dsh and Chromium process groups only while their command lines still match what
-up started (a reused pid is left alone), deletes the scratch home and the state/log files, and keeps
+Stops the recorded watchdog, dsh and Chromium process groups only while their command lines still
+match what up started (a reused pid is left alone), deletes the scratch home and the state/log files, and keeps
 the evidence directory and any --project folder.
 
 Options:
@@ -157,6 +165,7 @@ export const runScratchCli = async (argv: readonly string[], io: { readonly stdo
         'skip-build': { type: 'boolean' },
         'fake-secret-cli': { type: 'boolean' },
         timeout: { type: 'string' },
+        'idle-timeout': { type: 'string' },
         label: { type: 'string' },
         out: { type: 'string' },
         'dry-run': { type: 'boolean' },
@@ -170,7 +179,7 @@ export const runScratchCli = async (argv: readonly string[], io: { readonly stdo
     return 0
   }
   const allowed: Readonly<Record<string, readonly string[]>> = {
-    up: ['plugin', 'bundle', 'project', 'port', 'skip-build', 'fake-secret-cli', 'timeout'],
+    up: ['plugin', 'bundle', 'project', 'port', 'skip-build', 'fake-secret-cli', 'timeout', 'idle-timeout'],
     doctor: [],
     open: ['timeout'],
     shot: ['label', 'out'],
@@ -210,8 +219,11 @@ export const runScratchCli = async (argv: readonly string[], io: { readonly stdo
       if (timeoutMs instanceof ScratchError) return fail(timeoutMs)
       const port = values.port === undefined ? undefined : numberOption('port', 0)
       if (port instanceof ScratchError) return fail(port)
+      const idleTimeoutMinutes = Number(values['idle-timeout'] ?? DEFAULT_IDLE_TIMEOUT_MINUTES)
+      if (!Number.isSafeInteger(idleTimeoutMinutes) || idleTimeoutMinutes < 0)
+        return fail(new ScratchError('usage', '--idle-timeout requires a whole number of minutes (0 = never).', 'Run "dshx dev up --help".'))
       const { scratchUp } = await import('../scratch/up.js')
-      const state = await scratchUp({
+      const { state, swept } = await scratchUp({
         name: name.data,
         stateDir,
         plugins: Array.isArray(values.plugin) ? values.plugin : [],
@@ -220,16 +232,20 @@ export const runScratchCli = async (argv: readonly string[], io: { readonly stdo
         ...(port === undefined ? {} : { port }),
         skipBuild: values['skip-build'] === true,
         fakeSecretCli: values['fake-secret-cli'] === true,
+        idleTimeoutMinutes,
         timeoutMs,
         onProgress: message => write(io.stderr, `dshx dev up: ${message}\n`),
       })
       const shown = ScratchStateRuntime.publicState(state)
+      const sweptLines = swept.map(reaped => `stopped stale scratch "${reaped.name}" (${reaped.reason})\n`).join('')
+      const autoStop = shown.idleTimeoutMinutes === 0 ? 'when its dsh exits' : `after ${shown.idleTimeoutMinutes} idle min or when its dsh exits`
       return succeed(
-        shown,
-        `Scratch DSH "${shown.name}" up at ${shown.origin} (dsh pid ${shown.hostPid}, chromium pid ${shown.browserPid}).\n  home     ${shown.home}\n  project  ${shown.project}\n  state    ${shown.stateDir}\nNext: dshx dev doctor\n`,
+        { ...shown, swept: swept.map(reaped => ({ name: reaped.name, stateDir: reaped.stateDir, reason: reaped.reason, leftRunning: reaped.leftRunning })) },
+        `${sweptLines}Scratch DSH "${shown.name}" up at ${shown.origin} (dsh pid ${shown.hostPid}, chromium pid ${shown.browserPid}).\n  home     ${shown.home}\n  project  ${shown.project}\n  state    ${shown.stateDir}\n  stops    ${autoStop} (watchdog pid ${shown.watchdogPid ?? 'none'})\nNext: dshx dev doctor\n`,
       )
     }
     const state = await ScratchStateRuntime.read(stateDir, name.data)
+    if (action !== 'down') await ScratchStateRuntime.renewLease(stateDir)
     if (action === 'doctor') {
       const { scratchDoctor } = await import('../scratch/lifecycle.js')
       const checks = await scratchDoctor(state)

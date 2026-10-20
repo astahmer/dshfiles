@@ -6,6 +6,7 @@ import { prepareComposedBootProfile } from '../project/boot-profile.js'
 import { DSHFILES_ROOT, buildPlugin, findFreePort, LocalBundleModel } from '../project/local-bundles.js'
 import { compositionFailures, readProfileComposition } from '../project/profile-composition.js'
 import { ScratchProfileRuntime } from '../project/scratch-profile.js'
+import { ScratchReaperRuntime, type ReapedScratch } from './reaper.js'
 import { ScratchSeedRuntime } from './seed.js'
 import { LIVE_DSH_HOME, LIVE_DSH_PORT, ScratchError, ScratchStateRuntime, type ScratchState } from './state.js'
 
@@ -20,12 +21,15 @@ export interface ScratchUpOptions {
   readonly skipBuild: boolean
   /** Put the e2e fake `secret` CLI first on the Host's PATH, with synthetic aliases for the project. */
   readonly fakeSecretCli: boolean
+  /** Minutes without a `dshx dev` command before the watchdog runs `down`; 0 keeps it up until `down`. */
+  readonly idleTimeoutMinutes: number
   readonly timeoutMs: number
   readonly onProgress: (message: string) => void
 }
 
 const URL_PATTERN = /http:\/\/127\.0\.0\.1:\d+\/\S*/
 const browserHostScript = fileURLToPath(new URL('./browser-host.js', import.meta.url))
+const watchdogScript = fileURLToPath(new URL('./watchdog.js', import.meta.url))
 
 const sleep = (ms: number): Promise<void> => new Promise(resolveSleep => setTimeout(resolveSleep, ms))
 
@@ -77,15 +81,7 @@ const stopGroup = async (pid: number): Promise<void> => {
   }
 }
 
-export const scratchUp = async (options: ScratchUpOptions): Promise<ScratchState> => {
-  const existing = await ScratchStateRuntime.read(options.stateDir, options.name).catch(() => undefined)
-  if (existing !== undefined && ScratchStateRuntime.ownedProcessStatus(existing.host) === 'running') {
-    throw new ScratchError(
-      'already-up',
-      `A scratch DSH named "${options.name}" is already up at ${existing.origin} (pid ${existing.host.pid}).`,
-      `Reuse it, run "dshx dev down${options.name === 'default' ? '' : ` --name ${options.name}`}", or pass --name <other>.`,
-    )
-  }
+export const scratchUp = async (options: ScratchUpOptions): Promise<{ readonly state: ScratchState; readonly swept: readonly ReapedScratch[] }> => {
   if (options.port === LIVE_DSH_PORT) {
     throw new ScratchError('live-port', `Port ${LIVE_DSH_PORT} belongs to the live DSH.`, 'Omit --port to take a free port.')
   }
@@ -103,6 +99,16 @@ export const scratchUp = async (options: ScratchUpOptions): Promise<ScratchState
       'project-missing',
       `${options.project} is not a directory.`,
       'Pass an existing folder to --project, or omit it to seed a sample jj project.',
+    )
+  }
+  const swept = await ScratchReaperRuntime.sweepStaleScratches({ root: ScratchStateRuntime.stateRoot(), extraStateDirs: [options.stateDir] })
+  for (const reaped of swept) options.onProgress(`stopped stale scratch "${reaped.name}" (${reaped.reason})`)
+  const existing = await ScratchStateRuntime.read(options.stateDir, options.name).catch(() => undefined)
+  if (existing !== undefined && ScratchStateRuntime.ownedProcessStatus(existing.host) === 'running') {
+    throw new ScratchError(
+      'already-up',
+      `A scratch DSH named "${options.name}" is already up at ${existing.origin} (pid ${existing.host.pid}).`,
+      `Reuse it, run "dshx dev down${options.name === 'default' ? '' : ` --name ${options.name}`}", or pass --name <other>.`,
     )
   }
 
@@ -214,8 +220,16 @@ export const scratchUp = async (options: ScratchUpOptions): Promise<ScratchState
       evidenceDir: join(options.stateDir, 'evidence'),
     }
     if (fakeSecretCli !== undefined) state.fakeSecretCli = fakeSecretCli
+    state.idleTimeoutMinutes = options.idleTimeoutMinutes
     await ScratchStateRuntime.write(state)
-    return state
+    const watchdogPid = ScratchStateRuntime.spawnDetached(process.execPath, [watchdogScript, '--state-dir', options.stateDir], {
+      cwd: options.stateDir,
+      env: process.env,
+      log: join(options.stateDir, 'watchdog.log'),
+    })
+    state.watchdog = { pid: watchdogPid, signature: [watchdogScript, options.stateDir] }
+    await ScratchStateRuntime.write(state)
+    return { state, swept }
   } catch (error) {
     if (browserPid !== undefined) await stopGroup(browserPid)
     if (hostPid !== undefined) await stopGroup(hostPid)

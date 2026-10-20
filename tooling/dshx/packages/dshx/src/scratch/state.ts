@@ -1,6 +1,6 @@
 import { spawn, spawnSync } from 'node:child_process'
 import { closeSync, openSync } from 'node:fs'
-import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, rm, stat, utimes, writeFile } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
 import { join, resolve, sep } from 'node:path'
 import { z } from 'zod'
@@ -50,6 +50,10 @@ export const ScratchStateSchema = z
     seeds: z.array(z.object({ seed: z.enum(REACH_SEEDS), changedFile: z.string().optional() }).strict()).optional(),
     /** The loopback model provider started by `tool-call-thread` or `credential-recovery`; `down` stops it. */
     fakeProvider: ownedProcessSchema.optional(),
+    /** Minutes without a `dshx dev` command (the state file's mtime is the lease) before the watchdog runs `down`; 0 never. */
+    idleTimeoutMinutes: z.number().int().nonnegative().optional(),
+    /** The detached process that runs `down` when the lease expires or the dsh process is gone. */
+    watchdog: ownedProcessSchema.optional(),
   })
   .strict()
 
@@ -57,8 +61,11 @@ export type ScratchState = z.infer<typeof ScratchStateSchema>
 
 export const scratchNameSchema = z.string().regex(/^[a-z0-9][a-z0-9-]{0,31}$/, 'use 1-32 lowercase letters, digits or hyphens')
 
-const resolveStateDir = (options: { readonly name: string; readonly stateDir?: string }): string =>
-  resolve(options.stateDir ?? join(process.env.DSHX_DEV_STATE_ROOT ?? join(tmpdir(), 'dshx-dev'), options.name))
+export const DEFAULT_IDLE_TIMEOUT_MINUTES = 30
+
+const stateRoot = (): string => resolve(process.env.DSHX_DEV_STATE_ROOT ?? join(tmpdir(), 'dshx-dev'))
+
+const resolveStateDir = (options: { readonly name: string; readonly stateDir?: string }): string => resolve(options.stateDir ?? join(stateRoot(), options.name))
 
 const stateFile = (stateDir: string): string => join(stateDir, 'state.json')
 
@@ -94,6 +101,14 @@ const trackFakeProvider = async (state: ScratchState, fakeProvider: NonNullable<
 
 const removeScratchStateFile = (stateDir: string): Promise<void> => rm(stateFile(stateDir), { force: true })
 
+/** Every `dshx dev` command on an instance renews its idle lease by touching the state file. */
+const renewLease = async (stateDir: string): Promise<void> => {
+  const now = new Date()
+  await utimes(stateFile(stateDir), now, now).catch(() => undefined)
+}
+
+const lastUsedAt = async (stateDir: string): Promise<number | undefined> => (await stat(stateFile(stateDir)).catch(() => undefined))?.mtimeMs
+
 /** The state minus the launch token, safe to print. */
 const publicState = (state: ScratchState) => ({
   name: state.name,
@@ -108,6 +123,8 @@ const publicState = (state: ScratchState) => ({
   browserPid: state.browser.pid,
   hostLog: state.hostLog,
   evidenceDir: state.evidenceDir,
+  idleTimeoutMinutes: state.idleTimeoutMinutes ?? DEFAULT_IDLE_TIMEOUT_MINUTES,
+  watchdogPid: state.watchdog?.pid,
 })
 
 const isWithin = (root: string, target: string): boolean => {
@@ -145,11 +162,14 @@ const spawnDetached = (
 }
 
 export class ScratchStateRuntime {
+  static readonly stateRoot = stateRoot
   static readonly resolveStateDir = resolveStateDir
   static readonly read = readScratchState
   static readonly write = writeScratchState
   static readonly trackFakeProvider = trackFakeProvider
   static readonly remove = removeScratchStateFile
+  static readonly renewLease = renewLease
+  static readonly lastUsedAt = lastUsedAt
   static readonly publicState = publicState
   static readonly isWithin = isWithin
   static readonly ownedProcessStatus = ownedProcessStatus
