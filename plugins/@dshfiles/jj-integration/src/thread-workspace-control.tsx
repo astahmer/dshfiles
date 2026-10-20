@@ -197,63 +197,64 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
               </span>
             </div>
             <p className="dshx:px-3 dshx:pt-2 dshx:pb-3 dshx:text-xs dshx:text-muted-foreground">{statusText()}</p>
-            {!isThread ? null : integrationQueued ? (
-              <div className="dshx:px-3 dshx:pb-3">
-                <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:rounded-md dshx:border dshx:border-border dshx:py-1 dshx:pr-1 dshx:pl-2">
-                  <ClockIcon aria-hidden="true" className="dshx:size-3.5 dshx:shrink-0 dshx:text-muted-foreground" />
-                  <p className="dshx:min-w-0 dshx:flex-1 dshx:text-xs">{props.t('integrationQueuedHint', { bookmark: props.bookmark })}</p>
-                  <Button
-                    aria-label={props.t('undoQueuedIntegrationLabel', { bookmark: props.bookmark })}
-                    className="dshx-root dshx:shrink"
-                    disabled={undoQueuedIntegration.isPending}
-                    onClick={() => undoQueuedIntegration.mutate(current.path)}
-                    size="sm"
-                    title={props.t('undoQueuedIntegrationLabel', { bookmark: props.bookmark })}
-                    type="button"
-                    variant="ghost"
-                  >
-                    {undoQueuedIntegration.isPending ? <Spinner /> : <Undo2Icon aria-hidden="true" className="dshx:size-3.5" />}
-                    {props.t('undoQueuedIntegration')}
-                  </Button>
+            {isThread &&
+              (integrationQueued ? (
+                <div className="dshx:px-3 dshx:pb-3">
+                  <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:rounded-md dshx:border dshx:border-border dshx:py-1 dshx:pr-1 dshx:pl-2">
+                    <ClockIcon aria-hidden="true" className="dshx:size-3.5 dshx:shrink-0 dshx:text-muted-foreground" />
+                    <p className="dshx:min-w-0 dshx:flex-1 dshx:text-xs">{props.t('integrationQueuedHint', { bookmark: props.bookmark })}</p>
+                    <Button
+                      aria-label={props.t('undoQueuedIntegrationLabel', { bookmark: props.bookmark })}
+                      className="dshx-root dshx:shrink"
+                      disabled={undoQueuedIntegration.isPending}
+                      onClick={() => undoQueuedIntegration.mutate(current.path)}
+                      size="sm"
+                      title={props.t('undoQueuedIntegrationLabel', { bookmark: props.bookmark })}
+                      type="button"
+                      variant="ghost"
+                    >
+                      {undoQueuedIntegration.isPending ? <Spinner /> : <Undo2Icon aria-hidden="true" className="dshx:size-3.5" />}
+                      {props.t('undoQueuedIntegration')}
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            ) : canQueueIntegration ? (
-              <div className="dshx:px-3 dshx:pb-3">
-                <Button
-                  aria-label={props.t('queueIntegration', { bookmark: props.bookmark })}
-                  className="dshx-root dshx:w-full"
-                  disabled={queueIntegration.isPending}
-                  onClick={() => queueIntegration.mutate(current.path)}
-                  size="sm"
-                  title={props.t('queueIntegrationHint')}
-                  type="button"
-                  variant="outline"
-                >
-                  {queueIntegration.isPending ? <Spinner /> : <ClockIcon aria-hidden="true" className="dshx:size-3.5" />}
-                  {props.t('queueIntegration', { bookmark: props.bookmark })}
-                </Button>
-                <p className="dshx:pt-2 dshx:text-xs dshx:text-muted-foreground">
-                  {blockedReason === undefined ? props.t('queueIntegrationHint') : `${blockedReason} ${props.t('queueIntegrationHint')}`}
-                </p>
-              </div>
-            ) : (
-              <div className="dshx:px-3 dshx:pb-3">
-                <Button
-                  aria-label={label}
-                  className="dshx-root dshx:w-full"
-                  disabled={rebaseDisabled}
-                  onClick={() => rebase.mutate(current.path)}
-                  size="sm"
-                  title={canRebase ? `${label} (${props.t('toRebase', { count: unlanded })})` : `${label} — ${blockedReason}`}
-                  type="button"
-                  variant="outline"
-                >
-                  {rebasesPending ? <Spinner /> : <RefreshCwIcon aria-hidden="true" className="dshx:size-3.5" />}
-                  {props.t('rebaseOnto', { bookmark: props.bookmark })}
-                </Button>
-                {blockedReason === undefined ? null : <p className="dshx:pt-2 dshx:text-xs dshx:text-muted-foreground">{blockedReason}</p>}
-              </div>
-            )}
+              ) : canQueueIntegration ? (
+                <div className="dshx:px-3 dshx:pb-3">
+                  <Button
+                    aria-label={props.t('queueIntegration', { bookmark: props.bookmark })}
+                    className="dshx-root dshx:w-full"
+                    disabled={queueIntegration.isPending}
+                    onClick={() => queueIntegration.mutate(current.path)}
+                    size="sm"
+                    title={props.t('queueIntegrationHint')}
+                    type="button"
+                    variant="outline"
+                  >
+                    {queueIntegration.isPending ? <Spinner /> : <ClockIcon aria-hidden="true" className="dshx:size-3.5" />}
+                    {props.t('queueIntegration', { bookmark: props.bookmark })}
+                  </Button>
+                  <p className="dshx:pt-2 dshx:text-xs dshx:text-muted-foreground">
+                    {blockedReason === undefined ? props.t('queueIntegrationHint') : `${blockedReason} ${props.t('queueIntegrationHint')}`}
+                  </p>
+                </div>
+              ) : (
+                <div className="dshx:px-3 dshx:pb-3">
+                  <Button
+                    aria-label={label}
+                    className="dshx-root dshx:w-full"
+                    disabled={rebaseDisabled}
+                    onClick={() => rebase.mutate(current.path)}
+                    size="sm"
+                    title={canRebase ? `${label} (${props.t('toRebase', { count: unlanded })})` : `${label} — ${blockedReason}`}
+                    type="button"
+                    variant="outline"
+                  >
+                    {rebasesPending ? <Spinner /> : <RefreshCwIcon aria-hidden="true" className="dshx:size-3.5" />}
+                    {props.t('rebaseOnto', { bookmark: props.bookmark })}
+                  </Button>
+                  {blockedReason === undefined ? null : <p className="dshx:pt-2 dshx:text-xs dshx:text-muted-foreground">{blockedReason}</p>}
+                </div>
+              ))}
             <Separator />
             <div className="dshx:p-1">
               <Button
