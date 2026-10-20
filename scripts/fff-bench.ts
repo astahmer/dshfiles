@@ -29,6 +29,8 @@ const Task = z.object({
 type Task = z.infer<typeof Task>
 const TaskFile = z.object({ corpus: z.string(), tasks: z.array(Task) })
 
+const decodeJson = <Output>(schema: z.ZodType<Output>, text: string): Output => schema.parse(JSON.parse(text))
+
 const AssistantEvent = z.object({
   type: z.literal('assistant'),
   message: z.object({ content: z.array(z.looseObject({ type: z.string(), name: z.string().optional() })) }),
@@ -218,7 +220,7 @@ const report = (outDir: string): void => {
   const records = readFileSync(join(outDir, 'runs.jsonl'), 'utf8')
     .split('\n')
     .filter(line => line.trim() !== '')
-    .map(line => RunRecord.parse(JSON.parse(line)))
+    .map(line => decodeJson(RunRecord, line))
   const armNames = [...new Set(records.map(record => record.arm))]
   const rows = armNames.map(armName => {
     const runs = records.filter(record => record.arm === armName)
@@ -288,7 +290,7 @@ const Options = z.object({
   only: z.string().optional(),
 })
 const options = Options.parse(values)
-const taskFile = TaskFile.parse(JSON.parse(readFileSync(new URL('./fff-bench-tasks.json', import.meta.url), 'utf8')))
+const taskFile = decodeJson(TaskFile, readFileSync(new URL('./fff-bench-tasks.json', import.meta.url), 'utf8'))
 const tasks = taskFile.tasks.filter(task => options.only === undefined || task.id === options.only)
 mkdirSync(options.out, { recursive: true })
 const runsPath = join(options.out, 'runs.jsonl')
@@ -298,7 +300,7 @@ const done = new Set(
         .split('\n')
         .filter(line => line.trim() !== '')
         .map(line => {
-          const record = RunRecord.parse(JSON.parse(line))
+          const record = decodeJson(RunRecord, line)
           return `${record.task}.${record.arm}.${record.rep}`
         })
     : [],

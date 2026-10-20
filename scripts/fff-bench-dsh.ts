@@ -32,6 +32,8 @@ const Task = z.object({
 type Task = z.infer<typeof Task>
 const TaskFile = z.object({ corpus: z.string(), tasks: z.array(Task) })
 
+const decodeJson = <Output>(schema: z.ZodType<Output>, text: string): Output => schema.parse(JSON.parse(text))
+
 const Created = z.object({ data: z.object({ sessionId: z.string() }) })
 const Digest = z.object({
   data: z.object({
@@ -85,18 +87,18 @@ const dshx = async (args: string[]): Promise<string> => {
 
 const runOnce = async (options: { task: Task; arm: string; rep: number; corpus: string; provider: string; model: string; effort: string; rawDir: string }) => {
   const startedAt = performance.now()
-  const sessionId = Created.parse(JSON.parse(await dshx(['sessions', 'create', '--cwd', options.corpus, '--json']))).data.sessionId
+  const sessionId = decodeJson(Created, await dshx(['sessions', 'create', '--cwd', options.corpus, '--json'])).data.sessionId
   await dshx(['models', 'select', '--session', sessionId, '--reasoning-effort', options.effort, options.provider, options.model])
   await dshx(['sessions', 'prompt', sessionId, `${options.task.prompt}\n\n${answerRule}`])
 
-  let digest = Digest.parse(JSON.parse(await dshx(['sessions', 'digest', sessionId, '--json'])))
+  let digest = decodeJson(Digest, await dshx(['sessions', 'digest', sessionId, '--json']))
   while (digest.data.running || digest.data.lastTurnEnd == null) {
     if (performance.now() - startedAt > turnTimeoutMs) {
       await dshx(['sessions', 'cancel', sessionId])
       break
     }
     await new Promise(wake => setTimeout(wake, 2000))
-    digest = Digest.parse(JSON.parse(await dshx(['sessions', 'digest', sessionId, '--json'])))
+    digest = decodeJson(Digest, await dshx(['sessions', 'digest', sessionId, '--json']))
   }
   const wallMs = Math.round(performance.now() - startedAt)
 
@@ -109,7 +111,7 @@ const runOnce = async (options: { task: Task; arm: string; rep: number; corpus: 
   let turns = 0
   let inputTokens = 0
   let outputTokens = 0
-  for (const record of Export.parse(JSON.parse(exported)).data.records) {
+  for (const record of decodeJson(Export, exported).data.records) {
     const parsed = SessionEvent.safeParse(record.event)
     if (!parsed.success) continue
     const event = parsed.data
@@ -177,7 +179,7 @@ const options = Options.parse(
 )
 if (process.env.DSHX_URL === undefined) throw new Error('Set DSHX_URL to the scratch DSH launch URL (dshx dev state.json).')
 
-const taskFile = TaskFile.parse(JSON.parse(readFileSync(new URL('./fff-bench-tasks.json', import.meta.url), 'utf8')))
+const taskFile = decodeJson(TaskFile, readFileSync(new URL('./fff-bench-tasks.json', import.meta.url), 'utf8'))
 const tasks = taskFile.tasks.filter(task => options.only === undefined || task.id === options.only)
 const rawDir = join(options.out, 'sessions')
 mkdirSync(rawDir, { recursive: true })
@@ -188,7 +190,7 @@ const done = new Set(
         .split('\n')
         .filter(line => line.trim() !== '')
         .map(line => {
-          const record = z.object({ task: z.string(), arm: z.string(), rep: z.number() }).parse(JSON.parse(line))
+          const record = decodeJson(z.object({ task: z.string(), arm: z.string(), rep: z.number() }), line)
           return `${record.task}.${record.arm}.${record.rep}`
         })
     : [],
