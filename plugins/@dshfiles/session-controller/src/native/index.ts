@@ -344,8 +344,20 @@ export class SessionController extends TypertRemoteService {
    */
   @Remote('modelCatalog')
   modelCatalog(): Promise<ModelCatalog> {
-    return buildModelCatalog(this.ctx)
+    // dshfiles delta: every composer, picker and usage surface asks on load (12 calls, up to 2.7 s each, on one live
+    // page load), and each build lists every provider's models. Callers within 5 s of a build share it.
+    const key = JSON.stringify(this.ctx.agentDefaultModel.currentSelection())
+    const kept = this.catalogBuild
+    if (kept !== undefined && kept.key === key && performance.now() - kept.startedAt < 5_000) return kept.value
+    const value = buildModelCatalog(this.ctx)
+    this.catalogBuild = { key, startedAt: performance.now(), value }
+    value.catch(() => {
+      if (this.catalogBuild?.value === value) this.catalogBuild = undefined
+    })
+    return value
   }
+
+  private catalogBuild: { readonly key: string; readonly startedAt: number; readonly value: Promise<ModelCatalog> } | undefined
 
   /**
    * Report whether this deployment can hand a Session workspace path to a native desktop.
