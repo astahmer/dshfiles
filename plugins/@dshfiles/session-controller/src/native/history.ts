@@ -46,7 +46,7 @@ export class SessionHistoryController {
 
   /**
    * @param ctx - Host context carrying Session query and projection services.
-   * @param promote - starts ordinary Session activation after snapshot delivery.
+   * @param promote - starts ordinary Session activation after snapshot delivery, for a log left inside a turn.
    */
   constructor(
     private readonly ctx: Context,
@@ -202,7 +202,10 @@ export class SessionHistoryController {
           : projectionBlock(source.projections),
         ...assistantStream === undefined ? {} : { assistantStream },
       }
-      if (address.kind === 'session' && source.source === 'prepared') {
+      // dshfiles delta: opening a cold Session no longer resumes its Agent (about 1.2 s of main-thread work on a long
+      // thread, right as the snapshot is delivered). The first command resolves it from the preparation this follow
+      // keeps pinned; a log that stops inside a turn still resumes now, so its crash closers land while it is viewed.
+      if (address.kind === 'session' && source.source === 'prepared' && endsInsideTurn(events)) {
         const promotion = source.retain()
         try {
           this.promote(promotion)
@@ -275,6 +278,15 @@ export class SessionHistoryController {
     }
   }
 
+}
+
+function endsInsideTurn(events: readonly SessionEvent[]): boolean {
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    const type = events[index]?.type
+    if (type === 'turn/end') return false
+    if (type === 'turn/start') return true
+  }
+  return false
 }
 
 function cursorBeforeNext(nextSeq: SessionLogOffsetType): SessionSeqCursor {
