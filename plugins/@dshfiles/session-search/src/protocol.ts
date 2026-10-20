@@ -54,6 +54,10 @@ export const indexHealthSchema = z.object({
   behindBytes: z.number().int().nonnegative(),
   ingesting: z.boolean(),
   lastIngestMs: z.number().nonnegative(),
+  /** Slowest ingest pass since the worker started; a search waits behind a running pass. */
+  slowestIngestMs: z.number().nonnegative(),
+  lastSearchMs: z.number().nonnegative(),
+  slowestSearchMs: z.number().nonnegative(),
   lastError: z.string().nullable(),
 })
 export type IndexHealth = z.infer<typeof indexHealthSchema>

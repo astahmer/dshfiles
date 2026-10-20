@@ -84,7 +84,16 @@ describe('owned index', () => {
   })
 })
 
-const idleHealth = { behindSessions: 0, behindBytes: 0, ingesting: false, lastIngestMs: 0, lastError: null }
+const idleHealth = {
+  behindSessions: 0,
+  behindBytes: 0,
+  ingesting: false,
+  lastIngestMs: 0,
+  slowestIngestMs: 0,
+  lastSearchMs: 0,
+  slowestSearchMs: 0,
+  lastError: null,
+}
 
 describe('owned index document rows', () => {
   const sessionId = 'session-dddddddd-0000-4000-8000-000000000000'

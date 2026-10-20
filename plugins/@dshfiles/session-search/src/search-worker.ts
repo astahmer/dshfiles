@@ -32,6 +32,9 @@ interface WorkerState {
   ingesting: boolean
   stopped: boolean
   lastIngestMs: number
+  slowestIngestMs: number
+  lastSearchMs: number
+  slowestSearchMs: number
   lastError: string | null
   behindSessions: number
   behindBytes: number
@@ -43,6 +46,9 @@ const state: WorkerState = {
   ingesting: false,
   stopped: false,
   lastIngestMs: 0,
+  slowestIngestMs: 0,
+  lastSearchMs: 0,
+  slowestSearchMs: 0,
   lastError: null,
   behindSessions: 0,
   behindBytes: 0,
@@ -59,6 +65,9 @@ const health = (): IndexHealth =>
     behindBytes: state.behindBytes,
     ingesting: state.ingesting,
     lastIngestMs: state.lastIngestMs,
+    slowestIngestMs: state.slowestIngestMs,
+    lastSearchMs: state.lastSearchMs,
+    slowestSearchMs: state.slowestSearchMs,
     lastError: state.lastError,
   })
 
@@ -97,6 +106,7 @@ const startIngest = (): void => {
         state.behindBytes = result.behindBytes
         state.lastError = null
         state.lastIngestMs = Date.now() - startedAt
+        state.slowestIngestMs = Math.max(state.slowestIngestMs, state.lastIngestMs)
         parentPort?.postMessage({ kind: 'progress', health: health() } satisfies WorkerReply)
         await wait(result.complete && result.ingested === 0 ? IDLE_SLEEP_MS : BUSY_SLEEP_MS)
       } catch (error) {
@@ -146,9 +156,9 @@ parentPort?.on('message', raw => {
     respond(request.id, () => health())
     return
   }
-  if (request.kind === 'search-sessions') {
-    respond(request.id, () => requireIndex().searchSessions(request.request))
-    return
-  }
-  respond(request.id, () => ({ sessionId: request.request.sessionId, ...requireIndex().searchEvents(request.request) }))
+  const startedAt = performance.now()
+  if (request.kind === 'search-sessions') respond(request.id, () => requireIndex().searchSessions(request.request))
+  else respond(request.id, () => ({ sessionId: request.request.sessionId, ...requireIndex().searchEvents(request.request) }))
+  state.lastSearchMs = Math.round(performance.now() - startedAt)
+  state.slowestSearchMs = Math.max(state.slowestSearchMs, state.lastSearchMs)
 })

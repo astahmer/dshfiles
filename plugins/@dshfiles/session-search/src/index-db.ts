@@ -455,6 +455,9 @@ export class SearchIndex {
     readonly behindBytes: number
     readonly ingesting: boolean
     readonly lastIngestMs: number
+    readonly slowestIngestMs: number
+    readonly lastSearchMs: number
+    readonly slowestSearchMs: number
     readonly lastError: string | null
   }): IndexHealth {
     const sessions = countRowSchema.parse(this.#database.prepare('SELECT count(*) AS count FROM sessions').get()).count

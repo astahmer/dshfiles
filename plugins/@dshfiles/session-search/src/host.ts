@@ -41,6 +41,9 @@ const IDLE_HEALTH: IndexHealth = {
   behindBytes: 0,
   ingesting: false,
   lastIngestMs: 0,
+  slowestIngestMs: 0,
+  lastSearchMs: 0,
+  slowestSearchMs: 0,
   lastError: null,
 }
 
