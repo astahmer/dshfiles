@@ -1,8 +1,10 @@
+import { execFile } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
 import { existsSync, readFileSync, statSync } from 'node:fs'
 import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { basename, dirname, join, resolve } from 'node:path'
+import { promisify } from 'node:util'
 import { z } from 'zod'
 import { JsonText } from './json-text.js'
 import { ThreadIntegrationModel } from './thread-integration-state.js'
@@ -122,6 +124,7 @@ const MAX_PATCH_TARGET_REVISIONS = 1_024
 const MAX_PATCH_BODY_BYTES = 65_536
 const LAND_ATTEMPTS = 3
 const THREAD_WORKSPACE_NAME = /^thread-[0-9a-f]{6}$/u
+const execFileAsync = promisify(execFile)
 const HEX_ID = /^[0-9a-f]+$/u
 const isCommitId = (value: string): boolean => value.length >= 40 && HEX_ID.test(value)
 const commitIdRevset = (commitId: string): string => {
@@ -761,6 +764,16 @@ export const createThreads = (options: {
    * spare onto the base as it is now takes 0.15–0.35 s. The record survives a Host restart; a spare deleted from disk
    * is ignored.
    */
+  /**
+   * jj 0.46 backs each workspace of a colocated repository with a git worktree. A workspace whose folder was deleted
+   * stays registered with git and blocks a new `jj workspace add` at that path, and a moved folder is lost to git
+   * until repaired. Both fixes are best effort: a non-colocated repository has nothing to fix.
+   */
+  const gitWorktrees = async (repoRoot: string, args: readonly string[]): Promise<void> => {
+    if (!existsSync(join(repoRoot, '.git'))) return
+    await execFileAsync('git', ['-C', repoRoot, 'worktree', ...args]).catch(() => undefined)
+  }
+
   const sparesFile = (repoRoot: string): string => join(options.threadsDirectory(repoRoot), '.dshfiles-spare-workspaces.json')
   const spareWrites = new Map<string, Promise<unknown>>()
   const warming = new Map<string, Promise<void>>()
@@ -818,6 +831,7 @@ export const createThreads = (options: {
         const path = join(directory, name)
         if (name !== spare) {
           await rename(join(directory, spare), path)
+          await gitWorktrees(repoRoot, ['repair', path])
           await jj(['workspace', 'rename', name], path)
         }
         await jj(['new', target], path)
@@ -865,6 +879,7 @@ export const createThreads = (options: {
           return { commitId, parentIds: parents.split(',').filter(isCommitId), kept: disposition === 'kept' }
         })
       await mkdir(dirname(path), { recursive: true })
+      await gitWorktrees(repoRoot, ['prune'])
       if (workingCopy === undefined) {
         await jj(['workspace', 'add', path, '--name', name, '-r', options.bookmark()], repoRoot)
         return
