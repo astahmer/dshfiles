@@ -320,7 +320,7 @@ describe('memory runtime', () => {
     reply('session-fine', 1, 'INC-20931 delayed delivery by 26 minutes.\nmemory: t:11111111')
     reply('session-fine', 2, 'The incident note is drafted.')
 
-    const flags = Object.fromEntries(store.recentCitations(10).map(citation => [citation.thread, [citation.userCorrected, citation.agentCorrected]]))
+    const flags = Object.fromEntries(store.recentCitations({ limit: 10 }).map(citation => [citation.thread, [citation.userCorrected, citation.agentCorrected]]))
     expect(flags).toEqual({ 'session-user': [true, false], 'session-agent': [false, true], 'session-fine': [false, false] })
   })
 

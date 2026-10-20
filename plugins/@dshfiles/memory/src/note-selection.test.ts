@@ -1,41 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
-import type { PanelNote } from './api.js'
 import { NoteSelectionModel } from './note-selection.js'
 
-const note = (input: { readonly id: number; readonly type: PanelNote['type']; readonly status?: PanelNote['status'] }): PanelNote => ({
-  id: input.id,
-  project: '/work/repo',
-  type: input.type,
-  scope: 'repo',
-  confidence: 'stated',
-  text: `note ${String(input.id)}`,
-  sourceThread: null,
-  sourceSeq: null,
-  origin: 'agent',
-  createdAt: 1,
-  updatedAt: 1,
-  citations: 0,
-  status: input.status ?? 'valid',
-  supersedes: null,
-  supersededBy: null,
-  reason: null,
-})
-
 describe('note selection', () => {
-  it('orders selectable ids by the rendered type groups and skips invalid notes', () => {
-    const ids = NoteSelectionModel.orderedSelectableIds({
-      notes: [
-        note({ id: 1, type: 'project' }),
-        note({ id: 2, type: 'feedback' }),
-        note({ id: 3, type: 'project', status: 'forgotten' }),
-        note({ id: 4, type: 'reference' }),
-      ],
-      types: ['feedback', 'project', 'reference'],
-    })
-    expect(ids).toEqual([2, 1, 4])
-  })
-
   it('forgets every selected note and keeps the failed ones out of the cleared set', async () => {
     const calls: { readonly id: number; readonly reason: string }[] = []
     const outcome = await NoteSelectionModel.forget({

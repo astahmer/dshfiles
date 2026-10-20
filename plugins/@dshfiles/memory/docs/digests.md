@@ -54,13 +54,13 @@ becomes invisible to memory again, while its log stays.
 - **A normal digest costs no tokens.** It is a local read of the session log inside the DSH process.
 - **A thread with no trace of its own** needs one model call: no goal, no todos, no jj revision, no correction and no
   final answer worth 80 bytes. It runs with reasoning off, on the thread's provider and its first configured cheap
-  model, which `summarizerProvider` / `summarizerModel` / `summarizerEffort` override. The Memory panel's Usage tab
+  model, which `summarizerProvider` / `summarizerModel` / `summarizerEffort` override. The Memory page's Analytics tab
   counts these as "Digest calls" and "Digest cost". Measured on the author's store on 2026-10-16: 530 digests, 26
   model calls, 16 of them stored, 12.7k input and 4.3k output tokens in total.
 - **The start block is the real cost.** Every request, subagents included, carries up to `blockBytes` (1,600) of notes
   and thread pointers at the end of the system prompt — about 400 tokens. It is frozen per thread and byte-identical
   for every thread of a project until memory changes, so it sits in the provider's cached prefix instead of being paid
-  for at full price. The Usage tab reports its size and how many requests carried it.
+  for at full price. The Analytics tab reports its size and how many requests carried it.
 - **Nothing is injected while a thread runs.** The block is frozen at the thread's first prompt assembly, so a digest
   written during a thread reaches later threads, never the one that produced it.
 

@@ -9,6 +9,7 @@ import type { IndexedMessage, ThreadDigest } from './store.ts'
 
 export type ThreadHeader = {
   readonly id: string
+  readonly createdAt?: number | undefined
   readonly cwd?: string | undefined
   readonly parentSession?: string | undefined
   readonly origin?: string | undefined

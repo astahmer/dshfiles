@@ -38,12 +38,16 @@ Cross-thread, cross-project memory for DSH that leaves the live context and the 
   **Open in Memory** button that takes the same item to the Memory page (notes open their detail, digests open their
   row). The whole `memory: <id>` token carries the link, and the preview uses the `preview` API method, which does not
   create a synthetic memory-tool usage record.
-- **Memory panel** (sidebar → Memory): notes by type with their source (project, thread, message, who wrote it,
-  created and updated), inline edit and forget, a checkbox selection (Shift range, Cmd/Ctrl toggle, select-all over
-  the visible valid notes) that forgets every selected note after one count-named confirmation, superseded history,
-  markdown preview through DSH's own
-  `MarkdownText`; thread digests by project; usage: cost per day, start-block size and the requests that carried
-  it, recall hits and citations, correction heuristics and 👍/👎 per cited memory (also through the
+- **Memory page** (sidebar → Memory): three tabs.
+  **Notes** is a searchable, filterable list (type, status, source, sort; list or card view) beside a detail pane with
+  the note text, its source thread and message, metadata, related memories, superseded history, inline edit and
+  forget, and a project selector plus **Add memory** dialog. Selection mode (Shift range, Cmd/Ctrl toggle, select-all
+  over the visible valid notes) forgets every selected note after one count-named confirmation.
+  **Threads** lists digested threads and Sessions memory has not digested yet, with digest source and citation
+  counts; the detail pane has Digest / Memories / Citations / Timeline / Raw content views, a **Regenerate** action,
+  and a **Write digest now** action for an undigested thread.
+  **Analytics** shows stat cards with sparklines, digest activity, retrieval outcomes and cost charts, recall and
+  correctness bars, recent events, and the most-cited memories, over a 7/14/30/90-day window (also through the
   `dshfiles-memory` API).
 
 Message text is indexed with contentless FTS5 tables (the index only; the text stays in the session log). Credential

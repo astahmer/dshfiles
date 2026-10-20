@@ -54,21 +54,22 @@ Then('the inline memory preview shows {string}', async ({ page }: { page: Page }
   await finishJourneyAssertions(page)
 })
 
-Then('the note {string} is listed under Project', async ({ page }: { page: Page }, text: string) => {
-  await recordAssertion(page, 'memory-panel-lists-note-by-type', async () => {
-    await expect(page.getByRole('heading', { name: /^Project/ })).toBeVisible()
-    await expect(page.getByText(text, { exact: true })).toBeVisible()
+Then('the note {string} is listed in the Notes tab', async ({ page }: { page: Page }, text: string) => {
+  await recordAssertion(page, 'memory-panel-lists-note', async () => {
+    await expect(page.locator('main.dshx-root:visible').getByText(text, { exact: true }).first()).toBeVisible()
+    await expect(page.getByText('Decision', { exact: true }).first()).toBeVisible()
   })
 })
 
 Then('editing it to {string} keeps the old text in its history', async ({ page }: { page: Page }, text: string) => {
   await recordAssertion(page, 'memory-panel-edit-supersedes-note', async () => {
-    await expect(page.locator('dl[aria-label="Source of n:1"]')).toContainText('agent note')
+    await page.getByText('Deploys need the ops approval label.', { exact: true }).click()
+    await expect(page.getByLabel('Source and evidence')).toContainText('agent note')
     await page.getByRole('button', { name: 'Edit', exact: true }).click()
     await page.getByRole('textbox', { name: 'Note text' }).fill(text)
     await page.getByRole('combobox', { name: 'Edit note type' }).selectOption('feedback')
     await page.getByRole('button', { name: 'Save note', exact: true }).click()
-    await expect(page.getByRole('heading', { name: /^Feedback/ })).toBeVisible()
+    await expect(page.locator('main.dshx-root:visible').getByText(text, { exact: true }).first()).toBeVisible()
     await page.getByRole('button', { name: 'n:2', exact: true }).click()
     const history = page.getByRole('list', { name: 'Note history' })
     await expect(history).toContainText('Deploys need the ops approval label.')
@@ -78,12 +79,18 @@ Then('editing it to {string} keeps the old text in its history', async ({ page }
 
 Then('forgetting it with a reason removes it from the list', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'memory-panel-forget-note', async () => {
-    await page.getByRole('complementary', { name: 'Note detail' }).getByRole('button', { name: 'Forget', exact: true }).click()
+    const detail = page.getByRole('complementary', { name: 'Note detail' })
+    await detail.getByRole('button', { name: 'Forget', exact: true }).click()
     await page.getByRole('textbox', { name: 'Reason' }).fill('obsolete after the pipeline change')
     await page.getByRole('button', { name: 'Forget note', exact: true }).click()
-    await expect(page.getByText('No notes yet.', { exact: false })).toBeVisible()
+    await expect(page.locator('main.dshx-root:visible').getByText('No notes yet.', { exact: false })).toBeVisible()
   })
   await finishJourneyAssertions(page)
+})
+
+When('selection mode is on', async ({ page }: { page: Page }) => {
+  await page.getByRole('button', { name: 'Select notes', exact: true }).click()
+  await expect(page.getByRole('checkbox', { name: 'Select all visible notes', exact: true })).toBeVisible()
 })
 
 When('two visible notes are selected', async ({ page }: { page: Page }) => {
@@ -99,17 +106,20 @@ Then('forgetting the selection after confirmation empties the list', async ({ pa
     await expect(dialog).toContainText('Forget 2 selected notes?')
     await dialog.getByRole('textbox', { name: 'Reason for forgetting', exact: true }).fill('obsolete after the pipeline change')
     await dialog.getByRole('button', { name: 'Forget 2 notes', exact: true }).click()
-    await expect(page.getByText('No notes yet.', { exact: false })).toBeVisible()
+    await expect(page.locator('main.dshx-root:visible').getByText('No notes yet.', { exact: false })).toBeVisible()
   })
   await finishJourneyAssertions(page)
 })
 
-Then('the Usage tab shows the memory counters and the usage per day', async ({ page }: { page: Page }) => {
-  await recordAssertion(page, 'memory-panel-usage-counters', async () => {
-    await page.getByRole('tab', { name: 'Usage', exact: true }).click()
-    await expect(page.getByText('Model requests that carried it', { exact: true })).toBeVisible()
-    await expect(page.getByRole('table', { name: 'Memory cost per day' })).toBeVisible()
-    await expect(page.getByRole('table', { name: 'Memory usage per day' })).toBeVisible()
+Then('the Analytics tab shows the memory counters and the activity charts', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'memory-panel-analytics', async () => {
+    await page.getByRole('tab', { name: 'Analytics', exact: true }).click()
+    // DSH keeps an inactive main-panel copy mounted; scope every assertion to the visible page and its active tab.
+    const view = page.locator('main.dshx-root:visible [data-slot="tabs-content"][data-state="active"]')
+    await expect(view).toContainText('Digest calls')
+    await expect(view).toContainText('Digest activity')
+    await expect(view).toContainText('Recall')
+    await expect(view).toContainText('Recent events')
   })
   await finishJourneyAssertions(page)
 })

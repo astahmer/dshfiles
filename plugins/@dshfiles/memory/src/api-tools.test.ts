@@ -10,12 +10,14 @@ describe('memory tool exposure', () => {
       'memory_edit_note',
       'memory_forget_note',
       'memory_note',
+      'memory_note_counts',
       'memory_note_history',
       'memory_notes',
       'memory_projects',
       'memory_read',
       'memory_search',
       'memory_start_block',
+      'memory_thread_detail',
       'memory_threads',
       'related_threads',
     ])
@@ -26,12 +28,14 @@ describe('memory tool exposure', () => {
     expect(readOnly).toEqual([
       'find_threads',
       'memory_citations',
+      'memory_note_counts',
       'memory_note_history',
       'memory_notes',
       'memory_projects',
       'memory_read',
       'memory_search',
       'memory_start_block',
+      'memory_thread_detail',
       'memory_threads',
       'related_threads',
     ])
@@ -41,8 +45,9 @@ describe('memory tool exposure', () => {
     expect(memoryApi.methods.editNote.description).toMatch(/Call only when the user asked/u)
     expect(memoryApi.methods.forgetNote.description).toMatch(/Call only when the user asked/u)
     // usage needs the full MemoryUsage schema; preview duplicates memory_read and would count as an
-    // agent memory-tool call; rateCitation would let an Agent rate its own citations.
-    for (const name of ['usage', 'preview', 'rateCitation'] as const) {
+    // agent memory-tool call; rateCitation would let an Agent rate its own citations; createNote and
+    // redigest are the panel's own verbs (an Agent writes notes with memory_note and digests idle anyway).
+    for (const name of ['usage', 'preview', 'rateCitation', 'createNote', 'redigest'] as const) {
       expect(memoryApi.methods[name].tool).toBeUndefined()
     }
   })

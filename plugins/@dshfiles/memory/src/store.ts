@@ -61,14 +61,27 @@ export type NoteRecord = Note & {
 }
 
 export type DailyUsage = {
-  readonly day: string
-  readonly searches: number
-  readonly reads: number
-  readonly notes: number
+  day: string
+  searches: number
+  searchFound: number
+  searchEmpty: number
+  reads: number
+  readFound: number
+  readMissing: number
+  notes: number
   /** Tool calls whose results a reply cited. */
-  readonly cited: number
-  readonly citations: number
+  cited: number
+  citations: number
+  agentCorrected: number
+  userCorrected: number
+  /** Thread digests written that day, duplicates included. */
+  digests: number
+  /** Model requests that carried a non-empty start block. */
+  blockRequests: number
 }
+
+/** Stored notes by lifecycle state, for the notes header and analytics. */
+export type NoteStatusCounts = { readonly active: number; readonly superseded: number; readonly forgotten: number }
 
 export type IndexedMessage = { readonly seq: number; readonly role: 'user' | 'assistant'; readonly text: string; readonly at: number }
 
@@ -813,25 +826,40 @@ export const openMemoryStore = (options: { readonly path: string; readonly now?:
   const rateCitation = (input: { readonly id: number; readonly rating: 'up' | 'down' | null }): boolean =>
     statement('update citations set rating = ? where id = ?').run(input.rating, input.id).changes > 0
 
-  /** Recent citations with what they pointed at, for the panel's rating list. */
-  const recentCitations = (limit: number) =>
-    statement(
-      `select c.*, coalesce(t.title, n.text) target from citations c
+  /** Recent citations with what they pointed at and where, for the panel's rating list and analytics events. */
+  const recentCitations = (request: { readonly limit: number; readonly thread?: string | undefined; readonly ref?: string | undefined }) => {
+    const clauses: string[] = []
+    const params: (string | number)[] = []
+    if (request.thread !== undefined) {
+      clauses.push('c.thread = ?')
+      params.push(request.thread)
+    }
+    if (request.ref !== undefined) {
+      clauses.push('c.ref = ?')
+      params.push(request.ref)
+    }
+    return statement(
+      `select c.*, coalesce(t.title, n.text) target, coalesce(t.project, n.project) project, citing.title thread_title from citations c
          left join threads t on c.ref = 't:' || t.id
          left join notes n on c.ref = 'n:' || n.id
+         left join threads citing on citing.id = c.thread
+         ${clauses.length === 0 ? '' : `where ${clauses.join(' and ')}`}
          order by c.at desc limit ?`,
     )
-      .all(limit)
+      .all(...params, request.limit)
       .map(row => ({
         id: Number(row['id']),
         at: Number(row['at']),
         thread: String(row['thread']),
+        threadTitle: row['thread_title'] === null ? null : String(row['thread_title']),
         ref: String(row['ref']),
         target: row['target'] === null ? null : String(row['target']),
+        project: row['project'] === null ? null : String(row['project']),
         rating: citationRatings.find(rating => rating === row['rating']) ?? null,
         agentCorrected: Number(row['agent_corrected']) === 1,
         userCorrected: Number(row['user_corrected']) === 1,
       }))
+  }
 
   /** Whether the start block and cited memory hold up: totals for the panel. */
   const effectiveness = () => {
@@ -905,6 +933,7 @@ export const openMemoryStore = (options: { readonly path: string; readonly now?:
     readonly scope?: string | undefined
     readonly category?: NoteCategory | undefined
     readonly query?: string | undefined
+    readonly thread?: string | undefined
     readonly includeInvalid?: boolean | undefined
     readonly limit: number
   }): readonly NoteRecord[] => {
@@ -922,6 +951,10 @@ export const openMemoryStore = (options: { readonly path: string; readonly now?:
     if (filter.category !== undefined) {
       clauses.push('category = ?')
       params.push(filter.category)
+    }
+    if (filter.thread !== undefined) {
+      clauses.push('source_thread = ?')
+      params.push(filter.thread)
     }
     if (filter.query !== undefined && filter.query.trim().length > 0) {
       clauses.push('text like ?')
@@ -1055,32 +1088,87 @@ export const openMemoryStore = (options: { readonly path: string; readonly now?:
       .all()
       .map(row => ({ project: String(row['project']), threads: Number(row['threads']), notes: Number(row['notes']) }))
 
-  /** Memory activity per UTC day, newest first: tool calls by kind and citations. */
+  /** Memory activity per UTC day, newest first: tool calls and outcomes, citations, corrections, digests and blocks. */
   const usageByDay = (days: number): readonly DailyUsage[] => {
     const since = now() - days * dayMs
-    const rows = new Map<string, { day: string; searches: number; reads: number; notes: number; cited: number; citations: number }>()
-    const entry = (day: string) => {
+    const rows = new Map<string, DailyUsage>()
+    const entry = (day: string): DailyUsage => {
       const existing = rows.get(day)
       if (existing) return existing
-      const created = { day, searches: 0, reads: 0, notes: 0, cited: 0, citations: 0 }
+      const created: DailyUsage = {
+        day,
+        searches: 0,
+        searchFound: 0,
+        searchEmpty: 0,
+        reads: 0,
+        readFound: 0,
+        readMissing: 0,
+        notes: 0,
+        cited: 0,
+        citations: 0,
+        agentCorrected: 0,
+        userCorrected: 0,
+        digests: 0,
+        blockRequests: 0,
+      }
       rows.set(day, created)
       return created
     }
     for (const row of statement(
-      "select date(at / 1000, 'unixepoch') day, tool, count(*) calls, sum(used) used from tool_calls where at >= ? group by day, tool",
+      "select date(at / 1000, 'unixepoch') day, tool, count(*) calls, sum(results > 0) found, sum(results = 0) empty, sum(used) used from tool_calls where at >= ? group by day, tool",
     ).all(since)) {
       const day = entry(String(row['day']))
       const tool = String(row['tool'])
       const calls = Number(row['calls'])
-      if (tool === 'memory_search') day.searches += calls
-      else if (tool === 'memory_read') day.reads += calls
-      else day.notes += calls
+      const found = Number(row['found'] ?? 0)
+      const empty = Number(row['empty'] ?? 0)
+      if (tool === 'memory_search') {
+        day.searches += calls
+        day.searchFound += found
+        day.searchEmpty += empty
+      } else if (tool === 'memory_read') {
+        day.reads += calls
+        day.readFound += found
+        day.readMissing += empty
+      } else {
+        day.notes += calls
+      }
       day.cited += Number(row['used'] ?? 0)
     }
-    for (const row of statement("select date(at / 1000, 'unixepoch') day, count(*) n from citations where at >= ? group by day").all(since))
-      entry(String(row['day'])).citations += Number(row['n'])
+    for (const row of statement(
+      "select date(at / 1000, 'unixepoch') day, count(*) n, sum(agent_corrected) agent, sum(user_corrected) user from citations where at >= ? group by day",
+    ).all(since)) {
+      const day = entry(String(row['day']))
+      day.citations += Number(row['n'])
+      day.agentCorrected += Number(row['agent'] ?? 0)
+      day.userCorrected += Number(row['user'] ?? 0)
+    }
+    for (const row of statement("select date(digested_at / 1000, 'unixepoch') day, count(*) n from threads where digested_at >= ? group by day").all(since)) {
+      entry(String(row['day'])).digests += Number(row['n'])
+    }
+    for (const row of statement("select day, sum(value) n from daily where day >= date(? / 1000, 'unixepoch') and name = 'block.requests' group by day").all(
+      since,
+    )) {
+      entry(String(row['day'])).blockRequests += Number(row['n'])
+    }
     return [...rows.values()].sort((left, right) => right.day.localeCompare(left.day))
   }
+
+  /** Stored notes by lifecycle state, for the notes header and analytics. */
+  const noteStatusCounts = (project?: string | undefined): NoteStatusCounts => {
+    const row = statement(
+      `select sum(valid = 1) active, sum(valid = 0 and forgotten_at is null) superseded, sum(forgotten_at is not null) forgotten from notes${project === undefined ? '' : ' where project = ?'}`,
+    ).get(...(project === undefined ? [] : [project]))
+    return {
+      active: Number(row?.['active'] ?? 0),
+      superseded: Number(row?.['superseded'] ?? 0),
+      forgotten: Number(row?.['forgotten'] ?? 0),
+    }
+  }
+
+  /** The valid notes agents cited most, with their current text and citation counts. */
+  const topNotes = (limit: number): readonly NoteRecord[] =>
+    statement('select * from notes where valid = 1 and uses > 0 order by uses desc, created_at desc limit ?').all(limit).map(noteRecord)
 
   const usage = (): UsageCounts => ({
     tools: statement('select tool, count(*) calls, sum(results > 0) with_results, sum(used) used from tool_calls group by tool order by tool')
@@ -1159,6 +1247,8 @@ export const openMemoryStore = (options: { readonly path: string; readonly now?:
     rekeyProjects,
     projects,
     usageByDay,
+    noteStatusCounts,
+    topNotes,
     frozenBlock,
     freezeBlock,
     recordToolCall,

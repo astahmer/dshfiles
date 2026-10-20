@@ -3,7 +3,23 @@ import { z } from 'zod'
 
 import type { RetrievalStatus } from './embedder.ts'
 import { MemoryGuidance } from './guidance.ts'
+import type { DailyUsage, NoteStatusCounts } from './store.ts'
 import type { ThreadFinderPage, ThreadFinderRelations } from './thread-finder.ts'
+
+/** One notable memory action, newest first, for the panel's activity list and analytics. */
+export type MemoryEvent = {
+  readonly at: number
+  readonly kind: 'citation' | 'digest' | 'note'
+  readonly project: string
+  readonly detail: string
+  readonly thread: string | null
+  readonly threadTitle: string | null
+  readonly noteId: number | null
+  readonly ref: string | null
+  readonly rating: 'up' | 'down' | null
+  readonly agentCorrected: boolean
+  readonly userCorrected: boolean
+}
 
 /** What the panel shows about whether memory earns its keep. Counters are local and never leave the machine. */
 export type MemoryUsage = {
@@ -22,14 +38,14 @@ export type MemoryUsage = {
   readonly tools: readonly { readonly tool: string; readonly calls: number; readonly withResults: number; readonly empty: number; readonly used: number }[]
   readonly costs: MemoryCosts
   readonly effectiveness: MemoryEffectiveness
-  readonly daily: readonly {
-    readonly day: string
-    readonly searches: number
-    readonly reads: number
-    readonly notes: number
-    readonly cited: number
-    readonly citations: number
-  }[]
+  /** Notes by lifecycle state across every project. */
+  readonly noteCounts: NoteStatusCounts
+  /** Per-UTC-day activity for the analytics charts, newest first, already bounded to the requested window. */
+  readonly daily: readonly DailyUsage[]
+  /** The most recent citations, digests and note writes, newest first. */
+  readonly events: readonly MemoryEvent[]
+  /** The valid notes agents cite most in the window. */
+  readonly topNotes: readonly PanelNote[]
 }
 
 /** Tokens and list-price dollars of memory's own calls. `usd` is null when the route has no known price. */
@@ -82,16 +98,20 @@ export const panelNoteSchema = z.object({
   reason: z.string().nullable(),
 })
 
-/** One digested thread as the panel lists it. */
+/** One digested thread — or a Session memory has not digested yet — as the panel lists it. */
 export const panelThreadSchema = z.object({
   id: z.string(),
   project: z.string(),
   title: z.string(),
   decision: z.string(),
   digest: z.string(),
-  source: z.enum(['trail', 'model']),
+  source: z.enum(['trail', 'model']).nullable(),
   updatedAt: z.number(),
-  digestedAt: z.number(),
+  createdAt: z.number(),
+  digestedAt: z.number().nullable(),
+  digested: z.boolean(),
+  /** Session events at digest time; null for a thread memory has not read yet. */
+  events: z.number().int().nullable(),
   lastSeq: z.number().int(),
   citations: z.number().int(),
 })
@@ -103,6 +123,7 @@ export const notesFilterSchema = z
     scope: z.string(),
     type: memoryNoteTypeSchema.or(z.literal('')),
     query: z.string(),
+    thread: z.string(),
     includeInvalid: z.boolean(),
   })
   .strict()
@@ -112,12 +133,21 @@ export const memoryCitationSchema = z.object({
   id: z.number().int(),
   at: z.number(),
   thread: z.string(),
+  threadTitle: z.string().nullable(),
   ref: z.string(),
   target: z.string().nullable(),
+  project: z.string().nullable(),
   rating: z.enum(['up', 'down']).nullable(),
   agentCorrected: z.boolean(),
   userCorrected: z.boolean(),
 })
+
+const citationFilterSchema = z
+  .object({
+    thread: z.string().max(200).optional().describe('Only citations made in this Session.'),
+    ref: z.string().max(200).optional().describe('Only citations of this memory id (n:<id> or t:<session id>).'),
+  })
+  .strict()
 
 /** Model-facing text for a structured tool result. */
 const compactJson = <Output>(output: Output): string => JSON.stringify(output)
@@ -187,9 +217,10 @@ export const memoryApi = defineApi({
   version: 1,
   methods: {
     usage: method({
+      input: z.object({ days: z.number().int().min(1).max(365).optional().describe('Activity window in days; default 30.') }).strict(),
       output: z.custom<MemoryUsage>(),
       description:
-        "Memory's state and whether it earns its keep: stored digests, notes and indexed messages; its own digest and Jev cost per day; start-block size and the requests that carried it; memory tool calls, hits and citations; heuristic correction counts and ratings.",
+        "Memory's state and whether it earns its keep: stored digests, notes and indexed messages; its own digest and Jev cost per day; start-block size and the requests that carried it; memory tool calls, hits and citations; heuristic correction counts and ratings; per-day activity, recent events and the most-cited notes.",
     }),
     search: method({
       input: searchInput,
@@ -251,8 +282,27 @@ ${output.text}`,
       input: notesFilterSchema,
       output: z.array(panelNoteSchema),
       description:
-        'Browse stored notes by project, scope, type and text, optionally including superseded and forgotten ones. Read-only; every filter field is required, and an empty string means any.',
+        'Browse stored notes by project, scope, type, text and source thread, optionally including superseded and forgotten ones. Read-only; every filter field is required, and an empty string means any.',
       tool: { name: 'memory_notes', readOnly: true, render: compactJson },
+    }),
+    noteCounts: method({
+      input: z.object({ project: z.string() }).strict(),
+      output: z.custom<NoteStatusCounts>(),
+      description: 'How many notes are active, superseded or forgotten, for one project or every project (empty string). Read-only.',
+      tool: { name: 'memory_note_counts', readOnly: true, render: compactJson },
+    }),
+    createNote: method({
+      input: z
+        .object({
+          project: z.string().min(1).max(4_096),
+          text: z.string().trim().min(1).max(2_000),
+          type: memoryNoteTypeSchema,
+          scope: z.string().trim().min(1).max(256),
+          confidence: z.enum(['stated', 'inferred']),
+        })
+        .strict(),
+      output: panelNoteSchema,
+      description: 'Write a note from the Memory panel. It is filed under the project as a panel-authored note; duplicates return the existing note.',
     }),
     noteHistory: method({
       input: z.object({ id: z.number().int() }).strict(),
@@ -282,15 +332,33 @@ ${output.text}`,
       tool: { name: 'memory_forget_note', render: compactJson },
     }),
     threads: method({
-      input: z.object({ project: z.string() }).strict(),
+      input: z
+        .object({
+          project: z.string(),
+          includeUndigested: z.boolean().optional().describe('Also list Sessions memory has not digested yet; default false.'),
+        })
+        .strict(),
       output: z.array(panelThreadSchema),
-      description: 'Thread digests filed under one project, with their decisions, source and citation counts. Read-only.',
+      description:
+        'Thread digests filed under one project, with their decisions, source and citation counts, optionally with Sessions that have no digest yet. Read-only.',
       tool: { name: 'memory_threads', readOnly: true, render: compactJson },
     }),
+    threadDetail: method({
+      input: z.object({ id: z.string().min(1).max(200) }).strict(),
+      output: z.object({ messages: z.number().int(), createdAt: z.number(), updatedAt: z.number() }),
+      description: "One thread digest's message count and timestamps, read from its Session log. Read-only.",
+      tool: { name: 'memory_thread_detail', readOnly: true, render: compactJson },
+    }),
+    redigest: method({
+      input: z.object({ id: z.string().min(1).max(200) }).strict(),
+      output: z.object({ outcome: z.string() }),
+      description: 'Write or refresh one thread digest from its Session log now. Call only when the user asked for that thread.',
+    }),
     citations: method({
-      input: z.void(),
+      input: citationFilterSchema,
       output: z.array(memoryCitationSchema),
-      description: 'The 100 most recent citations of memory (`memory: <id>` in a reply), with heuristic correction flags and ratings. Read-only.',
+      description:
+        'The 100 most recent citations of memory (`memory: <id>` in a reply), optionally for one thread or one memory id, with heuristic correction flags and ratings. Read-only.',
       tool: { name: 'memory_citations', readOnly: true, render: compactJson },
     }),
     /** 👍/👎 on one cited memory; null clears the rating. */

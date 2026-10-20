@@ -810,6 +810,17 @@ export const createMemoryRuntime = (options: {
     return done
   }
 
+  /** One thread's message count and timestamps from its Session log, for the panel's digest detail. */
+  const threadDetail = async (sessionId: string): Promise<{ readonly messages: number; readonly createdAt: number; readonly updatedAt: number }> => {
+    const log = await services.readSession(sessionId)
+    const own = log.events.slice(log.inheritedEventCount)
+    return {
+      messages: own.filter(event => event.type === 'user/message' || event.type === 'assistant/message').length,
+      createdAt: log.header.createdAt ?? own[0]?.time ?? now(),
+      updatedAt: own.at(-1)?.time ?? log.header.createdAt ?? now(),
+    }
+  }
+
   return {
     onSessionEvent,
     startBlock,
@@ -823,6 +834,8 @@ export const createMemoryRuntime = (options: {
     preview,
     note,
     projectOf,
+    listThreadRecords: threadRecords,
+    threadDetail,
     stop: (): void => {
       stopped = true
       for (const timer of idleTimers.values()) clearTimeout(timer)

@@ -283,7 +283,7 @@
     {
       "id": "memory-panel",
       "title": "Browse and correct memory in the Memory panel",
-      "summary": "A sidebar Memory panel lists notes grouped by type (filter by project, scope and type; search), edits or forgets a note with a reason, shows its superseded history, lists thread digests by project with links, and shows usage per day.",
+      "summary": "A full Memory page with Notes, Threads and Analytics tabs: a searchable, filterable note list with a source-and-evidence detail pane (edit, forget, superseded history, related memories), a thread digest list with digest/memories/citations/timeline detail, and an analytics dashboard with per-day activity, cost, recall, correctness and recent events.",
       "surfaces": ["client", "api"],
       "configuration": [],
       "states": ["empty", "notes", "editing", "forgetting", "history", "threads", "usage"],
@@ -344,7 +344,7 @@
     {
       "id": "usage-telemetry",
       "title": "Show what memory costs and whether it holds up",
-      "summary": "Locally record memory's own digest and Jev calls (tokens, list-price dollars from AI Accounts' pricing cache), start-block size and the requests that carried it, memory tool calls with hits, empty results and citations, and two labelled heuristics: the agent revising, or the user correcting, an answer that cited memory. Cited memories can be rated \ud83d\udc4d/\ud83d\udc4e. The Memory panel's Usage tab and the dshfiles-memory API (usage, citations, rateCitation) expose it.",
+      "summary": "Locally record memory's own digest and Jev calls (tokens, list-price dollars from AI Accounts' pricing cache), start-block size and the requests that carried it, memory tool calls with hits, empty results and citations, and two labelled heuristics: the agent revising, or the user correcting, an answer that cited memory. Cited memories can be rated \ud83d\udc4d/\ud83d\udc4e. The Memory page's Analytics tab and the dshfiles-memory API (usage, citations, rateCitation) expose it.",
       "surfaces": ["client", "storage"],
       "configuration": [],
       "states": ["no-activity", "counted", "priced", "unpriced", "rated"],
@@ -378,7 +378,7 @@
           "testName": "flags, as heuristics, a citation the user then corrects and one the agent later revises"
         }
       ],
-      "reach": ["click button \"Memory\"", "click tab \"Usage\"", "expect table \"Memory usage per day\""]
+      "reach": ["click button \"Memory\"", "click tab \"Analytics\"", "expect text \"Recall\""]
     },
     {
       "id": "batch-forget-notes",
@@ -405,7 +405,7 @@
           "testName": "forgets every selected note and keeps the failed ones out of the cleared set"
         }
       ],
-      "reach": ["click button \"Memory\"", "expect checkbox \"Select all visible notes\""]
+      "reach": ["click button \"Memory\"", "click button \"Select notes\"", "expect checkbox \"Select all visible notes\""]
     }
   ]
 }

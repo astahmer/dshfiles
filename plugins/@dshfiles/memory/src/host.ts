@@ -21,7 +21,7 @@ import { EmbeddingProviders, type MemoryEmbedder, type RetrievalStatus } from '.
 import { costOfTokens } from '@dshfiles/ai-accounts/cost-estimate'
 import { createPricingCatalog, DEFAULT_PRICING_PATH, resolveRouteQuote } from '@dshfiles/ai-accounts/pricing-catalog'
 
-import { memoryApi, type MemoryCostLine, type MemoryCosts, type MemoryUsage, type PanelNote, type PanelThread } from './api.ts'
+import { memoryApi, type MemoryCostLine, type MemoryCosts, type MemoryEvent, type MemoryUsage, type PanelNote, type PanelThread } from './api.ts'
 import { projectPathFor } from './project-path.ts'
 import { MemoryGuidance } from './guidance.ts'
 import { ProjectScripts, type WorkspaceScripts } from './project-scripts.ts'
@@ -265,18 +265,71 @@ const addCost = (line: MemoryCostLine, row: ReturnType<MemoryStore['costsByDay']
         },
       }
 
-const costs = async (opened: MemoryStore): Promise<MemoryCosts> => {
-  const days = new Map<string, MemoryCostLine>()
+const costs = async (opened: MemoryStore, days: number): Promise<MemoryCosts> => {
+  const byDay = new Map<string, MemoryCostLine>()
   let total = emptyCostLine()
-  for (const row of opened.costsByDay(30)) {
+  for (const row of opened.costsByDay(days)) {
     const usd = row.kind === 'digest' ? await digestUsd(row) : 0
-    days.set(row.day, addCost(days.get(row.day) ?? emptyCostLine(), row, usd))
+    byDay.set(row.day, addCost(byDay.get(row.day) ?? emptyCostLine(), row, usd))
     total = addCost(total, row, usd)
   }
-  return { days: [...days].map(([day, line]) => ({ day, ...line })), total }
+  return { days: [...byDay].map(([day, line]) => ({ day, ...line })), total }
 }
 
-const usage = async (): Promise<MemoryUsage> => {
+/** Recent citations, digests and note writes, newest first, for the analytics activity list. */
+const recentEvents = (opened: MemoryStore, limit: number): readonly MemoryEvent[] => {
+  const threads = opened.listThreads({ limit })
+  const titles = new Map(threads.map(thread => [thread.id, thread.title]))
+  const events: MemoryEvent[] = []
+  for (const note of opened.listNotes({ limit })) {
+    events.push({
+      at: note.createdAt,
+      kind: 'note',
+      project: note.project,
+      detail: note.text,
+      thread: note.sourceThread,
+      threadTitle: note.sourceThread === null ? null : (titles.get(note.sourceThread) ?? null),
+      noteId: note.id,
+      ref: `n:${note.id}`,
+      rating: null,
+      agentCorrected: false,
+      userCorrected: false,
+    })
+  }
+  for (const thread of threads) {
+    events.push({
+      at: thread.digestedAt,
+      kind: 'digest',
+      project: thread.project,
+      detail: thread.title,
+      thread: thread.id,
+      threadTitle: thread.title,
+      noteId: null,
+      ref: `t:${thread.id}`,
+      rating: null,
+      agentCorrected: false,
+      userCorrected: false,
+    })
+  }
+  for (const citation of opened.recentCitations({ limit })) {
+    events.push({
+      at: citation.at,
+      kind: 'citation',
+      project: citation.project ?? 'unknown',
+      detail: citation.target ?? citation.ref,
+      thread: citation.thread,
+      threadTitle: citation.threadTitle,
+      noteId: null,
+      ref: citation.ref,
+      rating: citation.rating,
+      agentCorrected: citation.agentCorrected,
+      userCorrected: citation.userCorrected,
+    })
+  }
+  return events.sort((left, right) => right.at - left.at).slice(0, limit)
+}
+
+const usage = async (days: number): Promise<MemoryUsage> => {
   const base = {
     state: currentSettings().enabled ? (failure === null ? 'ready' : 'failed') : 'off',
     failure,
@@ -299,7 +352,10 @@ const usage = async (): Promise<MemoryUsage> => {
         block: { threads: 0, meanBytes: 0, maxBytes: 0, requests: 0 },
         citations: { total: 0, agentCorrected: 0, userCorrected: 0, up: 0, down: 0 },
       },
+      noteCounts: { active: 0, superseded: 0, forgotten: 0 },
       daily: [],
+      events: [],
+      topNotes: [],
     }
   const counts = store.usage()
   const counter = (name: string): number => counts.counters[name] ?? 0
@@ -319,9 +375,12 @@ const usage = async (): Promise<MemoryUsage> => {
     },
     jev: { calls: counter('jev.calls'), inputTokens: counter('jev.inputTokens'), failures: counter('jev.failures') },
     tools: counts.tools,
-    costs: await costs(store),
+    costs: await costs(store, days),
     effectiveness: store.effectiveness(),
-    daily: store.usageByDay(30),
+    noteCounts: store.noteStatusCounts(),
+    daily: store.usageByDay(days),
+    events: recentEvents(store, 40),
+    topNotes: store.topNotes(8).map(panelNote),
   }
 }
 
@@ -357,7 +416,10 @@ const panelThread = (thread: StoredThread): PanelThread => ({
   digest: thread.digest,
   source: thread.source,
   updatedAt: thread.updatedAt,
+  createdAt: thread.updatedAt,
   digestedAt: thread.digestedAt,
+  digested: true,
+  events: thread.lastSeq + 1,
   lastSeq: thread.lastSeq,
   citations: thread.uses,
 })
@@ -374,6 +436,7 @@ const notesFilter = z.object({
   scope: anyWhenEmpty(256),
   type: z.union([noteType, z.literal('').transform(() => undefined)]),
   query: anyWhenEmpty(256),
+  thread: anyWhenEmpty(200),
   includeInvalid: z.boolean(),
 })
 const noteId = z.number().int().positive()
@@ -429,7 +492,7 @@ const panelApi = memoryApi.host({
   read: ({ input, caller }) => withRuntime(active => active.read(callerOf(caller), input)),
   preview: ({ input }) => withRuntime(active => active.preview(input)),
   note: ({ input, caller }) => withRuntime(active => active.note(callerOf(caller), input)),
-  usage: () => usage(),
+  usage: ({ input }) => usage(input.days ?? 30),
   projects: async () => {
     await projectNormalization
     return [...requireStore().projects()]
@@ -447,11 +510,45 @@ const panelApi = memoryApi.host({
         scope: filter.scope,
         category: filter.type,
         query: filter.query,
+        thread: filter.thread,
         includeInvalid: filter.includeInvalid,
         limit: 500,
       })
       .map(panelNote)
     return [...notes]
+  },
+  noteCounts: async ({ input }) => {
+    await projectNormalization
+    return requireStore().noteStatusCounts(anyWhenEmpty(4_096).parse(input.project))
+  },
+  createNote: async ({ input }) => {
+    await projectNormalization
+    const parsed = z
+      .object({
+        project: z.string().min(1).max(4_096),
+        text: z.string().trim().min(1).max(2_000),
+        type: noteType,
+        scope: z.string().trim().min(1).max(256),
+        confidence: z.enum(['stated', 'inferred']),
+      })
+      .strict()
+      .parse(input)
+    const saved = requireStore().addNote({
+      project: parsed.project,
+      text: parsed.text,
+      category: parsed.type,
+      scope: parsed.scope,
+      confidence: parsed.confidence,
+      sourceThread: null,
+      sourceSeq: null,
+      origin: 'panel',
+    })
+    void runtime?.embedMissing()
+    const record = requireStore()
+      .noteHistory(saved.note.id)
+      .find(note => note.id === saved.note.id)
+    if (!record) throw new Error('The new note could not be read back.')
+    return panelNote(record)
   },
   noteHistory: ({ input }) => [...requireStore().noteHistory(noteId.parse(input.id)).map(panelNote)],
   editNote: ({ input }) => {
@@ -479,7 +576,13 @@ const panelApi = memoryApi.host({
     const parsed = z.object({ id: noteId, reason }).parse(input)
     return { forgotten: requireStore().forgetNote({ id: parsed.id, reason: parsed.reason || 'removed in the Memory panel' }) }
   },
-  citations: () => [...requireStore().recentCitations(100)],
+  citations: ({ input }) => [
+    ...requireStore().recentCitations({
+      limit: 100,
+      thread: input.thread === undefined || input.thread.length === 0 ? undefined : input.thread,
+      ref: input.ref === undefined || input.ref.length === 0 ? undefined : input.ref,
+    }),
+  ],
   rateCitation: ({ input }) => {
     const parsed = z.object({ id: noteId, rating: z.enum(['up', 'down']).nullable() }).parse(input)
     return { rated: requireStore().rateCitation(parsed) }
@@ -487,8 +590,32 @@ const panelApi = memoryApi.host({
   threads: async ({ input }) => {
     await projectNormalization
     const project = anyWhenEmpty(4_096).parse(input.project)
-    return [...requireStore().listThreads({ project, limit: 300 }).map(panelThread)]
+    const stored = requireStore().listThreads({ project, limit: 500 }).map(panelThread)
+    if (input.includeUndigested !== true) return [...stored]
+    const digested = new Set(stored.map(thread => thread.id))
+    const records = await withMemory(active => active.listThreadRecords())
+    const sessions: PanelThread[] = records
+      .filter(record => !digested.has(record.sessionId))
+      .filter(record => project === undefined || record.project === project)
+      .map(record => ({
+        id: record.sessionId,
+        project: record.project,
+        title: record.title.length === 0 ? '(untitled thread)' : record.title,
+        decision: '',
+        digest: '',
+        source: null,
+        updatedAt: record.updatedAt,
+        createdAt: record.createdAt,
+        digestedAt: null,
+        digested: false,
+        events: null,
+        lastSeq: 0,
+        citations: 0,
+      }))
+    return [...stored, ...sessions].sort((left, right) => right.updatedAt - left.updatedAt).slice(0, 500)
   },
+  threadDetail: ({ input }) => withMemory(active => active.threadDetail(input.id)),
+  redigest: ({ input }) => withRuntime(active => active.digest(input.id)).then(result => ({ outcome: result.summary })),
 })
 
 const normalizeProjectPaths = async (opened: MemoryStore) => {

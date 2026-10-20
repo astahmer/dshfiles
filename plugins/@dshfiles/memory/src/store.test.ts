@@ -177,6 +177,27 @@ describe('memory store', () => {
     ])
   })
 
+  it('counts notes by lifecycle state and ranks the most-cited valid notes', () => {
+    const store = open()
+    const cited = store.addNote(note('/p/x', 'Nightly runs start after the cache warms.')).note
+    const replaced = store.addNote(note('/p/x', 'Deploys need the ops approval label.')).note
+    const forgotten = store.addNote(note('/p/x', 'The old canary window is two hours.')).note
+    store.updateNote({
+      id: replaced.id,
+      text: 'Deploys need the ops-approval label and a green canary.',
+      reason: 'tightened',
+      sourceThread: null,
+      sourceSeq: null,
+      origin: 'panel',
+    })
+    store.forgetNote({ id: forgotten.id, reason: 'obsolete' })
+    store.recordUse({ kind: 'note', id: cited.id }, 'session-reader')
+    store.recordUse({ kind: 'note', id: cited.id }, 'session-writer')
+    expect(store.noteStatusCounts()).toEqual({ active: 2, superseded: 1, forgotten: 1 })
+    expect(store.noteStatusCounts('/p/x')).toEqual({ active: 2, superseded: 1, forgotten: 1 })
+    expect(store.topNotes(5).map(entry => [entry.id, entry.uses])).toEqual([[cited.id, 2]])
+  })
+
   it('keeps only an index of message text, never the text itself', () => {
     const store = open()
     store.indexMessages({
@@ -217,7 +238,24 @@ describe('memory store', () => {
       { tool: 'memory_search', calls: 1, withResults: 1, empty: 0, used: 1 },
     ])
     expect(store.thread('3f2a9c1e')?.uses).toBe(1)
-    expect(store.usageByDay(7)).toEqual([{ day: '2025-10-09', searches: 1, reads: 1, notes: 0, cited: 1, citations: 1 }])
+    expect(store.usageByDay(7)).toEqual([
+      {
+        day: '2025-10-09',
+        searches: 1,
+        searchFound: 1,
+        searchEmpty: 0,
+        reads: 1,
+        readFound: 1,
+        readMissing: 0,
+        notes: 0,
+        cited: 1,
+        citations: 1,
+        agentCorrected: 0,
+        userCorrected: 0,
+        digests: 1,
+        blockRequests: 0,
+      },
+    ])
   })
 
   it('ranks the caller project first and keeps old exact matches findable', () => {
@@ -251,7 +289,7 @@ describe('memory store', () => {
     store.recordUse({ kind: 'thread', id: 'session-3f2a9c1e' }, 'session-reader')
     store.recordUse({ kind: 'thread', id: 'session-3f2a9c1e' }, 'session-other')
     expect(store.flagCitations({ thread: 'session-reader', by: 'user', sinceMs: 60_000 })).toBe(1)
-    const [latest] = store.recentCitations(1)
+    const [latest] = store.recentCitations({ limit: 1 })
     expect(store.rateCitation({ id: latest?.id ?? 0, rating: 'down' })).toBe(true)
     expect(store.effectiveness()).toEqual({
       block: { threads: 2, meanBytes: 1_000, maxBytes: 1_100, requests: 7 },

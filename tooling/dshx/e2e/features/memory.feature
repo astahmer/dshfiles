@@ -9,7 +9,7 @@ Feature: Thread memory panel
     Given the isolated plugin profile "@dshfiles/memory" is booted
     And memory holds the project note "Deploys need the ops approval label."
     When the Memory panel is opened
-    Then the note "Deploys need the ops approval label." is listed under Project
+    Then the note "Deploys need the ops approval label." is listed in the Notes tab
     And editing it to "Deploys need the ops-approval label and a green canary." keeps the old text in its history
     And forgetting it with a reason removes it from the list
 
@@ -17,7 +17,7 @@ Feature: Thread memory panel
   Scenario: See memory usage per day
     Given the isolated plugin profile "@dshfiles/memory" is booted
     When the Memory panel is opened
-    Then the Usage tab shows the memory counters and the usage per day
+    Then the Analytics tab shows the memory counters and the activity charts
 
   @scenario:memory.panel-batch-forget
   Scenario: Forget several notes in one confirmed action
@@ -25,6 +25,7 @@ Feature: Thread memory panel
     And memory holds the project note "Deploys need the ops approval label."
     And memory holds the project note "Nightly runs start after the cache warms."
     When the Memory panel is opened
+    And selection mode is on
     And two visible notes are selected
     Then forgetting the selection after confirmation empties the list
 
