@@ -31,6 +31,19 @@ interface RetainThreadHistoryLookaheadInput<SessionId extends string> {
 const EDITABLE_TARGET_SELECTOR = 'input,textarea,select,[contenteditable]:not([contenteditable="false"]),[role="textbox"],[role="combobox"]'
 const MENU_TARGET_SELECTOR = '[role="menu"],[role="menuitem"],[role="menuitemcheckbox"],[role="menuitemradio"],[role="listbox"],[role="option"]'
 const MAX_LOOKAHEAD_SESSIONS = 3
+const navigationDirection = (key: string): ThreadNavigationDirection | undefined => {
+  switch (key) {
+    case 'ArrowDown':
+    case 'End':
+      return 1
+    case 'ArrowUp':
+    case 'Home':
+      return -1
+    default:
+      return undefined
+  }
+}
+
 const isExpanded = (element: Element): boolean => element.getAttribute('aria-expanded') === 'true'
 
 const isRendered = (button: HTMLElement): boolean => {
@@ -198,9 +211,8 @@ export class ThreadListNavigationModel {
       return
     }
 
-    const direction: ThreadNavigationDirection | null =
-      event.key === 'ArrowDown' ? 1 : event.key === 'ArrowUp' ? -1 : event.key === 'End' ? 1 : event.key === 'Home' ? -1 : null
-    if (direction === null) return
+    const direction = navigationDirection(event.key)
+    if (direction === undefined) return
 
     const nextIndex = event.key === 'Home' ? 0 : event.key === 'End' ? rows.length - 1 : Math.max(0, Math.min(rows.length - 1, activeIndex + direction))
     if (nextIndex === activeIndex && !event.shiftKey) {
