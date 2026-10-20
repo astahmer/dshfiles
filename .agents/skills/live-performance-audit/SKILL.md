@@ -52,7 +52,16 @@ above the core count (leaked `dshx-boot` scratch Hosts, editor jj servers) infla
 - Collapsed transcript groups kept every row mounted (hidden, for browser find): 42k DOM nodes per thread.
 - `session/follow` sends provider replay state (thinking signatures) twice per assistant message: 65 % of the bytes
   on Anthropic threads.
-- A cloned corpus in a scratch Host gives realistic `session/list` timing but does not open cloned histories; time
-  transcripts on the live instance.
+- `session/follow` sent `replayState.blocks` (thinking signatures) twice per assistant message, and `session/list`
+  decompressed every cold Session log per call; both are fixed in the `@dshfiles/session-controller` fork.
+- Every jj spawn loads the repository view (80–340 ms on a store with dozens of workspaces): key `--ignore-working-copy`
+  reads on the store's `op_heads/heads` listing instead of a clock.
+- An auto-load sentinel at the top of a transcript of collapsed Turns stays in range page after page; gate it on the
+  reader leaving the tail.
+- For transcripts and Host-gated behaviour, an APFS clone of `~/.dsh` (`cp -cR`, fix the relative `@dshfiles` links,
+  `HOME=<clone> dsh web --port 3197`) reproduces the live profile without touching it; scratch `dshx dev up` profiles
+  miss live data and user-layer patches.
+- The Host's "N entries did not activate … fiber state 1" line is a boot-time snapshot; rows still loading then
+  usually activate. Check the browser boot graph (`window.__DSH_BOOT__`) and console for client-side failures.
 
 Record findings and before/after tables in [`docs/performance.md`](../../../docs/performance.md).
