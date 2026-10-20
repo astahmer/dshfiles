@@ -21,12 +21,16 @@ import {
   type SessionSearchHit,
   type SessionSearchPage,
   type SessionSearchRequest,
+  type SessionRecord,
   type SessionTitleObservationResult,
 } from '@deepseek-ai/dsh-session-query'
 import { z } from 'zod'
 import { withoutUndefined } from './optional-fields.js'
 import type { EventFilters, SearchMatch, SessionHeaderRow } from './protocol.js'
 import { SearchWorkerClient } from './worker-client.js'
+
+/** Bounds how stale a listing may get when another process writes the same Session logs. */
+const LISTING_TTL_MS = 60_000
 
 const engineConfigSchema = z.object({
   client: z.custom<SearchWorkerClient>(value => value instanceof SearchWorkerClient, 'a session-search worker client'),
@@ -88,7 +92,40 @@ export class SessionSearchEngine extends SessionQueryEngine {
     this._maxLimit = parsed.maxLimit
     ctx.on('session/event', session => {
       this._titles.delete(session.id)
+      if (this._listing !== undefined && this._listing.headers.get(session.id) !== JSON.stringify(session.header)) this._listing = undefined
     })
+    ctx.on('session/created', () => {
+      this._listing = undefined
+    })
+    ctx.on('session/disposed', () => {
+      this._listing = undefined
+    })
+  }
+
+  /**
+   * Core lists Sessions by reading the first frame of every log (971 here): 10 s on a cold disk right after a restart,
+   * ~0.3 s warm, and the Session list, Memory's finder and other plugins each list on their own. One listing serves them
+   * until a Session is created or disposed, a listed live Session's header changes (a workspace move), or a minute
+   * passes, which bounds what another process writing the same logs can leave stale.
+   */
+  _listing: { readonly value: Promise<SessionRecord[]>; readonly at: number; readonly headers: Map<string, string> } | undefined
+
+  override async listSessions(signal?: AbortSignal): Promise<SessionRecord[]> {
+    const listing = this._listing
+    if (listing === undefined || Date.now() - listing.at >= LISTING_TTL_MS) {
+      const headers = new Map<string, string>()
+      const value = super.listSessions(signal).then(records => {
+        for (const record of records) headers.set(record.header.id, JSON.stringify(record.header))
+        return records
+      })
+      const entry = { value, at: Date.now(), headers }
+      this._listing = entry
+      value.catch(() => {
+        if (this._listing === entry) this._listing = undefined
+      })
+      return structuredClone(await value)
+    }
+    return structuredClone(await listing.value)
   }
 
   /**
