@@ -180,6 +180,7 @@ When('the Ask DSH question {string} is sent', async ({ page }: { page: Page }, q
 Then('a new thread opens with that question', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'ask-dsh-opens-its-new-thread-with-the-question', async () => {
     await expect(page.getByText('how do I rebind a shortcut?', { exact: true }).last()).toBeVisible({ timeout: 30_000 })
+    await expect(page.getByText('Ask DSH · how do I rebind a shortcut?', { exact: true }).last()).toBeVisible()
   })
   await finishJourneyAssertions(page)
 })

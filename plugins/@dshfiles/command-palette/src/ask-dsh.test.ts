@@ -1,6 +1,6 @@
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { describe, expect, it, vi } from 'vitest'
-import { askDsh, type AskDshPorts } from './ask-dsh.js'
+import { askDsh, askDshTitle, type AskDshPorts } from './ask-dsh.js'
 
 const sessionId = SessionId('session-ask-one')
 
@@ -12,6 +12,9 @@ const ports = (): { readonly calls: string[]; readonly ports: AskDshPorts<string
       createSession: vi.fn(async () => {
         calls.push('create')
         return sessionId
+      }),
+      titleSession: vi.fn(async (input: { readonly sessionId: SessionId; readonly title: string }) => {
+        calls.push(`title:${input.sessionId}:${input.title}`)
       }),
       prompt: vi.fn(async (input: { readonly sessionId: SessionId; readonly question: string }) => {
         calls.push(`prompt:${input.sessionId}:${input.question}`)
@@ -30,9 +33,10 @@ describe('askDsh', () => {
 
     expect(created).toBe(sessionId)
     expect(fake.createSession).toHaveBeenCalledWith({})
+    expect(fake.titleSession).toHaveBeenCalledWith({ sessionId, title: 'Ask DSH · how do I rebind a shortcut?' })
     expect(fake.prompt).toHaveBeenCalledWith({ sessionId, question: 'how do I rebind a shortcut?' })
     expect(fake.openSession).toHaveBeenCalledWith(sessionId)
-    expect(calls).toEqual(['create', `prompt:${sessionId}:how do I rebind a shortcut?`, 'open'])
+    expect(calls).toEqual(['create', `title:${sessionId}:Ask DSH · how do I rebind a shortcut?`, `prompt:${sessionId}:how do I rebind a shortcut?`, 'open'])
   })
 
   it('keeps the current project so the ask thread is grouped with its siblings', async () => {
@@ -56,5 +60,16 @@ describe('askDsh', () => {
     })
     await expect(askDsh({ question: 'hello?', target: {}, ports: fake })).rejects.toThrow('no model is available')
     expect(fake.openSession).not.toHaveBeenCalled()
+  })
+})
+
+describe('askDshTitle', () => {
+  it('prefixes the question so asks group in the sidebar', () => {
+    expect(askDshTitle('how do I rebind a shortcut?')).toBe('Ask DSH · how do I rebind a shortcut?')
+  })
+
+  it('keeps only the first line and bounds the title', () => {
+    expect(askDshTitle('  first line\nsecond line  ')).toBe('Ask DSH · first line')
+    expect(askDshTitle('x'.repeat(120))).toBe(`Ask DSH · ${'x'.repeat(60)}`)
   })
 })

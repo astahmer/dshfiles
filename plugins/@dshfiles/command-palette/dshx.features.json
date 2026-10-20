@@ -190,13 +190,13 @@
     {
       "id": "ask-dsh",
       "title": "Ask DSH from an empty palette",
-      "summary": "Tab on an empty command palette opens an ask bar; the question becomes a fresh thread's first message and that thread opens in the main view.",
+      "summary": "Tab on an empty command palette opens an ask bar; the question becomes a fresh thread's first message, titled Ask DSH \u00b7 <question>, and that thread opens in the main view.",
       "reach": [
         "press Meta+Shift+P",
         "press Tab",
         "fill combobox \"Search the command palette\" \"how do I rebind a shortcut?\"",
         "click option \"Ask DSH: how do I rebind a shortcut?\"",
-        "expect text \"how do I rebind a shortcut?\""
+        "expect text \"Ask DSH \u00b7 how do I rebind a shortcut?\""
       ],
       "surfaces": ["client"],
       "configuration": [],
@@ -266,6 +266,18 @@
           "id": "command-palette.ask-dsh-unit-enter",
           "file": "plugins/@dshfiles/command-palette/src/thread-palette.client.test.tsx",
           "testName": "sends the question on Enter once a row is active"
+        },
+        {
+          "kind": "unit-test",
+          "id": "command-palette.ask-dsh-unit-title-prefix",
+          "file": "plugins/@dshfiles/command-palette/src/ask-dsh.test.ts",
+          "testName": "prefixes the question so asks group in the sidebar"
+        },
+        {
+          "kind": "unit-test",
+          "id": "command-palette.ask-dsh-unit-title-bounds",
+          "file": "plugins/@dshfiles/command-palette/src/ask-dsh.test.ts",
+          "testName": "keeps only the first line and bounds the title"
         }
       ]
     },

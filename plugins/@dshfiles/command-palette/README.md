@@ -6,7 +6,9 @@ The app-wide searchable palette lives in this plugin and mounts into DSH's addit
 
 On an empty search the palette shows **Ask DSH** with a `Tab` keycap. Tab (or a click on the hint) swaps the
 search box for a one-question ask bar; Enter, or clicking the `Ask DSH: <question>` row, creates a **fresh
-thread** with the question as its first message and opens it in the main view. The thread lands in the project
+thread** with the question as its first message and opens it in the main view. The thread is titled
+`Ask DSH · <question>` so asks group together in the sidebar (the title is best-effort; a failed rename
+logs a warning and the question still sends). The thread lands in the project
 the main view shows, including the project a blank New-thread screen has picked; with no project picked it uses
 the Host default directory. It always creates a thread (the Host only reuses a blank Session when the request
 names one), so an open New-thread screen is never taken over. A failed send keeps the palette open with the

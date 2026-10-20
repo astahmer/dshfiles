@@ -246,7 +246,7 @@ export const PaletteOverlay = (props: PaletteOverlayProps): JSX.Element | null =
 export default defineClient({
   name: '@dshfiles/command-palette',
   locales: [commandPaletteLocale],
-  inject: ['slots', 'shortcuts', 'sessions', 'uiWorkspace', 'theme', 'connection'],
+  inject: ['slots', 'shortcuts', 'sessions', 'uiWorkspace', 'theme', 'connection', 'remote', 'remote.session'],
   setup(ctx, decorate) {
     const translate = ctx.locale.bind(COMMAND_PALETTE_LOCALE_NAMESPACE)
     const themeStore = createSnapshotStore(ctx.theme.getTheme())
@@ -290,6 +290,10 @@ export default defineClient({
                     target: workspaceId === undefined ? {} : { workspaceId },
                     ports: {
                       createSession: input => ctx.sessions.create(input),
+                      titleSession: async input => {
+                        const renamed = await ctx.remote.session.rename(input)
+                        if (!renamed.ok) console.warn(`command-palette: ask thread title not set (${renamed.error.message})`)
+                      },
                       prompt: async input => {
                         const reference = ctx.sessions.retain(input.sessionId, { source: 'askDsh' })
                         try {

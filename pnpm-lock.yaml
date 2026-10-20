@@ -1477,6 +1477,9 @@ importers:
       '@deepseek-ai/dsh':
         specifier: 0.2.1-rc.2
         version: 0.2.1-rc.2(becaf10d27b67932eaf11ae76b17ef2c)
+      '@deepseek-ai/dsh-api-remotes':
+        specifier: 'catalog:'
+        version: 0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-scope@0.2.1-rc.2(@deepseek-ai/cordis@4.0.4))
       '@deepseek-ai/dsh-api-session-controller':
         specifier: 'catalog:'
         version: 0.2.1-rc.2(d4330438b0f00034da71ed09823d4cc1)
