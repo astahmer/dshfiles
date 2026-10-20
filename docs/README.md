@@ -9,6 +9,7 @@ This directory holds repository-wide operational guidance. Product and API docum
 | [`e2e-testing.md`](e2e-testing.md)                           | Test layers, boot smoke, Gherkin journeys, feature catalogs, and run evidence.                                              |
 | [`verification-evidence.md`](verification-evidence.md)       | Project Checks receipt ownership, safe Activity Timeline projection, Session navigation, and security evidence.             |
 | [Incremental checks](incremental-checks.md)                  | Unified pnpm workspace, Turbo caching, JJ-aware changed/related tests, and safe fallback boundaries.                        |
+| [Repository guardrails](guardrails.md)                       | Dependency and TypeScript contracts, lint ratchets, export ownership, Knip, client flows and HTTP fakes.                    |
 | [Client state ownership](client-state-ownership.md)          | Which plugin state belongs on the Host, which belongs to a browser window, and what to move next.                           |
 | [Community plugin audit](community-plugin-audit.md)          | Dated 308-entry audit, decision tables, first-party alternatives, and disposable-probe screenshots.                         |
 | [`scripts/README.md`](../scripts/README.md)                  | Repository-level scripts and their owning workflows.                                                                        |

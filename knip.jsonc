@@ -3,7 +3,7 @@
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "include": ["files", "dependencies", "unlisted", "binaries", "unresolved", "catalog", "catalogReferences"],
   // playwright runs from tooling/dshx (`pnpm --dir tooling/dshx exec playwright`), where it is installed.
-  // jujutsu's locales.ts is a dictionary its client does not register yet (plans/guardrails.md).
+  // jujutsu's locales.ts is a dictionary its client does not register yet (docs/guardrails.md).
   // .local holds machine-local scratch scripts (git-ignored); the rich-composer native skeleton is
   // vendored for a platform the composer does not select yet.
   "ignore": ["plugins/@dshfiles/jujutsu/src/locales.ts", ".local/**", "plugins/@dshfiles/rich-composer/src/native/skeleton/safari.ts"],
@@ -12,7 +12,7 @@
     ".": {
       "entry": ["scripts/*.{ts,mjs}!", "scripts/dsh-lkg/*.mjs!"],
       // oxlint runs through `pnpm exec` inside scripts/lint-ratchet.ts. Cordis and the typert generator are
-      // unreferenced, but removing them re-resolves dsh peer variants in the undeduped lockfile (plans/guardrails.md).
+      // unreferenced, but removing them re-resolves dsh peer variants in the undeduped lockfile (docs/guardrails.md).
       "ignoreDependencies": ["oxlint"],
     },
     "apps/desktop": {},
@@ -57,22 +57,22 @@
       "ignoreDependencies": ["@dshfiles/shared-runtime", "@deepseek-ai/dsh"],
     },
     "plugins/@dshfiles/activity-timeline": {
-      // devDependency copies of peerDependencies the Host provides; listed in plans/guardrails.md for review.
+      // devDependency copies of peerDependencies the Host provides; listed in docs/guardrails.md for review.
       "entry": ["dshx.config.ts", "src/{host,client,client-entry,index}.{ts,tsx}!"],
       "ignoreDependencies": ["@dshfiles/shared-runtime", "@deepseek-ai/dsh", "@deepseek-ai/dsh-subprocess"],
     },
     "plugins/@dshfiles/editor": {
-      // devDependency copies of peerDependencies the Host provides; listed in plans/guardrails.md for review.
+      // devDependency copies of peerDependencies the Host provides; listed in docs/guardrails.md for review.
       "entry": ["dshx.config.ts", "src/{host,client,client-entry,index}.{ts,tsx}!"],
       "ignoreDependencies": ["@dshfiles/shared-runtime", "@deepseek-ai/dsh", "@deepseek-ai/dsh-client-ui-workspace"],
     },
     "plugins/@dshfiles/secret-catalog": {
-      // devDependency copies of peerDependencies the Host provides; listed in plans/guardrails.md for review.
+      // devDependency copies of peerDependencies the Host provides; listed in docs/guardrails.md for review.
       "entry": ["dshx.config.ts", "src/{host,client,client-entry,index}.{ts,tsx}!"],
       "ignoreDependencies": ["@dshfiles/shared-runtime", "@deepseek-ai/dsh", "@deepseek-ai/dsh-api-remotes"],
     },
     "plugins/@dshfiles/settings-shell": {
-      // devDependency copies of peerDependencies the Host provides; listed in plans/guardrails.md for review.
+      // devDependency copies of peerDependencies the Host provides; listed in docs/guardrails.md for review.
       "entry": ["dshx.config.ts", "src/{host,client,client-entry,index}.{ts,tsx}!"],
       "ignoreDependencies": ["@dshfiles/shared-runtime", "@deepseek-ai/dsh", "@deepseek-ai/dsh-api-remotes", "@deepseek-ai/dsh-client-ui-plugin-manager"],
     },
