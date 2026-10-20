@@ -10,7 +10,8 @@ import type { SidebarRootComponentProps } from '@deepseek-ai/dsh-client-ui-sideb
 import type { PropsLocale, PropsRuntime, TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import type { WorkspaceBrowserProps } from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { dshxRegistryApi } from '@dshfiles/dshx/api'
-import { createApiClient, createRegisteredApiClient, defineClient } from '@dshfiles/dshx/client'
+import { createApiClient, createRegisteredApiClient, defineClient, useSettings } from '@dshfiles/dshx/client'
+import { paletteSettings, type PaletteSettings } from './settings.js'
 import { askDsh } from './ask-dsh.js'
 import { createThreadContentSearch } from './thread-content-source.js'
 import { useMemo, useSyncExternalStore } from 'react'
@@ -20,6 +21,8 @@ import { COMMAND_PALETTE_LOCALE_NAMESPACE, commandPaletteLocale } from './locale
 import { newThreadShortcutDefaults } from './new-thread-shortcut.js'
 import { PaletteApi, PALETTE_EVENT, type PaletteAction, type PaletteActionContext, type PaletteMode, type PaletteWorkspace } from './palette-api.js'
 import { ThreadPalette } from './thread-palette.js'
+
+const defaultSettings: PaletteSettings = paletteSettings.schema({})
 
 const isShortcutCommandId = (value: string): value is ShortcutCommandId => /^[a-z][a-zA-Z0-9-]*(?:\.[a-zA-Z][a-zA-Z0-9-]*)+$/u.test(value)
 
@@ -132,15 +135,36 @@ const PaletteCatalog = (props: PaletteCatalogProps): JSX.Element => {
       themePreference: themeSnapshot.preference,
     }
   }, [archivedSessionIds, selectedSession, selectedWorkspaceId, themeSnapshot.preference, workspaceById, pinnedWorkspaceSessionIds, workspaces])
-  const threads = useMemo(
+  const workspacePathById = useMemo(
+    () => new Map<string, string>(workspaceItems.map(workspace => [String(workspace.workspaceId), workspace.path])),
+    [workspaceItems],
+  )
+  const repositoryOf = (workspaceId: WorkspaceId | undefined): string | undefined => {
+    const path = workspaceId === undefined ? undefined : workspacePathById.get(workspaceId)
+    return path === undefined ? undefined : EntityLabels.repositoryPath(path)
+  }
+  const threadEntries = useMemo(
     () =>
       sessions.flatMap(session => {
         if (session.blank || archivedSessionIds.has(session.id)) return []
         const workspaceId = workspaceForSession(session, sessionsById, workspaceBySession)
         const project = workspaceId === undefined ? '' : (workspaceTitleById.get(workspaceId) ?? '')
-        return [{ id: session.id, title: session.displayTitle, project, cwd: session.cwd ?? '', updatedAt: session.updatedAt }]
+        const path = workspaceId === undefined ? undefined : workspacePathById.get(workspaceId)
+        return [
+          {
+            thread: { id: session.id, title: session.displayTitle, project, cwd: session.cwd ?? '', updatedAt: session.updatedAt },
+            repository: path === undefined ? undefined : EntityLabels.repositoryPath(path),
+          },
+        ]
       }),
-    [archivedSessionIds, sessions, sessionsById, workspaceBySession, workspaceTitleById],
+    [archivedSessionIds, sessions, sessionsById, workspaceBySession, workspacePathById, workspaceTitleById],
+  )
+  const threads = useMemo(() => threadEntries.map(entry => entry.thread), [threadEntries])
+  const threadsScope = (useSettings(paletteSettings).value ?? defaultSettings).threadsScope
+  const currentRepository = threadsScope === 'project' ? repositoryOf(askWorkspaceId) : undefined
+  const projectThreads = useMemo(
+    () => (currentRepository === undefined ? undefined : threadEntries.filter(entry => entry.repository === currentRepository).map(entry => entry.thread)),
+    [currentRepository, threadEntries],
   )
   const openWorkspace = props.openWorkspace
   const workspaceActions = useMemo<readonly PaletteAction[]>(
@@ -162,6 +186,7 @@ const PaletteCatalog = (props: PaletteCatalogProps): JSX.Element => {
     <ThreadPalette
       mode={mode}
       threads={threads}
+      {...(projectThreads === undefined ? {} : { projectThreads })}
       context={context}
       additionalActions={workspaceActions}
       recentLimit={recentLimit}

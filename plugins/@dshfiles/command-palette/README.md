@@ -4,6 +4,13 @@
 
 The app-wide searchable palette lives in this plugin and mounts into DSH's additive `shell.overlay` slot. It owns the UI, keyboard shortcut, action registry, thread/file/content search, and global theme/workspace actions. Thread Sidebar contributes sidebar navigation and actions for the currently open thread.
 
+## Threads tab scope
+
+The **Threads** tab lists the current project's threads, its JJ thread
+workspaces included; **Everything** still searches every project, and a session
+ID or link finds any thread. Settings › Command palette › `threadsScope`
+switches the tab to `all` projects. Without a current project it lists them all.
+
 ## Ask DSH
 
 On an empty search the palette shows **Ask DSH** with a `Tab` keycap. Tab (or a click on the hint) swaps the

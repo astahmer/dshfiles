@@ -273,3 +273,35 @@ describe('Ask DSH keyboard submit', () => {
     await waitFor(() => expect(ask).toHaveBeenCalledWith('how do I rebind a shortcut?'))
   })
 })
+
+describe('Threads tab project scope', () => {
+  const here = { id: 'session-here', title: 'Here work', project: 'dshfiles', cwd: '/dev/dshfiles', updatedAt: 2 }
+  const elsewhere = { id: 'session-elsewhere', title: 'Elsewhere work', project: 'welii', cwd: '/dev/welii', updatedAt: 1 }
+
+  it('lists only the current project on Threads and every project on Everything', async () => {
+    const view = (mode: 'all' | 'threads') =>
+      render(
+        <ThreadPalette
+          mode={mode}
+          threads={[here, elsewhere]}
+          projectThreads={[here]}
+          context={context}
+          additionalActions={[]}
+          recentLimit={6}
+          mac
+          copy={copy}
+          searchContent={null}
+          onAsk={vi.fn(async () => {})}
+          onOpenThread={vi.fn()}
+          onClose={vi.fn()}
+        />,
+      )
+    view('threads')
+    await screen.findByRole('option', { name: /Here work/ })
+    expect(screen.queryByRole('option', { name: /Elsewhere work/ })).toBeNull()
+    cleanup()
+    view('all')
+    await screen.findByRole('option', { name: /Elsewhere work/ })
+    expect(screen.getByRole('option', { name: /Here work/ })).toBeTruthy()
+  })
+})

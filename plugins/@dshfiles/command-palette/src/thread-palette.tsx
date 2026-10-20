@@ -80,6 +80,8 @@ type PaletteActionOption = Omit<PaletteAction, 'label'> & { readonly label: stri
 interface ThreadPaletteProps {
   readonly mode: PaletteMode
   readonly threads: readonly ThreadCandidate[]
+  /** The current project's threads; when set, the Threads tab lists only these, while a session ID still finds any thread. */
+  readonly projectThreads?: readonly ThreadCandidate[]
   readonly context: PaletteActionContext
   readonly additionalActions: readonly PaletteAction[]
   readonly recentLimit: number
@@ -218,13 +220,22 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
   )
 
   const threadIndex = useMemo(() => PaletteRules.indexThreads(props.threads), [props.threads])
+  const projectThreadIndex = useMemo(
+    () => (props.projectThreads === undefined ? null : PaletteRules.indexThreads(props.projectThreads)),
+    [props.projectThreads],
+  )
   const threadSearch = PaletteRules.parseThreadSearchInput(deferredQuery)
+  const rankedThreadIndex = view === 'threads' && threadSearch.exactId === undefined ? (projectThreadIndex ?? threadIndex) : threadIndex
   const threadRows = useMemo(
     () =>
       view === 'all' || view === 'threads'
-        ? PaletteRules.rankThreads({ index: threadIndex, query: threadSearch.query, limit: threadSearch.query.length === 0 ? props.recentLimit : RESULT_LIMIT })
+        ? PaletteRules.rankThreads({
+            index: rankedThreadIndex,
+            query: threadSearch.query,
+            limit: threadSearch.query.length === 0 ? props.recentLimit : RESULT_LIMIT,
+          })
         : [],
-    [props.recentLimit, threadIndex, threadSearch.query, view],
+    [props.recentLimit, rankedThreadIndex, threadSearch.query, view],
   )
   const exactSearchId = threadSearch.exactId?.toLocaleLowerCase()
   const missingSessionId =

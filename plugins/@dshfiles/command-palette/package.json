@@ -51,6 +51,7 @@
     "@deepseek-ai/dsh-client-ui-theme": "0.2.1-rc.2",
     "@deepseek-ai/dsh-client-ui-workspace": "catalog:",
     "@deepseek-ai/dsh-tools": "catalog:",
+    "@deepseek-ai/schemastery": "catalog:",
     "@dshfiles/dshx": "workspace:*",
     "@testing-library/dom": "catalog:",
     "@testing-library/react": "catalog:",
@@ -79,7 +80,8 @@
     "@deepseek-ai/dsh-client-ui-slots": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-client-ui-theme": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-client-ui-workspace": ">=0.2.1-rc.2 <0.3.0-0",
-    "@deepseek-ai/dsh-tools": ">=0.2.1-rc.2 <0.3.0-0"
+    "@deepseek-ai/dsh-tools": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/schemastery": "^3.18.4"
   },
   "dsh": {
     "bundle": {

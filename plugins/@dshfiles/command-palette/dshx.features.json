@@ -4,9 +4,17 @@
     {
       "id": "palette-search",
       "title": "Search threads and workspace files",
-      "summary": "Rank recent threads by title, project, and id prefix; rank workspace paths by basename and frecency.",
+      "summary": "Rank recent threads by title, project, and id prefix; rank workspace paths by basename and frecency; the Threads tab lists the current project’s threads (its thread workspaces included) unless threadsScope is all.",
       "surfaces": ["client"],
-      "configuration": [],
+      "configuration": [
+        {
+          "key": "threadsScope",
+          "defaultValue": "project",
+          "constraints": "One of project or all; without a current project the Threads tab lists every thread.",
+          "choices": ["project", "all"],
+          "coveredBy": ["command-palette.threads-project-scope"]
+        }
+      ],
       "states": ["closed", "open-empty", "thread-results", "file-results", "content-results"],
       "failureModes": [
         "A thread title or project match is omitted from results.",
@@ -53,6 +61,12 @@
           "id": "command-palette.palette-search-unit-empty-file-frecent",
           "file": "plugins/@dshfiles/command-palette/src/palette.test.ts",
           "testName": "empty file search lists frecent paths before walk order"
+        },
+        {
+          "kind": "unit-test",
+          "id": "command-palette.threads-project-scope",
+          "file": "plugins/@dshfiles/command-palette/src/thread-palette.client.test.tsx",
+          "testName": "lists only the current project on Threads and every project on Everything"
         }
       ]
     },
@@ -190,13 +204,13 @@
     {
       "id": "ask-dsh",
       "title": "Ask DSH from an empty palette",
-      "summary": "Tab on an empty command palette opens an ask bar; the question becomes a fresh thread's first message, titled Ask DSH \u00b7 <question>, and that thread opens in the main view.",
+      "summary": "Tab on an empty command palette opens an ask bar; the question becomes a fresh thread's first message, titled Ask DSH · <question>, and that thread opens in the main view.",
       "reach": [
         "press Meta+Shift+P",
         "press Tab",
         "fill combobox \"Search the command palette\" \"how do I rebind a shortcut?\"",
         "click option \"Ask DSH: how do I rebind a shortcut?\"",
-        "expect text \"Ask DSH \u00b7 how do I rebind a shortcut?\""
+        "expect text \"Ask DSH · how do I rebind a shortcut?\""
       ],
       "surfaces": ["client"],
       "configuration": [],
