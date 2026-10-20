@@ -68,6 +68,14 @@ Feature: Thread sidebar journeys
     When a nonblank Host thread is pinned from its sidebar row
     Then the thread stays pinned after reload
 
+  @scenario:thread-sidebar.multi-select
+  Scenario: Extend a keyboard selection across threads and archive the batch
+    Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
+    When three nonblank Host threads fill the Active section
+    And the first thread row is focused and Shift+ArrowDown selects the next two rows
+    Then the sidebar shows three selected rows and their menu archives all of them
+    And one Undo restores the archived batch
+
   @scenario:thread-sidebar.view-controls
   Scenario: Thread grouping and filters affect rows and survive reload
     Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted

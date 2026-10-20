@@ -24,6 +24,13 @@ interface FinishedTurnJourney {
 
 const finishedTurnJourneys = new WeakMap<Page, FinishedTurnJourney>()
 
+interface BatchSelectionJourney {
+  readonly threadIds: readonly string[]
+  readonly prompts: readonly string[]
+}
+
+const batchSelectionJourneys = new WeakMap<Page, BatchSelectionJourney>()
+
 /** The key the plugin read before attention became Host-owned. */
 const LEGACY_NOTIFICATION_STORAGE_KEY = 'dshfiles.thread-sidebar.notifications.v1'
 
@@ -543,6 +550,68 @@ When('a nonblank Host thread is pinned from its sidebar row', async ({ page }: {
   await expect(threadSidebar(page).getByRole('button', { name: 'Pinned (1)', exact: true })).toBeVisible()
   await expect(targetRow.getByRole('button', { name: 'Unpin', exact: true })).toHaveCount(1)
   await expect(threadSidebar(page).getByText('could not update', { exact: false })).toHaveCount(0)
+})
+
+When('three nonblank Host threads fill the Active section', async ({ page }: { page: Page }) => {
+  const prompts = ['thread sidebar batch e2e first', 'thread sidebar batch e2e second', 'thread sidebar batch e2e third']
+  const threadIds: string[] = []
+  for (const prompt of prompts) {
+    const threadId = await startBlankThread(page)
+    const composer = page.getByRole('textbox').first()
+    await composer.fill(prompt)
+    await composer.press('Enter')
+    await expect(threadSidebar(page).locator('article').filter({ hasText: prompt })).toHaveCount(1)
+    threadIds.push(threadId)
+  }
+  await expect(threadSidebar(page).locator('article')).toHaveCount(3)
+  for (const prompt of prompts) {
+    const row = threadSidebar(page).locator('article').filter({ hasText: prompt })
+    await expect(row.getByRole('button', { name: 'Archive', exact: true })).toHaveCount(1, { timeout: 30_000 })
+  }
+  batchSelectionJourneys.set(page, { threadIds, prompts })
+})
+
+When('the first thread row is focused and Shift+ArrowDown selects the next two rows', async ({ page }: { page: Page }) => {
+  const firstRow = threadSidebar(page).getByTestId('thread-sidebar-scroll').locator('article[data-thread-id]').first()
+  await openThreadRow(firstRow)
+  await firstRow.locator(':scope > div > button').first().focus()
+  await page.keyboard.press('Shift+ArrowDown')
+  await page.keyboard.press('Shift+ArrowDown')
+})
+
+Then('the sidebar shows three selected rows and their menu archives all of them', async ({ page }: { page: Page }) => {
+  const journey = batchSelectionJourneys.get(page)
+  if (journey === undefined) throw new Error('No batch selection journey was recorded for this browser page.')
+  await recordAssertion(page, 'thread-sidebar-batch-selection-covers-three-rows', async () => {
+    await expect(page.getByTestId('thread-selection-bar')).toContainText('3 selected')
+    const selectedRows = threadSidebar(page).locator('button[data-thread-main-action][data-multi-selected="true"]')
+    await expect(selectedRows).toHaveCount(3)
+    const selectedIds = await selectedRows.evaluateAll(rows => rows.map(row => row.getAttribute('data-thread-id')))
+    expect([...selectedIds].sort()).toEqual([...journey.threadIds].sort())
+  })
+  await recordAssertion(page, 'thread-sidebar-batch-menu-archives-every-selected-row', async () => {
+    const anchorRow = threadSidebar(page).locator(`article[data-thread-id="${journey.threadIds[0]}"]`)
+    await openThreadRowMenu(anchorRow)
+    await expect(page.getByRole('menu')).toContainText('3 selected')
+    await page.getByRole('menuitem', { name: 'Archive', exact: true }).click()
+    await expect(threadSidebar(page).getByTestId('thread-sidebar-transient-notice')).toContainText('Thread archived.')
+  })
+})
+
+Then('one Undo restores the archived batch', async ({ page }: { page: Page }) => {
+  const journey = batchSelectionJourneys.get(page)
+  if (journey === undefined) throw new Error('No batch selection journey was recorded for this browser page.')
+  const notice = threadSidebar(page).getByTestId('thread-sidebar-transient-notice')
+  await recordAssertion(page, 'thread-sidebar-batch-undo-restores-every-row', async () => {
+    await notice.getByRole('button', { name: 'Undo', exact: true }).click()
+    await expect(notice).toContainText('Thread restored.')
+    for (const threadId of journey.threadIds) await expect(threadRow(page, threadId)).toHaveCount(1)
+  })
+  await recordAssertion(page, 'thread-sidebar-batch-selection-prunes-rows-that-left-the-list', async () => {
+    await expect(page.getByTestId('thread-selection-bar')).toHaveCount(0)
+    await expect(threadSidebar(page).locator('button[data-thread-main-action][data-multi-selected="true"]')).toHaveCount(0)
+  })
+  await finishJourneyAssertions(page)
 })
 
 Then('the thread stays pinned after reload', async ({ page }: { page: Page }) => {

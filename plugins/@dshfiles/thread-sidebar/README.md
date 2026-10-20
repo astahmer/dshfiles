@@ -11,6 +11,24 @@ no rows folds away and keeps its saved slot while the shown ones reorder around
 it. The project picker scopes rows to one workspace
 or unassigned sessions.
 
+**Keyboard and multi-select.** ↑/↓ move focus and open the focused thread (or
+only move focus when Sidebar settings says Move focus only); Shift+↑/↓ extends a
+range without opening, Home/End jump to the ends of the list, and Ctrl/Cmd+A
+selects every visible row. Shift+click and Ctrl/Cmd+click do the same from the
+pointer, ←/→ fold the containing group section or the row's subagent children,
+and Escape or a plain click clears the selection. A selected row paints in the
+info tone, and an "N selected" bar above the list offers Pin, Settle, Archive
+and Clear.
+
+The context menu of a row inside a multi-selection applies the whole batch:
+pin/unpin, park/unpark, settle/unsettle, mute/unmute, mark unread, copy thread
+links and archive/restore, plus Clear selection. Right-clicking outside the
+selection resets it to that row, so the single-thread menu still works. Park,
+settle and mute write one preference update for the batch, pin and archive call
+the Host once per row, archive refuses while a selected thread is running, and
+every verb honors the Apply actions to child threads preference. Archive keeps
+its undo notice and clears the selection when it succeeds.
+
 **Project attribution.** A `jj-integration` thread workspace
 (`<repository>-threads/<thread>`) is attributed to its owning repository. A
 session the Host accounts to no workspace at all — for example after its thread

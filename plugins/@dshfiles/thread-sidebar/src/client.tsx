@@ -39,6 +39,7 @@ import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
+  ContextMenuLabel,
   ContextMenuRadioGroup,
   ContextMenuRadioItem,
   ContextMenuSeparator,
@@ -352,8 +353,32 @@ const useAsideOpen = (): OpenAside | null => useContext(AsideOpenContext)
 
 type RowOperation = 'pin' | 'unpin' | 'archive' | 'unarchive'
 
+interface BatchSelectionSnapshot {
+  readonly ids: readonly string[]
+  readonly anyPinned: boolean
+  readonly anyUnpinned: boolean
+  readonly anyLive: boolean
+  readonly anyArchived: boolean
+  readonly anyParked: boolean
+  readonly anyUnparked: boolean
+  readonly anySettled: boolean
+  readonly anyUnsettled: boolean
+  readonly anyMuted: boolean
+}
+
 interface RowActions {
   readonly open: (sessionId: SessionSummary['id']) => void
+  readonly selection: () => ThreadSelectionState
+  readonly selectForContext: (sessionId: SessionSummary['id']) => void
+  readonly clearSelection: () => void
+  readonly batch: () => BatchSelectionSnapshot
+  readonly batchMutate: (operation: RowOperation) => void
+  readonly batchSetParked: (park: boolean) => void
+  readonly batchSetSettled: (settle: boolean) => void
+  readonly batchMute: (option: ThreadMuteOption) => void
+  readonly batchUnmute: () => void
+  readonly batchMarkUnread: () => void
+  readonly batchCopyLinks: () => void
   readonly mutate: (sessionId: SessionSummary['id'], operation: RowOperation) => Promise<void>
   readonly toggleParked: (sessionId: SessionSummary['id']) => void
   readonly toggleSettled: (sessionId: SessionSummary['id']) => void
@@ -587,106 +612,160 @@ type ThreadContextMenuProps = Pick<
   'session' | 'unread' | 'autoSettleOverride' | 'mute' | 'archived' | 'pinned' | 'parked' | 'settled' | 'workspaceId' | 'actions'
 > & { readonly children: JSX.Element }
 
-/** Right-click menu of one thread, shared by thread rows and the usage-limit rows. */
-const ThreadContextMenu = (props: ThreadContextMenuProps): JSX.Element => {
+/** One menu for the whole batch: every verb applies to each selected thread the verb can still change. */
+const BatchThreadMenuItems = (props: {
+  readonly snapshot: BatchSelectionSnapshot
+  readonly actions: RowActions
+  readonly t: ThreadSidebarTranslate
+}): JSX.Element => {
+  const snapshot = props.snapshot
+  return (
+    <>
+      <ContextMenuLabel>{props.t('threadSidebarSelectedCount', { count: snapshot.ids.length })}</ContextMenuLabel>
+      <ContextMenuSeparator />
+      {snapshot.anyUnpinned ? <ContextMenuItem onSelect={() => props.actions.batchMutate('pin')}>{props.t('threadSidebarPin')}</ContextMenuItem> : null}
+      {snapshot.anyPinned ? <ContextMenuItem onSelect={() => props.actions.batchMutate('unpin')}>{props.t('threadSidebarUnpin')}</ContextMenuItem> : null}
+      {snapshot.anyUnparked ? <ContextMenuItem onSelect={() => props.actions.batchSetParked(true)}>{props.t('threadSidebarPark')}</ContextMenuItem> : null}
+      {snapshot.anyParked ? <ContextMenuItem onSelect={() => props.actions.batchSetParked(false)}>{props.t('threadSidebarUnpark')}</ContextMenuItem> : null}
+      {snapshot.anyUnsettled ? <ContextMenuItem onSelect={() => props.actions.batchSetSettled(true)}>{props.t('threadSidebarSettle')}</ContextMenuItem> : null}
+      {snapshot.anySettled ? <ContextMenuItem onSelect={() => props.actions.batchSetSettled(false)}>{props.t('threadSidebarUnsettle')}</ContextMenuItem> : null}
+      <ContextMenuItem onSelect={() => props.actions.batchMarkUnread()}>{props.t('threadSidebarMarkUnread')}</ContextMenuItem>
+      <ContextMenuSub>
+        <ContextMenuSubTrigger>{props.t('threadSidebarMute')}</ContextMenuSubTrigger>
+        <ContextMenuSubContent className="dshx-root dshx:min-w-44">
+          {THREAD_MUTE_OPTIONS.map(option => (
+            <ContextMenuItem key={option} onSelect={() => props.actions.batchMute(option)}>
+              {props.t(muteOptionLabelKeys[option])}
+            </ContextMenuItem>
+          ))}
+          <ContextMenuSeparator />
+          <ContextMenuItem disabled={!snapshot.anyMuted} onSelect={() => props.actions.batchUnmute()}>
+            {props.t('threadSidebarUnmute')}
+          </ContextMenuItem>
+        </ContextMenuSubContent>
+      </ContextMenuSub>
+      <ContextMenuItem onSelect={() => props.actions.batchCopyLinks()}>{props.t('threadSidebarCopyLinks')}</ContextMenuItem>
+      <ContextMenuSeparator />
+      {snapshot.anyLive ? <ContextMenuItem onSelect={() => props.actions.batchMutate('archive')}>{props.t('threadSidebarArchive')}</ContextMenuItem> : null}
+      {snapshot.anyArchived ? (
+        <ContextMenuItem onSelect={() => props.actions.batchMutate('unarchive')}>{props.t('threadSidebarRestore')}</ContextMenuItem>
+      ) : null}
+      <ContextMenuSeparator />
+      <ContextMenuItem onSelect={() => props.actions.clearSelection()}>{props.t('threadSidebarClearSelection')}</ContextMenuItem>
+    </>
+  )
+}
+
+const ThreadMenuBody = (props: ThreadContextMenuProps): JSX.Element => {
   const { session, unread, archived, pinned, parked, settled } = props
   const t = props.actions.translate
   const openAside = useAsideOpen()
+  const selection = props.actions.selection()
+  if (selection.sessionIds.length > 1 && selection.sessionIds.includes(session.id)) {
+    return <BatchThreadMenuItems snapshot={props.actions.batch()} actions={props.actions} t={t} />
+  }
   return (
-    <ContextMenu>
-      <ContextMenuTrigger asChild>{props.children}</ContextMenuTrigger>
-      <ContextMenuContent className="dshx-root dshx:min-w-44" aria-label={t('threadSidebarContextMenu')}>
-        <ContextMenuItem onSelect={() => requestThreadMentionInsertion(session.id)}>{t('threadSidebarInsertMention')}</ContextMenuItem>
-        <ContextMenuItem onSelect={() => void props.actions.copy(session.id, t('threadSidebarIdCopied'))}>{t('threadSidebarCopyId')}</ContextMenuItem>
-        <ContextMenuItem
-          onSelect={() => void props.actions.copy(buildThreadUrl(window.location.href, session.id, props.workspaceId), t('threadSidebarLinkCopied'))}
-        >
-          {t('threadSidebarCopyLink')}
-        </ContextMenuItem>
-        {archived || openAside === null ? null : <ContextMenuItem onSelect={() => openAside(session.id)}>{t('threadSidebarOpenInSidePanel')}</ContextMenuItem>}
-        <ContextMenuSub>
-          <ContextMenuSubTrigger>{t('threadSidebarReferencedBy')}</ContextMenuSubTrigger>
-          <ContextMenuSubContent className="dshx-root dshx:min-w-56 dshx:max-w-72" aria-label={t('threadSidebarReferencedBy')}>
-            <ThreadReferencesItems sessionId={session.id} t={t} openThread={props.actions.open} Item={ContextMenuItem} />
-          </ContextMenuSubContent>
-        </ContextMenuSub>
-        <ContextMenuSeparator />
-        <ContextMenuItem disabled={unread} onSelect={() => props.actions.markUnread(session.id)}>
-          {t('threadSidebarMarkUnread')}
-        </ContextMenuItem>
-        <ContextMenuSeparator />
-        <ContextMenuSub>
-          <ContextMenuSubTrigger>{t('threadSidebarAutoSettleBehavior')}</ContextMenuSubTrigger>
-          <ContextMenuSubContent className="dshx-root dshx:min-w-44">
-            <ContextMenuRadioGroup value={props.autoSettleOverride}>
-              <ContextMenuRadioItem
-                value="inherit"
-                onSelect={event => {
-                  event.preventDefault()
-                  props.actions.setAutoSettleOverride(session.id, 'inherit')
-                }}
-              >
-                {t('threadSidebarAutoSettleInherit')}
-              </ContextMenuRadioItem>
-              <ContextMenuRadioItem
-                value="enabled"
-                onSelect={event => {
-                  event.preventDefault()
-                  props.actions.setAutoSettleOverride(session.id, 'enabled')
-                }}
-              >
-                {t('threadSidebarAutoSettleEnabled')}
-              </ContextMenuRadioItem>
-              <ContextMenuRadioItem
-                value="disabled"
-                onSelect={event => {
-                  event.preventDefault()
-                  props.actions.setAutoSettleOverride(session.id, 'disabled')
-                }}
-              >
-                {t('threadSidebarAutoSettleDisabled')}
-              </ContextMenuRadioItem>
-            </ContextMenuRadioGroup>
-          </ContextMenuSubContent>
-        </ContextMenuSub>
-        <ContextMenuSeparator />
-        <ContextMenuSub>
-          <ContextMenuSubTrigger>{t(props.mute === undefined ? 'threadSidebarMute' : 'threadSidebarMuted')}</ContextMenuSubTrigger>
-          <ContextMenuSubContent className="dshx-root dshx:min-w-44">
-            {THREAD_MUTE_OPTIONS.map(option => (
-              <ContextMenuItem key={option} onSelect={() => props.actions.mute(session.id, option)}>
-                {t(muteOptionLabelKeys[option])}
-              </ContextMenuItem>
-            ))}
-            <ContextMenuSeparator />
-            <ContextMenuItem disabled={props.mute === undefined} onSelect={() => props.actions.unmute(session.id)}>
-              {t('threadSidebarUnmute')}
+    <>
+      <ContextMenuItem onSelect={() => requestThreadMentionInsertion(session.id)}>{t('threadSidebarInsertMention')}</ContextMenuItem>
+      <ContextMenuItem onSelect={() => void props.actions.copy(session.id, t('threadSidebarIdCopied'))}>{t('threadSidebarCopyId')}</ContextMenuItem>
+      <ContextMenuItem
+        onSelect={() => void props.actions.copy(buildThreadUrl(window.location.href, session.id, props.workspaceId), t('threadSidebarLinkCopied'))}
+      >
+        {t('threadSidebarCopyLink')}
+      </ContextMenuItem>
+      {archived || openAside === null ? null : <ContextMenuItem onSelect={() => openAside(session.id)}>{t('threadSidebarOpenInSidePanel')}</ContextMenuItem>}
+      <ContextMenuSub>
+        <ContextMenuSubTrigger>{t('threadSidebarReferencedBy')}</ContextMenuSubTrigger>
+        <ContextMenuSubContent className="dshx-root dshx:min-w-56 dshx:max-w-72" aria-label={t('threadSidebarReferencedBy')}>
+          <ThreadReferencesItems sessionId={session.id} t={t} openThread={props.actions.open} Item={ContextMenuItem} />
+        </ContextMenuSubContent>
+      </ContextMenuSub>
+      <ContextMenuSeparator />
+      <ContextMenuItem disabled={unread} onSelect={() => props.actions.markUnread(session.id)}>
+        {t('threadSidebarMarkUnread')}
+      </ContextMenuItem>
+      <ContextMenuSeparator />
+      <ContextMenuSub>
+        <ContextMenuSubTrigger>{t('threadSidebarAutoSettleBehavior')}</ContextMenuSubTrigger>
+        <ContextMenuSubContent className="dshx-root dshx:min-w-44">
+          <ContextMenuRadioGroup value={props.autoSettleOverride}>
+            <ContextMenuRadioItem
+              value="inherit"
+              onSelect={event => {
+                event.preventDefault()
+                props.actions.setAutoSettleOverride(session.id, 'inherit')
+              }}
+            >
+              {t('threadSidebarAutoSettleInherit')}
+            </ContextMenuRadioItem>
+            <ContextMenuRadioItem
+              value="enabled"
+              onSelect={event => {
+                event.preventDefault()
+                props.actions.setAutoSettleOverride(session.id, 'enabled')
+              }}
+            >
+              {t('threadSidebarAutoSettleEnabled')}
+            </ContextMenuRadioItem>
+            <ContextMenuRadioItem
+              value="disabled"
+              onSelect={event => {
+                event.preventDefault()
+                props.actions.setAutoSettleOverride(session.id, 'disabled')
+              }}
+            >
+              {t('threadSidebarAutoSettleDisabled')}
+            </ContextMenuRadioItem>
+          </ContextMenuRadioGroup>
+        </ContextMenuSubContent>
+      </ContextMenuSub>
+      <ContextMenuSeparator />
+      <ContextMenuSub>
+        <ContextMenuSubTrigger>{t(props.mute === undefined ? 'threadSidebarMute' : 'threadSidebarMuted')}</ContextMenuSubTrigger>
+        <ContextMenuSubContent className="dshx-root dshx:min-w-44">
+          {THREAD_MUTE_OPTIONS.map(option => (
+            <ContextMenuItem key={option} onSelect={() => props.actions.mute(session.id, option)}>
+              {t(muteOptionLabelKeys[option])}
             </ContextMenuItem>
-          </ContextMenuSubContent>
-        </ContextMenuSub>
-        <ContextMenuSeparator />
-        {archived ? (
-          <ContextMenuItem onSelect={() => void props.actions.mutate(session.id, 'unarchive')}>{t('threadSidebarRestore')}</ContextMenuItem>
-        ) : (
-          <>
-            <ContextMenuItem onSelect={() => void props.actions.mutate(session.id, pinned ? 'unpin' : 'pin')}>
-              {t(pinned ? 'threadSidebarUnpin' : 'threadSidebarPin')}
-            </ContextMenuItem>
-            <ContextMenuItem disabled={session.running} onSelect={() => props.actions.toggleParked(session.id)}>
-              {t(parked ? 'threadSidebarUnpark' : 'threadSidebarPark')}
-            </ContextMenuItem>
-            <ContextMenuItem disabled={session.running} onSelect={() => props.actions.toggleSettled(session.id)}>
-              {t(settled ? 'threadSidebarUnsettle' : 'threadSidebarSettle')}
-            </ContextMenuItem>
-            <ContextMenuItem disabled={session.running} onSelect={() => void props.actions.mutate(session.id, 'archive')}>
-              {t('threadSidebarArchive')}
-            </ContextMenuItem>
-          </>
-        )}
-      </ContextMenuContent>
-    </ContextMenu>
+          ))}
+          <ContextMenuSeparator />
+          <ContextMenuItem disabled={props.mute === undefined} onSelect={() => props.actions.unmute(session.id)}>
+            {t('threadSidebarUnmute')}
+          </ContextMenuItem>
+        </ContextMenuSubContent>
+      </ContextMenuSub>
+      <ContextMenuSeparator />
+      {archived ? (
+        <ContextMenuItem onSelect={() => void props.actions.mutate(session.id, 'unarchive')}>{t('threadSidebarRestore')}</ContextMenuItem>
+      ) : (
+        <>
+          <ContextMenuItem onSelect={() => void props.actions.mutate(session.id, pinned ? 'unpin' : 'pin')}>
+            {t(pinned ? 'threadSidebarUnpin' : 'threadSidebarPin')}
+          </ContextMenuItem>
+          <ContextMenuItem disabled={session.running} onSelect={() => props.actions.toggleParked(session.id)}>
+            {t(parked ? 'threadSidebarUnpark' : 'threadSidebarPark')}
+          </ContextMenuItem>
+          <ContextMenuItem disabled={session.running} onSelect={() => props.actions.toggleSettled(session.id)}>
+            {t(settled ? 'threadSidebarUnsettle' : 'threadSidebarSettle')}
+          </ContextMenuItem>
+          <ContextMenuItem disabled={session.running} onSelect={() => void props.actions.mutate(session.id, 'archive')}>
+            {t('threadSidebarArchive')}
+          </ContextMenuItem>
+        </>
+      )}
+    </>
   )
 }
+
+/** Right-click menu of one thread, shared by thread rows and the usage-limit rows. */
+const ThreadContextMenu = (props: ThreadContextMenuProps): JSX.Element => (
+  <ContextMenu>
+    <ContextMenuTrigger asChild>{props.children}</ContextMenuTrigger>
+    <ContextMenuContent className="dshx-root dshx:min-w-44" aria-label={props.actions.translate('threadSidebarContextMenu')}>
+      <ThreadMenuBody {...props} />
+    </ContextMenuContent>
+  </ContextMenu>
+)
 
 /** Memoized so a session update re-renders only its own row, not the whole list. */
 const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
@@ -1098,6 +1177,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const [childrenOpenOverrides, setChildrenOpenOverrides] = useState<ReadonlyMap<string, boolean>>(() => new Map())
   const [expandedParents, setExpandedParents] = useState<ReadonlySet<string>>(() => new Set())
   const [threadSelection, setThreadSelection] = useState<ThreadSelectionState>(EMPTY_THREAD_SELECTION)
+  const selectionRef = useRef(threadSelection)
+  selectionRef.current = threadSelection
   const scrollAreaRef = useRef<HTMLDivElement>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [viewsManagerOpen, setViewsManagerOpen] = useState(false)
@@ -1845,6 +1926,124 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
 
   const mutateSession = async (sessionId: SessionSummary['id'], operation: RowOperation): Promise<void> => {
     await mutateThreads([sessionId], operation)
+  }
+
+  const batchSelectionIds = (): SessionSummary['id'][] =>
+    selectionRef.current.sessionIds.map(sessionId => SessionId(sessionId)).filter(sessionId => sessionState.byId[sessionId] !== undefined)
+
+  /** Selection rows plus the child rows the current cascade preference attaches to them. */
+  const batchTargetIds = (): string[] => {
+    const actionThreads = Object.values(sessionState.byId).filter(session => !session.blank)
+    const targets = new Set<string>()
+    for (const sessionId of batchSelectionIds()) {
+      for (const targetId of threadActionTargetIds({
+        threadId: sessionId,
+        threads: actionThreads,
+        cascadeToChildren: preferences.applyActionsToChildThreads,
+      })) {
+        targets.add(targetId)
+      }
+    }
+    return [...targets]
+  }
+
+  const batchSnapshot = (): BatchSelectionSnapshot => {
+    const ids = [...selectionRef.current.sessionIds]
+    return {
+      ids,
+      anyPinned: ids.some(sessionId => pinnedSessionIds.has(SessionId(sessionId))),
+      anyUnpinned: ids.some(sessionId => !pinnedSessionIds.has(SessionId(sessionId))),
+      anyLive: ids.some(sessionId => !archivedSessionIds.has(SessionId(sessionId))),
+      anyArchived: ids.some(sessionId => archivedSessionIds.has(SessionId(sessionId))),
+      anyParked: ids.some(sessionId => parkedSessionIds.has(sessionId)),
+      anyUnparked: ids.some(sessionId => !parkedSessionIds.has(sessionId)),
+      anySettled: ids.some(sessionId => settledSessionIds.has(SessionId(sessionId))),
+      anyUnsettled: ids.some(sessionId => !settledSessionIds.has(SessionId(sessionId))),
+      anyMuted: ids.some(sessionId => mutedSessionIds.has(SessionId(sessionId))),
+    }
+  }
+
+  const selectRowForContext = (sessionId: SessionSummary['id']): void => {
+    if (selectionRef.current.sessionIds.includes(sessionId)) return
+    setThreadSelection(ThreadSelectionModel.selectOnly(sessionId))
+  }
+
+  const clearThreadSelection = (): void => setThreadSelection(EMPTY_THREAD_SELECTION)
+
+  const batchMutate = (operation: RowOperation): void => {
+    const targetIds = batchSelectionIds()
+    if (targetIds.length === 0) return
+    void mutateThreads(targetIds, operation).then(succeeded => {
+      if (succeeded) setThreadSelection(EMPTY_THREAD_SELECTION)
+    })
+  }
+
+  const batchSetParked = (park: boolean): void => {
+    const targetIds = batchTargetIds()
+    if (targetIds.length === 0) return
+    const next = new Set(preferences.parkedSessionIds)
+    for (const targetId of targetIds) {
+      if (park) next.add(targetId)
+      else next.delete(targetId)
+    }
+    changePreferences({ parkedSessionIds: [...next] })
+    setNotice(null)
+    setThreadSelection(EMPTY_THREAD_SELECTION)
+  }
+
+  const batchSetSettled = (settle: boolean): void => {
+    const targetIds = batchTargetIds()
+    if (targetIds.length === 0) return
+    const status = { settledSessionIds: preferences.settledSessionIds, settledAt: preferences.settledAt }
+    if (!settle) {
+      const settledTargets = targetIds.filter(targetId => settledSessionIds.has(SessionId(targetId)))
+      if (settledTargets.length > 0) changePreferences(SettledThreadsModel.unsettle(status, settledTargets))
+      setThreadSelection(EMPTY_THREAD_SELECTION)
+      return
+    }
+    const unsettledTargets = targetIds.filter(targetId => !settledSessionIds.has(SessionId(targetId)))
+    if (unsettledTargets.length === 0) {
+      setThreadSelection(EMPTY_THREAD_SELECTION)
+      return
+    }
+    if (unsettledTargets.some(targetId => SidebarOrganization.hasRunningDescendant({ sessionId: SessionId(targetId), sessions }))) {
+      setNotice({ tone: 'warning', message: props.tSidebar('threadSidebarRunningNotice') })
+      return
+    }
+    changePreferences(SettledThreadsModel.settle(status, unsettledTargets, Date.now()))
+    setNotice({ tone: 'success', message: props.tSidebar('threadSidebarSettledNotice') })
+    setThreadSelection(EMPTY_THREAD_SELECTION)
+  }
+
+  const batchMute = (option: ThreadMuteOption): void => {
+    const targets = batchTargetIds().flatMap(targetId => {
+      const session = sessionState.byId[SessionId(targetId)]
+      return session === undefined || session.blank ? [] : [session]
+    })
+    if (targets.length === 0) return
+    changePreferences({ mutedThreads: muteSessions({ mutes: preferences.mutedThreads, sessions: targets, until: muteUntil(option, Date.now()) }) })
+    setThreadSelection(EMPTY_THREAD_SELECTION)
+  }
+
+  const batchUnmute = (): void => {
+    changePreferences({ mutedThreads: unmuteSessions(preferences.mutedThreads, batchTargetIds()) })
+    setThreadSelection(EMPTY_THREAD_SELECTION)
+  }
+
+  const batchMarkUnread = (): void => {
+    for (const sessionId of batchSelectionIds()) attention.markUnread(sessionId)
+    setThreadSelection(EMPTY_THREAD_SELECTION)
+  }
+
+  const batchCopyLinks = (): void => {
+    const links = batchSelectionIds().flatMap(sessionId => {
+      const session = sessionState.byId[sessionId]
+      if (session === undefined) return []
+      const workspaceId = SidebarOrganization.workspaceForLineage(session, sessionState.byId, workspaceBySession)
+      return [buildThreadUrl(window.location.href, session.id, workspaceId)]
+    })
+    if (links.length === 0) return
+    void copyContextValue(links.join('\n'), props.tSidebar('threadSidebarLinksCopied', { count: links.length }))
   }
 
   const tSidebar = props.tSidebar
@@ -2741,6 +2940,17 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const latestRowActions = useRef({
     openThread,
     openAside: asideOpener,
+    selection: () => selectionRef.current,
+    selectForContext: selectRowForContext,
+    clearSelection: clearThreadSelection,
+    batch: batchSnapshot,
+    batchMutate,
+    batchSetParked,
+    batchSetSettled,
+    batchMute,
+    batchUnmute,
+    batchMarkUnread,
+    batchCopyLinks,
     mutateSession,
     toggleParked,
     toggleSettled,
@@ -2758,6 +2968,17 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   latestRowActions.current = {
     openThread,
     openAside: asideOpener,
+    selection: () => selectionRef.current,
+    selectForContext: selectRowForContext,
+    clearSelection: clearThreadSelection,
+    batch: batchSnapshot,
+    batchMutate,
+    batchSetParked,
+    batchSetSettled,
+    batchMute,
+    batchUnmute,
+    batchMarkUnread,
+    batchCopyLinks,
     mutateSession,
     toggleParked,
     toggleSettled,
@@ -2851,6 +3072,17 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const rowActions = useMemo<RowActions>(() => {
     return {
       open: sessionId => latestRowActions.current.openThread(sessionId),
+      selection: () => latestRowActions.current.selection(),
+      selectForContext: sessionId => latestRowActions.current.selectForContext(sessionId),
+      clearSelection: () => latestRowActions.current.clearSelection(),
+      batch: () => latestRowActions.current.batch(),
+      batchMutate: operation => latestRowActions.current.batchMutate(operation),
+      batchSetParked: park => latestRowActions.current.batchSetParked(park),
+      batchSetSettled: settle => latestRowActions.current.batchSetSettled(settle),
+      batchMute: option => latestRowActions.current.batchMute(option),
+      batchUnmute: () => latestRowActions.current.batchUnmute(),
+      batchMarkUnread: () => latestRowActions.current.batchMarkUnread(),
+      batchCopyLinks: () => latestRowActions.current.batchCopyLinks(),
       mutate: (sessionId, operation) => latestRowActions.current.mutateSession(sessionId, operation),
       toggleParked: sessionId => latestRowActions.current.toggleParked(sessionId),
       toggleSettled: sessionId => latestRowActions.current.toggleSettled(sessionId),
@@ -2915,6 +3147,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const handleSelectionClickCapture = (event: ReactMouseEvent<HTMLDivElement>): void => {
     const target = event.target
     if (!(target instanceof Element)) return
+    // Portalled menus and dialogs keep this React tree as their parent, so their clicks arrive here too.
+    if (target.closest('[role="menu"],[role="menuitem"],[role="menuitemcheckbox"],[role="menuitemradio"],[role="dialog"]') !== null) return
     const rowButton = target.closest<HTMLButtonElement>(THREAD_MAIN_BUTTON_SELECTOR)
     if (rowButton === null || !event.currentTarget.contains(rowButton)) {
       if (!event.shiftKey && !event.metaKey && !event.ctrlKey && threadSelection.sessionIds.length > 0) {
@@ -2945,6 +3179,17 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       return
     }
     if (threadSelection.sessionIds.length > 0) setThreadSelection(EMPTY_THREAD_SELECTION)
+  }
+
+  /** Right-clicking outside a batch starts a new single-row selection; inside it, the batch survives. */
+  const handleSelectionContextMenuCapture = (event: ReactMouseEvent<HTMLDivElement>): void => {
+    const target = event.target
+    if (!(target instanceof Element)) return
+    const rowButton = target.closest<HTMLButtonElement>(THREAD_MAIN_BUTTON_SELECTOR)
+    if (rowButton === null || !event.currentTarget.contains(rowButton)) return
+    const sessionId = rowButton.dataset.threadId
+    if (sessionId === undefined) return
+    selectRowForContext(SessionId(sessionId))
   }
 
   const selectedSessionIds = threadSelection.sessionIds
@@ -3479,6 +3724,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           data-testid="thread-sidebar-scroll"
           className="dshx:min-h-0 dshx:flex-1 dshx:overflow-auto dshx:overscroll-y-contain dshx:px-2 dshx:pb-3"
           onClickCapture={handleSelectionClickCapture}
+          onContextMenuCapture={handleSelectionContextMenuCapture}
           onKeyDown={event =>
             ThreadListNavigationModel.navigate({
               event: event.nativeEvent,

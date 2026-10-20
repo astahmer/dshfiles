@@ -35,20 +35,22 @@ const installNavigation = (
   const selections: ThreadSelectionState[] = []
   const opened: string[] = []
   const warmed: string[][] = []
-  list.addEventListener('keydown', event =>
-    ThreadListNavigationModel.navigate({
+  list.addEventListener('keydown', event => {
+    const navigation = {
       event,
       list,
       selection,
-      onSelectionChange: next => {
+      onSelectionChange: (next: ThreadSelectionState) => {
         selection = next
         selections.push(next)
       },
-      onLookahead: sessionIds => warmed.push([...sessionIds]),
-      ...(options.arrowKeysSwitchThread === undefined ? {} : { arrowKeysSwitchThread: options.arrowKeysSwitchThread }),
-      open: sessionId => opened.push(sessionId),
-    }),
-  )
+      onLookahead: (sessionIds: readonly string[]) => warmed.push([...sessionIds]),
+      open: (sessionId: string) => opened.push(sessionId),
+    }
+    ThreadListNavigationModel.navigate(
+      options.arrowKeysSwitchThread === undefined ? navigation : { ...navigation, arrowKeysSwitchThread: options.arrowKeysSwitchThread },
+    )
+  })
   return {
     opened,
     selections,
