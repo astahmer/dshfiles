@@ -1179,15 +1179,15 @@ const api = jjIntegrationApi.host({
   },
   projects: async () => {
     const workspaces = [...registryOf().list()].sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt))
-    const projects = await registeredProjects({
+    const registered = await registeredProjects({
       workspaces: workspaces.map(workspace => ({ workspaceId: workspace.id, title: workspace.title, path: workspace.path })),
-      isSecondaryWorkspace: async path => {
-        if (!existsSync(path)) return false
+      classify: async path => {
+        if (!existsSync(path)) return 'missing'
         const location = await cachedLocation(requireThreads(), path)
-        return location !== undefined && ThreadWorkspaceModel.isSecondaryWorkspace(location)
+        return location !== undefined && ThreadWorkspaceModel.isSecondaryWorkspace(location) ? 'workspace' : 'project'
       },
     })
-    return { projects: [...projects] }
+    return { projects: [...registered.projects], workspaces: [...registered.workspaces] }
   },
   noFolder: async () => {
     const registry = registryOf()

@@ -205,6 +205,8 @@ const renderCleanup = (output: CleanupResult): string => {
     .join('\n')
 }
 
+const registeredProjectSchema = z.object({ workspaceId: z.string(), title: z.string(), path: z.string() }).strict()
+
 export const jjIntegrationApi = defineApi({
   id: 'jj-threads',
   version: 1,
@@ -256,9 +258,15 @@ export const jjIntegrationApi = defineApi({
     }),
     projects: method({
       input: z.object({}).strict(),
-      output: z.object({ projects: z.array(z.object({ workspaceId: z.string(), title: z.string(), path: z.string() }).strict()) }).strict(),
+      output: z
+        .object({
+          projects: z.array(registeredProjectSchema),
+          /** Existing thread workspaces, listed apart; a Host from before this field omits it. */
+          workspaces: z.array(registeredProjectSchema).optional(),
+        })
+        .strict(),
       description:
-        'List registered projects (DSH Workspaces) that are real checkouts rather than thread workspaces, with their workspace id, title and path. Read-only.',
+        'List registered projects (DSH Workspaces) that are real checkouts rather than thread workspaces, with their workspace id, title and path; folders that no longer exist are left out. Read-only.',
       tool: {
         name: 'jj_thread_projects',
         readOnly: true,
