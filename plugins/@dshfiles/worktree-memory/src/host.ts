@@ -100,11 +100,18 @@ const readCwds = async (context: Context, pids: readonly number[]): Promise<Map<
   return cwds
 }
 
+// kern.memorystatus_vm_pressure_level reports 1 (normal), 2 (warning) or 4 (critical).
+const darwinPressureLevels = new Map<string, MemoryPressure>([
+  ['1', 'normal'],
+  ['2', 'warning'],
+  ['4', 'critical'],
+])
+
 const readPressure = async (context: Context): Promise<MemoryPressure> => {
   try {
     if (process.platform === 'darwin') {
       const level = (await run(context, 'sysctl', ['-n', 'kern.memorystatus_vm_pressure_level'])).trim()
-      return level === '4' ? 'critical' : level === '2' ? 'warning' : level === '1' ? 'normal' : 'unknown'
+      return darwinPressureLevels.get(level) ?? 'unknown'
     }
     if (process.platform === 'linux') {
       const average = Number(/some avg10=([\d.]+)/.exec(await readFile('/proc/pressure/memory', 'utf8'))?.[1] ?? Number.NaN)
