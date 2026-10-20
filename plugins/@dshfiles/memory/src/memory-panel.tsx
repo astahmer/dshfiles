@@ -1,17 +1,29 @@
 import { MarkdownText, type MarkdownLabels } from '@deepseek-ai/dsh-client-ui-primitives'
 import { useApi } from '@dshfiles/dshx/client'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@dshfiles/plugin-ui/components/ui/alert-dialog'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@dshfiles/plugin-ui/components/ui/tabs'
 import { Textarea } from '@dshfiles/plugin-ui/components/ui/textarea'
 import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
+import { ListSelectionModel, type ListSelection } from '@dshfiles/plugin-ui/hooks/list-selection'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
-import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 
 import { memoryApi, type MemoryCitation, type MemoryNoteType, type MemoryUsage, type PanelNote, type PanelThread } from './api.ts'
 import { MemoryFocusModel } from './memory-focus.ts'
+import { NoteSelectionModel } from './note-selection.js'
 import { useNoteEditor } from './use-note-editor.js'
 
 const noteTypes: readonly { readonly value: MemoryNoteType; readonly label: string; readonly hint: string }[] = [
@@ -77,8 +89,18 @@ const NoteSource = (props: { readonly note: PanelNote; readonly openThread: Open
 }
 
 /** One note, editable in place: text with an edit/preview toggle, type and scope; forget with an optional reason. */
-const NoteEditor = (props: { readonly note: PanelNote; readonly openThread: OpenThread; readonly onSelect?: () => void }): JSX.Element => {
+const NoteEditor = (props: {
+  readonly note: PanelNote
+  readonly openThread: OpenThread
+  readonly onOpen?: () => void
+  readonly selection?: {
+    readonly selected: boolean
+    readonly toggle: (id: number) => void
+    readonly range: (id: number) => void
+  }
+}): JSX.Element => {
   const note = props.note
+  const modifiedCheckboxClick = useRef(false)
   const { snapshot, send } = useNoteEditor(note)
   const mode =
     snapshot.matches('editing') || snapshot.matches('saving')
@@ -92,11 +114,35 @@ const NoteEditor = (props: { readonly note: PanelNote; readonly openThread: Open
   return (
     <article className="dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-lg dshx:border dshx:border-border dshx:p-3" aria-label={`Note n:${note.id}`}>
       <header className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:text-xs">
+        {note.status !== 'valid' || props.selection === undefined ? null : (
+          <input
+            type="checkbox"
+            aria-label={`Select n:${note.id}`}
+            checked={props.selection.selected}
+            onClick={event => {
+              if (props.selection === undefined) return
+              if (!event.shiftKey && !event.metaKey && !event.ctrlKey) return
+              modifiedCheckboxClick.current = true
+              event.stopPropagation()
+              if (event.shiftKey) props.selection.range(note.id)
+              else props.selection.toggle(note.id)
+            }}
+            onChange={() => {
+              if (props.selection === undefined) return
+              if (modifiedCheckboxClick.current) {
+                modifiedCheckboxClick.current = false
+                return
+              }
+              props.selection.toggle(note.id)
+            }}
+            className="dshx:size-3.5 dshx:accent-[var(--color-info)]"
+          />
+        )}
         <button
           type="button"
           className="dshx:font-mono dshx:text-muted-foreground dshx:hover:underline"
-          onClick={props.onSelect}
-          disabled={props.onSelect === undefined}
+          onClick={props.onOpen}
+          disabled={props.onOpen === undefined}
         >
           n:{note.id}
         </button>
@@ -232,6 +278,12 @@ const NotesTab = (props: { readonly project: string | undefined; readonly openTh
   const [scope, setScope] = useState('')
   const [includeInvalid, setIncludeInvalid] = useState(false)
   const [selectedId, setSelectedId] = useState<number | null>(null)
+  const [selection, setSelection] = useState<ListSelection<number>>(() => ListSelectionModel.empty())
+  const [confirmingForget, setConfirmingForget] = useState(false)
+  const [forgetReason, setForgetReason] = useState('')
+  const [forgetFailure, setForgetFailure] = useState<string | null>(null)
+  const [forgetPending, setForgetPending] = useState(false)
+  const queryClient = useQueryClient()
   useEffect(() => {
     if (props.focusNoteId !== undefined) setSelectedId(props.focusNoteId)
   }, [props.focusNoteId])
@@ -240,8 +292,49 @@ const NotesTab = (props: { readonly project: string | undefined; readonly openTh
     queryKey: ['dshfiles-memory', 'notes', props.project, debounced, type, scope, includeInvalid],
     queryFn: ({ signal }) => api.notes({ project: props.project ?? '', query: debounced, type, scope, includeInvalid }, { signal }),
   })
-  const list = notes.data ?? []
+  const list = useMemo(() => notes.data ?? [], [notes.data])
+  const orderedIds = useMemo(() => NoteSelectionModel.orderedSelectableIds({ notes: list, types: noteTypes.map(item => item.value) }), [list])
+  useEffect(() => {
+    setSelection(current => {
+      const next = ListSelectionModel.prune({ state: current, visibleIds: orderedIds })
+      return next.ids.length === current.ids.length && next.anchorId === current.anchorId ? current : next
+    })
+  }, [orderedIds])
   const selected = list.find(note => note.id === selectedId)
+  const selectedNoteIds = useMemo(() => new Set(selection.ids), [selection.ids])
+  const toggleNoteSelection = (id: number): void => setSelection(current => ListSelectionModel.toggle({ state: current, id }))
+  const extendNoteSelection = (id: number): void => setSelection(current => ListSelectionModel.extend({ state: current, orderedIds, id }))
+  const clearSelection = (): void => setSelection(ListSelectionModel.empty())
+  const openForgetDialog = (): void => {
+    setForgetReason('')
+    setForgetFailure(null)
+    setConfirmingForget(true)
+  }
+  const forgetSelected = async (): Promise<void> => {
+    setForgetPending(true)
+    setForgetFailure(null)
+    try {
+      const outcome = await NoteSelectionModel.forget({
+        ids: selection.ids,
+        reason: forgetReason,
+        forget: async ({ id, reason }) => {
+          await api.forgetNote({ id, reason })
+        },
+      })
+      await queryClient.invalidateQueries({ queryKey: ['dshfiles-memory'] })
+      if (outcome.failed.length > 0) {
+        setSelection({ ids: outcome.failed, anchorId: outcome.failed[0] })
+        setForgetFailure(`${String(outcome.forgotten.length)} forgotten; ${String(outcome.failed.length)} could not be forgotten.`)
+        return
+      }
+      setConfirmingForget(false)
+      clearSelection()
+    } catch (error) {
+      setForgetFailure(errorMessage(error, 'The selected notes could not be forgotten.'))
+    } finally {
+      setForgetPending(false)
+    }
+  }
   return (
     <div className="dshx:flex dshx:flex-col dshx:gap-3">
       <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
@@ -270,6 +363,18 @@ const NotesTab = (props: { readonly project: string | undefined; readonly openTh
           Show superseded and forgotten
         </label>
       </div>
+      {orderedIds.length === 0 ? null : (
+        <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-xs">
+          <input
+            type="checkbox"
+            aria-label="Select all visible notes"
+            checked={ListSelectionModel.isComplete({ state: selection, orderedIds })}
+            onChange={() => setSelection(current => ListSelectionModel.toggleAllVisible({ state: current, orderedIds }))}
+            className="dshx:size-3.5 dshx:accent-[var(--color-info)]"
+          />
+          <span className="dshx:text-muted-foreground">Select all visible notes</span>
+        </div>
+      )}
       {notes.isError ? <p className="dshx:text-xs dshx:text-destructive">{errorMessage(notes.error, 'Notes are unavailable.')}</p> : null}
       {notes.isSuccess && list.length === 0 ? <Empty>No notes yet. Agents add them with memory_note when you correct or decide something.</Empty> : null}
       <div className={cn('dshx:grid dshx:gap-4', selected === undefined ? 'dshx:grid-cols-1' : 'dshx:grid-cols-1 dshx:lg:grid-cols-2')}>
@@ -283,7 +388,13 @@ const NotesTab = (props: { readonly project: string | undefined; readonly openTh
                   {item.label} <span className="dshx:font-normal dshx:text-muted-foreground">· {item.hint}</span>
                 </h3>
                 {group.map(note => (
-                  <NoteEditor key={`${note.id}:${note.updatedAt}`} note={note} openThread={props.openThread} onSelect={() => setSelectedId(note.id)} />
+                  <NoteEditor
+                    key={`${note.id}:${note.updatedAt}`}
+                    note={note}
+                    openThread={props.openThread}
+                    onOpen={() => setSelectedId(note.id)}
+                    selection={{ selected: selectedNoteIds.has(note.id), toggle: toggleNoteSelection, range: extendNoteSelection }}
+                  />
                 ))}
               </section>
             )
@@ -291,6 +402,51 @@ const NotesTab = (props: { readonly project: string | undefined; readonly openTh
         </div>
         {selected === undefined ? null : <NoteDetail key={selected.id} note={selected} openThread={props.openThread} close={() => setSelectedId(null)} />}
       </div>
+      {selection.ids.length === 0 ? null : (
+        <div className="dshx:sticky dshx:bottom-0 dshx:z-30 dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:rounded-xl dshx:border dshx:border-border dshx:bg-popover dshx:p-2 dshx:pl-3 dshx:text-[13px] dshx:shadow-lg">
+          <span className="dshx:mr-2 dshx:tabular-nums">{selection.ids.length} selected</span>
+          <Button size="xs" variant="destructive" onClick={openForgetDialog}>
+            Forget selected
+          </Button>
+          <Button size="xs" variant="ghost" onClick={clearSelection}>
+            Clear
+          </Button>
+        </div>
+      )}
+      <AlertDialog
+        open={confirmingForget}
+        onOpenChange={open => {
+          if (!open && !forgetPending) setConfirmingForget(false)
+        }}
+      >
+        <AlertDialogContent className="dshx-root" size="sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="dshx:text-sm">Forget {selection.ids.length} selected notes?</AlertDialogTitle>
+            <AlertDialogDescription>Each note stays in its history as forgotten, with the reason below.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <Input
+            aria-label="Reason for forgetting"
+            placeholder="Reason (optional)"
+            value={forgetReason}
+            onChange={event => setForgetReason(event.currentTarget.value)}
+            className="dshx:h-8"
+          />
+          {forgetFailure === null ? null : <p className="dshx:text-xs dshx:text-destructive">{forgetFailure}</p>}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={forgetPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              disabled={forgetPending || selection.ids.length === 0}
+              onClick={event => {
+                event.preventDefault()
+                void forgetSelected()
+              }}
+            >
+              {forgetPending ? 'Forgetting…' : `Forget ${String(selection.ids.length)} notes`}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
