@@ -45,6 +45,9 @@ decorators as written, and Node rejects them; upstream's build compiles with tsc
 `@deepseek-ai/dsh-api-gateway/client` and `@deepseek-ai/dsh-client-store` from the module table, as the native build
 does. `pnpm typecheck` runs the client program and the Host program with its tests (`tests/host`).
 
+`src/host.ts` is the fork's entry shim and must import the vendored native entry `src/native/index.ts`, so the lint and
+format configs exclude it with `src/native/**`.
+
 ### Updating upstream
 
 1. `node scripts/native-fork-diff.mjs session-controller --to <new-tag>` lists what upstream changed between the pinned tag and

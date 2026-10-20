@@ -16,6 +16,7 @@ const astGrepVendored = [
   'plugins/@dshfiles/rich-composer/src/native/**',
   'plugins/@dshfiles/chat/src/native/**',
   'plugins/@dshfiles/session-controller/src/native/**',
+  'plugins/@dshfiles/session-controller/src/host.ts',
   'plugins/@dshfiles/session-controller/typert/**',
   'plugins/@dshfiles/frame-layout/src/native/**',
 ]
