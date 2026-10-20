@@ -64,7 +64,10 @@ export const RemoteThreadView = () => {
   const hostName = thread?.hostName ?? directory.data?.runtimes.find(runtime => runtime.id === ref?.runtimeId)?.name ?? 'Remote host'
   const entryCount = data?.entries.length ?? 0
 
-  useEffect(() => bottom.current?.scrollIntoView({ block: 'end' }), [entryCount, data?.running])
+  useEffect(() => {
+    // scrollIntoView can return a Promise; returning it would become the effect cleanup.
+    bottom.current?.scrollIntoView({ block: 'end' })
+  }, [entryCount, data?.running])
 
   const refresh = (): void => void queryClient.invalidateQueries({ queryKey: multiHostKeys.transcript(ref?.runtimeId ?? '', ref?.sessionId ?? '') })
   const send = useMutation({
