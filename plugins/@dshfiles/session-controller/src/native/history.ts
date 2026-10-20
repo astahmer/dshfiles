@@ -366,6 +366,8 @@ async function tailPageOf(
   try {
     const log = await TailLog.open({ ctx, sessionId, signal })
     if (log === undefined) return undefined
+    // A page through seq -1 holds nothing: the sidebar asks for it on hover so the click finds the tail already open.
+    if (request.throughSeq < 0) return { records: [], hasMore: true }
     for (let frames = 16; ; frames *= 2) {
       signal.throwIfAborted()
       const events = log.before(frames)
