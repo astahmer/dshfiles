@@ -19,12 +19,13 @@ import {
 } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useVirtualizer } from '@dshfiles/plugin-ui/virtual'
-import { useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 
 import type { BacklogSummaryView } from './api.js'
-import { BacklogItems, type BacklogStatus } from './item.js'
+import { BacklogItems, type BacklogKind, type BacklogStatus } from './item.js'
 import { ItemGlyphs } from './item-glyphs.js'
 import { ItemPickers } from './item-pickers.js'
+import { extendBacklogSelection, toggleBacklogSelection } from './selection.js'
 import { StartThreadMenu } from './start-thread-dialog.js'
 import { StatusFilterBar } from './status-filter-bar.js'
 import { useBacklogActions } from './use-backlog-actions.js'
@@ -104,11 +105,13 @@ const Row = (props: {
   readonly cursor: boolean
   readonly selected: boolean
   readonly toggle: (id: number) => void
+  readonly selectWithModifiers: (id: number, shiftKey: boolean, additive: boolean) => void
   readonly select: (id: number) => void
   readonly hover: (id: number) => void
   readonly startThread: (item: BacklogSummaryView) => void
 }): JSX.Element => {
   const actions = useBacklogActions()
+  const modifiedCheckboxClick = useRef(false)
   const item = props.item
   const closed = item.status === 'done' || item.status === 'dropped'
   const background = (() => {
@@ -123,7 +126,13 @@ const Row = (props: {
         role="row"
         aria-label={`Item b:${String(item.id)}`}
         aria-selected={props.selected}
-        onClick={() => props.select(item.id)}
+        onClick={event => {
+          if (event.shiftKey || event.metaKey || event.ctrlKey) {
+            props.selectWithModifiers(item.id, event.shiftKey, event.metaKey || event.ctrlKey)
+            return
+          }
+          props.select(item.id)
+        }}
         onMouseMove={() => props.hover(item.id)}
         style={{ viewTransitionName: `backlog-item-${String(item.id)}` }}
         className={cn(
@@ -137,7 +146,19 @@ const Row = (props: {
             type="checkbox"
             aria-label={`Select b:${String(item.id)}`}
             checked={props.selected}
-            onChange={() => props.toggle(item.id)}
+            onClick={event => {
+              if (!event.shiftKey && !event.metaKey && !event.ctrlKey) return
+              modifiedCheckboxClick.current = true
+              event.stopPropagation()
+              props.selectWithModifiers(item.id, event.shiftKey, event.metaKey || event.ctrlKey)
+            }}
+            onChange={() => {
+              if (modifiedCheckboxClick.current) {
+                modifiedCheckboxClick.current = false
+                return
+              }
+              props.toggle(item.id)
+            }}
             className={cn(
               'dshx:size-3.5 dshx:accent-[var(--color-info)] dshx:transition-opacity',
               props.selected ? 'dshx:opacity-100' : 'dshx:opacity-0 dshx:group-hover/row:opacity-100',
@@ -221,12 +242,50 @@ export const ItemsView = (props: {
 }): JSX.Element => {
   const actions = useBacklogActions()
   const [selected, setSelected] = useState<ReadonlySet<number>>(new Set())
+  const selectionAnchor = useRef<number | null>(null)
+  useEffect(() => {
+    const availableIds = new Set(props.items.map(item => item.id))
+    setSelected(current => {
+      const next = new Set([...current].filter(id => availableIds.has(id)))
+      return next.size === current.size ? current : next
+    })
+    if (selectionAnchor.current !== null && !availableIds.has(selectionAnchor.current)) selectionAnchor.current = null
+  }, [props.items])
   const groups = useMemo(() => groupsOf(props.items, props.groupBy), [props.items, props.groupBy])
+  const orderedIds = useMemo(() => itemsOrder(props.items, props.groupBy, props.collapsed).map(item => item.id), [props.items, props.groupBy, props.collapsed])
   const toggle = (id: number): void => {
-    const next = new Set(selected)
-    if (next.has(id)) next.delete(id)
-    else next.add(id)
-    setSelected(next)
+    selectionAnchor.current = id
+    setSelected(toggleBacklogSelection(selected, id))
+  }
+  const selectWithModifiers = (id: number, shiftKey: boolean, additive: boolean): void => {
+    if (shiftKey) {
+      const anchorId = selectionAnchor.current ?? id
+      setSelected(extendBacklogSelection(selected, orderedIds, anchorId, id))
+      return
+    }
+    if (additive) {
+      toggle(id)
+      return
+    }
+    selectionAnchor.current = id
+    setSelected(new Set())
+    props.select(id)
+  }
+  const clearSelection = (): void => {
+    setSelected(new Set())
+    selectionAnchor.current = null
+  }
+  const selectAllVisible = (): void => {
+    if (orderedIds.length > 0 && orderedIds.every(id => selected.has(id))) {
+      clearSelection()
+      return
+    }
+    selectionAnchor.current = orderedIds[0] ?? null
+    setSelected(new Set(orderedIds))
+  }
+  const updateSelected = (fields: { readonly status?: BacklogStatus; readonly kind?: BacklogKind; readonly pinned?: boolean }): void => {
+    for (const id of selected) actions.update.mutate({ id, ...fields })
+    clearSelection()
   }
   const filtering = props.statuses.length > 0
   const visibleGroups = props.groupBy === 'status' && !filtering ? groups : groups.filter(group => group.items.length > 0)
@@ -280,7 +339,15 @@ export const ItemsView = (props: {
             'dshx:sticky dshx:top-0 dshx:z-20 dshx:h-8 dshx:items-center dshx:border-b dshx:border-border dshx:bg-background dshx:pr-3 dshx:text-[11px] dshx:font-medium dshx:text-muted-foreground',
           )}
         >
-          <span />
+          <span className="dshx:flex dshx:justify-center">
+            <input
+              type="checkbox"
+              aria-label="Select all visible items"
+              checked={orderedIds.length > 0 && orderedIds.every(id => selected.has(id))}
+              onChange={selectAllVisible}
+              className="dshx:size-3.5 dshx:accent-[var(--color-info)]"
+            />
+          </span>
           <span>Item</span>
           <span>Status</span>
           <span className={roomyOnly}>Kind</span>
@@ -354,7 +421,11 @@ export const ItemsView = (props: {
                     cursor={entry.item.id === props.cursorId}
                     selected={selected.has(entry.item.id)}
                     toggle={toggle}
-                    select={props.select}
+                    selectWithModifiers={selectWithModifiers}
+                    select={id => {
+                      clearSelection()
+                      props.select(id)
+                    }}
                     hover={props.hover}
                     startThread={props.startThread}
                   />
@@ -365,32 +436,54 @@ export const ItemsView = (props: {
         </div>
       </div>
       {selected.size === 0 ? null : (
-        <div className="dshx:absolute dshx:bottom-4 dshx:left-1/2 dshx:z-30 dshx:flex dshx:-translate-x-1/2 dshx:items-center dshx:gap-1 dshx:rounded-xl dshx:border dshx:border-border dshx:bg-popover dshx:p-1 dshx:pl-3 dshx:text-[13px] dshx:shadow-lg dshx:animate-in dshx:fade-in-0 dshx:slide-in-from-bottom-2">
-          <span className="dshx:mr-2 dshx:tabular-nums">{selected.size} selected</span>
+        <div className="dshx:absolute dshx:bottom-4 dshx:left-1/2 dshx:z-30 dshx:flex dshx:max-w-[calc(100%-1rem)] dshx:-translate-x-1/2 dshx:flex-wrap dshx:items-center dshx:justify-center dshx:gap-1 dshx:rounded-xl dshx:border dshx:border-border dshx:bg-popover dshx:p-1 dshx:pl-3 dshx:text-[13px] dshx:shadow-lg dshx:animate-in dshx:fade-in-0 dshx:slide-in-from-bottom-2">
+          <span title="Shift-click selects a range; Cmd/Ctrl-click toggles items" className="dshx:mr-2 dshx:tabular-nums">
+            {selected.size} selected
+          </span>
           <DropdownMenu>
             <DropdownMenuTrigger className="dshx:inline-flex dshx:h-7 dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:px-2 dshx:outline-none dshx:hover:bg-accent">
               Move to <ChevronDownIcon className="dshx:size-3 dshx:opacity-60" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="center" className="dshx-root">
               {BacklogItems.statuses.map(status => (
-                <DropdownMenuItem
-                  key={status}
-                  className="dshx:gap-2 dshx:text-[13px]"
-                  onSelect={() => {
-                    for (const id of selected) actions.update.mutate({ id, status })
-                    setSelected(new Set())
-                  }}
-                >
+                <DropdownMenuItem key={status} className="dshx:gap-2 dshx:text-[13px]" onSelect={() => updateSelected({ status })}>
                   <ItemGlyphs.StatusIcon status={status} />
                   {ItemGlyphs.statusLabels[status]}
                 </DropdownMenuItem>
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
+          <DropdownMenu>
+            <DropdownMenuTrigger className="dshx:inline-flex dshx:h-7 dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:px-2 dshx:outline-none dshx:hover:bg-accent">
+              Set kind <ChevronDownIcon className="dshx:size-3 dshx:opacity-60" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="center" className="dshx-root">
+              {BacklogItems.kinds.map(kind => (
+                <DropdownMenuItem key={kind} className="dshx:gap-2 dshx:text-[13px]" onSelect={() => updateSelected({ kind })}>
+                  <ItemGlyphs.KindIcon kind={kind} />
+                  {ItemGlyphs.kindLabels[kind]}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <button
+            type="button"
+            onClick={() => updateSelected({ pinned: true })}
+            className="dshx:inline-flex dshx:h-7 dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:px-2 dshx:outline-none dshx:hover:bg-accent"
+          >
+            <PinIcon className="dshx:size-3.5" /> Pin
+          </button>
+          <button
+            type="button"
+            onClick={() => updateSelected({ pinned: false })}
+            className="dshx:inline-flex dshx:h-7 dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:px-2 dshx:outline-none dshx:hover:bg-accent"
+          >
+            Unpin
+          </button>
           <button
             type="button"
             aria-label="Clear selection"
-            onClick={() => setSelected(new Set())}
+            onClick={clearSelection}
             className="dshx:rounded-md dshx:p-1.5 dshx:text-muted-foreground dshx:hover:bg-accent dshx:hover:text-foreground"
           >
             <XIcon className="dshx:size-3.5" />

@@ -8,8 +8,7 @@ const feedItems = (page: Page) => feed(page).getByRole('article', { name: /^Item
 const searchResults = (page: Page) => page.getByRole('list', { name: 'Search results' })
 const row = (page: Page, title: string) => feedItems(page).filter({ hasText: title })
 const peek = (page: Page) => page.getByRole('complementary', { name: 'Item detail' })
-const statusChip = (page: Page, label: string) =>
-  page.getByRole('group', { name: 'Filter by status' }).getByRole('button', { name: new RegExp(`^${label},`) })
+const statusChip = (page: Page, label: string) => page.getByRole('group', { name: 'Filter by status' }).getByRole('button', { name: new RegExp(`^${label},`) })
 const showFeed = async (page: Page): Promise<void> => {
   await page.getByRole('button', { name: 'Feed', exact: true }).click()
   await expect(feed(page)).toBeVisible()
@@ -212,6 +211,27 @@ Then('the item links the thread it started', async ({ page }: { page: Page }) =>
     // A draft with no message yet is not a listed thread, so the chip carries the session fallback label.
     await expect(peek(page).getByRole('button', { name: /^Unlink thread session-/ })).toBeVisible()
     await expect(peek(page).getByRole('button', { name: /^Thread [0-9a-f]{8}$/ })).toBeVisible()
+  })
+  await finishJourneyAssertions(page)
+})
+
+When('the Items view selects a range and toggles one item', async ({ page }: { page: Page }) => {
+  await page.getByRole('button', { name: 'Items', exact: true }).click()
+  const checkboxFor = (id: number) => page.getByRole('row', { name: `Item b:${String(id)}` }).getByRole('checkbox', { name: `Select b:${String(id)}` })
+  await checkboxFor(1).click()
+  await checkboxFor(3).click({ modifiers: ['Shift'] })
+  await expect(page.getByText('3 selected', { exact: true })).toBeVisible()
+  await checkboxFor(1).click({ modifiers: ['ControlOrMeta'] })
+  await expect(page.getByText('2 selected', { exact: true })).toBeVisible()
+})
+
+Then('the batch status action updates only the remaining selected items', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'backlog-multi-select-batch-status', async () => {
+    await page.getByRole('button', { name: 'Move to' }).click()
+    await page.getByRole('menuitem', { name: 'Done', exact: true }).click()
+    await expect(page.getByRole('button', { name: 'Status of b:1' })).toContainText('Inbox')
+    await expect(page.getByRole('button', { name: 'Status of b:2' })).toContainText('Done')
+    await expect(page.getByRole('button', { name: 'Status of b:3' })).toContainText('Done')
   })
   await finishJourneyAssertions(page)
 })

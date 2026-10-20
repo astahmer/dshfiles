@@ -128,6 +128,44 @@
       ]
     },
     {
+      "id": "multi-select-items",
+      "title": "Select items in ranges and batch-edit them",
+      "summary": "The Items table supports click-to-open, Shift-click ranges, Cmd/Ctrl-click additive toggles, select-all-visible, and batch status, kind and pin updates.",
+      "reach": [
+        "click button \"Backlog\"",
+        "fill textbox \"Capture\" \"First selection item\"",
+        "press Enter",
+        "expect text \"First selection item\"",
+        "click button \"Items\"",
+        "click checkbox \"Select b:1\"",
+        "expect text \"1 selected\""
+      ],
+      "surfaces": ["client"],
+      "configuration": [],
+      "states": ["unselected", "range-selected", "additive-selection", "batch-updated"],
+      "failureModes": ["A range uses the current visible item order and falls back to the target if its anchor is no longer visible."],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "backlog.multi-select",
+          "featureFile": "tooling/dshx/e2e/features/backlog.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.multi-select-toggle",
+          "file": "plugins/@dshfiles/backlog/src/selection.test.ts",
+          "testName": "toggles non-adjacent items without changing the remaining selection"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.multi-select-range",
+          "file": "plugins/@dshfiles/backlog/src/selection.test.ts",
+          "testName": "adds the inclusive range in either direction and preserves additive selections"
+        }
+      ]
+    },
+    {
       "id": "auto-triage",
       "title": "Triage new items automatically",
       "summary": "With autoTriage on, each capture is triaged in the background: Jev answers whether it is work to do and whether it repeats the closest open item, a configured cheap model proposes kind, status, title, tags and duplicates using the user's past corrections as examples. A confident proposal applies as `system` and skips fields the user set by hand; a hesitant one waits on the item to be accepted or dismissed.",

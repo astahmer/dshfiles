@@ -57,3 +57,13 @@ Feature: Backlog
     When the Backlog panel is opened again
     And backlog item b:1 is opened
     Then the item links the thread it started
+
+  @scenario:backlog.multi-select
+  Scenario: Select item ranges and apply batch updates
+    Given the isolated plugin profile "@dshfiles/backlog" is booted
+    When the Backlog panel is opened
+    And "First selection item" is captured
+    And "Second selection item" is captured
+    And "Third selection item" is captured
+    When the Items view selects a range and toggles one item
+    Then the batch status action updates only the remaining selected items
