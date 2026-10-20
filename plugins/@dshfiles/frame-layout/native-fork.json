@@ -3,8 +3,8 @@
   "upstream": {
     "repository": "https://github.com/deepseek-ai/deepseek-harness.git",
     "package": "@deepseek-ai/dsh-client-ui-layout",
-    "version": "0.2.0-rc.2",
-    "ref": "c1b47e41fcd54d20a0f061df28683bfc29ee24e5",
+    "version": "0.2.1-rc.2",
+    "ref": "dsh-v0.2.1-rc.2",
     "path": "packages/client/ui-layout"
   },
   "files": [
@@ -18,7 +18,6 @@
     "src/native/client/stores.ts",
     "src/native/client/AppFrame.tsx",
     "src/native/client/AppFrame.module.css",
-    "src/native/client/columns.ts",
-    "src/native/client/theme-presenter.ts"
+    "src/native/client/columns.ts"
   ]
 }

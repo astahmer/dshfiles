@@ -1,7 +1,7 @@
 .frame {
   position: relative; /* anchors the drag handles, which straddle column borders */
   display: grid;
-  grid-template-rows: 100%;
+  grid-template-rows: minmax(0, 1fr) auto;
   height: 100%;
   overflow: hidden;
   background: var(--dsw-alias-bg-base);
@@ -27,7 +27,6 @@
   --dsh-windows-content-radius: 16px;
   box-sizing: border-box;
   padding-top: var(--dsh-windows-titlebar-height);
-  grid-template-rows: minmax(0, 1fr);
   background: var(--dsw-specific-sidebar-fill);
 }
 
@@ -50,10 +49,6 @@
   border-right: none;
 }
 
-:global([data-windows-titlebar]) .handle {
-  top: var(--dsh-windows-titlebar-height);
-}
-
 @media (prefers-reduced-motion: reduce) {
   .frame[data-animating] {
     transition: none;
@@ -65,14 +60,6 @@
   overflow: hidden;
   background: var(--dsw-specific-sidebar-fill);
   border-right: 0.5px solid var(--dsw-alias-border-l3);
-}
-
-.bottomRow {
-  grid-column: 1 / -1;
-  min-height: 0;
-  overflow: hidden;
-  background: var(--dsw-alias-bg-base);
-  border-top: 0.5px solid var(--dsw-alias-border-l3);
 }
 
 .centerCol {
@@ -235,6 +222,7 @@
    over the centre. */
 .handle {
   position: absolute;
+  grid-area: 1 / 1 / 2 / -1;
   top: 0;
   bottom: 0;
   width: 8px;
@@ -245,8 +233,10 @@
 }
 
 /* The bottom row's handle rides the row's top edge, which the frame publishes
-   as --dsh-bottom-height while the row is open. */
+   as --dsh-bottom-height while the row is open; it is placed against the whole
+   frame rather than the columns' grid area the other handles span. */
 .handle[data-side='bottom'] {
+  grid-area: auto;
   top: auto;
   bottom: var(--dsh-bottom-height, 0px);
   left: 0;
@@ -293,6 +283,15 @@
   position: relative;
   min-width: 0;
   overflow: visible;
+}
+
+.bottomRow {
+  grid-column: 1 / -1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--dsw-alias-bg-base);
+  border-top: 0.5px solid var(--dsw-alias-border-l3);
 }
 
 .overlayLayer {
