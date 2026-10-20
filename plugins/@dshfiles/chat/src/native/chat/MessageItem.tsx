@@ -354,7 +354,7 @@ export const TurnErrorNodeView = memo(function TurnErrorNodeView({ node, t, useC
   const sessionId = useSession(snapshot => snapshot.sessionId)
   const running = useSession(snapshot => snapshot.running)
   const allowed = useAccess('session/prompt')
-  const action = node.data.code === 'INTERRUPTED' && latest && !running && allowed
+  const action = node.data.code !== 'ACCOUNT_SIGNED_OUT' && latest && !running && allowed
     ? <ResumeInterrupted sessionId={sessionId} seq={node.data.seq} />
     : undefined
   return <TurnErrorItem node={node.data} t={t} action={action} />

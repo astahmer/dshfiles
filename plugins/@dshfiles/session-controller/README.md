@@ -40,7 +40,8 @@ Every other vendored file is byte-identical to the pinned revision.
 | `src/mime-types.d.ts`                   | new: the one `mime-types` call's type; upstream gets it from its workspace                                                                                                                                                                                                                                                                                                                                                      |
 
 `interruption-api` serves availability and resume for Chat's latest interrupted
-turn, including the `chat_resume_interrupted` agent tool. Prompt admission checks
+turn (a Host exit, or a model request that failed after its retries; not a user
+stop or a signed-out account), including the `chat_resume_interrupted` agent tool. Prompt admission checks
 the expected ending sequence, idle status, and empty inbox after asynchronous
 attachment validation, immediately before delivery. Intervening work invalidates
 the action; a deterministic request id makes retries idempotent. A message that

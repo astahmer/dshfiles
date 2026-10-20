@@ -34,8 +34,9 @@ Every other vendored file is byte-identical to the pinned revision.
 | `src/transcript-window.ts`                    | new: which rows are mounted (latest 24, +24 per step, anchored by the first mounted row's identity, widened to a restored anchor or a Turn jump before the Host is asked for older pages)                                                                                   |
 | `src/client-entry.tsx`                        | new: dshx client entry calling the native `apply`                                                                                                                                                                                                                           |
 
-The latest **Task stopped** notice from a restart-interrupted turn offers an
-inline **Resume** while that turn remains latest, idle, and writable. Older
+The latest **Task stopped** or **Turn error** notice from a turn a restart cut
+off, or whose model request failed (upstream outage, rate limit, transport),
+offers an inline **Resume**; a signed-out account does not while that turn remains latest, idle, and writable. Older
 notices remain historical. The action uses the owned session-controller's
 `interruption-api` contract; an older Host without that API hides the action.
 Resume sends a continuation prompt, never blindly replays unfinished tools.

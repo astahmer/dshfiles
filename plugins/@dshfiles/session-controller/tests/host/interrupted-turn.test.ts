@@ -30,17 +30,25 @@ it('keeps offering a stopped task when a later message never started a turn', ()
   expect(latestInterruptedTurn([interrupted(3, 1), userMessage(4), interrupted(8, 2)])).toBe(8)
 })
 
-it('does not resume other terminal failures or signed-out tasks', () => {
-  const events: SessionEvent[] = [
-    interrupted(3, 1),
-    {
-      type: 'turn/end',
-      seq: SessionSeq(5),
-      time: 300,
-      data: { turn: 2, reason: { kind: 'error', error: { message: 'Sign in', code: 'ACCOUNT_SIGNED_OUT' } } },
-    },
-  ]
-  expect(latestInterruptedTurn(events)).toBeUndefined()
+const failed = (seq: number, code: string): SessionEvent => ({
+  type: 'turn/end',
+  seq: SessionSeq(seq),
+  time: 300,
+  data: { turn: 2, reason: { kind: 'error', error: { message: 'failed', code } } },
+})
+
+it('offers a task a model request failure stopped', () => {
+  expect(latestInterruptedTurn([interrupted(3, 1), failed(5, 'RATE_LIMIT')])).toBe(5)
+  expect(latestInterruptedTurn([failed(5, 'SERVER')])).toBe(5)
+})
+
+it('does not resume a signed-out task', () => {
+  expect(latestInterruptedTurn([interrupted(3, 1), failed(5, 'ACCOUNT_SIGNED_OUT')])).toBeUndefined()
+})
+
+it('does not resume a completed task', () => {
+  const completed: SessionEvent = { type: 'turn/end', seq: SessionSeq(5), time: 300, data: { turn: 2, reason: { kind: 'completed' } } }
+  expect(latestInterruptedTurn([interrupted(3, 1), completed])).toBeUndefined()
 })
 
 it('offers a task the Host shutdown cut off, but not one the user stopped', () => {

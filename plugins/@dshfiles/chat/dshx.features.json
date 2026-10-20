@@ -5,7 +5,7 @@
     {
       "id": "resume-interrupted",
       "title": "Resume the latest stopped task",
-      "summary": "Resume beside the latest interrupted task only while the Host confirms it remains idle; superseded history stays read-only.",
+      "summary": "Resume beside the latest task a restart or a failed model request stopped, while the Host confirms it remains idle; superseded history stays read-only.",
       "surfaces": ["client", "tool"],
       "configuration": [],
       "states": ["stopped", "resuming", "resumed", "failed"],

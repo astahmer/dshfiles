@@ -32,7 +32,7 @@ export const interruptionHost = interruptionApi.host({
           content: [
             {
               type: 'text',
-              text: 'Continue the interrupted task from the persisted transcript and current workspace state. Verify missing tool results before repeating any action. If safe continuation is unclear, explain what needs human input.',
+              text: 'Continue the interrupted task (stopped by a DSH restart or a failed model request) from the persisted transcript and current workspace state. Verify missing tool results before repeating any action. If safe continuation is unclear, explain what needs human input.',
             },
           ],
         },
