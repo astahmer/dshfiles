@@ -6,8 +6,8 @@ export { RemoteComposer } from './remote-composer.js'
 export { remoteDirectoryPicker } from './remote-folders.js'
 export {
   hostDestination,
-  openRemoteThread,
   openRemoteThreadRef,
+  RemoteThreadSelection,
   REMOTE_THREAD_PANEL,
   setHostDestination,
   type HostDestination,

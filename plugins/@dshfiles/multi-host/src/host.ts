@@ -43,7 +43,17 @@ const sessionRowSchema = z
     running: z.boolean(),
     blank: z.boolean(),
     updatedAt: z.number().finite(),
-    title: z.string().max(512).optional(),
+    title: z.string().max(512).nullable().optional(),
+    // The remote list names a thread through its title projection; an untitled thread reports null there.
+    projections: z
+      .object({
+        values: z
+          .object({ title: z.string().max(512).nullable().optional() })
+          .passthrough()
+          .optional(),
+      })
+      .passthrough()
+      .optional(),
   })
   .passthrough()
 const sessionListSchema = z.object({ items: z.array(sessionRowSchema).max(10_000) }).passthrough()
@@ -495,14 +505,18 @@ const multiHostHandlers = multiHostApi.host({
           const sessions = sessionListSchema
             .parse(sessionValue)
             .items.slice(0, 500)
-            .map(item => ({
-              runtimeId: runtime.id,
-              sessionId: item.sessionId,
-              ...(item.cwd === undefined ? {} : { cwd: item.cwd }),
-              running: item.running,
-              blank: item.blank,
-              updatedAt: item.updatedAt,
-            }))
+            .map(item => {
+              const title = item.title ?? item.projections?.values?.title ?? undefined
+              return {
+                runtimeId: runtime.id,
+                sessionId: item.sessionId,
+                ...(item.cwd === undefined ? {} : { cwd: item.cwd }),
+                ...(title === undefined || title === '' ? {} : { title }),
+                running: item.running,
+                blank: item.blank,
+                updatedAt: item.updatedAt,
+              }
+            })
           const workspaces = collectWorkspaces(frames).map(item => ({
             runtimeId: runtime.id,
             workspaceId: item.workspaceId,

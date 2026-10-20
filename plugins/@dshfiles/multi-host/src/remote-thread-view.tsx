@@ -10,7 +10,7 @@ import { errorMessage, useMutation, useQueries, useQuery, useQueryClient } from 
 import { useEffect, useRef, useState } from 'react'
 import { multiHostApi, type TranscriptEntry } from './api.js'
 import { multiHostKeys, multiHostQueries } from './destination/queries.js'
-import { openRemoteThread, openRemoteThreadRef } from './destination/state.js'
+import { openRemoteThreadRef, RemoteThreadSelection } from './destination/state.js'
 import { mergeInventory, type InventoryRow, type InventoryStatus } from './inventory.js'
 
 const folderName = (path: string | undefined): string | undefined => path?.split(/[\\/]/).filter(Boolean).at(-1)
@@ -118,7 +118,7 @@ export const RemoteThreadView = () => {
   }, [waitingSince])
   const waiting = data?.waiting
   // A long tool call and a pending approval look the same in the log, so only call it out once it has waited a minute.
-  const longToolWait = waiting?.kind === 'tool' && firstSeen?.since === waiting.since && Date.now() - firstSeen.at > 60_000
+  const longToolWait = waiting?.kind === 'tool' && firstSeen?.since === waiting.since && transcript.dataUpdatedAt - firstSeen.at > 60_000
 
   const refresh = (): void => void queryClient.invalidateQueries({ queryKey: multiHostKeys.transcript(ref?.runtimeId ?? '', ref?.sessionId ?? '') })
   const send = useMutation({
@@ -196,7 +196,7 @@ export const RemoteThreadView = () => {
                 type="button"
                 title={row.cwd ?? row.sessionId}
                 className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:rounded-md dshx:border dshx:p-2 dshx:text-left dshx:text-sm dshx:hover:bg-accent"
-                onClick={() => openRemoteThread({ runtimeId: row.runtimeId, sessionId: row.sessionId })}
+                onClick={() => RemoteThreadSelection.open({ runtimeId: row.runtimeId, sessionId: row.sessionId })}
               >
                 <ServerIcon className="dshx:size-3.5 dshx:shrink-0" />
                 <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col">
@@ -278,9 +278,7 @@ export const RemoteThreadView = () => {
         {waiting?.kind === 'question' ? (
           <Alert className="dshx:mb-2">
             <AlertDescription className="dshx:flex dshx:items-center dshx:gap-2">
-              <span className="dshx:min-w-0 dshx:flex-1 dshx:text-sm">
-                The agent on {hostName} is asking a question. Answer it in the host&apos;s DSH.
-              </span>
+              <span className="dshx:min-w-0 dshx:flex-1 dshx:text-sm">The agent on {hostName} is asking a question. Answer it in the host&apos;s DSH.</span>
               <Button size="sm" variant="outline" className="dshx:shrink-0" disabled={openHostUi.isPending} onClick={() => openHostUi.mutate()}>
                 <ExternalLinkIcon className="dshx:size-3.5" />
                 Host UI

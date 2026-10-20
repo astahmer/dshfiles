@@ -63,6 +63,7 @@ export const mergeInventory = (input: {
         runtimeId: session.runtimeId,
         sessionId: session.sessionId,
         hostName: source.hostName,
+        ...(session.title === undefined || session.title === '' ? {} : { title: session.title }),
         ...(session.cwd === undefined ? {} : { cwd: session.cwd }),
         running: session.running,
         updatedAt: session.updatedAt,

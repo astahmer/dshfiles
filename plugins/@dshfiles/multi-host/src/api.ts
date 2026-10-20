@@ -48,6 +48,8 @@ const sessionSchema = z.object({
   runtimeId: idSchema,
   sessionId: z.string(),
   cwd: z.string().optional(),
+  /** The remote thread's title projection when the runtime reports one; an older Host omits it. */
+  title: z.string().optional(),
   running: z.boolean(),
   blank: z.boolean(),
   updatedAt: z.number(),

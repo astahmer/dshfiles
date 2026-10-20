@@ -12,27 +12,17 @@ const startedHere = (input: { runtimeId: string; sessionId: string; title: strin
   connected: true,
 })
 
-const session = (input: {
-  runtimeId: string
-  sessionId: string
-  updatedAt: number
-  running?: boolean
-  blank?: boolean
-  cwd?: string
-}) => ({
+const session = (input: { runtimeId: string; sessionId: string; updatedAt: number; running?: boolean; blank?: boolean; cwd?: string; title?: string }) => ({
   runtimeId: input.runtimeId,
   sessionId: input.sessionId,
   ...(input.cwd === undefined ? {} : { cwd: input.cwd }),
+  ...(input.title === undefined ? {} : { title: input.title }),
   running: input.running ?? false,
   blank: input.blank ?? false,
   updatedAt: input.updatedAt,
 })
 
-const reachable = (input: {
-  runtimeId: string
-  hostName: string
-  sessions: readonly ReturnType<typeof session>[]
-}): InventoryStatus => ({
+const reachable = (input: { runtimeId: string; hostName: string; sessions: readonly ReturnType<typeof session>[] }): InventoryStatus => ({
   runtimeId: input.runtimeId,
   hostName: input.hostName,
   status: {
@@ -66,7 +56,9 @@ describe('remote inventory merge', () => {
   test('a thread in both sources appears once with its stored title and started-here flag', () => {
     const rows = mergeInventory({
       startedHere: [startedHere({ runtimeId: 'runtime-a', sessionId: 'session-1', title: 'Fix the build', createdAt: '2026-10-20T08:00:00.000Z' })],
-      statuses: [reachable({ runtimeId: 'runtime-a', hostName: 'Build box', sessions: [session({ runtimeId: 'runtime-a', sessionId: 'session-1', updatedAt: 1_000 })] })],
+      statuses: [
+        reachable({ runtimeId: 'runtime-a', hostName: 'Build box', sessions: [session({ runtimeId: 'runtime-a', sessionId: 'session-1', updatedAt: 1_000 })] }),
+      ],
     })
     expect(rows).toEqual([
       {
@@ -130,6 +122,21 @@ describe('remote inventory merge', () => {
         startedHere: true,
       },
     ])
+  })
+
+  test('a host-started thread keeps the title its runtime reports', () => {
+    const rows = mergeInventory({
+      startedHere: [],
+      statuses: [
+        reachable({
+          runtimeId: 'runtime-a',
+          hostName: 'Build box',
+          sessions: [session({ runtimeId: 'runtime-a', sessionId: 'session-1', updatedAt: 1, title: 'Question probe' })],
+        }),
+      ],
+    })
+    expect(rows[0]?.title).toBe('Question probe')
+    expect(rows[0]?.startedHere).toBe(false)
   })
 
   test('rows sort by updated time, newest first', () => {

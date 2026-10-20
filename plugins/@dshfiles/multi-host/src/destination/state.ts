@@ -41,7 +41,15 @@ export const setHostDestination = (next: HostDestination): void => {
   announce()
 }
 
-export const openRemoteThread = (ref: RemoteThreadRef): void => {
-  openRemoteThreadRef.set(ref)
-  announce()
+/** Which remote thread the `main` panel shows; no thread selected means the panel lists every one. */
+export class RemoteThreadSelection {
+  static open(ref: RemoteThreadRef): void {
+    openRemoteThreadRef.set(ref)
+    announce()
+  }
+  /** Back to the panel's own list of every thread on every host. */
+  static clear(): void {
+    openRemoteThreadRef.set(null)
+    announce()
+  }
 }

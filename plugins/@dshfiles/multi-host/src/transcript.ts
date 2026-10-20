@@ -41,8 +41,7 @@ const texts = (blocks: readonly z.infer<typeof textBlockSchema>[] | undefined): 
 
 export type TranscriptWaiting = { readonly kind: 'question' | 'tool'; readonly tool: string; readonly since: number }
 
-const questionTool = (name: string): boolean =>
-  name === 'ask_user_question' || name === 'ask_parent_question' || name.endsWith('__ask_user_question')
+const questionTool = (name: string): boolean => name === 'ask_user_question' || name === 'ask_parent_question' || name.endsWith('__ask_user_question')
 
 /**
  * Reduce a remote Session's history records to what the local remote-thread view shows: user and assistant text, one

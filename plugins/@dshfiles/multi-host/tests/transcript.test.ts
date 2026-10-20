@@ -84,7 +84,8 @@ describe('remote transcript pending detection', () => {
 
   test('a turn end clears the wait', () => {
     expect(
-      reduceTranscript([event(1, 'turn/start', { turn: 1 }), toolCall(2, 'ask_user_question'), event(3, 'turn/end', { reason: { kind: 'completed' } })]).waiting,
+      reduceTranscript([event(1, 'turn/start', { turn: 1 }), toolCall(2, 'ask_user_question'), event(3, 'turn/end', { reason: { kind: 'completed' } })])
+        .waiting,
     ).toBeUndefined()
   })
 })

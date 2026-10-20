@@ -3,7 +3,7 @@ import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { ServerIcon } from '@dshfiles/plugin-ui/icons'
 import { PluginQueryProvider, useQuery } from '@dshfiles/plugin-ui/query'
 import { isApiOwnerMissing } from '@dshfiles/dshx/api'
-import { multiHostApi, multiHostKeys, openRemoteThread, openRemoteThreadRef } from '@dshfiles/multi-host/destination'
+import { multiHostApi, multiHostKeys, openRemoteThreadRef, RemoteThreadSelection } from '@dshfiles/multi-host/destination'
 
 /**
  * Threads started on other hosts, with their host as a badge. They are Sessions of another runtime, so they live in
@@ -28,12 +28,24 @@ const RemoteThreadRows = (props: { readonly headerClassName: string; readonly on
   if (rows.length === 0) return null
   return (
     <section className="dshx:mt-1" aria-label="Remote threads" data-remote-threads="">
-      <div className={cn(props.headerClassName, 'dshx:flex dshx:h-8 dshx:items-center dshx:gap-2 dshx:px-2.5 dshx:text-sm dshx:text-muted-foreground')}>
+      <button
+        type="button"
+        aria-label="All remote threads, including ones started on a host"
+        title="Every thread on every host, including ones started there"
+        className={cn(
+          props.headerClassName,
+          'dshx:flex dshx:h-8 dshx:w-full dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-2.5 dshx:text-left dshx:text-sm dshx:text-muted-foreground dshx:outline-none dshx:hover:bg-accent dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50',
+        )}
+        onClick={() => {
+          RemoteThreadSelection.clear()
+          props.onOpen()
+        }}
+      >
         <ServerIcon className="dshx:size-3" aria-hidden />
         <span className="dshx:whitespace-nowrap">Remote</span>
         <span className="dshx:text-xs dshx:tabular-nums">({rows.length})</span>
         <span className="dshx:h-px dshx:flex-1 dshx:bg-border" aria-hidden="true" />
-      </div>
+      </button>
       {rows.map(thread => {
         const active = open?.runtimeId === thread.runtimeId && open.sessionId === thread.sessionId
         return (
@@ -46,7 +58,7 @@ const RemoteThreadRows = (props: { readonly headerClassName: string; readonly on
               active && 'dshx:bg-accent',
             )}
             onClick={() => {
-              openRemoteThread({ runtimeId: thread.runtimeId, sessionId: thread.sessionId })
+              RemoteThreadSelection.open({ runtimeId: thread.runtimeId, sessionId: thread.sessionId })
               props.onOpen()
             }}
           >
