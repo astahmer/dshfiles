@@ -56,6 +56,12 @@ describe('triage', () => {
     ])
   })
 
+  it('keeps a secret reference as a link, never as a value', () => {
+    const triaged = BacklogItems.triage('deploy key for the crawler is secret:CRAWLER_KEY@dev')
+    expect(triaged.links).toEqual([{ type: 'secret', target: 'CRAWLER_KEY@dev', provenance: 'extracted' }])
+    expect(triaged.links.some(link => link.target.startsWith('secret:'))).toBe(false)
+  })
+
   it('makes a trailing question mark a question and keeps unknown prefixes in the title', () => {
     expect(BacklogItems.triage('should settled threads keep their workspace?').kind).toBe('question')
     const unknown = BacklogItems.triage('Ops: rotate the token')

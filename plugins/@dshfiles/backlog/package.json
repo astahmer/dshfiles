@@ -27,6 +27,7 @@
   },
   "dependencies": {
     "@deepseek-ai/schemastery": "catalog:",
+    "@dshfiles/credential-port": "workspace:*",
     "@dshfiles/dshx": "workspace:*",
     "@dshfiles/input-trigger": "workspace:*",
     "@dshfiles/plugin-ui": "workspace:*",

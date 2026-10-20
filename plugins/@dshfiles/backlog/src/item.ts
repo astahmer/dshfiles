@@ -13,7 +13,7 @@ const attachmentKinds = ['image', 'file'] as const
 
 const kinds = ['task', 'bug', 'idea', 'note', 'question'] as const
 const statuses = ['inbox', 'todo', 'doing', 'done', 'dropped'] as const
-const linkTypes = ['item', 'thread', 'revision', 'branch', 'workspace', 'url'] as const
+const linkTypes = ['item', 'thread', 'revision', 'branch', 'workspace', 'url', 'secret'] as const
 const relations = ['related', 'depends-on', 'blocks', 'duplicates', 'implements', 'fixes', 'discovered-from', 'discussed-in'] as const
 const provenances = ['user', 'agent', 'extracted', 'inferred'] as const
 const attentions = ['none', 'needs-input', 'blocked', 'waiting'] as const
@@ -135,6 +135,7 @@ const linkPatterns: readonly { readonly type: BacklogLink['type']; readonly patt
   { type: 'branch', pattern: /(?<![\w/])branch:([\w./-]+[\w])/g },
   { type: 'workspace', pattern: /(?<![\w/])workspace:(\S+)/g },
   { type: 'url', pattern: /(https?:\/\/[^\s<>()]+[^\s<>().,;:!?'"])/g },
+  { type: 'secret', pattern: /(?<![\w/])secret:([A-Za-z_][A-Za-z0-9_-]*(?:@[A-Za-z0-9_-]+)?)/g },
 ]
 
 const tagPattern = /(?<![\w&#/])#([a-z][\w-]{0,59})/gi

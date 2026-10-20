@@ -9,7 +9,13 @@ export const backlogSettings = defineSettings({
       .description('Triage every new item in the background with Jev and/or the cheap model below. Off leaves items in the Inbox until you move them.'),
     jevEnabled: Schema.boolean()
       .default(false)
-      .description("Ask TypeSafe's Jev whether an item is work to do and whether it repeats an open item. Needs TYPESAFE_API_KEY in the Host environment."),
+      .description(
+        "Ask TypeSafe's Jev whether an item is work to do and whether it repeats an open item. Needs a key: bind one below, or set TYPESAFE_API_KEY in the Host environment.",
+      ),
+    jevSecret: Schema.string()
+      .role('secret-ref')
+      .default('')
+      .description('Secret Catalog alias holding the TypeSafe key, written as secret:ALIAS or secret:ALIAS@env. The value never leaves the Host.'),
     triageProvider: Schema.string()
       .default('')
       .description('Provider id for the triage model (as the model picker names it). Empty skips the model; Jev alone still triages.'),

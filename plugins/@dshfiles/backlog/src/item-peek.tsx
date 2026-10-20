@@ -21,6 +21,7 @@ import {
   GitBranchIcon,
   GitCommitHorizontalIcon,
   HashIcon,
+  KeyRoundIcon,
   LinkIcon,
   Maximize2Icon,
   MessageSquareIcon,
@@ -60,6 +61,7 @@ const linkIcons = {
   branch: GitBranchIcon,
   workspace: FolderIcon,
   url: ExternalLinkIcon,
+  secret: KeyRoundIcon,
 } satisfies Record<BacklogLink['type'], LucideIcon>
 
 const relationLabels = {
@@ -80,6 +82,7 @@ const linkLabel = (link: BacklogLink): string => {
   if (link.type === 'thread') return `Thread ${link.target.replace(/^session-/, '').slice(0, 8)}`
   if (link.type === 'revision') return `jj:${link.target}`
   if (link.type === 'url') return link.target.replace(/^https?:\/\//, '').replace(/\/$/, '')
+  if (link.type === 'secret') return `secret:${link.target}`
   return link.target
 }
 
@@ -451,12 +454,13 @@ const LinkRow = (props: {
   const actions = useBacklogActions()
   const link = props.link
   const Icon = linkIcons[link.type]
-  const openByType: Partial<Record<BacklogLink['type'], () => void>> = {
-    thread: () => props.openThread(link.target),
-    item: () => props.select(Number(link.target)),
-    url: () => void window.open(link.target, '_blank', 'noopener,noreferrer'),
+  const openAction = (): (() => void) | undefined => {
+    if (link.type === 'thread') return () => props.openThread(link.target)
+    if (link.type === 'item') return () => props.select(Number(link.target))
+    if (link.type === 'url') return () => void window.open(link.target, '_blank', 'noopener,noreferrer')
+    return undefined
   }
-  const open = openByType[link.type]
+  const open = openAction()
   return (
     <li className="dshx:group/link dshx:flex dshx:h-8 dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-2 dshx:transition-colors dshx:hover:bg-accent/50">
       <Icon aria-hidden className="dshx:size-3.5 dshx:shrink-0 dshx:text-muted-foreground" />

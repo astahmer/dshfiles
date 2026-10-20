@@ -14,6 +14,7 @@ import type { BacklogEvent, BacklogItem } from './item.js'
 import { BacklogModel, backlogDomain, backlogFileDomain, type BacklogActor, type BacklogStore } from './store.js'
 import { BacklogSignals } from './signals.js'
 import { BacklogTriage, type TriageQuestion, type TriageServices } from './triage.js'
+import { BacklogTriageKey } from './triage-key.js'
 
 interface OpenedBacklog {
   readonly store: BacklogStore
@@ -152,9 +153,15 @@ const complete = async (
     .join('')
 }
 
-const triageServices = (ctx: Context, settings: BacklogSettings): TriageServices => {
-  const apiKey = process.env['TYPESAFE_API_KEY']
-  const jevReady = settings.jevEnabled && apiKey !== undefined && apiKey !== ''
+const JEV_ENV_KEY = 'TYPESAFE_API_KEY'
+
+/** The key Jev answers with, resolved on the Host from the bound reference or the environment. */
+const jevApiKey = async (ctx: Context, settings: BacklogSettings): Promise<string | undefined> =>
+  BacklogTriageKey.resolve({ referenceText: settings.jevSecret, values: ctx.get('secretCatalogValues'), environmentKey: process.env[JEV_ENV_KEY] })
+
+const triageServices = async (ctx: Context, settings: BacklogSettings): Promise<TriageServices> => {
+  const apiKey = settings.jevEnabled ? await jevApiKey(ctx, settings) : undefined
+  const jevReady = settings.jevEnabled && apiKey !== undefined
   const modelReady = settings.triageProvider !== '' && settings.triageModel !== ''
   return {
     jev: jevReady ? request => askJev({ apiKey, ...request }) : undefined,
@@ -168,7 +175,7 @@ const triageItem = async (ctx: Context, id: number) => {
   const input = store.triageInput(id)
   if (input === undefined) return store.get(id)
   const settings = currentSettings()
-  const proposal = await BacklogTriage.run({ ...input, services: triageServices(ctx, settings), now: Date.now() })
+  const proposal = await BacklogTriage.run({ ...input, services: await triageServices(ctx, settings), now: Date.now() })
   if (proposal === null) return store.get(id)
   if (proposal.confidence >= settings.applyThreshold) return store.applyProposal({ id, proposal, actor: { kind: 'system' } })
   return store.propose({ id, proposal })
