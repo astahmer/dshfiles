@@ -6,5 +6,6 @@
     "allowImportingTsExtensions": true,
     "types": ["@dshfiles/dshx/client/env"]
   },
-  "include": ["dshx.config.ts", "src/client-entry.tsx", "src/native/client/**/*.ts", "src/native/types.ts", "src/native/remote-events.ts", "tests/**/*.ts"]
+  "include": ["dshx.config.ts", "src/client-entry.tsx", "src/native/client/**/*.ts", "src/native/types.ts", "src/native/remote-events.ts", "tests/**/*.ts"],
+  "exclude": ["tests/host/**"]
 }

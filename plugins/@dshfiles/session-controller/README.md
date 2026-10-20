@@ -27,14 +27,15 @@ declare `dsh.client.inject` on the stock package keep loading: the browser modul
 
 Every other vendored file is byte-identical to the pinned revision.
 
-| File                                    | Change                                                                                                                                                                                  |
-| --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/native/history.ts`                 | `entryFor` sends `BrowserEvent.of(event)`: history pages and live follow events reach the browser without per-block provider replay state                                               |
-| `src/browser-event.ts`                  | new: drops `replayState.blocks` from `assistant/message` and `assistant/attempt` (message source and stream chunks), keeps `replayState.response` (ids, native stop reason)             |
-| `src/native/client/sessions/session.ts` | a thread opens with `OPENING_PAGE_OPTIONS` (latest Turn, 20–120 messages) instead of the 50-message, two-Turn, 500-cap window; older pages keep the native window                       |
-| `src/native/client/index.ts`            | typing only: no duplicate `Context.sessions` augmentation (the stock one reaches every dshx client program), and the connection cast goes through `unknown` (dshx types see Host types) |
-| `src/host.ts`, `src/client-entry.tsx`   | new: dshx entries calling the native plugin                                                                                                                                             |
-| `src/mime-types.d.ts`                   | new: the one `mime-types` call's type; upstream gets it from its workspace                                                                                                              |
+| File                                    | Change                                                                                                                                                                                               |
+| --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/native/history.ts`                 | `entryFor` sends `BrowserEvent.of(event)`: history pages and live follow events reach the browser without per-block provider replay state                                                            |
+| `src/browser-event.ts`                  | new: drops `replayState.blocks` from `assistant/message` and `assistant/attempt` (message source and stream chunks), keeps `replayState.response` (ids, native stop reason)                          |
+| `src/native/client/sessions/session.ts` | a thread opens with `OPENING_PAGE_OPTIONS` (latest Turn, 20–120 messages) instead of the 50-message, two-Turn, 500-cap window; older pages keep the native window                                    |
+| `src/native/list.ts`                    | cold rows keep their projection column per Session id until that Session attaches, appends or detaches; every `session/list` used to re-read each cold Session log's compressed prefix (Host gap 70) |
+| `src/native/client/index.ts`            | typing only: no duplicate `Context.sessions` augmentation (the stock one reaches every dshx client program), and the connection cast goes through `unknown` (dshx types see Host types)              |
+| `src/host.ts`, `src/client-entry.tsx`   | new: dshx entries calling the native plugin                                                                                                                                                          |
+| `src/mime-types.d.ts`                   | new: the one `mime-types` call's type; upstream gets it from its workspace                                                                                                                           |
 
 ### Build
 
@@ -42,7 +43,7 @@ Every other vendored file is byte-identical to the pinned revision.
 decorators as written, and Node rejects them; upstream's build compiles with tsc too. `dshx build` then bundles
 `build/host/host.js`. The client inlines what the native client chunk inlines and loads `@deepseek-ai/cordis`,
 `@deepseek-ai/dsh-api-gateway/client` and `@deepseek-ai/dsh-client-store` from the module table, as the native build
-does. `pnpm typecheck` runs both programs.
+does. `pnpm typecheck` runs the client program and the Host program with its tests (`tests/host`).
 
 ### Updating upstream
 

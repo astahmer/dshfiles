@@ -1,0 +1,8 @@
+{
+  "extends": "./tsconfig.host.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": "."
+  },
+  "include": ["src/host.ts", "src/mime-types.d.ts", "tests/host/**/*.ts"]
+}

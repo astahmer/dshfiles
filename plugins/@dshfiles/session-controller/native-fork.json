@@ -17,5 +17,10 @@
       "local": "locale"
     }
   ],
-  "delta": ["src/native/history.ts", "src/native/client/sessions/session.ts", "src/native/client/index.ts"]
+  "delta": [
+    "src/native/history.ts",
+    "src/native/client/sessions/session.ts",
+    "src/native/client/index.ts",
+    "src/native/list.ts"
+  ]
 }

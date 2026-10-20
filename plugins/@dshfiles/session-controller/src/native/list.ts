@@ -77,10 +77,21 @@ export function truncateUnicodeCodePoints(value: string, maximum: number): strin
 /** Owns list projection registration, bounded cold summaries, and authorized search. */
 export class ApiSessionList {
   /**
+   * Projection columns of cold rows by Session id. Each one reads the Session log's compressed prefix from disk, once
+   * per cold Session on every list call (1.4 s of Host CPU per minute on a 944-Session corpus). A cold log changes only
+   * while its Session is attached here, so an entry is dropped when the Session attaches, appends or detaches.
+   */
+  private readonly coldProjections = new Map<string, SessionProjectionHints>()
+
+  /**
    * @param ctx - Host context carrying Session, query, persistence, and projection services.
    * @param workSliceMs - Resolved positive integral list-work budget in milliseconds.
    */
   constructor(private readonly ctx: Context, private readonly workSliceMs: number) {
+    const forget = (session: Session): void => { this.coldProjections.delete(session.id) }
+    ctx.on('session/created', forget)
+    ctx.on('session/event', forget)
+    ctx.on('session/disposed', forget)
     ctx.sessionProjections.register<'sessionListMetadata', SessionListMetadata>({
       key: 'sessionListMetadata',
       stateSchema: sessionListMetadataSchema,
@@ -165,7 +176,9 @@ export class ApiSessionList {
   }
 
   private summarizeCold({ header, formatStatus }: SessionRecord): SessionSummary {
-    const projections = this.projectionsFor(header, undefined)
+    const projections = this.coldProjections.get(header.id) ?? this.projectionsFor(header, undefined)
+    // A miss stays unmemoized: the persisted cache can gain this Session's record later.
+    if (projections !== undefined) this.coldProjections.set(header.id, projections)
     const metadata = projections?.values.sessionListMetadata
     return {
       sessionId: header.id,
