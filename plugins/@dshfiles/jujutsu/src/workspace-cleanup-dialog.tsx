@@ -19,6 +19,7 @@ const AGE_CHOICES = [
 const KIND_CHOICES: readonly { readonly kind: CleanupKindView; readonly label: string; readonly hint: string }[] = [
   { kind: 'empty', label: 'Empty', hint: 'never landed anything' },
   { kind: 'integrated', label: 'Already integrated', hint: 'landed, nothing left' },
+  { kind: 'untracked', label: 'Untracked folders', hint: 'folders and files in the threads directory no jj workspace owns' },
 ]
 
 const SKIP_LABELS = {
@@ -38,6 +39,25 @@ const formatAge = (at: number): string => {
   return age.unit === 'now' ? 'now' : `${String(age.n)}${AGE_SUFFIX[age.unit]} ago`
 }
 
+const cleanupRows = (result: CleanupResult) => [
+  ...result.workspaces.map(workspace => ({
+    key: `${workspace.repoRoot}:${workspace.name}`,
+    name: workspace.name,
+    kind: workspace.kind,
+    at: workspace.lastUsedAt,
+    outcome: workspace.outcome,
+    title: workspace.message ?? workspace.path,
+  })),
+  ...result.untracked.map(entry => ({
+    key: `${entry.repoRoot}:untracked:${entry.name}`,
+    name: entry.name,
+    kind: 'untracked',
+    at: entry.modifiedAt,
+    outcome: entry.outcome,
+    title: entry.message ?? entry.path,
+  })),
+]
+
 const skippedSummary = (skipped: CleanupResult['skipped']): string =>
   [...new Set(skipped.map(workspace => workspace.reason))]
     .map(reason => `${String(skipped.filter(workspace => workspace.reason === reason).length)} ${SKIP_LABELS[reason]}`)
@@ -51,7 +71,7 @@ export const WorkspaceCleanupDialog = (props: {
 }) => {
   const api = useApi(jjIntegrationApi)
   const [olderThanHours, setOlderThanHours] = useState<number>(6)
-  const [kinds, setKinds] = useState<CleanupKindView[]>(['empty', 'integrated'])
+  const [kinds, setKinds] = useState<CleanupKindView[]>(['empty', 'integrated', 'untracked'])
   const request = { path: props.path, olderThanHours, kinds }
   const preview = useQuery({
     queryKey: ['jujutsu', 'workspace-cleanup-preview', request],
@@ -67,8 +87,8 @@ export const WorkspaceCleanupDialog = (props: {
   const toggleKind = (kind: CleanupKindView, checked: boolean): void =>
     setKinds(current => (checked ? [...new Set([...current, kind])] : current.filter(existing => existing !== kind)))
   const shown = cleanup.data ?? preview.data
-  const candidates = shown?.workspaces ?? []
-  const removable = preview.data?.workspaces.length ?? 0
+  const candidates = shown === undefined ? [] : cleanupRows(shown)
+  const removable = preview.data === undefined ? 0 : preview.data.workspaces.length + preview.data.untracked.length
   const emptyRevisionCount = preview.data?.emptyRevisions.length ?? 0
   const nothingToDo = removable === 0 && emptyRevisionCount === 0
 
@@ -84,8 +104,8 @@ export const WorkspaceCleanupDialog = (props: {
         <DialogHeader>
           <DialogTitle>Clean up thread workspaces</DialogTitle>
           <DialogDescription>
-            Removes idle thread workspaces with no unlanded work, then abandons the empty revisions nothing builds on. Busy threads and unlanded work are always
-            kept.
+            Removes idle thread workspaces with no unlanded work and stale folders no workspace owns, then abandons the empty revisions nothing builds on. Busy
+            threads and unlanded work are always kept.
           </DialogDescription>
         </DialogHeader>
         <div className="dshx:flex dshx:flex-col dshx:gap-3 dshx:text-xs">
@@ -122,17 +142,13 @@ export const WorkspaceCleanupDialog = (props: {
             {preview.isFetching && shown === undefined && <Spinner className="dshx:size-3" />}
             {preview.isError && <p className="dshx:text-destructive">{errorMessage(preview.error, 'The cleanup preview failed.')}</p>}
             {shown !== undefined && candidates.length === 0 && <p className="dshx:text-muted-foreground">No workspace qualifies.</p>}
-            {candidates.map(workspace => (
-              <div
-                className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:font-mono"
-                key={`${workspace.repoRoot}:${workspace.name}`}
-                title={workspace.message ?? workspace.path}
-              >
-                <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{workspace.name}</span>
-                <span className="dshx:text-muted-foreground">{workspace.kind}</span>
-                <span className="dshx:text-muted-foreground">{formatAge(workspace.lastUsedAt)}</span>
-                {workspace.outcome !== 'would-remove' && (
-                  <span className={cn(workspace.outcome === 'removed' ? 'dshx:text-success' : 'dshx:text-destructive')}>{workspace.outcome}</span>
+            {candidates.map(row => (
+              <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:font-mono" key={row.key} title={row.title}>
+                <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{row.name}</span>
+                <span className="dshx:text-muted-foreground">{row.kind}</span>
+                <span className="dshx:text-muted-foreground">{formatAge(row.at)}</span>
+                {row.outcome !== 'would-remove' && (
+                  <span className={cn(row.outcome === 'removed' ? 'dshx:text-success' : 'dshx:text-destructive')}>{row.outcome}</span>
                 )}
               </div>
             ))}
@@ -158,7 +174,7 @@ export const WorkspaceCleanupDialog = (props: {
               variant="destructive"
             >
               {cleanup.isPending && <Spinner className="dshx:size-3" />}
-              Remove {String(removable)} workspace(s)
+              Remove {String(removable)} item(s)
               {emptyRevisionCount > 0 && ` + ${String(emptyRevisionCount)} revision(s)`}
             </Button>
           )}
