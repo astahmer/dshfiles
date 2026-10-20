@@ -23,4 +23,13 @@ export class ReviewedMarksModel {
   static readonly keyOf = reviewedKeyOf
   static readonly toggle = toggleReviewed
   static readonly record = recordReviewed
+
+  static mark(paths: readonly string[], additions: readonly string[]): string[] {
+    return [...new Set([...paths, ...additions])]
+  }
+
+  static unmark(paths: readonly string[], removals: readonly string[]): string[] {
+    const removed = new Set(removals)
+    return paths.filter(path => !removed.has(path))
+  }
 }

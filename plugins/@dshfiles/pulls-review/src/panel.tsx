@@ -5,6 +5,7 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Progress } from '@dshfiles/plugin-ui/components/ui/progress'
 import { PatchView, parsePatchFiles } from '@dshfiles/plugin-ui/diff'
 import { Check, ChevronLeft, ChevronRight, RefreshCw, Sparkles } from '@dshfiles/plugin-ui/icons'
+import { ListSelectionModel, type ListSelection } from '@dshfiles/plugin-ui/hooks/list-selection'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import { errorMessage, useMutation, useQuery } from '@dshfiles/plugin-ui/query'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
@@ -85,13 +86,22 @@ export const PullsReviewPanel = (props: PullsReviewPanelProps): ReactNode => {
   }, [reviewed, scopeKeyOf])
 
   const [selectedKey, setSelectedKey] = useState<string | undefined>(undefined)
+  const [selection, setSelection] = useState<ListSelection<string>>(() => ListSelectionModel.empty())
   useEffect(() => {
     setSelectedKey(undefined)
+    setSelection(ListSelectionModel.empty())
   }, [cwd, head])
 
   const scopes = result?.status === 'ok' ? result.scopes : []
   const scope = scopes.find(candidate => candidate.key === selectedKey) ?? scopes[0]
   const scopeIndex = scope === undefined ? -1 : scopes.indexOf(scope)
+  const scopePaths = useMemo(() => scope?.filePaths ?? [], [scope])
+  useEffect(() => {
+    setSelection(current => {
+      const next = ListSelectionModel.prune({ state: current, visibleIds: scopePaths })
+      return next.ids.length === current.ids.length && next.anchorId === current.anchorId ? current : next
+    })
+  }, [scopePaths])
 
   const resetSummarize = summarize.reset
   useEffect(() => {
@@ -114,6 +124,18 @@ export const PullsReviewPanel = (props: PullsReviewPanelProps): ReactNode => {
   const markReviewed = (path: string): void => {
     if (scopeKeyOf === undefined) return
     reviewedStore.set(ReviewedMarksModel.record(reviewed, scopeKeyOf, ReviewedMarksModel.toggle(reviewed[scopeKeyOf] ?? [], path)))
+  }
+
+  const selectedPaths = useMemo(() => new Set(selection.ids), [selection.ids])
+  const clearSelection = (): void => setSelection(ListSelectionModel.empty())
+  const togglePath = (path: string): void => setSelection(current => ListSelectionModel.toggle({ state: current, id: path }))
+  const extendPath = (path: string): void => setSelection(current => ListSelectionModel.extend({ state: current, orderedIds: scopePaths, id: path }))
+  const applyReviewed = (nextReviewed: boolean): void => {
+    if (scopeKeyOf === undefined || selection.ids.length === 0) return
+    const current = reviewed[scopeKeyOf] ?? []
+    const next = nextReviewed ? ReviewedMarksModel.mark(current, selection.ids) : ReviewedMarksModel.unmark(current, selection.ids)
+    reviewedStore.set(ReviewedMarksModel.record(reviewed, scopeKeyOf, next))
+    clearSelection()
   }
 
   const selectScope = (next: number): void => {
@@ -231,17 +253,57 @@ export const PullsReviewPanel = (props: PullsReviewPanelProps): ReactNode => {
                 </span>
               </div>
 
+              <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:text-[11px]">
+                <label className="dshx:flex dshx:items-center dshx:gap-1">
+                  <input
+                    type="checkbox"
+                    aria-label="Select all files in this scope"
+                    checked={ListSelectionModel.isComplete({ state: selection, orderedIds: scopePaths })}
+                    onChange={() => setSelection(current => ListSelectionModel.toggleAllVisible({ state: current, orderedIds: scopePaths }))}
+                    className="dshx:size-3.5 dshx:accent-[var(--color-info)]"
+                  />
+                  Select all
+                </label>
+                <span className="dshx:text-muted-foreground">Shift-click extends, Cmd/Ctrl-click toggles</span>
+                {selection.ids.length === 0 ? null : (
+                  <span className="dshx:ml-auto dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-1">
+                    <span className="dshx:mr-1 dshx:tabular-nums">{selection.ids.length} selected</span>
+                    <Button size="xs" variant="secondary" onClick={() => applyReviewed(true)}>
+                      Mark selected reviewed
+                    </Button>
+                    <Button size="xs" variant="ghost" onClick={() => applyReviewed(false)}>
+                      Mark selected unreviewed
+                    </Button>
+                    <Button size="xs" variant="ghost" onClick={clearSelection}>
+                      Clear
+                    </Button>
+                  </span>
+                )}
+              </div>
+
               <ul className="dshx:flex dshx:max-h-40 dshx:flex-col dshx:gap-0.5 dshx:overflow-auto">
                 {scope.filePaths.map(path => {
                   const file = statsByPath.get(path)
                   const isReviewed = reviewedPaths.has(path)
+                  const isSelected = selectedPaths.has(path)
                   return (
-                    <li key={path}>
+                    <li key={path} className={cn(isSelected && 'dshx:rounded-md dshx:bg-info/8')}>
                       <Button
                         variant="ghost"
                         size="sm"
+                        title="Click to mark reviewed; Shift-click selects a range; Cmd/Ctrl-click toggles the selection"
                         className="dshx:w-full dshx:justify-start dshx:gap-2 dshx:font-mono dshx:text-[11px]"
-                        onClick={() => markReviewed(path)}
+                        onClick={event => {
+                          if (event.shiftKey) {
+                            extendPath(path)
+                            return
+                          }
+                          if (event.metaKey || event.ctrlKey) {
+                            togglePath(path)
+                            return
+                          }
+                          markReviewed(path)
+                        }}
                       >
                         <span
                           aria-hidden

@@ -16,6 +16,11 @@ describe('reviewed marks', () => {
     expect(ReviewedMarksModel.toggle(['b.ts'], 'a.ts')).toEqual(['b.ts', 'a.ts'])
   })
 
+  it('marks and unmarks a batch without duplicating or dropping other paths', () => {
+    expect(ReviewedMarksModel.mark(['a.ts'], ['b.ts', 'a.ts'])).toEqual(['a.ts', 'b.ts'])
+    expect(ReviewedMarksModel.unmark(['a.ts', 'b.ts', 'c.ts'], ['b.ts', 'missing.ts'])).toEqual(['a.ts', 'c.ts'])
+  })
+
   it('keeps the record bounded and evicts the least recently touched key', () => {
     let record: Record<string, string[]> = {}
     for (let index = 0; index < MAX_REVIEWED_KEYS + 3; index++) record = ReviewedMarksModel.record(record, `key-${index}`, ['a.ts'])
