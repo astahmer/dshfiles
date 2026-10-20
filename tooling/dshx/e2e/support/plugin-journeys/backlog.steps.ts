@@ -3,11 +3,10 @@ import { Then, When } from '../bdd.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
 import { StartupDialogs } from '../../../packages/dshx/src/project/startup-dialogs.js'
 
-const feed = (page: Page) => page.getByRole('list', { name: 'Backlog feed' })
-const row = (page: Page, title: string) =>
-  feed(page)
-    .getByRole('listitem', { name: /^Item b:/ })
-    .filter({ hasText: title })
+const feed = (page: Page) => page.getByRole('feed', { name: 'Backlog feed' })
+const feedItems = (page: Page) => feed(page).getByRole('article', { name: /^Item b:/ })
+const searchResults = (page: Page) => page.getByRole('list', { name: 'Search results' })
+const row = (page: Page, title: string) => feedItems(page).filter({ hasText: title })
 const peek = (page: Page) => page.getByRole('complementary', { name: 'Item detail' })
 
 When('the Backlog panel is opened', async ({ page }: { page: Page }) => {
@@ -34,11 +33,7 @@ Then('the feed shows {string} as a bug in the inbox', async ({ page }: { page: P
     await item.click()
     await expect(peek(page).getByRole('button', { name: /^Kind of b:/ })).toContainText('Bug')
     await expect(peek(page).getByRole('button', { name: /^Status of b:/ })).toContainText('Inbox')
-    await expect(
-      feed(page)
-        .getByRole('listitem', { name: /^Item b:/ })
-        .first(),
-    ).toContainText('weekly digest of dormant items')
+    await expect(feedItems(page).last()).toContainText('weekly digest of dormant items')
   })
 })
 
@@ -48,14 +43,14 @@ When('the backlog is searched for {string}', async ({ page }: { page: Page }, qu
 
 Then('the feed lists only {string}', async ({ page }: { page: Page }, title: string) => {
   await recordAssertion(page, 'backlog-search', async () => {
-    await expect(feed(page).getByRole('listitem', { name: /^Item b:/ })).toHaveCount(1)
-    await expect(feed(page)).toContainText(title)
+    await expect(searchResults(page).getByRole('listitem', { name: /^Item b:/ })).toHaveCount(1)
+    await expect(searchResults(page)).toContainText(title)
   })
   await finishJourneyAssertions(page)
 })
 
 When('item b:{int} is moved to In progress on the board', async ({ page }: { page: Page }, id: number) => {
-  await page.getByRole('radio', { name: 'Board', exact: true }).click()
+  await page.getByRole('button', { name: 'Board', exact: true }).click()
   await page
     .getByRole('article', { name: `Card b:${String(id)}` })
     .getByRole('button', { name: `Status of b:${String(id)}` })
@@ -71,9 +66,9 @@ Then('the In progress column holds {string}', async ({ page }: { page: Page }, t
 })
 
 When('backlog item b:{int} is opened', async ({ page }: { page: Page }, id: number) => {
-  await page.getByRole('radio', { name: 'List', exact: true }).click()
+  await page.getByRole('button', { name: 'Feed', exact: true }).click()
   await feed(page)
-    .getByRole('listitem', { name: `Item b:${String(id)}`, exact: true })
+    .getByRole('article', { name: `Item b:${String(id)}`, exact: true })
     .click()
   await expect(peek(page)).toContainText(`b:${String(id)}`)
 })
@@ -94,7 +89,9 @@ When('the backlink to b:{int} is followed', async ({ page }: { page: Page }, id:
 Then('its activity records the move {string} by the user', async ({ page }: { page: Page }, move: string) => {
   await recordAssertion(page, 'backlog-activity-history', async () => {
     const activity = peek(page).getByRole('list', { name: 'Activity' })
-    await expect(activity).toContainText(`You moved it ${move}`)
+    // Runs of same-actor changes fold into "made N changes" until opened.
+    await activity.getByRole('button', { name: /made \d+ changes/ }).click()
+    await expect(activity).toContainText(`moved it ${move}`)
   })
   await finishJourneyAssertions(page)
 })

@@ -194,6 +194,8 @@ export const FeedView = (props: {
       )}
       <div
         ref={scroller}
+        role="feed"
+        aria-label="Backlog feed"
         onScroll={event => {
           const element = event.currentTarget
           atBottom.current = element.scrollHeight - element.scrollTop - element.clientHeight < 80
