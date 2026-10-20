@@ -5,15 +5,15 @@ import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@dshfiles/plugin-ui/components/ui/tabs'
 import { useMachine } from '@dshfiles/plugin-ui/machine'
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
-import type { ComposerActionProps } from '@dshfiles/dshx/client'
-import { areRecentPromptsEqual, MAX_RECENT_PROMPTS, MAX_RECENT_SCAN_NODES, projectRecentPrompts } from './recent-prompts.js'
+import { areRecentPromptsEqual, MAX_RECENT_PROMPTS, type RecentPrompt } from './recent-prompts.js'
+import { ChatSource, selectRecentPrompts, type PromptActionProps } from './recent-prompts-source.js'
 import { MAX_PROMPTS, MAX_PROMPT_TEXT_LENGTH, type SavedPrompt } from './library.js'
 import { usePromptLibrary, type PromptLibraryClient } from './library-client.js'
 import { PromptEditorForm, type PromptEditorSubmission } from './prompt-editor-form.js'
 import { promptLibraryMachine, type PromptLibraryWorkflowClient } from './prompt-library-machine.js'
 import { PromptDrafts } from './draft-store.js'
 
-const PromptStashAction = (props: ComposerActionProps): JSX.Element => {
+const PromptStashAction = (props: PromptActionProps): JSX.Element => {
   const input = props.useInput(state => state)
   const [activeSource, setActiveSource] = useState<'saved' | 'recent'>('saved')
   const libraryClientRef = useRef<PromptLibraryClient | null>(null)
@@ -65,22 +65,7 @@ const PromptStashAction = (props: ComposerActionProps): JSX.Element => {
     referenceCount: input.occurrences.length,
   })
   const currentPromptSaveDisabled = currentDraftBlock !== null || input.draft.length > MAX_PROMPT_TEXT_LENGTH || prompts.length >= MAX_PROMPTS
-  const recentPrompts = props.useChat(chat => {
-    const newestFirstNodes = {
-      *[Symbol.iterator]() {
-        let index = chat.order.length - 1
-        let scanned = 0
-        while (index >= 0 && scanned < MAX_RECENT_SCAN_NODES) {
-          const key = chat.order[index]
-          if (key !== undefined) yield chat.nodes.get(key)
-          index -= 1
-          scanned += 1
-        }
-      },
-    }
-
-    return projectRecentPrompts(newestFirstNodes)
-  }, areRecentPromptsEqual)
+  const [recentPrompts, setRecentPrompts] = useState<readonly RecentPrompt[]>([])
   const triggerId = useId()
 
   const openLibrary = (): void => {
@@ -134,6 +119,9 @@ const PromptStashAction = (props: ComposerActionProps): JSX.Element => {
         className="dshx-root dshx:flex dshx:max-h-(--radix-popover-content-available-height) dshx:w-[26rem] dshx:flex-col dshx:overflow-y-auto dshx:p-0"
         aria-labelledby={triggerId}
       >
+        {props.useChat === undefined ? null : (
+          <ChatSource useChat={props.useChat} selector={selectRecentPrompts} isEqual={areRecentPromptsEqual} onChange={setRecentPrompts} />
+        )}
         <Tabs value={activeSource} onValueChange={value => setActiveSource(value === 'recent' ? 'recent' : 'saved')} className="dshx:gap-0">
           <div className="dshx:flex dshx:items-start dshx:justify-between dshx:gap-3 dshx:px-3 dshx:pt-3">
             <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-0.5">

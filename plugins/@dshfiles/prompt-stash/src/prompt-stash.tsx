@@ -3,12 +3,13 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from '@dshfiles/plugin-ui/components/ui/command'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import type {} from '@deepseek-ai/dsh-client-ui-chat/client'
 import type { ComposerActionProps } from '@dshfiles/dshx/client'
 import { useDraftAttachmentRetention, type DraftAttachmentKeeper } from './draft-attachment-retention.js'
 import { MAX_SENT_PROMPTS, PromptDrafts, type DraftSaveBlock, type SavedDraft, type SentPrompt } from './draft-store.js'
 import { useSavedDrafts } from './draft-client.js'
+import { areSentPromptsEqual, ChatSource, selectSentPrompts, type PromptActionProps } from './recent-prompts-source.js'
 
 const draftBlockMessage = {
   'rich-content': 'Remove reference chips and attachments before saving a text-only draft.',
@@ -20,36 +21,23 @@ const draftBlockMessage = {
 const previewText = (text: string): string => text.replace(/\s+/g, ' ').trim().slice(0, 180)
 
 export const PromptStashAction = (
-  props: ComposerActionProps & { readonly attachmentKeeper: DraftAttachmentKeeper<ComposerActionProps['sessionId']> },
+  props: PromptActionProps & { readonly attachmentKeeper: DraftAttachmentKeeper<ComposerActionProps['sessionId']> },
 ): JSX.Element => {
   const input = props.useInput(state => state)
   useDraftAttachmentRetention({ keeper: props.attachmentKeeper, sessionId: props.sessionId, count: input.attachmentIds.length })
-  const chatOrder = props.useChat(state => state.order)
-  const chatNodes = props.useChat(state => state.nodes)
   const savedDrafts = useSavedDrafts()
   const [isOpen, setIsOpen] = useState(false)
   const [title, setTitle] = useState('')
   const [message, setMessage] = useState('')
   const [insertionSpan, setInsertionSpan] = useState<ReturnType<ComposerActionProps['inputActions']['captureInsertion']> | null>(null)
+  const [sentPrompts, setSentPrompts] = useState<readonly SentPrompt[]>([])
   const block = PromptDrafts.saveBlock({
     phase: input.phase,
     text: input.draft,
     attachmentCount: input.attachmentIds.length,
     referenceCount: input.occurrences.length,
   })
-  const sentPrompts = useMemo(
-    () =>
-      chatOrder
-        .flatMap(key => {
-          const node = chatNodes.get(key)
-          if (node?.kind !== 'user') return []
-          const prompt = PromptDrafts.sentPromptFromNode(node.data)
-          return prompt === null ? [] : [prompt]
-        })
-        .slice(-MAX_SENT_PROMPTS)
-        .reverse(),
-    [chatNodes, chatOrder],
-  )
+  const sentPromptRows = sentPrompts.slice(0, MAX_SENT_PROMPTS)
 
   const changeOpen = (next: boolean): void => {
     setMessage('')
@@ -132,6 +120,9 @@ export const PromptStashAction = (
         className="dshx-root dshx:flex dshx:max-h-(--radix-popover-content-available-height) dshx:w-96 dshx:flex-col dshx:gap-0 dshx:overflow-y-auto dshx:p-0"
         aria-label="Saved prompt drafts"
       >
+        {props.useChat === undefined ? null : (
+          <ChatSource useChat={props.useChat} selector={selectSentPrompts} isEqual={areSentPromptsEqual} onChange={setSentPrompts} />
+        )}
         <div className="dshx:flex dshx:flex-col dshx:gap-1 dshx:px-3 dshx:pt-3 dshx:pb-2">
           <h2 className="dshx:text-sm dshx:font-semibold">Saved drafts</h2>
           <p className="dshx:text-xs dshx:text-muted-foreground">Shared through the Host. Text drafts only; references and files stay in the composer.</p>
@@ -185,10 +176,10 @@ export const PromptStashAction = (
             </CommandGroup>
             <CommandSeparator />
             <CommandGroup heading="Sent prompts in this session" aria-label="Sent prompt history">
-              {sentPrompts.length === 0 ? (
+              {sentPromptRows.length === 0 ? (
                 <p className="dshx:px-2 dshx:py-1.5 dshx:text-xs dshx:text-muted-foreground">No sent text prompts are loaded for this session.</p>
               ) : null}
-              {sentPrompts.map(prompt => (
+              {sentPromptRows.map(prompt => (
                 <CommandItem
                   key={prompt.id}
                   value={`sent-${prompt.id} ${prompt.text}`}
