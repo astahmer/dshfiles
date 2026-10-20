@@ -1,7 +1,11 @@
 import type { ThreadSessionActivity } from './thread-rebase-eligibility.js'
 
-/** `empty` never landed anything; `integrated` landed at least once and has nothing left above the bookmark. */
-export type CleanupKind = 'empty' | 'integrated'
+/**
+ * `empty` never landed anything; `integrated` landed at least once and has nothing left above the bookmark;
+ * `untracked` is a threads-directory entry no jj workspace owns.
+ */
+export type CleanupKind = 'empty' | 'integrated' | 'untracked'
+type WorkspaceKind = Exclude<CleanupKind, 'untracked'>
 
 export type CleanupSkipReason = 'has-work' | 'busy' | 'activity-unknown' | 'queued' | 'too-recent' | 'kind-excluded'
 
@@ -16,7 +20,7 @@ export interface CleanupThread {
 }
 
 export type CleanupDecision =
-  | { readonly action: 'remove'; readonly kind: CleanupKind; readonly lastUsedAt: number }
+  | { readonly action: 'remove'; readonly kind: WorkspaceKind; readonly lastUsedAt: number }
   | { readonly action: 'skip'; readonly reason: CleanupSkipReason; readonly lastUsedAt: number }
 
 const lastUsedAt = (thread: CleanupThread): number => Math.max(0, ...thread.usedAt.filter(at => at !== undefined))
@@ -44,12 +48,23 @@ const decide = (input: {
     if (activity?.running === true || activity?.pendingUserQuestion === true) return skip('busy')
     if (activity?.running === undefined || activity.pendingUserQuestion === undefined) return skip('activity-unknown')
   }
-  const kind: CleanupKind = thread.rebasedAt === undefined ? 'empty' : 'integrated'
+  const kind: WorkspaceKind = thread.rebasedAt === undefined ? 'empty' : 'integrated'
   if (!input.kinds.includes(kind)) return skip('kind-excluded')
   if (input.now - usedAt < input.olderThanMs) return skip('too-recent')
   return { action: 'remove', kind, lastUsedAt: usedAt }
 }
 
+/** A folder can sit unregistered for a moment while a workspace is created, so a younger one is never untracked. */
+const UNTRACKED_MIN_AGE_MS = 60 * 60_000
+
+const isStaleUntracked = (input: {
+  readonly modifiedAt: number
+  readonly now: number
+  readonly olderThanMs: number
+  readonly kinds: readonly CleanupKind[]
+}): boolean => input.kinds.includes('untracked') && input.now - input.modifiedAt >= Math.max(input.olderThanMs, UNTRACKED_MIN_AGE_MS)
+
 export class WorkspaceCleanupModel {
   static readonly decide = decide
+  static readonly isStaleUntracked = isStaleUntracked
 }

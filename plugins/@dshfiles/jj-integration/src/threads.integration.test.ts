@@ -782,4 +782,24 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
       'described plan',
     )
   })
+
+  it('lists only threads-directory entries no workspace owns, even when a workspace folder was renamed', async () => {
+    const live = await threads.provision(repo)
+    const renamed = await threads.provision(repo)
+    const directory = ThreadWorkspaceModel.defaultThreadsDirectory(repo)
+    const movedPath = join(directory, 'thread-moved')
+    execFileSync('mv', [renamed.path, movedPath])
+    mkdirSync(join(directory, 'thread-forgotten'))
+    writeFileSync(join(directory, 'stray.log'), 'log\n')
+    writeFileSync(join(directory, '.metadata.json'), '{}')
+
+    const names = (await threads.untrackedEntries(repo)).map(entry => entry.name).sort()
+    expect(names).toEqual(['stray.log', 'thread-forgotten'])
+    expect(names).not.toContain(live.name)
+
+    await threads.removeUntrackedEntry({ repoRoot: repo, name: 'thread-forgotten' })
+    expect(existsSync(join(directory, 'thread-forgotten'))).toBe(false)
+    await expect(threads.removeUntrackedEntry({ repoRoot: repo, name: 'thread-moved' })).rejects.toThrow('belongs to a jj workspace')
+    expect(existsSync(movedPath)).toBe(true)
+  })
 })

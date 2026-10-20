@@ -92,14 +92,14 @@ const threadPathInput = z
   })
   .strict()
 
-const cleanupKindSchema = z.enum(['empty', 'integrated'])
+const cleanupKindSchema = z.enum(['empty', 'integrated', 'untracked'])
 
 const cleanupWorkspaceSchema = z
   .object({
     repoRoot: z.string(),
     name: z.string(),
     path: z.string(),
-    kind: cleanupKindSchema,
+    kind: z.enum(['empty', 'integrated']),
     lastUsedAt: z.number().int().nonnegative(),
     outcome: z.enum(['would-remove', 'removed', 'has-work', 'failed']),
     message: z.string().max(400).optional(),
@@ -114,11 +114,24 @@ const cleanupSkippedSchema = z
   })
   .strict()
 
+const cleanupUntrackedSchema = z
+  .object({
+    repoRoot: z.string(),
+    name: z.string(),
+    path: z.string(),
+    modifiedAt: z.number().int().nonnegative(),
+    outcome: z.enum(['would-remove', 'removed', 'failed']),
+    message: z.string().max(400).optional(),
+  })
+  .strict()
+
 const cleanupResultSchema = z
   .object({
     applied: z.boolean(),
     workspaces: z.array(cleanupWorkspaceSchema),
     skipped: z.array(cleanupSkippedSchema),
+    /** Threads-directory folders and files no jj workspace owns, such as forgotten workspaces and stray logs. */
+    untracked: z.array(cleanupUntrackedSchema),
     /** Empty, undescribed revisions nothing builds on, found (and abandoned when applied) after the workspaces went. */
     emptyRevisions: z.array(revisionSchema),
   })
@@ -133,6 +146,9 @@ const renderCleanup = (output: CleanupResult): string => {
   return [
     `${verb} ${String(removed.length)} thread workspace(s)${removed.length === 0 ? '' : `: ${removed.map(workspace => `${workspace.name} (${workspace.kind})`).join(', ')}`}.`,
     refused.length === 0 ? undefined : `Kept ${refused.map(workspace => `${workspace.name} (${workspace.message ?? workspace.outcome})`).join(', ')}.`,
+    output.untracked.length === 0
+      ? undefined
+      : `${verb} ${String(output.untracked.length)} untracked entr(ies): ${output.untracked.map(entry => (entry.outcome === 'failed' ? `${entry.name} (failed)` : entry.name)).join(', ')}.`,
     `${output.applied ? 'Abandoned' : 'Would abandon'} ${String(output.emptyRevisions.length)} dangling empty revision(s).`,
     output.skipped.length === 0
       ? undefined
@@ -346,13 +362,13 @@ export const jjIntegrationApi = defineApi({
             .int()
             .min(0)
             .max(24 * 90),
-          kinds: z.array(cleanupKindSchema).min(1).max(2),
+          kinds: z.array(cleanupKindSchema).min(1).max(3),
           apply: z.boolean(),
         })
         .strict(),
       output: cleanupResultSchema,
       description:
-        'Remove idle thread workspaces in one pass, then abandon the empty undescribed revisions nothing builds on. A workspace qualifies when it holds no unlanded revision, no live Session in it is working, waiting for an answer or unreadable, no integration is queued, its kind is listed (empty: never landed; integrated: landed and nothing left), and it was last used longer ago than olderThanHours. Never forces: unlanded work is always kept, and a later turn in a removed thread checks a fresh workspace out from the bookmark. apply: false previews; call with apply: true only when the user asked to clean up.',
+        'Remove idle thread workspaces in one pass, then abandon the empty undescribed revisions nothing builds on. A workspace qualifies when it holds no unlanded revision, no live Session in it is working, waiting for an answer or unreadable, no integration is queued, its kind is listed (empty: never landed; integrated: landed and nothing left), and it was last used longer ago than olderThanHours. Kind untracked also deletes threads-directory folders and files no jj workspace owns that were not modified for olderThanHours (at least one hour). Never forces: unlanded work is always kept, and a later turn in a removed thread checks a fresh workspace out from the bookmark. apply: false previews; call with apply: true only when the user asked to clean up.',
       tool: { name: 'jj_thread_cleanup', render: renderCleanup },
     }),
   },

@@ -283,6 +283,13 @@ row's own Remove does (never forced) and abandons the empty, undescribed
 revisions nothing builds on: no working copy, bookmark, tag or revision with
 content or a description descends from them, so no live workspace is rewritten.
 
+**Untracked folders** also deletes threads-directory folders and files no jj
+workspace owns (forgotten workspaces, stray logs, recovery copies) that were not
+modified for the chosen time, never under an hour. Dotfiles (the plugin's own
+metadata) stay. An entry counts as owned when its name matches a workspace, it
+is jj's recorded root, or a working `.jj` sits inside it: a renamed workspace
+folder leaves jj's recorded root stale.
+
 A workspace is kept when it holds unlanded revisions, a non-archived Session in
 it is working, waiting for an answer or its activity cannot be read, or an
 integration is queued. "Last used" is the latest of its working-copy commit

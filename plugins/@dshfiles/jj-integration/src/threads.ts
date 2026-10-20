@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
 import { existsSync, readFileSync, statSync } from 'node:fs'
-import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
+import { lstat, mkdir, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { basename, dirname, join, resolve } from 'node:path'
 import { promisify } from 'node:util'
@@ -106,6 +106,12 @@ export interface VerifiedLandOptions {
   readonly expectedSourceRevision: string
   readonly authorize: (location: ThreadLocation) => Promise<boolean>
   readonly verifyCandidate: (candidate: LandCandidate) => Promise<LandCandidateVerification>
+}
+
+export interface UntrackedEntry {
+  readonly name: string
+  readonly path: string
+  readonly modifiedAt: number
 }
 
 export type DiscardOutcome = { readonly status: 'discarded' } | { readonly status: 'has-work'; readonly revisions: readonly ThreadRevision[] }
@@ -1380,6 +1386,50 @@ export const createThreads = (options: {
       return found
     })
 
+  /**
+   * Whether an entry of the threads directory belongs to a live jj workspace. jj's recorded root goes stale when a
+   * workspace folder is renamed, so a match on the name, the recorded root, or a working `.jj` inside it all count.
+   */
+  const ownedByWorkspace = async (repoRoot: string): Promise<(path: string) => Promise<boolean>> => {
+    const listed = (await jj(['--ignore-working-copy', 'workspace', 'list', '-T', 'name ++ "\\t" ++ self.root() ++ "\\n"'], repoRoot))
+      .split('\n')
+      .filter(line => line.length > 0)
+      .map(line => line.split('\t'))
+    const names = new Set(listed.map(([name = '']) => name))
+    const roots = new Set(listed.map(([, root = '']) => root))
+    return async path => {
+      if (names.has(basename(path)) || roots.has(path)) return true
+      if (!existsSync(join(path, '.jj'))) return false
+      return (await execute(['--ignore-working-copy', 'workspace', 'root'], path)).exitCode === 0
+    }
+  }
+
+  /** Entries of the threads directory that no jj workspace owns: folders of forgotten workspaces, stray logs, recovery copies. */
+  const untrackedEntries = async (repoRoot: string): Promise<readonly UntrackedEntry[]> => {
+    const directory = options.threadsDirectory(repoRoot)
+    const [isOwned, entries] = await Promise.all([ownedByWorkspace(repoRoot), readdir(directory, { withFileTypes: true }).catch(() => [])])
+    const untracked: UntrackedEntry[] = []
+    for (const entry of entries) {
+      const path = join(directory, entry.name)
+      if (entry.name.startsWith('.') || (await isOwned(path))) continue
+      const modifiedAt = await lstat(path).then(
+        stats => stats.mtimeMs,
+        () => undefined,
+      )
+      if (modifiedAt !== undefined) untracked.push({ name: entry.name, path, modifiedAt: Math.round(modifiedAt) })
+    }
+    return untracked
+  }
+
+  const removeUntrackedEntry = (input: { readonly repoRoot: string; readonly name: string }): Promise<void> =>
+    serialized(input.repoRoot, async () => {
+      if (input.name.includes('/') || input.name.startsWith('.')) throw new ThreadError('unsafe-path', `Refusing to remove ${input.name}.`)
+      const path = join(options.threadsDirectory(input.repoRoot), input.name)
+      if (await (await ownedByWorkspace(input.repoRoot))(path)) throw new ThreadError('unsafe-path', `${input.name} belongs to a jj workspace now.`)
+      await rm(path, { recursive: true, force: true })
+      await gitWorktrees(input.repoRoot, ['prune'])
+    })
+
   /** Local bookmarks, and the nearest one the workspace at `path` builds on. */
   const bookmarks = async (path: string): Promise<{ readonly current: string | null; readonly names: readonly string[] }> => {
     const [listed, nearest] = await Promise.all([
@@ -1451,6 +1501,8 @@ export const createThreads = (options: {
     discard,
     workingCopyChangedAt,
     danglingEmptyRevisions,
+    untrackedEntries,
+    removeUntrackedEntry,
     bookmarks,
     workingCopyCommitId,
     revisionGraph,

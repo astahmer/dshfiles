@@ -67,4 +67,12 @@ describe('WorkspaceCleanupModel.decide', () => {
       }),
     ).toMatchObject({ action: 'skip', reason: 'kind-excluded' })
   })
+
+  it('treats an untracked entry as stale only past the threshold and never younger than an hour', () => {
+    const kinds = ['untracked'] as const
+    expect(WorkspaceCleanupModel.isStaleUntracked({ modifiedAt: now - 2 * HOUR, now, olderThanMs: HOUR, kinds })).toBe(true)
+    expect(WorkspaceCleanupModel.isStaleUntracked({ modifiedAt: now - 2 * HOUR, now, olderThanMs: 6 * HOUR, kinds })).toBe(false)
+    expect(WorkspaceCleanupModel.isStaleUntracked({ modifiedAt: now - 30 * 60_000, now, olderThanMs: 0, kinds })).toBe(false)
+    expect(WorkspaceCleanupModel.isStaleUntracked({ modifiedAt: 0, now, olderThanMs: 0, kinds: ['empty'] })).toBe(false)
+  })
 })

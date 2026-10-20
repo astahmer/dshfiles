@@ -824,6 +824,7 @@ const cleanupWorkspaces = async (input: {
   const workspaces: CleanupResult['workspaces'] = []
   const skipped: CleanupResult['skipped'] = []
   const emptyRevisions: CleanupResult['emptyRevisions'] = []
+  const untracked: CleanupResult['untracked'] = []
   for (const repository of repositories) {
     if (scopedRepoRoot !== undefined && repository.repoRoot !== scopedRepoRoot) continue
     const changedAt = await active.workingCopyChangedAt(repository.repoRoot).catch(() => new Map<string, number>())
@@ -860,6 +861,22 @@ const cleanupWorkspaces = async (input: {
         workspaces.push({ ...row, outcome: 'failed', message: (error instanceof Error ? error.message : String(error)).slice(0, 400) })
       }
     }
+    const entries = input.kinds.includes('untracked') ? await active.untrackedEntries(repository.repoRoot).catch(() => []) : []
+    for (const entry of entries) {
+      if (!WorkspaceCleanupModel.isStaleUntracked({ modifiedAt: entry.modifiedAt, now, olderThanMs: input.olderThanHours * HOUR_MS, kinds: input.kinds }))
+        continue
+      const row = { repoRoot: repository.repoRoot, name: entry.name, path: entry.path, modifiedAt: entry.modifiedAt }
+      if (!input.apply) {
+        untracked.push({ ...row, outcome: 'would-remove' })
+        continue
+      }
+      try {
+        await active.removeUntrackedEntry({ repoRoot: repository.repoRoot, name: entry.name })
+        untracked.push({ ...row, outcome: 'removed' })
+      } catch (error) {
+        untracked.push({ ...row, outcome: 'failed', message: (error instanceof Error ? error.message : String(error)).slice(0, 400) })
+      }
+    }
     const found = await active.danglingEmptyRevisions({ repoRoot: repository.repoRoot, abandon: input.apply }).catch((error: unknown) => {
       hostContext?.logger.warn(
         'jj-integration: could not clear empty revisions in %s: %s',
@@ -875,11 +892,11 @@ const cleanupWorkspaces = async (input: {
     const removed = workspaces.filter(workspace => workspace.outcome === 'removed').length
     emitActivity({
       type: 'workspace.cleaned',
-      summary: `Cleaned up ${String(removed)} thread workspace(s) and ${String(emptyRevisions.length)} empty revision(s)`,
+      summary: `Cleaned up ${String(removed)} thread workspace(s), ${String(untracked.filter(entry => entry.outcome === 'removed').length)} untracked entr(ies) and ${String(emptyRevisions.length)} empty revision(s)`,
       path: scopedRepoRoot ?? '',
     })
   }
-  return { applied: input.apply, workspaces, skipped, emptyRevisions }
+  return { applied: input.apply, workspaces, skipped, untracked, emptyRevisions }
 }
 
 const sweepFinishedThreads = async (): Promise<void> => {
