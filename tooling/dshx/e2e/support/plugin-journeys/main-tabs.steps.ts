@@ -415,32 +415,35 @@ When('the Workbench is kept as a tab and "+" is pressed', async ({ page }: { pag
   await newTabButton(page).click()
 })
 
-Then('a Start tab follows the Workbench and suggests a new thread, the panels and Settings', async ({ page }: { page: Page }) => {
-  await recordAssertion(page, 'main-tabs-plus-opens-start-page', async () => {
-    await expect.poll(() => tabSummary(page)).toEqual(['Workbench', 'Start*'])
-    await expect(page.getByRole('heading', { name: 'Workbench', exact: true })).toBeHidden()
-    const names = await suggestionNames(page)
-    expect(names[0]).toBe('New thread')
-    expect(names).toEqual(expect.arrayContaining(['Plugins', 'Jujutsu', 'Workbench']))
-    expect(names.at(-1)).toBe('Settings')
-    await expect(suggestion(page, 'New thread')).toHaveAttribute('aria-keyshortcuts', /.+/)
-    await expect(suggestion(page, 'Settings')).toHaveAttribute('aria-keyshortcuts', /.+/)
-    await expect(suggestion(page, 'New thread')).toBeFocused()
+Then(
+  'a Start tab follows the Workbench with its search input focused and suggestions for a new thread, panels and Settings',
+  async ({ page }: { page: Page }) => {
+    await recordAssertion(page, 'main-tabs-plus-opens-start-page', async () => {
+      await expect.poll(() => tabSummary(page)).toEqual(['Workbench', 'Start*'])
+      await expect(page.getByRole('heading', { name: 'Workbench', exact: true })).toBeHidden()
+      const names = await suggestionNames(page)
+      expect(names[0]).toBe('New thread')
+      expect(names).toEqual(expect.arrayContaining(['Plugins', 'Jujutsu', 'Workbench']))
+      expect(names.at(-1)).toBe('Settings')
+      await expect(suggestion(page, 'New thread')).toHaveAttribute('aria-keyshortcuts', /.+/)
+      await expect(suggestion(page, 'Settings')).toHaveAttribute('aria-keyshortcuts', /.+/)
+      await expect(page.getByRole('combobox', { name: 'Search tabs and panels' })).toBeFocused()
 
-    const originalViewport = page.viewportSize()
-    if (originalViewport === null) throw new Error('Expected a fixed browser viewport')
-    await page.setViewportSize({ width: 1280, height: originalViewport.height })
-    await expect.poll(() => startPageColumnCount(page)).toBe(2)
-    await page.setViewportSize({ width: 480, height: originalViewport.height })
-    await expect.poll(() => startPageColumnCount(page)).toBe(1)
-    await page.setViewportSize(originalViewport)
-  })
-})
+      const originalViewport = page.viewportSize()
+      if (originalViewport === null) throw new Error('Expected a fixed browser viewport')
+      await page.setViewportSize({ width: 1280, height: originalViewport.height })
+      await expect.poll(() => startPageColumnCount(page)).toBe(2)
+      await page.setViewportSize({ width: 480, height: originalViewport.height })
+      await expect.poll(() => startPageColumnCount(page)).toBe(1)
+      await page.setViewportSize(originalViewport)
+    })
+  },
+)
 
-When('the arrow keys move to Jujutsu and Enter picks it', async ({ page }: { page: Page }) => {
-  const names = await suggestionNames(page)
-  for (let step = 0; step < names.indexOf('Jujutsu'); step++) await page.keyboard.press('ArrowDown')
-  await expect(suggestion(page, 'Jujutsu')).toBeFocused()
+When('Jujutsu is typed into the Start search and Enter picks it', async ({ page }: { page: Page }) => {
+  const search = page.getByRole('combobox', { name: 'Search tabs and panels' })
+  await search.fill('Jujutsu')
+  await expect(suggestion(page, 'Jujutsu')).toHaveAttribute('aria-selected', 'true')
   await page.keyboard.press('Enter')
 })
 
@@ -455,7 +458,7 @@ When('a new tab is opened from the keyboard and Settings is picked', async ({ pa
   await page.keyboard.press(`${primary()}+Alt+KeyT`)
   await expect(tab(page, 'Start')).toHaveAttribute('aria-selected', 'true')
   await page.keyboard.press('End')
-  await expect(suggestion(page, 'Settings')).toBeFocused()
+  await expect(suggestion(page, 'Settings')).toHaveAttribute('aria-selected', 'true')
   await page.keyboard.press('Enter')
 })
 

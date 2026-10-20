@@ -52,8 +52,8 @@ Feature: Main view tabs
   Scenario: "+" opens a Start page whose suggestions take its place
     Given the isolated plugin composition of "@dshfiles/main-tabs, @dshfiles/workbench, @dshfiles/jujutsu" is booted
     When the Workbench is kept as a tab and "+" is pressed
-    Then a Start tab follows the Workbench and suggests a new thread, the panels and Settings
-    When the arrow keys move to Jujutsu and Enter picks it
+    Then a Start tab follows the Workbench with its search input focused and suggestions for a new thread, panels and Settings
+    When Jujutsu is typed into the Start search and Enter picks it
     Then Jujutsu replaced the Start tab
     When a new tab is opened from the keyboard and Settings is picked
     Then Settings opens and the Start tab is gone
