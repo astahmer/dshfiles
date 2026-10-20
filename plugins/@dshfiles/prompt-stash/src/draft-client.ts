@@ -183,7 +183,8 @@ export const useSavedDrafts = (): SavedDraftsClient => {
     void refetchDrafts()
   }, [refetchDrafts])
 
-  const state: SavedDraftsState = query.data !== undefined ? 'ready' : query.isPending ? 'loading' : localDraftStorageAvailable ? 'ready' : 'unavailable'
+  const state: SavedDraftsState =
+    query.data === undefined && query.isPending ? 'loading' : query.data !== undefined || localDraftStorageAvailable ? 'ready' : 'unavailable'
 
   return { state, drafts: query.data?.drafts ?? localStore.drafts, save, remove, refresh }
 }

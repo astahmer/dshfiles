@@ -140,15 +140,10 @@ const editorSaveCompletion = (result: PromptOperationResult) => {
 }
 
 const currentSaveCompletion = (result: PromptOperationResult) => {
-  const notice =
-    result.kind === 'applied'
-      ? 'Current composer text saved as a prompt. The composer was not changed.'
-      : result.kind === 'limit'
-        ? 'The saved prompt limit was reached. Remove a prompt before saving another.'
-        : result.kind === 'conflict'
-          ? 'The prompt library changed elsewhere. Try saving again.'
-          : 'The saved library is unavailable. The composer text is unchanged.'
-  return { pendingCurrentText: null, notice }
+  if (result.kind === 'applied') return { pendingCurrentText: null, notice: 'Current composer text saved as a prompt. The composer was not changed.' }
+  if (result.kind === 'limit') return { pendingCurrentText: null, notice: 'The saved prompt limit was reached. Remove a prompt before saving another.' }
+  if (result.kind === 'conflict') return { pendingCurrentText: null, notice: 'The prompt library changed elsewhere. Try saving again.' }
+  return { pendingCurrentText: null, notice: 'The saved library is unavailable. The composer text is unchanged.' }
 }
 
 const deleteCompletion = (result: PromptOperationResult) => {

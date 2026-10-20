@@ -372,16 +372,9 @@ export const usePromptLibrary = (options: { readonly pollWhileOpen: boolean } = 
   )
   const refresh = useCallback(() => void refetchLibrary(), [refetchLibrary])
 
-  const state: PromptLibraryState =
-    query.data !== undefined
-      ? 'ready'
-      : query.isPending
-        ? 'loading'
-        : localStatus.read === 'invalid'
-          ? 'invalid'
-          : localStatus.read === 'unavailable' || !localStatus.writable
-            ? 'unavailable'
-            : 'ready'
+  const localState: PromptLibraryState =
+    localStatus.read === 'invalid' ? 'invalid' : localStatus.read === 'unavailable' || !localStatus.writable ? 'unavailable' : 'ready'
+  const state: PromptLibraryState = query.data !== undefined ? 'ready' : query.isPending ? 'loading' : localState
 
   const prompts = query.data?.prompts ?? localStore.prompts
   return useMemo<PromptLibraryClient>(
