@@ -112,16 +112,25 @@ export class InputTriggerController {
   /** Per-source lexicon unsubscribers (sources without the hook never enter). */
   private readonly lexiconOffs = new Map<InputTriggerSource, () => void>()
 
+  /** Whether the roster has been warmed; see `warmOnce`. */
+  private warmed = false
+
   constructor(private readonly deps: InputTriggerControllerDeps) {
-    // Scope-birth prewarm: sessions are always agent-backed, so the one-time
-    // roster warm here replaces the projection-transition watch — there are
-    // no capability steps to react to.
     const projection = this.project()
-    for (const src of deps.roster.all()) {
-      src.warm?.(projection)
-      this.watchLexicon(src, projection)
-    }
+    for (const src of deps.roster.all()) this.watchLexicon(src, projection)
     this.refreshLexicon()
+  }
+
+  /**
+   * Warm every source the first time the composer tracks a draft. A controller is born with each Session scope,
+   * i.e. on every thread switch, and warming there made each switch fetch every catalog (skills, commands) whether or
+   * not the reader ever typed a trigger.
+   */
+  private warmOnce(): void {
+    if (this.warmed) return
+    this.warmed = true
+    const projection = this.project()
+    for (const src of this.deps.roster.all()) src.warm?.(projection)
   }
 
   /**
@@ -134,6 +143,7 @@ export class InputTriggerController {
    */
   track(draft: string, caret: number, guard: TriggerGuard, draftRev: number): void {
     if (this.disposed) return
+    if (draft.length > 0) this.warmOnce()
     const launched = this.launcher.getSnapshot() !== null
     this.clearLauncher()
     const raw = detectTrigger(draft, caret, guard)
@@ -454,7 +464,7 @@ export class InputTriggerController {
    */
   sourceAdded(source: InputTriggerSource): void {
     const projection = this.project()
-    source.warm?.(projection)
+    if (this.warmed) source.warm?.(projection)
     this.watchLexicon(source, projection)
     this.refreshLexicon()
   }

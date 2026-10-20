@@ -11,6 +11,11 @@ machine-readable record (upstream package, pinned ref, path mapping, delta files
 | [`@dshfiles/frame-layout`](../plugins/@dshfiles/frame-layout)             | `@deepseek-ai/dsh-client-ui-layout`       | `c1b47e4` (0.2.0-rc.2) | `ui-layout`          | remembered column widths, right-column dock seat, bottom row                                            |
 | [`@dshfiles/session-controller`](../plugins/@dshfiles/session-controller) | `@deepseek-ai/dsh-api-session-controller` | `dsh-v0.2.1-rc.2`      | `session-controller` | `session/follow` without provider replay blocks; threads open on the latest Turn instead of 50 messages |
 
+[`@dshfiles/input-trigger`](../plugins/@dshfiles/input-trigger) also vendors a native package
+(`@deepseek-ai/dsh-client-ui-input-trigger`, `dsh-v0.2.0-rc.2` plus a 0.2.1-rc.2 port), but its relative imports were
+normalized to `.js`, so it is not byte-identical and has no `native-fork.json`; its delta and update policy live in
+its [`UPSTREAM.md`](../plugins/@dshfiles/input-trigger/UPSTREAM.md).
+
 ## Checking and updating
 
 ```sh
