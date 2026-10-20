@@ -5,6 +5,7 @@ import type {} from '@deepseek-ai/dsh-storage-domain'
 import type {} from '@deepseek-ai/dsh-subprocess'
 import type {} from '@deepseek-ai/dsh-experimental-speech-to-text'
 import type { ApiCaller } from '@dshfiles/dshx/api'
+import { SecretReferenceResolver } from '@dshfiles/credential-port'
 import { defineHost } from '@dshfiles/dshx/host'
 import type { SettingsScope } from '@dshfiles/dshx/settings'
 import { z } from 'zod'
@@ -14,7 +15,6 @@ import type { BacklogEvent, BacklogItem } from './item.js'
 import { BacklogModel, backlogDomain, backlogFileDomain, type BacklogActor, type BacklogStore } from './store.js'
 import { BacklogSignals } from './signals.js'
 import { BacklogTriage, type TriageQuestion, type TriageServices } from './triage.js'
-import { BacklogTriageKey } from './triage-key.js'
 
 interface OpenedBacklog {
   readonly store: BacklogStore
@@ -157,7 +157,11 @@ const JEV_ENV_KEY = 'TYPESAFE_API_KEY'
 
 /** The key Jev answers with, resolved on the Host from the bound reference or the environment. */
 const jevApiKey = async (ctx: Context, settings: BacklogSettings): Promise<string | undefined> =>
-  BacklogTriageKey.resolve({ referenceText: settings.jevSecret, values: ctx.get('secretCatalogValues'), environmentKey: process.env[JEV_ENV_KEY] })
+  SecretReferenceResolver.resolve({
+    referenceText: settings.jevSecret,
+    values: ctx.get('secretCatalogValues'),
+    environmentValue: process.env[JEV_ENV_KEY],
+  })
 
 const triageServices = async (ctx: Context, settings: BacklogSettings): Promise<TriageServices> => {
   const apiKey = settings.jevEnabled ? await jevApiKey(ctx, settings) : undefined

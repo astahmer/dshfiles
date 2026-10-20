@@ -78,7 +78,7 @@ const setup = (overrides: Partial<MemorySettings> = {}, embedder?: MemoryEmbedde
           text: 'Counted 5xx responses in the gateway log; the worker log shows 312 retries.\nUser asked about logs/api-gateway.log and logs/worker.log.',
         }
       },
-      jevKey: () => undefined,
+      jevKey: async () => undefined,
       embedder: async specifier => {
         if (embedder === undefined) throw new Error(`cannot load ${specifier}`)
         return embedder

@@ -47,7 +47,8 @@ export type MemoryServices = {
       | { readonly provider: string; readonly model: string; readonly input: number; readonly cacheRead: number; readonly output: number }
       | undefined
   }>
-  readonly jevKey: () => string | undefined
+  /** The Jev key, resolved on the Host from a bound Secret Catalog reference or the environment. */
+  readonly jevKey: () => Promise<string | undefined>
   /** The configured embedding provider, loaded once per specifier; rejects when it cannot load. */
   readonly embedder: (specifier: string) => Promise<MemoryEmbedder>
   readonly fetch?: typeof fetch | undefined
@@ -141,7 +142,7 @@ export const createMemoryRuntime = (options: {
   }
 
   const jevSignals = async (log: SessionLog): Promise<readonly Signal[]> => {
-    const apiKey = services.jevKey()
+    const apiKey = await services.jevKey()
     if (!options.settings().jevEnabled || apiKey === undefined) return []
     const signals: Signal[] = []
     const candidates = log.events
@@ -336,7 +337,7 @@ export const createMemoryRuntime = (options: {
   }
 
   const recallGate = async (firstUserText: string | undefined): Promise<boolean> => {
-    const apiKey = services.jevKey()
+    const apiKey = await services.jevKey()
     if (!options.settings().jevEnabled || apiKey === undefined || firstUserText === undefined) return true
     try {
       const verdict = await JevClassifier.ask({ question: 'recall', text: firstUserText, apiKey, fetch: services.fetch })

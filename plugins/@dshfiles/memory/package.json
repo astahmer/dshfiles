@@ -36,6 +36,7 @@
   "dependencies": {
     "@deepseek-ai/schemastery": "catalog:",
     "@dshfiles/ai-accounts": "workspace:*",
+    "@dshfiles/credential-port": "workspace:*",
     "@dshfiles/optmem-core": "workspace:*",
     "@dshfiles/plugin-ui": "workspace:*",
     "@dshfiles/shared-runtime": "workspace:*",

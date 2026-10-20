@@ -66,3 +66,24 @@ declare module '@deepseek-ai/cordis' {
     secretCatalogValues?: SecretCatalogValues
   }
 }
+
+/**
+ * The key a Host feature uses for an API: the bound reference when the setting holds one, otherwise the process
+ * environment variable it has always read. Resolving here keeps the value on the Host and gives every consumer one
+ * error vocabulary for a bad binding.
+ */
+export class SecretReferenceResolver {
+  static async resolve(input: {
+    readonly referenceText: string
+    readonly values: Pick<SecretCatalogValues, 'resolve'> | undefined
+    readonly environmentValue: string | undefined
+  }): Promise<string | undefined> {
+    const reference = parseSecretReference(input.referenceText)
+    if (reference !== null) {
+      if (input.values === undefined) throw new Error('The Secret Catalog plugin is not loaded, so the bound secret reference cannot be resolved.')
+      return input.values.resolve({ reference, cwd: null })
+    }
+    if (input.referenceText.trim() !== '') throw new Error('The bound key is not a secret:ALIAS or secret:ALIAS@env reference.')
+    return input.environmentValue === undefined || input.environmentValue === '' ? undefined : input.environmentValue
+  }
+}

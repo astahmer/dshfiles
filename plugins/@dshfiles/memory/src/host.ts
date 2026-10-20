@@ -12,6 +12,7 @@ import type {} from '@deepseek-ai/dsh-tools'
 import { createRouteResolver, type SummaryEffort } from '@dshfiles/optmem-core/summary-routes'
 import type { ApiCaller } from '@dshfiles/dshx/api'
 import { defineHost } from '@dshfiles/dshx/host'
+import { SecretReferenceResolver } from '@dshfiles/credential-port'
 import type { SettingsScope } from '@dshfiles/dshx/settings'
 
 import { z } from 'zod'
@@ -71,6 +72,8 @@ const workspaceScriptsFor = async (cwd: string | undefined): Promise<WorkspaceSc
   if (cwd === undefined) return null
   return ProjectScripts.ensure({ root: dshHomePath('plugins', 'memory', 'projects'), project: await projectPathFor(cwd) }).catch(() => null)
 }
+
+const TYPESAFE_ENV_KEY = 'TYPESAFE_API_KEY'
 
 const hostServices = (ctx: Context): MemoryServices => {
   const sessionQuery = () => {
@@ -210,10 +213,12 @@ const hostServices = (ctx: Context): MemoryServices => {
       loaded.catch(() => embedders.delete(specifier))
       return loaded
     },
-    jevKey: () => {
-      const key = process.env['TYPESAFE_API_KEY']
-      return key === undefined || key.length === 0 ? undefined : key
-    },
+    jevKey: async () =>
+      SecretReferenceResolver.resolve({
+        referenceText: currentSettings().jevSecret,
+        values: ctx.get('secretCatalogValues'),
+        environmentValue: process.env[TYPESAFE_ENV_KEY],
+      }),
   }
 }
 

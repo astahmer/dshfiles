@@ -54,8 +54,12 @@ export const memorySettings = defineSettings({
     jevEnabled: Schema.boolean()
       .default(false)
       .description(
-        "Ask TypeSafe's Jev classifier which user messages carry a durable signal and whether a new thread likely needs memory. Needs TYPESAFE_API_KEY in the Host environment; any failure falls back to the heuristics.",
+        "Ask TypeSafe's Jev classifier which user messages carry a durable signal and whether a new thread likely needs memory. Needs a key: bind one below, or set TYPESAFE_API_KEY in the Host environment. Any failure falls back to the heuristics.",
       ),
+    jevSecret: Schema.string()
+      .role('secret-ref')
+      .default('')
+      .description('Secret Catalog alias holding the TypeSafe key, written as secret:ALIAS or secret:ALIAS@env. The value never leaves the Host.'),
     jevThreshold: Schema.number().min(0).max(1).step(0.05).default(0.5).description('Jev probability above which a message counts as a signal.'),
     retrieval: Schema.union([
       Schema.const('bm25').description('BM25: full-text (word stems and identifier substrings)'),

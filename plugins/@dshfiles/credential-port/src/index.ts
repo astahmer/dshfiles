@@ -8,6 +8,7 @@ export {
   secretAliasSchema,
   secretEnvironmentSchema,
   secretReferenceSchema,
+  SecretReferenceResolver,
   type SecretCatalogValues,
   type SecretReference,
   type SecretReferenceResolution,

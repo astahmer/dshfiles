@@ -297,6 +297,24 @@ Client UI uses `@dshfiles/plugin-ui` (shadcn/ui on Tailwind v4); skills
   and a bulk destructive verb (forget, stop, remove) opens an explicit
   confirmation that names the count — it never runs from a bare click.
 
+### Credentials: store a reference, never a value
+
+DSH never echoes a secret value back, so a setting or form field cannot hold one
+and round-trip. Every credential-using feature stores `secret:ALIAS` (or
+`secret:ALIAS@env`) and resolves it on the Host:
+
+- The grammar, schemas and `SecretReferenceResolver` come from
+  `@dshfiles/credential-port`; bundle it in the Host entry
+  (`host.bundleDependencies`) and never restate the regex locally.
+- `ctx.get('secretCatalogValues').resolve({ reference, cwd })` is the only
+  value read. It never crosses to a Client; keep an environment-variable
+  fallback when the feature has one.
+- A field that should offer the vault is marked `data-secret-input="reference"`
+  (plain HTML) or, in a settings schema, `Schema.string().role('secret-ref')`.
+  Never import the Catalog's picker from another plugin.
+- See [docs/secret-references.md](docs/secret-references.md) for the contract and
+  `plugins/@dshfiles/secret-catalog/README.md` for the implementation.
+
 ## Shell command batching
 
 DSH's `bash` tool is exclusive: several `bash` calls in one turn run one after

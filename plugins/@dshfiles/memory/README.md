@@ -48,7 +48,7 @@ Message text is indexed with contentless FTS5 tables (the index only; the text s
 shapes, bearer tokens, `key=value` secrets and tokenized URLs are redacted before anything is indexed, digested,
 noted or returned, and an excerpt never shows tool output that names a credential file.
 
-Optional: TypeSafe's Jev (`jevEnabled`, `TYPESAFE_API_KEY`) flags user messages as durable signals at digest time and
+Optional: TypeSafe's Jev (`jevEnabled`; key from `jevSecret`, a Secret Catalog reference, else `TYPESAFE_API_KEY`) flags user messages as durable signals at digest time and
 gates whether a new thread gets thread pointers at all. Any failure falls back to the heuristics.
 
 Out of scope: promoting facts into AGENTS.md or skills, reading `~/.agents`, mid-thread injection, thread handoff.
