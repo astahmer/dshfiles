@@ -57,6 +57,10 @@ One search took 21 s to 1.4 min and stalled every other request (`modelCatalog`,
 | The search query scored, measured and built `snippet()` for every match (~100 000 for a common term)                                        | 8.4 s for `plugin` on the live index                         | rank first through FTS5's ordered `rank` scan (best 2 000), snippets for returned rows only                                            | session-search         |
 | The conversation filter read every matched document's row from a 1.1 GB index while the file cache is evicted (24 GB, ~100 MB free)         | cold `plugin` 2.9 s with filters, 1.2 s without              | `conversation_documents` FTS table for the 90 000 user/assistant messages both callers search                                          | session-search         |
 
+Result on live (2026-10-20, after the session-search and memory fixes, within one loaded page): the finder answers in
+12–54 ms and the worker's own search in 8–33 ms; a palette search shows results in 0.3–0.9 s including typing and the
+200 ms debounce. A replaced session no longer scans the index (slowest ingest pass after a restart 1.9 s, was 14.7 s).
+
 ## Still open
 
 - A Host's first open of a long thread decodes the whole Session log (69 MB compressed for the 26 MB thread): 1.4–1.7 s.
@@ -65,3 +69,5 @@ One search took 21 s to 1.4 min and stalled every other request (`modelCatalog`,
 - Native per-switch catalogs (`skills/list`, `commands/list`, `schedule/list`, `agentPresets/list`, `session/modelCatalog`)
   answer under 250 ms on a warm Host but still run on every switch: Host gap 69.
 - Main-thread work on open is ~0.6 s spread over many small tasks; no single leaf above 80 ms.
+- The first thread-content search after a Host restart waits ~10 s for the finder's first Session list and titles
+  (cold projection reads while plugins activate); later searches are warm.
