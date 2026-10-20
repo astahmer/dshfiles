@@ -1,5 +1,6 @@
 import { expect, type Page } from '@playwright/test'
 import { spawnSync } from 'node:child_process'
+import { existsSync, readFileSync } from 'node:fs'
 import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
@@ -7,6 +8,7 @@ import { fileURLToPath } from 'node:url'
 import { After, Then, When } from '../bdd.js'
 import { finishJourneyAssertions, openSettingsDialog, recordAssertion } from '../steps.js'
 import { selectModelForNewThread } from '../threads.js'
+import { z } from 'zod'
 
 interface ThreadRepository {
   readonly temporaryRoot: string
@@ -70,12 +72,31 @@ const descriptionOf = (repository: ThreadRepository, revset: string): string =>
     'description.first_line()',
   ]).trim()
 
-const workspaceNames = (repository: ThreadRepository): readonly string[] =>
-  jjAt(repository.repositoryPath, repository.temporaryRoot, ['--ignore-working-copy', 'workspace', 'list'])
+const spareRecords = z.record(z.string(), z.string())
+
+/** Workspaces the Host keeps checked out ahead of the next New thread; they are not a thread the journey asked for. */
+const prewarmedSpareNames = (repository: ThreadRepository): readonly string[] => {
+  const file = join(repository.threadsPath, '.dshfiles-spare-workspaces.json')
+  if (!existsSync(file)) return []
+  try {
+    // The Host records a spare when it is ready; a half-written record must not fail a workspace assertion.
+    const parsed = spareRecords.safeParse(JSON.parse(readFileSync(file, 'utf8')))
+    return parsed.success ? Object.values(parsed.data) : []
+  } catch {
+    return []
+  }
+}
+
+/** A provisioned thread can itself be recorded as this project's spare, so a journey names what it still expects. */
+const workspaceNames = (repository: ThreadRepository, keep: readonly string[] = []): readonly string[] => {
+  const spares = new Set(prewarmedSpareNames(repository).filter(name => !keep.includes(name)))
+  return jjAt(repository.repositoryPath, repository.temporaryRoot, ['--ignore-working-copy', 'workspace', 'list'])
     .split('\n')
     .filter(line => line.includes(':'))
     .map(line => line.slice(0, line.indexOf(':')))
+    .filter(name => !spares.has(name))
     .sort()
+}
 
 const provisionedThreadName = (page: Page): string => {
   const threadName = provisionedThreads.get(page)
@@ -435,7 +456,7 @@ Then('the message is delivered from its new thread workspace', async ({ page }: 
     await expect(page.getByRole('status', { name: /^thread-/ })).toHaveCount(0)
     const threadName = await currentHeaderThreadName(page)
     expect(threadName).toMatch(/^thread-/)
-    await expect.poll(() => workspaceNames(repository)).toEqual(['default', threadName].sort())
+    await expect.poll(() => workspaceNames(repository, [threadName])).toEqual(['default', threadName].sort())
   })
   await finishJourneyAssertions(page)
 })
@@ -449,7 +470,7 @@ Then('the blank new thread keeps the previous workspace until it sends', async (
     await expect(projectButton(page)).toHaveText(`repo · ${previousThread}`)
     await expect(workspaceToggle(page)).toBeChecked()
     await expect(page.getByRole('status', { name: /^thread-/ })).toHaveCount(0)
-    expect(workspaceNames(repository)).toEqual(['default', previousThread])
+    expect(workspaceNames(repository, [previousThread])).toEqual(['default', previousThread])
   })
   await finishJourneyAssertions(page)
 })
@@ -468,7 +489,7 @@ Then('the new thread provisioned its own jj workspace instead of the previous on
   const threadName = await currentHeaderThreadName(page)
   await recordAssertion(page, 'jj-integration-new-thread-provisions-its-own-workspace', async () => {
     expect(threadName).not.toBe(previousThread)
-    await expect.poll(() => workspaceNames(repository)).toEqual(['default', previousThread, threadName].sort())
+    await expect.poll(() => workspaceNames(repository, [previousThread, threadName])).toEqual(['default', previousThread, threadName].sort())
     expect(commitIdOf(repository, `${threadName}@-`)).toBe(repository.baseCommitId)
   })
   provisionedThreads.set(page, threadName)
@@ -491,7 +512,7 @@ Then('the blank new thread returns to the owning project checkout', async ({ pag
     await expect(page.getByRole('button', { name: 'main', exact: true })).toBeVisible()
     await expect(workspaceToggle(page)).toBeVisible()
     await expect(workspaceToggle(page)).not.toBeChecked()
-    expect(workspaceNames(repository)).toEqual(['default', provisionedThreadName(page)])
+    expect(workspaceNames(repository, [provisionedThreadName(page)])).toEqual(['default', provisionedThreadName(page)])
   })
   await finishJourneyAssertions(page)
 })
@@ -518,7 +539,7 @@ Then('the New thread runs in its own jj workspace on {string}', async ({ page }:
   await recordAssertion(page, `jj-integration-isolated-thread-starts-on-${bookmark}`, async () => {
     await expect(workspaceToggle(page)).toBeChecked()
     await expect(page.getByRole('button', { name: bookmark, exact: true })).toBeVisible()
-    await expect.poll(() => workspaceNames(repository)).toEqual(expectedWorkspaceNames)
+    await expect.poll(() => workspaceNames(repository, expectedWorkspaceNames)).toEqual(expectedWorkspaceNames)
     expect(commitIdOf(repository, `${threadName}@-`)).toBe(expectedParent)
   })
 })
@@ -528,7 +549,7 @@ Then('the blank thread returns to the shared checkout and its workspace is kept 
   const threadName = provisionedThreadName(page)
   await recordAssertion(page, 'jj-integration-spare-kept-on-toggle', async () => {
     await expect(workspaceToggle(page)).not.toBeChecked()
-    await expect.poll(() => workspaceNames(repository)).toEqual(['default', threadName])
+    await expect.poll(() => workspaceNames(repository, [threadName])).toEqual(['default', threadName])
   })
 })
 
@@ -906,5 +927,7 @@ After(async ({ page }: { page: Page }) => {
   const repository = repositories.get(page)
   if (repository === undefined) return
   repositories.delete(page)
-  await rm(repository.temporaryRoot, { recursive: true, force: true })
+  // The Host prewarms the next thread's spare workspace in the background, so the store can still be written while
+  // the fixture is removed; retry instead of failing the journey on the teardown.
+  await rm(repository.temporaryRoot, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
 })
