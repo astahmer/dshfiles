@@ -108,6 +108,12 @@ const Row = (props: {
   const actions = useBacklogActions()
   const item = props.item
   const closed = item.status === 'done' || item.status === 'dropped'
+  const background = (() => {
+    if (props.open) return 'dshx:bg-accent/80'
+    if (props.selected) return 'dshx:bg-info/8'
+    if (props.cursor) return 'dshx:bg-accent/45'
+    return 'dshx:hover:bg-accent/30'
+  })()
   return (
     <div
       role="row"
@@ -119,7 +125,7 @@ const Row = (props: {
       className={cn(
         columns,
         'dshx:group/row dshx:h-10 dshx:cursor-default dshx:items-center dshx:border-b dshx:border-border/50 dshx:pr-3 dshx:text-[13px] dshx:transition-colors dshx:duration-75',
-        props.open ? 'dshx:bg-accent/80' : props.selected ? 'dshx:bg-info/8' : props.cursor ? 'dshx:bg-accent/45' : 'dshx:hover:bg-accent/30',
+        background,
       )}
     >
       <span className="dshx:flex dshx:justify-center" onClick={event => event.stopPropagation()}>

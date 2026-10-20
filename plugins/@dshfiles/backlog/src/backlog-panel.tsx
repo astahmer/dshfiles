@@ -287,16 +287,14 @@ export const BacklogPanel = (props: { readonly openThread: OpenThread; readonly 
     requestAnimationFrame(() => captureComposer.current?.focus())
   }
 
-  const order =
-    debounced !== ''
-      ? all
-      : view === 'inbox'
-        ? inboxOrder(inboxItems)
-        : view === 'items'
-          ? itemsOrder(items, stored.groupBy, collapsed)
-          : view === 'feed'
-            ? [...items].filter(item => !item.pinned).sort((left, right) => right.lastActivityAt - left.lastActivityAt)
-            : items
+  const viewOrder = () => {
+    if (debounced !== '') return all
+    if (view === 'inbox') return inboxOrder(inboxItems)
+    if (view === 'items') return itemsOrder(items, stored.groupBy, collapsed)
+    if (view === 'feed') return [...items].filter(item => !item.pinned).sort((left, right) => right.lastActivityAt - left.lastActivityAt)
+    return items
+  }
+  const order = viewOrder()
   const moveCursor = (step: number): void => {
     const index = order.findIndex(item => item.id === (cursorId ?? openId))
     const next = order[Math.min(order.length - 1, Math.max(0, index === -1 ? 0 : index + step))]
@@ -458,9 +456,8 @@ export const BacklogPanel = (props: { readonly openThread: OpenThread; readonly 
         ) : (
           <>
             <div className={cn('dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:flex-col', expanded && openId !== null && 'dshx:hidden')}>
-              {view === 'feed' ? (
-                <FeedView items={items} openId={openId} select={select} loaded={list.isSuccess} now={now} />
-              ) : view === 'items' ? (
+              {view === 'feed' && <FeedView items={items} openId={openId} select={select} loaded={list.isSuccess} now={now} />}
+              {view === 'items' && (
                 <ItemsView
                   items={items}
                   openId={openId}
@@ -473,11 +470,9 @@ export const BacklogPanel = (props: { readonly openThread: OpenThread; readonly 
                   setCollapsed={next => withViewTransition(() => setCollapsed(next))}
                   captureInto={startCapture}
                 />
-              ) : view === 'board' ? (
-                <BoardView items={items} openId={openId} open={select} captureInto={startCapture} />
-              ) : (
-                <ProjectsView selectedProject={selectedProject} setSelectedProject={setSelectedProject} select={select} now={now} />
               )}
+              {view === 'board' && <BoardView items={items} openId={openId} open={select} captureInto={startCapture} />}
+              {view === 'projects' && <ProjectsView selectedProject={selectedProject} setSelectedProject={setSelectedProject} select={select} now={now} />}
             </div>
             {inspector}
           </>

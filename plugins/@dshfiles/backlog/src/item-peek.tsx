@@ -450,14 +450,12 @@ const LinkRow = (props: {
   const actions = useBacklogActions()
   const link = props.link
   const Icon = linkIcons[link.type]
-  const open =
-    link.type === 'thread'
-      ? () => props.openThread(link.target)
-      : link.type === 'item'
-        ? () => props.select(Number(link.target))
-        : link.type === 'url'
-          ? () => window.open(link.target, '_blank', 'noopener,noreferrer')
-          : undefined
+  const openByType: Partial<Record<BacklogLink['type'], () => void>> = {
+    thread: () => props.openThread(link.target),
+    item: () => props.select(Number(link.target)),
+    url: () => void window.open(link.target, '_blank', 'noopener,noreferrer'),
+  }
+  const open = openByType[link.type]
   return (
     <li className="dshx:group/link dshx:flex dshx:h-8 dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-2 dshx:transition-colors dshx:hover:bg-accent/50">
       <Icon aria-hidden className="dshx:size-3.5 dshx:shrink-0 dshx:text-muted-foreground" />
