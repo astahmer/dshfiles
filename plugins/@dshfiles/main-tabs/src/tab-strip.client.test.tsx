@@ -67,7 +67,7 @@ const mount = () => render(<TabStrip tabs={tabs} send={() => {}} t={t} newTabKey
 
 const asideRequests: { readonly detail: unknown; readonly cancelable: boolean }[] = []
 const onAsideRequest = (event: Event): void => {
-  asideRequests.push({ detail: (event as CustomEvent).detail, cancelable: event.cancelable })
+  asideRequests.push({ detail: event instanceof CustomEvent ? event.detail : undefined, cancelable: event.cancelable })
   event.preventDefault()
 }
 

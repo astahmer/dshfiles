@@ -5,7 +5,9 @@ import { OPEN_THREAD_ASIDE_EVENT, requestThreadAside } from './thread-aside.js'
 const listeners: EventListener[] = []
 
 const listenForRequest = (handle: (event: CustomEvent) => void): void => {
-  const handler = (event: Event): void => handle(event as CustomEvent)
+  const handler = (event: Event): void => {
+    if (event instanceof CustomEvent) handle(event)
+  }
   window.addEventListener(OPEN_THREAD_ASIDE_EVENT, handler)
   listeners.push(handler)
 }
