@@ -1,10 +1,10 @@
 import type { CredentialProvider } from '@deepseek-ai/dsh-credentials'
 import { credentialRef } from '@deepseek-ai/dsh-credentials'
+import type { SecretCatalogCredentialBridge, SecretCatalogKeyOption } from '@dshfiles/credential-port'
 import { secretScopeSchema, type SecretScope } from './secret-metadata.js'
 import type { SecretCatalogOperations } from './secret-operations.js'
-import type { SecretCatalogCredentialBridge } from './credential-bridge-contract.js'
 
-export type { SecretCatalogCredentialBridge, SecretCatalogKeyOption } from './credential-bridge-contract.js'
+export type { SecretCatalogCredentialBridge, SecretCatalogKeyOption }
 
 const apiKeyRefPattern = /^[A-Z][A-Z0-9_]*_API_KEY$/
 const sourceCwdFor = (scope: SecretScope, cwd: string | null): string | null => {

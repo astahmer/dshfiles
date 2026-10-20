@@ -5,17 +5,13 @@
   "description": "Browse and manage secret CLI aliases for the selected project, without values crossing to the Client.",
   "files": [
     "dist",
-    "cordis.patch.yml",
-    "src/credential-bridge-contract.ts"
+    "cordis.patch.yml"
   ],
   "type": "module",
   "main": "./dist/index.js",
   "exports": {
     ".": "./dist/index.js",
     "./client": "./dist/client.js",
-    "./credential-bridge-contract": {
-      "types": "./src/credential-bridge-contract.ts"
-    },
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./package.json": "./package.json"
   },
@@ -27,6 +23,7 @@
     "test:e2e": "node ../../../tooling/dshx/scripts/run-e2e.mjs"
   },
   "dependencies": {
+    "@dshfiles/credential-port": "workspace:*",
     "@dshfiles/jj-integration": "workspace:*",
     "@dshfiles/plugin-ui": "workspace:*",
     "@dshfiles/project-folder-picker": "workspace:*",

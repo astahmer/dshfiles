@@ -1,6 +1,6 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { ModelCatalog, ModelCatalogModel, ModelSelection } from '@deepseek-ai/dsh-api-session-controller'
-import type { SecretCatalogCredentialBridge } from '@dshfiles/secret-catalog/credential-bridge-contract'
+import type { SecretCatalogCredentialBridge } from '@dshfiles/credential-port'
 import { accountRuntime } from './account-runtime.js'
 import { configFromAccountsFile } from './account-config.js'
 import { hostname } from 'node:os'

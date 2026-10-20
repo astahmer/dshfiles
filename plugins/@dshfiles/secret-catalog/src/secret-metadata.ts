@@ -1,7 +1,7 @@
 import { z } from 'zod'
 
-export { secretScopeSchema } from './credential-bridge-contract.js'
-export type { SecretScope } from './credential-bridge-contract.js'
+export { secretScopeSchema } from '@dshfiles/credential-port'
+export type { SecretScope } from '@dshfiles/credential-port'
 
 const secretPrintRowSchema = z
   .object({

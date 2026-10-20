@@ -804,6 +804,9 @@ importers:
       '@deepseek-ai/schemastery':
         specifier: 'catalog:'
         version: 3.18.4
+      '@dshfiles/credential-port':
+        specifier: workspace:*
+        version: link:../credential-port
       '@dshfiles/plugin-ui':
         specifier: workspace:*
         version: link:../plugin-ui
@@ -919,9 +922,6 @@ importers:
       '@dshfiles/request-messages':
         specifier: workspace:*
         version: link:../request-messages
-      '@dshfiles/secret-catalog':
-        specifier: workspace:*
-        version: link:../secret-catalog
       '@types/node':
         specifier: 22.20.5
         version: 22.20.5
@@ -1531,6 +1531,22 @@ importers:
       react-dom:
         specifier: 'catalog:'
         version: 18.3.1(react@18.3.1)
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.11(@opentelemetry/api@1.9.1)(@types/node@22.20.5)(happy-dom@20.14.6)(jsdom@26.1.0)(vite@8.3.2(@types/node@22.20.5))
+
+  plugins/@dshfiles/credential-port:
+    dependencies:
+      zod:
+        specifier: 'catalog:'
+        version: 4.4.3
+    devDependencies:
+      '@deepseek-ai/cordis':
+        specifier: 4.0.4
+        version: 4.0.4(@deepseek-ai/cordis-plugin-include@1.0.9)(@deepseek-ai/cordis-plugin-loader@1.0.5)
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
@@ -3496,6 +3512,9 @@ importers:
       '@deepseek-ai/schemastery':
         specifier: ^3.18.4
         version: 3.18.5
+      '@dshfiles/credential-port':
+        specifier: workspace:*
+        version: link:../credential-port
       '@dshfiles/jj-integration':
         specifier: workspace:*
         version: link:../jj-integration

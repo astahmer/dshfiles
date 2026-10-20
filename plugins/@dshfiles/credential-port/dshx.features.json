@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "kind": "library",
+  "features": [
+    {
+      "id": "secret-credential-port",
+      "title": "One Host service port for credentials kept in a secrets catalog",
+      "summary": "Name the scopes a catalog can address and the two calls a credential consumer makes, so the provider and the consumer share one definition instead of depending on each other.",
+      "surfaces": ["host", "integration"],
+      "configuration": [],
+      "states": ["global", "project", "local", "rejected"],
+      "failureModes": [
+        "A scope the catalog cannot address is rejected before any call reaches the catalog.",
+        "A consumer reads the port through the Cordis Context and treats a missing provider as unavailable instead of failing."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "credential-port.scopes",
+          "file": "plugins/@dshfiles/credential-port/src/index.test.ts",
+          "testName": "accepts the three scopes a secrets catalog can address"
+        },
+        {
+          "kind": "unit-test",
+          "id": "credential-port.rejected-scope",
+          "file": "plugins/@dshfiles/credential-port/src/index.test.ts",
+          "testName": "rejects a scope the catalog cannot address"
+        }
+      ]
+    }
+  ]
+}

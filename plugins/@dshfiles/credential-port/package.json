@@ -1,0 +1,31 @@
+{
+  "name": "@dshfiles/credential-port",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The Host service port a secrets catalog provides and credential consumers call, shared so neither plugin depends on the other.",
+  "license": "MIT",
+  "type": "module",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "dshx": {
+    "features": "./dshx.features.json"
+  }
+}
