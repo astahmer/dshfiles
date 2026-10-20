@@ -1,0 +1,99 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "agent-registry",
+      "title": "Manage persistent agents",
+      "summary": "Create, edit, enable and remove agents \u2014 handle, name, glyph, description, instructions, Agent preset, model route and reasoning effort \u2014 from one Host-owned registry every browser and agent reads. A built-in @dsh agent ships with the harness defaults and cannot be deleted.",
+      "reach": ["click button \"Agents\"", "expect textbox \"Name\""],
+      "surfaces": ["client", "host", "storage", "tool"],
+      "configuration": [],
+      "states": ["empty", "built-in-only", "editing", "enabled", "disabled"],
+      "failureModes": [
+        "A handle is a slug; a name alone is enough to create one.",
+        "Removing the built-in @dsh agent is refused and reported.",
+        "Removing an already-removed agent reports it as missing.",
+        "A save past the 100-agent limit is reported and existing agents stay."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "agents.registry-handles-and-mentions",
+          "file": "plugins/@dshfiles/agents/src/agent.test.ts",
+          "testName": "parses only a leading mention"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agents.registry-built-in",
+          "file": "plugins/@dshfiles/agents/src/agent.test.ts",
+          "testName": "the built-in agent pins nothing, so it means the harness default"
+        },
+        {
+          "kind": "host-test",
+          "id": "agents.registry-store",
+          "file": "plugins/@dshfiles/agents/src/store.test.ts",
+          "testName": "saves a new agent with usage metadata and keeps it on update"
+        },
+        {
+          "kind": "host-test",
+          "id": "agents.registry-store-delete",
+          "file": "plugins/@dshfiles/agents/src/store.test.ts",
+          "testName": "seeds the built-in agent and keeps it out of deletion"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agents.mentions-menu",
+          "file": "plugins/@dshfiles/agents/src/agent-mentions.test.ts",
+          "testName": "a scope prefix lists agents only"
+        },
+        {
+          "kind": "gherkin",
+          "id": "agents.create-agent",
+          "featureFile": "tooling/dshx/e2e/features/agents.feature"
+        }
+      ]
+    },
+    {
+      "id": "agent-mentions",
+      "title": "Mention an agent where a thread starts",
+      "summary": "A leading @handle dispatches an ordinary thread on that agent: its preset, its model route, its instructions and the user's text as the opening prompt. The @ menu lists enabled agents, @agent:/@a: narrows it, and another source's scope stays empty.",
+      "surfaces": ["client", "host", "tool"],
+      "configuration": [],
+      "states": ["idle", "mentioned", "dispatched"],
+      "failureModes": [
+        "An unknown handle stays a plain comment.",
+        "A disabled agent is not offered and does not dispatch.",
+        "A catalog without the agent's route leaves the Host default model."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "agents.dispatch-opening-message",
+          "file": "plugins/@dshfiles/agents/src/dispatch.test.ts",
+          "testName": "the opening message names the agent and carries the prompt"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agents.dispatch-catalog",
+          "file": "plugins/@dshfiles/agents/src/dispatch.test.ts",
+          "testName": "decodes the Host catalog into routable rows and the default key"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agents.mentions-scope",
+          "file": "plugins/@dshfiles/agents/src/agent-mentions.test.ts",
+          "testName": "another source scope leaves this source empty"
+        },
+        {
+          "kind": "gherkin",
+          "id": "agents.comment-dispatch",
+          "featureFile": "tooling/dshx/e2e/features/agents.feature"
+        }
+      ],
+      "reach": ["fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"@agent:\"", "expect text \"@dsh\""]
+    }
+  ]
+}

@@ -43,7 +43,7 @@ import { ProjectsView } from './projects-view.js'
 import { SearchResults } from './search-results.js'
 import { backlogSettings, type BacklogSettings } from './settings.js'
 import { StartThreadDialog } from './start-thread-dialog.js'
-import type { StartThreadCatalog, StartThreadItem, StartThreadProject, StartThreadRequest } from './start-thread.js'
+import type { StartThreadAgentChoice, StartThreadCatalog, StartThreadItem, StartThreadProject, StartThreadRequest } from './start-thread.js'
 import { FeedStatus } from './status-filter.js'
 import { BacklogQueries } from './use-backlog-actions.js'
 import { withViewTransition } from './view-transition.js'
@@ -201,6 +201,8 @@ const SavedViews = (props: {
 export interface StartThreadPorts {
   readonly listProjects: () => readonly StartThreadProject[]
   readonly loadCatalog: () => Promise<StartThreadCatalog>
+  /** Every enabled agent, so the dialog can start the thread as one. */
+  readonly listAgents: () => Promise<readonly StartThreadAgentChoice[]>
   readonly start: (request: StartThreadRequest) => Promise<{ readonly ok: true } | { readonly ok: false; readonly reason: string }>
 }
 
@@ -556,6 +558,7 @@ export const BacklogPanel = (props: {
           item={startThreadItem}
           projects={props.startThread.listProjects()}
           loadCatalog={props.startThread.loadCatalog}
+          listAgents={props.startThread.listAgents}
           sendByDefault={settings.value?.startThreadSendsFirstMessage ?? true}
           start={props.startThread.start}
           close={() => setStartThreadItem(null)}

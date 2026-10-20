@@ -4,7 +4,15 @@ import { LoaderCircleIcon, MessagesSquareIcon } from '@dshfiles/plugin-ui/icons'
 import { errorMessage, useQuery } from '@dshfiles/plugin-ui/query'
 import { useState } from 'react'
 
-import { StartThreadForm, type StartThreadCatalog, type StartThreadItem, type StartThreadProject, type StartThreadRequest } from './start-thread.js'
+import { AgentComments } from './agent-dispatch.js'
+import {
+  StartThreadForm,
+  type StartThreadAgentChoice,
+  type StartThreadCatalog,
+  type StartThreadItem,
+  type StartThreadProject,
+  type StartThreadRequest,
+} from './start-thread.js'
 
 const fieldClass =
   'dshx:h-8 dshx:w-full dshx:rounded-md dshx:border dshx:border-input dshx:bg-background dshx:px-2 dshx:text-[13px] dshx:text-foreground dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50'
@@ -20,12 +28,15 @@ export const StartThreadDialog = (props: {
   readonly item: StartThreadItem
   readonly projects: readonly StartThreadProject[]
   readonly loadCatalog: () => Promise<StartThreadCatalog>
+  /** Every enabled agent, so the thread can start as one with its preset, route and instructions. */
+  readonly listAgents: () => Promise<readonly StartThreadAgentChoice[]>
   readonly sendByDefault: boolean
   readonly start: (request: StartThreadRequest) => Promise<StartOutcome>
   readonly close: () => void
 }): JSX.Element => {
   const targets = StartThreadForm.targets(props.item, props.projects)
   const [targetValue, setTargetValue] = useState(() => StartThreadForm.defaultTargetValue(props.item, props.projects))
+  const [agentHandle, setAgentHandle] = useState('')
   const [modelKey, setModelKey] = useState<string | null>(null)
   const [effort, setEffort] = useState<string | null>(null)
   const [message, setMessage] = useState(() => StartThreadForm.message(props.item))
@@ -33,6 +44,8 @@ export const StartThreadDialog = (props: {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const catalogQuery = useQuery({ queryKey: ['dshfiles-backlog', 'start-thread', 'catalog'], queryFn: props.loadCatalog, staleTime: 30_000 })
+  const agentsQuery = useQuery({ queryKey: ['dshfiles-backlog', 'start-thread', 'agents'], queryFn: props.listAgents, staleTime: 30_000 })
+  const chosenAgent = (agentsQuery.data ?? []).find(candidate => candidate.handle === agentHandle)
   const catalog = catalogQuery.data ?? null
   const rows = catalog === null ? [] : StartThreadForm.rows(catalog)
   const selectedKey = modelKey ?? (catalog === null ? null : StartThreadForm.defaultModelKey(catalog))
@@ -45,20 +58,22 @@ export const StartThreadDialog = (props: {
     setEffort(null)
   }
 
+  /** An agent brings its own preset, route and instructions; without one the account/model fields decide. */
+  const selection = (): Pick<StartThreadRequest, 'agent' | 'provider' | 'model' | 'reasoningEffort' | 'message'> | null => {
+    if (chosenAgent !== undefined) {
+      return { agent: chosenAgent, provider: null, model: null, reasoningEffort: undefined, message: AgentComments.opening(chosenAgent, message.trim()) }
+    }
+    if (selected === undefined) return null
+    return { provider: selected.provider.id, model: selected.model.id, reasoningEffort: effortValue, message: message.trim() }
+  }
+
   const submit = async (): Promise<void> => {
-    if (selected === undefined) return
+    const picked = selection()
+    if (picked === null) return
     setBusy(true)
     setError(null)
     try {
-      const outcome = await props.start({
-        item: props.item,
-        target,
-        provider: selected.provider.id,
-        model: selected.model.id,
-        reasoningEffort: effortValue,
-        message: message.trim(),
-        send,
-      })
+      const outcome = await props.start({ item: props.item, target, ...picked, send })
       if (outcome.ok) {
         props.close()
         return
@@ -92,31 +107,51 @@ export const StartThreadDialog = (props: {
             </select>
           </label>
           <label className="dshx:flex dshx:flex-col dshx:gap-1">
-            <span className={labelClass}>Account and model</span>
-            {catalogQuery.isError ? (
-              <p className="dshx:text-xs dshx:text-destructive">The model catalog is unavailable: {errorMessage(catalogQuery.error, 'unknown error')}</p>
-            ) : (
-              <select
-                aria-label="Thread model"
-                className={fieldClass}
-                value={selectedKey ?? ''}
-                disabled={catalog === null}
-                onChange={event => pickModel(event.currentTarget.value)}
-              >
-                {catalog === null ? <option value="">Loading models…</option> : null}
-                {catalog?.providers.map(provider => (
-                  <optgroup key={provider.id} label={provider.name}>
-                    {provider.models.map(model => (
-                      <option key={`${provider.id}/${model.id}`} value={`${provider.id}/${model.id}`}>
-                        {model.name}
-                      </option>
-                    ))}
-                  </optgroup>
-                ))}
-              </select>
+            <span className={labelClass}>Agent</span>
+            <select aria-label="Thread agent" className={fieldClass} value={agentHandle} onChange={event => setAgentHandle(event.currentTarget.value)}>
+              <option value="">None (pick an account and model)</option>
+              {(agentsQuery.data ?? []).map(choice => (
+                <option key={choice.handle} value={choice.handle}>
+                  {choice.name} · @{choice.handle}
+                </option>
+              ))}
+            </select>
+            {chosenAgent === undefined ? null : (
+              <span className="dshx:text-[11px] dshx:text-muted-foreground">
+                {chosenAgent.route === null ? 'Harness default model' : `${chosenAgent.route.provider}/${chosenAgent.route.model}`} ·{' '}
+                {chosenAgent.preset ?? 'Host default tools'}
+                {chosenAgent.instructions.trim() === '' ? '' : ' · instructions applied'}
+              </span>
             )}
           </label>
-          {selected === undefined || selected.model.efforts.length === 0 ? null : (
+          {chosenAgent === undefined ? (
+            <label className="dshx:flex dshx:flex-col dshx:gap-1">
+              <span className={labelClass}>Account and model</span>
+              {catalogQuery.isError ? (
+                <p className="dshx:text-xs dshx:text-destructive">The model catalog is unavailable: {errorMessage(catalogQuery.error, 'unknown error')}</p>
+              ) : (
+                <select
+                  aria-label="Thread model"
+                  className={fieldClass}
+                  value={selectedKey ?? ''}
+                  disabled={catalog === null}
+                  onChange={event => pickModel(event.currentTarget.value)}
+                >
+                  {catalog === null ? <option value="">Loading models…</option> : null}
+                  {catalog?.providers.map(provider => (
+                    <optgroup key={provider.id} label={provider.name}>
+                      {provider.models.map(model => (
+                        <option key={`${provider.id}/${model.id}`} value={`${provider.id}/${model.id}`}>
+                          {model.name}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+              )}
+            </label>
+          ) : null}
+          {chosenAgent !== undefined || selected === undefined || selected.model.efforts.length === 0 ? null : (
             <label className="dshx:flex dshx:flex-col dshx:gap-1">
               <span className={labelClass}>Reasoning effort</span>
               <select aria-label="Reasoning effort" className={fieldClass} value={effortValue ?? ''} onChange={event => setEffort(event.currentTarget.value)}>
@@ -129,7 +164,7 @@ export const StartThreadDialog = (props: {
             </label>
           )}
           <label className="dshx:flex dshx:flex-col dshx:gap-1">
-            <span className={labelClass}>First message</span>
+            <span className={labelClass}>{chosenAgent === undefined ? 'First message' : 'Task'}</span>
             <textarea
               aria-label="First message"
               value={message}
@@ -156,7 +191,7 @@ export const StartThreadDialog = (props: {
           <Button variant="outline" onClick={props.close} disabled={busy}>
             Cancel
           </Button>
-          <Button onClick={() => void submit()} disabled={busy || selected === undefined}>
+          <Button onClick={() => void submit()} disabled={busy || selection() === null}>
             {busy ? <LoaderCircleIcon aria-hidden className="dshx:size-3.5 dshx:animate-spin" /> : <MessagesSquareIcon aria-hidden className="dshx:size-3.5" />}
             Start thread
           </Button>

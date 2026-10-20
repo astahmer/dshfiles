@@ -40,6 +40,7 @@ import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useQuery } from '@dshfiles/plugin-ui/query'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 
+import { useAgentDispatch } from './agent-dispatch-context.js'
 import { backlogApi, BacklogViews, type BacklogDetailView, type BacklogSummaryView } from './api.js'
 import type { ComposerThread } from './composer.js'
 import { BacklogItems, type BacklogAttention, type BacklogEvent, type BacklogLink, type BacklogProposal, type BacklogRelation } from './item.js'
@@ -405,42 +406,66 @@ const Conversation = (props: { readonly events: readonly BacklogEvent[]; readonl
   )
 }
 
-const CommentBox = (props: { readonly id: number }): JSX.Element => {
+const CommentBox = (props: { readonly item: StartThreadItem }): JSX.Element => {
   const actions = useBacklogActions()
+  const dispatch = useAgentDispatch()
   const [text, setText] = useState('')
-  const submit = (): void => {
-    if (text.trim() === '') return
+  const [pending, setPending] = useState(false)
+  const [failed, setFailed] = useState<string | null>(null)
+  const comment = (): void => {
     setText('')
-    actions.comment.mutate({ id: props.id, text }, { onError: () => setText(current => (current === '' ? text : current)) })
+    setFailed(null)
+    actions.comment.mutate({ id: props.item.id, text }, { onError: () => setText(current => (current === '' ? text : current)) })
+  }
+  /** A leading `@handle` starts that agent's thread; anything else, or a handle nothing matches, stays a comment. */
+  const submit = async (): Promise<void> => {
+    if (text.trim() === '' || pending) return
+    if (dispatch === null) {
+      comment()
+      return
+    }
+    setPending(true)
+    setFailed(null)
+    try {
+      const outcome = await dispatch.dispatch({ item: props.item, text })
+      if (outcome.kind === 'dispatched') setText('')
+      else if (outcome.kind === 'failed') setFailed(outcome.reason)
+      else comment()
+    } catch (cause) {
+      setFailed(cause instanceof Error ? cause.message : String(cause))
+    } finally {
+      setPending(false)
+    }
   }
   return (
     <form
       onSubmit={event => {
         event.preventDefault()
-        submit()
+        void submit()
       }}
       className="dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-xl dshx:border dshx:border-border dshx:bg-card dshx:p-2.5 dshx:transition-colors dshx:focus-within:border-input"
     >
       <textarea
         aria-label="Comment"
         rows={1}
-        placeholder="Reply… b:12, jj:rev and URLs become links"
+        placeholder="Reply… b:12, jj:rev and URLs become links; @agent starts a thread"
         value={text}
         onChange={event => setText(event.currentTarget.value)}
         onKeyDown={event => {
           if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
             event.preventDefault()
-            submit()
+            void submit()
           }
         }}
         className="dshx:field-sizing-content dshx:max-h-40 dshx:min-h-10 dshx:resize-none dshx:bg-transparent dshx:text-[13px] dshx:outline-none dshx:placeholder:text-muted-foreground"
       />
+      {failed === null ? null : <p className="dshx:text-[11px] dshx:text-destructive">{failed}</p>}
       <div className="dshx:flex dshx:items-center dshx:justify-between">
         <span className="dshx:flex dshx:items-center dshx:gap-1 dshx:text-[11px] dshx:text-muted-foreground">
           <Kbd>⌘</Kbd>
           <Kbd>↵</Kbd> to send
         </span>
-        <Button type="submit" size="xs" disabled={text.trim() === ''}>
+        <Button type="submit" size="xs" disabled={text.trim() === '' || pending}>
           <CornerDownLeftIcon /> Reply
         </Button>
       </div>
@@ -741,7 +766,7 @@ const PeekBody = (props: {
           </Section>
           <Section title="Activity">
             <Conversation events={item.events} attention={item.attention ?? 'none'} />
-            <CommentBox id={item.id} />
+            <CommentBox item={{ id: item.id, title: item.title, project: item.project, preview: item.body.slice(0, 500) }} />
           </Section>
         </div>
       </div>

@@ -27,6 +27,7 @@
   },
   "dependencies": {
     "@deepseek-ai/schemastery": "catalog:",
+    "@dshfiles/agents": "workspace:*",
     "@dshfiles/credential-port": "workspace:*",
     "@dshfiles/dshx": "workspace:*",
     "@dshfiles/input-trigger": "workspace:*",
@@ -84,6 +85,7 @@
     "@deepseek-ai/dsh-tools": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-workspace": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/schemastery": "^3.18.4",
+    "@dshfiles/agents": ">=0.1.0 <0.2.0-0",
     "@dshfiles/input-trigger": ">=0.1.0 <0.2.0-0",
     "@dshfiles/thread-sidebar": ">=0.1.0"
   },

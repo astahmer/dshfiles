@@ -1,8 +1,8 @@
 /**
- * `skill`, `mcp` and `backlog` belong to the skill (thread-sidebar), MCP (mcp-servers) and backlog `@` sources; this
- * one stays empty for them.
+ * `skill`, `mcp`, `backlog` and `agent` belong to the skill (thread-sidebar), MCP (mcp-servers), backlog and agents
+ * `@` sources; this one stays empty for them.
  */
-export type MentionScope = 'all' | 'thread' | 'file' | 'skill' | 'mcp' | 'backlog'
+export type MentionScope = 'all' | 'thread' | 'file' | 'skill' | 'mcp' | 'backlog' | 'agent'
 
 export interface MentionQuery {
   readonly scope: MentionScope
@@ -38,6 +38,8 @@ const SCOPE_PREFIXES: readonly (readonly [string, MentionScope])[] = [
   ['mcp:', 'mcp'],
   ['backlog:', 'backlog'],
   ['b:', 'backlog'],
+  ['agent:', 'agent'],
+  ['a:', 'agent'],
 ]
 
 const HOUR = 3_600_000

@@ -4,14 +4,24 @@ import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import type { WorkspaceId } from '@deepseek-ai/dsh-workspace/types'
+import { agentsApi } from '@dshfiles/agents/contract'
 import type {} from '@dshfiles/input-trigger/client'
 import { createApiClient, defineClient } from '@dshfiles/dshx/client'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 
+import { AgentDispatchProvider } from './agent-dispatch-context.js'
+import { AgentComments, type AgentDispatchPort } from './agent-dispatch.js'
 import { backlogApi, BacklogViews } from './api.js'
 import { BacklogMentions } from './backlog-mentions.js'
 import { BacklogPanel, type StartThreadPorts } from './backlog-panel.js'
-import { StartThreadForm, type StartThreadCatalog, type StartThreadRequest, type StartThreadTarget } from './start-thread.js'
+import {
+  defaultTargetFor,
+  StartThreadForm,
+  type StartThreadCatalog,
+  type StartThreadCreation,
+  type StartThreadRequest,
+  type StartThreadTarget,
+} from './start-thread.js'
 
 const PANEL_ID = 'dshfiles-backlog-panel'
 
@@ -27,6 +37,7 @@ export default defineClient({
   inject: ['slots', 'sessions', 'workspaces', 'remote', 'remote.session', 'uiWorkspace', 'conversation', 'inputTriggers'],
   setup(ctx, decorate) {
     const api = createApiClient(ctx, backlogApi)
+    const agents = createApiClient(ctx, agentsApi)
     const startThreadPorts: StartThreadPorts = {
       listProjects: () =>
         ctx.workspaces.list.getSnapshot().items.map(workspace => ({ id: workspace.workspaceId, title: workspace.title, path: workspace.path })),
@@ -35,18 +46,38 @@ export default defineClient({
         if (!result.ok) throw new Error(result.error.message)
         return StartThreadForm.catalog(result.value)
       },
+      listAgents: async () => {
+        try {
+          const snapshot = await agents.list()
+          return snapshot.agents.filter(agent => agent.enabled).map(agent => ({ ...AgentComments.agent(agent), description: agent.description }))
+        } catch {
+          return []
+        }
+      },
       start: async (request: StartThreadRequest) => {
+        const base = creationArgsFor(request.target, ctx.workspaces.list.getSnapshot().items[0]?.workspaceId)
+        const creation: StartThreadCreation = request.agent?.preset == null ? { ...base } : { ...base, agentPreset: request.agent.preset }
         let sessionId
         try {
-          sessionId = await ctx.sessions.create(creationArgsFor(request.target, ctx.workspaces.list.getSnapshot().items[0]?.workspaceId))
+          sessionId = await ctx.sessions.create(creation)
         } catch (cause) {
           return { ok: false, reason: `The thread could not be created: ${cause instanceof Error ? cause.message : String(cause)}` }
         }
-        const selection = { sessionId, provider: request.provider, model: request.model }
-        const selected = await ctx.remote.session.selectModel(
-          request.reasoningEffort === undefined ? selection : { ...selection, reasoningEffort: request.reasoningEffort },
-        )
-        if (!selected.ok) console.warn(`backlog: thread ${sessionId} kept the Host default model: ${selected.error.message}`)
+        const route = request.agent?.route ?? null
+        const selection =
+          route === null
+            ? request.provider === null || request.model === null
+              ? null
+              : { provider: request.provider, model: request.model, reasoningEffort: request.reasoningEffort }
+            : { provider: route.provider, model: route.model, reasoningEffort: route.reasoningEffort ?? request.reasoningEffort }
+        if (selection !== null) {
+          const selected = await ctx.remote.session.selectModel(
+            selection.reasoningEffort === undefined
+              ? { sessionId, provider: selection.provider, model: selection.model }
+              : { sessionId, provider: selection.provider, model: selection.model, reasoningEffort: selection.reasoningEffort },
+          )
+          if (!selected.ok) console.warn(`backlog: thread ${sessionId} kept the Host default model: ${selected.error.message}`)
+        }
         const renamed = await ctx.remote.session.rename({ sessionId, title: StartThreadForm.title(request.item) })
         if (!renamed.ok) console.warn(`backlog: thread ${sessionId} title kept as created: ${renamed.error.message}`)
         if (request.message !== '') {
@@ -73,6 +104,30 @@ export default defineClient({
         return { ok: true }
       },
     }
+    /**
+     * A leading `@handle` in an item comment starts that agent's thread for the item. An unknown or disabled handle,
+     * or an agents bundle that is not installed, leaves the comment exactly as it was.
+     */
+    const dispatchPort: AgentDispatchPort = {
+      dispatch: async ({ item, text }) => {
+        const mention = AgentComments.mention(text)
+        if (mention === null) return { kind: 'skipped', reason: 'no-mention' }
+        let agent
+        try {
+          const found = await agents.get({ handle: mention.handle })
+          agent = found.agent
+        } catch {
+          return { kind: 'skipped', reason: 'agents-unavailable' }
+        }
+        if (agent === null) return { kind: 'skipped', reason: 'unknown-agent' }
+        if (!agent.enabled) return { kind: 'skipped', reason: 'disabled-agent' }
+        const projects = startThreadPorts.listProjects()
+        const started = await startThreadPorts.start(AgentComments.request({ item, agent, task: mention.task, target: defaultTargetFor(item, projects) }))
+        if (!started.ok) return { kind: 'failed', reason: started.reason }
+        await api.safe.comment({ id: item.id, text })
+        return { kind: 'dispatched' }
+      },
+    }
     const mentions = BacklogMentions.createSource({
       section: 'Backlog',
       search: async (query, limit, signal) => BacklogViews.list(await api.list({ query, freshness: 'active', limit }, { signal })).items,
@@ -80,22 +135,24 @@ export default defineClient({
     ctx.effect(() => ctx.inputTriggers.registerSource(mentions), 'backlog: @ mentions')
     const PanelView = (): JSX.Element => (
       <PluginQueryProvider>
-        <BacklogPanel
-          startThread={startThreadPorts}
-          listThreads={() => {
-            const state = ctx.sessions.list.getSnapshot()
-            return state.ids.flatMap(id => {
-              const session = state.byId[id]
-              if (session === undefined || session.blank || session.parentId !== undefined) return []
-              const thread = { id: session.id, title: session.displayTitle, running: session.running }
-              return [session.cwd === undefined ? thread : { ...thread, cwd: session.cwd }]
-            })
-          }}
-          openThread={sessionId => {
-            const session = Object.values(ctx.sessions.list.getSnapshot().byId).find(candidate => candidate?.id === sessionId)
-            if (session !== undefined) ctx.uiWorkspace.openSession(session.id)
-          }}
-        />
+        <AgentDispatchProvider port={dispatchPort}>
+          <BacklogPanel
+            startThread={startThreadPorts}
+            listThreads={() => {
+              const state = ctx.sessions.list.getSnapshot()
+              return state.ids.flatMap(id => {
+                const session = state.byId[id]
+                if (session === undefined || session.blank || session.parentId !== undefined) return []
+                const thread = { id: session.id, title: session.displayTitle, running: session.running }
+                return [session.cwd === undefined ? thread : { ...thread, cwd: session.cwd }]
+              })
+            }}
+            openThread={sessionId => {
+              const session = Object.values(ctx.sessions.list.getSnapshot().byId).find(candidate => candidate?.id === sessionId)
+              if (session !== undefined) ctx.uiWorkspace.openSession(session.id)
+            }}
+          />
+        </AgentDispatchProvider>
       </PluginQueryProvider>
     )
     ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 3, label: 'Backlog' }, PanelGlyph))

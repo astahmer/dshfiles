@@ -1,0 +1,104 @@
+{
+  "name": "@dshfiles/agents",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Persistent, mentionable agents: identity, instructions, model route and tool preset, dispatched into an ordinary thread.",
+  "license": "MIT",
+  "files": [
+    "dist",
+    "cordis.patch.yml",
+    "README.md"
+  ],
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js",
+    "./package.json": "./package.json",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./client": "./dist/client.js",
+    "./contract": {
+      "types": "./src/contract.ts",
+      "default": "./dist/contract.js"
+    }
+  },
+  "scripts": {
+    "build": "dshx build",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test:boot": "node ../../../tooling/dshx/scripts/boot-check-web.mjs --plugin",
+    "test:e2e": "node ../../../tooling/dshx/scripts/run-e2e.mjs"
+  },
+  "dependencies": {
+    "@dshfiles/dshx": "workspace:*",
+    "@dshfiles/input-trigger": "workspace:*",
+    "@dshfiles/plugin-ui": "workspace:*",
+    "@dshfiles/shared-runtime": "workspace:*",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@deepseek-ai/cordis": "catalog:",
+    "@deepseek-ai/dsh": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-agent-preset-registry": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-api-gateway": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-api-session-controller": "catalog:",
+    "@deepseek-ai/dsh-api-workspace-controller": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-client-connection": "catalog:",
+    "@deepseek-ai/dsh-client-ui-primitives": "catalog:",
+    "@deepseek-ai/dsh-client-ui-renderer": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-client-ui-sidebar": "catalog:",
+    "@deepseek-ai/dsh-client-ui-slots": "catalog:",
+    "@deepseek-ai/dsh-client-ui-workspace": "catalog:",
+    "@deepseek-ai/dsh-storage-domain": "catalog:",
+    "@deepseek-ai/dsh-workspace": "catalog:",
+    "@types/node": "22.19.20",
+    "@types/react": "catalog:",
+    "react": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "~4.0.4",
+    "@deepseek-ai/dsh": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-agent-preset-registry": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-api-gateway": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-api-session-controller": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-api-workspace-controller": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-client-connection": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-client-ui-primitives": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-client-ui-renderer": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-client-ui-sidebar": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-client-ui-slots": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-client-ui-workspace": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-storage-domain": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-tools": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-workspace": ">=0.2.1-rc.2 <0.3.0-0"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@deepseek-ai/dsh-client-connection",
+        "@deepseek-ai/dsh-api-session-controller",
+        "@deepseek-ai/dsh-api-workspace-controller",
+        "@deepseek-ai/dsh-api-gateway",
+        "@deepseek-ai/dsh-client-ui-renderer",
+        "@deepseek-ai/dsh-client-ui-slots",
+        "@deepseek-ai/dsh-client-ui-sidebar",
+        "@deepseek-ai/dsh-client-ui-workspace",
+        "@deepseek-ai/dsh-client-ui-primitives"
+      ],
+      "external": [
+        "@dshfiles/input-trigger",
+        "@dshfiles/shared-runtime"
+      ],
+      "immediately": false
+    }
+  },
+  "dshx": {
+    "features": "./dshx.features.json"
+  }
+}

@@ -190,7 +190,7 @@ export default defineClient({
         const startedAt = performance.now()
         if (sessions.binding(session.sessionId) === undefined) throw new Error(`mention candidates require a retained session "${session.sessionId}"`)
         const query = MentionRanking.parseQuery(request.query)
-        if (query.scope === 'skill' || query.scope === 'mcp' || query.scope === 'backlog') return []
+        if (query.scope === 'skill' || query.scope === 'mcp' || query.scope === 'backlog' || query.scope === 'agent') return []
         const quoted = request.quoted === true
         const [files, threads] = await sessions.using(session.sessionId, { source: 'mentionCandidates', signal: request.signal }, async reference => {
           request.signal.throwIfAborted()

@@ -21,6 +21,15 @@ export interface StartThreadProject {
   readonly path: string
 }
 
+/** What starting a thread reads from an item; a summary or a full detail both satisfy it. */
+export interface StartThreadItem {
+  readonly id: number
+  readonly title: string
+  /** The opening message's context line; empty when the title already says it. */
+  readonly preview: string
+  readonly project: string | null
+}
+
 /** One selectable reasoning effort of an exact model route. */
 export interface StartThreadEffort {
   readonly id: string
@@ -51,6 +60,13 @@ export interface StartThreadCatalog {
   readonly providers: readonly StartThreadProvider[]
 }
 
+/** The `sessions.create` arguments a started thread passes; `agentPreset` applies the agent's tool composition. */
+export interface StartThreadCreation {
+  readonly workspaceId?: WorkspaceId
+  readonly cwd?: string
+  readonly agentPreset?: string
+}
+
 /** Where the thread runs: a registered project, a bare folder, or the Host default directory. */
 export type StartThreadTarget =
   | { readonly kind: 'project'; readonly projectId: WorkspaceId }
@@ -71,20 +87,29 @@ export interface StartThreadTargetOption {
   readonly target: StartThreadTarget
 }
 
-/** The item fields needed to start a thread, whether selected from a list or its detail view. */
-export interface StartThreadItem {
-  readonly id: number
-  readonly title: string
-  readonly project: string | null
-  readonly preview: string
+/** The persistent agent a thread is started as: its preset, its route, and its instructions. */
+export interface StartThreadAgent {
+  readonly handle: string
+  readonly name: string
+  readonly instructions: string
+  readonly preset: string | null
+  readonly route: { readonly provider: string; readonly model: string; readonly reasoningEffort?: string | undefined } | null
+}
+
+/** An agent the dialog can start the thread as, with the one line that tells it apart from the others. */
+export interface StartThreadAgentChoice extends StartThreadAgent {
+  readonly description: string
 }
 
 /** What the panel collects before starting a thread for an item. */
 export interface StartThreadRequest {
   readonly item: StartThreadItem
   readonly target: StartThreadTarget
-  readonly provider: string
-  readonly model: string
+  /** The agent picked in the dialog; its preset and route win over the provider/model fields. */
+  readonly agent?: StartThreadAgent
+  /** `null` leaves the Host default when no agent route applies. */
+  readonly provider: string | null
+  readonly model: string | null
   readonly reasoningEffort: string | undefined
   readonly message: string
   /** Send the message as the thread's first turn; false leaves it as an editable draft. */
@@ -168,6 +193,13 @@ export class StartThreadForm {
   static title(item: StartThreadItem): string {
     return item.title.slice(0, TITLE_MAX)
   }
+}
+
+/** The item's own target as a `StartThreadTarget`, for a caller that starts a thread without the dialog. */
+export const defaultTargetFor = (item: StartThreadItem, projects: readonly StartThreadProject[]): StartThreadTarget => {
+  const value = StartThreadForm.defaultTargetValue(item, projects)
+  const option = StartThreadForm.targets(item, projects).find(candidate => candidate.value === value)
+  return option?.target ?? { kind: 'default' }
 }
 
 export const startThreadLimits = { titleMax: TITLE_MAX, messageMax: MESSAGE_MAX } as const

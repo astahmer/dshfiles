@@ -23,6 +23,8 @@ describe('MentionRanking.parseQuery', () => {
     expect(MentionRanking.parseQuery('skill:rev')).toEqual({ scope: 'skill', text: 'rev', prefix: 'skill:' })
     expect(MentionRanking.parseQuery('b:paste')).toEqual({ scope: 'backlog', text: 'paste', prefix: 'b:' })
     expect(MentionRanking.parseQuery('MCP:figma')).toEqual({ scope: 'mcp', text: 'figma', prefix: 'MCP:' })
+    expect(MentionRanking.parseQuery('agent:rev')).toEqual({ scope: 'agent', text: 'rev', prefix: 'agent:' })
+    expect(MentionRanking.parseQuery('a:rev')).toEqual({ scope: 'agent', text: 'rev', prefix: 'a:' })
   })
 })
 

@@ -3,7 +3,7 @@ import { defineLocale } from '@dshfiles/dshx/client'
 export const MENTIONS_LOCALE_NAMESPACE = 'dshfiles.mentions'
 
 const en = {
-  'scope.all': 'Threads & files · @t: threads · @f: files · @skill: · @mcp: · @b: backlog',
+  'scope.all': 'Threads & files · @t: threads · @f: files · @agent: · @skill: · @mcp: · @b: backlog',
   'scope.thread': 'Threads · @f: files',
   'scope.file': 'Files · @t: threads',
   subagent: 'subagent',
@@ -18,7 +18,7 @@ const en = {
 } as const
 
 const zh = {
-  'scope.all': '对话与文件 · @t: 对话 · @f: 文件 · @skill: · @mcp: · @b: 待办',
+  'scope.all': '对话与文件 · @t: 对话 · @f: 文件 · @agent: · @skill: · @mcp: · @b: 待办',
   'scope.thread': '对话 · @f: 文件',
   'scope.file': '文件 · @t: 对话',
   subagent: '子智能体',
