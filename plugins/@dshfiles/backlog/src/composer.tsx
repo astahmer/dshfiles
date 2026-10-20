@@ -57,6 +57,7 @@ export const Composer = (props: {
   const [caret, setCaret] = useState(0)
   const [failed, setFailed] = useState<string | null>(null)
   const [highlight, setHighlight] = useState(0)
+  const [navigated, setNavigated] = useState(false)
   const [itemSuggestions, setItemSuggestions] = useState<readonly Suggestion[]>([])
   const ownRef = useRef<HTMLTextAreaElement>(null)
   const input = props.inputRef ?? ownRef
@@ -126,12 +127,14 @@ export const Composer = (props: {
 
   useEffect(() => {
     setHighlight(0)
+    setNavigated(false)
   }, [token?.trigger, token?.query])
 
   const pick = (suggestion: Suggestion): void => {
     if (token === null) return
     const next = `${text.slice(0, token.start)}${suggestion.insert}${text.slice(caret)}`
     const position = token.start + suggestion.insert.length
+    setNavigated(false)
     setText(next)
     requestAnimationFrame(() => {
       input.current?.focus()
@@ -213,10 +216,12 @@ export const Composer = (props: {
             if (suggestions.length > 0) {
               if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
                 event.preventDefault()
+                setNavigated(true)
                 setHighlight(current => (current + (event.key === 'ArrowDown' ? 1 : -1) + suggestions.length) % suggestions.length)
                 return
               }
-              if (event.key === 'Enter' || event.key === 'Tab') {
+              // Tab completes a suggestion; Enter still adds the item, so a line ending in `#tag` sends on the first press.
+              if (event.key === 'Tab' || (event.key === 'Enter' && navigated)) {
                 const chosen = suggestions[highlight]
                 if (chosen !== undefined) {
                   event.preventDefault()
@@ -262,7 +267,7 @@ export const Composer = (props: {
         chat ? (
           <p className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-x-3 dshx:gap-y-1 dshx:text-[11px] dshx:text-muted-foreground dshx:@max-pane-narrow:hidden">
             <span>
-              <Kbd>↵</Kbd> add · <Kbd>⇧↵</Kbd> new line
+              <Kbd>↵</Kbd> add · <Kbd>⇧↵</Kbd> new line · <Kbd>Tab</Kbd> complete
             </span>
             <span>
               <code>bug:</code> <code>idea:</code> <code>note:</code> set the kind
