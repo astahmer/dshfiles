@@ -33,6 +33,7 @@ test('only turn ends that ask the user for something count as attention', () => 
   assert.equal(ThreadAttentionStoreModel.finishReasonFromEvent(turnEnd('completed')), 'completed')
   assert.equal(ThreadAttentionStoreModel.finishReasonFromEvent(turnEnd('error')), 'error')
   assert.equal(ThreadAttentionStoreModel.finishReasonFromEvent(turnEnd('aborted')), 'aborted')
+  assert.equal(ThreadAttentionStoreModel.finishReasonFromEvent({ type: 'turn/end', data: { reason: { kind: 'aborted', reason: { kind: 'disposed' } } } }), null)
   assert.equal(ThreadAttentionStoreModel.finishReasonFromEvent(turnEnd('blocked')), 'blocked')
   assert.equal(ThreadAttentionStoreModel.finishReasonFromEvent(turnEnd('max-tokens')), 'max-tokens')
   assert.equal(ThreadAttentionStoreModel.finishReasonFromEvent(turnEnd('forked')), null)

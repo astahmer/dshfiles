@@ -21,7 +21,7 @@ export type AttentionTable = KvTable<string, ThreadAttentionView>
 
 const turnEndEventSchema = z.object({
   type: z.literal('turn/end'),
-  data: z.object({ reason: z.object({ kind: z.string().max(64) }) }),
+  data: z.object({ reason: z.object({ kind: z.string().max(64), reason: z.object({ kind: z.string().max(64) }).optional() }) }),
 })
 
 /**
@@ -39,7 +39,11 @@ const finishReasonByKind: Readonly<Record<string, AttentionFinishReason>> = {
 
 const finishReasonFromEvent = (event: unknown): AttentionFinishReason | null => {
   const parsed = turnEndEventSchema.safeParse(event)
-  return parsed.success ? (finishReasonByKind[parsed.data.data.reason.kind] ?? null) : null
+  if (!parsed.success) return null
+  const reason = parsed.data.data.reason
+  // The Host shutting down disposes a running Agent: that turn resumes after the restart, it was not stopped by anyone.
+  if (reason.kind === 'aborted' && reason.reason?.kind === 'disposed') return null
+  return finishReasonByKind[reason.kind] ?? null
 }
 
 /** Monotone across Host restarts: a new record always outranks every stored version. */

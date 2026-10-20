@@ -21,7 +21,7 @@ import { threadSidebarSessionArchiveApi } from './session-archive-api.js'
 import { InflightTurns } from './inflight-turns.js'
 import { activeRestartSessionIds, createRestartRecoveryStore } from './restart-recovery.js'
 import { createRestartController, readLaunchUrl } from './restart.js'
-import { settledSessionIdsFromHost, threadSidebarHostSettings } from './settings.js'
+import { RestartResumeSetting, settledSessionIdsFromHost, threadSidebarHostSettings } from './settings.js'
 import { underSettledSession } from './settled-gate.js'
 import { threadSidebarModelRouteProjection } from './subagent-provenance/projection.js'
 import { setThreadActionsContext, threadActionsHost } from './thread-actions-host.js'
@@ -50,8 +50,54 @@ const sessionArchiveApi = threadSidebarSessionArchiveApi.host({
   },
 })
 
+/** How often a pending restart looks for running turns, and how long it waits before restarting anyway. */
+const DRAIN_POLL_MS = 2_000
+const DRAIN_LIMIT_MS = 30 * 60_000
+
+/**
+ * One restart waiting for this Host to go idle. It restarts after two polls in a row find no running turn, so a
+ * queued follow-up that starts right after a turn ends is not cut off; past the limit it restarts anyway, and the
+ * managed restart records whatever still runs so it resumes after boot.
+ */
+let pendingRestart: { readonly since: number; readonly timer: NodeJS.Timeout } | undefined
+
+const runningTurns = (ctx: Context): number => activeRestartSessionIds(ctx.agents.list()).length
+
+const restartWhenIdle = (ctx: Context): void => {
+  if (pendingRestart !== undefined) return
+  const since = Date.now()
+  let idlePolls = 0
+  const timer = setInterval(() => {
+    idlePolls = runningTurns(ctx) === 0 ? idlePolls + 1 : 0
+    if (idlePolls < 2 && Date.now() - since < DRAIN_LIMIT_MS) return
+    clearInterval(timer)
+    pendingRestart = undefined
+    void restartController(ctx)
+      .request()
+      .catch((error: unknown) => {
+        ctx.logger.warn('thread-sidebar: the restart waiting for idle could not start: %s', error instanceof Error ? error.message : String(error))
+      })
+  }, DRAIN_POLL_MS)
+  timer.unref()
+  pendingRestart = { since, timer }
+}
+
 const restartApi = threadSidebarRestartApi.host({
-  availability: ({ ctx }) => ({ available: restartController(ctx).available }),
+  availability: ({ ctx }) => ({
+    available: restartController(ctx).available,
+    pending: pendingRestart === undefined ? null : { since: pendingRestart.since, running: runningTurns(ctx) },
+  }),
+  requestRestartWhenIdle: ({ ctx }) => {
+    if (!restartController(ctx).available) throw new Error('This DSH process is not running under the managed restart launcher.')
+    restartWhenIdle(ctx)
+    return { accepted: true as const }
+  },
+  cancelPendingRestart: () => {
+    if (pendingRestart === undefined) return { canceled: false }
+    clearInterval(pendingRestart.timer)
+    pendingRestart = undefined
+    return { canceled: true }
+  },
   launchUrl: async () => ({ url: await readLaunchUrl() }),
   requestRestart: async ({ ctx }) => {
     try {
@@ -70,6 +116,48 @@ const resumePrompt = [
   'If safe continuation is unclear, explain what needs human input instead of guessing.',
 ].join(' ')
 
+/** Queue the fixed continuation prompt for one recovery row, once: its stable request id makes a repeat a no-op. */
+const resumeRecovery = async (ctx: Context, sessionId: string): Promise<boolean> => {
+  const entry = (await restartRecoveryStore.list()).find(candidate => candidate.sessionId === sessionId)
+  if (entry === undefined) return false
+
+  const active = ctx.agents.list().find(agent => agent.id === SessionId(sessionId))
+  if (active?.status === 'running') {
+    await restartRecoveryStore.complete(sessionId)
+    return true
+  }
+
+  const controller = ctx.get('sessionController')
+  if (controller === undefined) throw new Error('Session resume is unavailable.')
+  await controller.prompt(
+    {
+      // SAFETY: the persisted schema validated this request id as a UUID before it was branded here.
+      requestId: entry.requestId as SessionRequestId,
+      sessionId: SessionId(sessionId),
+      mode: 'queue',
+      content: [{ type: 'text', text: resumePrompt }],
+    },
+    AbortSignal.timeout(15_000),
+  )
+  await restartRecoveryStore.complete(sessionId)
+  return true
+}
+
+/** Rows recorded this long before boot belong to the stop that just happened; older ones wait for a person. */
+const AUTO_RESUME_WINDOW_MS = 30 * 60_000
+/** Lets the session controller and providers finish activating before the first resumed turn starts. */
+const AUTO_RESUME_DELAY_MS = 10_000
+
+const resumeAfterBoot = async (ctx: Context, bootedAt: number): Promise<void> => {
+  if (!RestartResumeSetting.enabled()) return
+  const entries = (await restartRecoveryStore.list()).filter(entry => entry.interruptedAt >= bootedAt - AUTO_RESUME_WINDOW_MS)
+  for (const entry of entries) {
+    await resumeRecovery(ctx, entry.sessionId).catch((error: unknown) => {
+      ctx.logger.warn('thread-sidebar: could not resume %s after the restart: %s', entry.sessionId, error instanceof Error ? error.message : String(error))
+    })
+  }
+}
+
 const recoveryApi = threadSidebarRecoveryApi.host({
   pending: async ({ ctx }) => {
     await restartRecoveryStore.remove(new Set(activeRestartSessionIds(ctx.agents.list())))
@@ -79,31 +167,7 @@ const recoveryApi = threadSidebarRecoveryApi.host({
       entries: entries.map(entry => ({ sessionId: entry.sessionId, reason: entry.reason, interruptedAt: entry.interruptedAt })),
     }
   },
-  resume: async ({ ctx, input }) => {
-    const entry = (await restartRecoveryStore.list()).find(candidate => candidate.sessionId === input.sessionId)
-    if (entry === undefined) return { accepted: false }
-
-    const active = ctx.agents.list().find(agent => agent.id === SessionId(input.sessionId))
-    if (active?.status === 'running') {
-      await restartRecoveryStore.complete(input.sessionId)
-      return { accepted: true }
-    }
-
-    const controller = ctx.get('sessionController')
-    if (controller === undefined) throw new Error('Session resume is unavailable.')
-    await controller.prompt(
-      {
-        // SAFETY: the persisted schema validated this request id as a UUID before it was branded here.
-        requestId: entry.requestId as SessionRequestId,
-        sessionId: SessionId(input.sessionId),
-        mode: 'queue',
-        content: [{ type: 'text', text: resumePrompt }],
-      },
-      AbortSignal.timeout(15_000),
-    )
-    await restartRecoveryStore.complete(input.sessionId)
-    return { accepted: true }
-  },
+  resume: async ({ ctx, input }) => ({ accepted: await resumeRecovery(ctx, input.sessionId) }),
   dismiss: async ({ input }) => {
     const exists = (await restartRecoveryStore.list()).some(entry => entry.sessionId === input.sessionId)
     await restartRecoveryStore.dismiss(input.sessionId)
@@ -229,7 +293,12 @@ export default defineHost({
     // A turn that was still open when the previous Host process stopped never wrote its own recovery
     // record: the crash leaves the marker behind instead, and this process turns it into a visible row.
     ctx.effect(() => {
-      void InflightTurns.promote({ inflight: inflightTurns, recovery: restartRecoveryStore }).catch(() => undefined)
+      const bootedAt = Date.now()
+      const promoted = InflightTurns.promote({ inflight: inflightTurns, recovery: restartRecoveryStore }).catch(() => [])
+      const resumeTimer = setTimeout(() => {
+        void promoted.then(() => resumeAfterBoot(ctx, bootedAt)).catch(() => undefined)
+      }, AUTO_RESUME_DELAY_MS)
+      resumeTimer.unref()
       const stop = ctx.on('session/event', (session, event) => {
         const boundary = InflightTurns.boundaryFromEvent(event)
         if (boundary === null) return
@@ -238,6 +307,9 @@ export default defineHost({
           void inflightTurns.start(sessionId).catch(() => undefined)
           return
         }
+        // A turn this Host's own shutdown cut off keeps its marker: the next process promotes it into a resume row,
+        // which a write racing the five-second shutdown could not guarantee.
+        if (boundary === 'shutdown') return
         // Crash recovery appends an `interrupted` turn end the moment the thread is next loaded, which
         // can land before this process promotes the markers it inherited. Take the marker here so that
         // turn still becomes a resume row instead of being dropped before `promote` can read it.
@@ -247,6 +319,7 @@ export default defineHost({
           .catch(() => undefined)
       })
       return () => {
+        clearTimeout(resumeTimer)
         stop()
       }
     }, 'thread-sidebar: interrupted-turn tracking')

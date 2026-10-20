@@ -120,6 +120,7 @@ const preferencesInputSchema = z
     desktopNotificationsEnabled: z.boolean().default(DEFAULT_PREFERENCES.desktopNotificationsEnabled),
     notificationCategories: threadNotificationCategoriesSchema.optional(),
     applyActionsToChildThreads: z.boolean().default(DEFAULT_PREFERENCES.applyActionsToChildThreads),
+    resumeAfterRestart: z.boolean().default(DEFAULT_PREFERENCES.resumeAfterRestart),
     maxChildren: z.number().int().min(1).max(50).default(DEFAULT_PREFERENCES.maxChildren),
     finishedSubagents: z.enum(['show', 'collapse', 'hide']).default(DEFAULT_PREFERENCES.finishedSubagents),
     threadViews: threadViewSettingsSchema.default(DEFAULT_PREFERENCES.threadViews),

@@ -28,11 +28,18 @@ const turnStartSchema = z.object({ type: z.literal('turn/start') })
 
 const turnEndSchema = z.object({
   type: z.literal('turn/end'),
-  data: z.object({ reason: z.object({ kind: z.string().max(64) }).optional() }).optional(),
+  data: z
+    .object({
+      reason: z.object({ kind: z.string().max(64), reason: z.object({ kind: z.string().max(64) }).optional() }).optional(),
+    })
+    .optional(),
 })
 
-/** A turn opens here, closes here, or closes here because another process ended it first. */
-export type TurnBoundary = 'start' | 'end' | 'interrupted'
+/**
+ * A turn opens here, closes here, closes here because another process ended it first (`interrupted`), or is
+ * cut off by this Host shutting down (`shutdown`: the loop ends it as aborted because its Agent was disposed).
+ */
+export type TurnBoundary = 'start' | 'end' | 'interrupted' | 'shutdown'
 
 /** The recovery rows an in-flight promotion writes, kept structural so this module owns no store. */
 interface RecoveryRecorder {
@@ -48,7 +55,9 @@ const parseTurnBoundary = (event: unknown): TurnBoundary | null => {
   if (turnStartSchema.safeParse(event).success) return 'start'
   const end = turnEndSchema.safeParse(event)
   if (!end.success) return null
-  return end.data.data?.reason?.kind === 'interrupted' ? 'interrupted' : 'end'
+  const reason = end.data.data?.reason
+  if (reason?.kind === 'interrupted') return 'interrupted'
+  return reason?.kind === 'aborted' && reason.reason?.kind === 'disposed' ? 'shutdown' : 'end'
 }
 
 /**

@@ -158,6 +158,21 @@ describe('thread-sidebar attention wiring', () => {
     expect(await inflightSessionIds(harness.home)).toEqual([])
   })
 
+  it('keeps the marker of a turn its own shutdown cut off, so the next process can resume it', async () => {
+    const harness = await startHarness()
+    harness.dispatch({ type: 'turn/start', seq: 4, time: 1, data: { turn: 1 } })
+    await vi.waitFor(async () => expect(await inflightSessionIds(harness.home)).toEqual(['session-1']))
+
+    harness.dispatch({ type: 'turn/end', seq: 5, time: 2, data: { turn: 1, reason: { kind: 'aborted', reason: { kind: 'disposed' } } } })
+    await new Promise(resolve => setTimeout(resolve, 100))
+    expect(await inflightSessionIds(harness.home)).toEqual(['session-1'])
+    expect(await createRestartRecoveryStore({ home: harness.home }).list()).toEqual([])
+
+    harness.dispatch({ type: 'turn/start', seq: 6, time: 3, data: { turn: 2 } })
+    harness.dispatch({ type: 'turn/end', seq: 7, time: 4, data: { turn: 2, reason: { kind: 'aborted', reason: { kind: 'user' } } } })
+    await vi.waitFor(async () => expect(await inflightSessionIds(harness.home)).toEqual([]))
+  })
+
   it('promotes the turns a previous process left open as interrupted recoveries', async () => {
     const harness = await startHarness(async home => {
       await mkdir(join(home, 'runtime'), { recursive: true })

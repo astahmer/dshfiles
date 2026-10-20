@@ -75,6 +75,9 @@ export const threadSidebarSettings = defineSettings({
     notificationCategories: Schema.transform(Schema.any(), value => threadNotificationCategoriesSchema.parse(value))
       .default(DEFAULT_PREFERENCES.notificationCategories)
       .hidden(),
+    resumeAfterRestart: Schema.boolean()
+      .default(DEFAULT_PREFERENCES.resumeAfterRestart)
+      .description('When DSH starts again, continue the threads that were working when it stopped (a restart, a crash or a forced stop).'),
     applyActionsToChildThreads: Schema.boolean()
       .default(DEFAULT_PREFERENCES.applyActionsToChildThreads)
       .description('Apply manual pin, park, archive, and restore actions to all child threads.'),
@@ -165,6 +168,7 @@ export const threadSidebarSettings = defineSettings({
 
 let readSettledStatus: (() => SettledStatus) | undefined
 let readParkedSessionIds: (() => readonly string[]) | undefined
+let readResumeAfterRestart: (() => boolean) | undefined
 let writeSettledStatus: ((next: SettledStatus, parkedSessionIds?: readonly string[]) => Promise<void>) | undefined
 
 /**
@@ -182,10 +186,13 @@ export const threadSidebarHostSettings = threadSidebarSettings.host({
         ...(parkedSessionIds === undefined ? undefined : { parkedSessionIds: [...parkedSessionIds] }),
       })
     }
+    const readResume = (): boolean => scope.get().resumeAfterRestart
     readSettledStatus = read
     readParkedSessionIds = readParked
     writeSettledStatus = write
+    readResumeAfterRestart = readResume
     return () => {
+      if (readResumeAfterRestart === readResume) readResumeAfterRestart = undefined
       if (readSettledStatus !== read) return
       readSettledStatus = undefined
       readParkedSessionIds = undefined
@@ -193,6 +200,17 @@ export const threadSidebarHostSettings = threadSidebarSettings.host({
     }
   },
 })
+
+export class RestartResumeSetting {
+  /** Whether threads cut off by the previous Host process resume on their own; on until the setting says otherwise. */
+  static enabled(): boolean {
+    try {
+      return readResumeAfterRestart?.() ?? true
+    } catch {
+      return true
+    }
+  }
+}
 
 /** Settled Session ids on this Host; empty while the namespace is unregistered (desktop shells, older builds). */
 export const settledSessionIdsFromHost = (): readonly string[] => {

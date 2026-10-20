@@ -134,6 +134,8 @@ export interface SidebarPreferences {
   desktopNotificationsEnabled: boolean
   notificationCategories: ThreadNotificationCategories
   applyActionsToChildThreads: boolean
+  /** Continue the threads a stopped Host cut off once it starts again. */
+  resumeAfterRestart: boolean
   /** Child threads listed under a parent before the "N more…" line. */
   maxChildren: number
   finishedSubagents: FinishedSubagentsMode
@@ -200,6 +202,7 @@ export const DEFAULT_PREFERENCES: SidebarPreferences = {
   desktopNotificationsEnabled: false,
   notificationCategories: DEFAULT_THREAD_NOTIFICATION_CATEGORIES,
   applyActionsToChildThreads: true,
+  resumeAfterRestart: true,
   maxChildren: 3,
   finishedSubagents: 'collapse',
   threadViews: DEFAULT_THREAD_VIEW_SETTINGS,
