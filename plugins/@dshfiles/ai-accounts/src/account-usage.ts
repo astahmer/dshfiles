@@ -2,6 +2,8 @@ import type { AccountProfile, UsageCard } from './api.js'
 import { ClaudeAccountModel, claudeAccountService } from './claude-account.js'
 import { AccountStoreModel } from './account-store.js'
 import { readCommandCodeUsage } from './commandcode-usage.js'
+import type { OAuthCredential } from '@earendil-works/pi-ai'
+import { readCopilotUsage } from './copilot-quota.js'
 import { CredentialModel, type CredentialValueResolver } from './credentials.js'
 import { readCursorUsage } from './cursor-account.js'
 import { ProviderUsageModel, readCodexUsage, readOpenCodeUsage } from './usage.js'
@@ -17,6 +19,8 @@ export const readAccountUsage = async (input: {
   readonly shadowRoot: string
   readonly signal?: AbortSignal | undefined
   readonly resolveCredential?: CredentialValueResolver | undefined
+  /** The Copilot account's stored OAuth grant. */
+  readonly readCopilotCredential?: ((instanceId: string) => Promise<OAuthCredential | undefined>) | undefined
 }): Promise<UsageCard> => {
   const { account, signal } = input
   switch (account.kind) {
@@ -34,7 +38,7 @@ export const readAccountUsage = async (input: {
     case 'commandcode':
       return readCommandCodeUsage({ keyEnv: account.apiKeyEnv, apiBaseUrl: account.apiBaseUrl, resolveCredential: input.resolveCredential }, signal)
     case 'github-copilot':
-      return ProviderUsageModel.emptyUsage('unsupported', 'GitHub does not expose a supported subscription quota endpoint.')
+      return readCopilotUsage({ credential: await input.readCopilotCredential?.(account.instanceId), signal })
     case 'cursor':
       return readCursorUsage(account.apiKeyEnv, signal, input.resolveCredential)
     case 'opencode-go': {

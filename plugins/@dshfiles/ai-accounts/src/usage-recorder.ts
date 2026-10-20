@@ -5,6 +5,9 @@ import { mapRollingUntilAborted } from './rolling-concurrency.js'
 import { usageMetaSchema, type UsageMeta, type UsageHistorySettings } from './usage-history-model.js'
 import type { AccountProfile, UsageCard } from './api.js'
 import type { CredentialValueResolver } from './credentials.js'
+import { createCopilotCredentialsService } from './copilot-credentials.js'
+
+type CopilotCredentialReader = ReturnType<typeof createCopilotCredentialsService>['read']
 
 /**
  * Quota history collection.
@@ -30,9 +33,9 @@ interface AccountsForCollection {
 }
 
 const providerReader =
-  (shadowRoot: string, resolveCredential?: CredentialValueResolver): AccountUsageReader =>
+  (shadowRoot: string, resolveCredential: CredentialValueResolver | undefined, readCopilotCredential: CopilotCredentialReader): AccountUsageReader =>
   (account, signal) =>
-    readAccountUsage({ account, shadowRoot, signal, resolveCredential })
+    readAccountUsage({ account, shadowRoot, signal, resolveCredential, readCopilotCredential })
 
 const facilityOf = (ctx: Context) => ctx.get('storageDomain')
 type Facility = NonNullable<ReturnType<typeof facilityOf>>
@@ -210,7 +213,7 @@ const createUsageHistoryScheduler = (
       const recorded = await collectUsageHistory(
         ctx,
         source.accounts,
-        options.readUsage ?? providerReader(source.shadowRoot, options.resolveCredential),
+        options.readUsage ?? providerReader(source.shadowRoot, options.resolveCredential, createCopilotCredentialsService(ctx.get('credentials')).read),
         currentController.signal,
       )
       if (currentController.signal.aborted) return recorded
