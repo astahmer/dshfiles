@@ -471,6 +471,21 @@ export default defineClient({
 
     const openThread = (sessionId: SessionSummary['id']): void => ctx.uiWorkspace.openSession(sessionId)
 
+    /**
+     * Navigation history can point at a thread archived since the visit. Restore it before opening:
+     * native navigation clears an archived main Session right after it opens, releasing the reference.
+     */
+    const openSessionRestoringArchived = (sessionId: SessionSummary['id']): void => {
+      if (!ctx.workspaces.list.getSnapshot().archivedSessionIds.includes(sessionId)) {
+        openThread(sessionId)
+        return
+      }
+      void ctx.workspaces.unarchiveSession(sessionId).then(
+        () => openThread(sessionId),
+        () => undefined,
+      )
+    }
+
     const SidebarRootAdapter = (props: SidebarShellBaseProps): JSX.Element => (
       <SidebarRoot
         {...props}
@@ -478,7 +493,7 @@ export default defineClient({
         subscribeFooterSnapshot={subscribeFooterSnapshot}
         readClientRevisionKey={readClientRevisionKey}
         subscribeClientRevisions={subscribeClientRevisions}
-        openSession={openThread}
+        openSession={openSessionRestoringArchived}
         runCommand={runCommand}
       />
     )

@@ -1589,6 +1589,39 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   }, [acknowledgeAttention, acknowledgeManualUnread, selectedAttention, selectedSessionId])
   threadTitle.current = sessionId => sessionState.byId[sessionId]?.displayTitle
 
+  const selectThread = (sessionId: SessionSummary['id']): void => {
+    const opened = attention.records.get(sessionId)
+    if (opened !== undefined) attention.clearUnread(sessionId, opened.version)
+    setRouteRequest(null)
+    openedRouteId.current = sessionId
+    suppressUrlForSession.current = null
+    const session = sessionState.byId[sessionId]
+    const workspaceId =
+      session === undefined
+        ? undefined
+        : (realWorkspaceBySession.get(session.id) ?? SidebarOrganization.workspaceForLineage(session, sessionState.byId, workspaceBySession))
+    window.history.replaceState(window.history.state, '', buildThreadUrl(window.location.href, sessionId, workspaceId))
+    props.open(sessionId)
+  }
+
+  /**
+   * Select the thread in the main view. An archived thread is restored first: DSH drops an archived
+   * Session from the main view on every list change, so opening one without restoring it fails as a
+   * released Session reference — restoring is the one click that replaces that retry fight.
+   */
+  const openThread = (sessionId: SessionSummary['id']): void => {
+    if (archivedSessionIds.has(sessionId)) {
+      void props.unarchiveSession(sessionId).then(
+        () => selectThread(sessionId),
+        () => setNotice({ tone: 'danger', message: props.tSidebar('threadSidebarActionFailure') }),
+      )
+      return
+    }
+    selectThread(sessionId)
+  }
+  const openThreadRef = useRef(openThread)
+  openThreadRef.current = openThread
+
   useEffect(() => {
     const onPopState = (): void => {
       const requested = readThreadUrl(window.location.href)?.sessionId ?? null
@@ -1616,8 +1649,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     }
     if (openedRouteId.current === routeRequest) return
     openedRouteId.current = routeRequest
-    props.open(target.id)
-  }, [props.open, props.tSidebar, routeRequest, sessions, sessionState.phase, setNotice])
+    openThreadRef.current(target.id)
+  }, [archivedSessionIds, props, routeRequest, sessions, sessionState.phase, setNotice])
 
   useEffect(() => {
     if (selectedSession === undefined || routeRequest !== null) return
@@ -1798,37 +1831,6 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   }
 
   const tSidebar = props.tSidebar
-
-  const selectThread = (sessionId: SessionSummary['id']): void => {
-    const opened = attention.records.get(sessionId)
-    if (opened !== undefined) attention.clearUnread(sessionId, opened.version)
-    setRouteRequest(null)
-    openedRouteId.current = sessionId
-    suppressUrlForSession.current = null
-    const session = sessionState.byId[sessionId]
-    const workspaceId =
-      session === undefined
-        ? undefined
-        : (realWorkspaceBySession.get(session.id) ?? SidebarOrganization.workspaceForLineage(session, sessionState.byId, workspaceBySession))
-    window.history.replaceState(window.history.state, '', buildThreadUrl(window.location.href, sessionId, workspaceId))
-    props.open(sessionId)
-  }
-
-  /**
-   * Select the thread in the main view. An archived thread is restored first: DSH drops an archived
-   * Session from the main view on every list change, so opening one without restoring it fails as a
-   * released Session reference — restoring is the one click that replaces that retry fight.
-   */
-  const openThread = (sessionId: SessionSummary['id']): void => {
-    if (archivedSessionIds.has(sessionId)) {
-      void props.unarchiveSession(sessionId).then(
-        () => selectThread(sessionId),
-        () => setNotice({ tone: 'danger', message: props.tSidebar('threadSidebarActionFailure') }),
-      )
-      return
-    }
-    selectThread(sessionId)
-  }
 
   const copyContextValue = async (value: string, successMessage: string): Promise<void> => {
     setNotice(
