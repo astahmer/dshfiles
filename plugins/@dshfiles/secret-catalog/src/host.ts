@@ -8,6 +8,7 @@ import { runSecretCli } from './secret-cli-runner.js'
 import { createSecretTools } from './secret-tools.js'
 import { secretCatalogSettings } from './settings.js'
 import { createSecretCatalogCredentialBridge } from './credential-bridge.js'
+import { createSecretCatalogValues } from './secret-reference-resolver.js'
 
 export type { SecretCatalogCredentialBridge, SecretCatalogKeyOption } from './credential-bridge.js'
 
@@ -60,6 +61,7 @@ export default defineHost({
         getCredentials: () => ctx.get('credentials'),
       }),
     )
+    ctx.provide('secretCatalogValues', createSecretCatalogValues({ operations: operationsFor(ctx) }))
     ctx.effect(
       () => () => {
         if (hostContext === ctx) hostContext = undefined
