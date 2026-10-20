@@ -45,6 +45,7 @@ import { ConversationSession, ConversationSessionHeader } from './skeleton/Conve
 import { InputBar } from './skeleton/InputBar.tsx'
 import { todoDockEntry } from './skeleton/TodoPanel.tsx'
 import { installStopShortcut } from './stop-shortcut.ts'
+import { liveViewBindings } from './conversation/live-bindings.ts'
 import { TRAJECTORY_VIEW_ID, resolveActiveView } from './view-selection.ts'
 import { en, NS, zh, type ConversationKey } from './locales.ts'
 import { CONVERSATION_SETTINGS_NAMESPACE, type ConversationSettings } from '../submission-settings.ts'
@@ -243,7 +244,12 @@ export function apply(ctx: Context, config: Config = Config({})): void {
         return candidate !== undefined && tab.id === candidate.id && tab.label === candidate.label
       })
     if (!unchanged) conversationViews.set(next)
-    for (const binding of bindings) restoreView(binding.sessionId)
+    const live = liveViewBindings({
+      bindings,
+      current: sessionId => sessions.binding(sessionId),
+      onDrop: binding => { trackedBindings.delete(binding) },
+    })
+    for (const binding of live) restoreView(binding.sessionId)
   }
   ctx.effect(() => {
     const disposeViews = slots.subscribe('conversation.view', refreshViews)
