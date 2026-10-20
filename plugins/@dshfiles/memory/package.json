@@ -17,6 +17,10 @@
     "./api": {
       "types": "./src/api.ts",
       "default": "./src/api.ts"
+    },
+    "./workspace-scripts-api": {
+      "types": "./src/workspace-scripts-api.ts",
+      "default": "./src/workspace-scripts-api.ts"
     }
   },
   "scripts": {

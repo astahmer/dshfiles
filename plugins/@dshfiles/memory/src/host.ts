@@ -22,6 +22,9 @@ import { createPricingCatalog, DEFAULT_PRICING_PATH, resolveRouteQuote } from '@
 
 import { memoryApi, type MemoryCostLine, type MemoryCosts, type MemoryUsage, type PanelNote, type PanelThread } from './api.ts'
 import { projectPathFor } from './project-path.ts'
+import { MemoryGuidance } from './guidance.ts'
+import { ProjectScripts, type WorkspaceScripts } from './project-scripts.ts'
+import { workspaceScriptsApi } from './workspace-scripts-api.ts'
 import { createMemoryRuntime, type Caller, type MemoryRuntime, type MemoryServices, type SessionTitleRead } from './runtime.ts'
 import { MemorySessionList } from './session-list.ts'
 import { memorySettings, type MemorySettings } from './settings.ts'
@@ -62,6 +65,12 @@ const textOf = (blocks: readonly { readonly type: string; readonly text?: string
 const embedders = new Map<string, Promise<MemoryEmbedder>>()
 
 const listedTitleSchema = z.string().min(1)
+
+/** A thread workspace's project scripts, or null outside a project with a lockfile or when they cannot be written. */
+const workspaceScriptsFor = async (cwd: string | undefined): Promise<WorkspaceScripts | null> => {
+  if (cwd === undefined) return null
+  return ProjectScripts.ensure({ root: dshHomePath('plugins', 'memory', 'projects'), project: await projectPathFor(cwd) }).catch(() => null)
+}
 
 const hostServices = (ctx: Context): MemoryServices => {
   const sessionQuery = () => {
@@ -397,6 +406,10 @@ const instant = (value: string | undefined, endOfDay: boolean): number | undefin
   return dateOnly && endOfDay ? parsed + dayMs - 1 : parsed
 }
 
+const workspaceScriptsHost = workspaceScriptsApi.host({
+  scripts: async ({ input }) => workspaceScriptsFor(input.cwd),
+})
+
 const panelApi = memoryApi.host({
   search: ({ input, caller }) => withRuntime(active => active.search(callerOf(caller), input)),
   findThreads: ({ input, caller }) =>
@@ -533,9 +546,14 @@ const setup = (ctx: Context): void => {
         const first = log?.events.find(event => event.type === 'user/message' && event.data.source.kind === 'user')
         return first?.type === 'user/message' ? textOf(first.data.content) : undefined
       })
-      if (text.length === 0) return assembled
+      const scripts = await workspaceScriptsFor(agent.session.header.cwd)
+      const sections = [
+        ...(text.length === 0 ? [] : [{ name: 'dshfiles-memory:start-block', text, interpolate: false }]),
+        ...(scripts === null ? [] : [{ name: 'dshfiles-memory:workspace-scripts', text: MemoryGuidance.workspaceScripts(scripts), interpolate: false }]),
+      ]
+      if (sections.length === 0) return assembled
       active.countBlockRequest(Buffer.byteLength(text))
-      return { ...assembled, sections: [...assembled.sections, { name: 'dshfiles-memory:start-block', text, interpolate: false }] }
+      return { ...assembled, sections: [...assembled.sections, ...sections] }
     } catch (error) {
       logger.warn('memory: no start block for %s: %s', agent.id, error instanceof Error ? error.message : String(error))
       return assembled
@@ -573,6 +591,6 @@ const setup = (ctx: Context): void => {
 export default defineHost({
   name: '@dshfiles/memory',
   settings: [ownedSettings],
-  apis: [panelApi],
+  apis: [panelApi, workspaceScriptsHost],
   setup,
 })
