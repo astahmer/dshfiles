@@ -113,6 +113,7 @@ export default defineClient({
     'sidebarRightTabs',
     'resources',
     'remote',
+    'remote.session',
     'remote.workspace',
     'remote.sessionReferenceResolver',
     'remote.skills',
