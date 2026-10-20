@@ -238,6 +238,20 @@ const THREAD_COMPOSER = 'Message or run a task, / commands, @ files or sessions'
 const NEW_THREAD_COMPOSER = 'Describe what you want to build, / commands, @ files or sessions'
 const FAKE_MODEL = 'commandcode_work/gpt-6-luna'
 
+When('backlog card b:{int} is expanded', async ({ page }: { page: Page }, id: number) => {
+  await page.getByRole('button', { name: 'Board', exact: true }).click()
+  const card = page.getByRole('article', { name: `Card b:${String(id)}` })
+  await card.click()
+  await expect(card).toHaveAttribute('aria-expanded', 'true')
+})
+
+When('the Start button on backlog card b:{int} is clicked', async ({ page }: { page: Page }, id: number) => {
+  const card = page.getByRole('article', { name: `Card b:${String(id)}` })
+  await expect(card.getByRole('button', { name: 'Start', exact: true })).toBeVisible()
+  await expect(card.getByRole('button', { name: 'Open', exact: true })).toBeVisible()
+  await card.getByRole('button', { name: 'Start', exact: true }).click()
+})
+
 When('backlog item b:{int} is right-clicked for a thread', async ({ page }: { page: Page }, id: number) => {
   await feed(page)
     .getByRole('article', { name: `Item b:${String(id)}`, exact: true })

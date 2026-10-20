@@ -46,12 +46,13 @@ Feature: Backlog
     Then the feed narrows back to "composer drops chips on paste"
 
   @scenario:backlog.start-thread
-  Scenario: Start a thread for an item from its context menu
+  Scenario: Start a thread from an expanded board card
     Given the isolated plugin composition of "@dshfiles/backlog, @dshfiles/ai-accounts" is booted
     When a Command Code account backed by a local fake provider is added
     And the Backlog panel is opened
     And "Ship the thread starter" is captured
-    When backlog item b:1 is right-clicked for a thread
+    When backlog card b:1 is expanded
+    And the Start button on backlog card b:1 is clicked
     Then the start thread dialog offers the account model and the Host default folder
     And the start thread dialog sends the prefilled message by default
     When the thread is started from the dialog without a first message

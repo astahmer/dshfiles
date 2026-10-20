@@ -85,7 +85,11 @@ const CardFace = (props: { readonly item: BacklogSummaryView; readonly onPickSta
 }
 
 /** The expanded half of a card: the latest few events, then the actions that fit its state. */
-const CardDetail = (props: { readonly item: BacklogSummaryView; readonly open: (id: number) => void }): JSX.Element => {
+const CardDetail = (props: {
+  readonly item: BacklogSummaryView
+  readonly open: (id: number) => void
+  readonly startThread: (item: BacklogSummaryView) => void
+}): JSX.Element => {
   const api = useApi(backlogApi)
   const actions = useBacklogActions()
   const item = props.item
@@ -143,6 +147,9 @@ const CardDetail = (props: { readonly item: BacklogSummaryView; readonly open: (
             Resolve
           </Button>
         )}
+        <Button size="xs" variant="outline" title="Start a thread for this item" onClick={() => props.startThread(item)}>
+          Start
+        </Button>
         <Button size="xs" variant="outline" onClick={() => props.open(item.id)}>
           Open
         </Button>
@@ -267,7 +274,7 @@ export const BoardView = (props: {
                     )}
                   >
                     <CardFace item={item} onPickStatus={status => move(item.id, status)} />
-                    {expanded === item.id ? <CardDetail item={item} open={props.open} /> : null}
+                    {expanded === item.id ? <CardDetail item={item} open={props.open} startThread={props.startThread} /> : null}
                   </article>
                 </BacklogItemMenu>
               ))}
