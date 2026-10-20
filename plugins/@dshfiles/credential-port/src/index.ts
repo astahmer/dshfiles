@@ -1,6 +1,18 @@
 import type {} from '@deepseek-ai/cordis'
 import { z } from 'zod'
 
+export {
+  DEFAULT_SECRET_ENVIRONMENT,
+  formatSecretReference,
+  parseSecretReference,
+  secretAliasSchema,
+  secretEnvironmentSchema,
+  secretReferenceSchema,
+  type SecretCatalogValues,
+  type SecretReference,
+  type SecretReferenceResolution,
+} from './secret-reference.js'
+
 /**
  * The port a secrets catalog provides on the Cordis Context and credential consumers call. It lives in its own package
  * because both sides import it: whichever plugin owned it would make the other depend on that plugin's whole dependency
