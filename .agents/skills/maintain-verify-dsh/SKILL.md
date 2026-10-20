@@ -44,8 +44,12 @@ If none applies, stop: **Clean**.
    dshx dev doctor
    dshx dev open <plugin>/<feature>      # each affected feature
    dshx dev shot --label <feature> --json
-   dshx dev down && pgrep -fl 'dshx-boot-profile|browser-host.js' || echo clean
+   dshx dev down && pgrep -fl 'dshx-boot-profile|browser-host.js|scratch/watchdog.js' || echo clean
    ```
+   `up` runs `down` on other agents' stale instances under the state root. A
+   spec or live pass that exercises the lease, watchdog or sweep sets
+   `DSHX_DEV_STATE_ROOT` to its own temp dir (`dev-scratch.spec.ts` does), so
+   it can never stop an instance in `$TMPDIR/dshx-dev`.
    A `reach` not walked green in this session stays unverified; say so.
    Then `pnpm check:e2e <plugin>` for each touched plugin: its journeys must be
    green before landing (`pnpm check` runs only the `@smoke` subset). A shared

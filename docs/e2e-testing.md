@@ -244,7 +244,9 @@ signature — a reused pid or an unrecorded lookalike is dropped, never killed.
 `tooling/dshx/scripts/reap-scratch-processes.mjs` runs the same sweep from a
 shell (`--dry-run`, `--workspace`, `--min-age-seconds`), and its `--patterns`
 mode is the blunt instrument for a one-off cleanup: that one does match a live
-`dshx dev up` Host.
+`dshx dev up` Host. A `dshx dev up` instance stops itself instead: its watchdog
+runs `down` after 30 idle minutes or once its Host exits, and the next `up`
+sweeps any state left behind.
 
 ### What one change re-runs
 

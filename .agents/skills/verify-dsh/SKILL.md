@@ -28,7 +28,8 @@ bookmark, starts `dsh` on a free port and a headless Chromium. Without
 failure; diagnose its Host activation issue and record a Host gap instead of
 relaxing `doctor`. `--skip-build` reuses `dist/`; `--project <dir>` registers a
 real folder instead (kept on `down`); `--name` runs another instance beside it.
-Takes ~20 s for three bundles.
+Takes ~20 s for three bundles. `up` first runs `down` on every instance under
+the state root whose lease expired or whose `dsh` exited, and names each one.
 
 ## Doctor
 
@@ -36,8 +37,9 @@ Takes ~20 s for three bundles.
 dshx dev doctor          # exit 1 on any failed check; each failure prints its fix
 ```
 
-Isolation, both processes alive and still ours, URL authenticates, every plugin
-entry active and every bundle under test loaded, no error lines in the host log.
+Isolation, both processes alive and still ours, the auto-stop watchdog running,
+URL authenticates, every plugin entry active and every bundle under test loaded,
+no error lines in the host log.
 
 ## Drive
 
@@ -91,8 +93,13 @@ and redacted. Report the paths and the counts, not the raw log.
 ```sh
 dshx dev down --dry-run   # what it would stop and delete
 dshx dev down
-pgrep -fl 'dshx-boot-profile|browser-host.js' || echo clean
+pgrep -fl 'dshx-boot-profile|browser-host.js|scratch/watchdog.js' || echo clean
 ```
+
+Always `down` when done. As a backstop, a detached watchdog runs `down` once the
+instance went 30 min without a `dshx dev` command (each one renews the lease,
+the state file's mtime) or once its `dsh` exits. `up --idle-timeout <min>`
+changes it; `0` disables only the idle stop.
 
 ## Journeys
 
@@ -157,6 +164,8 @@ dsh-our-free-model` loads the web profile's keyless free-model bundle (its
   seed's fake provider.
 - Several workspaces run `dshx dev` at once and the state dir is keyed by name only:
   pass `--name <topic>` to every command.
+- `not-up` after a long pause means the watchdog stopped the idle instance
+  (evidence stays): `up` again, or pass a longer `--idle-timeout` for long gaps.
 
 ## Safety
 
