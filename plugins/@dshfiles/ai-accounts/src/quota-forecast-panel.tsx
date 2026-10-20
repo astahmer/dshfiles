@@ -57,14 +57,14 @@ export const QuotaForecastPanel = (props: { readonly onBack: () => void }): JSX.
   const report = QuotaCoverageModel.report({ accounts: coverageInputs, now, workHours })
   const plans = QuotaCoverageModel.handoffs({ accounts: coverageInputs, now, workHours })
 
-  const headline =
-    view === 'coverage'
-      ? CoverageBoardView.headline(report)
-      : view === 'handoff'
-        ? HandoffBoardView.headline(plans, now)
-        : view === 'pace'
-          ? PaceBoardView.headline(pace, now)
-          : ForecastBoardView.headline(board)
+  const headlineByView = {
+    forecast: () => ForecastBoardView.headline(board),
+    table: () => ForecastBoardView.headline(board),
+    pace: () => PaceBoardView.headline(pace, now),
+    coverage: () => CoverageBoardView.headline(report),
+    handoff: () => HandoffBoardView.headline(plans, now),
+  }
+  const headline = headlineByView[view]()
 
   return (
     <main className="dshx-root dshx:@container dshx:flex dshx:h-full dshx:min-h-0 dshx:w-full dshx:flex-col dshx:gap-5 dshx:overflow-auto dshx:px-6 dshx:py-5 dshx:@max-pane-narrow:px-3">

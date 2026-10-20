@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createAccountPool } from './account-pool.js'
-import { failoverAccountIds, selectRequestAccount, wireAccountFor } from './request-account-routing.js'
+import { RequestAccountRouting } from './request-account-routing.js'
 
 const routes = new Map<string, { readonly kind: string; readonly enabled: boolean }>([
   ['codex-work', { kind: 'codex', enabled: true }],
@@ -42,7 +42,7 @@ const modelsCompatible = (sourceProvider: string, candidateProvider: string, mod
   modelSurfaces.get(`${sourceProvider}:${model}`) === modelSurfaces.get(`${candidateProvider}:${model}`)
 
 const select = (input: { readonly provider: string; readonly model: string; readonly pool: ReturnType<typeof poolFor>; readonly now?: number }): string =>
-  selectRequestAccount({
+  RequestAccountRouting.selectRequestAccount({
     provider: input.provider,
     model: input.model,
     conversationKey: 'session-one',
@@ -92,13 +92,13 @@ describe('request account routing', () => {
       modelsCompatible,
     }
 
-    expect(failoverAccountIds({ ...input, distribution: 'priority' })).toEqual(['codex-personal', 'codex-alt'])
-    expect(failoverAccountIds({ ...input, distribution: 'sticky' })).toEqual(['codex-alt', 'codex-personal'])
+    expect(RequestAccountRouting.failoverAccountIds({ ...input, distribution: 'priority' })).toEqual(['codex-personal', 'codex-alt'])
+    expect(RequestAccountRouting.failoverAccountIds({ ...input, distribution: 'sticky' })).toEqual(['codex-alt', 'codex-personal'])
   })
 
   it('keeps failover inside enabled same-provider model routes and skips hidden accounts', () => {
     expect(
-      failoverAccountIds({
+      RequestAccountRouting.failoverAccountIds({
         from: 'codex-work',
         model: 'gpt-6',
         routes,
@@ -114,7 +114,7 @@ describe('request account routing', () => {
     const pool = poolFor('priority')
     pool.noteRateLimited('codex-work', 60_000, 1_000)
     const wire = (purpose: string | undefined) =>
-      wireAccountFor({
+      RequestAccountRouting.wireAccountFor({
         provider: 'codex-work',
         model: 'gpt-6',
         purpose,
@@ -134,7 +134,7 @@ describe('request account routing', () => {
     const pool = poolFor('priority')
 
     expect(
-      wireAccountFor({
+      RequestAccountRouting.wireAccountFor({
         provider: 'codex-personal',
         model: 'gpt-6',
         purpose: undefined,
