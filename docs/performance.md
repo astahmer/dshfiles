@@ -63,8 +63,19 @@ Result on live (2026-10-20, after the session-search and memory fixes, within on
 
 ## Still open
 
-- A Host's first open of a long thread decodes the whole Session log (69 MB compressed for the 26 MB thread): 1.4–1.7 s.
-  That is `dsh-session-persistence-jsonl` loading the Session, below the controller.
+- A Host's first open of a long thread decodes the whole Session log (69 MB compressed for the 26 MB thread): 1.5 s
+  to history on a cold Host. That is `dsh-session-persistence-jsonl` loading the Session, below the controller; the
+  fix is an opening snapshot served from the log's tail, a fork of that persistence row.
+
+## First open of a thread (2026-10-20)
+
+Opening a cold thread used to resume its Agent right after the snapshot went out: agent restore, `dsh-context` and
+the projection cells (`materializeCells`) held the Host's main thread for about 1.2 s, and the browser's first frames
+waited behind it. `@dshfiles/session-controller` now leaves the Agent cold on open (a log that stops inside a turn
+still resumes, so its crash closers land), and `@dshfiles/rich-composer` resumes it on the first draft edit through
+its `agent-warmup` API, while the person types. Cold Host, same probe: the 358 KB thread 2.1 s → 0.76 s to history,
+the 69 MB thread 2.1–3.4 s → 1.5 s; a warmup call answers in about 0.2 s.
+
 - Third-party `dsh-context/detail` reads each Session once per Host (0.4–2 s), then answers in under 100 ms.
 - Native per-switch catalogs (`skills/list`, `commands/list`, `schedule/list`, `agentPresets/list`, `session/modelCatalog`)
   answer under 250 ms on a warm Host but still run on every switch: Host gap 69.
