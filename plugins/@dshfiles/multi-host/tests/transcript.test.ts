@@ -54,3 +54,37 @@ describe('remote transcript reduction', () => {
     expect(cancelled.entries.at(-1)).toEqual({ seq: 30, kind: 'status', text: 'Turn ended: cancelled' })
   })
 })
+
+const toolCall = (seq: number, name: string) => event(seq, 'tool/call', { callId: 'call-1', name, arguments: '{}' })
+const toolResult = (seq: number) =>
+  event(seq, 'tool/result', { message: { role: 'tool', toolCallId: 'call-1', isError: false, content: [{ type: 'text', text: 'done' }] } })
+
+describe('remote transcript pending detection', () => {
+  test('an open ask_user_question call while the turn runs is a question, including an MCP-prefixed name', () => {
+    expect(reduceTranscript([event(1, 'turn/start', { turn: 1 }), toolCall(2, 'ask_user_question')]).waiting).toEqual({
+      kind: 'question',
+      tool: 'ask_user_question',
+      since: 2,
+    })
+    expect(reduceTranscript([event(1, 'turn/start', { turn: 1 }), toolCall(2, 'mcp__dsh__ask_user_question')]).waiting).toEqual({
+      kind: 'question',
+      tool: 'mcp__dsh__ask_user_question',
+      since: 2,
+    })
+    expect(reduceTranscript([event(1, 'turn/start', { turn: 1 }), toolCall(2, 'ask_parent_question')]).waiting?.kind).toBe('question')
+  })
+
+  test('the question result clears the wait', () => {
+    expect(reduceTranscript([event(1, 'turn/start', { turn: 1 }), toolCall(2, 'ask_user_question'), toolResult(3)]).waiting).toBeUndefined()
+  })
+
+  test('an open bash call is a tool wait', () => {
+    expect(reduceTranscript([event(1, 'turn/start', { turn: 1 }), toolCall(2, 'bash')]).waiting).toEqual({ kind: 'tool', tool: 'bash', since: 2 })
+  })
+
+  test('a turn end clears the wait', () => {
+    expect(
+      reduceTranscript([event(1, 'turn/start', { turn: 1 }), toolCall(2, 'ask_user_question'), event(3, 'turn/end', { reason: { kind: 'completed' } })]).waiting,
+    ).toBeUndefined()
+  })
+})

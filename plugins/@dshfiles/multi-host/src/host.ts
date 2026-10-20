@@ -692,6 +692,7 @@ const multiHostHandlers = multiHostApi.host({
             ...(snapshot.header?.cwd === undefined ? {} : { cwd: snapshot.header.cwd }),
             ...(reduced.title === undefined ? {} : { title: reduced.title }),
             ...(reduced.model === undefined ? {} : { model: reduced.model }),
+            ...(reduced.waiting === undefined ? {} : { waiting: reduced.waiting }),
             running: reduced.running,
             entries: reduced.entries,
           }

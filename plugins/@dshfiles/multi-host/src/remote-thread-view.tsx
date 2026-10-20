@@ -53,6 +53,7 @@ export const RemoteThreadView = () => {
   const queryClient = useQueryClient()
   const ref = openRemoteThreadRef.useValue()
   const [reply, setReply] = useState('')
+  const [firstSeen, setFirstSeen] = useState<{ readonly since: number; readonly at: number } | null>(null)
   const bottom = useRef<HTMLDivElement>(null)
   const threads = useQuery({ queryKey: multiHostKeys.threads, queryFn: ({ signal }) => api.threadList(undefined, { signal }), refetchInterval: 15_000 })
   const directory = useQuery(multiHostQueries.directory(api))
@@ -107,6 +108,17 @@ export const RemoteThreadView = () => {
     // scrollIntoView can return a Promise; returning it would become the effect cleanup.
     bottom.current?.scrollIntoView({ block: 'end' })
   }, [entryCount, data?.running])
+
+  const waitingSince = data?.waiting?.since
+  useEffect(() => {
+    setFirstSeen(current => {
+      if (waitingSince === undefined) return current === null ? current : null
+      return current?.since === waitingSince ? current : { since: waitingSince, at: Date.now() }
+    })
+  }, [waitingSince])
+  const waiting = data?.waiting
+  // A long tool call and a pending approval look the same in the log, so only call it out once it has waited a minute.
+  const longToolWait = waiting?.kind === 'tool' && firstSeen?.since === waiting.since && Date.now() - firstSeen.at > 60_000
 
   const refresh = (): void => void queryClient.invalidateQueries({ queryKey: multiHostKeys.transcript(ref?.runtimeId ?? '', ref?.sessionId ?? '') })
   const send = useMutation({
@@ -263,6 +275,32 @@ export const RemoteThreadView = () => {
         <div ref={bottom} />
       </div>
       <div className="dshx:border-t dshx:p-3">
+        {waiting?.kind === 'question' ? (
+          <Alert className="dshx:mb-2">
+            <AlertDescription className="dshx:flex dshx:items-center dshx:gap-2">
+              <span className="dshx:min-w-0 dshx:flex-1 dshx:text-sm">
+                The agent on {hostName} is asking a question. Answer it in the host&apos;s DSH.
+              </span>
+              <Button size="sm" variant="outline" className="dshx:shrink-0" disabled={openHostUi.isPending} onClick={() => openHostUi.mutate()}>
+                <ExternalLinkIcon className="dshx:size-3.5" />
+                Host UI
+              </Button>
+            </AlertDescription>
+          </Alert>
+        ) : null}
+        {longToolWait && waiting !== undefined ? (
+          <Alert className="dshx:mb-2">
+            <AlertDescription className="dshx:flex dshx:items-center dshx:gap-2">
+              <span className="dshx:min-w-0 dshx:flex-1 dshx:text-sm">
+                Waiting on {waiting.tool} on {hostName}. It may need an approval there.
+              </span>
+              <Button size="sm" variant="outline" className="dshx:shrink-0" disabled={openHostUi.isPending} onClick={() => openHostUi.mutate()}>
+                <ExternalLinkIcon className="dshx:size-3.5" />
+                Host UI
+              </Button>
+            </AlertDescription>
+          </Alert>
+        ) : null}
         {send.isError || cancel.isError || openHostUi.isError ? (
           <p className="dshx:mb-2 dshx:text-xs dshx:text-destructive">
             {errorMessage(send.error ?? cancel.error ?? openHostUi.error, 'The host refused the request.')}

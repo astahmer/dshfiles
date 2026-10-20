@@ -39,6 +39,11 @@ const texts = (blocks: readonly z.infer<typeof textBlockSchema>[] | undefined): 
     .join('\n')
     .trim()
 
+export type TranscriptWaiting = { readonly kind: 'question' | 'tool'; readonly tool: string; readonly since: number }
+
+const questionTool = (name: string): boolean =>
+  name === 'ask_user_question' || name === 'ask_parent_question' || name.endsWith('__ask_user_question')
+
 /**
  * Reduce a remote Session's history records to what the local remote-thread view shows: user and assistant text, one
  * line per tool call, and turn outcomes. The native renderer cannot show another runtime's Session, so this view
@@ -46,12 +51,20 @@ const texts = (blocks: readonly z.infer<typeof textBlockSchema>[] | undefined): 
  */
 export const reduceTranscript = (
   records: readonly unknown[],
-): { readonly entries: TranscriptEntry[]; readonly running: boolean; readonly title?: string; readonly model?: ModelSelection } => {
+): {
+  readonly entries: TranscriptEntry[]
+  readonly running: boolean
+  readonly title?: string
+  readonly model?: ModelSelection
+  readonly waiting?: TranscriptWaiting
+} => {
   const entries: TranscriptEntry[] = []
   let running = false
   let title: string | undefined
   let model: ModelSelection | undefined
+  let lastCall: { readonly callId: string; readonly name: string; readonly seq: number } | undefined
   const toolEntries = new Map<string, TranscriptEntry>()
+  const resolvedCalls = new Set<string>()
   for (const raw of records) {
     const record = recordSchema.safeParse(raw)
     if (!record.success) continue
@@ -85,9 +98,11 @@ export const reduceTranscript = (
       const entry: TranscriptEntry = { seq, kind: 'tool', text: toolSummary(call.data) }
       entries.push(entry)
       toolEntries.set(call.data.callId, entry)
+      lastCall = { callId: call.data.callId, name: call.data.name, seq }
     }
     if (type === 'tool/result') {
       const result = toolResultSchema.safeParse(data)
+      if (result.success) resolvedCalls.add(result.data.message.toolCallId)
       const entry = result.success ? toolEntries.get(result.data.message.toolCallId) : undefined
       if (result.data === undefined || entry === undefined) continue
       const output = texts(result.data.message.content)
@@ -95,5 +110,15 @@ export const reduceTranscript = (
       entry.text = `${entry.text}${result.data.message.isError === true ? ' (failed)' : ''}${shown === '' ? '' : `\n${shown}`}`
     }
   }
-  return { entries, running, ...(title === undefined ? {} : { title }), ...(model === undefined ? {} : { model }) }
+  const waiting: TranscriptWaiting | undefined =
+    running && lastCall !== undefined && !resolvedCalls.has(lastCall.callId)
+      ? { kind: questionTool(lastCall.name) ? 'question' : 'tool', tool: lastCall.name, since: lastCall.seq }
+      : undefined
+  return {
+    entries,
+    running,
+    ...(title === undefined ? {} : { title }),
+    ...(model === undefined ? {} : { model }),
+    ...(waiting === undefined ? {} : { waiting }),
+  }
 }

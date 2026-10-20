@@ -106,6 +106,11 @@ const transcriptEntrySchema = z.object({
   kind: z.enum(['user', 'assistant', 'tool', 'status']),
   text: z.string(),
 })
+const transcriptWaitingSchema = z.object({
+  kind: z.enum(['question', 'tool']),
+  tool: z.string(),
+  since: z.number().int(),
+})
 const remoteThreadSchema = z.object({
   runtimeId: idSchema,
   sessionId: sessionIdSchema,
@@ -318,6 +323,7 @@ export const multiHostApi = defineApi({
           title: z.string().optional(),
           running: z.boolean(),
           model: modelSelectionSchema.optional(),
+          waiting: transcriptWaitingSchema.optional(),
           entries: z.array(transcriptEntrySchema),
         }),
         failedSchema,
@@ -397,6 +403,7 @@ export type ConnectionTestStep = z.infer<typeof connectionTestStepSchema>
 export type RemoteThreadSummary = z.infer<typeof remoteThreadSchema>
 export type DirectoryListing = z.infer<typeof directoryListingSchema>
 export type TranscriptEntry = z.infer<typeof transcriptEntrySchema>
+export type TranscriptWaiting = z.infer<typeof transcriptWaitingSchema>
 export type ModelSelection = z.infer<typeof modelSelectionSchema>
 export type RuntimeSummary = z.infer<typeof runtimeSummarySchema>
 export type WorkspaceSummary = z.infer<typeof workspaceSchema>
