@@ -1,5 +1,7 @@
 # @dshfiles/memory
 
+![Browse and correct memory in the Memory panel](docs/screenshots/memory-panel.png)
+
 Read [docs/findings.md](docs/findings.md) first: why memory exists, its design, and how it compares with native DSH.
 For the plain-language version — what a digest is, when one is written, what the panel's **Digest** button does, and
 what it costs — see [docs/digests.md](docs/digests.md).

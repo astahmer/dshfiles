@@ -1,5 +1,7 @@
 # @dshfiles/backlog
 
+![Capture anything and let it sort itself](docs/screenshots/capture-and-triage.png)
+
 One capture feed for notes, tasks, bugs, ideas and questions, shared by the user and every agent. It
 replaces a "TODO" chat channel: adding something costs one line, the feed stays ordered by activity so
 idle things sink, and the tracker parts (status, actors, links, search, board) come for free.

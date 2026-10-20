@@ -1,5 +1,7 @@
 # @dshfiles/workbench
 
+![Arrange plugin panels in independent layouts](docs/screenshots/dockable-panel-layouts.png)
+
 Docking workbench for DSH, in two surfaces over one panel registry. Registered panels can move, split, tab, and float
 without remounting; each surface persists its own layout. The [`@dshfiles/editor`](../editor/README.md) package
 contributes an editor panel, and [`@dshfiles/jujutsu`](../jujutsu/README.md) one that leads the dock by default.

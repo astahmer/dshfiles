@@ -1,5 +1,7 @@
 # MCP servers
 
+![Manage local and remote MCP server definitions](docs/screenshots/server-configuration.png)
+
 This dshx bundle manages one MCP server list in the active DSH profile. It
 supports local stdio and remote Streamable HTTP, an optional Host-managed local
 start process for HTTP entries, custom entries, edits, persisted enable/disable,

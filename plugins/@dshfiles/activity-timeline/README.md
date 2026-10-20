@@ -1,5 +1,7 @@
 # DSH activity timeline
 
+![Unified agent activity feed](docs/screenshots/activity-feed.png)
+
 One chronological activity feed across agents, sessions, communication, and jj
 workspaces — a shared activity room rather than another thread list. Observation
 only: it never activates, messages, or steers an Agent.

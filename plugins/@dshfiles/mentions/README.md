@@ -1,5 +1,7 @@
 # @dshfiles/mentions
 
+![Ranked @ mentions for files and threads](docs/screenshots/ranked-mentions.png)
+
 One `@` menu for files and threads. It replaces the native `ui-reference`
 source (disabled in `cordis.patch.yml`), which lists every file before any
 thread.

@@ -1,5 +1,9 @@
 # Thread workspaces (jj-integration)
 
+![Thread integration control center](docs/screenshots/thread-workspaces-panel.png)
+
+![New thread destination and workspace isolation](docs/screenshots/thread-destination.png)
+
 Lets many agents work on one jj repository at once: a thread can run in its own
 jj workspace beside the repository, and **Integrate** moves its finished work
 into `main`. Internally, jj rebases the thread revisions onto current `main`,

@@ -1,5 +1,7 @@
 # Secret Catalog
 
+![Browse aliases by scope and environment](docs/screenshots/scoped-alias-catalog.png)
+
 Secret Catalog is a DSH 0.2 client/Host plugin backed by the installed
 `secret` CLI contract. It uses `secret print --all --json` only when a project
 folder is selected. Without one it calls `secret print global --json`, so the

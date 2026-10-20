@@ -1,5 +1,7 @@
 # @dshfiles/rich-composer
 
+![Paste session mentions as reference chips](docs/screenshots/paste-session-mentions.png)
+
 Owned fork of DSH's native Conversation client plugin. It preserves the full native shell, services, Slots and composer, while recognizing canonical session-reference wire text on paste and inserting it as a structured reference chip. Plain text is preferred; when only HTML is available, session-link anchors are converted to canonical mention text and other markup is reduced to safe text.
 
 ## Upstream and license

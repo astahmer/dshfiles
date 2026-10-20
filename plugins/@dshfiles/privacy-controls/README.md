@@ -1,5 +1,7 @@
 # Feedback & privacy controls
 
+![Control feedback and session-data sharing](docs/screenshots/feedback-privacy-settings.png)
+
 This Web Settings section controls feedback and session-log sharing one feature at a time. The checked-in Web profile starts with the answer-feedback UI, session feedback capture, and both upload paths off; local session-log downloads stay on.
 
 These controls live in one dedicated bundle because DSH exposes them as separate Loader rows with distinct data flows. Keeping each switch explicit preserves the answer-UI/session-feedback dependency and separates uploads from local downloads.

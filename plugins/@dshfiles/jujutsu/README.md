@@ -1,5 +1,7 @@
 # @dshfiles/jujutsu
 
+![Locate landmarks and compare revision ancestry](docs/screenshots/graph-navigation.png)
+
 A DSH sidebar plugin for browsing and changing a Jujutsu repository. It is built
 with this repository's local `@dshfiles/dshx` fork and DSH 0.2 client/host
 contracts.

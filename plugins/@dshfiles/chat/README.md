@@ -1,5 +1,7 @@
 # @dshfiles/chat
 
+![Open a thread on its latest messages](docs/screenshots/windowed-transcript.png)
+
 Owned fork of DSH's native Chat client plugin. It keeps the native transcript, its Slots, renderers, settings and
 scroll behaviour, and mounts only the newest transcript rows plus the ones the reader scrolls up to (see Local delta):
 on the live profile a single thread used to mount up to 42k DOM nodes on open.

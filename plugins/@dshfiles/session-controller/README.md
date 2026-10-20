@@ -1,5 +1,7 @@
 # @dshfiles/session-controller
 
+![Send the browser only what a thread renders](docs/screenshots/lean-session-follow.png)
+
 Owned fork of DSH's native Session controller row (Host commands, `session/follow`, history pages, and the browser
 Session client). It keeps the native behaviour and changes what a thread costs to open (see Local delta): on the live
 profile one Anthropic thread opened with a 26 MB snapshot, 17 MB of it thinking signatures the browser never reads.

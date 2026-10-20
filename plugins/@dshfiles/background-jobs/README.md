@@ -1,5 +1,7 @@
 # DSH background jobs board
 
+![Cross-Session background jobs board](docs/screenshots/jobs-board.png)
+
 One page for every background job of every Session: the ones still running, and —
 opt-in — the ones that already finished. Rows are classified deterministically
 from the job kind and its label, so "when did we last run the e2e suite", "which

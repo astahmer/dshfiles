@@ -1,5 +1,7 @@
 # DSHX Plugin Marketplace
 
+![Browse and filter the plugin catalog](docs/screenshots/catalog-browse.png)
+
 `@dshfiles/plugin-marketplace` started as upstream DSHX's self-hosting reference plugin and now lives with our other owned bundles; its MIT license is kept in `LICENSE`. It adds a **Settings → Built-in plugins → Framework Hub** tab to a DSH Web Profile and reads Framework Hub's installable marketplace catalog.
 
 The package exercises the complete plugin authoring path produced by `create-dshx`: `defineHost`, `defineSettings`, `defineApi`, `defineClient`, `defineLocale`, `defineSlot`, Standard Schema validation, and `useApiQuery`. It is built and installed as an ordinary DSH bundle; no Harness or DSHX core patch is required.

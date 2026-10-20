@@ -1,5 +1,7 @@
 # DSH usage analytics
 
+![Request log](docs/screenshots/usage-request-log.png)
+
 A **Usage analytics** main panel (sidebar) with a request log and usage charts,
 built from the session logs DSH already writes. Observation only.
 

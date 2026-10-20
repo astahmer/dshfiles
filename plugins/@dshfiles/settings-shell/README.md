@@ -1,5 +1,7 @@
 # @dshfiles/settings-shell
 
+![Native Settings shell, ported](docs/screenshots/settings-shell-port.png)
+
 DSH's Settings, rebuilt as a plugin so it can grow VS Code-style behaviour the native shell has no seat for.
 
 ## Use

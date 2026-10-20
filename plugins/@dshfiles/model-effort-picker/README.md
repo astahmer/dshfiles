@@ -1,5 +1,7 @@
 # @dshfiles/model-effort-picker
 
+![Edit the model fallback chain from the composer picker](docs/screenshots/model-fallbacks.png)
+
 Replaces the composer model control with a searchable, provider-grouped model picker. Its reasoning slider uses only the selected model’s advertised effort levels and writes through DSH’s shared per-session model directory, so the native model popup stays in sync.
 
 ## Account swap

@@ -1,5 +1,7 @@
 # @dshfiles/attachment-gallery
 
+![Navigate image previews](docs/screenshots/image-gallery-navigation.png)
+
 Owned port of DSH's native attachment presentation plugin. It keeps the stock composer drop target, mixed image/file rail, upload progress and retry behavior, and image rendering in messages, trajectory records, and image-bearing tool calls. Image previews add left/right keyboard navigation, side controls, and a selectable thumbnail strip.
 
 ## Upstream and license

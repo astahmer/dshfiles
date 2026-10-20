@@ -1,5 +1,7 @@
 # Home
 
+![New thread screen branding and shortcuts](docs/screenshots/home-screen.png)
+
 Owns the New thread screen's top: the DeepSeek mark and headline are replaced,
 and a compact row below the composer lets you resume one of the project's
 recent threads or jump to thread workspaces with work to rebase.

@@ -1,5 +1,7 @@
 # Sidebar Commands
 
+![Navigate to registered panels](docs/screenshots/dynamic-panel-navigation.png)
+
 A client-only `/goto` slash command. Its popup lists every panel registered in
 `sidebar.panellist` that also has a `main` occupant, then the 20 most recently
 updated sessions, and opens the row you pick through `ctx.layout.selectPanel`

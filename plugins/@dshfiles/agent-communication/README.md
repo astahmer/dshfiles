@@ -1,5 +1,7 @@
 # DSH Agent communication
 
+![Post messages from the communication browser](docs/screenshots/human-browser.png)
+
 This owned DSH bundle provides durable topic channels and direct Agent inboxes. Incoming messages are passive records: arrival never adds a Session/user message, calls `Agent.followup()` or `Agent.steer()`, or replays a notification when an Agent is created. Completed turns stay completed. `priority` (`normal`/`urgent`) and `intent` (`notice`/`request`) are descriptive metadata only; a `request` records that the sender asks for action and still starts no turn.
 
 Agents in the same resolved working directory are subscribed to `workspace/<hash>` during Host startup and `agent/created`. Automatic registration never fails on capacity: a full topic evicts its stalest subscribers (least recent communication activity first) instead of throwing, because that call runs while a Session is being created. Only an explicit `dshx_comm_subscribe` reports `topic-full`.

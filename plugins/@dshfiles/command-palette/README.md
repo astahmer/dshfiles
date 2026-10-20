@@ -1,5 +1,7 @@
 # Command Palette
 
+![Register and invoke typed palette actions](docs/screenshots/action-registry.png)
+
 The app-wide searchable palette lives in this plugin and mounts into DSH's additive `shell.overlay` slot. It owns the UI, keyboard shortcut, action registry, thread/file/content search, and global theme/workspace actions. Thread Sidebar contributes sidebar navigation and actions for the currently open thread.
 
 ## Ask DSH

@@ -1,5 +1,7 @@
 # AI Accounts
 
+![Manage provider account drafts](docs/screenshots/account-lifecycle.png)
+
 AI Accounts runs several subscription accounts side by side. Codex, Claude,
 OpenCode Go and Command Code accounts each become their own route in the model
 picker. GitHub Copilot connects through GitHub's device-code OAuth flow. Cursor

@@ -1,5 +1,7 @@
 # @dshfiles/frame-layout
 
+![Hand the frame's regions to plugin surfaces](docs/screenshots/panel-seats.png)
+
 DSH's three-column AppFrame, forked so the frame's dragged panel widths and collapsed sidebar survive a reload.
 
 ## Use

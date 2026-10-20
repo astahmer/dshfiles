@@ -1,5 +1,7 @@
 # Thread Sidebar
 
+![Organize threads by workspace and status](docs/screenshots/thread-classification.png)
+
 This bundle builds a full sidebar replacement with the repository's local
 `@dshfiles/dshx` fork. It groups the real DSH session list by project and
 activity, with pinned, active, parked, inactive, settled, and archived sections. Active
