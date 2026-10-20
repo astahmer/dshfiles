@@ -38,7 +38,6 @@ export const useServerActions = () => {
     mutationFn: (server: ServerView) => api.setConnection({ id: server.id, connected: !McpServerStatusModel.isClientActive(server) }),
     onSuccess,
   })
-  const remove = useMutation({ mutationFn: (server: ServerView) => api.remove({ id: server.id }), onSuccess })
   const signOut = useMutation({ mutationFn: (server: ServerView) => api.signOut({ id: server.id }), onSuccess })
   const [authorizationUrl, setAuthorizationUrl] = useState<string | null>(null)
   const authorize = useMutation({
@@ -53,13 +52,12 @@ export const useServerActions = () => {
     },
     onError: (_error, input) => input.popup?.close(),
   })
-  const mutations = [save, toggleEnabled, toggleConnection, remove, signOut, authorize]
+  const mutations = [save, toggleEnabled, toggleConnection, signOut, authorize]
   const resetErrors = (): void => {
     for (const mutation of mutations) if (mutation.isError) mutation.reset()
   }
   return {
     isPending: mutations.some(mutation => mutation.isPending),
-    isRemoving: remove.isPending,
     /** Shown when the browser blocked the sign-in tab, so the user can continue from a link. */
     authorizationUrl,
     dismissAuthorization: (): void => setAuthorizationUrl(null),
@@ -113,10 +111,6 @@ export const useServerActions = () => {
     toggleConnection: (server: ServerView): void => {
       resetErrors()
       toggleConnection.mutate(server)
-    },
-    remove: (input: { readonly server: ServerView; readonly onSettled: () => void }): void => {
-      resetErrors()
-      remove.mutate(input.server, { onSettled: input.onSettled })
     },
   }
 }

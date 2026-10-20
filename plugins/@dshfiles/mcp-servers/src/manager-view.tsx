@@ -5,6 +5,7 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
+  AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
@@ -14,13 +15,17 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Empty, EmptyDescription } from '@dshfiles/plugin-ui/components/ui/empty'
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemMedia, ItemSeparator, ItemTitle } from '@dshfiles/plugin-ui/components/ui/item'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
-import { Fragment, useEffect, useRef, useState } from 'react'
+import { useApi } from '@dshfiles/dshx/client'
+import { ListSelectionModel, type ListSelection } from '@dshfiles/plugin-ui/hooks/list-selection'
+import { errorMessage } from '@dshfiles/plugin-ui/query'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { CatalogBrowser, SignInNotice, type CustomServerRequest } from './catalog-browser.js'
-import type { ServerDraft, ServerView } from './api.js'
+import { mcpServersApi, type ServerDraft, type ServerView } from './api.js'
 import type { McpServersTranslate } from './locales.js'
 import { PreferencesForm } from './preferences-form.js'
 import { ServerEditor, ServerEditorDialog } from './server-editor.js'
 import { McpServerFormModel, type ServerFormValues } from './server-form.js'
+import { ServerSelectionModel } from './server-selection.js'
 import { useServerActions, useServerSnapshot } from './server-queries.js'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { McpServerStatusModel } from './server-status.js'
@@ -34,13 +39,26 @@ interface EditorState {
 export const ManagerView = ({ t }: { readonly t: McpServersTranslate }): JSX.Element => {
   const snapshot = useServerSnapshot({ reconcile: true })
   const actions = useServerActions()
+  const api = useApi(mcpServersApi)
   const [editor, setEditor] = useState<EditorState>({ key: 0, values: McpServerFormModel.blankServerForm(), opened: false })
   const editorRef = useRef<HTMLDivElement>(null)
-  const [pendingRemoval, setPendingRemoval] = useState<ServerView | null>(null)
+  const [pendingRemoval, setPendingRemoval] = useState<readonly ServerView[]>([])
+  const [selection, setSelection] = useState<ListSelection<string>>(() => ListSelectionModel.empty())
+  const [batchPending, setBatchPending] = useState(false)
+  const [batchError, setBatchError] = useState<string | null>(null)
   const [browsing, setBrowsing] = useState(false)
   const [custom, setCustom] = useState<(CustomServerRequest & { readonly key: number }) | null>(null)
-  const servers = snapshot.data?.servers ?? []
+  const servers = useMemo(() => snapshot.data?.servers ?? [], [snapshot.data])
   const enabledCount = servers.filter(server => server.enabled).length
+  const orderedServerIds = useMemo(() => servers.map(server => server.id), [servers])
+  const selectedServerIds = useMemo(() => new Set(selection.ids), [selection.ids])
+  const selectedServers = useMemo(() => ServerSelectionModel.selected({ servers, ids: selection.ids }), [servers, selection.ids])
+  useEffect(() => {
+    setSelection(current => {
+      const next = ListSelectionModel.prune({ state: current, visibleIds: orderedServerIds })
+      return next.ids.length === current.ids.length && next.anchorId === current.anchorId ? current : next
+    })
+  }, [orderedServerIds])
 
   useEffect(() => {
     if (editor.opened) editorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -54,9 +72,41 @@ export const ManagerView = ({ t }: { readonly t: McpServersTranslate }): JSX.Ele
   const save = async (draft: ServerDraft): Promise<void> => {
     if (await actions.save(draft)) resetEditor()
   }
+  const clearSelection = (): void => setSelection(ListSelectionModel.empty())
+  const toggleServer = (id: string): void => setSelection(current => ListSelectionModel.toggle({ state: current, id }))
+  const extendServer = (id: string): void => setSelection(current => ListSelectionModel.extend({ state: current, orderedIds: orderedServerIds, id }))
+  const setEnabledForSelection = async (enabled: boolean): Promise<void> => {
+    const targets = ServerSelectionModel.targets({ servers, ids: selection.ids, enabled })
+    if (targets.length === 0) return
+    setBatchPending(true)
+    setBatchError(null)
+    try {
+      for (const server of targets) await api.setEnabled({ id: server.id, enabled })
+      clearSelection()
+      await snapshot.refetch()
+    } catch (error) {
+      setBatchError(errorMessage(error, t('error')))
+    } finally {
+      setBatchPending(false)
+    }
+  }
+  const removeServers = async (targets: readonly ServerView[]): Promise<void> => {
+    if (targets.length === 0) return
+    setBatchPending(true)
+    setBatchError(null)
+    try {
+      for (const server of targets) await api.remove({ id: server.id })
+      setPendingRemoval([])
+      clearSelection()
+      await snapshot.refetch()
+    } catch (error) {
+      setBatchError(errorMessage(error, t('error')))
+    } finally {
+      setBatchPending(false)
+    }
+  }
   const confirmRemoval = (): void => {
-    if (pendingRemoval === null) return
-    actions.remove({ server: pendingRemoval, onSettled: () => setPendingRemoval(null) })
+    void removeServers(pendingRemoval)
   }
 
   return (
@@ -79,9 +129,9 @@ export const ManagerView = ({ t }: { readonly t: McpServersTranslate }): JSX.Ele
           </div>
         </header>
 
-        {snapshot.isError || actions.failed ? (
+        {snapshot.isError || actions.failed || batchError !== null ? (
           <Alert variant="destructive">
-            <AlertDescription>{t('error')}</AlertDescription>
+            <AlertDescription>{batchError ?? t('error')}</AlertDescription>
           </Alert>
         ) : null}
         <SignInNotice actions={actions} t={t} />
@@ -97,6 +147,47 @@ export const ManagerView = ({ t }: { readonly t: McpServersTranslate }): JSX.Ele
             </h2>
             <span className="dshx:text-xs dshx:text-muted-foreground">{snapshot.data ? `${enabledCount} ${t('enabledCount')}` : '…'}</span>
           </div>
+          {servers.length === 0 ? null : (
+            <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:text-xs">
+              <label className="dshx:flex dshx:items-center dshx:gap-1">
+                <input
+                  type="checkbox"
+                  aria-label={t('selectAllServers')}
+                  checked={ListSelectionModel.isComplete({ state: selection, orderedIds: orderedServerIds })}
+                  onChange={() => setSelection(current => ListSelectionModel.toggleAllVisible({ state: current, orderedIds: orderedServerIds }))}
+                  className="dshx:size-3.5 dshx:accent-[var(--color-info)]"
+                />
+                {t('selectAllServers')}
+              </label>
+              {selection.ids.length === 0 ? null : (
+                <span className="dshx:ml-auto dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-1">
+                  <span className="dshx:mr-1 dshx:tabular-nums">{t('selectedServers', { count: selection.ids.length })}</span>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={batchPending || selectedServers.every(server => server.enabled)}
+                    onClick={() => void setEnabledForSelection(true)}
+                  >
+                    {t('enableSelected')}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    disabled={batchPending || selectedServers.every(server => !server.enabled)}
+                    onClick={() => void setEnabledForSelection(false)}
+                  >
+                    {t('disableSelected')}
+                  </Button>
+                  <Button size="sm" variant="destructive" disabled={batchPending} onClick={() => setPendingRemoval(selectedServers)}>
+                    {t('removeSelected')}
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={clearSelection}>
+                    {t('clearSelection')}
+                  </Button>
+                </span>
+              )}
+            </div>
+          )}
           <div className="dshx:rounded-lg dshx:border dshx:bg-card">
             {servers.length > 0 ? (
               <ItemGroup>
@@ -104,9 +195,12 @@ export const ManagerView = ({ t }: { readonly t: McpServersTranslate }): JSX.Ele
                   <Fragment key={server.id}>
                     {index > 0 ? <ItemSeparator /> : null}
                     <ServerItem
-                      busy={actions.isPending}
+                      busy={actions.isPending || batchPending}
+                      selected={selectedServerIds.has(server.id)}
+                      onRangeSelection={extendServer}
+                      onToggleSelection={toggleServer}
                       onEdit={() => openEditor(McpServerFormModel.serverFormFromView(server))}
-                      onRemove={() => setPendingRemoval(server)}
+                      onRemove={() => setPendingRemoval([server])}
                       onSignIn={() => actions.signIn(server)}
                       onSignOut={() => actions.signOut(server)}
                       onToggleConnection={() => actions.toggleConnection(server)}
@@ -155,26 +249,29 @@ export const ManagerView = ({ t }: { readonly t: McpServersTranslate }): JSX.Ele
 
       <AlertDialog
         onOpenChange={open => {
-          if (!open && !actions.isRemoving) setPendingRemoval(null)
+          if (!open && !batchPending) setPendingRemoval([])
         }}
-        open={pendingRemoval !== null}
+        open={pendingRemoval.length > 0}
       >
         <AlertDialogContent className="dshx-root" size="sm">
           <AlertDialogHeader>
-            <AlertDialogTitle className="dshx:text-sm">{t('confirmRemove')}</AlertDialogTitle>
+            <AlertDialogTitle className="dshx:text-sm">
+              {pendingRemoval.length === 1 ? t('confirmRemove') : t('confirmRemoveMany', { count: pendingRemoval.length })}
+            </AlertDialogTitle>
+            <AlertDialogDescription>{t('confirmRemoveDetail')}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={actions.isRemoving}>{t('cancel')}</AlertDialogCancel>
+            <AlertDialogCancel disabled={batchPending}>{t('cancel')}</AlertDialogCancel>
             <AlertDialogAction
-              disabled={actions.isRemoving}
+              disabled={batchPending}
               onClick={event => {
                 event.preventDefault()
                 confirmRemoval()
               }}
               variant="destructive"
             >
-              {actions.isRemoving ? <Spinner /> : null}
-              {t('remove')}
+              {batchPending ? <Spinner /> : null}
+              {pendingRemoval.length === 1 ? t('remove') : t('removeSelected')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -187,6 +284,9 @@ interface ServerItemProps {
   readonly t: McpServersTranslate
   readonly server: ServerView
   readonly busy: boolean
+  readonly selected: boolean
+  readonly onToggleSelection: (id: string) => void
+  readonly onRangeSelection: (id: string) => void
   readonly onEdit: () => void
   readonly onToggleConnection: () => void
   readonly onToggleEnabled: () => void
@@ -197,8 +297,29 @@ interface ServerItemProps {
 
 const ServerItem = ({ t, server, ...props }: ServerItemProps): JSX.Element => {
   const processText = McpServerStatusModel.localProcessText({ server, t })
+  const modifiedCheckboxClick = useRef(false)
   return (
     <Item role="listitem">
+      <input
+        type="checkbox"
+        aria-label={`${t('selectServer')} ${server.name}`}
+        checked={props.selected}
+        onClick={event => {
+          if (!event.shiftKey && !event.metaKey && !event.ctrlKey) return
+          modifiedCheckboxClick.current = true
+          event.stopPropagation()
+          if (event.shiftKey) props.onRangeSelection(server.id)
+          else props.onToggleSelection(server.id)
+        }}
+        onChange={() => {
+          if (modifiedCheckboxClick.current) {
+            modifiedCheckboxClick.current = false
+            return
+          }
+          props.onToggleSelection(server.id)
+        }}
+        className="dshx:size-3.5 dshx:shrink-0 dshx:accent-[var(--color-info)]"
+      />
       <ItemMedia className="dshx:size-10 dshx:rounded-lg dshx:border-0 dshx:text-muted-foreground" variant="icon">
         {server.transport === 'stdio' ? <SquareTerminalIcon className="dshx:size-[18px]" /> : <GlobeIcon className="dshx:size-[18px]" />}
       </ItemMedia>
