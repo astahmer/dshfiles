@@ -29,9 +29,9 @@ export default defineClient({
             const state = ctx.sessions.list.getSnapshot()
             return state.ids.flatMap(id => {
               const session = state.byId[id]
-              return session === undefined || session.blank || session.parentId !== undefined
-                ? []
-                : [{ id: session.id, title: session.displayTitle, running: session.running, ...(session.cwd === undefined ? {} : { cwd: session.cwd }) }]
+              if (session === undefined || session.blank || session.parentId !== undefined) return []
+              const thread = { id: session.id, title: session.displayTitle, running: session.running }
+              return [session.cwd === undefined ? thread : { ...thread, cwd: session.cwd }]
             })
           }}
           openThread={sessionId => {

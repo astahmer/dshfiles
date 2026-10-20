@@ -451,13 +451,11 @@ export const Composer = (props: {
   const chat = props.variant === 'chat'
   const speechReason = speech.data?.reason ?? 'The voice-input bundle is not loaded.'
   const voiceAvailable = speech.data?.available === true
-  const voiceTitle = transcribing
-    ? 'Transcribing…'
-    : recording
-      ? 'Stop recording'
-      : speech.data?.available === true
-        ? speechReason
-        : 'Voice input is not available'
+  const voiceTitle = (() => {
+    if (transcribing) return 'Transcribing…'
+    if (recording) return 'Stop recording'
+    return voiceAvailable ? speechReason : 'Voice input is not available'
+  })()
   const effectiveKind = kind ?? preview?.kind ?? 'task'
 
   return (
