@@ -9,6 +9,7 @@ import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { ProjectFolderPicker } from '@dshfiles/project-folder-picker'
 import { SECRET_CATALOG_LOCALE_NAMESPACE, secretCatalogLocale } from './locales.js'
 import { SecretCatalogPanel } from './secret-catalog-panel.js'
+import { SecretInputOverlay } from './secret-input-overlay.js'
 import { createWorkspacePickerPorts } from './workspace-picker-adapter.js'
 
 const PANEL_ID = 'secret-catalog'
@@ -47,6 +48,12 @@ export default defineClient({
         )),
       ),
     )
+    const SecretOverlay = (): JSX.Element => (
+      <PluginQueryProvider>
+        <SecretInputOverlay />
+      </PluginQueryProvider>
+    )
+    ctx.slots.inject('shell.overlay', () => ctx.slots.register({ name: 'shell.overlay', id: 'dshfiles-secret-input', order: 118 }, decorate(SecretOverlay)))
   },
 })
 
