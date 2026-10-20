@@ -285,6 +285,17 @@ Client UI uses `@dshfiles/plugin-ui` (shadcn/ui on Tailwind v4); skills
   `/machine`, localStorage → `createStoredValue`.
 - Prefer Host utilities (`relativeTime`, `writeClipboard`, `rankByName` from
   `@deepseek-ai/dsh-client-ui-primitives`) over local copies.
+- **Multi-select only when a repeated row verb is worth batching.** Add it to
+  a list whose rows share a routine verb (move, mark, enable, stop) and whose
+  batch saves real work; skip it for detail panes and for lists whose rows have
+  unrelated actions. Use one model: plain click selects one row — or runs the
+  row's existing verb when it already has one — Cmd/Ctrl-click toggles the
+  selection, Shift-click extends the inclusive range from the anchor, and the
+  header checkbox selects exactly the rows visible under the current filter,
+  group or scope; changing any of those drops ids that are no longer visible.
+  A batch action keeps each single-row verb's rules, refusals and confirmations,
+  and a bulk destructive verb (forget, stop, remove) opens an explicit
+  confirmation that names the count — it never runs from a bare click.
 
 ## Shell command batching
 
