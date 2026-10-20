@@ -46,6 +46,7 @@ import { BacklogItems, type BacklogAttention, type BacklogEvent, type BacklogLin
 import { ItemGlyphs } from './item-glyphs.js'
 import { ItemFiles } from './item-files.js'
 import { BacklogItemMenu } from './item-actions-menu.js'
+import { BacklogText } from './item-text.js'
 import { ItemPickers } from './item-pickers.js'
 import type { StartThreadItem } from './start-thread.js'
 import { BacklogTriage } from './triage.js'
@@ -173,28 +174,47 @@ const AddLink = (props: { readonly id: number }): JSX.Element => {
 const TitleField = (props: { readonly id: number; readonly title: string }): JSX.Element => {
   const actions = useBacklogActions()
   const [title, setTitle] = useState(props.title)
+  const [editing, setEditing] = useState(false)
   useEffect(() => {
     setTitle(props.title)
   }, [props.title])
   const save = (): void => {
+    setEditing(false)
     if (title.trim() !== '' && title !== props.title) actions.update.mutate({ id: props.id, title })
   }
+  if (editing)
+    return (
+      <textarea
+        aria-label="Title"
+        autoFocus
+        rows={1}
+        value={title}
+        onChange={event => setTitle(event.currentTarget.value.replace(/\n/g, ''))}
+        onBlur={save}
+        onKeyDown={event => {
+          if (event.key === 'Enter') {
+            event.preventDefault()
+            event.currentTarget.blur()
+          }
+          if (event.key === 'Escape') {
+            setTitle(props.title)
+            setEditing(false)
+          }
+        }}
+        className="dshx:field-sizing-content dshx:w-full dshx:resize-none dshx:bg-transparent dshx:text-xl dshx:font-semibold dshx:leading-snug dshx:tracking-tight dshx:text-foreground dshx:outline-none"
+      />
+    )
   return (
-    <textarea
-      aria-label="Title"
-      rows={1}
-      value={title}
-      onChange={event => setTitle(event.currentTarget.value.replace(/\n/g, ''))}
-      onBlur={save}
-      onKeyDown={event => {
-        if (event.key === 'Enter') {
-          event.preventDefault()
-          event.currentTarget.blur()
-        }
-        if (event.key === 'Escape') setTitle(props.title)
-      }}
-      className="dshx:field-sizing-content dshx:w-full dshx:resize-none dshx:bg-transparent dshx:text-xl dshx:font-semibold dshx:leading-snug dshx:tracking-tight dshx:text-foreground dshx:outline-none"
-    />
+    <div className="dshx:flex dshx:items-start dshx:gap-1">
+      <BacklogText
+        text={props.title}
+        onActivate={() => setEditing(true)}
+        className="dshx:min-w-0 dshx:flex-1 dshx:cursor-text dshx:text-xl dshx:font-semibold dshx:leading-snug dshx:tracking-tight dshx:text-foreground dshx:[&>div]:text-xl! dshx:[&>div]:leading-snug! dshx:[&>div]:text-foreground! dshx:[&>div>p]:my-0"
+      />
+      <Button aria-label="Edit title" onClick={() => setEditing(true)} size="icon-xs" type="button" variant="ghost">
+        <PencilIcon aria-hidden />
+      </Button>
+    </div>
   )
 }
 
@@ -215,7 +235,7 @@ const BodyField = (props: { readonly id: number; readonly body: string }): JSX.E
         aria-label="Body"
         autoFocus
         value={body}
-        placeholder="Add a description… Markdown, b:12, jj:rev and URLs become links."
+        placeholder="Add a description… Markdown and URLs are clickable; b:12 and jj:rev add relationship links."
         onChange={event => setBody(event.currentTarget.value)}
         onBlur={save}
         onKeyDown={event => {
@@ -228,19 +248,28 @@ const BodyField = (props: { readonly id: number; readonly body: string }): JSX.E
         className="dshx:field-sizing-content dshx:min-h-28 dshx:w-full dshx:resize-none dshx:rounded-lg dshx:border dshx:border-input dshx:bg-transparent dshx:p-2.5 dshx:text-[13px] dshx:leading-relaxed dshx:text-foreground dshx:outline-none"
       />
     )
+  if (props.body === '')
+    return (
+      <button
+        type="button"
+        aria-label="Edit description"
+        onClick={() => setEditing(true)}
+        className="dshx:-mx-2 dshx:rounded-lg dshx:px-2 dshx:py-1.5 dshx:text-left dshx:text-[13px] dshx:leading-relaxed dshx:text-muted-foreground dshx:transition-colors dshx:hover:bg-accent/40"
+      >
+        Add a description…
+      </button>
+    )
   return (
-    <button
-      type="button"
-      aria-label="Edit description"
-      onClick={() => setEditing(true)}
-      className="dshx:-mx-2 dshx:rounded-lg dshx:px-2 dshx:py-1.5 dshx:text-left dshx:text-[13px] dshx:leading-relaxed dshx:transition-colors dshx:hover:bg-accent/40"
-    >
-      {props.body === '' ? (
-        <span className="dshx:text-muted-foreground">Add a description…</span>
-      ) : (
-        <MarkdownText text={props.body} labels={markdownLabels} variant="compact" />
-      )}
-    </button>
+    <div className="dshx:flex dshx:min-w-0 dshx:items-start dshx:gap-1">
+      <BacklogText
+        text={props.body}
+        onActivate={() => setEditing(true)}
+        className="dshx:-mx-2 dshx:min-w-0 dshx:flex-1 dshx:cursor-text dshx:rounded-lg dshx:px-2 dshx:py-1.5 dshx:text-left dshx:text-[13px] dshx:leading-relaxed dshx:transition-colors dshx:hover:bg-accent/40"
+      />
+      <Button aria-label="Edit description" className="dshx:mt-1 dshx:shrink-0" onClick={() => setEditing(true)} size="icon-xs" type="button" variant="ghost">
+        <PencilIcon aria-hidden />
+      </Button>
+    </div>
   )
 }
 
@@ -637,7 +666,10 @@ const PeekBody = (props: {
           <div className="dshx:flex dshx:flex-col dshx:gap-2">
             {props.loading ? null : <ItemFiles itemId={item.id} attachments={item.attachments} />}
             {props.loading ? (
-              <p className="dshx:line-clamp-3 dshx:text-[13px] dshx:leading-relaxed dshx:text-muted-foreground">{item.body}</p>
+              <BacklogText
+                text={item.body}
+                className="dshx:line-clamp-3 dshx:text-[13px] dshx:leading-relaxed dshx:text-muted-foreground dshx:[&>div]:line-clamp-3"
+              />
             ) : (
               <BodyField id={item.id} body={item.body} />
             )}

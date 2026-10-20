@@ -24,6 +24,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { BacklogSummaryView } from './api.js'
 import { BacklogItems, type BacklogKind, type BacklogStatus } from './item.js'
 import { ItemGlyphs } from './item-glyphs.js'
+import { BacklogText } from './item-text.js'
 import { ItemPickers } from './item-pickers.js'
 import { extendBacklogSelection, toggleBacklogSelection } from './selection.js'
 import { BacklogItemMenu } from './item-actions-menu.js'
@@ -174,9 +175,15 @@ const Row = (props: {
             )}
           />
         </span>
-        <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
+        <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
           <span className="dshx:w-10 dshx:shrink-0 dshx:font-mono! dshx:text-[11px] dshx:text-muted-foreground">b:{item.id}</span>
-          <span className={cn('dshx:min-w-0 dshx:truncate', closed && 'dshx:text-muted-foreground')}>{item.title}</span>
+          <BacklogText
+            text={item.title}
+            className={cn(
+              'dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-[13px] dshx:[&>div]:truncate dshx:[&>div]:text-[13px]! dshx:[&>div]:leading-tight! dshx:[&>div]:font-medium! dshx:[&>div]:text-foreground! dshx:[&>div>p]:my-0 dshx:[&>div>p]:truncate',
+              closed && 'dshx:text-muted-foreground dshx:line-through dshx:[&>div]:text-muted-foreground! dshx:[&>div]:line-through',
+            )}
+          />
           {item.pinned ? <PinIcon aria-label="Pinned" className="dshx:size-3 dshx:shrink-0 dshx:fill-current dshx:text-warning" /> : null}
           <ItemGlyphs.AttentionBadge attention={item.attention} compact />
           {item.proposal === null ? null : <WandSparklesIcon aria-label="Suggestion waiting" className="dshx:size-3 dshx:shrink-0 dshx:text-violet" />}
@@ -197,7 +204,7 @@ const Row = (props: {
               {item.activity.comments}
             </span>
           )}
-        </span>
+        </div>
         <span onClick={event => event.stopPropagation()} className="dshx:flex dshx:items-center">
           <span className={wideOnly}>
             <ItemPickers.Status id={item.id} status={item.status} withLabel onPick={status => actions.update.mutate({ id: item.id, status })} />

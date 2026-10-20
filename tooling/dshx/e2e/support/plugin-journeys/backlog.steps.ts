@@ -147,6 +147,7 @@ When('backlog item b:{int} is opened', async ({ page }: { page: Page }, id: numb
   await page.getByRole('button', { name: 'Feed', exact: true }).click()
   await feed(page)
     .getByRole('article', { name: `Item b:${String(id)}`, exact: true })
+    .getByText(`b:${String(id)}`, { exact: true })
     .click()
   await expect(peek(page)).toContainText(`b:${String(id)}`)
 })
@@ -369,6 +370,60 @@ Then('the item links the thread it started', async ({ page }: { page: Page }) =>
     // A draft with no message yet is not a listed thread, so the chip carries the session fallback label.
     await expect(peek(page).getByRole('button', { name: /^Unlink thread session-/ })).toBeVisible()
     await expect(peek(page).getByRole('button', { name: /^Thread [0-9a-f]{8}$/ })).toBeVisible()
+  })
+  await finishJourneyAssertions(page)
+})
+
+When('an item with linked title and description is captured', async ({ page }: { page: Page }) => {
+  const capture = page.getByRole('textbox', { name: 'Capture', exact: true })
+  const title = 'Open [guide](https://example.com/guide) https://example.com'
+  const description = 'Read [description](https://example.org/description) https://example.org'
+  await capture.fill(`${title}\n${description}`)
+  await capture.press('Enter')
+  await expect(capture).toHaveValue('')
+  await expect(row(page, 'Open')).toBeVisible()
+})
+
+Then('item text links are clickable in the feed', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'backlog-item-text-links-feed', async () => {
+    const item = row(page, 'Open')
+    const titleLink = item.getByRole('link', { name: 'guide', exact: true })
+    const descriptionLink = item.getByRole('link', { name: 'description', exact: true })
+    await expect(titleLink).toHaveAttribute('href', 'https://example.com/guide')
+    await expect(item.getByRole('link', { name: 'https://example.com', exact: true })).toHaveAttribute('href', 'https://example.com')
+    await expect(descriptionLink).toHaveAttribute('href', 'https://example.org/description')
+    await expect(item.getByRole('link', { name: 'https://example.org', exact: true })).toHaveAttribute('href', 'https://example.org')
+    await titleLink.evaluate(element => element.addEventListener('click', event => event.preventDefault(), { once: true }))
+    await titleLink.click()
+    await expect(peek(page)).toHaveCount(0)
+    await descriptionLink.evaluate(element => element.addEventListener('click', event => event.preventDefault(), { once: true }))
+    await descriptionLink.click()
+    await expect(peek(page)).toHaveCount(0)
+  })
+})
+
+Then('item title links are clickable in the Items view', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'backlog-item-text-links-items', async () => {
+    const titleLink = page.getByRole('row', { name: 'Item b:1', exact: true }).getByRole('link', { name: 'guide', exact: true })
+    await expect(titleLink).toHaveAttribute('href', 'https://example.com/guide')
+    await titleLink.evaluate(element => element.addEventListener('click', event => event.preventDefault(), { once: true }))
+    await titleLink.click()
+    await expect(peek(page)).toHaveCount(0)
+  })
+})
+
+Then('item text links are clickable in the detail', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'backlog-item-text-links-detail', async () => {
+    const titleLink = peek(page).getByRole('link', { name: 'guide', exact: true })
+    const descriptionLink = peek(page).getByRole('link', { name: 'description', exact: true })
+    await expect(titleLink).toHaveAttribute('href', 'https://example.com/guide')
+    await expect(descriptionLink).toHaveAttribute('href', 'https://example.org/description')
+    await titleLink.evaluate(element => element.addEventListener('click', event => event.preventDefault(), { once: true }))
+    await titleLink.click()
+    await expect(peek(page).getByRole('textbox', { name: 'Title' })).toHaveCount(0)
+    await descriptionLink.evaluate(element => element.addEventListener('click', event => event.preventDefault(), { once: true }))
+    await descriptionLink.click()
+    await expect(peek(page).getByRole('textbox', { name: 'Body' })).toHaveCount(0)
   })
   await finishJourneyAssertions(page)
 })

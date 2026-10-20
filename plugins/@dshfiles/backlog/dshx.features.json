@@ -101,7 +101,15 @@
     {
       "id": "board-links-and-history",
       "title": "Board, links, backlinks and history",
-      "summary": "A board groups the same items into Inbox, Todo, In progress, Done and Dropped columns in that order. An item's detail edits its fields, links it to threads, revisions, branches, workspaces, URLs or other items, lists the items that link to it, and shows every event with its actor; fields the user set are recorded as theirs.",
+      "summary": "A board groups the same items into Inbox, Todo, In progress, Done and Dropped columns in that order. Titles and descriptions render Markdown and URLs as clickable links in the feed, board and detail. An item's detail links it to threads, revisions, branches, workspaces, URLs or other items, lists the items that link to it, and shows every event with its actor; fields the user set are recorded as theirs.",
+      "reach": [
+        "click button \"Backlog\"",
+        "fill textbox \"Capture\" \"Open [guide](https://example.com/guide) https://example.com\nRead [description](https://example.org/description) https://example.org\"",
+        "press Enter",
+        "expect link \"guide\"",
+        "click text \"b:1\"",
+        "expect link \"description\""
+      ],
       "surfaces": ["client", "host", "tool"],
       "configuration": [],
       "states": ["inbox", "todo", "doing", "done", "dropped"],
@@ -111,6 +119,11 @@
         {
           "kind": "gherkin",
           "id": "backlog.board-links",
+          "featureFile": "tooling/dshx/e2e/features/backlog.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "backlog.item-text-links",
           "featureFile": "tooling/dshx/e2e/features/backlog.feature"
         },
         {

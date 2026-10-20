@@ -8,6 +8,7 @@ import { useState, type PointerEvent as ReactPointerEvent } from 'react'
 import { backlogApi, BacklogViews, type BacklogSummaryView } from './api.js'
 import type { BacklogStatus } from './item.js'
 import { ItemGlyphs } from './item-glyphs.js'
+import { BacklogText } from './item-text.js'
 import { ItemPickers } from './item-pickers.js'
 import { BacklogItemMenu } from './item-actions-menu.js'
 import type { StartThreadItem } from './start-thread.js'
@@ -51,7 +52,10 @@ const CardFace = (props: { readonly item: BacklogSummaryView; readonly onPickSta
             <ItemGlyphs.KindIcon kind={item.kind} />
           </span>
         )}
-        <p className="dshx:line-clamp-2 dshx:min-w-0 dshx:flex-1 dshx:text-[13px] dshx:leading-snug dshx:font-medium">{item.title}</p>
+        <BacklogText
+          text={item.title}
+          className="dshx:line-clamp-2 dshx:min-w-0 dshx:flex-1 dshx:text-[13px] dshx:leading-snug dshx:font-medium dshx:text-foreground dshx:[&>div]:line-clamp-2 dshx:[&>div]:text-[13px]! dshx:[&>div]:leading-snug! dshx:[&>div]:font-medium! dshx:[&>div]:text-foreground! dshx:[&>div>p]:my-0"
+        />
         {props.onPickStatus === undefined ? null : (
           <span
             className="dshx:-mt-1 dshx:-mr-1.5 dshx:opacity-0 dshx:transition-opacity dshx:group-hover/card:opacity-100"
@@ -61,7 +65,12 @@ const CardFace = (props: { readonly item: BacklogSummaryView; readonly onPickSta
           </span>
         )}
       </div>
-      {item.preview === '' ? null : <p className="dshx:line-clamp-2 dshx:text-xs dshx:leading-relaxed dshx:text-muted-foreground">{item.preview}</p>}
+      {item.preview === '' ? null : (
+        <BacklogText
+          text={item.preview}
+          className="dshx:line-clamp-2 dshx:text-xs dshx:leading-relaxed dshx:text-muted-foreground dshx:[&>div]:line-clamp-2 dshx:[&>div]:text-xs! dshx:[&>div]:leading-relaxed! dshx:[&>div]:text-muted-foreground! dshx:[&>div>p]:my-0"
+        />
+      )}
       <div className="dshx:flex dshx:items-center dshx:gap-2">
         <StateLine item={item} />
         <span className="dshx:ml-auto dshx:flex dshx:items-center dshx:gap-2 dshx:text-[11px] dshx:text-muted-foreground">

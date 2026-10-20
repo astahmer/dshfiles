@@ -98,3 +98,15 @@ Feature: Backlog
     And backlog item b:1 exposes all context actions in the "projects" view
     When backlog item b:1 is assigned to a registered project from its feed context menu
     Then backlog item b:1 exposes all context actions in the "details" view
+
+  @scenario:backlog.item-text-links
+  Scenario: Follow links in an item title and description
+    Given the isolated plugin profile "@dshfiles/backlog" is booted
+    When the Backlog panel is opened
+    And an item with linked title and description is captured
+    Then item text links are clickable in the feed
+    When the Items view is opened
+    Then item title links are clickable in the Items view
+    When the feed is shown
+    And backlog item b:1 is opened
+    Then item text links are clickable in the detail

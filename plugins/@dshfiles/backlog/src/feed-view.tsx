@@ -9,6 +9,7 @@ import { ItemPickers } from './item-pickers.js'
 import { BacklogItemMenu } from './item-actions-menu.js'
 import type { StartThreadItem } from './start-thread.js'
 import { StatusFilterBar } from './status-filter-bar.js'
+import { BacklogText } from './item-text.js'
 import { useBacklogActions } from './use-backlog-actions.js'
 
 const DAY_MS = 86_400_000
@@ -83,16 +84,21 @@ const FeedEntry = (props: {
               <ItemPickers.Status id={item.id} status={item.status} onPick={status => actions.update.mutate({ id: item.id, status })} />
             </span>
             {item.kind === 'task' ? null : <ItemGlyphs.KindIcon kind={item.kind} />}
-            <p
+            <BacklogText
+              text={item.title}
               className={cn(
-                'dshx:min-w-0 dshx:truncate dshx:text-sm dshx:font-medium',
-                closed && 'dshx:text-muted-foreground dshx:line-through dshx:decoration-muted-foreground/40',
+                'dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-sm dshx:font-medium dshx:[&>div]:truncate dshx:[&>div]:text-sm! dshx:[&>div]:leading-tight! dshx:[&>div]:font-medium! dshx:[&>div]:text-foreground! dshx:[&>div>p]:my-0 dshx:[&>div>p]:truncate',
+                closed &&
+                  'dshx:text-muted-foreground dshx:line-through dshx:decoration-muted-foreground/40 dshx:[&>div]:text-muted-foreground! dshx:[&>div]:line-through',
               )}
-            >
-              {item.title}
-            </p>
+            />
           </div>
-          {item.preview === '' ? null : <p className="dshx:line-clamp-2 dshx:text-[13px] dshx:leading-relaxed dshx:text-muted-foreground">{item.preview}</p>}
+          {item.preview === '' ? null : (
+            <BacklogText
+              text={item.preview}
+              className="dshx:line-clamp-2 dshx:text-[13px] dshx:leading-relaxed dshx:text-muted-foreground dshx:[&>div]:line-clamp-2 dshx:[&>div]:text-[13px]! dshx:[&>div]:leading-relaxed! dshx:[&>div]:text-muted-foreground! dshx:[&>div>p]:my-0"
+            />
+          )}
           <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-1.5">
             <ItemGlyphs.AttentionBadge attention={item.attention} />
             {item.proposal === null ? null : (
