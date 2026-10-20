@@ -26,6 +26,8 @@ const config = workerConfigSchema.parse(workerData)
 const IDLE_SLEEP_MS = 5_000
 const BUSY_SLEEP_MS = 50
 
+const BACKFILL_ROWIDS = 2_000
+
 interface WorkerState {
   index: SearchIndex | undefined
   root: string | undefined
@@ -101,6 +103,8 @@ const startIngest = (): void => {
       const startedAt = Date.now()
       state.ingesting = true
       try {
+        // One bounded step per loop, so searches still run between steps while an older index gains its conversation table.
+        const backfilled = requireIndex().backfillConversation(BACKFILL_ROWIDS)
         const result = await runIngestPass({ index: requireIndex(), root, budgetMs: 1_000, windowBytes: config.windowBytes, now: Date.now })
         state.behindSessions = result.behindSessions
         state.behindBytes = result.behindBytes
@@ -108,7 +112,7 @@ const startIngest = (): void => {
         state.lastIngestMs = Date.now() - startedAt
         state.slowestIngestMs = Math.max(state.slowestIngestMs, state.lastIngestMs)
         parentPort?.postMessage({ kind: 'progress', health: health() } satisfies WorkerReply)
-        await wait(result.complete && result.ingested === 0 ? IDLE_SLEEP_MS : BUSY_SLEEP_MS)
+        await wait(backfilled && result.complete && result.ingested === 0 ? IDLE_SLEEP_MS : BUSY_SLEEP_MS)
       } catch (error) {
         state.lastError = describe(error)
         state.lastIngestMs = Date.now() - startedAt

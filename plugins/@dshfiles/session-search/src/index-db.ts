@@ -47,6 +47,19 @@ CREATE VIRTUAL TABLE IF NOT EXISTS session_documents USING fts5(
   tokenize = 'unicode61'
 );
 
+-- The user/assistant messages of each session's current surface, under the same rowids: the subset both callers
+-- search (90 000 of 560 000 documents here), so a filtered search reads neither other documents nor their rows.
+CREATE VIRTUAL TABLE IF NOT EXISTS conversation_documents USING fts5(
+  text,
+  session_id UNINDEXED,
+  seq UNINDEXED,
+  type UNINDEXED,
+  time UNINDEXED,
+  surface UNINDEXED,
+  truncated UNINDEXED,
+  tokenize = 'unicode61'
+);
+
 CREATE TABLE IF NOT EXISTS session_document_rows (
   session_id TEXT NOT NULL,
   document_rowid INTEGER NOT NULL,
@@ -202,6 +215,28 @@ const eventFilterClauses = (filters: EventFilters | undefined) => {
 /** Documents a search scores before it falls back to every match; see `#rankedRows`. */
 const RANK_CAP = 2_000
 
+const CONVERSATION_TYPES: ReadonlySet<string> = new Set(['user/message', 'assistant/message'])
+const CONVERSATION_SURFACE = 'current'
+const isConversation = (document: { readonly type: string; readonly surface: string }): boolean =>
+  CONVERSATION_TYPES.has(document.type) && document.surface === CONVERSATION_SURFACE
+
+type DocumentTable = 'session_documents' | 'conversation_documents'
+
+/** The FTS table a search reads and the filter clauses still left to apply on it. */
+type SearchRoute = { readonly table: DocumentTable; readonly filters: EventFilters | undefined }
+
+const metaValueSchema = z.object({ value: z.string() })
+const backfillRowSchema = z.object({
+  rowid: numberLike,
+  text: z.string(),
+  session_id: z.string(),
+  seq: numberLike,
+  type: z.string(),
+  time: numberLike,
+  surface: z.string(),
+  truncated: numberLike,
+})
+
 export class SearchIndex {
   readonly #database: DatabaseSync
   readonly #path: string
@@ -255,6 +290,19 @@ export class SearchIndex {
             document.truncated ? 1 : 0,
           )
           remember.run(header.id, Number(inserted.lastInsertRowid))
+          if (isConversation(document))
+            this.#database
+              .prepare('INSERT INTO conversation_documents (rowid, text, session_id, seq, type, time, surface, truncated) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+              .run(
+                inserted.lastInsertRowid,
+                document.text,
+                document.sessionId,
+                document.seq,
+                document.type,
+                document.time,
+                document.surface,
+                document.truncated ? 1 : 0,
+              )
         }
       }
       const truncated = documents.reduce((total, document) => total + (document.truncated ? 1 : 0), 0)
@@ -319,11 +367,86 @@ export class SearchIndex {
     const mapped = this.#database.prepare('SELECT document_rowid FROM session_document_rows WHERE session_id = ?').all(sessionId)
     if (mapped.length === 0) {
       this.#database.prepare('DELETE FROM session_documents WHERE session_id = ?').run(sessionId)
+      this.#database.prepare('DELETE FROM conversation_documents WHERE session_id = ?').run(sessionId)
       return
     }
     const remove = this.#database.prepare('DELETE FROM session_documents WHERE rowid = ?')
-    for (const row of mapped) remove.run(documentRowidSchema.parse(row).document_rowid)
+    const removeConversation = this.#database.prepare('DELETE FROM conversation_documents WHERE rowid = ?')
+    for (const row of mapped) {
+      const rowid = documentRowidSchema.parse(row).document_rowid
+      remove.run(rowid)
+      removeConversation.run(rowid)
+    }
     this.#database.prepare('DELETE FROM session_document_rows WHERE session_id = ?').run(sessionId)
+  }
+
+  #meta(key: string): string | undefined {
+    const parsed = metaValueSchema.safeParse(this.#database.prepare('SELECT value FROM meta WHERE key = ?').get(key))
+    return parsed.success ? parsed.data.value : undefined
+  }
+
+  #setMeta(key: string, value: string): void {
+    this.#database.prepare('INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value').run(key, value)
+  }
+
+  /** Whether `conversation_documents` holds every conversation document, so searches may use it. */
+  get conversationReady(): boolean {
+    return this.#meta('conversation_ready') === '1'
+  }
+
+  /**
+   * Copy the next `rowids` rowids of conversation documents indexed before `conversation_documents` existed. Documents
+   * committed since are written to both tables, so the copy stops at the highest rowid it saw first.
+   * @returns whether the copy is complete.
+   */
+  backfillConversation(rowids: number): boolean {
+    if (this.conversationReady) return true
+    this.#database.exec('BEGIN IMMEDIATE')
+    try {
+      let until = Number(this.#meta('conversation_backfill_until') ?? Number.NaN)
+      if (Number.isNaN(until)) {
+        until = numberLike.parse(this.#database.prepare('SELECT coalesce(max(rowid), 0) AS value FROM session_documents').get()?.['value'] ?? 0)
+        this.#setMeta('conversation_backfill_until', String(until))
+      }
+      const from = Number(this.#meta('conversation_backfill_from') ?? '0')
+      const to = Math.min(until, from + rowids)
+      const copy = this.#database.prepare(
+        'INSERT OR REPLACE INTO conversation_documents (rowid, text, session_id, seq, type, time, surface, truncated) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      )
+      for (const raw of this.#database
+        .prepare('SELECT rowid, text, session_id, seq, type, time, surface, truncated FROM session_documents WHERE rowid > ? AND rowid <= ?')
+        .all(from, to)) {
+        const row = backfillRowSchema.parse(raw)
+        if (isConversation(row)) copy.run(row.rowid, row.text, row.session_id, row.seq, row.type, row.time, row.surface, row.truncated)
+      }
+      this.#setMeta('conversation_backfill_from', String(to))
+      if (to >= until) this.#setMeta('conversation_ready', '1')
+      this.#database.exec('COMMIT')
+      return to >= until
+    } catch (error) {
+      this.#database.exec('ROLLBACK')
+      throw error
+    }
+  }
+
+  /**
+   * The table a filtered search reads: the conversation subset when the filters ask for exactly it (the user and/or
+   * assistant messages of the current surface), with the clauses that subset already satisfies dropped.
+   */
+  #route(filters: EventFilters | undefined): SearchRoute {
+    if (filters === undefined || !this.conversationReady) return { table: 'session_documents', filters }
+    const types = filters.filter(filter => filter.kind === 'type')
+    const surfaces = filters.filter(filter => filter.kind === 'surface')
+    const [type] = types
+    const [surface] = surfaces
+    if (types.length !== 1 || surfaces.length !== 1 || type === undefined || surface === undefined) return { table: 'session_documents', filters }
+    if (surface.values.length !== 1 || surface.values[0] !== CONVERSATION_SURFACE) return { table: 'session_documents', filters }
+    if (type.values.length === 0 || !type.values.every(value => CONVERSATION_TYPES.has(value))) return { table: 'session_documents', filters }
+    const coversEveryType = [...CONVERSATION_TYPES].every(value => type.values.includes(value))
+    return {
+      table: 'conversation_documents',
+      filters: filters.filter(filter => filter.kind !== 'surface' && (filter.kind !== 'type' || !coversEveryType)),
+    }
   }
 
   searchSessions(request: SessionSearchRequest): SearchRows {
@@ -337,16 +460,27 @@ export class SearchIndex {
       filters.push('s.cwd = ?')
       bindings.push(request.cwd)
     }
-    const events = eventFilterClauses(request.filters)
+    const route = this.#route(request.filters)
+    const events = eventFilterClauses(route.filters)
     filters.push(...events.clauses)
     bindings.push(...events.bindings)
-    const rows = this.#rankedRows({ filters, bindings, limit: request.limit + 1, offset: request.cursor ?? 0, sessionId: undefined, query: request.query })
+    const rows = this.#rankedRows({
+      table: route.table,
+      filters,
+      bindings,
+      limit: request.limit + 1,
+      offset: request.cursor ?? 0,
+      sessionId: undefined,
+      query: request.query,
+    })
     return { matches: rows.slice(0, request.limit).map(row => this.#match(row)), hasMore: rows.length > request.limit }
   }
 
   searchEvents(request: SessionEventSearchRequest): EventSearchRows {
-    const events = eventFilterClauses(request.filters)
+    const route = this.#route(request.filters)
+    const events = eventFilterClauses(route.filters)
     const rows = this.#rankedRows({
+      table: route.table,
       filters: events.clauses,
       bindings: events.bindings,
       limit: request.limit + 1,
@@ -378,6 +512,7 @@ export class SearchIndex {
    * recomputed over every match.
    */
   #rankedRows(input: {
+    readonly table: DocumentTable
     readonly query: string
     readonly filters: readonly string[]
     readonly bindings: readonly (string | number)[]
@@ -391,6 +526,7 @@ export class SearchIndex {
   }
 
   #rankedRowsWithin(input: {
+    readonly table: DocumentTable
     readonly query: string
     readonly filters: readonly string[]
     readonly bindings: readonly (string | number)[]
@@ -399,7 +535,8 @@ export class SearchIndex {
     readonly sessionId: string | undefined
     readonly rankCap: number | undefined
   }): readonly RankedRow[] {
-    const where = ['session_documents MATCH ?', ...(input.sessionId === undefined ? [] : ['d.session_id = ?']), ...input.filters].join(' AND ')
+    const table = input.table
+    const where = [`${table} MATCH ?`, ...(input.sessionId === undefined ? [] : ['d.session_id = ?']), ...input.filters].join(' AND ')
     const bindings: (string | number)[] = [
       input.query,
       ...(input.sessionId === undefined ? [] : [input.sessionId]),
@@ -412,8 +549,8 @@ export class SearchIndex {
     const sql = `
       WITH matched AS (
         SELECT d.rowid AS document_rowid, d.session_id AS session_id, d.seq AS seq, d.time AS time,
-               ${input.rankCap === undefined ? 'bm25(session_documents)' : 'rank'} AS score, length(d.text) AS document_length
-        FROM session_documents AS d JOIN sessions AS s ON s.id = d.session_id
+               ${input.rankCap === undefined ? `bm25(${table})` : 'rank'} AS score, length(d.text) AS document_length
+        FROM ${table} AS d JOIN sessions AS s ON s.id = d.session_id
         WHERE ${where}${input.rankCap === undefined ? '' : ' ORDER BY rank LIMIT ?'}
       ),
       ranked AS (
@@ -429,9 +566,9 @@ export class SearchIndex {
       SELECT d.session_id AS session_id, d.seq AS seq, d.type AS type, d.time AS time, d.surface AS surface,
              s.id AS id, s.version AS version, s.created_at AS created_at, s.cwd AS cwd, s.parent_session AS parent_session,
              s.seed_length AS seed_length, s.delegation_depth AS delegation_depth, s.agent_preset AS agent_preset,
-             snippet(session_documents, 0, ?, ?, '…', 32) AS marked_text
-      FROM page JOIN session_documents AS d ON d.rowid = page.document_rowid JOIN sessions AS s ON s.id = page.session_id
-      WHERE session_documents MATCH ?
+             snippet(${table}, 0, ?, ?, '…', 32) AS marked_text
+      FROM page JOIN ${table} AS d ON d.rowid = page.document_rowid JOIN sessions AS s ON s.id = page.session_id
+      WHERE ${table} MATCH ?
       ORDER BY page.score ASC, page.document_length ASC, page.time DESC, page.session_id ASC, page.seq DESC
     `
     const values = this.#database.prepare(sql).all(...bindings.slice(0, -1), MARKER_START, MARKER_END, input.query)
