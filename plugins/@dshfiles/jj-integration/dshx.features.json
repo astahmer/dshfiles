@@ -392,7 +392,7 @@
         "A conflict leaves the bookmark where it was.",
         "Placeholder descriptions (empty or wip) are refused.",
         "Rebase is refused while any thread session is running or waiting for input, except the calling agent's own session.",
-        "Archive from the rebase notice affects only the current Session and is disabled while it is running.",
+        "The rebase notice offers the actions `integratedThreadActions` selects; Archive affects only the current Session and both actions are disabled while it runs, while Settle is answered by thread-sidebar, the owner of the settled status.",
         "The post-rebase checkout sync refuses described work the bookmark lacks and undoes a conflicting rebase; the panel line names the files and the rebase itself stands."
       ],
       "externalDependencies": [

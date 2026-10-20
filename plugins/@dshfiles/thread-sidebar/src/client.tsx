@@ -134,6 +134,7 @@ import { ThreadListNavigationModel } from './thread-list-navigation.js'
 import { workingThreadIds } from './working-threads.js'
 import { indexRebasedThreadSessions } from './rebased-threads.js'
 import { SettledThreadsModel, type SettledSessionState } from './settled-threads.js'
+import { answerSettleRequests } from './settle-request.js'
 import { THREAD_DELAYS, threadDelayMs, type ThreadDelay } from './thread-delays.js'
 import { useAutoArchive, type AutoArchiveClient } from './auto-archive-machine.js'
 import { useAutoSettle, type AutoSettleClient } from './auto-settle-machine.js'
@@ -1907,8 +1908,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     changePreferences(SettledThreadsModel.settle(status, sessionIds, Date.now()))
   }
 
-  const toggleSettled = (sessionId: SessionSummary['id']): void => {
-    const shouldSettle = !settledSessionIds.has(sessionId)
+  const applySettled = (sessionId: SessionSummary['id'], shouldSettle: boolean): void => {
     if (shouldSettle && SidebarOrganization.hasRunningDescendant({ sessionId, sessions })) {
       setNotice({ tone: 'warning', message: props.tSidebar('threadSidebarRunningNotice') })
       return
@@ -1922,6 +1922,20 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     changePreferences(shouldSettle ? SettledThreadsModel.settle(status, targets, Date.now()) : SettledThreadsModel.unsettle(status, targets))
     setNotice(shouldSettle ? { tone: 'success', message: props.tSidebar('threadSidebarSettledNotice') } : null)
   }
+
+  const toggleSettled = (sessionId: SessionSummary['id']): void => {
+    applySettled(sessionId, !settledSessionIds.has(sessionId))
+  }
+
+  /**
+   * The jj-integration notice asks this sidebar to settle the thread it just integrated. Settling writes our own
+   * status, so the sidebar answers the request and the notice keeps no second copy of it.
+   */
+  const settleRequest = useRef<(sessionId: SessionSummary['id']) => void>(() => undefined)
+  settleRequest.current = sessionId => {
+    if (!settledSessionIds.has(sessionId)) applySettled(sessionId, true)
+  }
+  useEffect(() => answerSettleRequests(sessionId => settleRequest.current(SessionId(sessionId))), [])
 
   const collapsedGroups = preferences.collapsedGroups
   const toggleGroup = (key: string): void => {

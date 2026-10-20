@@ -608,7 +608,8 @@ Then('Rebase moves main onto the work described {string}', async ({ page }: { pa
 
     await expect(notice).toBeVisible()
     await expect(notice).toContainText(`Integrated into main (${changeIdOf(repository, 'main')})`)
-    await expect(notice.getByRole('button', { name: 'Archive this integrated thread', exact: true })).toBeEnabled()
+    await expect(notice.getByRole('button', { name: 'Settle this integrated thread', exact: true })).toBeEnabled()
+    await expect(notice.getByRole('button', { name: 'Archive this integrated thread', exact: true })).toHaveCount(0)
     // A thread lands more than once, so each land is a row in the transcript rather than a banner in the composer dock.
     const noticeBounds = await notice.boundingBox()
     const composerBounds = await threadComposer(page).boundingBox()
@@ -648,13 +649,16 @@ Then('Rebase reflects the external rebase without reloading', async ({ page }: {
   })
 })
 
-When('the thread is archived from the rebase notice', async ({ page }: { page: Page }) => {
-  await page.getByTestId('jj-thread-rebased-notice').last().getByRole('button', { name: 'Archive this integrated thread', exact: true }).click()
+When('the thread is settled from the rebase notice', async ({ page }: { page: Page }) => {
+  const notice = page.getByTestId('jj-thread-rebased-notice').last()
+  await notice.getByRole('button', { name: 'Settle this integrated thread', exact: true }).click()
+  // The sidebar answered the request, so the notice stops offering an action that already happened.
+  await expect(notice.getByRole('button', { name: 'Settle this integrated thread', exact: true })).toHaveCount(0)
 })
 
-Then('the thread appears in the Archived sidebar section', async ({ page }: { page: Page }) => {
-  const archivedSection = page.getByRole('region', { name: 'Threads', exact: true }).getByRole('button', { name: 'Archived (1)', exact: true })
-  await recordAssertion(page, 'jj-integration-rebased-thread-can-be-archived-from-notice', () => expect(archivedSection).toBeVisible())
+Then('the thread appears in the Settled sidebar section', async ({ page }: { page: Page }) => {
+  const settledSection = page.getByRole('region', { name: 'Threads', exact: true }).getByRole('button', { name: 'Settled (1)', exact: true })
+  await recordAssertion(page, 'jj-integration-rebased-thread-can-be-settled-from-notice', () => expect(settledSection).toBeVisible())
   await finishJourneyAssertions(page)
 })
 

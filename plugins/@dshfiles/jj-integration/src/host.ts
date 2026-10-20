@@ -19,7 +19,13 @@ import type { SettingsScope } from '@dshfiles/dshx/settings'
 import { z } from 'zod'
 import { jjIntegrationApi, type DestinationView, type LandResult, type RepositoryView, type ThreadView, type WorkspaceSyncView } from './api.js'
 import { JsonText } from './json-text.js'
-import { isolatesNewThreadsByDefault, jjIntegrationSettings, mayAutoIntegrateWorkspace, type JjIntegrationSettings } from './settings.js'
+import {
+  defaultJjIntegrationSettings,
+  isolatesNewThreadsByDefault,
+  jjIntegrationSettings,
+  mayAutoIntegrateWorkspace,
+  type JjIntegrationSettings,
+} from './settings.js'
 import { ThreadRebaseEligibilityModel, type ThreadSessionActivity } from './thread-rebase-eligibility.js'
 import { createSessionActivityCache } from './session-activity-cache.js'
 import { createDeferredIntegrations } from './deferred-integrations.js'
@@ -70,7 +76,6 @@ const readIntegrationProgress = (path: string): IntegrationProgress | null => {
   return progress
 }
 
-const defaultSettings: JjIntegrationSettings = jjIntegrationSettings.schema({})
 let settingsScope: SettingsScope<JjIntegrationSettings> | undefined
 let hostContext: Context | undefined
 let threads: Threads | undefined
@@ -82,9 +87,9 @@ let workspaceSyncQueue: Promise<void> = Promise.resolve()
 
 const readSettings = (): JjIntegrationSettings => {
   try {
-    return settingsScope?.get() ?? defaultSettings
+    return settingsScope?.get() ?? defaultJjIntegrationSettings
   } catch {
-    return defaultSettings
+    return defaultJjIntegrationSettings
   }
 }
 

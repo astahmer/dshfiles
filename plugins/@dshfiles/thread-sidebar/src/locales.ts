@@ -222,9 +222,9 @@ const en = {
   threadSidebarAutoSettleDisabled: 'Never settle this thread',
   threadSidebarAutoArchive: 'Settle inactive threads',
   threadSidebarRebased: 'Rebased',
-  threadSidebarArchiveRebased: 'Settle rebased threads',
+  threadSidebarArchiveRebased: 'Settle integrated threads',
   threadSidebarArchiveRebasedHint:
-    'Settle a rebased thread after its revisions are safely on the project bookmark. Settled threads stay listed and openable but run no model step until you unsettle them. Running, waiting, recently active, pinned, or newly changed threads are skipped.',
+    'Settle a thread after its revisions are integrated onto the project bookmark. Settled threads stay listed and openable but run no model step until you unsettle them. Running, waiting, recently active, pinned, or newly changed threads are skipped.',
   threadSidebarArchiveSettled: 'Archive settled threads',
   threadSidebarArchiveSettledHint:
     'Archive a settled thread once this delay has passed, counted from when it was settled. Running, waiting, recently active, pinned, or newly changed threads are skipped, and the settled banner shows the archive time.',
@@ -573,9 +573,9 @@ const zh = {
   threadSidebarAutoSettleDisabled: '永不沉淀此会话',
   threadSidebarAutoArchive: '自动沉淀不活跃会话',
   threadSidebarRebased: '已变基',
-  threadSidebarArchiveRebased: '沉淀已变基会话',
+  threadSidebarArchiveRebased: '沉淀已集成会话',
   threadSidebarArchiveRebasedHint:
-    '当修订已安全进入项目书签后沉淀。沉淀后的会话仍会列出并可打开，但取消沉淀前不会运行模型步骤。运行中、等待输入、近期活跃、已固定或产生新改动的会话会跳过。',
+    '当修订已集成到项目书签后沉淀。沉淀后的会话仍会列出并可打开，但取消沉淀前不会运行模型步骤。运行中、等待输入、近期活跃、已固定或产生新改动的会话会跳过。',
   threadSidebarArchiveSettled: '归档已沉淀会话',
   threadSidebarArchiveSettledHint:
     '沉淀达到此时长后自动归档，计时从沉淀时刻开始。运行中、等待输入、近期活跃、已固定或产生新改动的会话会跳过；沉淀横幅会显示归档时间。',

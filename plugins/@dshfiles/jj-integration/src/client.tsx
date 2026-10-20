@@ -11,12 +11,12 @@ import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-session-log-export/client'
 import { createApiClient, defineClient, useApi, useSettings } from '@dshfiles/dshx/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
-import { ArchiveIcon, GitMergeIcon } from '@dshfiles/plugin-ui/icons'
+import { ArchiveIcon, CircleCheckIcon, GitMergeIcon } from '@dshfiles/plugin-ui/icons'
 import { hostDestination, multiHostApi, multiHostQueries, REMOTE_THREAD_PANEL, RemoteComposer } from '@dshfiles/multi-host/destination'
 import { errorMessage, PluginQueryProvider, pluginQueryClient, useMutation, useQuery } from '@dshfiles/plugin-ui/query'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { createWorkspacePickerPorts } from '@dshfiles/project-folder-picker'
-import { useCallback, useLayoutEffect, useSyncExternalStore } from 'react'
+import { useCallback, useLayoutEffect, useState, useSyncExternalStore } from 'react'
 import { startWorkspaceToggle, type DestinationBarServices } from './destination-bar.js'
 import { createComposerWorkspaceNavigation, type ComposerReferenceHandoff } from './composer-workspace-navigation.js'
 import { mainViewSessionId } from './main-view-session.js'
@@ -32,7 +32,8 @@ import { useToast } from './toast.js'
 import { DraftAttachmentCarry } from './draft-attachment-carry.js'
 import { deferWorkspaceSubmit, deliverFirstSend } from './workspace-submit.js'
 import { defersIsolationToSend, ownsIsolatedThreadWorkspace, WorkspaceToggle, type DeferredMove, type ToggleRequest } from './workspace-toggle-machine.js'
-import { jjIntegrationSettings } from './settings.js'
+import { defaultJjIntegrationSettings, IntegratedNoticeActions, jjIntegrationSettings } from './settings.js'
+import { requestThreadSettle } from './settle-request.js'
 
 const PANEL_ID = 'jj-integration'
 const RIGHT_PANE_ID = '@dshfiles/jj-integration/thread-workspaces'
@@ -240,16 +241,31 @@ export default defineClient({
         () => ctx.workspaces.list.getSnapshot().archivedSessionIds.includes(props.sessionId),
         () => false,
       )
-      const archiveToast = useToast()
+      const noticeToast = useToast()
       const archive = useMutation({
         mutationFn: () => ctx.workspaces.archiveSession(props.sessionId),
-        onError: error => archiveToast.show({ text: errorMessage(error, translate('archiveFailed')), success: false }),
+        onError: error => noticeToast.show({ text: errorMessage(error, translate('archiveFailed')), success: false }),
       })
+      const settings = useSettings(jjIntegrationSettings).value ?? defaultJjIntegrationSettings
+      const noticeActions = IntegratedNoticeActions.forSettings(settings)
+      const [settledHere, setSettledHere] = useState(false)
+      const settle = (): void => {
+        if (!requestThreadSettle(props.sessionId)) {
+          noticeToast.show({ text: translate('settleUnavailable'), success: false })
+          return
+        }
+        setSettledHere(true)
+      }
       const thread = status.data?.thread
-      if (thread === null || thread === undefined || thread.rebasedAt === undefined || turnStartedAt === undefined) return archiveToast.element
-      const integrations = thread.integrations ?? [{ at: thread.rebasedAt, tipChangeId: thread.rebasedTipChangeId }]
-      const markers = IntegrationTimeline.forTurn({ integrations, turnStartedAt, nextTurnStartedAt })
-      if (markers.length === 0) return archiveToast.element
+      const rebasedAt = thread?.rebasedAt
+      const markers =
+        thread === null || thread === undefined || rebasedAt === undefined || turnStartedAt === undefined
+          ? []
+          : IntegrationTimeline.forTurn({
+              integrations: thread.integrations ?? [{ at: rebasedAt, tipChangeId: thread.rebasedTipChangeId }],
+              turnStartedAt,
+              nextTurnStartedAt,
+            })
       return (
         <>
           {markers.map(marker => (
@@ -268,23 +284,41 @@ export default defineClient({
                 {new Date(marker.at).toLocaleString()}
               </time>
               <span aria-hidden="true" className="dshx:h-px dshx:min-w-4 dshx:flex-1 dshx:bg-border" />
-              {archived || marker.at !== thread.rebasedAt ? null : (
-                <Button
-                  aria-label={translate('archiveRebasedThread')}
-                  disabled={sessionRunning || archive.isPending}
-                  onClick={() => archive.mutate()}
-                  size="sm"
-                  title={translate('archiveRebasedThread')}
-                  type="button"
-                  variant="ghost"
-                >
-                  {archive.isPending ? null : <ArchiveIcon aria-hidden="true" size={16} />}
-                  {archive.isPending ? translate('archivingThread') : translate('archiveThread')}
-                </Button>
+              {archived || marker.at !== rebasedAt ? null : (
+                <>
+                  {noticeActions.includes('settle') && !settledHere ? (
+                    <Button
+                      aria-label={translate('settleRebasedThread')}
+                      disabled={sessionRunning}
+                      onClick={settle}
+                      size="sm"
+                      title={translate('settleRebasedThread')}
+                      type="button"
+                      variant="ghost"
+                    >
+                      <CircleCheckIcon aria-hidden="true" size={16} />
+                      {translate('settleThread')}
+                    </Button>
+                  ) : null}
+                  {noticeActions.includes('archive') ? (
+                    <Button
+                      aria-label={translate('archiveRebasedThread')}
+                      disabled={sessionRunning || archive.isPending}
+                      onClick={() => archive.mutate()}
+                      size="sm"
+                      title={translate('archiveRebasedThread')}
+                      type="button"
+                      variant="ghost"
+                    >
+                      {archive.isPending ? null : <ArchiveIcon aria-hidden="true" size={16} />}
+                      {archive.isPending ? translate('archivingThread') : translate('archiveThread')}
+                    </Button>
+                  ) : null}
+                </>
               )}
             </div>
           ))}
-          {archiveToast.element}
+          {noticeToast.element}
         </>
       )
     }

@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { isolatesNewThreadsByDefault, jjIntegrationSettings, mayAutoIntegrateWorkspace } from './settings.js'
+import {
+  defaultJjIntegrationSettings,
+  IntegratedNoticeActions,
+  isolatesNewThreadsByDefault,
+  jjIntegrationSettings,
+  mayAutoIntegrateWorkspace,
+} from './settings.js'
 
 describe('automatic integration scope', () => {
   it('defaults to manual integration and opt-in thread isolation', () => {
@@ -24,5 +30,15 @@ describe('automatic integration scope', () => {
     expect(mayAutoIntegrateWorkspace({ ...base, scope: 'all', isThreadWorkspace: false })).toBe(false)
     expect(mayAutoIntegrateWorkspace({ ...base, scope: 'all', isThreadWorkspace: true, sessionIds: ['session-1', 'session-2'] })).toBe(false)
     expect(mayAutoIntegrateWorkspace({ ...base, scope: 'all', isThreadWorkspace: true, sessionId: 'session-2' })).toBe(false)
+  })
+})
+
+describe('integrated notice actions', () => {
+  it('offers Settle alone unless another action is configured', () => {
+    expect(defaultJjIntegrationSettings.integratedThreadActions).toBe('settle')
+    expect(IntegratedNoticeActions.forSettings(defaultJjIntegrationSettings)).toEqual(['settle'])
+    expect(IntegratedNoticeActions.forSettings(jjIntegrationSettings.schema({ integratedThreadActions: 'settle' }))).toEqual(['settle'])
+    expect(IntegratedNoticeActions.forSettings(jjIntegrationSettings.schema({ integratedThreadActions: 'both' }))).toEqual(['settle', 'archive'])
+    expect(IntegratedNoticeActions.forSettings(jjIntegrationSettings.schema({ integratedThreadActions: 'none' }))).toEqual([])
   })
 })

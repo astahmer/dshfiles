@@ -182,9 +182,14 @@ in scope, so Rebase stays refused while a user's session works.
 
 Each successful rebase adds a row to the conversation, after the turn it
 followed, with the target bookmark and 12-character tip change ID; a thread that
-keeps working and lands again gets one row per land. The latest row's
-**Archive** action archives only that Session and is disabled while the Session
-is running.
+keeps working and lands again gets one row per land. The latest row's actions are
+what `integratedThreadActions` selects: **Settle** alone by default, **Archive**,
+both, or none. Archive acts on that Session only; Settle asks
+`@dshfiles/thread-sidebar`, which owns the settled status, through the cancelable
+`dshfiles:thread-settle` window event (`src/settle-request.ts`), so the status has
+one writer. Both are disabled while the Session is running. Automatic settling
+and archiving are not a second policy here: "Settle integrated threads" and
+"Archive settled threads" in Settings › Thread sidebar already do it on a delay.
 
 ### Verified automatic integration
 

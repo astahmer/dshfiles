@@ -20,6 +20,16 @@ export const jjIntegrationSettings = defineSettings({
       .description(
         'Automatically rebase finished thread work after Project Checks pass. All scope also isolates new threads by default; existing shared checkouts stay manual.',
       ),
+    integratedThreadActions: Schema.union([
+      Schema.const('settle').description('Settle: offer only Settle in the “Integrated into …” notice.'),
+      Schema.const('archive').description('Archive: offer only Archive, the notice’s original action.'),
+      Schema.const('both').description('Both: offer Settle and Archive.'),
+      Schema.const('none').description('None: offer no button; act on the thread row instead.'),
+    ])
+      .default('settle')
+      .description(
+        'Buttons the “Integrated into …” notice offers. “Settle integrated threads” and “Archive settled threads” in Thread sidebar settings do it automatically instead.',
+      ),
     bookmark: Schema.string().default('main').description('Exact local bookmark new threads start from and Rebase advances.'),
     threadsDirectory: Schema.string()
       .default('')
@@ -39,6 +49,19 @@ export const jjIntegrationSettings = defineSettings({
 })
 
 export type JjIntegrationSettings = SettingsValue<typeof jjIntegrationSettings.schema>
+
+/** Schema defaults, for surfaces that render before the Settings namespace loads. */
+export const defaultJjIntegrationSettings: JjIntegrationSettings = jjIntegrationSettings.schema({})
+
+export type IntegratedNoticeAction = 'settle' | 'archive'
+
+/** The actions the “Integrated into …” notice offers; settling and archiving automatically are sidebar settings. */
+export class IntegratedNoticeActions {
+  static readonly forSettings = (settings: JjIntegrationSettings): readonly IntegratedNoticeAction[] => {
+    if (settings.integratedThreadActions === 'both') return ['settle', 'archive']
+    return settings.integratedThreadActions === 'none' ? [] : [settings.integratedThreadActions]
+  }
+}
 
 export const isolatesNewThreadsByDefault = (settings: JjIntegrationSettings): boolean => settings.isolateByDefault || settings.autoIntegrationScope === 'all'
 

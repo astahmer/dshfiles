@@ -37,7 +37,10 @@ entries. A thread menu can inherit the global setting, explicitly settle that
 thread, or exclude it; explicit per-thread enables still honor excluded projects
 and other safety checks. Settling records the instant in `settledAt`, which is
 what the composer banner dates and what the separate settled auto-archive delay
-counts from.
+counts from. It also answers jj-integration's **Settle** action in its post-rebase
+notice (`src/settle-request.ts`): the sidebar owns this status, so the notice asks
+through the cancelable `dshfiles:thread-settle` window event instead of writing a
+second copy.
 
 Sidebar preferences live in DSH Settings under the Host-synced `thread-sidebar`
 namespace (`src/settings.ts`, registered by `src/host.ts`). The plugin draws its

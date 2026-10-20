@@ -117,8 +117,8 @@ Feature: jj thread workspaces
     Then Rebase detects the follow-up revision without reloading
     When the thread's work is rebased outside the UI
     Then Rebase reflects the external rebase without reloading
-    When the thread is archived from the rebase notice
-    Then the thread appears in the Archived sidebar section
+    When the thread is settled from the rebase notice
+    Then the thread appears in the Settled sidebar section
 
   @scenario:jj-integration.rebase-command-browser-journey
   Scenario: Rebase a thread from its composer command
