@@ -24,6 +24,20 @@ Feature: MCP servers
     Then the Echo server reads "Disabled in configuration"
     And removing the Echo server after confirmation empties the list
 
+  @scenario:mcp-servers.batch-lifecycle
+  Scenario: Disable, enable and remove a selected server through the batch bar
+    Given the isolated plugin profile "@dshfiles/mcp-servers" is booted
+    When the MCP servers page is opened
+    And the local echo MCP server is added as a stdio command
+    Then the Echo server reads "Native client loaded · 1 Host tools registered"
+    When the Echo server is selected for batch actions
+    And the selected servers are disabled
+    Then the Echo server reads "Disabled in configuration"
+    When the selected servers are enabled
+    Then the Echo server is enabled again
+    When the selected Echo server is removed after confirmation
+    Then the registered server list is empty
+
   @scenario:mcp-servers.preferences
   Scenario: Manager preferences are saved and applied
     Given the isolated plugin profile "@dshfiles/mcp-servers" is booted

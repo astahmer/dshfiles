@@ -147,6 +147,11 @@ The native Client command API has no non-consuming action or selection-restore
 handle, so preserving an active text selection requires a Client/InputBar
 contract change.
 
+The manager's Registered servers list also takes checkbox selection (Shift
+range, Cmd/Ctrl toggle, select-all): Enable selected and Disable selected skip
+servers already in that state, and Remove selected opens one confirmation that
+names the count before every native client stops and the stored grants go.
+
 The native quick panel is a companion to the full manager page. It lists each
 configured server's enablement, native client lifecycle, and registered tool
 count separately, and offers refresh, connect/disconnect, enable/disable, and

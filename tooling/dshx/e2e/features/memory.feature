@@ -19,6 +19,15 @@ Feature: Thread memory panel
     When the Memory panel is opened
     Then the Usage tab shows the memory counters and the usage per day
 
+  @scenario:memory.panel-batch-forget
+  Scenario: Forget several notes in one confirmed action
+    Given the isolated plugin profile "@dshfiles/memory" is booted
+    And memory holds the project note "Deploys need the ops approval label."
+    And memory holds the project note "Nightly runs start after the cache warms."
+    When the Memory panel is opened
+    And two visible notes are selected
+    Then forgetting the selection after confirmation empties the list
+
   @scenario:memory.reference-preview
   Scenario: Open a cited note inline from a conversation
     Given the isolated plugin composition of "@dshfiles/memory, @dshfiles/ai-accounts" is booted

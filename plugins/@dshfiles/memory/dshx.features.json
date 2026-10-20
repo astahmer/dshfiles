@@ -379,6 +379,33 @@
         }
       ],
       "reach": ["click button \"Memory\"", "click tab \"Usage\"", "expect table \"Memory usage per day\""]
+    },
+    {
+      "id": "batch-forget-notes",
+      "title": "Forget a selection of notes",
+      "summary": "Valid notes carry a checkbox; Shift/Cmd select ranges and toggles, select-all covers the visible valid notes, and one confirmed action forgets the selection with a shared reason. Superseded and forgotten notes never get a checkbox.",
+      "surfaces": ["client"],
+      "configuration": [],
+      "states": ["unselected", "range-selected", "confirmed", "partially-forgotten"],
+      "failureModes": [
+        "A note that is no longer valid cannot be selected, so a batch never mixes forgotten history into the selection.",
+        "A failed forget keeps only the failed notes selected and reports the split count."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "memory.panel-batch-forget",
+          "featureFile": "tooling/dshx/e2e/features/memory.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "memory.batch-forget",
+          "file": "plugins/@dshfiles/memory/src/note-selection.test.ts",
+          "testName": "forgets every selected note and keeps the failed ones out of the cleared set"
+        }
+      ],
+      "reach": ["click button \"Memory\"", "expect checkbox \"Select all visible notes\""]
     }
   ]
 }

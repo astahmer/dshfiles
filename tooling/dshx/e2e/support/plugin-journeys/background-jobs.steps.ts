@@ -85,6 +85,48 @@ Then('the board shows that job with its label clamped to the bound', async ({ pa
   await finishJourneyAssertions(page)
 })
 
+/**
+ * Two live commands whose labels share one marker, so the Running scope can select both without touching other jobs.
+ * Bash tool calls in one turn run one after another, so each long command needs its own thread to stay running.
+ */
+const BATCH_COMMANDS = ['sleep 180; echo batch-stop-one', 'sleep 180; echo batch-stop-two'] as const
+
+When('a thread starts two running bash jobs', async ({ page }: { page: Page }) => {
+  const root = await createScratchDirectory('dshx-background-jobs-batch-')
+  const workspace = join(root, 'batch-stop-project')
+  await mkdir(workspace)
+  await registerWorkspaceFolder(page, workspace)
+  for (const [index, command] of BATCH_COMMANDS.entries()) {
+    await startThreadWithModel(page, { project: 'batch-stop-project', model: 'commandcode_work/gpt-6-luna' })
+    const composer = page.getByRole('textbox', { name: THREAD_COMPOSER })
+    await expect(composer).toBeEnabled({ timeout: 45_000 })
+    await composer.fill(`[[call bash ${JSON.stringify({ command, description: `Batch stop ${String(index + 1)}` })}]]`)
+    await composer.press('Enter')
+    await expect(page.locator('[data-chat-call-id]').first()).toBeVisible({ timeout: 45_000 })
+  }
+})
+
+When('the Jobs panel lists both batch jobs in the Running scope', async ({ page }: { page: Page }) => {
+  await openJobs(page)
+  await page.getByRole('radio', { name: 'Running', exact: true }).click()
+  await expect(page.locator('[data-job-id]').filter({ hasText: 'batch-stop' })).toHaveCount(2, { timeout: 45_000 })
+})
+
+Then('selecting both jobs and stopping them through confirmation clears the Running scope', async ({ page }: { page: Page }) => {
+  const rows = page.locator('[data-job-id]').filter({ hasText: 'batch-stop' })
+  await rows.nth(0).getByRole('checkbox').check()
+  await rows.nth(1).getByRole('checkbox').check()
+  await expect(page.getByText('2 selected', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: 'Stop selected', exact: true }).click()
+  const dialog = page.getByRole('alertdialog')
+  await expect(dialog).toContainText('Stop 2 running jobs?')
+  await dialog.getByRole('button', { name: 'Stop 2 jobs', exact: true }).click()
+  await recordAssertion(page, 'background-jobs-batch-stop-clears-running', async () => {
+    await expect.poll(async () => rows.count(), { timeout: 45_000 }).toBe(0)
+  })
+  await finishJourneyAssertions(page)
+})
+
 Then('the category filter, the scope and the search narrow the board', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'background-jobs-category-filter-narrows-the-board', async () => {
     await page.getByRole('button', { name: /^jj & git \d+$/ }).click()

@@ -142,6 +142,16 @@ const repositoryFor = (page: Page): ThreadRepository => {
   return repository
 }
 
+/**
+ * The checkout the journey's thread actually runs in, ready for another journey to seed working-copy changes there.
+ * An isolated thread workspace wins; a thread that stayed in the project checkout returns that checkout instead.
+ */
+export const threadWorkspacePathFor = (page: Page): string => {
+  const repository = repositoryFor(page)
+  const threadName = workspaceNames(repository).find(name => name !== 'default')
+  return threadName === undefined ? repository.repositoryPath : join(repository.threadsPath, threadName)
+}
+
 const projectButton = (page: Page) => page.getByRole('button', { name: 'Choose workspace', exact: true })
 const dismissGetStartedDialog = async (page: Page): Promise<void> => {
   const dialog = page.getByRole('dialog', { name: 'Get started', exact: true })

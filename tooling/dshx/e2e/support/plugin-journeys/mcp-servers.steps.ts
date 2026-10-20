@@ -100,6 +100,47 @@ Then('removing the Echo server after confirmation empties the list', async ({ pa
   await finishJourneyAssertions(page)
 })
 
+const selectEchoForBatch = async (page: Page): Promise<void> => {
+  await serverRow(page, 'Echo server').getByRole('checkbox', { name: 'Select server Echo server', exact: true }).check()
+  await expect(page.getByText('1 selected', { exact: true })).toBeVisible()
+}
+
+When('the Echo server is selected for batch actions', async ({ page }: { page: Page }) => {
+  await selectEchoForBatch(page)
+})
+
+When('the selected servers are disabled', async ({ page }: { page: Page }) => {
+  await page.getByRole('button', { name: 'Disable selected', exact: true }).click()
+  await expect(page.getByText('1 selected', { exact: true })).toHaveCount(0)
+})
+
+When('the selected servers are enabled', async ({ page }: { page: Page }) => {
+  await selectEchoForBatch(page)
+  await page.getByRole('button', { name: 'Enable selected', exact: true }).click()
+})
+
+Then('the Echo server is enabled again', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'mcp-servers-batch-enable-restores-the-client', async () => {
+    await expect(serverRow(page, 'Echo server')).toContainText('Native client loaded', { timeout: 30_000 })
+    await expect(serverRow(page, 'Echo server')).not.toContainText('Disabled in configuration')
+  })
+})
+
+When('the selected Echo server is removed after confirmation', async ({ page }: { page: Page }) => {
+  await selectEchoForBatch(page)
+  await page.getByRole('button', { name: 'Remove selected', exact: true }).click()
+  const dialog = page.getByRole('alertdialog')
+  await expect(dialog).toContainText('Remove this server and stop its native client?')
+  await dialog.getByRole('button', { name: 'Remove', exact: true }).click()
+})
+
+Then('the registered server list is empty', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'mcp-servers-batch-remove-empties-the-list', () =>
+    expect(servers(page).getByText('No MCP servers configured yet.', { exact: true })).toBeVisible(),
+  )
+  await finishJourneyAssertions(page)
+})
+
 const preferences = (page: Page) => page.getByRole('region', { name: 'Preferences', exact: true })
 
 When('public Registry search is turned off and the tool call timeout set to 45 seconds', async ({ page }: { page: Page }) => {

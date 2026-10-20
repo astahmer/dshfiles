@@ -12,6 +12,14 @@ Feature: Background jobs board
     Then the board lists the recorded jobs with their categories and statuses
     And the category filter, the scope and the search narrow the board
 
+  @scenario:background-jobs.batch-stop
+  Scenario: Stop several running jobs through one confirmation
+    Given the isolated plugin composition of "@dshfiles/background-jobs, @dshfiles/ai-accounts, @dshfiles/workspace-folder-picker" is booted
+    When a Command Code account backed by a local fake provider is added
+    And a thread starts two running bash jobs
+    And the Jobs panel lists both batch jobs in the Running scope
+    Then selecting both jobs and stopping them through confirmation clears the Running scope
+
   @scenario:background-jobs.oversized-live-label
   Scenario: A live job whose label exceeds the wire bound still renders
     Given the isolated plugin composition of "@dshfiles/background-jobs, @dshfiles/ai-accounts, @dshfiles/workspace-folder-picker" is booted

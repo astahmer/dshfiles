@@ -108,6 +108,33 @@
           "testName": "keeps the durable record when a state file is malformed"
         }
       ]
+    },
+    {
+      "id": "batch-stop-jobs",
+      "title": "Stop a selection of running jobs",
+      "summary": "Running rows carry a checkbox; Shift/Cmd select ranges and toggles, select-all covers the visible running rows, and stopping the selection goes through one confirmation that names the count. Each kill still passes the registry's owner fence.",
+      "surfaces": ["client"],
+      "configuration": [],
+      "states": ["unselected", "range-selected", "confirmed", "partially-stopped"],
+      "failureModes": [
+        "Finished rows have no checkbox, so a batch can never target a job that already settled.",
+        "A kill the owner fence refuses stays selected and is reported instead of being retried without the fence."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "background-jobs.batch-stop",
+          "featureFile": "tooling/dshx/e2e/features/background-jobs.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "background-jobs.batch-stop-partial",
+          "file": "plugins/@dshfiles/background-jobs/src/job-selection.test.ts",
+          "testName": "reports requested, already-finished and failed kills separately"
+        }
+      ],
+      "reach": ["click button \"Jobs\"", "expect checkbox \"Select all running jobs\""]
     }
   ]
 }

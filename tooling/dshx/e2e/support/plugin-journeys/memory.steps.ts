@@ -86,6 +86,24 @@ Then('forgetting it with a reason removes it from the list', async ({ page }: { 
   await finishJourneyAssertions(page)
 })
 
+When('two visible notes are selected', async ({ page }: { page: Page }) => {
+  await page.getByRole('checkbox', { name: 'Select n:1', exact: true }).check()
+  await page.getByRole('checkbox', { name: 'Select n:2', exact: true }).check()
+  await expect(page.getByText('2 selected', { exact: true })).toBeVisible()
+})
+
+Then('forgetting the selection after confirmation empties the list', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'memory-panel-batch-forget-notes', async () => {
+    await page.getByRole('button', { name: 'Forget selected', exact: true }).click()
+    const dialog = page.getByRole('alertdialog')
+    await expect(dialog).toContainText('Forget 2 selected notes?')
+    await dialog.getByRole('textbox', { name: 'Reason for forgetting', exact: true }).fill('obsolete after the pipeline change')
+    await dialog.getByRole('button', { name: 'Forget 2 notes', exact: true }).click()
+    await expect(page.getByText('No notes yet.', { exact: false })).toBeVisible()
+  })
+  await finishJourneyAssertions(page)
+})
+
 Then('the Usage tab shows the memory counters and the usage per day', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'memory-panel-usage-counters', async () => {
     await page.getByRole('tab', { name: 'Usage', exact: true }).click()

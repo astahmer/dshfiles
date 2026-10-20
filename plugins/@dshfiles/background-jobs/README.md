@@ -61,7 +61,10 @@ change is a one-line rule change plus a test.
 (Running / Finished / All), search over labels, ids and exit codes, category
 chips with live counts, grouping by Session or category, per-row output
 expansion for jobs this process still holds a ring for, and a two-press Stop
-that goes through the registry's owner fence.
+that goes through the registry's owner fence. Running rows also take a checkbox
+(Shift range, Cmd/Ctrl toggle, select-all over the visible running rows): Stop
+selected stops them all after one confirmation naming the count, and every kill
+still passes the same owner fence.
 
 ## Agent tools
 

@@ -264,6 +264,33 @@
           "testName": "accepts only a bare HTTP(S) origin for the callback"
         }
       ]
+    },
+    {
+      "id": "batch-server-actions",
+      "title": "Batch enable, disable and remove MCP servers",
+      "summary": "Registered servers take checkbox selection with ranges and visible-only select-all; enabled or disabled servers change in one pass, and removing a selection always goes through a count-named confirmation that stops its native clients and drops their grants.",
+      "surfaces": ["client"],
+      "configuration": [],
+      "states": ["unselected", "range-selected", "batch-enabled", "batch-disabled", "confirmed-removal"],
+      "failureModes": [
+        "A server whose enabled state already matches the batch is skipped instead of being written twice.",
+        "Removal stops at the first failure and reports it; nothing is removed without the confirmation naming the count."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "mcp-servers.batch-lifecycle",
+          "featureFile": "tooling/dshx/e2e/features/mcp-servers.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "mcp-servers.batch-targets",
+          "file": "plugins/@dshfiles/mcp-servers/src/server-selection.test.ts",
+          "testName": "targets only the selected servers an enable or disable would change"
+        }
+      ],
+      "reach": ["click button \"MCP servers\"", "expect checkbox \"Select all servers\""]
     }
   ],
   "kind": "bundle"

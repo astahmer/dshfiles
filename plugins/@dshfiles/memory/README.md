@@ -37,7 +37,9 @@ Cross-thread, cross-project memory for DSH that leaves the live context and the 
   row). The whole `memory: <id>` token carries the link, and the preview uses the `preview` API method, which does not
   create a synthetic memory-tool usage record.
 - **Memory panel** (sidebar → Memory): notes by type with their source (project, thread, message, who wrote it,
-  created and updated), inline edit and forget, superseded history, markdown preview through DSH's own
+  created and updated), inline edit and forget, a checkbox selection (Shift range, Cmd/Ctrl toggle, select-all over
+  the visible valid notes) that forgets every selected note after one count-named confirmation, superseded history,
+  markdown preview through DSH's own
   `MarkdownText`; thread digests by project; usage: cost per day, start-block size and the requests that carried
   it, recall hits and citations, correction heuristics and 👍/👎 per cited memory (also through the
   `dshfiles-memory` API).
