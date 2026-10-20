@@ -201,13 +201,13 @@ export const jjIntegrationApi = defineApi({
       input: z.object({ path: z.string().min(1), sessionId: z.string().optional() }).strict(),
       output: landResultSchema,
       description:
-        'Rebase the thread at a path: move its described revisions onto the target bookmark and advance the bookmark. Never pushes. Refuses while any thread session is running or waiting for input; the calling agent may rebase its own thread once it resolved a handed-back problem.',
+        'Rebase the thread at a path: move its described revisions onto the target bookmark and advance the bookmark. Never pushes. Refuses while any Session working in that jj workspace is running or waiting for input, and names them; the calling agent may rebase its own thread once it resolved a handed-back problem.',
     }),
     queueLand: method({
       input: z.object({ path: z.string().min(1), sessionId: z.string().optional() }).strict(),
       output: z.object({ queuedAt: z.number().int().nonnegative() }).strict(),
       description:
-        'Queue an integration of the thread at a path that runs as soon as every thread Session is idle and no question waits. The rebase itself keeps every guard of `land`; cancelQueuedLand undoes the request until it starts.',
+        'Queue an integration of the thread at a path that runs as soon as every Session working in that jj workspace is idle and no question waits. The rebase itself keeps every guard of `land`; cancelQueuedLand undoes the request until it starts.',
     }),
     cancelQueuedLand: method({
       input: z.object({ path: z.string().min(1) }).strict(),

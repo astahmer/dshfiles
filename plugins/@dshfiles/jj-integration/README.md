@@ -68,8 +68,9 @@ One control in the conversation header carries the workspace state:
   **Download session log**.
 - While a session is running or a question waits, **Integrate** becomes
   **Queue integration into `main`**: the Host keeps the request and runs the
-  regular guarded integration as soon as every thread Session is idle (woken by
-  Session events, with a 30 s fallback). The menu then says it is queued, the
+  regular guarded integration as soon as every Session working in that jj
+  workspace is idle (woken by Session events, with a 30 s fallback). The menu
+  then says it is queued, the
   trigger shows a clock, and **Undo** cancels it until the rebase actually
   starts. Queueing and cancelling also leave dated inline chat notices; the
   active queue notice has its own **Undo** action. The thread list shows a subtle
@@ -186,6 +187,14 @@ handed-back agent is the one session exempt from the idle check above: it cannot
 resolve conflicts and then rebase while its own turn still counts as running.
 Every other session of the thread must be idle, and the UI paths keep the caller
 in scope, so Rebase stays refused while a user's session works.
+
+A jj thread workspace is one folder, and more than one DSH thread can end up
+working in it (a thread started from inside another one, a fork). The idle check
+therefore covers every Session with that folder as its working directory, not
+just the conversation you are looking at. A refusal names the Sessions actually
+keeping it busy, with their titles, so "this thread is idle" never disagrees
+with the message: another thread in the same workspace is what blocks it. The
+queued integration drains once those Sessions fall idle too.
 
 Each successful rebase adds a row to the conversation, after the turn it
 followed, with the target bookmark and 12-character tip change ID; a thread that

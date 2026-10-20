@@ -31,6 +31,14 @@ export interface ThreadWorkspaceControlProps {
 
 const noCwd = (): null => null
 
+/** A Session the client already sees keeping this workspace busy, so the hint can name it instead of blaming "this thread". */
+interface WorkspaceBlocker {
+  readonly title: string
+  readonly reason: 'working' | 'question'
+}
+
+const noBlockers: readonly WorkspaceBlocker[] = []
+
 const folderName = (path: string): string =>
   path
     .split('/')
@@ -128,6 +136,22 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
   const sessionRunning = useSyncExternalStore(subscribe, readSessionRunning, () => true)
   const clientCanRebase = useSyncExternalStore(subscribe, readClientCanRebase, () => false)
   const sessionWaitingForInput = useSyncExternalStore(subscribe, readClientQuestionPending, () => true)
+  const readWorkspaceBlockers = useCallback((): readonly WorkspaceBlocker[] => {
+    const sessions = props.sessions.list.getSnapshot().byId
+    const seen = new Set<string>()
+    const blockers: WorkspaceBlocker[] = []
+    const consider = (session: SessionSummary | undefined): void => {
+      if (session === undefined || seen.has(session.id)) return
+      const pendingUserQuestion = ThreadRebaseEligibilityModel.hasPendingUserQuestion(session.projectionValues)
+      if (!session.running && pendingUserQuestion !== true) return
+      seen.add(session.id)
+      blockers.push({ title: session.title ?? session.displayTitle, reason: session.running ? 'working' : 'question' })
+    }
+    for (const sessionId of sessionIds) consider(sessions[SessionId(sessionId)])
+    for (const session of Object.values(sessions)) if (session.cwd === current?.path) consider(session)
+    return blockers
+  }, [current?.path, props.sessions, sessionIds])
+  const workspaceBlockers = useSyncExternalStore(subscribe, readWorkspaceBlockers, () => noBlockers)
   const canRebase = ThreadRebaseEligibilityModel.fromClientSnapshot({
     threadSessionsEligible: clientCanRebase,
     sessionRunning,
@@ -145,7 +169,18 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
   const rebaseDisabled = rebasesPending || !isThread || unlanded === 0 || !canRebase
   const integrationQueued = current?.integrationQueuedAt !== undefined
   const canQueueIntegration = isThread && unlanded > 0 && !canRebase && !rebasesPending
-  const blockedReason = isThread && !canRebase ? props.t(clientCanRebase === undefined ? 'rebaseActivityUnknown' : 'rebaseBlocked') : undefined
+  const blockedReason =
+    isThread && !canRebase
+      ? clientCanRebase === undefined
+        ? props.t('rebaseActivityUnknown')
+        : workspaceBlockers.length === 0
+          ? props.t('rebaseBlockedUnknownThread')
+          : props.t('rebaseBlocked', {
+              threads: workspaceBlockers
+                .map(blocker => props.t(blocker.reason === 'working' ? 'blockerThreadWorking' : 'blockerThreadWaiting', { thread: blocker.title }))
+                .join(', '),
+            })
+      : undefined
   const statusText = (): string => {
     if (loading) return props.t('workspaceStatusLoading')
     if (!isThread) return props.t('sharedCheckoutHint')

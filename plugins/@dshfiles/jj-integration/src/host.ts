@@ -26,7 +26,7 @@ import {
   mayAutoIntegrateWorkspace,
   type JjIntegrationSettings,
 } from './settings.js'
-import { ThreadRebaseEligibilityModel, type ThreadSessionActivity } from './thread-rebase-eligibility.js'
+import { ThreadRebaseEligibilityModel, type ThreadActivityBlocker, type ThreadSessionActivity } from './thread-rebase-eligibility.js'
 import { createSessionActivityCache } from './session-activity-cache.js'
 import { createDeferredIntegrations } from './deferred-integrations.js'
 import { ThreadIntegrationModel } from './thread-integration-state.js'
@@ -212,6 +212,7 @@ const readSessionActivity = (budgetMs: number): Promise<ReadonlyMap<string, Thre
         activity.set(item.sessionId, {
           running: item.running,
           pendingUserQuestion: ThreadRebaseEligibilityModel.hasPendingUserQuestion(item.projections?.values),
+          title: item.projections?.values.title ?? undefined,
         })
       }
       return activity
@@ -561,6 +562,18 @@ const queueWorkspaceSync = (input: {
     })
 }
 
+/**
+ * One thread workspace can hold several DSH Sessions, so a refusal names the ones actually keeping it busy instead of
+ * blaming the thread the user is looking at.
+ */
+const busyWorkspaceMessage = (blockers: readonly ThreadActivityBlocker[]): string => {
+  if (blockers.length === 0) return 'This workspace is still in use. Integrate once every thread in it is idle.'
+  const named = blockers.map(
+    blocker => `“${blocker.title ?? blocker.sessionId}” ${blocker.reason === 'working' ? 'is still working' : 'is waiting for an answer'}`,
+  )
+  return `This workspace is still in use: ${named.join('; ')}. Integrate once every thread in it is idle.`
+}
+
 const landThread = async (input: {
   readonly path: string
   readonly sessionId: string | undefined
@@ -586,12 +599,11 @@ const landThread = async (input: {
       sessionId: input.sessionId,
     })
     if (eligible === undefined) {
-      throw new PluginApiError('Could not verify whether this thread is idle. Refresh and retry integration.', { code: 'thread-activity-unknown' })
+      throw new PluginApiError('Could not verify whether this workspace is idle. Refresh and retry integration.', { code: 'thread-activity-unknown' })
     }
     if (!eligible) {
-      throw new PluginApiError('This thread still has active work or unanswered questions. Stop work and resolve questions before integrating.', {
-        code: 'thread-active',
-      })
+      const blockers = ThreadRebaseEligibilityModel.blockers({ sessionIds: workspace.sessionIds, activity })
+      throw new PluginApiError(busyWorkspaceMessage(blockers), { code: 'thread-active' })
     }
     if (input.stillQueued?.() === false) throw new PluginApiError('The queued integration was cancelled.', { code: 'integration-cancelled' })
   }

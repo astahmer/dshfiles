@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ThreadRebaseEligibilityModel } from './thread-rebase-eligibility.js'
+import { ThreadRebaseEligibilityModel, type ThreadSessionActivity } from './thread-rebase-eligibility.js'
 
 describe('thread rebase eligibility', () => {
   it('allows a thread with no sessions', () => {
@@ -59,6 +59,57 @@ describe('thread rebase eligibility', () => {
     expect(ThreadRebaseEligibilityModel.hasPendingUserQuestion({ userQuestions: { active: [] } })).toBe(false)
     expect(ThreadRebaseEligibilityModel.hasPendingUserQuestion({})).toBeUndefined()
     expect(ThreadRebaseEligibilityModel.hasPendingUserQuestion(undefined)).toBeUndefined()
+  })
+})
+
+describe('workspace blockers', () => {
+  const idle = { running: false, pendingUserQuestion: false }
+
+  it('names nothing while every Session is idle', () => {
+    expect(
+      ThreadRebaseEligibilityModel.blockers({
+        sessionIds: ['a', 'b'],
+        activity: new Map([
+          ['a', idle],
+          ['b', idle],
+        ]),
+      }),
+    ).toEqual([])
+  })
+
+  it('names a working Session with its title', () => {
+    expect(
+      ThreadRebaseEligibilityModel.blockers({
+        sessionIds: ['mine', 'other'],
+        activity: new Map<string, ThreadSessionActivity>([
+          ['mine', idle],
+          ['other', { running: true, pendingUserQuestion: false, title: 'Keyboard-accessible session list' }],
+        ]),
+      }),
+    ).toEqual([{ sessionId: 'other', title: 'Keyboard-accessible session list', reason: 'working' }])
+  })
+
+  it('reports an unanswered question once the turn stopped', () => {
+    expect(
+      ThreadRebaseEligibilityModel.blockers({
+        sessionIds: ['other'],
+        activity: new Map<string, ThreadSessionActivity>([['other', { running: false, pendingUserQuestion: true, title: 'Move tabs between sidepanels' }]]),
+      }),
+    ).toEqual([{ sessionId: 'other', title: 'Move tabs between sidepanels', reason: 'question' }])
+  })
+
+  it('treats work as the reason when a Session both runs and asks', () => {
+    expect(
+      ThreadRebaseEligibilityModel.blockers({
+        sessionIds: ['other'],
+        activity: new Map([['other', { running: true, pendingUserQuestion: true }]]),
+      }),
+    ).toEqual([{ sessionId: 'other', title: undefined, reason: 'working' }])
+  })
+
+  it('names nothing when activity is unknown, so the guard keeps its separate message', () => {
+    expect(ThreadRebaseEligibilityModel.blockers({ sessionIds: ['a'], activity: undefined })).toEqual([])
+    expect(ThreadRebaseEligibilityModel.blockers({ sessionIds: ['ghost'], activity: new Map() })).toEqual([])
   })
 })
 

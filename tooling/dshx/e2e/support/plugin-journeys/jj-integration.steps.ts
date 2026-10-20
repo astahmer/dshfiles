@@ -714,7 +714,7 @@ Then('the workspace menu shows the queued integration with Undo', async ({ page 
   const repository = repositoryFor(page)
   await openWorkspaceMenu(page)
   await recordAssertion(page, 'jj-integration-queued-integration-shows-undo', async () => {
-    await expect(workspaceMenu(page)).toContainText('Queued: integrates into main as soon as this thread is idle.', { timeout: 10_000 })
+    await expect(workspaceMenu(page)).toContainText('Queued: integrates into main once every thread in this workspace is idle.', { timeout: 10_000 })
     await expect(undoQueuedIntegrationButton(page)).toBeEnabled()
     await expect(page.getByTestId('jj-thread-integration-queued-notice')).toContainText('Integration into main queued')
     await expect(page.getByTestId('thread-sidebar-integration-queued-tag')).toBeVisible()

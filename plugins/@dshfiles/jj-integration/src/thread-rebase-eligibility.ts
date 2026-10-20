@@ -5,6 +5,15 @@ interface UserQuestionProjectionValues {
 export interface ThreadSessionActivity {
   readonly running: boolean | undefined
   readonly pendingUserQuestion: boolean | undefined
+  /** Durable title, so a refusal can name the Session that keeps the workspace busy. */
+  readonly title?: string | undefined
+}
+
+/** One Session that keeps a workspace out of a rebase, with the reason a message can state. */
+export interface ThreadActivityBlocker {
+  readonly sessionId: string
+  readonly title: string | undefined
+  readonly reason: 'working' | 'question'
 }
 
 const hasPendingUserQuestion = (projectionValues: UserQuestionProjectionValues | undefined): boolean | undefined => {
@@ -59,6 +68,25 @@ const threadRebaseEligibility = (input: {
 }): boolean | undefined =>
   canRebaseThreadIfKnown(rebaseGuardSessionIds({ sessionIds: input.sessionIds, fromAgent: input.fromAgent, sessionId: input.sessionId }), input.activity)
 
+/**
+ * The Sessions that block a workspace from rebasing, in guard order. A message names them instead of blaming "this
+ * thread": one thread workspace can hold several DSH Sessions, and a different one being busy is what a refusal means.
+ */
+const blockersOf = (input: {
+  readonly sessionIds: readonly string[]
+  readonly activity: ReadonlyMap<string, ThreadSessionActivity> | undefined
+}): readonly ThreadActivityBlocker[] => {
+  const activity = input.activity
+  if (activity === undefined) return []
+  const blockers: ThreadActivityBlocker[] = []
+  for (const sessionId of input.sessionIds) {
+    const current = activity.get(sessionId)
+    if (current?.running !== true && current?.pendingUserQuestion !== true) continue
+    blockers.push({ sessionId, title: current.title, reason: current.running === true ? 'working' : 'question' })
+  }
+  return blockers
+}
+
 const canRebaseFromClientSnapshot = (input: {
   readonly threadSessionsEligible: boolean | undefined
   readonly sessionRunning: boolean
@@ -71,5 +99,6 @@ export class ThreadRebaseEligibilityModel {
   static readonly canRebaseIfKnown = canRebaseThreadIfKnown
   static readonly guardSessionIds = rebaseGuardSessionIds
   static readonly eligibility = threadRebaseEligibility
+  static readonly blockers = blockersOf
   static readonly fromClientSnapshot = canRebaseFromClientSnapshot
 }
