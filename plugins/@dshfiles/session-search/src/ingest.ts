@@ -4,7 +4,8 @@
  * responsive to searches between passes, and every session commits on its own, so an interrupted pass resumes instead
  * of restarting the corpus.
  */
-import { readFile } from 'node:fs/promises'
+import { open } from 'node:fs/promises'
+import { setImmediate } from 'node:timers/promises'
 import { buildSessionEventSearchDocuments, extractSessionEventText } from '@deepseek-ai/dsh-session-query'
 import { SessionId, type SessionEvent } from '@deepseek-ai/dsh-session/types'
 import { FrameLog, type SessionLogFile } from './frame-log.js'
@@ -54,10 +55,16 @@ const toHeader = (raw: unknown, sessionId: string): SessionHeaderRow => {
   return parsed.success ? withoutUndefined(parsed.data) : fallbackHeader(sessionId)
 }
 
-/** Read only the byte window a pass needs, so one 50 MB log never arrives in a single synchronous burst. */
+/** Read only the byte window a pass needs: the whole 69 MB log used to be read to slice it, on every pass. */
 const readWindow = async (path: string, from: number, windowBytes: number): Promise<Buffer> => {
-  const whole = await readFile(path)
-  return whole.subarray(from, Math.min(whole.length, from + windowBytes))
+  const handle = await open(path, 'r')
+  try {
+    const buffer = Buffer.alloc(windowBytes)
+    const { bytesRead } = await handle.read(buffer, 0, windowBytes, from)
+    return buffer.subarray(0, bytesRead)
+  } finally {
+    await handle.close()
+  }
 }
 
 const ingestSession = async (options: IngestPassOptions & { readonly log: SessionLogFile }): Promise<number> => {
@@ -65,8 +72,15 @@ const ingestSession = async (options: IngestPassOptions & { readonly log: Sessio
   const cursor = index.cursor(log.sessionId)
   const replace = cursor === undefined || cursor.dev !== log.dev || cursor.ino !== log.ino || log.size < cursor.offset
   const from = replace ? 0 : cursor.offset
-  const window = await readWindow(log.path, from, windowBytes)
-  const decoded = FrameLog.decodeFrom(window, 0)
+  // A frame larger than the window decodes nothing; widen until one fits or the rest of the log is read.
+  let size = windowBytes
+  let window = await readWindow(log.path, from, size)
+  let decoded = FrameLog.decodeFrom(window, 0)
+  while (decoded.offset === 0 && from + size < log.size) {
+    size *= 2
+    window = await readWindow(log.path, from, size)
+    decoded = FrameLog.decodeFrom(window, 0)
+  }
   const events = parseEvents(decoded.text, replace)
   const rows: DocumentRow[] = []
   if (events.length > 0) {
@@ -131,6 +145,8 @@ export const runIngestPass = async (options: IngestPassOptions): Promise<IngestP
     }
     documents += await ingestSession({ ...options, log })
     ingested += 1
+    // Searches queue on this thread's message port; let them run between sessions.
+    await setImmediate()
   }
   return { scanned: logs.length, ingested, documents, behindSessions, behindBytes, complete }
 }

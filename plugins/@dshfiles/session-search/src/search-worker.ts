@@ -18,7 +18,8 @@ const workerConfigSchema = z.object({
     .number()
     .int()
     .positive()
-    .default(16 * 1024 * 1024),
+    // Each window is decoded, parsed and committed in one synchronous step that searches wait behind.
+    .default(2 * 1024 * 1024),
 })
 const config = workerConfigSchema.parse(workerData)
 
