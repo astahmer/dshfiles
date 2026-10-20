@@ -20,3 +20,10 @@ Feature: Multi-host loopback SSH lifecycle
     And a lost mutation response is reconciled without replay
     And the remote DSH crashes and its scratch home is cleaned
     Then the scratch DSH readiness and recovery checks pass
+
+  @scenario:multi-host.remote-inventory
+  Scenario: A thread started on the host appears in the manager's inventory
+    Given a loopback SSH DSH pair is booted
+    When the scratch remote is added from the host UI
+    And a thread is started directly on the scratch remote
+    Then the manager lists it as started on the host

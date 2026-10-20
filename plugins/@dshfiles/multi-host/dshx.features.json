@@ -20,7 +20,7 @@
         "Corrupt or unsupported directory data is left intact and writes are refused."
       ],
       "externalDependencies": [],
-      "reach": ["click button \"New session\"", "click button \"Run on Local\"", "click text \"Add host…\"", "expect dialog \"Add host\""],
+      "reach": ["click button \"New session\"", "click button \"Run on Local\"", "click text \"Add host\u2026\"", "expect dialog \"Add host\""],
       "verification": [
         {
           "kind": "gherkin",
@@ -69,10 +69,10 @@
     {
       "id": "session-routing",
       "title": "Start and follow threads on a remote host",
-      "summary": "Browse the host's folders, start a thread there from the New thread composer, follow its transcript and reply from the remote thread view.",
+      "summary": "Browse the host's folders, start a thread there from the New thread composer, follow its transcript and reply from the remote thread view, see threads started directly on the host in the remote inventory, and see when a remote turn waits on a question or approval.",
       "surfaces": ["client", "host", "integration"],
       "configuration": [],
-      "states": ["folder-chosen", "starting", "running", "finished", "offline"],
+      "states": ["folder-chosen", "starting", "running", "finished", "offline", "waiting-on-host"],
       "failureModes": [
         "A capability or version mismatch disables incompatible actions.",
         "An unknown mutation result after a lost reply is inspected and never automatically replayed."
@@ -129,6 +129,70 @@
           "id": "multi-host.view-directory-listing",
           "file": "plugins/@dshfiles/multi-host/tests/directory-listing.test.ts",
           "testName": "lists folders and folder symlinks, hidden ones last, with crumbs; files are left out"
+        }
+      ]
+    },
+    {
+      "id": "remote-inventory",
+      "title": "Every thread on every host",
+      "summary": "The remote threads panel merges threads started from this DSH with the sessions each host reports, grouped by host: threads started on the host itself carry a muted badge, an offline host shows one unavailable line, and status is polled only while the list is open.",
+      "surfaces": ["client", "host", "integration"],
+      "configuration": [],
+      "states": ["empty", "listed", "host-started", "host-offline"],
+      "failureModes": [
+        "A failed status keeps that host's started-here rows instead of dropping them.",
+        "A blank host session (never received a message) stays out of the list."
+      ],
+      "externalDependencies": [],
+      "reach": ["click button \"All remote threads, including ones started on a host\"", "expect heading \"Remote threads\""],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "multi-host.remote-inventory",
+          "featureFile": "tooling/dshx/e2e/features/multi-host.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "multi-host.inventory-merge",
+          "file": "plugins/@dshfiles/multi-host/tests/inventory.test.ts",
+          "testName": "a thread in both sources appears once with its stored title and started-here flag"
+        }
+      ]
+    },
+    {
+      "id": "waiting-on-host",
+      "title": "A remote turn waiting on the host",
+      "summary": "When a remote turn stops on ask_user_question or holds a tool call open, the open-thread view says what it waits on above the composer and points at the host's DSH; a generic tool call is only called out after a minute because the log cannot tell a slow command from a pending approval.",
+      "surfaces": ["client", "host", "integration"],
+      "configuration": [],
+      "states": ["running", "waiting-question", "waiting-tool", "finished"],
+      "failureModes": ["A missing waiting field is read as not waiting, so an older Host still renders.", "A tool result or a turn end clears the wait."],
+      "externalDependencies": [],
+      "reach": [
+        "click button \"All remote threads, including ones started on a host\"",
+        "click text \"Question probe\"",
+        "expect text \"is asking a question.*\"",
+        "fill textbox \"Reply on Remote loopback\" \"Here is my answer: name it sample.\"",
+        "click button \"Send reply\"",
+        "expect text \"Here is my answer: name it sample.*\""
+      ],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "multi-host.waiting-on-host",
+          "file": "plugins/@dshfiles/multi-host/tests/transcript.test.ts",
+          "testName": "an open ask_user_question call while the turn runs is a question, including an MCP-prefixed name"
+        },
+        {
+          "kind": "unit-test",
+          "id": "multi-host.waiting-clears",
+          "file": "plugins/@dshfiles/multi-host/tests/transcript.test.ts",
+          "testName": "a turn end clears the wait"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "multi-host.waiting-banner-ui",
+          "reason": "No provider credential is available to the headless E2E scratch runtime, so it cannot run a remote agent turn that calls ask_user_question. The banner is driven in the scratch UI with `dshx dev open multi-host/waiting-on-host` against a free-model remote runtime instead."
         }
       ]
     }

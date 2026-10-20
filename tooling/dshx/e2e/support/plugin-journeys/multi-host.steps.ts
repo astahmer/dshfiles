@@ -1,5 +1,5 @@
 import { expect, type Page } from '@playwright/test'
-import { randomBytes } from 'node:crypto'
+import { randomBytes, randomUUID } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { chmod, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
@@ -14,6 +14,7 @@ import { finishJourneyAssertions, recordAssertion, visitIsolatedPluginProfile } 
 import { connectDshxApi } from '../../../packages/dshx/src/platform/dshx-api.js'
 import { DSHFILES_ROOT } from '../../../packages/dshx/src/project/local-bundles.js'
 import { launchFilePaths, parseRuntimeLaunch } from '../../../../../plugins/@dshfiles/multi-host/src/launch-file.js'
+import { mergeInventory } from '../../../../../plugins/@dshfiles/multi-host/src/inventory.js'
 
 const multiHostPackageId = '@dshfiles/multi-host'
 const jjIntegrationPackageId = '@dshfiles/jj-integration'
@@ -54,6 +55,33 @@ const runtimeDirectorySchema = z.object({
   hosts: z.array(z.object({ id: z.string(), name: z.string() }).passthrough()),
   runtimes: z.array(z.object({ id: z.string(), hostId: z.string(), name: z.string(), remoteHome: z.string(), connected: z.boolean() }).passthrough()),
 })
+
+const promptAcceptedSchema = z.discriminatedUnion('ok', [
+  z.object({ ok: z.literal(true), value: z.object({ accepted: z.literal(true) }).passthrough() }),
+  z.object({ ok: z.literal(false), code: z.string(), message: z.string() }),
+])
+
+const inventoryStatusSchema = z.discriminatedUnion('ok', [
+  z
+    .object({
+      ok: z.literal(true),
+      runtime: z.object({ hostId: z.string(), name: z.string() }).passthrough(),
+      sessions: z.array(z.object({ sessionId: z.string(), blank: z.boolean(), running: z.boolean(), cwd: z.string().optional() }).passthrough()),
+    })
+    .passthrough(),
+  z.object({ ok: z.literal(false), code: z.string(), message: z.string() }).passthrough(),
+])
+
+const remoteThreadListSchema = z.object({ threads: z.array(z.object({ runtimeId: z.string(), sessionId: z.string() }).passthrough()) })
+
+type InventoryObservation = {
+  readonly runtimeId: string
+  readonly sessionId: string
+  readonly startedHere: boolean
+  readonly hostName: string
+}
+
+const inventoryObservations = new WeakMap<Page, InventoryObservation>()
 
 type MultiHostScratchPair = {
   readonly sshd: Awaited<ReturnType<typeof startLoopbackSshd>>
@@ -434,6 +462,70 @@ When('the remote DSH crashes and its scratch home is cleaned', async ({ page }: 
   await pair.remote.close()
   expect(existsSync(pair.remote.homeRoot)).toBe(false)
   updateObservation(page, { remoteCrashCleaned: true })
+})
+
+When('a thread is started directly on the scratch remote', async ({ page }: { readonly page: Page }) => {
+  const pair = pairFor(page)
+  const call = await hostApi(pair.manager)
+  const directory = runtimeDirectorySchema.parse(await call('list'))
+  const host = directory.hosts.find(item => item.name === scratchRemoteName)
+  if (host === undefined) throw new Error('The saved scratch SSH host was not listed by the manager DSH.')
+  const runtime = directory.runtimes.find(item => item.hostId === host.id)
+  if (runtime === undefined) throw new Error('The scratch SSH host did not register a remote DSH runtime.')
+
+  const created = nativeCreateSchema.parse(
+    await call('runtimeCall', {
+      runtimeId: runtime.id,
+      request: { namespace: 'session', method: 'create', args: { request: { cwd: pair.remote.homeRoot } } },
+    }),
+  )
+  if (!created.ok) throw new Error(`The remote session could not be created: ${created.code}.`)
+  const sessionId = created.value.sessionId
+  const prompted = promptAcceptedSchema.parse(
+    await call('runtimeCall', {
+      runtimeId: runtime.id,
+      request: {
+        namespace: 'session',
+        method: 'prompt',
+        args: { request: { requestId: randomUUID(), sessionId, mode: 'queue', content: [{ type: 'text', text: 'Inventory probe' }] } },
+      },
+    }),
+  )
+  if (!prompted.ok) throw new Error(`The remote session did not accept its first message: ${prompted.code}.`)
+  const listed = remoteThreadListSchema.parse(await call('threadList'))
+  expect(listed.threads.some(thread => thread.runtimeId === runtime.id && thread.sessionId === sessionId)).toBe(false)
+  inventoryObservations.set(page, { runtimeId: runtime.id, sessionId, startedHere: false, hostName: scratchRemoteName })
+})
+
+Then('the manager lists it as started on the host', async ({ page }: { readonly page: Page }) => {
+  const pair = pairFor(page)
+  const observed = inventoryObservations.get(page)
+  if (observed === undefined) throw new Error('The inventory journey did not observe a remote-started thread.')
+  const call = await hostApi(pair.manager)
+  const directory = runtimeDirectorySchema.parse(await call('list'))
+  const hostName = observed.hostName
+  const status = inventoryStatusSchema.parse(await call('runtimeStatus', { runtimeId: observed.runtimeId }))
+  if (!status.ok) throw new Error(`The scratch runtime status was unavailable: ${status.code}.`)
+  expect(directory.hosts.some(host => host.name === hostName)).toBe(true)
+  const row = mergeInventory({
+    startedHere: [],
+    statuses: [
+      {
+        runtimeId: observed.runtimeId,
+        hostName,
+        status: {
+          ok: true,
+          runtime: { id: observed.runtimeId, hostId: status.runtime.hostId, name: status.runtime.name, identity: null, connected: true },
+          workspaces: [],
+          sessions: status.sessions.map(session => ({ ...session, runtimeId: observed.runtimeId })),
+        },
+      },
+    ],
+  }).find(item => item.runtimeId === observed.runtimeId && item.sessionId === observed.sessionId)
+  if (row === undefined) throw new Error('The remote-started thread did not reach the merged inventory.')
+  expect(row.startedHere).toBe(false)
+  expect(row.cwd).toBe(pair.remote.homeRoot)
+  await recordAssertion(page, 'multi-host-remote-inventory', async () => expect(row.startedHere).toBe(false))
 })
 
 Then('the scratch DSH readiness and recovery checks pass', async ({ page }: { readonly page: Page }) => {
