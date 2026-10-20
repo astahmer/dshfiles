@@ -105,7 +105,7 @@ interface SidebarShellExtras {
   subscribeClientRevisions: (listener: () => void) => () => void
   openSession: (sessionId: SessionSummary['id']) => void
   /** Runs a Host shortcut command by id; null when this Host cannot run commands outside a key press. */
-  runCommand: ((commandId: string) => void) | null
+  runCommand: ((commandId: string) => boolean) | null
 }
 
 type SidebarLocation = NavigationLocation<SessionSummary['id'], SidebarPanelMetadata['id']>
@@ -217,6 +217,17 @@ const sameIds = (left: readonly string[], right: readonly string[]): boolean => 
 /** Commands that only reopen this palette are left out of its command list. */
 const SELF_COMMAND_IDS = new Set(['commandPalette.open'])
 
+/** The cancelable cross-plugin event `@dshfiles/settings-shell` listens for; handled when dispatch returns false. */
+const OPEN_SETTINGS_EVENT = 'dshfiles:open-settings'
+const SETTINGS_COMMAND_ID = 'settings.open'
+
+const requestSettings = (runCommand: ((commandId: string) => boolean) | null): void => {
+  if (runCommand?.(SETTINGS_COMMAND_ID) === true) return
+  if (!window.dispatchEvent(new CustomEvent(OPEN_SETTINGS_EVENT, { cancelable: true }))) return
+  // A native settings root owns the seat instead of the dshx shell: its trigger is the only public opener there.
+  document.querySelector<HTMLButtonElement>('[data-footer-entry="settings"] button[aria-haspopup="dialog"]')?.click()
+}
+
 const focusComposer = (): void => {
   const composer = document.querySelector<HTMLElement>('[role="textbox"]:not([aria-disabled="true"]), textarea:not([disabled])')
   if (composer === null) return
@@ -269,6 +280,7 @@ interface NavigationIconRowProps {
   readonly overflow: NavigationOverflow
   readonly labels: { readonly more: string; readonly filter: string; readonly empty: string; readonly customize: string; readonly navigation: string }
   readonly onCustomize: () => void
+  readonly settings: { readonly label: string; readonly open: () => void } | null
   /** Pointer drag within the row; indices are positions among `items`. */
   readonly onReorder: (fromIndex: number, toIndex: number) => void
   readonly dragHint: string
@@ -276,6 +288,7 @@ interface NavigationIconRowProps {
 
 /** BB's collapsed navigation: one scrollable icon row plus a pinned ⋮ destination menu. */
 const NavigationIconRow = (props: NavigationIconRowProps): JSX.Element => {
+  const settings = props.settings
   const scrollRef = useRef<HTMLDivElement>(null)
   const [width, setWidth] = useState(0)
   const [edges, setEdges] = useState({ start: false, end: false })
@@ -480,6 +493,19 @@ const NavigationIconRow = (props: NavigationIconRowProps): JSX.Element => {
               </CommandList>
               <CommandSeparator />
               <CommandList className="dshx:p-1">
+                {settings === null ? null : (
+                  <CommandItem
+                    value="open-settings"
+                    className="dshx:gap-2.5"
+                    onSelect={() => {
+                      setMenuOpen(false)
+                      settings.open()
+                    }}
+                  >
+                    <IconSettingsOutlineRegular size={16} />
+                    <span>{settings.label}</span>
+                  </CommandItem>
+                )}
                 <CommandItem
                   value="customize-sidebar"
                   className="dshx:gap-2.5"
@@ -1360,6 +1386,11 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
                 items={navigationItems}
                 overflow={preferences.navigationOverflow}
                 onCustomize={openCustomize}
+                settings={
+                  footerSnapshot.settingsId === null
+                    ? null
+                    : { label: text(props.t, 'threadSidebarHostSettings'), open: () => requestSettings(props.runCommand) }
+                }
                 dragHint={text(props.t, 'threadSidebarDragToReorder')}
                 onReorder={(fromIndex, toIndex) =>
                   updatePreferences({
@@ -1752,6 +1783,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
                 }}
                 aria-hidden={concealed ? true : undefined}
                 data-overflowed={concealed ? 'true' : undefined}
+                data-footer-entry={entry.kind}
                 className={cn(
                   'dshx:flex dshx:w-max dshx:max-h-11 dshx:shrink-0 dshx:items-center dshx:whitespace-nowrap dshx:*:shrink-0',
                   concealed && 'dshx:pointer-events-none dshx:invisible dshx:absolute dshx:top-0 dshx:left-0',
@@ -1786,16 +1818,29 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
               className="dshx-root dshx:flex dshx:max-h-[min(480px,calc(100vh-96px))] dshx:w-auto dshx:min-w-56 dshx:max-w-[min(360px,calc(100vw-16px))] dshx:flex-col dshx:gap-0.5 dshx:overflow-y-auto dshx:p-1"
               aria-label={text(props.t, 'threadSidebarMore')}
             >
+              {footerSnapshot.settingsId === null ? null : (
+                <Button
+                  variant="ghost"
+                  className="dshx:w-full dshx:shrink-0 dshx:justify-start dshx:gap-2 dshx:font-normal dshx:text-muted-foreground dshx:hover:text-foreground"
+                  onClick={() => {
+                    setMoreOpen(false)
+                    requestSettings(props.runCommand)
+                  }}
+                >
+                  <IconSettingsOutlineRegular size={16} />
+                  <span className="dshx:truncate">{text(props.t, 'threadSidebarHostSettings')}</span>
+                </Button>
+              )}
+              {footerSnapshot.settingsId === null || overflowFooterEntries.length === 0 ? null : (
+                <div className="dshx:my-1 dshx:h-px dshx:shrink-0 dshx:bg-border" aria-hidden="true" />
+              )}
               {overflowFooterEntries.map(entry => (
                 <div className="dshx:flex dshx:items-center dshx:whitespace-nowrap dshx:*:w-full" key={entry.id}>
                   {renderFooterEntry(entry, true)}
                 </div>
               ))}
-              {overflowFooterEntries.length === 0 ? null : <div className="dshx:my-1 dshx:h-px dshx:shrink-0 dshx:bg-border" aria-hidden="true" />}
-              {footerPages.length === 0 ? null : (
-                <span className="dshx:px-2 dshx:pt-0.5 dshx:pb-1 dshx:text-xs dshx:font-medium dshx:text-muted-foreground">
-                  {text(props.t, 'threadSidebarMorePages')}
-                </span>
+              {(footerSnapshot.settingsId === null && overflowFooterEntries.length === 0) || footerPages.length === 0 ? null : (
+                <div className="dshx:my-1 dshx:h-px dshx:shrink-0 dshx:bg-border" aria-hidden="true" />
               )}
               {footerPages.map(({ entry, current }) => (
                 <Button

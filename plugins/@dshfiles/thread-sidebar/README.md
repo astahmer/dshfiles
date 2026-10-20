@@ -59,8 +59,9 @@ Browser storage is only used while the Host namespace is unavailable.
 mode once its pane is dragged to 76px or less) renders one horizontal icon row
 that scrolls sideways (wheel included, scrollbar hidden, faded edges) with a
 pinned ⋮ button. The ⋮ menu is a filterable list ("Filter destinations…") of
-every destination plus **Customize sidebar**. Overflow can be Scroll, Overflow
-menu (only fitting icons, the rest in ⋮), or Scroll + menu (default).
+every destination, followed by **Settings** and **Customize sidebar**. Overflow
+can be Scroll, Overflow menu (only fitting icons, the rest in ⋮), or Scroll +
+menu (default).
 Expanded mode is a labelled list with a trailing Customize row; density is
 Compact (30px rows) or Comfortable (34px). Dragging the splitter past 76px from
 the icon row switches to expanded.
@@ -193,7 +194,9 @@ points:
 
 **Footer** entries render on one row and never shrink or wrap. Entries that do
 not fit move into More (⋯) together with entries hidden in Customize; overflow
-is recomputed from measured widths on resize.
+is recomputed from measured widths on resize. More also opens **Settings** and
+lists every sidebar page as a flat list (no group heading), so the menu stays
+usable at any width.
 
 `sidebar.footer.above` (list, owner `{}`) is a full-width seat stacked above the
 wide foot, for rows that must not fold into More (the AI Accounts usage strip).

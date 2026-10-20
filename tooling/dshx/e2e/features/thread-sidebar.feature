@@ -125,10 +125,12 @@ Feature: Thread sidebar journeys
     Then the custom layout survives a browser reload
 
   @scenario:thread-sidebar.footer-more-menu
-  Scenario: The footer More menu stays a real menu and reaches the Plugins page
+  Scenario: The header and footer More menus both reach Settings and the pages
     Given the isolated plugin profile "@dshfiles/thread-sidebar" is booted
     When the sidebar footer More menu is opened
-    Then the footer menu lists the sidebar pages and opens the Plugins page
+    Then the footer menu lists Settings and the sidebar pages and opens the Plugins page
+    When the sidebar header More menu is opened
+    Then the header menu offers Settings and Customize sidebar
 
   @scenario:thread-sidebar.palette-search
   Scenario: Thread search reports an empty result from a fresh Host profile

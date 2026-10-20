@@ -1016,16 +1016,35 @@ When('the sidebar footer More menu is opened', async ({ page }: { page: Page }) 
   await page.getByRole('button', { name: 'More', exact: true }).click()
 })
 
-Then('the footer menu lists the sidebar pages and opens the Plugins page', async ({ page }: { page: Page }) => {
+Then('the footer menu lists Settings and the sidebar pages and opens the Plugins page', async ({ page }: { page: Page }) => {
   const menu = page.getByRole('dialog', { name: 'More', exact: true })
+  const settings = menu.getByRole('button', { name: 'Settings', exact: true })
   const plugins = menu.getByRole('button', { name: 'Plugins', exact: true })
-  await recordAssertion(page, 'thread-sidebar-footer-more-lists-pages', async () => {
-    await expect(menu.getByText('Pages', { exact: true })).toBeVisible()
+  await recordAssertion(page, 'thread-sidebar-footer-more-lists-settings-and-pages', async () => {
+    await expect(settings).toBeVisible()
+    await expect(menu.getByText('Pages', { exact: true })).toHaveCount(0)
     await expect(plugins).toBeVisible()
   })
   await plugins.click()
   await recordAssertion(page, 'thread-sidebar-footer-more-opens-the-plugins-page', async () => {
     await expect(sidebarNavigation(page).getByRole('button', { name: 'Plugins', exact: true })).toHaveAttribute('aria-current', 'page')
+  })
+})
+
+When('the sidebar header More menu is opened', async ({ page }: { page: Page }) => {
+  await page.getByRole('button', { name: 'More sidebar destinations', exact: true }).click()
+})
+
+Then('the header menu offers Settings and Customize sidebar', async ({ page }: { page: Page }) => {
+  const menu = page.getByRole('dialog').filter({ has: page.getByPlaceholder('Filter destinations…') })
+  const settings = menu.getByRole('option', { name: 'Settings', exact: true })
+  await recordAssertion(page, 'thread-sidebar-header-more-offers-settings', async () => {
+    await expect(settings).toBeVisible()
+    await expect(menu.getByRole('option', { name: 'Customize sidebar', exact: true })).toBeVisible()
+  })
+  await settings.click()
+  await recordAssertion(page, 'thread-sidebar-header-more-opens-settings', async () => {
+    await expect(page.getByRole('dialog').filter({ hasText: 'Built-in plugins' })).toBeVisible()
   })
   await finishJourneyAssertions(page)
 })

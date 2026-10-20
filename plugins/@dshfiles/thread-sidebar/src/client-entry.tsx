@@ -449,7 +449,7 @@ export default defineClient({
     // The public Shortcuts service lists commands but only runs them from a key press; its registry's `invoke` is what
     // the Desktop menu uses. Read it defensively so a Host without it simply leaves Host commands out of the palette.
     const shortcuts = ctx.shortcuts
-    const runCommand = hasHostCommandRegistry(shortcuts) ? (commandId: string): void => void runHostCommand(shortcuts, commandId) : null
+    const runCommand = hasHostCommandRegistry(shortcuts) ? (commandId: string): boolean => runHostCommand(shortcuts, commandId) : null
 
     const openThread = (sessionId: SessionSummary['id']): void => ctx.uiWorkspace.openSession(sessionId)
 
