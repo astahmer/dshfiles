@@ -1,5 +1,7 @@
-import { defineClient } from '@dshfiles/dshx/client'
+import { createApiClient, defineClient } from '@dshfiles/dshx/client'
 import type { SettingsValue } from '@dshfiles/dshx/settings'
+import { agentWarmupApi } from './agent-warmup-api.ts'
+import type {} from './agent-warmup.ts'
 import { composerControlsSettings } from './composer-controls-settings.ts'
 import { apply, inject } from './native/index.js'
 
@@ -12,6 +14,11 @@ export default defineClient({
   inject,
   setup(ctx) {
     apply(ctx)
+
+    const warmup = createApiClient(ctx, agentWarmupApi)
+    ctx.on('dshfiles/composer/first-edit', sessionId => {
+      void warmup.warm({ sessionId }).catch(() => undefined)
+    })
 
     // The permission seat is a single slot: a lower-priority empty occupant shadows the native selector, and
     // disposing it hands the seat back, so the toggle applies live without touching the vendored InputBar.

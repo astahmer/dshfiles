@@ -27,6 +27,7 @@
     "src/native/input/editor/runtime.ts",
     "src/native/input/editor/projection.ts",
     "src/native/user-text/session-reference-rule.ts",
-    "src/native/conversation/location-index.ts"
+    "src/native/conversation/location-index.ts",
+    "src/native/input/hub.ts"
   ]
 }

@@ -26,6 +26,7 @@ import type { PopupDismissFace } from './facade.ts'
 import { SessionInputShell } from './facade.ts'
 import { reportMessageSubmission } from './submission-analytics.ts'
 import { readConversationDraft } from '../stores.ts'
+import { AgentWarmup } from '../../agent-warmup.ts'
 
 /** Structural command face for per-session popup resolution. */
 interface CommandFace {
@@ -152,6 +153,8 @@ export class InputHub implements SessionInputResolver {
           shell.consumeToken(req.guard) ? true : undefined),
         actx.on('slash/input-insert-text', req =>
           shell.insertText(req.text, req.span, req.continue === true) ? true : undefined),
+        // dshfiles delta: opening a thread no longer resumes its Agent; its first draft edit does.
+        AgentWarmup.onFirstEdit({ ctx: this.rootCtx, sessionId: binding.sessionId, state: shell.state }),
       ]
       return () => {
         for (const off of offs) off()
