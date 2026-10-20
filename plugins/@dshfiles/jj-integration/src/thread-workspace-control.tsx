@@ -10,7 +10,7 @@ import { ChevronDownIcon, ClockIcon, FolderGit2Icon, PanelRightIcon, RefreshCwIc
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { errorMessage, useIsMutating, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
-import { useCallback, useMemo, useRef, useSyncExternalStore } from 'react'
+import { useCallback, useMemo, useSyncExternalStore } from 'react'
 import { jjIntegrationApi, type ThreadView } from './api.js'
 import type { JjIntegrationTranslate } from './locales.js'
 import { announceRepositoryChange, describeLandResult } from './land-feedback.js'
@@ -36,8 +36,6 @@ interface WorkspaceBlocker {
   readonly title: string
   readonly reason: 'working' | 'question'
 }
-
-const noBlockers: readonly WorkspaceBlocker[] = []
 
 const folderName = (path: string): string =>
   path
@@ -136,11 +134,10 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
   const sessionRunning = useSyncExternalStore(subscribe, readSessionRunning, () => true)
   const clientCanRebase = useSyncExternalStore(subscribe, readClientCanRebase, () => false)
   const sessionWaitingForInput = useSyncExternalStore(subscribe, readClientQuestionPending, () => true)
-  // useSyncExternalStore compares the snapshot by identity, so this getter must hand back the same array until the
-  // blockers really change; a fresh array per read re-renders forever and retires the header cell.
-  const blockersSnapshot = useRef<{ readonly key: string; readonly blockers: readonly WorkspaceBlocker[] }>({ key: '', blockers: noBlockers })
-  const readWorkspaceBlockers = useCallback((): readonly WorkspaceBlocker[] => {
-    const sessions = props.sessions.list.getSnapshot().byId
+  // The store snapshot itself: useSyncExternalStore compares by identity, so a derived array must not be the snapshot.
+  const readSessionsById = useCallback(() => props.sessions.list.getSnapshot().byId, [props.sessions])
+  const sessionsById = useSyncExternalStore(subscribe, readSessionsById, readSessionsById)
+  const workspaceBlockers = useMemo(() => {
     const seen = new Set<string>()
     const blockers: WorkspaceBlocker[] = []
     const consider = (session: SessionSummary | undefined): void => {
@@ -150,14 +147,10 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
       seen.add(session.id)
       blockers.push({ title: session.title ?? session.displayTitle, reason: session.running ? 'working' : 'question' })
     }
-    for (const sessionId of sessionIds) consider(sessions[SessionId(sessionId)])
-    for (const session of Object.values(sessions)) if (session.cwd === current?.path) consider(session)
-    if (blockers.length === 0) return noBlockers
-    const key = blockers.map(blocker => `${blocker.reason}:${blocker.title}`).join('\n')
-    if (blockersSnapshot.current.key !== key) blockersSnapshot.current = { key, blockers }
-    return blockersSnapshot.current.blockers
-  }, [current?.path, props.sessions, sessionIds])
-  const workspaceBlockers = useSyncExternalStore(subscribe, readWorkspaceBlockers, () => noBlockers)
+    for (const sessionId of sessionIds) consider(sessionsById[SessionId(sessionId)])
+    for (const session of Object.values(sessionsById)) if (session.cwd === current?.path) consider(session)
+    return blockers
+  }, [current?.path, sessionIds, sessionsById])
   const canRebase = ThreadRebaseEligibilityModel.fromClientSnapshot({
     threadSessionsEligible: clientCanRebase,
     sessionRunning,
