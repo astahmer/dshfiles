@@ -39,7 +39,7 @@ import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useQuery } from '@dshfiles/plugin-ui/query'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 
-import { backlogApi, type BacklogDetailView, type BacklogSummaryView } from './api.js'
+import { backlogApi, BacklogViews, type BacklogDetailView, type BacklogSummaryView } from './api.js'
 import type { ComposerThread } from './composer.js'
 import { BacklogItems, type BacklogAttention, type BacklogEvent, type BacklogLink, type BacklogProposal, type BacklogRelation } from './item.js'
 import { ItemGlyphs } from './item-glyphs.js'
@@ -703,7 +703,7 @@ const ItemPeek = (props: {
       : { ok: true as const, value: { item: { ...summary, body: summary.preview, humanFields: [], events: [] }, backlinks: [] } }
   const detail = useQuery({
     queryKey: [BacklogQueries.key, 'item', props.id],
-    queryFn: ({ signal }) => api.get({ id: props.id }, { signal }),
+    queryFn: async ({ signal }) => BacklogViews.detailResult(await api.get({ id: props.id }, { signal })),
     placeholderData: () => placeholder,
   })
   return (

@@ -29,7 +29,7 @@ import { errorMessage, keepPreviousData, useQuery, useQueryClient } from '@dshfi
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { z } from 'zod'
 
-import { backlogApi, type BacklogSummaryView } from './api.js'
+import { backlogApi, BacklogViews, type BacklogSummaryView } from './api.js'
 import { BoardView } from './board-view.js'
 import { Composer, type ComposerThread } from './composer.js'
 import { FeedView } from './feed-view.js'
@@ -223,12 +223,13 @@ export const BacklogPanel = (props: { readonly openThread: OpenThread; readonly 
   }, [revision.data, queryClient])
   const list = useQuery({
     queryKey: [BacklogQueries.key, 'list', debounced, kinds],
-    queryFn: ({ signal }) => api.list({ query: debounced, kinds, freshness: 'all', limit: debounced === '' ? 2_000 : 200 }, { signal }),
+    queryFn: async ({ signal }) =>
+      BacklogViews.list(await api.list({ query: debounced, kinds, freshness: 'all', limit: debounced === '' ? 2_000 : 200 }, { signal })),
     placeholderData: keepPreviousData,
   })
   const inbox = useQuery({
     queryKey: [BacklogQueries.key, 'list', 'inbox'],
-    queryFn: ({ signal }) => api.list({ inbox: true, freshness: 'all', limit: 200 }, { signal }),
+    queryFn: async ({ signal }) => BacklogViews.list(await api.list({ inbox: true, freshness: 'all', limit: 200 }, { signal })),
   })
   const settings = useSettings(backlogSettings)
   // Settings writes round-trip through the Host for a few seconds; show the saved list at once and defer to it after.

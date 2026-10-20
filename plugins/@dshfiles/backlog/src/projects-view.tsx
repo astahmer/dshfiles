@@ -5,7 +5,7 @@ import { useMemo, type ReactNode } from 'react'
 import { useApi } from '@dshfiles/dshx/client'
 import { useQuery } from '@dshfiles/plugin-ui/query'
 
-import { backlogApi, type BacklogSummaryView } from './api.js'
+import { backlogApi, BacklogViews, type BacklogSummaryView } from './api.js'
 import type { BacklogStatus } from './item.js'
 import { ItemGlyphs } from './item-glyphs.js'
 import { BacklogQueries } from './use-backlog-actions.js'
@@ -90,7 +90,8 @@ const Overview = (props: { readonly project: Project; readonly back: () => void;
   const project = props.project
   const list = useQuery({
     queryKey: [BacklogQueries.key, 'list', 'project', project.key],
-    queryFn: ({ signal }) => api.list({ project: project.key === NO_PROJECT ? null : project.key, freshness: 'all', limit: 500 }, { signal }),
+    queryFn: async ({ signal }) =>
+      BacklogViews.list(await api.list({ project: project.key === NO_PROJECT ? null : project.key, freshness: 'all', limit: 500 }, { signal })),
   })
   const projectItems = list.data?.items ?? []
   const open = projectItems.filter(item => item.status !== 'done' && item.status !== 'dropped')

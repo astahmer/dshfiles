@@ -33,7 +33,7 @@ import { errorMessage, useQuery } from '@dshfiles/plugin-ui/query'
 import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { z } from 'zod'
 
-import { backlogApi } from './api.js'
+import { backlogApi, BacklogViews } from './api.js'
 import { fileInput, readComposerFile, type ComposerFile } from './composer-files.js'
 import { BacklogItems, type BacklogKind, type BacklogStatus } from './item.js'
 import { ItemGlyphs } from './item-glyphs.js'
@@ -115,7 +115,7 @@ const ReferenceDialog = (props: {
   }, [open])
   const items = useQuery({
     queryKey: ['dshfiles-backlog-composer-items', debounced],
-    queryFn: ({ signal }) => api.list({ query: debounced, freshness: 'all', limit: 8 }, { signal }),
+    queryFn: async ({ signal }) => BacklogViews.list(await api.list({ query: debounced, freshness: 'all', limit: 8 }, { signal })),
     enabled: open && props.mode === 'item',
   })
   const projects = useQuery({

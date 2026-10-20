@@ -6,7 +6,7 @@ import type {} from '@dshfiles/input-trigger/client'
 import { createApiClient, defineClient } from '@dshfiles/dshx/client'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 
-import { backlogApi } from './api.js'
+import { backlogApi, BacklogViews } from './api.js'
 import { BacklogMentions } from './backlog-mentions.js'
 import { BacklogPanel } from './backlog-panel.js'
 
@@ -19,7 +19,7 @@ export default defineClient({
     const api = createApiClient(ctx, backlogApi)
     const mentions = BacklogMentions.createSource({
       section: 'Backlog',
-      search: async (query, limit, signal) => (await api.list({ query, freshness: 'active', limit }, { signal })).items,
+      search: async (query, limit, signal) => BacklogViews.list(await api.list({ query, freshness: 'active', limit }, { signal })).items,
     })
     ctx.effect(() => ctx.inputTriggers.registerSource(mentions), 'backlog: @ mentions')
     const PanelView = (): JSX.Element => (

@@ -32,7 +32,7 @@ const summarySchema = z
     project: z.string().nullable(),
     tags: z.array(z.string()),
     links: z.array(BacklogItems.linkSchema),
-    attachments: z.array(BacklogItems.attachmentSchema),
+    attachments: z.array(BacklogItems.attachmentSchema).default([]),
     actors: BacklogItems.itemSchema.shape.actors,
     pinned: z.boolean(),
     freshness: freshnessSchema,
@@ -264,3 +264,24 @@ export const backlogApi = defineApi({
 
 export type BacklogSummaryView = z.infer<typeof summarySchema>
 export type BacklogDetailView = z.infer<typeof detailSchema>
+export type BacklogListView = z.infer<typeof listOutputSchema>
+export type BacklogDetailResult = z.infer<typeof detailResultSchema>
+
+export type BacklogSummaryInput = z.input<typeof summarySchema>
+export type BacklogListInput = z.input<typeof listOutputSchema>
+export type BacklogDetailInput = z.input<typeof detailSchema>
+
+/**
+ * Client boundary decode. The live DSH keeps its old Host until the user restarts, so a Host that predates item
+ * attachments answers without them; decoding here fills the gap instead of letting a view dereference undefined.
+ */
+export class BacklogViews {
+  static readonly summary = (value: BacklogSummaryInput): BacklogSummaryView => summarySchema.parse(value)
+
+  static readonly list = (value: BacklogListInput): BacklogListView => listOutputSchema.parse(value)
+
+  static readonly detail = (value: BacklogDetailInput): BacklogDetailView => detailSchema.parse(value)
+
+  static readonly detailResult = (result: BacklogDetailResult): BacklogDetailResult =>
+    result.ok ? { ok: true, value: BacklogViews.detail(result.value) } : result
+}

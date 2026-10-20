@@ -5,7 +5,7 @@ import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useQuery } from '@dshfiles/plugin-ui/query'
 import { useState, type PointerEvent as ReactPointerEvent } from 'react'
 
-import { backlogApi, type BacklogSummaryView } from './api.js'
+import { backlogApi, BacklogViews, type BacklogSummaryView } from './api.js'
 import type { BacklogStatus } from './item.js'
 import { ItemGlyphs } from './item-glyphs.js'
 import { ItemPickers } from './item-pickers.js'
@@ -87,7 +87,10 @@ const CardDetail = (props: { readonly item: BacklogSummaryView; readonly open: (
   const api = useApi(backlogApi)
   const actions = useBacklogActions()
   const item = props.item
-  const detail = useQuery({ queryKey: [BacklogQueries.key, 'item', item.id], queryFn: ({ signal }) => api.get({ id: item.id }, { signal }) })
+  const detail = useQuery({
+    queryKey: [BacklogQueries.key, 'item', item.id],
+    queryFn: async ({ signal }) => BacklogViews.detailResult(await api.get({ id: item.id }, { signal })),
+  })
   const events = detail.data?.ok === true ? detail.data.value.item.events.slice(-RECENT_EVENTS) : []
   const agent = item.actors.find(actor => actor.id.startsWith('agent:'))?.id
   return (
