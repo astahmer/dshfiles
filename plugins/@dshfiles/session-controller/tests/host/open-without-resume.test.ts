@@ -33,6 +33,8 @@ const openedWith = async (events: readonly SessionEvent[]): Promise<readonly str
     retain: observation,
     [Symbol.dispose]: () => undefined,
   })
+  // SAFETY: follow() asks the registry only whether the Session is attached; no persistence is mounted, so it takes the full read.
+  ctx.provide('sessions', { get: () => undefined } as never)
   // SAFETY: follow() reads only observeSession from the query service.
   ctx.provide('sessionQuery', { observeSession: async () => observation() } as never)
   const promoted: string[] = []

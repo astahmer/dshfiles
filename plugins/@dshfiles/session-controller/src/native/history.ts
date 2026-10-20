@@ -35,6 +35,7 @@ import type {
 } from './types.ts'
 import { SessionAssistantStreamAccumulator } from './assistant-stream.ts'
 import { BrowserEvent } from '../browser-event.ts'
+import { TailLog } from '../tail-log.ts'
 
 const DEFAULT_MAX_MESSAGES = 50
 const MESSAGE_TYPES = new Set(['user/message', 'assistant/message'])
@@ -177,12 +178,23 @@ export class SessionHistoryController {
     const onAbort = (): void => { notify() }
     signal.addEventListener('abort', onAbort, { once: true })
     try {
-      using source = await this.sourceFor(address, signal, true)
-      const events = source.events
+      // dshfiles delta: a cold Session opens from the end of its log (see ../tail-log.ts); the full read stays the path
+      // for a live Session and for every log the tail cannot serve exactly.
+      const tail = address.kind === 'session' && this.ctx.sessions.get(target) === undefined
+        ? await tailOpening(this.ctx, target, request, signal)
+        : undefined
+      using source = tail === undefined ? await this.sourceFor(address, signal, true) : undefined
       signal.throwIfAborted()
-      const cursor = source.cursor
+      const opening = tail ?? (source === undefined ? undefined : {
+        header: source.header,
+        cursor: source.cursor,
+        page: paginate(source.events, undefined, request.maxMessages ?? DEFAULT_MAX_MESSAGES, source.cursor, request.turnWindow),
+        projections: source.projections,
+      })
+      /* v8 ignore next -- one of the two reads always produces the opening. */
+      if (opening === undefined) throw new RemoteError('gateway/internal', 'session follow produced no opening', {})
+      const { cursor, page } = opening
       snapshotCursor = cursor
-      const page = paginate(events, undefined, request.maxMessages ?? DEFAULT_MAX_MESSAGES, cursor, request.turnWindow)
       const assistantStream = request.assistantStream === true
         ? this.assistantStreams.get(target)?.snapshot() ?? { revision: 0 }
         : undefined
@@ -193,19 +205,19 @@ export class SessionHistoryController {
       const assistantStreamOrdinalCut = assistantStreamOrdinal
       yield {
         type: 'snapshot',
-        header: wireHeader(source.header),
+        header: wireHeader(opening.header),
         cursor,
         records: pageRecords(page.events),
         hasMore: page.hasMore,
-        projections: source.projections === undefined
+        projections: opening.projections === undefined
           ? { asOfSeq: cursor, values: {} }
-          : projectionBlock(source.projections),
+          : projectionBlock(opening.projections),
         ...assistantStream === undefined ? {} : { assistantStream },
       }
       // dshfiles delta: opening a cold Session no longer resumes its Agent (about 1.2 s of main-thread work on a long
       // thread, right as the snapshot is delivered). The first command resolves it from the preparation this follow
       // keeps pinned; a log that stops inside a turn still resumes now, so its crash closers land while it is viewed.
-      if (address.kind === 'session' && source.source === 'prepared' && endsInsideTurn(events)) {
+      if (address.kind === 'session' && source?.source === 'prepared' && endsInsideTurn(source.events)) {
         const promotion = source.retain()
         try {
           this.promote(promotion)
@@ -281,12 +293,54 @@ export class SessionHistoryController {
 }
 
 function endsInsideTurn(events: readonly SessionEvent[]): boolean {
+  return lastTurnMarker(events) === 'turn/start'
+}
+
+function lastTurnMarker(events: readonly SessionEvent[]): 'turn/start' | 'turn/end' | undefined {
   for (let index = events.length - 1; index >= 0; index -= 1) {
     const type = events[index]?.type
-    if (type === 'turn/end') return false
-    if (type === 'turn/start') return true
+    if (type === 'turn/end' || type === 'turn/start') return type
   }
-  return false
+  return undefined
+}
+
+/**
+ * The opening snapshot of a cold Session from the end of its log: frames are decoded backwards until the opening
+ * window is settled, and projections fold the cached checkpoint over that tail. `undefined` sends the caller to the
+ * full read, including a log that stops inside a turn, which the full read resumes to close.
+ */
+async function tailOpening(
+  ctx: Context,
+  sessionId: SessionId,
+  request: SessionFollowRequest,
+  signal: AbortSignal,
+): Promise<{
+  readonly header: SessionHeader
+  readonly cursor: SessionSeqCursor
+  readonly page: { readonly events: SessionEvent[]; readonly hasMore: boolean }
+  readonly projections: NonNullable<SessionObservation['projections']>
+} | undefined> {
+  try {
+    const log = await TailLog.open({ ctx, sessionId, signal })
+    if (log === undefined) return undefined
+    for (let frames = 16; ; frames *= 2) {
+      signal.throwIfAborted()
+      const events = log.before(frames)
+      const last = events.at(-1)
+      if (last === undefined) return undefined
+      const marker = lastTurnMarker(events)
+      if (marker === 'turn/start') return undefined
+      const page = paginate(events, undefined, request.maxMessages ?? DEFAULT_MAX_MESSAGES, last.seq, request.turnWindow, log.base)
+      if ((marker === undefined || !page.settled) && !log.complete) continue
+      if (!page.settled) return undefined
+      const projections = log.restore(ctx)
+      return projections === undefined ? undefined : { header: log.header, cursor: last.seq, page, projections }
+    }
+  } catch (error: unknown) {
+    if (signal.aborted) throw error
+    ctx.logger.warn(`session-controller: tail opening for "${sessionId}" fell back to the full read: ${String(error)}`)
+    return undefined
+  }
 }
 
 function cursorBeforeNext(nextSeq: SessionLogOffsetType): SessionSeqCursor {
@@ -408,17 +462,20 @@ function paginate(
   maxMessages: number,
   throughSeq: SessionSeqCursor,
   turnWindow?: SessionPageRequest['turnWindow'],
-): { readonly events: SessionEvent[]; readonly hasMore: boolean } {
+  base = 0,
+): { readonly events: SessionEvent[]; readonly hasMore: boolean; readonly settled: boolean } {
+  // dshfiles delta: `events` may start at seq `base` (a decoded log tail); `settled` says whether the window was
+  // decided inside it.
   const end = SessionLogOffset(Math.min(throughSeq + 1, beforeSeq ?? throughSeq + 1))
   let count = 0
   let turns = 0
-  let cut = SessionLogOffset(0)
-  for (let index = end - 1; index >= 0; index--) {
-    const event = events[index] as SessionEvent
+  let cut: number | undefined
+  for (let index = end - 1; index >= base; index--) {
+    const event = events[index - base] as SessionEvent
     if (turnWindow !== undefined && event.type === 'turn/start') {
       turns++
       if (count >= turnWindow.minMessages && turns >= turnWindow.minTurns) {
-        cut = SessionLogOffset(index)
+        cut = index
         break
       }
     }
@@ -432,11 +489,13 @@ function paginate(
       }
     }
     if (count >= maxMessages) {
-      cut = SessionLogOffset(groupStart)
+      cut = groupStart
       break
     }
   }
-  return { events: events.slice(cut, end), hasMore: cut > 0 }
+  if (cut === undefined && base === 0) cut = 0
+  if (cut === undefined || cut < base) return { events: [], hasMore: true, settled: false }
+  return { events: events.slice(cut - base, end - base), hasMore: cut > 0, settled: true }
 }
 
 /** Translate current logical Session metadata to the browser wire. */
