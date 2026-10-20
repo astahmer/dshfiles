@@ -29,6 +29,20 @@ When('the composer model picker is searched for an unavailable model', async ({ 
   await trigger.click()
 
   await expect(page.getByText('Choose a model', { exact: true })).toHaveCount(0)
+  const modelList = page.getByRole('list', { name: 'Models grouped by provider', exact: true })
+  const providerGroups = modelList.locator('section[aria-label]')
+  await expect(providerGroups.first()).toBeVisible()
+  const search = page.getByRole('textbox', { name: 'Search models and providers', exact: true })
+  const modelOptions = modelList.locator('[data-model-picker-option]')
+  await search.press('ArrowDown')
+  await expect(modelOptions.first()).toBeFocused()
+  await modelOptions.first().press('ArrowDown')
+  await expect(modelOptions.nth(1)).toBeFocused()
+  await modelOptions.nth(1).press('ArrowUp')
+  await expect(modelOptions.first()).toBeFocused()
+  await modelOptions.first().press('ArrowUp')
+  await expect(search).toBeFocused()
+
   const popoverBounds = await page.getByRole('dialog').boundingBox()
   if (popoverBounds === null) throw new Error('The model picker popover has no visible bounds.')
   expect(popoverBounds.width).toBeLessThanOrEqual(430)
@@ -57,12 +71,7 @@ When('the composer model picker is searched for an unavailable model', async ({ 
     await effort.locator('[data-model-effort-option]').count(),
   )
 
-  const modelList = page.getByRole('list', { name: 'Models grouped by provider', exact: true })
-  const providerGroups = modelList.locator('section[aria-label]')
-  await expect(providerGroups.first()).toBeVisible()
   await expect(modelList.getByText(selectedModel, { exact: true })).toBeVisible()
-
-  const search = page.getByRole('textbox', { name: 'Search models and providers', exact: true })
   await expect(search).toBeVisible()
   await search.fill('zz-no-provider-model-83914')
   await expect(modelList.getByText('No matching models.', { exact: true })).toBeVisible()

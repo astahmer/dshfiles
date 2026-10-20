@@ -22,6 +22,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
   const [query, setQuery] = useState('')
   const [selectionError, setSelectionError] = useState<string | null>(null)
   const modelListRef = useRef<HTMLDivElement>(null)
+  const searchInputRef = useRef<HTMLInputElement>(null)
   const state = useSyncExternalStore(
     onStoreChange => directory.subscribe(onStoreChange),
     () => directory.getSnapshot(),
@@ -151,7 +152,13 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                 autoFocus
                 className="dshx:pl-9"
                 onChange={event => setQuery(event.currentTarget.value)}
+                onKeyDown={event => {
+                  if (event.key !== 'ArrowDown') return
+                  event.preventDefault()
+                  modelListRef.current?.querySelector<HTMLButtonElement>('button[data-model-picker-option]:not(:disabled)')?.focus()
+                }}
                 placeholder="Search models or providers…"
+                ref={searchInputRef}
                 value={query}
               />
             </label>
@@ -183,6 +190,17 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                           disabled={busy}
                           key={`${group.id}:${model.id}`}
                           onClick={() => void submitSelection(ModelPickerModel.selectionForModel(group, model, current))}
+                          onKeyDown={event => {
+                            if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
+                            event.preventDefault()
+                            const options = Array.from(
+                              modelListRef.current?.querySelectorAll<HTMLButtonElement>('button[data-model-picker-option]:not(:disabled)') ?? [],
+                            )
+                            const optionIndex = options.indexOf(event.currentTarget)
+                            const nextOption = options[optionIndex + (event.key === 'ArrowDown' ? 1 : -1)]
+                            if (nextOption !== undefined) nextOption.focus()
+                            else if (event.key === 'ArrowUp' && optionIndex === 0) searchInputRef.current?.focus()
+                          }}
                           size="sm"
                           variant="ghost"
                         >
