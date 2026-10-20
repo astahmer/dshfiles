@@ -7,7 +7,7 @@ import { Kbd, KbdGroup } from '@dshfiles/plugin-ui/components/ui/kbd'
 import { ArrowLeftIcon, CheckIcon, CommandIcon, FileIcon, FileSearchIcon, HashIcon, ListOrderedIcon, MessageSquareIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useMachine } from '@dshfiles/plugin-ui/machine'
-import { useDeferredValue, useEffect, useMemo, useRef, useSyncExternalStore, type KeyboardEvent } from 'react'
+import { useDeferredValue, useEffect, useMemo, useRef, useState, useSyncExternalStore, type KeyboardEvent } from 'react'
 import { useContentSearch, type ContentSearch } from './content-search-machine.js'
 import { PaletteFrecency, paletteFrecency } from './frecency.js'
 import { paletteNavigationMachine } from './palette-navigation-machine.js'
@@ -64,6 +64,15 @@ export interface ThreadPaletteCopy {
   readonly contentSearching: string
   readonly contentUnavailable: string
   readonly actionFailed: string
+  /** Ask DSH: the entry point shown on an empty palette, its input, and its result row. */
+  readonly ask: string
+  readonly askPlaceholder: string
+  readonly askHint: string
+  readonly askEmpty: string
+  readonly askPending: string
+  readonly askSend: string
+  readonly askExit: string
+  readonly askFailed: string
 }
 
 type PaletteActionOption = Omit<PaletteAction, 'label'> & { readonly label: string }
@@ -78,6 +87,8 @@ interface ThreadPaletteProps {
   readonly copy: ThreadPaletteCopy
   readonly searchContent: ContentSearch | null
   readonly onOpenThread: (sessionId: string) => void
+  /** Send one Ask DSH question and open the thread it creates; a rejection keeps the palette open. */
+  readonly onAsk: (question: string) => Promise<void>
   readonly onClose: () => void
 }
 
@@ -88,11 +99,19 @@ type PaletteRow =
   | { readonly kind: 'content'; readonly thread: ThreadCandidate; readonly snippet: string }
   | { readonly kind: 'line'; readonly line: number }
   | { readonly kind: 'help'; readonly prefix: PalettePrefix | ''; readonly label: string }
+  | { readonly kind: 'ask'; readonly question: string }
 
 const RESULT_LIMIT = 50
 const COMMAND_LIMIT = 30
 const FRECENT_COMMANDS_ON_EMPTY = 5
 const GO_TO_FILE_ID = 'action:go-to-file'
+
+const escapeLabelFor = (input: { readonly ask: boolean; readonly subview: boolean; readonly hasQuery: boolean; readonly copy: ThreadPaletteCopy }): string => {
+  if (input.ask) return input.hasQuery ? input.copy.clear : input.copy.askExit
+  if (input.subview) return input.copy.back
+  if (input.hasQuery) return input.copy.clear
+  return input.copy.close
+}
 
 const rememberPaletteUse = (id: string): void => {
   paletteFrecency.set(PaletteFrecency.recordUse(paletteFrecency.get(), id, Date.now()))
@@ -104,10 +123,11 @@ const rowValue = (row: PaletteRow): string => {
   if (row.kind === 'file') return `file:${row.path}`
   if (row.kind === 'line') return `line:${row.line}`
   if (row.kind === 'help') return `help:${row.prefix}`
+  if (row.kind === 'ask') return 'ask-dsh'
   return `destination:${row.destination.id}`
 }
 
-type PaletteView = PaletteMode | 'commands' | 'content' | 'line' | 'help'
+type PaletteView = PaletteMode | 'commands' | 'content' | 'line' | 'help' | 'ask'
 
 const VIEW_BY_PREFIX = {
   '>': 'commands',
@@ -123,13 +143,17 @@ const SAME_COMMAND_AS = new Map([['@dshfiles/thread-sidebar/command/session.new'
 
 export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
   const [navigationSnapshot, sendNavigation] = useMachine(paletteNavigationMachine, { input: { mode: props.mode } })
-  const { mode, query, backStack, notice, selected, closeRequested } = navigationSnapshot.context
+  const { mode, query, backStack, notice, selected, closeRequested, ask } = navigationSnapshot.context
   const parsed = PaletteRules.parsePaletteQuery(query)
-  const view: PaletteView = parsed.prefix === null ? mode : VIEW_BY_PREFIX[parsed.prefix]
-  const deferredQuery = useDeferredValue(parsed.text)
-  const subview = backStack.length > 0 || parsed.prefix !== null
+  // In Ask DSH the whole query is the question: prefixes are ordinary text there.
+  const searchText = ask ? query : parsed.text
+  const view: PaletteView = ask ? 'ask' : parsed.prefix === null ? mode : VIEW_BY_PREFIX[parsed.prefix]
+  const deferredQuery = useDeferredValue(searchText)
+  const subview = !ask && (backStack.length > 0 || parsed.prefix !== null)
   useEffect(() => sendNavigation({ type: 'mode.sync', mode: props.mode }), [props.mode, sendNavigation])
   const emptyQuery = deferredQuery.trim().length === 0
+  const [askPending, setAskPending] = useState(false)
+  const askInFlight = useRef(false)
   const [actionSnapshot, sendAction, actionActor] = useMachine(paletteActionMachine)
   const latestOnClose = useRef(props.onClose)
   latestOnClose.current = props.onClose
@@ -142,6 +166,21 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
     latestOnClose.current()
     sendNavigation({ type: 'close.handled' })
   }, [closeRequested, sendNavigation])
+  const submitAsk = async (question: string): Promise<void> => {
+    const trimmed = question.trim()
+    if (trimmed.length === 0 || askInFlight.current) return
+    askInFlight.current = true
+    setAskPending(true)
+    try {
+      await props.onAsk(trimmed)
+      latestOnClose.current()
+    } catch {
+      sendNavigation({ type: 'notice.show', message: props.copy.askFailed })
+    } finally {
+      askInFlight.current = false
+      setAskPending(false)
+    }
+  }
   const runningAction = actionSnapshot.matches('running')
   const frecency = paletteFrecency.useValue()
   const boosts = useMemo(() => PaletteFrecency.boosts(frecency, Date.now()), [frecency])
@@ -223,6 +262,11 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
     [props.copy.helpCommands, props.copy.helpContent, props.copy.helpLine, props.copy.helpNone, props.copy.helpSession, props.copy.helpThread, view],
   )
 
+  const askRows = useMemo<PaletteRow[]>(
+    () => (view === 'ask' && deferredQuery.trim().length > 0 ? [{ kind: 'ask', question: deferredQuery.trim() }] : []),
+    [deferredQuery, view],
+  )
+
   const goToFile: PaletteActionOption = useMemo(
     () => ({
       id: GO_TO_FILE_ID,
@@ -260,6 +304,7 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
 
   const rows: PaletteRow[] = useMemo(
     () => [
+      ...askRows,
       ...helpRows.map((help): PaletteRow => ({ kind: 'help', ...help })),
       ...(line === null ? [] : [{ kind: 'line', line } satisfies PaletteRow]),
       ...contentRows.map((hit): PaletteRow => ({ kind: 'content', ...hit })),
@@ -268,13 +313,18 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
       ...fileRows.map((path): PaletteRow => ({ kind: 'file', path })),
       ...threadRows.map((thread): PaletteRow => ({ kind: 'thread', thread })),
     ],
-    [commandRows, contentRows, destinationRows, fileRows, helpRows, line, threadRows],
+    [askRows, commandRows, contentRows, destinationRows, fileRows, helpRows, line, threadRows],
   )
   const numbered = rows.slice(0, 9)
   // Until the pointer or arrows pick a row, the first match is active, so Enter runs it right after typing.
   const activeValue = rows.some(row => rowValue(row) === selected) ? selected : rows[0] === undefined ? '' : rowValue(rows[0])
 
   const activate = (row: PaletteRow): void => {
+    if (row.kind === 'ask') {
+      // Enter can land before the deferred row catches up with the last keystroke; the live query wins.
+      void submitAsk(query)
+      return
+    }
     if (row.kind === 'help') {
       sendNavigation({ type: 'query.change', query: row.prefix })
       return
@@ -316,6 +366,13 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
   }
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
+    // Tab on an empty search toggles the Ask DSH bar, as Linear's palette does for Ask Linear.
+    if (event.key === 'Tab' && !event.shiftKey && !subview && query.length === 0) {
+      event.preventDefault()
+      event.stopPropagation()
+      sendNavigation({ type: ask ? 'ask.exit' : 'ask.enter' })
+      return
+    }
     if (!(props.mac ? event.metaKey : event.ctrlKey) || !/^Digit[1-9]$/.test(event.code)) return
     const row = numbered[Number(event.code.slice(5)) - 1]
     if (row === undefined) return
@@ -356,9 +413,12 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
     content: { chip: props.copy.viewContent, placeholder: props.copy.contentPlaceholder },
     line: { chip: props.copy.viewLine, placeholder: props.copy.linePlaceholder },
     help: { chip: props.copy.viewHelp, placeholder: props.copy.helpPlaceholder },
+    ask: { chip: props.copy.ask, placeholder: props.copy.askPlaceholder },
   } satisfies Readonly<Record<PaletteView, { readonly chip: string; readonly placeholder: string }>>
   const placeholder = viewCopy[view].placeholder
-  const escapeLabel = subview ? props.copy.back : query.length > 0 ? props.copy.clear : props.copy.close
+  const escapeLabel = escapeLabelFor({ ask, subview, hasQuery: query.length > 0, copy: props.copy })
+  const showAskEntry = !ask && !subview && query.length === 0
+  const askStatus = ask ? (askPending ? props.copy.askPending : props.copy.askHint) : props.copy.prefixHint
 
   const destinationItem = (destination: PaletteActionOption): JSX.Element => {
     const row: PaletteRow = { kind: 'destination', destination }
@@ -389,7 +449,7 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
         className="dshx-root dshx:gap-0 dshx:overflow-hidden dshx:p-0 dshx:sm:max-w-2xl"
         showCloseButton={false}
         onEscapeKeyDown={(event: KeyboardEvent) => {
-          if (!subview && query.length === 0) return
+          if (!ask && !subview && query.length === 0) return
           event.preventDefault()
           goBack()
         }}
@@ -404,27 +464,45 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
           loop
           className="dshx:rounded-none"
         >
-          <CommandInput
-            autoFocus
-            aria-label={props.copy.searchLabel}
-            className="dshx:h-11"
-            value={query}
-            onValueChange={next => {
-              sendNavigation({ type: 'query.change', query: next })
-              clearNotice()
-            }}
-            placeholder={placeholder}
-          />
+          <div className="dshx:relative">
+            <CommandInput
+              autoFocus
+              aria-label={props.copy.searchLabel}
+              className="dshx:h-11"
+              value={query}
+              onValueChange={next => {
+                sendNavigation({ type: 'query.change', query: next })
+                clearNotice()
+              }}
+              placeholder={placeholder}
+            />
+            {showAskEntry ? (
+              <button
+                type="button"
+                aria-label={props.copy.ask}
+                title={props.copy.ask}
+                onMouseDown={event => event.preventDefault()}
+                onClick={() => sendNavigation({ type: 'ask.enter' })}
+                className="dshx:absolute dshx:right-2 dshx:top-1/2 dshx:flex dshx:-translate-y-1/2 dshx:items-center dshx:gap-2 dshx:rounded dshx:px-1.5 dshx:py-0.5 dshx:text-xs dshx:text-muted-foreground dshx:hover:text-foreground"
+              >
+                <span>{props.copy.ask}</span>
+                <KbdGroup>
+                  <Kbd>Tab</Kbd>
+                </KbdGroup>
+              </button>
+            ) : null}
+          </div>
           <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:border-b dshx:px-3 dshx:py-1.5 dshx:text-xs dshx:text-muted-foreground">
-            {subview ? (
+            {ask || subview ? (
               <Button
                 type="button"
                 variant="ghost"
                 size="icon-sm"
-                aria-label={props.copy.back}
-                title={props.copy.back}
+                aria-label={ask ? props.copy.askExit : props.copy.back}
+                title={ask ? props.copy.askExit : props.copy.back}
                 onClick={event => {
-                  goBack()
+                  if (ask) sendNavigation({ type: 'ask.exit' })
+                  else goBack()
                   event.currentTarget.closest('[role="dialog"]')?.querySelector<HTMLInputElement>('[data-slot="command-input"]')?.focus()
                 }}
               >
@@ -445,15 +523,32 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
                 </TabsList>
               </Tabs>
             )}
-            {subview ? <Badge variant="secondary">{viewCopy[view].chip}</Badge> : null}
-            <span className="dshx:truncate">{notice ?? (actionSnapshot.matches('failed') ? props.copy.actionFailed : props.copy.prefixHint)}</span>
+            {ask || subview ? <Badge variant="secondary">{viewCopy[view].chip}</Badge> : null}
+            <span className="dshx:truncate">{notice ?? (actionSnapshot.matches('failed') && !ask ? props.copy.actionFailed : askStatus)}</span>
           </div>
           <CommandList className="dshx:max-h-[min(60vh,440px)] dshx:p-1">
             <CommandEmpty className="dshx:py-6 dshx:text-center dshx:text-sm dshx:text-muted-foreground">
-              {missingSessionId && threadSearch.exactId !== undefined
-                ? props.copy.sessionNotFound.replace('{id}', threadSearch.exactId)
-                : (filesStatus ?? contentStatus ?? (view === 'line' ? props.copy.linePlaceholder : props.copy.empty))}
+              {ask && emptyQuery
+                ? props.copy.askEmpty
+                : missingSessionId && threadSearch.exactId !== undefined
+                  ? props.copy.sessionNotFound.replace('{id}', threadSearch.exactId)
+                  : (filesStatus ?? contentStatus ?? (view === 'line' ? props.copy.linePlaceholder : props.copy.empty))}
             </CommandEmpty>
+            {askRows.length > 0 ? (
+              <CommandGroup heading={props.copy.ask}>
+                {askRows.map(row => (
+                  <CommandItem key="ask-dsh" value={rowValue(row)} className={itemClass} disabled={askPending} onSelect={() => void activate(row)}>
+                    <span
+                      className="dshx:inline-flex dshx:size-7 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:text-muted-foreground"
+                      aria-hidden="true"
+                    >
+                      <MessageSquareIcon className="dshx:size-4" />
+                    </span>
+                    <span className="dshx:truncate dshx:text-sm">{`${props.copy.ask}: ${row.kind === 'ask' ? row.question : ''}`}</span>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            ) : null}
             {helpRows.length > 0 ? (
               <CommandGroup heading={props.copy.viewHelp}>
                 {helpRows.map(help => {
@@ -568,7 +663,7 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
           </span>
           <span className="dshx:flex dshx:items-center dshx:gap-1.5">
             <Kbd>Enter</Kbd>
-            {props.copy.open}
+            {ask ? props.copy.askSend : props.copy.open}
           </span>
           <span className="dshx:flex dshx:items-center dshx:gap-1.5">
             <Kbd>Esc</Kbd>

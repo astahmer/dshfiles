@@ -188,6 +188,88 @@
       ]
     },
     {
+      "id": "ask-dsh",
+      "title": "Ask DSH from an empty palette",
+      "summary": "Tab on an empty command palette opens an ask bar; the question becomes a fresh thread's first message and that thread opens in the main view.",
+      "reach": [
+        "press Meta+Shift+P",
+        "press Tab",
+        "fill combobox \"Search the command palette\" \"how do I rebind a shortcut?\"",
+        "click option \"Ask DSH: how do I rebind a shortcut?\"",
+        "expect text \"how do I rebind a shortcut?\""
+      ],
+      "surfaces": ["client"],
+      "configuration": [],
+      "states": ["palette-empty", "ask-input", "sending", "thread-opened", "send-failed"],
+      "failureModes": [
+        "Tab on an empty palette does not open the ask bar.",
+        "The question never becomes the new thread's first message.",
+        "A failed send closes the palette and loses the question."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "command-palette.ask-dsh",
+          "featureFile": "tooling/dshx/e2e/features/command-palette.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "command-palette.ask-dsh-unit-fresh-thread",
+          "file": "plugins/@dshfiles/command-palette/src/ask-dsh.test.ts",
+          "testName": "creates one fresh session, sends the trimmed question, then opens the thread"
+        },
+        {
+          "kind": "unit-test",
+          "id": "command-palette.ask-dsh-unit-project",
+          "file": "plugins/@dshfiles/command-palette/src/ask-dsh.test.ts",
+          "testName": "keeps the current project so the ask thread is grouped with its siblings"
+        },
+        {
+          "kind": "unit-test",
+          "id": "command-palette.ask-dsh-unit-empty-question",
+          "file": "plugins/@dshfiles/command-palette/src/ask-dsh.test.ts",
+          "testName": "refuses an empty question before creating a session"
+        },
+        {
+          "kind": "unit-test",
+          "id": "command-palette.ask-dsh-unit-prompt-failure",
+          "file": "plugins/@dshfiles/command-palette/src/ask-dsh.test.ts",
+          "testName": "does not open a thread when the Host refuses the question"
+        },
+        {
+          "kind": "unit-test",
+          "id": "command-palette.ask-dsh-unit-tab-entry",
+          "file": "plugins/@dshfiles/command-palette/src/thread-palette.client.test.tsx",
+          "testName": "opens on Tab from an empty search and returns to search on Escape"
+        },
+        {
+          "kind": "unit-test",
+          "id": "command-palette.ask-dsh-unit-sends",
+          "file": "plugins/@dshfiles/command-palette/src/thread-palette.client.test.tsx",
+          "testName": "sends the typed question through the palette and closes on success"
+        },
+        {
+          "kind": "unit-test",
+          "id": "command-palette.ask-dsh-unit-failure",
+          "file": "plugins/@dshfiles/command-palette/src/thread-palette.client.test.tsx",
+          "testName": "keeps the question and explains a failed send"
+        },
+        {
+          "kind": "unit-test",
+          "id": "command-palette.ask-dsh-unit-escape",
+          "file": "plugins/@dshfiles/command-palette/src/palette-navigation-machine.test.ts",
+          "testName": "entering Ask DSH clears the query and Escape leaves it before closing the palette"
+        },
+        {
+          "kind": "unit-test",
+          "id": "command-palette.ask-dsh-unit-enter",
+          "file": "plugins/@dshfiles/command-palette/src/thread-palette.client.test.tsx",
+          "testName": "sends the question on Enter once a row is active"
+        }
+      ]
+    },
+    {
       "id": "performance-budget",
       "title": "Keep palette ranking within the interaction budget",
       "summary": "Keep opening and per-keystroke ranking responsive across large thread, file, and action datasets.",

@@ -3,7 +3,7 @@ import type { SessionListState, SessionSummary } from '@deepseek-ai/dsh-api-sess
 import type {} from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type {} from '@deepseek-ai/dsh-client-connection/client'
 import type { ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client'
-import type { WorkspaceView } from '@deepseek-ai/dsh-api-workspace-controller/client'
+import type { WorkspaceId, WorkspaceView } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import { createSnapshotStore, type SnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type { ThemeSnapshot } from '@deepseek-ai/dsh-client-ui-theme/client'
 import type { SidebarRootComponentProps } from '@deepseek-ai/dsh-client-ui-sidebar/client'
@@ -11,6 +11,7 @@ import type { PropsLocale, PropsRuntime, TranslateNS } from '@deepseek-ai/dsh-cl
 import type { WorkspaceBrowserProps } from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { dshxRegistryApi } from '@dshfiles/dshx/api'
 import { createApiClient, createRegisteredApiClient, defineClient } from '@dshfiles/dshx/client'
+import { askDsh } from './ask-dsh.js'
 import { createThreadContentSearch } from './thread-content-source.js'
 import { useMemo, useSyncExternalStore } from 'react'
 import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
@@ -29,6 +30,8 @@ interface PaletteOverlayProps extends PropsRuntime<'shell.overlay'>, PropsLocale
   readonly searchContent: (query: string, signal: AbortSignal) => Promise<readonly { readonly sessionId: string; readonly snippet: string }[]>
   readonly openSession: (sessionId: SessionSummary['id']) => void
   readonly openWorkspace: (workspaceId: WorkspaceView['workspaceId']) => Promise<void>
+  /** Create a fresh thread for one Ask DSH question, send it, then open the thread. */
+  readonly askDsh: (input: { readonly question: string; readonly workspaceId: WorkspaceId | undefined }) => Promise<void>
   readonly translate: TranslateNS<typeof COMMAND_PALETTE_LOCALE_NAMESPACE>
 }
 
@@ -62,8 +65,8 @@ const samePaletteSessions = (left: readonly SessionSummary[], right: readonly Se
 const workspaceForSession = (
   session: SessionSummary | undefined,
   byId: Readonly<Record<string, SessionSummary>>,
-  workspaceBySession: ReadonlyMap<string, string>,
-): string | undefined => {
+  workspaceBySession: ReadonlyMap<string, WorkspaceId>,
+): WorkspaceId | undefined => {
   let cursor = session?.id
   const visited = new Set<string>()
   while (cursor !== undefined && !visited.has(cursor)) {
@@ -94,8 +97,11 @@ const PaletteCatalog = (props: PaletteCatalogProps): JSX.Element => {
     [workspaceItems],
   )
   // The New-thread screen holds a blank Session in the main view; it is not a thread, so it gets no thread actions.
-  const selectedSession = sessions.find(session => (session.retainedBy.mainView ?? 0) > 0 && !session.blank)
+  const mainViewSession = sessions.find(session => (session.retainedBy.mainView ?? 0) > 0)
+  const selectedSession = mainViewSession?.blank === true ? undefined : mainViewSession
   const selectedWorkspaceId = workspaceForSession(selectedSession, sessionsById, workspaceBySession)
+  // Ask DSH still targets the picked project while that blank New-thread Session is in the main view.
+  const askWorkspaceId = selectedWorkspaceId ?? workspaceForSession(mainViewSession, sessionsById, workspaceBySession)
   const workspaces = useMemo(() => workspaceItems.map(workspace => ({ id: workspace.workspaceId, title: workspace.title })), [workspaceItems])
   const workspaceById = useMemo<ReadonlyMap<string, PaletteWorkspace>>(
     () => new Map<string, PaletteWorkspace>(workspaces.map(workspace => [String(workspace.id), workspace])),
@@ -203,11 +209,20 @@ const PaletteCatalog = (props: PaletteCatalogProps): JSX.Element => {
         helpNone: props.translate('commandPaletteHelpNone'),
         goToLine: props.translate('commandPaletteGoToLine'),
         noEditorFile: props.translate('commandPaletteNoEditorFile'),
+        ask: props.translate('commandPaletteAsk'),
+        askPlaceholder: props.translate('commandPaletteAskPlaceholder'),
+        askHint: props.translate('commandPaletteAskHint'),
+        askEmpty: props.translate('commandPaletteAskEmpty'),
+        askPending: props.translate('commandPaletteAskPending'),
+        askSend: props.translate('commandPaletteAskSend'),
+        askExit: props.translate('commandPaletteAskExit'),
+        askFailed: props.translate('commandPaletteAskFailed'),
         contentSearching: props.translate('commandPaletteContentSearching'),
         contentUnavailable: props.translate('commandPaletteContentUnavailable'),
         actionFailed: props.translate('commandPaletteActionFailed'),
       }}
       searchContent={props.searchContent}
+      onAsk={question => props.askDsh({ question, workspaceId: askWorkspaceId })}
       onOpenThread={sessionId => {
         const session = sessions.find(candidate => candidate.id === sessionId)
         if (session !== undefined) props.openSession(session.id)
@@ -269,6 +284,28 @@ export default defineClient({
                 searchContent={searchContent}
                 openSession={sessionId => ctx.uiWorkspace.openSession(sessionId)}
                 openWorkspace={workspaceId => ctx.uiWorkspace.openWorkspace(workspaceId)}
+                askDsh={async ({ question, workspaceId }) => {
+                  await askDsh({
+                    question,
+                    target: workspaceId === undefined ? {} : { workspaceId },
+                    ports: {
+                      createSession: input => ctx.sessions.create(input),
+                      prompt: async input => {
+                        const reference = ctx.sessions.retain(input.sessionId, { source: 'askDsh' })
+                        try {
+                          await reference.ready
+                          const session = reference.binding.session
+                          const handle = session.beginSubmission({ mode: 'queue', text: input.question, attachments: [] })
+                          const result = await session.prompt([{ type: 'text', text: input.question }], 'queue', undefined, handle.requestId)
+                          if (!result.ok) throw new Error(result.error.message)
+                        } finally {
+                          reference.release()
+                        }
+                      },
+                      openSession: sessionId => ctx.uiWorkspace.openSession(sessionId),
+                    },
+                  })
+                }}
                 translate={translate}
               />
             )),

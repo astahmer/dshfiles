@@ -51,6 +51,14 @@ const en = {
   commandPaletteThemeSystem: 'Use system theme',
   commandPaletteActionFailed: 'That action could not be completed.',
   commandPaletteNewThread: 'New thread',
+  commandPaletteAsk: 'Ask DSH',
+  commandPaletteAskPlaceholder: 'Ask DSH anything about using or operating it…',
+  commandPaletteAskHint: 'Tab opens Ask DSH on an empty search',
+  commandPaletteAskEmpty: 'Type a question about DSH, then press Enter.',
+  commandPaletteAskPending: 'Sending your question…',
+  commandPaletteAskSend: 'Send question',
+  commandPaletteAskExit: 'Back to search',
+  commandPaletteAskFailed: 'Ask DSH could not send that question.',
 }
 
 const zh = {
@@ -102,6 +110,14 @@ const zh = {
   commandPaletteThemeSystem: '跟随系统主题',
   commandPaletteActionFailed: '无法完成此操作。',
   commandPaletteNewThread: '新建会话',
+  commandPaletteAsk: '询问 DSH',
+  commandPaletteAskPlaceholder: '询问 DSH 如何使用或操作它…',
+  commandPaletteAskHint: '在空搜索中按 Tab 打开“询问 DSH”',
+  commandPaletteAskEmpty: '输入关于 DSH 的问题，然后按 Enter。',
+  commandPaletteAskPending: '正在发送问题…',
+  commandPaletteAskSend: '发送问题',
+  commandPaletteAskExit: '返回搜索',
+  commandPaletteAskFailed: '“询问 DSH”无法发送该问题。',
 }
 
 export const commandPaletteLocale = defineLocale(COMMAND_PALETTE_LOCALE_NAMESPACE, { en, zh })

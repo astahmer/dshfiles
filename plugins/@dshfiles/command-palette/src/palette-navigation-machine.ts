@@ -18,6 +18,8 @@ interface PaletteNavigationContext {
   readonly selected: string
   readonly notice: string | null
   readonly closeRequested: boolean
+  /** The Ask DSH input replaces search results with one sendable row. */
+  readonly ask: boolean
 }
 
 type PaletteNavigationEvent =
@@ -29,6 +31,8 @@ type PaletteNavigationEvent =
   | { readonly type: 'notice.show'; readonly message: string }
   | { readonly type: 'notice.clear' }
   | { readonly type: 'back' }
+  | { readonly type: 'ask.enter' }
+  | { readonly type: 'ask.exit' }
   | { readonly type: 'close.handled' }
 
 // SAFETY: XState uses these empty carriers for inference; runtime values come from the input and typed events.
@@ -40,9 +44,9 @@ export const paletteNavigationMachine = setup({
   },
   actions: {
     syncMode: assign(({ event }) =>
-      event.type === 'mode.sync' ? { mode: event.mode, query: '', backStack: [], selected: '', notice: null, closeRequested: false } : {},
+      event.type === 'mode.sync' ? { mode: event.mode, query: '', backStack: [], selected: '', notice: null, closeRequested: false, ask: false } : {},
     ),
-    changeMode: assign(({ event }) => (event.type === 'mode.change' ? { mode: event.mode, selected: '', notice: null } : {})),
+    changeMode: assign(({ event }) => (event.type === 'mode.change' ? { mode: event.mode, selected: '', notice: null, ask: false } : {})),
     changeQuery: assign(({ event }) => (event.type === 'query.change' ? { query: event.query, selected: '', notice: null } : {})),
     changeSelection: assign(({ event }) => (event.type === 'selection.change' ? { selected: event.value } : {})),
     navigateToFiles: assign(({ context }) => ({
@@ -52,11 +56,15 @@ export const paletteNavigationMachine = setup({
       selected: '',
       notice: null,
       closeRequested: false,
+      ask: false,
     })),
+    enterAsk: assign(() => ({ ask: true, query: '', selected: '', notice: null, closeRequested: false })),
+    exitAsk: assign(() => ({ ask: false, selected: '', notice: null })),
     showNotice: assign(({ event }) => (event.type === 'notice.show' ? { notice: event.message } : {})),
     clearNotice: assign(() => ({ notice: null })),
     goBack: assign(({ context }) => {
-      const parsed = PaletteRules.parsePaletteQuery(context.query)
+      // Nothing in Ask DSH is a prefix: the whole query is the question.
+      const parsed = context.ask ? { prefix: null, text: context.query } : PaletteRules.parsePaletteQuery(context.query)
       if (parsed.prefix !== null) return { query: parsed.text, selected: '', notice: null, closeRequested: false }
       const previous = context.backStack.at(-1)
       if (previous !== undefined) {
@@ -70,6 +78,7 @@ export const paletteNavigationMachine = setup({
         }
       }
       if (context.query.length > 0) return { query: '', selected: '', notice: null, closeRequested: false }
+      if (context.ask) return { ask: false, selected: '', notice: null, closeRequested: false }
       return { closeRequested: true }
     }),
     markCloseHandled: assign(() => ({ closeRequested: false })),
@@ -83,6 +92,7 @@ export const paletteNavigationMachine = setup({
     selected: '',
     notice: null,
     closeRequested: false,
+    ask: false,
   }),
   initial: 'active',
   states: {
@@ -96,6 +106,8 @@ export const paletteNavigationMachine = setup({
         'notice.show': { actions: 'showNotice' },
         'notice.clear': { actions: 'clearNotice' },
         back: { actions: 'goBack' },
+        'ask.enter': { actions: 'enterAsk' },
+        'ask.exit': { actions: 'exitAsk' },
         'close.handled': { actions: 'markCloseHandled' },
       },
     },

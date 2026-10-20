@@ -50,6 +50,14 @@ const copy: ThreadPaletteCopy = {
   contentSearching: 'Searching thread content…',
   contentUnavailable: 'Thread content is unavailable.',
   actionFailed: 'Action failed.',
+  ask: 'Ask DSH',
+  askPlaceholder: 'Ask DSH anything…',
+  askHint: 'Tab opens Ask DSH on an empty search',
+  askEmpty: 'Type a question about DSH, then press Enter.',
+  askPending: 'Sending your question…',
+  askSend: 'Send question',
+  askExit: 'Back to search',
+  askFailed: 'Ask DSH could not send that question.',
 }
 
 const context: PaletteActionContext = {
@@ -59,7 +67,7 @@ const context: PaletteActionContext = {
   themePreference: 'system',
 }
 
-const mount = () => {
+const mount = (onAsk: (question: string) => Promise<void> = vi.fn(async () => {})) => {
   const onClose = vi.fn()
   render(
     <ThreadPalette
@@ -71,11 +79,12 @@ const mount = () => {
       mac
       copy={copy}
       searchContent={null}
+      onAsk={onAsk}
       onOpenThread={vi.fn()}
       onClose={onClose}
     />,
   )
-  return onClose
+  return { onAsk, onClose }
 }
 
 beforeEach(() => {
@@ -98,7 +107,7 @@ afterEach(() => {
 
 describe('ThreadPalette navigation', () => {
   it('backs out of a thread prefix before clearing the query', async () => {
-    const onClose = mount()
+    const { onClose } = mount()
     expect(screen.getByRole('tab', { name: 'Everything' })).toBeTruthy()
     const threadsTab = screen.getByRole('tab', { name: 'Threads' })
     expect(screen.getByRole('tab', { name: 'Files' })).toBeTruthy()
@@ -125,7 +134,7 @@ describe('ThreadPalette navigation', () => {
   })
 
   it('returns to the parent query when the Back button is clicked', async () => {
-    const onClose = mount()
+    const { onClose } = mount()
     const input = screen.getByRole<HTMLInputElement>('combobox')
     input.focus()
     fireEvent.change(input, { target: { value: 'thread:session-missing' } })
@@ -140,7 +149,7 @@ describe('ThreadPalette navigation', () => {
   })
 
   it('closes the palette when Escape backs out at the root', async () => {
-    const onClose = mount()
+    const { onClose } = mount()
     const input = screen.getByRole<HTMLInputElement>('combobox')
     input.focus()
 
@@ -187,7 +196,7 @@ describe('ThreadPalette actions', () => {
         if (attempts === 1) throw new Error('controlled failure')
       },
     })
-    const onClose = mount()
+    const { onClose } = mount()
     const input = screen.getByRole<HTMLInputElement>('combobox')
     input.focus()
     fireEvent.change(input, { target: { value: 'retry' } })
@@ -202,5 +211,65 @@ describe('ThreadPalette actions', () => {
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1))
     expect(attempts).toBe(2)
     dispose()
+  })
+})
+
+describe('Ask DSH', () => {
+  it('opens on Tab from an empty search and returns to search on Escape', async () => {
+    const { onAsk } = mount()
+    const input = screen.getByRole<HTMLInputElement>('combobox')
+    expect(input.getAttribute('placeholder')).toBe('Search everything…')
+
+    fireEvent.keyDown(input, { key: 'Tab', code: 'Tab' })
+    await waitFor(() => expect(input.getAttribute('placeholder')).toBe('Ask DSH anything…'))
+    expect(screen.getByText('Type a question about DSH, then press Enter.')).toBeTruthy()
+
+    fireEvent.keyDown(input, { key: 'Escape', code: 'Escape' })
+    await waitFor(() => expect(input.getAttribute('placeholder')).toBe('Search everything…'))
+    expect(onAsk).not.toHaveBeenCalled()
+  })
+
+  it('sends the typed question through the palette and closes on success', async () => {
+    const ask = vi.fn(async () => {})
+    const { onClose } = mount(ask)
+    const input = screen.getByRole<HTMLInputElement>('combobox')
+    fireEvent.keyDown(input, { key: 'Tab', code: 'Tab' })
+    fireEvent.change(input, { target: { value: 'how do I rebind a shortcut?' } })
+
+    const row = await screen.findByRole('option', { name: 'Ask DSH: how do I rebind a shortcut?' })
+    fireEvent.click(row)
+
+    await waitFor(() => expect(ask).toHaveBeenCalledWith('how do I rebind a shortcut?'))
+    await waitFor(() => expect(onClose).toHaveBeenCalled())
+  })
+
+  it('keeps the question and explains a failed send', async () => {
+    const ask = vi.fn(async () => {
+      throw new Error('no model')
+    })
+    const { onClose } = mount(ask)
+    const input = screen.getByRole<HTMLInputElement>('combobox')
+    fireEvent.keyDown(input, { key: 'Tab', code: 'Tab' })
+    fireEvent.change(input, { target: { value: 'what does the backlog plugin do?' } })
+
+    fireEvent.click(await screen.findByRole('option', { name: 'Ask DSH: what does the backlog plugin do?' }))
+
+    expect(await screen.findByText('Ask DSH could not send that question.')).toBeTruthy()
+    expect(input.value).toBe('what does the backlog plugin do?')
+    expect(onClose).not.toHaveBeenCalled()
+  })
+})
+
+describe('Ask DSH keyboard submit', () => {
+  it('sends the question on Enter once a row is active', async () => {
+    const ask = vi.fn(async () => {})
+    mount(ask)
+    const input = screen.getByRole<HTMLInputElement>('combobox')
+    fireEvent.keyDown(input, { key: 'Tab', code: 'Tab' })
+    fireEvent.change(input, { target: { value: 'how do I rebind a shortcut?' } })
+    await screen.findByRole('option', { name: 'Ask DSH: how do I rebind a shortcut?' })
+
+    fireEvent.keyDown(input, { key: 'Enter', code: 'Enter' })
+    await waitFor(() => expect(ask).toHaveBeenCalledWith('how do I rebind a shortcut?'))
   })
 })

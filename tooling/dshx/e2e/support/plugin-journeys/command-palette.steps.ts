@@ -150,6 +150,40 @@ Then('thread content search finds the message and opens its thread', async ({ pa
   await finishJourneyAssertions(page)
 })
 
+Then('the Ask DSH entry appears on the empty palette', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'ask-dsh-entry-is-visible-on-an-empty-palette', async () => {
+    const entry = paletteDialog(page).getByRole('button', { name: 'Ask DSH', exact: true })
+    await expect(entry).toBeVisible()
+    await expect(entry.getByText('Tab', { exact: true })).toBeVisible()
+  })
+})
+
+When('Tab is pressed in the command palette', async ({ page }: { page: Page }) => {
+  await paletteInput(page).press('Tab')
+})
+
+Then('the palette asks for an Ask DSH question', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'tab-opens-the-ask-dsh-bar', async () => {
+    await expect(paletteInput(page)).toHaveAttribute('placeholder', 'Ask DSH anything about using or operating it…')
+    await expect(paletteDialog(page).getByText('Type a question about DSH, then press Enter.', { exact: true })).toBeVisible()
+  })
+})
+
+When('the Ask DSH question {string} is sent', async ({ page }: { page: Page }, question: string) => {
+  await paletteInput(page).fill(question)
+  await paletteDialog(page)
+    .getByRole('option', { name: `Ask DSH: ${question}` })
+    .click()
+  await expect(paletteDialog(page)).not.toBeVisible()
+})
+
+Then('a new thread opens with that question', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'ask-dsh-opens-its-new-thread-with-the-question', async () => {
+    await expect(page.getByText('how do I rebind a shortcut?', { exact: true }).last()).toBeVisible({ timeout: 30_000 })
+  })
+  await finishJourneyAssertions(page)
+})
+
 Then('file search explains that the Editor plugin is unavailable', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'file-search-requires-editor-integration', () =>
     expect(page.getByText('File search needs the Editor plugin.', { exact: true })).toBeVisible(),

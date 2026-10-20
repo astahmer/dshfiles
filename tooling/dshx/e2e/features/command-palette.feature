@@ -65,6 +65,16 @@ Feature: Command palette
     When Escape is pressed in the command palette
     Then Escape clears the palette query without closing it
 
+  @scenario:command-palette.ask-dsh
+  Scenario: Ask DSH sends a question into a new thread
+    Given the isolated plugin profile "@dshfiles/command-palette" is booted
+    When the command palette is opened
+    Then the Ask DSH entry appears on the empty palette
+    When Tab is pressed in the command palette
+    Then the palette asks for an Ask DSH question
+    When the Ask DSH question "how do I rebind a shortcut?" is sent
+    Then a new thread opens with that question
+
   @scenario:command-palette.session-link-search
   Scenario: A pasted session link uses its ID and ignores unrelated query parameters
     Given the isolated plugin profile "@dshfiles/command-palette" is booted
