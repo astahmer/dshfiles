@@ -4,7 +4,7 @@ import type { DockviewApi } from 'dockview-react'
 export type WorkbenchRegionId = 'main' | 'right' | 'bottom'
 
 /** What the registry needs from a surface: which panels it holds. */
-export type WorkbenchRegionSurface = { readonly getPanel: (panelId: string) => unknown }
+export type WorkbenchRegionSurface = { readonly getPanel: (panelId: string) => object | undefined }
 
 export interface WorkbenchRegionRegistry<Surface extends WorkbenchRegionSurface = DockviewApi> {
   /** Register a live surface; the returned disposer removes it again. */
