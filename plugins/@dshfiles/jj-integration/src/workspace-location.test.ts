@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { ThreadError } from './threads.js'
 import type { ThreadLocation } from './threads.js'
-import { locateOrMissing } from './workspace-location.js'
+import { locateBestEffort, locateOrMissing } from './workspace-location.js'
 
 const location: ThreadLocation = { repoRoot: '/repo', workspaceRoot: '/repo', threadName: undefined }
 
@@ -18,5 +18,16 @@ describe('locateOrMissing', () => {
         throw new Error('jj lookup timed out')
       }),
     ).rejects.toThrow('jj lookup timed out')
+  })
+})
+
+describe('locateBestEffort', () => {
+  it('keeps unrelated workspace scans available when a lookup fails', async () => {
+    await expect(locateBestEffort(async () => location)).resolves.toEqual(location)
+    await expect(
+      locateBestEffort(async () => {
+        throw new Error('jj lookup timed out')
+      }),
+    ).resolves.toBeUndefined()
   })
 })

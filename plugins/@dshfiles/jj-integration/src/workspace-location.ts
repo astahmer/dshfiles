@@ -8,3 +8,11 @@ export const locateOrMissing = async (locate: () => Promise<ThreadLocation>): Pr
     throw error
   }
 }
+
+export const locateBestEffort = async <Location>(locate: () => Promise<Location | undefined>): Promise<Location | undefined> => {
+  try {
+    return await locate()
+  } catch {
+    return undefined
+  }
+}

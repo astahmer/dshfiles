@@ -288,6 +288,7 @@ export default defineClient({
             return read({ path }).catch(() => ({ thread: null }))
           })
         },
+        refetchInterval: query => (query.state.data?.thread?.integrationQueuedAt === undefined ? false : 2_000),
       })
       const bookmark = useBookmark()
       const thread = status.data?.thread

@@ -908,6 +908,7 @@ describe('deliverFirstSend', () => {
       readonly copies?: boolean
       readonly keeps?: boolean
       readonly destinationFails?: boolean
+      readonly failIsolationAttempts?: number
     } = {},
   ) => {
     const sourceComposer = composerWithDraft('first prompt')
@@ -918,34 +919,39 @@ describe('deliverFirstSend', () => {
     const shown: string[] = []
     const isolated: string[] = []
     const copied: string[] = []
-    const delivery = deliverFirstSend({
-      source,
-      submitSource: 'enter',
-      destination: async () => {
-        if (options.destinationFails) throw new Error('Destination lookup timed out.')
-        return options.keeps === true ? null : isolateRequest()
-      },
-      isolate: async () => {
-        isolated.push('ws-thread-abc123')
-        return { workspaceId: 'ws-thread-abc123' }
-      },
-      composerIn: async () => target,
-      copyDraft: async () => {
-        copied.push(target.sessionId)
-        if (options.copies === false) return false
-        targetComposer.edit(sourceComposer.input.state.getSnapshot().draft)
-        return true
-      },
-      clearSource: () => sourceComposer.edit(''),
-      showsSource: () => options.showsSource ?? false,
-      show: sessionId => void shown.push(sessionId),
-      blocks,
-      reason: 'Preparing thread-abc123…',
-      failureMessage: 'Workspace setup failed.',
-      changedMessage: 'The draft changed.',
-      signal: new AbortController().signal,
-    })
-    return { delivery, sourceComposer, targetComposer, blockCalls, shown, isolated, copied }
+    const isolationAttempts: string[] = []
+    const deliver = () =>
+      deliverFirstSend({
+        source,
+        submitSource: 'enter',
+        destination: async () => {
+          if (options.destinationFails) throw new Error('Destination lookup timed out.')
+          return options.keeps === true ? null : isolateRequest()
+        },
+        isolate: async () => {
+          isolationAttempts.push('attempt')
+          if (isolationAttempts.length <= (options.failIsolationAttempts ?? 0)) throw new Error('Workspace provisioning failed.')
+          isolated.push('ws-thread-abc123')
+          return { workspaceId: 'ws-thread-abc123' }
+        },
+        composerIn: async () => target,
+        copyDraft: async () => {
+          copied.push(target.sessionId)
+          if (options.copies === false) return false
+          targetComposer.edit(sourceComposer.input.state.getSnapshot().draft)
+          return true
+        },
+        clearSource: () => sourceComposer.edit(''),
+        showsSource: () => options.showsSource ?? false,
+        show: sessionId => void shown.push(sessionId),
+        blocks,
+        reason: 'Preparing thread-abc123…',
+        failureMessage: 'Workspace setup failed.',
+        changedMessage: 'The draft changed.',
+        signal: new AbortController().signal,
+      })
+    const delivery = deliver()
+    return { delivery, deliver, sourceComposer, targetComposer, blockCalls, shown, isolated, copied, isolationAttempts }
   }
 
   it('keeps the deferred move after a failed first send until a successful retry claims it', async () => {
@@ -995,6 +1001,22 @@ describe('deliverFirstSend', () => {
     expect(fixture.sourceComposer.input.state.getSnapshot().draft).toBe('first prompt')
     expect(fixture.sourceComposer.notices).toEqual(['Workspace setup failed.'])
     expect(fixture.isolated).toEqual([])
+  })
+
+  it('keeps the first send retryable when workspace provisioning fails', async () => {
+    const fixture = deliveryFixture({ failIsolationAttempts: 1 })
+    await expect(fixture.delivery).resolves.toBe('failed')
+    expect(fixture.sourceComposer.submissions).toEqual([])
+    expect(fixture.sourceComposer.input.state.getSnapshot().draft).toBe('first prompt')
+    expect(fixture.sourceComposer.notices).toEqual(['Workspace setup failed.'])
+    expect(fixture.isolationAttempts).toEqual(['attempt'])
+
+    await expect(fixture.deliver()).resolves.toBe('sent')
+    expect(fixture.sourceComposer.submissions).toEqual([])
+    expect(fixture.sourceComposer.input.state.getSnapshot().draft).toBe('')
+    expect(fixture.isolated).toEqual(['ws-thread-abc123'])
+    expect(fixture.targetComposer.submissions).toEqual([{ mode: 'queue', source: 'enter' }])
+    expect(fixture.isolationAttempts).toEqual(['attempt', 'attempt'])
   })
 
   it('keeps the draft in the source when the thread workspace refuses it', async () => {

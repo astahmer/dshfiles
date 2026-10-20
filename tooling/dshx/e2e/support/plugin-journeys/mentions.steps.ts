@@ -1,6 +1,7 @@
 import { expect, type Page } from '@playwright/test'
 import { Then, When } from '../bdd.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
+import { selectModelForNewThread } from '../threads.js'
 
 const NEW_THREAD_COMPOSER = 'Describe what you want to build, / commands, @ files or sessions'
 const THREAD_COMPOSER = 'Message or run a task, / commands, @ files or sessions'
@@ -23,7 +24,8 @@ const openNewThread = async (page: Page): Promise<void> => {
 
 const startThread = async (page: Page, text: string): Promise<void> => {
   await openNewThread(page)
-  await newThreadComposer(page).fill(text)
+  await selectModelForNewThread(page, 'commandcode_work/gpt-6-luna')
+  await newThreadComposer(page).fill(`${text}\n\n[[title ${text}]]`)
   await newThreadComposer(page).press('Enter')
   await expect(page.getByRole('textbox', { name: THREAD_COMPOSER, exact: true })).toBeVisible()
 }

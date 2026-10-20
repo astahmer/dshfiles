@@ -120,7 +120,7 @@ export const startWorkspaceToggle = (input: {
       void storedSpares.set(next)
     },
     generateName: randomThreadName,
-    preparationTimeoutReason: () => t('workspacePreparationTimedOut'),
+    preparationTimeoutReason: () => t('workspaceDestinationUnavailable'),
   }
   const actor = createActor(workspaceToggleMachine, { input: { client } })
   actor.on('switched', event => {
@@ -360,9 +360,9 @@ export const DestinationBar = (props: {
       ) : null}
       {newThreadId !== null && destination.isError ? (
         <span role="alert" className="dshx:inline-flex dshx:items-center dshx:gap-1 dshx:text-xs dshx:text-destructive">
-          {t('workspacePreparationTimedOut')}
+          {t('workspaceDestinationUnavailable')}
           <Button variant="link" size="sm" onClick={() => void destination.refetch()}>
-            {t('refresh')}
+            {t('retryDestination')}
           </Button>
         </span>
       ) : null}

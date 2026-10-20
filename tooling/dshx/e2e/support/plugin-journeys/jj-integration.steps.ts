@@ -26,6 +26,13 @@ const threadComposerName = 'Message or run a task, / commands, @ files or sessio
 const threadComposer = (page: Page) => page.getByRole('textbox', { name: threadComposerName, exact: true })
 const attachmentFixtures = fileURLToPath(new URL('../../fixtures/attachments/', import.meta.url))
 const newThreadComposer = (page: Page) => page.getByRole('textbox', { name: newThreadComposerName, exact: true })
+const destinationRequestSchema = z
+  .object({
+    method: z.string().regex(/\/destination$/u),
+    payload: z.object({ input: z.object({ workspaceId: z.string() }).passthrough() }).passthrough(),
+    rpcId: z.string(),
+  })
+  .passthrough()
 const removeComposerAttachment = (page: Page, name: string) => page.getByRole('button', { name, exact: true })
 const expectDraftAndAttachments = async (page: Page, text: string): Promise<void> => {
   await expect(newThreadComposer(page)).toHaveText(text)
@@ -280,6 +287,10 @@ When('the New thread workspace toggle is turned off', async ({ page }: { page: P
   await expect(projectButton(page)).toHaveText('repo')
 })
 
+When('the local Command Code model is selected for the New thread', async ({ page }: { page: Page }) => {
+  await selectModelForNewThread(page, 'commandcode_work/gpt-6-luna')
+})
+
 When('the New thread workspace is kept in the shared checkout', async ({ page }: { page: Page }) => {
   const toggle = workspaceToggle(page)
   if (await toggle.isChecked()) await toggle.click()
@@ -399,7 +410,9 @@ When('new threads start in their own jj workspace by default', async ({ page }: 
 
 When('a first message is sent from the shared checkout', async ({ page }: { page: Page }) => {
   const composer = page.getByRole('textbox', { name: newThreadComposerName, exact: true })
-  await composer.fill('background new thread e2e')
+  await selectModelForNewThread(page, 'commandcode_work/gpt-6-luna')
+  // The local fake provider uses this directive to make the generated thread name deterministic.
+  await composer.fill('background new thread e2e\n\n[[title background new thread e2e]]')
   await composer.press('Enter')
   // The first send also creates the session and its workspace; on a loaded machine that outlasts the 15s default.
   await expect(page.getByRole('region', { name: 'Threads' }).getByRole('button', { name: /background new thread e2e/u })).toBeVisible({ timeout: 45_000 })
@@ -453,6 +466,7 @@ Then('a reload keeps the blank New thread unprovisioned', async ({ page }: { pag
 When('a message is submitted before the new thread workspace is ready', async ({ page }: { page: Page }) => {
   const composer = newThreadComposer(page)
   await expect(composer).toBeEditable()
+  await selectModelForNewThread(page, 'commandcode_work/gpt-6-luna')
   await composer.fill('message sent during workspace preparation')
   await expect(composer).toHaveText('message sent during workspace preparation')
   await composer.press('Enter')
@@ -474,39 +488,38 @@ Then('the message is delivered from its new thread workspace', async ({ page }: 
 When('the next five New thread destination lookups fail', async ({ page }: { page: Page }) => {
   let remainingFailures = 5
   await page.context().route('**/api/**', async route => {
-    const request = route.request().postDataJSON()
-    if (
-      typeof request !== 'object' ||
-      request === null ||
-      !('method' in request) ||
-      typeof request.method !== 'string' ||
-      !request.method.endsWith('/destination') ||
-      !('input' in request)
-    ) {
-      return route.continue()
-    }
-    const input = request.input
-    if (typeof input !== 'object' || input === null || !('workspaceId' in input) || !('sessionId' in input)) return route.continue()
-    if (remainingFailures === 0) return route.continue()
+    const parsedRequest = destinationRequestSchema.safeParse(route.request().postDataJSON())
+    if (!parsedRequest.success || remainingFailures === 0) return route.continue()
     remainingFailures -= 1
-    return route.abort()
+    const request = parsedRequest.data
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        type: 'server-response',
+        rpcId: request.rpcId,
+        result: { ok: false, error: { code: 'e2e.destination-failed', message: 'Injected destination failure', details: {} } },
+      }),
+    })
   })
 })
 
-Then('the first send can be retried after a failed destination lookup', async ({ page }: { page: Page }) => {
+Then('a failed destination lookup leaves the first send retryable', async ({ page }: { page: Page }) => {
   const destination = page.getByLabel('New thread destination', { exact: true })
   const composer = newThreadComposer(page)
-  await expect(destination.getByRole('alert')).toContainText('Could not determine the workspace destination in time.')
+  await expect(destination.getByRole('alert')).toContainText('Could not determine the workspace destination.')
   await composer.fill('first message from the inherited workspace')
   await composer.press('Enter')
   await expect(composer).toHaveText('first message from the inherited workspace')
+  await expect(page.getByText('The workspace could not be prepared; the message was not sent. Send again to retry.', { exact: true })).toBeVisible()
   const previousThread = provisionedThreadName(page)
   await expect(projectButton(page)).toHaveText(`repo · ${previousThread}`)
   expect(workspaceNames(repositoryFor(page), [previousThread])).toEqual(['default', previousThread].sort())
-  await destination.getByRole('button', { name: 'Refresh', exact: true }).click()
+  await destination.getByRole('button', { name: 'Retry', exact: true }).click()
   await expect(destination.getByRole('alert')).toHaveCount(0)
-  await composer.press('Enter')
-  await expect(composer).toHaveCount(0, { timeout: 45_000 })
+  await expect(composer).toHaveText('first message from the inherited workspace')
+  expect(workspaceNames(repositoryFor(page), [previousThread])).toEqual(['default', previousThread].sort())
+  await finishJourneyAssertions(page)
 })
 
 Then('the blank new thread keeps the previous workspace until it sends', async ({ page }: { page: Page }) => {

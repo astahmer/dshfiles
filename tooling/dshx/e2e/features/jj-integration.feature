@@ -52,7 +52,7 @@ Feature: jj thread workspaces
     Then the new thread provisioned its own jj workspace instead of the previous one
 
   @scenario:jj-integration.failed-destination-retry-browser-journey
-  Scenario: A failed destination lookup cannot send a New thread into its inherited workspace
+  Scenario: A failed destination lookup keeps the first message unsent and offers retry
     Given the isolated plugin composition of "@dshfiles/jj-integration, @dshfiles/workspace-folder-picker, @dshfiles/home, @dshfiles/thread-sidebar, @dshfiles/multi-host" is booted
     When a disposable jj repository is chosen as the New thread project
     And the New thread workspace toggle is turned on
@@ -60,13 +60,14 @@ Feature: jj thread workspaces
     And new threads start in their own jj workspace by default
     And the next five New thread destination lookups fail
     And New thread is clicked in the sidebar
-    Then the first send can be retried after a failed destination lookup
-    And the new thread provisioned its own jj workspace instead of the previous one
+    Then a failed destination lookup leaves the first send retryable
 
   @scenario:jj-integration.new-thread-background-browser-journey
   Scenario: A New thread provisions nothing until its first send
-    Given the isolated plugin composition of "@dshfiles/jj-integration, @dshfiles/workspace-folder-picker, @dshfiles/home, @dshfiles/thread-sidebar, @dshfiles/multi-host" is booted
-    When a disposable jj repository is chosen as the New thread project
+    Given the isolated plugin composition of "@dshfiles/jj-integration, @dshfiles/workspace-folder-picker, @dshfiles/home, @dshfiles/thread-sidebar, @dshfiles/multi-host, @dshfiles/ai-accounts" is booted
+    When a Command Code account backed by a local fake provider is added
+    And the New thread screen is reopened
+    And a disposable jj repository is chosen as the New thread project
     And a first message is sent from the shared checkout
     And new threads start in their own jj workspace by default
     And New thread is clicked in the sidebar
@@ -76,8 +77,10 @@ Feature: jj thread workspaces
 
   @scenario:jj-integration.new-thread-deferred-submit-browser-journey
   Scenario: The first send allocates the thread workspace and delivers the message there
-    Given the isolated plugin composition of "@dshfiles/jj-integration, @dshfiles/workspace-folder-picker, @dshfiles/home, @dshfiles/thread-sidebar, @dshfiles/multi-host" is booted
-    When a disposable jj repository is chosen as the New thread project
+    Given the isolated plugin composition of "@dshfiles/jj-integration, @dshfiles/workspace-folder-picker, @dshfiles/home, @dshfiles/thread-sidebar, @dshfiles/multi-host, @dshfiles/ai-accounts" is booted
+    When a Command Code account backed by a local fake provider is added
+    And the New thread screen is reopened
+    And a disposable jj repository is chosen as the New thread project
     And a first message is sent from the shared checkout
     And new threads start in their own jj workspace by default
     And New thread is clicked in the sidebar
@@ -101,8 +104,10 @@ Feature: jj thread workspaces
 
   @scenario:jj-integration.structured-reference-handoff-browser-journey
   Scenario: Switching the thread destination preserves structured composer references
-    Given the isolated plugin composition of "@dshfiles/jj-integration, @dshfiles/mentions, @dshfiles/workspace-folder-picker, @dshfiles/home, @dshfiles/thread-sidebar, @dshfiles/multi-host" is booted
-    When a disposable jj repository is chosen as the New thread project
+    Given the isolated plugin composition of "@dshfiles/jj-integration, @dshfiles/mentions, @dshfiles/workspace-folder-picker, @dshfiles/home, @dshfiles/thread-sidebar, @dshfiles/multi-host, @dshfiles/ai-accounts" is booted
+    When a Command Code account backed by a local fake provider is added
+    And the New thread screen is reopened
+    And a disposable jj repository is chosen as the New thread project
     And threads named "Mention target" and "Second thread" are started
     And a new thread composer types "@t:Mention"
     And the highlighted mention row is picked with the keyboard
@@ -134,9 +139,12 @@ Feature: jj thread workspaces
 
   @scenario:jj-integration.turn-end-integrate-browser-journey
   Scenario: Integrate a thread from the end of its turn
-    Given the isolated plugin composition of "@dshfiles/jj-integration, @dshfiles/workspace-folder-picker, @dshfiles/multi-host" is booted
-    When a disposable jj repository is chosen as the New thread project
+    Given the isolated plugin composition of "@dshfiles/jj-integration, @dshfiles/workspace-folder-picker, @dshfiles/multi-host, @dshfiles/ai-accounts" is booted
+    When a Command Code account backed by a local fake provider is added
+    And the New thread screen is reopened
+    And a disposable jj repository is chosen as the New thread project
     And the New thread workspace toggle is turned on
+    And the local Command Code model is selected for the New thread
     And a message is sent in the thread workspace
     Then the end of the turn offers no integration before there is work
     When the thread workspace gains a revision described "One click work"

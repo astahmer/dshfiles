@@ -50,7 +50,7 @@ import { ThreadIntegrationModel } from './thread-integration-state.js'
 import { workspaceHasOtherSession } from './thread-session-ownership.js'
 import { registeredProjects } from './registered-projects.js'
 import { createThreads, ThreadWorkspaceModel, ThreadError, type JjExecutor, type ThreadLocation, type ThreadStatus, type Threads } from './threads.js'
-import { locateOrMissing } from './workspace-location.js'
+import { locateBestEffort, locateOrMissing } from './workspace-location.js'
 
 declare module '@deepseek-ai/cordis' {
   interface Events {
@@ -376,6 +376,9 @@ const cachedLocation = async (threads: Threads, path: string): Promise<ThreadLoc
   return location
 }
 
+const cachedBestEffortLocation = async (threads: Threads, path: string): Promise<ThreadLocation | undefined> =>
+  locateBestEffort(() => cachedLocation(threads, path))
+
 /** Registered workspaces whose folders still exist, so one missing entry cannot cost a process per scan. */
 const presentWorkspaces = (workspaces: readonly Workspace[]): readonly Workspace[] => workspaces.filter(workspace => existsSync(workspace.path))
 
@@ -414,7 +417,7 @@ const scanRepositories = async (): Promise<readonly RepositoryView[]> => {
   const archived = new Set<string>(registry.archivedSessionIds)
   const activity = await sessionActivity.display()
   const present = presentWorkspaces(workspaces)
-  const locations = await mapBounded(present, LOCATE_CONCURRENCY, workspace => cachedLocation(active, workspace.path))
+  const locations = await mapBounded(present, LOCATE_CONCURRENCY, workspace => cachedBestEffortLocation(active, workspace.path))
   const repoRoots = [...new Set(locations.flatMap(location => (location === undefined ? [] : [location.repoRoot])))]
   const statusesByRepo = await mapBounded(repoRoots, REPOSITORY_SCAN_CONCURRENCY, repoRoot => cachedThreadStatuses(active, repoRoot))
   return repoRoots.map((repoRoot, index) => {
@@ -764,7 +767,7 @@ const wakeDeferredIntegrations = (delayMs: number): void => {
 }
 
 const queueIntegration = async (input: { readonly path: string; readonly sessionId: string | undefined }): Promise<{ readonly queuedAt: number }> => {
-  const location = await cachedLocation(requireThreads(), input.path)
+  const location = await cachedBestEffortLocation(requireThreads(), input.path)
   if (location?.threadName === undefined) throw new PluginApiError('This workspace is not a thread.', { code: 'not-a-thread' })
   const entry = deferredIntegrations.queue({ path: location.workspaceRoot, sessionId: input.sessionId })
   // Queueing changes no jj state, only what the assembled repository views report.
@@ -1032,7 +1035,7 @@ const restoreMissingThreadWorkspace = async (path: string, sessionId: string): P
   const activeThreads = requireThreads()
   for (const workspace of registryOf().list()) {
     if (!existsSync(workspace.path) || threadsDirectory(workspace.path) !== dirname(path)) continue
-    const location = await cachedLocation(activeThreads, workspace.path)
+    const location = await cachedBestEffortLocation(activeThreads, workspace.path)
     if (location === undefined || location.repoRoot !== location.workspaceRoot) continue
     await activeThreads.restore(location.repoRoot, path)
     locationCache.delete(path)
@@ -1114,7 +1117,7 @@ const api = jjIntegrationApi.host({
     const source = registry.get(WorkspaceId(input.workspaceId))
     const unchanged = { workspaceId: input.workspaceId, branched: false }
     if (source === undefined || source.sessionIds.length === 0) return unchanged
-    const location = await cachedLocation(requireThreads(), source.path)
+    const location = await cachedBestEffortLocation(requireThreads(), source.path)
     if (location?.threadName === undefined) return unchanged
     const activeThreads = requireThreads()
     const thread = await activeThreads.provision(location.repoRoot, await activeThreads.branchPoint(location.workspaceRoot))
@@ -1129,9 +1132,7 @@ const api = jjIntegrationApi.host({
     const source = registry.get(WorkspaceId(input.workspaceId))
     if (source === undefined) throw new Error(`Unknown workspace ${input.workspaceId}.`)
     const settings = readSettings()
-    const location = await requireThreads()
-      .locate(source.path)
-      .catch(() => undefined)
+    const location = await cachedLocation(requireThreads(), source.path)
     if (location === undefined) return { workspaceId: source.id, isolated: false, destination: noDestination(isolatesNewThreadsByDefault(settings)) }
     const project = await registry.resolveByPath(location.repoRoot)
     if (!(input.isolate ?? isolatesNewThreadsByDefault(settings))) {
@@ -1148,9 +1149,12 @@ const api = jjIntegrationApi.host({
   destination: async ({ input }) => {
     const registry = registryOf()
     const source = registry.get(WorkspaceId(input.workspaceId))
+    if (source === undefined) {
+      throw new PluginApiError('The workspace destination is unknown. Refresh and retry.', { code: 'workspace-not-found' })
+    }
     const ownedByAnotherSession =
-      input.sessionId === undefined ? undefined : workspaceHasOtherSession({ sessionId: input.sessionId, workspaceSessionIds: source?.sessionIds })
-    const location = source === undefined ? undefined : await cachedLocation(requireThreads(), source.path)
+      input.sessionId === undefined ? undefined : workspaceHasOtherSession({ sessionId: input.sessionId, workspaceSessionIds: source.sessionIds })
+    const location = await cachedLocation(requireThreads(), source.path)
     if (location === undefined) {
       const destination = noDestination(isolatesNewThreadsByDefault(readSettings()))
       if (ownedByAnotherSession === undefined) return destination
@@ -1184,7 +1188,7 @@ const api = jjIntegrationApi.host({
       workspaces: workspaces.map(workspace => ({ workspaceId: workspace.id, title: workspace.title, path: workspace.path })),
       classify: async path => {
         if (!existsSync(path)) return 'missing'
-        const location = await cachedLocation(requireThreads(), path)
+        const location = await cachedBestEffortLocation(requireThreads(), path)
         return location !== undefined && ThreadWorkspaceModel.isSecondaryWorkspace(location) ? 'workspace' : 'project'
       },
     })
