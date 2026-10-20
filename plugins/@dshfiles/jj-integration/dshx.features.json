@@ -345,7 +345,7 @@
     {
       "id": "rebase",
       "title": "Integrate a thread into the bookmark",
-      "summary": "One conversation-header control names the current thread's jj workspace, how many revisions are ready to integrate, and whether integration is blocked; its menu holds Integrate, the Thread workspaces side panel, and Download session log. Hovering the current-thread workspace chip lazily previews a bounded revision graph of thread work, the configured bookmark and its origin ref, plus the default workspace. Integrate a thread's described work into the target bookmark from that menu, the panel, or the compatible `/rebase` composer command. Under the hood, jj rebases thread revisions onto the current bookmark tip, then advances the bookmark; existing bookmark ancestry stays intact. The in-chat notice shows the tip change ID and offers Archive for the current thread. Queueing or cancelling an integration leaves a dated chat notice; the active queued notice offers Undo, and a subtle thread-list tag disappears when cancelled or completed. Queue notices share the Host-memory lifetime of the queue. Integration refuses non-thread workspaces and is disabled while any thread session is working or waiting for input; an agent handed back conflicts or descriptions may integrate its own thread once they are fixed, while every other session of that thread must still be idle. Afterwards the checkout running DSH follows the bookmark in the background through `dshx checkout sync`, with a panel line saying what was rebuilt and whether to restart.",
+      "summary": "One conversation-header control names the current thread's jj workspace, how many revisions are ready to integrate, and whether integration is blocked; its menu holds Integrate, the Thread workspaces side panel, and Download session log. Hovering the current-thread workspace chip lazily previews a bounded revision graph of thread work, the configured bookmark and its origin ref, plus the default workspace. Integrate a thread's described work into the target bookmark from that menu, the panel, the newest completed turn, or the compatible `/rebase` composer command. The turn-end row names the pending revisions and offers the same Integrate one click from the answer the user just read; it disappears once the work lands. Under the hood, jj rebases thread revisions onto the current bookmark tip, then advances the bookmark; existing bookmark ancestry stays intact. The in-chat notice shows the tip change ID and offers Archive for the current thread. Queueing or cancelling an integration leaves a dated chat notice; the active queued notice offers Undo, and a subtle thread-list tag disappears when cancelled or completed. Queue notices share the Host-memory lifetime of the queue. Integration refuses non-thread workspaces and is disabled while any thread session is working or waiting for input; an agent handed back conflicts or descriptions may integrate its own thread once they are fixed, while every other session of that thread must still be idle. Afterwards the checkout running DSH follows the bookmark in the background through `dshx checkout sync`, with a panel line saying what was rebuilt and whether to restart.",
       "reach": [
         "seed rebase-ready-thread",
         "hover button \"Current thread workspace: thread-*\"",
@@ -385,7 +385,8 @@
         "conflicted",
         "shared-checkout-refused",
         "checkout-synced",
-        "integration-queued"
+        "integration-queued",
+        "turn-end-offer"
       ],
       "failureModes": [
         "The `/rebase` command refuses non-thread workspaces because they have no safe per-thread workspace boundary.",
@@ -393,7 +394,8 @@
         "Placeholder descriptions (empty or wip) are refused.",
         "Rebase is refused while any thread session is running or waiting for input, except the calling agent's own session.",
         "The rebase notice offers the actions `integratedThreadActions` selects; Archive affects only the current Session and both actions are disabled while it runs, while Settle is answered by thread-sidebar, the owner of the settled status.",
-        "The post-rebase checkout sync refuses described work the bookmark lacks and undoes a conflicting rebase; the panel line names the files and the rebase itself stands."
+        "The post-rebase checkout sync refuses described work the bookmark lacks and undoes a conflicting rebase; the panel line names the files and the rebase itself stands.",
+        "Only the newest completed turn offers the inline Integrate: an older turn keeps its dated notices, and the row is hidden for a shared checkout, an archived thread, a queued or running integration, unverified activity, or work the control center calls blocked (undescribed, conflicted, missing)."
       ],
       "externalDependencies": [
         {
@@ -488,6 +490,46 @@
           "id": "jj-integration.checkout-sync",
           "file": "plugins/@dshfiles/jj-integration/src/threads.integration.test.ts",
           "testName": "brings the default checkout onto the rebased bookmark with dshx checkout sync, keeping its local edits"
+        }
+      ]
+    },
+    {
+      "id": "turn-end-integrate",
+      "title": "Integrate from the end of a turn",
+      "summary": "The newest completed turn of an isolated thread workspace offers the same integration one click from the answer: a row beside the answer names the pending revisions and its button lands them. It appears only while the workspace is ready — described, conflict-free revisions with no Session writing and no question waiting — and disappears once the work lands, a queue waits, or a Session works again. The header control stays the permanent entry point.",
+      "reach": [
+        "seed rebase-ready-thread",
+        "expect button \"Integrate into main\"",
+        "click button \"Integrate into main\"",
+        "click button \"Current thread workspace: thread-*\"",
+        "expect text \"Nothing to integrate\""
+      ],
+      "surfaces": ["client"],
+      "configuration": [],
+      "states": ["offer-shown", "offer-hidden-without-work", "offer-hidden-blocked", "offer-hidden-queued", "landing-from-turn-end"],
+      "failureModes": [
+        "Only the newest completed turn offers it; older turns keep their dated notices, so a long thread never grows a column of stale buttons.",
+        "A shared checkout, an archived thread, a queued or running integration, an unverified activity check, or work the control center calls blocked never shows the row.",
+        "It runs the header control's own land action: a refused integration reports the same toast and leaves the bookmark where it was."
+      ],
+      "externalDependencies": [
+        {
+          "id": "jj",
+          "boundary": "Read-only thread status through the jj-integration Host API, then the same land call the header control uses.",
+          "deterministicFake": "The scratch seed creates a real thread workspace with one described revision in a temporary jj repository."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "jj-integration.turn-end-integrate-browser-journey",
+          "featureFile": "tooling/dshx/e2e/features/jj-integration.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.turn-end-offer",
+          "file": "plugins/@dshfiles/jj-integration/src/inline-integrate.test.ts",
+          "testName": "offers one click for a finished turn whose described work is ready"
         }
       ]
     },

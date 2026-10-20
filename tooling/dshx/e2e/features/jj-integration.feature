@@ -120,6 +120,18 @@ Feature: jj thread workspaces
     When the thread is settled from the rebase notice
     Then the thread appears in the Settled sidebar section
 
+  @scenario:jj-integration.turn-end-integrate-browser-journey
+  Scenario: Integrate a thread from the end of its turn
+    Given the isolated plugin composition of "@dshfiles/jj-integration, @dshfiles/workspace-folder-picker, @dshfiles/multi-host" is booted
+    When a disposable jj repository is chosen as the New thread project
+    And the New thread workspace toggle is turned on
+    And a message is sent in the thread workspace
+    Then the end of the turn offers no integration before there is work
+    When the thread workspace gains a revision described "One click work"
+    Then the end of the turn offers one revision to integrate into main
+    When the integration is clicked at the end of the turn
+    Then the inline integration advances main and confirms it in the chat
+
   @scenario:jj-integration.rebase-command-browser-journey
   Scenario: Rebase a thread from its composer command
     Given the isolated plugin composition of "@dshfiles/jj-integration, @dshfiles/workspace-folder-picker, @dshfiles/multi-host" is booted

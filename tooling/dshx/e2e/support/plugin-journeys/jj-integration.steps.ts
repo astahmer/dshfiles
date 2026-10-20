@@ -130,6 +130,8 @@ const dismissGetStartedDialog = async (page: Page): Promise<void> => {
 }
 const workspaceToggle = (page: Page) => page.getByRole('checkbox', { name: 'workspace', exact: true })
 const rebaseButton = (page: Page) => page.getByRole('button', { name: 'Integrate this thread into main', exact: true })
+/** The same land action, one click from the answer: the row the newest completed turn renders. */
+const turnEndIntegrateOffer = (page: Page) => page.getByTestId('jj-inline-integrate-offer')
 /** The one header control: it names a thread workspace, or the shared checkout the thread runs in. */
 const workspaceControl = (page: Page) => page.getByRole('button', { name: /^(?:Current thread workspace: |Workspace actions for )/ })
 const workspaceMenu = (page: Page) => page.locator('[data-slot="popover-content"]')
@@ -628,6 +630,42 @@ Then('Rebase detects the follow-up revision without reloading', async ({ page }:
     await expect(workspaceMenu(page)).toContainText('1 pending integration', { timeout: 10_000 })
     await expect(rebaseButton(page)).toBeEnabled()
   })
+})
+
+When('the end of the turn offers no integration before there is work', async ({ page }: { page: Page }) => {
+  await expect(turnEndIntegrateOffer(page)).toHaveCount(0)
+})
+
+Then('the end of the turn offers one revision to integrate into main', async ({ page }: { page: Page }) => {
+  const offer = turnEndIntegrateOffer(page)
+  await recordAssertion(page, 'jj-integration-turn-end-integrates-in-one-click', async () => {
+    await expect(offer).toBeVisible({ timeout: 20_000 })
+    await expect(offer).toContainText('1 revision(s) ready to integrate into main.')
+    await expect(offer.getByRole('button', { name: 'Integrate into main', exact: true })).toBeEnabled()
+  })
+  // One click away means inside the reading flow: above the composer, not hidden in the header.
+  const offerBounds = await offer.boundingBox()
+  const composerBounds = await threadComposer(page).boundingBox()
+  if (offerBounds === null || composerBounds === null) throw new Error('The turn-end offer or the thread composer has no layout box.')
+  expect(offerBounds.y + offerBounds.height).toBeLessThanOrEqual(composerBounds.y)
+  await finishJourneyAssertions(page)
+})
+
+When('the integration is clicked at the end of the turn', async ({ page }: { page: Page }) => {
+  await turnEndIntegrateOffer(page).getByRole('button', { name: 'Integrate into main', exact: true }).click()
+})
+
+Then('the inline integration advances main and confirms it in the chat', async ({ page }: { page: Page }) => {
+  const repository = repositoryFor(page)
+  await recordAssertion(page, 'jj-integration-turn-end-land-confirms-in-chat', async () => {
+    const notice = page.getByTestId('jj-thread-rebased-notice')
+    await expect(notice).toHaveCount(1)
+    await expect(notice).toContainText('Integrated into main')
+    await expect(turnEndIntegrateOffer(page)).toHaveCount(0)
+    expect(descriptionOf(repository, 'main')).toBe('One click work')
+    expect(commitIdOf(repository, 'main-')).toBe(repository.baseCommitId)
+  })
+  await finishJourneyAssertions(page)
 })
 
 When("the thread's work is rebased outside the UI", async ({ page }: { page: Page }) => {

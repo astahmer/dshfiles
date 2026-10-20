@@ -81,6 +81,24 @@ One control in the conversation header carries the workspace state:
   turn require the owned `@dshfiles/chat` renderer; stock chat renders turn-tail
   contributions only once the turn ends. The sidebar tag works with either.
 
+### Integrate from the end of a turn
+
+The newest completed turn carries the same integration one click away: when the
+turn ends and the thread workspace is ready (described, conflict-free revisions,
+no Session writing, no question waiting), an inline row beside the answer names
+the pending revisions and offers **Integrate into `main`**. It runs the header
+control's own land action; the header stays the permanent entry point, and the
+row disappears as soon as the work lands.
+
+- Only the newest turn offers it: older turns keep their dated notices, so a
+  long thread never grows a column of stale buttons.
+- It is hidden for a shared checkout, an archived thread, a queued or running
+  integration, unverified activity, and any workspace the control center
+  classifies as blocked — undescribed, conflicted or missing. It never offers
+  work the Host would refuse.
+- It rides the stock `conversation.chat.turnTail` slot, which renders once the
+  turn closes: the offer appears exactly when the thread stops working.
+
 ### Session-log export
 
 DSH's `@deepseek-ai/dsh-session-log-export` (MIT, `0.2.0-rc.2`, upstream

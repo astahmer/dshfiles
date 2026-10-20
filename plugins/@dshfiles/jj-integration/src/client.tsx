@@ -12,12 +12,13 @@ import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-session-log-export/client'
 import { createApiClient, defineClient, useApi, useSettings } from '@dshfiles/dshx/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { ArchiveIcon, CircleCheckIcon, ClockIcon, GitMergeIcon, Undo2Icon } from '@dshfiles/plugin-ui/icons'
 import { hostDestination, multiHostApi, multiHostQueries, REMOTE_THREAD_PANEL, RemoteComposer } from '@dshfiles/multi-host/destination'
-import { errorMessage, PluginQueryProvider, pluginQueryClient, useMutation, useQuery } from '@dshfiles/plugin-ui/query'
+import { errorMessage, PluginQueryProvider, pluginQueryClient, useIsMutating, useMutation, useQuery } from '@dshfiles/plugin-ui/query'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { createWorkspacePickerPorts } from '@dshfiles/project-folder-picker'
-import { useCallback, useLayoutEffect, useState, useSyncExternalStore } from 'react'
+import { useCallback, useLayoutEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { z } from 'zod'
 import { startWorkspaceToggle, type DestinationBarServices } from './destination-bar.js'
 import { createComposerWorkspaceNavigation, type ComposerReferenceHandoff } from './composer-workspace-navigation.js'
@@ -25,11 +26,15 @@ import { mainViewSessionId } from './main-view-session.js'
 import { jjIntegrationApi } from './api.js'
 import { HeroWorkspacePicker } from './hero-workspace-picker.js'
 import { IntegrationTimeline, type IntegrationRecord } from './integration-timeline.js'
-import { announceRepositoryChange } from './land-feedback.js'
+import { InlineIntegrateOffer } from './inline-integrate.js'
+import { announceRepositoryChange, describeLandResult } from './land-feedback.js'
 import { JJ_INTEGRATION_LOCALE_NAMESPACE, jjIntegrationLocale } from './locales.js'
-import { ThreadWorkspacesPanel } from './panel.js'
+import { ThreadWorkspacesPanel, threadQueryKeys, threadRebaseMutationKey } from './panel.js'
 import { prepareRemoteFolder } from './remote-destination.js'
+import { revisionGraphQueryKey } from './revision-graph-hover-card.js'
 import { createSessionLogDownloadPort, SessionLogDownloadFeedback, type SessionLogDownloadService } from './session-log-download.js'
+import { ThreadIntegrationModel } from './thread-integration-state.js'
+import { ThreadRebaseEligibilityModel } from './thread-rebase-eligibility.js'
 import { ThreadWorkspaceControl } from './thread-workspace-control.js'
 import { useToast } from './toast.js'
 import { DraftAttachmentCarry } from './draft-attachment-carry.js'
@@ -276,11 +281,57 @@ export default defineClient({
               })),
       })
       const bookmark = useBookmark()
+      const thread = status.data?.thread
+      const threadPath = thread?.path ?? path
+      const threadSessionIds = useMemo(
+        () => thread?.sessionIds ?? (path === undefined ? [] : [String(props.sessionId)]),
+        [thread?.sessionIds, path, props.sessionId],
+      )
       const sessionRunning = useSyncExternalStore(
         subscribeToSessions,
         () => ctx.sessions.list.getSnapshot().byId[props.sessionId]?.running === true,
         () => true,
       )
+      // The workspace's activity, not just this Session's: a sibling thread writing in the same workspace blocks
+      // integration here exactly as it blocks the header control.
+      const readWorkspaceRunning = useCallback(
+        (): boolean =>
+          Object.values(ctx.sessions.list.getSnapshot().byId).some(
+            session => session.running && (threadSessionIds.includes(String(session.id)) || (threadPath !== undefined && session.cwd === threadPath)),
+          ),
+        [threadSessionIds, threadPath],
+      )
+      const readWorkspaceQuestion = useCallback((): boolean => {
+        const sessions = ctx.sessions.list.getSnapshot().byId
+        const asks = (session: SessionSummary | undefined): boolean => ThreadRebaseEligibilityModel.hasPendingUserQuestion(session?.projectionValues) === true
+        return (
+          threadSessionIds.some(sessionId => asks(sessions[SessionId(sessionId)])) ||
+          (threadPath !== undefined && Object.values(sessions).some(session => session.cwd === threadPath && asks(session)))
+        )
+      }, [threadSessionIds, threadPath])
+      const readClientCanRebase = useCallback(
+        (): boolean | undefined =>
+          ThreadRebaseEligibilityModel.canRebase(threadSessionIds, sessionId => {
+            const session = ctx.sessions.list.getSnapshot().byId[SessionId(sessionId)]
+            return session === undefined
+              ? undefined
+              : { running: session.running, pendingUserQuestion: ThreadRebaseEligibilityModel.hasPendingUserQuestion(session.projectionValues) }
+          }),
+        [threadSessionIds],
+      )
+      const workspaceRunning = useSyncExternalStore(subscribeToSessions, readWorkspaceRunning, () => true)
+      const workspaceWaitingForInput = useSyncExternalStore(subscribeToSessions, readWorkspaceQuestion, () => true)
+      const clientCanRebase = useSyncExternalStore(subscribeToSessions, readClientCanRebase, () => false)
+      const canRebase = ThreadRebaseEligibilityModel.fromClientSnapshot({
+        threadSessionsEligible: clientCanRebase,
+        sessionRunning: workspaceRunning,
+        questionPending: workspaceWaitingForInput,
+      })
+      const assessment =
+        thread === null || thread === undefined
+          ? undefined
+          : ThreadIntegrationModel.assess({ thread, running: workspaceRunning, waitingForInput: workspaceWaitingForInput, integrationAllowed: canRebase })
+      const landing = useIsMutating({ mutationKey: threadRebaseMutationKey }) > 0
       const subscribeToWorkspaces = useCallback((listener: () => void) => ctx.workspaces.list.subscribe(listener), [])
       const archived = useSyncExternalStore(
         subscribeToWorkspaces,
@@ -302,7 +353,6 @@ export default defineClient({
         }
         setSettledHere(true)
       }
-      const thread = status.data?.thread
       const cancelQueue = useMutation({
         mutationFn: () => {
           if (thread === null || thread === undefined) throw new Error(translate('unknownWorkspace'))
@@ -315,6 +365,18 @@ export default defineClient({
         },
         onError: error => noticeToast.show({ text: errorMessage(error, translate('loadFailed')), success: false }),
       })
+      const land = useMutation({
+        mutationKey: threadRebaseMutationKey,
+        mutationFn: (landedPath: string) =>
+          runHostRequest({ timeoutMs: 300_000, request: signal => api.land({ path: landedPath, sessionId: props.sessionId }, { signal }) }),
+        onError: error => noticeToast.show({ text: errorMessage(error, translate('loadFailed')), success: false }),
+        onSettled: async (result, _error, landedPath) => {
+          announceRepositoryChange()
+          await pluginQueryClient().invalidateQueries({ queryKey: threadQueryKeys.threadAt(landedPath) })
+          await pluginQueryClient().invalidateQueries({ queryKey: revisionGraphQueryKey(landedPath) })
+          if (result !== undefined && result !== null) noticeToast.show({ text: describeLandResult(translate, result), success: result.status === 'landed' })
+        },
+      })
       if (thread === null || thread === undefined || turnStartedAt === undefined) return noticeToast.element
       const integrations = thread.integrations ?? (thread.rebasedAt === undefined ? [] : [{ at: thread.rebasedAt, tipChangeId: thread.rebasedTipChangeId }])
       const queueEvents = [...(thread.integrationQueueEvents ?? [])]
@@ -326,7 +388,14 @@ export default defineClient({
       )
       const activeQueueMarker = events.findLast(event => event.kind === 'queued' && event.at === thread.integrationQueuedAt)
       const markers = IntegrationTimeline.forTurn({ integrations: events, turnStartedAt, nextTurnStartedAt })
-      if (markers.length === 0) return noticeToast.element
+      const offered = InlineIntegrateOffer.isOffered({
+        category: assessment?.category ?? 'no-changes',
+        isNewestTurn: nextTurnStartedAt === undefined,
+        archived,
+        landing,
+        queued: thread.integrationQueuedAt !== undefined,
+      })
+      if (markers.length === 0 && !offered) return noticeToast.element
       return (
         <>
           {markers.map((marker, index) => (
@@ -398,6 +467,31 @@ export default defineClient({
               )}
             </div>
           ))}
+          {offered ? (
+            // The header control stays the permanent entry point; this is the same land action one click from the
+            // answer the user just read, and it disappears as soon as the work is integrated.
+            <div
+              className="dshx-root dshx:my-3 dshx:flex dshx:w-full dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:rounded-lg dshx:border dshx:border-border dshx:bg-muted/40 dshx:px-3 dshx:py-2"
+              data-testid="jj-inline-integrate-offer"
+            >
+              <GitMergeIcon aria-hidden="true" className="dshx:size-4 dshx:shrink-0 dshx:text-muted-foreground" />
+              <p className="dshx:min-w-0 dshx:flex-1 dshx:text-sm dshx:text-muted-foreground">
+                {translate('inlineIntegrateHint', { count: thread.unlanded.length, bookmark })}
+              </p>
+              <Button
+                aria-label={translate('rebaseOnto', { bookmark })}
+                className="dshx-root dshx:shrink"
+                disabled={landing}
+                onClick={() => land.mutate(thread.path)}
+                size="sm"
+                title={translate('rebaseThread', { bookmark })}
+                type="button"
+              >
+                {land.isPending ? <Spinner /> : <GitMergeIcon aria-hidden="true" className="dshx:size-3.5" />}
+                {land.isPending ? translate('rebasing') : translate('rebaseOnto', { bookmark })}
+              </Button>
+            </div>
+          ) : null}
           {noticeToast.element}
         </>
       )
