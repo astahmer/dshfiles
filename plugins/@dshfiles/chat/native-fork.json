@@ -37,6 +37,7 @@
     "src/native/chat/MessageIconActions.tsx",
     "src/native/chat/ChatGroupSeat.tsx",
     "src/native/chat/ChatView.tsx",
-    "src/native/conversation-nodes/turn-tail.ts"
+    "src/native/conversation-nodes/turn-tail.ts",
+    "src/native/conversation-nodes/turn-error.ts"
   ]
 }

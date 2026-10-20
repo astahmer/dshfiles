@@ -38,6 +38,8 @@ function endFailure(reason: TurnEndReason): { readonly message: string; readonly
     case 'error':
       return reason.error
     case 'aborted':
+      // dshfiles delta: a turn the Host's own shutdown cut off reads as interrupted, not as stopped by the user.
+      if (reason.reason.kind === 'disposed') return { message: 'DSH restarted before this turn finished.', code: 'INTERRUPTED' }
       // User and parent cancellations show only the stopped turn summary.
       return reason.reason.kind === 'hook' && reason.reason.reason === 'deepseek-account/signed-out'
         ? { message: 'Stopped because you signed out of DeepSeek.', code: 'ACCOUNT_SIGNED_OUT' }
