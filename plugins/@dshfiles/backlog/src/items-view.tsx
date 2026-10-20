@@ -25,6 +25,7 @@ import type { BacklogSummaryView } from './api.js'
 import { BacklogItems, type BacklogStatus } from './item.js'
 import { ItemGlyphs } from './item-glyphs.js'
 import { ItemPickers } from './item-pickers.js'
+import { StatusFilterBar } from './status-filter-bar.js'
 import { useBacklogActions } from './use-backlog-actions.js'
 
 type GroupBy = 'status' | 'kind' | 'project' | 'attention'
@@ -208,6 +209,10 @@ export const ItemsView = (props: {
   readonly collapsed: ReadonlySet<string>
   readonly setCollapsed: (value: ReadonlySet<string>) => void
   readonly captureInto: (status: BacklogStatus) => void
+  readonly counts: Record<BacklogStatus, number>
+  readonly statuses: readonly BacklogStatus[]
+  readonly toggleStatus: (status: BacklogStatus) => void
+  readonly clearStatuses: () => void
 }): JSX.Element => {
   const actions = useBacklogActions()
   const [selected, setSelected] = useState<ReadonlySet<number>>(new Set())
@@ -218,7 +223,8 @@ export const ItemsView = (props: {
     else next.add(id)
     setSelected(next)
   }
-  const visibleGroups = props.groupBy === 'status' ? groups : groups.filter(group => group.items.length > 0)
+  const filtering = props.statuses.length > 0
+  const visibleGroups = props.groupBy === 'status' && !filtering ? groups : groups.filter(group => group.items.length > 0)
   const entries = useMemo(
     (): Entry[] =>
       visibleGroups.flatMap(group => {
@@ -242,6 +248,7 @@ export const ItemsView = (props: {
   })
   return (
     <div className="dshx:relative dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col">
+      <StatusFilterBar counts={props.counts} statuses={props.statuses} toggle={props.toggleStatus} clear={props.clearStatuses} />
       <div className="dshx:flex dshx:h-10 dshx:shrink-0 dshx:items-center dshx:gap-2 dshx:border-b dshx:border-border dshx:px-4">
         <DropdownMenu>
           <DropdownMenuTrigger className="dshx:inline-flex dshx:h-7 dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:px-2 dshx:text-xs dshx:text-muted-foreground dshx:outline-none dshx:hover:bg-accent dshx:hover:text-foreground">
@@ -276,6 +283,20 @@ export const ItemsView = (props: {
           <span className={roomyOnly}>People</span>
           <span className="dshx:text-right">Updated</span>
         </div>
+        {entries.length === 0 && filtering ? (
+          <div className="dshx:flex dshx:flex-col dshx:items-center dshx:gap-2 dshx:px-4 dshx:py-20 dshx:text-center">
+            <span className="dshx:text-3xl">◌</span>
+            <p className="dshx:text-sm dshx:font-medium">No items match this status filter</p>
+            <p className="dshx:max-w-80 dshx:text-xs dshx:text-muted-foreground">Pick another status above, or clear the filter to see everything.</p>
+            <button
+              type="button"
+              onClick={props.clearStatuses}
+              className="dshx:mt-1 dshx:rounded-full dshx:border dshx:border-border dshx:px-3 dshx:py-1 dshx:text-xs dshx:text-muted-foreground dshx:transition-colors dshx:hover:bg-accent dshx:hover:text-foreground"
+            >
+              Show all statuses
+            </button>
+          </div>
+        ) : null}
         <div style={{ height: virtualizer.getTotalSize() }} className="dshx:relative">
           {virtualizer.getVirtualItems().map(virtual => {
             const entry = entries[virtual.index]

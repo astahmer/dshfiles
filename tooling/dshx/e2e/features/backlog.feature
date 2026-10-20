@@ -26,3 +26,20 @@ Feature: Backlog
     Then it is referenced by "Child step, part of b:1"
     When the backlink to b:2 is followed
     Then its activity records the move "inbox → doing" by the user
+
+  @scenario:backlog.status-filter
+  Scenario: Read the feed by one status or several at once
+    Given the isolated plugin profile "@dshfiles/backlog" is booted
+    When the Backlog panel is opened
+    And "bug: composer drops chips on paste" is captured
+    And "idea: weekly digest of dormant items" is captured
+    When item b:1 is moved to In progress on the board
+    And the feed is filtered by the "In progress" status
+    Then the feed narrows to "composer drops chips on paste"
+    When the feed is also filtered by the "Inbox" status
+    Then the feed shows both "composer drops chips on paste" and "weekly digest of dormant items"
+    When the Items view is opened
+    Then the Items view lists both "composer drops chips on paste" and "weekly digest of dormant items"
+    When the feed is shown
+    And the "Inbox" status filter is cleared
+    Then the feed narrows back to "composer drops chips on paste"

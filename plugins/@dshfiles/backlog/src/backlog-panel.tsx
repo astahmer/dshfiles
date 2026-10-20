@@ -42,6 +42,7 @@ import { ItemsView, itemsOrder } from './items-view.js'
 import { ProjectsView } from './projects-view.js'
 import { SearchResults } from './search-results.js'
 import { backlogSettings, type BacklogSettings } from './settings.js'
+import { FeedStatus } from './status-filter.js'
 import { BacklogQueries } from './use-backlog-actions.js'
 import { withViewTransition } from './view-transition.js'
 
@@ -57,8 +58,13 @@ const viewIcons = { feed: MessagesSquareIcon, inbox: InboxIcon, items: Rows3Icon
 
 const preferences = createStoredValue({
   key: 'dshfiles.backlog.view.v2',
-  schema: z.object({ view: z.enum(views), groupBy: z.enum(['status', 'kind', 'project', 'attention']), showDormant: z.boolean() }),
-  fallback: { view: 'feed' as const, groupBy: 'status' as const, showDormant: false },
+  schema: z.object({
+    view: z.enum(views),
+    groupBy: z.enum(['status', 'kind', 'project', 'attention']),
+    showDormant: z.boolean(),
+    statuses: z.array(BacklogItems.statusSchema).default([]),
+  }),
+  fallback: { view: 'feed' as const, groupBy: 'status' as const, showDormant: false, statuses: [] },
 })
 
 const isTyping = (target: EventTarget | null): boolean =>
@@ -256,6 +262,8 @@ export const BacklogPanel = (props: { readonly openThread: OpenThread; readonly 
     () => (stored.showDormant || debounced !== '' ? all : all.filter(item => isVisible(item, now))),
     [all, stored.showDormant, debounced, now],
   )
+  const filteredItems = useMemo(() => FeedStatus.filter(items, stored.statuses), [items, stored.statuses])
+  const statusTotals = useMemo(() => FeedStatus.counts(items), [items])
   const inboxItems = inbox.data?.items ?? []
   const inboxThreads = useMemo(
     () =>
@@ -291,8 +299,8 @@ export const BacklogPanel = (props: { readonly openThread: OpenThread; readonly 
   const viewOrder = () => {
     if (debounced !== '') return all
     if (view === 'inbox') return inboxOrder(inboxItems)
-    if (view === 'items') return itemsOrder(items, stored.groupBy, collapsed)
-    if (view === 'feed') return [...items].filter(item => !item.pinned).sort((left, right) => right.lastActivityAt - left.lastActivityAt)
+    if (view === 'items') return itemsOrder(filteredItems, stored.groupBy, collapsed)
+    if (view === 'feed') return [...filteredItems].filter(item => !item.pinned).sort((left, right) => right.lastActivityAt - left.lastActivityAt)
     return items
   }
   const order = viewOrder()
@@ -457,10 +465,26 @@ export const BacklogPanel = (props: { readonly openThread: OpenThread; readonly 
         ) : (
           <>
             <div className={cn('dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:flex-col', expanded && openId !== null && 'dshx:hidden')}>
-              {view === 'feed' && <FeedView items={items} openId={openId} select={select} loaded={list.isSuccess} now={now} />}
+              {view === 'feed' && (
+                <FeedView
+                  items={filteredItems}
+                  counts={statusTotals}
+                  statuses={stored.statuses}
+                  toggleStatus={status => setPreference({ statuses: FeedStatus.toggle(stored.statuses, status) })}
+                  clearStatuses={() => setPreference({ statuses: [] })}
+                  openId={openId}
+                  select={select}
+                  loaded={list.isSuccess}
+                  now={now}
+                />
+              )}
               {view === 'items' && (
                 <ItemsView
-                  items={items}
+                  items={filteredItems}
+                  counts={statusTotals}
+                  statuses={stored.statuses}
+                  toggleStatus={status => setPreference({ statuses: FeedStatus.toggle(stored.statuses, status) })}
+                  clearStatuses={() => setPreference({ statuses: [] })}
                   openId={openId}
                   cursorId={cursorId}
                   select={select}

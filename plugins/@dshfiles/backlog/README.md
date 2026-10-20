@@ -38,7 +38,9 @@ New items land in `inbox`.
 
 ## Feed, board and freshness
 
-The feed lists pinned items first, then newest activity. Freshness is derived on read and never stored:
+The feed lists pinned items first, then newest activity. A chip row above the feed and the Items list
+narrows both to one status or several at once; the picks persist across reloads and `All` clears them.
+Freshness is derived on read and never stored:
 
 | Item               | Leaves the feed                             |
 | ------------------ | ------------------------------------------- |

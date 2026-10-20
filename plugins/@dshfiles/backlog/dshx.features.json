@@ -60,13 +60,24 @@
     {
       "id": "activity-feed-and-freshness",
       "title": "Feed ordered by activity, with idle items sinking",
-      "summary": "The feed lists pinned items, then newest activity first. Freshness is derived on read: notes go dormant after 14 days, other open items after 30, idle in-progress work is flagged stale, closed items archive after 7 days; any touch revives an item.",
+      "summary": "The feed lists pinned items, then newest activity first. Status chips narrow the feed and the Items list to one status or several at once. Freshness is derived on read: notes go dormant after 14 days, other open items after 30, idle in-progress work is flagged stale, closed items archive after 7 days; any touch revives an item.",
       "surfaces": ["client", "host"],
       "configuration": [],
       "states": ["fresh", "stale", "dormant", "archived"],
       "failureModes": ["Dormant and archived items stay in search and backlinks; only the default feed hides them."],
       "externalDependencies": [],
       "verification": [
+        {
+          "kind": "gherkin",
+          "id": "backlog.status-filter",
+          "featureFile": "tooling/dshx/e2e/features/backlog.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.feed-unit-status-filter",
+          "file": "plugins/@dshfiles/backlog/src/status-filter.test.ts",
+          "testName": "shows every status until a chip is picked, then only the picked ones"
+        },
         {
           "kind": "unit-test",
           "id": "backlog.feed-unit-dormant",

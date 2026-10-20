@@ -8,6 +8,12 @@ const feedItems = (page: Page) => feed(page).getByRole('article', { name: /^Item
 const searchResults = (page: Page) => page.getByRole('list', { name: 'Search results' })
 const row = (page: Page, title: string) => feedItems(page).filter({ hasText: title })
 const peek = (page: Page) => page.getByRole('complementary', { name: 'Item detail' })
+const statusChip = (page: Page, label: string) =>
+  page.getByRole('group', { name: 'Filter by status' }).getByRole('button', { name: new RegExp(`^${label},`) })
+const showFeed = async (page: Page): Promise<void> => {
+  await page.getByRole('button', { name: 'Feed', exact: true }).click()
+  await expect(feed(page)).toBeVisible()
+}
 
 When('the Backlog panel is opened', async ({ page }: { page: Page }) => {
   // A loaded machine can raise the provider-setup modal after the boot step stopped waiting; it hides the panel from role queries.
@@ -92,6 +98,65 @@ Then('its activity records the move {string} by the user', async ({ page }: { pa
     // Runs of same-actor changes fold into "made N changes" until opened.
     await activity.getByRole('button', { name: /made \d+ changes/ }).click()
     await expect(activity).toContainText(`moved it ${move}`)
+  })
+  await finishJourneyAssertions(page)
+})
+
+When('the feed is filtered by the {string} status', async ({ page }: { page: Page }, label: string) => {
+  await showFeed(page)
+  await statusChip(page, label).click()
+})
+
+When('the feed is also filtered by the {string} status', async ({ page }: { page: Page }, label: string) => {
+  await statusChip(page, label).click()
+})
+
+When('the feed is shown', async ({ page }: { page: Page }) => {
+  await showFeed(page)
+})
+
+When('the Items view is opened', async ({ page }: { page: Page }) => {
+  await page.getByRole('button', { name: 'Items', exact: true }).click()
+  await expect(page.getByRole('table', { name: 'Backlog items' })).toBeVisible()
+})
+
+Then('the Items view lists both {string} and {string}', async ({ page }: { page: Page }, first: string, second: string) => {
+  await recordAssertion(page, 'backlog-status-items', async () => {
+    const items = page.getByRole('table', { name: 'Backlog items' })
+    await expect(statusChip(page, 'In progress')).toHaveAttribute('aria-pressed', 'true')
+    await expect(statusChip(page, 'Inbox')).toHaveAttribute('aria-pressed', 'true')
+    await expect(items.getByRole('row', { name: /^Item b:/ })).toHaveCount(2)
+    await expect(items).toContainText(first)
+    await expect(items).toContainText(second)
+  })
+})
+
+Then('the feed narrows to {string}', async ({ page }: { page: Page }, title: string) => {
+  await recordAssertion(page, 'backlog-status-single', async () => {
+    await expect(feedItems(page)).toHaveCount(1)
+    await expect(feed(page)).toContainText(title)
+  })
+})
+
+Then('the feed shows both {string} and {string}', async ({ page }: { page: Page }, first: string, second: string) => {
+  await recordAssertion(page, 'backlog-status-multi', async () => {
+    await expect(statusChip(page, 'In progress')).toHaveAttribute('aria-pressed', 'true')
+    await expect(statusChip(page, 'Inbox')).toHaveAttribute('aria-pressed', 'true')
+    await expect(feedItems(page)).toHaveCount(2)
+    await expect(feed(page)).toContainText(first)
+    await expect(feed(page)).toContainText(second)
+  })
+})
+
+When('the {string} status filter is cleared', async ({ page }: { page: Page }, label: string) => {
+  await statusChip(page, label).click()
+})
+
+Then('the feed narrows back to {string}', async ({ page }: { page: Page }, title: string) => {
+  await recordAssertion(page, 'backlog-status-cleared', async () => {
+    await expect(statusChip(page, 'Inbox')).toHaveAttribute('aria-pressed', 'false')
+    await expect(feedItems(page)).toHaveCount(1)
+    await expect(feed(page)).toContainText(title)
   })
   await finishJourneyAssertions(page)
 })

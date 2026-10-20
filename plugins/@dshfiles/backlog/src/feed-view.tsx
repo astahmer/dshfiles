@@ -3,8 +3,10 @@ import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 
 import type { BacklogSummaryView } from './api.js'
+import type { BacklogStatus } from './item.js'
 import { ItemGlyphs } from './item-glyphs.js'
 import { ItemPickers } from './item-pickers.js'
+import { StatusFilterBar } from './status-filter-bar.js'
 import { useBacklogActions } from './use-backlog-actions.js'
 
 const DAY_MS = 86_400_000
@@ -147,12 +149,22 @@ const FeedEntry = (props: { readonly item: BacklogSummaryView; readonly open: bo
   )
 }
 
+const selectionLabel = (statuses: readonly BacklogStatus[]): string => {
+  const labels = statuses.map(status => ItemGlyphs.statusLabels[status].toLowerCase())
+  if (labels.length <= 1) return labels[0] ?? ''
+  return `${labels.slice(0, -1).join(', ')} and ${labels.at(-1) ?? ''}`
+}
+
 /**
  * The Discord channel this replaces: one entry per item in order of last activity, newest at the bottom beside the
  * composer, so touching an item bumps it down and idle ones scroll away. Pinned items stay in a strip on top.
  */
 export const FeedView = (props: {
   readonly items: readonly BacklogSummaryView[]
+  readonly counts: Record<BacklogStatus, number>
+  readonly statuses: readonly BacklogStatus[]
+  readonly toggleStatus: (status: BacklogStatus) => void
+  readonly clearStatuses: () => void
   readonly openId: number | null
   readonly select: (id: number) => void
   readonly loaded: boolean
@@ -182,6 +194,7 @@ export const FeedView = (props: {
 
   return (
     <div className="dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col">
+      <StatusFilterBar counts={props.counts} statuses={props.statuses} toggle={props.toggleStatus} clear={props.clearStatuses} />
       {pinned.length === 0 ? null : (
         <div className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-2 dshx:overflow-x-auto dshx:border-b dshx:border-border dshx:px-4 dshx:py-2">
           <PinIcon aria-hidden className="dshx:size-3.5 dshx:shrink-0 dshx:fill-current dshx:text-warning" />
@@ -209,14 +222,29 @@ export const FeedView = (props: {
         className="dshx:min-h-0 dshx:flex-1 dshx:overflow-y-auto"
       >
         <div className="dshx:mx-auto dshx:flex dshx:min-h-full dshx:max-w-4xl dshx:flex-col dshx:justify-end dshx:px-3 dshx:pt-6 dshx:pb-3">
-          {props.loaded && ordered.length === 0 ? (
-            <div className="dshx:flex dshx:flex-col dshx:items-center dshx:gap-2 dshx:py-20 dshx:text-center">
-              <span className="dshx:text-3xl">✦</span>
-              <p className="dshx:text-sm dshx:font-medium">Your backlog starts here</p>
-              <p className="dshx:max-w-80 dshx:text-xs dshx:text-muted-foreground">
-                Type anything below like a message. Kinds, tags and links are picked up for you; idle things sink on their own.
-              </p>
-            </div>
+          {props.loaded && props.items.length === 0 ? (
+            props.statuses.length === 0 ? (
+              <div className="dshx:flex dshx:flex-col dshx:items-center dshx:gap-2 dshx:py-20 dshx:text-center">
+                <span className="dshx:text-3xl">✦</span>
+                <p className="dshx:text-sm dshx:font-medium">Your backlog starts here</p>
+                <p className="dshx:max-w-80 dshx:text-xs dshx:text-muted-foreground">
+                  Type anything below like a message. Kinds, tags and links are picked up for you; idle things sink on their own.
+                </p>
+              </div>
+            ) : (
+              <div className="dshx:flex dshx:flex-col dshx:items-center dshx:gap-2 dshx:py-20 dshx:text-center">
+                <span className="dshx:text-3xl">◌</span>
+                <p className="dshx:text-sm dshx:font-medium">No {selectionLabel(props.statuses)} items</p>
+                <p className="dshx:max-w-80 dshx:text-xs dshx:text-muted-foreground">Pick another status above, or clear the filter to see everything.</p>
+                <button
+                  type="button"
+                  onClick={props.clearStatuses}
+                  className="dshx:mt-1 dshx:rounded-full dshx:border dshx:border-border dshx:px-3 dshx:py-1 dshx:text-xs dshx:text-muted-foreground dshx:transition-colors dshx:hover:bg-accent dshx:hover:text-foreground"
+                >
+                  Show all statuses
+                </button>
+              </div>
+            )
           ) : null}
           {hidden === 0 ? null : (
             <button
