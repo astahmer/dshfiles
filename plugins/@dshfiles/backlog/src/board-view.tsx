@@ -9,6 +9,7 @@ import { backlogApi, BacklogViews, type BacklogSummaryView } from './api.js'
 import type { BacklogStatus } from './item.js'
 import { ItemGlyphs } from './item-glyphs.js'
 import { ItemPickers } from './item-pickers.js'
+import { StartThreadMenu } from './start-thread-dialog.js'
 import { BacklogQueries, useBacklogActions } from './use-backlog-actions.js'
 import { withViewTransition } from './view-transition.js'
 
@@ -161,6 +162,7 @@ export const BoardView = (props: {
   readonly openId: number | null
   readonly open: (id: number) => void
   readonly captureInto: (status: BacklogStatus) => void
+  readonly startThread: (item: BacklogSummaryView) => void
 }): JSX.Element => {
   const actions = useBacklogActions()
   const [drag, setDrag] = useState<Drag | null>(null)
@@ -241,22 +243,23 @@ export const BoardView = (props: {
             <div className="dshx:flex dshx:min-h-16 dshx:flex-1 dshx:flex-col dshx:gap-1.5 dshx:overflow-y-auto dshx:p-0.5">
               {column.length === 0 ? <p className="dshx:py-6 dshx:text-center dshx:text-xs dshx:text-muted-foreground/70">Nothing here</p> : null}
               {column.slice(0, (pages[status] ?? 1) * COLUMN_PAGE).map(item => (
-                <article
-                  key={item.id}
-                  aria-label={`Card b:${String(item.id)}`}
-                  aria-expanded={expanded === item.id}
-                  onPointerDown={event => startDrag(event, item)}
-                  style={{ viewTransitionName: `backlog-item-${String(item.id)}` }}
-                  className={cn(
-                    cardClass,
-                    'dshx:cursor-grab dshx:hover:border-input dshx:hover:shadow-sm',
-                    item.id === props.openId ? 'dshx:border-info/60 dshx:ring-1 dshx:ring-info/25' : 'dshx:border-border',
-                    drag?.id === item.id && 'dshx:opacity-30',
-                  )}
-                >
-                  <CardFace item={item} onPickStatus={status => move(item.id, status)} />
-                  {expanded === item.id ? <CardDetail item={item} open={props.open} /> : null}
-                </article>
+                <StartThreadMenu key={item.id} item={item} startThread={props.startThread}>
+                  <article
+                    aria-label={`Card b:${String(item.id)}`}
+                    aria-expanded={expanded === item.id}
+                    onPointerDown={event => startDrag(event, item)}
+                    style={{ viewTransitionName: `backlog-item-${String(item.id)}` }}
+                    className={cn(
+                      cardClass,
+                      'dshx:cursor-grab dshx:hover:border-input dshx:hover:shadow-sm',
+                      item.id === props.openId ? 'dshx:border-info/60 dshx:ring-1 dshx:ring-info/25' : 'dshx:border-border',
+                      drag?.id === item.id && 'dshx:opacity-30',
+                    )}
+                  >
+                    <CardFace item={item} onPickStatus={status => move(item.id, status)} />
+                    {expanded === item.id ? <CardDetail item={item} open={props.open} /> : null}
+                  </article>
+                </StartThreadMenu>
               ))}
               {column.length > (pages[status] ?? 1) * COLUMN_PAGE ? (
                 <button

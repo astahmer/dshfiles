@@ -43,3 +43,17 @@ Feature: Backlog
     When the feed is shown
     And the "Inbox" status filter is cleared
     Then the feed narrows back to "composer drops chips on paste"
+
+  @scenario:backlog.start-thread
+  Scenario: Start a thread for an item from its context menu
+    Given the isolated plugin composition of "@dshfiles/backlog, @dshfiles/ai-accounts" is booted
+    When a Command Code account backed by a local fake provider is added
+    And the Backlog panel is opened
+    And "Ship the thread starter" is captured
+    When backlog item b:1 is right-clicked for a thread
+    Then the start thread dialog offers the account model and the Host default folder
+    When the thread is started from the dialog without a first message
+    Then the thread composer is open for it
+    When the Backlog panel is opened again
+    And backlog item b:1 is opened
+    Then the item links the thread it started

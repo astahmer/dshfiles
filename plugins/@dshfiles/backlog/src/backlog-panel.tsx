@@ -42,6 +42,8 @@ import { ItemsView, itemsOrder } from './items-view.js'
 import { ProjectsView } from './projects-view.js'
 import { SearchResults } from './search-results.js'
 import { backlogSettings, type BacklogSettings } from './settings.js'
+import { StartThreadDialog } from './start-thread-dialog.js'
+import type { StartThreadCatalog, StartThreadProject, StartThreadRequest } from './start-thread.js'
 import { FeedStatus } from './status-filter.js'
 import { BacklogQueries } from './use-backlog-actions.js'
 import { withViewTransition } from './view-transition.js'
@@ -195,7 +197,18 @@ const SavedViews = (props: {
   )
 }
 
-export const BacklogPanel = (props: { readonly openThread: OpenThread; readonly listThreads: () => readonly ComposerThread[] }): JSX.Element => {
+/** What the panel needs from the client entry to start a thread for an item; the entry owns those services. */
+export interface StartThreadPorts {
+  readonly listProjects: () => readonly StartThreadProject[]
+  readonly loadCatalog: () => Promise<StartThreadCatalog>
+  readonly start: (request: StartThreadRequest) => Promise<{ readonly ok: true } | { readonly ok: false; readonly reason: string }>
+}
+
+export const BacklogPanel = (props: {
+  readonly openThread: OpenThread
+  readonly listThreads: () => readonly ComposerThread[]
+  readonly startThread: StartThreadPorts
+}): JSX.Element => {
   const api = useApi(backlogApi)
   const stored = preferences.useValue()
   const view = stored.view
@@ -210,6 +223,7 @@ export const BacklogPanel = (props: { readonly openThread: OpenThread; readonly 
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set(['dropped']))
   const [selectedProject, setSelectedProject] = useState<string | null>(null)
   const [captureStatus, setCaptureStatus] = useState<BacklogStatus | null>(null)
+  const [startThreadItem, setStartThreadItem] = useState<BacklogSummaryView | null>(null)
   const captureComposer = useRef<HTMLTextAreaElement>(null)
   const searchInput = useRef<HTMLInputElement>(null)
   const debounced = useDebouncedValue({ value: query, delayMs: 120 })
@@ -340,6 +354,9 @@ export const BacklogPanel = (props: { readonly openThread: OpenThread; readonly 
         toggleExpanded={() => withViewTransition(() => setExpanded(!expanded))}
         openThread={props.openThread}
         select={select}
+        startThread={() => {
+          if (openSummary !== undefined) setStartThreadItem(openSummary)
+        }}
         close={() => {
           setOpenId(null)
           setExpanded(false)
@@ -476,6 +493,7 @@ export const BacklogPanel = (props: { readonly openThread: OpenThread; readonly 
                   select={select}
                   loaded={list.isSuccess}
                   now={now}
+                  startThread={setStartThreadItem}
                 />
               )}
               {view === 'items' && (
@@ -494,15 +512,26 @@ export const BacklogPanel = (props: { readonly openThread: OpenThread; readonly 
                   collapsed={collapsed}
                   setCollapsed={next => withViewTransition(() => setCollapsed(next))}
                   captureInto={startCapture}
+                  startThread={setStartThreadItem}
                 />
               )}
-              {view === 'board' && <BoardView items={items} openId={openId} open={select} captureInto={startCapture} />}
+              {view === 'board' && <BoardView items={items} openId={openId} open={select} captureInto={startCapture} startThread={setStartThreadItem} />}
               {view === 'projects' && <ProjectsView selectedProject={selectedProject} setSelectedProject={setSelectedProject} select={select} now={now} />}
             </div>
             {inspector}
           </>
         )}
       </div>
+      {startThreadItem === null ? null : (
+        <StartThreadDialog
+          key={startThreadItem.id}
+          item={startThreadItem}
+          projects={props.startThread.listProjects()}
+          loadCatalog={props.startThread.loadCatalog}
+          start={props.startThread.start}
+          close={() => setStartThreadItem(null)}
+        />
+      )}
       <div className="dshx:shrink-0 dshx:px-4 dshx:pt-1 dshx:pb-4">
         <div className="dshx:mx-auto dshx:max-w-4xl">
           <Composer

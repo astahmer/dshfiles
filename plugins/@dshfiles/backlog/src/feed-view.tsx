@@ -6,6 +6,7 @@ import type { BacklogSummaryView } from './api.js'
 import type { BacklogStatus } from './item.js'
 import { ItemGlyphs } from './item-glyphs.js'
 import { ItemPickers } from './item-pickers.js'
+import { StartThreadMenu } from './start-thread-dialog.js'
 import { StatusFilterBar } from './status-filter-bar.js'
 import { useBacklogActions } from './use-backlog-actions.js'
 
@@ -40,112 +41,119 @@ const Chip = (props: { readonly children: ReactNode; readonly className?: string
   </span>
 )
 
-const FeedEntry = (props: { readonly item: BacklogSummaryView; readonly open: boolean; readonly select: (id: number) => void }): JSX.Element => {
+const FeedEntry = (props: {
+  readonly item: BacklogSummaryView
+  readonly open: boolean
+  readonly select: (id: number) => void
+  readonly startThread: (item: BacklogSummaryView) => void
+}): JSX.Element => {
   const actions = useBacklogActions()
   const item = props.item
   const author = item.actors.find(actor => actor.role === 'owner')?.id ?? item.actors[0]?.id
   const summary = activityLine(item)
   const closed = item.status === 'done' || item.status === 'dropped'
   return (
-    <article
-      aria-label={`Item b:${String(item.id)}`}
-      onClick={() => props.select(item.id)}
-      className={cn(
-        'dshx:group/entry dshx:relative dshx:flex dshx:cursor-default dshx:gap-3 dshx:rounded-lg dshx:px-3 dshx:py-2.5 dshx:transition-colors dshx:duration-100',
-        props.open ? 'dshx:bg-accent/70' : 'dshx:hover:bg-accent/35',
-      )}
-    >
-      <ItemGlyphs.ActorAvatar actorId={author} className="dshx:mt-0.5 dshx:size-7 dshx:text-[11px] dshx:ring-0" />
-      <div className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-1">
-        <div className="dshx:flex dshx:items-baseline dshx:gap-2 dshx:text-xs">
-          <span className="dshx:font-medium dshx:text-foreground">{ItemGlyphs.actorName(author)}</span>
-          <span className="dshx:text-muted-foreground">{new Date(item.createdAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}</span>
-          <span className="dshx:font-mono! dshx:text-[11px] dshx:text-muted-foreground">b:{item.id}</span>
+    <StartThreadMenu item={item} startThread={props.startThread}>
+      <article
+        aria-label={`Item b:${String(item.id)}`}
+        onClick={() => props.select(item.id)}
+        className={cn(
+          'dshx:group/entry dshx:relative dshx:flex dshx:cursor-default dshx:gap-3 dshx:rounded-lg dshx:px-3 dshx:py-2.5 dshx:transition-colors dshx:duration-100',
+          props.open ? 'dshx:bg-accent/70' : 'dshx:hover:bg-accent/35',
+        )}
+      >
+        <ItemGlyphs.ActorAvatar actorId={author} className="dshx:mt-0.5 dshx:size-7 dshx:text-[11px] dshx:ring-0" />
+        <div className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-1">
+          <div className="dshx:flex dshx:items-baseline dshx:gap-2 dshx:text-xs">
+            <span className="dshx:font-medium dshx:text-foreground">{ItemGlyphs.actorName(author)}</span>
+            <span className="dshx:text-muted-foreground">{new Date(item.createdAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}</span>
+            <span className="dshx:font-mono! dshx:text-[11px] dshx:text-muted-foreground">b:{item.id}</span>
+          </div>
+          <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
+            <span onClick={event => event.stopPropagation()}>
+              <ItemPickers.Status id={item.id} status={item.status} onPick={status => actions.update.mutate({ id: item.id, status })} />
+            </span>
+            {item.kind === 'task' ? null : <ItemGlyphs.KindIcon kind={item.kind} />}
+            <p
+              className={cn(
+                'dshx:min-w-0 dshx:truncate dshx:text-sm dshx:font-medium',
+                closed && 'dshx:text-muted-foreground dshx:line-through dshx:decoration-muted-foreground/40',
+              )}
+            >
+              {item.title}
+            </p>
+          </div>
+          {item.preview === '' ? null : <p className="dshx:line-clamp-2 dshx:text-[13px] dshx:leading-relaxed dshx:text-muted-foreground">{item.preview}</p>}
+          <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-1.5">
+            <ItemGlyphs.AttentionBadge attention={item.attention} />
+            {item.proposal === null ? null : (
+              <Chip className="dshx:border-violet/40 dshx:text-violet">
+                <WandSparklesIcon className="dshx:size-3" /> Suggestion
+              </Chip>
+            )}
+            {item.project === null ? null : (
+              <Chip>
+                <ItemGlyphs.ProjectDot project={item.project} />
+                {ItemGlyphs.projectName(item.project)}
+              </Chip>
+            )}
+            {item.tags.map(tag => (
+              <Chip key={tag}>#{tag}</Chip>
+            ))}
+            {item.attachments.length === 0 ? null : (
+              <Chip>
+                <PaperclipIcon className="dshx:size-3" />
+                {item.attachments.length}
+              </Chip>
+            )}
+            {item.links.length === 0 ? null : (
+              <Chip>
+                <LinkIcon className="dshx:size-3" />
+                {item.links.length}
+              </Chip>
+            )}
+            {item.activity.comments === 0 ? null : (
+              <Chip>
+                <MessageSquareIcon className="dshx:size-3" />
+                {item.activity.comments}
+              </Chip>
+            )}
+            {item.freshness === 'fresh' ? null : <Chip className={cn(item.freshness === 'stale' && 'dshx:text-warning')}>{item.freshness}</Chip>}
+          </div>
+          {summary === null ? null : (
+            <p className="dshx:flex dshx:items-center dshx:gap-1.5 dshx:text-[11px] dshx:text-muted-foreground">
+              <span aria-hidden className="dshx:h-px dshx:w-3 dshx:bg-border" />
+              <span className="dshx:truncate">{summary}</span>
+              <span>· {ItemGlyphs.ago(item.lastActivityAt)}</span>
+            </p>
+          )}
         </div>
-        <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
-          <span onClick={event => event.stopPropagation()}>
-            <ItemPickers.Status id={item.id} status={item.status} onPick={status => actions.update.mutate({ id: item.id, status })} />
-          </span>
-          {item.kind === 'task' ? null : <ItemGlyphs.KindIcon kind={item.kind} />}
-          <p
+        <div
+          onClick={event => event.stopPropagation()}
+          className="dshx:absolute dshx:-top-3 dshx:right-3 dshx:flex dshx:items-center dshx:gap-0.5 dshx:rounded-lg dshx:border dshx:border-border dshx:bg-popover dshx:p-0.5 dshx:opacity-0 dshx:shadow-sm dshx:transition-opacity dshx:group-hover/entry:opacity-100"
+        >
+          <button
+            type="button"
+            aria-label={item.pinned ? 'Unpin' : 'Pin'}
+            onClick={() => actions.update.mutate({ id: item.id, pinned: !item.pinned })}
             className={cn(
-              'dshx:min-w-0 dshx:truncate dshx:text-sm dshx:font-medium',
-              closed && 'dshx:text-muted-foreground dshx:line-through dshx:decoration-muted-foreground/40',
+              'dshx:rounded-md dshx:p-1 dshx:text-muted-foreground dshx:hover:bg-accent dshx:hover:text-foreground',
+              item.pinned && 'dshx:text-warning',
             )}
           >
-            {item.title}
-          </p>
+            <PinIcon className={cn('dshx:size-3.5', item.pinned && 'dshx:fill-current')} />
+          </button>
+          <button
+            type="button"
+            aria-label="Run triage"
+            onClick={() => actions.triage.mutate(item.id)}
+            className="dshx:rounded-md dshx:p-1 dshx:text-muted-foreground dshx:hover:bg-accent dshx:hover:text-foreground"
+          >
+            <WandSparklesIcon className="dshx:size-3.5" />
+          </button>
         </div>
-        {item.preview === '' ? null : <p className="dshx:line-clamp-2 dshx:text-[13px] dshx:leading-relaxed dshx:text-muted-foreground">{item.preview}</p>}
-        <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-1.5">
-          <ItemGlyphs.AttentionBadge attention={item.attention} />
-          {item.proposal === null ? null : (
-            <Chip className="dshx:border-violet/40 dshx:text-violet">
-              <WandSparklesIcon className="dshx:size-3" /> Suggestion
-            </Chip>
-          )}
-          {item.project === null ? null : (
-            <Chip>
-              <ItemGlyphs.ProjectDot project={item.project} />
-              {ItemGlyphs.projectName(item.project)}
-            </Chip>
-          )}
-          {item.tags.map(tag => (
-            <Chip key={tag}>#{tag}</Chip>
-          ))}
-          {item.attachments.length === 0 ? null : (
-            <Chip>
-              <PaperclipIcon className="dshx:size-3" />
-              {item.attachments.length}
-            </Chip>
-          )}
-          {item.links.length === 0 ? null : (
-            <Chip>
-              <LinkIcon className="dshx:size-3" />
-              {item.links.length}
-            </Chip>
-          )}
-          {item.activity.comments === 0 ? null : (
-            <Chip>
-              <MessageSquareIcon className="dshx:size-3" />
-              {item.activity.comments}
-            </Chip>
-          )}
-          {item.freshness === 'fresh' ? null : <Chip className={cn(item.freshness === 'stale' && 'dshx:text-warning')}>{item.freshness}</Chip>}
-        </div>
-        {summary === null ? null : (
-          <p className="dshx:flex dshx:items-center dshx:gap-1.5 dshx:text-[11px] dshx:text-muted-foreground">
-            <span aria-hidden className="dshx:h-px dshx:w-3 dshx:bg-border" />
-            <span className="dshx:truncate">{summary}</span>
-            <span>· {ItemGlyphs.ago(item.lastActivityAt)}</span>
-          </p>
-        )}
-      </div>
-      <div
-        onClick={event => event.stopPropagation()}
-        className="dshx:absolute dshx:-top-3 dshx:right-3 dshx:flex dshx:items-center dshx:gap-0.5 dshx:rounded-lg dshx:border dshx:border-border dshx:bg-popover dshx:p-0.5 dshx:opacity-0 dshx:shadow-sm dshx:transition-opacity dshx:group-hover/entry:opacity-100"
-      >
-        <button
-          type="button"
-          aria-label={item.pinned ? 'Unpin' : 'Pin'}
-          onClick={() => actions.update.mutate({ id: item.id, pinned: !item.pinned })}
-          className={cn(
-            'dshx:rounded-md dshx:p-1 dshx:text-muted-foreground dshx:hover:bg-accent dshx:hover:text-foreground',
-            item.pinned && 'dshx:text-warning',
-          )}
-        >
-          <PinIcon className={cn('dshx:size-3.5', item.pinned && 'dshx:fill-current')} />
-        </button>
-        <button
-          type="button"
-          aria-label="Run triage"
-          onClick={() => actions.triage.mutate(item.id)}
-          className="dshx:rounded-md dshx:p-1 dshx:text-muted-foreground dshx:hover:bg-accent dshx:hover:text-foreground"
-        >
-          <WandSparklesIcon className="dshx:size-3.5" />
-        </button>
-      </div>
-    </article>
+      </article>
+    </StartThreadMenu>
   )
 }
 
@@ -169,6 +177,7 @@ export const FeedView = (props: {
   readonly select: (id: number) => void
   readonly loaded: boolean
   readonly now: number
+  readonly startThread: (item: BacklogSummaryView) => void
 }): JSX.Element => {
   const now = props.now
   const scroller = useRef<HTMLDivElement | null>(null)
@@ -268,7 +277,7 @@ export const FeedView = (props: {
                     <span className="dshx:h-px dshx:flex-1 dshx:bg-border" />
                   </div>
                 ) : null}
-                <FeedEntry item={item} open={item.id === props.openId} select={props.select} />
+                <FeedEntry item={item} open={item.id === props.openId} select={props.select} startThread={props.startThread} />
               </div>
             )
           })}

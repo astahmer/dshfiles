@@ -1,22 +1,74 @@
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
+import type {} from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
+import type { WorkspaceId } from '@deepseek-ai/dsh-workspace/types'
 import type {} from '@dshfiles/input-trigger/client'
 import { createApiClient, defineClient } from '@dshfiles/dshx/client'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 
 import { backlogApi, BacklogViews } from './api.js'
 import { BacklogMentions } from './backlog-mentions.js'
-import { BacklogPanel } from './backlog-panel.js'
+import { BacklogPanel, type StartThreadPorts } from './backlog-panel.js'
+import { StartThreadForm, type StartThreadCatalog, type StartThreadRequest, type StartThreadTarget } from './start-thread.js'
 
 const PANEL_ID = 'dshfiles-backlog-panel'
 
+declare module '@deepseek-ai/dsh-api-session-controller/client' {
+  interface SessionReferenceSourceMap {
+    /** A thread the backlog just started for one item, retained while its first message is admitted. */
+    backlogStartThread: unknown
+  }
+}
+
 export default defineClient({
   name: '@dshfiles/backlog',
-  inject: ['slots', 'sessions', 'uiWorkspace', 'inputTriggers'],
+  inject: ['slots', 'sessions', 'workspaces', 'remote', 'remote.session', 'uiWorkspace', 'inputTriggers'],
   setup(ctx, decorate) {
     const api = createApiClient(ctx, backlogApi)
+    const startThreadPorts: StartThreadPorts = {
+      listProjects: () =>
+        ctx.workspaces.list.getSnapshot().items.map(workspace => ({ id: workspace.workspaceId, title: workspace.title, path: workspace.path })),
+      loadCatalog: async (): Promise<StartThreadCatalog> => {
+        const result = await ctx.remote.session.modelCatalog()
+        if (!result.ok) throw new Error(result.error.message)
+        return StartThreadForm.catalog(result.value)
+      },
+      start: async (request: StartThreadRequest) => {
+        let sessionId
+        try {
+          sessionId = await ctx.sessions.create(creationArgsFor(request.target, ctx.workspaces.list.getSnapshot().items[0]?.workspaceId))
+        } catch (cause) {
+          return { ok: false, reason: `The thread could not be created: ${cause instanceof Error ? cause.message : String(cause)}` }
+        }
+        const selection = { sessionId, provider: request.provider, model: request.model }
+        const selected = await ctx.remote.session.selectModel(
+          request.reasoningEffort === undefined ? selection : { ...selection, reasoningEffort: request.reasoningEffort },
+        )
+        if (!selected.ok) console.warn(`backlog: thread ${sessionId} kept the Host default model: ${selected.error.message}`)
+        const renamed = await ctx.remote.session.rename({ sessionId, title: StartThreadForm.title(request.item) })
+        if (!renamed.ok) console.warn(`backlog: thread ${sessionId} title kept as created: ${renamed.error.message}`)
+        if (request.message !== '') {
+          const reference = ctx.sessions.retain(sessionId, { source: 'backlogStartThread' })
+          try {
+            await reference.ready
+            const session = reference.binding.session
+            const handle = session.beginSubmission({ mode: 'queue', text: request.message, attachments: [] })
+            const prompted = await session.prompt([{ type: 'text', text: request.message }], 'queue', undefined, handle.requestId)
+            if (!prompted.ok) console.warn(`backlog: thread ${sessionId} started without its first message: ${prompted.error.message}`)
+          } catch (cause) {
+            console.warn(`backlog: thread ${sessionId} started without its first message: ${String(cause)}`)
+          } finally {
+            reference.release()
+          }
+        }
+        const linked = await api.safe.link({ id: request.item.id, link: { type: 'thread', target: sessionId, provenance: 'user' } })
+        if (!linked.ok) console.warn(`backlog: item b:${String(request.item.id)} was not linked to thread ${sessionId}: ${linked.error.message}`)
+        ctx.uiWorkspace.openSession(sessionId)
+        return { ok: true }
+      },
+    }
     const mentions = BacklogMentions.createSource({
       section: 'Backlog',
       search: async (query, limit, signal) => BacklogViews.list(await api.list({ query, freshness: 'active', limit }, { signal })).items,
@@ -25,6 +77,7 @@ export default defineClient({
     const PanelView = (): JSX.Element => (
       <PluginQueryProvider>
         <BacklogPanel
+          startThread={startThreadPorts}
           listThreads={() => {
             const state = ctx.sessions.list.getSnapshot()
             return state.ids.flatMap(id => {
@@ -45,6 +98,16 @@ export default defineClient({
     ctx.slots.inject('main', () => ctx.slots.register({ name: 'main', key: PANEL_ID }, decorate(PanelView)))
   },
 })
+
+/**
+ * A thread with no project joins the first registered workspace, the way the composer's New thread does; a bare path
+ * runs in that folder, and a Host with no workspace at all leaves the choice to the composer.
+ */
+const creationArgsFor = (target: StartThreadTarget, defaultWorkspaceId: WorkspaceId | undefined) => {
+  if (target.kind === 'project') return { workspaceId: target.projectId }
+  if (target.kind === 'cwd') return { cwd: target.path }
+  return defaultWorkspaceId === undefined ? {} : { workspaceId: defaultWorkspaceId }
+}
 
 const PanelGlyph = (props: { readonly size?: number }): JSX.Element => (
   <svg

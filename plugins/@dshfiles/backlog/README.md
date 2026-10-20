@@ -66,6 +66,20 @@ with its actor (`user`, `system` or `agent:<sessionId>`). **Referenced by** list
 this one. Fields the user changes by hand are recorded in `humanFields`, so later automatic moves can
 leave them alone. Nothing is deleted; `dropped` closes an item.
 
+## Starting a thread from an item
+
+Right-click a feed entry, an Items row or a board card (or press **Start thread** in the peek header) to open
+the start-thread dialog. It prefills the item's own project when that path is a registered project, offers the
+other projects plus a bare folder for a project path the registry does not know, and lists every routable
+account/model from the Host catalog with the model's reasoning efforts. The first message is prefilled from
+the item (title plus preview) and can be cleared to open an empty draft instead.
+
+Starting creates the thread, selects the account/model on it, names it after the item, sends the first message
+when one is left, links the item to the thread (provenance `user`) and opens it. A thread with no project joins
+the first registered workspace, the way the composer's New thread does. Failures after creation keep the thread
+and open it: a refused model switch leaves the Host default model, and a failed link is logged rather than
+losing the thread.
+
 ## Automatic triage
 
 Off by default (Settings → `dshfiles-backlog`). With `autoTriage` on, every capture is triaged in the

@@ -512,6 +512,7 @@ const PeekBody = (props: {
   readonly openThread: OpenThread
   readonly select: (id: number) => void
   readonly close: () => void
+  readonly startThread?: () => void
 }): JSX.Element => {
   const actions = useBacklogActions()
   const item = props.detail.item
@@ -543,6 +544,11 @@ const PeekBody = (props: {
           {item.freshness === 'fresh' ? null : <span className="dshx:rounded-full dshx:bg-muted dshx:px-1.5 dshx:text-[11px]">{item.freshness}</span>}
         </nav>
         <div className="dshx:ml-auto dshx:flex dshx:items-center dshx:gap-0.5">
+          {props.startThread === undefined ? null : (
+            <Button variant="ghost" size="icon-xs" aria-label="Start thread" title="Start a thread for this item" onClick={props.startThread}>
+              <MessagesSquareIcon />
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="icon-xs"
@@ -693,6 +699,7 @@ const ItemPeek = (props: {
   readonly select: (id: number) => void
   readonly close: () => void
   readonly embedded?: boolean
+  readonly startThread?: () => void
 }): JSX.Element => {
   const api = useApi(backlogApi)
   const summary = props.summary
@@ -726,6 +733,7 @@ const ItemPeek = (props: {
           openThread={props.openThread}
           select={props.select}
           close={props.close}
+          {...(props.startThread === undefined ? {} : { startThread: props.startThread })}
         />
       ) : (
         <p className="dshx:p-6 dshx:text-sm dshx:text-muted-foreground">b:{props.id} does not exist.</p>

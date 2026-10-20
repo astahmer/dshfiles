@@ -160,3 +160,58 @@ Then('the feed narrows back to {string}', async ({ page }: { page: Page }, title
   })
   await finishJourneyAssertions(page)
 })
+
+const startThreadDialog = (page: Page) => page.getByRole('dialog', { name: 'Start thread', exact: true })
+const THREAD_COMPOSER = 'Message or run a task, / commands, @ files or sessions'
+const NEW_THREAD_COMPOSER = 'Describe what you want to build, / commands, @ files or sessions'
+const FAKE_MODEL = 'commandcode_work/gpt-6-luna'
+
+When('backlog item b:{int} is right-clicked for a thread', async ({ page }: { page: Page }, id: number) => {
+  await feed(page)
+    .getByRole('article', { name: `Item b:${String(id)}`, exact: true })
+    .click({ button: 'right' })
+  await page.getByRole('menuitem', { name: 'Start thread…', exact: true }).click()
+})
+
+Then('the start thread dialog offers the account model and the Host default folder', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'backlog-start-thread-dialog', async () => {
+    await expect(startThreadDialog(page)).toBeVisible()
+    await expect(startThreadDialog(page).getByLabel('Thread project')).toHaveValue('default')
+    // The fake Command Code account publishes its route a moment after it is added.
+    await expect(async () => {
+      const options = await startThreadDialog(page).getByLabel('Thread model').locator('option').count()
+      expect(options).toBeGreaterThan(0)
+    }).toPass({ timeout: 20_000 })
+    await expect(startThreadDialog(page).getByLabel('Thread model')).toBeVisible()
+  })
+})
+
+When('the thread is started from the dialog without a first message', async ({ page }: { page: Page }) => {
+  await expect(startThreadDialog(page).getByLabel('First message')).toHaveValue('Work on b:1: Ship the thread starter')
+  await startThreadDialog(page).getByLabel('First message').fill('')
+  await startThreadDialog(page).getByRole('button', { name: 'Start thread', exact: true }).click()
+  await expect(startThreadDialog(page)).toBeHidden()
+})
+
+Then('the thread composer is open for it', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'backlog-start-thread-opens', async () => {
+    // An empty first message leaves a blank draft, so the composer may still carry the New thread placeholder.
+    const composer = page.getByRole('textbox', { name: THREAD_COMPOSER, exact: true }).or(page.getByRole('textbox', { name: NEW_THREAD_COMPOSER, exact: true }))
+    await expect(composer.first()).toBeVisible({ timeout: 20_000 })
+    await expect(page.getByRole('button', { name: new RegExp(`^Select model, current ${FAKE_MODEL.replaceAll('/', '\\/')}`) })).toBeVisible()
+  })
+})
+
+When('the Backlog panel is opened again', async ({ page }: { page: Page }) => {
+  await page.getByRole('button', { name: 'Backlog', exact: true }).click()
+  await expect(page.getByRole('textbox', { name: 'Capture', exact: true })).toBeVisible()
+})
+
+Then('the item links the thread it started', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'backlog-start-thread-links', async () => {
+    // A draft with no message yet is not a listed thread, so the chip carries the session fallback label.
+    await expect(peek(page).getByRole('button', { name: /^Unlink thread session-/ })).toBeVisible()
+    await expect(peek(page).getByRole('button', { name: /^Thread [0-9a-f]{8}$/ })).toBeVisible()
+  })
+  await finishJourneyAssertions(page)
+})

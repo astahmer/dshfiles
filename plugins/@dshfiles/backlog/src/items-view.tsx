@@ -25,6 +25,7 @@ import type { BacklogSummaryView } from './api.js'
 import { BacklogItems, type BacklogStatus } from './item.js'
 import { ItemGlyphs } from './item-glyphs.js'
 import { ItemPickers } from './item-pickers.js'
+import { StartThreadMenu } from './start-thread-dialog.js'
 import { StatusFilterBar } from './status-filter-bar.js'
 import { useBacklogActions } from './use-backlog-actions.js'
 
@@ -105,6 +106,7 @@ const Row = (props: {
   readonly toggle: (id: number) => void
   readonly select: (id: number) => void
   readonly hover: (id: number) => void
+  readonly startThread: (item: BacklogSummaryView) => void
 }): JSX.Element => {
   const actions = useBacklogActions()
   const item = props.item
@@ -116,84 +118,86 @@ const Row = (props: {
     return 'dshx:hover:bg-accent/30'
   })()
   return (
-    <div
-      role="row"
-      aria-label={`Item b:${String(item.id)}`}
-      aria-selected={props.selected}
-      onClick={() => props.select(item.id)}
-      onMouseMove={() => props.hover(item.id)}
-      style={{ viewTransitionName: `backlog-item-${String(item.id)}` }}
-      className={cn(
-        columns,
-        'dshx:group/row dshx:h-10 dshx:cursor-default dshx:items-center dshx:border-b dshx:border-border/50 dshx:pr-3 dshx:text-[13px] dshx:transition-colors dshx:duration-75',
-        background,
-      )}
-    >
-      <span className="dshx:flex dshx:justify-center" onClick={event => event.stopPropagation()}>
-        <input
-          type="checkbox"
-          aria-label={`Select b:${String(item.id)}`}
-          checked={props.selected}
-          onChange={() => props.toggle(item.id)}
-          className={cn(
-            'dshx:size-3.5 dshx:accent-[var(--color-info)] dshx:transition-opacity',
-            props.selected ? 'dshx:opacity-100' : 'dshx:opacity-0 dshx:group-hover/row:opacity-100',
-          )}
-        />
-      </span>
-      <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
-        <span className="dshx:w-10 dshx:shrink-0 dshx:font-mono! dshx:text-[11px] dshx:text-muted-foreground">b:{item.id}</span>
-        <span className={cn('dshx:min-w-0 dshx:truncate', closed && 'dshx:text-muted-foreground')}>{item.title}</span>
-        {item.pinned ? <PinIcon aria-label="Pinned" className="dshx:size-3 dshx:shrink-0 dshx:fill-current dshx:text-warning" /> : null}
-        <ItemGlyphs.AttentionBadge attention={item.attention} compact />
-        {item.proposal === null ? null : <WandSparklesIcon aria-label="Suggestion waiting" className="dshx:size-3 dshx:shrink-0 dshx:text-violet" />}
-        {item.tags.slice(0, 2).map(tag => (
-          <span key={tag} className="dshx:hidden dshx:shrink-0 dshx:text-[11px] dshx:text-muted-foreground dshx:@min-[52rem]:inline">
-            #{tag}
-          </span>
-        ))}
-        {item.links.length === 0 ? null : (
-          <span className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-0.5 dshx:text-[11px] dshx:text-muted-foreground">
-            <LinkIcon aria-hidden className="dshx:size-3" />
-            {item.links.length}
-          </span>
+    <StartThreadMenu item={item} startThread={props.startThread}>
+      <div
+        role="row"
+        aria-label={`Item b:${String(item.id)}`}
+        aria-selected={props.selected}
+        onClick={() => props.select(item.id)}
+        onMouseMove={() => props.hover(item.id)}
+        style={{ viewTransitionName: `backlog-item-${String(item.id)}` }}
+        className={cn(
+          columns,
+          'dshx:group/row dshx:h-10 dshx:cursor-default dshx:items-center dshx:border-b dshx:border-border/50 dshx:pr-3 dshx:text-[13px] dshx:transition-colors dshx:duration-75',
+          background,
         )}
-        {item.activity.comments === 0 ? null : (
-          <span className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-0.5 dshx:text-[11px] dshx:text-muted-foreground">
-            <MessageSquareIcon aria-hidden className="dshx:size-3" />
-            {item.activity.comments}
-          </span>
-        )}
-      </span>
-      <span onClick={event => event.stopPropagation()} className="dshx:flex dshx:items-center">
-        <span className={wideOnly}>
-          <ItemPickers.Status id={item.id} status={item.status} withLabel onPick={status => actions.update.mutate({ id: item.id, status })} />
+      >
+        <span className="dshx:flex dshx:justify-center" onClick={event => event.stopPropagation()}>
+          <input
+            type="checkbox"
+            aria-label={`Select b:${String(item.id)}`}
+            checked={props.selected}
+            onChange={() => props.toggle(item.id)}
+            className={cn(
+              'dshx:size-3.5 dshx:accent-[var(--color-info)] dshx:transition-opacity',
+              props.selected ? 'dshx:opacity-100' : 'dshx:opacity-0 dshx:group-hover/row:opacity-100',
+            )}
+          />
         </span>
-        <span className="dshx:hidden dshx:@max-pane-compact:inline-flex">
-          <ItemPickers.Status id={item.id} status={item.status} onPick={status => actions.update.mutate({ id: item.id, status })} />
-        </span>
-      </span>
-      <span className={cn('dshx:flex dshx:items-center dshx:gap-1.5 dshx:text-muted-foreground', roomyOnly)}>
-        <ItemGlyphs.KindIcon kind={item.kind} />
-        {ItemGlyphs.kindLabels[item.kind]}
-      </span>
-      <span className={cn('dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5', wideOnly)}>
-        {item.project === null ? (
-          <span className="dshx:text-muted-foreground/60">—</span>
-        ) : (
-          <>
-            <ItemGlyphs.ProjectDot project={item.project} />
-            <span className="dshx:truncate" title={item.project}>
-              {ItemGlyphs.projectName(item.project)}
+        <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
+          <span className="dshx:w-10 dshx:shrink-0 dshx:font-mono! dshx:text-[11px] dshx:text-muted-foreground">b:{item.id}</span>
+          <span className={cn('dshx:min-w-0 dshx:truncate', closed && 'dshx:text-muted-foreground')}>{item.title}</span>
+          {item.pinned ? <PinIcon aria-label="Pinned" className="dshx:size-3 dshx:shrink-0 dshx:fill-current dshx:text-warning" /> : null}
+          <ItemGlyphs.AttentionBadge attention={item.attention} compact />
+          {item.proposal === null ? null : <WandSparklesIcon aria-label="Suggestion waiting" className="dshx:size-3 dshx:shrink-0 dshx:text-violet" />}
+          {item.tags.slice(0, 2).map(tag => (
+            <span key={tag} className="dshx:hidden dshx:shrink-0 dshx:text-[11px] dshx:text-muted-foreground dshx:@min-[52rem]:inline">
+              #{tag}
             </span>
-          </>
-        )}
-      </span>
-      <span className={roomyOnly}>
-        <ItemGlyphs.ActorStack actorIds={item.actors.map(actor => actor.id)} max={2} />
-      </span>
-      <span className="dshx:text-right dshx:text-[11px] dshx:tabular-nums dshx:text-muted-foreground">{ItemGlyphs.ago(item.lastActivityAt)}</span>
-    </div>
+          ))}
+          {item.links.length === 0 ? null : (
+            <span className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-0.5 dshx:text-[11px] dshx:text-muted-foreground">
+              <LinkIcon aria-hidden className="dshx:size-3" />
+              {item.links.length}
+            </span>
+          )}
+          {item.activity.comments === 0 ? null : (
+            <span className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-0.5 dshx:text-[11px] dshx:text-muted-foreground">
+              <MessageSquareIcon aria-hidden className="dshx:size-3" />
+              {item.activity.comments}
+            </span>
+          )}
+        </span>
+        <span onClick={event => event.stopPropagation()} className="dshx:flex dshx:items-center">
+          <span className={wideOnly}>
+            <ItemPickers.Status id={item.id} status={item.status} withLabel onPick={status => actions.update.mutate({ id: item.id, status })} />
+          </span>
+          <span className="dshx:hidden dshx:@max-pane-compact:inline-flex">
+            <ItemPickers.Status id={item.id} status={item.status} onPick={status => actions.update.mutate({ id: item.id, status })} />
+          </span>
+        </span>
+        <span className={cn('dshx:flex dshx:items-center dshx:gap-1.5 dshx:text-muted-foreground', roomyOnly)}>
+          <ItemGlyphs.KindIcon kind={item.kind} />
+          {ItemGlyphs.kindLabels[item.kind]}
+        </span>
+        <span className={cn('dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5', wideOnly)}>
+          {item.project === null ? (
+            <span className="dshx:text-muted-foreground/60">—</span>
+          ) : (
+            <>
+              <ItemGlyphs.ProjectDot project={item.project} />
+              <span className="dshx:truncate" title={item.project}>
+                {ItemGlyphs.projectName(item.project)}
+              </span>
+            </>
+          )}
+        </span>
+        <span className={roomyOnly}>
+          <ItemGlyphs.ActorStack actorIds={item.actors.map(actor => actor.id)} max={2} />
+        </span>
+        <span className="dshx:text-right dshx:text-[11px] dshx:tabular-nums dshx:text-muted-foreground">{ItemGlyphs.ago(item.lastActivityAt)}</span>
+      </div>
+    </StartThreadMenu>
   )
 }
 
@@ -213,6 +217,7 @@ export const ItemsView = (props: {
   readonly statuses: readonly BacklogStatus[]
   readonly toggleStatus: (status: BacklogStatus) => void
   readonly clearStatuses: () => void
+  readonly startThread: (item: BacklogSummaryView) => void
 }): JSX.Element => {
   const actions = useBacklogActions()
   const [selected, setSelected] = useState<ReadonlySet<number>>(new Set())
@@ -351,6 +356,7 @@ export const ItemsView = (props: {
                     toggle={toggle}
                     select={props.select}
                     hover={props.hover}
+                    startThread={props.startThread}
                   />
                 )}
               </div>

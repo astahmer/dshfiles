@@ -445,6 +445,46 @@
           "testName": "takes the kind, status and project the composer set, and records them as the user owns them"
         }
       ]
+    },
+    {
+      "id": "start-thread-from-item",
+      "title": "Start a thread from an item",
+      "summary": "Right-clicking any item, feed entry or board card opens a dialog that picks the project (the item's own project preselected), the account/model and reasoning effort, and an opening message; starting it creates the thread, names it after the item, links the item to it and opens it.",
+      "reach": ["click button \"Backlog\"", "expect textbox \"Capture\"", "click button \"Board\"", "expect textbox \"Capture\""],
+      "surfaces": ["client"],
+      "configuration": [],
+      "states": ["item-without-project", "item-project-registered", "item-project-unregistered"],
+      "failureModes": [
+        "A thread the Host refuses is reported in the dialog and no item link is written.",
+        "A model switch that the Host rejects keeps the thread on the Host default model and still opens it.",
+        "An empty first message opens an empty thread instead of sending anything."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "backlog.start-thread",
+          "featureFile": "tooling/dshx/e2e/features/backlog.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog-start-thread-project-targets",
+          "file": "plugins/@dshfiles/backlog/src/start-thread.test.ts",
+          "testName": "preselects the item project, a bare folder for an unregistered path, and the Host default without one"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog-start-thread-catalog",
+          "file": "plugins/@dshfiles/backlog/src/start-thread.test.ts",
+          "testName": "lists one row per provider and model so equal model ids stay distinct"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog-start-thread-message",
+          "file": "plugins/@dshfiles/backlog/src/start-thread.test.ts",
+          "testName": "opens with the item heading and appends the preview once"
+        }
+      ]
     }
   ],
   "kind": "bundle"
