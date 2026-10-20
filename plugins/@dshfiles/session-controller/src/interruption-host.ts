@@ -3,7 +3,6 @@ import { remoteErrorOf } from '@deepseek-ai/dsh-typert-protocol'
 import { brandString } from '@deepseek-ai/dsh-brand'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { interruptionApi } from './interruption-api.ts'
-import type {} from './native/index.ts'
 import type { SessionRequestId } from './native/types.ts'
 
 export const interruptionHost = interruptionApi.host({
