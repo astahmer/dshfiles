@@ -1,12 +1,10 @@
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
-import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@dshfiles/plugin-ui/components/ui/context-menu'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@dshfiles/plugin-ui/components/ui/dialog'
 import { LoaderCircleIcon, MessagesSquareIcon } from '@dshfiles/plugin-ui/icons'
 import { errorMessage, useQuery } from '@dshfiles/plugin-ui/query'
-import { useState, type ReactNode } from 'react'
+import { useState } from 'react'
 
-import type { BacklogSummaryView } from './api.js'
-import { StartThreadForm, type StartThreadCatalog, type StartThreadProject, type StartThreadRequest } from './start-thread.js'
+import { StartThreadForm, type StartThreadCatalog, type StartThreadItem, type StartThreadProject, type StartThreadRequest } from './start-thread.js'
 
 const fieldClass =
   'dshx:h-8 dshx:w-full dshx:rounded-md dshx:border dshx:border-input dshx:bg-background dshx:px-2 dshx:text-[13px] dshx:text-foreground dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50'
@@ -14,29 +12,12 @@ const labelClass = 'dshx:text-[11px] dshx:font-semibold dshx:uppercase dshx:trac
 
 type StartOutcome = { readonly ok: true } | { readonly ok: false; readonly reason: string }
 
-/** Right-click entry point: one row action that opens the start-thread dialog for that item. */
-export const StartThreadMenu = (props: {
-  readonly item: BacklogSummaryView
-  readonly startThread: (item: BacklogSummaryView) => void
-  readonly children: ReactNode
-}): JSX.Element => (
-  <ContextMenu>
-    <ContextMenuTrigger asChild>{props.children}</ContextMenuTrigger>
-    <ContextMenuContent className="dshx-root dshx:min-w-48">
-      <ContextMenuItem className="dshx:gap-2 dshx:text-[13px]" onSelect={() => props.startThread(props.item)}>
-        <MessagesSquareIcon aria-hidden className="dshx:size-3.5" />
-        Start thread…
-      </ContextMenuItem>
-    </ContextMenuContent>
-  </ContextMenu>
-)
-
 /**
  * Chooses the project, account/model and opening message, then asks the panel to start the thread. The catalog is a
  * Host read, so it loads when the dialog opens instead of with every list refresh.
  */
 export const StartThreadDialog = (props: {
-  readonly item: BacklogSummaryView
+  readonly item: StartThreadItem
   readonly projects: readonly StartThreadProject[]
   readonly loadCatalog: () => Promise<StartThreadCatalog>
   readonly sendByDefault: boolean

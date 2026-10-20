@@ -4,7 +4,8 @@ import { useMutation, useQueryClient } from '@dshfiles/plugin-ui/query'
 
 import { backlogApi, type BacklogDetailView, type BacklogSummaryView } from './api.js'
 
-type UpdateInput = ApiClientInput<(typeof backlogApi)['methods']['update']>
+export type BacklogUpdateInput = ApiClientInput<(typeof backlogApi)['methods']['update']>
+type UpdateInput = BacklogUpdateInput
 type ListData = { readonly revision: number; readonly total: number; readonly items: BacklogSummaryView[] }
 type DetailData = { readonly ok: true; readonly value: BacklogDetailView } | { readonly ok: false; readonly reason: 'not-found' }
 

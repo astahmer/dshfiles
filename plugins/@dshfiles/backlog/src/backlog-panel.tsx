@@ -43,7 +43,7 @@ import { ProjectsView } from './projects-view.js'
 import { SearchResults } from './search-results.js'
 import { backlogSettings, type BacklogSettings } from './settings.js'
 import { StartThreadDialog } from './start-thread-dialog.js'
-import type { StartThreadCatalog, StartThreadProject, StartThreadRequest } from './start-thread.js'
+import type { StartThreadCatalog, StartThreadItem, StartThreadProject, StartThreadRequest } from './start-thread.js'
 import { FeedStatus } from './status-filter.js'
 import { BacklogQueries } from './use-backlog-actions.js'
 import { withViewTransition } from './view-transition.js'
@@ -223,7 +223,8 @@ export const BacklogPanel = (props: {
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set(['dropped']))
   const [selectedProject, setSelectedProject] = useState<string | null>(null)
   const [captureStatus, setCaptureStatus] = useState<BacklogStatus | null>(null)
-  const [startThreadItem, setStartThreadItem] = useState<BacklogSummaryView | null>(null)
+  const [startThreadItem, setStartThreadItem] = useState<StartThreadItem | null>(null)
+  const openStartThread = (item: StartThreadItem): void => setStartThreadItem(item)
   const captureComposer = useRef<HTMLTextAreaElement>(null)
   const searchInput = useRef<HTMLInputElement>(null)
   const debounced = useDebouncedValue({ value: query, delayMs: 120 })
@@ -250,6 +251,10 @@ export const BacklogPanel = (props: {
   const inbox = useQuery({
     queryKey: [BacklogQueries.key, 'list', 'inbox'],
     queryFn: async ({ signal }) => BacklogViews.list(await api.list({ inbox: true, freshness: 'all', limit: 200 }, { signal })),
+  })
+  const projectCatalog = useQuery({
+    queryKey: [BacklogQueries.key, 'projects'],
+    queryFn: ({ signal }) => api.projects(undefined, { signal }),
   })
   const settings = useSettings(backlogSettings)
   // Settings writes round-trip through the Host for a few seconds; show the saved list at once and defer to it after.
@@ -292,6 +297,13 @@ export const BacklogPanel = (props: {
   const unread = inboxItems.filter(item => item.acknowledgedAt === null || item.acknowledgedAt < item.lastActivityAt).length
   const tags = useMemo(() => [...new Set(all.flatMap(item => item.tags))].sort(), [all])
   const threads = props.listThreads()
+  const projectPaths = useMemo(() => {
+    const backlogProjects = (projectCatalog.data ?? []).flatMap(project => (project.project === null ? [] : [project.project]))
+    const workspaceProjects = props.startThread.listProjects().map(project => project.path)
+    return [...new Set([...backlogProjects, ...workspaceProjects])].sort((left, right) =>
+      ItemGlyphs.projectName(left).localeCompare(ItemGlyphs.projectName(right)),
+    )
+  }, [projectCatalog.data, props.startThread])
 
   const select = (id: number): void => {
     setOpenId(id)
@@ -354,9 +366,8 @@ export const BacklogPanel = (props: {
         toggleExpanded={() => withViewTransition(() => setExpanded(!expanded))}
         openThread={props.openThread}
         select={select}
-        startThread={() => {
-          if (openSummary !== undefined) setStartThreadItem(openSummary)
-        }}
+        projectPaths={projectPaths}
+        startThread={openStartThread}
         close={() => {
           setOpenId(null)
           setExpanded(false)
@@ -462,6 +473,8 @@ export const BacklogPanel = (props: {
                 select={select}
                 hover={setCursorId}
                 loaded={list.isSuccess}
+                startThread={openStartThread}
+                projectPaths={projectPaths}
               />
             </div>
             {inspector}
@@ -478,6 +491,8 @@ export const BacklogPanel = (props: {
             }
             inspector={inspector}
             loaded={inbox.isSuccess}
+            startThread={openStartThread}
+            projectPaths={projectPaths}
           />
         ) : (
           <>
@@ -493,7 +508,8 @@ export const BacklogPanel = (props: {
                   select={select}
                   loaded={list.isSuccess}
                   now={now}
-                  startThread={setStartThreadItem}
+                  projectPaths={projectPaths}
+                  startThread={openStartThread}
                 />
               )}
               {view === 'items' && (
@@ -512,11 +528,23 @@ export const BacklogPanel = (props: {
                   collapsed={collapsed}
                   setCollapsed={next => withViewTransition(() => setCollapsed(next))}
                   captureInto={startCapture}
-                  startThread={setStartThreadItem}
+                  projectPaths={projectPaths}
+                  startThread={openStartThread}
                 />
               )}
-              {view === 'board' && <BoardView items={items} openId={openId} open={select} captureInto={startCapture} startThread={setStartThreadItem} />}
-              {view === 'projects' && <ProjectsView selectedProject={selectedProject} setSelectedProject={setSelectedProject} select={select} now={now} />}
+              {view === 'board' && (
+                <BoardView items={items} openId={openId} open={select} captureInto={startCapture} projectPaths={projectPaths} startThread={openStartThread} />
+              )}
+              {view === 'projects' && (
+                <ProjectsView
+                  selectedProject={selectedProject}
+                  setSelectedProject={setSelectedProject}
+                  select={select}
+                  now={now}
+                  startThread={openStartThread}
+                  projectPaths={projectPaths}
+                />
+              )}
             </div>
             {inspector}
           </>

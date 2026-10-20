@@ -1,4 +1,4 @@
-import { expect, type Page } from '@playwright/test'
+import { expect, type Locator, type Page } from '@playwright/test'
 import { Then, When } from '../bdd.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
 import { StartupDialogs } from '../../../packages/dshx/src/project/startup-dialogs.js'
@@ -12,6 +12,70 @@ const statusChip = (page: Page, label: string) => page.getByRole('group', { name
 const showFeed = async (page: Page): Promise<void> => {
   await page.getByRole('button', { name: 'Feed', exact: true }).click()
   await expect(feed(page)).toBeVisible()
+}
+
+const contextTarget = async (page: Page, id: number, view: string): Promise<Locator> => {
+  const itemName = `Item b:${String(id)}`
+  if (view === 'feed') {
+    await page.getByRole('textbox', { name: 'Search backlog', exact: true }).fill('')
+    await showFeed(page)
+    return feed(page).getByRole('article', { name: itemName, exact: true })
+  }
+  if (view === 'items') {
+    await page.getByRole('textbox', { name: 'Search backlog', exact: true }).fill('')
+    await page.getByRole('button', { name: 'Items', exact: true }).click()
+    return page.getByRole('row', { name: itemName, exact: true })
+  }
+  if (view === 'board') {
+    await page.getByRole('textbox', { name: 'Search backlog', exact: true }).fill('')
+    await page.getByRole('button', { name: 'Board', exact: true }).click()
+    return page.getByRole('article', { name: `Card b:${String(id)}`, exact: true })
+  }
+  if (view === 'search') {
+    await page.getByRole('textbox', { name: 'Search backlog', exact: true }).fill(`b:${String(id)}`)
+    return searchResults(page).getByRole('listitem', { name: itemName, exact: true })
+  }
+  if (view === 'inbox') {
+    await page.getByRole('textbox', { name: 'Search backlog', exact: true }).fill('')
+    await page
+      .getByRole('navigation', { name: 'Backlog views' })
+      .getByRole('button', { name: /^Inbox\b/ })
+      .click()
+    return page.getByRole('listitem', { name: itemName, exact: true })
+  }
+  if (view === 'projects') {
+    await page.getByRole('textbox', { name: 'Search backlog', exact: true }).fill('')
+    await page.getByRole('button', { name: 'Projects', exact: true }).click()
+    await page.getByRole('button', { name: /No project/ }).click()
+    return page.getByRole('listitem', { name: itemName, exact: true }).first()
+  }
+  if (view === 'details') {
+    await page.getByRole('textbox', { name: 'Search backlog', exact: true }).fill('')
+    await showFeed(page)
+    await feed(page)
+      .getByRole('article', { name: itemName, exact: true })
+      .click({ position: { x: 8, y: 8 } })
+    await expect(peek(page)).toBeVisible()
+    return peek(page).getByRole('textbox', { name: 'Title', exact: true })
+  }
+  throw new Error(`Unknown backlog item view: ${view}`)
+}
+
+const contextMenu = (page: Page) => page.getByRole('menu')
+
+const expectItemActions = async (page: Page, includeOpenItem: boolean): Promise<void> => {
+  const menu = contextMenu(page)
+  await expect(menu.getByRole('menuitem', { name: 'Start thread…', exact: true })).toBeVisible()
+  await expect(menu.getByRole('menuitem', { name: 'Status', exact: true })).toBeVisible()
+  await expect(menu.getByRole('menuitem', { name: 'Kind', exact: true })).toBeVisible()
+  await expect(menu.getByRole('menuitem', { name: 'Attention', exact: true })).toBeVisible()
+  await expect(menu.getByRole('menuitem', { name: 'Project', exact: true })).toBeVisible()
+  await expect(menu.getByRole('menuitem', { name: /^(Unpin item|Pin item)$/ })).toBeVisible()
+  await expect(menu.getByRole('menuitem', { name: 'Run triage', exact: true })).toBeVisible()
+  if (includeOpenItem) await expect(menu.getByRole('menuitem', { name: 'Open item', exact: true })).toBeVisible()
+  await menu.getByRole('menuitem', { name: 'Project', exact: true }).hover()
+  await expect(page.getByRole('menu').last().getByRole('menuitemradio', { name: 'No project', exact: true })).toBeVisible()
+  await page.keyboard.press('Escape')
 }
 
 When('the Backlog panel is opened', async ({ page }: { page: Page }) => {
@@ -179,6 +243,54 @@ When('backlog item b:{int} is right-clicked for a thread', async ({ page }: { pa
     .getByRole('article', { name: `Item b:${String(id)}`, exact: true })
     .click({ button: 'right' })
   await page.getByRole('menuitem', { name: 'Start thread…', exact: true }).click()
+})
+
+Then('backlog item b:{int} exposes all context actions in the {string} view', async ({ page }: { page: Page }, id: number, view: string) => {
+  await recordAssertion(page, `backlog-item-actions-${view}`, async () => {
+    const target = await contextTarget(page, id, view)
+    await expect(target).toBeVisible()
+    await target.click({ button: 'right' })
+    await expect(contextMenu(page)).toBeVisible()
+    await expectItemActions(page, view !== 'details')
+    await page.keyboard.press('Escape')
+  })
+  if (view === 'details') await finishJourneyAssertions(page)
+})
+
+When('backlog item b:{int} is moved to {string} from its feed context menu', async ({ page }: { page: Page }, id: number, status: string) => {
+  const target = await contextTarget(page, id, 'feed')
+  await target.click({ button: 'right' })
+  await contextMenu(page).getByRole('menuitem', { name: 'Status', exact: true }).hover()
+  await page.getByRole('menu').last().getByRole('menuitemradio', { name: status, exact: true }).click()
+  await target.click({ button: 'right' })
+  await contextMenu(page).getByRole('menuitem', { name: 'Status', exact: true }).hover()
+  await expect(page.getByRole('menu').last().getByRole('menuitemradio', { name: status, exact: true })).toHaveAttribute('aria-checked', 'true')
+  await page.keyboard.press('Escape')
+})
+
+When('backlog item b:{int} is marked {string} from its feed context menu', async ({ page }: { page: Page }, id: number, attention: string) => {
+  const target = await contextTarget(page, id, 'feed')
+  await target.click({ button: 'right' })
+  await contextMenu(page).getByRole('menuitem', { name: 'Attention', exact: true }).hover()
+  await page.getByRole('menu').last().getByRole('menuitemradio', { name: attention, exact: true }).click()
+  await target.click({ button: 'right' })
+  await contextMenu(page).getByRole('menuitem', { name: 'Attention', exact: true }).hover()
+  await expect(page.getByRole('menu').last().getByRole('menuitemradio', { name: attention, exact: true })).toHaveAttribute('aria-checked', 'true')
+  await page.keyboard.press('Escape')
+})
+
+When('backlog item b:{int} is assigned to a registered project from its feed context menu', async ({ page }: { page: Page }, id: number) => {
+  const target = await contextTarget(page, id, 'feed')
+  await target.click({ button: 'right' })
+  await contextMenu(page).getByRole('menuitem', { name: 'Project', exact: true }).hover()
+  const projectMenu = page.getByRole('menu').last()
+  const projectOptions = projectMenu.getByRole('menuitemradio')
+  await expect(async () => expect(await projectOptions.count()).toBeGreaterThan(1)).toPass()
+  await projectOptions.nth(1).click()
+  await target.click({ button: 'right' })
+  await contextMenu(page).getByRole('menuitem', { name: 'Project', exact: true }).hover()
+  await expect(page.getByRole('menu').last().getByRole('menuitemradio', { name: 'No project', exact: true })).toHaveAttribute('aria-checked', 'false')
+  await page.keyboard.press('Escape')
 })
 
 Then('the start thread dialog offers the account model and the Host default folder', async ({ page }: { page: Page }) => {

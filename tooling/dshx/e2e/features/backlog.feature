@@ -81,3 +81,19 @@ Feature: Backlog
     And the send-now box is unchecked
     And the thread is started from the dialog with its message kept
     Then the thread composer holds "Work on b:1: Draft the thread starter" as a draft
+
+  @scenario:backlog.item-context-actions
+  Scenario: Right-click actions follow items across backlog views
+    Given the isolated plugin profile "@dshfiles/backlog" is booted
+    When the Backlog panel is opened
+    And "Context menu target" is captured
+    When backlog item b:1 is moved to "In progress" from its feed context menu
+    Then backlog item b:1 exposes all context actions in the "feed" view
+    And backlog item b:1 exposes all context actions in the "items" view
+    And backlog item b:1 exposes all context actions in the "board" view
+    And backlog item b:1 exposes all context actions in the "search" view
+    When backlog item b:1 is marked "Blocked" from its feed context menu
+    Then backlog item b:1 exposes all context actions in the "inbox" view
+    And backlog item b:1 exposes all context actions in the "projects" view
+    When backlog item b:1 is assigned to a registered project from its feed context menu
+    Then backlog item b:1 exposes all context actions in the "details" view

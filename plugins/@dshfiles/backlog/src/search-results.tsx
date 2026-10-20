@@ -3,7 +3,10 @@ import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import type { ReactNode } from 'react'
 
 import type { BacklogSummaryView } from './api.js'
+import { BacklogItemMenu } from './item-actions-menu.js'
 import { ItemGlyphs } from './item-glyphs.js'
+import type { StartThreadItem } from './start-thread.js'
+import { useBacklogActions } from './use-backlog-actions.js'
 
 type MatchField = NonNullable<BacklogSummaryView['match']>['fields'][number]
 
@@ -48,8 +51,11 @@ export const SearchResults = (props: {
   readonly select: (id: number) => void
   readonly hover: (id: number) => void
   readonly loaded: boolean
+  readonly startThread: (item: StartThreadItem) => void
+  readonly projectPaths: readonly string[]
 }): JSX.Element => {
   const terms = termsOf(props.query)
+  const actions = useBacklogActions()
   return (
     <div className="dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col">
       <div className="dshx:flex dshx:h-10 dshx:shrink-0 dshx:items-center dshx:gap-2 dshx:border-b dshx:border-border dshx:px-4 dshx:text-xs dshx:text-muted-foreground">
@@ -71,47 +77,58 @@ export const SearchResults = (props: {
           </li>
         ) : null}
         {props.items.map(item => (
-          <li
+          <BacklogItemMenu
             key={item.id}
-            aria-label={`Item b:${String(item.id)}`}
-            onClick={() => props.select(item.id)}
-            onMouseMove={() => props.hover(item.id)}
-            className={cn(
-              'dshx:flex dshx:cursor-default dshx:flex-col dshx:gap-1 dshx:border-b dshx:border-border/50 dshx:px-4 dshx:py-2.5 dshx:transition-colors',
-              item.id === props.openId ? 'dshx:bg-accent/80' : item.id === props.cursorId ? 'dshx:bg-accent/45' : 'dshx:hover:bg-accent/30',
-            )}
+            item={item}
+            projectPaths={props.projectPaths}
+            update={input => actions.update.mutate(input)}
+            triage={id => actions.triage.mutate(id)}
+            startThread={props.startThread}
+            openItem={props.select}
           >
-            <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:text-[13px]">
-              <ItemGlyphs.StatusIcon status={item.status} />
-              <span className="dshx:w-10 dshx:shrink-0 dshx:font-mono! dshx:text-[11px] dshx:text-muted-foreground">b:{item.id}</span>
-              <span className="dshx:min-w-0 dshx:truncate dshx:font-medium">
-                <Highlight text={item.title} terms={terms} />
-              </span>
-              <ItemGlyphs.AttentionBadge attention={item.attention} compact />
-              {item.freshness === 'fresh' ? null : (
-                <span className="dshx:shrink-0 dshx:rounded-full dshx:bg-muted dshx:px-1.5 dshx:text-[11px] dshx:text-muted-foreground">{item.freshness}</span>
+            <li
+              aria-label={`Item b:${String(item.id)}`}
+              onClick={() => props.select(item.id)}
+              onMouseMove={() => props.hover(item.id)}
+              className={cn(
+                'dshx:flex dshx:cursor-default dshx:flex-col dshx:gap-1 dshx:border-b dshx:border-border/50 dshx:px-4 dshx:py-2.5 dshx:transition-colors',
+                item.id === props.openId ? 'dshx:bg-accent/80' : item.id === props.cursorId ? 'dshx:bg-accent/45' : 'dshx:hover:bg-accent/30',
               )}
-              <span className="dshx:ml-auto dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1.5 dshx:text-[11px] dshx:text-muted-foreground">
-                {item.project === null ? null : (
-                  <>
-                    <ItemGlyphs.ProjectDot project={item.project} />
-                    {ItemGlyphs.projectName(item.project)} ·
-                  </>
-                )}
-                {ItemGlyphs.ago(item.lastActivityAt)}
-              </span>
-            </div>
-            {item.match === null ? null : (
-              <div className="dshx:flex dshx:min-w-0 dshx:items-baseline dshx:gap-2 dshx:pl-[66px] dshx:text-xs">
-                <span className="dshx:shrink-0 dshx:text-muted-foreground">in {item.match.fields.map(field => fieldLabels[field]).join(', ')}</span>
-                {item.match.snippet === null ? null : (
-                  <span className="dshx:min-w-0 dshx:truncate dshx:text-muted-foreground">
-                    <Highlight text={item.match.snippet} terms={terms} />
+            >
+              <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:text-[13px]">
+                <ItemGlyphs.StatusIcon status={item.status} />
+                <span className="dshx:w-10 dshx:shrink-0 dshx:font-mono! dshx:text-[11px] dshx:text-muted-foreground">b:{item.id}</span>
+                <span className="dshx:min-w-0 dshx:truncate dshx:font-medium">
+                  <Highlight text={item.title} terms={terms} />
+                </span>
+                <ItemGlyphs.AttentionBadge attention={item.attention} compact />
+                {item.freshness === 'fresh' ? null : (
+                  <span className="dshx:shrink-0 dshx:rounded-full dshx:bg-muted dshx:px-1.5 dshx:text-[11px] dshx:text-muted-foreground">
+                    {item.freshness}
                   </span>
                 )}
+                <span className="dshx:ml-auto dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1.5 dshx:text-[11px] dshx:text-muted-foreground">
+                  {item.project === null ? null : (
+                    <>
+                      <ItemGlyphs.ProjectDot project={item.project} />
+                      {ItemGlyphs.projectName(item.project)} ·
+                    </>
+                  )}
+                  {ItemGlyphs.ago(item.lastActivityAt)}
+                </span>
               </div>
-            )}
-          </li>
+              {item.match === null ? null : (
+                <div className="dshx:flex dshx:min-w-0 dshx:items-baseline dshx:gap-2 dshx:pl-[66px] dshx:text-xs">
+                  <span className="dshx:shrink-0 dshx:text-muted-foreground">in {item.match.fields.map(field => fieldLabels[field]).join(', ')}</span>
+                  {item.match.snippet === null ? null : (
+                    <span className="dshx:min-w-0 dshx:truncate dshx:text-muted-foreground">
+                      <Highlight text={item.match.snippet} terms={terms} />
+                    </span>
+                  )}
+                </div>
+              )}
+            </li>
+          </BacklogItemMenu>
         ))}
       </ul>
     </div>

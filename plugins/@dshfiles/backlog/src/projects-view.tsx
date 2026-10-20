@@ -7,8 +7,10 @@ import { useQuery } from '@dshfiles/plugin-ui/query'
 
 import { backlogApi, BacklogViews, type BacklogSummaryView } from './api.js'
 import type { BacklogStatus } from './item.js'
+import { BacklogItemMenu } from './item-actions-menu.js'
 import { ItemGlyphs } from './item-glyphs.js'
-import { BacklogQueries } from './use-backlog-actions.js'
+import type { StartThreadItem } from './start-thread.js'
+import { BacklogQueries, type BacklogUpdateInput, useBacklogActions } from './use-backlog-actions.js'
 
 const DAY_MS = 86_400_000
 const NO_PROJECT = ''
@@ -69,24 +71,47 @@ const Card = (props: { readonly title: string; readonly action?: ReactNode; read
   </section>
 )
 
-const ItemLine = (props: { readonly item: BacklogSummaryView; readonly select: (id: number) => void }): JSX.Element => (
-  <li>
-    <button
-      type="button"
-      onClick={() => props.select(props.item.id)}
-      className="dshx:flex dshx:h-9 dshx:w-full dshx:items-center dshx:gap-2.5 dshx:rounded-md dshx:px-2 dshx:text-left dshx:text-[13px] dshx:transition-colors dshx:hover:bg-accent/50"
-    >
-      <ItemGlyphs.StatusIcon status={props.item.status} />
-      <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{props.item.title}</span>
-      <ItemGlyphs.AttentionBadge attention={props.item.attention} compact />
-      <ItemGlyphs.ActorStack actorIds={props.item.actors.map(actor => actor.id)} max={2} />
-      <span className="dshx:w-8 dshx:text-right dshx:text-[11px] dshx:text-muted-foreground">{ItemGlyphs.ago(props.item.lastActivityAt)}</span>
-    </button>
-  </li>
+const ItemLine = (props: {
+  readonly item: BacklogSummaryView
+  readonly select: (id: number) => void
+  readonly startThread: (item: StartThreadItem) => void
+  readonly projectPaths: readonly string[]
+  readonly update: (input: BacklogUpdateInput) => void
+  readonly triage: (id: number) => void
+}): JSX.Element => (
+  <BacklogItemMenu
+    item={props.item}
+    projectPaths={props.projectPaths}
+    update={props.update}
+    triage={props.triage}
+    startThread={props.startThread}
+    openItem={props.select}
+  >
+    <li aria-label={`Item b:${String(props.item.id)}`}>
+      <button
+        type="button"
+        onClick={() => props.select(props.item.id)}
+        className="dshx:flex dshx:h-9 dshx:w-full dshx:items-center dshx:gap-2.5 dshx:rounded-md dshx:px-2 dshx:text-left dshx:text-[13px] dshx:transition-colors dshx:hover:bg-accent/50"
+      >
+        <ItemGlyphs.StatusIcon status={props.item.status} />
+        <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{props.item.title}</span>
+        <ItemGlyphs.AttentionBadge attention={props.item.attention} compact />
+        <ItemGlyphs.ActorStack actorIds={props.item.actors.map(actor => actor.id)} max={2} />
+        <span className="dshx:w-8 dshx:text-right dshx:text-[11px] dshx:text-muted-foreground">{ItemGlyphs.ago(props.item.lastActivityAt)}</span>
+      </button>
+    </li>
+  </BacklogItemMenu>
 )
 
-const Overview = (props: { readonly project: Project; readonly back: () => void; readonly select: (id: number) => void }): JSX.Element => {
+const Overview = (props: {
+  readonly project: Project
+  readonly back: () => void
+  readonly select: (id: number) => void
+  readonly startThread: (item: StartThreadItem) => void
+  readonly projectPaths: readonly string[]
+}): JSX.Element => {
   const api = useApi(backlogApi)
+  const actions = useBacklogActions()
   const project = props.project
   const list = useQuery({
     queryKey: [BacklogQueries.key, 'list', 'project', project.key],
@@ -161,7 +186,15 @@ const Overview = (props: { readonly project: Project; readonly back: () => void;
             <Card title="Needs you">
               <ul className="dshx:-mx-2 dshx:flex dshx:flex-col">
                 {needsYou.map(item => (
-                  <ItemLine key={item.id} item={item} select={props.select} />
+                  <ItemLine
+                    key={item.id}
+                    item={item}
+                    select={props.select}
+                    startThread={props.startThread}
+                    projectPaths={props.projectPaths}
+                    update={input => actions.update.mutate(input)}
+                    triage={id => actions.triage.mutate(id)}
+                  />
                 ))}
               </ul>
             </Card>
@@ -170,7 +203,15 @@ const Overview = (props: { readonly project: Project; readonly back: () => void;
             {active.length === 0 ? <p className="dshx:text-xs dshx:text-muted-foreground">Nothing open.</p> : null}
             <ul className="dshx:-mx-2 dshx:flex dshx:flex-col">
               {active.slice(0, 12).map(item => (
-                <ItemLine key={item.id} item={item} select={props.select} />
+                <ItemLine
+                  key={item.id}
+                  item={item}
+                  select={props.select}
+                  startThread={props.startThread}
+                  projectPaths={props.projectPaths}
+                  update={input => actions.update.mutate(input)}
+                  triage={id => actions.triage.mutate(id)}
+                />
               ))}
             </ul>
           </Card>
@@ -206,19 +247,29 @@ const Overview = (props: { readonly project: Project; readonly back: () => void;
           <Card title="Recent activity">
             <ol className="dshx:flex dshx:flex-col dshx:gap-3">
               {recent.map(item => (
-                <li key={item.id} className="dshx:flex dshx:gap-2.5 dshx:text-xs">
-                  <ItemGlyphs.ActorAvatar actorId={item.activity.last?.actor} className="dshx:mt-0.5" />
-                  <button
-                    type="button"
-                    onClick={() => props.select(item.id)}
-                    className="dshx:min-w-0 dshx:flex-1 dshx:text-left dshx:text-muted-foreground dshx:hover:text-foreground"
-                  >
-                    <span className="dshx:font-medium dshx:text-foreground">{ItemGlyphs.actorName(item.activity.last?.actor)}</span>{' '}
-                    {item.activity.last === null ? '' : ItemGlyphs.describeEvent(item.activity.last, item.attention)} ·{' '}
-                    <span className="dshx:font-medium dshx:text-foreground">{item.title}</span>
-                  </button>
-                  <span className="dshx:shrink-0 dshx:text-[11px] dshx:text-muted-foreground">{ItemGlyphs.ago(item.lastActivityAt)}</span>
-                </li>
+                <BacklogItemMenu
+                  key={item.id}
+                  item={item}
+                  projectPaths={props.projectPaths}
+                  update={input => actions.update.mutate(input)}
+                  triage={id => actions.triage.mutate(id)}
+                  startThread={props.startThread}
+                  openItem={props.select}
+                >
+                  <li aria-label={`Item b:${String(item.id)}`} className="dshx:flex dshx:gap-2.5 dshx:text-xs">
+                    <ItemGlyphs.ActorAvatar actorId={item.activity.last?.actor} className="dshx:mt-0.5" />
+                    <button
+                      type="button"
+                      onClick={() => props.select(item.id)}
+                      className="dshx:min-w-0 dshx:flex-1 dshx:text-left dshx:text-muted-foreground dshx:hover:text-foreground"
+                    >
+                      <span className="dshx:font-medium dshx:text-foreground">{ItemGlyphs.actorName(item.activity.last?.actor)}</span>{' '}
+                      {item.activity.last === null ? '' : ItemGlyphs.describeEvent(item.activity.last, item.attention)} ·{' '}
+                      <span className="dshx:font-medium dshx:text-foreground">{item.title}</span>
+                    </button>
+                    <span className="dshx:shrink-0 dshx:text-[11px] dshx:text-muted-foreground">{ItemGlyphs.ago(item.lastActivityAt)}</span>
+                  </li>
+                </BacklogItemMenu>
               ))}
             </ol>
           </Card>
@@ -234,6 +285,8 @@ export const ProjectsView = (props: {
   readonly setSelectedProject: (project: string | null) => void
   readonly select: (id: number) => void
   readonly now: number
+  readonly startThread: (item: StartThreadItem) => void
+  readonly projectPaths: readonly string[]
 }): JSX.Element => {
   const api = useApi(backlogApi)
   const query = useQuery({ queryKey: [BacklogQueries.key, 'projects'], queryFn: ({ signal }) => api.projects(undefined, { signal }) })
@@ -248,7 +301,13 @@ export const ProjectsView = (props: {
   return (
     <div className="dshx:@container dshx:min-h-0 dshx:flex-1 dshx:overflow-y-auto">
       {selected !== undefined ? (
-        <Overview project={selected} back={() => props.setSelectedProject(null)} select={props.select} />
+        <Overview
+          project={selected}
+          back={() => props.setSelectedProject(null)}
+          select={props.select}
+          startThread={props.startThread}
+          projectPaths={props.projectPaths}
+        />
       ) : (
         <div className="dshx:mx-auto dshx:flex dshx:max-w-6xl dshx:flex-col dshx:gap-4 dshx:px-6 dshx:py-5">
           <div>

@@ -4,7 +4,9 @@ import { useState, type ReactNode } from 'react'
 
 import type { BacklogSummaryView } from './api.js'
 import { linkedThreadIds, type InboxThread } from './inbox-threads.js'
+import { BacklogItemMenu } from './item-actions-menu.js'
 import { ItemGlyphs } from './item-glyphs.js'
+import type { StartThreadItem } from './start-thread.js'
 import { useBacklogActions } from './use-backlog-actions.js'
 
 type InboxFilter = 'all' | 'needs-input' | 'blocked' | 'suggestions'
@@ -63,6 +65,8 @@ export const InboxView = (props: {
   readonly acknowledgeThread: (thread: InboxThread) => void
   readonly inspector: ReactNode
   readonly loaded: boolean
+  readonly startThread: (item: StartThreadItem) => void
+  readonly projectPaths: readonly string[]
 }): JSX.Element => {
   const actions = useBacklogActions()
   const [filter, setFilter] = useState<InboxFilter>('all')
@@ -167,78 +171,90 @@ export const InboxView = (props: {
             </li>
           ) : null}
           {rows.map(item => (
-            <li
+            <BacklogItemMenu
               key={item.id}
-              aria-label={`Item b:${String(item.id)}`}
-              aria-current={item.id === props.openId ? 'true' : undefined}
-              onClick={() => props.select(item.id)}
-              className={cn(
-                'dshx:group/row dshx:relative dshx:flex dshx:cursor-default dshx:gap-3 dshx:border-b dshx:border-border/60 dshx:px-4 dshx:py-3 dshx:transition-colors',
-                item.id === props.openId ? 'dshx:bg-accent/70' : 'dshx:hover:bg-accent/35',
-              )}
+              item={item}
+              projectPaths={props.projectPaths}
+              update={input => actions.update.mutate(input)}
+              triage={id => actions.triage.mutate(id)}
+              startThread={props.startThread}
+              openItem={props.select}
             >
-              {isUnread(item) ? (
-                <span
-                  aria-label="Unread"
-                  className="dshx:absolute dshx:top-1/2 dshx:left-1.5 dshx:size-1.5 dshx:-translate-y-1/2 dshx:rounded-full dshx:bg-info"
-                />
-              ) : null}
-              {item.proposal !== null && item.attention === 'none' ? (
-                <span className="dshx:inline-flex dshx:size-7 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-full dshx:bg-violet/15 dshx:text-violet">
-                  <WandSparklesIcon className="dshx:size-3.5" />
-                </span>
-              ) : (
-                <ItemGlyphs.ActorAvatar actorId={item.activity.last?.actor ?? item.actors[0]?.id} className="dshx:size-7 dshx:text-[11px] dshx:ring-0" />
-              )}
-              <div className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-1">
-                <p
-                  className={cn('dshx:line-clamp-2 dshx:text-[13px] dshx:leading-snug', isUnread(item) ? 'dshx:text-foreground' : 'dshx:text-muted-foreground')}
-                >
-                  {headline(item)}
-                </p>
-                {item.activity.last?.kind === 'commented' ? (
-                  <p className="dshx:truncate dshx:text-xs dshx:text-muted-foreground">{item.activity.last.detail}</p>
-                ) : item.preview === '' ? null : (
-                  <p className="dshx:truncate dshx:text-xs dshx:text-muted-foreground">{item.preview}</p>
+              <li
+                aria-label={`Item b:${String(item.id)}`}
+                aria-current={item.id === props.openId ? 'true' : undefined}
+                onClick={() => props.select(item.id)}
+                className={cn(
+                  'dshx:group/row dshx:relative dshx:flex dshx:cursor-default dshx:gap-3 dshx:border-b dshx:border-border/60 dshx:px-4 dshx:py-3 dshx:transition-colors',
+                  item.id === props.openId ? 'dshx:bg-accent/70' : 'dshx:hover:bg-accent/35',
                 )}
-                <p className="dshx:flex dshx:items-center dshx:gap-1.5 dshx:text-[11px] dshx:text-muted-foreground">
-                  <ItemGlyphs.AttentionBadge attention={item.attention} compact />
-                  {linkedThreadIds(item).map(sessionId => (
-                    <button
-                      key={sessionId}
-                      type="button"
-                      onClick={event => {
-                        event.stopPropagation()
-                        props.openThread(sessionId)
-                      }}
-                      className="dshx:inline-flex dshx:items-center dshx:gap-1 dshx:font-medium dshx:text-foreground dshx:hover:underline"
-                    >
-                      <MessagesSquareIcon aria-hidden className="dshx:size-3" /> Open thread
-                    </button>
-                  ))}
-                  {item.project === null ? null : (
-                    <>
-                      <ItemGlyphs.ProjectDot project={item.project} />
-                      <span className="dshx:truncate">{ItemGlyphs.projectName(item.project)}</span>·
-                    </>
-                  )}
-                  <span className="dshx:font-mono!">b:{item.id}</span>· {ItemGlyphs.ago(item.lastActivityAt)}
-                </p>
-              </div>
-              <button
-                type="button"
-                aria-label="Resolve"
-                title={item.attention === 'none' ? 'Dismiss the suggestion' : 'Mark resolved'}
-                onClick={event => {
-                  event.stopPropagation()
-                  if (item.attention === 'none') actions.dismissProposal.mutate(item.id)
-                  else actions.update.mutate({ id: item.id, attention: 'none' })
-                }}
-                className="dshx:self-start dshx:rounded-md dshx:p-1 dshx:text-muted-foreground dshx:opacity-0 dshx:transition-opacity dshx:group-hover/row:opacity-100 dshx:hover:bg-accent dshx:hover:text-foreground"
               >
-                <CheckIcon className="dshx:size-3.5" />
-              </button>
-            </li>
+                {isUnread(item) ? (
+                  <span
+                    aria-label="Unread"
+                    className="dshx:absolute dshx:top-1/2 dshx:left-1.5 dshx:size-1.5 dshx:-translate-y-1/2 dshx:rounded-full dshx:bg-info"
+                  />
+                ) : null}
+                {item.proposal !== null && item.attention === 'none' ? (
+                  <span className="dshx:inline-flex dshx:size-7 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-full dshx:bg-violet/15 dshx:text-violet">
+                    <WandSparklesIcon className="dshx:size-3.5" />
+                  </span>
+                ) : (
+                  <ItemGlyphs.ActorAvatar actorId={item.activity.last?.actor ?? item.actors[0]?.id} className="dshx:size-7 dshx:text-[11px] dshx:ring-0" />
+                )}
+                <div className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-1">
+                  <p
+                    className={cn(
+                      'dshx:line-clamp-2 dshx:text-[13px] dshx:leading-snug',
+                      isUnread(item) ? 'dshx:text-foreground' : 'dshx:text-muted-foreground',
+                    )}
+                  >
+                    {headline(item)}
+                  </p>
+                  {item.activity.last?.kind === 'commented' ? (
+                    <p className="dshx:truncate dshx:text-xs dshx:text-muted-foreground">{item.activity.last.detail}</p>
+                  ) : item.preview === '' ? null : (
+                    <p className="dshx:truncate dshx:text-xs dshx:text-muted-foreground">{item.preview}</p>
+                  )}
+                  <p className="dshx:flex dshx:items-center dshx:gap-1.5 dshx:text-[11px] dshx:text-muted-foreground">
+                    <ItemGlyphs.AttentionBadge attention={item.attention} compact />
+                    {linkedThreadIds(item).map(sessionId => (
+                      <button
+                        key={sessionId}
+                        type="button"
+                        onClick={event => {
+                          event.stopPropagation()
+                          props.openThread(sessionId)
+                        }}
+                        className="dshx:inline-flex dshx:items-center dshx:gap-1 dshx:font-medium dshx:text-foreground dshx:hover:underline"
+                      >
+                        <MessagesSquareIcon aria-hidden className="dshx:size-3" /> Open thread
+                      </button>
+                    ))}
+                    {item.project === null ? null : (
+                      <>
+                        <ItemGlyphs.ProjectDot project={item.project} />
+                        <span className="dshx:truncate">{ItemGlyphs.projectName(item.project)}</span>·
+                      </>
+                    )}
+                    <span className="dshx:font-mono!">b:{item.id}</span>· {ItemGlyphs.ago(item.lastActivityAt)}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  aria-label="Resolve"
+                  title={item.attention === 'none' ? 'Dismiss the suggestion' : 'Mark resolved'}
+                  onClick={event => {
+                    event.stopPropagation()
+                    if (item.attention === 'none') actions.dismissProposal.mutate(item.id)
+                    else actions.update.mutate({ id: item.id, attention: 'none' })
+                  }}
+                  className="dshx:self-start dshx:rounded-md dshx:p-1 dshx:text-muted-foreground dshx:opacity-0 dshx:transition-opacity dshx:group-hover/row:opacity-100 dshx:hover:bg-accent dshx:hover:text-foreground"
+                >
+                  <CheckIcon className="dshx:size-3.5" />
+                </button>
+              </li>
+            </BacklogItemMenu>
           ))}
         </ul>
       </section>

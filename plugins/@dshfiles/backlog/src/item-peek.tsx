@@ -45,7 +45,9 @@ import type { ComposerThread } from './composer.js'
 import { BacklogItems, type BacklogAttention, type BacklogEvent, type BacklogLink, type BacklogProposal, type BacklogRelation } from './item.js'
 import { ItemGlyphs } from './item-glyphs.js'
 import { ItemFiles } from './item-files.js'
+import { BacklogItemMenu } from './item-actions-menu.js'
 import { ItemPickers } from './item-pickers.js'
+import type { StartThreadItem } from './start-thread.js'
 import { BacklogTriage } from './triage.js'
 import { BacklogQueries, useBacklogActions } from './use-backlog-actions.js'
 
@@ -516,7 +518,8 @@ const PeekBody = (props: {
   readonly openThread: OpenThread
   readonly select: (id: number) => void
   readonly close: () => void
-  readonly startThread?: () => void
+  readonly startThread: (item: StartThreadItem) => void
+  readonly projectPaths: readonly string[]
 }): JSX.Element => {
   const actions = useBacklogActions()
   const item = props.detail.item
@@ -548,11 +551,15 @@ const PeekBody = (props: {
           {item.freshness === 'fresh' ? null : <span className="dshx:rounded-full dshx:bg-muted dshx:px-1.5 dshx:text-[11px]">{item.freshness}</span>}
         </nav>
         <div className="dshx:ml-auto dshx:flex dshx:items-center dshx:gap-0.5">
-          {props.startThread === undefined ? null : (
-            <Button variant="ghost" size="icon-xs" aria-label="Start thread" title="Start a thread for this item" onClick={props.startThread}>
-              <MessagesSquareIcon />
-            </Button>
-          )}
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            aria-label="Start thread"
+            title="Start a thread for this item"
+            onClick={() => props.startThread({ id: item.id, title: item.title, project: item.project, preview: item.body })}
+          >
+            <MessagesSquareIcon />
+          </Button>
           <Button
             variant="ghost"
             size="icon-xs"
@@ -585,22 +592,30 @@ const PeekBody = (props: {
       </header>
       <div ref={scroller} className="dshx:min-h-0 dshx:flex-1 dshx:overflow-y-auto">
         <div className={cn('dshx:mx-auto dshx:flex dshx:flex-col dshx:gap-6 dshx:px-5 dshx:py-5', props.expanded && 'dshx:max-w-3xl dshx:px-8')}>
-          <div className="dshx:flex dshx:flex-col dshx:gap-3">
-            <TitleField id={item.id} title={item.title} />
-            <div className="dshx:-ml-1.5 dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-1">
-              <ItemPickers.Status id={item.id} status={item.status} withLabel onPick={status => actions.update.mutate({ id: item.id, status })} />
-              <ItemPickers.Kind id={item.id} kind={item.kind} onPick={kind => actions.update.mutate({ id: item.id, kind })} />
-              <ItemPickers.Attention
-                id={item.id}
-                attention={item.attention ?? 'none'}
-                onPick={attention => actions.update.mutate({ id: item.id, attention })}
-              />
-              <span className="dshx:ml-1">
-                <ItemGlyphs.ActorStack actorIds={item.actors.map(actor => actor.id)} />
-              </span>
+          <BacklogItemMenu
+            item={item}
+            projectPaths={props.projectPaths}
+            update={input => actions.update.mutate(input)}
+            triage={id => actions.triage.mutate(id)}
+            startThread={props.startThread}
+          >
+            <div className="dshx:flex dshx:flex-col dshx:gap-3">
+              <TitleField id={item.id} title={item.title} />
+              <div className="dshx:-ml-1.5 dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-1">
+                <ItemPickers.Status id={item.id} status={item.status} withLabel onPick={status => actions.update.mutate({ id: item.id, status })} />
+                <ItemPickers.Kind id={item.id} kind={item.kind} onPick={kind => actions.update.mutate({ id: item.id, kind })} />
+                <ItemPickers.Attention
+                  id={item.id}
+                  attention={item.attention ?? 'none'}
+                  onPick={attention => actions.update.mutate({ id: item.id, attention })}
+                />
+                <span className="dshx:ml-1">
+                  <ItemGlyphs.ActorStack actorIds={item.actors.map(actor => actor.id)} />
+                </span>
+              </div>
+              <TagsField id={item.id} tags={item.tags} />
             </div>
-            <TagsField id={item.id} tags={item.tags} />
-          </div>
+          </BacklogItemMenu>
           {running.length === 0 ? null : (
             <section
               aria-label="Execution"
@@ -666,17 +681,27 @@ const PeekBody = (props: {
                 <span className="dshx:text-[11px] dshx:text-muted-foreground">Referenced by</span>
                 <ul aria-label="Referenced by" className="dshx:flex dshx:flex-col">
                   {props.detail.backlinks.map(backlink => (
-                    <li key={backlink.id}>
-                      <button
-                        type="button"
-                        onClick={() => props.select(backlink.id)}
-                        className="dshx:flex dshx:h-8 dshx:w-full dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-2 dshx:text-left dshx:text-[13px] dshx:transition-colors dshx:hover:bg-accent/50"
-                      >
-                        <ItemGlyphs.StatusIcon status={backlink.status} />
-                        <span className="dshx:font-mono! dshx:text-xs dshx:text-muted-foreground">b:{backlink.id}</span>
-                        <span className="dshx:min-w-0 dshx:truncate">{backlink.title}</span>
-                      </button>
-                    </li>
+                    <BacklogItemMenu
+                      key={backlink.id}
+                      item={backlink}
+                      projectPaths={props.projectPaths}
+                      update={input => actions.update.mutate(input)}
+                      triage={id => actions.triage.mutate(id)}
+                      startThread={props.startThread}
+                      openItem={props.select}
+                    >
+                      <li>
+                        <button
+                          type="button"
+                          onClick={() => props.select(backlink.id)}
+                          className="dshx:flex dshx:h-8 dshx:w-full dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-2 dshx:text-left dshx:text-[13px] dshx:transition-colors dshx:hover:bg-accent/50"
+                        >
+                          <ItemGlyphs.StatusIcon status={backlink.status} />
+                          <span className="dshx:font-mono! dshx:text-xs dshx:text-muted-foreground">b:{backlink.id}</span>
+                          <span className="dshx:min-w-0 dshx:truncate">{backlink.title}</span>
+                        </button>
+                      </li>
+                    </BacklogItemMenu>
                   ))}
                 </ul>
               </div>
@@ -703,7 +728,8 @@ const ItemPeek = (props: {
   readonly select: (id: number) => void
   readonly close: () => void
   readonly embedded?: boolean
-  readonly startThread?: () => void
+  readonly startThread: (item: StartThreadItem) => void
+  readonly projectPaths: readonly string[]
 }): JSX.Element => {
   const api = useApi(backlogApi)
   const summary = props.summary
@@ -737,7 +763,8 @@ const ItemPeek = (props: {
           openThread={props.openThread}
           select={props.select}
           close={props.close}
-          {...(props.startThread === undefined ? {} : { startThread: props.startThread })}
+          startThread={props.startThread}
+          projectPaths={props.projectPaths}
         />
       ) : (
         <p className="dshx:p-6 dshx:text-sm dshx:text-muted-foreground">b:{props.id} does not exist.</p>

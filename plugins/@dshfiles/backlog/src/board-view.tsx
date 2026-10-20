@@ -9,7 +9,8 @@ import { backlogApi, BacklogViews, type BacklogSummaryView } from './api.js'
 import type { BacklogStatus } from './item.js'
 import { ItemGlyphs } from './item-glyphs.js'
 import { ItemPickers } from './item-pickers.js'
-import { StartThreadMenu } from './start-thread-dialog.js'
+import { BacklogItemMenu } from './item-actions-menu.js'
+import type { StartThreadItem } from './start-thread.js'
 import { BacklogQueries, useBacklogActions } from './use-backlog-actions.js'
 import { withViewTransition } from './view-transition.js'
 
@@ -162,7 +163,8 @@ export const BoardView = (props: {
   readonly openId: number | null
   readonly open: (id: number) => void
   readonly captureInto: (status: BacklogStatus) => void
-  readonly startThread: (item: BacklogSummaryView) => void
+  readonly startThread: (item: StartThreadItem) => void
+  readonly projectPaths: readonly string[]
 }): JSX.Element => {
   const actions = useBacklogActions()
   const [drag, setDrag] = useState<Drag | null>(null)
@@ -243,7 +245,15 @@ export const BoardView = (props: {
             <div className="dshx:flex dshx:min-h-16 dshx:flex-1 dshx:flex-col dshx:gap-1.5 dshx:overflow-y-auto dshx:p-0.5">
               {column.length === 0 ? <p className="dshx:py-6 dshx:text-center dshx:text-xs dshx:text-muted-foreground/70">Nothing here</p> : null}
               {column.slice(0, (pages[status] ?? 1) * COLUMN_PAGE).map(item => (
-                <StartThreadMenu key={item.id} item={item} startThread={props.startThread}>
+                <BacklogItemMenu
+                  key={item.id}
+                  item={item}
+                  projectPaths={props.projectPaths}
+                  update={input => actions.update.mutate(input)}
+                  triage={id => actions.triage.mutate(id)}
+                  startThread={props.startThread}
+                  openItem={props.open}
+                >
                   <article
                     aria-label={`Card b:${String(item.id)}`}
                     aria-expanded={expanded === item.id}
@@ -259,7 +269,7 @@ export const BoardView = (props: {
                     <CardFace item={item} onPickStatus={status => move(item.id, status)} />
                     {expanded === item.id ? <CardDetail item={item} open={props.open} /> : null}
                   </article>
-                </StartThreadMenu>
+                </BacklogItemMenu>
               ))}
               {column.length > (pages[status] ?? 1) * COLUMN_PAGE ? (
                 <button

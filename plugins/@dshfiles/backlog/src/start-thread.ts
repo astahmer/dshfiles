@@ -2,8 +2,6 @@ import type { ModelCatalog } from '@deepseek-ai/dsh-api-session-controller/types
 import type { WorkspaceId } from '@deepseek-ai/dsh-workspace/types'
 import { z } from 'zod'
 
-import type { BacklogSummaryView } from './api.js'
-
 const effortSchema = z.object({ id: z.string(), name: z.string(), description: z.string().optional() })
 const modelSchema = z.object({
   id: z.string(),
@@ -73,9 +71,17 @@ export interface StartThreadTargetOption {
   readonly target: StartThreadTarget
 }
 
+/** The item fields needed to start a thread, whether selected from a list or its detail view. */
+export interface StartThreadItem {
+  readonly id: number
+  readonly title: string
+  readonly project: string | null
+  readonly preview: string
+}
+
 /** What the panel collects before starting a thread for an item. */
 export interface StartThreadRequest {
-  readonly item: BacklogSummaryView
+  readonly item: StartThreadItem
   readonly target: StartThreadTarget
   readonly provider: string
   readonly model: string
@@ -117,7 +123,7 @@ export class StartThreadForm {
   }
 
   /** The item's own project preselects; a project-registered path wins over the same path taken as a bare folder. */
-  static targets(item: BacklogSummaryView, projects: readonly StartThreadProject[]): StartThreadTargetOption[] {
+  static targets(item: StartThreadItem, projects: readonly StartThreadProject[]): StartThreadTargetOption[] {
     const registered = projects.map(project => ({
       value: `project:${project.id}`,
       label: project.title,
@@ -133,7 +139,7 @@ export class StartThreadForm {
   }
 
   /** The preselected target value: the item's project when it resolves, otherwise the Host default. */
-  static defaultTargetValue(item: BacklogSummaryView, projects: readonly StartThreadProject[]): string {
+  static defaultTargetValue(item: StartThreadItem, projects: readonly StartThreadProject[]): string {
     if (item.project === null) return 'default'
     const project = projects.find(candidate => candidate.path === item.project)
     return project === undefined ? `cwd:${item.project}` : `project:${project.id}`
@@ -152,14 +158,14 @@ export class StartThreadForm {
   }
 
   /** The opening message: enough for the agent to find the item without pasting the whole body. */
-  static message(item: BacklogSummaryView): string {
+  static message(item: StartThreadItem): string {
     const heading = `Work on b:${String(item.id)}: ${item.title}`
     const body = item.preview.trim() === '' || item.preview.trim() === item.title ? '' : `\n\n${item.preview}`
     return `${heading}${body}`.slice(0, MESSAGE_MAX)
   }
 
   /** The thread title the sidebar shows, clipped to the Session title limit. */
-  static title(item: BacklogSummaryView): string {
+  static title(item: StartThreadItem): string {
     return item.title.slice(0, TITLE_MAX)
   }
 }

@@ -26,8 +26,9 @@ import { BacklogItems, type BacklogKind, type BacklogStatus } from './item.js'
 import { ItemGlyphs } from './item-glyphs.js'
 import { ItemPickers } from './item-pickers.js'
 import { extendBacklogSelection, toggleBacklogSelection } from './selection.js'
-import { StartThreadMenu } from './start-thread-dialog.js'
+import { BacklogItemMenu } from './item-actions-menu.js'
 import { StatusFilterBar } from './status-filter-bar.js'
+import type { StartThreadItem } from './start-thread.js'
 import { useBacklogActions } from './use-backlog-actions.js'
 
 type GroupBy = 'status' | 'kind' | 'project' | 'attention'
@@ -108,7 +109,8 @@ const Row = (props: {
   readonly selectWithModifiers: (id: number, shiftKey: boolean, additive: boolean) => void
   readonly select: (id: number) => void
   readonly hover: (id: number) => void
-  readonly startThread: (item: BacklogSummaryView) => void
+  readonly startThread: (item: StartThreadItem) => void
+  readonly projectPaths: readonly string[]
 }): JSX.Element => {
   const actions = useBacklogActions()
   const modifiedCheckboxClick = useRef(false)
@@ -121,7 +123,14 @@ const Row = (props: {
     return 'dshx:hover:bg-accent/30'
   })()
   return (
-    <StartThreadMenu item={item} startThread={props.startThread}>
+    <BacklogItemMenu
+      item={item}
+      projectPaths={props.projectPaths}
+      update={input => actions.update.mutate(input)}
+      triage={id => actions.triage.mutate(id)}
+      startThread={props.startThread}
+      openItem={props.select}
+    >
       <div
         role="row"
         aria-label={`Item b:${String(item.id)}`}
@@ -218,7 +227,7 @@ const Row = (props: {
         </span>
         <span className="dshx:text-right dshx:text-[11px] dshx:tabular-nums dshx:text-muted-foreground">{ItemGlyphs.ago(item.lastActivityAt)}</span>
       </div>
-    </StartThreadMenu>
+    </BacklogItemMenu>
   )
 }
 
@@ -238,7 +247,8 @@ export const ItemsView = (props: {
   readonly statuses: readonly BacklogStatus[]
   readonly toggleStatus: (status: BacklogStatus) => void
   readonly clearStatuses: () => void
-  readonly startThread: (item: BacklogSummaryView) => void
+  readonly startThread: (item: StartThreadItem) => void
+  readonly projectPaths: readonly string[]
 }): JSX.Element => {
   const actions = useBacklogActions()
   const [selected, setSelected] = useState<ReadonlySet<number>>(new Set())
@@ -428,6 +438,7 @@ export const ItemsView = (props: {
                     }}
                     hover={props.hover}
                     startThread={props.startThread}
+                    projectPaths={props.projectPaths}
                   />
                 )}
               </div>

@@ -6,7 +6,8 @@ import type { BacklogSummaryView } from './api.js'
 import type { BacklogStatus } from './item.js'
 import { ItemGlyphs } from './item-glyphs.js'
 import { ItemPickers } from './item-pickers.js'
-import { StartThreadMenu } from './start-thread-dialog.js'
+import { BacklogItemMenu } from './item-actions-menu.js'
+import type { StartThreadItem } from './start-thread.js'
 import { StatusFilterBar } from './status-filter-bar.js'
 import { useBacklogActions } from './use-backlog-actions.js'
 
@@ -45,7 +46,8 @@ const FeedEntry = (props: {
   readonly item: BacklogSummaryView
   readonly open: boolean
   readonly select: (id: number) => void
-  readonly startThread: (item: BacklogSummaryView) => void
+  readonly startThread: (item: StartThreadItem) => void
+  readonly projectPaths: readonly string[]
 }): JSX.Element => {
   const actions = useBacklogActions()
   const item = props.item
@@ -53,7 +55,14 @@ const FeedEntry = (props: {
   const summary = activityLine(item)
   const closed = item.status === 'done' || item.status === 'dropped'
   return (
-    <StartThreadMenu item={item} startThread={props.startThread}>
+    <BacklogItemMenu
+      item={item}
+      projectPaths={props.projectPaths}
+      update={input => actions.update.mutate(input)}
+      triage={id => actions.triage.mutate(id)}
+      startThread={props.startThread}
+      openItem={props.select}
+    >
       <article
         aria-label={`Item b:${String(item.id)}`}
         onClick={() => props.select(item.id)}
@@ -153,7 +162,7 @@ const FeedEntry = (props: {
           </button>
         </div>
       </article>
-    </StartThreadMenu>
+    </BacklogItemMenu>
   )
 }
 
@@ -177,9 +186,11 @@ export const FeedView = (props: {
   readonly select: (id: number) => void
   readonly loaded: boolean
   readonly now: number
-  readonly startThread: (item: BacklogSummaryView) => void
+  readonly startThread: (item: StartThreadItem) => void
+  readonly projectPaths: readonly string[]
 }): JSX.Element => {
   const now = props.now
+  const menuActions = useBacklogActions()
   const scroller = useRef<HTMLDivElement | null>(null)
   const atBottom = useRef(true)
   const ordered = useMemo(
@@ -208,15 +219,24 @@ export const FeedView = (props: {
         <div className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-2 dshx:overflow-x-auto dshx:border-b dshx:border-border dshx:px-4 dshx:py-2">
           <PinIcon aria-hidden className="dshx:size-3.5 dshx:shrink-0 dshx:fill-current dshx:text-warning" />
           {pinned.map(item => (
-            <button
+            <BacklogItemMenu
               key={item.id}
-              type="button"
-              onClick={() => props.select(item.id)}
-              className="dshx:flex dshx:h-7 dshx:max-w-64 dshx:shrink-0 dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:border dshx:border-border dshx:bg-card dshx:px-2 dshx:text-xs dshx:transition-colors dshx:hover:bg-accent"
+              item={item}
+              projectPaths={props.projectPaths}
+              update={input => menuActions.update.mutate(input)}
+              triage={id => menuActions.triage.mutate(id)}
+              startThread={props.startThread}
+              openItem={props.select}
             >
-              <ItemGlyphs.StatusIcon status={item.status} />
-              <span className="dshx:truncate">{item.title}</span>
-            </button>
+              <button
+                type="button"
+                onClick={() => props.select(item.id)}
+                className="dshx:flex dshx:h-7 dshx:max-w-64 dshx:shrink-0 dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:border dshx:border-border dshx:bg-card dshx:px-2 dshx:text-xs dshx:transition-colors dshx:hover:bg-accent"
+              >
+                <ItemGlyphs.StatusIcon status={item.status} />
+                <span className="dshx:truncate">{item.title}</span>
+              </button>
+            </BacklogItemMenu>
           ))}
         </div>
       )}
@@ -277,7 +297,13 @@ export const FeedView = (props: {
                     <span className="dshx:h-px dshx:flex-1 dshx:bg-border" />
                   </div>
                 ) : null}
-                <FeedEntry item={item} open={item.id === props.openId} select={props.select} startThread={props.startThread} />
+                <FeedEntry
+                  item={item}
+                  open={item.id === props.openId}
+                  select={props.select}
+                  startThread={props.startThread}
+                  projectPaths={props.projectPaths}
+                />
               </div>
             )
           })}
