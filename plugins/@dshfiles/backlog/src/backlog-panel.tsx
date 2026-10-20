@@ -528,6 +528,7 @@ export const BacklogPanel = (props: {
           item={startThreadItem}
           projects={props.startThread.listProjects()}
           loadCatalog={props.startThread.loadCatalog}
+          sendByDefault={settings.value?.startThreadSendsFirstMessage ?? true}
           start={props.startThread.start}
           close={() => setStartThreadItem(null)}
         />

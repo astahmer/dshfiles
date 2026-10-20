@@ -81,6 +81,8 @@ export interface StartThreadRequest {
   readonly model: string
   readonly reasoningEffort: string | undefined
   readonly message: string
+  /** Send the message as the thread's first turn; false leaves it as an editable draft. */
+  readonly send: boolean
 }
 
 const TITLE_MAX = 200

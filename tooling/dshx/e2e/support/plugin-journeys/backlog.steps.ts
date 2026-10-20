@@ -185,6 +185,29 @@ Then('the start thread dialog offers the account model and the Host default fold
   })
 })
 
+Then('the start thread dialog sends the prefilled message by default', async ({ page }: { page: Page }) => {
+  await expect(startThreadDialog(page).getByRole('checkbox', { name: 'Send this message now' })).toBeChecked()
+})
+
+When('the send-now box is unchecked', async ({ page }: { page: Page }) => {
+  await startThreadDialog(page).getByRole('checkbox', { name: 'Send this message now' }).uncheck()
+  await expect(startThreadDialog(page)).toContainText('editable draft')
+})
+
+When('the thread is started from the dialog with its message kept', async ({ page }: { page: Page }) => {
+  await startThreadDialog(page).getByRole('button', { name: 'Start thread', exact: true }).click()
+  await expect(startThreadDialog(page)).toBeHidden()
+})
+
+Then('the thread composer holds {string} as a draft', async ({ page }: { page: Page }, text: string) => {
+  await recordAssertion(page, 'backlog-start-thread-draft', async () => {
+    const composer = page.getByRole('textbox', { name: THREAD_COMPOSER, exact: true }).or(page.getByRole('textbox', { name: NEW_THREAD_COMPOSER, exact: true }))
+    // The rich composer is a contenteditable editor, so the draft is asserted as text rather than a value.
+    await expect(composer.first()).toContainText(text, { timeout: 20_000 })
+  })
+  await finishJourneyAssertions(page)
+})
+
 When('the thread is started from the dialog without a first message', async ({ page }: { page: Page }) => {
   await expect(startThreadDialog(page).getByLabel('First message')).toHaveValue('Work on b:1: Ship the thread starter')
   await startThreadDialog(page).getByLabel('First message').fill('')

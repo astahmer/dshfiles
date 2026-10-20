@@ -75,7 +75,9 @@ account/model from the Host catalog with the model's reasoning efforts. The firs
 the item (title plus preview) and can be cleared to open an empty draft instead.
 
 Starting creates the thread, selects the account/model on it, names it after the item, sends the first message
-when one is left, links the item to the thread (provenance `user`) and opens it. A thread with no project joins
+when one is left (Settings → `dshfiles-backlog` → _Send the prefilled first message_; off opens it as an editable
+draft, and the dialog's _Send this message now_ box overrides the setting for one thread), links the item to the
+thread (provenance `user`) and opens it. A thread with no project joins
 the first registered workspace, the way the composer's New thread does. Failures after creation keep the thread
 and open it: a refused model switch leaves the Host default model, and a failed link is logged rather than
 losing the thread.

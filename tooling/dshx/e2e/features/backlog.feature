@@ -52,6 +52,7 @@ Feature: Backlog
     And "Ship the thread starter" is captured
     When backlog item b:1 is right-clicked for a thread
     Then the start thread dialog offers the account model and the Host default folder
+    And the start thread dialog sends the prefilled message by default
     When the thread is started from the dialog without a first message
     Then the thread composer is open for it
     When the Backlog panel is opened again
@@ -67,3 +68,15 @@ Feature: Backlog
     And "Third selection item" is captured
     When the Items view selects a range and toggles one item
     Then the batch status action updates only the remaining selected items
+
+
+  @scenario:backlog.start-thread-draft
+  Scenario: Start a thread with the first message left as a draft
+    Given the isolated plugin composition of "@dshfiles/backlog, @dshfiles/ai-accounts" is booted
+    When a Command Code account backed by a local fake provider is added
+    And the Backlog panel is opened
+    And "Draft the thread starter" is captured
+    When backlog item b:1 is right-clicked for a thread
+    And the send-now box is unchecked
+    And the thread is started from the dialog with its message kept
+    Then the thread composer holds "Work on b:1: Draft the thread starter" as a draft

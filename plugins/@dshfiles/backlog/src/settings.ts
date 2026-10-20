@@ -25,6 +25,11 @@ export const backlogSettings = defineSettings({
       .description(
         'Move items on their own: a user message mentioning b:12 links that thread and starts the item; a revision on main saying "Closes b:12" finishes it. Never overrides a status you set by hand.',
       ),
+    startThreadSendsFirstMessage: Schema.boolean()
+      .default(true)
+      .description(
+        'When a thread is started from an item, send its prefilled first message at once. Off opens the thread with that text as a draft you can edit before sending.',
+      ),
     revisionRepositories: Schema.array(Schema.string())
       .default([])
       .description('Repositories whose main bookmark is read for "Closes b:<n>", besides every project an open item names.'),

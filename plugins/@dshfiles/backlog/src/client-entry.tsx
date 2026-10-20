@@ -24,7 +24,7 @@ declare module '@deepseek-ai/dsh-api-session-controller/client' {
 
 export default defineClient({
   name: '@dshfiles/backlog',
-  inject: ['slots', 'sessions', 'workspaces', 'remote', 'remote.session', 'uiWorkspace', 'inputTriggers'],
+  inject: ['slots', 'sessions', 'workspaces', 'remote', 'remote.session', 'uiWorkspace', 'conversation', 'inputTriggers'],
   setup(ctx, decorate) {
     const api = createApiClient(ctx, backlogApi)
     const startThreadPorts: StartThreadPorts = {
@@ -53,10 +53,14 @@ export default defineClient({
           const reference = ctx.sessions.retain(sessionId, { source: 'backlogStartThread' })
           try {
             await reference.ready
-            const session = reference.binding.session
-            const handle = session.beginSubmission({ mode: 'queue', text: request.message, attachments: [] })
-            const prompted = await session.prompt([{ type: 'text', text: request.message }], 'queue', undefined, handle.requestId)
-            if (!prompted.ok) console.warn(`backlog: thread ${sessionId} started without its first message: ${prompted.error.message}`)
+            if (request.send) {
+              const session = reference.binding.session
+              const handle = session.beginSubmission({ mode: 'queue', text: request.message, attachments: [] })
+              const prompted = await session.prompt([{ type: 'text', text: request.message }], 'queue', undefined, handle.requestId)
+              if (!prompted.ok) console.warn(`backlog: thread ${sessionId} started without its first message: ${prompted.error.message}`)
+            } else {
+              ctx.conversation.input.requestDraftInitialization(reference.binding, { prompt: request.message, clearPreviousDraft: true })
+            }
           } catch (cause) {
             console.warn(`backlog: thread ${sessionId} started without its first message: ${String(cause)}`)
           } finally {

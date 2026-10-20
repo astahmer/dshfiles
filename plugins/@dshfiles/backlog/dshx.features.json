@@ -487,21 +487,27 @@
     {
       "id": "start-thread-from-item",
       "title": "Start a thread from an item",
-      "summary": "Right-clicking any item, feed entry or board card opens a dialog that picks the project (the item's own project preselected), the account/model and reasoning effort, and an opening message; starting it creates the thread, names it after the item, links the item to it and opens it.",
+      "summary": "Right-clicking any item, feed entry or board card opens a dialog that picks the project (the item's own project preselected), the account/model and reasoning effort, and an opening message; starting it creates the thread, names it after the item, links the item to it and opens it, sending the message at once unless the setting or the dialog box asks for an editable draft.",
       "reach": ["click button \"Backlog\"", "expect textbox \"Capture\"", "click button \"Board\"", "expect textbox \"Capture\""],
       "surfaces": ["client"],
       "configuration": [],
-      "states": ["item-without-project", "item-project-registered", "item-project-unregistered"],
+      "states": ["item-without-project", "item-project-registered", "item-project-unregistered", "send-at-once", "draft-only"],
       "failureModes": [
         "A thread the Host refuses is reported in the dialog and no item link is written.",
         "A model switch that the Host rejects keeps the thread on the Host default model and still opens it.",
-        "An empty first message opens an empty thread instead of sending anything."
+        "An empty first message opens an empty thread instead of sending anything.",
+        "A blocked draft initialization leaves the thread open with an empty composer."
       ],
       "externalDependencies": [],
       "verification": [
         {
           "kind": "gherkin",
           "id": "backlog.start-thread",
+          "featureFile": "tooling/dshx/e2e/features/backlog.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "backlog.start-thread-draft",
           "featureFile": "tooling/dshx/e2e/features/backlog.feature"
         },
         {

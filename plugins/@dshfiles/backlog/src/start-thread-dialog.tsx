@@ -39,6 +39,7 @@ export const StartThreadDialog = (props: {
   readonly item: BacklogSummaryView
   readonly projects: readonly StartThreadProject[]
   readonly loadCatalog: () => Promise<StartThreadCatalog>
+  readonly sendByDefault: boolean
   readonly start: (request: StartThreadRequest) => Promise<StartOutcome>
   readonly close: () => void
 }): JSX.Element => {
@@ -47,6 +48,7 @@ export const StartThreadDialog = (props: {
   const [modelKey, setModelKey] = useState<string | null>(null)
   const [effort, setEffort] = useState<string | null>(null)
   const [message, setMessage] = useState(() => StartThreadForm.message(props.item))
+  const [send, setSend] = useState(props.sendByDefault)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const catalogQuery = useQuery({ queryKey: ['dshfiles-backlog', 'start-thread', 'catalog'], queryFn: props.loadCatalog, staleTime: 30_000 })
@@ -74,6 +76,7 @@ export const StartThreadDialog = (props: {
         model: selected.model.id,
         reasoningEffort: effortValue,
         message: message.trim(),
+        send,
       })
       if (outcome.ok) {
         props.close()
@@ -154,7 +157,17 @@ export const StartThreadDialog = (props: {
               placeholder="Leave empty to open an empty thread"
               className="dshx:w-full dshx:resize-y dshx:rounded-md dshx:border dshx:border-input dshx:bg-background dshx:p-2 dshx:text-[13px] dshx:text-foreground dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50"
             />
-            <span className="dshx:text-[11px] dshx:text-muted-foreground">The thread is linked to this item and opened once it exists.</span>
+            <label className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-[13px]">
+              <input type="checkbox" checked={send} onChange={event => setSend(event.currentTarget.checked)} disabled={message.trim() === ''} />
+              Send this message now
+            </label>
+            <span className="dshx:text-[11px] dshx:text-muted-foreground">
+              {message.trim() === ''
+                ? 'The thread is linked to this item and opened as an empty draft.'
+                : send
+                  ? 'The thread is linked to this item, told what to work on and opened.'
+                  : 'The thread is linked to this item and opened with the message as an editable draft.'}
+            </span>
           </label>
           {error === null ? null : <p className="dshx:text-xs dshx:text-destructive">{error}</p>}
         </div>
