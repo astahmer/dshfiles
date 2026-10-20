@@ -61,12 +61,6 @@ Result on live (2026-10-20, after the session-search and memory fixes, within on
 12–54 ms and the worker's own search in 8–33 ms; a palette search shows results in 0.3–0.9 s including typing and the
 200 ms debounce. A replaced session no longer scans the index (slowest ingest pass after a restart 1.9 s, was 14.7 s).
 
-## Still open
-
-- A Host's first open of a long thread decodes the whole Session log (69 MB compressed for the 26 MB thread): 1.5 s
-  to history on a cold Host. That is `dsh-session-persistence-jsonl` loading the Session, below the controller; the
-  fix is an opening snapshot served from the log's tail, a fork of that persistence row.
-
 ## First open of a thread (2026-10-20)
 
 Opening a cold thread used to resume its Agent right after the snapshot went out: agent restore, `dsh-context` and
@@ -76,9 +70,17 @@ still resumes, so its crash closers land), and `@dshfiles/rich-composer` resumes
 its `agent-warmup` API, while the person types. Cold Host, same probe: the 358 KB thread 2.1 s → 0.76 s to history,
 the 69 MB thread 2.1–3.4 s → 1.5 s; a warmup call answers in about 0.2 s.
 
+The opening then stopped decoding the whole log. The JSONL backend writes one independently decodable zstd frame per
+append, so `follow` decodes only the newest frames (further back until the opening window settles) and folds the
+cached projection checkpoint over that tail with `sessionProjections.restore`. Live, forked, subagent, torn, migrating
+and mid-turn logs keep the full read. On a clone of the live Host, 52 of 52 openings were identical to the full read
+(cursor, `hasMore`, every record, every projection). Live, cold: the 69 MB thread 1.5 s → 0.54 s to history.
+
+## Still open
+
+- Loading older history in a cold thread (scrolling up past the opening window) and the first command still read the
+  whole log once; the opening no longer does.
 - Third-party `dsh-context/detail` reads each Session once per Host (0.4–2 s), then answers in under 100 ms.
 - Native per-switch catalogs (`skills/list`, `commands/list`, `schedule/list`, `agentPresets/list`, `session/modelCatalog`)
   answer under 250 ms on a warm Host but still run on every switch: Host gap 69.
 - Main-thread work on open is ~0.6 s spread over many small tasks; no single leaf above 80 ms.
-- The first thread-content search after a Host restart waits ~10 s for the finder's first Session list and titles
-  (cold projection reads while plugins activate); later searches are warm.
