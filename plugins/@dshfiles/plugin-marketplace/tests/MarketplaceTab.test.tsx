@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { PluginQueryProvider, QueryClient } from '@dshfiles/plugin-ui/query'
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { MarketplaceCard, MarketplaceListOutput } from '../src/api.js'
 import { zh } from '../src/locales.js'
@@ -11,6 +11,61 @@ const mocks = vi.hoisted(() => ({
   install: vi.fn(),
   settings: { value: undefined as { hubBaseUrl: string; defaultSort: 'latest' | 'stars'; hideIncompatible: boolean } | undefined },
 }))
+
+class RecordingObserver implements IntersectionObserver {
+  readonly root: Element | Document | null = null
+  readonly rootMargin = '0px'
+  readonly scrollMargin = '0px'
+  readonly thresholds: readonly number[] = [0]
+  static readonly instances: RecordingObserver[] = []
+  private readonly callback: IntersectionObserverCallback
+
+  constructor(callback: IntersectionObserverCallback) {
+    this.callback = callback
+    RecordingObserver.instances.push(this)
+  }
+
+  observe(): void {}
+  unobserve(): void {}
+  disconnect(): void {}
+  takeRecords(): IntersectionObserverEntry[] {
+    return []
+  }
+
+  emit(isIntersecting: boolean): void {
+    const rect = new DOMRect()
+    this.callback(
+      [
+        {
+          isIntersecting,
+          boundingClientRect: rect,
+          intersectionRatio: isIntersecting ? 1 : 0,
+          intersectionRect: rect,
+          rootBounds: null,
+          target: document.body,
+          time: 0,
+        },
+      ],
+      this,
+    )
+  }
+}
+
+const installObserver = (): void => {
+  RecordingObserver.instances.length = 0
+  Object.defineProperty(globalThis, 'IntersectionObserver', { value: RecordingObserver, configurable: true, writable: true })
+}
+
+const latestObserver = (): RecordingObserver => {
+  const observer = RecordingObserver.instances.at(-1)
+  if (observer === undefined) throw new Error('the marketplace did not observe its load-more sentinel')
+  return observer
+}
+
+const intersectLatestObserver = async (): Promise<void> => {
+  await waitFor(() => expect(RecordingObserver.instances.length).toBeGreaterThan(0))
+  act(() => latestObserver().emit(true))
+}
 
 vi.mock('@dshfiles/dshx/client', () => ({
   defineLocale: (namespace: string, dictionaries: unknown) => ({ namespace, dictionaries }),
@@ -91,6 +146,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup()
+  Object.defineProperty(globalThis, 'IntersectionObserver', { value: undefined, configurable: true, writable: true })
   vi.clearAllMocks()
   mocks.settings.value = undefined
 })
@@ -99,9 +155,11 @@ const listInputs = (): unknown[] => mocks.list.mock.calls.map(call => call[0])
 
 describe('MarketplaceTab', () => {
   it('sends list inputs without undefined keys, which the dshx API transport rejects', async () => {
+    installObserver()
     mocks.list.mockResolvedValueOnce(page({ nextCursor: 'cursor-two' }))
     renderTab()
-    fireEvent.click(await screen.findByRole('button', { name: '加载更多' }))
+    expect(await screen.findByText('测试插件')).toBeTruthy()
+    await intersectLatestObserver()
     await waitFor(() => expect(mocks.list).toHaveBeenCalledTimes(2))
     expect(listInputs()).toStrictEqual([{ locale: 'zh' }, { locale: 'zh', cursor: 'cursor-two' }])
   })
@@ -236,10 +294,12 @@ describe('MarketplaceTab', () => {
     expect(await screen.findByText(zh.empty)).toBeTruthy()
     empty.unmount()
 
+    installObserver()
     mocks.list.mockResolvedValueOnce(page({ nextCursor: 'cursor-two' }))
     mocks.list.mockResolvedValueOnce(page({ items: [plugin({ slug: 'third', name: '第三个插件' })] }))
     renderTab()
-    fireEvent.click(await screen.findByRole('button', { name: '加载更多' }))
+    expect(await screen.findByText('测试插件')).toBeTruthy()
+    await intersectLatestObserver()
     await waitFor(() => {
       expect(mocks.list).toHaveBeenLastCalledWith({ locale: 'zh', cursor: 'cursor-two' }, signalOptions)
       expect(screen.getByText('第三个插件')).toBeTruthy()

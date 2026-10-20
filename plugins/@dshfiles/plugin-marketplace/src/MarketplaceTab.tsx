@@ -27,6 +27,7 @@ import {
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { keepPreviousData, useInfiniteQuery, useMutation, useQueryClient, type InfiniteData } from '@dshfiles/plugin-ui/query'
 import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
+import { useLoadMore } from '@dshfiles/plugin-ui/hooks/use-load-more'
 import { useMemo, useRef, useState, type ReactNode } from 'react'
 import type { InstallFailureCode, MarketplaceCard, MarketplaceListOutput, MarketplaceLocale, MarketplaceSort } from './api.js'
 import { pluginMarketplaceApi } from './api.js'
@@ -452,6 +453,14 @@ export const MarketplaceTab = ({ t }: MarketplaceTabProps): ReactNode => {
   const visibleItems = useMemo(() => (compatibleOnly ? items.filter(item => item.compatibility !== 'incompatible') : items), [items, compatibleOnly])
   const hiddenCount = items.length - visibleItems.length
   const installingSlug = install.isPending ? (install.variables?.slug ?? null) : null
+  const loadMoreSentinel = useLoadMore({
+    enabled: catalog.hasNextPage && !catalog.isFetchingNextPage && !catalog.isFetchNextPageError && !showingPrevious,
+    resetKey: catalog.data?.pages.length ?? 0,
+    onLoadMore: () => {
+      void catalog.fetchNextPage()
+    },
+    rootMargin: '0px 0px 640px 0px',
+  })
 
   return (
     <section aria-busy={initialLoading || catalog.isFetchingNextPage} className="dshx-root dshx:@container dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-3">
@@ -642,22 +651,21 @@ export const MarketplaceTab = ({ t }: MarketplaceTabProps): ReactNode => {
       {catalog.hasNextPage && !showingPrevious ? (
         <div className="dshx:flex dshx:flex-col dshx:items-center dshx:gap-2 dshx:pb-2">
           {catalog.isFetchNextPageError ? (
-            <Alert variant="destructive">
-              <AlertDescription>{t('unavailable')}</AlertDescription>
-            </Alert>
+            <>
+              <Alert variant="destructive">
+                <AlertDescription>{t('unavailable')}</AlertDescription>
+              </Alert>
+              <Button onClick={() => void catalog.fetchNextPage()} size="sm" type="button" variant="outline">
+                {t('retry')}
+              </Button>
+            </>
           ) : null}
-          <Button
-            disabled={catalog.isFetchingNextPage}
-            onClick={() => {
-              void catalog.fetchNextPage()
-            }}
-            size="sm"
-            type="button"
-            variant="outline"
-          >
-            {catalog.isFetchingNextPage ? <InstallSpinner /> : null}
-            {catalog.isFetchingNextPage ? t('loadingMore') : catalog.isFetchNextPageError ? t('retry') : t('loadMore')}
-          </Button>
+          {catalog.isFetchingNextPage ? (
+            <span className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-xs dshx:text-muted-foreground" role="status">
+              <InstallSpinner /> {t('loadingMore')}
+            </span>
+          ) : null}
+          <div key="marketplace-load-more-sentinel" ref={loadMoreSentinel} aria-hidden="true" style={{ flex: '0 0 1px', height: 1 }} />
         </div>
       ) : null}
 

@@ -188,8 +188,9 @@ and dropped items archive after 7 days. Snoozing hides an item until a chosen ti
 ## Scale
 
 Lists poll a revision number and refetch only when it changes. Items is virtualized, the Feed mounts the
-newest 150 entries with older pages on request, Board columns mount 30 cards at a time, and project progress
-is counted on the Host over every item. Measured on 2,017 items (headless Chromium, warm): Items 104–313 ms,
+newest 150 entries and loads older entries as you scroll upward, Board columns reveal 30 cards at a time as
+you scroll, and project progress is counted on the Host over every item. Measured on 2,017 items (headless
+Chromium, warm): Items 104–313 ms,
 Board 208–269 ms, Feed 243–405 ms, search 82–550 ms, Projects 458–775 ms, first open 1.0–1.6 s.
 
 ## Storage

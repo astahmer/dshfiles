@@ -7,6 +7,8 @@ import { Separator } from '@dshfiles/plugin-ui/components/ui/separator'
 import { RefreshCwIcon, SearchIcon } from '@dshfiles/plugin-ui/icons'
 import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
 import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
+import { useLoadMore } from '@dshfiles/plugin-ui/hooks/use-load-more'
+import { usePrependScrollAnchor } from '@dshfiles/plugin-ui/hooks/use-prepend-scroll-anchor'
 import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { IWorkspaces } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { UiWorkspace } from '@deepseek-ai/dsh-client-ui-workspace/client'
@@ -103,6 +105,8 @@ export const ActivityTimelinePanel = (props: {
     () => [debouncedSearch, [...sources].sort().join(','), attentionOnly, detailed] as const,
     [debouncedSearch, sources, attentionOnly, detailed],
   )
+  const olderScope = JSON.stringify(filterKey)
+  const captureOlderAnchor = usePrependScrollAnchor({ root: scrollRef, pageCount: older.length, scope: olderScope })
   const feedQuery = useQuery({
     queryKey: [...feedKey, ...filterKey],
     queryFn: ({ signal }) =>
@@ -150,9 +154,22 @@ export const ActivityTimelinePanel = (props: {
     onSuccess: (page, token) => {
       // A page that resolved after the filter changed belongs to the previous history.
       if (page === null || !feedHistory.accepts(token)) return
-      setOlder(current => [...(page.items ?? []), ...current])
+      const pageItems = page.items ?? []
+      setOlder(current => [...pageItems, ...current])
       setCursor(page.nextCursor)
     },
+  })
+  const loadOlder = (): void => {
+    if (cursor === null || olderMutation.isPending) return
+    captureOlderAnchor()
+    olderMutation.mutate(feedHistory.request())
+  }
+  const olderSentinel = useLoadMore({
+    enabled: cursor !== null && !olderMutation.isPending && !olderMutation.isError,
+    resetKey: older.length,
+    onLoadMore: loadOlder,
+    root: scrollRef,
+    rootMargin: '500px 0px 0px 0px',
   })
   const detailQuery = useQuery({
     queryKey: ['activity-timeline', 'event', selected?.id],
@@ -186,12 +203,14 @@ export const ActivityTimelinePanel = (props: {
     setNavigationError('')
   }, [selected?.id])
 
+  const resetOlderMutation = olderMutation.reset
   useEffect(() => {
     feedHistory.invalidate()
     mergedItems.current = []
     setOlder([])
     setCursor(null)
-  }, [feedHistory, filterKey])
+    resetOlderMutation()
+  }, [feedHistory, filterKey, resetOlderMutation])
 
   useEffect(() => {
     if (older.length === 0) setCursor(feedQuery.data?.nextCursor ?? null)
@@ -299,9 +318,9 @@ export const ActivityTimelinePanel = (props: {
             </Button>
           </div>
         </div>
-        {feedQuery.error === null ? null : (
+        {feedQuery.error === null && olderMutation.error === null ? null : (
           <Alert variant="destructive">
-            <AlertDescription>{errorMessage(feedQuery.error, t('loadFailed'))}</AlertDescription>
+            <AlertDescription>{errorMessage(feedQuery.error ?? olderMutation.error, t('loadFailed'))}</AlertDescription>
           </Alert>
         )}
         <div className="dshx:grid dshx:min-h-0 dshx:gap-3 dshx:@4xl:grid-cols-[minmax(0,1fr)_22rem]">
@@ -314,9 +333,9 @@ export const ActivityTimelinePanel = (props: {
                     {t('newEvents')} ({pendingNew})
                   </Button>
                 ) : null}
-                {cursor === null ? null : (
-                  <Button size="sm" variant="outline" disabled={olderMutation.isPending} onClick={() => olderMutation.mutate(feedHistory.request())}>
-                    {olderMutation.isPending ? t('loadingOlder') : t('loadOlder')}
+                {cursor === null || !olderMutation.isError ? null : (
+                  <Button size="sm" variant="outline" onClick={loadOlder}>
+                    {t('loadOlder')}
                   </Button>
                 )}
               </div>
@@ -336,10 +355,16 @@ export const ActivityTimelinePanel = (props: {
                     {debouncedSearch.length === 0 && sources.length === 0 && !attentionOnly ? t('noActivity') : t('noMatch')}
                   </p>
                 ) : null}
+                <div key="activity-older-sentinel" ref={olderSentinel} aria-hidden="true" style={{ flex: '0 0 1px', height: 1 }} />
                 {items.map(item => (
                   <ActivityRow key={item.id} item={item} selected={selected?.id === item.id} t={t} sessionLabel={sessionLabel} onSelect={setSelected} />
                 ))}
               </div>
+              {olderMutation.isPending ? (
+                <p className="dshx:p-1 dshx:text-xs dshx:text-muted-foreground" role="status">
+                  {t('loadingOlder')}
+                </p>
+              ) : null}
             </CardContent>
           </Card>
           <Card className="dshx:min-w-0">

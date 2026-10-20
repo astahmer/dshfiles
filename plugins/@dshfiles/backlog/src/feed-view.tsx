@@ -1,5 +1,7 @@
 import { LinkIcon, MessageSquareIcon, PaperclipIcon, PinIcon, WandSparklesIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
+import { useLoadMore } from '@dshfiles/plugin-ui/hooks/use-load-more'
+import { usePrependScrollAnchor } from '@dshfiles/plugin-ui/hooks/use-prepend-scroll-anchor'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 
 import type { BacklogSummaryView } from './api.js'
@@ -13,7 +15,7 @@ import { BacklogText } from './item-text.js'
 import { useBacklogActions } from './use-backlog-actions.js'
 
 const DAY_MS = 86_400_000
-/** Like a chat history: the newest page is mounted, older pages load on request. */
+/** Like a chat history: the newest page is mounted first, older entries appear as the scroller reaches its top. */
 const PAGE = 150
 
 const dayLabel = (time: number, now: number): string => {
@@ -206,6 +208,17 @@ export const FeedView = (props: {
   const [shown, setShown] = useState(PAGE)
   const visible = ordered.slice(-shown)
   const hidden = ordered.length - visible.length
+  const captureOlderAnchor = usePrependScrollAnchor({ root: scroller, pageCount: shown, scope: JSON.stringify(props.statuses) })
+  const olderSentinel = useLoadMore({
+    enabled: hidden > 0,
+    resetKey: shown,
+    onLoadMore: () => {
+      captureOlderAnchor()
+      setShown(current => current + PAGE)
+    },
+    root: scroller,
+    rootMargin: '500px 0px 0px 0px',
+  })
   const pinned = props.items.filter(item => item.pinned)
   const lastId = ordered.at(-1)?.id
 
@@ -217,6 +230,24 @@ export const FeedView = (props: {
     const element = scroller.current
     if (element !== null) element.scrollTop = element.scrollHeight
   }, [props.loaded])
+
+  const renderVisibleEntry = (item: BacklogSummaryView, index: number): JSX.Element => {
+    const label = dayLabel(item.lastActivityAt, now)
+    const previous = visible[index - 1]
+    const separator = previous === undefined || dayLabel(previous.lastActivityAt, now) !== label
+    return (
+      <div key={item.id}>
+        {separator ? (
+          <div role="separator" className="dshx:my-3 dshx:flex dshx:items-center dshx:gap-3 dshx:px-3">
+            <span className="dshx:h-px dshx:flex-1 dshx:bg-border" />
+            <span className="dshx:text-[11px] dshx:font-medium dshx:text-muted-foreground">{label}</span>
+            <span className="dshx:h-px dshx:flex-1 dshx:bg-border" />
+          </div>
+        ) : null}
+        <FeedEntry item={item} open={item.id === props.openId} select={props.select} startThread={props.startThread} projectPaths={props.projectPaths} />
+      </div>
+    )
+  }
 
   return (
     <div className="dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col">
@@ -281,38 +312,8 @@ export const FeedView = (props: {
               </div>
             )
           ) : null}
-          {hidden === 0 ? null : (
-            <button
-              type="button"
-              onClick={() => setShown(shown + PAGE)}
-              className="dshx:mx-auto dshx:mb-2 dshx:rounded-full dshx:border dshx:border-border dshx:px-3 dshx:py-1 dshx:text-xs dshx:text-muted-foreground dshx:transition-colors dshx:hover:bg-accent dshx:hover:text-foreground"
-            >
-              Show {Math.min(hidden, PAGE)} older
-            </button>
-          )}
-          {visible.map((item, index) => {
-            const label = dayLabel(item.lastActivityAt, now)
-            const previous = visible[index - 1]
-            const separator = previous === undefined || dayLabel(previous.lastActivityAt, now) !== label
-            return (
-              <div key={item.id}>
-                {separator ? (
-                  <div role="separator" className="dshx:my-3 dshx:flex dshx:items-center dshx:gap-3 dshx:px-3">
-                    <span className="dshx:h-px dshx:flex-1 dshx:bg-border" />
-                    <span className="dshx:text-[11px] dshx:font-medium dshx:text-muted-foreground">{label}</span>
-                    <span className="dshx:h-px dshx:flex-1 dshx:bg-border" />
-                  </div>
-                ) : null}
-                <FeedEntry
-                  item={item}
-                  open={item.id === props.openId}
-                  select={props.select}
-                  startThread={props.startThread}
-                  projectPaths={props.projectPaths}
-                />
-              </div>
-            )
-          })}
+          <div key="older-sentinel" ref={olderSentinel} aria-hidden="true" style={{ flex: '0 0 1px', height: 1 }} />
+          {visible.map((item, index) => renderVisibleEntry(item, index))}
         </div>
       </div>
     </div>

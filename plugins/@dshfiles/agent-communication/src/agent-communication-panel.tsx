@@ -20,12 +20,14 @@ import { Textarea } from '@dshfiles/plugin-ui/components/ui/textarea'
 import { HashIcon, MessageSquareIcon, RefreshCwIcon, SearchIcon, SendIcon } from '@dshfiles/plugin-ui/icons'
 import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
 import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
+import { useLoadMore } from '@dshfiles/plugin-ui/hooks/use-load-more'
+import { usePrependScrollAnchor } from '@dshfiles/plugin-ui/hooks/use-prepend-scroll-anchor'
 import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { IWorkspaces } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import { errorMessage, useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useApi } from '@dshfiles/dshx/client'
 import type { CommunicationDiagnosticAgent, CommunicationDiagnostics, CommunicationMessage } from '@dshfiles/dshx/communication'
-import { useState } from 'react'
+import { useLayoutEffect, useRef, useState } from 'react'
 import { agentCommunicationApi, type AgentCommunicationBrowseInput, type AgentCommunicationPostInput } from './api.js'
 import { MessagePages } from './message-pages.js'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
@@ -390,6 +392,29 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
     .slice()
     .reverse()
     .flatMap(page => page.items)
+  const historyPageCount = messagesQuery.data?.pages.length ?? 0
+  const messageQueryIdentity = JSON.stringify(browseQueryKey)
+  const messagesScroll = useRef<HTMLDivElement>(null)
+  const captureOlderAnchor = usePrependScrollAnchor({ root: messagesScroll, pageCount: historyPageCount, scope: messageQueryIdentity })
+  const loadOlderMessages = (): void => {
+    if (!messagesQuery.hasNextPage || messagesQuery.isFetchingNextPage) return
+    captureOlderAnchor()
+    void messagesQuery.fetchNextPage()
+  }
+  const olderSentinel = useLoadMore({
+    enabled: messagesQuery.hasNextPage && !messagesQuery.isFetchingNextPage && !messagesQuery.isFetchNextPageError,
+    resetKey: historyPageCount,
+    onLoadMore: loadOlderMessages,
+    root: messagesScroll,
+    rootMargin: '500px 0px 0px 0px',
+  })
+  const initializedMessageKey = useRef<string | null>(null)
+  useLayoutEffect(() => {
+    const container = messagesScroll.current
+    if (container === null || messages.length === 0 || historyPageCount === 0 || initializedMessageKey.current === messageQueryIdentity) return
+    initializedMessageKey.current = messageQueryIdentity
+    container.scrollTop = container.scrollHeight
+  }, [historyPageCount, messageQueryIdentity, messages.length])
   const selectedMessage = messages.find(message => message.id === selectedMessageId) ?? null
   const recipientQuery = useQuery({
     queryKey: [...messageRecipientsKey, selectedMessageId],
@@ -470,6 +495,18 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
     setReceiptCount(null)
     sendMutation.reset()
   }
+  const renderMessage = (message: CommunicationMessage): JSX.Element => (
+    <MessageRow
+      key={message.id}
+      message={message}
+      selected={selectedMessageId === message.id}
+      labels={labels}
+      t={t}
+      onSelect={messageId => setSelectedMessageId(current => (current === messageId ? null : messageId))}
+      onOpenDirect={agentId => changeSelection({ kind: 'direct', agentId })}
+      disabled={sendMutation.isPending}
+    />
+  )
 
   return (
     <div className="dshx-root dshx:flex dshx:flex-col dshx:gap-4 dshx:p-3 dshx:sm:p-5">
@@ -627,23 +664,18 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
                     {messagesQuery.data !== undefined && messages.length === 0 ? (
                       <p className="dshx:p-4 dshx:text-sm dshx:text-muted-foreground">{debouncedSearch.length > 0 ? t('noSearchResults') : t('noMessages')}</p>
                     ) : null}
-                    <div className="dshx:flex dshx:max-h-[65vh] dshx:flex-col dshx:gap-3 dshx:overflow-y-auto dshx:p-1">
-                      {messages.map(message => (
-                        <MessageRow
-                          key={message.id}
-                          message={message}
-                          selected={selectedMessageId === message.id}
-                          labels={labels}
-                          t={t}
-                          onSelect={messageId => setSelectedMessageId(current => (current === messageId ? null : messageId))}
-                          onOpenDirect={agentId => changeSelection({ kind: 'direct', agentId })}
-                          disabled={sendMutation.isPending}
-                        />
-                      ))}
+                    <div ref={messagesScroll} className="dshx:flex dshx:max-h-[65vh] dshx:flex-col dshx:gap-3 dshx:overflow-y-auto dshx:p-1">
+                      <div key="messages-older-sentinel" ref={olderSentinel} aria-hidden="true" style={{ flex: '0 0 1px', height: 1 }} />
+                      {messages.map(renderMessage)}
                     </div>
-                    {messagesQuery.hasNextPage ? (
-                      <Button variant="outline" disabled={messagesQuery.isFetchingNextPage} onClick={() => void messagesQuery.fetchNextPage()}>
-                        {messagesQuery.isFetchingNextPage ? t('loadingOlder') : t('loadOlder')}
+                    {messagesQuery.isFetchingNextPage ? (
+                      <p className="dshx:p-1 dshx:text-xs dshx:text-muted-foreground" role="status">
+                        {t('loadingOlder')}
+                      </p>
+                    ) : null}
+                    {messagesQuery.isFetchNextPageError ? (
+                      <Button variant="outline" onClick={loadOlderMessages}>
+                        {t('loadOlder')}
                       </Button>
                     ) : null}
                     <form

@@ -17,7 +17,7 @@ import { withViewTransition } from './view-transition.js'
 
 const boardStatuses: readonly BacklogStatus[] = ['inbox', 'todo', 'doing', 'done', 'dropped']
 const RECENT_EVENTS = 4
-/** Cards mounted per column before a "show more"; a long column scrolls without rendering every card. */
+/** Cards mounted per column before scrolling near the end reveals another batch. */
 const COLUMN_PAGE = 30
 
 type Drag = { readonly id: number; readonly x: number; readonly y: number; readonly offsetX: number; readonly offsetY: number; readonly width: number }
@@ -258,7 +258,18 @@ export const BoardView = (props: {
                 <PlusIcon className="dshx:size-3.5" />
               </button>
             </header>
-            <div className="dshx:flex dshx:min-h-16 dshx:flex-1 dshx:flex-col dshx:gap-1.5 dshx:overflow-y-auto dshx:p-0.5">
+            <div
+              className="dshx:flex dshx:min-h-16 dshx:flex-1 dshx:flex-col dshx:gap-1.5 dshx:overflow-y-auto dshx:p-0.5"
+              onScroll={event => {
+                const element = event.currentTarget
+                if (element.scrollHeight - element.scrollTop - element.clientHeight > 240) return
+                setPages(current => {
+                  const page = current[status] ?? 1
+                  if (column.length <= page * COLUMN_PAGE) return current
+                  return { ...current, [status]: page + 1 }
+                })
+              }}
+            >
               {column.length === 0 ? <p className="dshx:py-6 dshx:text-center dshx:text-xs dshx:text-muted-foreground/70">Nothing here</p> : null}
               {column.slice(0, (pages[status] ?? 1) * COLUMN_PAGE).map(item => (
                 <BacklogItemMenu
@@ -287,15 +298,6 @@ export const BoardView = (props: {
                   </article>
                 </BacklogItemMenu>
               ))}
-              {column.length > (pages[status] ?? 1) * COLUMN_PAGE ? (
-                <button
-                  type="button"
-                  onClick={() => setPages({ ...pages, [status]: (pages[status] ?? 1) + 1 })}
-                  className="dshx:rounded-lg dshx:py-1.5 dshx:text-xs dshx:text-muted-foreground dshx:transition-colors dshx:hover:bg-accent dshx:hover:text-foreground"
-                >
-                  Show {Math.min(column.length - (pages[status] ?? 1) * COLUMN_PAGE, COLUMN_PAGE)} more
-                </button>
-              ) : null}
             </div>
           </section>
         )

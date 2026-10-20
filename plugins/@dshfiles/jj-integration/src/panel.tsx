@@ -19,6 +19,7 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Card, CardContent, CardHeader } from '@dshfiles/plugin-ui/components/ui/card'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { Separator } from '@dshfiles/plugin-ui/components/ui/separator'
+import { useLoadMore } from '@dshfiles/plugin-ui/hooks/use-load-more'
 import { Skeleton } from '@dshfiles/plugin-ui/components/ui/skeleton'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
@@ -67,7 +68,7 @@ export const threadQueryKeys = {
 }
 export const threadRebaseMutationKey = ['jj-integration', 'thread-rebase'] as const
 
-/** Rows one group shows before it offers to reveal the rest. */
+/** Rows mounted per group before its boundary reveals the next batch. */
 const GROUP_LIMIT = 8
 
 /** One row layout: selection, thread, activity, changes, status/blocker, actions. */
@@ -78,6 +79,12 @@ type IntegrationFilter = 'attention' | 'all' | 'ready' | 'blocked' | 'conflicts'
 type LifecycleFilter = 'any' | 'active' | 'idle' | 'finished' | 'missing'
 type ThreadLifecycle = 'active' | 'waiting-input' | 'idle' | 'finished' | 'missing'
 type RowGroup = 'conflicts' | 'ready' | 'blocked' | 'integrating' | 'completed'
+
+const GroupLoadMoreSentinel = (props: { readonly enabled: boolean; readonly resetKey: number; readonly onLoadMore: () => void }): JSX.Element | null => {
+  const sentinel = useLoadMore({ enabled: props.enabled, resetKey: props.resetKey, onLoadMore: props.onLoadMore, rootMargin: '0px 0px 500px 0px' })
+  if (!props.enabled) return null
+  return <div ref={sentinel} aria-hidden="true" style={{ flex: '0 0 1px', height: 1 }} />
+}
 
 type ToneClasses = { readonly solid: string; readonly text: string; readonly chip: string; readonly dot: string }
 
@@ -823,7 +830,7 @@ export const ThreadWorkspacesPanel = (props: {
   const [filter, setFilter] = useState<IntegrationFilter>('attention')
   const [lifecycleFilter, setLifecycleFilter] = useState<LifecycleFilter>('any')
   const [search, setSearch] = useState('')
-  const [showAll, setShowAll] = useState<Readonly<Record<string, boolean>>>({})
+  const [shownCounts, setShownCounts] = useState<Readonly<Partial<Record<RowGroup, number>>>>({})
   const [selectedPaths, setSelectedPaths] = useState<ReadonlySet<string>>(new Set())
   const repositoriesWithThreads = useMemo(() => repositories.data?.repositories.filter(repository => repository.threads.length > 0), [repositories.data])
   const showRepositoryHeader = (repositoriesWithThreads?.length ?? 0) > 1 || autoIntegrationApplies || excludedRepositoryRoots.length > 0
@@ -952,13 +959,12 @@ export const ThreadWorkspacesPanel = (props: {
     return !entry.assessment.needsAttention
   })
   useEffect(() => {
-    // Rows on screen first: a group shows GROUP_LIMIT rows until it is expanded, and the rest fill in behind them.
     const priority = new Set<string>()
     const shownPerGroup = new Map<RowGroup, number>()
     for (const entry of visibleEntries) {
       const group = rowGroupOf(entry.assessment.category)
       const shown = shownPerGroup.get(group) ?? 0
-      if (showAll[group] !== true && shown >= GROUP_LIMIT) continue
+      if (shown >= (shownCounts[group] ?? GROUP_LIMIT)) continue
       shownPerGroup.set(group, shown + 1)
       for (const sessionId of entry.thread.sessionIds) priority.add(sessionId)
     }
@@ -966,7 +972,7 @@ export const ThreadWorkspacesPanel = (props: {
     for (const { thread } of threads) for (const sessionId of thread.sessionIds) if (!priority.has(sessionId)) background.push(sessionId)
     projectionRefresh.request([...priority], 'visible')
     projectionRefresh.request(background, 'background')
-  }, [projectionRefresh, showAll, threads, visibleEntries])
+  }, [projectionRefresh, shownCounts, threads, visibleEntries])
   const groups: readonly {
     readonly id: RowGroup
     readonly title: string
@@ -1162,8 +1168,8 @@ export const ThreadWorkspacesPanel = (props: {
           {groups.map(group => {
             const entriesInGroup = visibleEntries.filter(entry => rowGroupOf(entry.assessment.category) === group.id)
             if (entriesInGroup.length === 0) return null
-            const expandedGroup = showAll[group.id] === true
-            const shownEntries = expandedGroup ? entriesInGroup : entriesInGroup.slice(0, GROUP_LIMIT)
+            const shownCount = shownCounts[group.id] ?? GROUP_LIMIT
+            const shownEntries = entriesInGroup.slice(0, shownCount)
             const hiddenCount = entriesInGroup.length - shownEntries.length
             return (
               <section key={group.id} className="dshx:flex dshx:flex-col dshx:gap-2">
@@ -1242,32 +1248,16 @@ export const ThreadWorkspacesPanel = (props: {
                       </div>
                     )
                   })}
-                  {hiddenCount > 0 ? (
-                    <div className="dshx:flex dshx:justify-center dshx:border-t dshx:border-border dshx:bg-muted/20 dshx:py-1.5">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="dshx:text-muted-foreground"
-                        onClick={() => setShowAll(previous => ({ ...previous, [group.id]: true }))}
-                      >
-                        <ChevronDownIcon />
-                        {t('showMoreThreads', { count: hiddenCount })}
-                      </Button>
-                    </div>
-                  ) : null}
-                  {expandedGroup && entriesInGroup.length > GROUP_LIMIT ? (
-                    <div className="dshx:flex dshx:justify-center dshx:border-t dshx:border-border dshx:bg-muted/20 dshx:py-1.5">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="dshx:text-muted-foreground"
-                        onClick={() => setShowAll(previous => ({ ...previous, [group.id]: false }))}
-                      >
-                        <ChevronDownIcon className="dshx:rotate-180" />
-                        {t('hideExtraThreads')}
-                      </Button>
-                    </div>
-                  ) : null}
+                  <GroupLoadMoreSentinel
+                    enabled={hiddenCount > 0}
+                    resetKey={shownCount}
+                    onLoadMore={() =>
+                      setShownCounts(current => ({
+                        ...current,
+                        [group.id]: Math.min(entriesInGroup.length, (current[group.id] ?? GROUP_LIMIT) + GROUP_LIMIT),
+                      }))
+                    }
+                  />
                 </div>
               </section>
             )
