@@ -144,6 +144,8 @@ const integrationRecordSchema = z.object({ at: rebaseTimestampSchema, tipChangeI
 const rebaseMetadataEntrySchema = integrationRecordSchema.extend({ history: z.array(integrationRecordSchema).optional() }).strict()
 const rebaseMetadataValueSchema = z.union([rebaseTimestampSchema, rebaseMetadataEntrySchema])
 const rebaseMetadataSchema = z.record(z.string(), rebaseMetadataValueSchema)
+/** Base revset → name of the unclaimed thread workspace made ahead for it. */
+const sparesSchema = z.record(z.string(), z.string().regex(THREAD_WORKSPACE_NAME))
 type RebaseMetadataEntry = z.infer<typeof rebaseMetadataEntrySchema>
 type IntegrationRecord = z.infer<typeof integrationRecordSchema>
 /** A thread lands again and again while it keeps working; the oldest landings stop mattering long before this many. */
@@ -695,7 +697,10 @@ export const createThreads = (options: {
 
   const list = async (repoRoot: string): Promise<readonly ThreadStatus[]> => {
     const directory = options.threadsDirectory(repoRoot)
-    const names = (await jj(['--ignore-working-copy', 'workspace', 'list', '-T', 'name ++ "\\n"'], repoRoot)).split('\n').filter(name => name.length > 0)
+    const spares = new Set(Object.values(await readSpares(repoRoot)))
+    const names = (await jj(['--ignore-working-copy', 'workspace', 'list', '-T', 'name ++ "\\n"'], repoRoot))
+      .split('\n')
+      .filter(name => name.length > 0 && !spares.has(name))
     const rebaseMetadata = await readRebaseMetadata(repoRoot)
     /** Two read-only `jj` calls per thread, run with bounded parallelism: a store with dozens of thread workspaces stays responsive. */
     const statuses = new Array<ThreadStatus | undefined>(names.length)
@@ -750,14 +755,81 @@ export const createThreads = (options: {
     return withRebaseMetadata(threadStatus, rebaseMetadata[name])
   }
 
+  /**
+   * One checked-out, unclaimed workspace per repository and base, made ahead of the first send that isolates a thread:
+   * `jj workspace add` checks the whole tree out (1.6–2.8 s on a 2 700-file repo with 70 workspaces), while moving a
+   * spare onto the base as it is now takes 0.15–0.35 s. The record survives a Host restart; a spare deleted from disk
+   * is ignored.
+   */
+  const sparesFile = (repoRoot: string): string => join(options.threadsDirectory(repoRoot), '.dshfiles-spare-workspaces.json')
+  const spareWrites = new Map<string, Promise<unknown>>()
+  const warming = new Map<string, Promise<void>>()
+  const readSpares = async (repoRoot: string): Promise<Readonly<Record<string, string>>> => {
+    const parsed = JsonText.decode(sparesSchema, await readFile(sparesFile(repoRoot), 'utf8').catch(() => '{}'))
+    return parsed?.success === true ? parsed.data : {}
+  }
+  const updateSpares = (repoRoot: string, change: (spares: Readonly<Record<string, string>>) => Readonly<Record<string, string>>): Promise<void> => {
+    const next = (spareWrites.get(repoRoot) ?? Promise.resolve()).then(async () => {
+      const path = sparesFile(repoRoot)
+      const temporaryPath = `${path}.${randomBytes(4).toString('hex')}.tmp`
+      await mkdir(dirname(path), { recursive: true })
+      await writeFile(temporaryPath, JSON.stringify(change(await readSpares(repoRoot))), 'utf8')
+      await rename(temporaryPath, path)
+    })
+    spareWrites.set(
+      repoRoot,
+      next.catch(() => undefined),
+    )
+    return next
+  }
+  const usableSpare = (repoRoot: string, name: string | undefined): string | undefined =>
+    name !== undefined && existsSync(join(options.threadsDirectory(repoRoot), name, '.jj')) ? name : undefined
+
+  /** Make the spare for `base` in the background; outside the repo lock, since adding a workspace moves no bookmark. */
+  const prewarm = (repoRoot: string, base?: string): void => {
+    const target = base ?? options.bookmark()
+    const key = `${repoRoot}\0${target}`
+    if (warming.has(key)) return
+    const task = (async () => {
+      if (usableSpare(repoRoot, (await readSpares(repoRoot))[target]) !== undefined) return
+      const name = `thread-${randomBytes(3).toString('hex')}`
+      const directory = options.threadsDirectory(repoRoot)
+      await mkdir(directory, { recursive: true })
+      await jj(['workspace', 'add', join(directory, name), '--name', name, '-r', target], repoRoot)
+      await updateSpares(repoRoot, spares => ({ ...spares, [target]: name }))
+    })()
+      .catch(() => undefined)
+      .finally(() => {
+        warming.delete(key)
+      })
+    warming.set(key, task)
+  }
+
   const provision = (repoRoot: string, base?: string, requestedName?: string): Promise<{ readonly name: string; readonly path: string }> =>
     serialized(repoRoot, async () => {
-      const name = requestedName ?? `thread-${randomBytes(3).toString('hex')}`
+      const target = base ?? options.bookmark()
       const directory = options.threadsDirectory(repoRoot)
+      const spare = usableSpare(repoRoot, (await readSpares(repoRoot))[target])
+      if (spare !== undefined) {
+        await updateSpares(repoRoot, ({ [target]: _claimed, ...rest }) => rest)
+        // The thread keeps the name the client already shows: the spare's folder moves within the same directory, so
+        // its relative pointer to the store still holds, and jj renames the workspace to match.
+        const name = requestedName !== undefined && !existsSync(join(directory, requestedName)) ? requestedName : spare
+        const path = join(directory, name)
+        if (name !== spare) {
+          await rename(join(directory, spare), path)
+          await jj(['workspace', 'rename', name], path)
+        }
+        await jj(['new', target], path)
+        prewarm(repoRoot, target)
+        return { name, path }
+      }
+      const name = requestedName ?? `thread-${randomBytes(3).toString('hex')}`
       const path = join(directory, name)
       await mkdir(directory, { recursive: true })
       // Plain `workspace add`: with --ignore-working-copy jj registers the workspace but never checks its files out.
-      await jj(['workspace', 'add', path, '--name', name, '-r', base ?? options.bookmark()], repoRoot)
+      await jj(['workspace', 'add', path, '--name', name, '-r', target], repoRoot)
+      prewarm(repoRoot, target)
       return { name, path }
     })
 
@@ -1305,7 +1377,7 @@ export const createThreads = (options: {
     return (await readAtOperation(['log', '--no-pager', '--color=never', '--limit', '20', '-r', revset, '-T', template])).trimEnd()
   }
 
-  return { locate, list, status, provision, restore, land, landAt, landVerified, discard, bookmarks, workingCopyCommitId, revisionGraph }
+  return { locate, list, status, provision, prewarm, restore, land, landAt, landVerified, discard, bookmarks, workingCopyCommitId, revisionGraph }
 }
 
 export type Threads = ReturnType<typeof createThreads>

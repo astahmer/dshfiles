@@ -77,6 +77,26 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
     expect((await threads.locate(thread.path)).threadName).toBe('thread-c0ffee')
   })
 
+  it('checks the next thread out ahead, then hands it over under the requested name on the bookmark as it is now', async () => {
+    const first = await threads.provision(repo)
+    const spares = join(`${repo}-threads`, '.dshfiles-spare-workspaces.json')
+    await expect.poll(() => existsSync(spares), { timeout: 20_000 }).toBe(true)
+    const spareName = JsonText.decode(z.record(z.string(), z.string()), readFileSync(spares, 'utf8'))?.data?.main
+    if (spareName === undefined) throw new Error('expected a spare for main')
+    expect((await threads.list(repo)).map(entry => entry.name)).toEqual([first.name])
+
+    writeFileSync(join(repo, 'shared.txt'), 'two\n')
+    jj(repo, 'commit', '-m', 'moved main')
+    jj(repo, 'bookmark', 'set', 'main', '-r', '@-')
+
+    const second = await threads.provision(repo, undefined, 'thread-beef00')
+    expect(second).toEqual({ name: 'thread-beef00', path: join(`${repo}-threads`, 'thread-beef00') })
+    expect(existsSync(join(`${repo}-threads`, spareName))).toBe(false)
+    expect(readFileSync(join(second.path, 'shared.txt'), 'utf8')).toBe('two\n')
+    expect((await threads.locate(second.path)).threadName).toBe('thread-beef00')
+    expect(commitIdAt(repo, 'thread-beef00@-')).toBe(bookmarkTargetCommitId(repo))
+  })
+
   it('checks a deleted thread workspace out again on its own working-copy revision, even into a re-created empty folder', async () => {
     const thread = await threads.provision(repo)
     writeFileSync(join(thread.path, 'thread.txt'), 'work\n')

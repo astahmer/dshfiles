@@ -854,6 +854,8 @@ const api = jjIntegrationApi.host({
       registry.resolveByPath(location.repoRoot),
       destinationAt(location.workspaceRoot, location.threadName !== undefined, null),
     ])
+    // A new thread that will isolate on its first send finds its workspace already checked out.
+    if (location.threadName === undefined && located.isolateByDefault) requireThreads().prewarm(location.repoRoot)
     const destination = { ...located, projectWorkspaceId: project?.id ?? null }
     if (ownedByAnotherSession === undefined) return destination
     return { ...destination, ownedByAnotherSession }
