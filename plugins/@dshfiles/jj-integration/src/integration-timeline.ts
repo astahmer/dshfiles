@@ -1,4 +1,5 @@
 export interface IntegrationRecord {
+  readonly kind: 'integrated'
   readonly at: number
   readonly tipChangeId?: string | undefined
 }
@@ -14,11 +15,11 @@ export class IntegrationTimeline {
   readonly #turnStarts = new Map<string, Map<number, number>>()
   readonly #listeners = new Set<Listener>()
 
-  static forTurn(input: {
-    readonly integrations: readonly IntegrationRecord[]
+  static forTurn<Record extends { readonly at: number }>(input: {
+    readonly integrations: readonly Record[]
     readonly turnStartedAt: number
     readonly nextTurnStartedAt: number | undefined
-  }): readonly IntegrationRecord[] {
+  }): readonly Record[] {
     return input.integrations.filter(
       record => record.at >= input.turnStartedAt && (input.nextTurnStartedAt === undefined || record.at < input.nextTurnStartedAt),
     )

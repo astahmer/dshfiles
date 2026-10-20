@@ -156,7 +156,7 @@ Feature: jj thread workspaces
 
   @scenario:jj-integration.queued-integration-browser-journey
   Scenario: Queue an integration while the thread works, undo it, then let it land once idle
-    Given the isolated plugin composition of "@dshfiles/jj-integration, @dshfiles/workspace-folder-picker, @dshfiles/multi-host, @dshfiles/ai-accounts" is booted
+    Given the isolated plugin composition of "@dshfiles/jj-integration, @dshfiles/workspace-folder-picker, @dshfiles/multi-host, @dshfiles/ai-accounts, @dshfiles/thread-sidebar, @dshfiles/chat" is booted
     When a Command Code account backed by a local fake provider is added
     And the New thread screen is reopened
     And a disposable jj repository is chosen as the New thread project

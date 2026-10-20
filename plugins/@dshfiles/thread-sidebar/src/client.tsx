@@ -133,6 +133,7 @@ import { buildThreadUrl, clearThreadUrl, readThreadUrl } from './thread-url.js'
 import { ThreadListNavigationModel } from './thread-list-navigation.js'
 import { workingThreadIds } from './working-threads.js'
 import { indexRebasedThreadSessions } from './rebased-threads.js'
+import { indexQueuedIntegrationSessions } from './queued-integrations.js'
 import { SettledThreadsModel, type SettledSessionState } from './settled-threads.js'
 import { answerSettleRequests } from './settle-request.js'
 import { THREAD_DELAYS, threadDelayMs, type ThreadDelay } from './thread-delays.js'
@@ -399,6 +400,7 @@ interface ThreadRowProps {
   readonly mute: ThreadMute | undefined
   readonly attentionLabel: ThreadAttentionLabel | undefined
   readonly rebasedAt: number | undefined
+  readonly integrationQueuedAt: number | undefined
   readonly needsResume: boolean
   readonly resumeBusy: boolean
   readonly childAttentionLabels: ReadonlyMap<SessionSummary['id'], ThreadAttentionLabel>
@@ -694,7 +696,7 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
   const showMachine = rowStyle.machine && props.machine !== undefined
   const showPath = rowStyle.path && session.cwd !== undefined && session.cwd.length > 0
   const metaLine = showProject || showMachine || showPath || childCount > 0
-  const headLine = rowStyle.title || rowStyle.time || rowStyle.statusDot || props.rebasedAt !== undefined
+  const headLine = rowStyle.title || rowStyle.time || rowStyle.statusDot || props.rebasedAt !== undefined || props.integrationQueuedAt !== undefined
   const openAside = useAsideOpen()
   /**
    * One hover action's button, or null when the row's own state rules it out: the recovery pair only on a thread that
@@ -877,6 +879,14 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                     {t(props.attentionLabel)}
                   </span>
                 )}
+                {props.integrationQueuedAt === undefined
+                  ? null
+                  : withTooltip(
+                      t('threadSidebarIntegrationQueuedHint'),
+                      <Badge variant="secondary" aria-label={t('threadSidebarIntegrationQueuedHint')} data-testid="thread-sidebar-integration-queued-tag">
+                        {t('threadSidebarIntegrationQueued')}
+                      </Badge>,
+                    )}
                 {props.rebasedAt === undefined ? null : (
                   <Badge variant="success" title={new Date(props.rebasedAt).toLocaleString()} data-testid="thread-sidebar-rebased-tag">
                     {t('threadSidebarRebased')}
@@ -1064,11 +1074,16 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       cancel: (handle: number) => window.clearTimeout(handle),
     })
     const onVisibilityChange = (): void => poll.visibilityChanged()
+    const onRepositoryChange = (): void => {
+      if (jjInventoryVisible && !jjOwnerMissing) void refetchJjRepositories()
+    }
+    window.addEventListener('dshfiles:jj-changed', onRepositoryChange)
     document.addEventListener('visibilitychange', onVisibilityChange)
     poll.start()
     poll.setAvailable(!jjOwnerMissing && jjInventoryVisible)
     return () => {
       document.removeEventListener('visibilitychange', onVisibilityChange)
+      window.removeEventListener('dshfiles:jj-changed', onRepositoryChange)
       poll.stop()
     }
   }, [jjInventoryVisible, jjOwnerMissing, refetchJjRepositories])
@@ -1161,6 +1176,10 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   )
   /** Titles by workspace id, so a row does not rescan every workspace on each render. */
   const workspaceTitleById = useMemo(() => new Map<string, string>(displayWorkspaces.map(workspace => [workspace.id, workspace.title])), [displayWorkspaces])
+  const integrationQueuedAtBySessionId = useMemo(
+    () => indexQueuedIntegrationSessions((jjRepositories.data?.repositories ?? []).flatMap(repository => repository.threads)),
+    [jjRepositories.data],
+  )
   const rebasedIndex = useMemo(
     () =>
       indexRebasedThreadSessions({
@@ -2895,6 +2914,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         mute={mutedSessionIds.has(session.id) ? mutedThreads[session.id] : undefined}
         attentionLabel={rowAttentionLabel}
         rebasedAt={rebasedIndex.rebasedAtBySessionId.get(session.id)}
+        integrationQueuedAt={integrationQueuedAtBySessionId.get(session.id)}
         needsResume={recoverySessionIds.has(session.id)}
         resumeBusy={resumeBusySessionIds.has(session.id)}
         childAttentionLabels={inlineAttentionLabels}

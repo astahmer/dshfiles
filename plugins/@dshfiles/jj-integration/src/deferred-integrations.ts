@@ -25,6 +25,11 @@ export const createDeferredIntegrations = (options: {
   const now = options.now ?? Date.now
   const entries = new Map<string, DeferredIntegration>()
   const passedGuard = new Set<string>()
+  const events: { readonly path: string; readonly at: number; readonly kind: 'queued' | 'unqueued' }[] = []
+  const record = (event: (typeof events)[number]): void => {
+    events.push(event)
+    if (events.length > 1_000) events.shift()
+  }
   let draining: Promise<void> | undefined
   let drainAgain = false
 
@@ -77,12 +82,15 @@ export const createDeferredIntegrations = (options: {
     if (existing !== undefined) return existing
     const entry: DeferredIntegration = { path: input.path, sessionId: input.sessionId, queuedAt: now() }
     entries.set(input.path, entry)
+    record({ path: input.path, at: entry.queuedAt, kind: 'queued' })
     return entry
   }
 
   const cancel = (path: string): DeferredIntegrationCancel => {
     if (passedGuard.has(path)) return 'integrating'
-    return entries.delete(path) ? 'cancelled' : 'not-queued'
+    if (!entries.delete(path)) return 'not-queued'
+    record({ path, at: now(), kind: 'unqueued' })
+    return 'cancelled'
   }
 
   return {
@@ -91,6 +99,10 @@ export const createDeferredIntegrations = (options: {
     drain,
     get: (path: string): DeferredIntegration | undefined => entries.get(path),
     paths: (): readonly string[] => [...entries.keys()],
-    clear: (): void => entries.clear(),
+    history: (path: string) => events.filter(event => event.path === path).map(event => ({ at: event.at, kind: event.kind })),
+    clear: (): void => {
+      entries.clear()
+      events.length = 0
+    },
   }
 }

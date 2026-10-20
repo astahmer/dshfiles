@@ -254,7 +254,8 @@ const threadView = (
   const withWorkspaceTitle: ThreadView = workspace === undefined ? view : { ...view, workspaceTitle: workspace.title }
   const withEligibility: ThreadView = canRebase === undefined ? withWorkspaceTitle : { ...withWorkspaceTitle, canRebase }
   const integrationQueuedAt = deferredIntegrations.get(status.path)?.queuedAt
-  const withQueue: ThreadView = integrationQueuedAt === undefined ? withEligibility : { ...withEligibility, integrationQueuedAt }
+  const withQueueEvents: ThreadView = { ...withEligibility, integrationQueueEvents: deferredIntegrations.history(status.path) }
+  const withQueue: ThreadView = integrationQueuedAt === undefined ? withQueueEvents : { ...withQueueEvents, integrationQueuedAt }
   if (status.rebasedAt === undefined) return withQueue
   const viewWithRebaseTimestamp = {
     ...withQueue,

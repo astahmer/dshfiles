@@ -4,6 +4,16 @@ import { IntegrationTimeline } from './integration-timeline.js'
 const integrations = [{ at: 150, tipChangeId: 'first' }, { at: 250, tipChangeId: 'second' }, { at: 260 }]
 
 describe('IntegrationTimeline', () => {
+  it('keeps queue and cancellation notices with the turn they followed', () => {
+    const events = [
+      { at: 150, kind: 'queued' },
+      { at: 200, kind: 'unqueued' },
+      { at: 250, kind: 'queued' },
+    ]
+    expect(IntegrationTimeline.forTurn({ integrations: events, turnStartedAt: 100, nextTurnStartedAt: 200 })).toEqual([events[0]])
+    expect(IntegrationTimeline.forTurn({ integrations: events, turnStartedAt: 200, nextTurnStartedAt: undefined })).toEqual(events.slice(1))
+  })
+
   it('shows each land once, after the Turn it followed', () => {
     const timeline = new IntegrationTimeline()
     for (const [turn, startedAt] of [

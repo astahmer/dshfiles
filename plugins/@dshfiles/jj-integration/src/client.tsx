@@ -11,7 +11,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-session-log-export/client'
 import { createApiClient, defineClient, useApi, useSettings } from '@dshfiles/dshx/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
-import { ArchiveIcon, CircleCheckIcon, GitMergeIcon } from '@dshfiles/plugin-ui/icons'
+import { ArchiveIcon, CircleCheckIcon, ClockIcon, GitMergeIcon, Undo2Icon } from '@dshfiles/plugin-ui/icons'
 import { hostDestination, multiHostApi, multiHostQueries, REMOTE_THREAD_PANEL, RemoteComposer } from '@dshfiles/multi-host/destination'
 import { errorMessage, PluginQueryProvider, pluginQueryClient, useMutation, useQuery } from '@dshfiles/plugin-ui/query'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
@@ -22,7 +22,8 @@ import { createComposerWorkspaceNavigation, type ComposerReferenceHandoff } from
 import { mainViewSessionId } from './main-view-session.js'
 import { jjIntegrationApi } from './api.js'
 import { HeroWorkspacePicker } from './hero-workspace-picker.js'
-import { IntegrationTimeline } from './integration-timeline.js'
+import { IntegrationTimeline, type IntegrationRecord } from './integration-timeline.js'
+import { announceRepositoryChange } from './land-feedback.js'
 import { JJ_INTEGRATION_LOCALE_NAMESPACE, jjIntegrationLocale } from './locales.js'
 import { ThreadWorkspacesPanel } from './panel.js'
 import { prepareRemoteFolder } from './remote-destination.js'
@@ -257,34 +258,68 @@ export default defineClient({
         setSettledHere(true)
       }
       const thread = status.data?.thread
-      const rebasedAt = thread?.rebasedAt
-      const markers =
-        thread === null || thread === undefined || rebasedAt === undefined || turnStartedAt === undefined
-          ? []
-          : IntegrationTimeline.forTurn({
-              integrations: thread.integrations ?? [{ at: rebasedAt, tipChangeId: thread.rebasedTipChangeId }],
-              turnStartedAt,
-              nextTurnStartedAt,
-            })
+      const cancelQueue = useMutation({
+        mutationFn: () => {
+          if (thread === null || thread === undefined) throw new Error(translate('unknownWorkspace'))
+          return runHostRequest({ timeoutMs: 30_000, request: signal => api.cancelQueuedLand({ path: thread.path }, { signal }) })
+        },
+        onSuccess: async result => {
+          announceRepositoryChange()
+          await pluginQueryClient().invalidateQueries({ queryKey: ['jj-integration', 'thread', path] })
+          if (result.status === 'integrating') noticeToast.show({ text: translate('queuedIntegrationAlreadyRunning'), success: false })
+        },
+        onError: error => noticeToast.show({ text: errorMessage(error, translate('loadFailed')), success: false }),
+      })
+      if (thread === null || thread === undefined || turnStartedAt === undefined) return noticeToast.element
+      const integrations = thread.integrations ?? (thread.rebasedAt === undefined ? [] : [{ at: thread.rebasedAt, tipChangeId: thread.rebasedTipChangeId }])
+      const queueEvents = [...(thread.integrationQueueEvents ?? [])]
+      if (thread.integrationQueuedAt !== undefined && !queueEvents.some(event => event.kind === 'queued' && event.at === thread.integrationQueuedAt)) {
+        queueEvents.push({ at: thread.integrationQueuedAt, kind: 'queued' })
+      }
+      const events = [...integrations.map(marker => ({ ...marker, kind: 'integrated' }) satisfies IntegrationRecord), ...queueEvents].sort(
+        (left, right) => left.at - right.at,
+      )
+      const activeQueueMarker = events.findLast(event => event.kind === 'queued' && event.at === thread.integrationQueuedAt)
+      const markers = IntegrationTimeline.forTurn({ integrations: events, turnStartedAt, nextTurnStartedAt })
+      if (markers.length === 0) return noticeToast.element
       return (
         <>
-          {markers.map(marker => (
+          {markers.map((marker, index) => (
             <div
-              key={marker.at}
-              data-testid="jj-thread-rebased-notice"
+              key={`${marker.kind}-${marker.at}-${index}`}
+              data-testid={marker.kind === 'integrated' ? 'jj-thread-rebased-notice' : `jj-thread-integration-${marker.kind}-notice`}
               className="dshx-root dshx:my-3 dshx:flex dshx:w-full dshx:items-center dshx:gap-2 dshx:text-sm dshx:text-muted-foreground"
             >
-              <GitMergeIcon aria-hidden="true" className="dshx:shrink-0" size={14} />
+              {marker.kind === 'integrated' ? (
+                <GitMergeIcon aria-hidden="true" className="dshx:shrink-0" size={14} />
+              ) : (
+                <ClockIcon aria-hidden="true" className="dshx:shrink-0" size={14} />
+              )}
               <span className="dshx:min-w-0">
-                {marker.tipChangeId === undefined
-                  ? translate('rebaseNotice', { bookmark })
-                  : translate('rebaseNoticeWithTip', { bookmark, revisionId: marker.tipChangeId })}
+                {marker.kind === 'integrated'
+                  ? marker.tipChangeId === undefined
+                    ? translate('rebaseNotice', { bookmark })
+                    : translate('rebaseNoticeWithTip', { bookmark, revisionId: marker.tipChangeId })
+                  : translate(marker.kind === 'queued' ? 'integrationQueuedNotice' : 'integrationUnqueuedNotice', { bookmark })}
               </span>
               <time className="dshx:shrink-0 dshx:text-xs dshx:tabular-nums" dateTime={new Date(marker.at).toISOString()}>
                 {new Date(marker.at).toLocaleString()}
               </time>
               <span aria-hidden="true" className="dshx:h-px dshx:min-w-4 dshx:flex-1 dshx:bg-border" />
-              {archived || marker.at !== rebasedAt ? null : (
+              {marker !== activeQueueMarker ? null : (
+                <Button
+                  aria-label={translate('undoQueuedIntegrationLabel', { bookmark })}
+                  disabled={cancelQueue.isPending}
+                  onClick={() => cancelQueue.mutate()}
+                  size="sm"
+                  type="button"
+                  variant="ghost"
+                >
+                  <Undo2Icon aria-hidden="true" size={14} />
+                  {translate('undoQueuedIntegration')}
+                </Button>
+              )}
+              {archived || marker.kind !== 'integrated' || marker.at !== thread.rebasedAt ? null : (
                 <>
                   {noticeActions.includes('settle') && !settledHere ? (
                     <Button

@@ -222,6 +222,8 @@ const en = {
   threadSidebarAutoSettleDisabled: 'Never settle this thread',
   threadSidebarAutoArchive: 'Settle inactive threads',
   threadSidebarRebased: 'Rebased',
+  threadSidebarIntegrationQueued: 'Integration queued',
+  threadSidebarIntegrationQueuedHint: 'Integration queued until this workspace is idle.',
   threadSidebarArchiveRebased: 'Settle integrated threads',
   threadSidebarArchiveRebasedHint:
     'Settle a thread after its revisions are integrated onto the project bookmark. Settled threads stay listed and openable but run no model step until you unsettle them. Running, waiting, recently active, pinned, or newly changed threads are skipped.',
@@ -573,6 +575,8 @@ const zh = {
   threadSidebarAutoSettleDisabled: '永不沉淀此会话',
   threadSidebarAutoArchive: '自动沉淀不活跃会话',
   threadSidebarRebased: '已变基',
+  threadSidebarIntegrationQueued: '等待集成',
+  threadSidebarIntegrationQueuedHint: '集成已排队，将在此工作区空闲后执行。',
   threadSidebarArchiveRebased: '沉淀已集成会话',
   threadSidebarArchiveRebasedHint:
     '当修订已集成到项目书签后沉淀。沉淀后的会话仍会列出并可打开，但取消沉淀前不会运行模型步骤。运行中、等待输入、近期活跃、已固定或产生新改动的会话会跳过。',

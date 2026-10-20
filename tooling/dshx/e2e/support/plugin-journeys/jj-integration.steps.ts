@@ -670,11 +670,14 @@ When('the Thread workspaces panel is opened', async ({ page }: { page: Page }) =
 /** Long enough to queue, undo and queue again while the turn still runs, even on a loaded machine. */
 const BUSY_BASH_DIRECTIVE = `[[call bash ${JSON.stringify({ command: 'sleep 60 && echo queued-integration', description: 'Keep the thread busy' })}]]`
 const queueIntegrationButton = (page: Page) => page.getByRole('button', { name: 'Queue integration into main', exact: true })
-const undoQueuedIntegrationButton = (page: Page) => page.getByRole('button', { name: 'Cancel the queued integration into main', exact: true })
+const undoQueuedIntegrationButton = (page: Page) => workspaceMenu(page).getByRole('button', { name: 'Cancel the queued integration into main', exact: true })
 
 When('the New thread screen is reopened', async ({ page }: { page: Page }) => {
   await page.keyboard.press('Escape')
-  await page.getByRole('button', { name: 'New session', exact: true }).first().click()
+  await page
+    .getByRole('button', { name: /^(?:New session|New thread)$/ })
+    .first()
+    .click()
   await expect(newThreadComposer(page)).toBeVisible()
 })
 
@@ -713,14 +716,17 @@ Then('the workspace menu shows the queued integration with Undo', async ({ page 
   await recordAssertion(page, 'jj-integration-queued-integration-shows-undo', async () => {
     await expect(workspaceMenu(page)).toContainText('Queued: integrates into main as soon as this thread is idle.', { timeout: 10_000 })
     await expect(undoQueuedIntegrationButton(page)).toBeEnabled()
+    await expect(page.getByTestId('jj-thread-integration-queued-notice')).toContainText('Integration into main queued')
+    await expect(page.getByTestId('thread-sidebar-integration-queued-tag')).toBeVisible()
     expect(commitIdOf(repository, 'main')).toBe(repository.baseCommitId)
   })
 })
 
 When('the queued integration is undone', async ({ page }: { page: Page }) => {
-  await openWorkspaceMenu(page)
-  await undoQueuedIntegrationButton(page).click()
-  await expect(undoQueuedIntegrationButton(page)).toHaveCount(0, { timeout: 10_000 })
+  await page.keyboard.press('Escape')
+  await page.getByTestId('jj-thread-integration-queued-notice').getByRole('button', { name: 'Cancel the queued integration into main' }).click()
+  await expect(page.getByTestId('jj-thread-integration-unqueued-notice')).toContainText('Queued integration into main cancelled.')
+  await expect(page.getByTestId('thread-sidebar-integration-queued-tag')).toHaveCount(0, { timeout: 15_000 })
 })
 
 Then('the undone integration leaves main in place and can be queued again', async ({ page }: { page: Page }) => {
@@ -740,6 +746,8 @@ Then('main advances onto the work described {string} once the thread is idle', a
     expect(commitIdOf(repository, 'main-')).toBe(repository.baseCommitId)
     await openWorkspaceMenu(page)
     await expect(workspaceMenu(page)).not.toContainText('Queued:', { timeout: 15_000 })
+    await expect(page.getByTestId('thread-sidebar-integration-queued-tag')).toHaveCount(0, { timeout: 15_000 })
+    await expect(page.getByTestId('jj-thread-rebased-notice')).toBeVisible()
   })
   await finishJourneyAssertions(page)
 })

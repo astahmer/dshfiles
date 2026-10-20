@@ -54,7 +54,12 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
   const thread = useQuery({
     queryKey: threadQueryKeys.threadAt(cwd ?? ''),
     enabled: cwd !== null && cwd.length > 0,
-    queryFn: ({ signal }) => runHostRequest({ signal, timeoutMs: 30_000, request: hostSignal => api.threadAt({ path: cwd ?? '' }, { signal: hostSignal }) }),
+    queryFn: async ({ signal }) => {
+      const previous = queryClient.getQueryData<{ readonly thread: ThreadView | null }>(threadQueryKeys.threadAt(cwd ?? ''))
+      const current = await runHostRequest({ signal, timeoutMs: 30_000, request: hostSignal => api.threadAt({ path: cwd ?? '' }, { signal: hostSignal }) })
+      if (previous?.thread?.integrationQueuedAt !== current.thread?.integrationQueuedAt) announceRepositoryChange()
+      return current
+    },
     refetchInterval: query => (query.state.data?.thread === null ? false : 5_000),
   })
   const rebase = useMutation({
@@ -70,6 +75,7 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
   })
   /** The status refetch runs jj and can take seconds, so the menu shows the Host's answer at once and refreshes behind it. */
   const showQueued = (path: string, integrationQueuedAt: number | undefined): void => {
+    announceRepositoryChange()
     queryClient.setQueryData(threadQueryKeys.threadAt(path), (previous: { readonly thread: ThreadView | null } | undefined) => {
       if (previous?.thread === null || previous?.thread === undefined) return previous
       const { integrationQueuedAt: _previousQueuedAt, ...thread } = previous.thread

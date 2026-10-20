@@ -18,6 +18,31 @@ const harness = (land: Parameters<typeof createDeferredIntegrations>[0]['land'])
 }
 
 describe('deferred integrations', () => {
+  it('records only actual queue and cancel transitions, scoped by workspace', () => {
+    const { queue } = harness(async () => landed)
+    queue.queue({ path: '/repo/a', sessionId: undefined })
+    queue.queue({ path: '/repo/a', sessionId: undefined })
+    queue.queue({ path: '/repo/b', sessionId: undefined })
+    expect(queue.cancel('/repo/a')).toBe('cancelled')
+    expect(queue.cancel('/repo/a')).toBe('not-queued')
+    expect(queue.history('/repo/a')).toEqual([
+      { at: 42, kind: 'queued' },
+      { at: 42, kind: 'unqueued' },
+    ])
+    expect(queue.history('/repo/b')).toEqual([{ at: 42, kind: 'queued' }])
+    queue.clear()
+    expect(queue.history('/repo/a')).toEqual([])
+  })
+
+  it('bounds retained queue history', () => {
+    const { queue } = harness(async () => landed)
+    for (let index = 0; index < 501; index += 1) {
+      queue.queue({ path: '/repo/a', sessionId: undefined })
+      queue.cancel('/repo/a')
+    }
+    expect(queue.history('/repo/a')).toHaveLength(1_000)
+  })
+
   it('keeps a busy thread queued and integrates it once the guard passes', async () => {
     let busy = true
     const { queue, settled } = harness(async ({ stillQueued }) => {
@@ -78,6 +103,7 @@ describe('deferred integrations', () => {
     const draining = queue.drain()
     await started
     expect(queue.cancel('/repo/thread-a')).toBe('integrating')
+    expect(queue.history('/repo/thread-a')).toEqual([{ at: 42, kind: 'queued' }])
     releaseRebase()
     await draining
 

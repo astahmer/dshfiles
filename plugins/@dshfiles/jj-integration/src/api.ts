@@ -22,6 +22,7 @@ const threadSchema = z
     rebasedTipChangeId: z.string().min(1).max(128).optional(),
     /** When the user queued an integration that waits for the thread to go idle; absent when none is queued. */
     integrationQueuedAt: z.number().int().nonnegative().optional(),
+    integrationQueueEvents: z.array(z.object({ at: z.number().int().nonnegative(), kind: z.enum(['queued', 'unqueued']) }).strict()).optional(),
     /** Every recorded land, oldest first; absent from a Host older than this field. */
     integrations: z.array(z.object({ at: z.number().int().nonnegative(), tipChangeId: z.string().min(1).max(128).optional() }).strict()).optional(),
     unlanded: z.array(revisionSchema),

@@ -71,7 +71,14 @@ One control in the conversation header carries the workspace state:
   regular guarded integration as soon as every thread Session is idle (woken by
   Session events, with a 30 s fallback). The menu then says it is queued, the
   trigger shows a clock, and **Undo** cancels it until the rebase actually
-  starts. The queue lives in Host memory, so a Host restart drops it.
+  starts. Queueing and cancelling also leave dated inline chat notices; the
+  active queue notice has its own **Undo** action. The thread list shows a subtle
+  **Integration queued** tag until cancellation or completion. Repeated queue
+  requests add no duplicate notice; a rejected cancellation adds none either.
+  The queue and its latest 1,000 notice events live in Host memory, so a Host
+  restart drops them. Reloading the browser keeps them. Notices during a running
+  turn require the owned `@dshfiles/chat` renderer; stock chat renders turn-tail
+  contributions only once the turn ends. The sidebar tag works with either.
 
 ### Session-log export
 
