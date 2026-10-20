@@ -332,6 +332,7 @@
       "configuration": [],
       "states": ["unread", "acknowledged", "resolved", "snoozed"],
       "failureModes": ["Without thread-sidebar's attention API the Inbox shows backlog items only."],
+      "reach": ["click button \"Backlog\"", "click button \"Inbox\"", "expect text \"Needs you\""],
       "externalDependencies": [
         {
           "id": "@dshfiles/thread-sidebar",

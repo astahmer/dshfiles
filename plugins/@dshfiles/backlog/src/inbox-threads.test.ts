@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import type { BacklogSummaryView } from './api.js'
-import { inboxThreadsFrom } from './inbox-threads.js'
+import { inboxThreadsFrom, linkedThreadIds } from './inbox-threads.js'
 
 const item = (id: number, threads: readonly string[]): BacklogSummaryView => ({
   id,
@@ -36,6 +36,12 @@ const items = [item(1, ['session-err', 'session-done']), item(2, ['session-manua
 const titles = new Map([['session-err', 'Migrate users']])
 
 describe('inbox threads', () => {
+  it('exposes linked working threads for inbox item actions', () => {
+    const source = item(3, ['session-first', 'session-second'])
+    const linked: BacklogSummaryView = { ...source, links: [...source.links, { type: 'url', target: 'https://example.com' }] }
+    expect(linkedThreadIds(linked)).toEqual(['session-first', 'session-second'])
+  })
+
   it('keeps only failed turns of threads linked to an item by default', () => {
     expect(
       inboxThreadsFrom({ mode: 'failures', records, items, titles }).map(thread => [thread.sessionId, thread.title, thread.items.map(entry => entry.id)]),

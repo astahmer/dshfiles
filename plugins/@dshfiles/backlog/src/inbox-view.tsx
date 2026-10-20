@@ -3,7 +3,7 @@ import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useState, type ReactNode } from 'react'
 
 import type { BacklogSummaryView } from './api.js'
-import type { InboxThread } from './inbox-threads.js'
+import { linkedThreadIds, type InboxThread } from './inbox-threads.js'
 import { ItemGlyphs } from './item-glyphs.js'
 import { useBacklogActions } from './use-backlog-actions.js'
 
@@ -203,6 +203,19 @@ export const InboxView = (props: {
                 )}
                 <p className="dshx:flex dshx:items-center dshx:gap-1.5 dshx:text-[11px] dshx:text-muted-foreground">
                   <ItemGlyphs.AttentionBadge attention={item.attention} compact />
+                  {linkedThreadIds(item).map(sessionId => (
+                    <button
+                      key={sessionId}
+                      type="button"
+                      onClick={event => {
+                        event.stopPropagation()
+                        props.openThread(sessionId)
+                      }}
+                      className="dshx:inline-flex dshx:items-center dshx:gap-1 dshx:font-medium dshx:text-foreground dshx:hover:underline"
+                    >
+                      <MessagesSquareIcon aria-hidden className="dshx:size-3" /> Open thread
+                    </button>
+                  ))}
                   {item.project === null ? null : (
                     <>
                       <ItemGlyphs.ProjectDot project={item.project} />
