@@ -4,7 +4,7 @@ Owner plugin: `@dshfiles/multi-host` (`plugins/@dshfiles/multi-host`). No core p
 If something cannot be done with the existing Host methods and the remote runtime's supported RPCs, write the gap in
 `plans/dsh-host-gaps.md` and stop that slice.
 
-**Resume here:** Slice 1, task 1.1.
+**Resume here:** Slice 2, task 2.1.
 
 ## Why
 
@@ -26,9 +26,9 @@ Out of scope: streaming the transcript instead of polling (measure first), deplo
 
 | Task | State |
 | ---- | ----- |
-| 1.1 Inventory query | todo |
-| 1.2 Inventory list in the remote threads panel | todo |
-| 1.3 Tests for inventory merge | todo |
+| 1.1 Inventory query | done |
+| 1.2 Inventory list in the remote threads panel | done (ui-styles rebuilt in task 3) |
+| 1.3 Tests for inventory merge | done |
 | 2.1 Pending detection in `reduceTranscript` | todo |
 | 2.2 "Waiting on host" banner | todo |
 | 2.3 Tests for pending detection | todo |
