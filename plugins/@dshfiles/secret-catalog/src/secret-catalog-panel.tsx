@@ -158,7 +158,8 @@ export const SecretCatalogPanel = (props: SecretCatalogPanelProps): JSX.Element 
   const loading = listQuery.isFetching
   const listFailed = listQuery.isError && !listQuery.isFetching
   const showCatalog = !(listFailed && rows.length === 0)
-  const error = copyMutation.isError ? t('copyFailed') : revealSnapshot.matches('failed') ? t('revealFailed') : listFailed ? t('loadFailed') : null
+  const loadError = listFailed ? t('loadFailed') : null
+  const error = copyMutation.isError ? t('copyFailed') : revealSnapshot.matches('failed') ? t('revealFailed') : loadError
   const machineName = machineQuery.data?.name ?? null
 
   useEffect(() => {
