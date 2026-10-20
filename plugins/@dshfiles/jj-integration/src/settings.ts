@@ -50,6 +50,30 @@ export const jjIntegrationSettings = defineSettings({
     removeFinishedThreads: Schema.boolean()
       .default(true)
       .description('Remove a thread workspace once all its threads are archived and it holds no revisions to rebase. Work is never deleted.'),
+    autoCleanup: Schema.object({
+      enabled: Schema.boolean().default(true).description('Run “Clean up thread workspaces” on its own, on the interval below.'),
+      kinds: Schema.array(
+        Schema.union([
+          Schema.const('empty').description('Empty: workspaces that never landed anything.'),
+          Schema.const('integrated').description('Integrated: workspaces whose work all landed.'),
+          Schema.const('untracked').description('Untracked: threads-directory folders and files no jj workspace owns.'),
+        ]),
+      )
+        .default(['empty', 'integrated'])
+        .description('Which idle thread workspaces the automatic run removes. Untracked is opt-in. An empty list removes nothing.'),
+      olderThanHours: Schema.natural()
+        .min(1)
+        .max(24 * 90)
+        .default(24)
+        .description('Only workspaces last used longer ago than this many hours.'),
+      intervalMinutes: Schema.natural()
+        .min(5)
+        .max(24 * 60)
+        .default(60)
+        .description('Minutes between automatic runs. The first run waits a few minutes after DSH starts.'),
+    }).description(
+      'Remove idle thread workspaces automatically in every registered jj repository, through the same cleanup job as the manual button. A workspace with unlanded revisions, a working or waiting thread, a thread whose activity cannot be read, or a queued integration is always kept.',
+    ),
   }),
 })
 

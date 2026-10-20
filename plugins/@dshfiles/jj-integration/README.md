@@ -323,6 +323,26 @@ verb as `jj_thread_cleanup` (`apply: false` previews, `apply: true` waits for
 the pass and returns its result), plus `jj_thread_cleanup_jobs` to read the
 background trail.
 
+### Automatic cleanup
+
+The Host also runs that same job on its own (setting `autoCleanup`, on by
+default): every `intervalMinutes` (60) it cleans every registered jj repository
+of the selected `kinds` (`empty` and `integrated`; `untracked` is opt-in) unused
+for `olderThanHours` (24). The first run waits five minutes after the Host
+starts, a run is skipped while any cleanup job is queued or running, and
+disposing the plugin cancels the next run. It uses the same qualifiers as the
+button, so a workspace with unlanded revisions, a working, waiting or unreadable
+Session, or a queued integration is always kept. Each run lands in the cleanup
+trail (`jj_thread_cleanup_jobs` marks it `automatic`) and in the activity
+timeline as `workspace.cleaned` — routine when nothing was removed, with the
+skip counts (`Skipped 41: 29 activity-unknown, 12 has-work.`) as its detail — or
+`workspace.cleanup-failed` when the job failed. An empty `kinds` list or
+`enabled: false` turns it off; settings are read at each run.
+
+The activity read is the same bounded Session list a Rebase guard uses (15 s).
+When the Host's Session list takes longer, every Session reads as
+`activity-unknown` and the run removes nothing; the skip counts say so.
+
 This replaces `jjc` and `jjw cleanup` from nixfiles for thread workspaces: both
 are terminal tools (an fzf picker, day-granularity ages, no knowledge of DSH
 Sessions), while the cleanup has to skip busy threads and drop the DSH
@@ -337,16 +357,17 @@ revisions a live workspace still builds on.
 
 ## Settings (`jj-integration`)
 
-| Key                                   | Default   | Meaning                                                                                                                    |
-| ------------------------------------- | --------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `autoIntegrationScope`                | `none`    | `none` is manual; `isolated` auto-integrates uniquely owned thread workspaces; `all` also isolates new threads by default. |
-| `autoIntegrationExcludedRepositories` | empty     | Absolute repository paths that automatic integration never touches; manual Integrate still works.                          |
-| `isolateByDefault`                    | `false`   | Initial state of the new-thread workspace toggle; `all` scope forces isolation on by default.                              |
-| `bookmark`                            | `main`    | Exact bookmark threads start from and Rebase advances.                                                                     |
-| `threadsDirectory`                    | empty     | Parent for thread workspaces; empty uses `<repository>-threads`.                                                           |
-| `askAgentToFixLanding`                | `true`    | Hand Rebase problems back to the thread's agent.                                                                           |
-| `syncWorkspaceAfterLand`              | `default` | Workspace brought onto the bookmark after Rebase (`dshx checkout sync`); empty disables it.                                |
-| `removeFinishedThreads`               | `true`    | Remove finished thread workspaces without revisions to rebase.                                                             |
+| Key                                   | Default   | Meaning                                                                                                                                    |
+| ------------------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `autoIntegrationScope`                | `none`    | `none` is manual; `isolated` auto-integrates uniquely owned thread workspaces; `all` also isolates new threads by default.                 |
+| `autoIntegrationExcludedRepositories` | empty     | Absolute repository paths that automatic integration never touches; manual Integrate still works.                                          |
+| `isolateByDefault`                    | `false`   | Initial state of the new-thread workspace toggle; `all` scope forces isolation on by default.                                              |
+| `bookmark`                            | `main`    | Exact bookmark threads start from and Rebase advances.                                                                                     |
+| `threadsDirectory`                    | empty     | Parent for thread workspaces; empty uses `<repository>-threads`.                                                                           |
+| `askAgentToFixLanding`                | `true`    | Hand Rebase problems back to the thread's agent.                                                                                           |
+| `syncWorkspaceAfterLand`              | `default` | Workspace brought onto the bookmark after Rebase (`dshx checkout sync`); empty disables it.                                                |
+| `removeFinishedThreads`               | `true`    | Remove finished thread workspaces without revisions to rebase.                                                                             |
+| `autoCleanup`                         | object    | `{ enabled: true, kinds: ['empty', 'integrated'], olderThanHours: 24, intervalMinutes: 60 }`; see [Automatic cleanup](#automatic-cleanup). |
 
 The settings keys `askAgentToFixLanding` and `syncWorkspaceAfterLand` retain
 their names for saved-settings compatibility; their descriptions and UI copy

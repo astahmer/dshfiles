@@ -1,5 +1,6 @@
 import { defineApi, method } from '@dshfiles/dshx/api'
 import { z } from 'zod'
+import { CleanupJobModel } from './cleanup-jobs.js'
 
 const revisionSchema = z.object({ changeId: z.string(), commitId: z.string(), description: z.string(), conflict: z.boolean() }).strict()
 export type ThreadRevisionView = z.infer<typeof revisionSchema>
@@ -145,7 +146,15 @@ const cleanupJobSchema = z
     /** `queued` waits behind the job that runs; a Host restart drops the trail with the job. */
     state: z.enum(['queued', 'running', 'done', 'failed']),
     phase: z.enum(['queued', 'scanning', 'removing', 'abandoning', 'done', 'failed']),
-    request: z.object({ path: z.string().nullable(), olderThanHours: z.number().int().nonnegative(), kinds: z.array(cleanupKindSchema) }).strict(),
+    request: z
+      .object({
+        path: z.string().nullable(),
+        olderThanHours: z.number().int().nonnegative(),
+        kinds: z.array(cleanupKindSchema),
+        /** `automatic` is the Host's interval run (setting autoCleanup); a Host from before it omits the field. */
+        trigger: z.enum(['manual', 'automatic']).optional(),
+      })
+      .strict(),
     startedAt: z.number().int().nonnegative(),
     finishedAt: z.number().int().nonnegative().nullable(),
     progress: z
@@ -190,11 +199,7 @@ const renderCleanup = (output: CleanupResult): string => {
       ? undefined
       : `${verb} ${String(output.untracked.length)} untracked entr(ies): ${output.untracked.map(entry => (entry.outcome === 'failed' ? `${entry.name} (failed)` : entry.name)).join(', ')}.`,
     `${output.applied ? 'Abandoned' : 'Would abandon'} ${String(output.emptyRevisions.length)} dangling empty revision(s).`,
-    output.skipped.length === 0
-      ? undefined
-      : `Skipped ${String(output.skipped.length)}: ${[...new Set(output.skipped.map(workspace => workspace.reason))]
-          .map(reason => `${String(output.skipped.filter(workspace => workspace.reason === reason).length)} ${reason}`)
-          .join(', ')}.`,
+    CleanupJobModel.skippedSummary(output),
   ]
     .filter(line => line !== undefined)
     .join('\n')
@@ -426,7 +431,8 @@ export const jjIntegrationApi = defineApi({
               const running = job.progress.current === null ? '' : ` · removing ${job.progress.current}`
               const failure = job.error === null ? '' : ` · ${job.error}`
               const result = job.result === null ? '' : ` · ${renderCleanup(job.result).replaceAll('\n', ' · ')}`
-              return `${job.id} · ${job.state}/${job.phase} · ${progress} · ${String(job.progress.removed)} removed, ${String(job.progress.kept)} kept, ${String(job.progress.failed)} failed${running}${failure}${result}`
+              const trigger = job.request.trigger === 'automatic' ? ' · automatic' : ''
+              return `${job.id}${trigger} · ${job.state}/${job.phase} · ${progress} · ${String(job.progress.removed)} removed, ${String(job.progress.kept)} kept, ${String(job.progress.failed)} failed${running}${failure}${result}`
             })
             .join('\n') || 'No thread-workspace removal has run.',
       },

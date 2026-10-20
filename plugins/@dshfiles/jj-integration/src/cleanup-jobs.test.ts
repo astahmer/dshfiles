@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { CleanupJobModel, createCleanupJobRunner, createCleanupJobTrail, MAX_CLEANUP_JOBS, type CleanupJobRequest } from './cleanup-jobs.js'
 import type { CleanupResult } from './api.js'
 
-const request: CleanupJobRequest = { path: '/work/sample', olderThanHours: 6, kinds: ['empty', 'integrated'] }
+const request: CleanupJobRequest = { path: '/work/sample', olderThanHours: 6, kinds: ['empty', 'integrated'], trigger: 'manual' }
 
 const result = (input: { readonly workspaces: number; readonly untracked?: number; readonly revisions?: number }): CleanupResult => ({
   applied: true,
@@ -150,8 +150,18 @@ describe('createCleanupJobTrail', () => {
 })
 
 describe('CleanupJobModel.sameRequest', () => {
-  it('matches the same scope regardless of kind order', () => {
-    expect(CleanupJobModel.sameRequest(request, { path: '/work/sample', olderThanHours: 6, kinds: ['integrated', 'empty'] })).toBe(true)
+  it('matches the same scope regardless of kind order or trigger', () => {
+    expect(CleanupJobModel.sameRequest(request, { path: '/work/sample', olderThanHours: 6, kinds: ['integrated', 'empty'], trigger: 'automatic' })).toBe(true)
+  })
+
+  it('summarizes why workspaces stayed, one count per reason', () => {
+    const skipped = (reason: CleanupResult['skipped'][number]['reason'], name: string) => ({ repoRoot: '/work/sample', name, reason })
+    const scan: CleanupResult = {
+      ...result({ workspaces: 0 }),
+      skipped: [skipped('activity-unknown', 'thread-a'), skipped('has-work', 'thread-b'), skipped('activity-unknown', 'thread-c')],
+    }
+    expect(CleanupJobModel.skippedSummary(scan)).toBe('Skipped 3: 2 activity-unknown, 1 has-work.')
+    expect(CleanupJobModel.skippedSummary(result({ workspaces: 1 }))).toBeUndefined()
   })
 
   it('separates a different age, folder or kind set', () => {

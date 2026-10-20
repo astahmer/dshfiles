@@ -12,12 +12,16 @@ export type CleanupJobPhase = 'queued' | 'scanning' | 'removing' | 'abandoning' 
 
 export type CleanupJobOutcome = 'removed' | 'kept' | 'failed'
 
+/** `automatic` is the Host's own interval run; it queues behind and attaches to manual jobs exactly like a click. */
+export type CleanupTrigger = 'manual' | 'automatic'
+
 export interface CleanupJobRequest {
   /** Any folder inside the repository; null cleans every registered jj repository. */
   readonly path: string | null
   readonly olderThanHours: number
   /** Copies of the requested kinds, in wire shape rather than the caller's array. */
   readonly kinds: CleanupKind[]
+  readonly trigger: CleanupTrigger
 }
 
 export interface CleanupJobProgress {
@@ -52,6 +56,19 @@ export class CleanupJobModel {
   /** A second click on the same scope attaches to the job already running instead of queuing the same removal twice. */
   static readonly sameRequest = (left: CleanupJobRequest, right: CleanupJobRequest): boolean =>
     left.path === right.path && left.olderThanHours === right.olderThanHours && [...left.kinds].sort().join() === [...right.kinds].sort().join()
+
+  static readonly removedCount = (result: CleanupResult) => ({
+    workspaces: result.workspaces.filter(workspace => workspace.outcome === 'removed').length,
+    untracked: result.untracked.filter(entry => entry.outcome === 'removed').length,
+  })
+
+  /** Why the rest stayed, e.g. `Skipped 41: 29 activity-unknown, 12 has-work.`, so a run that removed nothing explains itself. */
+  static readonly skippedSummary = (result: CleanupResult): string | undefined => {
+    if (result.skipped.length === 0) return undefined
+    const counts = new Map<string, number>()
+    for (const row of result.skipped) counts.set(row.reason, (counts.get(row.reason) ?? 0) + 1)
+    return `Skipped ${String(result.skipped.length)}: ${[...counts].map(([reason, count]) => `${String(count)} ${reason}`).join(', ')}.`
+  }
 }
 
 const emptyProgress: CleanupJobProgress = { total: 0, processed: 0, removed: 0, kept: 0, failed: 0, current: null }

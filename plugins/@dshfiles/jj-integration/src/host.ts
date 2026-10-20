@@ -32,7 +32,8 @@ import {
   type WorkspaceSyncView,
 } from './api.js'
 import { WorkspaceCleanupModel } from './workspace-cleanup.js'
-import { createCleanupJobRunner, type CleanupJobReporter } from './cleanup-jobs.js'
+import { CleanupJobModel, createCleanupJobRunner, type CleanupJobReporter, type CleanupTrigger } from './cleanup-jobs.js'
+import { createAutoCleanupScheduler, type AutoCleanupOutcome } from './auto-cleanup.js'
 import { JsonText } from './json-text.js'
 import {
   defaultJjIntegrationSettings,
@@ -902,7 +903,13 @@ const previewCleanup = async (input: CleanupRequest): Promise<CleanupResult> => 
   }
 }
 
-const applyCleanup = async (scan: CleanupScan, report: Pick<CleanupJobReporter, 'beginPhase' | 'beginItem' | 'settleItem'>): Promise<CleanupResult> => {
+const applyCleanup = async (input: {
+  readonly scan: CleanupScan
+  readonly trigger: CleanupTrigger
+  readonly report: Pick<CleanupJobReporter, 'beginPhase' | 'beginItem' | 'settleItem'>
+}): Promise<CleanupResult> => {
+  const scan = input.scan
+  const report = input.report
   const active = requireThreads()
   const workspaces: CleanupResult['workspaces'] = []
   const untracked: CleanupResult['untracked'] = []
@@ -940,25 +947,45 @@ const applyCleanup = async (scan: CleanupScan, report: Pick<CleanupJobReporter, 
     emptyRevisions.push(...found)
   }
   invalidateRepositories()
+  const result: CleanupResult = { applied: true, workspaces, skipped: scan.skipped, untracked, emptyRevisions }
+  const removedCount = CleanupJobModel.removedCount(result)
   emitActivity({
     type: 'workspace.cleaned',
-    summary: `Cleaned up ${String(workspaces.filter(workspace => workspace.outcome === 'removed').length)} thread workspace(s), ${String(untracked.filter(entry => entry.outcome === 'removed').length)} untracked entr(ies) and ${String(emptyRevisions.length)} empty revision(s)`,
+    summary: `${input.trigger === 'automatic' ? 'Automatic cleanup removed' : 'Cleaned up'} ${String(removedCount.workspaces)} thread workspace(s), ${String(removedCount.untracked)} untracked entr(ies) and ${String(emptyRevisions.length)} empty revision(s)`,
+    detail: CleanupJobModel.skippedSummary(result),
     path: scan.scopedRepoRoot ?? '',
+    level: input.trigger === 'automatic' && removedCount.workspaces + removedCount.untracked + emptyRevisions.length === 0 ? 'routine' : 'notable',
   })
-  return { applied: true, workspaces, skipped: scan.skipped, untracked, emptyRevisions }
+  return result
 }
 
 const cleanupRunner = createCleanupJobRunner({
   execute: async ({ request, report }) => {
     const scan = await scanCleanup({ path: request.path ?? undefined, olderThanHours: request.olderThanHours, kinds: request.kinds, apply: true })
     report.planned(scan.workspaces.length + scan.untracked.length)
-    return await applyCleanup(scan, report)
+    return await applyCleanup({ scan, trigger: request.trigger, report })
   },
 })
 
+/** A finished run already reported itself as `workspace.cleaned`; only the runs that removed nothing by design or failed say so here. */
+const reportAutoCleanup = (outcome: AutoCleanupOutcome): void => {
+  if (outcome.status === 'busy') {
+    hostContext?.logger.debug('jj-integration: automatic cleanup skipped while %s runs', outcome.jobId)
+    return
+  }
+  if (outcome.status !== 'failed') return
+  emitActivity({
+    type: 'workspace.cleanup-failed',
+    summary: 'Automatic thread-workspace cleanup failed',
+    detail: outcome.message,
+    path: '',
+    level: 'attention',
+  })
+}
+
 const cleanupWorkspaces = async (input: CleanupRequest & { readonly apply: boolean }): Promise<CleanupResult> => {
   if (!input.apply) return await previewCleanup(input)
-  const { done } = cleanupRunner.start({ path: input.path ?? null, olderThanHours: input.olderThanHours, kinds: [...input.kinds] })
+  const { done } = cleanupRunner.start({ path: input.path ?? null, olderThanHours: input.olderThanHours, kinds: [...input.kinds], trigger: 'manual' })
   return await done
 }
 
@@ -1204,7 +1231,7 @@ const api = jjIntegrationApi.host({
   discard: ({ input }) => discardThread(input),
   cleanupWorkspaces: ({ input }) => cleanupWorkspaces(input),
   startCleanup: ({ input }) => {
-    const { job, done } = cleanupRunner.start({ path: input.path ?? null, olderThanHours: input.olderThanHours, kinds: [...input.kinds] })
+    const { job, done } = cleanupRunner.start({ path: input.path ?? null, olderThanHours: input.olderThanHours, kinds: [...input.kinds], trigger: 'manual' })
     // The job owns the removal once queued; its failure is reported on the trail, not to a request that already returned.
     void done.catch(() => undefined)
     return { job }
@@ -1516,6 +1543,11 @@ const setupHost = (context: Context): Effect<void> => {
   const sweep = (): void => {
     void sweepFinishedThreads().catch(error => context.logger.warn('jj-integration: thread sweep failed: %o', error))
   }
+  const autoCleanup = createAutoCleanupScheduler({
+    runner: cleanupRunner,
+    settings: () => readSettings().autoCleanup,
+    report: reportAutoCleanup,
+  })
   const firstSweep = setTimeout(sweep, 30_000)
   const timer = setInterval(sweep, SWEEP_INTERVAL_MS)
   firstSweep.unref()
@@ -1523,6 +1555,7 @@ const setupHost = (context: Context): Effect<void> => {
   return {
     async *[Symbol.asyncIterator]() {
       yield async () => {
+        autoCleanup.dispose()
         clearTimeout(firstSweep)
         clearInterval(timer)
         clearInterval(deferredFallback)
