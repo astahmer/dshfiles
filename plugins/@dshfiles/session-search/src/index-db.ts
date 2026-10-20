@@ -199,6 +199,9 @@ const eventFilterClauses = (filters: EventFilters | undefined) => {
   return { clauses, bindings }
 }
 
+/** Documents a search scores before it falls back to every match; see `#rankedRows`. */
+const RANK_CAP = 2_000
+
 export class SearchIndex {
   readonly #database: DatabaseSync
   readonly #path: string
@@ -367,6 +370,13 @@ export class SearchIndex {
     return parsed.success ? headerOf(parsed.data) : null
   }
 
+  /**
+   * The best-ranked document of each matching session, best sessions first. A common term matches ~100 000 documents
+   * here, so this ranks first and builds snippets for the returned rows only (snippet() re-tokenizes a whole document),
+   * and scores only the best `rankCap` documents through FTS5's ordered `rank` scan. Walking documents in rank order
+   * keeps the first one of each session, so the cap only loses sessions past it; a capped answer shorter than asked is
+   * recomputed over every match.
+   */
   #rankedRows(input: {
     readonly query: string
     readonly filters: readonly string[]
@@ -375,36 +385,56 @@ export class SearchIndex {
     readonly offset: number
     readonly sessionId: string | undefined
   }): readonly RankedRow[] {
+    const rankCap = Math.max(RANK_CAP, (input.offset + input.limit) * 50)
+    const capped = this.#rankedRowsWithin({ ...input, rankCap })
+    return capped.length >= input.limit ? capped : this.#rankedRowsWithin({ ...input, rankCap: undefined })
+  }
+
+  #rankedRowsWithin(input: {
+    readonly query: string
+    readonly filters: readonly string[]
+    readonly bindings: readonly (string | number)[]
+    readonly limit: number
+    readonly offset: number
+    readonly sessionId: string | undefined
+    readonly rankCap: number | undefined
+  }): readonly RankedRow[] {
     const where = ['session_documents MATCH ?', ...(input.sessionId === undefined ? [] : ['d.session_id = ?']), ...input.filters].join(' AND ')
     const bindings: (string | number)[] = [
       input.query,
       ...(input.sessionId === undefined ? [] : [input.sessionId]),
       ...input.bindings,
+      ...(input.rankCap === undefined ? [] : [input.rankCap]),
       input.limit,
       input.offset,
+      input.query,
     ]
     const sql = `
       WITH matched AS (
-        SELECT d.session_id AS session_id, d.seq AS seq, d.type AS type, d.time AS time, d.surface AS surface,
-               s.id AS id, s.version AS version, s.created_at AS created_at, s.cwd AS cwd, s.parent_session AS parent_session,
-               s.seed_length AS seed_length, s.delegation_depth AS delegation_depth, s.agent_preset AS agent_preset,
-               bm25(session_documents) AS score, length(d.text) AS document_length,
-               snippet(session_documents, 0, ?, ?, '…', 32) AS marked_text
+        SELECT d.rowid AS document_rowid, d.session_id AS session_id, d.seq AS seq, d.time AS time,
+               ${input.rankCap === undefined ? 'bm25(session_documents)' : 'rank'} AS score, length(d.text) AS document_length
         FROM session_documents AS d JOIN sessions AS s ON s.id = d.session_id
-        WHERE ${where}
+        WHERE ${where}${input.rankCap === undefined ? '' : ' ORDER BY rank LIMIT ?'}
       ),
       ranked AS (
-        SELECT session_id, seq, type, time, surface, id, version, created_at, cwd, parent_session, seed_length, delegation_depth,
-               agent_preset, marked_text, score, document_length,
+        SELECT document_rowid, session_id, seq, time, score, document_length,
                row_number() OVER (PARTITION BY session_id ORDER BY score ASC, document_length ASC, time DESC, seq DESC) AS event_rank
         FROM matched
+      ),
+      page AS (
+        SELECT document_rowid, score, document_length, time, session_id, seq FROM ranked WHERE event_rank = 1
+        ORDER BY score ASC, document_length ASC, time DESC, session_id ASC, seq DESC
+        LIMIT ? OFFSET ?
       )
-      SELECT session_id, seq, type, time, surface, id, version, created_at, cwd, parent_session, seed_length, delegation_depth, agent_preset, marked_text
-      FROM ranked WHERE event_rank = 1
-      ORDER BY score ASC, document_length ASC, time DESC, session_id ASC, seq DESC
-      LIMIT ? OFFSET ?
+      SELECT d.session_id AS session_id, d.seq AS seq, d.type AS type, d.time AS time, d.surface AS surface,
+             s.id AS id, s.version AS version, s.created_at AS created_at, s.cwd AS cwd, s.parent_session AS parent_session,
+             s.seed_length AS seed_length, s.delegation_depth AS delegation_depth, s.agent_preset AS agent_preset,
+             snippet(session_documents, 0, ?, ?, '…', 32) AS marked_text
+      FROM page JOIN session_documents AS d ON d.rowid = page.document_rowid JOIN sessions AS s ON s.id = page.session_id
+      WHERE session_documents MATCH ?
+      ORDER BY page.score ASC, page.document_length ASC, page.time DESC, page.session_id ASC, page.seq DESC
     `
-    const values = this.#database.prepare(sql).all(MARKER_START, MARKER_END, ...bindings)
+    const values = this.#database.prepare(sql).all(...bindings.slice(0, -1), MARKER_START, MARKER_END, input.query)
     return values.map(value => rankedRowSchema.parse(value))
   }
 
