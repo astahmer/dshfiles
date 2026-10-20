@@ -637,7 +637,9 @@ const setupHost = (context: Context): Effect<void> => {
 
   context.on('agent/created', async ({ agent }) => {
     await initializeAgent(agent)
-    await refreshUnreadCounts()
+    // agent/created listeners run in series inside session/create; a new Agent has nothing unread, so the counts of
+    // every other live Agent refresh after the thread is created instead of before.
+    void refreshUnreadCounts().catch(() => undefined)
     return undefined
   })
 
