@@ -13,10 +13,12 @@ export const COLLAPSED_GROUPS_STORAGE_KEY = 'dshfiles.thread-sidebar.collapsed-g
 
 const collapsedGroupsSchema = z.array(z.string().min(1).max(200)).max(200)
 
+const noCollapsedGroups: readonly string[] = []
+
 export const storedCollapsedGroups = createStoredValue({
   key: COLLAPSED_GROUPS_STORAGE_KEY,
   schema: collapsedGroupsSchema,
-  fallback: [] as readonly string[],
+  fallback: noCollapsedGroups,
 })
 
 export const toggleCollapsedGroup = (collapsedGroups: readonly string[], key: string): string[] =>

@@ -11,12 +11,12 @@ import { useEffect, useState, type RefObject } from 'react'
  * row mounts, which is the previous behaviour.
  */
 export const useNearViewport = (ref: RefObject<Element | null>, rootMargin = '600px'): boolean => {
-  const [near, setNear] = useState(() => typeof IntersectionObserver === 'undefined')
+  const [near, setNear] = useState(() => globalThis.IntersectionObserver === undefined)
   useEffect(() => {
     if (near) return
     const element = ref.current
     if (element === null) return
-    if (typeof IntersectionObserver === 'undefined') {
+    if (globalThis.IntersectionObserver === undefined) {
       setNear(true)
       return
     }

@@ -2,7 +2,8 @@
 import { describe, expect, it } from 'vitest'
 import { OPEN_THREAD_ASIDE_EVENT, readThreadAsideRequest } from './thread-aside-request.js'
 
-const request = (detail: unknown, cancelable = true): Event => new CustomEvent(OPEN_THREAD_ASIDE_EVENT, { detail, cancelable })
+const request = (detail: { readonly sessionId: string; readonly extra?: boolean } | string, cancelable = true): Event =>
+  new CustomEvent(OPEN_THREAD_ASIDE_EVENT, { detail, cancelable })
 
 describe('thread aside requests', () => {
   it('reads the session one cancelable request names', () => {
