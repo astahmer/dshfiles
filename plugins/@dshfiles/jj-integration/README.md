@@ -207,6 +207,13 @@ the thread workspace has exactly one owning Session. Scope `all` also makes
 isolation the default for new threads; existing shared workspaces remain manual.
 The composer workspace control can still opt a new thread out of isolation.
 
+A repository can opt out of automatic integration entirely with the **Auto**
+switch beside its project header in **Thread integration**, or by adding its
+absolute path to `autoIntegrationExcludedRepositories`. Use it for a checkout
+whose bookmark only accepts pull requests, such as a protected `main` on a team
+repository: automatic integration never moves that bookmark, while a manual
+**Integrate** on a row still does.
+
 Automatic integration is separate from **Integrate**: it checks the completion
 receipt against the source revision, pins the current bookmark, and fails closed
 on detached work, represented or mixed patches, or scans that cannot prove patch
@@ -243,15 +250,16 @@ The confirmation dialog explains these effects before removal.
 
 ## Settings (`jj-integration`)
 
-| Key                      | Default   | Meaning                                                                                                                    |
-| ------------------------ | --------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `autoIntegrationScope`   | `none`    | `none` is manual; `isolated` auto-integrates uniquely owned thread workspaces; `all` also isolates new threads by default. |
-| `isolateByDefault`       | `false`   | Initial state of the new-thread workspace toggle; `all` scope forces isolation on by default.                              |
-| `bookmark`               | `main`    | Exact bookmark threads start from and Rebase advances.                                                                     |
-| `threadsDirectory`       | empty     | Parent for thread workspaces; empty uses `<repository>-threads`.                                                           |
-| `askAgentToFixLanding`   | `true`    | Hand Rebase problems back to the thread's agent.                                                                           |
-| `syncWorkspaceAfterLand` | `default` | Workspace brought onto the bookmark after Rebase (`dshx checkout sync`); empty disables it.                                |
-| `removeFinishedThreads`  | `true`    | Remove finished thread workspaces without revisions to rebase.                                                             |
+| Key                                   | Default   | Meaning                                                                                                                    |
+| ------------------------------------- | --------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `autoIntegrationScope`                | `none`    | `none` is manual; `isolated` auto-integrates uniquely owned thread workspaces; `all` also isolates new threads by default. |
+| `autoIntegrationExcludedRepositories` | empty     | Absolute repository paths that automatic integration never touches; manual Integrate still works.                          |
+| `isolateByDefault`                    | `false`   | Initial state of the new-thread workspace toggle; `all` scope forces isolation on by default.                              |
+| `bookmark`                            | `main`    | Exact bookmark threads start from and Rebase advances.                                                                     |
+| `threadsDirectory`                    | empty     | Parent for thread workspaces; empty uses `<repository>-threads`.                                                           |
+| `askAgentToFixLanding`                | `true`    | Hand Rebase problems back to the thread's agent.                                                                           |
+| `syncWorkspaceAfterLand`              | `default` | Workspace brought onto the bookmark after Rebase (`dshx checkout sync`); empty disables it.                                |
+| `removeFinishedThreads`               | `true`    | Remove finished thread workspaces without revisions to rebase.                                                             |
 
 The settings keys `askAgentToFixLanding` and `syncWorkspaceAfterLand` retain
 their names for saved-settings compatibility; their descriptions and UI copy

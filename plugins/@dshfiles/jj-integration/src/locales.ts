@@ -231,6 +231,13 @@ const en = {
   inactiveHint: 'Archived thread workspaces, hidden from the counts above.',
   showMoreThreads: 'Show {count} more workspace(s)',
   hideExtraThreads: 'Show fewer workspaces',
+  autoIntegrationLabel: 'Auto',
+  autoIntegrationOff: 'Auto-integration off',
+  autoIntegrationToggle: 'Integrate {repository} automatically',
+  autoIntegrationToggleHint:
+    'Automatically integrate finished thread work onto {bookmark}. Turn this off for a repository whose bookmark only accepts pull requests.',
+  autoIntegrationExcludedHint: 'This repository is never integrated automatically. Manual Integrate still works.',
+  autoIntegrationSaveFailed: 'The auto-integration exclusion could not be saved.',
 } as const
 
 const zh = {
@@ -456,6 +463,12 @@ const zh = {
   inactiveHint: '已归档的线程工作区，不计入上方统计。',
   showMoreThreads: '再显示 {count} 个工作区',
   hideExtraThreads: '收起工作区',
+  autoIntegrationLabel: '自动',
+  autoIntegrationOff: '自动集成已关闭',
+  autoIntegrationToggle: '自动集成 {repository}',
+  autoIntegrationToggleHint: '自动把已完成的线程工作集成到 {bookmark}。若仓库的 {bookmark} 只接受拉取请求，请关闭此项。',
+  autoIntegrationExcludedHint: '此仓库绝不会自动集成。手动“集成”仍然可用。',
+  autoIntegrationSaveFailed: '无法保存自动集成排除项。',
 } satisfies Record<keyof typeof en, string>
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {

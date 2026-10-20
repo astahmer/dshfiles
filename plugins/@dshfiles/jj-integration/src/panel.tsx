@@ -21,6 +21,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Separator } from '@dshfiles/plugin-ui/components/ui/separator'
 import { Skeleton } from '@dshfiles/plugin-ui/components/ui/skeleton'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
+import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
 import {
   CheckIcon,
   ChevronDownIcon,
@@ -38,7 +39,7 @@ import {
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { errorMessage, useIsMutating, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
-import { useApi } from '@dshfiles/dshx/client'
+import { useApi, useSettings } from '@dshfiles/dshx/client'
 import { useMachine } from '@dshfiles/plugin-ui/machine'
 import { useCallback, useEffect, useId, useMemo, useState, useSyncExternalStore } from 'react'
 import { jjIntegrationApi, type ThreadView, type WorkspaceSyncView } from './api.js'
@@ -49,6 +50,7 @@ import type { JjIntegrationTranslate } from './locales.js'
 import { integrationQueueMachine, type IntegrationJob, type IntegrationJobPhase } from './integration-queue-machine.js'
 import { indexSessionActivity } from './panel-session-activity.js'
 import { createProjectionRefreshQueue } from './projection-refresh-queue.js'
+import { defaultJjIntegrationSettings, jjIntegrationSettings, RepositoryAutoIntegration } from './settings.js'
 import { ThreadRebaseEligibilityModel } from './thread-rebase-eligibility.js'
 import {
   ThreadIntegrationModel,
@@ -734,6 +736,18 @@ export const ThreadWorkspacesPanel = (props: {
   const queryClient = useQueryClient()
   const rebasesPending = useIsMutating({ mutationKey: threadRebaseMutationKey }) > 0
   const toast = useToast()
+  const settings = useSettings(jjIntegrationSettings)
+  const autoIntegrationScope = settings.value?.autoIntegrationScope ?? defaultJjIntegrationSettings.autoIntegrationScope
+  const excludedRepositoryRoots = settings.value?.autoIntegrationExcludedRepositories ?? defaultJjIntegrationSettings.autoIntegrationExcludedRepositories
+  const autoIntegrationApplies = autoIntegrationScope !== 'none'
+  const setRepositoryExclusion = async (repositoryRoot: string, excluded: boolean): Promise<void> => {
+    const next = excluded ? [...new Set([...excludedRepositoryRoots, repositoryRoot])] : excludedRepositoryRoots.filter(root => root !== repositoryRoot)
+    try {
+      if (!(await settings.set('autoIntegrationExcludedRepositories', next))) toast.show({ text: t('autoIntegrationSaveFailed'), success: false })
+    } catch (error) {
+      toast.show({ text: errorMessage(error, t('autoIntegrationSaveFailed')), success: false })
+    }
+  }
   const [notice, setNotice] = useState<{ readonly tone: 'default' | 'destructive'; readonly text: string } | null>(null)
   const repositories = useQuery({
     queryKey: threadQueryKeys.repositories,
@@ -812,6 +826,7 @@ export const ThreadWorkspacesPanel = (props: {
   const [showAll, setShowAll] = useState<Readonly<Record<string, boolean>>>({})
   const [selectedPaths, setSelectedPaths] = useState<ReadonlySet<string>>(new Set())
   const repositoriesWithThreads = useMemo(() => repositories.data?.repositories.filter(repository => repository.threads.length > 0), [repositories.data])
+  const showRepositoryHeader = (repositoriesWithThreads?.length ?? 0) > 1 || autoIntegrationApplies || excludedRepositoryRoots.length > 0
   const threads = useMemo(
     () => repositoriesWithThreads?.flatMap(repository => repository.threads.map(thread => ({ repository, thread }))) ?? [],
     [repositoriesWithThreads],
@@ -1165,12 +1180,35 @@ export const ThreadWorkspacesPanel = (props: {
                   {repositoriesWithThreads?.map(repository => {
                     const repoEntries = shownEntries.filter(entry => entry.repositoryRoot === repository.repoRoot)
                     if (repoEntries.length === 0) return null
+                    const repositoryExcluded = RepositoryAutoIntegration.isExcluded({ repositoryRoot: repository.repoRoot, excludedRepositoryRoots })
                     return (
                       <div key={repository.repoRoot} className="dshx:flex dshx:flex-col">
-                        {repositoriesWithThreads.length > 1 ? (
+                        {showRepositoryHeader ? (
                           <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:border-b dshx:border-border dshx:bg-muted/30 dshx:px-3 dshx:py-1.5 dshx:text-xs">
                             <span className="dshx:font-medium">{repository.title}</span>
                             <span className="dshx:min-w-0 dshx:truncate dshx:font-mono dshx:text-muted-foreground">{repository.repoRoot}</span>
+                            <div className="dshx:ml-auto dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-2">
+                              {repositoryExcluded ? (
+                                <Badge variant="warning" title={t('autoIntegrationExcludedHint', { repository: repository.title })}>
+                                  {t('autoIntegrationOff')}
+                                </Badge>
+                              ) : null}
+                              {autoIntegrationApplies ? (
+                                <div
+                                  className="dshx:flex dshx:items-center dshx:gap-1.5 dshx:text-muted-foreground"
+                                  title={t('autoIntegrationToggleHint', { bookmark: props.bookmark })}
+                                >
+                                  <span>{t('autoIntegrationLabel')}</span>
+                                  <Switch
+                                    size="sm"
+                                    checked={!repositoryExcluded}
+                                    disabled={!settings.writable || settings.mutation.pending}
+                                    aria-label={t('autoIntegrationToggle', { repository: repository.title })}
+                                    onCheckedChange={checked => void setRepositoryExclusion(repository.repoRoot, !checked)}
+                                  />
+                                </div>
+                              ) : null}
+                            </div>
                           </div>
                         ) : null}
                         <ul className="dshx:flex dshx:flex-col">

@@ -986,13 +986,16 @@ const setupHost = (context: Context): Effect<void> => {
 
     const activeThreads = requireThreads()
     const initialLocation = await activeThreads.locate(workspace.path, verifiedTurn.signal).catch(() => undefined)
+    const autoIntegrationSettings = readSettings()
     if (
       initialLocation === undefined ||
       !mayAutoIntegrateWorkspace({
-        scope: readSettings().autoIntegrationScope,
+        scope: autoIntegrationSettings.autoIntegrationScope,
         isThreadWorkspace: initialLocation.threadName !== undefined,
         sessionId: verifiedTurn.sessionId,
         sessionIds: workspace.sessionIds,
+        repositoryRoot: initialLocation.repoRoot,
+        excludedRepositoryRoots: autoIntegrationSettings.autoIntegrationExcludedRepositories,
       })
     ) {
       return
@@ -1027,14 +1030,17 @@ const setupHost = (context: Context): Effect<void> => {
         expectedSourceRevision: verifiedTurn.sourceRevision,
         authorize: async location => {
           const current = await registry.resolveByPath(location.workspaceRoot)
+          const currentSettings = readSettings()
           if (
             current === undefined ||
             current.path !== workspace.path ||
             !mayAutoIntegrateWorkspace({
-              scope: readSettings().autoIntegrationScope,
+              scope: currentSettings.autoIntegrationScope,
               isThreadWorkspace: location.threadName !== undefined,
               sessionId: verifiedTurn.sessionId,
               sessionIds: current.sessionIds,
+              repositoryRoot: location.repoRoot,
+              excludedRepositoryRoots: currentSettings.autoIntegrationExcludedRepositories,
             })
           ) {
             return false

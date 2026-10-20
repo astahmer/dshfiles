@@ -20,6 +20,11 @@ export const jjIntegrationSettings = defineSettings({
       .description(
         'Automatically rebase finished thread work after Project Checks pass. All scope also isolates new threads by default; existing shared checkouts stay manual.',
       ),
+    autoIntegrationExcludedRepositories: Schema.array(Schema.string())
+      .default([])
+      .description(
+        'Repositories whose finished thread work is never integrated automatically, such as a checkout whose main only accepts pull requests. Manual Integrate still works. Each value is the absolute repository path shown beside the project in Thread integration.',
+      ),
     integratedThreadActions: Schema.union([
       Schema.const('settle').description('Settle: offer only Settle in the “Integrated into …” notice.'),
       Schema.const('archive').description('Archive: offer only Archive, the notice’s original action.'),
@@ -65,9 +70,27 @@ export class IntegratedNoticeActions {
 
 export const isolatesNewThreadsByDefault = (settings: JjIntegrationSettings): boolean => settings.isolateByDefault || settings.autoIntegrationScope === 'all'
 
+/** Repository-level opt-out from automatic integration, matched on the repository root the Host reports. */
+export class RepositoryAutoIntegration {
+  /** Repository paths differ only by a trailing separator when a person typed them. */
+  static readonly isExcluded = (input: { readonly repositoryRoot: string; readonly excludedRepositoryRoots: readonly string[] }): boolean => {
+    const repository = RepositoryAutoIntegration.comparablePath(input.repositoryRoot)
+    return input.excludedRepositoryRoots.some(excluded => RepositoryAutoIntegration.comparablePath(excluded) === repository)
+  }
+
+  private static readonly comparablePath = (path: string): string => path.trim().replace(/[\\/]+$/u, '')
+}
+
 export const mayAutoIntegrateWorkspace = (input: {
   readonly scope: JjIntegrationSettings['autoIntegrationScope']
   readonly isThreadWorkspace: boolean
   readonly sessionId: string
   readonly sessionIds: readonly string[]
-}): boolean => input.scope !== 'none' && input.isThreadWorkspace && input.sessionIds.length === 1 && input.sessionIds[0] === input.sessionId
+  readonly repositoryRoot: string
+  readonly excludedRepositoryRoots: readonly string[]
+}): boolean =>
+  input.scope !== 'none' &&
+  input.isThreadWorkspace &&
+  input.sessionIds.length === 1 &&
+  input.sessionIds[0] === input.sessionId &&
+  !RepositoryAutoIntegration.isExcluded(input)

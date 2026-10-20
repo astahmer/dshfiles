@@ -509,7 +509,14 @@
         "click button \"Thread integration\"",
         "expect heading \"Thread integration\""
       ],
-      "configuration": [],
+      "configuration": [
+        {
+          "key": "autoIntegrationExcludedRepositories",
+          "defaultValue": "empty",
+          "constraints": "Absolute repository paths whose finished thread work is never integrated automatically; a manual Integrate on a row still works.",
+          "coveredBy": ["jj-integration.auto-integration-repository-exclusion"]
+        }
+      ],
       "surfaces": ["client", "host", "integration"],
       "states": [
         "loading",
@@ -531,6 +538,7 @@
         "integration-validating",
         "integration-rebasing",
         "integration-failed",
+        "repository-auto-integration-off",
         "thread-details-expanded",
         "single-message-preview",
         "removal-confirming",
@@ -564,6 +572,12 @@
           "kind": "gherkin",
           "id": "jj-integration.discard-browser-journey",
           "featureFile": "tooling/dshx/e2e/features/jj-integration.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.auto-integration-repository-exclusion",
+          "file": "plugins/@dshfiles/jj-integration/src/settings.test.ts",
+          "testName": "never auto-integrates an excluded repository"
         },
         {
           "kind": "unit-test",
