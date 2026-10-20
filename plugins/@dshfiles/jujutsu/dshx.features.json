@@ -15,7 +15,7 @@
         "click button \"Compare\"",
         "expect region \"Revision comparison\"",
         "click combobox \"Comparison target\"",
-        "click option \"Another revision…\"",
+        "click option \"Another revision\u2026\"",
         "expect combobox \"Choose revision target\"",
         "click combobox \"Choose revision target\"",
         "expect combobox \"Search loaded revisions\""
@@ -35,7 +35,13 @@
           "deterministicFake": "Real disposable local JJ repositories, including merge DAGs and multiple workspaces."
         }
       ],
-      "verification": [{ "kind": "gherkin", "id": "jujutsu.graph-navigation", "featureFile": "tooling/dshx/e2e/features/jujutsu.feature" }]
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "jujutsu.graph-navigation",
+          "featureFile": "tooling/dshx/e2e/features/jujutsu.feature"
+        }
+      ]
     },
     {
       "id": "revision-graph",
@@ -320,7 +326,7 @@
     {
       "id": "workspace-at-revision",
       "title": "Create a workspace at a revision",
-      "summary": "Right-click a revision and choose New workspace here… to add an isolated JJ workspace checked out at it, then launch a session there only after explicit confirmation. Forking a session moved to the native Branch action.",
+      "summary": "Right-click a revision and choose New workspace here\u2026 to add an isolated JJ workspace checked out at it, then launch a session there only after explicit confirmation. Forking a session moved to the native Branch action.",
       "reach": [
         "click button \"Jujutsu\"",
         "click button \"Choose repository\"",
@@ -329,7 +335,7 @@
         "press Enter",
         "expect button \"Sample project*\"",
         "rightclick button \"Sample project*\"",
-        "click menuitem \"New workspace here…\"",
+        "click menuitem \"New workspace here\u2026\"",
         "expect dialog \"New workspace\""
       ],
       "surfaces": ["client", "host", "integration"],
@@ -365,11 +371,11 @@
     {
       "id": "chat-references",
       "title": "Open Jujutsu references from a chat message",
-      "summary": "Inline code in a message becomes a link when it is an explicit JJ identity — a revision-shaped token, a repository bookmark, or a `jj:`-prefixed name — hovering it previews a bounded revision graph around it — its neighbourhood plus the working copy, main, main@origin and the default workspace — and clicking it opens the side panel on the Session repository, focused on that revision or comparing it with main/default along its history path. The `jj:` prefix is the writing convention Agents are told to use, and the reader sees the bare name.",
+      "summary": "Inline code in a message becomes a link when it is an explicit JJ identity \u2014 a revision-shaped token, a repository bookmark, or a `jj:`-prefixed name \u2014 hovering it previews a bounded revision graph around it \u2014 its neighbourhood plus the working copy, main, main@origin and the default workspace \u2014 and clicking it opens the side panel on the Session repository, focused on that revision or comparing it with main/default along its history path. The `jj:` prefix is the writing convention Agents are told to use, and the reader sees the bare name.",
       "reach": [
         "seed chat-reference-thread",
         "hover link \"main\"",
-        "expect text \"Revision graph · main\"",
+        "expect text \"Revision graph \u00b7 main\"",
         "expect text \"default@*\"",
         "press Escape",
         "click link \"main\"",
@@ -409,7 +415,7 @@
         {
           "id": "jj-repository",
           "boundary": "Local bookmark names read through the composer context query; the reference must appear in a rendered message.",
-          "deterministicFake": "A real scratch jj repository with a `main` bookmark, and a Command Code account on the loopback fake provider answering `[[answer …]]` so the code span is deterministic."
+          "deterministicFake": "A real scratch jj repository with a `main` bookmark, and a Command Code account on the loopback fake provider answering `[[answer \u2026]]` so the code span is deterministic."
         }
       ],
       "verification": [
@@ -435,6 +441,43 @@
           "id": "jujutsu.chat-reference-display",
           "file": "plugins/@dshfiles/jujutsu/src/chat-reference-links.test.ts",
           "testName": "re-strips a prefix React rewrites and stops linking a token that changed"
+        }
+      ]
+    },
+    {
+      "id": "workspace-cleanup",
+      "title": "Remove idle thread workspaces in the background",
+      "summary": "The repository menu's Clean up thread workspaces dialog previews what qualifies, then starts a background removal job that survives closing the panel: a trail under the panel header reports scanning, each removed or kept workspace, the empty revisions it abandons, and keeps the last result until dismissed.",
+      "reach": [
+        "click button \"Jujutsu\"",
+        "click button \"Choose repository\"",
+        "fill textbox \"Search projects or enter a folder path\" \"sample\"",
+        "expect option \"sample*\"",
+        "press Enter",
+        "click button \"Repository actions\"",
+        "click menuitem \"Clean up thread workspaces\u2026\"",
+        "expect text \"Clean up thread workspaces\""
+      ],
+      "surfaces": ["client", "host"],
+      "configuration": [],
+      "states": ["preview", "queued", "running", "done", "failed"],
+      "failureModes": [
+        "A workspace with unlanded work, a busy Session or a queued integration is kept.",
+        "A second click on the same scope attaches to the job already running instead of queuing it twice.",
+        "A Host restart drops the trail with the job; what it already removed stays removed."
+      ],
+      "externalDependencies": [
+        {
+          "id": "jj-repository",
+          "boundary": "Real local JJ workspaces: forgetting a workspace and deleting its folder.",
+          "deterministicFake": "A disposable local JJ repository with an idle thread workspace."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "jujutsu.workspace-cleanup",
+          "featureFile": "tooling/dshx/e2e/features/jujutsu.feature"
         }
       ]
     }

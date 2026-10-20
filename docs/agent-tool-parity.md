@@ -39,7 +39,7 @@ backing verb; `host-gap` counts capabilities no verb can reach yet.
 | mentions                                                                                                                                          | 8                    | 1 (`skill`)                                                                                              | 1             | 0         |
 | btw                                                                                                                                               | 8                    | 0                                                                                                        | 3             | 1         |
 | shortcuts                                                                                                                                         | 4                    | 0                                                                                                        | 2             | 1         |
-| jj-integration                                                                                                                                    | 22                   | 8                                                                                                        | 5             | 3         |
+| jj-integration                                                                                                                                    | 23                   | 10                                                                                                       | 5             | 3         |
 | jujutsu                                                                                                                                           | 29                   | 12                                                                                                       | 0             | 3         |
 | project-checks                                                                                                                                    | 8                    | 4                                                                                                        | 1             | 2         |
 | project-folder-picker / workspace-folder-picker                                                                                                   | 9                    | 0                                                                                                        | 4             | 2         |
@@ -163,6 +163,9 @@ Bound now (sibling revision `feat(jj-integration): expose thread-workspace actio
 explicit `force` so unlanded revisions are never abandoned by a bare request.
 `jj_thread_cleanup` binds the panel's **Clean up thread workspaces…** dialog; it
 takes an explicit `apply` (false previews) and never forces a discard.
+`jj_thread_cleanup_jobs` reads the background trail the dialog's confirmation
+now starts (state, phase, counts, the workspace in flight, the newest result),
+so the agent can follow the same asynchronous pass the user watches.
 
 Deliberately not bound, because an existing tool already covers the decision or
 there is no model decision to make: `land` and `threadAt` (both accept an

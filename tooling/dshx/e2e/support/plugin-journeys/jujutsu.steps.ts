@@ -348,3 +348,26 @@ After(async ({ page }: { page: Page }) => {
   fixtures.delete(page)
   await rm(fixture.temporaryRoot, { recursive: true, force: true })
 })
+
+/** The repository state before the cleanup dialog opened, so its preview is proven to remove nothing. */
+const cleanupSnapshots = new WeakMap<Page, string>()
+
+When('the repository actions menu opens the workspace cleanup', async ({ page }: { page: Page }) => {
+  cleanupSnapshots.set(page, snapshotRepository(fixtureFor(page)))
+  await page.getByRole('button', { name: 'Repository actions', exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Clean up thread workspaces…', exact: true }).click()
+  await expect(page.getByRole('dialog', { name: 'Clean up thread workspaces', exact: true })).toBeVisible({ timeout: 10_000 })
+})
+
+Then('the cleanup previews idle workspaces without removing anything', async ({ page }: { page: Page }) => {
+  const fixture = fixtureFor(page)
+  const dialog = page.getByRole('dialog', { name: 'Clean up thread workspaces', exact: true })
+  await recordAssertion(page, 'jujutsu-cleanup-previews-before-removing', async () =>
+    expect(dialog.getByText(/Would abandon \d+ dangling empty revision/)).toBeVisible({ timeout: 20_000 }),
+  )
+  await dialog.getByRole('button', { name: 'Cancel', exact: true }).click()
+  await expect(dialog).toBeHidden()
+  expect(snapshotRepository(fixture)).toBe(cleanupSnapshots.get(page))
+  await expect(revisionRow(page, fixture.sourceDescription)).toBeVisible()
+  await finishJourneyAssertions(page)
+})

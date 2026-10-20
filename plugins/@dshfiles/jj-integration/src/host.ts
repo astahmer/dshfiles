@@ -32,6 +32,7 @@ import {
   type WorkspaceSyncView,
 } from './api.js'
 import { WorkspaceCleanupModel } from './workspace-cleanup.js'
+import { createCleanupJobRunner, type CleanupJobReporter } from './cleanup-jobs.js'
 import { JsonText } from './json-text.js'
 import {
   defaultJjIntegrationSettings,
@@ -808,12 +809,29 @@ const discardThread = async (input: { readonly path: string; readonly force: boo
 
 const HOUR_MS = 60 * 60_000
 
-const cleanupWorkspaces = async (input: {
+const errorText = (error: unknown): string => (error instanceof Error ? error.message : String(error)).slice(0, 400)
+
+type PlannedWorkspace = Omit<CleanupResult['workspaces'][number], 'outcome' | 'message'>
+type PlannedUntracked = Omit<CleanupResult['untracked'][number], 'outcome' | 'message'>
+
+interface CleanupRequest {
   readonly path?: string | undefined
   readonly olderThanHours: number
   readonly kinds: readonly CleanupKindView[]
-  readonly apply: boolean
-}): Promise<CleanupResult> => {
+}
+
+/** What one scan decided, before anything is removed: the removal pass reports its progress item by item. */
+interface CleanupScan {
+  readonly scopedRepoRoot: string | undefined
+  readonly repoRoots: readonly string[]
+  readonly skipped: CleanupResult['skipped']
+  readonly workspaces: readonly PlannedWorkspace[]
+  readonly untracked: readonly PlannedUntracked[]
+  /** Preview only: what the abandon pass would clear, read before anything moved. */
+  readonly emptyRevisions: CleanupResult['emptyRevisions']
+}
+
+const scanCleanup = async (input: CleanupRequest & { readonly apply: boolean }): Promise<CleanupScan> => {
   const active = requireThreads()
   const scopedRepoRoot = input.path === undefined ? undefined : (await active.locate(input.path)).repoRoot
   invalidateRepositories()
@@ -821,12 +839,14 @@ const cleanupWorkspaces = async (input: {
   const registry = registryOf()
   const archived = new Set<string>(registry.archivedSessionIds)
   const now = Date.now()
-  const workspaces: CleanupResult['workspaces'] = []
+  const repoRoots: string[] = []
+  const workspaces: PlannedWorkspace[] = []
   const skipped: CleanupResult['skipped'] = []
   const emptyRevisions: CleanupResult['emptyRevisions'] = []
-  const untracked: CleanupResult['untracked'] = []
+  const untracked: PlannedUntracked[] = []
   for (const repository of repositories) {
     if (scopedRepoRoot !== undefined && repository.repoRoot !== scopedRepoRoot) continue
+    repoRoots.push(repository.repoRoot)
     const changedAt = await active.workingCopyChangedAt(repository.repoRoot).catch(() => new Map<string, number>())
     for (const thread of repository.threads) {
       const createdAt = thread.workspaceId === null ? undefined : registry.get(WorkspaceId(thread.workspaceId))?.createdAt
@@ -849,35 +869,16 @@ const cleanupWorkspaces = async (input: {
         skipped.push({ repoRoot: repository.repoRoot, name: thread.name, reason: decision.reason })
         continue
       }
-      const row = { repoRoot: repository.repoRoot, name: thread.name, path: thread.path, kind: decision.kind, lastUsedAt: decision.lastUsedAt }
-      if (!input.apply) {
-        workspaces.push({ ...row, outcome: 'would-remove' })
-        continue
-      }
-      try {
-        const outcome = await discardThread({ path: thread.path, force: false })
-        workspaces.push({ ...row, outcome: outcome.status === 'discarded' ? 'removed' : 'has-work' })
-      } catch (error) {
-        workspaces.push({ ...row, outcome: 'failed', message: (error instanceof Error ? error.message : String(error)).slice(0, 400) })
-      }
+      workspaces.push({ repoRoot: repository.repoRoot, name: thread.name, path: thread.path, kind: decision.kind, lastUsedAt: decision.lastUsedAt })
     }
     const entries = input.kinds.includes('untracked') ? await active.untrackedEntries(repository.repoRoot).catch(() => []) : []
     for (const entry of entries) {
       if (!WorkspaceCleanupModel.isStaleUntracked({ modifiedAt: entry.modifiedAt, now, olderThanMs: input.olderThanHours * HOUR_MS, kinds: input.kinds }))
         continue
-      const row = { repoRoot: repository.repoRoot, name: entry.name, path: entry.path, modifiedAt: entry.modifiedAt }
-      if (!input.apply) {
-        untracked.push({ ...row, outcome: 'would-remove' })
-        continue
-      }
-      try {
-        await active.removeUntrackedEntry({ repoRoot: repository.repoRoot, name: entry.name })
-        untracked.push({ ...row, outcome: 'removed' })
-      } catch (error) {
-        untracked.push({ ...row, outcome: 'failed', message: (error instanceof Error ? error.message : String(error)).slice(0, 400) })
-      }
+      untracked.push({ repoRoot: repository.repoRoot, name: entry.name, path: entry.path, modifiedAt: entry.modifiedAt })
     }
-    const found = await active.danglingEmptyRevisions({ repoRoot: repository.repoRoot, abandon: input.apply }).catch((error: unknown) => {
+    if (input.apply) continue
+    const found = await active.danglingEmptyRevisions({ repoRoot: repository.repoRoot, abandon: false }).catch((error: unknown) => {
       hostContext?.logger.warn(
         'jj-integration: could not clear empty revisions in %s: %s',
         repository.repoRoot,
@@ -887,16 +888,78 @@ const cleanupWorkspaces = async (input: {
     })
     emptyRevisions.push(...found)
   }
-  if (input.apply) {
-    invalidateRepositories()
-    const removed = workspaces.filter(workspace => workspace.outcome === 'removed').length
-    emitActivity({
-      type: 'workspace.cleaned',
-      summary: `Cleaned up ${String(removed)} thread workspace(s), ${String(untracked.filter(entry => entry.outcome === 'removed').length)} untracked entr(ies) and ${String(emptyRevisions.length)} empty revision(s)`,
-      path: scopedRepoRoot ?? '',
-    })
+  return { scopedRepoRoot, repoRoots, skipped, workspaces, untracked, emptyRevisions }
+}
+
+const previewCleanup = async (input: CleanupRequest): Promise<CleanupResult> => {
+  const scan = await scanCleanup({ ...input, apply: false })
+  return {
+    applied: false,
+    workspaces: scan.workspaces.map(row => ({ ...row, outcome: 'would-remove' })),
+    skipped: scan.skipped,
+    untracked: scan.untracked.map(row => ({ ...row, outcome: 'would-remove' })),
+    emptyRevisions: scan.emptyRevisions,
   }
-  return { applied: input.apply, workspaces, skipped, untracked, emptyRevisions }
+}
+
+const applyCleanup = async (scan: CleanupScan, report: Pick<CleanupJobReporter, 'beginPhase' | 'beginItem' | 'settleItem'>): Promise<CleanupResult> => {
+  const active = requireThreads()
+  const workspaces: CleanupResult['workspaces'] = []
+  const untracked: CleanupResult['untracked'] = []
+  const emptyRevisions: CleanupResult['emptyRevisions'] = []
+  report.beginPhase('removing')
+  for (const planned of scan.workspaces) {
+    report.beginItem(planned.name)
+    try {
+      const outcome = await discardThread({ path: planned.path, force: false })
+      const removed = outcome.status === 'discarded'
+      workspaces.push({ ...planned, outcome: removed ? 'removed' : 'has-work' })
+      report.settleItem(removed ? 'removed' : 'kept')
+    } catch (error) {
+      workspaces.push({ ...planned, outcome: 'failed', message: errorText(error) })
+      report.settleItem('failed')
+    }
+  }
+  for (const planned of scan.untracked) {
+    report.beginItem(planned.name)
+    try {
+      await active.removeUntrackedEntry({ repoRoot: planned.repoRoot, name: planned.name })
+      untracked.push({ ...planned, outcome: 'removed' })
+      report.settleItem('removed')
+    } catch (error) {
+      untracked.push({ ...planned, outcome: 'failed', message: errorText(error) })
+      report.settleItem('failed')
+    }
+  }
+  report.beginPhase('abandoning')
+  for (const repoRoot of scan.repoRoots) {
+    const found = await active.danglingEmptyRevisions({ repoRoot, abandon: true }).catch((error: unknown) => {
+      hostContext?.logger.warn('jj-integration: could not clear empty revisions in %s: %s', repoRoot, errorText(error))
+      return []
+    })
+    emptyRevisions.push(...found)
+  }
+  invalidateRepositories()
+  emitActivity({
+    type: 'workspace.cleaned',
+    summary: `Cleaned up ${String(workspaces.filter(workspace => workspace.outcome === 'removed').length)} thread workspace(s), ${String(untracked.filter(entry => entry.outcome === 'removed').length)} untracked entr(ies) and ${String(emptyRevisions.length)} empty revision(s)`,
+    path: scan.scopedRepoRoot ?? '',
+  })
+  return { applied: true, workspaces, skipped: scan.skipped, untracked, emptyRevisions }
+}
+
+const cleanupRunner = createCleanupJobRunner({
+  execute: async ({ request, report }) => {
+    const scan = await scanCleanup({ path: request.path ?? undefined, olderThanHours: request.olderThanHours, kinds: request.kinds, apply: true })
+    report.planned(scan.workspaces.length + scan.untracked.length)
+    return await applyCleanup(scan, report)
+  },
+})
+
+const cleanupWorkspaces = async (input: CleanupRequest & { readonly apply: boolean }): Promise<CleanupResult> => {
+  if (!input.apply) return await previewCleanup(input)
+  const { done } = cleanupRunner.start({ path: input.path ?? null, olderThanHours: input.olderThanHours, kinds: [...input.kinds] })
+  return await done
 }
 
 const sweepFinishedThreads = async (): Promise<void> => {
@@ -1140,6 +1203,13 @@ const api = jjIntegrationApi.host({
   workspaceSync: () => ({ sync: workspaceSync }),
   discard: ({ input }) => discardThread(input),
   cleanupWorkspaces: ({ input }) => cleanupWorkspaces(input),
+  startCleanup: ({ input }) => {
+    const { job, done } = cleanupRunner.start({ path: input.path ?? null, olderThanHours: input.olderThanHours, kinds: [...input.kinds] })
+    // The job owns the removal once queued; its failure is reported on the trail, not to a request that already returned.
+    void done.catch(() => undefined)
+    return { job }
+  },
+  cleanupJobs: () => ({ jobs: [...cleanupRunner.trail()] }),
 })
 
 const rebaseCommand = defineCommand({

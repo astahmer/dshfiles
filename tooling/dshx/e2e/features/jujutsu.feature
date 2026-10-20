@@ -94,3 +94,10 @@ Feature: Jujutsu revision interactions
     Then hovering the reference previews the revision graph around it
     And clicking the reference opens the panel focused on that revision
     And the Agent prompt tells it to write Jujutsu references with the jj: prefix
+
+  @scenario:jujutsu.workspace-cleanup
+  Scenario: The repository menu previews a background cleanup before removing anything
+    Given the isolated plugin composition of "@dshfiles/jujutsu, @dshfiles/jj-integration" is booted
+    When a disposable Jujutsu repository is selected
+    And the repository actions menu opens the workspace cleanup
+    Then the cleanup previews idle workspaces without removing anything

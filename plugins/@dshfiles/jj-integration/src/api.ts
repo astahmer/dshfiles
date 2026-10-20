@@ -139,6 +139,46 @@ const cleanupResultSchema = z
 export type CleanupResult = z.infer<typeof cleanupResultSchema>
 export type CleanupKindView = z.infer<typeof cleanupKindSchema>
 
+const cleanupJobSchema = z
+  .object({
+    id: z.string().min(1).max(64),
+    /** `queued` waits behind the job that runs; a Host restart drops the trail with the job. */
+    state: z.enum(['queued', 'running', 'done', 'failed']),
+    phase: z.enum(['queued', 'scanning', 'removing', 'abandoning', 'done', 'failed']),
+    request: z.object({ path: z.string().nullable(), olderThanHours: z.number().int().nonnegative(), kinds: z.array(cleanupKindSchema) }).strict(),
+    startedAt: z.number().int().nonnegative(),
+    finishedAt: z.number().int().nonnegative().nullable(),
+    progress: z
+      .object({
+        /** Workspaces and untracked folders the scan decided to remove; empty revisions settle only at the end. */
+        total: z.number().int().nonnegative(),
+        processed: z.number().int().nonnegative(),
+        removed: z.number().int().nonnegative(),
+        kept: z.number().int().nonnegative(),
+        failed: z.number().int().nonnegative(),
+        current: z.string().max(400).nullable(),
+      })
+      .strict(),
+    error: z.string().max(400).nullable(),
+    /** Only the newest job carries its rows, so a poll of the whole trail stays small. */
+    result: cleanupResultSchema.nullable(),
+  })
+  .strict()
+export type CleanupJobView = z.infer<typeof cleanupJobSchema>
+
+const cleanupRequestSchema = z
+  .object({
+    /** Any folder inside the repository; omit to clean every registered jj repository. */
+    path: z.string().min(1).optional(),
+    olderThanHours: z
+      .number()
+      .int()
+      .min(0)
+      .max(24 * 90),
+    kinds: z.array(cleanupKindSchema).min(1).max(3),
+  })
+  .strict()
+
 const renderCleanup = (output: CleanupResult): string => {
   const verb = output.applied ? 'Removed' : 'Would remove'
   const removed = output.workspaces.filter(workspace => workspace.outcome === 'removed' || workspace.outcome === 'would-remove')
@@ -359,23 +399,37 @@ export const jjIntegrationApi = defineApi({
       },
     }),
     cleanupWorkspaces: method({
-      input: z
-        .object({
-          /** Any folder inside the repository; omit to clean every registered jj repository. */
-          path: z.string().min(1).optional(),
-          olderThanHours: z
-            .number()
-            .int()
-            .min(0)
-            .max(24 * 90),
-          kinds: z.array(cleanupKindSchema).min(1).max(3),
-          apply: z.boolean(),
-        })
-        .strict(),
+      input: cleanupRequestSchema.extend({ apply: z.boolean() }).strict(),
       output: cleanupResultSchema,
       description:
         'Remove idle thread workspaces in one pass, then abandon the empty undescribed revisions nothing builds on. A workspace qualifies when it holds no unlanded revision, no live Session in it is working, waiting for an answer or unreadable, no integration is queued, its kind is listed (empty: never landed; integrated: landed and nothing left), and it was last used longer ago than olderThanHours. Kind untracked also deletes threads-directory folders and files no jj workspace owns that were not modified for olderThanHours (at least one hour). Never forces: unlanded work is always kept, and a later turn in a removed thread checks a fresh workspace out from the bookmark. apply: false previews; call with apply: true only when the user asked to clean up.',
       tool: { name: 'jj_thread_cleanup', render: renderCleanup },
+    }),
+    startCleanup: method({
+      input: cleanupRequestSchema,
+      output: z.object({ job: cleanupJobSchema }).strict(),
+      description:
+        'Start removing idle thread workspaces in the background. Returns at once with the job, so a UI click never waits on node_modules deletion; cleanupJobs reports its progress and outcome, and the newest job carries the full result. The same scope already queued or running is returned instead of queued twice. A workspace qualifies exactly as in cleanupWorkspaces, never forcibly. Call only when the user asked to clean up.',
+    }),
+    cleanupJobs: method({
+      input: z.object({}).strict(),
+      output: z.object({ jobs: z.array(cleanupJobSchema).max(32) }).strict(),
+      description:
+        'Progress and recent trail of background thread-workspace removals, newest first: state, phase, counts, the item in flight, the failure, and the newest job’s full result. Read-only.',
+      tool: {
+        name: 'jj_thread_cleanup_jobs',
+        readOnly: true,
+        render: output =>
+          output.jobs
+            .map(job => {
+              const progress = `${String(job.progress.processed)}/${String(job.progress.total)} processed`
+              const running = job.progress.current === null ? '' : ` · removing ${job.progress.current}`
+              const failure = job.error === null ? '' : ` · ${job.error}`
+              const result = job.result === null ? '' : ` · ${renderCleanup(job.result).replaceAll('\n', ' · ')}`
+              return `${job.id} · ${job.state}/${job.phase} · ${progress} · ${String(job.progress.removed)} removed, ${String(job.progress.kept)} kept, ${String(job.progress.failed)} failed${running}${failure}${result}`
+            })
+            .join('\n') || 'No thread-workspace removal has run.',
+      },
     }),
   },
 })

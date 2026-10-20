@@ -4,11 +4,11 @@ import { Checkbox } from '@dshfiles/plugin-ui/components/ui/checkbox'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@dshfiles/plugin-ui/components/ui/dialog'
 import { Label } from '@dshfiles/plugin-ui/components/ui/label'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
-import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { errorMessage, keepPreviousData, useMutation, useQuery } from '@dshfiles/plugin-ui/query'
+import { errorMessage, keepPreviousData, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useApi } from '@dshfiles/dshx/client'
 import { jjIntegrationApi, type CleanupKindView, type CleanupResult } from '@dshfiles/jj-integration/api'
 import { useState } from 'react'
+import { CleanupJobTrailModel, cleanupJobsKey, requestWorkspaceCleanup, useCleanupJobs } from './cleanup-jobs-queries.js'
 
 const AGE_CHOICES = [
   { hours: 1, label: '1h' },
@@ -45,16 +45,14 @@ const cleanupRows = (result: CleanupResult) => [
     name: workspace.name,
     kind: workspace.kind,
     at: workspace.lastUsedAt,
-    outcome: workspace.outcome,
-    title: workspace.message ?? workspace.path,
+    title: workspace.path,
   })),
   ...result.untracked.map(entry => ({
     key: `${entry.repoRoot}:untracked:${entry.name}`,
     name: entry.name,
     kind: 'untracked',
     at: entry.modifiedAt,
-    outcome: entry.outcome,
-    title: entry.message ?? entry.path,
+    title: entry.path,
   })),
 ]
 
@@ -70,6 +68,7 @@ export const WorkspaceCleanupDialog = (props: {
   readonly onCleaned: () => void
 }) => {
   const api = useApi(jjIntegrationApi)
+  const queryClient = useQueryClient()
   const [olderThanHours, setOlderThanHours] = useState<number>(6)
   const [kinds, setKinds] = useState<CleanupKindView[]>(['empty', 'integrated', 'untracked'])
   const request = { path: props.path, olderThanHours, kinds }
@@ -80,26 +79,27 @@ export const WorkspaceCleanupDialog = (props: {
     retry: false,
     queryFn: ({ signal }) => api.cleanupWorkspaces({ ...request, apply: false }, { signal }),
   })
+  const running = useCleanupJobs().data?.jobs.find(CleanupJobTrailModel.isActive)
   const cleanup = useMutation({
-    mutationFn: () => api.cleanupWorkspaces({ ...request, apply: true }),
-    onSuccess: () => props.onCleaned(),
+    mutationFn: () => requestWorkspaceCleanup(api, request),
+    // The removal runs on the Host: the dialog is done the moment the job starts, and the panel trail reports the rest.
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: cleanupJobsKey })
+      props.onCleaned()
+      props.onOpenChange(false)
+    },
   })
   const toggleKind = (kind: CleanupKindView, checked: boolean): void =>
     setKinds(current => (checked ? [...new Set([...current, kind])] : current.filter(existing => existing !== kind)))
-  const shown = cleanup.data ?? preview.data
+  const shown = preview.data
   const candidates = shown === undefined ? [] : cleanupRows(shown)
-  const removable = preview.data === undefined ? 0 : preview.data.workspaces.length + preview.data.untracked.length
-  const emptyRevisionCount = preview.data?.emptyRevisions.length ?? 0
+  const removable = shown === undefined ? 0 : shown.workspaces.length + shown.untracked.length
+  const emptyRevisionCount = shown?.emptyRevisions.length ?? 0
   const nothingToDo = removable === 0 && emptyRevisionCount === 0
+  const progress = running === undefined ? '' : CleanupJobTrailModel.progressLabel(running)
 
   return (
-    <Dialog
-      onOpenChange={open => {
-        if (!open) cleanup.reset()
-        props.onOpenChange(open)
-      }}
-      open={props.open}
-    >
+    <Dialog onOpenChange={open => props.onOpenChange(open)} open={props.open}>
       <DialogContent className="dshx-root dshx:sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Clean up thread workspaces</DialogTitle>
@@ -147,37 +147,39 @@ export const WorkspaceCleanupDialog = (props: {
                 <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{row.name}</span>
                 <span className="dshx:text-muted-foreground">{row.kind}</span>
                 <span className="dshx:text-muted-foreground">{formatAge(row.at)}</span>
-                {row.outcome !== 'would-remove' && (
-                  <span className={cn(row.outcome === 'removed' ? 'dshx:text-success' : 'dshx:text-destructive')}>{row.outcome}</span>
-                )}
               </div>
             ))}
           </div>
-          {shown !== undefined && (
+          {shown === undefined ? null : (
             <p className="dshx:text-muted-foreground">
-              {cleanup.data === undefined ? 'Would abandon' : 'Abandoned'} {String(shown.emptyRevisions.length)} dangling empty revision(s).
+              Would abandon {String(emptyRevisionCount)} dangling empty revision(s).
               {shown.skipped.length > 0 && ` Kept ${String(shown.skipped.length)}: ${skippedSummary(shown.skipped)}.`}
             </p>
           )}
-          {cleanup.isError && <p className="dshx:text-destructive">{errorMessage(cleanup.error, 'The cleanup failed.')}</p>}
+          {running === undefined ? null : (
+            <p className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-muted-foreground" role="status">
+              <Spinner className="dshx:size-3" />
+              {CleanupJobTrailModel.phaseLabel(running)}
+              {progress === '' ? null : <span className="dshx:font-mono">{progress}</span>}
+            </p>
+          )}
+          {cleanup.isError && <p className="dshx:text-destructive">{errorMessage(cleanup.error, 'The cleanup could not start.')}</p>}
         </div>
         <DialogFooter>
           <Button onClick={() => props.onOpenChange(false)} size="sm" type="button" variant="ghost">
-            {cleanup.data === undefined ? 'Cancel' : 'Close'}
+            Cancel
           </Button>
-          {cleanup.data === undefined && (
-            <Button
-              disabled={nothingToDo || preview.isFetching || cleanup.isPending || kinds.length === 0}
-              onClick={() => cleanup.mutate()}
-              size="sm"
-              type="button"
-              variant="destructive"
-            >
-              {cleanup.isPending && <Spinner className="dshx:size-3" />}
-              Remove {String(removable)} item(s)
-              {emptyRevisionCount > 0 && ` + ${String(emptyRevisionCount)} revision(s)`}
-            </Button>
-          )}
+          <Button
+            disabled={nothingToDo || preview.isFetching || cleanup.isPending || kinds.length === 0 || running !== undefined}
+            onClick={() => cleanup.mutate()}
+            size="sm"
+            type="button"
+            variant="destructive"
+          >
+            {cleanup.isPending && <Spinner className="dshx:size-3" />}
+            Remove {String(removable)} item(s)
+            {emptyRevisionCount > 0 && ` + ${String(emptyRevisionCount)} revision(s)`}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -89,6 +89,7 @@ import { descendantCommitIds, emptyAncestorCandidates } from './source-control.j
 import { SourceControlView } from './source-control-view.js'
 import { WorkspaceProvisionerDialog } from './workspace-provisioner.js'
 import { WorkspaceCleanupDialog } from './workspace-cleanup-dialog.js'
+import { WorkspaceCleanupTrail } from './workspace-cleanup-trail.js'
 import { containsPath, sidePanelRepository } from './side-panel-repository.js'
 import { filterGraphRevisions, mergeGraphRevisions } from './graph-navigation.js'
 import { GraphViewStatus, LandmarkControls, RelationshipInspector } from './graph-navigation-controls.js'
@@ -1716,6 +1717,8 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
               )}
             </div>
           </header>
+
+          <WorkspaceCleanupTrail onFinished={refreshRepository} />
 
           {rowConfirmAnchorId === null && inlineConfirm !== null && <div className="dshx:border-b dshx:p-2">{inlineConfirm}</div>}
 

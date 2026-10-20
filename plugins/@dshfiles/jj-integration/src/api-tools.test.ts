@@ -14,6 +14,7 @@ describe('jj-integration tool exposure', () => {
       'jj_thread_workspace_sync',
       'jj_thread_discard',
       'jj_thread_cleanup',
+      'jj_thread_cleanup_jobs',
     ])
   })
 
@@ -21,7 +22,14 @@ describe('jj-integration tool exposure', () => {
     const readOnly = Object.values(jjIntegrationApi.methods)
       .filter(method => method.tool?.readOnly === true)
       .map(method => method.tool?.name)
-    expect(readOnly).toEqual(['jj_thread_destination', 'jj_thread_projects', 'jj_thread_repositories', 'jj_thread_status', 'jj_thread_workspace_sync'])
+    expect(readOnly).toEqual([
+      'jj_thread_destination',
+      'jj_thread_projects',
+      'jj_thread_repositories',
+      'jj_thread_status',
+      'jj_thread_workspace_sync',
+      'jj_thread_cleanup_jobs',
+    ])
     for (const method of Object.values(jjIntegrationApi.methods)) {
       if (method.tool === undefined) continue
       expect(method.description ?? method.tool.description).toBeTruthy()

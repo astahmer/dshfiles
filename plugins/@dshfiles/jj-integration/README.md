@@ -296,6 +296,17 @@ row's own Remove does (never forced) and abandons the empty, undescribed
 revisions nothing builds on: no working copy, bookmark, tag or revision with
 content or a description descends from them, so no live workspace is rewritten.
 
+The confirmation starts a **background job** and closes at once. Removing a
+workspace deletes its `node_modules`, so the pass can run for minutes; it
+continues on the Host whether or not the panel stays open. A trail line under
+the panel header polls the job (scanning, then `3/8` while removing workspaces
+and untracked folders, then abandoning empty revisions) and keeps the last
+result on screen — `6 thread workspaces removed · 2 kept` — until dismissed.
+The same job is readable and replayed from the activity timeline, and a second
+click on the same scope attaches to the job already running instead of queuing
+it twice. A Host restart drops the trail with the job; what it had already
+removed stays removed.
+
 **Untracked folders** also deletes threads-directory folders and files no jj
 workspace owns (forgotten workspaces, stray logs, recovery copies) that were not
 modified for the chosen time, never under an hour. Dotfiles (the plugin's own
@@ -308,7 +319,9 @@ it is working, waiting for an answer or its activity cannot be read, or an
 integration is queued. "Last used" is the latest of its working-copy commit
 time, its creation and its last land. A later turn in a thread whose workspace
 was removed checks a fresh workspace out from the bookmark. Agents get the same
-verb as `jj_thread_cleanup` (`apply: false` previews).
+verb as `jj_thread_cleanup` (`apply: false` previews, `apply: true` waits for
+the pass and returns its result), plus `jj_thread_cleanup_jobs` to read the
+background trail.
 
 This replaces `jjc` and `jjw cleanup` from nixfiles for thread workspaces: both
 are terminal tools (an fzf picker, day-granularity ages, no knowledge of DSH
