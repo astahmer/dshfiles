@@ -294,7 +294,10 @@ export default defineClient({
                     title: translate('newThread'),
                     icon: <MessageSquarePlusIcon aria-hidden size={22} strokeWidth={1.5} />,
                     shortcut: shortcutOf('session.new'),
-                    pick: () => ctx.uiWorkspace.startSession(),
+                    pick: () => {
+                      actor.send({ type: 'start.newThread' })
+                      ctx.uiWorkspace.startSession()
+                    },
                   },
                 ],
               },

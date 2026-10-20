@@ -291,10 +291,15 @@ describe('tabsMachine', () => {
     tabs.enable()
     tabs.host(thread('a'))
     tabs.actor.send({ type: 'tab.new' })
+    tabs.actor.send({ type: 'start.newThread' })
     tabs.host(null)
+    tabs.host(thread('a'))
     expect(tabs.set()).toMatchObject({ activeTabId: null })
     expect(tabs.ids()).toEqual(['thread:a'])
     expect(tabs.navigated).toEqual([])
+    tabs.host(thread('b'))
+    expect(tabs.set().activeTabId).toBe('thread:b')
+    expect(tabs.ids()).toEqual(['thread:a', 'thread:b'])
   })
 
   it('opens the new-tab page at the end of the strip without navigating, and focuses it when opened again', () => {

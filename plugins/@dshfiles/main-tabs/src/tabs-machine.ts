@@ -50,7 +50,8 @@ export interface TabsPorts {
 export type TabsEvent =
   | { readonly type: 'host.navigated'; readonly target: HostTarget | null; readonly projectId: string | null }
   | { readonly type: 'tab.new' }
-  /** A suggestion picked on the new-tab page: its target takes the page's place; null closes it (New thread, Settings). */
+  | { readonly type: 'start.newThread' }
+  /** A suggestion picked on the new-tab page: its target takes the page's place; null closes it (Settings). */
   | { readonly type: 'start.pick'; readonly target: HostTarget | null }
   | { readonly type: 'tab.select'; readonly tabId: string }
   /** Open a target from outside the main view; `newTab` keeps every existing tab, whatever `openMode` says (Mod-click). */
@@ -79,6 +80,8 @@ interface TabsContext {
   readonly hostTarget: HostTarget | null
   readonly hostProjectId: string | null
   readonly hostSeen: boolean
+  readonly startingNewThread: boolean
+  readonly newThreadPreviousTarget: HostTarget | null
   readonly pendingKeptSessionId: string | null
   /** A navigation this machine started; Host reports of anything else are in-between states until it lands. */
   readonly pendingTarget: HostTarget | null
@@ -252,6 +255,11 @@ export const tabsMachine = setup({
         hostTarget: event.target,
         hostProjectId: event.projectId,
         hostSeen: true,
+        startingNewThread: context.startingNewThread && (event.target === null || sameTarget(event.target, context.newThreadPreviousTarget)),
+        newThreadPreviousTarget:
+          context.startingNewThread && event.target !== null && !sameTarget(event.target, context.newThreadPreviousTarget)
+            ? null
+            : context.newThreadPreviousTarget,
         pendingTarget: null,
         restored: true,
       }
@@ -290,6 +298,8 @@ export const tabsMachine = setup({
   guards: {
     enabled: ({ event }) => event.type === 'preferences.changed' && event.preferences.enabled,
     hostSeen: ({ context }) => context.hostSeen,
+    staleHostDuringNewThread: ({ context, event }) =>
+      context.startingNewThread && event.type === 'host.navigated' && event.target !== null && sameTarget(event.target, context.newThreadPreviousTarget),
     disabled: ({ event }) => event.type === 'preferences.changed' && !event.preferences.enabled,
     landsPending: ({ context, event }) => event.type === 'host.navigated' && sameTarget(event.target, context.pendingTarget),
     restoresSavedTab: ({ context, event }) =>
@@ -313,6 +323,8 @@ export const tabsMachine = setup({
       hostTarget: null,
       hostProjectId: null,
       hostSeen: false,
+      startingNewThread: false,
+      newThreadPreviousTarget: null,
       pendingKeptSessionId: null,
       pendingTarget: null,
       restored: false,
@@ -368,6 +380,9 @@ export const tabsMachine = setup({
             'navigateToActive',
             'persist',
           ],
+        },
+        'start.newThread': {
+          actions: assign(({ context }) => ({ startingNewThread: true, newThreadPreviousTarget: context.hostTarget })),
         },
         'tab.new': {
           actions: [
@@ -529,6 +544,7 @@ export const tabsMachine = setup({
         following: {
           on: {
             'host.navigated': [
+              { guard: 'staleHostDuringNewThread', actions: 'recordHost' },
               {
                 guard: 'restoresSavedTab',
                 target: 'navigating',
