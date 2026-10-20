@@ -242,16 +242,10 @@ export function ChatView({
                 {t('chat.loadError', { message: openError.message, code: openError.code })}
               </div>
             )}
-            {transcript.hidden > 0 && scroll.initialized && (
+            {transcript.hasMore && scroll.initialized && !loadingOlder && (
               <OlderRowsSentinel listRef={scroll.listRef} hidden={transcript.hidden} onVisible={scroll.loadEarlier} />
             )}
-            {transcript.hasMore && (
-              <div className={css.older}>
-                <button type="button" disabled={loadingOlder} onClick={scroll.loadEarlier}>
-                  {loadingOlder ? t('loading') : t('chat.loadOlder')}
-                </button>
-              </div>
-            )}
+            {transcript.hasMore && loadingOlder && <div className={css.older}>{t('loading')}</div>}
             <MarkdownDelegateProvider openFile={requestOpenFile} openExternalLink={openExternalLink} fileImages={fileImages}>
               {renderSlot('conversation.chat.flow', {
                 entries: transcript.entries, pendingInputs, lastInputTurn, deferCollapse,
@@ -291,7 +285,10 @@ export function ChatView({
   )
 }
 
-/** Mounts the next older rows once the reader nears the top of the mounted ones. */
+/**
+ * Mounts the next older rows, or asks the Host for the next older page, once the reader nears the top. It unmounts
+ * while a page loads, so a page that still leaves it in view observes it again and takes the next one.
+ */
 function OlderRowsSentinel({ listRef, hidden, onVisible }: {
   listRef: { readonly current: HTMLDivElement | null }
   hidden: number
