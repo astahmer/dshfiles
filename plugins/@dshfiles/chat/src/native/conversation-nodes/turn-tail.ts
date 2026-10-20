@@ -64,9 +64,19 @@ function tailData(context: ConversationNodeContext<TurnTailState>): TurnTailChat
   const end = context.state === undefined
     ? context.matches.find(match => match.event.type === 'turn/end')
     : context.state.end
-  if (end?.event.type !== 'turn/end') return null
   const turn = turnLocation(context)
   if (turn === undefined) return null
+  if (end?.event.type !== 'turn/end') {
+    const start = context.start?.event
+    if (start?.type !== 'turn/start' || turn.status !== 'open') return null
+    return {
+      turn: start.data.turn,
+      seq: context.matches.reduce<number>((latest, match) => Math.max(latest, match.event.seq), start.seq),
+      time: start.time,
+      closing: null,
+      branchUnavailable: true,
+    }
+  }
   const assistants = turn.steps
     .map(step => step.data.get('assistant-step'))
     .filter((candidate): candidate is Readonly<AssistantChatData> => candidate !== undefined)
@@ -100,7 +110,7 @@ function tailData(context: ConversationNodeContext<TurnTailState>): TurnTailChat
   }
 }
 
-/** Completed-turn footer Definition independent of any Assistant row. */
+/** Turn footer Definition independent of any Assistant row. */
 export const turnTailDefinition: ConversationNodeDefinition<TurnTailState> = {
   kind: 'turn-tail',
   target: 'chat',
@@ -121,7 +131,9 @@ export const turnTailDefinition: ConversationNodeDefinition<TurnTailState> = {
   update: (context, match) => match.event.type === 'turn/end'
     ? { ...context.state, end: match }
     : context.state,
-  publication: match => match.event.type === 'turn/end' ? 'immediate' : 'none',
+  publication: match => match.event.type === 'turn/start' || match.event.type === 'turn/end'
+    ? 'immediate'
+    : 'animation-frame',
   buildLocationData: (context, scope) => {
     if (scope !== 'turn') return null
     const value = tailData(context)
