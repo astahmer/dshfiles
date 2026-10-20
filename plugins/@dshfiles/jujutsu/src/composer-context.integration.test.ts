@@ -4,6 +4,8 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { expect, onTestFinished, test } from 'vitest'
+import { Context } from '@deepseek-ai/cordis'
+import { composerReads } from './composer-context-host.ts'
 import {
   COMPOSER_BOOKMARKS_TEMPLATE,
   COMPOSER_FILE_TEMPLATE,
@@ -98,4 +100,26 @@ test('composer templates and ranges read head, bookmarks, totals and files from 
     { path: 'feature.txt', additions: 1, deletions: 0 },
     { path: 'new file.txt', additions: 1, deletions: 0 },
   ])
+})
+
+test('composer reads spawn jj again for view reads only after an operation lands', async () => {
+  const home = await mkdtemp(join(tmpdir(), 'dshfiles-jj-composer-reads-'))
+  const repo = join(home, 'repo')
+  onTestFinished(() => rm(home, { recursive: true, force: true }))
+  runJj(home, home, ['git', 'init', '--no-colocate', repo])
+  const spawned: string[] = []
+  const read = composerReads(async (_ctx, cwd, args) => {
+    spawned.push(args.join(' '))
+    return { stdout: runJj(cwd, home, args), truncated: false }
+  })
+  const ctx = new Context()
+  const describeAt = () => read(ctx, repo, ['--ignore-working-copy', 'log', '--no-graph', '-r', '@', '-T', 'description'], undefined, { outputLimit: 8_000 })
+
+  expect((await describeAt()).stdout).toBe('')
+  expect((await describeAt()).stdout).toBe('')
+  expect(spawned).toHaveLength(1)
+
+  runJj(repo, home, ['describe', '-m', 'landed'])
+  expect((await describeAt()).stdout).toBe('landed\n')
+  expect(spawned).toHaveLength(2)
 })

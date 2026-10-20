@@ -1,6 +1,7 @@
 import type { Context } from '@deepseek-ai/cordis'
+import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { realpath } from 'node:fs/promises'
-import { isAbsolute } from 'node:path'
+import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { z } from 'zod'
 import { composerContextApi, type ComposerBase } from './composer-context-api.js'
 import { RevisionReads } from './revision-reads.js'
@@ -77,19 +78,38 @@ const baseLabel = (base: ComposerBase, targetBookmarks: readonly string[]): stri
 /** The composer bar re-reads its JJ context on every render burst; one read per argument set serves them all. */
 const COMPOSER_READ_TTL_MS = 2_000
 
+/**
+ * The store's operation heads as seen from a workspace root, or null when unreadable. A `--ignore-working-copy` read
+ * depends only on them, so it is reused until an operation lands instead of for two seconds: each jj spawn loads the
+ * repository view first, 80–340 ms on a store with dozens of workspaces.
+ */
+const operationHeads = (root: string): string | null => {
+  try {
+    const marker = join(root, '.jj', 'repo')
+    const store = statSync(marker).isDirectory() ? marker : resolve(dirname(marker), readFileSync(marker, 'utf8').trim())
+    return readdirSync(join(store, 'op_heads', 'heads'))
+      .sort()
+      .join(',')
+  } catch {
+    return null
+  }
+}
+
 /** Read-only JJ context for the composer: one snapshotting read, then parallel reads that skip the working copy. */
-export const composerContextHost = (directRun: RunJj) => {
+/** Memoized JJ reads: in-flight reads are shared, snapshotting reads last two seconds, view reads one operation head. */
+export const composerReads = (directRun: RunJj): RunJj => {
   const readResults = new Map<string, { readonly value: Awaited<ReturnType<RunJj>>; readonly at: number }>()
   const readsInFlight = new Map<string, Promise<Awaited<ReturnType<RunJj>>>>()
-  const run: RunJj = (ctx, cwd, args, signal, options) => {
-    const key = `${cwd}\u0000${args.join('\u0000')}\u0000${String(options.outputLimit)}`
+  return (ctx, cwd, args, signal, options) => {
+    const heads = args[0] === '--ignore-working-copy' ? operationHeads(cwd) : null
+    const key = `${cwd}\u0000${heads ?? ''}\u0000${args.join('\u0000')}\u0000${String(options.outputLimit)}`
     const cached = readResults.get(key)
-    if (cached !== undefined && Date.now() - cached.at < COMPOSER_READ_TTL_MS) return Promise.resolve(cached.value)
+    if (cached !== undefined && (heads !== null || Date.now() - cached.at < COMPOSER_READ_TTL_MS)) return Promise.resolve(cached.value)
     const inFlight = readsInFlight.get(key)
     if (inFlight !== undefined) return inFlight
     const read = directRun(ctx, cwd, args, signal, options).then(value => {
       readResults.set(key, { value, at: Date.now() })
-      if (readResults.size > 64) for (const [candidate, entry] of readResults) if (Date.now() - entry.at > COMPOSER_READ_TTL_MS) readResults.delete(candidate)
+      if (readResults.size > 256) readResults.delete(readResults.keys().next().value ?? key)
       return value
     })
     readsInFlight.set(key, read)
@@ -97,6 +117,10 @@ export const composerContextHost = (directRun: RunJj) => {
       if (readsInFlight.get(key) === read) readsInFlight.delete(key)
     })
   }
+}
+
+export const composerContextHost = (directRun: RunJj) => {
+  const run = composerReads(directRun)
   return composerContextApi.host({
     context: async ({ input, ctx, signal }) => {
       const root = await workspaceRoot(ctx, run, input.cwd, signal)
