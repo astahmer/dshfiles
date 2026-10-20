@@ -9,18 +9,21 @@ export const interruptionHost = interruptionApi.host({
   available: async ({ ctx, input }) => {
     const sessionId = SessionId(input.sessionId)
     if (!ctx.remoteAccess.allows({ kind: 'session', id: sessionId })) return { available: false }
-    return { available: (await ctx.sessionController.interruptedTurn(sessionId)) === input.seq }
+    const controller = ctx.get('sessionController')
+    if (controller === undefined) return { available: false }
+    return { available: (await controller.interruptedTurn(sessionId)) === input.seq }
   },
   resume: async ({ ctx, input }) => {
     const sessionId = SessionId(input.sessionId)
     if (!ctx.remoteAccess.allows({ kind: 'session', id: sessionId })) return { accepted: false }
-    if ((await ctx.sessionController.interruptedTurn(sessionId)) !== input.seq) return { accepted: false }
+    const controller = ctx.get('sessionController')
+    if (controller === undefined || (await controller.interruptedTurn(sessionId)) !== input.seq) return { accepted: false }
     const hash = createHash('sha256').update(`resume-interrupted:${sessionId}:${input.seq}`).digest('hex')
     const requestId = brandString<SessionRequestId>(
       `${hash.slice(0, 8)}-${hash.slice(8, 12)}-4${hash.slice(13, 16)}-8${hash.slice(17, 20)}-${hash.slice(20, 32)}`,
     )
     try {
-      await ctx.sessionController.prompt(
+      await controller.prompt(
         {
           sessionId,
           requestId,

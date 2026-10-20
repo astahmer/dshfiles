@@ -5,7 +5,7 @@ export const latestInterruptedTurn = (events: readonly SessionEvent[]): number |
     const event = events[index]
     if (event === undefined) continue
     if (event.type === 'turn/end') return event.data.reason.kind === 'interrupted' ? event.seq : undefined
-    if (event.type === 'turn/start' || event.type === 'user/message' || event.type === 'agent/inbox/spliced') return undefined
+    if (event.type === 'turn/start' || event.type === 'agent/inbox/spliced') return undefined
   }
   return undefined
 }

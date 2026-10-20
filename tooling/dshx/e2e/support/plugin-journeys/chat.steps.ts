@@ -6,8 +6,23 @@ import { seedInterruptedSession } from '../seed-interrupted-session.mjs'
 When('a thread with two interrupted tasks is opened', async ({ page }: { page: Page }) => {
   const profile = profileFor(page)
   await seedInterruptedSession({ homeRoot: profile.homeRoot, profileRoot: `${profile.homeRoot}/profiles/${profile.profile}` })
-  await page.reload()
-  await page.getByText('Interrupted resume fixture', { exact: true }).first().click()
+  const fixture = page.getByRole('treeitem', { name: /Untitled|Interrupted resume fixture/ })
+  await expect
+    .poll(
+      async () => {
+        await page.reload()
+        if ((await fixture.count()) === 0) await page.getByText('Ungrouped', { exact: true }).first().click()
+        await fixture
+          .first()
+          .waitFor({ state: 'attached', timeout: 3_000 })
+          .catch(() => undefined)
+        return fixture.count()
+      },
+      { timeout: 30_000 },
+    )
+    .toBeGreaterThan(0)
+  await fixture.first().click()
+  await page.getByText('Task stopped', { exact: true }).first().waitFor()
 })
 
 Then('only the latest stopped notice offers Resume', async ({ page }: { page: Page }) => {

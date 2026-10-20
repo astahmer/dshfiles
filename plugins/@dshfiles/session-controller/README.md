@@ -30,7 +30,7 @@ Every other vendored file is byte-identical to the pinned revision.
 | File                                    | Change                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `src/native/history.ts`                 | `entryFor` sends `BrowserEvent.of(event)`: history pages and live follow events reach the browser without per-block provider replay state; opening a cold Session resumes its Agent only when the log stops inside a turn (crash closers), otherwise the first command does                                                                                                                                                     |
-| `src/native/index.ts` | `modelCatalog` shares one build with callers within 5 s for the same default model (a page load asked 12 times, up to 2.7 s each) |
+| `src/native/index.ts`                   | `modelCatalog` shares one build with callers within 5 s for the same default model (a page load asked 12 times, up to 2.7 s each)                                                                                                                                                                                                                                                                                               |
 | `src/tail-log.ts`                       | new: decodes only the last frames of a cold Session's zstd log and folds the cached projection checkpoint over them (`sessionProjections.restore`); `follow` opens a cold, unforked Session over 1 MB from it and `page` serves its older pages from the same kept tail (3 kept, 2 min, re-validated by file identity); live, forked, torn, migrating or mid-turn logs keep the full read. `paginate` takes the tail's base seq |
 | `src/browser-event.ts`                  | new: drops `replayState.blocks` from `assistant/message` and `assistant/attempt` (message source and stream chunks), keeps `replayState.response` (ids, native stop reason)                                                                                                                                                                                                                                                     |
 | `src/native/client/sessions/session.ts` | a thread opens with `OPENING_PAGE_OPTIONS` (latest Turn, 20–120 messages) instead of the 50-message, two-Turn, 500-cap window; older pages keep the native window                                                                                                                                                                                                                                                               |
@@ -43,7 +43,10 @@ Every other vendored file is byte-identical to the pinned revision.
 turn, including the `chat_resume_interrupted` agent tool. Prompt admission checks
 the expected ending sequence, idle status, and empty inbox after asynchronous
 attachment validation, immediately before delivery. Intervening work invalidates
-the action; a deterministic request id makes retries idempotent.
+the action; a deterministic request id makes retries idempotent. A message that
+arrived after the interruption but never started a turn does not invalidate it:
+a restart can persist the message and leave no turn to run it, so the stopped
+task still offers Resume.
 
 ### Build
 
