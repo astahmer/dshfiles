@@ -104,7 +104,7 @@ const startIngest = (): void => {
       state.ingesting = true
       try {
         // One bounded step per loop, so searches still run between steps while an older index gains its conversation table.
-        const backfilled = requireIndex().backfillConversation(BACKFILL_ROWIDS)
+        const backfilled = requireIndex().backfillConversation(BACKFILL_ROWIDS) && requireIndex().backfillRowMap(BACKFILL_ROWIDS)
         const result = await runIngestPass({ index: requireIndex(), root, budgetMs: 1_000, windowBytes: config.windowBytes, now: Date.now })
         state.behindSessions = result.behindSessions
         state.behindBytes = result.behindBytes

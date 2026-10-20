@@ -366,6 +366,10 @@ export class SearchIndex {
   #deleteSessionRows(sessionId: string): void {
     const mapped = this.#database.prepare('SELECT document_rowid FROM session_document_rows WHERE session_id = ?').all(sessionId)
     if (mapped.length === 0) {
+      // Nothing indexed means nothing to delete; only a Session indexed before the rowid map (see `backfillRowMap`)
+      // still takes the scanning delete, ~15 s on this index while the worker serves no search.
+      const counted = countRowSchema.safeParse(this.#database.prepare('SELECT documents_count AS count FROM sessions WHERE id = ?').get(sessionId))
+      if (!counted.success || counted.data.count === 0) return
       this.#database.prepare('DELETE FROM session_documents WHERE session_id = ?').run(sessionId)
       this.#database.prepare('DELETE FROM conversation_documents WHERE session_id = ?').run(sessionId)
       return
@@ -421,6 +425,38 @@ export class SearchIndex {
       }
       this.#setMeta('conversation_backfill_from', String(to))
       if (to >= until) this.#setMeta('conversation_ready', '1')
+      this.#database.exec('COMMIT')
+      return to >= until
+    } catch (error) {
+      this.#database.exec('ROLLBACK')
+      throw error
+    }
+  }
+
+  /**
+   * Record the rowids of the next `rowids` documents indexed before `session_document_rows` existed, so replacing or
+   * forgetting their Session deletes by rowid instead of scanning every document. Stops at the highest rowid it saw
+   * first; later documents are mapped as they are committed.
+   * @returns whether every document is mapped.
+   */
+  backfillRowMap(rowids: number): boolean {
+    if (this.#meta('row_map_ready') === '1') return true
+    this.#database.exec('BEGIN IMMEDIATE')
+    try {
+      let until = Number(this.#meta('row_map_backfill_until') ?? Number.NaN)
+      if (Number.isNaN(until)) {
+        until = numberLike.parse(this.#database.prepare('SELECT coalesce(max(rowid), 0) AS value FROM session_documents').get()?.['value'] ?? 0)
+        this.#setMeta('row_map_backfill_until', String(until))
+      }
+      const from = Number(this.#meta('row_map_backfill_from') ?? '0')
+      const to = Math.min(until, from + rowids)
+      this.#database
+        .prepare(
+          'INSERT OR IGNORE INTO session_document_rows (session_id, document_rowid) SELECT session_id, rowid FROM session_documents WHERE rowid > ? AND rowid <= ?',
+        )
+        .run(from, to)
+      this.#setMeta('row_map_backfill_from', String(to))
+      if (to >= until) this.#setMeta('row_map_ready', '1')
       this.#database.exec('COMMIT')
       return to >= until
     } catch (error) {

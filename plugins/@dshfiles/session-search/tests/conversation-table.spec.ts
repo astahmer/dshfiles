@@ -63,3 +63,28 @@ it('copies documents indexed before the conversation table and then searches it 
   expect(index.searchSessions({ query: 'rollout', limit: 5, filters: conversation }).matches).toEqual([])
   index.close()
 })
+
+it('maps documents indexed before the rowid map so forgetting their session deletes by rowid', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'session-search-rowmap-'))
+  roots.push(root)
+  const path = join(root, 'index.sqlite')
+  const legacy = new SearchIndex(path)
+  commit(legacy, 'session-legacy', [
+    { type: 'user/message', surface: 'current', text: 'the obsidian deploy' },
+    { type: 'tool/result', surface: 'current', text: 'obsidian output' },
+  ])
+  legacy.close()
+  const raw = new DatabaseSync(path)
+  raw.exec("DELETE FROM session_document_rows; DELETE FROM meta WHERE key LIKE 'row_map_%'")
+  raw.close()
+
+  const index = new SearchIndex(path)
+  while (!index.backfillRowMap(1)) {}
+  const mapped = new DatabaseSync(path)
+  expect(mapped.prepare("SELECT count(*) AS n FROM session_document_rows WHERE session_id = 'session-legacy'").get()).toEqual({ n: 2 })
+  mapped.close()
+
+  index.forget('session-legacy')
+  expect(index.searchSessions({ query: 'obsidian', limit: 5 }).matches).toEqual([])
+  index.close()
+})
