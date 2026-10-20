@@ -3,6 +3,7 @@ import { BlockAssembler, createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
 import type {} from '@deepseek-ai/dsh-storage-domain'
 import type {} from '@deepseek-ai/dsh-subprocess'
+import type {} from '@deepseek-ai/dsh-experimental-speech-to-text'
 import type { ApiCaller } from '@dshfiles/dshx/api'
 import { defineHost } from '@dshfiles/dshx/host'
 import type { SettingsScope } from '@dshfiles/dshx/settings'
@@ -10,7 +11,7 @@ import { z } from 'zod'
 import { backlogApi } from './api.js'
 import { backlogSettings, type BacklogSettings } from './settings.js'
 import type { BacklogEvent, BacklogItem } from './item.js'
-import { BacklogModel, backlogDomain, type BacklogActor, type BacklogStore } from './store.js'
+import { BacklogModel, backlogDomain, backlogFileDomain, type BacklogActor, type BacklogStore } from './store.js'
 import { BacklogSignals } from './signals.js'
 import { BacklogTriage, type TriageQuestion, type TriageServices } from './triage.js'
 
@@ -51,13 +52,18 @@ const openBacklog = async (ctx: Context): Promise<OpenedBacklog> => {
   const storage = ctx.get('storageDomain')
   if (storage === undefined) throw new Error('Backlog storage is unavailable.')
   const domain = await storage.open(backlogDomain)
+  const attachments = await storage.open(backlogFileDomain)
   return {
     store: BacklogModel.createStore({
       items: domain.table('items'),
+      files: attachments.table('files'),
       dormantDays: () => currentSettings().dormantAfterDays,
       onEvent: (item, event) => publishActivity(ctx, item, event),
     }),
-    close: () => domain.close(),
+    close: async () => {
+      await domain.close()
+      await attachments.close()
+    },
   }
 }
 
@@ -279,6 +285,56 @@ const pollRevisions = async (ctx: Context): Promise<void> => {
 const actorOf = (caller: ApiCaller): BacklogActor =>
   caller.kind === 'agent' ? { kind: 'agent', sessionId: caller.sessionId, cwd: caller.cwd } : { kind: 'user' }
 
+const speechStatusOf = (ctx: Context) => {
+  const speech = ctx.get('speechToText')
+  if (speech === undefined) {
+    return { available: false, ready: false, provider: null, language: null, reason: 'The voice-input bundle is not loaded.' }
+  }
+  try {
+    const snapshot = speech.snapshot()
+    const provider = snapshot.providers.find(candidate => candidate.id === snapshot.selection.providerId)
+    if (provider === undefined) {
+      return { available: true, ready: false, provider: null, language: snapshot.selection.language, reason: 'The selected recognizer is not registered.' }
+    }
+    const phase = provider.preparation?.phase
+    return {
+      available: true,
+      ready: phase === 'ready',
+      provider: provider.name,
+      language: snapshot.selection.language,
+      reason: phase === 'ready' ? null : 'Open Plugins → Voice input to prepare the recognizer.',
+    }
+  } catch (error) {
+    return {
+      available: true,
+      ready: false,
+      provider: null,
+      language: null,
+      reason: error instanceof Error ? error.message.slice(0, 300) : 'Speech readiness is unavailable.',
+    }
+  }
+}
+
+const transcribeSpeech = async (
+  ctx: Context,
+  audioBase64: string,
+  signal: AbortSignal,
+): Promise<{ ok: true; text: string } | { ok: false; reason: string }> => {
+  const speech = ctx.get('speechToText')
+  if (speech === undefined) return { ok: false, reason: 'The voice-input bundle is not loaded.' }
+  const status = speechStatusOf(ctx)
+  if (!status.ready) return { ok: false, reason: status.reason ?? 'The recognizer is not ready.' }
+  try {
+    const audio = new Uint8Array(Buffer.from(audioBase64, 'base64'))
+    if (audio.byteLength === 0) return { ok: false, reason: 'The recording was empty.' }
+    const spec = speech.resolve({ audio })
+    const transcript = await speech.transcribe(spec, signal)
+    return { ok: true, text: transcript.text }
+  } catch (error) {
+    return { ok: false, reason: error instanceof Error ? error.message.slice(0, 300) : 'Transcription failed.' }
+  }
+}
+
 const backlogApiHost = backlogApi.host({
   list: async ({ ctx, input }) => (await backlogFor(ctx)).list(input),
   get: async ({ ctx, input }) => (await backlogFor(ctx)).get(input.id),
@@ -294,6 +350,11 @@ const backlogApiHost = backlogApi.host({
   acknowledge: async ({ ctx, input }) => (await backlogFor(ctx)).acknowledge(input),
   applyProposal: async ({ ctx, input, caller }) => (await backlogFor(ctx)).applyProposal({ id: input.id, actor: actorOf(caller) }),
   dismissProposal: async ({ ctx, input, caller }) => (await backlogFor(ctx)).dismissProposal({ id: input.id, actor: actorOf(caller) }),
+  attachFile: async ({ ctx, input, caller }) => (await backlogFor(ctx)).attachFile({ id: input.id, file: input.file, actor: actorOf(caller) }),
+  readFile: async ({ ctx, input }) => (await backlogFor(ctx)).readFile(input),
+  removeFile: async ({ ctx, input, caller }) => (await backlogFor(ctx)).removeFile({ ...input, actor: actorOf(caller) }),
+  speechStatus: ({ ctx }) => speechStatusOf(ctx),
+  transcribeSpeech: async ({ ctx, input, signal }) => transcribeSpeech(ctx, input.audioBase64, signal),
   update: async ({ ctx, input, caller }) => (await backlogFor(ctx)).update({ ...input, actor: actorOf(caller) }),
   link: async ({ ctx, input, caller }) => (await backlogFor(ctx)).link({ ...input, actor: actorOf(caller) }),
   comment: async ({ ctx, input, caller }) => (await backlogFor(ctx)).comment({ ...input, actor: actorOf(caller) }),

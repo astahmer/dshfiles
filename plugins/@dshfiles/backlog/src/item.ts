@@ -7,6 +7,9 @@ const MAX_TARGET_CHARS = 500
 const MAX_TAGS = 20
 const MAX_LINKS = 100
 const MAX_EVENTS = 200
+const MAX_ATTACHMENTS = 8
+const MAX_FILE_BYTES = 16 * 1024 * 1024
+const attachmentKinds = ['image', 'file'] as const
 
 const kinds = ['task', 'bug', 'idea', 'note', 'question'] as const
 const statuses = ['inbox', 'todo', 'doing', 'done', 'dropped'] as const
@@ -16,6 +19,7 @@ const provenances = ['user', 'agent', 'extracted', 'inferred'] as const
 const attentions = ['none', 'needs-input', 'blocked', 'waiting'] as const
 const freshnessStates = ['fresh', 'stale', 'dormant', 'archived'] as const
 const humanFieldNames = ['title', 'body', 'kind', 'status', 'project', 'tags', 'pinned', 'attention'] as const
+const imageMediaTypes = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'] as const
 
 const kindSchema = z.enum(kinds)
 const statusSchema = z.enum(statuses)
@@ -33,6 +37,20 @@ const linkSchema = z
   .strict()
 /** `user`, `system`, or `agent:<sessionId>`. */
 const actorIdSchema = z.string().regex(/^(user|system|agent:[\w.-]+)$/)
+
+/** One file kept with an item; the bytes live in their own table, keyed by item and attachment. */
+const attachmentSchema = z
+  .object({
+    id: z.string().regex(/^[a-z0-9-]{8,64}$/i),
+    kind: z.enum(attachmentKinds),
+    name: z.string().min(1).max(200),
+    mediaType: z.string().regex(/^[\w.+-]+\/[\w.+-]+$/),
+    bytes: z.number().int().positive().max(MAX_FILE_BYTES),
+    width: z.number().int().positive().max(20_000).optional(),
+    height: z.number().int().positive().max(20_000).optional(),
+    createdAt: z.number().int().nonnegative(),
+  })
+  .strict()
 
 const eventSchema = z
   .object({
@@ -68,6 +86,7 @@ const itemSchema = z
     project: z.string().max(MAX_TARGET_CHARS).nullable(),
     tags: z.array(z.string().max(60)).max(MAX_TAGS),
     links: z.array(linkSchema).max(MAX_LINKS),
+    attachments: z.array(attachmentSchema).max(MAX_ATTACHMENTS).default([]),
     actors: z.array(z.object({ id: actorIdSchema, role: z.enum(['owner', 'contributor']) }).strict()).max(50),
     pinned: z.boolean(),
     humanFields: z.array(z.enum(humanFieldNames)),
@@ -88,6 +107,13 @@ export type BacklogLink = z.infer<typeof linkSchema>
 export type BacklogAttention = z.infer<typeof attentionSchema>
 export type BacklogRelation = z.infer<typeof relationSchema>
 export type BacklogEvent = z.infer<typeof eventSchema>
+export type BacklogAttachment = z.infer<typeof attachmentSchema>
+/** One file the API receives; the bytes are base64 without a data-URL prefix. */
+export type BacklogFileInput = Omit<BacklogAttachment, 'createdAt'> & {
+  readonly data: string
+  readonly width?: number | undefined
+  readonly height?: number | undefined
+}
 export type BacklogItem = z.infer<typeof itemSchema>
 export type BacklogFreshness = (typeof freshnessStates)[number]
 export type BacklogHumanField = (typeof humanFieldNames)[number]
@@ -190,6 +216,11 @@ export class BacklogItems {
   static readonly maxTitleChars = MAX_TITLE_CHARS
   static readonly maxBodyChars = MAX_BODY_CHARS
   static readonly maxTargetChars = MAX_TARGET_CHARS
+  static readonly maxAttachments = MAX_ATTACHMENTS
+  static readonly maxFileBytes = MAX_FILE_BYTES
+  static readonly attachmentKinds = attachmentKinds
+  static readonly imageMediaTypes = imageMediaTypes
+  static readonly attachmentSchema = attachmentSchema
   static readonly itemSchema = itemSchema
   static readonly proposalSchema = proposalSchema
   static readonly linkSchema = linkSchema

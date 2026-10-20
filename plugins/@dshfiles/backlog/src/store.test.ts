@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import type { BacklogItem } from './item.js'
 import { BacklogItems } from './item.js'
-import { BacklogModel } from './store.js'
+import { BacklogModel, type BacklogFileRecord } from './store.js'
 
 const DAY_MS = 86_400_000
 
-const memoryTable = () => {
-  const rows = new Map<string, BacklogItem>()
+const memoryTable = <Value>() => {
+  const rows = new Map<string, Value>()
   return {
     rows,
     get: (key: string) => rows.get(key),
@@ -15,11 +15,11 @@ const memoryTable = () => {
     get size() {
       return rows.size
     },
-    put: async (key: string, value: BacklogItem) => {
+    put: async (key: string, value: Value) => {
       rows.set(key, value)
     },
     delete: async (key: string) => rows.delete(key),
-    update: async (key: string, change: (current: BacklogItem) => BacklogItem) => {
+    update: async (key: string, change: (current: Value) => Value) => {
       const current = rows.get(key)
       if (current === undefined) throw new Error('missing row')
       const next = change(current)
@@ -28,6 +28,8 @@ const memoryTable = () => {
     },
   }
 }
+
+const memoryFiles = () => memoryTable<BacklogFileRecord>()
 
 const clock = (start: number) => {
   let time = start
@@ -83,8 +85,8 @@ describe('freshness', () => {
 describe('store', () => {
   it('links an agent capture to its thread and project, and lists newest activity first', async () => {
     const time = clock(1_000)
-    const items = memoryTable()
-    const store = BacklogModel.createStore({ items, now: time.now })
+    const items = memoryTable<BacklogItem>()
+    const store = BacklogModel.createStore({ files: memoryFiles(), items, now: time.now })
 
     const first = await store.capture({ text: 'idea: a kanban for agents', actor: user })
     time.advance(10)
@@ -105,7 +107,7 @@ describe('store', () => {
 
   it('hides dormant items from the feed until something touches them', async () => {
     const time = clock(0)
-    const store = BacklogModel.createStore({ items: memoryTable(), now: time.now })
+    const store = BacklogModel.createStore({ files: memoryFiles(), items: memoryTable<BacklogItem>(), now: time.now })
     await store.capture({ text: 'note: old thought', actor: user })
     time.advance(15 * DAY_MS)
 
@@ -118,7 +120,7 @@ describe('store', () => {
   })
 
   it('records who moved an item and which fields the user owns', async () => {
-    const store = BacklogModel.createStore({ items: memoryTable(), now: () => 5 })
+    const store = BacklogModel.createStore({ files: memoryFiles(), items: memoryTable<BacklogItem>(), now: () => 5 })
     await store.capture({ text: 'ship the board', actor: agent })
 
     const moved = await store.update({ id: 1, status: 'doing', actor: user })
@@ -131,7 +133,7 @@ describe('store', () => {
   })
 
   it('answers backlinks for items and for any linked target', async () => {
-    const store = BacklogModel.createStore({ items: memoryTable(), now: () => 1 })
+    const store = BacklogModel.createStore({ files: memoryFiles(), items: memoryTable<BacklogItem>(), now: () => 1 })
     await store.capture({ text: 'parent epic', actor: user })
     await store.capture({ text: 'child step, part of b:1', actor: user })
     await store.link({ id: 2, link: { type: 'branch', target: 'feat/backlog' }, actor: user })
@@ -146,20 +148,20 @@ describe('store', () => {
   })
 
   it('continues ids after a Host restart', async () => {
-    const items = memoryTable()
-    const first = BacklogModel.createStore({ items, now: () => 1 })
+    const items = memoryTable<BacklogItem>()
+    const first = BacklogModel.createStore({ files: memoryFiles(), items, now: () => 1 })
     await first.capture({ text: 'one', actor: user })
     await first.capture({ text: 'two', actor: user })
     await first.flush()
 
-    const reopened = BacklogModel.createStore({ items, now: () => 2 })
+    const reopened = BacklogModel.createStore({ files: memoryFiles(), items, now: () => 2 })
     expect((await reopened.capture({ text: 'three', actor: user })).item.id).toBe(3)
   })
 })
 
 describe('triage proposals', () => {
   it('applies automatic triage without touching fields the user set by hand', async () => {
-    const store = BacklogModel.createStore({ items: memoryTable(), now: () => 9 })
+    const store = BacklogModel.createStore({ files: memoryFiles(), items: memoryTable<BacklogItem>(), now: () => 9 })
     await store.capture({ text: 'Kodiak rebases FIFO', actor: user })
     await store.update({ id: 1, status: 'doing', actor: user })
 
@@ -174,7 +176,7 @@ describe('triage proposals', () => {
   })
 
   it('keeps a hesitant proposal until the user accepts it, then treats its values as theirs', async () => {
-    const store = BacklogModel.createStore({ items: memoryTable(), now: () => 9 })
+    const store = BacklogModel.createStore({ files: memoryFiles(), items: memoryTable<BacklogItem>(), now: () => 9 })
     await store.capture({ text: 'parent epic', actor: user })
     await store.capture({ text: 'paste drops chips', actor: user })
     await store.propose({ id: 2, proposal: { kind: 'bug', duplicateOf: 1, confidence: 0.5, reason: 'Broken.', source: 'model', at: 9 } })
@@ -188,7 +190,7 @@ describe('triage proposals', () => {
   })
 
   it('dismisses a proposal without changing the item', async () => {
-    const store = BacklogModel.createStore({ items: memoryTable(), now: () => 9 })
+    const store = BacklogModel.createStore({ files: memoryFiles(), items: memoryTable<BacklogItem>(), now: () => 9 })
     await store.capture({ text: 'an idea', actor: user })
     await store.propose({ id: 1, proposal: { kind: 'idea', confidence: 0.4, reason: '', source: 'jev', at: 9 } })
     const dismissed = await store.dismissProposal({ id: 1, actor: user })
@@ -200,7 +202,7 @@ describe('triage proposals', () => {
 
 describe('lifecycle signals', () => {
   it('moves an item forward on a signal, records the link, and never moves it back', async () => {
-    const store = BacklogModel.createStore({ items: memoryTable(), now: () => 9 })
+    const store = BacklogModel.createStore({ files: memoryFiles(), items: memoryTable<BacklogItem>(), now: () => 9 })
     await store.capture({ text: 'ship the board', actor: user })
 
     const started = await store.applySignal({ id: 1, status: 'doing', link: { type: 'thread', target: 'session-abc123' }, reason: 'mentioned in a thread' })
@@ -216,7 +218,7 @@ describe('lifecycle signals', () => {
   })
 
   it('links but does not move an item whose status the user chose', async () => {
-    const store = BacklogModel.createStore({ items: memoryTable(), now: () => 9 })
+    const store = BacklogModel.createStore({ files: memoryFiles(), items: memoryTable<BacklogItem>(), now: () => 9 })
     await store.capture({ text: 'parked on purpose', actor: user })
     await store.update({ id: 1, status: 'todo', actor: user })
     const signalled = await store.applySignal({
@@ -233,7 +235,7 @@ describe('lifecycle signals', () => {
 describe('attention and inbox', () => {
   it('puts an item asking for input in the Inbox, keeps it visible, and keeps it there once acknowledged', async () => {
     const time = clock(0)
-    const store = BacklogModel.createStore({ items: memoryTable(), now: time.now })
+    const store = BacklogModel.createStore({ files: memoryFiles(), items: memoryTable<BacklogItem>(), now: time.now })
     await store.capture({ text: 'note: deploy order', actor: user })
     await store.update({ id: 1, attention: 'needs-input', actor: agent })
     time.advance(60 * DAY_MS)
@@ -248,7 +250,7 @@ describe('attention and inbox', () => {
 
   it('hides a snoozed item until its time, then lets it resurface', async () => {
     const time = clock(0)
-    const store = BacklogModel.createStore({ items: memoryTable(), now: time.now })
+    const store = BacklogModel.createStore({ files: memoryFiles(), items: memoryTable<BacklogItem>(), now: time.now })
     await store.capture({ text: 'look at this later', actor: user })
     await store.update({ id: 1, snoozedUntil: DAY_MS, actor: user })
     expect(store.list({}).total).toBe(0)
@@ -257,7 +259,7 @@ describe('attention and inbox', () => {
   })
 
   it('summarizes many agent updates as one activity line', async () => {
-    const store = BacklogModel.createStore({ items: memoryTable(), now: () => 3 })
+    const store = BacklogModel.createStore({ files: memoryFiles(), items: memoryTable<BacklogItem>(), now: () => 3 })
     await store.capture({ text: 'migrate users table', actor: user })
     await store.comment({ id: 1, text: 'read the schema', actor: agent })
     await store.comment({ id: 1, text: 'wrote the migration', actor: agent })
@@ -271,9 +273,48 @@ describe('attention and inbox', () => {
   })
 
   it('stamps who made a link', async () => {
-    const store = BacklogModel.createStore({ items: memoryTable(), now: () => 3 })
+    const store = BacklogModel.createStore({ files: memoryFiles(), items: memoryTable<BacklogItem>(), now: () => 3 })
     await store.capture({ text: 'parent', actor: user })
     const linked = await store.link({ id: 1, link: { type: 'revision', target: 'kvyxrlmkptyv', relation: 'implements' }, actor: agent })
     expect(linked.ok && linked.value.item.links).toEqual([{ type: 'revision', target: 'kvyxrlmkptyv', relation: 'implements', provenance: 'agent' }])
+  })
+  it('keeps images and files with an item, reads them back, and removes them', async () => {
+    const time = clock(1_000)
+    const files = memoryFiles()
+    const store = BacklogModel.createStore({ items: memoryTable<BacklogItem>(), files, now: time.now })
+    const detail = await store.capture({
+      text: 'bug: composer loses pasted screenshots',
+      files: [
+        { id: 'image-one-1234', kind: 'image', name: 'shot.png', mediaType: 'image/png', bytes: 3, data: 'aGk=' },
+        { id: 'file-one-1234', kind: 'file', name: 'spec.pdf', mediaType: 'application/pdf', bytes: 4, data: 'JVBERg==' },
+      ],
+      actor: user,
+    })
+    await store.flush()
+
+    expect(detail.item.attachments.map(attachment => attachment.name)).toEqual(['shot.png', 'spec.pdf'])
+    expect(store.list({}).items[0]?.attachments).toHaveLength(2)
+    expect(await store.readFile({ id: detail.item.id, attachmentId: 'image-one-1234' })).toEqual({
+      ok: true,
+      value: { dataUrl: 'data:image/png;base64,aGk=' },
+    })
+    expect(await store.readFile({ id: detail.item.id, attachmentId: 'file-one-1234' })).toEqual({
+      ok: true,
+      value: { dataUrl: 'data:application/pdf;base64,JVBERg==' },
+    })
+
+    const removed = await store.removeFile({ id: detail.item.id, attachmentId: 'image-one-1234', actor: user })
+    expect(removed.ok && removed.value.item.attachments.map(attachment => attachment.name)).toEqual(['spec.pdf'])
+    expect(files.rows.size).toBe(1)
+    expect(await store.readFile({ id: detail.item.id, attachmentId: 'image-one-1234' })).toEqual({ ok: false, reason: 'not-found' })
+  })
+
+  it('takes the kind, status and project the composer set, and records them as the user owns them', async () => {
+    const store = BacklogModel.createStore({ items: memoryTable<BacklogItem>(), files: memoryFiles(), now: () => 1 })
+    const detail = await store.capture({ text: 'fix the composer', kind: 'bug', status: 'doing', project: '/work/dshfiles', actor: user })
+    expect(detail.item.kind).toBe('bug')
+    expect(detail.item.status).toBe('doing')
+    expect(detail.item.project).toBe('/work/dshfiles')
+    expect(detail.item.humanFields).toEqual(['kind', 'status', 'project'])
   })
 })

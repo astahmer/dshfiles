@@ -11,6 +11,7 @@ const summary = (id: number, title: string): BacklogSummaryView => ({
   project: null,
   tags: [],
   links: [],
+  attachments: [],
   actors: [],
   pinned: false,
   freshness: 'fresh',

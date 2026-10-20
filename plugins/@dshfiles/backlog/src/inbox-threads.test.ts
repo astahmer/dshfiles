@@ -11,6 +11,7 @@ const item = (id: number, threads: readonly string[]): BacklogSummaryView => ({
   project: null,
   tags: [],
   links: threads.map(target => ({ type: 'thread', target })),
+  attachments: [],
   actors: [],
   pinned: false,
   freshness: 'fresh',

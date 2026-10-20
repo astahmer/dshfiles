@@ -2,6 +2,8 @@ import { defineDomain, type KvTable } from '@deepseek-ai/dsh-storage-domain'
 import type { BacklogDetailView, BacklogSummaryView } from './api.js'
 import {
   BacklogItems,
+  type BacklogAttachment,
+  type BacklogFileInput,
   type BacklogAttention,
   type BacklogEvent,
   type BacklogFreshness,
@@ -12,6 +14,7 @@ import {
   type BacklogProposal,
   type BacklogStatus,
 } from './item.js'
+import { z } from 'zod'
 import { BacklogSearch, type SearchMatch } from './search.js'
 import { BacklogTriage } from './triage.js'
 
@@ -23,7 +26,28 @@ export const backlogDomain = defineDomain({
   },
 })
 
+/** File bytes live beside the items instead of inside them: a list never decodes a megabyte it does not show. */
+const storedFileSchema = z
+  .object({
+    itemId: z.number().int().positive(),
+    attachment: BacklogItems.attachmentSchema,
+    data: z.string().min(1).max(12_000_000),
+  })
+  .strict()
+
+export const backlogFileDomain = defineDomain({
+  name: 'backlog_files',
+  version: 1,
+  tables: {
+    files: { valueSchema: storedFileSchema, __key: 'files' },
+  },
+})
+
 type ItemTable = KvTable<string, BacklogItem>
+type FileTable = KvTable<string, z.infer<typeof storedFileSchema>>
+export type BacklogFileRecord = z.infer<typeof storedFileSchema>
+
+const fileKey = (itemId: number, attachmentId: string): string => `${String(itemId)}:${attachmentId}`
 
 export type BacklogActor =
   | { readonly kind: 'user' }
@@ -69,8 +93,13 @@ export interface BacklogStore {
     readonly text: string
     readonly project?: string | null | undefined
     readonly status?: BacklogStatus | undefined
+    readonly kind?: BacklogKind | undefined
+    readonly files?: readonly BacklogFileInput[] | undefined
     readonly actor: BacklogActor
   }): Promise<BacklogDetail>
+  attachFile(input: { readonly id: number; readonly file: BacklogFileInput; readonly actor: BacklogActor }): Promise<BacklogResult<BacklogDetail>>
+  readFile(input: { readonly id: number; readonly attachmentId: string }): Promise<BacklogResult<{ readonly dataUrl: string }>>
+  removeFile(input: { readonly id: number; readonly attachmentId: string; readonly actor: BacklogActor }): Promise<BacklogResult<BacklogDetail>>
   update(input: BacklogUpdate & { readonly actor: BacklogActor }): Promise<BacklogResult<BacklogDetail>>
   link(input: {
     readonly id: number
@@ -158,6 +187,7 @@ const summarize = (item: BacklogItem, now: number, match: SearchMatch | null = n
   project: item.project,
   tags: item.tags,
   links: item.links,
+  attachments: item.attachments,
   actors: item.actors,
   pinned: item.pinned,
   freshness: BacklogItems.freshness(item, now, dormantDays),
@@ -178,12 +208,14 @@ const byActivity = (left: BacklogItem, right: BacklogItem): number =>
 
 const createBacklogStore = ({
   items,
+  files,
   now = Date.now,
   dormantDays = () => BacklogItems.defaultDormantDays,
   onEvent = () => undefined,
   reportError = error => console.error('Backlog write failed', { error: error instanceof Error ? error.message.slice(0, 200) : String(error) }),
 }: {
   readonly items: ItemTable
+  readonly files: FileTable
   readonly now?: () => number
   /** Idle days per kind before an open item goes dormant; read on every query so a settings change applies at once. */
   readonly dormantDays?: () => Readonly<Record<BacklogKind, number>>
@@ -241,6 +273,30 @@ const createBacklogStore = ({
 
   const find = (id: number): BacklogItem | undefined => records.get(id)
 
+  const attachmentOf = (file: BacklogFileInput, at: number): BacklogAttachment => {
+    const attachment: BacklogAttachment = {
+      id: file.id,
+      kind: file.kind,
+      name: file.name,
+      mediaType: file.mediaType,
+      bytes: file.bytes,
+      createdAt: at,
+    }
+    if (file.width !== undefined) attachment.width = file.width
+    if (file.height !== undefined) attachment.height = file.height
+    return attachment
+  }
+
+  const storeFiles = async (itemId: number, input: readonly BacklogFileInput[], at: number): Promise<BacklogAttachment[]> => {
+    const kept: BacklogAttachment[] = []
+    for (const file of input.slice(0, BacklogItems.maxAttachments)) {
+      const attachment = attachmentOf(file, at)
+      await files.put(fileKey(itemId, attachment.id), { itemId, attachment, data: file.data })
+      kept.push(attachment)
+    }
+    return kept
+  }
+
   const list: BacklogStore['list'] = query => {
     const at = now()
     const freshnessFilter = query.freshness ?? 'active'
@@ -270,22 +326,31 @@ const createBacklogStore = ({
 
   return {
     revision: () => revision,
-    capture: async ({ text, project, status, actor }) => {
+    capture: async ({ text, project, status, kind, files: pendingFiles = [], actor }) => {
       const at = now()
       const triaged = BacklogItems.triage(text)
       const actorId = actorIdOf(actor)
+      const attachments = await storeFiles(nextId, pendingFiles, at)
+      const chosenKind = kind ?? triaged.kind
+      const chosenStatus = status ?? 'inbox'
+      const chosenProject = project ?? (actor.kind === 'agent' ? (actor.cwd ?? null) : null)
       const item: BacklogItem = {
         id: nextId,
         title: triaged.title,
         body: triaged.body,
-        kind: triaged.kind,
-        status: status ?? 'inbox',
-        project: project ?? (actor.kind === 'agent' ? (actor.cwd ?? null) : null),
+        kind: chosenKind,
+        status: chosenStatus,
+        project: chosenProject,
         tags: triaged.tags,
         links: BacklogItems.uniqueLinks([...triaged.links, ...callerLinks(actor)]),
+        attachments,
         actors: [{ id: actorId, role: 'owner' }],
         pinned: false,
-        humanFields: [],
+        humanFields: [
+          ...(kind === undefined ? [] : (['kind'] as const)),
+          ...(status === undefined ? [] : (['status'] as const)),
+          ...(project === undefined ? [] : (['project'] as const)),
+        ],
         createdAt: at,
         lastActivityAt: at,
         events: [{ at, actor: actorId, kind: 'created', detail: text.slice(0, BacklogItems.maxBodyChars) }],
@@ -295,6 +360,41 @@ const createBacklogStore = ({
       const created = item.events[0]
       if (created !== undefined) onEvent(item, created)
       return detailOf(item)
+    },
+    attachFile: async ({ id, file, actor }) => {
+      const item = find(id)
+      if (item === undefined) return { ok: false, reason: 'not-found' }
+      if (item.attachments.length >= BacklogItems.maxAttachments) return { ok: true, value: detailOf(item) }
+      const at = now()
+      const attachment = attachmentOf(file, at)
+      await files.put(fileKey(id, attachment.id), { itemId: id, attachment, data: file.data })
+      return {
+        ok: true,
+        value: await touch(item, actor, { kind: 'edited', detail: `attached ${attachment.name}` }, { attachments: [...item.attachments, attachment] }),
+      }
+    },
+    readFile: async ({ id, attachmentId }) => {
+      const item = find(id)
+      if (item === undefined || !item.attachments.some(attachment => attachment.id === attachmentId)) return { ok: false, reason: 'not-found' }
+      const stored = files.get(fileKey(id, attachmentId))
+      if (stored === undefined) return { ok: false, reason: 'not-found' }
+      return { ok: true, value: { dataUrl: `data:${stored.attachment.mediaType};base64,${stored.data}` } }
+    },
+    removeFile: async ({ id, attachmentId, actor }) => {
+      const item = find(id)
+      if (item === undefined) return { ok: false, reason: 'not-found' }
+      const attachment = item.attachments.find(candidate => candidate.id === attachmentId)
+      if (attachment === undefined) return { ok: true, value: detailOf(item) }
+      await files.delete(fileKey(id, attachmentId))
+      return {
+        ok: true,
+        value: await touch(
+          item,
+          actor,
+          { kind: 'edited', detail: `removed ${attachment.name}` },
+          { attachments: item.attachments.filter(candidate => candidate.id !== attachmentId) },
+        ),
+      }
     },
     update: async ({ id, actor, ...fields }) => {
       const item = find(id)

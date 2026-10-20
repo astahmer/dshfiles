@@ -9,7 +9,23 @@ Plan and open steps: [plans/backlog](../../../plans/backlog/README.md).
 ## Capture
 
 The **Backlog** sidebar panel has one capture box pinned to the bottom of every view (Enter adds,
-Shift+Enter breaks the line); agents use `backlog_capture`. Structure comes from the text:
+Shift+Enter breaks the line); agents use `backlog_capture`. It is a chat-sized card with a Linear-style
+toolbar:
+
+- `+` picks images or any files, links a backlog item or a thread, or sets a project by searching the same
+  index the panel uses. Picked references land in the text as `b:<n>` or a `session-…` id; a project becomes
+  a chip.
+- Status and kind chips are editable before sending; the kind chip otherwise follows the text prefix.
+- Files can be picked, pasted or dropped. Images are scaled to 1600 px and re-encoded as WebP; other files
+  keep their bytes. The Host keeps the bytes in their own storage domain, never in the item row. An item
+  shows images as a thumbnail grid and other files as download rows; a feed row shows a paperclip count.
+  At most eight files, 16 MB each (20 MB before an image is shrunk).
+- The microphone records a 16 kHz mono WAV and transcribes it through the Host voice-input bundle
+  (`@deepseek-ai/dsh-experimental-voice-input-bundle`), so the selected SenseVoice provider prepares and
+  recognizes audio on the Host machine. The button is disabled with the setup reason until that bundle is
+  loaded and its recognizer is ready.
+
+Structure comes from the text:
 
 - `bug:`, `idea:`, `note:`, `question:`, `task:`/`todo:` set the kind; a first line ending in `?` is a
   question; anything else is a task. The first line is the title, the rest the markdown body.
@@ -97,6 +113,9 @@ thread and starts the item, just as typing `b:12` does.
 | `backlog_update`           | write: edit or move                                                                   |
 | `backlog_link`             | write: link or unlink                                                                 |
 | `backlog_comment`          | write                                                                                 |
+| `backlog_attach_file`      | write: keep one base64 image or file with an item                                     |
+| `backlog_read_file`        | read: one image or file as a data URL                                                 |
+| `backlog_remove_file`      | write: remove one image or file                                                       |
 | `backlog_triage`           | write: run triage on one item now                                                     |
 | `backlog_projects`         | read: per-project counts, who needs you, people                                       |
 | `backlog_accept_proposal`  | write                                                                                 |

@@ -14,6 +14,7 @@ const item = (id: number, title: string, fields: Partial<BacklogItem> = {}): Bac
   project: '/work/welii',
   tags: [],
   links: [],
+  attachments: [],
   actors: [{ id: 'user', role: 'owner' }],
   pinned: false,
   humanFields: [],

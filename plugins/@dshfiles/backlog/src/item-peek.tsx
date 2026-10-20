@@ -43,6 +43,7 @@ import { backlogApi, type BacklogDetailView, type BacklogSummaryView } from './a
 import type { ComposerThread } from './composer.js'
 import { BacklogItems, type BacklogAttention, type BacklogEvent, type BacklogLink, type BacklogProposal, type BacklogRelation } from './item.js'
 import { ItemGlyphs } from './item-glyphs.js'
+import { ItemFiles } from './item-files.js'
 import { ItemPickers } from './item-pickers.js'
 import { BacklogTriage } from './triage.js'
 import { BacklogQueries, useBacklogActions } from './use-backlog-actions.js'
@@ -609,6 +610,7 @@ const PeekBody = (props: {
           )}
           {item.proposal === undefined || item.proposal === null ? null : <ProposalCard id={item.id} proposal={item.proposal} />}
           <div className="dshx:flex dshx:flex-col dshx:gap-2">
+            {props.loading ? null : <ItemFiles itemId={item.id} attachments={item.attachments} />}
             {props.loading ? (
               <p className="dshx:line-clamp-3 dshx:text-[13px] dshx:leading-relaxed dshx:text-muted-foreground">{item.body}</p>
             ) : (

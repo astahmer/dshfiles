@@ -4,6 +4,24 @@ import { BacklogItems } from './item.js'
 
 const idSchema = z.number().int().positive()
 const freshnessSchema = z.enum(BacklogItems.freshnessStates)
+const fileInputSchema = BacklogItems.attachmentSchema.omit({ createdAt: true }).extend({ data: z.string().min(1).max(24_000_000) })
+const fileOutputSchema = z.discriminatedUnion('ok', [
+  z.object({ ok: z.literal(true), value: z.object({ dataUrl: z.string().min(1) }).strict() }).strict(),
+  z.object({ ok: z.literal(false), reason: z.literal('not-found') }).strict(),
+])
+const speechStatusSchema = z
+  .object({
+    available: z.boolean(),
+    ready: z.boolean(),
+    provider: z.string().nullable(),
+    language: z.string().nullable(),
+    reason: z.string().nullable(),
+  })
+  .strict()
+const transcriptionSchema = z.discriminatedUnion('ok', [
+  z.object({ ok: z.literal(true), text: z.string() }).strict(),
+  z.object({ ok: z.literal(false), reason: z.string().max(500) }).strict(),
+])
 
 const summarySchema = z
   .object({
@@ -14,6 +32,7 @@ const summarySchema = z
     project: z.string().nullable(),
     tags: z.array(z.string()),
     links: z.array(BacklogItems.linkSchema),
+    attachments: z.array(BacklogItems.attachmentSchema),
     actors: BacklogItems.itemSchema.shape.actors,
     pinned: z.boolean(),
     freshness: freshnessSchema,
@@ -141,11 +160,45 @@ export const backlogApi = defineApi({
             .optional()
             .describe("Absolute project path; an agent's working directory by default."),
           status: BacklogItems.statusSchema.optional().describe('Defaults to `inbox`.'),
+          kind: BacklogItems.kindSchema.optional().describe('Overrides the kind the text prefix would derive.'),
+          files: z
+            .array(fileInputSchema)
+            .max(BacklogItems.maxAttachments)
+            .optional()
+            .describe('Files to keep with the item: base64 `data` without a data-URL prefix, with kind, name, media type and byte size.'),
         })
         .strict(),
       output: detailSchema,
       description: `Add one item to the backlog; the calling thread is linked to it. ${writeNote}`,
       tool: { name: 'backlog_capture', readOnly: false },
+    }),
+    attachFile: method({
+      input: z.object({ id: idSchema, file: fileInputSchema }).strict(),
+      output: detailResultSchema,
+      description: `Keep one image or file with an existing backlog item. ${writeNote}`,
+      tool: { name: 'backlog_attach_file', readOnly: false },
+    }),
+    readFile: method({
+      input: z.object({ id: idSchema, attachmentId: z.string().min(1).max(64) }).strict(),
+      output: fileOutputSchema,
+      description: 'Read one image or file kept with a backlog item as a data URL. Read-only.',
+      tool: { name: 'backlog_read_file', readOnly: true },
+    }),
+    removeFile: method({
+      input: z.object({ id: idSchema, attachmentId: z.string().min(1).max(64) }).strict(),
+      output: detailResultSchema,
+      description: `Remove one image or file from a backlog item. ${writeNote}`,
+      tool: { name: 'backlog_remove_file', readOnly: false },
+    }),
+    speechStatus: method({
+      input: z.void(),
+      output: speechStatusSchema,
+      description: 'Whether the Host voice-input bundle can transcribe right now, with the selected provider and language. Not an agent tool.',
+    }),
+    transcribeSpeech: method({
+      input: z.object({ audioBase64: z.string().min(1).max(24_000_000) }).strict(),
+      output: transcriptionSchema,
+      description: 'Transcribe one browser microphone recording through the Host voice-input bundle. Not an agent tool.',
     }),
     update: method({
       input: z

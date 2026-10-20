@@ -384,6 +384,55 @@
           "testName": "stamps who made a link"
         }
       ]
+    },
+    {
+      "id": "rich-capture",
+      "title": "A chat-sized capture box with files, properties and references",
+      "summary": "The composer is a three-line card with a Linear-style toolbar: `+` adds an image or any file, links a backlog item or a thread, or sets a project; status and kind chips are editable before sending; images can be pasted, dropped or picked, are scaled in the browser, other files keep their bytes, and all are kept with the item; the microphone records through the Host voice-input bundle and inserts the transcript into the same draft. Images render as a thumbnail grid, other files as download rows, and feed cards show a paperclip count.",
+      "reach": [
+        "click button \"Backlog\"",
+        "expect textbox \"Capture\"",
+        "expect button \"Dictate\"",
+        "attach \"tooling/dshx/e2e/fixtures/attachments/red.png\"",
+        "expect img \"red.png\"",
+        "attach \"tooling/dshx/e2e/fixtures/attachments/note.txt\"",
+        "expect text \"note.txt\"",
+        "click button \"Status\"",
+        "click menuitem \"In progress\"",
+        "click button \"Add a file or a reference\"",
+        "click menuitem \"Link a thread\"",
+        "expect dialog \"Link a thread\"",
+        "press Escape",
+        "fill textbox \"Capture\" \"rich capture with an image\"",
+        "press Enter",
+        "expect text \"rich capture with an image\"",
+        "click text \"rich capture with an image\"",
+        "expect img \"red.png\"",
+        "expect text \"note.txt\""
+      ],
+      "surfaces": ["client", "host", "storage"],
+      "configuration": [],
+      "states": ["empty", "typing", "images", "properties", "sending", "saved"],
+      "failureModes": [
+        "A file that is not a supported image, or one still larger than 8 MB after shrinking, is refused with the reason and the rest of the draft stays.",
+        "Voice input is disabled with a title when the browser has no speech recognizer.",
+        "A failed capture puts the text, images and properties back."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "host-test",
+          "id": "backlog.rich-capture-files",
+          "file": "plugins/@dshfiles/backlog/src/store.test.ts",
+          "testName": "keeps images and files with an item, reads them back, and removes them"
+        },
+        {
+          "kind": "host-test",
+          "id": "backlog.rich-capture-properties",
+          "file": "plugins/@dshfiles/backlog/src/store.test.ts",
+          "testName": "takes the kind, status and project the composer set, and records them as the user owns them"
+        }
+      ]
     }
   ],
   "kind": "bundle"

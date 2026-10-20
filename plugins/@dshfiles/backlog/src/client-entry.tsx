@@ -31,7 +31,7 @@ export default defineClient({
               const session = state.byId[id]
               return session === undefined || session.blank || session.parentId !== undefined
                 ? []
-                : [{ id: session.id, title: session.displayTitle, running: session.running }]
+                : [{ id: session.id, title: session.displayTitle, running: session.running, ...(session.cwd === undefined ? {} : { cwd: session.cwd }) }]
             })
           }}
           openThread={sessionId => {

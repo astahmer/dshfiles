@@ -1,4 +1,4 @@
-import { LinkIcon, MessageSquareIcon, PinIcon, WandSparklesIcon } from '@dshfiles/plugin-ui/icons'
+import { LinkIcon, MessageSquareIcon, PaperclipIcon, PinIcon, WandSparklesIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 
@@ -91,6 +91,12 @@ const FeedEntry = (props: { readonly item: BacklogSummaryView; readonly open: bo
           {item.tags.map(tag => (
             <Chip key={tag}>#{tag}</Chip>
           ))}
+          {item.attachments.length === 0 ? null : (
+            <Chip>
+              <PaperclipIcon className="dshx:size-3" />
+              {item.attachments.length}
+            </Chip>
+          )}
           {item.links.length === 0 ? null : (
             <Chip>
               <LinkIcon className="dshx:size-3" />

@@ -60,7 +60,7 @@ backing verb; `host-gap` counts capabilities no verb can reach yet.
 | editor                                                                                                                                            | 7                    | 1                                                                                                        | 5             | 2         |
 | diff-viewed                                                                                                                                       | 3                    | 0                                                                                                        | 1             | 2         |
 | prompt-stash                                                                                                                                      | 6                    | 0                                                                                                        | 1             | 5         |
-| backlog                                                                                                                                           | 12                   | 11                                                                                                       | 0             | 0         |
+| backlog                                                                                                                                           | 14                   | 14                                                                                                       | 0             | 0         |
 | queue-reorder                                                                                                                                     | 7                    | 2 (not installed)                                                                                        | 5             | 1         |
 | request-messages                                                                                                                                  | 1                    | 0                                                                                                        | 0             | 1         |
 | rich-composer                                                                                                                                     | 2                    | 0                                                                                                        | 0             | 2         |
@@ -312,8 +312,9 @@ Still missing, because they write secrets or need a browser:
 ### backlog
 
 - `backlog`: every panel verb is its API method bound as a tool — read-only
-  `backlog_list`, `backlog_get`, `backlog_referencing` and `backlog_projects`; writes
-  `backlog_capture`, `backlog_update`, `backlog_link`, `backlog_comment`, `backlog_triage`,
+  `backlog_list`, `backlog_get`, `backlog_referencing`, `backlog_projects` and
+  `backlog_read_file`; writes `backlog_capture`, `backlog_update`, `backlog_link`,
+  `backlog_comment`, `backlog_attach_file`, `backlog_remove_file`, `backlog_triage`,
   `backlog_accept_proposal` and `backlog_dismiss_proposal`.
   Deliberate exception to "write tools say the user asked": the backlog exists
   so agents record and progress their own work, so the write descriptions allow

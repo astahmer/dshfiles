@@ -12,6 +12,7 @@ const item = (id: number, title: string, fields: Partial<BacklogItem> = {}): Bac
   project: null,
   tags: [],
   links: [],
+  attachments: [],
   actors: [{ id: 'user', role: 'owner' }],
   pinned: false,
   humanFields: [],
