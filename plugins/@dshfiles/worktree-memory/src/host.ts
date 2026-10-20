@@ -9,6 +9,7 @@ import { SessionId } from '@deepseek-ai/dsh-session/types'
 import type {} from '@deepseek-ai/dsh-subprocess'
 import type {} from '@deepseek-ai/dsh-workspace'
 import { defineHost } from '@dshfiles/dshx/host'
+import { z } from 'zod'
 import { worktreeMemoryApi } from './api.js'
 import { ProcessTable, type KnownSession, type ProcessRow } from './process-table.js'
 import { emptyCategoryBytes, type MemoryPressure, type MemorySnapshot, type ProcessTree, type StopResult, type StopTarget } from './types.js'
@@ -124,6 +125,8 @@ const readPressure = async (context: Context): Promise<MemoryPressure> => {
   return 'unknown'
 }
 
+const listedTitleSchema = z.string().min(1)
+
 const readSessions = async (context: Context): Promise<KnownSession[]> => {
   const controller = context.get('sessionController')
   if (controller === undefined) return []
@@ -133,32 +136,9 @@ const readSessions = async (context: Context): Promise<KnownSession[]> => {
     cwd: summary.cwd ?? null,
     running: summary.running,
     updatedAt: summary.updatedAt ?? null,
-    title: null,
+    // The list serves each title from its cached projections; the per-Session title read decoded whole logs.
+    title: listedTitleSchema.safeParse(summary.projections?.values.title).data ?? null,
   }))
-}
-
-/** Titles cost a read per Session, so only the Sessions the snapshot actually names are resolved. */
-const withTitles = async (context: Context, snapshot: MemorySnapshot): Promise<MemorySnapshot> => {
-  const query = context.get('sessionQuery')
-  const named = new Set(
-    snapshot.groups.flatMap(group => [
-      ...group.threads.map(thread => thread.sessionId),
-      ...group.trees.flatMap(tree => (tree.sessionId === null ? [] : [tree.sessionId])),
-    ]),
-  )
-  if (query === undefined || named.size === 0) return snapshot
-  const titles = new Map<string, string>()
-  const results = await query
-    .readTitleSnapshots(
-      [...named].map(id => SessionId(id)),
-      AbortSignal.timeout(SESSIONS_TIMEOUT_MS),
-    )
-    .catch(() => [])
-  for (const result of results) if (result.status === 'fulfilled' && result.value.title !== undefined) titles.set(result.sessionId, result.value.title.title)
-  return {
-    ...snapshot,
-    groups: snapshot.groups.map(group => ({ ...group, threads: group.threads.map(thread => ({ ...thread, title: titles.get(thread.sessionId) ?? null })) })),
-  }
 }
 
 const probe = async (active: MemoryRuntime): Promise<Probe> => {
@@ -185,7 +165,7 @@ const probe = async (active: MemoryRuntime): Promise<Probe> => {
     pressure,
     systemBytes: totalmem(),
   })
-  return { snapshot: await withTitles(context, snapshot), rows }
+  return { snapshot, rows }
 }
 
 /** One probe serves every caller within the TTL, so a polling panel in several tabs costs one `ps`. */
