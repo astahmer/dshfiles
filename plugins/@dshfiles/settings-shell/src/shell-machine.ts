@@ -66,7 +66,9 @@ export const shellMachine = setup({
     leavePanel: ({ context }) => context.ports.leavePanel(),
     selectRequested,
     focusRequested,
-    forgetSection: assign({ sectionId: undefined, field: undefined, query: '' }),
+    // Hiding the main view closes the surface but keeps its query, so a tab switch restores the search; an explicit close clears it.
+    forgetSection: assign({ sectionId: undefined, field: undefined }),
+    forgetQuery: assign({ query: '' }),
     search: assign({ query: ({ event }) => (event.type === 'search' ? event.query : '') }),
   },
   guards: {
@@ -79,7 +81,7 @@ export const shellMachine = setup({
   on: {
     select: { actions: assign({ sectionId: ({ event }) => event.sectionId, field: undefined, query: '' }) },
     // The side panel keeps Settings outside this machine's surfaces: it still shares the section and the query.
-    back: { actions: 'forgetSection' },
+    back: { actions: ['forgetSection', 'forgetQuery'] },
     focus: { actions: 'focusRequested' },
     search: { actions: 'search' },
   },
@@ -102,7 +104,7 @@ export const shellMachine = setup({
       },
       on: {
         open: [{ guard: 'wantsTab', target: 'tab', actions: ['selectRequested', 'showPanel'] }, { actions: 'selectRequested' }],
-        close: { target: 'closed' },
+        close: { target: 'closed', actions: 'forgetQuery' },
         search: { actions: 'search' },
         moveToTab: { target: 'tab', actions: 'showPanel' },
         'panel.shown': { target: 'tab' },
@@ -112,7 +114,7 @@ export const shellMachine = setup({
       on: {
         // Settings already fills the main view: a request for the dialog only changes the section.
         open: { actions: ['selectRequested', 'showPanel'] },
-        close: { target: 'closed', actions: 'leavePanel' },
+        close: { target: 'closed', actions: ['leavePanel', 'forgetQuery'] },
         search: { actions: 'search' },
         'panel.hidden': { target: 'closed' },
       },

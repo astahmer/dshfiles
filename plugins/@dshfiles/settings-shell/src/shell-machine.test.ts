@@ -52,6 +52,18 @@ describe('settings shell machine', () => {
     expect(actor.getSnapshot().context.field).toBeUndefined()
   })
 
+  it('keeps the query when the main view hides the tab and shows it again', () => {
+    const { actor } = start()
+    actor.send({ type: 'open', surface: 'tab' })
+    actor.send({ type: 'search', query: 'max tabs' })
+    actor.send({ type: 'panel.hidden' })
+    expect(actor.getSnapshot().value).toBe('closed')
+    expect(actor.getSnapshot().context.query).toBe('max tabs')
+    actor.send({ type: 'panel.shown' })
+    expect(actor.getSnapshot().value).toBe('tab')
+    expect(actor.getSnapshot().context.query).toBe('max tabs')
+  })
+
   it('keeps the query across sections opened without one, and drops it on close or a picked section', () => {
     const { actor } = start()
     actor.send({ type: 'open', surface: 'modal', query: 'archive' })

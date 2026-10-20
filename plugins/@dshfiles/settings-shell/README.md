@@ -24,8 +24,9 @@ One field at the top of Settings searches every setting the shell can draw: thei
 word must match; accents and case are ignored; hidden and secret fields never match. Results replace the section as a
 flat list grouped by page, with matches highlighted, editable in place, and a count ("6 Settings Found"). The tree
 stays visible with a match count per entry; picking an entry with matches scrolls to its results. `Escape` clears the
-query before it closes the dialog. Native sections draw their own rows, so a match on a section's name offers to open
-it; the namespaces behind native rows (theme, language, …) are searchable under _More settings_.
+query before it closes the dialog. Leaving the Settings tab for another tab keeps the query, so returning to the tab
+restores its results and the text in the field. Native sections draw their own rows, so a match on a section's name
+offers to open it; the namespaces behind native rows (theme, language, …) are searchable under _More settings_.
 
 This replaces `@dshfiles/settings-search`, which was **folded** in: its popup under the navigation and its separate
 search section are gone, and the schema walking and ranking it did now live in `src/schema-form/schema-model.ts` and
