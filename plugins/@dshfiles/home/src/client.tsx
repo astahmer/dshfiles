@@ -9,7 +9,7 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { ArrowRightIcon } from '@dshfiles/plugin-ui/icons'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { PluginQueryProvider, useQuery } from '@dshfiles/plugin-ui/query'
-import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
+import { useCallback, useSyncExternalStore } from 'react'
 import { HOME_LOCALE_NAMESPACE, homeLocale, type HomeTranslate } from './locales.js'
 import { NewThreadSettings } from './settings-section.js'
 import { brandStyle, projectOf } from './home-model.js'
@@ -17,7 +17,6 @@ import { isNewThreadScreen } from './new-thread-screen.js'
 import { homeSettings, type HomeSettings } from './settings.js'
 
 const RECENT_THREADS = 3
-const EMPTY_SCREEN_SETTLE_MS = 1_000
 const defaults: HomeSettings = homeSettings.schema({})
 
 interface Stores {
@@ -82,14 +81,8 @@ const HomeStrip = (props: {
   const settings = useSettings(homeSettings).value ?? defaults
   const sessionId = props.session?.sessionId ?? props.sessionId
   const summary = useStores(props.stores, () => props.stores.sessions.list.getSnapshot().byId[sessionId])
-  const onNewThreadScreen = props.session === undefined ? summary?.blank === true && summary.running !== true : isNewThreadScreen(props.session)
-  const [settledScreen, setSettledScreen] = useState(false)
-  useEffect(() => {
-    setSettledScreen(false)
-    if (!onNewThreadScreen) return
-    const timeout = window.setTimeout(() => setSettledScreen(true), EMPTY_SCREEN_SETTLE_MS)
-    return () => window.clearTimeout(timeout)
-  }, [onNewThreadScreen, sessionId])
+  const summaryBlank = summary?.blank === true
+  const onNewThreadScreen = props.session === undefined ? summary?.blank === true && summary.running !== true : isNewThreadScreen(props.session, summaryBlank)
   const project = useStores(props.stores, () => workspaceOfSession(props.stores, sessionId))
   const recentKey = useStores(props.stores, () => {
     if (project === undefined) return ''
@@ -116,16 +109,22 @@ const HomeStrip = (props: {
           result.repositories.find(repository => repository.repoRoot === project?.path)?.threads.filter(thread => thread.unlanded.length > 0).length ?? 0,
       ),
   })
-  if (!onNewThreadScreen || !settledScreen) return null
+  if (!onNewThreadScreen || !(settings.showRecentThreads || settings.showUnlandedWork)) return null
   const recentIds = new Set(settings.showRecentThreads && recentKey !== '' ? recentKey.split(',') : [])
   const sessions = props.stores.sessions.list.getSnapshot()
   const recent = sessions.ids
     .filter(id => recentIds.has(id))
     .sort((left, right) => (sessions.byId[right]?.updatedAt ?? 0) - (sessions.byId[left]?.updatedAt ?? 0))
   const threadsToRebase = rebaseWork.data ?? 0
-  if (recent.length === 0 && threadsToRebase === 0) return null
+  // The hero composer is centered in its column, so a row that appears after the first frame lifts it by half a row.
+  // The rail therefore keeps one line of height from that first frame: the shortcuts land inside it, the card does not
+  // move — the rebase count arrives one Host read later than the screen.
   return (
-    <div className="dshx-root dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-1.5 dshx:pb-2 dshx:text-xs dshx:text-muted-foreground" style={{ order: 1 }}>
+    <div
+      className="dshx-root dshx:flex dshx:min-h-9 dshx:flex-wrap dshx:items-center dshx:gap-1.5 dshx:pb-2 dshx:text-xs dshx:text-muted-foreground"
+      data-testid="dshfiles-home-shortcut-rail"
+      style={{ order: 1 }}
+    >
       {recent.length > 0 ? <span>{props.t('resume')}</span> : null}
       {recent.map(id => (
         <Button key={id} size="sm" variant="ghost" className="dshx:h-7 dshx:max-w-56 dshx:px-2 dshx:text-xs" onClick={() => props.openSession(id)}>

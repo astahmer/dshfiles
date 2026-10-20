@@ -17,6 +17,7 @@ Feature: New thread home screen
     And the thread workspace gains a revision described "Feature to rebase"
     And the page is reloaded so the home screen reads the thread workspaces afresh
     And a new thread is started from the sidebar
+    And the composer stays put when the New thread shortcuts change
     Then the New thread screen offers to resume "jj integration rebase e2e thread" and reports one thread with work to rebase
     And the resume list appears below the chat composer
     When recent threads are turned off in the New thread settings

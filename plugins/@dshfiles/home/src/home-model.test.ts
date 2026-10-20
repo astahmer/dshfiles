@@ -15,10 +15,16 @@ describe('home model', () => {
   })
 
   it('keeps the strip on the New thread screen only', () => {
-    expect(isNewThreadScreen({ blank: true, running: false, promptAttempted: false })).toBe(true)
-    expect(isNewThreadScreen({ blank: true, running: true, promptAttempted: true })).toBe(false)
-    expect(isNewThreadScreen({ blank: true, running: false, promptAttempted: true })).toBe(false)
-    expect(isNewThreadScreen({ blank: false, running: false, promptAttempted: true })).toBe(false)
+    expect(isNewThreadScreen({ blank: true, running: false, promptAttempted: false }, true)).toBe(true)
+    expect(isNewThreadScreen({ blank: true, running: true, promptAttempted: true }, true)).toBe(false)
+    expect(isNewThreadScreen({ blank: true, running: false, promptAttempted: true }, true)).toBe(false)
+    expect(isNewThreadScreen({ blank: false, running: false, promptAttempted: true }, true)).toBe(false)
+  })
+
+  it('waits for the Session list to call the Session blank before treating the screen as new', () => {
+    const opening = { blank: true, running: false, promptAttempted: false }
+    expect(isNewThreadScreen(opening, false)).toBe(false)
+    expect(isNewThreadScreen(opening, true)).toBe(true)
   })
 
   it('hides only the native pieces the settings replace', () => {

@@ -92,6 +92,43 @@ Then('the resume list appears below the chat composer', async ({ page }: { page:
   })
 })
 
+// The hero composer is centered on its column, so a shortcuts row that mounts only once it has content lifts the card
+// by half a row every time the screen opens. The row reserves its line with the screen instead, and the shortcuts only
+// fill it: the rail is attached before its content, and changing that content leaves the composer exactly where it was.
+const composerTop = async (page: Page): Promise<number> => {
+  const box = await page.locator('[data-conversation-region="composer"]').first().boundingBox()
+  if (box === null) throw new Error('The composer seat is not visible')
+  return Math.round(box.y)
+}
+
+const shortcutRail = (page: Page) => page.getByTestId('dshfiles-home-shortcut-rail')
+
+Then('the composer stays put when the New thread shortcuts change', async ({ page }: { page: Page }) => {
+  const shortcutsShown = await composerTop(page)
+  await recordAssertion(page, 'home-strip-reserves-its-line', async () => {
+    // A settle timer used to hold the strip back for a second; the rail is part of the screen now, so it exists while
+    // the shortcuts content is still one Host read away.
+    await expect(shortcutRail(page)).toHaveCount(1, { timeout: 500 })
+  })
+  await openNewThreadSettings(page)
+  const recentThreads = settingsDialog(page).getByRole('switch', { name: 'Recent threads', exact: true })
+  await recentThreads.click()
+  await expect(recentThreads).not.toBeChecked()
+  await closeSettings(page)
+  await expect(page.getByText('Resume', { exact: true })).toHaveCount(0)
+  await recordAssertion(page, 'home-strip-keeps-its-line-without-the-resume-list', async () => {
+    await expect(shortcutRail(page)).toBeVisible()
+    expect(await composerTop(page)).toBe(shortcutsShown)
+  })
+  await openNewThreadSettings(page)
+  await settingsDialog(page).getByRole('switch', { name: 'Recent threads', exact: true }).click()
+  await closeSettings(page)
+  await recordAssertion(page, 'home-strip-fills-its-line-in-place', async () => {
+    await expect(page.getByText('Resume', { exact: true })).toBeVisible()
+    expect(await composerTop(page)).toBe(shortcutsShown)
+  })
+})
+
 Then('the work to rebase opens the Thread workspaces panel', async ({ page }: { page: Page }) => {
   await page.getByRole('button', { name: '1 thread has work to rebase', exact: true }).click()
   await recordAssertion(page, 'home-work-to-rebase-opens-thread-workspaces', async () => {
