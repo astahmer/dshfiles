@@ -33,6 +33,7 @@
   },
   "dependencies": {
     "@dshfiles/command-palette": "workspace:*",
+    "@dshfiles/memory": "workspace:*",
     "@dshfiles/multi-host": "workspace:*",
     "@dshfiles/plugin-ui": "workspace:*",
     "@dshfiles/project-checks": "workspace:*",

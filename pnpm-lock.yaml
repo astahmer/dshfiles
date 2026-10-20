@@ -1957,6 +1957,9 @@ importers:
       '@dshfiles/command-palette':
         specifier: workspace:*
         version: link:../command-palette
+      '@dshfiles/memory':
+        specifier: workspace:*
+        version: link:../memory
       '@dshfiles/multi-host':
         specifier: workspace:*
         version: link:../multi-host

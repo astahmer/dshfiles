@@ -1,8 +1,10 @@
+import { execFile } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { existsSync, statSync } from 'node:fs'
 import { mkdir } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
+import { promisify } from 'node:util'
 import type { Context, Effect } from '@deepseek-ai/cordis'
 import type { SessionRequestId } from '@deepseek-ai/dsh-api-session-controller'
 import type {} from '@deepseek-ai/dsh-subprocess'
@@ -13,6 +15,7 @@ import { SessionId } from '@deepseek-ai/dsh-session'
 import { WorkspaceId, type Workspace } from '@deepseek-ai/dsh-workspace'
 import { isApiOwnerMissing, PluginApiError, type ApiCaller } from '@dshfiles/dshx/api'
 import { createHostApiClient, defineCommand, defineHost, type CommandInvocation, type CommandResult } from '@dshfiles/dshx/host'
+import { workspaceScriptsApi } from '@dshfiles/memory/workspace-scripts-api'
 import { projectChecksApi } from '@dshfiles/project-checks/api'
 import type { ProjectChecksVerifiedTurn } from '@dshfiles/project-checks/completion-event'
 import type { SettingsScope } from '@dshfiles/dshx/settings'
@@ -45,6 +48,9 @@ const MAX_STDERR = 64 * 1024
 const JJ_TIMEOUT_MS = 120_000
 /** A thread younger than this may still be waiting for its first Session to attach. */
 const SWEEP_GRACE_MS = 15 * 60_000
+/** A cleanup deletes node_modules trees, which can take minutes on a slow disk. */
+const CLEANUP_TIMEOUT_MS = 5 * 60_000
+const execFileAsync = promisify(execFile)
 const SWEEP_INTERVAL_MS = 10 * 60_000
 /** Installs and plugin rebuilds after a large rebase take minutes. */
 const SYNC_TIMEOUT_MS = 30 * 60_000
@@ -733,10 +739,14 @@ const discardThread = async (input: { readonly path: string; readonly force: boo
 }
 
 const sweepFinishedThreads = async (): Promise<void> => {
-  if (!readSettings().removeFinishedThreads) return
+  const removeFinished = readSettings().removeFinishedThreads
   for (const repository of await listRepositories()) {
     for (const thread of repository.threads) {
-      if (!thread.finished || thread.unlanded.length > 0) continue
+      if (!thread.finished) continue
+      if (!removeFinished || thread.unlanded.length > 0) {
+        await cleanKeptThread(thread.path)
+        continue
+      }
       const createdAt = thread.workspaceId === null ? undefined : registryOf().get(WorkspaceId(thread.workspaceId))?.createdAt
       const bornAt = createdAt === undefined ? (existsSync(thread.path) ? statSync(thread.path).mtimeMs : 0) : Date.parse(createdAt)
       if (Date.now() - bornAt < SWEEP_GRACE_MS) continue
@@ -745,6 +755,23 @@ const sweepFinishedThreads = async (): Promise<void> => {
       })
     }
   }
+}
+
+/**
+ * An archived thread kept for its unlanded work keeps its folder but not its dependencies: the project's cleanup
+ * script (written once by memory, per project) deletes its node_modules, which setup reinstalls if it is reopened.
+ */
+const cleanKeptThread = async (path: string): Promise<void> => {
+  if (hostContext === undefined || !existsSync(join(path, 'node_modules'))) return
+  const memory = createHostApiClient(hostContext, workspaceScriptsApi, '@dshfiles/jj-integration')
+  const scripts = await memory.scripts({ cwd: path }).catch((error: unknown) => {
+    if (!(error instanceof Error && isApiOwnerMissing(error))) hostContext?.logger.warn('jj-integration: no cleanup script for %s: %s', path, String(error))
+    return null
+  })
+  if (scripts === null) return
+  await execFileAsync(scripts.cleanup, [path], { timeout: CLEANUP_TIMEOUT_MS }).catch((error: unknown) => {
+    hostContext?.logger.warn('jj-integration: cleanup of archived thread %s failed: %s', path, error instanceof Error ? error.message : String(error))
+  })
 }
 
 /** A deleted thread folder must not fail the next turn of a Session pinned to it: check the workspace out again first. */
