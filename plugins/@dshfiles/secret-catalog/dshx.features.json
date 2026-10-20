@@ -4,14 +4,14 @@
     {
       "id": "scoped-alias-catalog",
       "title": "Browse aliases by scope and environment",
-      "summary": "Search metadata-only aliases across all, project, global, and local scopes; choose projects through the shared picker, which hides confirmed secondary JJ workspaces until shown and marks them, and identify the current host-local scope.",
+      "summary": "Search metadata-only aliases across all, project, global, and local scopes; choose projects through the shared picker, which opens on projects and lists confirmed secondary JJ workspaces on their own tab, and identify the current host-local scope.",
       "reach": [
         "seed fake-secret-cli",
         "seed rebase-ready-thread",
         "click button \"Secret Catalog\"",
         "click button \"Choose a project folder…\"",
         "expect dialog \"Choose a project folder\"",
-        "click switch \"Hide JJ workspaces\"",
+        "click tab \"Workspaces\"",
         "expect text \"JJ workspace\""
       ],
       "surfaces": ["client", "host", "settings", "integration"],

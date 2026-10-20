@@ -1,5 +1,7 @@
 # Thread workspaces (jj-integration)
 
+![Pick a New-thread project](docs/screenshots/new-thread-project-picker.png)
+
 ![Thread integration control center](docs/screenshots/thread-workspaces-panel.png)
 
 ![New thread destination and workspace isolation](docs/screenshots/thread-destination.png)

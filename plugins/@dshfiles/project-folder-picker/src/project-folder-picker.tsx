@@ -4,14 +4,12 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@dshfiles/plugin-ui/components/ui/dialog'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Kbd, KbdGroup } from '@dshfiles/plugin-ui/components/ui/kbd'
-import { Label } from '@dshfiles/plugin-ui/components/ui/label'
-import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
 import { Tabs, TabsList, TabsTrigger } from '@dshfiles/plugin-ui/components/ui/tabs'
 import { FolderIcon, FolderOpenIcon, HistoryIcon, SearchIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { keepPreviousData, useMutation, useQuery } from '@dshfiles/plugin-ui/query'
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
-import { ProjectFolderPickerModel, type PickerEntry, type PickerTab } from './project-folder-picker-model.js'
+import { ProjectFolderPickerModel, type PickerEntry, type PickerSectionId, type PickerTab } from './project-folder-picker-model.js'
 
 export interface RegisteredProject {
   readonly workspaceId: string
@@ -57,10 +55,12 @@ export interface ProjectFolderPickerProps {
    * caller that knows it rather than read here.
    */
   readonly machineName?: string
-  /** Previously chosen folders offered on the Recents tab; selecting one yields a directory selection. */
+  /** Recently chosen folders, newest first, for the Recents tab; a registered one shows as its project, another yields a directory selection. */
   readonly recentFolders?: readonly string[]
-  /** Initial state of the "Hide JJ workspaces" switch, which drops projects flagged `isJjWorkspace` from the Projects tab. */
-  readonly excludeJjWorkspaces?: boolean
+  /** Tab shown on open; Projects by default, which leaves JJ thread workspaces to their own tab. */
+  readonly initialTab?: PickerTab
+  /** Projects listed first on Everything and Projects, ahead of recents, under no heading. */
+  readonly pinnedWorkspaceIds?: readonly string[]
   /** Accessible list label and placeholder override for callers whose list is not only projects. */
   readonly placeholder?: string
 }
@@ -89,6 +89,23 @@ const listClassName = 'dshx:flex dshx:max-h-[min(420px,55vh)] dshx:min-h-12 dshx
 
 const emptyClassName = 'dshx:py-6 dshx:text-center dshx:text-sm dshx:text-muted-foreground'
 
+const noRecentFolders: readonly string[] = []
+
+const noPinnedWorkspaces: readonly string[] = []
+
+const tabLabels = { all: 'Everything', projects: 'Projects', recents: 'Recents', workspaces: 'Workspaces' } satisfies Readonly<Record<PickerTab, string>>
+
+const sectionLabels = { pinned: 'Pinned', recents: 'Recents', projects: 'Projects', workspaces: 'JJ workspaces' } satisfies Readonly<
+  Record<PickerSectionId, string>
+>
+
+const emptyLabels = {
+  all: 'No projects or folders match.',
+  projects: 'No registered projects match.',
+  recents: 'No recent folders match.',
+  workspaces: 'No JJ workspaces match.',
+} satisfies Readonly<Record<PickerTab, string>>
+
 export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Element => {
   const [query, setQuery] = useState('')
   const [selectedIndex, setSelectedIndex] = useState(0)
@@ -97,20 +114,18 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
   const pickRequest = useRef<AbortController | null>(null)
   const searchInput = useRef<HTMLInputElement | null>(null)
   const pathMode = props.mode === 'directories' || ProjectFolderPickerModel.isPathQuery(query)
-  const [tab, setTab] = useState<PickerTab>('projects')
-  const [excludeJjWorkspaces, setExcludeJjWorkspaces] = useState(props.excludeJjWorkspaces === true)
-  const recentFolders = props.recentFolders
-  const entries = useMemo(
-    () => ProjectFolderPickerModel.pickerEntries({ projects: props.projects, recentFolders: recentFolders ?? [], query, tab, excludeJjWorkspaces }),
-    [props.projects, recentFolders, query, tab, excludeJjWorkspaces],
+  const [tab, setTab] = useState<PickerTab>(props.initialTab ?? 'projects')
+  const recentFolders = props.recentFolders ?? noRecentFolders
+  const pinnedWorkspaceIds = props.pinnedWorkspaceIds ?? noPinnedWorkspaces
+  const sections = useMemo(
+    () => ProjectFolderPickerModel.pickerSections({ projects: props.projects, recentFolders, pinnedWorkspaceIds, query, tab }),
+    [props.projects, recentFolders, pinnedWorkspaceIds, query, tab],
   )
-  const hasRecentFolders = useMemo(
-    () =>
-      ProjectFolderPickerModel.pickerEntries({ projects: props.projects, recentFolders: recentFolders ?? [], query: '', tab: 'recents', excludeJjWorkspaces })
-        .length > 0,
-    [props.projects, recentFolders, excludeJjWorkspaces],
+  const entries = useMemo(() => sections.flatMap(section => section.entries), [sections])
+  const tabs = useMemo(
+    () => ProjectFolderPickerModel.availableTabs({ projects: props.projects, recentFolders, pinnedWorkspaceIds }),
+    [props.projects, recentFolders, pinnedWorkspaceIds],
   )
-  const hasJjWorkspaces = props.projects.some(project => project.isJjWorkspace === true)
 
   const listingQuery = useQuery({
     queryKey: ['project-folder-picker', 'list', browseTarget?.path ?? null],
@@ -149,7 +164,7 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
 
   useEffect(() => () => pickRequest.current?.abort(), [])
 
-  useEffect(() => setSelectedIndex(0), [query, listing?.path, tab, excludeJjWorkspaces])
+  useEffect(() => setSelectedIndex(0), [query, listing?.path, tab])
 
   useEffect(() => {
     if (listingQuery.data === undefined || listingQuery.isPlaceholderData || browseTarget === null) return
@@ -414,50 +429,49 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
           </>
         ) : (
           <>
-            {(hasRecentFolders || hasJjWorkspaces) && (
+            {tabs.length > 2 && (
               <div className="dshx:flex dshx:items-center dshx:gap-3 dshx:px-4 dshx:pt-2">
-                {hasRecentFolders && (
-                  <Tabs onValueChange={(value: string) => setTab(value === 'recents' ? 'recents' : 'projects')} value={tab}>
-                    <TabsList className="dshx:h-7!">
-                      <TabsTrigger className="dshx:px-2.5 dshx:text-xs" value="projects">
-                        Projects
+                <Tabs
+                  onValueChange={(value: string) => {
+                    if (ProjectFolderPickerModel.isPickerTab(value)) setTab(value)
+                  }}
+                  value={tab}
+                >
+                  <TabsList aria-label="Show" className="dshx:h-7!">
+                    {tabs.map(pickerTab => (
+                      <TabsTrigger className="dshx:px-2.5 dshx:text-xs" key={pickerTab} value={pickerTab}>
+                        {tabLabels[pickerTab]}
                       </TabsTrigger>
-                      <TabsTrigger className="dshx:px-2.5 dshx:text-xs" value="recents">
-                        Recents
-                      </TabsTrigger>
-                    </TabsList>
-                  </Tabs>
-                )}
-                {hasJjWorkspaces && tab === 'projects' && (
-                  <Label className="dshx:ml-auto dshx:flex dshx:cursor-pointer dshx:items-center dshx:gap-2 dshx:text-xs dshx:font-normal dshx:text-muted-foreground">
-                    <Switch checked={excludeJjWorkspaces} onCheckedChange={(checked: boolean) => setExcludeJjWorkspaces(checked)} size="sm" />
-                    Hide JJ workspaces
-                  </Label>
-                )}
+                    ))}
+                  </TabsList>
+                </Tabs>
               </div>
             )}
-            <div
-              aria-busy={props.loading === true}
-              aria-label={tab === 'projects' ? 'Projects' : 'Recent folders'}
-              className={cn(listClassName, 'dshx:pt-2')}
-              role="listbox"
-            >
-              {entries.map((entry, index) => (
-                <PickerEntryRow
-                  active={index === selectedIndex}
-                  entry={entry}
-                  index={index}
-                  key={entry.kind === 'project' ? entry.project.workspaceId : 'recent:' + entry.path}
-                  machineName={props.machineName}
-                  onHover={() => setSelectedIndex(index)}
-                  onSelect={() => props.onSelect(ProjectFolderPickerModel.pickerEntrySelection(entry))}
-                />
+            <div aria-busy={props.loading === true} aria-label={tabLabels[tab]} className={cn(listClassName, 'dshx:pt-2')} role="listbox">
+              {sections.map(section => (
+                <div aria-label={tab === 'all' ? sectionLabels[section.id] : undefined} className="dshx:contents" key={section.id} role="group">
+                  {tab === 'all' && sections.length > 1 && section.id !== 'pinned' && (
+                    <p aria-hidden className="dshx:px-2 dshx:pt-2 dshx:pb-1 dshx:text-xs dshx:font-medium dshx:text-muted-foreground">
+                      {sectionLabels[section.id]}
+                    </p>
+                  )}
+                  {section.entries.map(entry => {
+                    const index = entries.indexOf(entry)
+                    return (
+                      <PickerEntryRow
+                        active={index === selectedIndex}
+                        entry={entry}
+                        index={index}
+                        key={entry.kind === 'project' ? entry.project.workspaceId : 'recent:' + entry.path}
+                        machineName={props.machineName}
+                        onHover={() => setSelectedIndex(index)}
+                        onSelect={() => props.onSelect(ProjectFolderPickerModel.pickerEntrySelection(entry))}
+                      />
+                    )
+                  })}
+                </div>
               ))}
-              {entries.length === 0 && (
-                <p className={emptyClassName}>
-                  {props.loading === true ? 'Loading projects…' : tab === 'projects' ? 'No registered projects match.' : 'No recent folders match.'}
-                </p>
-              )}
+              {entries.length === 0 && <p className={emptyClassName}>{props.loading === true ? 'Loading projects…' : emptyLabels[tab]}</p>}
             </div>
           </>
         )}

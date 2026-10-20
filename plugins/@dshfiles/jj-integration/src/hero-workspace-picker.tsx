@@ -16,12 +16,16 @@ import { jjIntegrationApi } from './api.js'
 import { DestinationBar, HostChipSlot, type DestinationBarServices, type WorkspaceToggleActor, workspaceListed } from './destination-bar.js'
 import type { JjIntegrationTranslate } from './locales.js'
 import { RemoteDestinationChips } from './remote-destination.js'
+import { recentProjectPaths } from './recent-projects.js'
 
 const NO_FOLDER_ID = 'dshfiles:no-folder'
+const NO_FOLDER_PATH_SUFFIX = '/.dsh/no-folder'
+const RECENT_PROJECT_COUNT = 5
+const pinnedWorkspaceIds = [NO_FOLDER_ID]
 
 /**
- * Replaces the native New-thread project picker: registered projects without the per-thread workspaces, a
- * "No folder" entry, and folder browsing to add a project. A chosen project goes through jj-integration so the
+ * Replaces the native New-thread project picker: registered projects first, the per-thread workspaces on their own
+ * tab, a "No folder" entry, and folder browsing to add a project. A chosen project goes through jj-integration so the
  * isolate-by-default setting applies here too.
  */
 export const HeroWorkspacePicker = (
@@ -87,10 +91,26 @@ export const HeroWorkspacePicker = (
   const bar = <DestinationBar workspaceId={props.selectedId} services={props.services} toggle={props.toggle} t={props.t} />
   if (!props.open) return bar
 
+  // The Host lists both by last use; its own "No folder" registration is the entry offered first here.
+  const hostProjects = (projects.data?.projects ?? []).filter(project => !project.path.endsWith(NO_FOLDER_PATH_SUFFIX))
   const registered: RegisteredProject[] = [
     { workspaceId: NO_FOLDER_ID, title: props.t('noFolder'), canonicalPath: '~/.dsh/no-folder' },
-    ...(projects.data?.projects ?? []).map(project => ({ workspaceId: project.workspaceId, title: project.title, canonicalPath: project.path })),
+    ...hostProjects.map(project => ({ workspaceId: project.workspaceId, title: project.title, canonicalPath: project.path })),
+    ...(projects.data?.workspaces ?? []).map(workspace => ({
+      workspaceId: workspace.workspaceId,
+      title: workspace.title,
+      canonicalPath: workspace.path,
+      isJjWorkspace: true,
+    })),
   ]
+  // Read once per open rather than subscribed: every Session event would otherwise re-render the destination bar.
+  const recentFolders = recentProjectPaths({
+    threads: Object.values(props.services.sessions.list.getSnapshot().byId).flatMap(session =>
+      session === undefined ? [] : [{ cwd: session.cwd, updatedAt: session.updatedAt, blank: session.blank }],
+    ),
+    projectPaths: hostProjects.map(project => project.path),
+    limit: RECENT_PROJECT_COUNT,
+  })
 
   // The composer moves to the chosen project at once; the destination bar then gives the thread its own workspace in
   // the background when isolation is the default, so nothing here waits on jj.
@@ -111,6 +131,8 @@ export const HeroWorkspacePicker = (
       {bar}
       <ProjectFolderPicker
         projects={registered}
+        recentFolders={recentFolders}
+        pinnedWorkspaceIds={pinnedWorkspaceIds}
         directoryPicker={directoryPicker}
         onRegisterWorkspace={props.ports.registerWorkspace}
         onSelect={selection => void choose(selection).catch(() => props.onClose())}

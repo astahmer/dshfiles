@@ -746,6 +746,45 @@
           "reason": "Presentation-only empty state: the filter bar and groups are hidden, which the reach proves in the running client."
         }
       ]
+    },
+    {
+      "id": "new-thread-project-picker",
+      "title": "Pick a New-thread project",
+      "summary": "The New-thread project picker opens on registered projects only with No folder pinned first; Everything lists No folder, then up to five projects of the latest threads (a thread workspace counts as its project), then the other projects, then JJ thread workspaces, and Workspaces lists only thread workspaces whose folders still exist.",
+      "reach": [
+        "seed rebase-ready-thread",
+        "click button \"New thread\"",
+        "click button \"Choose workspace\"",
+        "expect tab \"Projects\"",
+        "expect option \"No folder*\"",
+        "click tab \"Everything\"",
+        "expect text \"JJ workspaces\""
+      ],
+      "surfaces": ["host", "client"],
+      "configuration": [],
+      "states": ["projects", "everything", "workspaces"],
+      "failureModes": ["Removed thread workspaces whose folders are gone are listed as projects.", "Thread workspaces are listed on the default Projects tab."],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.registered-projects",
+          "file": "plugins/@dshfiles/jj-integration/src/registered-projects.test.ts",
+          "testName": "splits projects from thread workspaces concurrently, drops missing folders and keeps registry order"
+        },
+        {
+          "kind": "unit-test",
+          "id": "project-folder-picker.everything-tab",
+          "file": "plugins/@dshfiles/project-folder-picker/src/project-folder-picker-model.test.ts",
+          "testName": "lists recents, then projects, then workspaces on Everything, each folder once"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.recent-projects",
+          "file": "plugins/@dshfiles/jj-integration/src/recent-projects.test.ts",
+          "testName": "folds thread workspaces into their project, dedupes, skips blanks and unknown folders, and stops at the limit"
+        }
+      ]
     }
   ]
 }

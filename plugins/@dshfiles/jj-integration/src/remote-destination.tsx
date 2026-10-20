@@ -190,7 +190,6 @@ export const RemoteDestinationChips = (props: {
           }}
           onClose={() => props.onPickerOpenChange(false)}
           showNativePicker={false}
-          excludeJjWorkspaces
           recentFolders={recentFolders}
           machineName={props.hostName}
           title={`${t('chooseProject')} · ${props.hostName}`}

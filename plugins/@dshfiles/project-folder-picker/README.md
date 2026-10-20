@@ -17,7 +17,7 @@ port, and a workspace registration callback.
 ```
 
 Optional props: `title`, `machineName`, `placeholder`, `recentFolders`,
-`excludeJjWorkspaces`, `disabled`, `mode`, `showNativePicker`, and
+`initialTab`, `pinnedWorkspaceIds`, `disabled`, `mode`, `showNativePicker`, and
 `onUseAbsolutePath`. The default
 `projects` mode shows registered projects and switches to browsing when the
 query starts with `/` or `~/`. A unique matching folder opens as the path is
@@ -33,14 +33,14 @@ provided, so the caller can validate the uncanonicalized path. Set
 `showNativePicker` to `false` when the injected Host backend has no native
 chooser.
 
-Project mode splits its list into small **Projects** and **Recents** tabs; the
-Recents tab appears only when there are recent folders (previously chosen paths
-that are not registered projects), and choosing one yields a `directory`
-selection. When any project carries `isJjWorkspace: true`, the Projects tab
-shows a **Hide JJ workspaces** switch; `excludeJjWorkspaces` sets its initial
-state. The secret catalog, the Jujutsu repository picker and the remote-host
-destination turn it on, since they want the project rather than a thread's
-workspace of it.
+Project mode opens on the **Projects** tab: registered projects without JJ thread
+workspaces (any project carrying `isJjWorkspace: true`). Tabs mirror the command
+palette's: **Everything** lists recents, then projects, then workspaces, each
+folder once; **Recents** and **Workspaces** appear only when they have folders.
+`recentFolders` is newest first; a registered recent folder shows as its project,
+any other one yields a `directory` selection, and a JJ workspace is never a recent.
+`pinnedWorkspaceIds` lead Everything and Projects (the New-thread picker pins
+**No folder**). `initialTab` overrides the default.
 
 `RegisteredProject` requires `workspaceId`, `title`, and the Host-canonical
 `canonicalPath`. Selection is a discriminated union:

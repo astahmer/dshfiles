@@ -51,7 +51,7 @@
         "seed rebase-ready-thread",
         "click button \"Jujutsu\"",
         "click button \"Choose repository\"",
-        "click switch \"Hide JJ workspaces\"",
+        "click tab \"Workspaces\"",
         "expect text \"JJ workspace\"",
         "fill textbox \"Search projects or enter a folder path\" \"sample\"",
         "expect option \"sample*\"",
@@ -59,7 +59,7 @@
         "expect button \"Sample project*\"",
         "expect text \"(no description)\"",
         "click button \"Choose repository\"",
-        "click switch \"Hide JJ workspaces\"",
+        "click tab \"Workspaces\"",
         "expect text \"JJ workspace\""
       ],
       "surfaces": ["client", "host", "settings", "integration"],
