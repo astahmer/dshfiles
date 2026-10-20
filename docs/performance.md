@@ -80,7 +80,8 @@ and mid-turn logs keep the full read. On a clone of the live Host, 52 of 52 open
 
 - Loading older history in a cold thread (scrolling up past the opening window) and the first command still read the
   whole log once; the opening no longer does.
-- Third-party `dsh-context/detail` reads each Session once per Host (0.4–2 s), then answers in under 100 ms.
+- Third-party `dsh-context` read each Session's whole log on its first visit (up to 2.4 s per switch); it is no
+  longer in the web profile.
 - Native per-switch catalogs (`skills/list`, `commands/list`, `schedule/list`, `agentPresets/list`, `session/modelCatalog`)
   answer under 250 ms on a warm Host but still run on every switch: Host gap 69.
 - Main-thread work on open is ~0.6 s spread over many small tasks; no single leaf above 80 ms.
