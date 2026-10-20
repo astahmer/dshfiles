@@ -48,4 +48,4 @@ that (`bundleDependencies`), and `dist/client.js` requires exactly the same modu
 ## Rollout
 
 The settings namespace moves from `ui-chat` to `dshfiles-chat`, so a profile that set Chat preferences on the
-`ui-chat` row (for example `transcriptView`) needs them set again in Settings → Chat, or on the `dshfiles-chat` row.
+`ui-chat` row (for example `transcriptView`) needs them set again in Settings → Chat, or on the `dshfiles-chat` row.an `OlderRowsSentinel` near the top mounts older rows, then requests older Host pages, once the reader leaves the tail or reads upward (wheel, key, scroll), and for at most three steps while the rows do not fill the view, so opening never pages in the whole history; the "Load earlier" button is gone

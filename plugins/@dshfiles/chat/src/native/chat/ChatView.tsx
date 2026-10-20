@@ -14,7 +14,7 @@ import { isAtOrOutside } from '../contract/group-tree.ts'
 import type { ChatFlowHookContext, ChatViewSlotProps, OpenFileOptions } from '../contract/slots.ts'
 import type { ChatSnapshot } from '../contract/snapshot.ts'
 import { TurnNavigator } from './TurnNavigator.tsx'
-import { useTranscriptWindow } from '../../transcript-window.ts'
+import { TranscriptWindow, useTranscriptWindow } from '../../transcript-window.ts'
 import { mergeTurnRailItems } from './turn-rail-items.ts'
 import { useChatScroll } from './use-chat-scroll.ts'
 import { fileMediaUrl, resolveWorkspacePath } from '@deepseek-ai/dsh-util-workspace-path'
@@ -116,6 +116,8 @@ export function ChatView({
   ), [groupedView])
   // Read during render from the previous commit: the scroll owner needs the window's output to exist.
   const followingTail = useRef(true)
+  const fillSteps = useRef(TranscriptWindow.openingFillSteps)
+  useEffect(() => { fillSteps.current = TranscriptWindow.openingFillSteps }, [sessionId])
   const transcript = useTranscriptWindow({
     ready: openState === 'open',
     following: useCallback(() => followingTail.current, []),
@@ -243,7 +245,7 @@ export function ChatView({
               </div>
             )}
             {transcript.hasMore && scroll.initialized && !loadingOlder && (
-              <OlderRowsSentinel listRef={scroll.listRef} hidden={transcript.hidden} onVisible={scroll.loadEarlier} />
+              <OlderRowsSentinel listRef={scroll.listRef} hidden={transcript.hidden} onVisible={scroll.loadEarlier} fillSteps={fillSteps} />
             )}
             {transcript.hasMore && loadingOlder && <div className={css.older}>{t('loading')}</div>}
             <MarkdownDelegateProvider openFile={requestOpenFile} openExternalLink={openExternalLink} fileImages={fileImages}>
@@ -289,21 +291,65 @@ export function ChatView({
  * Mounts the next older rows, or asks the Host for the next older page, once the reader nears the top. It unmounts
  * while a page loads, so a page that still leaves it in view observes it again and takes the next one.
  */
-function OlderRowsSentinel({ listRef, hidden, onVisible }: {
+function OlderRowsSentinel({ listRef, hidden, onVisible, fillSteps }: {
   listRef: { readonly current: HTMLDivElement | null }
   hidden: number
   onVisible: () => void
+  /** Steps left that may widen a view the rows do not fill yet, without the reader scrolling. */
+  fillSteps: { current: number }
 }) {
   const ref = useRef<HTMLDivElement>(null)
   // Observed again after every step: a step that still leaves the sentinel in view must take the next one.
   useEffect(() => {
     const target = ref.current
-    if (target === null || typeof IntersectionObserver !== 'function') return
+    const list = listRef.current
+    if (target === null || list === null || typeof IntersectionObserver !== 'function') return
+    let near = false
+    let fired = false
+    let upward = false
+    let lastTop = list.scrollTop
+    // A thread opens at its newest row, and collapsed Turns are a few pixels tall, so the top is often within reach
+    // there; widening only once the reader leaves the tail, or a few steps while the rows do not fill the view, keeps
+    // an open from paging in the whole history.
+    const take = (): void => {
+      if (fired || !near) return
+      const fillsView = list.scrollHeight > list.clientHeight + 1
+      const atTail = list.scrollHeight - list.scrollTop - list.clientHeight < 48
+      if (atTail && !upward && (fillsView || fillSteps.current <= 0)) return
+      if (atTail && !upward) fillSteps.current -= 1
+      fired = true
+      onVisible()
+    }
     const observer = new IntersectionObserver((records) => {
-      if (records.some(record => record.isIntersecting)) onVisible()
-    }, { root: listRef.current, rootMargin: '1200px 0px 0px 0px' })
+      near = records.some(record => record.isIntersecting)
+      take()
+    }, { root: list, rootMargin: '1200px 0px 0px 0px' })
+    // Reading upward also counts when the rows cannot scroll yet: a wheel or key toward older rows.
+    const onScroll = (): void => {
+      if (list.scrollTop < lastTop) upward = true
+      lastTop = list.scrollTop
+      take()
+    }
+    const onWheel = (event: WheelEvent): void => {
+      if (event.deltaY >= 0) return
+      upward = true
+      take()
+    }
+    const onKey = (event: KeyboardEvent): void => {
+      if (event.key !== 'PageUp' && event.key !== 'ArrowUp' && event.key !== 'Home') return
+      upward = true
+      take()
+    }
     observer.observe(target)
-    return () => { observer.disconnect() }
+    list.addEventListener('scroll', onScroll, { passive: true })
+    list.addEventListener('wheel', onWheel, { passive: true })
+    list.addEventListener('keydown', onKey)
+    return () => {
+      observer.disconnect()
+      list.removeEventListener('scroll', onScroll)
+      list.removeEventListener('wheel', onWheel)
+      list.removeEventListener('keydown', onKey)
+    }
   }, [listRef, hidden, onVisible])
   return <div ref={ref} aria-hidden="true" data-chat-older-rows="" />
 }

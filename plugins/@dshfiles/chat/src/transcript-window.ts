@@ -15,6 +15,8 @@ export class TranscriptWindow {
   static readonly openingRows = 24
   /** Rows one step up the transcript mounts. */
   static readonly growthRows = 24
+  /** Steps an open may take on its own while its rows do not fill the view; scrolling up takes the rest. */
+  static readonly openingFillSteps = 3
 
   /** Index of the first mounted row when a thread opens, keeping a restored reading position mounted. */
   static openingStart(input: { readonly count: number; readonly anchorIndex: number | null }): number {
