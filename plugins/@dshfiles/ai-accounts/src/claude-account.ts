@@ -159,70 +159,130 @@ export class ClaudeAccountModel {
   }
 }
 
-export const createClaudeAccountService = (dependencies: ClaudeAccountServiceDependencies) => ({
-  describeAuth: async (input: {
-    readonly configDir: string
-    readonly keyEnv: string
-    readonly now: number
-    readonly resolveCredential?: CredentialValueResolver | undefined
-  }): Promise<ClaudeAuthView> => {
-    const [login, identity, named] = await Promise.all([
-      readClaudeLogin(input.configDir, dependencies),
-      readClaudeIdentity(input.configDir, dependencies),
-      input.resolveCredential === undefined ? Promise.resolve(dependencies.readKeyFromEnv(input.keyEnv)) : input.resolveCredential(input.keyEnv),
-    ])
-    const hasKey = named.length > 0
-    const credential = login.kind === 'signed-in' ? login.credential : undefined
-    const expired = credential?.expiresAt !== undefined && credential.expiresAt <= input.now
-    const signedOutDetail = login.kind === 'signed-out' ? signedOutMessage(input.configDir) : undefined
-    const loginDetail = expired ? 'The Claude Code login has expired. Run Claude Code once on this account to refresh it.' : signedOutDetail
-    const detail = hasKey ? undefined : loginDetail
-    return { signedIn: hasKey || (credential !== undefined && !expired), identity, plan: credential?.plan, detail }
-  },
+/** A usage reading serves every caller for this long. */
+const CLAUDE_USAGE_FRESH_MS = 2 * 60_000
+/** Back-off after a 429 that names no Retry-After. */
+const CLAUDE_USAGE_BACKOFF_MS = 10 * 60_000
 
-  resolveInferenceToken: async (input: {
-    readonly configDir: string
-    readonly keyEnv: string
-    readonly now: number
-    readonly resolveCredential?: CredentialValueResolver | undefined
-  }): Promise<string> => {
-    const named = input.resolveCredential === undefined ? dependencies.readKeyFromEnv(input.keyEnv) : await input.resolveCredential(input.keyEnv)
-    if (named.length > 0) return named
-    const login = await readClaudeLogin(input.configDir, dependencies)
-    if (login.kind === 'signed-out') throw new Error(signedOutMessage(input.configDir))
-    if (login.kind === 'missing') throw new Error(`No Claude login found. Run: ${ClaudeAccountModel.claudeLoginHint(input.configDir)}`)
-    const credential = login.credential
-    if (credential.expiresAt !== undefined && credential.expiresAt <= input.now) {
-      throw new Error('The Claude Code login has expired. Run Claude Code once on this account to refresh it.')
-    }
-    return credential.accessToken
-  },
+type UsageRead = { readonly card: UsageCard; readonly retryAfterMs?: number }
 
-  readUsage: async (configDir: string, signal?: AbortSignal): Promise<UsageCard> => {
-    if (signal?.aborted) return ProviderUsageModel.emptyUsage('error', 'Usage collection was cancelled.')
-    const login = await readClaudeLogin(configDir, dependencies)
-    if (login.kind === 'signed-out') return ProviderUsageModel.emptyUsage('unauthenticated', signedOutMessage(configDir))
-    if (login.kind === 'missing') return ProviderUsageModel.emptyUsage('unauthenticated', 'Quota needs the Claude Code login; a setup-token cannot read it.')
-    const credential = login.credential
-    if (credential.expiresAt !== undefined && credential.expiresAt <= dependencies.now()) {
-      return ProviderUsageModel.emptyUsage('unauthenticated', 'The Claude Code login has expired. Run Claude Code once to refresh it.')
-    }
-    try {
-      const response = await dependencies.fetch(CLAUDE_USAGE_URL, {
-        headers: { authorization: `Bearer ${credential.accessToken}`, 'anthropic-beta': 'oauth-2025-04-20', accept: 'application/json' },
-        redirect: 'error',
-        signal: ProviderUsageModel.usageSignal(signal),
+interface UsageEntry {
+  card?: UsageCard
+  at: number
+  backoffUntil: number
+  inFlight?: Promise<UsageCard> | undefined
+}
+
+const retryAfterMs = (header: string | null): number => {
+  const seconds = Number(header)
+  return header !== null && Number.isFinite(seconds) && seconds > 0 ? seconds * 1_000 : CLAUDE_USAGE_BACKOFF_MS
+}
+
+/** The last good reading, labelled with its age, while Anthropic asks us to wait; a rate-limited card without one. */
+const staleOrLimited = (entry: UsageEntry, now: number): UsageCard => {
+  if (entry.card === undefined) return ProviderUsageModel.emptyUsage('rate-limited', 'Claude rate-limited the usage request.')
+  const minutes = Math.max(1, Math.round((now - entry.at) / 60_000))
+  return { ...entry.card, message: `Reading from ${String(minutes)} min ago; Claude asked to wait before the next one.` }
+}
+
+const fetchUsage = async (configDir: string, dependencies: ClaudeAccountServiceDependencies, signal: AbortSignal | undefined): Promise<UsageRead> => {
+  if (signal?.aborted) return { card: ProviderUsageModel.emptyUsage('error', 'Usage collection was cancelled.') }
+  const login = await readClaudeLogin(configDir, dependencies)
+  if (login.kind === 'signed-out') return { card: ProviderUsageModel.emptyUsage('unauthenticated', signedOutMessage(configDir)) }
+  if (login.kind === 'missing')
+    return { card: ProviderUsageModel.emptyUsage('unauthenticated', 'Quota needs the Claude Code login; a setup-token cannot read it.') }
+  const credential = login.credential
+  if (credential.expiresAt !== undefined && credential.expiresAt <= dependencies.now()) {
+    return { card: ProviderUsageModel.emptyUsage('unauthenticated', 'The Claude Code login has expired. Run Claude Code once to refresh it.') }
+  }
+  try {
+    const response = await dependencies.fetch(CLAUDE_USAGE_URL, {
+      headers: { authorization: `Bearer ${credential.accessToken}`, 'anthropic-beta': 'oauth-2025-04-20', accept: 'application/json' },
+      redirect: 'error',
+      signal: ProviderUsageModel.usageSignal(signal),
+    })
+    if (response.status === 401 || response.status === 403)
+      return { card: ProviderUsageModel.emptyUsage('unauthenticated', 'Claude rejected this login; sign in again.') }
+    if (response.status === 429)
+      return {
+        card: ProviderUsageModel.emptyUsage('rate-limited', 'Claude rate-limited the usage request.'),
+        retryAfterMs: retryAfterMs(response.headers.get('retry-after')),
+      }
+    if (!response.ok) return { card: ProviderUsageModel.emptyUsage('error', `Claude returned ${String(response.status)} for usage.`) }
+    return { card: ClaudeAccountModel.parseClaudeUsage(await response.json(), credential.plan) }
+  } catch (cause) {
+    return { card: ProviderUsageModel.emptyUsage('error', cause instanceof Error ? cause.message : 'Claude usage could not be read.') }
+  }
+}
+
+export const createClaudeAccountService = (dependencies: ClaudeAccountServiceDependencies) => {
+  const usageReads = new Map<string, UsageEntry>()
+  return {
+    describeAuth: async (input: {
+      readonly configDir: string
+      readonly keyEnv: string
+      readonly now: number
+      readonly resolveCredential?: CredentialValueResolver | undefined
+    }): Promise<ClaudeAuthView> => {
+      const [login, identity, named] = await Promise.all([
+        readClaudeLogin(input.configDir, dependencies),
+        readClaudeIdentity(input.configDir, dependencies),
+        input.resolveCredential === undefined ? Promise.resolve(dependencies.readKeyFromEnv(input.keyEnv)) : input.resolveCredential(input.keyEnv),
+      ])
+      const hasKey = named.length > 0
+      const credential = login.kind === 'signed-in' ? login.credential : undefined
+      const expired = credential?.expiresAt !== undefined && credential.expiresAt <= input.now
+      const signedOutDetail = login.kind === 'signed-out' ? signedOutMessage(input.configDir) : undefined
+      const loginDetail = expired ? 'The Claude Code login has expired. Run Claude Code once on this account to refresh it.' : signedOutDetail
+      const detail = hasKey ? undefined : loginDetail
+      return { signedIn: hasKey || (credential !== undefined && !expired), identity, plan: credential?.plan, detail }
+    },
+
+    resolveInferenceToken: async (input: {
+      readonly configDir: string
+      readonly keyEnv: string
+      readonly now: number
+      readonly resolveCredential?: CredentialValueResolver | undefined
+    }): Promise<string> => {
+      const named = input.resolveCredential === undefined ? dependencies.readKeyFromEnv(input.keyEnv) : await input.resolveCredential(input.keyEnv)
+      if (named.length > 0) return named
+      const login = await readClaudeLogin(input.configDir, dependencies)
+      if (login.kind === 'signed-out') throw new Error(signedOutMessage(input.configDir))
+      if (login.kind === 'missing') throw new Error(`No Claude login found. Run: ${ClaudeAccountModel.claudeLoginHint(input.configDir)}`)
+      const credential = login.credential
+      if (credential.expiresAt !== undefined && credential.expiresAt <= input.now) {
+        throw new Error('The Claude Code login has expired. Run Claude Code once on this account to refresh it.')
+      }
+      return credential.accessToken
+    },
+
+    readUsage: async (configDir: string, signal?: AbortSignal): Promise<UsageCard> => {
+      // The page, the footer, the history recorder and quota continuations all read here; Anthropic rate-limits this
+      // endpoint after a few calls a minute, so one reading serves them all for a while and a 429 backs off.
+      const now = dependencies.now()
+      const known = usageReads.get(configDir)
+      if (known?.card !== undefined && now - known.at < CLAUDE_USAGE_FRESH_MS) return known.card
+      if (known !== undefined && now < known.backoffUntil) return staleOrLimited(known, now)
+      if (known?.inFlight !== undefined) return known.inFlight
+      const inFlight = fetchUsage(configDir, dependencies, signal).then(read => {
+        const entry = usageReads.get(configDir) ?? { at: 0, backoffUntil: 0 }
+        entry.inFlight = undefined
+        usageReads.set(configDir, entry)
+        if (read.retryAfterMs !== undefined) {
+          entry.backoffUntil = dependencies.now() + read.retryAfterMs
+          return staleOrLimited(entry, dependencies.now())
+        }
+        if (read.card.status === 'ok') {
+          entry.card = read.card
+          entry.at = dependencies.now()
+        }
+        return read.card
       })
-      if (response.status === 401 || response.status === 403)
-        return ProviderUsageModel.emptyUsage('unauthenticated', 'Claude rejected this login; sign in again.')
-      if (response.status === 429) return ProviderUsageModel.emptyUsage('rate-limited', 'Claude rate-limited the usage request.')
-      if (!response.ok) return ProviderUsageModel.emptyUsage('error', `Claude returned ${String(response.status)} for usage.`)
-      return ClaudeAccountModel.parseClaudeUsage(await response.json(), credential.plan)
-    } catch (cause) {
-      return ProviderUsageModel.emptyUsage('error', cause instanceof Error ? cause.message : 'Claude usage could not be read.')
-    }
-  },
-})
+      usageReads.set(configDir, { ...(known ?? { at: 0, backoffUntil: 0 }), inFlight })
+      return inFlight
+    },
+  }
+}
 
 export const claudeAccountService = createClaudeAccountService({
   readFile,
