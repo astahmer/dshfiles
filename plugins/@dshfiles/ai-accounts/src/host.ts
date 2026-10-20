@@ -11,7 +11,8 @@ import type { ModelFallbackStore } from './model-fallback-store.js'
 import type { FallbackRoute } from './model-fallback-api.js'
 import { createUsageCache } from './account-usage.js'
 import { createCopilotLoginService } from './copilot-login.js'
-import { claudeAccountService } from './claude-account.js'
+import { ClaudeAccountModel, claudeAccountService } from './claude-account.js'
+import { CLAUDE_CLI_TOKEN, ClaudeCliSessions } from './claude-cli.js'
 import { readCommandCodeKey } from './commandcode-usage.js'
 import { AccountSettingsModel, aiAccountsHostSettings } from './settings.js'
 import { shouldUseLunaReserve, withLunaReserve } from './codex-luna-reserve.js'
@@ -28,6 +29,7 @@ import { definePlugin } from '@dshfiles/dshx/host'
 import { openaiCodexProvider } from '@earendil-works/pi-ai/providers/openai-codex'
 import { opencodeGoProvider } from '@earendil-works/pi-ai/providers/opencode-go'
 import { anthropicProvider } from '@earendil-works/pi-ai/providers/anthropic'
+import { createProvider } from '@earendil-works/pi-ai'
 import { githubCopilotProvider } from '@earendil-works/pi-ai/providers/github-copilot'
 import { createCopilotCredentialsService } from './copilot-credentials.js'
 import { GITHUB_COPILOT_KIND } from './provider-routes.js'
@@ -163,6 +165,24 @@ export default definePlugin({
     const codexUpstream = openaiCodexProvider()
     const opencodeUpstream = opencodeGoProvider()
     const claudeUpstream = anthropicProvider()
+    const claudeCli = new ClaudeCliSessions({
+      configDir: provider => {
+        const route = routes.get(provider)
+        return route?.kind === CLAUDE_KIND ? route.configDir : ClaudeAccountModel.resolveClaudeConfigDir('')
+      },
+    })
+    ctx.effect(() => () => claudeCli.dispose(), 'ai-accounts: claude cli processes')
+    // Same catalog as the Messages API; requests run through the account's Claude Code CLI login (see claude-cli.ts).
+    const claudeCliUpstream = createProvider({
+      id: claudeUpstream.id,
+      name: 'Claude Code',
+      auth: claudeUpstream.auth,
+      models: claudeUpstream.getModels(),
+      api: {
+        stream: (model, context, options) => claudeCli.stream(model, context, options),
+        streamSimple: (model, context, options) => claudeCli.stream(model, context, options),
+      },
+    })
     const githubCopilotUpstream = githubCopilotProvider()
     /** Codex accounts a quota failure sent to Luna Reserve ahead of their usage card, until this time. */
     const lunaReserveHolds = new Map<string, number>()
@@ -228,7 +248,7 @@ export default definePlugin({
                 shouldUseLunaReserve(runtime.usageCache?.latest()?.cards.find(card => card.instanceId === id)?.usage, Date.now())),
           })
         }
-        if (route.kind === CLAUDE_KIND) return claudeUpstream
+        if (route.kind === CLAUDE_KIND) return ClaudeAccountModel.usesCliTransport(route) ? claudeCliUpstream : claudeUpstream
         if (route.kind === GITHUB_COPILOT_KIND) return githubCopilotUpstream
         return keyedUpstream(route)
       }
@@ -384,6 +404,7 @@ export default definePlugin({
           }
           if (route.kind === GITHUB_COPILOT_KIND) return undefined
           if (route.kind === CLAUDE_KIND) {
+            if (ClaudeAccountModel.usesCliTransport(route)) return CLAUDE_CLI_TOKEN
             try {
               return await claudeAccountService.resolveInferenceToken({
                 configDir: route.configDir,

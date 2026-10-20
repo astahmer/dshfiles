@@ -28,6 +28,22 @@ login, because a setup token cannot read usage. Cursor publishes no usage API,
 so the plugin reads the dashboard's own endpoint. If Cursor changes that
 endpoint, the card reports "unsupported" instead of a guessed number.
 
+## Claude through the Claude Code CLI
+
+A Claude account on its Claude Code login (no key variable) runs its requests through the official `claude` CLI, not
+the Messages API. A Team or Max seat's allowance covers only requests Claude Code itself makes: the same OAuth token
+sent over HTTP is billed to the organization's extra usage, and once that monthly cap is reached every request fails
+with a 429 "monthly spend limit" while the seat still has quota. Through the CLI, the request reports
+`isUsingOverage: false` and counts against the seat's 5-hour and weekly windows.
+
+Each DSH conversation drives one `claude -p` process (stream-json in and out) with DSH's system prompt, no built-in
+tools, no setting sources and an empty working directory, so local settings, hooks and CLAUDE.md files stay out. DSH's
+tools reach Claude through a small MCP server the plugin starts per process: a tool call is held, the DSH step ends
+with `toolUse`, and DSH's tool result releases it, so the same process continues the turn and keeps its prompt cache.
+A new user turn goes to the same process; a process whose transcript diverged (an edit, a compaction, a Host restart)
+is replaced by one that receives the transcript so far as text. Idle processes stop after 30 minutes, and at most six
+run at once. `src/claude-cli.ts` holds the transport; a setup-token or API key keeps the Messages API.
+
 ## API keys
 
 For every selected keyed account, **Set up key…** opens a setup dialog even if

@@ -130,6 +130,13 @@ export class ClaudeAccountModel {
     return trimmed === '' ? DEFAULT_CONFIG_DIR : resolve(expandHome(trimmed))
   }
 
+  /**
+   * A route on the account's Claude Code login (no key variable) runs through the CLI: the login's seat allowance only
+   * covers requests Claude Code makes, and HTTP requests with it are billed to the organization's extra usage. A
+   * setup-token or API key keeps the Messages API.
+   */
+  static usesCliTransport = (route: { readonly apiKeyEnv: string }): boolean => route.apiKeyEnv.trim() === ''
+
   /** Claude Code suffixes its keychain item with a hash of a non-default config dir. */
   static claudeKeychainService = (configDir: string): string =>
     configDir === DEFAULT_CONFIG_DIR ? 'Claude Code-credentials' : `Claude Code-credentials-${createHash('sha256').update(configDir).digest('hex').slice(0, 8)}`
