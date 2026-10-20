@@ -328,10 +328,11 @@ Then('the thread is settled, opens read-only and unsettles to reply', async ({ p
     await setThreadStatusFilters(page, 'Filter: Not working', [])
     await expect(targetRow).toHaveCount(1)
   })
-  await recordAssertion(page, 'thread-sidebar-settled-banner-carries-time-and-archive', async () => {
+  await recordAssertion(page, 'thread-sidebar-settled-banner-carries-actions', async () => {
     const banner = page.getByRole('status', { name: 'This thread is settled.' })
-    // The settle instant is recorded, so the banner dates it; no archive delay is set here, so it shows no archive time.
-    await expect(banner.locator('time')).toHaveCount(1)
+    // The label already says settled, so a freshly settled thread shows no redundant "Settled now" age; no archive
+    // delay is set here, so the banner carries no date at all.
+    await expect(banner).not.toContainText('Settled now')
     await expect(banner.getByRole('button', { name: 'Archive', exact: true })).toBeVisible()
     // The banner reads like the jj rebase notice: capped and centred, never the dock's full width.
     const maxWidth = await banner.evaluate(element => Number.parseFloat(getComputedStyle(element).maxWidth))
@@ -443,9 +444,9 @@ When('a thread is settled with a one-week settled-archive delay', async ({ page 
 Then('the settled banner shows the archive time it is waiting for', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'thread-sidebar-settled-banner-shows-archive-time', async () => {
     const banner = page.getByRole('status', { name: 'This thread is settled.' })
-    // Two instants: when it was settled, and when the one-week delay will archive it.
-    await expect(banner.locator('time')).toHaveCount(2)
-    await expect(banner).toContainText('Settled')
+    // One dated instant: the one-week archive deadline. A freshly settled thread withholds its redundant age.
+    await expect(banner.locator('time').filter({ hasText: 'Archives in' })).toHaveCount(1)
+    await expect(banner).not.toContainText('Settled now')
     await expect(banner).toContainText('Archives')
   })
 })

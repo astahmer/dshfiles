@@ -588,7 +588,7 @@
     {
       "id": "settled-auto-archive",
       "title": "Archive a settled thread once its delay passes",
-      "summary": "Archive a settled thread after a configurable delay counted from the instant it was settled. The settled composer banner dates the thread, shows when the delay will archive it, and offers Archive and Unsettle to reply; archived, pinned, running, waiting or newly changed threads, and threads settled before the timestamps existed, are never archived by the policy.",
+      "summary": "Archive a settled thread after a configurable delay counted from the instant it was settled. The settled composer banner withholds its settle age while that age is only \"now\", dates the thread once the age says more, shows when the delay will archive it, and offers Archive and Unsettle to reply; archived, pinned, running, waiting or newly changed threads, and threads settled before the timestamps existed, are never archived by the policy.",
       "reach": [
         "click button \"All threads\"",
         "click button \"New thread\"",

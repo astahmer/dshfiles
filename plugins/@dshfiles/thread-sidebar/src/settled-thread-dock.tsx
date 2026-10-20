@@ -10,6 +10,7 @@ import { DockNotice } from './dock-notice.js'
 import type { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
 import { SidebarOrganization } from './organization.js'
 import { formatAge, formatRemaining } from './relative-age.js'
+import { settledAgeLabel } from './settled-age.js'
 import { SettledThreadsModel } from './settled-threads.js'
 import { usePreferences } from './sidebar-state.js'
 import { threadDelayMs } from './thread-delays.js'
@@ -59,21 +60,24 @@ export const SettledThreadDock = (props: {
   const archive = useMutation({
     mutationFn: () => SidebarOrganization.archiveWithoutStopping((targetId, options) => workspaces.archiveSession(targetId, options), sessionId),
   })
+  const settledAge = settledAt === undefined ? undefined : settledAgeLabel(formatAge(settledAt, now))
+  const meta =
+    settledAge === undefined && archiveAt === undefined ? undefined : (
+      <>
+        {settledAt === undefined || settledAge === undefined ? null : (
+          <time dateTime={new Date(settledAt).toISOString()}>{t('threadSidebarSettledAt', { when: settledAge })}</time>
+        )}
+        {archiveAt === undefined ? null : (
+          <time dateTime={new Date(archiveAt).toISOString()}>{t('threadSidebarSettledArchiveAt', { when: formatRemaining(archiveAt, now) })}</time>
+        )}
+      </>
+    )
   if (!settled) return null
   return (
     <DockNotice
       label={t('threadSidebarSettledBanner')}
       icon={<CheckCircleIcon className="dshx:size-4 dshx:shrink-0" aria-hidden />}
-      meta={
-        <>
-          {settledAt === undefined ? null : (
-            <time dateTime={new Date(settledAt).toISOString()}>{t('threadSidebarSettledAt', { when: formatAge(settledAt, now) })}</time>
-          )}
-          {archiveAt === undefined ? null : (
-            <time dateTime={new Date(archiveAt).toISOString()}>{t('threadSidebarSettledArchiveAt', { when: formatRemaining(archiveAt, now) })}</time>
-          )}
-        </>
-      }
+      meta={meta}
       actions={
         <>
           <Button size="sm" variant="ghost" disabled={archive.isPending} onClick={() => archive.mutate()}>

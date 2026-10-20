@@ -126,10 +126,11 @@ storage failures and restart requests — stay in the list flow instead.
 **Settled composer.** A settled thread opens normally and reads as history: the
 composer carries a **This thread is settled.** banner
 (`src/settled-thread-dock.tsx`), one compact card beside the jj rebase notice
-with the settle age and the archive deadline in the sidebar's own relative
-buckets, an **Archive** button and **Unsettle to reply**, because the Host
-rejects the next model step while the thread is settled. The rejection is a
-`agent/pre-step` listener in `src/host.ts` over `src/settled-gate.ts`: a settled
+with the settle age once it stops reading "now" and the archive deadline in the
+sidebar's own relative buckets, an **Archive** button and **Unsettle to reply**,
+because the Host rejects the next model step while the thread is settled. The
+rejection is a `agent/pre-step` listener in `src/host.ts` over
+`src/settled-gate.ts`: a settled
 Session, or a subagent descendant of one, runs no model step until it is
 unsettled, so a late wake (subagent settlement, queued follow-up, reminder)
 proposes a step that ends as `blocked` without a request.
