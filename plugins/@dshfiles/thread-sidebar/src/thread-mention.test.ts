@@ -74,3 +74,53 @@ test('thread mention classifies Remote preflight errors without logging their me
   assert.equal(JSON.stringify(diagnostic).includes(arityFailure.message), false)
   assert.equal(ThreadMentionModel.classifyThreadMentionFailure(new Error('client api: candidates has no active Connection')), 'connection-unavailable')
 })
+
+test('thread mention insert requests carry the composer they address', () => {
+  assert.deepEqual(ThreadMentionModel.decodeThreadMentionInsertRequest({ sessionId: 'target' }), { sessionId: 'target' })
+  assert.deepEqual(ThreadMentionModel.decodeThreadMentionInsertRequest({ sessionId: 'target', hostSessionId: 'host' }), {
+    sessionId: 'target',
+    hostSessionId: 'host',
+  })
+  assert.equal(ThreadMentionModel.decodeThreadMentionInsertRequest({ sessionId: 'target', hostSessionId: '' }), null)
+  assert.equal(ThreadMentionModel.decodeThreadMentionInsertRequest({ sessionId: 'target', label: 'untrusted' }), null)
+  assert.equal(ThreadMentionModel.decodeThreadMentionInsertRequest('@thread:target'), null)
+})
+
+const dragDataTransfer = () => {
+  const values = new Map<string, string>()
+  return {
+    effectAllowed: 'none',
+    get types(): readonly string[] {
+      return [...values.keys()]
+    },
+    setData: (format: string, value: string): void => {
+      values.set(format, value)
+    },
+    getData: (format: string): string => values.get(format) ?? '',
+  }
+}
+
+test('a dragged thread travels on its own drag type, never as plain text', () => {
+  const dataTransfer = dragDataTransfer()
+
+  ThreadMentionModel.writeThreadMentionDrag(dataTransfer, 'thread-42')
+
+  assert.equal(dataTransfer.effectAllowed, 'copyMove')
+  assert.deepEqual(dataTransfer.types, [ThreadMentionModel.THREAD_MENTION_MIME])
+  assert.equal(dataTransfer.types.includes('text/plain'), false)
+  assert.equal(ThreadMentionModel.hasThreadMentionDrag(dataTransfer), true)
+  assert.equal(ThreadMentionModel.readThreadMentionDrag(dataTransfer), 'thread-42')
+})
+
+test('a drag without a thread payload is ignored, and a malformed one resolves to nothing', () => {
+  const foreign = dragDataTransfer()
+  foreign.setData('text/plain', 'thread-42')
+
+  assert.equal(ThreadMentionModel.hasThreadMentionDrag(foreign), false)
+  assert.equal(ThreadMentionModel.readThreadMentionDrag(foreign), null)
+  assert.equal(ThreadMentionModel.hasThreadMentionDrag(null), false)
+  assert.equal(ThreadMentionModel.readThreadMentionDrag(null), null)
+  assert.equal(ThreadMentionModel.decodeThreadMentionDrag('not json'), null)
+  assert.equal(ThreadMentionModel.decodeThreadMentionDrag(JSON.stringify({ sessionId: '' })), null)
+  assert.equal(ThreadMentionModel.decodeThreadMentionDrag(JSON.stringify({ sessionId: 'thread-42', label: 'untrusted' })), null)
+})

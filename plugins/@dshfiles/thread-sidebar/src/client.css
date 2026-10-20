@@ -1,0 +1,20 @@
+[data-composer-seat][data-dshfiles-mention-target] {
+  border-radius: 16px;
+  outline: 2px dashed var(--dsw-alias-brand-primary);
+  outline-offset: 3px;
+}
+
+.dshfiles-thread-mention-hint {
+  position: fixed;
+  z-index: 90;
+  pointer-events: none;
+  padding: 4px 8px;
+  border: 1px solid var(--dsw-alias-border-l3);
+  border-radius: var(--dsw-radius-md);
+  background: var(--dsw-alias-bg-layer-1);
+  box-shadow: 0 4px 12px rgb(0 0 0 / 0.18);
+  color: var(--dsw-alias-label-primary);
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: nowrap;
+}

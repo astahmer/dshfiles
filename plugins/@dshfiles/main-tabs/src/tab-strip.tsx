@@ -4,6 +4,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { InlineTitleEditor } from '@dshfiles/plugin-ui/components/ui/inline-title-editor'
 import { ChevronDownIcon, CopyIcon, PanelRightOpenIcon, PinIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
+import { requestThreadMentionInsertion, ThreadMentionDrag } from '@dshfiles/thread-sidebar/thread-mention'
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type ReactElement } from 'react'
 import { createPortal } from 'react-dom'
 import type { MainTabsTranslate } from './locales.js'
@@ -297,6 +298,10 @@ export const TabStrip = (props: TabStripProps): ReactElement => {
                   onDragStart={event => {
                     dragged.current = tab.id
                     setAsideDrop(false)
+                    if (tab.kind === 'thread') {
+                      ThreadMentionDrag.write(event.dataTransfer, tab.sessionId)
+                      return
+                    }
                     event.dataTransfer.effectAllowed = 'move'
                     event.dataTransfer.setData('text/plain', tab.title)
                   }}
@@ -375,6 +380,9 @@ export const TabStrip = (props: TabStripProps): ReactElement => {
                 {tab.kind === 'start' && !tab.preview ? null : <ContextMenuSeparator />}
                 {tab.kind === 'thread' ? (
                   <>
+                    <ContextMenuItem onSelect={() => requestThreadMentionInsertion(tab.sessionId, ThreadMentionDrag.activeComposerSessionId())}>
+                      {t('mentionThread')}
+                    </ContextMenuItem>
                     <ContextMenuItem onSelect={() => openAside(tab.sessionId)}>
                       <PanelRightOpenIcon aria-hidden="true" />
                       {t('openInSidePanel')}

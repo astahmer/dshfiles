@@ -5,13 +5,14 @@
     {
       "id": "main-view-tabs",
       "title": "Browser-like tabs above the main view",
-      "summary": "Every thread or global panel shown in the main view opens or focuses a tab above it. The strip looks like DSH's own right-panel tabs (28px pills, hairline separators, a close cross over a faded title end). Tabs close with × or a middle click, reorder by drag, pin to the start, close others or to the right from their context menu, scroll or list in a dropdown when they overflow, and show working, needs-you and unread dots on thread tabs. A thread tab's menu opens that thread in the right side panel — through the cancelable `dshfiles:open-thread-aside` event `@dshfiles/thread-sidebar` answers, with the strip saying the panel is unavailable when no plugin takes it — and dragging a thread tab onto the open side panel moves it there instead: the right column highlights under the pointer, and dropping closes the main tab once the aside took the thread. The aside tab's own menu moves it back through `dshfiles:open-thread`. Thread tabs also copy their ID or a clean deep link, and their menu's Edit title edits the title in place. Opening from outside the strip uses a VS Code-style preview tab by default; double-clicking a sidebar thread keeps its tab open.",
+      "summary": "Every thread or global panel shown in the main view opens or focuses a tab above it. The strip looks like DSH's own right-panel tabs (28px pills, hairline separators, a close cross over a faded title end). Tabs close with × or a middle click, reorder by drag, pin to the start, close others or to the right from their context menu, scroll or list in a dropdown when they overflow, and show working, needs-you and unread dots on thread tabs. A thread tab's menu opens that thread in the right side panel — through the cancelable `dshfiles:open-thread-aside` event `@dshfiles/thread-sidebar` answers, with the strip saying the panel is unavailable when no plugin takes it — and dragging a thread tab onto the open side panel moves it there instead: the right column highlights under the pointer, and dropping closes the main tab once the aside took the thread. The aside tab's own menu moves it back through `dshfiles:open-thread`. Thread tabs also copy their ID or a clean deep link, their menu's Edit title edits the title in place, and their menu can insert that thread into the active composer as a native @mention. A thread tab dragged onto a composer mentions it there instead of reordering: the tab drag carries the thread-mention type rather than plain text, so the editor never receives a stray title. Opening from outside the strip uses a VS Code-style preview tab by default; double-clicking a sidebar thread keeps its tab open.",
       "reach": [
         "seed tool-call-thread",
         "rightclick tab \"*\"",
         "expect menuitem \"Open in side panel\"",
         "expect menuitem \"Copy thread ID\"",
         "expect menuitem \"Copy thread link\"",
+        "expect menuitem \"@Mention thread\"",
         "press Escape",
         "rightclick tab \"*\"",
         "click menuitem \"Edit title\"",
@@ -42,7 +43,7 @@
           "coveredBy": ["main-tabs.panels-and-threads", "main-tabs.machine-unit-preview", "main-tabs.machine-unit-replace"]
         }
       ],
-      "states": ["following", "navigating", "off", "preview", "pinned", "overflowing", "strip-unmounted", "side-panel-unavailable", "renaming"],
+      "states": ["following", "navigating", "off", "preview", "pinned", "overflowing", "strip-unmounted", "side-panel-unavailable", "renaming", "mention-drop"],
       "failureModes": [
         "A tab whose panel plugin is gone stays dimmed until the panel registers again; picking it does nothing.",
         "A navigation the Host never finishes stops being awaited after two seconds.",
@@ -50,7 +51,8 @@
         "Open in side panel leaves the thread alone and the strip announces that the side panel is unavailable there when no plugin offers an aside, and a request with no thread on screen is declined the same way.",
         "Dragging a panel tab over the right column asks its plugin through the cancelable `dshfiles:move-panel-aside` event. A panel whose plugin offers no side-panel view keeps its tab and the strip says so; a panel tab is only moved when its owner cancels the request.",
         "A thread dropped where the aside owner declined the request keeps its main tab and announces the unavailable side panel; dragging where the right sidebar is not mounted highlights nothing.",
-        "If DSH stops rendering the main slot outlet (`[data-slot=\"main\"]`) the strip stays hidden, tabs keep following the main view, and the console warns once at startup; if the strip lands anywhere but directly above the main panel, the console warns too."
+        "If DSH stops rendering the main slot outlet (`[data-slot=\"main\"]`) the strip stays hidden, tabs keep following the main view, and the console warns once at startup; if the strip lands anywhere but directly above the main panel, the console warns too.",
+        "A thread tab dropped outside the active composer leaves the strip alone; a drop on the composer inserts a mention chip and never the tab title as plain text."
       ],
       "externalDependencies": [],
       "verification": [
@@ -262,6 +264,29 @@
           "id": "main-tabs.thread-link-clean",
           "file": "plugins/@dshfiles/main-tabs/src/thread-link.test.ts",
           "testName": "copies a clean thread link with its workspace"
+        },
+        {
+          "kind": "gherkin",
+          "id": "main-tabs.mention-into-composer",
+          "featureFile": "tooling/dshx/e2e/features/main-tabs.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.thread-tab-mention-menu",
+          "file": "plugins/@dshfiles/main-tabs/src/tab-strip.client.test.tsx",
+          "testName": "mentions a thread from its tab menu into the main composer"
+        },
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.panel-tab-mention-omitted",
+          "file": "plugins/@dshfiles/main-tabs/src/tab-strip.client.test.tsx",
+          "testName": "omits the mention action from panel tab menus"
+        },
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.thread-tab-mention-drag",
+          "file": "plugins/@dshfiles/main-tabs/src/tab-strip.client.test.tsx",
+          "testName": "puts a dragged thread tab on the mention drag type and keeps plain text for panel tabs"
         }
       ]
     },

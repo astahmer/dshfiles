@@ -18,6 +18,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { defineClient, hasHostCommandRegistry, runHostCommand } from '@dshfiles/dshx/client'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { ArchivedThreadDock } from './archived-thread-dock.js'
 import { SettledThreadDock } from './settled-thread-dock.js'
 import { SidebarRoot, type FooterSnapshot, type SidebarShellBaseProps } from './sidebar-shell.js'
@@ -40,17 +41,20 @@ import { THREAD_SIDEBAR_LOCALE_NAMESPACE, threadSidebarLocale } from './locales.
 import { SidebarOrganization } from './organization.js'
 import { NAVIGATION_EVENT } from './navigation-history.js'
 import { PALETTE_EVENT } from '@dshfiles/command-palette/api'
+import './client.css'
 import { SettingsTab } from './settings-tab.js'
 import { ThreadNotificationAudioModel } from './thread-notification-audio.js'
 import { createSkillMentionSource } from './skill-mention.js'
 import {
   buildThreadReferenceInsert,
   classifyThreadMentionFailure,
-  decodeThreadMentionSessionId,
+  decodeThreadMentionInsertRequest,
   summarizeThreadMentionFailure,
+  ThreadMentionDrag,
   threadMentionFailureCodeSchema,
   THREAD_MENTION_CAPTURE_EVENT,
   THREAD_MENTION_INSERT_EVENT,
+  THREAD_MENTION_TARGET_ATTRIBUTE,
   type ThreadMentionFailureDiagnosticInput,
 } from './thread-mention.js'
 
@@ -254,22 +258,39 @@ export default defineClient({
       }
     }, 'thread-sidebar: @ skill source')
 
-    const ThreadMentionInput = (props: { readonly inputActions: InputActions; readonly sessionId: SessionSummary['id'] }): null => {
+    const ThreadMentionInput = (props: { readonly inputActions: InputActions; readonly sessionId: SessionSummary['id'] }) => {
       const insertion = useRef<ReturnType<InputActions['captureInsertion']> | null>(null)
       const pending = useRef(new Set<AbortController>())
+      const marker = useRef<HTMLSpanElement | null>(null)
+      const targetSeat = useRef<HTMLElement | null>(null)
+      const [dropHint, setDropHint] = useState<{ readonly top: number; readonly left: number } | null>(null)
 
       useEffect(() => {
+        const pendingControllers = pending.current
         const sessionContext = ctx.sessions.scope(props.sessionId)
         if (sessionContext === undefined) return
         const input = ctx.conversation.input.for(sessionContext)
-        const capture = (): void => {
-          insertion.current = props.inputActions.captureInsertion()
+        const clearDropTarget = (): void => {
+          targetSeat.current?.removeAttribute(THREAD_MENTION_TARGET_ATTRIBUTE)
+          targetSeat.current = null
+          setDropHint(null)
         }
-        const insert = (event: Event): void => {
-          const targetSessionId = event instanceof CustomEvent ? decodeThreadMentionSessionId(event.detail) : null
-          if (targetSessionId === null) return
-          const span = insertion.current ?? props.inputActions.captureInsertion()
-          insertion.current = null
+        const markDropTarget = (seat: HTMLElement | null): void => {
+          if (targetSeat.current === seat) return
+          clearDropTarget()
+          if (seat === null) return
+          targetSeat.current = seat
+          seat.setAttribute(THREAD_MENTION_TARGET_ATTRIBUTE, '')
+          const box = seat.getBoundingClientRect()
+          setDropHint({ top: box.top + 10, left: box.left + 10 })
+        }
+        /** The seat this mounted composer owns, so a thread dropped on an aside's composer never reaches the main one. */
+        const ownSeat = (event: Event): HTMLElement | null => {
+          const target = event.target instanceof Element ? event.target : null
+          const seat = target?.closest<HTMLElement>('[data-composer-seat]') ?? null
+          return seat !== null && marker.current?.closest('[data-composer-seat]') === seat ? seat : null
+        }
+        const insertMention = (targetSessionId: string, span: ReturnType<InputActions['captureInsertion']>, focusAfterInsert = false): void => {
           const controller = new AbortController()
           pending.current.add(controller)
           void (async () => {
@@ -298,7 +319,9 @@ export default defineClient({
               failurePhase = 'insertion-exception'
               if (!input.insertReference(buildThreadReferenceInsert(candidate), span)) {
                 input.notify('info', translate('threadSidebarMentionDraftChanged'))
+                return
               }
+              if (focusAfterInsert) input.focus()
             } catch (failure) {
               if (!controller.signal.aborted) {
                 const parsedFailure = threadMentionFailureCodeSchema.safeParse(failure)
@@ -316,19 +339,92 @@ export default defineClient({
             }
           })()
         }
+        const capture = (): void => {
+          insertion.current = props.inputActions.captureInsertion()
+        }
+        const insert = (event: Event): void => {
+          const request = event instanceof CustomEvent ? decodeThreadMentionInsertRequest(event.detail) : null
+          if (request === null) return
+          if (request.hostSessionId !== undefined && request.hostSessionId !== props.sessionId) return
+          const span = insertion.current ?? props.inputActions.captureInsertion()
+          insertion.current = null
+          insertMention(request.sessionId, span)
+        }
+        const onDragOver = (event: DragEvent): void => {
+          if (!ThreadMentionDrag.has(event.dataTransfer)) return
+          const seat = ownSeat(event)
+          if (seat === null) {
+            clearDropTarget()
+            return
+          }
+          event.preventDefault()
+          if (event.dataTransfer !== null) event.dataTransfer.dropEffect = 'copy'
+          markDropTarget(seat)
+        }
+        const onDragLeave = (event: DragEvent): void => {
+          if (!ThreadMentionDrag.has(event.dataTransfer) || targetSeat.current === null) return
+          const seat = event.target instanceof Element ? event.target.closest<HTMLElement>('[data-composer-seat]') : null
+          if (seat !== targetSeat.current) return
+          const next = event.relatedTarget instanceof Node ? event.relatedTarget : null
+          if (next !== null && targetSeat.current.contains(next)) return
+          clearDropTarget()
+        }
+        const onDrop = (event: DragEvent): void => {
+          if (!ThreadMentionDrag.has(event.dataTransfer)) return
+          const seat = ownSeat(event)
+          if (seat === null) return
+          event.preventDefault()
+          event.stopPropagation()
+          const targetSessionId = ThreadMentionDrag.read(event.dataTransfer)
+          clearDropTarget()
+          if (targetSessionId === null) return
+          insertMention(targetSessionId, props.inputActions.captureInsertion(), true)
+        }
 
         window.addEventListener(THREAD_MENTION_CAPTURE_EVENT, capture)
         window.addEventListener(THREAD_MENTION_INSERT_EVENT, insert)
+        window.addEventListener('dragend', clearDropTarget, true)
+        document.addEventListener('dragover', onDragOver, true)
+        document.addEventListener('dragleave', onDragLeave, true)
+        document.addEventListener('drop', onDrop, true)
         return () => {
           window.removeEventListener(THREAD_MENTION_CAPTURE_EVENT, capture)
           window.removeEventListener(THREAD_MENTION_INSERT_EVENT, insert)
-          for (const controller of pending.current) controller.abort()
-          pending.current.clear()
+          window.removeEventListener('dragend', clearDropTarget, true)
+          document.removeEventListener('dragover', onDragOver, true)
+          document.removeEventListener('dragleave', onDragLeave, true)
+          document.removeEventListener('drop', onDrop, true)
+          clearDropTarget()
+          for (const controller of pendingControllers) controller.abort()
+          pendingControllers.clear()
         }
       }, [props.inputActions, props.sessionId, translate])
 
-      return null
+      return (
+        <>
+          <span ref={marker} hidden data-thread-sidebar-mention-input="" />
+          {dropHint === null
+            ? null
+            : createPortal(
+                <span aria-hidden className="dshfiles-thread-mention-hint" style={{ top: dropHint.top, left: dropHint.left }}>
+                  {translate('threadSidebarDropToMention')}
+                </span>,
+                document.body,
+              )}
+        </>
+      )
     }
+
+    ctx.effect(() => {
+      const onDragStart = (event: DragEvent): void => {
+        const row = event.target instanceof Element ? event.target.closest('[data-thread-main-action][data-thread-id]') : null
+        const sessionId = row?.getAttribute('data-thread-id') ?? ''
+        if (sessionId === '' || event.dataTransfer === null) return
+        ThreadMentionDrag.write(event.dataTransfer, sessionId)
+      }
+      document.addEventListener('dragstart', onDragStart, true)
+      return () => document.removeEventListener('dragstart', onDragStart, true)
+    }, 'thread-sidebar: drag a thread row into the composer')
     const navigationCommands = [
       { id: 'threadSidebar.navigateBack', code: 'BracketLeft', direction: -1, label: 'threadSidebarNavigateBack', aliases: ['back', 'previous thread'] },
       { id: 'threadSidebar.navigateForward', code: 'BracketRight', direction: 1, label: 'threadSidebarNavigateForward', aliases: ['forward', 'next thread'] },

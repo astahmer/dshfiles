@@ -399,6 +399,17 @@ default, and each child persists its direct parent session ID. The configurable
 `subagent.maxDepth` currently defaults to 1, but the lineage model and sidebar
 do not bake in that depth. Change the native Subagent depth setting when deeper
 delegation is desired.
+**Mention a thread.** A row's context menu, a `@dshfiles/main-tabs` thread
+tab's menu, and a drag from either source all insert that thread as the same
+native reference chip in the composer on screen. The drag carries only
+`application/x-dshfiles-thread-mention` (`{ "sessionId": … }`), never plain text,
+so the rich editor cannot paste a stray title: the composer under the pointer
+outlines, a _Drop to mention thread_ hint follows it, and only the composer whose
+own seat received the drop inserts. A drop on a right-panel aside inserts there,
+never in a main composer showing the same thread. The row menu item is
+`@Mention thread`; resolution, unavailable-target and draft-changed outcomes
+notify through the composer instead of touching the draft.
+
 The native `@` reference source already offers recent sessions and searches by
 session ID, title, display label, or workspace path. An empty `@` query is
 limited to the configured recent candidate count (default 50), with

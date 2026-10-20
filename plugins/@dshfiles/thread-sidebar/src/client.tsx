@@ -157,7 +157,7 @@ import {
 } from './thread-view.js'
 import { DEFAULT_THREAD_VIEW_SETTINGS, ThreadViewPreferencesModel, threadViewPreferences, type ThreadViewSettings } from './thread-view-preferences.js'
 import { ThreadViewManager, threadViewPresetLabel } from './thread-view-manager.js'
-import { captureThreadMentionInsertion, requestThreadMentionInsertion } from './thread-mention.js'
+import { captureThreadMentionInsertion, requestThreadMentionInsertion, ThreadMentionDrag } from './thread-mention.js'
 import {
   ThreadNotificationModel,
   legacyNotificationPreferences,
@@ -553,6 +553,7 @@ const ChildThreadList = (props: {
       <li key={child.id}>
         <button
           type="button"
+          draggable
           className={cn(
             lineClass,
             'dshx:data-[selected=true]:bg-accent',
@@ -684,7 +685,9 @@ const ThreadMenuBody = (props: ThreadContextMenuProps): JSX.Element => {
   }
   return (
     <>
-      <ContextMenuItem onSelect={() => requestThreadMentionInsertion(session.id)}>{t('threadSidebarInsertMention')}</ContextMenuItem>
+      <ContextMenuItem onSelect={() => requestThreadMentionInsertion(session.id, ThreadMentionDrag.activeComposerSessionId())}>
+        {t('threadSidebarInsertMention')}
+      </ContextMenuItem>
       <ContextMenuItem onSelect={() => props.actions.beginRename(session.id)}>{t('threadSidebarRenameThread')}</ContextMenuItem>
       <ContextMenuSeparator />
       <ContextMenuItem onSelect={() => void props.actions.copy(session.id, t('threadSidebarIdCopied'))}>{t('threadSidebarCopyId')}</ContextMenuItem>
@@ -966,6 +969,7 @@ const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
           ) : (
             <button
               type="button"
+              draggable
               className={cn(
                 'dshx:flex dshx:w-full dshx:min-w-0 dshx:flex-col dshx:rounded-md dshx:text-left dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50 dshx:disabled:cursor-default',
                 compact ? 'dshx:gap-0.5 dshx:px-2 dshx:py-1.5' : 'dshx:gap-1 dshx:px-2.5 dshx:py-2.5',

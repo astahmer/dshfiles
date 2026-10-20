@@ -78,6 +78,16 @@ Feature: Main view tabs
     When the moved aside tab's menu moves that thread to the main area
     Then the thread is a main tab again and the side panel dropped its tab
 
+  @scenario:main-tabs.mention-into-composer
+  Scenario: Mentioning a thread into the composer from its tab menu and by dragging it there
+    Given the isolated plugin composition of "@dshfiles/main-tabs, @dshfiles/thread-sidebar" is booted
+    When a thread tab is mentioned from its context menu
+    Then its native mention chip joins the composer draft
+    When the mentioned thread is dragged from its sidebar row into the composer
+    Then a second mention chip joins the draft
+    When the mentioned thread's tab is dragged into the composer
+    Then a third mention chip joins the draft
+
   @scenario:main-tabs.move-panel-between-panels
   Scenario: A panel tab moves into the side panel and back to the main view
     Given the isolated plugin composition of "@dshfiles/main-tabs, @dshfiles/workbench, @dshfiles/jujutsu" is booted

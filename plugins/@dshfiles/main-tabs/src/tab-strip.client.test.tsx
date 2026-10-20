@@ -4,10 +4,12 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import type { MainTabsTranslate } from './locales.js'
 import { OPEN_THREAD_ASIDE_EVENT } from './thread-aside.js'
 import { PANEL_ASIDE_EVENT } from './panel-aside.js'
+import { THREAD_MENTION_INSERT_EVENT, ThreadMentionDrag } from '@dshfiles/thread-sidebar/thread-mention'
 import { TabStrip, type TabView } from './tab-strip.js'
 import type { TabsEvent } from './tabs-machine.js'
 
 const labels = {
+  mentionThread: '@Mention thread',
   closeTab: 'Close tab',
   copyThreadId: 'Copy thread ID',
   copyThreadLink: 'Copy thread link',
@@ -178,6 +180,69 @@ describe('TabStrip thread actions', () => {
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Copy thread ID' }))
 
     await waitFor(() => expect(screen.getByRole('status').textContent).toBe('Could not access the clipboard.'))
+  })
+})
+
+describe('TabStrip thread mentions', () => {
+  it('mentions a thread from its tab menu into the main composer', async () => {
+    const requests: unknown[] = []
+    const onMention = (event: Event): void => {
+      requests.push(event instanceof CustomEvent ? event.detail : undefined)
+    }
+    window.addEventListener(THREAD_MENTION_INSERT_EVENT, onMention)
+    const host = document.createElement('div')
+    host.setAttribute('data-conversation-session', 'thread-9')
+    const seat = document.createElement('div')
+    seat.setAttribute('data-composer-seat', '')
+    host.append(seat)
+    document.body.append(host)
+    mount()
+
+    openContextMenu(screen.getByRole('tab', { name: 'Thread, Working' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: '@Mention thread' }))
+
+    expect(requests).toEqual([{ sessionId: 'thread-1', hostSessionId: 'thread-9' }])
+    window.removeEventListener(THREAD_MENTION_INSERT_EVENT, onMention)
+  })
+
+  it('omits the mention action from panel tab menus', async () => {
+    mount()
+
+    openContextMenu(screen.getByRole('tab', { name: 'Workbench' }))
+    await screen.findByRole('menuitem', { name: 'Close tab' })
+    expect(screen.queryByRole('menuitem', { name: '@Mention thread' })).toBeNull()
+  })
+
+  it('puts a dragged thread tab on the mention drag type and keeps plain text for panel tabs', () => {
+    const stored = new Map<string, string>()
+    const transfer = {
+      effectAllowed: 'none',
+      get types(): readonly string[] {
+        return [...stored.keys()]
+      },
+      setData: (format: string, value: string): void => {
+        stored.set(format, value)
+      },
+      getData: (format: string): string => stored.get(format) ?? '',
+    }
+    const dragEventWith = (type: string): Event => {
+      const event = new Event(type, { bubbles: true, cancelable: true })
+      Object.defineProperty(event, 'dataTransfer', { value: transfer })
+      return event
+    }
+    mount()
+
+    screen.getByRole('tab', { name: 'Thread, Working' }).dispatchEvent(dragEventWith('dragstart'))
+    expect(ThreadMentionDrag.read(transfer)).toBe('thread-1')
+    expect(stored.has('text/plain')).toBe(false)
+    expect(transfer.effectAllowed).toBe('copyMove')
+
+    stored.clear()
+    transfer.effectAllowed = 'none'
+    screen.getByRole('tab', { name: 'Workbench' }).dispatchEvent(dragEventWith('dragstart'))
+    expect(ThreadMentionDrag.read(transfer)).toBeNull()
+    expect(stored.get('text/plain')).toBe('Workbench')
+    expect(transfer.effectAllowed).toBe('move')
   })
 })
 

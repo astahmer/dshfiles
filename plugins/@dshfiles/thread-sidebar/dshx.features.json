@@ -333,7 +333,7 @@
       ],
       "failureModes": [
         "Working and not-working status matching uses session activity plus attention, archive, and mute state; source filters use parentId and origin.",
-        "Saved view IDs and names must be unique; at least one of 1\u201312 presets must remain enabled."
+        "Saved view IDs and names must be unique; at least one of 1–12 presets must remain enabled."
       ],
       "externalDependencies": [],
       "verification": [
@@ -731,7 +731,7 @@
       "states": ["read", "manual-unread"],
       "failureModes": [
         "The Host stores the mark for the whole user, so every open tab, plugin and CLI reads the same unread state.",
-        "Opening a thread drops its whole attention record without touching another thread\u2019s record.",
+        "Opening a thread drops its whole attention record without touching another thread’s record.",
         "The Host still holds the record after a DSH restart, while a failed migration keeps the browser copy for a retry."
       ],
       "externalDependencies": [],
@@ -1474,8 +1474,8 @@
     },
     {
       "id": "thread-reference-mention",
-      "title": "Insert cross-session references into the composer",
-      "summary": "Resolve a target Host session and insert its native reference chip at the active composer\u2019s captured selection.",
+      "title": "Mention another thread from its row, its tab, or a drag into the composer",
+      "summary": "Resolve a target Host session and insert its native reference chip at the active composer's caret, from the sidebar row menu, from a main-view tab's menu, or by dragging a thread row or thread tab and dropping it on a composer. A drag carries only the plugin's own thread-mention type, so a rich editor never receives stray plain text; the composer under the pointer outlines and shows a drop hint, and only that composer inserts. Resolving, unavailable, and draft-changed outcomes surface as notices instead of changing the draft.",
       "reach": [
         "click button \"All threads\"",
         "click button \"New thread\"",
@@ -1492,8 +1492,13 @@
       ],
       "surfaces": ["client", "host", "integration"],
       "configuration": [],
-      "states": ["captured", "resolving", "inserted", "unavailable", "failed"],
-      "failureModes": ["Unresolvable targets and canceled requests never change the draft.", "Error diagnostics expose only bounded, non-sensitive fields."],
+      "states": ["idle", "dragging", "captured", "resolving", "inserted", "unavailable", "failed"],
+      "failureModes": [
+        "Unresolvable targets and canceled requests never change the draft.",
+        "Error diagnostics expose only bounded, non-sensitive fields.",
+        "A drop on an aside composer inserts there, never in the main composer showing the same thread.",
+        "A drag without the thread-mention payload is ignored, and a malformed payload inserts nothing."
+      ],
       "externalDependencies": [],
       "verification": [
         {
@@ -1524,6 +1529,35 @@
           "id": "thread-sidebar.thread-reference-mention-unit-classified-diagnostics",
           "file": "plugins/@dshfiles/thread-sidebar/src/thread-mention.test.ts",
           "testName": "thread mention classifies Remote preflight errors without logging their messages"
+        },
+        {
+          "kind": "gherkin",
+          "id": "main-tabs.mention-into-composer",
+          "featureFile": "tooling/dshx/e2e/features/main-tabs.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.thread-reference-mention-unit-drag-payload",
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-mention.test.ts",
+          "testName": "a dragged thread travels on its own drag type, never as plain text"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.thread-reference-mention-unit-drag-ignored",
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-mention.test.ts",
+          "testName": "a drag without a thread payload is ignored, and a malformed one resolves to nothing"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.thread-reference-mention-unit-address-request",
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-mention.test.ts",
+          "testName": "thread mention insert requests carry the composer they address"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.thread-reference-mention-unit-main-composer",
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-mention-dom.test.ts",
+          "testName": "the main composer session ignores an aside conversation on screen beside it"
         }
       ]
     },

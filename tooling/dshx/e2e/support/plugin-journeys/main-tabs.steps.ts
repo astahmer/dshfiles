@@ -469,3 +469,60 @@ Then('Settings opens and the Start tab is gone', async ({ page }: { page: Page }
   })
   await finishJourneyAssertions(page)
 })
+
+interface MentionJourney {
+  readonly threadId: string
+}
+
+const mentionJourneys = new WeakMap<Page, MentionJourney>()
+
+const mentionComposer = (page: Page) => page.getByRole('textbox').first()
+const mentionChips = (page: Page) => mentionComposer(page).locator('[data-composer-chip="reference"]')
+
+When('a thread tab is mentioned from its context menu', async ({ page }: { page: Page }) => {
+  const threadId = await startSidebarThread(page, 'mention target thread')
+  // Keep the target's preview tab so it survives starting the thread that receives the mention.
+  await threadTab(page, threadId).dblclick()
+  await expect(threadTab(page, threadId)).not.toHaveAttribute('data-preview')
+  await startSidebarThread(page, 'mention host thread')
+  await threadTab(page, threadId).click({ button: 'right' })
+  const mentionItem = page.getByRole('menuitem', { name: '@Mention thread', exact: true })
+  await expect(mentionItem).toBeVisible()
+  await mentionItem.click()
+  mentionJourneys.set(page, { threadId })
+})
+
+Then('its native mention chip joins the composer draft', async ({ page }: { page: Page }) => {
+  if (mentionJourneys.get(page) === undefined) throw new Error('No thread mention journey was recorded for this browser page.')
+  await recordAssertion(page, 'main-tabs-thread-tab-menu-mentions-into-the-composer', async () => {
+    await expect(mentionChips(page)).toHaveCount(1, { timeout: 15_000 })
+  })
+})
+
+When('the mentioned thread is dragged from its sidebar row into the composer', async ({ page }: { page: Page }) => {
+  const journey = mentionJourneys.get(page)
+  if (journey === undefined) throw new Error('No thread mention journey was recorded for this browser page.')
+  // The hover action strip covers the row's right half, so grab the trigger from the left a reader would use.
+  await sidebarThreadRow(page, journey.threadId)
+    .locator(':scope > div > button')
+    .first()
+    .dragTo(mentionComposer(page), { sourcePosition: { x: 24, y: 16 } })
+})
+
+Then('a second mention chip joins the draft', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'main-tabs-dragging-a-thread-row-mentions-into-the-composer', async () => {
+    await expect(mentionChips(page)).toHaveCount(2, { timeout: 15_000 })
+  })
+})
+
+When("the mentioned thread's tab is dragged into the composer", async ({ page }: { page: Page }) => {
+  const journey = mentionJourneys.get(page)
+  if (journey === undefined) throw new Error('No thread mention journey was recorded for this browser page.')
+  await threadTab(page, journey.threadId).dragTo(mentionComposer(page))
+})
+
+Then('a third mention chip joins the draft', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'main-tabs-dragging-a-thread-tab-mentions-into-the-composer', async () => {
+    await expect(mentionChips(page)).toHaveCount(3, { timeout: 15_000 })
+  })
+})

@@ -93,6 +93,7 @@ export const UsageLimitSection = <Thread extends UsageLimitThread>(props: UsageL
             key={row.continuation.continuationId}
           >
             <button
+              draggable
               className="dshx:min-w-0 dshx:flex-1 dshx:text-left"
               data-thread-id={row.session.id}
               data-thread-main-action=""

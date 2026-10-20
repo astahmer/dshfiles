@@ -24,6 +24,10 @@
     "./snapshots": {
       "types": "./src/snapshots.ts",
       "default": "./dist/snapshots.js"
+    },
+    "./thread-mention": {
+      "types": "./src/thread-mention.ts",
+      "default": "./dist/thread-mention.js"
     }
   },
   "scripts": {
