@@ -36,7 +36,7 @@ node ~/dev/dshfiles/scripts/dsh-lkg/cli.mjs snapshot [--label <text>] [--if-chan
 node ~/dev/dshfiles/scripts/dsh-lkg/cli.mjs list
 node ~/dev/dshfiles/scripts/dsh-lkg/cli.mjs verify [<id>|current] [--turn] [--turn-model <provider/model>]
 node ~/dev/dshfiles/scripts/dsh-lkg/cli.mjs upgrade <version> [--turn-model <provider/model>]
-node ~/dev/dshfiles/scripts/dsh-lkg/cli.mjs reap [--keep 3]
+node ~/dev/dshfiles/scripts/dsh-lkg/cli.mjs reap [--keep 0]
 node ~/dev/dshfiles/scripts/dsh-lkg/cli.mjs remove <id>
 node ~/dev/dshfiles/scripts/dsh-lkg/cli.mjs unlock <id>
 ```
@@ -79,7 +79,7 @@ link to (dshx under `tooling/`), so bare imports hoisted to the root resolve.
 
 A failed candidate is deleted (kept as `versions/.<id>.failed` with
 `DSH_LKG_KEEP_FAILED=1`) and its Host output is written to
-`logs/health-<id>.log`; the previous known-good snapshot stays current. `reap` keeps the newest three plus whatever `current` points at.
+`logs/health-<id>.log`; the previous known-good snapshot stays current. Only `current` is kept: every promotion reaps the versions before it and any staging tree a crashed snapshot left behind, since recovery only ever goes back to the last known good. `reap --keep <n>` keeps the newest `n` besides `current`.
 
 ## Upgrading DSH
 

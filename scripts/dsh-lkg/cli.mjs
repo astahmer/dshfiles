@@ -40,7 +40,10 @@ const VERSIONS = join(STORE, 'versions')
 const STATE = join(STORE, 'state')
 const LOGS = join(STORE, 'logs')
 const CURRENT = join(STORE, 'current')
-const DEFAULT_KEEP = 3
+/** Versions kept besides `current`: recovery only ever goes back to the last known good, never n-2. */
+const DEFAULT_KEEP = 0
+/** A staging tree older than this belongs to no running snapshot. */
+const STALE_STAGING_MS = 60 * 60_000
 const HEALTH_TIMEOUT_MS = 90_000
 const CLIENT_SETTLE_MS = 45_000
 const TURN_TIMEOUT_MS = 180_000
@@ -735,6 +738,7 @@ const snapshot = async ({ label, ifChanged = false, candidateGlobal, turn } = {}
   symlinkSync(final, link)
   renameSync(link, CURRENT)
   log(`dsh-lkg: promoted ${id}; dsh-recover is ${launcher}`)
+  reapVersions(DEFAULT_KEEP)
   return { id, health }
 }
 
@@ -825,9 +829,13 @@ const verify = async (target, { turn } = {}) => {
 
 const reap = keep => {
   requireOperator()
+  reapVersions(keep)
+}
+
+const reapVersions = keep => {
   const current = currentVersionId()
   const ids = versionIds()
-  const keepIds = new Set(ids.slice(-keep))
+  const keepIds = new Set(keep > 0 ? ids.slice(-keep) : [])
   if (current !== undefined) keepIds.add(current)
   for (const id of ids) {
     if (keepIds.has(id)) continue
@@ -835,6 +843,13 @@ const reap = keep => {
     thawed(root)
     rmSync(root, { recursive: true, force: true })
     log(`dsh-lkg: removed ${id}`)
+  }
+  for (const name of readdirSync(VERSIONS).filter(entry => entry.startsWith('.') && entry.endsWith('.staging'))) {
+    const staging = join(VERSIONS, name)
+    if (Date.now() - statSync(staging).mtimeMs < STALE_STAGING_MS) continue
+    thawed(staging)
+    rmSync(staging, { recursive: true, force: true })
+    log(`dsh-lkg: removed abandoned ${name}`)
   }
 }
 
