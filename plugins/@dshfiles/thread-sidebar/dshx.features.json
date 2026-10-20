@@ -73,7 +73,7 @@
         {
           "key": "parkedSessionIds",
           "defaultValue": "[]",
-          "constraints": "Parked session IDs in sidebar preferences; not updated through Host session attention.",
+          "constraints": "Parked session IDs in sidebar preferences; settling a session drops its parked mark in the same write. Not updated through Host session attention.",
           "coveredBy": ["thread-sidebar.classification"]
         },
         {

@@ -40,6 +40,29 @@ const unsettle = (status: SettledStatus, sessionIds: readonly string[]): Settled
   return { settledSessionIds, settledAt: withOnlySettledIds(status.settledAt, settledSessionIds) }
 }
 
+export interface SettleAndUnparkInput {
+  readonly status: SettledStatus
+  readonly parkedSessionIds: readonly string[]
+  readonly sessionIds: readonly string[]
+  readonly now: number
+}
+
+export interface SettledPreferences extends SettledStatus {
+  readonly parkedSessionIds: string[]
+}
+
+/**
+ * Settling a thread drops its parked mark in the same write. Park means "not now" and settle means
+ * "nothing wakes it"; a settled thread belongs in Settled, never in Parked, so the two cannot hold
+ * the same id. Unsettling leaves park alone instead of restoring a mark this settle removed.
+ */
+const settleAndUnpark = (input: SettleAndUnparkInput): SettledPreferences => {
+  const settled = settle(input.status, input.sessionIds, input.now)
+  if (input.sessionIds.length === 0) return { ...settled, parkedSessionIds: [...input.parkedSessionIds] }
+  const targets = new Set(input.sessionIds)
+  return { ...settled, parkedSessionIds: input.parkedSessionIds.filter(sessionId => !targets.has(sessionId)) }
+}
+
 /** When the sidebar will archive a settled thread, or undefined while no delay will do it. */
 const archiveTime = (input: { readonly settledAt: number | undefined; readonly delayMs: number }): number | undefined =>
   input.settledAt === undefined || !Number.isFinite(input.delayMs) ? undefined : input.settledAt + input.delayMs
@@ -72,6 +95,7 @@ const dueArchiveSessionIds = (input: {
 
 export class SettledThreadsModel {
   static readonly settle = settle
+  static readonly settleAndUnpark = settleAndUnpark
   static readonly unsettle = unsettle
   static readonly archiveTime = archiveTime
   static readonly dueArchiveSessionIds = dueArchiveSessionIds

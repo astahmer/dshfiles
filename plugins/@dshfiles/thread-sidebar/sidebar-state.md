@@ -22,7 +22,9 @@ running. Working is not an unread or attention state.
 **Active** is a status section, not a synonym for Working. Archived, Pinned,
 and Settled sections take precedence. Otherwise, running threads are Active;
 non-running Parked threads are Parked; the rest remain Active until the idle
-threshold. By default, a non-running thread becomes Inactive after two hours.
+threshold. Settling a thread clears its parked mark in the same write, so a
+settled thread is never also Parked. By default, a non-running thread becomes
+Inactive after two hours.
 
 **Settled** is this plugin's own status, not DSH's archive: the thread stays
 listed and openable, but the Host refuses the model steps it proposes until it

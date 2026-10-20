@@ -26,6 +26,32 @@ describe('SettledThreadsModel.settle', () => {
   })
 })
 
+describe('SettledThreadsModel.settleAndUnpark', () => {
+  const status = { settledSessionIds: [], settledAt: {} }
+
+  it('settles a parked thread and drops its parked mark in the same write', () => {
+    expect(
+      SettledThreadsModel.settleAndUnpark({
+        status,
+        parkedSessionIds: ['session-a', 'session-b'],
+        sessionIds: ['session-a'],
+        now: 1_000,
+      }),
+    ).toEqual({ settledSessionIds: ['session-a'], settledAt: { 'session-a': 1_000 }, parkedSessionIds: ['session-b'] })
+  })
+
+  it('leaves other parked ids alone and never restores a mark on unsettle', () => {
+    const settled = SettledThreadsModel.settleAndUnpark({ status, parkedSessionIds: ['session-a'], sessionIds: ['session-a'], now: 1_000 })
+    expect(settled.parkedSessionIds).toEqual([])
+    expect(SettledThreadsModel.unsettle(settled, ['session-a'])).toEqual({ settledSessionIds: [], settledAt: {} })
+  })
+
+  it('ignores an empty settle and keeps parked ids as they are', () => {
+    const result = SettledThreadsModel.settleAndUnpark({ status, parkedSessionIds: ['session-a'], sessionIds: [], now: 1_000 })
+    expect(result).toEqual({ settledSessionIds: [], settledAt: {}, parkedSessionIds: ['session-a'] })
+  })
+})
+
 describe('SettledThreadsModel.archiveTime', () => {
   it('adds the delay to the settle instant and stays undefined without either', () => {
     expect(SettledThreadsModel.archiveTime({ settledAt: 1_000, delayMs: 60_000 })).toBe(61_000)

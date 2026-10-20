@@ -281,7 +281,8 @@ its alerts still fire and it still runs steps when something wakes it. Settle
 goes further: the thread moves to the Settled section and runs no step at all
 until it is unsettled, while staying listed and openable. Mute keeps the thread where it is and only silences it, for
 a while or for good. They answer different questions ("not now" vs "not
-noisy"), so they stay separate and combine freely. The sidebar separates **Approval needed**,
+noisy"), so they stay separate: settling a parked thread drops its parked
+mark, and unsettling does not bring that mark back. The sidebar separates **Approval needed**,
 **Input needed**, **Turn finished**, **Interrupted**, and **Needs resume**.
 Permission approvals and plan-review decisions use **Approval needed**;
 structured user-question requests use **Input needed**. Open questions use the

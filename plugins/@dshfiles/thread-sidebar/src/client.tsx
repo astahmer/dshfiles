@@ -137,7 +137,7 @@ import { EMPTY_THREAD_SELECTION, THREAD_MAIN_BUTTON_SELECTOR, ThreadSelectionMod
 import { workingThreadIds } from './working-threads.js'
 import { indexRebasedThreadSessions } from './rebased-threads.js'
 import { indexQueuedIntegrationSessions } from './queued-integrations.js'
-import { SettledThreadsModel, type SettledSessionState } from './settled-threads.js'
+import { SettledThreadsModel, type SettledPreferences, type SettledSessionState } from './settled-threads.js'
 import { answerSettleRequests } from './settle-request.js'
 import { THREAD_DELAYS, threadDelayMs, type ThreadDelay } from './thread-delays.js'
 import { useAutoArchive, type AutoArchiveClient } from './auto-archive-machine.js'
@@ -1991,6 +1991,15 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     setThreadSelection(EMPTY_THREAD_SELECTION)
   }
 
+  /** Settling also clears the parked mark, so one write carries both fields. */
+  const settlePreferences = (sessionIds: readonly string[]): SettledPreferences =>
+    SettledThreadsModel.settleAndUnpark({
+      status: { settledSessionIds: preferences.settledSessionIds, settledAt: preferences.settledAt },
+      parkedSessionIds: preferences.parkedSessionIds,
+      sessionIds,
+      now: Date.now(),
+    })
+
   const batchSetSettled = (settle: boolean): void => {
     const targetIds = batchTargetIds()
     if (targetIds.length === 0) return
@@ -2010,7 +2019,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       setNotice({ tone: 'warning', message: props.tSidebar('threadSidebarRunningNotice') })
       return
     }
-    changePreferences(SettledThreadsModel.settle(status, unsettledTargets, Date.now()))
+    changePreferences(settlePreferences(unsettledTargets))
     setNotice({ tone: 'success', message: props.tSidebar('threadSidebarSettledNotice') })
     setThreadSelection(EMPTY_THREAD_SELECTION)
   }
@@ -2141,8 +2150,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   /** One Settings write per scan rather than one per thread; the status is ours, not a Host verb. */
   const settleSessions = (sessionIds: readonly string[]): void => {
     if (sessionIds.length === 0) return
-    const status = { settledSessionIds: preferences.settledSessionIds, settledAt: preferences.settledAt }
-    changePreferences(SettledThreadsModel.settle(status, sessionIds, Date.now()))
+    changePreferences(settlePreferences(sessionIds))
   }
 
   const applySettled = (sessionId: SessionSummary['id'], shouldSettle: boolean): void => {
@@ -2156,7 +2164,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       cascadeToChildren: preferences.applyActionsToChildThreads,
     })
     const status = { settledSessionIds: preferences.settledSessionIds, settledAt: preferences.settledAt }
-    changePreferences(shouldSettle ? SettledThreadsModel.settle(status, targets, Date.now()) : SettledThreadsModel.unsettle(status, targets))
+    changePreferences(shouldSettle ? settlePreferences(targets) : SettledThreadsModel.unsettle(status, targets))
     setNotice(shouldSettle ? { tone: 'success', message: props.tSidebar('threadSidebarSettledNotice') } : null)
   }
 

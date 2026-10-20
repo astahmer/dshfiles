@@ -161,7 +161,8 @@ export const threadSidebarSettings = defineSettings({
 })
 
 let readSettledStatus: (() => SettledStatus) | undefined
-let writeSettledStatus: ((next: SettledStatus) => Promise<void>) | undefined
+let readParkedSessionIds: (() => readonly string[]) | undefined
+let writeSettledStatus: ((next: SettledStatus, parkedSessionIds?: readonly string[]) => Promise<void>) | undefined
 
 /**
  * The Host half of the namespace. It remembers its live scope so the settled-thread gate and the Agent's
@@ -170,14 +171,21 @@ let writeSettledStatus: ((next: SettledStatus) => Promise<void>) | undefined
 export const threadSidebarHostSettings = threadSidebarSettings.host({
   setup: scope => {
     const read = (): SettledStatus => ({ settledSessionIds: scope.get().settledSessionIds, settledAt: scope.get().settledAt })
-    const write = async (next: SettledStatus): Promise<void> => {
-      await scope.update({ settledSessionIds: [...next.settledSessionIds], settledAt: { ...next.settledAt } })
+    const readParked = (): readonly string[] => scope.get().parkedSessionIds
+    const write = async (next: SettledStatus, parkedSessionIds?: readonly string[]): Promise<void> => {
+      await scope.update({
+        settledSessionIds: [...next.settledSessionIds],
+        settledAt: { ...next.settledAt },
+        ...(parkedSessionIds === undefined ? undefined : { parkedSessionIds: [...parkedSessionIds] }),
+      })
     }
     readSettledStatus = read
+    readParkedSessionIds = readParked
     writeSettledStatus = write
     return () => {
       if (readSettledStatus !== read) return
       readSettledStatus = undefined
+      readParkedSessionIds = undefined
       writeSettledStatus = undefined
     }
   },
@@ -194,11 +202,21 @@ export const settledSessionIdsFromHost = (): readonly string[] => {
 
 /** Add or drop one settled Session id, returning the ids the Host now holds. */
 export const setSessionSettled = async (sessionId: string, settled: boolean): Promise<readonly string[]> => {
-  if (readSettledStatus === undefined || writeSettledStatus === undefined) {
+  if (readSettledStatus === undefined || readParkedSessionIds === undefined || writeSettledStatus === undefined) {
     throw new Error('The thread-sidebar settings namespace is unavailable on this Host.')
   }
   const current = readSettledStatus()
-  const next = settled ? SettledThreadsModel.settle(current, [sessionId], Date.now()) : SettledThreadsModel.unsettle(current, [sessionId])
-  await writeSettledStatus(next)
+  if (!settled) {
+    const next = SettledThreadsModel.unsettle(current, [sessionId])
+    await writeSettledStatus(next)
+    return next.settledSessionIds
+  }
+  const next = SettledThreadsModel.settleAndUnpark({
+    status: current,
+    parkedSessionIds: readParkedSessionIds(),
+    sessionIds: [sessionId],
+    now: Date.now(),
+  })
+  await writeSettledStatus(next, next.parkedSessionIds)
   return next.settledSessionIds
 }
