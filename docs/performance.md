@@ -87,6 +87,19 @@ processes (agents' bash calls and the `jujutsu` per-workspace `jj log` fan-out o
 per 20–30 s) and session-log probes. The response is automatic: leaked scratch instances stop after an idle lease
 (dshx), and idle thread workspaces are cleaned up on a schedule (`@dshfiles/jj-integration`).
 
+### The session list that "took 150 s"
+
+The same day, a read-only `dshx sessions list --json` on the live Host measured 150 493 ms and 241 937 ms, which made
+every thread workspace read as `activity-unknown` and stopped the automatic cleanup from removing anything. It was the
+same machine, not the code: the identical call is **0.56–0.79 s** on the rebooted Host at load 8–12, and the cleanup
+preview then resolved every Session (`Skipped 43: 35 too-recent, 4 has-work, 4 busy` — no `activity-unknown`), because
+it reads activity in-process with no 3.7 MB payload behind it. A 190x swing follows the load, not the code.
+
+The payload is still worth knowing: 1140 Sessions, 3.7 MB compact (7.3 MB pretty), of which 3.4 MB is projections no
+list consumer needs to fold for every row — `aiAccountsCost` 1.0 MB, `turnOutline` 666 KB, `imageLimits` 224 KB,
+`modelSelection` 145 KB, `sessionStats` 131 KB. `SessionListRequest` has no projection selector, so every caller pays
+for all of them: a per-consumer selector is the next real win here, not a different list algorithm.
+
 ## Still open
 
 - Loading older history in a cold thread (scrolling up past the opening window) and the first command still read the
