@@ -33,6 +33,7 @@ import { THREAD_ASIDE_CONVERSATION_SLOT, THREAD_ASIDE_ID, THREAD_ASIDE_KIND, thr
 import { OPEN_THREAD_ASIDE_EVENT, readThreadAsideRequest } from './thread-aside-request.js'
 import type { SubagentAddress } from '@deepseek-ai/dsh-subagent/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
+import { HoverPrefetch } from './hover-prefetch.js'
 import { sidebarChildren } from './sidebar-contract.js'
 import { THREAD_SIDEBAR_LOCALE_NAMESPACE, threadSidebarLocale } from './locales.js'
 import { SidebarOrganization } from './organization.js'
@@ -209,6 +210,23 @@ export default defineClient({
       }
     }
     ctx.effect(watchNativeSearchRequests, 'thread-sidebar: native session search')
+    ctx.effect(
+      () =>
+        HoverPrefetch.install({
+          root: document,
+          rowIdOf: event =>
+            event.target instanceof Element
+              ? (event.target.closest('[data-thread-main-action][data-thread-id]')?.getAttribute('data-thread-id') ?? null)
+              : null,
+          warm: threadId => {
+            // Only a thread this Host lists: remote-host rows carry ids the local session controller does not own.
+            const session = Object.values(ctx.sessions.list.getSnapshot().byId).find(candidate => candidate?.id === threadId)
+            if (session === undefined) return
+            void ctx.remote.session.page({ address: { kind: 'session', sessionId: session.id }, throughSeq: -1, maxMessages: 1 }).catch(() => undefined)
+          },
+        }),
+      'thread-sidebar: warm a hovered thread',
+    )
 
     const isShortcutCommandId = (value: string): value is ShortcutCommandId => /^[a-z][a-zA-Z0-9-]*(?:\.[a-zA-Z][a-zA-Z0-9-]*)+$/u.test(value)
     const translate = ctx.locale.bind(THREAD_SIDEBAR_LOCALE_NAMESPACE)
