@@ -737,7 +737,6 @@ export default defineClient({
       if (deferred && move !== undefined) {
         // A New thread isolates on its first send. The send runs on its own and moves only its draft, so another New
         // thread opened meanwhile, or a second thread sent before this one lands, keeps its own composer and move.
-        workspaceToggle.send({ type: 'claim', sessionId })
         let request = move.request
         const files = DraftAttachmentCarry.filesOf(ctx.conversation, state.attachmentIds)
         // Keep the source registered while the send runs, so its draft survives the user opening another thread.
@@ -777,6 +776,9 @@ export default defineClient({
           changedMessage: translate('workspaceSendChanged'),
           signal: controller.signal,
         })
+          .then(outcome => {
+            if (outcome === 'sent' || outcome === 'kept') workspaceToggle.send({ type: 'claim', sessionId })
+          })
           .catch(() => source.input.notify('error', translate('workspaceSendFailed')))
           .finally(() => {
             sourceHeld.release()

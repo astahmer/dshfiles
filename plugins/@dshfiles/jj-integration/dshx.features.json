@@ -8,10 +8,6 @@
       "summary": "Above a new thread's composer: pick the folder (or none), the jj bookmark it starts from, and whether it gets its own jj workspace beside the repository; unsent drafts, attachments, and structured references follow workspace changes.",
       "reach": [
         "click button \"New thread\"",
-        "click button \"Choose workspace\"",
-        "fill textbox \"Search projects or enter a folder path\" \"sample\"",
-        "expect option \"sample*\"",
-        "press Enter",
         "expect button \"main\"",
         "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Keep this draft\"",
         "attach \"tooling/dshx/e2e/fixtures/attachments/red.png\"",
@@ -146,7 +142,8 @@
       "states": ["previous-thread-workspace", "project-checkout"],
       "failureModes": [
         "With isolation off, a blank new thread retains its previous thread workspace instead of returning to its owning project checkout.",
-        "With isolation on, a blank thread reuses its previous thread workspace as its own destination on the first send instead of getting a fresh one."
+        "With isolation on, a blank thread reuses its previous thread workspace as its own destination on the first send instead of getting a fresh one.",
+        "A failed destination lookup drops the deferred move, so a later Send can escape into the inherited workspace."
       ],
       "externalDependencies": [
         {
@@ -164,6 +161,11 @@
         {
           "kind": "gherkin",
           "id": "jj-integration.new-thread-from-thread-workspace-isolation-browser-journey",
+          "featureFile": "tooling/dshx/e2e/features/jj-integration.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "jj-integration.failed-destination-retry-browser-journey",
           "featureFile": "tooling/dshx/e2e/features/jj-integration.feature"
         },
         {
@@ -189,6 +191,18 @@
           "id": "jj-integration.new-thread-project-default-move",
           "file": "plugins/@dshfiles/jj-integration/src/workspace-toggle-machine.test.ts",
           "testName": "does not reuse the inherited thread workspace when isolation is the default"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.destination-ownership-host-answer",
+          "file": "plugins/@dshfiles/jj-integration/src/workspace-toggle-machine.test.ts",
+          "testName": "does not settle from a client workspaces-list hint when Host destination is unknown"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.destination-failure-retry",
+          "file": "plugins/@dshfiles/jj-integration/src/workspace-toggle-machine.test.ts",
+          "testName": "keeps the deferred move after a failed first send until a successful retry claims it"
         }
       ]
     },
@@ -196,14 +210,7 @@
       "id": "new-thread-background",
       "title": "New thread provisions nothing until its first send",
       "summary": "The sidebar's New thread, the palette and the project picker open the composer at once and provision nothing: with isolation on by default the blank thread waits in the project (or inherited) checkout, and its own jj workspace (a spare when available, but never the inherited source workspace) is created only by its first send. That send waits for the new Session to open and delivers the same draft there. An abandoned New thread therefore leaves no jj workspace behind; a reload before the first send keeps it unprovisioned. A thread left in another thread's workspace moves back to the project checkout on arrival when isolation is off, which creates nothing.",
-      "reach": [
-        "click button \"New thread\"",
-        "click button \"Choose workspace\"",
-        "fill textbox \"Search projects or enter a folder path\" \"sample\"",
-        "expect option \"sample*\"",
-        "press Enter",
-        "expect checkbox \"workspace\""
-      ],
+      "reach": ["click button \"New thread\"", "expect checkbox \"workspace\""],
       "surfaces": ["client"],
       "configuration": [],
       "states": ["opening", "deferred", "committing", "switching", "settled"],

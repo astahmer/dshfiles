@@ -630,6 +630,11 @@ const waitForWorkspaceToggle = (input: { readonly actor: WorkspaceToggleActor; r
 export class WorkspaceToggle {
   static readonly defaultDestinationMove = defaultDestinationMove
   static readonly isolatingMove = isolatingMove
+  static readonly hostConfirmedOwnThreadWorkspace = (input: {
+    readonly inThreadWorkspace: boolean
+    readonly clientOccupied: boolean | undefined
+    readonly destination: DestinationView | undefined
+  }): boolean => input.inThreadWorkspace && input.destination !== undefined && ownsIsolatedThreadWorkspace(input.destination)
   static readonly deferredMoveFor = (snapshot: { readonly context: { readonly deferred: readonly DeferredMove[] } }, sessionId: string): DeferredMove | null =>
     deferredMoveFor(snapshot.context.deferred, sessionId)
   static readonly spareKey = spareKey

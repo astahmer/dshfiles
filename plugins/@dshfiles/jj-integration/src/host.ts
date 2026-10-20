@@ -50,6 +50,7 @@ import { ThreadIntegrationModel } from './thread-integration-state.js'
 import { workspaceHasOtherSession } from './thread-session-ownership.js'
 import { registeredProjects } from './registered-projects.js'
 import { createThreads, ThreadWorkspaceModel, ThreadError, type JjExecutor, type ThreadLocation, type ThreadStatus, type Threads } from './threads.js'
+import { locateOrMissing } from './workspace-location.js'
 
 declare module '@deepseek-ai/cordis' {
   interface Events {
@@ -370,7 +371,7 @@ const invalidateRepositories = (): void => {
 const cachedLocation = async (threads: Threads, path: string): Promise<ThreadLocation | undefined> => {
   const cached = locationCache.get(path)
   if (cached !== undefined && Date.now() - cached.at < LOCATION_CACHE_TTL_MS) return cached.value
-  const location = await threads.locate(path).catch(() => undefined)
+  const location = await locateOrMissing(() => threads.locate(path))
   locationCache.set(path, { value: location, at: Date.now() })
   return location
 }

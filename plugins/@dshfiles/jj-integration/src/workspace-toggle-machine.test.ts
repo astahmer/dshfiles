@@ -652,6 +652,7 @@ describe('deferWorkspaceSubmit', () => {
     const toggle = startToggle()
     arriveAt(toggle, { sessionId: 'source', workspaceId: 'project' })
     commit(toggle, 'source')
+    expect(defersIsolationToSend(WorkspaceToggle.deferredMoveFor(toggle.actor.getSnapshot(), 'source'))).toBe(true)
     const sourceComposer = composerWithDraft('send after setup')
     const source: WorkspaceComposer = {
       sessionId: SessionId('source'),
@@ -732,6 +733,33 @@ describe('defersIsolationToSend', () => {
     expect(defersIsolationToSend(move({ wantsIsolation: true }))).toBe(true)
     expect(defersIsolationToSend(move({ request: isolateRequest() }))).toBe(true)
     expect(defersIsolationToSend(move({ wantsIsolation: true, request: sharedRequest() }))).toBe(false)
+  })
+})
+
+describe('hostConfirmedOwnThreadWorkspace', () => {
+  it('does not settle from a client workspaces-list hint when Host destination is unknown', () => {
+    expect(
+      WorkspaceToggle.hostConfirmedOwnThreadWorkspace({
+        inThreadWorkspace: true,
+        clientOccupied: false,
+        destination: undefined,
+      }),
+    ).toBe(false)
+    expect(
+      WorkspaceToggle.hostConfirmedOwnThreadWorkspace({
+        inThreadWorkspace: true,
+        clientOccupied: true,
+        destination: {
+          vcs: 'jj',
+          isolated: true,
+          projectWorkspaceId: 'project',
+          bookmark: 'main',
+          bookmarks: ['main'],
+          isolateByDefault: true,
+          ownedByAnotherSession: false,
+        },
+      }),
+    ).toBe(true)
   })
 })
 
@@ -874,7 +902,13 @@ describe('first-send isolation', () => {
 
 describe('deliverFirstSend', () => {
   const deliveryFixture = (
-    options: { readonly showsSource?: boolean; readonly targetDraft?: string; readonly copies?: boolean; readonly keeps?: boolean } = {},
+    options: {
+      readonly showsSource?: boolean
+      readonly targetDraft?: string
+      readonly copies?: boolean
+      readonly keeps?: boolean
+      readonly destinationFails?: boolean
+    } = {},
   ) => {
     const sourceComposer = composerWithDraft('first prompt')
     const targetComposer = composerWithDraft(options.targetDraft ?? '')
@@ -887,7 +921,10 @@ describe('deliverFirstSend', () => {
     const delivery = deliverFirstSend({
       source,
       submitSource: 'enter',
-      destination: async () => (options.keeps === true ? null : isolateRequest()),
+      destination: async () => {
+        if (options.destinationFails) throw new Error('Destination lookup timed out.')
+        return options.keeps === true ? null : isolateRequest()
+      },
       isolate: async () => {
         isolated.push('ws-thread-abc123')
         return { workspaceId: 'ws-thread-abc123' }
@@ -911,6 +948,23 @@ describe('deliverFirstSend', () => {
     return { delivery, sourceComposer, targetComposer, blockCalls, shown, isolated, copied }
   }
 
+  it('keeps the deferred move after a failed first send until a successful retry claims it', async () => {
+    const toggle = startToggle()
+    arriveAt(toggle, { sessionId: 'source', workspaceId: 'project' })
+    const move = WorkspaceToggle.deferredMoveFor(toggle.actor.getSnapshot(), 'source')
+    if (move === null) throw new Error('Expected the arriving New thread to defer its move.')
+
+    const failed = deliveryFixture({ destinationFails: true })
+    await expect(failed.delivery).resolves.toBe('failed')
+    expect(WorkspaceToggle.deferredMoveFor(toggle.actor.getSnapshot(), 'source')).toEqual(move)
+    expect(defersIsolationToSend(WorkspaceToggle.deferredMoveFor(toggle.actor.getSnapshot(), 'source'))).toBe(true)
+
+    const retried = deliveryFixture()
+    await expect(retried.delivery).resolves.toBe('sent')
+    toggle.actor.send({ type: 'claim', sessionId: 'source' })
+    expect(WorkspaceToggle.deferredMoveFor(toggle.actor.getSnapshot(), 'source')).toBeNull()
+  })
+
   it('sends into the thread workspace and leaves the view on the New thread opened meanwhile', async () => {
     const fixture = deliveryFixture({ showsSource: false })
     await expect(fixture.delivery).resolves.toBe('sent')
@@ -931,6 +985,15 @@ describe('deliverFirstSend', () => {
     const fixture = deliveryFixture({ keeps: true })
     await expect(fixture.delivery).resolves.toBe('kept')
     expect(fixture.sourceComposer.submissions).toEqual([{ mode: 'queue', source: 'enter' }])
+    expect(fixture.isolated).toEqual([])
+  })
+
+  it('keeps a New thread unsent when its destination lookup fails', async () => {
+    const fixture = deliveryFixture({ destinationFails: true })
+    await expect(fixture.delivery).resolves.toBe('failed')
+    expect(fixture.sourceComposer.submissions).toEqual([])
+    expect(fixture.sourceComposer.input.state.getSnapshot().draft).toBe('first prompt')
+    expect(fixture.sourceComposer.notices).toEqual(['Workspace setup failed.'])
     expect(fixture.isolated).toEqual([])
   })
 

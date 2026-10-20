@@ -51,6 +51,18 @@ Feature: jj thread workspaces
     When the blank new thread sends its first message
     Then the new thread provisioned its own jj workspace instead of the previous one
 
+  @scenario:jj-integration.failed-destination-retry-browser-journey
+  Scenario: A failed destination lookup cannot send a New thread into its inherited workspace
+    Given the isolated plugin composition of "@dshfiles/jj-integration, @dshfiles/workspace-folder-picker, @dshfiles/home, @dshfiles/thread-sidebar, @dshfiles/multi-host" is booted
+    When a disposable jj repository is chosen as the New thread project
+    And the New thread workspace toggle is turned on
+    And a message is sent in the thread workspace
+    And new threads start in their own jj workspace by default
+    And the next five New thread destination lookups fail
+    And New thread is clicked in the sidebar
+    Then the first send can be retried after a failed destination lookup
+    And the new thread provisioned its own jj workspace instead of the previous one
+
   @scenario:jj-integration.new-thread-background-browser-journey
   Scenario: A New thread provisions nothing until its first send
     Given the isolated plugin composition of "@dshfiles/jj-integration, @dshfiles/workspace-folder-picker, @dshfiles/home, @dshfiles/thread-sidebar, @dshfiles/multi-host" is booted

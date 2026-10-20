@@ -471,6 +471,44 @@ Then('the message is delivered from its new thread workspace', async ({ page }: 
   await finishJourneyAssertions(page)
 })
 
+When('the next five New thread destination lookups fail', async ({ page }: { page: Page }) => {
+  let remainingFailures = 5
+  await page.context().route('**/api/**', async route => {
+    const request = route.request().postDataJSON()
+    if (
+      typeof request !== 'object' ||
+      request === null ||
+      !('method' in request) ||
+      typeof request.method !== 'string' ||
+      !request.method.endsWith('/destination') ||
+      !('input' in request)
+    ) {
+      return route.continue()
+    }
+    const input = request.input
+    if (typeof input !== 'object' || input === null || !('workspaceId' in input) || !('sessionId' in input)) return route.continue()
+    if (remainingFailures === 0) return route.continue()
+    remainingFailures -= 1
+    return route.abort()
+  })
+})
+
+Then('the first send can be retried after a failed destination lookup', async ({ page }: { page: Page }) => {
+  const destination = page.getByLabel('New thread destination', { exact: true })
+  const composer = newThreadComposer(page)
+  await expect(destination.getByRole('alert')).toContainText('Could not determine the workspace destination in time.')
+  await composer.fill('first message from the inherited workspace')
+  await composer.press('Enter')
+  await expect(composer).toHaveText('first message from the inherited workspace')
+  const previousThread = provisionedThreadName(page)
+  await expect(projectButton(page)).toHaveText(`repo · ${previousThread}`)
+  expect(workspaceNames(repositoryFor(page), [previousThread])).toEqual(['default', previousThread].sort())
+  await destination.getByRole('button', { name: 'Refresh', exact: true }).click()
+  await expect(destination.getByRole('alert')).toHaveCount(0)
+  await composer.press('Enter')
+  await expect(composer).toHaveCount(0, { timeout: 45_000 })
+})
+
 Then('the blank new thread keeps the previous workspace until it sends', async ({ page }: { page: Page }) => {
   const repository = repositoryFor(page)
   const previousThread = provisionedThreadName(page)

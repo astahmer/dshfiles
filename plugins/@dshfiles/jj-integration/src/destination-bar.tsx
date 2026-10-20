@@ -21,7 +21,6 @@ import { resolveNewThreadWorkspaceId } from './new-thread-workspace.js'
 import { workspaceHasOtherSession } from './thread-session-ownership.js'
 import { jjIntegrationSettings } from './settings.js'
 import {
-  ownsIsolatedThreadWorkspace,
   WorkspaceToggle,
   workspaceToggleMachine,
   type ProvisionedDestination,
@@ -249,8 +248,11 @@ export const DestinationBar = (props: {
   // The blank thread is already alone in a thread workspace: it has its destination, and settling here keeps the
   // machine out of the destination lookup — which disables its query and holds Send — when the Host would only answer
   // that no move is needed.
-  const ownsThreadWorkspace =
-    inThreadWorkspace === true && (composerWorkspace?.occupied === false || (destination.data !== undefined && ownsIsolatedThreadWorkspace(destination.data)))
+  const ownsThreadWorkspace = WorkspaceToggle.hostConfirmedOwnThreadWorkspace({
+    inThreadWorkspace: inThreadWorkspace === true,
+    clientOccupied: composerWorkspace?.occupied,
+    destination: destination.data,
+  })
   useEffect(() => {
     if (newThreadId === null || newThreadSessionId === null || workspaceId === null) return
     arrive({ visitId: newThreadId, sessionId: newThreadSessionId, workspaceId, isolateByDefault })
@@ -354,6 +356,14 @@ export const DestinationBar = (props: {
             />
             {t('workspace')}
           </label>
+        </span>
+      ) : null}
+      {newThreadId !== null && destination.isError ? (
+        <span role="alert" className="dshx:inline-flex dshx:items-center dshx:gap-1 dshx:text-xs dshx:text-destructive">
+          {t('workspacePreparationTimedOut')}
+          <Button variant="link" size="sm" onClick={() => void destination.refetch()}>
+            {t('refresh')}
+          </Button>
         </span>
       ) : null}
       {toggle.error === null ? null : <span className="dshx:text-xs dshx:text-destructive">{toggle.error}</span>}
