@@ -31,6 +31,7 @@ import { subagentChatAddress } from './subagent-provenance/resource.js'
 import { ThreadAsideConversation } from './thread-aside-panel.js'
 import { THREAD_ASIDE_CONVERSATION_SLOT, THREAD_ASIDE_ID, THREAD_ASIDE_KIND, threadAsideAddress, threadAsideSessionId } from './thread-aside.js'
 import { OPEN_THREAD_ASIDE_EVENT, readThreadAsideRequest } from './thread-aside-request.js'
+import { requestThreadMainTab } from './main-tab-request.js'
 import type { SubagentAddress } from '@deepseek-ai/dsh-subagent/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { HoverPrefetch } from './hover-prefetch.js'
@@ -730,6 +731,40 @@ export default defineClient({
           ),
         ),
       'thread-sidebar: aside tab body',
+    )
+
+    // The aside hands its thread back to the main view. The menu seat belongs to the native right sidebar, so the row
+    // is a plain menuitem. The aside closes first: opening the main tab navigates to that thread's Session, and the
+    // side panel controller then acts on the Session that just came on screen. A request nobody took puts the aside
+    // back, so a profile without @dshfiles/main-tabs keeps the thread where it was.
+    ctx.effect(
+      () =>
+        ctx.slots.inject('sidebar.right.tab.menu.item', () =>
+          ctx.slots.register(
+            { name: 'sidebar.right.tab.menu.item', id: 'move-to-main-area', order: 10 },
+            (props: PropsRuntime<'sidebar.right.tab.menu.item'>) => {
+              const sessionId = threadAsideSessionId(props.tab.contentId)
+              if (sessionId === undefined) return null
+              return (
+                <button
+                  type="button"
+                  role="menuitem"
+                  data-thread-sidebar-move-to-main=""
+                  className="dshx:flex dshx:w-full dshx:cursor-pointer dshx:items-center dshx:rounded-(--dsw-radius-md) dshx:border-none dshx:bg-transparent dshx:px-[7px] dshx:py-1 dshx:text-left dshx:text-[length:calc(var(--dsh-content-font-size-secondary,13px)-1px)] dshx:text-(--dsw-alias-label-primary) dshx:hover:bg-(--dsw-alias-interactive-bg-hover)"
+                  onClick={() => {
+                    props.dismiss()
+                    ctx.sidebarRight.close(props.tab.id)
+                    if (requestThreadMainTab(sessionId)) return
+                    ctx.sidebarRight.openResource(threadAsideAddress(sessionId), { kind: THREAD_ASIDE_KIND })
+                  }}
+                >
+                  {translate('threadSidebarMoveToMainArea')}
+                </button>
+              )
+            },
+          ),
+        ),
+      'thread-sidebar: move an aside to the main view',
     )
 
     ctx.effect(

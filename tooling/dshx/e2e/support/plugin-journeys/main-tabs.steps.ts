@@ -268,6 +268,42 @@ Then('the side panel hosts that thread beside the main view', async ({ page }: {
   await finishJourneyAssertions(page)
 })
 
+/** The thread a scenario moved into the side panel, so its post-move assertions name the same session. */
+const movedAsideSessions = new WeakMap<Page, string>()
+
+When('a second thread tab is dragged onto the side panel', async ({ page }: { page: Page }) => {
+  const keptSessionId = await startSidebarThread(page, 'kept aside thread')
+  await threadTab(page, keptSessionId).dblclick()
+  const currentSessionId = await startSidebarThread(page, 'moved aside thread')
+  await threadTab(page, currentSessionId).click({ button: 'right' })
+  await page.getByRole('menuitem', { name: 'Open in side panel', exact: true }).click()
+  await expect(page.locator('[data-dshfiles-thread-aside]')).toHaveCount(1)
+  movedAsideSessions.set(page, keptSessionId)
+  await threadTab(page, keptSessionId).dragTo(page.locator('[data-slot="rightbar"] [data-dockkit-surface]').first())
+})
+
+Then('the side panel hosts that thread and its main tab is gone', async ({ page }: { page: Page }) => {
+  const sessionId = movedAsideSessions.get(page) ?? ''
+  await recordAssertion(page, 'main-tabs-drag-tab-into-side-panel', async () => {
+    await expect(page.locator('[data-dockkit-tab]').filter({ hasText: 'kept aside thread' })).toHaveCount(1)
+    await expect(threadTab(page, sessionId)).toHaveCount(0)
+  })
+})
+
+When("the moved aside tab's menu moves that thread to the main area", async ({ page }: { page: Page }) => {
+  await page.locator('[data-dockkit-tab]').filter({ hasText: 'kept aside thread' }).click({ button: 'right' })
+  await page.getByRole('menuitem', { name: 'Move to main area', exact: true }).click()
+})
+
+Then('the thread is a main tab again and the side panel dropped its tab', async ({ page }: { page: Page }) => {
+  const sessionId = movedAsideSessions.get(page) ?? ''
+  await recordAssertion(page, 'main-tabs-move-aside-back-to-main', async () => {
+    await expect(threadTab(page, sessionId)).toHaveAttribute('aria-selected', 'true')
+    await expect(page.locator('[data-dockkit-tab]').filter({ hasText: 'kept aside thread' })).toHaveCount(0)
+  })
+  await finishJourneyAssertions(page)
+})
+
 Then('the tabs come back with the pin and the Jujutsu tab is active again', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'main-tabs-restore-after-reload', async () => {
     await expect.poll(() => tabSummary(page)).toEqual(['Workbench (pinned)', 'Jujutsu*'])

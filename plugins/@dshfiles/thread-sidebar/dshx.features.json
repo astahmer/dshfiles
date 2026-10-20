@@ -1611,7 +1611,7 @@
     {
       "id": "open-thread-in-side-panel",
       "title": "Open a thread in the right side panel",
-      "summary": "A thread's row context menu, its hover action, the Open in side panel command palette action and a `@dshfiles/main-tabs` thread tab's own context menu open that thread in the right sidebar instead of the main column: the row action routes through the entry's sidebar-right controller, which opens a threadaside resource tab, and the tab menu asks for the same aside over the cancelable `dshfiles:open-thread-aside` window event this plugin answers. The tab retains the Session and hosts the same embedded Conversation a subagent chat does, so the thread streams and its composer works beside the thread the user is reading; closing the tab only releases the reference, and an already-open aside is focused instead of duplicated. The rebindable command threadSidebar.openInSidePanel ships unbound, and Customize sidebar > Hover actions stores hiddenRowActions and rowActionOrder so every row button is per-user in both visibility and left-to-right order.",
+      "summary": "A thread's row context menu, its hover action, the Open in side panel command palette action and a `@dshfiles/main-tabs` thread tab's own context menu open that thread in the right sidebar instead of the main column: the row action routes through the entry's sidebar-right controller, which opens a threadaside resource tab, and the tab menu asks for the same aside over the cancelable `dshfiles:open-thread-aside` window event this plugin answers. Dragging a main thread tab onto the open side panel moves it here the same way, and the aside tab's own menu row Move to main area hands it back: it dispatches `dshfiles:open-thread` and closes the aside only once `@dshfiles/main-tabs` took the thread, so the thread lives in one place. The tab retains the Session and hosts the same embedded Conversation a subagent chat does, so the thread streams and its composer works beside the thread the user is reading; closing the tab only releases the reference, and an already-open aside is focused instead of duplicated. The rebindable command threadSidebar.openInSidePanel ships unbound, and Customize sidebar > Hover actions stores hiddenRowActions and rowActionOrder so every row button is per-user in both visibility and left-to-right order.",
       "reach": [
         "click button \"New thread\"",
         "fill textbox \"Describe what you want to build, / commands, @ files or sessions\" \"Hover actions target\"",
@@ -1640,7 +1640,8 @@
       "failureModes": [
         "An aside tab closed while the thread is still running keeps running: nothing is archived.",
         "An archived row offers no aside, because a stopped thread has nothing to show.",
-        "A `dshfiles:open-thread-aside` request is declined while no thread is on screen: there is no side panel to open an aside into, and the caller is expected to say so."
+        "A `dshfiles:open-thread-aside` request is declined while no thread is on screen: there is no side panel to open an aside into, and the caller is expected to say so.",
+        "Move to main area leaves the aside tab open when `@dshfiles/main-tabs` is absent or switched off: a dispatch it did not answer moves nothing."
       ],
       "externalDependencies": [],
       "verification": [
@@ -1648,6 +1649,17 @@
           "kind": "gherkin",
           "id": "thread-sidebar.open-in-side-panel",
           "featureFile": "tooling/dshx/e2e/features/thread-sidebar.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "main-tabs.move-tab-between-panels",
+          "featureFile": "tooling/dshx/e2e/features/main-tabs.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.main-tab-request",
+          "file": "plugins/@dshfiles/thread-sidebar/src/main-tab-request.test.ts",
+          "testName": "asks the main tab strip for a kept tab and reports that it took the thread"
         },
         {
           "kind": "unit-test",

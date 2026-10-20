@@ -1,0 +1,4 @@
+[data-rightbar-col][data-dshfiles-aside-drop] {
+  outline: 2px solid var(--dsw-alias-brand-primary);
+  outline-offset: 2px;
+}

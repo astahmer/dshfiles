@@ -165,7 +165,13 @@ over the cancelable `dshfiles:open-thread-aside` window event, which this entry
 answers by cancelling it; a request made while no thread is on screen is left
 uncancelled, because there is no side panel to open an aside into. Opening the same
 thread twice focuses its existing tab, and closing the tab only releases the
-reference — nothing is archived. Archived rows offer no aside, and the item is
+reference — nothing is archived. Dropping a `@dshfiles/main-tabs` thread tab on the
+open side panel moves it here the same way: the strip asks through
+`dshfiles:open-thread-aside` and closes its tab once this entry answered. The
+reverse is an aside tab menu item, _Move to main area_: it dispatches the
+cancelable `dshfiles:open-thread` event that `@dshfiles/main-tabs` answers, then
+closes the aside tab, so the thread lives in exactly one place. Archived rows
+offer no aside, and the item is
 absent if no entry provided the opener. The pane is a flex column, not a block, so
 the embedded Conversation is sized by the pane: a block wrapper makes it grow past
 the pane's height, which cuts the composer off and leaves the transcript

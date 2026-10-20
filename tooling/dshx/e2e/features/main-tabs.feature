@@ -69,3 +69,11 @@ Feature: Main view tabs
     Given the isolated plugin composition of "@dshfiles/main-tabs, @dshfiles/thread-sidebar" is booted
     When a thread tab's context menu opens it in the side panel
     Then the side panel hosts that thread beside the main view
+
+  @scenario:main-tabs.move-tab-between-panels
+  Scenario: A thread tab moves into the side panel and back to the main view
+    Given the isolated plugin composition of "@dshfiles/main-tabs, @dshfiles/thread-sidebar" is booted
+    When a second thread tab is dragged onto the side panel
+    Then the side panel hosts that thread and its main tab is gone
+    When the moved aside tab's menu moves that thread to the main area
+    Then the thread is a main tab again and the side panel dropped its tab

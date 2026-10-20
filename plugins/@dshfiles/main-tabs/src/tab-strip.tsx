@@ -3,8 +3,10 @@ import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator,
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { ChevronDownIcon, CopyIcon, PanelRightOpenIcon, PinIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { useEffect, useRef, useState, type KeyboardEvent, type ReactElement } from 'react'
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type ReactElement } from 'react'
+import { createPortal } from 'react-dom'
 import type { MainTabsTranslate } from './locales.js'
+import { ASIDE_DROP_ATTRIBUTE, asideDropColumn } from './aside-drop.js'
 import { requestThreadAside } from './thread-aside.js'
 import { buildThreadTabLink } from './thread-link.js'
 import { CompassGlyph } from './start-page.js'
@@ -85,7 +87,11 @@ export const TabStrip = (props: TabStripProps): ReactElement => {
   const [overflowing, setOverflowing] = useState(false)
   const [dropIndex, setDropIndex] = useState<number | null>(null)
   const [status, setStatus] = useState('')
+  const [asideDrop, setAsideDrop] = useState(false)
   const dragged = useRef<string | null>(null)
+  const asideColumn = useRef<HTMLElement | null>(null)
+  const tabsRef = useRef(tabs)
+  tabsRef.current = tabs
   const activeId = tabs.find(tab => tab.active)?.id
   const copy = async (value: string, copiedKey: 'threadIdCopied' | 'threadLinkCopied'): Promise<void> => {
     try {
@@ -97,6 +103,62 @@ export const TabStrip = (props: TabStripProps): ReactElement => {
   const openAside = (sessionId: string): void => {
     if (!requestThreadAside(sessionId)) setStatus(t('sidePanelUnavailable'))
   }
+  const draggedThread = (): Extract<TabView, { kind: 'thread' }> | null => {
+    const view = tabsRef.current.find(tab => tab.id === dragged.current)
+    return view?.kind === 'thread' ? view : null
+  }
+  const clearAsideTarget = useCallback((): void => {
+    asideColumn.current?.removeAttribute(ASIDE_DROP_ATTRIBUTE)
+    asideColumn.current = null
+    setAsideDrop(false)
+  }, [])
+
+  useEffect(() => {
+    const columnUnder = (event: DragEvent): HTMLElement | null => asideDropColumn(window.document, { x: event.clientX, y: event.clientY })
+    /** A drop on the right sidebar moves the thread there: the side panel takes it, then the main tab goes away. */
+    const moveDraggedThreadToAside = (): void => {
+      const thread = draggedThread()
+      if (thread === null) return
+      if (!requestThreadAside(thread.sessionId)) {
+        setStatus(t('sidePanelUnavailable'))
+        return
+      }
+      send({ type: 'tab.close', tabId: thread.id })
+    }
+    const onDragOver = (event: DragEvent): void => {
+      if (draggedThread() === null) {
+        clearAsideTarget()
+        return
+      }
+      const column = columnUnder(event)
+      if (column !== asideColumn.current) {
+        asideColumn.current?.removeAttribute(ASIDE_DROP_ATTRIBUTE)
+        column?.setAttribute(ASIDE_DROP_ATTRIBUTE, '')
+        asideColumn.current = column
+        setAsideDrop(column !== null)
+      }
+      if (column === null) return
+      event.preventDefault()
+      if (event.dataTransfer !== null) event.dataTransfer.dropEffect = 'move'
+    }
+    const onDrop = (event: DragEvent): void => {
+      if (columnUnder(event) === null || draggedThread() === null) return
+      event.preventDefault()
+      moveDraggedThreadToAside()
+      clearAsideTarget()
+    }
+    const onDragEnd = (): void => clearAsideTarget()
+    window.addEventListener('dragover', onDragOver, true)
+    window.addEventListener('drop', onDrop, true)
+    window.addEventListener('dragend', onDragEnd, true)
+    return () => {
+      window.removeEventListener('dragover', onDragOver, true)
+      window.removeEventListener('drop', onDrop, true)
+      window.removeEventListener('dragend', onDragEnd, true)
+      asideColumn.current?.removeAttribute(ASIDE_DROP_ATTRIBUTE)
+      asideColumn.current = null
+    }
+  }, [clearAsideTarget, send, t])
 
   useEffect(() => {
     const element = scroller.current
@@ -209,6 +271,7 @@ export const TabStrip = (props: TabStripProps): ReactElement => {
                   onKeyDown={event => onTabKeyDown(event, tab, index)}
                   onDragStart={event => {
                     dragged.current = tab.id
+                    setAsideDrop(false)
                     event.dataTransfer.effectAllowed = 'move'
                     event.dataTransfer.setData('text/plain', tab.title)
                   }}
@@ -229,6 +292,7 @@ export const TabStrip = (props: TabStripProps): ReactElement => {
                   onDragEnd={() => {
                     dragged.current = null
                     setDropIndex(null)
+                    clearAsideTarget()
                   }}
                 >
                   <span
@@ -366,6 +430,18 @@ export const TabStrip = (props: TabStripProps): ReactElement => {
           {status}
         </span>
       ) : null}
+      {asideDrop
+        ? createPortal(
+            <div
+              role="status"
+              data-dshfiles-aside-drop-hint=""
+              className="dshx-root dshx:pointer-events-none dshx:fixed dshx:top-1/2 dshx:right-4 dshx:z-[80] dshx:-translate-y-1/2 dshx:rounded-(--dsw-radius-md) dshx:border dshx:border-(--dsw-alias-border-l3) dshx:bg-(--dsw-alias-bg-layer-1) dshx:px-3 dshx:py-1.5 dshx:text-[length:var(--dsh-content-font-size-secondary,13px)] dshx:text-(--dsw-alias-label-primary) dshx:shadow-lg"
+            >
+              {t('moveToSidePanel')}
+            </div>,
+            document.body,
+          )
+        : null}
     </div>
   )
 }
