@@ -748,4 +748,38 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
     expect(await threads.discard({ repoRoot: repo, name: busy.name, force: true })).toEqual({ status: 'discarded' })
     expect((await threads.list(repo)).map(entry => entry.name)).toEqual([])
   })
+
+  it('dates every working copy and abandons only the empty revisions nothing builds on', async () => {
+    const thread = await threads.provision(repo)
+    const changedAt = await threads.workingCopyChangedAt(repo)
+    expect(changedAt.get(thread.name)).toBeGreaterThan(Date.now() - 60_000)
+    expect(changedAt.has('default')).toBe(true)
+
+    jj(repo, '--ignore-working-copy', 'new', 'main', '--no-edit')
+    jj(repo, '--ignore-working-copy', 'new', 'main', '--no-edit', '-m', 'described plan')
+    const dangling = jj(
+      repo,
+      '--ignore-working-copy',
+      'log',
+      '--no-graph',
+      '-r',
+      'mutable() & empty() & description(exact:"") ~ working_copies()',
+      '-T',
+      'commit_id ++ "\\n"',
+    )
+      .split('\n')
+      .filter(line => line.length > 0)
+
+    const preview = await threads.danglingEmptyRevisions({ repoRoot: repo, abandon: false })
+    expect(preview.map(revision => revision.commitId).sort()).toEqual(dangling.sort())
+    expect(preview).toHaveLength(1)
+
+    expect(await threads.danglingEmptyRevisions({ repoRoot: repo, abandon: true })).toHaveLength(1)
+    expect(await threads.danglingEmptyRevisions({ repoRoot: repo, abandon: false })).toEqual([])
+    expect((await threads.workingCopyChangedAt(repo)).has(thread.name)).toBe(true)
+    expect(bookmarkTarget(repo).trim()).toBe('base')
+    expect(jj(repo, '--ignore-working-copy', 'log', '--no-graph', '-r', 'description(substring:"described plan")', '-T', 'description')).toContain(
+      'described plan',
+    )
+  })
 })

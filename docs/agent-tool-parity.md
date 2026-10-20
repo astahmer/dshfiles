@@ -76,22 +76,22 @@ Each row is a tool worth building today: the backing verb already exists.
 
 ### thread-sidebar
 
-| Proposed tool                    | Capability                                               | Backing verb                                                                     |
-| -------------------------------- | -------------------------------------------------------- | -------------------------------------------------------------------------------- |
-| `thread_park` / `thread_unpark`  | Park a thread out of the active groups                   | host-gap: nothing but browser-local `parkedSessionIds` (`src/settings.ts:110`)   |
+| Proposed tool                    | Capability                                                                                  | Backing verb                                                                                                                                                |
+| -------------------------------- | ------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `thread_park` / `thread_unpark`  | Park a thread out of the active groups                                                      | host-gap: nothing but browser-local `parkedSessionIds` (`src/settings.ts:110`)                                                                              |
 | `thread_move_to_section`         | Drag a row into Pinned/Active/Parked/Inactive/Settled/Archived, including the idle override | composites the served `thread_pin`/`thread_unpin`/`thread_settle`/`thread_unsettle`/`thread_archive`/`thread_unarchive` tools; parking has no Host verb yet |
-| `thread_mute` / `thread_unmute`  | Snooze notifications 1h…forever                          | `settings/update`, namespace `thread-sidebar` (`src/settings.ts:111`)            |
-| `thread_mark_unread`             | Mark a thread manually unread                            | host-gap: browser-local (`src/thread-notifications.ts:24`)                       |
-| `thread_link`                    | Copy a thread id or link                                 | host-gap for the Agent: `writeClipboard` is client-only (`src/thread-url.ts:14`) |
-| `thread_settle_policy`           | Per-thread auto-settle override                          | `settings/update`, `thread-sidebar` (`src/settings.ts:108-109`)                  |
-| `thread_views_update`            | Saved views add/rename/reorder/remove                    | `settings/update`, view presets                                                  |
-| `thread_sidebar_settings_update` | Row display, attention groups, colours, subagent folding | `settings/update`, `thread-sidebar` (`src/settings.ts:10-21, 27-68, 123-126`)    |
-| `thread_auto_settle_settings`    | Auto-settle idle threads, interval, exclusions           | `settings/update`, `thread-sidebar` (`src/settings.ts:77-90`)                    |
-| `thread_archive_rebased`         | Archive rebased threads after a delay                    | `workspace/archiveSession` + jj `/threadAt`                                      |
-| `thread_settled_auto_archive`    | Archive a settled thread after a delay                   | `settings/update`, `settledArchiveDelay` in `thread-sidebar` (`src/settings.ts`) |
-| `thread_children_list`           | Child/subagent rows with fold state                      | `thread_references` lists the children of one thread; fold state is client-only  |
-| `remote_thread_list`             | Threads on other hosts                                   | `multi-host.threadList` (no `tool` binding)                                      |
-| `dsh_restart`                    | Restart DSH / copy launch URL                            | own `requestRestart` host service (`src/host.ts:18-28`)                          |
+| `thread_mute` / `thread_unmute`  | Snooze notifications 1h…forever                                                             | `settings/update`, namespace `thread-sidebar` (`src/settings.ts:111`)                                                                                       |
+| `thread_mark_unread`             | Mark a thread manually unread                                                               | host-gap: browser-local (`src/thread-notifications.ts:24`)                                                                                                  |
+| `thread_link`                    | Copy a thread id or link                                                                    | host-gap for the Agent: `writeClipboard` is client-only (`src/thread-url.ts:14`)                                                                            |
+| `thread_settle_policy`           | Per-thread auto-settle override                                                             | `settings/update`, `thread-sidebar` (`src/settings.ts:108-109`)                                                                                             |
+| `thread_views_update`            | Saved views add/rename/reorder/remove                                                       | `settings/update`, view presets                                                                                                                             |
+| `thread_sidebar_settings_update` | Row display, attention groups, colours, subagent folding                                    | `settings/update`, `thread-sidebar` (`src/settings.ts:10-21, 27-68, 123-126`)                                                                               |
+| `thread_auto_settle_settings`    | Auto-settle idle threads, interval, exclusions                                              | `settings/update`, `thread-sidebar` (`src/settings.ts:77-90`)                                                                                               |
+| `thread_archive_rebased`         | Archive rebased threads after a delay                                                       | `workspace/archiveSession` + jj `/threadAt`                                                                                                                 |
+| `thread_settled_auto_archive`    | Archive a settled thread after a delay                                                      | `settings/update`, `settledArchiveDelay` in `thread-sidebar` (`src/settings.ts`)                                                                            |
+| `thread_children_list`           | Child/subagent rows with fold state                                                         | `thread_references` lists the children of one thread; fold state is client-only                                                                             |
+| `remote_thread_list`             | Threads on other hosts                                                                      | `multi-host.threadList` (no `tool` binding)                                                                                                                 |
+| `dsh_restart`                    | Restart DSH / copy launch URL                                                               | own `requestRestart` host service (`src/host.ts:18-28`)                                                                                                     |
 
 Already tool-served (this change): the 21 `thread_*` / `project_*` tools below, including
 `thread_settle` / `thread_unsettle` (move one thread into or out of the plugin's own
@@ -161,6 +161,8 @@ Bound now (sibling revision `feat(jj-integration): expose thread-workspace actio
 `jj_thread_projects`, `jj_thread_repositories`, `jj_thread_destination` and
 `jj_thread_workspace_sync` read-only, plus `jj_thread_discard`, which requires an
 explicit `force` so unlanded revisions are never abandoned by a bare request.
+`jj_thread_cleanup` binds the panel's **Clean up thread workspaces…** dialog; it
+takes an explicit `apply` (false previews) and never forces a discard.
 
 Deliberately not bound, because an existing tool already covers the decision or
 there is no model decision to make: `land` and `threadAt` (both accept an

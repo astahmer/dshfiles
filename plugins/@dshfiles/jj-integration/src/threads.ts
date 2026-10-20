@@ -116,6 +116,7 @@ const LAND_REVISION_TEMPLATE =
 const MAX_CONFLICT_FILES = 50
 /** How far behind the bookmark a workspace is read; the count is displayed, so an exact value past this is noise. */
 const MAX_BEHIND_REVISIONS = 1_000
+const MAX_DANGLING_EMPTY_REVISIONS = 500
 const MAX_DETACHED_REVISIONS = 128
 const MAX_PATCH_REVISIONS = 128
 const MAX_PATCH_FILES = 64
@@ -1341,6 +1342,44 @@ export const createThreads = (options: {
       return { status: 'discarded' }
     })
 
+  /** When each workspace's working-copy commit last changed, in epoch milliseconds, keyed by workspace name. */
+  const workingCopyChangedAt = async (repoRoot: string): Promise<ReadonlyMap<string, number>> => {
+    const output = await jj(
+      [
+        '--ignore-working-copy',
+        'log',
+        '--no-graph',
+        '-r',
+        'working_copies()',
+        '-T',
+        'working_copies.map(|w| w.name()).join(",") ++ "\\t" ++ committer.timestamp().format("%s") ++ "\\n"',
+      ],
+      repoRoot,
+    )
+    const changedAt = new Map<string, number>()
+    for (const line of output.split('\n')) {
+      const [names = '', seconds = ''] = line.split('\t')
+      const epochSeconds = Number.parseInt(seconds, 10)
+      if (!Number.isFinite(epochSeconds)) continue
+      for (const name of names.split(',')) if (name.length > 0) changedAt.set(name, epochSeconds * 1000)
+    }
+    return changedAt
+  }
+
+  /**
+   * Empty, undescribed, single-parent mutable revisions that nothing still builds on: no working copy, bookmark or
+   * revision with content or a description descends from them, so abandoning them rewrites no live workspace.
+   */
+  const danglingEmptyRevset = (): string =>
+    `(mutable() & empty() & ~merges() & description(exact:"")) ~ ::(working_copies() | bookmarks() | remote_bookmarks() | tags() | (mutable() & ~empty()) | (mutable() & ~description(exact:"")))`
+
+  const danglingEmptyRevisions = async (input: { readonly repoRoot: string; readonly abandon: boolean }): Promise<readonly ThreadRevision[]> =>
+    serialized(input.repoRoot, async () => {
+      const found = await revisions(danglingEmptyRevset(), input.repoRoot, true, undefined, MAX_DANGLING_EMPTY_REVISIONS)
+      if (input.abandon && found.length > 0) await jj(['--ignore-working-copy', 'abandon', ...found.map(revision => revision.commitId)], input.repoRoot)
+      return found
+    })
+
   /** Local bookmarks, and the nearest one the workspace at `path` builds on. */
   const bookmarks = async (path: string): Promise<{ readonly current: string | null; readonly names: readonly string[] }> => {
     const [listed, nearest] = await Promise.all([
@@ -1399,7 +1438,23 @@ export const createThreads = (options: {
     return (await readAtOperation(['log', '--no-pager', '--color=never', '--limit', '20', '-r', revset, '-T', template])).trimEnd()
   }
 
-  return { locate, list, status, provision, prewarm, restore, land, landAt, landVerified, discard, bookmarks, workingCopyCommitId, revisionGraph }
+  return {
+    locate,
+    list,
+    status,
+    provision,
+    prewarm,
+    restore,
+    land,
+    landAt,
+    landVerified,
+    discard,
+    workingCopyChangedAt,
+    danglingEmptyRevisions,
+    bookmarks,
+    workingCopyCommitId,
+    revisionGraph,
+  }
 }
 
 export type Threads = ReturnType<typeof createThreads>

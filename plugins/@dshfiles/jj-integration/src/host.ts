@@ -21,7 +21,17 @@ import { projectChecksApi } from '@dshfiles/project-checks/api'
 import type { ProjectChecksVerifiedTurn } from '@dshfiles/project-checks/completion-event'
 import type { SettingsScope } from '@dshfiles/dshx/settings'
 import { z } from 'zod'
-import { jjIntegrationApi, type DestinationView, type LandResult, type RepositoryView, type ThreadView, type WorkspaceSyncView } from './api.js'
+import {
+  jjIntegrationApi,
+  type CleanupKindView,
+  type CleanupResult,
+  type DestinationView,
+  type LandResult,
+  type RepositoryView,
+  type ThreadView,
+  type WorkspaceSyncView,
+} from './api.js'
+import { WorkspaceCleanupModel } from './workspace-cleanup.js'
 import { JsonText } from './json-text.js'
 import {
   defaultJjIntegrationSettings,
@@ -796,6 +806,82 @@ const discardThread = async (input: { readonly path: string; readonly force: boo
   return { status: outcome.status, revisions: outcome.status === 'has-work' ? [...outcome.revisions] : [] }
 }
 
+const HOUR_MS = 60 * 60_000
+
+const cleanupWorkspaces = async (input: {
+  readonly path?: string | undefined
+  readonly olderThanHours: number
+  readonly kinds: readonly CleanupKindView[]
+  readonly apply: boolean
+}): Promise<CleanupResult> => {
+  const active = requireThreads()
+  const scopedRepoRoot = input.path === undefined ? undefined : (await active.locate(input.path)).repoRoot
+  invalidateRepositories()
+  const [repositories, activity] = await Promise.all([listRepositories(), input.apply ? sessionActivity.guard() : sessionActivity.display()])
+  const registry = registryOf()
+  const archived = new Set<string>(registry.archivedSessionIds)
+  const now = Date.now()
+  const workspaces: CleanupResult['workspaces'] = []
+  const skipped: CleanupResult['skipped'] = []
+  const emptyRevisions: CleanupResult['emptyRevisions'] = []
+  for (const repository of repositories) {
+    if (scopedRepoRoot !== undefined && repository.repoRoot !== scopedRepoRoot) continue
+    const changedAt = await active.workingCopyChangedAt(repository.repoRoot).catch(() => new Map<string, number>())
+    for (const thread of repository.threads) {
+      const createdAt = thread.workspaceId === null ? undefined : registry.get(WorkspaceId(thread.workspaceId))?.createdAt
+      const decision = WorkspaceCleanupModel.decide({
+        thread: {
+          name: thread.name,
+          unlandedCount: thread.unlanded.length,
+          rebasedAt: thread.rebasedAt,
+          sessionIds: thread.sessionIds,
+          integrationQueued: deferredIntegrations.get(thread.path) !== undefined,
+          usedAt: [changedAt.get(thread.name), thread.rebasedAt, createdAt === undefined ? undefined : Date.parse(createdAt)],
+        },
+        archived,
+        activity,
+        now,
+        olderThanMs: input.olderThanHours * HOUR_MS,
+        kinds: input.kinds,
+      })
+      if (decision.action === 'skip') {
+        skipped.push({ repoRoot: repository.repoRoot, name: thread.name, reason: decision.reason })
+        continue
+      }
+      const row = { repoRoot: repository.repoRoot, name: thread.name, path: thread.path, kind: decision.kind, lastUsedAt: decision.lastUsedAt }
+      if (!input.apply) {
+        workspaces.push({ ...row, outcome: 'would-remove' })
+        continue
+      }
+      try {
+        const outcome = await discardThread({ path: thread.path, force: false })
+        workspaces.push({ ...row, outcome: outcome.status === 'discarded' ? 'removed' : 'has-work' })
+      } catch (error) {
+        workspaces.push({ ...row, outcome: 'failed', message: (error instanceof Error ? error.message : String(error)).slice(0, 400) })
+      }
+    }
+    const found = await active.danglingEmptyRevisions({ repoRoot: repository.repoRoot, abandon: input.apply }).catch((error: unknown) => {
+      hostContext?.logger.warn(
+        'jj-integration: could not clear empty revisions in %s: %s',
+        repository.repoRoot,
+        error instanceof Error ? error.message : String(error),
+      )
+      return []
+    })
+    emptyRevisions.push(...found)
+  }
+  if (input.apply) {
+    invalidateRepositories()
+    const removed = workspaces.filter(workspace => workspace.outcome === 'removed').length
+    emitActivity({
+      type: 'workspace.cleaned',
+      summary: `Cleaned up ${String(removed)} thread workspace(s) and ${String(emptyRevisions.length)} empty revision(s)`,
+      path: scopedRepoRoot ?? '',
+    })
+  }
+  return { applied: input.apply, workspaces, skipped, emptyRevisions }
+}
+
 const sweepFinishedThreads = async (): Promise<void> => {
   const removeFinished = readSettings().removeFinishedThreads
   for (const repository of await listRepositories()) {
@@ -1021,6 +1107,7 @@ const api = jjIntegrationApi.host({
   },
   workspaceSync: () => ({ sync: workspaceSync }),
   discard: ({ input }) => discardThread(input),
+  cleanupWorkspaces: ({ input }) => cleanupWorkspaces(input),
 })
 
 const rebaseCommand = defineCommand({

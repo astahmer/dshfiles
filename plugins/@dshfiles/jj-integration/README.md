@@ -272,6 +272,30 @@ and permanently deletes its folder. It does **not** archive or delete the
 conversation sessions; they remain in DSH with their original archive state.
 The confirmation dialog explains these effects before removal.
 
+### Clean up idle workspaces in one pass
+
+The Jujutsu panel's repository menu (⋮) offers **Clean up thread workspaces…**.
+Pick how long a workspace must have been unused (1h, 6h or 24h) and which kinds
+to remove: **Empty** (never landed anything) and/or **Already integrated**
+(landed, nothing left above the bookmark). The dialog previews the list before
+anything is removed. One confirmation then discards every match exactly as the
+row's own Remove does (never forced) and abandons the empty, undescribed
+revisions nothing builds on: no working copy, bookmark, tag or revision with
+content or a description descends from them, so no live workspace is rewritten.
+
+A workspace is kept when it holds unlanded revisions, a non-archived Session in
+it is working, waiting for an answer or its activity cannot be read, or an
+integration is queued. "Last used" is the latest of its working-copy commit
+time, its creation and its last land. A later turn in a thread whose workspace
+was removed checks a fresh workspace out from the bookmark. Agents get the same
+verb as `jj_thread_cleanup` (`apply: false` previews).
+
+This replaces `jjc` and `jjw cleanup` from nixfiles for thread workspaces: both
+are terminal tools (an fzf picker, day-granularity ages, no knowledge of DSH
+Sessions), while the cleanup has to skip busy threads and drop the DSH
+registration. `jjc`'s revset is the model for the empty-revision pass, minus the
+revisions a live workspace still builds on.
+
 ## Agent tools
 
 - `jj_thread_isolate`: before the first code edit, create a dedicated jj workspace when the current Session is not isolated. It starts from the current working-copy revision. The Session cwd stays unchanged, so use the returned absolute path for all file operations and as shell `workdir`; status and rebase tools follow the isolated workspace automatically.

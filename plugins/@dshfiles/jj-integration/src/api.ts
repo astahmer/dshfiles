@@ -92,6 +92,58 @@ const threadPathInput = z
   })
   .strict()
 
+const cleanupKindSchema = z.enum(['empty', 'integrated'])
+
+const cleanupWorkspaceSchema = z
+  .object({
+    repoRoot: z.string(),
+    name: z.string(),
+    path: z.string(),
+    kind: cleanupKindSchema,
+    lastUsedAt: z.number().int().nonnegative(),
+    outcome: z.enum(['would-remove', 'removed', 'has-work', 'failed']),
+    message: z.string().max(400).optional(),
+  })
+  .strict()
+
+const cleanupSkippedSchema = z
+  .object({
+    repoRoot: z.string(),
+    name: z.string(),
+    reason: z.enum(['has-work', 'busy', 'activity-unknown', 'queued', 'too-recent', 'kind-excluded']),
+  })
+  .strict()
+
+const cleanupResultSchema = z
+  .object({
+    applied: z.boolean(),
+    workspaces: z.array(cleanupWorkspaceSchema),
+    skipped: z.array(cleanupSkippedSchema),
+    /** Empty, undescribed revisions nothing builds on, found (and abandoned when applied) after the workspaces went. */
+    emptyRevisions: z.array(revisionSchema),
+  })
+  .strict()
+export type CleanupResult = z.infer<typeof cleanupResultSchema>
+export type CleanupKindView = z.infer<typeof cleanupKindSchema>
+
+const renderCleanup = (output: CleanupResult): string => {
+  const verb = output.applied ? 'Removed' : 'Would remove'
+  const removed = output.workspaces.filter(workspace => workspace.outcome === 'removed' || workspace.outcome === 'would-remove')
+  const refused = output.workspaces.filter(workspace => workspace.outcome === 'has-work' || workspace.outcome === 'failed')
+  return [
+    `${verb} ${String(removed.length)} thread workspace(s)${removed.length === 0 ? '' : `: ${removed.map(workspace => `${workspace.name} (${workspace.kind})`).join(', ')}`}.`,
+    refused.length === 0 ? undefined : `Kept ${refused.map(workspace => `${workspace.name} (${workspace.message ?? workspace.outcome})`).join(', ')}.`,
+    `${output.applied ? 'Abandoned' : 'Would abandon'} ${String(output.emptyRevisions.length)} dangling empty revision(s).`,
+    output.skipped.length === 0
+      ? undefined
+      : `Skipped ${String(output.skipped.length)}: ${[...new Set(output.skipped.map(workspace => workspace.reason))]
+          .map(reason => `${String(output.skipped.filter(workspace => workspace.reason === reason).length)} ${reason}`)
+          .join(', ')}.`,
+  ]
+    .filter(line => line !== undefined)
+    .join('\n')
+}
+
 export const jjIntegrationApi = defineApi({
   id: 'jj-threads',
   version: 1,
@@ -283,6 +335,25 @@ export const jjIntegrationApi = defineApi({
                 .map(revision => revision.description || revision.changeId)
                 .join('; ')}). Ask the user before passing force: true.`,
       },
+    }),
+    cleanupWorkspaces: method({
+      input: z
+        .object({
+          /** Any folder inside the repository; omit to clean every registered jj repository. */
+          path: z.string().min(1).optional(),
+          olderThanHours: z
+            .number()
+            .int()
+            .min(0)
+            .max(24 * 90),
+          kinds: z.array(cleanupKindSchema).min(1).max(2),
+          apply: z.boolean(),
+        })
+        .strict(),
+      output: cleanupResultSchema,
+      description:
+        'Remove idle thread workspaces in one pass, then abandon the empty undescribed revisions nothing builds on. A workspace qualifies when it holds no unlanded revision, no live Session in it is working, waiting for an answer or unreadable, no integration is queued, its kind is listed (empty: never landed; integrated: landed and nothing left), and it was last used longer ago than olderThanHours. Never forces: unlanded work is always kept, and a later turn in a removed thread checks a fresh workspace out from the bookmark. apply: false previews; call with apply: true only when the user asked to clean up.',
+      tool: { name: 'jj_thread_cleanup', render: renderCleanup },
     }),
   },
 })
