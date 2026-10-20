@@ -109,7 +109,6 @@
       ],
       "external": [
         "@deepseek-ai/dsh-agent/types",
-        "@deepseek-ai/dsh-api-session-controller/client",
         "@deepseek-ai/dsh-api-session-controller/types",
         "@deepseek-ai/dsh-api-workspace-controller/client",
         "@deepseek-ai/dsh-attachment",
