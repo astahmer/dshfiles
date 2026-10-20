@@ -102,6 +102,7 @@ export interface VerifiedLandOptions {
   readonly path: string
   readonly bookmark?: string | undefined
   readonly signal?: AbortSignal | undefined
+  readonly sessionId?: string | undefined
   readonly expectedSourceRevision: string
   readonly authorize: (location: ThreadLocation) => Promise<boolean>
   readonly verifyCandidate: (candidate: LandCandidate) => Promise<LandCandidateVerification>
@@ -143,7 +144,9 @@ const PATCH_CANDIDATE_TEMPLATE = `commit_id ++ "\\t" ++ parents.len() ++ "\\t" +
 const PATCH_TARGET_TEMPLATE = `commit_id ++ "\\t" ++ parents.len() ++ "\\t" ++ conflict ++ "\\t" ++ ${PATCH_FINGERPRINT} ++ "\\n"`
 const PATCH_BODY_TEMPLATE = 'commit_id ++ "\\t" ++ json(stringify(diff.git(3))) ++ "\\n"'
 const rebaseTimestampSchema = z.number().int().nonnegative().safe()
-const integrationRecordSchema = z.object({ at: rebaseTimestampSchema, tipChangeId: z.string().min(1).max(128).optional() }).strict()
+const integrationRecordSchema = z
+  .object({ at: rebaseTimestampSchema, tipChangeId: z.string().min(1).max(128).optional(), sessionId: z.string().min(1).max(128).optional() })
+  .strict()
 const rebaseMetadataEntrySchema = integrationRecordSchema.extend({ history: z.array(integrationRecordSchema).optional() }).strict()
 const rebaseMetadataValueSchema = z.union([rebaseTimestampSchema, rebaseMetadataEntrySchema])
 const rebaseMetadataSchema = z.record(z.string(), rebaseMetadataValueSchema)
@@ -677,13 +680,15 @@ export const createThreads = (options: {
     if (metadata.history !== undefined) return metadata.history
     return [metadata.tipChangeId === undefined ? { at: metadata.at } : { at: metadata.at, tipChangeId: metadata.tipChangeId }]
   }
-  const writeRebaseMetadata = async (repoRoot: string, name: string, tipChangeId: string | undefined): Promise<number> => {
+  const writeRebaseMetadata = async (repoRoot: string, name: string, tipChangeId: string | undefined, sessionId: string | undefined): Promise<number> => {
     const at = Date.now()
     const directory = options.threadsDirectory(repoRoot)
     await mkdir(directory, { recursive: true })
     const path = timestampFile(repoRoot)
     const temporaryPath = `${path}.${randomBytes(4).toString('hex')}.tmp`
-    const record: IntegrationRecord = tipChangeId === undefined ? { at } : { at, tipChangeId }
+    const record: IntegrationRecord = { at }
+    if (tipChangeId !== undefined) record.tipChangeId = tipChangeId
+    if (sessionId !== undefined) record.sessionId = sessionId
     const existing = await readRebaseMetadata(repoRoot)
     const history = [...integrationHistory(existing[name]), record].slice(-MAX_INTEGRATION_HISTORY)
     const metadata = { ...existing, [name]: { ...record, history } }
@@ -1224,7 +1229,7 @@ export const createThreads = (options: {
           if (!workingCopyEmpty && (await ensureAuthorized().catch(() => false))) {
             await jj(['new', commitIdRevset(afterMoveSnapshot.bookmarkCommitId)], cwd).catch(() => undefined)
           }
-          await writeRebaseMetadata(thread.repoRoot, thread.threadName, candidateRevision.changeId).catch(() => undefined)
+          await writeRebaseMetadata(thread.repoRoot, thread.threadName, candidateRevision.changeId, input.sessionId).catch(() => undefined)
           return { status: 'landed', revisions: rebased, head: candidateRevision }
         }
         if (input.signal?.aborted) return { status: 'verification-cancelled' }
@@ -1251,6 +1256,7 @@ export const createThreads = (options: {
     input: {
       readonly bookmark?: string | undefined
       readonly signal?: AbortSignal | undefined
+      readonly sessionId?: string | undefined
       readonly validate?: () => Promise<void>
       readonly onProgress?: (phase: 'queued' | 'validating' | 'rebasing') => void
     } = {},
@@ -1300,7 +1306,7 @@ export const createThreads = (options: {
           if (!workingCopyEmpty) await jj(['new', bookmark], cwd, input.signal)
           const head = rebased[0]
           if (head === undefined) throw new ThreadError('jj-failed', 'The rebased revisions have no bookmark head.')
-          await writeRebaseMetadata(thread.repoRoot, thread.threadName, head.changeId).catch(() => undefined)
+          await writeRebaseMetadata(thread.repoRoot, thread.threadName, head.changeId, input.sessionId).catch(() => undefined)
           return { status: 'landed', revisions: rebased, head }
         }
         if (attempt >= LAND_ATTEMPTS) throw new ThreadError('jj-failed', `Could not move ${bookmark}: ${moved.stderr.trim().slice(0, 400)}`)
@@ -1312,6 +1318,7 @@ export const createThreads = (options: {
     path: string,
     input: {
       readonly signal?: AbortSignal | undefined
+      readonly sessionId?: string | undefined
       readonly validate?: () => Promise<void>
       readonly onProgress?: (phase: 'queued' | 'validating' | 'rebasing') => void
     } = {},

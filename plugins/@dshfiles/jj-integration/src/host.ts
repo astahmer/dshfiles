@@ -11,6 +11,7 @@ import type {} from '@deepseek-ai/dsh-subprocess'
 import type {} from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-working-directory'
 import type {} from '@deepseek-ai/dsh-session/types'
+import type {} from '@deepseek-ai/dsh-session-query'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import { WorkspaceId, type Workspace } from '@deepseek-ai/dsh-workspace'
 import { isApiOwnerMissing, PluginApiError, type ApiCaller } from '@dshfiles/dshx/api'
@@ -32,6 +33,7 @@ import {
 import { ThreadRebaseEligibilityModel, type ThreadActivityBlocker, type ThreadSessionActivity } from './thread-rebase-eligibility.js'
 import { createSessionActivityCache } from './session-activity-cache.js'
 import { createDeferredIntegrations } from './deferred-integrations.js'
+import { IntegrationAttribution } from './integration-attribution.js'
 import { ThreadIntegrationModel } from './thread-integration-state.js'
 import { workspaceHasOtherSession } from './thread-session-ownership.js'
 import { registeredProjects } from './registered-projects.js'
@@ -238,15 +240,55 @@ const sessionActivity = createSessionActivityCache({
   guardBudgetMs: SESSION_ACTIVITY_GUARD_BUDGET_MS,
 })
 
+type ThreadIntegrationView = NonNullable<ThreadView['integrations']>[number]
+
+/** A fork's boundary never moves, so one observation per forked Session serves every Turn tail of its conversation. */
+const MAX_FORK_CUT_ENTRIES = 256
+const forkCuts = new Map<string, number>()
+
+/**
+ * A forked Session copies its parent's transcript but keeps working in the parent's jj workspace, so that workspace
+ * keeps recording the parent's later lands. The fork's boundary is the last event it inherited, not its creation: a
+ * branch can be cut at an earlier Turn, and only lands recorded up to that point belong to the copied conversation.
+ */
+const sessionForkedAt = async (sessionId: string | undefined): Promise<number | undefined> => {
+  if (sessionId === undefined) return undefined
+  const known = forkCuts.get(sessionId)
+  if (known !== undefined) return known
+  try {
+    const snapshot = await requireContext().sessionPersistence.stat(SessionId(sessionId))
+    if (snapshot?.header.isSeeded !== true) return undefined
+    const observation = await requireContext().sessionQuery.observeSession(SessionId(sessionId), { projectionMode: 'none' })
+    try {
+      const cut = observation.events[observation.inheritedEventCount - 1]?.time
+      if (cut === undefined) return undefined
+      forkCuts.set(sessionId, cut)
+      while (forkCuts.size > MAX_FORK_CUT_ENTRIES) {
+        const oldest = forkCuts.keys().next().value
+        if (oldest === undefined) break
+        forkCuts.delete(oldest)
+      }
+      return cut
+    } finally {
+      observation[Symbol.dispose]()
+    }
+  } catch {
+    return undefined
+  }
+}
+
 const threadView = (
   status: ThreadStatus,
   workspace: Workspace | undefined,
   archived: ReadonlySet<string>,
   activity: ReadonlyMap<string, ThreadSessionActivity> | undefined,
   caller: { readonly fromAgent: boolean; readonly sessionId: string | undefined } = { fromAgent: false, sessionId: undefined },
+  attribution: { readonly sessionId: string | undefined; readonly forkCutAt: number | undefined } | undefined = undefined,
 ): ThreadView => {
   const sessionIds = [...new Set([...(workspace?.sessionIds ?? []), ...isolatedSessionIdsAt(status.path)])]
   const canRebase = ThreadRebaseEligibilityModel.eligibility({ sessionIds, activity, fromAgent: caller.fromAgent, sessionId: caller.sessionId })
+  const viewerSessionId = attribution?.sessionId
+  const forkCutAt = attribution?.forkCutAt
   const view: ThreadView = {
     name: status.name,
     path: status.path,
@@ -260,15 +302,22 @@ const threadView = (
   }
   const withWorkspaceTitle: ThreadView = workspace === undefined ? view : { ...view, workspaceTitle: workspace.title }
   const withEligibility: ThreadView = canRebase === undefined ? withWorkspaceTitle : { ...withWorkspaceTitle, canRebase }
-  const integrationQueuedAt = deferredIntegrations.get(status.path)?.queuedAt
-  const withQueueEvents: ThreadView = { ...withEligibility, integrationQueueEvents: deferredIntegrations.history(status.path) }
+  const visible = IntegrationAttribution.forSession({ records: deferredIntegrations.history(status.path), sessionId: viewerSessionId, forkCutAt })
+  const queueEvents = visible.map(event => ({ at: event.at, kind: event.kind }))
+  const queuedEntry = deferredIntegrations.get(status.path)
+  const integrationQueuedAt =
+    queuedEntry !== undefined && (viewerSessionId === undefined || queuedEntry.sessionId === undefined || queuedEntry.sessionId === viewerSessionId)
+      ? queuedEntry.queuedAt
+      : undefined
+  const withQueueEvents: ThreadView = { ...withEligibility, integrationQueueEvents: queueEvents }
   const withQueue: ThreadView = integrationQueuedAt === undefined ? withQueueEvents : { ...withQueueEvents, integrationQueuedAt }
   if (status.rebasedAt === undefined) return withQueue
-  const viewWithRebaseTimestamp = {
-    ...withQueue,
-    rebasedAt: status.rebasedAt,
-    integrations: [...(status.integrations ?? [])],
-  }
+  const integrations = IntegrationAttribution.forSession({ records: status.integrations ?? [], sessionId: viewerSessionId, forkCutAt }).map(record => {
+    const visibleRecord: ThreadIntegrationView = { at: record.at }
+    if (record.tipChangeId !== undefined) visibleRecord.tipChangeId = record.tipChangeId
+    return visibleRecord
+  })
+  const viewWithRebaseTimestamp = { ...withQueue, rebasedAt: status.rebasedAt, integrations }
   if (status.rebasedTipChangeId === undefined) return viewWithRebaseTimestamp
   return { ...viewWithRebaseTimestamp, rebasedTipChangeId: status.rebasedTipChangeId }
 }
@@ -392,6 +441,8 @@ const findThread = async (input: {
   readonly includeActivity?: boolean
   /** The Session asking, so its own turn is not counted against the thread it wants to rebase. */
   readonly caller?: { readonly fromAgent: boolean; readonly sessionId: string | undefined } | undefined
+  /** The Session reading the view, so integration notices show only the lands its conversation knows about. */
+  readonly viewerSessionId?: string | undefined
 }): Promise<{ readonly repoRoot: string; readonly thread: ThreadView } | undefined> => {
   const location = input.location
   if (location.threadName === undefined) return undefined
@@ -399,13 +450,22 @@ const findThread = async (input: {
   const registry = registryOf()
   const workspace = await registry.resolveByPath(location.workspaceRoot)
   const shouldReadActivity = input.includeActivity !== false && workspace !== undefined && workspace.sessionIds.length > 0
-  const [threadStatus, activity] = await Promise.all([
+  const viewerSessionId = input.viewerSessionId
+  const [threadStatus, activity, forkCutAt] = await Promise.all([
     active.status(location.repoRoot, location.threadName),
     shouldReadActivity ? sessionActivity.display() : Promise.resolve(undefined),
+    viewerSessionId === undefined ? Promise.resolve(undefined) : sessionForkedAt(viewerSessionId),
   ])
   return {
     repoRoot: location.repoRoot,
-    thread: threadView(threadStatus, workspace, new Set(registry.archivedSessionIds), activity, input.caller),
+    thread: threadView(
+      threadStatus,
+      workspace,
+      new Set(registry.archivedSessionIds),
+      activity,
+      input.caller,
+      viewerSessionId === undefined ? undefined : { sessionId: viewerSessionId, forkCutAt },
+    ),
   }
 }
 
@@ -616,10 +676,8 @@ const landThread = async (input: {
   const threadName = location.threadName
   if (threadName === undefined) throw new PluginApiError('This workspace is not a thread.', { code: 'not-a-thread' })
   const onProgress = (phase: IntegrationProgressPhase): void => recordIntegrationProgress(input.path, phase)
-  const outcome = await activeThreads.landAt(
-    { ...location, threadName },
-    input.signal === undefined ? { bookmark, validate, onProgress } : { bookmark, signal: input.signal, validate, onProgress },
-  )
+  const landOptions = { bookmark, sessionId: input.sessionId, validate, onProgress }
+  const outcome = await activeThreads.landAt({ ...location, threadName }, input.signal === undefined ? landOptions : { ...landOptions, signal: input.signal })
   if (outcome.status === 'landed' || outcome.status === 'nothing-to-land') invalidateRepositories()
   const result: LandResult = {
     status: outcome.status,
@@ -935,7 +993,7 @@ const api = jjIntegrationApi.host({
     const location = await requireThreads()
       .locate(input.path)
       .catch(() => undefined)
-    const found = location === undefined ? undefined : await findThread({ location, includeActivity: false })
+    const found = location === undefined ? undefined : await findThread({ location, includeActivity: false, viewerSessionId: input.sessionId })
     return { thread: found?.thread ?? null }
   },
   revisionGraph: async ({ input }) => ({ graph: await requireThreads().revisionGraph(input.path) }),
@@ -1066,6 +1124,7 @@ const setupHost = (context: Context): Effect<void> => {
         path: workspace.path,
         bookmark,
         signal: verifiedTurn.signal,
+        sessionId: verifiedTurn.sessionId,
         expectedSourceRevision: verifiedTurn.sourceRevision,
         authorize: async location => {
           const current = await registry.resolveByPath(location.workspaceRoot)

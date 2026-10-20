@@ -52,6 +52,10 @@ const panelAsideRequestSchema = z.object({ panelId: z.string().min(1) }).strict(
 // The export plugin registers its header cell at the default priority; a lower one shadows it (see SlotCore.register).
 const SESSION_LOG_SHADOW_PRIORITY = -1
 
+/** A Host that validates a request against an older schema rejects it as `contract`, never as a transport failure. */
+const contractRejectionSchema = z.looseObject({ kind: z.literal('contract') })
+const isContractRejection = (error: unknown): boolean => contractRejectionSchema.safeParse(error).success
+
 const PanelGlyph = (props: { readonly size?: number | undefined }): JSX.Element => (
   <svg aria-hidden width={props.size ?? 18} height={props.size ?? 18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
     <path d="M6 4v16M18 4v16M6 9h7a4 4 0 0 1 4 4v3" />
@@ -270,15 +274,19 @@ export default defineClient({
       const path = ctx.sessions.list.getSnapshot().byId[props.sessionId]?.cwd
       // Every Turn tail of a Session shares this query key, so one jj read serves the whole conversation.
       const status = useQuery({
-        queryKey: ['jj-integration', 'thread', path],
+        queryKey: ['jj-integration', 'thread', path, props.sessionId],
         enabled: path !== undefined,
         retry: false,
-        queryFn: ({ signal }) =>
-          path === undefined
-            ? Promise.resolve({ thread: null })
-            : runHostRequest({ signal, timeoutMs: 15_000, request: hostSignal => api.threadAt({ path }, { signal: hostSignal }) }).catch(() => ({
-                thread: null,
-              })),
+        queryFn: ({ signal }) => {
+          if (path === undefined) return Promise.resolve({ thread: null })
+          const read = (input: { readonly path: string; readonly sessionId?: string }) =>
+            runHostRequest({ signal, timeoutMs: 15_000, request: hostSignal => api.threadAt(input, { signal: hostSignal }) })
+          return read({ path, sessionId: props.sessionId }).catch(error => {
+            // A Host from before per-conversation land attribution rejects the extra field; its workspace-wide view still works.
+            if (!isContractRejection(error)) return { thread: null }
+            return read({ path }).catch(() => ({ thread: null }))
+          })
+        },
       })
       const bookmark = useBookmark()
       const thread = status.data?.thread

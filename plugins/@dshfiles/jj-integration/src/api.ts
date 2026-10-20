@@ -176,7 +176,13 @@ export const jjIntegrationApi = defineApi({
       },
     }),
     threadAt: method({
-      input: z.object({ path: z.string().min(1) }).strict(),
+      input: z
+        .object({
+          path: z.string().min(1),
+          /** The reading Session, so integration notices stay inside its own conversation; an older Host rejects it. */
+          sessionId: z.string().min(1).max(128).optional(),
+        })
+        .strict(),
       output: z.object({ thread: threadSchema.nullable() }).strict(),
       description:
         'The thread workspace at a path (revisions not yet on the bookmark, conflicts, whether main moved, and whether it is safe to rebase), or null when the path is not a thread.',

@@ -37,4 +37,13 @@ describe('jj-integration tool exposure', () => {
     expect('issues' in (await validate({ path: '/work/thread-abc123' }))).toBe(true)
     expect('issues' in (await validate({ path: '/work/thread-abc123', force: false }))).toBe(false)
   })
+
+  test('threadAt carries the reading Session and stays open to a Host that predates it', async () => {
+    const schema = jjIntegrationApi.methods.threadAt.input
+    if (schema === undefined) throw new Error('threadAt must declare an input schema')
+    const validate = async (value: { readonly path: string; readonly sessionId?: string }) => await schema['~standard'].validate(value)
+
+    expect('issues' in (await validate({ path: '/work/thread-abc123' }))).toBe(false)
+    expect('issues' in (await validate({ path: '/work/thread-abc123', sessionId: 'session-abc' }))).toBe(false)
+  })
 })

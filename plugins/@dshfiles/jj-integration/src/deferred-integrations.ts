@@ -10,6 +10,13 @@ export type DeferredIntegrationSettlement = { readonly kind: 'result'; readonly 
 
 export type DeferredIntegrationCancel = 'cancelled' | 'not-queued' | 'integrating'
 
+/** One recorded queue or cancel transition, with the Session that asked for it. */
+export interface DeferredIntegrationEvent {
+  at: number
+  kind: 'queued' | 'unqueued'
+  sessionId?: string | undefined
+}
+
 /**
  * Integrations the user asked for while the thread was still busy. Each attempt runs the regular guarded rebase, so a
  * thread that is still writing or waiting on a question stays queued, and the rebase only starts once the Host itself
@@ -25,7 +32,7 @@ export const createDeferredIntegrations = (options: {
   const now = options.now ?? Date.now
   const entries = new Map<string, DeferredIntegration>()
   const passedGuard = new Set<string>()
-  const events: { readonly path: string; readonly at: number; readonly kind: 'queued' | 'unqueued' }[] = []
+  const events: { readonly path: string; readonly at: number; readonly kind: 'queued' | 'unqueued'; readonly sessionId: string | undefined }[] = []
   const record = (event: (typeof events)[number]): void => {
     events.push(event)
     if (events.length > 1_000) events.shift()
@@ -82,14 +89,16 @@ export const createDeferredIntegrations = (options: {
     if (existing !== undefined) return existing
     const entry: DeferredIntegration = { path: input.path, sessionId: input.sessionId, queuedAt: now() }
     entries.set(input.path, entry)
-    record({ path: input.path, at: entry.queuedAt, kind: 'queued' })
+    record({ path: input.path, at: entry.queuedAt, kind: 'queued', sessionId: input.sessionId })
     return entry
   }
 
   const cancel = (path: string): DeferredIntegrationCancel => {
     if (passedGuard.has(path)) return 'integrating'
-    if (!entries.delete(path)) return 'not-queued'
-    record({ path, at: now(), kind: 'unqueued' })
+    const entry = entries.get(path)
+    if (entry === undefined) return 'not-queued'
+    entries.delete(path)
+    record({ path, at: now(), kind: 'unqueued', sessionId: entry.sessionId })
     return 'cancelled'
   }
 
@@ -99,7 +108,14 @@ export const createDeferredIntegrations = (options: {
     drain,
     get: (path: string): DeferredIntegration | undefined => entries.get(path),
     paths: (): readonly string[] => [...entries.keys()],
-    history: (path: string) => events.filter(event => event.path === path).map(event => ({ at: event.at, kind: event.kind })),
+    history: (path: string): readonly DeferredIntegrationEvent[] =>
+      events
+        .filter(event => event.path === path)
+        .map(event => {
+          const visible: DeferredIntegrationEvent = { at: event.at, kind: event.kind }
+          if (event.sessionId !== undefined) visible.sessionId = event.sessionId
+          return visible
+        }),
     clear: (): void => {
       entries.clear()
       events.length = 0
