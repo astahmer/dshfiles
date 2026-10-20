@@ -153,6 +153,44 @@ button.crumb:hover {
   cursor: default;
 }
 
+button.crumbEditable {
+  cursor: text;
+}
+
+.titleEditor {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.titleInput {
+  field-sizing: content;
+  min-width: 80px;
+  max-width: 260px;
+  padding: 3px 7px;
+  border: 1px solid var(--dsw-alias-border-l3);
+  border-radius: var(--dsw-radius-md);
+  background: var(--dsw-alias-bg-base);
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+  outline: none;
+}
+
+.titleInput:focus {
+  border-color: var(--dsw-alias-brand-primary);
+}
+
+.titleError {
+  color: var(--dsw-alias-state-error-primary);
+  font-size: 12px;
+  line-height: 18px;
+  white-space: nowrap;
+}
+
 .headerActions {
   display: flex;
   flex: none;

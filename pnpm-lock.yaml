@@ -2231,6 +2231,9 @@ importers:
       '@deepseek-ai/dsh':
         specifier: 0.2.1-rc.2
         version: 0.2.1-rc.2(62164a93bf152a2516a0bd86eacd50ac)
+      '@deepseek-ai/dsh-api-gateway':
+        specifier: 'catalog:'
+        version: 0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)
       '@deepseek-ai/dsh-api-session-controller':
         specifier: 'catalog:'
         version: 0.2.1-rc.2(985cd115661eba5d1b0384c99b1a6beb)
@@ -3359,6 +3362,12 @@ importers:
       '@deepseek-ai/dsh-agent':
         specifier: 'catalog:'
         version: 0.2.1-rc.2(3bb27a3380dabe8aa6c4edfe696d286a)
+      '@deepseek-ai/dsh-api-gateway':
+        specifier: 'catalog:'
+        version: 0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)
+      '@deepseek-ai/dsh-api-remotes':
+        specifier: 'catalog:'
+        version: 0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-scope@0.2.1-rc.2(@deepseek-ai/cordis@4.0.4))
       '@deepseek-ai/dsh-api-session-controller':
         specifier: 'catalog:'
         version: 0.2.1-rc.2(985cd115661eba5d1b0384c99b1a6beb)

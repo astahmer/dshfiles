@@ -94,7 +94,7 @@ const openThreadRequestSchema = z.object({ sessionId: z.string().min(1), newTab:
 export default defineClient({
   name: '@dshfiles/main-tabs',
   locales: [mainTabsLocale],
-  inject: ['slots', 'layout', 'sessions', 'workspaces', 'uiWorkspace', 'shortcuts'],
+  inject: ['slots', 'layout', 'sessions', 'workspaces', 'uiWorkspace', 'shortcuts', 'remote', 'remote.session'],
   setup(ctx, decorate) {
     const translate = ctx.locale.bind(MAIN_TABS_LOCALE_NAMESPACE)
 
@@ -111,6 +111,13 @@ export default defineClient({
       if (sessionId === undefined) return false
       ctx.uiWorkspace.openSession(sessionId)
       return true
+    }
+
+    const renameThread = async (sessionId: string, title: string): Promise<void> => {
+      const target = ctx.sessions.list.getSnapshot().ids.find(id => id === sessionId)
+      if (target === undefined) throw new Error('the thread is not listed')
+      const result = await ctx.remote.session.rename({ sessionId: target, title })
+      if (!result.ok) throw new Error(result.error.message)
     }
 
     const actor = createActor(tabsMachine, { input: { ports: { navigate, save: saveTabs }, persisted: storedTabs.get() } })
@@ -368,7 +375,13 @@ export default defineClient({
 
           return createPortal(
             <>
-              <TabStrip tabs={tabs} send={sendStripEvent} t={props.t} newTabKeys={shortcutOf('mainTabs.newTab')?.keys.join('') ?? ''} />
+              <TabStrip
+                tabs={tabs}
+                send={sendStripEvent}
+                t={props.t}
+                newTabKeys={shortcutOf('mainTabs.newTab')?.keys.join('') ?? ''}
+                renameThread={renameThread}
+              />
               {startShown ? <StartPage sections={startSections()} t={props.t} /> : null}
             </>,
             host,

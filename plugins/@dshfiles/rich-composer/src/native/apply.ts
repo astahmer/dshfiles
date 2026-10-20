@@ -59,7 +59,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 
 /** Services required by the Conversation plugin. */
 export const inject = [
-  'slots', 'sessions', 'fileUpload', 'uiSession', 'uiWorkspace', 'locale', 'configForms',
+  'slots', 'sessions', 'fileUpload', 'uiSession', 'uiWorkspace', 'locale', 'configForms', 'remote', 'remote.session',
 ]
 
 /** Conversation runtime configuration. */
@@ -444,6 +444,10 @@ export function apply(ctx: Context, config: Config = Config({})): void {
     inject: (sessionId: SessionId, actions: BoundActions<typeof conversationStore>): ConversationSessionHeaderInjected => ({
       hooks: { conversationViews },
       open: (id) => { workspaceNavigation.openSession(id) },
+      rename: async (id, title) => {
+        const result = await ctx.remote.session.rename({ sessionId: id, title })
+        if (!result.ok) throw new Error(result.error.message)
+      },
       selectView: (view) => {
         activateView(sessionId, view)
         actions.setView(view)

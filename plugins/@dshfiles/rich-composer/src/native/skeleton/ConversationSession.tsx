@@ -1,6 +1,7 @@
 /** Strict per-session header/body content inserted into the resident conversation layout. */
 
 import clsx from 'clsx'
+import { useEffect, useRef, useState } from 'react'
 import type { SessionListState, SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type {
@@ -50,6 +51,62 @@ function equalBreadcrumbs(left: readonly Breadcrumb[], right: readonly Breadcrum
     })
 }
 
+interface SessionTitleEditorProps {
+  readonly title: string
+  readonly label: string
+  readonly error: string | undefined
+  readonly onCommit: (title: string) => void
+  readonly onCancel: () => void
+}
+
+/** In-place editor for the current Session title: Enter or blur commits, Escape cancels. */
+function SessionTitleEditor({ title, label, error, onCommit, onCancel }: SessionTitleEditorProps): JSX.Element {
+  const [draft, setDraft] = useState(title)
+  const settled = useRef(false)
+  const input = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    input.current?.focus()
+    input.current?.select()
+  }, [])
+  const settle = (mode: 'commit' | 'cancel'): void => {
+    if (settled.current) return
+    settled.current = true
+    const next = draft.trim()
+    if (mode === 'cancel' || next === '' || next === title.trim()) {
+      onCancel()
+      return
+    }
+    onCommit(next)
+  }
+  return (
+    <span className={css.titleEditor}>
+      <input
+        ref={input}
+        aria-label={label}
+        aria-invalid={error === undefined ? undefined : true}
+        className={css.titleInput}
+        maxLength={200}
+        spellCheck={false}
+        value={draft}
+        onChange={event => setDraft(event.currentTarget.value)}
+        onBlur={() => settle('commit')}
+        onClick={event => event.stopPropagation()}
+        onKeyDown={event => {
+          event.stopPropagation()
+          if (event.key === 'Enter') {
+            event.preventDefault()
+            settle('commit')
+          } else if (event.key === 'Escape') {
+            event.preventDefault()
+            settle('cancel')
+          }
+        }}
+      />
+      {error === undefined ? null : <span role="alert" className={css.titleError}>{error}</span>}
+    </span>
+  )
+}
+
 /**
  * Renders Session header chrome above the resident conversation scrollport.
  * @param props - Strict Session store, view ledger, navigation, render, and locale shares.
@@ -57,12 +114,27 @@ function equalBreadcrumbs(left: readonly Breadcrumb[], right: readonly Breadcrum
  */
 export function ConversationSessionHeader({
   sessionId, hideChrome, useSessions, useConversationViews, useStore,
-  renderSlot, open, selectView, t,
+  renderSlot, open, rename, selectView, t,
 }: ConversationSessionHeaderProps) {
   const tabs = useConversationViews(value => value)
   const selectedId = useStore(s => s.view)
   const active = resolveActiveView(tabs, selectedId)
   const ancestry = useSessions(s => deriveAncestry(s, sessionId), equalBreadcrumbs)
+  const [renaming, setRenaming] = useState(false)
+  const [renameError, setRenameError] = useState<string>()
+  useEffect(() => {
+    setRenaming(false)
+    setRenameError(undefined)
+  }, [sessionId])
+  const commitRename = async (title: string): Promise<void> => {
+    try {
+      await rename(sessionId, title)
+      setRenaming(false)
+      setRenameError(undefined)
+    } catch {
+      setRenameError(t('session.renameFailed'))
+    }
+  }
   const showTabs = !hideChrome && tabs.length > 1
   return (
     <>
@@ -73,16 +145,42 @@ export function ConversationSessionHeader({
               <nav className={css.crumbs} aria-label={t('session.hierarchy')}>
                 {ancestry.map((summary, index) => {
                   const last = index === ancestry.length - 1
-                  // The current crumb has no navigation, so it is plain text
-                  // rather than a disabled button: on darwin desktop a button
-                  // would subtract itself from the header's drag row (ui-web
-                  // base.css) and leave the title inert for dragging too.
+                  // The current crumb is editable in place. Ancestor crumbs stay
+                  // buttons because they navigate; a subagent current crumb keeps
+                  // its lineage switcher and is not renamed from here.
                   const title = last
-                    ? (
-                      <span className={clsx(css.crumb, summary.subagent && css.crumbSubagent, css.crumbCurrent)}>
-                        {summary.displayTitle}
-                      </span>
-                    )
+                    ? summary.subagent
+                      ? (
+                        <span className={clsx(css.crumb, css.crumbSubagent, css.crumbCurrent)}>
+                          {summary.displayTitle}
+                        </span>
+                      )
+                      : renaming
+                        ? (
+                          <SessionTitleEditor
+                            title={summary.displayTitle}
+                            label={t('session.renameTitle')}
+                            error={renameError}
+                            onCommit={next => void commitRename(next)}
+                            onCancel={() => {
+                              setRenaming(false)
+                              setRenameError(undefined)
+                            }}
+                          />
+                        )
+                        : (
+                          <button
+                            type="button"
+                            className={clsx(css.crumb, css.crumbCurrent, css.crumbEditable)}
+                            title={t('session.renameHint')}
+                            onClick={() => {
+                              setRenameError(undefined)
+                              setRenaming(true)
+                            }}
+                          >
+                            {summary.displayTitle}
+                          </button>
+                        )
                     : (
                       <button
                         type="button"

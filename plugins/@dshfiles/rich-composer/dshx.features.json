@@ -28,6 +28,33 @@
           "testName": "turns canonical session mentions into structured references and preserves surrounding text"
         }
       ]
+    },
+    {
+      "id": "rename-thread-title",
+      "title": "Rename a thread from its header title",
+      "summary": "Clicking the current Session title in the main view header opens an in-place editor focused on the whole title. Enter or leaving the field commits the trimmed title through the Session rename API, Escape cancels, and a blank or unchanged draft closes without a Host call. The header keeps the breadcrumb shape, so ancestor crumbs still navigate and a subagent's lineage switcher is unchanged.",
+      "surfaces": ["client"],
+      "configuration": [],
+      "states": ["title-idle", "title-editing", "title-committed", "title-cancelled"],
+      "failureModes": [
+        "A rename the Host refuses keeps the editor open with an error and the previous title stays on the thread.",
+        "An unchanged or blank draft closes the editor without a Host call."
+      ],
+      "externalDependencies": [],
+      "reach": [
+        "seed tool-call-thread",
+        "click title \"Click to rename\"",
+        "fill textbox \"Rename thread\" \"Header rename\"",
+        "press Enter",
+        "expect button \"Header rename\""
+      ],
+      "verification": [
+        {
+          "kind": "not-applicable",
+          "id": "rich-composer.thread-title-rename",
+          "reason": "The in-place header editor is exercised end to end by its scratch reach; mounting the slot in a unit harness would require the full Conversation runtime."
+        }
+      ]
     }
   ]
 }

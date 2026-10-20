@@ -541,6 +541,10 @@ export default defineClient({
       const result = await ctx.remote.workspace.unpinSession({ sessionId })
       if (!result.ok) throw new Error(result.error.code)
     }
+    const renameSession = async (sessionId: SessionSummary['id'], title: string) => {
+      const result = await ctx.remote.session.rename({ sessionId, title })
+      if (!result.ok) throw new Error(result.error.message)
+    }
     const subagentCatalogActions = (_parentSessionId: SessionId): SubagentCatalogInjected => ({
       openChild(address: SubagentAddress) {
         ctx.uiWorkspace.openSession(address)
@@ -666,6 +670,7 @@ export default defineClient({
               const result = await ctx.remote.workspace.unpinSession({ sessionId })
               if (!result.ok) throw new Error(result.error.code)
             },
+            renameSession,
             open: openThread,
             openRemoteThreads: () => ctx.layout.selectPanel('dshfiles-multi-host-thread' as MainPanelId),
           }),

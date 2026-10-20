@@ -5,13 +5,19 @@
     {
       "id": "main-view-tabs",
       "title": "Browser-like tabs above the main view",
-      "summary": "Every thread or global panel shown in the main view opens or focuses a tab above it. The strip looks like DSH's own right-panel tabs (28px pills, hairline separators, a close cross over a faded title end). Tabs close with × or a middle click, reorder by drag, pin to the start, close others or to the right from their context menu, scroll or list in a dropdown when they overflow, and show working, needs-you and unread dots on thread tabs. A thread tab's menu opens that thread in the right side panel — through the cancelable `dshfiles:open-thread-aside` event `@dshfiles/thread-sidebar` answers, with the strip saying the panel is unavailable when no plugin takes it — and dragging a thread tab onto the open side panel moves it there instead: the right column highlights under the pointer, and dropping closes the main tab once the aside took the thread. The aside tab's own menu moves it back through `dshfiles:open-thread`. Thread tabs also copy their ID or a clean deep link. Opening from outside the strip uses a VS Code-style preview tab by default; double-clicking a sidebar thread keeps its tab open.",
+      "summary": "Every thread or global panel shown in the main view opens or focuses a tab above it. The strip looks like DSH's own right-panel tabs (28px pills, hairline separators, a close cross over a faded title end). Tabs close with × or a middle click, reorder by drag, pin to the start, close others or to the right from their context menu, scroll or list in a dropdown when they overflow, and show working, needs-you and unread dots on thread tabs. A thread tab's menu opens that thread in the right side panel — through the cancelable `dshfiles:open-thread-aside` event `@dshfiles/thread-sidebar` answers, with the strip saying the panel is unavailable when no plugin takes it — and dragging a thread tab onto the open side panel moves it there instead: the right column highlights under the pointer, and dropping closes the main tab once the aside took the thread. The aside tab's own menu moves it back through `dshfiles:open-thread`. Thread tabs also copy their ID or a clean deep link, and their menu's Edit title edits the title in place. Opening from outside the strip uses a VS Code-style preview tab by default; double-clicking a sidebar thread keeps its tab open.",
       "reach": [
         "seed tool-call-thread",
         "rightclick tab \"*\"",
         "expect menuitem \"Open in side panel\"",
         "expect menuitem \"Copy thread ID\"",
-        "expect menuitem \"Copy thread link\""
+        "expect menuitem \"Copy thread link\"",
+        "press Escape",
+        "rightclick tab \"*\"",
+        "click menuitem \"Edit title\"",
+        "fill textbox \"Edit title\" \"Renamed thread\"",
+        "press Enter",
+        "expect tab \"Renamed thread*\""
       ],
       "surfaces": ["client", "integration", "storage", "settings"],
       "configuration": [
@@ -36,7 +42,7 @@
           "coveredBy": ["main-tabs.panels-and-threads", "main-tabs.machine-unit-preview", "main-tabs.machine-unit-replace"]
         }
       ],
-      "states": ["following", "navigating", "off", "preview", "pinned", "overflowing", "strip-unmounted", "side-panel-unavailable"],
+      "states": ["following", "navigating", "off", "preview", "pinned", "overflowing", "strip-unmounted", "side-panel-unavailable", "renaming"],
       "failureModes": [
         "A tab whose panel plugin is gone stays dimmed until the panel registers again; picking it does nothing.",
         "A navigation the Host never finishes stops being awaited after two seconds.",
@@ -102,6 +108,12 @@
           "id": "main-tabs.aside-drop-declined-unit",
           "file": "plugins/@dshfiles/main-tabs/src/tab-strip.client.test.tsx",
           "testName": "keeps the main tab and says the side panel is unavailable when nobody takes the drop"
+        },
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.tab-title-rename",
+          "file": "plugins/@dshfiles/main-tabs/src/tab-strip.client.test.tsx",
+          "testName": "renames a thread from its tab menu"
         },
         {
           "kind": "gherkin",

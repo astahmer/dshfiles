@@ -1828,6 +1828,35 @@
           "testName": "expands and collapses child rows with Right and Left"
         }
       ]
+    },
+    {
+      "id": "rename-thread-title",
+      "title": "Edit a thread title from its row menu",
+      "summary": "The thread row context menu has Edit title: it replaces the row title with a focused input, commits the trimmed title on Enter or blur through the Session rename API, and cancels on Escape without a Host call.",
+      "reach": [
+        "seed tool-call-thread",
+        "rightclick text \"sample\"",
+        "click menuitem \"Edit title\"",
+        "fill textbox \"Edit title\" \"Sidebar rename\"",
+        "press Enter",
+        "expect text \"Sidebar rename\""
+      ],
+      "surfaces": ["client", "integration"],
+      "configuration": [],
+      "states": ["title-idle", "title-editing", "title-committed", "title-cancelled"],
+      "failureModes": [
+        "A rename the Host refuses keeps the row title and shows the sidebar failure notice.",
+        "An unchanged or blank draft closes the editor without a Host call."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.rename-title-route",
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-actions.test.ts",
+          "testName": "routes rename, fork, stop and model selection to the named thread"
+        }
+      ]
     }
   ],
   "kind": "bundle"

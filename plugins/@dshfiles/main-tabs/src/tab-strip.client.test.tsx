@@ -11,6 +11,8 @@ const labels = {
   closeTab: 'Close tab',
   copyThreadId: 'Copy thread ID',
   copyThreadLink: 'Copy thread link',
+  renameThread: 'Edit title',
+  renameFailed: 'Could not rename the thread.',
   openInSidePanel: 'Open in side panel',
   moveToSidePanel: 'Move to side panel',
   sidePanelUnavailable: 'The side panel is not available here.',
@@ -93,7 +95,8 @@ const openContextMenu = (tab: HTMLElement): void => {
   fireEvent.contextMenu(tab, { clientX: 20, clientY: 20 })
 }
 
-const mount = (send: (event: TabsEvent) => void = () => {}) => render(<TabStrip tabs={tabs} send={send} t={t} newTabKeys="" />)
+const mount = (send: (event: TabsEvent) => void = () => {}, renameThread: (sessionId: string, title: string) => Promise<void> = async () => {}) =>
+  render(<TabStrip tabs={tabs} send={send} t={t} newTabKeys="" renameThread={renameThread} />)
 
 const asideRequests: { readonly detail: unknown; readonly cancelable: boolean }[] = []
 const onAsideRequest = (event: Event): void => {
@@ -113,6 +116,31 @@ describe('TabStrip thread actions', () => {
     openContextMenu(screen.getByRole('tab', { name: 'Thread, Working' }))
     await screen.findByRole('menuitem', { name: 'Copy thread ID' })
     expect(screen.getByRole('menuitem', { name: 'Copy thread link' })).toBeDefined()
+  })
+
+  it('renames a thread from its tab menu', async () => {
+    const renameThread = vi.fn(async () => {})
+    mount(() => {}, renameThread)
+
+    openContextMenu(screen.getByRole('tab', { name: 'Thread, Working' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Edit title' }))
+    const input = await screen.findByRole('textbox', { name: 'Edit title' })
+    fireEvent.change(input, { target: { value: 'Renamed thread' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+
+    await waitFor(() => expect(renameThread).toHaveBeenCalledWith('thread-1', 'Renamed thread'))
+  })
+
+  it('cancels a tab title edit on Escape', async () => {
+    const renameThread = vi.fn(async () => {})
+    mount(() => {}, renameThread)
+
+    openContextMenu(screen.getByRole('tab', { name: 'Thread, Working' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Edit title' }))
+    fireEvent.keyDown(await screen.findByRole('textbox', { name: 'Edit title' }), { key: 'Escape' })
+
+    expect(screen.queryByRole('textbox', { name: 'Edit title' })).toBeNull()
+    expect(renameThread).not.toHaveBeenCalled()
   })
 
   it('omits thread copy actions from panel tab menus', async () => {

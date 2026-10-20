@@ -1,6 +1,7 @@
 import { writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from '@dshfiles/plugin-ui/components/ui/context-menu'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
+import { InlineTitleEditor } from '@dshfiles/plugin-ui/components/ui/inline-title-editor'
 import { ChevronDownIcon, CopyIcon, PanelRightOpenIcon, PinIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type ReactElement } from 'react'
@@ -41,6 +42,8 @@ interface TabStripProps {
   readonly t: MainTabsTranslate
   /** The new-tab command's keys, shown in the "+" tooltip. */
   readonly newTabKeys: string
+  /** Rename one thread's explicit title; rejects when the Host refuses it. */
+  readonly renameThread: (sessionId: string, title: string) => Promise<void>
 }
 
 /** One dot per thread tab, most urgent first: a question or approval waits, then work in progress, then an unseen finish. */
@@ -95,6 +98,7 @@ export const TabStrip = (props: TabStripProps): ReactElement => {
   const [dropIndex, setDropIndex] = useState<number | null>(null)
   const [status, setStatus] = useState('')
   const [asideDrop, setAsideDrop] = useState(false)
+  const [renamingTabId, setRenamingTabId] = useState<string | null>(null)
   const dragged = useRef<string | null>(null)
   const asideColumn = useRef<HTMLElement | null>(null)
   const tabsRef = useRef(tabs)
@@ -109,6 +113,16 @@ export const TabStrip = (props: TabStripProps): ReactElement => {
   }
   const openAside = (sessionId: string): void => {
     if (!requestThreadAside(sessionId)) setStatus(t('sidePanelUnavailable'))
+  }
+  const renameTab = async (tab: TabView, title: string): Promise<void> => {
+    if (tab.kind !== 'thread') return
+    try {
+      await props.renameThread(tab.sessionId, title)
+      setRenamingTabId(null)
+      setStatus('')
+    } catch {
+      setStatus(t('renameFailed'))
+    }
   }
   /** The dragged tab's move target, or null when this tab stays in the strip (reorder or start tab). */
   const draggedMove = (): DraggedMove | null => {
@@ -261,7 +275,7 @@ export const TabStrip = (props: TabStripProps): ReactElement => {
                   data-pinned={tab.pinned || undefined}
                   data-preview={tab.preview || undefined}
                   tabIndex={tab.active || (activeId === undefined && index === 0) ? 0 : -1}
-                  draggable
+                  draggable={renamingTabId !== tab.id}
                   className={cn(
                     'dshx:group dshx:relative dshx:flex dshx:h-7 dshx:max-w-[190px] dshx:flex-[0_1_auto] dshx:cursor-pointer dshx:items-center dshx:rounded-(--dsw-radius-sm) dshx:px-2.5 dshx:leading-none dshx:whitespace-nowrap dshx:text-muted-foreground dshx:outline-none dshx:select-none dshx:hover:bg-accent dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:focus-visible:ring-inset',
                     tab.pinned ? 'dshx:min-w-0' : 'dshx:min-w-[100px]',
@@ -318,7 +332,17 @@ export const TabStrip = (props: TabStripProps): ReactElement => {
                     {tab.status === null ? null : (
                       <span aria-hidden className={cn('dshx:size-1.5 dshx:flex-none dshx:rounded-full', statusDotClass[tab.status])} />
                     )}
-                    <span className={cn('dshx:truncate', tab.preview && 'dshx:italic')}>{tab.title}</span>
+                    {tab.kind === 'thread' && renamingTabId === tab.id ? (
+                      <InlineTitleEditor
+                        value={tab.title}
+                        label={t('renameThread')}
+                        className="dshx:h-5 dshx:min-w-20 dshx:border-0 dshx:bg-transparent dshx:p-0 dshx:shadow-none dshx:text-inherit dshx:focus-visible:ring-0"
+                        onCancel={() => setRenamingTabId(null)}
+                        onCommit={title => void renameTab(tab, title)}
+                      />
+                    ) : (
+                      <span className={cn('dshx:truncate', tab.preview && 'dshx:italic')}>{tab.title}</span>
+                    )}
                     {tab.pinned ? <PinIcon aria-label={t('pinned')} size={12} className="dshx:flex-none dshx:text-(--dsw-alias-label-tertiary)" /> : null}
                   </span>
                   {tab.pinned ? null : (
@@ -347,6 +371,7 @@ export const TabStrip = (props: TabStripProps): ReactElement => {
                   <ContextMenuItem onSelect={() => send({ type: 'tab.togglePin', tabId: tab.id })}>{t(tab.pinned ? 'unpin' : 'pin')}</ContextMenuItem>
                 )}
                 {tab.preview ? <ContextMenuItem onSelect={() => send({ type: 'tab.keep', tabId: tab.id })}>{t('keepOpen')}</ContextMenuItem> : null}
+                {tab.kind === 'thread' ? <ContextMenuItem onSelect={() => setRenamingTabId(tab.id)}>{t('renameThread')}</ContextMenuItem> : null}
                 {tab.kind === 'start' && !tab.preview ? null : <ContextMenuSeparator />}
                 {tab.kind === 'thread' ? (
                   <>
