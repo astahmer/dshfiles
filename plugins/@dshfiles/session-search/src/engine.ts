@@ -21,6 +21,7 @@ import {
   type SessionSearchHit,
   type SessionSearchPage,
   type SessionSearchRequest,
+  type SessionTitleObservationResult,
 } from '@deepseek-ai/dsh-session-query'
 import { z } from 'zod'
 import { withoutUndefined } from './optional-fields.js'
@@ -85,6 +86,26 @@ export class SessionSearchEngine extends SessionQueryEngine {
     this._client = parsed.client
     this._defaultLimit = parsed.defaultLimit
     this._maxLimit = parsed.maxLimit
+    ctx.on('session/event', session => {
+      this._titles.delete(session.id)
+    })
+  }
+
+  /**
+   * Core folds a title by decoding the Session's whole log (69 MB compressed for the largest here), and Memory's
+   * finder and the worktree-memory panel ask for dozens of titles per search or 3 s poll. A title changes only through
+   * an event appended to its own Session, so a read title is kept until then.
+   */
+  readonly _titles = new Map<string, SessionTitleObservationResult>()
+
+  override async readTitleSnapshots(sessionIds: readonly SessionId[], signal?: AbortSignal): Promise<SessionTitleObservationResult[]> {
+    const missing = sessionIds.filter(id => !this._titles.has(id))
+    const read = new Map((missing.length === 0 ? [] : await super.readTitleSnapshots(missing, signal)).map(result => [result.sessionId, result]))
+    for (const result of read.values()) if (result.status === 'fulfilled') this._titles.set(result.sessionId, result)
+    return sessionIds.flatMap(id => {
+      const result = this._titles.get(id) ?? read.get(id)
+      return result === undefined ? [] : [structuredClone(result)]
+    })
   }
 
   override async searchSessions(request: SessionSearchRequest, exec?: SessionSearchExecContext): Promise<SessionSearchPage<SessionSearchHit>> {
