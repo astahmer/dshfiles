@@ -1,0 +1,5 @@
+- id: subprocess
+  disabled: true
+- insert:
+    - id: dshfiles-subprocess-local
+      name: '@dshfiles/subprocess-local'
