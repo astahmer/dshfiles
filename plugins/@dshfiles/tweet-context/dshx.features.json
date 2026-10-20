@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "public-post-context",
+      "title": "Fetch public X post text and sampled video frames",
+      "summary": "Give an agent a public X/Twitter post's text and author, plus up to six bounded image samples from a video post.",
+      "surfaces": ["host", "integration"],
+      "configuration": [],
+      "states": ["input-validation", "post-fetch", "video-download", "frame-sampling", "attachment-save", "ready", "failed"],
+      "failureModes": [
+        "Only HTTPS x.com and twitter.com status URLs are accepted; private, deleted, or unavailable posts cannot be retrieved.",
+        "The third-party FxEmbed API and video.twimg.com may be unavailable or return unsupported data.",
+        "Video downloads are capped at 25 MB and 10 minutes; ffmpeg must be on the DSH Host PATH, with frames capped at 16 million pixels and single allocations at 128 MB.",
+        "Only sampled still images are returned; audio and continuous motion are unavailable."
+      ],
+      "externalDependencies": [
+        {
+          "id": "fxembed-public-api",
+          "boundary": "The public numeric post ID is sent to api.fxtwitter.com; the response supplies post text, author metadata, and video URLs.",
+          "deterministicFake": "The host test injects a fetcher that serves a fixed FxEmbed-shaped response from a local HTTP fixture; it never calls a public post API."
+        },
+        {
+          "id": "x-video-cdn",
+          "boundary": "An MP4 variant is downloaded from video.twimg.com and decoded by the Host's ffmpeg binary.",
+          "deterministicFake": "The host test routes a video.twimg.com URL to a generated two-second local MP4, then uses the real download and ffmpeg sampling path."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "tweet-context.tool-catalog",
+          "featureFile": "tooling/dshx/e2e/features/tweet-context.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "tweet-context.url-normalization",
+          "file": "plugins/@dshfiles/tweet-context/tests/host.spec.ts",
+          "testName": "normalizes status links and drops tracking parameters"
+        },
+        {
+          "kind": "unit-test",
+          "id": "tweet-context.variant-size-budget",
+          "file": "plugins/@dshfiles/tweet-context/tests/host.spec.ts",
+          "testName": "chooses the highest-bitrate MP4 under the bounded download size"
+        },
+        {
+          "kind": "unit-test",
+          "id": "tweet-context.ffmpeg-frame-sampling",
+          "file": "plugins/@dshfiles/tweet-context/tests/host.spec.ts",
+          "testName": "uses ffmpeg to create real JPEG frames from a local MP4"
+        },
+        {
+          "kind": "unit-test",
+          "id": "tweet-context.ffmpeg-pixel-budget",
+          "file": "plugins/@dshfiles/tweet-context/tests/host.spec.ts",
+          "testName": "rejects decoded frames above the ffmpeg pixel budget"
+        },
+        {
+          "kind": "unit-test",
+          "id": "tweet-context.fixture-provider-flow",
+          "file": "plugins/@dshfiles/tweet-context/tests/host.spec.ts",
+          "testName": "fetches fixed post and video fixtures, samples frames, and blocks unsafe media hosts and redirects"
+        },
+        {
+          "kind": "unit-test",
+          "id": "tweet-context.untrusted-provider-content",
+          "file": "plugins/@dshfiles/tweet-context/tests/host.spec.ts",
+          "testName": "marks and quotes provider metadata and post text as untrusted content"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "tweet-context.live-provider-availability",
+          "reason": "Automated tests deliberately do not call FxEmbed or the live video CDN: availability and public-post retention are third-party concerns. The complete response, download, ffmpeg, and attachment projection path is exercised with local fixtures."
+        }
+      ]
+    }
+  ]
+}
