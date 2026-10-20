@@ -6,6 +6,7 @@ import { basename, dirname, join, resolve } from 'node:path'
 import { z } from 'zod'
 import { JsonText } from './json-text.js'
 import { ThreadIntegrationModel } from './thread-integration-state.js'
+import { JjReadCache } from './jj-read-cache.js'
 
 export interface JjResult {
   readonly exitCode: number
@@ -327,8 +328,14 @@ export const createThreads = (options: {
     return next
   }
 
+  const viewReads = new JjReadCache<JjResult>()
   const execute = (args: readonly string[], cwd: string, signal?: AbortSignal): Promise<JjResult> =>
-    signal === undefined ? options.executor({ args, cwd }) : options.executor({ args, cwd, signal })
+    JjReadCache.isViewRead(args)
+      ? // Shared by every caller of the same read, so no single caller's signal may abort it.
+        viewReads.read({ args, cwd, run: () => options.executor({ args, cwd }), succeeded: result => result.exitCode === 0 && !result.stdoutLossy })
+      : signal === undefined
+        ? options.executor({ args, cwd })
+        : options.executor({ args, cwd, signal })
 
   const completeStdout = (result: JjResult): string => {
     if (result.stdoutLossy) throw new ThreadError('jj-failed', 'JJ output exceeded the safe size limit; refusing incomplete repository data.')
