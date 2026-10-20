@@ -19,6 +19,8 @@ export type InventoryRow = {
   readonly startedHere: boolean
 }
 
+type OptionalRowFields = { title?: string; cwd?: string }
+
 const rowKey = (runtimeId: string, sessionId: string): string => `${runtimeId}\u0000${sessionId}`
 
 /**
@@ -59,12 +61,14 @@ export const mergeInventory = (input: {
       if (session.blank) continue
       const key = rowKey(session.runtimeId, session.sessionId)
       if (rows.has(key)) continue
+      const optional: OptionalRowFields = {}
+      if (session.title !== undefined && session.title !== '') optional.title = session.title
+      if (session.cwd !== undefined) optional.cwd = session.cwd
       rows.set(key, {
         runtimeId: session.runtimeId,
         sessionId: session.sessionId,
         hostName: source.hostName,
-        ...(session.title === undefined || session.title === '' ? {} : { title: session.title }),
-        ...(session.cwd === undefined ? {} : { cwd: session.cwd }),
+        ...optional,
         running: session.running,
         updatedAt: session.updatedAt,
         startedHere: false,

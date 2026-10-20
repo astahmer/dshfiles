@@ -3,7 +3,7 @@ import { homedir } from 'node:os'
 import { basename, join } from 'node:path'
 import { z } from 'zod'
 import { defineHost } from '@dshfiles/dshx/host'
-import { multiHostApi, type ConnectionTestStep, type RuntimeStatus } from './api.js'
+import { multiHostApi, type ConnectionTestStep, type RuntimeStatus, type SessionSummary } from './api.js'
 import { connectLocal } from './connectors/local.js'
 import { SshConnector } from './connectors/ssh.js'
 import { GatewayUnavailableError, type Gateway } from './connectors/gateway.js'
@@ -507,15 +507,16 @@ const multiHostHandlers = multiHostApi.host({
             .items.slice(0, 500)
             .map(item => {
               const title = item.title ?? item.projections?.values?.title ?? undefined
-              return {
+              const summary: SessionSummary = {
                 runtimeId: runtime.id,
                 sessionId: item.sessionId,
-                ...(item.cwd === undefined ? {} : { cwd: item.cwd }),
-                ...(title === undefined || title === '' ? {} : { title }),
                 running: item.running,
                 blank: item.blank,
                 updatedAt: item.updatedAt,
               }
+              if (item.cwd !== undefined) summary.cwd = item.cwd
+              if (title !== undefined && title !== '') summary.title = title
+              return summary
             })
           const workspaces = collectWorkspaces(frames).map(item => ({
             runtimeId: runtime.id,

@@ -40,6 +40,7 @@ const texts = (blocks: readonly z.infer<typeof textBlockSchema>[] | undefined): 
     .trim()
 
 export type TranscriptWaiting = { readonly kind: 'question' | 'tool'; readonly tool: string; readonly since: number }
+type ReducedTranscript = { entries: TranscriptEntry[]; running: boolean; title?: string; model?: ModelSelection; waiting?: TranscriptWaiting }
 
 const questionTool = (name: string): boolean => name === 'ask_user_question' || name === 'ask_parent_question' || name.endsWith('__ask_user_question')
 
@@ -113,11 +114,9 @@ export const reduceTranscript = (
     running && lastCall !== undefined && !resolvedCalls.has(lastCall.callId)
       ? { kind: questionTool(lastCall.name) ? 'question' : 'tool', tool: lastCall.name, since: lastCall.seq }
       : undefined
-  return {
-    entries,
-    running,
-    ...(title === undefined ? {} : { title }),
-    ...(model === undefined ? {} : { model }),
-    ...(waiting === undefined ? {} : { waiting }),
-  }
+  const reduced: ReducedTranscript = { entries, running }
+  if (title !== undefined) reduced.title = title
+  if (model !== undefined) reduced.model = model
+  if (waiting !== undefined) reduced.waiting = waiting
+  return reduced
 }
