@@ -63,5 +63,12 @@ above the core count (leaked `dshx-boot` scratch Hosts, editor jj servers) infla
   miss live data and user-layer patches.
 - The Host's "N entries did not activate … fiber state 1" line is a boot-time snapshot; rows still loading then
   usually activate. Check the browser boot graph (`window.__DSH_BOOT__`) and console for client-side failures.
+- On a starved machine (load ≫ cores) the 1 ms sampler is descheduled: sample deltas reach 100–250 ms and land on
+  whatever frame was on the stack, so self time per frame is noise. Check `uptime` and the delta distribution before
+  trusting a single hot frame. On 2026-10-21 (load 54–82: three leaked `dshx dev up` instances plus e2e runs) a
+  `session/create` took 6.5 s with no regression in `main`; the Host lagged up to 1.8 s because the machine did.
+- Confirm a suspected hot path by counting it on the live Host instead of trusting the profile: a conditional
+  breakpoint whose condition increments a global and returns `false` counts calls without pausing (it showed
+  28 `AbortSignal.timeout` fires in 20 s, not the thousands a misread profile implied).
 
 Record findings and before/after tables in [`docs/performance.md`](../../../docs/performance.md).

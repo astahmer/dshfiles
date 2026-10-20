@@ -40,6 +40,8 @@ const owner = url => (url.match(/(@dshfiles\/[^/]+|@deepseek-ai\/[^/]+)/g) ?? [u
 const inclusive = new Map()
 let busy = 0
 profile.samples.forEach((sample, index) => {
+  // The first delta spans the attach, not the sampled frame: on a loaded Host it blamed 5.8 s on a lone DOMException.
+  if (index === 0) return
   const delta = profile.timeDeltas[index] ?? 0
   const frame = byId.get(sample).callFrame
   if (frame.functionName === '(idle)' || frame.functionName === '(program)') return

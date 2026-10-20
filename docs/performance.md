@@ -76,6 +76,17 @@ cached projection checkpoint over that tail with `sessionProjections.restore`. L
 and mid-turn logs keep the full read. On a clone of the live Host, 52 of 52 openings were identical to the full read
 (cursor, `hasMore`, every record, every projection). Live, cold: the 69 MB thread 1.5 s → 0.54 s to history.
 
+## Slow New thread under machine load (2026-10-21)
+
+`session/create` took 6.5 s, `threadAt` 3.6 s and `page` 2.9 s in one click. No revision on `main` touched the path
+in a way that explains it: the only change on it (the free-name check before a thread workspace is provisioned) adds
+one `jj workspace list`, 80–200 ms. The machine was the cause: load 54–82 on 10 cores from three `dshx dev up`
+instances nobody stopped (each a Host, a browser host and headless Chromium) plus three e2e runs. The live Host sat at
+80–97 % CPU with event-loop stalls up to 1.8 s (p50 97 ms, p90 371 ms). Its own top costs were spawning child
+processes (agents' bash calls and the `jujutsu` per-workspace `jj log` fan-out over 45 thread workspaces, 1.7–2.7 s
+per 20–30 s) and session-log probes. The response is automatic: leaked scratch instances stop after an idle lease
+(dshx), and idle thread workspaces are cleaned up on a schedule (`@dshfiles/jj-integration`).
+
 ## Still open
 
 - Loading older history in a cold thread (scrolling up past the opening window) and the first command still read the
