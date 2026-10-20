@@ -31,6 +31,22 @@ describe('thread view preferences', () => {
     })
   })
 
+  it('keeps attention dots off All threads while showing them on matching presets', () => {
+    const entries = [
+      {
+        thread: {},
+        attentionLabel: 'threadSidebarInputNeeded',
+        running: true,
+        archived: false,
+        settled: false,
+        muted: false,
+      },
+    ] as const
+
+    expect(ThreadViewPreferencesModel.attentionLabelForPreset(DEFAULT_THREAD_VIEW_PRESETS[0], entries)).toBeUndefined()
+    expect(ThreadViewPreferencesModel.attentionLabelForPreset(DEFAULT_THREAD_VIEW_PRESETS[1], entries)).toBe('threadSidebarInputNeeded')
+  })
+
   it('decodes individual group and filter presets', () => {
     expect(ThreadViewPreferencesModel.decodeThreadViewPreferences({ groupBy: 'date' })).toEqual({
       groupBy: 'date',

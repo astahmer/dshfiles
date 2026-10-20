@@ -908,6 +908,14 @@ When('a thread finishes its turn and the browser hands its unfinished marker to 
       ),
     [LEGACY_NOTIFICATION_STORAGE_KEY, targetThreadId],
   )
+  await threadSidebar(page).getByRole('button', { name: 'Sidebar settings', exact: true }).click()
+  await sidebarSettings(page).getByRole('button', { name: 'Manage views', exact: true }).click()
+  const viewManager = page.getByRole('dialog')
+  await viewManager.getByRole('button', { name: 'Add view', exact: true }).click()
+  await viewManager.getByLabel('View name').fill('Done')
+  await viewManager.getByRole('checkbox', { name: 'Not working', exact: true }).check()
+  await viewManager.getByRole('button', { name: 'Save view', exact: true }).click()
+  await viewManager.getByRole('button', { name: 'Close', exact: true }).click()
   finishedTurnJourneys.set(page, { targetThreadId })
 })
 
@@ -918,21 +926,35 @@ Then('every open tab shows the finished turn until one tab opens it', async ({ p
   await recordAssertion(page, 'thread-sidebar-turn-finished-outlives-its-client', async () => {
     await page.reload()
     await expect(finishedLabel(page)).toBeVisible({ timeout: 60_000 })
+    const tabs = threadSidebar(page).getByRole('group', { name: 'Thread list view', exact: true })
+    const doneTab = tabs.getByRole('button', { name: 'Done, Turn finished', exact: true })
+    await expect(doneTab).toBeVisible()
+    await expect(doneTab.getByTestId('thread-view-attention-dot')).toHaveClass(/bg-success/)
+    await expect(tabs.getByRole('button', { name: 'All threads', exact: true }).getByTestId('thread-view-attention-dot')).toHaveCount(0)
   })
   const otherTab = await page.context().newPage()
   try {
     await otherTab.goto(page.url())
     await recordAssertion(page, 'thread-sidebar-turn-finished-is-shared-across-tabs', async () => {
       await expect(finishedLabel(otherTab)).toBeVisible({ timeout: 30_000 })
+      await expect(
+        threadSidebar(otherTab).getByRole('button', { name: 'Done, Turn finished', exact: true }).getByTestId('thread-view-attention-dot'),
+      ).toBeVisible()
       await otherTab.reload()
       await expect(finishedLabel(otherTab)).toBeVisible({ timeout: 30_000 })
+      await expect(
+        threadSidebar(otherTab).getByRole('button', { name: 'Done, Turn finished', exact: true }).getByTestId('thread-view-attention-dot'),
+      ).toBeVisible()
     })
     await recordAssertion(page, 'thread-sidebar-turn-finished-clears-in-every-tab', async () => {
       await openThreadRow(threadRow(otherTab, journey.targetThreadId))
       await expect(finishedLabel(otherTab)).toHaveCount(0, { timeout: 15_000 })
+      await expect(threadSidebar(otherTab).getByRole('button', { name: 'Done, Turn finished', exact: true })).toHaveCount(0)
+      await expect(threadSidebar(otherTab).getByRole('button', { name: 'Done', exact: true }).getByTestId('thread-view-attention-dot')).toHaveCount(0)
       await page.bringToFront()
       await page.reload()
       await expect(finishedLabel(page)).toHaveCount(0, { timeout: 30_000 })
+      await expect(threadSidebar(page).getByRole('button', { name: 'Done, Turn finished', exact: true })).toHaveCount(0)
     })
   } finally {
     await otherTab.close()

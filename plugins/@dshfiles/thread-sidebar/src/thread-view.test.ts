@@ -68,6 +68,60 @@ describe('thread view grouping', () => {
   })
 })
 
+describe('thread view attention markers', () => {
+  it('selects one highest-priority attention state among matching threads', () => {
+    expect(
+      ThreadViewModel.attentionLabelForView({
+        filters: ['working'],
+        sourceFilter: 'all',
+        entries: [
+          {
+            thread: {},
+            attentionLabel: 'threadSidebarInputNeeded',
+            running: true,
+            archived: false,
+            settled: false,
+            muted: false,
+          },
+          {
+            thread: {},
+            attentionLabel: 'threadSidebarInterrupted',
+            running: true,
+            archived: false,
+            settled: false,
+            muted: false,
+          },
+          {
+            thread: {},
+            attentionLabel: 'threadSidebarTurnFinished',
+            running: false,
+            archived: false,
+            settled: false,
+            muted: false,
+          },
+        ],
+      }),
+    ).toBe('threadSidebarInterrupted')
+  })
+
+  it('only considers attention threads that match the tab source and status', () => {
+    const entries = [
+      {
+        thread: { origin: 'subagent' },
+        attentionLabel: 'threadSidebarInputNeeded',
+        running: false,
+        archived: false,
+        settled: false,
+        muted: false,
+      },
+    ] as const
+
+    expect(ThreadViewModel.attentionLabelForView({ filters: ['working'], sourceFilter: 'subagents', entries })).toBeUndefined()
+    expect(ThreadViewModel.attentionLabelForView({ filters: ['not-working'], sourceFilter: 'main', entries })).toBeUndefined()
+    expect(ThreadViewModel.attentionLabelForView({ filters: ['not-working'], sourceFilter: 'subagents', entries })).toBe('threadSidebarInputNeeded')
+  })
+})
+
 describe('thread view filters', () => {
   it('hides /btw side chats by their title marker only', () => {
     expect(ThreadViewModel.isSideChat({ title: 'btw · why is the build slow?' })).toBe(true)

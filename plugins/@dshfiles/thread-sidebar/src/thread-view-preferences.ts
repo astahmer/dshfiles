@@ -4,7 +4,9 @@ import {
   THREAD_GROUP_BY_OPTIONS,
   THREAD_SOURCE_FILTER_OPTIONS,
   THREAD_STATUS_FILTER_OPTIONS,
+  ThreadViewModel,
   type ThreadStatusFilter,
+  type ThreadViewAttentionEntry,
   type ThreadViewPreferences,
 } from './thread-view.js'
 
@@ -198,6 +200,11 @@ const decodeThreadViewSettings = (value: unknown): ThreadViewSettings | null => 
 const activeThreadView = (settings: ThreadViewSettings): ThreadViewPreset =>
   settings.views.find(view => view.id === settings.activeViewId && view.enabled) ?? settings.views.find(view => view.enabled) ?? DEFAULT_THREAD_VIEW_PRESETS[0]
 
+const attentionLabelForPreset = (view: ThreadViewPreset, entries: readonly ThreadViewAttentionEntry[]) => {
+  if (view.id === ALL_THREADS_VIEW_ID) return undefined
+  return ThreadViewModel.attentionLabelForView({ filters: view.statusFilters, sourceFilter: view.sourceFilter, entries })
+}
+
 const selectThreadView = (settings: ThreadViewSettings, viewId: string): ThreadViewSettings => {
   const view = settings.views.find(candidate => candidate.id === viewId)
   return view?.enabled ? { ...settings, activeViewId: view.id } : settings
@@ -267,6 +274,7 @@ export class ThreadViewPreferencesModel {
   static readonly decodeThreadViewPreferences = decodeThreadViewPreferences
   static readonly decodeThreadViewSettings = decodeThreadViewSettings
   static readonly activeThreadView = activeThreadView
+  static readonly attentionLabelForPreset = attentionLabelForPreset
   static readonly selectThreadView = selectThreadView
   static readonly saveThreadView = saveThreadView
   static readonly moveThreadView = moveThreadView

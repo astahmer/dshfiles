@@ -246,7 +246,7 @@
     {
       "id": "thread-list-views",
       "title": "Configure saved thread views",
-      "summary": "Group thread rows by activity and filter by any combination of status, source, or attention; create named tabs with saved presets, reorder or disable views, and hide quick controls.",
+      "summary": "Group thread rows by activity and filter by any combination of status, source, or attention; create named tabs with saved presets, reorder or disable views, and show one highest-priority colored attention dot on matching tabs other than All threads.",
       "reach": [
         "expect group \"Thread list view\"",
         "click button \"All threads\"",
@@ -333,6 +333,7 @@
       ],
       "failureModes": [
         "Working and not-working status matching uses session activity plus attention, archive, and mute state; source filters use parentId and origin.",
+        "Attention dots appear only on matching non-All-threads views and use one highest-priority attention color.",
         "Saved view IDs and names must be unique; at least one of 1–12 presets must remain enabled."
       ],
       "externalDependencies": [],
@@ -376,6 +377,24 @@
           "id": "thread-sidebar.view-controls-unit-source-filters",
           "file": "plugins/@dshfiles/thread-sidebar/src/thread-view.test.ts",
           "testName": "filters main and subagent sources using Host lineage metadata"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.view-controls-unit-attention-priority",
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-view.test.ts",
+          "testName": "selects one highest-priority attention state among matching threads"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.view-controls-unit-attention-matches-view",
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-view.test.ts",
+          "testName": "only considers attention threads that match the tab source and status"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.view-controls-unit-attention-omits-all-threads",
+          "file": "plugins/@dshfiles/thread-sidebar/src/thread-view-preferences.test.ts",
+          "testName": "keeps attention dots off All threads while showing them on matching presets"
         },
         {
           "kind": "unit-test",

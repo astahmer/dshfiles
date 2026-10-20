@@ -1494,7 +1494,6 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       matchesWorkspace: (session: SessionSummary) =>
         preferences.workspaceFilter === null ||
         (SidebarOrganization.workspaceForLineage(session, sessionState.byId, workspaceBySession) ?? '') === preferences.workspaceFilter,
-      matchesSource: (session: SessionSummary) => ThreadViewModel.matchesSourceFilter(session, threadView.sourceFilter),
     }),
     [
       archivedSessionIds,
@@ -1505,13 +1504,23 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       recoverySessionIds,
       sessionState.byId,
       sessions,
-      threadView.sourceFilter,
       workspaceBySession,
     ],
   )
-  const needsResumeRows = useMemo(() => selectRecoveryRows({ ...recoveryRowOptions, reason: 'restart' }), [recoveryRowOptions])
-  const interruptedRows = useMemo(() => selectRecoveryRows({ ...recoveryRowOptions, reason: 'interrupted' }), [recoveryRowOptions])
-  const usageLimitRows = useMemo(
+  const allNeedsResumeRows = useMemo(() => selectRecoveryRows({ ...recoveryRowOptions, reason: 'restart', matchesSource: () => true }), [recoveryRowOptions])
+  const allInterruptedRows = useMemo(
+    () => selectRecoveryRows({ ...recoveryRowOptions, reason: 'interrupted', matchesSource: () => true }),
+    [recoveryRowOptions],
+  )
+  const needsResumeRows = useMemo(
+    () => allNeedsResumeRows.filter(session => ThreadViewModel.matchesSourceFilter(session, threadView.sourceFilter)),
+    [allNeedsResumeRows, threadView.sourceFilter],
+  )
+  const interruptedRows = useMemo(
+    () => allInterruptedRows.filter(session => ThreadViewModel.matchesSourceFilter(session, threadView.sourceFilter)),
+    [allInterruptedRows, threadView.sourceFilter],
+  )
+  const allUsageLimitRows = useMemo(
     () =>
       UsageLimitRowsModel.select({
         sessions,
@@ -1522,7 +1531,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         matchesWorkspace: session =>
           preferences.workspaceFilter === null ||
           (SidebarOrganization.workspaceForLineage(session, sessionState.byId, workspaceBySession) ?? '') === preferences.workspaceFilter,
-        matchesSource: session => ThreadViewModel.matchesSourceFilter(session, threadView.sourceFilter),
+        matchesSource: () => true,
       }),
     [
       archivedSessionIds,
@@ -1531,12 +1540,15 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       preferences.workspaceFilter,
       sessionState.byId,
       sessions,
-      threadView.sourceFilter,
       usageLimitQuery.data?.continuations,
       workspaceBySession,
     ],
   )
-  const usageLimitSessionIds = useMemo(() => new Set(usageLimitRows.map(row => row.session.id)), [usageLimitRows])
+  const usageLimitRows = useMemo(
+    () => allUsageLimitRows.filter(row => ThreadViewModel.matchesSourceFilter(row.session, threadView.sourceFilter)),
+    [allUsageLimitRows, threadView.sourceFilter],
+  )
+  const allUsageLimitSessionIds = useMemo(() => new Set(allUsageLimitRows.map(row => row.session.id)), [allUsageLimitRows])
   const resumeUsageLimitThread = async (input: { readonly continuationId: string; readonly sessionId: string }): Promise<boolean> => {
     if (usageLimitBusyIds.has(input.continuationId)) return false
     setUsageLimitBusyIds(current => new Set(current).add(input.continuationId))
@@ -2660,7 +2672,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         mutedSessionIds,
         archivedSessionIds,
         settledSessionIds,
-        excludedSessionIds: usageLimitSessionIds,
+        excludedSessionIds: allUsageLimitSessionIds,
         matchesWorkspace: session =>
           preferences.workspaceFilter === null ||
           (SidebarOrganization.workspaceForLineage(session, sessionState.byId, workspaceBySession) ?? '') === preferences.workspaceFilter,
@@ -2676,7 +2688,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       preferences.workspaceFilter,
       selectedSession?.id,
       sessionState.byId,
-      usageLimitSessionIds,
+      allUsageLimitSessionIds,
       workspaceBySession,
     ],
   )
@@ -2708,6 +2720,46 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       return ids
     }, [attentionSessionIds, sectionEntries, threadTree]),
     StableValueModel.sameSet,
+  )
+  const attentionLabelsBySession = useMemo(() => {
+    const labels = new Map<SessionSummary['id'], ThreadAttentionLabel>()
+    const addLabel = (sessionId: SessionSummary['id'], label: ThreadAttentionLabel): void => {
+      const mostUrgent = ThreadViewModel.mostUrgentAttentionLabel([labels.get(sessionId), label])
+      if (mostUrgent !== undefined) labels.set(sessionId, mostUrgent)
+    }
+    for (const session of turnFinishedRows) addLabel(session.id, 'threadSidebarTurnFinished')
+    for (const session of allNeedsResumeRows) addLabel(session.id, 'threadSidebarNeedsResume')
+    for (const row of allUsageLimitRows) addLabel(row.session.id, 'threadSidebarNeedsResume')
+    for (const session of needsInputRows) addLabel(session.id, 'threadSidebarInputNeeded')
+    for (const session of approvalNeededRows) addLabel(session.id, 'threadSidebarApprovalNeeded')
+    for (const session of allInterruptedRows) addLabel(session.id, 'threadSidebarInterrupted')
+    return labels
+  }, [allInterruptedRows, allNeedsResumeRows, allUsageLimitRows, approvalNeededRows, needsInputRows, turnFinishedRows])
+  const threadViewAttentionEntries = useMemo(() => {
+    const entryFor = (
+      entry: (typeof sectionEntries)[number] | (typeof childThreadEntries)[number] | (typeof detachedThreadEntries)[number],
+      isRoot: boolean,
+    ) => {
+      const childLabels = isRoot ? (threadTree.childrenByRoot.get(entry.session.id) ?? NO_CHILDREN).map(child => attentionLabelsBySession.get(child.id)) : []
+      const attentionLabel = ThreadViewModel.mostUrgentAttentionLabel([attentionLabelsBySession.get(entry.session.id), ...childLabels])
+      return {
+        thread: entry.session,
+        attentionLabel,
+        running: entry.activity.running,
+        archived: archivedSessionIds.has(entry.session.id),
+        settled: settledSessionIds.has(entry.session.id),
+        muted: mutedSessionIds.has(entry.session.id),
+      }
+    }
+    return [
+      ...sectionEntries.map(entry => entryFor(entry, true)),
+      ...childThreadEntries.map(entry => entryFor(entry, false)),
+      ...detachedThreadEntries.map(entry => entryFor(entry, false)),
+    ]
+  }, [archivedSessionIds, attentionLabelsBySession, childThreadEntries, detachedThreadEntries, mutedSessionIds, sectionEntries, settledSessionIds, threadTree])
+  const attentionLabelByViewId = useMemo(
+    () => new Map(threadViewSettings.views.map(view => [view.id, ThreadViewPreferencesModel.attentionLabelForPreset(view, threadViewAttentionEntries)])),
+    [threadViewAttentionEntries, threadViewSettings.views],
   )
   const visibleThreadEntries = useMemo(
     () =>
@@ -3698,22 +3750,44 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           <div role="group" className="dshx:flex dshx:gap-1 dshx:overflow-x-auto dshx:pt-1" aria-label={props.tSidebar('threadSidebarListView')}>
             {threadViewSettings.views
               .filter(view => view.enabled)
-              .map(view => (
-                <Button
-                  key={view.id}
-                  type="button"
-                  variant={view.id === threadView.id ? 'secondary' : 'ghost'}
-                  size="sm"
-                  className="dshx:min-w-20 dshx:flex-1 dshx:shrink-0"
-                  aria-pressed={view.id === threadView.id}
-                  onClick={() => selectThreadViewPreset(view.id)}
-                >
-                  <span className="dshx:truncate">{threadViewPresetLabel(view, props.tSidebar)}</span>
-                  {view.statusFilters.length === 1 && view.statusFilters[0] === 'working' ? (
-                    <span className="dshx:shrink-0">({workingThreadCountsBySource[view.sourceFilter]})</span>
-                  ) : null}
-                </Button>
-              ))}
+              .map(view => {
+                const label = threadViewPresetLabel(view, props.tSidebar)
+                const attentionLabel = attentionLabelByViewId.get(view.id)
+                const workingCount =
+                  view.statusFilters.length === 1 && view.statusFilters[0] === 'working' ? workingThreadCountsBySource[view.sourceFilter] : null
+                const accessibleLabel =
+                  attentionLabel === undefined ? undefined : `${label}${workingCount === null ? '' : ` (${workingCount})`}, ${props.tSidebar(attentionLabel)}`
+                return (
+                  <Button
+                    key={view.id}
+                    type="button"
+                    variant={view.id === threadView.id ? 'secondary' : 'ghost'}
+                    size="sm"
+                    className="dshx:min-w-20 dshx:flex-1 dshx:shrink-0"
+                    aria-label={accessibleLabel}
+                    aria-pressed={view.id === threadView.id}
+                    onClick={() => selectThreadViewPreset(view.id)}
+                  >
+                    <span className="dshx:truncate">{label}</span>
+                    {attentionLabel === undefined ? null : (
+                      <span
+                        aria-hidden="true"
+                        data-testid="thread-view-attention-dot"
+                        className={cn(
+                          'dshx:size-1.5 dshx:shrink-0 dshx:rounded-full',
+                          ThreadAttentionPresentationModel.attentionDotClass({
+                            attentionLabel,
+                            attentionColors: preferences.attentionColors,
+                            unread: false,
+                            running: false,
+                          }),
+                        )}
+                      />
+                    )}
+                    {workingCount === null ? null : <span className="dshx:shrink-0">({workingCount})</span>}
+                  </Button>
+                )
+              })}
           </div>
           {threadViewSettings.showGroupControl || threadViewSettings.showFilterControl ? (
             <div

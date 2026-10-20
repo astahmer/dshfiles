@@ -1,4 +1,5 @@
 import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
+import type { ThreadAttentionLabel } from './attention-presentation.js'
 
 export const THREAD_GROUP_BY_OPTIONS = ['project', 'date', 'status', 'none'] as const
 export type ThreadGroupBy = (typeof THREAD_GROUP_BY_OPTIONS)[number]
@@ -23,6 +24,15 @@ export interface ThreadViewEntry<Thread extends Pick<SessionSummary, 'updatedAt'
   readonly workspaceId: string | undefined
   /** What the thread sorts and dates by; a muted thread keeps the time it had when muted. Defaults to `updatedAt`. */
   readonly activityAt?: number
+}
+
+export interface ThreadViewAttentionEntry {
+  readonly thread: Partial<Pick<SessionSummary, 'origin' | 'parentId'>>
+  readonly attentionLabel: ThreadAttentionLabel | undefined
+  readonly running: boolean
+  readonly archived: boolean
+  readonly settled: boolean
+  readonly muted: boolean
 }
 
 export interface ThreadViewGroup<Thread> {
@@ -62,6 +72,47 @@ const matchesThreadStatusFilter = (options: {
     if (filter === 'settled') return options.settled
     return options.archived
   })
+}
+
+const attentionPriority = {
+  threadSidebarInterrupted: 5,
+  threadSidebarApprovalNeeded: 4,
+  threadSidebarInputNeeded: 4,
+  threadSidebarNeedsResume: 3,
+  threadSidebarTurnFinished: 1,
+} satisfies Record<ThreadAttentionLabel, number>
+
+const mostUrgentAttentionLabel = (labels: readonly (ThreadAttentionLabel | undefined)[]): ThreadAttentionLabel | undefined => {
+  let mostUrgent: ThreadAttentionLabel | undefined
+  for (const label of labels) {
+    if (label === undefined) continue
+    if (mostUrgent === undefined || attentionPriority[label] > attentionPriority[mostUrgent]) mostUrgent = label
+  }
+  return mostUrgent
+}
+
+const attentionLabelForView = (input: {
+  readonly filters: ThreadStatusFilters
+  readonly sourceFilter: ThreadSourceFilter
+  readonly entries: readonly ThreadViewAttentionEntry[]
+}): ThreadAttentionLabel | undefined => {
+  const labels = input.entries.flatMap(entry => {
+    if (entry.attentionLabel === undefined || !matchesThreadSourceFilter(entry.thread, input.sourceFilter)) return []
+    if (
+      !matchesThreadStatusFilter({
+        filters: input.filters,
+        running: entry.running,
+        needsAttention: true,
+        archived: entry.archived,
+        settled: entry.settled,
+        muted: entry.muted,
+      })
+    ) {
+      return []
+    }
+    return [entry.attentionLabel]
+  })
+  return mostUrgentAttentionLabel(labels)
 }
 
 const threadDateGroup = (updatedAt: number, now: number): ThreadDateGroup => {
@@ -126,6 +177,8 @@ export class ThreadViewModel {
   static readonly isSideChat = isSideChat
   static readonly matchesSourceFilter = matchesThreadSourceFilter
   static readonly matchesStatusFilter = matchesThreadStatusFilter
+  static readonly mostUrgentAttentionLabel = mostUrgentAttentionLabel
+  static readonly attentionLabelForView = attentionLabelForView
   static readonly dateGroup = threadDateGroup
   static readonly groupEntries = groupThreadEntries
 }
