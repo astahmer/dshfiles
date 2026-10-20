@@ -13,12 +13,13 @@ The New thread bar (rendered by `@dshfiles/jj-integration`) starts with the
 - **A host** — each registered host with a status dot (green: connected, with
   the round-trip in ms; grey: not connected yet; red: the last error).
   Opening the menu pings every host once.
-- **Add host…** — SSH destination (suggestions from `~/.ssh/config` aliases,
-  following `Include`, and plain `known_hosts` names), a name, and the remote
-  DSH home. **Find** lists the DSH homes under the remote user's home that
-  publish a launch file. **Test connection** shows each step (SSH login, DSH
-  runtime, multi-host identity) with its time. **Add host** pins the runtime's
-  identity and selects it.
+- **Add host…** — choose an SSH destination from a searchable picker of
+  `~/.ssh/config` aliases (following `Include`) and plain `known_hosts` names,
+  or choose a custom destination for `user@host`. Give it a name, then use
+  **Find** to list DSH homes under the remote user's home that publish a launch
+  file and select the right one. **Test connection** shows each step (SSH login,
+  DSH runtime, multi-host identity) with its time. **Add host** pins the
+  runtime's identity and selects it.
 - **Manage hosts…** — edit (re-qualifies the target and home), reconnect, or
   remove a host. Removing keeps remote data and the local record of threads
   started there; they come back if the host is added again.

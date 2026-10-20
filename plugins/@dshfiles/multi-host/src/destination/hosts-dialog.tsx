@@ -1,10 +1,12 @@
 import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from '@dshfiles/plugin-ui/components/ui/command'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@dshfiles/plugin-ui/components/ui/dialog'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
+import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
-import { CheckIcon, PencilIcon, PlusIcon, RefreshCwIcon, SearchIcon, ServerIcon, Trash2Icon, XIcon } from '@dshfiles/plugin-ui/icons'
+import { CheckIcon, ChevronDownIcon, PencilIcon, PlusIcon, RefreshCwIcon, SearchIcon, ServerIcon, Trash2Icon, XIcon } from '@dshfiles/plugin-ui/icons'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useState } from 'react'
 import type { ConnectionTestStep, HostSummary, RuntimeSummary } from '../api.js'
@@ -43,11 +45,19 @@ const HostForm = (props: { readonly api: MultiHostClient; readonly initial: Draf
   const { api } = props
   const queryClient = useQueryClient()
   const [draft, setDraft] = useState<Draft>(props.initial)
+  const [targetPickerOpen, setTargetPickerOpen] = useState(false)
+  const [customTargetSelected, setCustomTargetSelected] = useState(false)
   const suggestions = useQuery({
     queryKey: multiHostKeys.sshHosts,
     queryFn: ({ signal }) => api.sshConfigHosts(undefined, { signal }),
     staleTime: 60_000,
   })
+  const aliases = suggestions.data?.hosts.aliases ?? []
+  const knownHosts = suggestions.data?.hosts.knownHosts ?? []
+  const known = [...aliases, ...knownHosts]
+  const customTargetActive =
+    customTargetSelected || (draft.sshTarget !== '' && (suggestions.isSuccess || suggestions.isError) && !known.includes(draft.sshTarget))
+  const targetLabel = customTargetActive ? 'Custom SSH destination' : draft.sshTarget || 'Choose an SSH host…'
   const discover = useMutation({
     mutationFn: async () => {
       const result = await api.discoverHomes({ sshTarget: draft.sshTarget.trim() })
@@ -89,7 +99,6 @@ const HostForm = (props: { readonly api: MultiHostClient; readonly initial: Draf
   })
   const ready = draft.sshTarget.trim() !== '' && draft.remoteHome.trim().startsWith('/')
   const busy = discover.isPending || test.isPending || save.isPending
-  const known = [...(suggestions.data?.hosts.aliases ?? []), ...(suggestions.data?.hosts.knownHosts ?? [])]
 
   return (
     <form
@@ -99,24 +108,89 @@ const HostForm = (props: { readonly api: MultiHostClient; readonly initial: Draf
         if (ready) save.mutate()
       }}
     >
-      <label className="dshx:flex dshx:flex-col dshx:gap-1 dshx:text-sm">
+      <div className="dshx:flex dshx:flex-col dshx:gap-1 dshx:text-sm">
         <span className="dshx:font-medium">SSH destination</span>
-        <Input
-          autoFocus
-          list="dshfiles-multi-host-ssh-hosts"
-          placeholder="user@host or an ~/.ssh/config alias"
-          value={draft.sshTarget}
-          onChange={event => setDraft({ ...draft, sshTarget: event.target.value })}
-        />
-        <datalist id="dshfiles-multi-host-ssh-hosts">
-          {known.map(name => (
-            <option key={name} value={name} />
-          ))}
-        </datalist>
+        <Popover open={targetPickerOpen} onOpenChange={setTargetPickerOpen}>
+          <PopoverTrigger asChild>
+            <Button type="button" variant="outline" className="dshx:justify-between dshx:font-normal" aria-label="SSH destination">
+              <span className="dshx:min-w-0 dshx:truncate">{targetLabel}</span>
+              <ChevronDownIcon className="dshx:ml-2 dshx:size-3.5 dshx:shrink-0 dshx:opacity-60" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent align="start" className="dshx-root dshx:w-80 dshx:p-0">
+            <Command>
+              <CommandInput placeholder="Search SSH hosts…" aria-label="Search SSH hosts" />
+              <CommandList>
+                <CommandEmpty>No matching SSH hosts.</CommandEmpty>
+                {aliases.length === 0 ? null : (
+                  <CommandGroup heading="SSH config">
+                    {aliases.map(alias => (
+                      <CommandItem
+                        key={alias}
+                        value={alias}
+                        onSelect={() => {
+                          setDraft(current => ({ ...current, sshTarget: alias }))
+                          setCustomTargetSelected(false)
+                          setTargetPickerOpen(false)
+                        }}
+                      >
+                        <ServerIcon className="dshx:size-3.5" />
+                        <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{alias}</span>
+                        {draft.sshTarget === alias ? <CheckIcon className="dshx:size-3.5" /> : null}
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                )}
+                {knownHosts.length === 0 ? null : (
+                  <CommandGroup heading="Known hosts">
+                    {knownHosts.map(host => (
+                      <CommandItem
+                        key={host}
+                        value={host}
+                        onSelect={() => {
+                          setDraft(current => ({ ...current, sshTarget: host }))
+                          setCustomTargetSelected(false)
+                          setTargetPickerOpen(false)
+                        }}
+                      >
+                        <ServerIcon className="dshx:size-3.5" />
+                        <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{host}</span>
+                        {draft.sshTarget === host ? <CheckIcon className="dshx:size-3.5" /> : null}
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                )}
+                <CommandSeparator />
+                <CommandGroup>
+                  <CommandItem
+                    value="custom-ssh-destination"
+                    onSelect={() => {
+                      setDraft(current => ({ ...current, sshTarget: known.includes(current.sshTarget) ? '' : current.sshTarget }))
+                      setCustomTargetSelected(true)
+                      setTargetPickerOpen(false)
+                    }}
+                  >
+                    <PlusIcon className="dshx:size-3.5" />
+                    Enter a custom destination…
+                  </CommandItem>
+                </CommandGroup>
+              </CommandList>
+            </Command>
+          </PopoverContent>
+        </Popover>
+        {customTargetActive ? (
+          <Input
+            autoFocus
+            aria-label="Custom SSH destination"
+            placeholder="user@host"
+            value={draft.sshTarget}
+            onChange={event => setDraft({ ...draft, sshTarget: event.target.value })}
+          />
+        ) : null}
         <span className="dshx:text-xs dshx:text-muted-foreground">
-          Uses your ssh agent and keys (BatchMode). The host key must already be in known_hosts; nothing is stored but the target.
+          Choose an SSH config alias or a known host. Uses your SSH agent and keys (BatchMode); the host key must already be in known_hosts.
         </span>
-      </label>
+      </div>
       <label className="dshx:flex dshx:flex-col dshx:gap-1 dshx:text-sm">
         <span className="dshx:font-medium">Name</span>
         <Input placeholder="Raspberry Pi" value={draft.name} onChange={event => setDraft({ ...draft, name: event.target.value })} />

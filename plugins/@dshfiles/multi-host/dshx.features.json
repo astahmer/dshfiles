@@ -4,7 +4,7 @@
     {
       "id": "runtime-directory",
       "title": "Register and identify local DSH runtimes",
-      "summary": "Maintain a bounded host/runtime directory with stable runtime identity; add, edit, test, reconnect and remove SSH hosts from the host chip.",
+      "summary": "Maintain a bounded host/runtime directory with stable runtime identity; add hosts with a searchable SSH destination picker, edit, test, reconnect and remove them from the host chip.",
       "surfaces": ["client", "host", "settings", "storage", "integration"],
       "configuration": [
         {
@@ -20,7 +20,14 @@
         "Corrupt or unsupported directory data is left intact and writes are refused."
       ],
       "externalDependencies": [],
-      "reach": ["click button \"New session\"", "click button \"Run on Local\"", "click text \"Add host\u2026\"", "expect dialog \"Add host\""],
+      "reach": [
+        "click button \"New session\"",
+        "click button \"Run on Local\"",
+        "click option \"Add host\u2026\"",
+        "expect dialog \"Add host\"",
+        "click button \"SSH destination\"",
+        "expect text \"Enter a custom destination\u2026\""
+      ],
       "verification": [
         {
           "kind": "gherkin",
