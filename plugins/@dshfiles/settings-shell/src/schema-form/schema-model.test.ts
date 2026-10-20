@@ -18,6 +18,7 @@ const schema = jsonValueSchema.parse(
     ]).default('preview'),
     notes: Schema.string().role('textarea').default(''),
     token: Schema.string().role('secret'),
+    secretRef: Schema.string().role('secret-ref').default(''),
     tags: Schema.array(Schema.string()).default([]),
     colors: Schema.dict(Schema.union(['warning', 'success'])).default({}),
     layout: Schema.object({ dense: Schema.boolean().default(false).description('Tighter rows.') }),
@@ -31,7 +32,19 @@ describe('settingFields', () => {
   const byKey = new Map(fields.map(field => [field.key, field]))
 
   it('turns each visible setting into a titled field with the control its type calls for', () => {
-    expect(fields.map(field => field.key)).toEqual(['enabled', 'maxTabs', 'idleMinutes', 'ratio', 'openMode', 'notes', 'tags', 'colors', 'dense', 'rows'])
+    expect(fields.map(field => field.key)).toEqual([
+      'enabled',
+      'maxTabs',
+      'idleMinutes',
+      'ratio',
+      'openMode',
+      'notes',
+      'secretRef',
+      'tags',
+      'colors',
+      'dense',
+      'rows',
+    ])
     expect(byKey.get('enabled')).toMatchObject({ title: 'Enabled', description: 'Show the strip.', control: { kind: 'boolean' }, defaultValue: true })
     expect(byKey.get('maxTabs')?.control).toEqual({ kind: 'number', percent: false, min: 2, max: 50, step: 1 })
     expect(byKey.get('idleMinutes')?.control).toMatchObject({ kind: 'number', unit: 'min' })
@@ -45,6 +58,7 @@ describe('settingFields', () => {
       ],
     })
     expect(byKey.get('notes')?.control).toEqual({ kind: 'text', multiline: true })
+    expect(byKey.get('secretRef')?.control).toEqual({ kind: 'text', multiline: false, secretReference: true })
   })
 
   it('edits arrays and dicts of scalars as lists and records, and anything else as JSON', () => {

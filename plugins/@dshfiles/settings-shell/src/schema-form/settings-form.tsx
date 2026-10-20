@@ -185,6 +185,8 @@ const TextInput = (props: {
   readonly value: JsonValue | undefined
   readonly disabled: boolean
   readonly className?: string | undefined
+  readonly placeholder?: string | undefined
+  readonly secretReference?: boolean
   readonly onChange: (value: JsonValue) => void
 }): JSX.Element => {
   const draft = useDraft(z.string().catch('').parse(props.value), text => props.onChange(text))
@@ -204,12 +206,14 @@ const TextInput = (props: {
     <Input
       aria-label={props.label}
       className={cn('dshx:h-8 dshx:w-64', props.className)}
+      data-secret-input={props.secretReference === true ? 'reference' : undefined}
       disabled={props.disabled}
       onBlur={draft.onCommit}
       onChange={event => draft.onChange(event.currentTarget.value)}
       onKeyDown={event => {
         if (event.key === 'Enter') draft.onCommit()
       }}
+      placeholder={props.placeholder}
       value={draft.value}
     />
   )
@@ -239,6 +243,8 @@ const ScalarInput = (props: {
       label={props.label}
       multiline={control.multiline}
       onChange={props.onChange}
+      placeholder={control.secretReference === true ? props.t('form.secretReference') : undefined}
+      secretReference={control.secretReference === true}
       value={props.value}
     />
   )

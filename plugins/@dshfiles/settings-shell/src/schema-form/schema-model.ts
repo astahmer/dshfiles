@@ -50,7 +50,7 @@ export type ScalarControl =
   | { readonly kind: 'boolean' }
   | { readonly kind: 'choice'; readonly options: readonly ChoiceOption[] }
   | NumberControl
-  | { readonly kind: 'text'; readonly multiline: boolean }
+  | { readonly kind: 'text'; readonly multiline: boolean; readonly secretReference?: true }
 
 export type SettingControl =
   | ScalarControl
@@ -151,7 +151,10 @@ const choiceOptions = (walk: Walk, node: SchemaNode): readonly ChoiceOption[] | 
 
 const scalarControl = (walk: Walk, node: SchemaNode, key: string): ScalarControl | undefined => {
   if (node.type === 'boolean') return { kind: 'boolean' }
-  if (node.type === 'string') return { kind: 'text', multiline: node.meta.role === 'textarea' }
+  if (node.type === 'string') {
+    if (node.meta.role === 'secret-ref') return { kind: 'text', multiline: false, secretReference: true }
+    return { kind: 'text', multiline: node.meta.role === 'textarea' }
+  }
   if (node.type === 'number' || node.type === 'natural' || node.type === 'percent') {
     const bounds = numberMeta.catch({}).parse(node.meta)
     const percent = node.type === 'percent' || (node.meta.role === 'slider' && bounds.min === 0 && bounds.max === 1)
