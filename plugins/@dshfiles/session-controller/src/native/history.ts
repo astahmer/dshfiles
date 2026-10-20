@@ -84,6 +84,11 @@ export class SessionHistoryController {
     const beforeSeq = request.beforeSeq === undefined
       ? undefined
       : SessionLogOffset(request.beforeSeq)
+    // dshfiles delta: an older page of a cold Session comes from the same log tail its opening decoded.
+    if (request.address.kind === 'session' && this.ctx.sessions.get(request.address.sessionId) === undefined) {
+      const tailPage = await tailPageOf(this.ctx, request.address.sessionId, { ...request, beforeSeq, throughSeq }, signal)
+      if (tailPage !== undefined) return tailPage
+    }
     using source = await this.sourceFor(request.address, signal, false)
     signal.throwIfAborted()
     const sourceLog = source.events
@@ -339,6 +344,40 @@ async function tailOpening(
   } catch (error: unknown) {
     if (signal.aborted) throw error
     ctx.logger.warn(`session-controller: tail opening for "${sessionId}" fell back to the full read: ${String(error)}`)
+    return undefined
+  }
+}
+
+/**
+ * One older page of a cold Session from the end of its log, decoding further back until the page is settled.
+ * `undefined` sends the caller to the full read, which also owns every request error.
+ */
+async function tailPageOf(
+  ctx: Context,
+  sessionId: SessionId,
+  request: {
+    readonly beforeSeq: SessionLogOffsetType | undefined
+    readonly throughSeq: SessionSeqCursor
+    readonly maxMessages?: number
+    readonly turnWindow?: SessionPageRequest['turnWindow']
+  },
+  signal: AbortSignal,
+): Promise<SessionPage | undefined> {
+  try {
+    const log = await TailLog.open({ ctx, sessionId, signal })
+    if (log === undefined) return undefined
+    for (let frames = 16; ; frames *= 2) {
+      signal.throwIfAborted()
+      const events = log.before(frames)
+      const cursor = events.at(-1)?.seq
+      if (cursor === undefined || request.throughSeq > cursor) return undefined
+      const page = paginate(events, request.beforeSeq, request.maxMessages ?? DEFAULT_MAX_MESSAGES, request.throughSeq, request.turnWindow, log.base)
+      if (page.settled) return { records: pageRecords(page.events), hasMore: page.hasMore }
+      if (log.complete) return undefined
+    }
+  } catch (error: unknown) {
+    if (signal.aborted) throw error
+    ctx.logger.warn(`session-controller: tail page for "${sessionId}" fell back to the full read: ${String(error)}`)
     return undefined
   }
 }

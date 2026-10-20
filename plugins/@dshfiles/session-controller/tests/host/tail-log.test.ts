@@ -27,7 +27,10 @@ const tailOver = async (bytes: Buffer): Promise<TailLog | undefined> => {
   writeFileSync(path, bytes)
   const ctx = new Context()
   // SAFETY: TailLog.open reads only stat and resolveCurrentLog from the JSONL backend.
-  ctx.provide('sessionPersistence', { stat: async () => ({ header, formatStatus: 'current', revision: 'r' }), resolveCurrentLog: async () => path } as never)
+  ctx.provide('sessionPersistence', {
+    stat: async () => ({ header, formatStatus: 'current', revision: 'r', sizeBytes: 2_000_000 }),
+    resolveCurrentLog: async () => path,
+  } as never)
   return TailLog.open({ ctx, sessionId: header.id, signal: new AbortController().signal })
 }
 

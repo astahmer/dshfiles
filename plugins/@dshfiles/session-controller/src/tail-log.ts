@@ -3,11 +3,16 @@ import { SessionLogOffset, type SessionEvent, type SessionHeader, type SessionId
 import type {} from '@deepseek-ai/dsh-session-persistence'
 import type { ProjectionCheckpoint, ProjectionSnapshot } from '@deepseek-ai/dsh-session-projection'
 import type {} from '@deepseek-ai/dsh-session-projection-cache'
-import { readFile } from 'node:fs/promises'
+import { readFile, stat } from 'node:fs/promises'
 import { zstdDecompressSync } from 'node:zlib'
 import { z } from 'zod'
 
 const ZSTD_MAGIC = 0xfd2fb528
+/** Below this a log decodes whole about as fast as its tail (median 155 ms vs 170 ms measured), so it keeps the full read. */
+const MIN_TAIL_BYTES = 1_000_000
+/** Opened tails kept for the opening's next pages; each holds its log's bytes. */
+const KEPT_TAILS = 3
+const KEPT_TAIL_MS = 120_000
 
 const jsonlLogSchema = z.object({ resolveCurrentLog: z.function() })
 const cacheTableSchema = z.object({ requireTable: z.function() })
@@ -42,6 +47,7 @@ interface FrameRange {
  * events. `before()` decodes further back on demand; `restore` folds the projection checkpoint over the decoded tail.
  */
 export class TailLog {
+  private static readonly kept = new Map<SessionId, { readonly path: string; readonly identity: string; readonly tail: TailLog; timer: NodeJS.Timeout }>()
   private readonly texts = new Map<number, string>()
   private firstFrame: number
   private decoded: readonly SessionEvent[] = []
@@ -59,22 +65,60 @@ export class TailLog {
    * another backend or encoding, a forked or subagent Session, a torn last frame.
    */
   static async open(input: { readonly ctx: Context; readonly sessionId: SessionId; readonly signal: AbortSignal }): Promise<TailLog | undefined> {
+    const kept = TailLog.kept.get(input.sessionId)
+    if (kept !== undefined) {
+      // A file identity check instead of the backend's stat and log lookup (130–330 ms on a busy Host): an unchanged
+      // file is the same log, already scanned and partly decoded.
+      if ((await TailLog.identityOf(kept.path)) === kept.identity) {
+        kept.timer.refresh()
+        return kept.tail
+      }
+      TailLog.forget(input.sessionId)
+    }
     const persistence = input.ctx.get('sessionPersistence')
     if (persistence === undefined || !jsonlLogSchema.safeParse(persistence).success) return undefined
     const stat = await persistence.stat(input.sessionId, { signal: input.signal })
-    if (stat === undefined || stat.formatStatus !== 'current') return undefined
+    if (stat === undefined || stat.formatStatus !== 'current' || (stat.sizeBytes ?? 0) < MIN_TAIL_BYTES) return undefined
     const header = stat.header
     if (header.cwd === undefined || header.isSeeded || header.origin === 'subagent') return undefined
     // SAFETY: the schema above proved the JSONL backend's public resolveCurrentLog method is present.
     const lookup = persistence as unknown as JsonlLogLookup
     const path = logPathSchema.safeParse(await lookup.resolveCurrentLog(input.sessionId, input.signal))
     if (!path.success) return undefined
+    const identity = await TailLog.identityOf(path.data)
     const bytes = await readFile(path.data, { signal: input.signal })
     const frames = TailLog.scan(bytes)
-    if (frames === undefined || frames.length < 2) return undefined
+    if (identity === undefined || frames === undefined || frames.length < 2) return undefined
     const tail = new TailLog(header, bytes, frames)
     if (!tail.textOf(frames.length - 1).endsWith('\n')) return undefined
+    TailLog.keep(input.sessionId, { path: path.data, identity, tail })
     return tail
+  }
+
+  private static keep(sessionId: SessionId, entry: { readonly path: string; readonly identity: string; readonly tail: TailLog }): void {
+    TailLog.forget(sessionId)
+    for (const oldest of TailLog.kept.keys()) {
+      if (TailLog.kept.size < KEPT_TAILS) break
+      TailLog.forget(oldest)
+    }
+    const timer = setTimeout(() => {
+      TailLog.forget(sessionId)
+    }, KEPT_TAIL_MS)
+    timer.unref()
+    TailLog.kept.set(sessionId, { ...entry, timer })
+  }
+
+  private static forget(sessionId: SessionId): void {
+    const kept = TailLog.kept.get(sessionId)
+    if (kept === undefined) return
+    clearTimeout(kept.timer)
+    TailLog.kept.delete(sessionId)
+  }
+
+  /** Size, modification time and inode: an append or a rewrite changes it, so a kept tail is never served stale. */
+  private static async identityOf(path: string): Promise<string | undefined> {
+    const info = await stat(path, { bigint: true }).catch(() => undefined)
+    return info === undefined ? undefined : `${String(info.ino)}:${String(info.size)}:${String(info.mtimeNs)}`
   }
 
   /** Complete frame ranges, or `undefined` when the file ends inside a frame (a torn append the full read repairs). */
@@ -133,12 +177,19 @@ export class TailLog {
     let first = Math.max(1, this.firstFrame - frames)
     while (first > 1 && !this.textOf(first - 1).endsWith('\n')) first -= 1
     if (first === this.firstFrame) return this.decoded
-    const text = Array.from({ length: this.frames.length - first }, (_, index) => this.textOf(first + index)).join('')
-    const events = text
+    // Frame `firstFrame - 1` ends a record (checked when `firstFrame` was chosen), so only the new frames are parsed.
+    const parts: string[] = []
+    for (let frame = first; frame < this.firstFrame; frame += 1) {
+      parts.push(this.textOf(frame))
+      this.texts.delete(frame)
+    }
+    const added = parts
+      .join('')
       .split('\n')
       .filter(line => line !== '')
       .map(line => TailLog.eventOf(line))
-    for (let index = 1; index < events.length; index += 1) {
+    const events = [...added, ...this.decoded]
+    for (let index = 1; index <= added.length && index < events.length; index += 1) {
       if (events[index]?.seq !== (events[index - 1]?.seq ?? -2) + 1) throw new Error(`session "${this.header.id}" log tail has a seq gap`)
     }
     this.firstFrame = first
@@ -172,6 +223,7 @@ export class TailLog {
     }
   }
 
+  /** Plaintext of one frame; kept only until `before()` parses it, so decoded text is never held twice. */
   private textOf(frame: number): string {
     const cached = this.texts.get(frame)
     if (cached !== undefined) return cached
