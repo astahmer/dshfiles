@@ -52,6 +52,7 @@ var __disposeResources = (this && this.__disposeResources) || (function (Suppres
     return e.name = "SuppressedError", e.error = error, e.suppressed = suppressed, e;
 });
 import { modelAvailable } from './catalog.js';
+import { latestInterruptedTurn } from '../interrupted-turn.js';
 import { randomUUID } from 'node:crypto';
 import { brandString } from '@deepseek-ai/dsh-brand';
 import { AttachmentError } from '@deepseek-ai/dsh-attachment';
@@ -320,6 +321,13 @@ export class SessionCommandController {
                     const message = createUserMessage({ content, source });
                     if (this.ctx.agents.get(agent.id) !== agent) {
                         throw new RemoteError('session/not-found', `session "${agent.id}" was disposed during prompt admission`, { sessionId: agent.id });
+                    }
+                    if (hasPromptRequest(agent, request.requestId))
+                        return { accepted: true };
+                    if (request.expectedInterruptedSeq !== undefined
+                        && (agent.status !== 'idle' || agent.inbox.nextTurn.length > 0 || agent.inbox.nextStep.length > 0
+                            || latestInterruptedTurn(agent.session.snapshotEvents()) !== request.expectedInterruptedSeq)) {
+                        throw new RemoteError('session/interruption-superseded', 'That stopped task is no longer waiting to be resumed.', {});
                     }
                     const binding = __addDisposableResource(env_2, this.ctx.fileUploads.bindPrompt(agent, admission.receiptIds, request.requestId), false);
                     if (request.mode === 'steer')

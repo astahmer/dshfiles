@@ -24,7 +24,8 @@
     "build": "dshx build",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test:boot": "node ../../../tooling/dshx/scripts/boot-check-web.mjs --plugin"
+    "test:boot": "node ../../../tooling/dshx/scripts/boot-check-web.mjs --plugin",
+    "test:e2e": "node ../../../tooling/dshx/scripts/run-e2e.mjs"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "catalog:",
@@ -34,6 +35,7 @@
     "@deepseek-ai/dsh-api-session-controller": "catalog:",
     "@deepseek-ai/dsh-attachment": "0.2.1-rc.2",
     "@deepseek-ai/dsh-brand": "0.2.1-rc.2",
+    "@deepseek-ai/dsh-client-connection": "catalog:",
     "@deepseek-ai/dsh-client-locale": "catalog:",
     "@deepseek-ai/dsh-client-product-analytics": "0.2.1-rc.2",
     "@deepseek-ai/dsh-client-store": "catalog:",
@@ -66,6 +68,8 @@
     "@deepseek-ai/dsh-util-workspace-path": "0.2.1-rc.2",
     "@deepseek-ai/schemastery": "catalog:",
     "@dshfiles/dshx": "workspace:*",
+    "@dshfiles/plugin-ui": "workspace:*",
+    "@dshfiles/session-controller": "workspace:*",
     "@tanstack/react-virtual": "3.14.13",
     "@testing-library/dom": "catalog:",
     "@testing-library/react": "catalog:",
@@ -83,6 +87,7 @@
     "@deepseek-ai/dsh": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-api-session-controller": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-api-workspace-controller": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-client-connection": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-client-locale": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-client-ui-conversation": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-client-ui-input-trigger": ">=0.2.1-rc.2 <0.3.0-0",
@@ -101,6 +106,7 @@
     "client": {
       "platform": "web",
       "inject": [
+        "@deepseek-ai/dsh-client-connection",
         "@deepseek-ai/dsh-api-session-controller",
         "@deepseek-ai/dsh-api-workspace-controller",
         "@deepseek-ai/dsh-client-locale",

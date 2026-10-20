@@ -19,6 +19,9 @@
   ],
   "delta": [
     "src/native/history.ts",
+    "src/native/commands.ts",
+    "src/native/index.ts",
+    "src/native/types.ts",
     "src/native/client/sessions/session.ts",
     "src/native/client/index.ts",
     "src/native/list.ts"

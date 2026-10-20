@@ -38,6 +38,12 @@ Every other vendored file is byte-identical to the pinned revision.
 | `src/host.ts`, `src/client-entry.tsx`   | new: dshx entries calling the native plugin                                                                                                                                                                                                                                                                          |
 | `src/mime-types.d.ts`                   | new: the one `mime-types` call's type; upstream gets it from its workspace                                                                                                                                                                                                                                           |
 
+`interruption-api` serves availability and resume for Chat's latest interrupted
+turn, including the `chat_resume_interrupted` agent tool. Prompt admission checks
+the expected ending sequence, idle status, and empty inbox after asynchronous
+attachment validation, immediately before delivery. Intervening work invalidates
+the action; a deterministic request id makes retries idempotent.
+
 ### Build
 
 `tsconfig.host.json` compiles the Host side with tsc into `build/host` first: the dshx bundler keeps TC39 `@Remote`

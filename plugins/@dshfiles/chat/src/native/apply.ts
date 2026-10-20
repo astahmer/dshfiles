@@ -81,7 +81,7 @@ export const inject = [
  * Mount all Chat-owned contributions.
  * @param ctx - Client root context.
  */
-export function apply(ctx: Context): void {
+export function apply(ctx: Context, decorate: <Component>(component: Component) => Component = component => component): void {
   const quotaNotice = createSnapshotStore<QuotaNoticeState | null>(null)
   let quotaNoticeSeq = 0
   // Each hold is its own token, so a release can only drop the hold it was
@@ -169,7 +169,7 @@ export function apply(ctx: Context): void {
   const performancePolicy = new PerformanceUsagePolicy(chatSettings)
   ctx.effect(() => () => { transcriptView.dispose(); performancePolicy.dispose() })
   const performanceUsage = performancePolicy.mode
-  registerChatNodeRenderers(ctx, performanceUsage, presentation)
+  registerChatNodeRenderers(ctx, performanceUsage, presentation, decorate)
   ctx.slots.registerFactory({
     name: 'conversation.chat.user.content', scope: 'session', locale: NS,
     children: { 'conversation.chat.user.images': { kind: 'single', scope: 'session' } },

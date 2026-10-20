@@ -3,6 +3,25 @@
   "kind": "bundle",
   "features": [
     {
+      "id": "resume-interrupted",
+      "title": "Resume the latest stopped task",
+      "summary": "Resume beside the latest interrupted task only while the Host confirms it remains idle; superseded history stays read-only.",
+      "surfaces": ["client", "tool"],
+      "configuration": [],
+      "states": ["stopped", "resuming", "resumed", "failed"],
+      "failureModes": ["Missing recovery owner hides the action.", "Resume failures keep a retryable action."],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "chat.resume-action",
+          "file": "plugins/@dshfiles/chat/tests/resume-interrupted.test.tsx",
+          "testName": "disables Resume while pending, reports errors, and hides after acceptance"
+        },
+        { "kind": "gherkin", "id": "chat.resume-interrupted", "featureFile": "tooling/dshx/e2e/features/chat.feature" }
+      ]
+    },
+    {
       "id": "windowed-transcript",
       "title": "Open a thread on its latest messages",
       "summary": "A thread opens with the rows that fill the viewport mounted; older rows mount as the transcript scrolls up.",

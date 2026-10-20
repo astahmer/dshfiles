@@ -215,6 +215,7 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
     'session/projections-unavailable': Record<string, never>
     'session/writer-held': { readonly sessionId: SessionId }
     'session/agent-busy': { readonly reason: string }
+    'session/interruption-superseded': Record<string, never>
     'session/invalid-time-zone': { readonly value: string }
     'session/workspace-attach-failed': { readonly sessionId: SessionId; readonly workspaceId: string }
     'agent-preset/conflict': {
@@ -349,6 +350,8 @@ export interface SessionPromptRequest {
   /** At least one non-whitespace text part or attachment. */
   readonly content: readonly PromptContentPart[]
   readonly clientTimeZone?: string
+  /** Admit only while this exact interrupted ending remains latest and idle. */
+  readonly expectedInterruptedSeq?: number
 }
 
 /** Receipt after one prompt enters the target Agent inbox. */

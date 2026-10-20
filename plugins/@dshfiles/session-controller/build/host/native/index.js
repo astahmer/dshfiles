@@ -96,6 +96,7 @@ import { canonicalClientTimeZone } from '@deepseek-ai/dsh-util-time';
 import { assertNever } from '@deepseek-ai/dsh-util-values';
 import { ApiSessionAgentController, inspectApiSession, } from './agent.js';
 import { SessionCommandController, hasPromptContent } from './commands.js';
+import { latestInterruptedTurn } from '../interrupted-turn.js';
 import { SessionControlController } from './control.js';
 import { SessionHistoryController } from './history.js';
 import { SessionFileReferences } from './file-references.js';
@@ -329,6 +330,13 @@ let SessionController = (() => {
                 });
             }
             return inspectApiSession(this.ctx, sessionId, signal);
+        }
+        async interruptedTurn(sessionId) {
+            const inspection = await this.inspect(sessionId);
+            const agent = this.ctx.agents.get(sessionId);
+            if (agent !== undefined && (agent.status !== 'idle' || agent.inbox.nextTurn.length > 0 || agent.inbox.nextStep.length > 0))
+                return undefined;
+            return latestInterruptedTurn(inspection.events);
         }
         /**
          * Read all visible Session rows without resuming an Agent.

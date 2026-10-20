@@ -1,6 +1,7 @@
 /** Session commands whose activation policy is explicit at each Remote method. */
 
 import { modelAvailable } from './catalog.ts'
+import { latestInterruptedTurn } from '../interrupted-turn.ts'
 import { randomUUID } from 'node:crypto'
 import type { Context } from '@deepseek-ai/cordis'
 import { brandString } from '@deepseek-ai/dsh-brand'
@@ -345,6 +346,12 @@ export class SessionCommandController {
             `session "${agent.id}" was disposed during prompt admission`,
             { sessionId: agent.id },
           )
+        }
+        if (hasPromptRequest(agent, request.requestId)) return { accepted: true }
+        if (request.expectedInterruptedSeq !== undefined
+          && (agent.status !== 'idle' || agent.inbox.nextTurn.length > 0 || agent.inbox.nextStep.length > 0
+            || latestInterruptedTurn(agent.session.snapshotEvents()) !== request.expectedInterruptedSeq)) {
+          throw new RemoteError('session/interruption-superseded', 'That stopped task is no longer waiting to be resumed.', {})
         }
         using binding = this.ctx.fileUploads.bindPrompt(agent, admission.receiptIds, request.requestId)
         if (request.mode === 'steer') agent.steer(message)

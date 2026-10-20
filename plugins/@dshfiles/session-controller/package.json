@@ -18,6 +18,7 @@
   "exports": {
     ".": "./dist/index.js",
     "./client": "./dist/client.js",
+    "./interruption-api": { "types": "./src/interruption-api.ts", "default": "./dist/interruption-api.js" },
     "./typert": "./typert/host.js",
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./package.json": "./package.json"
@@ -108,6 +109,7 @@
     "@deepseek-ai/dsh-skill": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-subagent": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-typert-protocol": ">=0.2.1-rc.2 <0.3.0-0",
+    "@deepseek-ai/dsh-tools": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-typert-registry": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-util-time": ">=0.2.1-rc.2 <0.3.0-0",
     "@deepseek-ai/dsh-util-values": ">=0.2.1-rc.2 <0.3.0-0",

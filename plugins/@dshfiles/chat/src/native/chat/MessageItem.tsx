@@ -12,6 +12,7 @@ import { CompactionItem } from './CompactionItem.tsx'
 import { ContextInjectionRow } from './ContextInjectionRow.tsx'
 import { MessageIconActions } from './MessageIconActions.tsx'
 import css from './MessageItem.module.css'
+import { ResumeInterrupted } from '../../resume-interrupted.tsx'
 
 const EMPTY_TEXT_FACTS: Readonly<Partial<UserTextFacts>> = {}
 
@@ -129,8 +130,9 @@ function ModelRetryItem({ node, active, t }: {
 }
 
 /** Persistent, turn-positioned feedback for a terminal failure. */
-function TurnErrorItem({ node, t }: {
+function TurnErrorItem({ node, t, action }: {
   node: TurnErrorNode
+  action?: ReactNode
   t: ChatViewSlotProps['t']
 }) {
   return (
@@ -140,6 +142,7 @@ function TurnErrorItem({ node, t }: {
         <span className={css.turnErrorTitle}>{node.code === 'ACCOUNT_SIGNED_OUT' || node.code === 'INTERRUPTED' ? t('message.taskStopped') : t('message.turnError')}</span>
         <span className={css.turnErrorMessage}>{failureMessage(node.message, node.code, t)}</span>
       </div>
+      {action}
       {node.code !== undefined && node.code !== 'INTERRUPTED' && <code className={css.turnErrorCode}>{node.code}</code>}
     </div>
   )
@@ -346,8 +349,15 @@ export const RetryNodeView = memo(function RetryNodeView({ node, t }: ChatNodeVi
 })
 
 /** Terminal turn-error keyed Chat renderer. */
-export const TurnErrorNodeView = memo(function TurnErrorNodeView({ node, t }: ChatNodeViewProps<'turn-error'>) {
-  return <TurnErrorItem node={node.data} t={t} />
+export const TurnErrorNodeView = memo(function TurnErrorNodeView({ node, t, useChat, useSession, useAccess }: ChatNodeViewProps<'turn-error'>) {
+  const latest = useChat(snapshot => snapshot.timeline.turnOrder.at(-1) === node.data.turn)
+  const sessionId = useSession(snapshot => snapshot.sessionId)
+  const running = useSession(snapshot => snapshot.running)
+  const allowed = useAccess('session/prompt')
+  const action = node.data.code === 'INTERRUPTED' && latest && !running && allowed
+    ? <ResumeInterrupted sessionId={sessionId} seq={node.data.seq} />
+    : undefined
+  return <TurnErrorItem node={node.data} t={t} action={action} />
 })
 
 /** Max-tokens turn-end notice keyed Chat renderer. */

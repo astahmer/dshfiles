@@ -1305,6 +1305,9 @@ importers:
       '@deepseek-ai/dsh-brand':
         specifier: 0.2.1-rc.2
         version: 0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)
+      '@deepseek-ai/dsh-client-connection':
+        specifier: 'catalog:'
+        version: 0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)(@deepseek-ai/dsh-scope@0.2.1-rc.2(@deepseek-ai/cordis@4.0.4))
       '@deepseek-ai/dsh-client-locale':
         specifier: 'catalog:'
         version: 0.2.1-rc.2(@deepseek-ai/cordis@4.0.4)
@@ -1401,6 +1404,12 @@ importers:
       '@dshfiles/dshx':
         specifier: workspace:*
         version: link:../../../tooling/dshx/packages/dshx
+      '@dshfiles/plugin-ui':
+        specifier: workspace:*
+        version: link:../plugin-ui
+      '@dshfiles/session-controller':
+        specifier: workspace:*
+        version: link:../session-controller
       '@tanstack/react-virtual':
         specifier: 3.14.13
         version: 3.14.13(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -3609,6 +3618,9 @@ importers:
 
   plugins/@dshfiles/session-controller:
     dependencies:
+      '@deepseek-ai/dsh-tools':
+        specifier: '>=0.2.1-rc.2 <0.3.0-0'
+        version: 0.2.1-rc.2(0ab00a8eb09daf0ab308290e757fa426)
       mime-types:
         specifier: ^3.0.2
         version: 3.0.2

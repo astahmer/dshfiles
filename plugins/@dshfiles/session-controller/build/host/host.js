@@ -1,8 +1,13 @@
+import { z } from 'zod';
+import { defineHost } from '@dshfiles/dshx/host';
 import SessionController from './native/index.js';
-export const inject = SessionController.inject;
-export const Config = SessionController.Config;
-/** The native controller is a Cordis Service class; this Loader row hosts it unchanged. */
-export const apply = (ctx, config) => {
-    ctx.plugin(SessionController, config);
-};
+import { interruptionHost } from './interruption-host.js';
+const configSchema = z.object({ nativeOpen: z.boolean().optional(), listWorkSliceMs: z.number().int().positive().default(16) }).default({ listWorkSliceMs: 16 });
+export default defineHost({
+    name: '@dshfiles/session-controller',
+    Config: configSchema,
+    inject: [...SessionController.inject, 'remoteAccess'],
+    apis: [interruptionHost],
+    setup: (ctx, config) => { ctx.plugin(SessionController, SessionController.Config(configSchema.parse(config))); },
+});
 //# sourceMappingURL=host.js.map

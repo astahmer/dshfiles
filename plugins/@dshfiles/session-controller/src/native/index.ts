@@ -23,6 +23,7 @@ import {
   type ApiSessionAgentResult,
 } from './agent.ts'
 import { SessionCommandController, hasPromptContent } from './commands.ts'
+import { latestInterruptedTurn } from '../interrupted-turn.ts'
 import { SessionControlController } from './control.ts'
 import { SessionHistoryController } from './history.ts'
 import { SessionFileReferences } from './file-references.ts'
@@ -264,6 +265,13 @@ export class SessionController extends TypertRemoteService {
       })
     }
     return inspectApiSession(this.ctx, sessionId, signal)
+  }
+
+  async interruptedTurn(sessionId: SessionId): Promise<number | undefined> {
+    const inspection = await this.inspect(sessionId)
+    const agent = this.ctx.agents.get(sessionId)
+    if (agent !== undefined && (agent.status !== 'idle' || agent.inbox.nextTurn.length > 0 || agent.inbox.nextStep.length > 0)) return undefined
+    return latestInterruptedTurn(inspection.events)
   }
 
   /**

@@ -1,10 +1,14 @@
-import type { Context } from '@deepseek-ai/cordis'
-import SessionController, { type Config as SessionControllerConfig } from './native/index.ts'
+import { z } from 'zod'
+import { defineHost } from '@dshfiles/dshx/host'
+import SessionController from './native/index.ts'
+import { interruptionHost } from './interruption-host.ts'
 
-export const inject = SessionController.inject
-export const Config = SessionController.Config
+const configSchema = z.object({ nativeOpen: z.boolean().optional(), listWorkSliceMs: z.number().int().positive().default(16) }).default({ listWorkSliceMs: 16 })
 
-/** The native controller is a Cordis Service class; this Loader row hosts it unchanged. */
-export const apply = (ctx: Context, config: SessionControllerConfig): void => {
-  ctx.plugin(SessionController, config)
-}
+export default defineHost({
+  name: '@dshfiles/session-controller',
+  Config: configSchema,
+  inject: [...SessionController.inject, 'remoteAccess'],
+  apis: [interruptionHost],
+  setup: (ctx, config: unknown) => { ctx.plugin(SessionController, SessionController.Config(configSchema.parse(config))) },
+})

@@ -29,5 +29,5 @@
       "local": "locale"
     }
   ],
-  "delta": ["src/chat-settings.ts", "src/native/chat/MessageIconActions.tsx", "src/native/chat/ChatGroupSeat.tsx", "src/native/chat/ChatView.tsx"]
+  "delta": ["src/native/apply.ts", "src/native/chat/register-node-renderers.ts", "src/native/chat/MessageItem.tsx", "src/chat-settings.ts", "src/native/chat/MessageIconActions.tsx", "src/native/chat/ChatGroupSeat.tsx", "src/native/chat/ChatView.tsx"]
 }

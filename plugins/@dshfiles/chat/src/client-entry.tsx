@@ -3,8 +3,8 @@ import { apply, inject } from './native/index.ts'
 
 export default defineClient({
   name: '@dshfiles/chat',
-  inject,
-  setup(ctx) {
-    apply(ctx)
+  inject: [...inject, 'connection'],
+  setup(ctx, decorate) {
+    apply(ctx, decorate)
   },
 })

@@ -27,6 +27,7 @@ export function registerChatNodeRenderers(
   ctx: Context,
   performanceUsage: ObservableSnapshot<PerformanceUsageMode>,
   presentation: ObservableSnapshot<ChatPresentationPolicy>,
+  decorate: <Component>(component: Component) => Component,
 ): void {
   ctx.effect(() => ctx.slots.registerFactory({
     name: 'conversation.chat.reasoning.content',
@@ -70,7 +71,7 @@ export function registerChatNodeRenderers(
   ctx.slots.inject('conversation.chat.node', () => ctx.slots.register(
     { name: 'conversation.chat.node', key: 'model-retry', locale: NS }, RetryNodeView))
   ctx.slots.inject('conversation.chat.node', () => ctx.slots.register(
-    { name: 'conversation.chat.node', key: 'turn-error', locale: NS }, TurnErrorNodeView))
+    { name: 'conversation.chat.node', key: 'turn-error', locale: NS }, decorate(TurnErrorNodeView)))
   ctx.slots.inject('conversation.chat.node', () => ctx.slots.register(
     { name: 'conversation.chat.node', key: 'turn-max-tokens', locale: NS }, TurnMaxTokensNodeView))
   ctx.slots.inject('conversation.chat.node', () => ctx.slots.register(

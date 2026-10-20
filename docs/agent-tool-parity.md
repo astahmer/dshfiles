@@ -379,6 +379,12 @@ Already covered by the new `thread_*` / `project_*` tools: session list, create,
 fork, rename, cancel, archive/unarchive, pin/unpin, reorder, model selection,
 workspace create/rename/delete/reorder.
 
+The owned Chat's inline **Resume** beside the latest restart-interrupted task
+uses `chat_resume_interrupted`, served by the session-controller's
+`chat-resume.resume` API. Both UI and tool require the exact interrupted ending
+sequence and refuse superseded or busy tasks; the action sends a continuation
+through normal prompt admission, not a replay of unfinished tool calls.
+
 | Proposed tool                                           | Capability                                   | Backing verb                                                             |
 | ------------------------------------------------------- | -------------------------------------------- | ------------------------------------------------------------------------ |
 | `session_search`                                        | Search Session message content               | `session/search`                                                         |
