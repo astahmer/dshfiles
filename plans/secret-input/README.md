@@ -49,23 +49,39 @@ is consumed.
 | Fill the revealed value into inputs | Only on explicit per-field reveal | Same policy as Secret Catalog: reveal is a deliberate click, never an implicit fill on focus.                                    |
 | A separate secrets service        | No       | secret-catalog already owns CLI access, scopes and redaction; the new parts are a grammar, a port method and a client affordance. |
 
-## Open questions (blocking phase 2/3)
+## Decisions
 
-1. **Scope of “bind”**: reference storage (recommended) vs. item links only vs.
-   transient fill.
-2. **First consumers**: backlog triage key (recommended) vs. generic mechanism
-   only vs. backlog item links only.
-3. **`data-secret-input` reach**: overlay for any marked input plus the exported
-   component (recommended) vs. explicit component adoption only.
+Settled with the user (2026-10-20):
+
+1. **Bind means a reference.** A field stores `secret:ALIAS[@env]`; the Host
+   resolves it when it consumes the credential. No plaintext in settings, items
+   or browser state.
+2. **Backlog first, generic mechanism underneath.** The Jev triage key binds to
+   an alias, and the Backlog composer carries the same attribute every other
+   plugin can use.
+3. **Attribute first, overlay ships it.** `data-secret-input="reference"` is the
+   contract; the Secret Catalog registers the `shell.overlay` picker, so native
+   and third-party fields get it without importing anything.
 
 ## Phases
 
-| Phase | Work                                                                                                                       | Proof                                              |
-| ----- | -------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
-| 1     | Grammar + schemas + `resolve` port method; unit tests in `credential-port` and secret-catalog                               | `pnpm --dir plugins/@dshfiles/credential-port test` |
-| 2     | `SecretInput` component and the `[data-secret-input]` overlay (positioning, controlled-input writes, Esc, busy state)        | Vitest for the write helper; e2e journey on a marked field |
-| 3     | Backlog: `jevKeyAlias` setting, Host-side resolution in triage, fallback to `TYPESAFE_API_KEY` when unset                    | triage test with a stubbed resolver + e2e settings journey |
-| 4     | Backlog item `secret` links (extraction, display, copy/reveal), if question 2 keeps item links                              | link extraction test + item-view e2e                 |
+| Phase | Work                                                                                                        | State                                                              |
+| ----- | ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| 1     | Grammar, `secretReferenceSchema`, and the `secretCatalogValues` port in `credential-port`                     | Shipped                                                            |
+| 2     | `createSecretCatalogValues` in the Catalog: one unique row per alias+environment, revealed through the CLI  | Shipped                                                            |
+| 3     | `role('secret-ref')` control in settings-shell, rendered with `data-secret-input`                            | Shipped                                                            |
+| 4     | `SecretInputBinding` + the `shell.overlay` picker: key button on a focused field, alias search, controlled writes | Shipped; portaled into the field's dialog because a modal layer makes the rest of the page inert |
+| 5     | Backlog: `jevSecret` setting, `BacklogTriageKey` resolution, environment fallback, `secret` link extraction, composer attribute | Shipped                                                            |
+
+Verified end to end in a scratch DSH with the fake secret CLI: Settings → "jev secret" → key
+button → `GITHUB_TOKEN@prod` → the field holds `secret:GITHUB_TOKEN`. Modals needed two fixes the
+unit tests cannot catch: the affordance was portaled below the dialog (so its clicks were inert), and
+the alias panel closes on pick only when it is unmounted rather than `hidden` (a `dshflex` class beats
+the `hidden` attribute).
+
+Still open: reveal a bound reference inline from an item's `secret` link (the
+Catalog row's own reveal covers it today), and adopting the attribute on
+MCP server env fields and AI Accounts refs where a value is currently typed.
 
 ## Limits
 

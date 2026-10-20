@@ -123,3 +123,19 @@ installed workspace-controller entry points. Host API registration injects
 `dsh-subprocess-local`; this bundle does not insert a second provider. This
 package contributes its own sidebar and main slots; profile composition
 remains a parent registration step.
+
+## Secret references
+
+Other plugins never hold a credential value. They hold a reference — `secret:ALIAS`
+or `secret:ALIAS@ENV`, parsed by `@dshfiles/credential-port` — and resolve it on
+the Host through the `secretCatalogValues` port this bundle provides. Resolution
+looks up the one row matching alias and environment (a duplicate across scopes
+is refused by name, never guessed) and reveals it through the same `secret get`
+path the Copy action uses. The value reaches the requesting plugin only.
+
+Browser-side, any text field carrying `data-secret-input="reference"` gets a key
+button while focused: the `shell.overlay` picker lists the global aliases,
+searches them, and writes the reference through the field's own value setter so a
+controlled input's `onChange` sees it. `SecretInputBinding` in this package holds
+the attribute names and the write helper for code that wants to name them. The
+Settings form uses it for `Schema.string().role('secret-ref')` fields.

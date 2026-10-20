@@ -87,9 +87,11 @@ losing the thread.
 Off by default (Settings → `dshfiles-backlog`). With `autoTriage` on, every capture is triaged in the
 background, so adding an item never waits:
 
-- **Jev** (`jevEnabled`, `TYPESAFE_API_KEY` in the Host environment) answers two cheap yes/no questions:
+- **Jev** (`jevEnabled`) answers two cheap yes/no questions:
   is this work to do (otherwise a plain capture becomes a `note`), and is it the same work as the closest
-  open item (a suspected duplicate).
+  open item (a suspected duplicate). Its key comes from `jevSecret` — a Secret Catalog reference such as
+  `secret:TYPESAFE_KEY` or `secret:TYPESAFE_KEY@dev` — and falls back to `TYPESAFE_API_KEY` in the Host
+  environment when that setting is empty. The value is resolved on the Host and never stored in settings.
 - **A cheap model** (`triageProvider` + `triageModel`) proposes kind, status, title, tags and a duplicate
   among the similar items it is shown. Items whose applied triage you later corrected by hand are given
   to it as examples; they are read from the event log, not stored separately.
@@ -190,3 +192,12 @@ Board 208–269 ms, Feed 243–405 ms, search 82–550 ms, Projects 458–775 ms
 
 Host-owned storage-domain `backlog`, table `items` keyed by id, so every browser and agent reads the same
 rows. Search is an in-memory token match over title, body, tags, project and link targets.
+
+## Secret references
+
+An item may name a credential without holding one: `secret:ALIAS` or
+`secret:ALIAS@env` in the title or body becomes a `secret` link (the target is
+`ALIAS` or `ALIAS@env`). Nothing is resolved there — the Secret Catalog owns the
+value, and its own reveal covers the read. The capture composer carries
+`data-secret-input="reference"`, so the Catalog's picker can write a reference
+into it.
