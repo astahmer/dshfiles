@@ -203,9 +203,8 @@ export const BacklogPanel = (props: { readonly openThread: OpenThread; readonly 
   const [expanded, setExpanded] = useState(false)
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set(['dropped']))
   const [selectedProject, setSelectedProject] = useState<string | null>(null)
-  const [quickAdd, setQuickAdd] = useState<{ readonly status: BacklogStatus | null } | null>(null)
-  const feedComposer = useRef<HTMLTextAreaElement>(null)
-  const quickComposer = useRef<HTMLTextAreaElement>(null)
+  const [captureStatus, setCaptureStatus] = useState<BacklogStatus | null>(null)
+  const captureComposer = useRef<HTMLTextAreaElement>(null)
   const searchInput = useRef<HTMLInputElement>(null)
   const debounced = useDebouncedValue({ value: query, delayMs: 120 })
 
@@ -283,6 +282,10 @@ export const BacklogPanel = (props: { readonly openThread: OpenThread; readonly 
     else setPreference({ view: next })
     setExpanded(false)
   }
+  const startCapture = (status: BacklogStatus | null): void => {
+    setCaptureStatus(status)
+    requestAnimationFrame(() => captureComposer.current?.focus())
+  }
 
   const order =
     debounced !== ''
@@ -311,10 +314,8 @@ export const BacklogPanel = (props: { readonly openThread: OpenThread; readonly 
     else if (event.key === 'Enter' && cursorId !== null) select(cursorId)
     else if (event.key === 'Escape' && expanded) setExpanded(false)
     else if (event.key === 'Escape' && openId !== null) setOpenId(null)
-    else if (event.key === 'c') {
-      if (view === 'feed') feedComposer.current?.focus()
-      else setQuickAdd({ status: null })
-    } else if (event.key === '/') searchInput.current?.focus()
+    else if (event.key === 'c') startCapture(captureStatus)
+    else if (event.key === '/') searchInput.current?.focus()
     else return
     event.preventDefault()
   }
@@ -413,7 +414,7 @@ export const BacklogPanel = (props: { readonly openThread: OpenThread; readonly 
           <FilterMenu kinds={kinds} setKinds={setKinds} showDormant={stored.showDormant} setShowDormant={value => setPreference({ showDormant: value })} />
           <button
             type="button"
-            onClick={() => (view === 'feed' ? feedComposer.current?.focus() : setQuickAdd(quickAdd === null ? { status: null } : null))}
+            onClick={() => startCapture(null)}
             className="dshx:inline-flex dshx:h-7 dshx:items-center dshx:gap-1 dshx:rounded-md dshx:bg-primary dshx:px-2.5 dshx:text-xs dshx:font-medium dshx:text-primary-foreground dshx:transition-[opacity,transform] dshx:hover:opacity-90 dshx:active:scale-[0.98]"
           >
             <PlusIcon className="dshx:size-3.5" />
@@ -421,21 +422,6 @@ export const BacklogPanel = (props: { readonly openThread: OpenThread; readonly 
           </button>
         </div>
       </header>
-      {quickAdd === null || view === 'feed' ? null : (
-        <div className="dshx:shrink-0 dshx:border-b dshx:border-border dshx:px-4 dshx:py-2.5 dshx:animate-in dshx:fade-in-0 dshx:slide-in-from-top-1">
-          <Composer
-            variant="compact"
-            draftKey="quick"
-            placeholder="New item… Enter adds it"
-            tags={tags}
-            threads={threads}
-            status={quickAdd.status}
-            onClearStatus={() => setQuickAdd({ status: null })}
-            inputRef={quickComposer}
-            autoFocus
-          />
-        </div>
-      )}
       {list.isError ? (
         <p className="dshx:px-4 dshx:py-2 dshx:text-xs dshx:text-destructive">{errorMessage(list.error, 'The backlog is unavailable.')}</p>
       ) : null}
@@ -473,16 +459,7 @@ export const BacklogPanel = (props: { readonly openThread: OpenThread; readonly 
           <>
             <div className={cn('dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:flex-col', expanded && openId !== null && 'dshx:hidden')}>
               {view === 'feed' ? (
-                <FeedView
-                  items={items}
-                  openId={openId}
-                  select={select}
-                  tags={tags}
-                  threads={threads}
-                  composerRef={feedComposer}
-                  loaded={list.isSuccess}
-                  now={now}
-                />
+                <FeedView items={items} openId={openId} select={select} loaded={list.isSuccess} now={now} />
               ) : view === 'items' ? (
                 <ItemsView
                   items={items}
@@ -494,11 +471,10 @@ export const BacklogPanel = (props: { readonly openThread: OpenThread; readonly 
                   setGroupBy={groupBy => withViewTransition(() => setPreference({ groupBy }))}
                   collapsed={collapsed}
                   setCollapsed={next => withViewTransition(() => setCollapsed(next))}
-                  tags={tags}
-                  threads={threads}
+                  captureInto={startCapture}
                 />
               ) : view === 'board' ? (
-                <BoardView items={items} openId={openId} open={select} captureInto={status => setQuickAdd({ status })} />
+                <BoardView items={items} openId={openId} open={select} captureInto={startCapture} />
               ) : (
                 <ProjectsView selectedProject={selectedProject} setSelectedProject={setSelectedProject} select={select} now={now} />
               )}
@@ -506,6 +482,20 @@ export const BacklogPanel = (props: { readonly openThread: OpenThread; readonly 
             {inspector}
           </>
         )}
+      </div>
+      <div className="dshx:shrink-0 dshx:px-4 dshx:pt-1 dshx:pb-4">
+        <div className="dshx:mx-auto dshx:max-w-4xl">
+          <Composer
+            variant="chat"
+            draftKey="feed"
+            placeholder="Capture a thought, a task, a bug… like sending a message"
+            tags={tags}
+            threads={threads}
+            status={captureStatus}
+            onClearStatus={() => setCaptureStatus(null)}
+            inputRef={captureComposer}
+          />
+        </div>
       </div>
     </main>
   )

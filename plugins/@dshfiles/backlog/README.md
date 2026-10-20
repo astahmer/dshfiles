@@ -8,8 +8,8 @@ Plan and open steps: [plans/backlog](../../../plans/backlog/README.md).
 
 ## Capture
 
-The **Backlog** sidebar panel has one capture box (Enter adds, Shift+Enter breaks the line); agents use
-`backlog_capture`. Structure comes from the text:
+The **Backlog** sidebar panel has one capture box pinned to the bottom of every view (Enter adds,
+Shift+Enter breaks the line); agents use `backlog_capture`. Structure comes from the text:
 
 - `bug:`, `idea:`, `note:`, `question:`, `task:`/`todo:` set the kind; a first line ending in `?` is a
   question; anything else is a task. The first line is the title, the rest the markdown body.

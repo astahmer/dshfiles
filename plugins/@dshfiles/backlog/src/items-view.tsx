@@ -22,7 +22,6 @@ import { useVirtualizer } from '@dshfiles/plugin-ui/virtual'
 import { useMemo, useRef, useState, type ReactNode } from 'react'
 
 import type { BacklogSummaryView } from './api.js'
-import { Composer, type ComposerThread } from './composer.js'
 import { BacklogItems, type BacklogStatus } from './item.js'
 import { ItemGlyphs } from './item-glyphs.js'
 import { ItemPickers } from './item-pickers.js'
@@ -32,7 +31,6 @@ type GroupBy = 'status' | 'kind' | 'project' | 'attention'
 type Entry =
   | { readonly kind: 'header'; readonly key: string; readonly group: Group }
   | { readonly kind: 'row'; readonly key: string; readonly item: BacklogSummaryView }
-  | { readonly kind: 'add'; readonly key: string; readonly group: Group; readonly status: BacklogStatus }
 type Group = { readonly key: string; readonly label: ReactNode; readonly status: BacklogStatus | null; readonly items: BacklogSummaryView[] }
 
 const groupLabels = { status: 'Status', kind: 'Kind', project: 'Project', attention: 'Attention' } satisfies Record<GroupBy, string>
@@ -203,12 +201,10 @@ export const ItemsView = (props: {
   readonly setGroupBy: (value: GroupBy) => void
   readonly collapsed: ReadonlySet<string>
   readonly setCollapsed: (value: ReadonlySet<string>) => void
-  readonly tags: readonly string[]
-  readonly threads: readonly ComposerThread[]
+  readonly captureInto: (status: BacklogStatus) => void
 }): JSX.Element => {
   const actions = useBacklogActions()
   const [selected, setSelected] = useState<ReadonlySet<number>>(new Set())
-  const [addingIn, setAddingIn] = useState<string | null>(null)
   const groups = useMemo(() => groupsOf(props.items, props.groupBy), [props.items, props.groupBy])
   const toggle = (id: number): void => {
     const next = new Set(selected)
@@ -225,17 +221,16 @@ export const ItemsView = (props: {
         const rows = [...group.items]
           .sort((left, right) => Number(right.pinned) - Number(left.pinned) || right.lastActivityAt - left.lastActivityAt)
           .map((item): Entry => ({ kind: 'row', key: `r:${String(item.id)}`, item }))
-        const add: Entry[] = addingIn === group.key && group.status !== null ? [{ kind: 'add', key: `a:${group.key}`, group, status: group.status }] : []
-        return [header, ...rows, ...add]
+        return [header, ...rows]
       }),
-    [visibleGroups, props.collapsed, addingIn],
+    [visibleGroups, props.collapsed],
   )
   const scroller = useRef<HTMLDivElement>(null)
   // Only the rows in view are mounted, so a backlog of thousands scrolls like one of twenty.
   const virtualizer = useVirtualizer({
     count: entries.length,
     getScrollElement: () => scroller.current,
-    estimateSize: index => (entries[index]?.kind === 'row' ? 40 : entries[index]?.kind === 'header' ? 36 : 64),
+    estimateSize: index => (entries[index]?.kind === 'row' ? 40 : 36),
     getItemKey: index => entries[index]?.key ?? index,
     overscan: 12,
   })
@@ -279,6 +274,7 @@ export const ItemsView = (props: {
           {virtualizer.getVirtualItems().map(virtual => {
             const entry = entries[virtual.index]
             if (entry === undefined) return null
+            const groupStatus = entry.kind === 'header' ? entry.group.status : null
             return (
               <div
                 key={virtual.key}
@@ -308,18 +304,18 @@ export const ItemsView = (props: {
                     </button>
                     <span className="dshx:flex dshx:items-center dshx:gap-1.5 dshx:font-medium">{entry.group.label}</span>
                     <span className="dshx:text-xs dshx:text-muted-foreground">{entry.group.items.length}</span>
-                    {entry.group.status === null ? null : (
+                    {groupStatus === null ? null : (
                       <button
                         type="button"
-                        aria-label={`Add to ${ItemGlyphs.statusLabels[entry.group.status]}`}
-                        onClick={() => setAddingIn(addingIn === entry.group.key ? null : entry.group.key)}
+                        aria-label={`Add to ${ItemGlyphs.statusLabels[groupStatus]}`}
+                        onClick={() => props.captureInto(groupStatus)}
                         className="dshx:rounded dshx:p-0.5 dshx:text-muted-foreground dshx:hover:bg-accent dshx:hover:text-foreground"
                       >
                         <PlusIcon className="dshx:size-3.5" />
                       </button>
                     )}
                   </div>
-                ) : entry.kind === 'row' ? (
+                ) : (
                   <Row
                     item={entry.item}
                     open={entry.item.id === props.openId}
@@ -329,18 +325,6 @@ export const ItemsView = (props: {
                     select={props.select}
                     hover={props.hover}
                   />
-                ) : (
-                  <div className="dshx:border-b dshx:border-border/50 dshx:px-9 dshx:py-2">
-                    <Composer
-                      variant="compact"
-                      draftKey={`group:${entry.group.key}`}
-                      placeholder={`New item in ${ItemGlyphs.statusLabels[entry.status]}…`}
-                      status={entry.status}
-                      tags={props.tags}
-                      threads={props.threads}
-                      autoFocus
-                    />
-                  </div>
                 )}
               </div>
             )

@@ -3,7 +3,6 @@ import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 
 import type { BacklogSummaryView } from './api.js'
-import { Composer, type ComposerThread } from './composer.js'
 import { ItemGlyphs } from './item-glyphs.js'
 import { ItemPickers } from './item-pickers.js'
 import { useBacklogActions } from './use-backlog-actions.js'
@@ -150,9 +149,6 @@ export const FeedView = (props: {
   readonly items: readonly BacklogSummaryView[]
   readonly openId: number | null
   readonly select: (id: number) => void
-  readonly tags: readonly string[]
-  readonly threads: readonly ComposerThread[]
-  readonly composerRef: React.RefObject<HTMLTextAreaElement>
   readonly loaded: boolean
   readonly now: number
 }): JSX.Element => {
@@ -240,18 +236,6 @@ export const FeedView = (props: {
               </div>
             )
           })}
-        </div>
-      </div>
-      <div className="dshx:shrink-0 dshx:px-4 dshx:pt-1 dshx:pb-4">
-        <div className="dshx:mx-auto dshx:max-w-4xl">
-          <Composer
-            variant="chat"
-            draftKey="feed"
-            placeholder="Capture a thought, a task, a bug… like sending a message"
-            tags={props.tags}
-            threads={props.threads}
-            inputRef={props.composerRef}
-          />
         </div>
       </div>
     </div>
