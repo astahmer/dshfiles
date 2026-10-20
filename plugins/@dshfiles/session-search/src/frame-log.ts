@@ -85,33 +85,36 @@ export class FrameLog {
   }
 
   /**
-   * Decode complete frames from `from`. The returned offset stops before any frame whose plaintext ends mid-line, so the
-   * next pass re-decodes that frame instead of losing the beginning of an event.
+   * Decode complete frames from `from`. A line the writer split across frames is joined; the returned offset stops
+   * before a trailing run of frames whose last plaintext still ends mid-line, so the next pass re-decodes them instead
+   * of losing the beginning of an event. (Stopping at the first such frame instead pinned a log's cursor before any
+   * split line forever, and every pass re-read the same window.)
    */
   static decodeFrom(buffer: Buffer, from = 0, limitBytes = Number.POSITIVE_INFINITY): DecodedLog {
     const ranges = FrameLog.scan(buffer, from)
     const parts: string[] = []
     const consumed: FrameRange[] = []
+    let pendingParts: string[] = []
+    let pendingRanges: FrameRange[] = []
     let decodedBytes = 0
-    let holdFrom: number | undefined
     for (const range of ranges) {
       const text = zstdDecompressSync(buffer.subarray(range.start, range.end)).toString('utf8')
-      parts.push(text)
+      pendingParts.push(text)
+      pendingRanges.push(range)
       decodedBytes += text.length
-      if (text.endsWith('\n')) {
-        consumed.push(range)
-        if (decodedBytes >= limitBytes) break
-        continue
-      }
-      holdFrom = range.start
-      break
+      if (!text.endsWith('\n')) continue
+      parts.push(...pendingParts)
+      consumed.push(...pendingRanges)
+      pendingParts = []
+      pendingRanges = []
+      if (decodedBytes >= limitBytes) break
     }
     const last = consumed.at(-1)
     return {
-      text: holdFrom === undefined ? parts.join('') : parts.slice(0, consumed.length).join(''),
+      text: parts.join(''),
       frames: consumed,
       offset: last === undefined ? from : last.end,
-      torn: holdFrom !== undefined || consumed.length < ranges.length,
+      torn: pendingRanges.length > 0 || consumed.length < ranges.length,
     }
   }
 
