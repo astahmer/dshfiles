@@ -9,6 +9,7 @@ import { useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEve
 import { KIND_GROUPS, KIND_LABEL } from './account-labels.js'
 import type { AccountsUsage } from './api.js'
 import { ProviderGlyph } from './provider-glyph.js'
+import { UsagePlanBadge } from './usage-plan-badge.js'
 import { useQuotaClock } from './quota-clock.js'
 import { usePreferences } from './use-preferences.js'
 import { QUOTA_TONE_PROGRESS, QUOTA_TONE_TEXT, quotaTone } from './quota-tone.js'
@@ -57,6 +58,7 @@ const AccountUsageCard = (props: { readonly card: OverviewCard; readonly hostNam
       <header className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
         <ProviderGlyph className="dshx:size-3.5" kind={props.card.kind} />
         <strong className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-sm dshx:font-semibold">{props.card.displayName}</strong>
+        <UsagePlanBadge plan={usage.plan} />
         {limited ? (
           <Badge className="dshx:h-5 dshx:px-1.5 dshx:text-[10px]" variant="destructive">
             Limit reached

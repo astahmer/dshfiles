@@ -341,6 +341,30 @@ const expectUsageCards = async (page: Page, layout: 'stacked' | 'side by side'):
 Then('widening the usage popover from its grip lays the accounts out side by side', async ({ page }: { page: Page }) => {
   await stripMeter(page).click()
   await expectUsageCards(page, 'stacked')
+  await recordAssertion(page, 'ai-accounts-quota-header-shows-provider-plan', async () => {
+    const header = usagePopover(page).locator('article header').filter({ hasText: 'Command Code 1' })
+    const plan = header.getByLabel('Subscription plan: individual-pro', { exact: true })
+    await expect(plan).toBeVisible()
+    await expect(plan).toHaveText('individual-pro')
+    await expect(plan).toHaveAttribute('title', 'Subscription plan: individual-pro')
+    const bounds = await plan.evaluate(element => {
+      const header = element.closest('header')
+      if (header === null) throw new Error('The plan badge is not in a quota card header')
+      const headerBox = header.getBoundingClientRect()
+      const planBox = element.getBoundingClientRect()
+      return {
+        planTop: planBox.top,
+        planBottom: planBox.bottom,
+        planWidth: planBox.width,
+        headerTop: headerBox.top,
+        headerBottom: headerBox.bottom,
+        headerWidth: headerBox.width,
+      }
+    })
+    expect(bounds.planTop).toBeGreaterThanOrEqual(bounds.headerTop)
+    expect(bounds.planBottom).toBeLessThanOrEqual(bounds.headerBottom + 1)
+    expect(bounds.planWidth).toBeLessThanOrEqual(bounds.headerWidth * 0.3 + 1)
+  })
   const grip = await usagePopover(page).getByRole('separator', { name: 'Resize usage popover', exact: true }).boundingBox()
   if (grip === null) throw new Error('The usage popover grip is not laid out')
   await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2)
