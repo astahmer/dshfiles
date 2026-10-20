@@ -1,3 +1,6 @@
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -320,5 +323,21 @@ describe('memory store statement reuse', () => {
     } finally {
       prepare.mockRestore()
     }
+  })
+
+  it('adds the excerpt column to a database indexed before excerpts were kept', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'memory-excerpt-'))
+    const path = join(directory, 'memory.db')
+    const legacy = new DatabaseSync(path)
+    legacy.exec(
+      'create table messages (rowid integer primary key, thread text not null, seq integer not null, project text not null, role text not null, at integer not null, unique (thread, seq))',
+    )
+    legacy.close()
+
+    const store = openMemoryStore({ path })
+    store.indexMessages({ thread: 'session-new', project: '/p/x', throughSeq: 1, messages: [{ seq: 1, role: 'user', text: 'INC-200 rollback', at: start }] })
+    const hit = store.search({ query: 'rollback', projects: ['/p/x'], ownProject: '/p/x', limit: 5 }).find(entry => entry.kind === 'message')
+    expect(hit).toMatchObject({ kind: 'message', excerpt: 'INC-200 rollback' })
+    rmSync(directory, { recursive: true, force: true })
   })
 })

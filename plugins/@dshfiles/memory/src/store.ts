@@ -83,6 +83,8 @@ export type SearchHit =
       readonly project: string
       readonly score: number
       readonly updatedAt: number
+      /** The message's first `MemoryStore.excerptChars` characters; null for rows indexed before excerpts were kept. */
+      readonly excerpt: string | null
     }
 
 export type Ranker = 'bm25' | 'vector' | 'hybrid'
@@ -222,6 +224,7 @@ create table if not exists messages (
   project text not null,
   role text not null,
   at integer not null,
+  excerpt text,
   unique (thread, seq)
 );
 create index if not exists messages_at on messages (at);
@@ -246,6 +249,11 @@ create table if not exists daily (day text not null, name text not null, value i
 create index if not exists citations_at on citations (at);
 `
 
+/** Characters of a message kept with its index row, enough for a search snippet without reading the Session log. */
+const EXCERPT_CHARS = 2_000
+
+const excerptOf = (value: SQLOutputValue | undefined): string | null => (value === null || value === undefined ? null : String(value))
+
 /**
  * The plugin's only persistent state: thread digests, notes, a contentless index of message text (the text itself
  * stays in DSH's session log and is read back on demand), frozen start blocks, optional embeddings and usage counters.
@@ -256,6 +264,14 @@ export const openMemoryStore = (options: { readonly path: string; readonly now?:
   const database = new DatabaseSync(options.path)
   database.exec('pragma journal_mode = wal; pragma busy_timeout = 5000;')
   database.exec(schema)
+  // Databases created before excerpts were kept get the column; their rows stay null until a log read backfills them.
+  if (
+    !database
+      .prepare('select name from pragma_table_info(?)')
+      .all('messages')
+      .some(column => column['name'] === 'excerpt')
+  )
+    database.exec('alter table messages add column excerpt text')
   /**
    * One prepared statement per SQL text for the life of this database. The store compiles the same index, lookup and
    * retention SQL over and over otherwise — three statements per indexed message alone — and preparing re-parses it.
@@ -490,12 +506,13 @@ export const openMemoryStore = (options: { readonly path: string; readonly now?:
       let last = through
       for (const message of input.messages) {
         if (message.seq <= through || message.text.trim().length === 0) continue
-        const result = statement('insert or ignore into messages (thread, seq, project, role, at) values (?, ?, ?, ?, ?)').run(
+        const result = statement('insert or ignore into messages (thread, seq, project, role, at, excerpt) values (?, ?, ?, ?, ?, ?)').run(
           input.thread,
           message.seq,
           input.project,
           message.role,
           message.at,
+          message.text.slice(0, EXCERPT_CHARS),
         )
         if (result.changes === 0) continue
         statement('insert into messages_words (rowid, text) values (?, ?)').run(result.lastInsertRowid, message.text)
@@ -510,6 +527,17 @@ export const openMemoryStore = (options: { readonly path: string; readonly now?:
           last,
         )
       return added
+    })
+
+  /** Fill the excerpt of rows indexed before excerpts were kept, from one read of their Session log. */
+  const backfillExcerpts = (input: { readonly thread: string; readonly messages: readonly { readonly seq: number; readonly text: string }[] }): void =>
+    transaction(() => {
+      for (const message of input.messages)
+        statement('update messages set excerpt = ? where thread = ? and seq = ? and excerpt is null').run(
+          message.text.slice(0, EXCERPT_CHARS),
+          input.thread,
+          message.seq,
+        )
     })
 
   const indexedThrough = (thread: string): number =>
@@ -635,7 +663,7 @@ export const openMemoryStore = (options: { readonly path: string; readonly now?:
         const scope = scoped('m.project')
         lists.push(
           statement(
-            `select m.thread, m.seq, m.role, m.project, m.at from ${table} f join messages m on m.rowid = f.rowid
+            `select m.thread, m.seq, m.role, m.project, m.at, m.excerpt from ${table} f join messages m on m.rowid = f.rowid
                where ${table} match ?${scope.sql} order by bm25(${table}) limit ?`,
           )
             .all(match, ...scope.parameters, depth * 4)
@@ -649,6 +677,7 @@ export const openMemoryStore = (options: { readonly path: string; readonly now?:
               project: String(row['project']),
               score: 0,
               updatedAt: Number(row['at']),
+              excerpt: excerptOf(row['excerpt']),
             })),
         )
       }
@@ -659,7 +688,7 @@ export const openMemoryStore = (options: { readonly path: string; readonly now?:
       const scope = scoped('e.project')
       lists.push(
         statement(
-          `select e.kind, e.ref, e.project, e.vector, e.updated_at, m.thread, m.seq, m.role from embeddings e
+          `select e.kind, e.ref, e.project, e.vector, e.updated_at, m.thread, m.seq, m.role, m.excerpt from embeddings e
              left join messages m on e.kind = 'message' and m.rowid = cast(e.ref as integer) where e.model = ?${scope.sql}`,
         )
           .all(request.embeddingModel, ...scope.parameters)
@@ -676,7 +705,14 @@ export const openMemoryStore = (options: { readonly path: string; readonly now?:
             const base = { project: String(row['project']), score: 0, updatedAt: Number(row['updated_at']) }
             if (row['kind'] === 'note') return { kind: 'note', id: Number(row['ref']), ...base }
             if (row['kind'] === 'message')
-              return { kind: 'message', thread: String(row['thread']), seq: Number(row['seq']), role: String(row['role']), ...base }
+              return {
+                kind: 'message',
+                thread: String(row['thread']),
+                seq: Number(row['seq']),
+                role: String(row['role']),
+                excerpt: excerptOf(row['excerpt']),
+                ...base,
+              }
             return { kind: 'thread', id: String(row['ref']), ...base }
           }),
       )
@@ -1102,6 +1138,7 @@ export const openMemoryStore = (options: { readonly path: string; readonly now?:
     forgetNote,
     blockNotes,
     indexMessages,
+    backfillExcerpts,
     indexedThrough,
     putEmbedding,
     missingEmbeddings,

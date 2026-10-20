@@ -22,7 +22,8 @@ import { createPricingCatalog, DEFAULT_PRICING_PATH, resolveRouteQuote } from '@
 
 import { memoryApi, type MemoryCostLine, type MemoryCosts, type MemoryUsage, type PanelNote, type PanelThread } from './api.ts'
 import { projectPathFor } from './project-path.ts'
-import { createMemoryRuntime, type Caller, type MemoryRuntime, type MemoryServices } from './runtime.ts'
+import { createMemoryRuntime, type Caller, type MemoryRuntime, type MemoryServices, type SessionTitleRead } from './runtime.ts'
+import { MemorySessionList } from './session-list.ts'
 import { memorySettings, type MemorySettings } from './settings.ts'
 import { sessionContentHits } from './session-content.ts'
 import { openMemoryStore, type MemoryStore, type NoteRecord, type StoredThread } from './store.ts'
@@ -60,12 +61,19 @@ const textOf = (blocks: readonly { readonly type: string; readonly text?: string
 
 const embedders = new Map<string, Promise<MemoryEmbedder>>()
 
+const listedTitleSchema = z.string().min(1)
+
 const hostServices = (ctx: Context): MemoryServices => {
   const sessionQuery = () => {
     const service = ctx.get('sessionQuery')
     if (!service) throw new Error('the DSH sessionQuery service is unavailable')
     return service
   }
+  const sessionList = new MemorySessionList({
+    listSessions: async () => (await sessionQuery().listSessions()).map(record => ({ header: record.header, live: record.live, persisted: record.persisted })),
+  })
+  ctx.on('session/created', () => sessionList.sessionsChanged())
+  ctx.on('session/disposed', () => sessionList.sessionsChanged())
   const routes = createRouteResolver({
     policy: () => {
       const settings = currentSettings()
@@ -103,14 +111,29 @@ const hostServices = (ctx: Context): MemoryServices => {
       await projectNormalization
       return projectPathFor(cwd)
     },
-    listSessions: async () => (await sessionQuery().listSessions()).map(record => ({ header: record.header, live: record.live, persisted: record.persisted })),
+    listSessions: () => sessionList.listSessions(),
     readSessionTitles: async sessionIds => {
-      const results = await sessionQuery().readTitleSnapshots(sessionIds.map(id => SessionId(id)))
-      return results.map(result =>
-        result.status === 'fulfilled'
-          ? { sessionId: result.sessionId, title: result.value.title?.title, updatedAt: result.value.title?.updatedAt }
-          : { sessionId: result.sessionId, title: undefined, updatedAt: undefined },
-      )
+      // The Session list serves each title from the projection cache (a log-prefix read, kept until the Session
+      // changes); core's title fold decodes the whole log, so it only answers the Sessions the list has no title for.
+      const listed = await ctx
+        .get('sessionController')
+        ?.list({}, AbortSignal.timeout(10_000))
+        .catch(() => undefined)
+      const fromList = new Map<string, SessionTitleRead>()
+      for (const item of listed?.items ?? []) {
+        const title = listedTitleSchema.safeParse(item.projections?.values.title)
+        if (title.success) fromList.set(item.sessionId, { sessionId: item.sessionId, title: title.data, updatedAt: item.updatedAt })
+      }
+      const missing = sessionIds.filter(id => !fromList.has(id))
+      const folded = missing.length === 0 ? [] : await sessionQuery().readTitleSnapshots(missing.map(id => SessionId(id)))
+      for (const result of folded)
+        fromList.set(
+          result.sessionId,
+          result.status === 'fulfilled'
+            ? { sessionId: result.sessionId, title: result.value.title?.title, updatedAt: result.value.title?.updatedAt }
+            : { sessionId: result.sessionId, title: undefined, updatedAt: undefined },
+        )
+      return sessionIds.map(id => fromList.get(id) ?? { sessionId: id, title: undefined, updatedAt: undefined })
     },
     searchSessionContent: async (request, signal) => {
       const page = await sessionQuery().searchSessions(

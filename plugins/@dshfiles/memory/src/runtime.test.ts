@@ -338,6 +338,26 @@ describe('memory runtime', () => {
     expect(store.usage().tools.map(entry => entry.tool)).toContain('find_threads')
   })
 
+  it('answers memory message hits from stored excerpts without reading Session logs', async () => {
+    const { logs, runtime, store, caller, titles } = setup()
+    const thread = halyardThread('session-22222222-0000-4000-8000-000000000000')
+    logs.set(thread.header.id, thread.log())
+    titles.set(thread.header.id, 'Ops notes')
+    store.indexMessages({
+      thread: thread.header.id,
+      project: root,
+      throughSeq: 2,
+      messages: [{ seq: 2, role: 'user', text: 'The halyard coordinator restarted during the config push.', at: Date.now() }],
+    })
+    const logReads = vi.spyOn(logs, 'get')
+
+    const page = await runtime.findThreads(caller('session-reader'), { query: 'coordinator' })
+
+    expect(page.hits.map(hit => hit.sessionId)).toEqual([thread.header.id])
+    expect(page.hits[0]?.sources).toContain('memory-message')
+    expect(logReads).not.toHaveBeenCalled()
+  })
+
   it('reports a finder that cannot search content as an actionable code, never as an empty page', async () => {
     const { logs, runtime, caller, content } = setup()
     const thread = halyardThread('session-11111111-0000-4000-8000-000000000000')

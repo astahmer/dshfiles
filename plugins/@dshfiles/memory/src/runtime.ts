@@ -406,12 +406,26 @@ export const createMemoryRuntime = (options: {
     return `${start > 0 ? '…' : ''}${Utf8.clip(flat.slice(start), bytes)}`
   }
 
-  const messageText = async (thread: string, seq: number): Promise<string | undefined> => {
-    const log = await readLog(thread).catch(() => undefined)
-    const event = log?.events.find(candidate => candidate.seq === seq)
-    if (event?.type === 'user/message') return event.data.content.flatMap(block => (block.type === 'text' ? [block.text] : [])).join('\n')
-    if (event?.type === 'assistant/message') return event.data.message.content.flatMap(block => (block.type === 'text' ? [block.text] : [])).join('\n')
+  const eventText = (event: SessionEvent): string | undefined => {
+    if (event.type === 'user/message') return event.data.content.flatMap(block => (block.type === 'text' ? [block.text] : [])).join('\n')
+    if (event.type === 'assistant/message') return event.data.message.content.flatMap(block => (block.type === 'text' ? [block.text] : [])).join('\n')
     return undefined
+  }
+
+  /**
+   * A message hit's text: its stored excerpt, else one read of the whole Session log, which then fills the excerpts of
+   * every indexed message of that thread so the next search does not read it again.
+   */
+  const messageText = async (hit: { readonly thread: string; readonly seq: number; readonly excerpt: string | null }): Promise<string | undefined> => {
+    if (hit.excerpt !== null) return hit.excerpt
+    const log = await readLog(hit.thread).catch(() => undefined)
+    if (log === undefined) return undefined
+    const messages = log.events.flatMap(event => {
+      const text = eventText(event)
+      return text === undefined ? [] : [{ seq: event.seq, text }]
+    })
+    store.backfillExcerpts({ thread: hit.thread, messages })
+    return messages.find(message => message.seq === hit.seq)?.text
   }
 
   const search = async (
@@ -452,7 +466,7 @@ export const createMemoryRuntime = (options: {
             `${hitId(hit)} (${day(note.createdAt)}${where}, ${note.category}, ${note.scope}${note.sourceThread === null ? '' : `, from t:${ThreadDigestRules.shortId(note.sourceThread)}`}) ${note.text}`,
           )
       } else {
-        const text = await messageText(hit.thread, hit.seq)
+        const text = await messageText(hit)
         if (text !== undefined)
           lines.push(`${hitId(hit)} (${day(hit.updatedAt)}${where}, ${hit.role} message) ${snippet(ThreadDigestRules.redact(text), args.query)}`)
       }
@@ -551,7 +565,9 @@ export const createMemoryRuntime = (options: {
           })
         continue
       }
-      const text = await messageText(hit.thread, hit.seq)
+      // The palette waits on this: a row indexed before excerpts were kept is left to the content index instead of
+      // decoding its Session log here.
+      const text = hit.excerpt ?? undefined
       if (text !== undefined)
         mapped.push({
           kind: 'message',
