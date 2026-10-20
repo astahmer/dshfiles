@@ -6,6 +6,7 @@
       "title": "Navigate to registered panels",
       "summary": "Offer only currently registered root panels and navigate using their current display labels.",
       "surfaces": ["client", "command", "integration"],
+      "reach": ["click button \"Open command palette\"", "fill combobox \"Search the command palette\" \"Go to\"", "expect option \"Go to*\""],
       "configuration": [],
       "states": ["available", "unregistered", "selected"],
       "failureModes": ["An orphan or unregistered panel is omitted.", "A target removed before selection reports a stale-target error."],

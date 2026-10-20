@@ -6,6 +6,13 @@
       "title": "Run trusted project checks",
       "summary": "Run configured fixed-argv actions only inside canonical trusted project roots and retain bounded receipts without exposing child output.",
       "surfaces": ["client", "host", "command", "settings", "integration"],
+      "reach": [
+        "click button \"New thread\"",
+        "click button \"Open command palette\"",
+        "fill combobox \"Search the command palette\" \"Project checks\"",
+        "click option \"Project checks*\"",
+        "expect heading \"Project checks\""
+      ],
       "configuration": [
         {
           "key": "actions",

@@ -6,6 +6,13 @@
       "title": "Browse and filter the plugin catalog",
       "summary": "Search, filter by category and compatibility, sort, paginate, refresh, and open catalog entries without claiming unavailable detail or uninstall capabilities.",
       "surfaces": ["client", "host", "integration"],
+      "reach": [
+        "click button \"Open command palette\"",
+        "fill combobox \"Search the command palette\" \"Settings: Built-in plugins\"",
+        "click option \"Settings: Built-in plugins*\"",
+        "click tab \"Framework Hub\"",
+        "expect searchbox \"Search plugins\""
+      ],
       "configuration": [
         {
           "key": "hubBaseUrl",

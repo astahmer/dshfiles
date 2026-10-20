@@ -23,6 +23,10 @@
       ],
       "reach": [
         "seed rebase-ready-thread",
+        "click button \"All threads\"",
+        "click text \"Seeded thread to rebase\"",
+        "click button \"All threads\"",
+        "click text \"Seeded thread to rebase\"",
         "fill textbox \"Message or run a task, / commands, @ files or sessions\" \"/pulls\"",
         "press Enter",
         "expect text \"pulls.review \u00b7 main..@*\"",

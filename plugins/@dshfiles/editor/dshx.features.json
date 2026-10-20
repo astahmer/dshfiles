@@ -6,6 +6,7 @@
       "title": "Browse and edit workspace files",
       "summary": "Browse bounded project files, open session-scoped Monaco tabs, search and go to line, preserve dirty drafts, and save through Host file APIs.",
       "surfaces": ["client", "host", "settings", "integration"],
+      "reach": ["click button \"Open right sidebar\"", "click text \"Editor\"", "expect text \"Pick a file in the tree, or open one from another panel.\""],
       "configuration": [
         {
           "key": "editorPlacement",

@@ -6,7 +6,13 @@
       "id": "feedback-privacy-settings",
       "title": "Control feedback and session-data sharing",
       "summary": "Independently control answer feedback, session feedback capture, OpenTelemetry session-log export, and official DeepSeek API session-log upload; keep local log downloads separate. The answer-feedback UI requires the sessionFeedback Host Remote.",
-      "reach": ["click button \"Settings\"", "click button \"Feedback & privacy\"", "expect switch \"Answer feedback UI\""],
+      "reach": [
+        "click button \"Open command palette\"",
+        "fill combobox \"Search the command palette\" \"Settings: Feedback\"",
+        "click option \"Settings: Feedback*\"",
+        "click button \"Feedback & privacy\"",
+        "expect switch \"Answer feedback UI\""
+      ],
       "surfaces": ["client", "host", "settings"],
       "configuration": [],
       "states": ["default-off", "enabled", "dependency-blocked", "download-preserved", "unavailable"],
