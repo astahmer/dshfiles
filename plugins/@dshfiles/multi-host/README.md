@@ -41,6 +41,18 @@ With a host chosen:
   every 1.5 s, 8 s when idle), reply, stop, and **Host UI**, which opens the
   host's own DSH in a new tab on a stable loopback origin. If the host drops,
   the last transcript stays on screen under the error.
+- The **Remote threads** list shows every thread on every registered host,
+  grouped by host and newest first: threads started from here keep their title,
+  threads started on the host itself (its own UI or another machine) carry a
+  muted **started on host** badge and are titled by their folder. Status is
+  polled only while that list is open. An offline host shows one muted
+  "unavailable" line and still lists the threads started here.
+- While a remote turn waits, the open-thread view says what it waits on:
+  **The agent ... is asking a question** when the last tool call is
+  `ask_user_question` (or `ask_parent_question`), and **Waiting on <tool>**
+  when any other call has stayed open for more than a minute, since the log
+  cannot tell a slow command from a pending approval. Both offer **Host UI**;
+  answering and approving stay in the host's own DSH.
 - The thread sidebar shows a **Remote** section: every thread started from
   here, badged with its host and whether its connection is open.
 
@@ -109,8 +121,9 @@ title}` for threads started here, so the sidebar and view can list them.
   threads; the model is picked in the remote composer.
 - No password or keyboard-interactive SSH (BatchMode only), and no remote
   provisioning.
-- Sidebar entries are threads started from this machine; threads created
-  directly on the host are not listed.
+- The sidebar's Remote section still lists only threads started from this
+  machine; threads created directly on the host appear in the Remote threads
+  list, not the sidebar.
 - LSP is not advertised by remote runtimes (unchanged from earlier
   validation).
 

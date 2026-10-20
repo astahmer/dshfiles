@@ -156,3 +156,30 @@ The repository-only lifecycle journey boots two scratch DSH profiles: the manage
 - Named scratch UI reach used `mhost-verify-20261016` for every operation: `dshx dev up --plugin @dshfiles/multi-host --plugin @dshfiles/jj-integration --name mhost-verify-20261016 --json`, `dshx dev doctor --name mhost-verify-20261016 --json`, `dshx dev open multi-host/runtime-directory --name mhost-verify-20261016 --json`, `dshx dev shot --name mhost-verify-20261016 --label multi-host-runtime-directory --json`, and `dshx dev down --name mhost-verify-20261016 --json`. All three bundles loaded, `doctor` reported no host errors, the Add host dialog opened, and the screenshot had zero console, page, request, or HTTP errors and zero warnings. `down` removed the scratch home and token-bearing state/logs with `leftRunning: []`; a process check found no scratch DSH processes. No live `:3080` runtime or physical host was touched by these local checks.
 
 **Physical release gate remains open by user choice.** In the separate authorized read-only audit, the VPS had an existing registered DSH home and HomeInfra-only Swarm services, but no DSH service or multi-host launch metadata in that home. The Pi's pinned host key was valid, but SSH with the configured identity was denied (`Permission denied (publickey)`); no alternate credential was tried. Nixfiles has macOS DSH Home Manager wiring and a Pi runner, but no Linux DSH service owner. No target or service owner was selected. No secrets were read; no remote files or services were changed. These local checks do not prove physical-host SSH, service ownership, persistent Linux startup, upgrade/rollback, or deployment acceptance; keep those release gates open.
+
+## Remote inventory and waiting banner (2026-10-20)
+
+Two scratch DSHs on this machine: the manager loaded `@dshfiles/multi-host`,
+`@dshfiles/jj-integration` and `@dshfiles/thread-sidebar`; a second instance on
+`127.0.0.1:3199` loaded `@dshfiles/multi-host`, `@dshfiles/jj-integration` and
+the registry bundle `dsh-our-free-model`, registered as a host through the
+loopback connector (`hostUpsert` kind `local` + `runtimeUpsert` with the
+second runtime's launch URL). Its scratch profile patch pointed
+`agent-default-model` at the keyless `our-free-model` / `kilo-auto/free` route,
+so a real remote turn could run. No `:3080` runtime, live profile or user
+credential was touched.
+
+| Check                 | Result                                                                                                                                                                                                                                                                                                                                 |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Inventory list        | The panel merged the manager's started-here thread with three sessions created directly on the remote runtime, grouped under the host name; host-started rows carried the `started on host` badge, the projected remote title (`Question probe`), a `Working` spinner while running and a relative age. Screenshot `remote-inventory`. |
+| Thread title          | The remote `session.list` carries the title only as `projections.values.title`; the Host now maps it to the optional `sessions[].title`, so the list shows the real title instead of the folder basename.                                                                                                                              |
+| Open and reply        | Clicking the host-started row opened it in the remote thread view; typing into `Reply on Remote loopback` and Send showed the message in the transcript on the next poll.                                                                                                                                                              |
+| Waiting on a question | The remote agent called `ask_user_question` and the local view showed "The agent on Remote loopback is asking a question. Answer it in the host's DSH." with **Host UI**. Screenshot `remote-question-banner`.                                                                                                                         |
+| Offline host          | Stopping the remote runtime left one muted "Remote loopback unavailable: Could not reach the runtime through its recorded connector." line and the started-here row. Screenshot `remote-host-offline`.                                                                                                                                 |
+| Opening the list      | The sidebar **Remote** header now opens the panel's list (and clears the open thread), which is what made the list reachable without a started-here row already selected.                                                                                                                                                              |
+
+Screenshots and JSON summaries lived in `$TMPDIR/dshx-dev/rthux2-local/evidence`
+(four states above) and were kept by `dshx dev down`; the scratch homes and
+launch tokens were deleted. The generic tool-call wait (`kind: 'tool'`, shown
+only after 60 s) was not driven live: it needs a remote tool call kept open for
+a minute, and the log cannot distinguish it from a pending approval.

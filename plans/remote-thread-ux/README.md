@@ -4,7 +4,7 @@ Owner plugin: `@dshfiles/multi-host` (`plugins/@dshfiles/multi-host`). No core p
 If something cannot be done with the existing Host methods and the remote runtime's supported RPCs, write the gap in
 `plans/dsh-host-gaps.md` and stop that slice.
 
-**Resume here:** Task 3, verification.
+**Resume here:** Closing the plan (all tasks done and verified).
 
 ## Why
 
@@ -32,8 +32,8 @@ Out of scope: streaming the transcript instead of polling (measure first), deplo
 | 2.1 Pending detection in `reduceTranscript` | done |
 | 2.2 "Waiting on host" banner | done |
 | 2.3 Tests for pending detection | done |
-| 3 Verification (unit, build, boot, e2e, loopback scratch) | todo |
-| 4 Docs + revisions | todo |
+| 3 Verification (unit, build, boot, e2e, loopback scratch) | done |
+| 4 Docs + revisions | done |
 
 ## Slice 1: remote inventory
 

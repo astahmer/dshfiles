@@ -253,6 +253,11 @@ agent tools`): read-only `multi_host_identity`, `multi_host_status`,
 `multi_host_open_folder`, `multi_host_start_thread` and
 `multi_host_forget_thread`. Every write names the user request it needs.
 
+The remote inventory adds no user verb: it renders the `sessions` that
+`multi_host_status`/`runtimeStatus` already returns, and that read already has
+its agent tool. The waiting-on-host banner is presentation over the same
+transcript read (`multi_host_thread_transcript`).
+
 Deliberately untooled, pinned by a test:
 
 | Verb                                   | Why no tool                                                                                          |
