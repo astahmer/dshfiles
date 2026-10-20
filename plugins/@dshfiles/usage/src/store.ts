@@ -78,6 +78,8 @@ const MIGRATIONS: readonly string[] = [
 
   CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL) STRICT;
   `,
+  // Pricing reads the distinct routes that have usage; the partial index answers it without reading request rows.
+  'CREATE INDEX requests_route_band ON requests (provider, model, band) WHERE input IS NOT NULL;',
 ]
 
 export interface RouteBand {
@@ -235,6 +237,10 @@ export const openUsageStore = (path: string) => {
     return statement
   }
 
+  /** Routes with usage, keyed by `routeBandKey`; filled on the first pricing pass. */
+  let pricedRoutes: Map<string, RouteBand> | undefined
+  const routeBandKey = (route: RouteBand): string => `${route.provider}\u0000${route.model}\u0000${String(route.band)}`
+
   const transaction = <Result>(work: () => Result): Result => {
     database.exec('BEGIN IMMEDIATE')
     try {
@@ -249,6 +255,7 @@ export const openUsageStore = (path: string) => {
 
   const upsertRequest = (row: RequestRow, settled: boolean): void => {
     const usage = row.usage
+    const band = usage === null ? 0 : CostEstimateModel.contextBand(usage.input + usage.cacheRead + usage.cacheWrite)
     prepare(
       `INSERT INTO requests (id, session_id, seq, message_id, turn, step, purpose, source, provider, model, started_at, ended_at, ttft_ms,
          input, cache_read, cache_write, output, reasoning, band, status, stop_reason, error_code, merged_into, settled)
@@ -281,12 +288,13 @@ export const openUsageStore = (path: string) => {
       usage?.cacheWrite ?? null,
       usage?.output ?? null,
       usage?.reasoning ?? null,
-      usage === null ? 0 : CostEstimateModel.contextBand(usage.input + usage.cacheRead + usage.cacheWrite),
+      band,
       row.status,
       row.stopReason,
       row.errorCode,
       settled ? 1 : 0,
     )
+    if (usage !== null) pricedRoutes?.set(routeBandKey({ provider: row.provider, model: row.model, band }), { provider: row.provider, model: row.model, band })
   }
 
   const upsertSession = (session: SessionMeta): void => {
@@ -373,14 +381,20 @@ export const openUsageStore = (path: string) => {
       .array(z.object({ provider: z.string(), model: z.string(), band: z.number() }))
       .parse(prepare('SELECT DISTINCT provider, model, band FROM requests WHERE input IS NOT NULL').all())
 
-  const unratedRouteBands = (): RouteBand[] =>
-    z.array(z.object({ provider: z.string(), model: z.string(), band: z.number() })).parse(
-      prepare(
-        `SELECT DISTINCT r.provider, r.model, r.band FROM requests r
-           LEFT JOIN route_rates rr ON rr.provider = r.provider AND rr.model = r.model AND rr.band = r.band
-           WHERE r.input IS NOT NULL AND rr.provider IS NULL`,
-      ).all(),
+  /**
+   * Pricing runs after every index pass and asked SQLite for the distinct routes of all 150 000 requests each time
+   * (50–450 ms on the Host's event loop). The set is read once and topped up as requests with usage land.
+   */
+  const unratedRouteBands = (): RouteBand[] => {
+    pricedRoutes ??= new Map(routeBands().map(route => [routeBandKey(route), route]))
+    const rated = new Set(
+      z
+        .array(z.object({ provider: z.string(), model: z.string(), band: z.number() }))
+        .parse(prepare('SELECT provider, model, band FROM route_rates').all())
+        .map(routeBandKey),
     )
+    return [...pricedRoutes.values()].filter(route => !rated.has(routeBandKey(route)))
+  }
 
   /** Replace every rate (`replace: true`) or add the missing ones. */
   const writeRates = (input: { readonly rates: ReadonlyMap<string, { readonly route: RouteBand; readonly rates: Rates }>; readonly replace: boolean }): void =>

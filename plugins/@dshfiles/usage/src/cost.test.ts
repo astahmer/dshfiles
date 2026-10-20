@@ -110,4 +110,37 @@ describe('request costs', () => {
     expect(store.requests({ from: 0, to: 10_000, sort: 'cost', direction: 'desc', limit: 1 }).rows[0]?.cost).toBeCloseTo(0.0173, 10)
     expect(pricer.fetchedAt()).toBe(0.2)
   })
+
+  it('prices a route that first appears after an earlier pass, without a catalog change', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'usage-pricing-'))
+    scratchDirs.push(dir)
+    const pricingPath = join(dir, 'pricing.json')
+    const price = { input: 0.1, output: 0.5, cacheRead: 0.01 }
+    await writeFile(
+      pricingPath,
+      JSON.stringify({ version: 1, fetchedAt: 1, source: 'test', providers: { openai: { 'gpt-6-luna': price, 'gpt-6-sol': price, 'gpt-6-terra': price } } }),
+    )
+    const store = openUsageStore(':memory:')
+    const slice = (id: string, model: string, offset: number) => ({
+      path: '/x',
+      sessionId: 'session-a',
+      offset,
+      size: offset,
+      mtimeMs: offset,
+      state: '{}',
+      session: null,
+      rows: [request({ id, startedAt: 1_000 * offset, model })],
+    })
+    const pricer = createRatePricer({ store, pricingPath })
+    store.commitLogSlice(slice('a', 'gpt-6-luna', 1))
+    await pricer.update()
+
+    store.commitLogSlice(slice('b', 'gpt-6-sol', 2))
+    await pricer.update()
+    store.commitLogSlice(slice('c', 'gpt-6-terra', 3))
+    await pricer.update()
+    const costs = store.requests({ from: 0, to: 10_000, sort: 'cost', direction: 'desc', limit: 3 }).rows.map(row => row.cost)
+    expect(costs).toHaveLength(3)
+    expect(costs.every(cost => cost !== null && cost > 0)).toBe(true)
+  })
 })
