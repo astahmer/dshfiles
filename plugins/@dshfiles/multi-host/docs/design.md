@@ -91,9 +91,14 @@ borrow its central control plane, enrollment, provisioning or self-update.
   this page's origin; the host UI opens on its own loopback origin.
 - **Forwarded ports bind loopback only**, and DSH's own token and
   trusted-authority checks stay in force.
-- **Provisioning is someone else's job.** Attaching never installs or updates
-  the remote runtime. A persistent host is a service-manager concern (systemd
-  user unit with linger, or Nix), not a side effect of the tunnel.
+- **Attaching never installs; provisioning is explicit.** Adding a host, reading
+  it or starting a thread never installs or updates the remote runtime.
+  Provisioning is its own verb with its own opt-in (`dryRun` plan, then one step
+  per `confirm: 'next'` call or all named steps with `confirm: 'all'`), and it
+  refuses what belongs to the machine's owner: fnm, Home Manager and service
+  supervision come back as blocked steps, never as installs. A persistent host
+  stays a service-manager concern (systemd user unit with linger, launchd or
+  Nix), not a side effect of the tunnel.
 
 The remote OS and user are trusted infrastructure: SSH encryption does not
 protect secrets from that host's administrator.

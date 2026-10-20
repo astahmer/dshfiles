@@ -74,6 +74,37 @@ With a host chosen:
 4. Add the host from the chip. Nothing is installed on the host by this
    plugin; provisioning stays with whoever manages that machine.
 
+## Provisioning and remote administration
+
+The same plugin is the agent's hands on that machine. Each verb is one dshx
+method with a `multi_host_*` tool:
+
+- `multi_host_exec` — one bounded command (120 s, 128 KB of output) with its
+  exit code and both streams, for a machine that is not set up yet.
+- `multi_host_doctor` — read-only facts plus diagnostics: a Nix Node build DSH
+  cannot boot, an fnm-managed official Node that is available, a profile pinning
+  a core version the runtime does not run, a missing launch file, a moving
+  checkout with conflicts.
+- `multi_host_provision` — the whole setup as ordered, state-checked steps:
+  `node`, `checkout`, `install`, `build`, `cli`, `profile`, `runtime`.
+  `dryRun: true` returns the plan and commands without touching the machine;
+  `confirm: 'next'` (default) runs exactly one step per call, so every step is
+  its own opt-in; `confirm: 'all'` runs the named steps in order. A step already
+  satisfied from the machine's own facts is skipped, never repeated, and a step
+  needing something no plugin may install (fnm on a machine without it) comes
+  back `blocked` with the reason.
+- `multi_host_runtime_status` / `multi_host_runtime_control` /
+  `multi_host_runtime_logs` — whether the headless runtime is up, start it with
+  an official Node build and a free loopback port, stop it (refusing a pid that
+  is not that machine's DSH web), read its bounded log tail.
+- `multi_host_checkout_sync` — fetch and rebase one checkout onto
+  `<bookmark>@origin`, keeping that machine's edits; `apply: false` only reports
+  the commands.
+
+Provisioning never installs a package manager or edits the machine's own setup:
+a missing fnm or a stale nixfiles is reported, not patched. It also never
+rewrites another machine's checkout without `apply`.
+
 ## How it works
 
 - **Directory** (`plugins/multi-host/directory.json`, 0600): hosts
@@ -119,8 +150,9 @@ title}` for threads started here, so the sidebar and view can list them.
   text and tool output and links to the host's own UI for the rest.
 - The agent preset chip of the New thread row does not apply to remote
   threads; the model is picked in the remote composer.
-- No password or keyboard-interactive SSH (BatchMode only), and no remote
-  provisioning.
+- No password or keyboard-interactive SSH (BatchMode only). Provisioning runs
+  over that key only and leaves fnm, Home Manager and other machine setup to
+  whoever manages the machine.
 - The sidebar's Remote section still lists only threads started from this
   machine; threads created directly on the host appear in the Remote threads
   list, not the sidebar.
@@ -138,7 +170,9 @@ title}` for threads started here, so the sidebar and view can list them.
 
 `pnpm build`, `pnpm test`, `pnpm typecheck` from this package. The live SSH
 suite runs only when `MULTI_HOST_SSH_TARGET` and `MULTI_HOST_SSH_HOME` point at
-a host running DSH with this plugin.
+a host running DSH with this plugin; the remote-administration suite runs
+read-only checks (doctor, exec, runtime status and logs, a provisioning dry-run,
+a checkout-sync dry-run) when `MULTI_HOST_SSH_TARGET` is set.
 
 The manual [SSH smoke](../../../tooling/dshx/scripts/smoke-multi-host-ssh.mjs)
 creates remote sessions/files and restarts its selected user service. It has no

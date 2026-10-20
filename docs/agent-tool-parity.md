@@ -47,7 +47,7 @@ backing verb; `host-gap` counts capabilities no verb can reach yet.
 | agent-communication                                                                                                                               | 10                   | 14                                                                                                       | 0             | 0         |
 | agent-questions                                                                                                                                   | 12                   | 11                                                                                                       | 0             | 1         |
 | activity-timeline                                                                                                                                 | 7                    | 5                                                                                                        | 0             | 0         |
-| multi-host                                                                                                                                        | 17                   | 20                                                                                                       | 0             | 1         |
+| multi-host                                                                                                                                        | 24                   | 27                                                                                                       | 0             | 1         |
 | goal-stall-guard                                                                                                                                  | 4                    | 3                                                                                                        | 1             | 0         |
 | agent-toolkit                                                                                                                                     | 9                    | 1                                                                                                        | 6             | 3         |
 | tool-meta                                                                                                                                         | 3                    | 0                                                                                                        | 2             | 1         |
@@ -252,6 +252,19 @@ agent tools`): read-only `multi_host_identity`, `multi_host_status`,
 `multi_host_find_homes`, `multi_host_test`, `multi_host_mkdir`,
 `multi_host_open_folder`, `multi_host_start_thread` and
 `multi_host_forget_thread`. Every write names the user request it needs.
+
+Remote administration has its own tools, each bound to one dshx method and one
+SSH-bounded verb: `multi_host_exec` (one command, exit code and both streams,
+120 s at most), `multi_host_doctor` (read-only facts plus the diagnostics worth
+acting on, such as the Nix Node build DSH cannot boot or a profile pinning a core
+version the runtime does not run), `multi_host_provision` (official Node through
+fnm, checkout, install, build, CLI, profile and headless runtime; `dryRun` plans,
+`confirm: 'next'` runs one step per call and `confirm: 'all'` runs the named
+steps), `multi_host_runtime_status`, `multi_host_runtime_control` (start/stop; a
+stop refuses a pid whose command is not that machine's DSH web),
+`multi_host_runtime_logs` and `multi_host_checkout_sync` (`apply: false` only
+reports the fetch and rebase commands). Provisioning never installs fnm itself:
+that is the machine's own setup, reported as a blocked step.
 
 The remote inventory adds no user verb: it renders the `sessions` that
 `multi_host_status`/`runtimeStatus` already returns, and that read already has

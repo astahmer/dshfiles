@@ -13,7 +13,8 @@ const sshTargetOf = (value: string): string => {
   return parsed.sshTarget
 }
 
-const sshOptions = (): string[] => [
+/** `-v` is only for tunnels: their readiness is read from a verbose stderr line. */
+const sshOptions = ({ verbose = false }: { readonly verbose?: boolean | undefined } = {}): string[] => [
   '-o',
   'BatchMode=yes',
   '-o',
@@ -30,7 +31,7 @@ const sshOptions = (): string[] => [
   'ServerAliveInterval=10',
   '-o',
   'ServerAliveCountMax=2',
-  '-v',
+  ...(verbose ? ['-v'] : []),
 ]
 
 const safeSshError = (stderr: string, defaultCode: string, defaultMessage: string): GatewayUnavailableError => {
@@ -49,30 +50,52 @@ const safeSshError = (stderr: string, defaultCode: string, defaultMessage: strin
   return new GatewayUnavailableError(defaultCode, defaultMessage)
 }
 
-const shellQuote = (value: string): string => `'${value.replace(/'/g, `'\\''`)}'`
+export const shellQuote = (value: string): string => `'${value.replace(/'/g, `'\\''`)}'`
 
-const runSshCommand = async ({
+export interface SshProcessResult {
+  /** The remote command's exit status; null when ssh itself ended the run. */
+  readonly code: number | null
+  readonly stdout: string
+  readonly stderr: string
+  readonly timedOut: boolean
+  readonly outputExceeded: boolean
+  readonly durationMs: number
+}
+
+/**
+ * One bounded remote process: resolves with its exit status and both streams instead of throwing on a non-zero exit,
+ * which remote commands need to report their own failure. Cancellation and ssh startup failures still reject.
+ */
+const runSshProcess = async ({
   sshTarget,
   command,
+  timeoutMs = 12_000,
+  maxOutputBytes = outputLimit,
   signal,
 }: {
   readonly sshTarget: string
   readonly command: string
+  readonly timeoutMs?: number | undefined
+  readonly maxOutputBytes?: number | undefined
   readonly signal?: AbortSignal | undefined
-}): Promise<string> => {
+}): Promise<SshProcessResult> => {
   if (signal?.aborted) throw new GatewayUnavailableError('cancelled', 'The SSH request was cancelled.')
   const target = sshTargetOf(sshTarget)
+  const startedAt = Date.now()
   const child = spawn('ssh', [...sshOptions(), target, command], { stdio: ['ignore', 'pipe', 'pipe'] })
   let stdout = ''
   let stderr = ''
   let outputBytes = 0
   let outputExceeded = false
+  let timedOut = false
   const append = (current: string, chunk: Buffer | string): string => {
     const content = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
     outputBytes += content.byteLength
-    if (outputBytes > outputLimit) {
-      outputExceeded = true
-      void stopChild(child)
+    if (outputBytes > maxOutputBytes) {
+      if (!outputExceeded) {
+        outputExceeded = true
+        void stopChild(child)
+      }
       return current
     }
     return current + content.toString('utf8')
@@ -106,9 +129,10 @@ const runSshCommand = async ({
       timer = setTimeout(() => {
         if (finished) return
         finished = true
+        timedOut = true
         void stopChild(child)
-        reject(new GatewayUnavailableError('ssh-timeout', 'The SSH command exceeded its time limit.'))
-      }, 12_000)
+        resolve(null)
+      }, timeoutMs)
       abortListener = () => {
         if (finished) return
         finished = true
@@ -118,13 +142,27 @@ const runSshCommand = async ({
       signal?.addEventListener('abort', abortListener, { once: true })
       if (signal?.aborted) abortListener()
     })
-    if (outputExceeded) throw new GatewayUnavailableError('ssh-output-too-large', 'The SSH command returned more data than allowed.')
-    if (code !== 0) throw safeSshError(stderr, 'ssh-command-failed', 'The SSH command failed.')
-    return stdout
+    return { code, stdout, stderr: stderr.slice(-8_192), timedOut, outputExceeded, durationMs: Date.now() - startedAt }
   } finally {
     if (timer !== undefined) clearTimeout(timer)
     if (abortListener !== undefined) signal?.removeEventListener('abort', abortListener)
   }
+}
+
+const runSshCommand = async ({
+  sshTarget,
+  command,
+  signal,
+}: {
+  readonly sshTarget: string
+  readonly command: string
+  readonly signal?: AbortSignal | undefined
+}): Promise<string> => {
+  const result = await runSshProcess({ sshTarget, command, signal })
+  if (result.outputExceeded) throw new GatewayUnavailableError('ssh-output-too-large', 'The SSH command returned more data than allowed.')
+  if (result.timedOut) throw new GatewayUnavailableError('ssh-timeout', 'The SSH command exceeded its time limit.')
+  if (result.code !== 0) throw safeSshError(result.stderr, 'ssh-command-failed', 'The SSH command failed.')
+  return result.stdout
 }
 
 const remoteLaunch = async ({
@@ -180,7 +218,7 @@ const openTunnel = async ({
   readonly signal?: AbortSignal | undefined
 }): Promise<ChildProcess> => {
   const target = sshTargetOf(sshTarget)
-  const child = spawn('ssh', [...sshOptions(), '-N', '-L', `${localAddress}:${localPort}:127.0.0.1:${remotePort}`, target], {
+  const child = spawn('ssh', [...sshOptions({ verbose: true }), '-N', '-L', `${localAddress}:${localPort}:127.0.0.1:${remotePort}`, target], {
     stdio: ['ignore', 'ignore', 'pipe'],
   })
   let stderr = ''
@@ -312,4 +350,5 @@ export class SshConnector {
   static readonly connect = connectSsh
   static readonly probe = probeSsh
   static readonly discoverHomes = discoverRemoteHomes
+  static readonly run = runSshProcess
 }

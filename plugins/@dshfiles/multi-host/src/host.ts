@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { homedir } from 'node:os'
-import { basename, join } from 'node:path'
+import { basename, join, posix } from 'node:path'
 import { z } from 'zod'
 import { defineHost } from '@dshfiles/dshx/host'
 import { multiHostApi, type ConnectionTestStep, type RuntimeStatus, type SessionSummary } from './api.js'
@@ -21,6 +21,11 @@ import {
   type RuntimeRecord,
 } from './records.js'
 import { createChildDirectory, listDirectory } from './directory-listing.js'
+import { RemoteDoctor, type RemoteFacts } from './remote-doctor.js'
+import { RemoteExec } from './remote-exec.js'
+import { RemoteProvision } from './remote-provision.js'
+import { RemoteRuntime } from './remote-runtime.js'
+import { RemoteCheckout } from './remote-checkout.js'
 import { listSshConfigHosts } from './ssh-config.js'
 import { DirectoryStoreError, HostDirectoryStore } from './store.js'
 import { reduceTranscript } from './transcript.js'
@@ -408,11 +413,148 @@ const sshHostId = (sshTarget: string): string =>
     .replace(/[^A-Za-z0-9._-]/g, '-')
     .slice(0, 64) || 'host'
 
+const remoteHomeOf = ({ facts, requested }: { readonly facts: RemoteFacts; readonly requested: string | undefined }): string => {
+  if (requested !== undefined) return requested
+  if (facts.home === undefined) throw new GatewayUnavailableError('remote-home-unknown', 'The remote home could not be read; pass remoteHome.')
+  return `${facts.home}/.dsh`
+}
+
+const startPathDirectories = ({ facts, nodePath }: { readonly facts: RemoteFacts; readonly nodePath: string }): string[] =>
+  [
+    posix.dirname(nodePath),
+    facts.dsh.path === undefined ? undefined : posix.dirname(facts.dsh.path),
+    facts.pnpm.path === undefined ? undefined : posix.dirname(facts.pnpm.path),
+    facts.home === undefined ? undefined : `${facts.home}/.local/share/pnpm/bin`,
+  ].filter((directory): directory is string => directory !== undefined && directory !== '.')
+
+const officialNodeOf = ({ facts, minimum = '22.19.0' }: { readonly facts: RemoteFacts; readonly minimum?: string }): string | undefined => {
+  const official = RemoteDoctor.officialNodePath({ nodes: facts.fnm.nodes, minimum })
+  return facts.node.nix ? official : (facts.node.path ?? official)
+}
+
 const multiHostHandlers = multiHostApi.host({
   identity: async () => readOrCreateRuntimeIdentity(configuredProfile),
   list: async () => {
     const [hosts, runtimes] = await Promise.all([HostDirectoryStore.listHosts(), HostDirectoryStore.listRuntimes()])
     return { hosts: hosts.map(record => hostSummary(record, runtimes)), runtimes: runtimes.map(runtimeSummary) }
+  },
+  remoteExec: async ({ input, signal }) => {
+    try {
+      const result = await RemoteExec.run({ sshTarget: input.sshTarget, command: input.command, cwd: input.cwd, timeoutMs: input.timeoutMs, signal })
+      return { ok: true as const, code: result.code, stdout: result.stdout, stderr: result.stderr, timedOut: result.timedOut, durationMs: result.durationMs }
+    } catch (error) {
+      return { ok: false as const, ...safeFailure(error) }
+    }
+  },
+  doctor: async ({ input, signal }) => {
+    try {
+      const facts = await RemoteDoctor.readFacts({ sshTarget: input.sshTarget, profile: input.profile, checkoutPath: input.checkoutPath, signal })
+      return { ok: true as const, facts, diagnostics: RemoteDoctor.diagnose({ facts, expected: { profile: input.profile, dshVersion: input.dshVersion } }) }
+    } catch (error) {
+      return { ok: false as const, ...safeFailure(error) }
+    }
+  },
+  provision: async ({ input, signal }) => {
+    try {
+      const facts = await RemoteDoctor.readFacts({ sshTarget: input.sshTarget, profile: input.profile, checkoutPath: input.checkoutPath, signal })
+      const options = {
+        remoteHome: input.remoteHome,
+        checkoutPath: input.checkoutPath ?? facts.checkout.path,
+        profile: input.profile,
+        dshVersion: input.dshVersion,
+        nodeVersion: input.nodeVersion,
+        repository: input.repository,
+        revision: input.revision,
+      }
+      const run = await RemoteProvision.run({
+        sshTarget: input.sshTarget,
+        facts,
+        options,
+        steps: input.steps,
+        confirm: input.confirm,
+        dryRun: input.dryRun,
+        signal,
+      })
+      return { ok: true as const, plan: RemoteProvision.plan({ facts, options }), executed: run.executed, remaining: run.remaining }
+    } catch (error) {
+      return { ok: false as const, ...safeFailure(error) }
+    }
+  },
+  remoteRuntimeStatus: async ({ input, signal }) => {
+    try {
+      const facts = await RemoteDoctor.readFacts({ sshTarget: input.sshTarget, profile: 'web', signal })
+      const status = await RemoteRuntime.readStatus({ sshTarget: input.sshTarget, remoteHome: remoteHomeOf({ facts, requested: input.remoteHome }), signal })
+      return { ok: true as const, status }
+    } catch (error) {
+      return { ok: false as const, ...safeFailure(error) }
+    }
+  },
+  runtimeControl: async ({ input, signal }) => {
+    try {
+      const facts = await RemoteDoctor.readFacts({ sshTarget: input.sshTarget, profile: input.profile, checkoutPath: input.checkoutPath, signal })
+      const remoteHome = remoteHomeOf({ facts, requested: input.remoteHome })
+      const before = await RemoteRuntime.readStatus({ sshTarget: input.sshTarget, remoteHome, signal })
+      if (input.action === 'stop') {
+        if (!before.running || before.pid === undefined)
+          return { ok: true as const, action: 'stop' as const, detail: 'no running remote runtime', status: before }
+        const stopped = await RemoteExec.run({ sshTarget: input.sshTarget, command: RemoteRuntime.stopCommand({ pid: before.pid }), timeoutMs: 30_000, signal })
+        const status = await RemoteRuntime.readStatus({ sshTarget: input.sshTarget, remoteHome, signal })
+        return { ok: true as const, action: 'stop' as const, detail: stopped.stdout.trim() || stopped.stderr.trim() || 'stop requested', status }
+      }
+      if (before.running && before.listening) {
+        return { ok: true as const, action: 'start' as const, detail: `already running on port ${before.port ?? 'unknown'}`, status: before }
+      }
+      const nodePath = officialNodeOf({ facts })
+      if (nodePath === undefined) throw new GatewayUnavailableError('no-official-node', 'No official Node build on that machine; provision it first.')
+      if (facts.dsh.path === undefined) throw new GatewayUnavailableError('dsh-missing', 'No dsh CLI on that machine; provision it first.')
+      const command = RemoteRuntime.startCommand({
+        remoteHome,
+        checkoutPath: input.checkoutPath ?? facts.checkout.path,
+        profile: input.profile,
+        dshPath: facts.dsh.path,
+        platform: facts.uname.startsWith('Darwin') ? 'Darwin' : undefined,
+        pathDirectories: startPathDirectories({ facts, nodePath }),
+      })
+      await RemoteExec.run({
+        sshTarget: input.sshTarget,
+        command: `${command}\n${RemoteRuntime.waitForLaunchCommand({ remoteHome })}`,
+        timeoutMs: 120_000,
+        signal,
+      })
+      const status = await RemoteRuntime.readStatus({ sshTarget: input.sshTarget, remoteHome, signal })
+      return {
+        ok: true as const,
+        action: 'start' as const,
+        detail: status.running ? `running on port ${status.port ?? 'unknown'}` : 'started but no launch file yet',
+        status,
+      }
+    } catch (error) {
+      return { ok: false as const, ...safeFailure(error) }
+    }
+  },
+  runtimeLogs: async ({ input, signal }) => {
+    try {
+      const facts = await RemoteDoctor.readFacts({ sshTarget: input.sshTarget, profile: 'web', signal })
+      const logFile = RemoteRuntime.logPath({ remoteHome: remoteHomeOf({ facts, requested: input.remoteHome }) })
+      const result = await RemoteExec.run({
+        sshTarget: input.sshTarget,
+        command: RemoteRuntime.logsCommand({ logFile, lines: input.lines }),
+        timeoutMs: 20_000,
+        signal,
+      })
+      return { ok: true as const, logFile, tail: result.stdout }
+    } catch (error) {
+      return { ok: false as const, ...safeFailure(error) }
+    }
+  },
+  checkoutSync: async ({ input, signal }) => {
+    try {
+      const facts = await RemoteDoctor.readFacts({ sshTarget: input.sshTarget, profile: 'web', checkoutPath: input.path, signal })
+      const run = await RemoteCheckout.run({ sshTarget: input.sshTarget, facts, bookmark: input.bookmark, apply: input.apply, signal })
+      return { ok: true as const, applied: run.applied, detail: run.detail, plan: run.plan, stdout: run.stdout, stderr: run.stderr }
+    } catch (error) {
+      return { ok: false as const, ...safeFailure(error) }
+    }
   },
   sshConfigHosts: async () => ({ hosts: await listSshConfigHosts(join(homedir(), '.ssh')) }),
   discoverHomes: async ({ input, signal }) => {

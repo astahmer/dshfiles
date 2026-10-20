@@ -159,6 +159,115 @@ export const nativeRpcResultSchema = z.discriminatedUnion('ok', [
   z.object({ ok: z.literal(false), code: z.string(), message: z.string() }).strict(),
 ])
 
+const remotePathSchema = z
+  .string()
+  .trim()
+  .min(2)
+  .max(4096)
+  .regex(/^\/(?!.*(?:^|\/)\.\.(?:\/|$)).+$/u)
+
+const profileNameSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(64)
+  .regex(/^[A-Za-z0-9][A-Za-z0-9._-]*$/u)
+
+const semanticVersionSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(64)
+  .regex(/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/u)
+
+const repositorySchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(1024)
+  .regex(/^(?:https:\/\/[^\s]+|git@[^\s]+|ssh:\/\/[^\s]+)$/u)
+
+const provisionStepSchema = z.enum(['node', 'checkout', 'install', 'build', 'cli', 'profile', 'runtime'])
+
+const remoteNodeSchema = z.object({
+  path: z.string().optional(),
+  version: z.string().optional(),
+  resolved: z.string().optional(),
+  nix: z.boolean(),
+})
+
+const remoteFactsSchema = z.object({
+  uname: z.string(),
+  osVersion: z.string().optional(),
+  user: z.string().optional(),
+  home: z.string().optional(),
+  node: remoteNodeSchema,
+  fnm: z.object({ path: z.string().optional(), nodes: z.array(z.object({ version: z.string(), path: z.string() })) }),
+  dsh: z.object({ path: z.string().optional(), version: z.string().optional() }),
+  jj: z.object({ path: z.string().optional(), version: z.string().optional() }),
+  pnpm: z.object({ path: z.string().optional(), version: z.string().optional() }),
+  launch: z.object({ files: z.array(z.string()), port: z.number().int().optional(), pid: z.number().int().optional() }),
+  profile: z.object({ path: z.string(), exists: z.boolean(), pluginLinks: z.number().int(), coreVersion: z.string().optional() }),
+  checkout: z.object({
+    path: z.string(),
+    exists: z.boolean(),
+    installed: z.boolean(),
+    built: z.boolean(),
+    changeId: z.string().optional(),
+    commitId: z.string().optional(),
+    description: z.string().optional(),
+    conflicts: z.number().int(),
+    mainOrigin: z.string().optional(),
+  }),
+})
+
+const remoteDiagnosticSchema = z.object({ code: z.string().max(128), severity: z.enum(['error', 'warning', 'info']), message: z.string().max(2048) })
+
+const remoteExecOutputSchema = z.object({
+  ok: z.literal(true),
+  code: z.number().int().nullable(),
+  stdout: z.string(),
+  stderr: z.string(),
+  timedOut: z.boolean(),
+  durationMs: z.number().int().nonnegative(),
+})
+
+const provisionPlanStepSchema = z.object({
+  id: provisionStepSchema,
+  title: z.string(),
+  state: z.enum(['done', 'pending', 'blocked']),
+  reason: z.string(),
+  commands: z.array(z.string()),
+})
+
+const provisionStepRunSchema = z.object({
+  id: provisionStepSchema,
+  ok: z.boolean(),
+  state: z.enum(['ran', 'failed', 'skipped', 'blocked']),
+  detail: z.string(),
+  stdout: z.string(),
+  stderr: z.string(),
+})
+
+const remoteRuntimeStatusSchema = z.object({
+  running: z.boolean(),
+  port: z.number().int().optional(),
+  pid: z.number().int().optional(),
+  command: z.string().optional(),
+  listening: z.boolean(),
+  launchFiles: z.array(z.string()),
+  logFile: z.string(),
+  logBytes: z.number().int().optional(),
+})
+
+const checkoutSyncPlanSchema = z.object({
+  path: z.string(),
+  bookmark: z.string(),
+  upToDate: z.boolean(),
+  reason: z.string(),
+  commands: z.array(z.string()),
+})
+
 export const multiHostApi = defineApi({
   id: 'multi-host',
   version: 1,
@@ -374,6 +483,121 @@ export const multiHostApi = defineApi({
         name: 'multi_host_thread_stop',
         render: output => (output.ok ? 'Asked the remote thread to stop.' : `Failed: ${output.message}`),
       },
+    }),
+
+    remoteExec: method({
+      input: z
+        .object({
+          sshTarget: sshTargetSchema,
+          command: z.string().trim().min(1).max(2000),
+          cwd: remotePathSchema.optional(),
+          timeoutMs: z.number().int().min(1000).max(120_000).default(30_000),
+        })
+        .strict(),
+      output: z.discriminatedUnion('ok', [remoteExecOutputSchema, failedSchema]),
+      description:
+        'Run one bounded command on an SSH host and return its exit code, stdout and stderr (120 s at most). Call only when the user asked to run something on that machine.',
+      tool: { name: 'multi_host_exec', render: compactJson },
+    }),
+    doctor: method({
+      input: z
+        .object({
+          sshTarget: sshTargetSchema,
+          profile: profileNameSchema.default('web'),
+          checkoutPath: remotePathSchema.optional(),
+          dshVersion: semanticVersionSchema.optional(),
+        })
+        .strict(),
+      output: z.discriminatedUnion('ok', [
+        z.object({ ok: z.literal(true), facts: remoteFactsSchema, diagnostics: z.array(remoteDiagnosticSchema) }),
+        failedSchema,
+      ]),
+      description:
+        'Report what one SSH host has for DSH: node (and whether it is the Nix build DSH cannot boot), fnm, jj, pnpm, dsh, profile core version, checkout revision and any running runtime, plus the diagnostics worth acting on. Read-only.',
+      tool: { name: 'multi_host_doctor', readOnly: true, render: compactJson },
+    }),
+    provision: method({
+      input: z
+        .object({
+          sshTarget: sshTargetSchema,
+          remoteHome: remoteHomeSchema,
+          checkoutPath: remotePathSchema.optional(),
+          profile: profileNameSchema.default('web'),
+          repository: repositorySchema,
+          revision: z.string().trim().min(1).max(128).optional(),
+          dshVersion: semanticVersionSchema,
+          nodeVersion: z.string().trim().min(1).max(32).default('22.23.3'),
+          steps: z.array(provisionStepSchema).min(1).default(['node', 'checkout', 'install', 'build', 'cli', 'profile', 'runtime']),
+          confirm: z.enum(['all', 'next']).default('next'),
+          dryRun: z.boolean().default(false),
+        })
+        .strict(),
+      output: z.discriminatedUnion('ok', [
+        z.object({
+          ok: z.literal(true),
+          plan: z.array(provisionPlanStepSchema),
+          executed: z.array(provisionStepRunSchema),
+          remaining: z.array(provisionStepSchema),
+        }),
+        failedSchema,
+      ]),
+      description:
+        'Install and start DSH on an SSH host: official Node through fnm, the dshfiles checkout, its dependencies and build, the dsh CLI, the web profile and a headless runtime. dryRun only plans. confirm "next" (default) runs one step per call, so each step is its own opt-in; "all" runs every named step. Call only when the user asked to provision that machine.',
+      tool: { name: 'multi_host_provision', render: compactJson },
+    }),
+    remoteRuntimeStatus: method({
+      input: z.object({ sshTarget: sshTargetSchema, remoteHome: remoteHomeSchema.optional() }).strict(),
+      output: z.discriminatedUnion('ok', [z.object({ ok: z.literal(true), status: remoteRuntimeStatusSchema }), failedSchema]),
+      description: 'Whether a DSH runtime answers on one SSH host: its launch file, port, pid, process command and log size. Read-only.',
+      tool: { name: 'multi_host_runtime_status', readOnly: true, render: compactJson },
+    }),
+    runtimeControl: method({
+      input: z
+        .object({
+          sshTarget: sshTargetSchema,
+          remoteHome: remoteHomeSchema.optional(),
+          action: z.enum(['start', 'stop']),
+          checkoutPath: remotePathSchema.optional(),
+          profile: profileNameSchema.default('web'),
+        })
+        .strict(),
+      output: z.discriminatedUnion('ok', [
+        z.object({ ok: z.literal(true), action: z.enum(['start', 'stop']), detail: z.string(), status: remoteRuntimeStatusSchema }),
+        failedSchema,
+      ]),
+      description:
+        'Start or stop the headless DSH runtime on one SSH host (start uses an official Node build and a free loopback port; stop refuses a process that is not that machine DSH web). Call only when the user asked to start or stop it.',
+      tool: { name: 'multi_host_runtime_control', render: compactJson },
+    }),
+    runtimeLogs: method({
+      input: z.object({ sshTarget: sshTargetSchema, remoteHome: remoteHomeSchema.optional(), lines: z.number().int().min(1).max(400).default(200) }).strict(),
+      output: z.discriminatedUnion('ok', [z.object({ ok: z.literal(true), logFile: z.string(), tail: z.string() }), failedSchema]),
+      description: 'Read the tail of the headless DSH runtime log on one SSH host (400 lines at most). Read-only.',
+      tool: { name: 'multi_host_runtime_logs', readOnly: true, render: compactJson },
+    }),
+    checkoutSync: method({
+      input: z
+        .object({
+          sshTarget: sshTargetSchema,
+          path: remotePathSchema,
+          bookmark: z.string().trim().min(1).max(128).default('main'),
+          apply: z.boolean().default(false),
+        })
+        .strict(),
+      output: z.discriminatedUnion('ok', [
+        z.object({
+          ok: z.literal(true),
+          applied: z.boolean(),
+          detail: z.string(),
+          plan: checkoutSyncPlanSchema,
+          stdout: z.string(),
+          stderr: z.string(),
+        }),
+        failedSchema,
+      ]),
+      description:
+        'Fetch and rebase one checkout on an SSH host onto its bookmark origin, keeping that machine edits. Without apply it only reports the commands. Call only when the user asked to update that checkout.',
+      tool: { name: 'multi_host_checkout_sync', render: compactJson },
     }),
     runtimeCall: method({
       input: z.object({ runtimeId: idSchema, request: nativeRpcSchema }).strict(),

@@ -6,6 +6,9 @@ describe('multi-host tool exposure', () => {
     const tools = Object.values(multiHostApi.methods).flatMap(method => (method.tool === undefined ? [] : [method.tool]))
     expect(tools.map(tool => tool.name).sort()).toEqual([
       'multi_host_browse',
+      'multi_host_checkout_sync',
+      'multi_host_doctor',
+      'multi_host_exec',
       'multi_host_find_homes',
       'multi_host_forget_thread',
       'multi_host_identity',
@@ -13,9 +16,13 @@ describe('multi-host tool exposure', () => {
       'multi_host_mkdir',
       'multi_host_models',
       'multi_host_open_folder',
+      'multi_host_provision',
       'multi_host_reconnect',
       'multi_host_remove_host',
       'multi_host_remove_runtime',
+      'multi_host_runtime_control',
+      'multi_host_runtime_logs',
+      'multi_host_runtime_status',
       'multi_host_save_ssh_host',
       'multi_host_ssh_hosts',
       'multi_host_start_thread',
@@ -35,9 +42,12 @@ describe('multi-host tool exposure', () => {
       .sort()
     expect(readOnly).toEqual([
       'multi_host_browse',
+      'multi_host_doctor',
       'multi_host_identity',
       'multi_host_list',
       'multi_host_models',
+      'multi_host_runtime_logs',
+      'multi_host_runtime_status',
       'multi_host_ssh_hosts',
       'multi_host_status',
       'multi_host_thread_transcript',
