@@ -4,6 +4,7 @@ import type { WorkspaceBrowserProps } from '@deepseek-ai/dsh-client-ui-workspace
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
+import { DetachedThreadsModel, type DetachedGroupAction } from './detached-threads.js'
 import { DraftThreadsModel } from './draft-threads.js'
 import { HostSnapshotsModel } from './snapshots.js'
 import { storedCollapsedGroups, toggleCollapsedGroup } from './collapsed-groups.js'
@@ -1413,6 +1414,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const draftSessionIds = useMemo(() => new Set(draftSessions.map(draft => draft.id)), [draftSessions])
   const [draftsOpen, setDraftsOpen] = useState(false)
   const [draftsCleaning, setDraftsCleaning] = useState(false)
+  const [detachedBranchBusy, setDetachedBranchBusy] = useState<ReadonlySet<string>>(() => new Set())
   const attentionSessions = useMemo(
     () => sessions.filter(session => SidebarOrganization.isAttentionSessionIncluded(session, preferences.includeSubagentAttention)),
     [preferences.includeSubagentAttention, sessions],
@@ -2095,6 +2097,29 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     }
   }
 
+  /**
+   * Put a whole branch whose parent left the corpus away, or bring it back. Those rows are plain child rows with no
+   * menu, and there is no parent row to cascade from, so the header is the only place that can archive the branch.
+   */
+  const mutateDetachedBranch = async (branch: {
+    readonly missingAncestorId: string
+    readonly threadIds: readonly SessionSummary['id'][]
+    readonly action: DetachedGroupAction
+  }): Promise<void> => {
+    if (detachedBranchBusy.has(branch.missingAncestorId)) return
+    setDetachedBranchBusy(current => new Set(current).add(branch.missingAncestorId))
+    try {
+      const succeeded = await mutateThreads(branch.threadIds, branch.action === 'restore' ? 'unarchive' : 'archive')
+      if (branch.action === 'restore' && succeeded) setNotice({ tone: 'success', message: props.tSidebar('threadSidebarRestoredNotice') })
+    } finally {
+      setDetachedBranchBusy(current => {
+        const next = new Set(current)
+        next.delete(branch.missingAncestorId)
+        return next
+      })
+    }
+  }
+
   const notifyThread = (category: ThreadNotificationCategory, eventId: string, sessionId: SessionSummary['id'], title: string, fallbackBody: string): void => {
     const categoryPreferences = preferences.notificationCategories[category]
     if (!ThreadNotificationModel.threadNotificationHasOutput(categoryPreferences) || isMuteActive(mutedThreads[sessionId], Date.now())) return
@@ -2721,10 +2746,12 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
    */
   const detachedThreadGroups = useMemo(() => {
     if (threadView.sourceFilter === 'main') return []
+    const archivedShown = DetachedThreadsModel.showsArchived(threadView.statusFilters)
     return [...threadTree.detachedByMissingAncestor.entries()]
       .map(([missingAncestorId, children]) => {
         const listed = children.filter(
           child =>
+            (archivedShown || !archivedSessionIds.has(child.id)) &&
             !attentionIds.has(child.id) &&
             ThreadViewModel.matchesStatusFilter({
               filters: threadView.statusFilters,
@@ -2742,7 +2769,15 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           isFinished: child => child.origin === 'subagent' && !child.running && !waitingSessionIds.has(child.id),
           selectedId: selectedChildId,
         })
-        return { missingAncestorId, live, finished, selectedChildId, count: live.length + finished.length }
+        return {
+          missingAncestorId,
+          live,
+          finished,
+          selectedChildId,
+          count: live.length + finished.length,
+          threadIds: listed.map(child => child.id),
+          branchAction: DetachedThreadsModel.actionFor(listed.map(child => ({ archived: archivedSessionIds.has(child.id) }))),
+        }
       })
       .filter(group => group.count > 0)
   }, [
@@ -4016,38 +4051,57 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                   </section>
                 )
               })}
-          {detachedThreadGroups.map(group => (
-            <section
-              className="dshx:mt-1"
-              key={`detached:${group.missingAncestorId}`}
-              aria-label={`${props.tSidebar('threadSidebarMissingParent')} ${group.missingAncestorId}`}
-            >
-              <div
-                className={cn(
-                  stickyHeaderClass,
-                  'dshx:flex dshx:h-8 dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:px-2.5 dshx:text-sm dshx:text-muted-foreground',
-                )}
+          {detachedThreadGroups.map(group => {
+            const branchAction = group.branchAction
+            const branchBusy = detachedBranchBusy.has(group.missingAncestorId)
+            return (
+              <section
+                className="dshx:mt-1"
+                key={`detached:${group.missingAncestorId}`}
+                aria-label={`${props.tSidebar('threadSidebarMissingParent')} ${group.missingAncestorId}`}
               >
-                <span className="dshx:shrink-0 dshx:whitespace-nowrap">{props.tSidebar('threadSidebarMissingParent')}</span>
-                <span className="dshx:min-w-0 dshx:truncate dshx:text-xs" title={group.missingAncestorId}>
-                  {shortSessionId(group.missingAncestorId)}
-                </span>
-                <span className="dshx:text-xs dshx:tabular-nums">({group.count})</span>
-                <span className="dshx:h-px dshx:flex-1 dshx:bg-border" aria-hidden="true" />
-              </div>
-              <ChildThreadList
-                parentId={group.missingAncestorId}
-                childThreads={group.live}
-                finishedChildThreads={group.finished}
-                unreadSessionIds={unreadSessionIds}
-                allShown={expandedParents.has(group.missingAncestorId)}
-                selectedChildId={group.selectedChildId}
-                attentionLabels={inlineAttentionLabels}
-                rowStyle={rowStyle}
-                actions={rowActions}
-              />
-            </section>
-          ))}
+                <div
+                  className={cn(
+                    stickyHeaderClass,
+                    'dshx:flex dshx:h-8 dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:px-2.5 dshx:text-sm dshx:text-muted-foreground',
+                  )}
+                >
+                  <span className="dshx:shrink-0 dshx:whitespace-nowrap">{props.tSidebar('threadSidebarMissingParent')}</span>
+                  <span className="dshx:min-w-0 dshx:truncate dshx:text-xs" title={group.missingAncestorId}>
+                    {shortSessionId(group.missingAncestorId)}
+                  </span>
+                  <span className="dshx:text-xs dshx:tabular-nums">({group.count})</span>
+                  <span className="dshx:h-px dshx:flex-1 dshx:bg-border" aria-hidden="true" />
+                  {branchAction === null ? null : (
+                    <Button
+                      size="icon-xs"
+                      variant="ghost"
+                      className="dshx:shrink-0"
+                      aria-label={props.tSidebar(branchAction === 'restore' ? 'threadSidebarMissingParentRestore' : 'threadSidebarMissingParentArchive')}
+                      title={props.tSidebar(branchAction === 'restore' ? 'threadSidebarMissingParentRestoreHint' : 'threadSidebarMissingParentArchiveHint')}
+                      disabled={branchBusy}
+                      onClick={() =>
+                        void mutateDetachedBranch({ missingAncestorId: group.missingAncestorId, threadIds: group.threadIds, action: branchAction })
+                      }
+                    >
+                      {branchAction === 'restore' ? <IconUnarchiveOutlineRegular size={13} /> : <IconArchiveOutlineRegular size={13} />}
+                    </Button>
+                  )}
+                </div>
+                <ChildThreadList
+                  parentId={group.missingAncestorId}
+                  childThreads={group.live}
+                  finishedChildThreads={group.finished}
+                  unreadSessionIds={unreadSessionIds}
+                  allShown={expandedParents.has(group.missingAncestorId)}
+                  selectedChildId={group.selectedChildId}
+                  attentionLabels={inlineAttentionLabels}
+                  rowStyle={rowStyle}
+                  actions={rowActions}
+                />
+              </section>
+            )
+          })}
           {props.openRemoteThreads === undefined ? null : <RemoteThreadsSection headerClassName={stickyHeaderClass} onOpen={props.openRemoteThreads} />}
           {draftSessions.length === 0 ? null : (
             <section className="dshx:mt-1" key="drafts" aria-label={props.tSidebar('threadSidebarDrafts')}>

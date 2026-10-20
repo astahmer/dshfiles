@@ -1125,7 +1125,7 @@
     {
       "id": "thread-children-and-links",
       "title": "Browse child sessions and share thread URLs",
-      "summary": "Default child lists to open only while a subagent is working, preserve manual toggles, expand recursive child sessions with inherited workspace context, fold or hide finished subagents, group a branch whose parent session is gone under a \u201cparent thread unavailable\u201d header instead of a top-level row, and copy credential-free thread URLs.",
+      "summary": "Default child lists to open only while a subagent is working, preserve manual toggles, expand recursive child sessions with inherited workspace context, fold or hide finished subagents, group a branch whose parent session is gone under a \u201cparent thread unavailable\u201d header instead of a top-level row, archive or restore that whole branch from the header, and copy credential-free thread URLs.",
       "reach": [
         "click button \"Sidebar settings\"",
         "click button \"Finished subagents: Fold into \u201cN finished\u201d\"",
@@ -1155,6 +1155,7 @@
       "failureModes": [
         "Child chains preserve inherited workspace identity.",
         "A branch whose nearest listed ancestor is missing from the corpus groups under one \u201cparent thread unavailable\u201d header and never renders as a top-level thread row.",
+        "The unavailable branch header archives every thread in it, and archived threads of that branch stay hidden until the view filters for archived, where the same header restores them.",
         "Copied links omit credentials and unsupported path-based routes."
       ],
       "externalDependencies": [],
@@ -1181,6 +1182,18 @@
           "id": "thread-sidebar.thread-children-and-links-unit-detached-branch",
           "file": "plugins/@dshfiles/thread-sidebar/src/thread-children.test.ts",
           "testName": "a branch whose listed ancestor has a missing parent follows it into one detached group"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.thread-children-and-links-unit-detached-archived-hidden",
+          "file": "plugins/@dshfiles/thread-sidebar/src/detached-threads.test.ts",
+          "testName": "an unavailable branch hides its archived threads until the view asks for archived"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.thread-children-and-links-unit-detached-branch-action",
+          "file": "plugins/@dshfiles/thread-sidebar/src/detached-threads.test.ts",
+          "testName": "the branch header archives its live threads and restores it once every visible thread is archived"
         },
         {
           "kind": "unit-test",

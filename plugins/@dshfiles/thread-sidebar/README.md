@@ -344,9 +344,14 @@ A branch whose nearest listed ancestor is gone from the corpus (for example a
 quarantined session log) never turns into a top-level row: the whole branch
 groups under one “Parent thread unavailable: …” header naming the missing
 session, with its children nested and the same status, source, and finished
-subagent rules as a listed parent. Nothing can create that state through the
+subagent rules as a listed parent. The header carries one archive action for the
+whole branch, because those child rows have no menu of their own and there is no
+parent row to cascade from; with the Archived filter on, the same button restores
+the branch. An archived branch leaves the unfiltered list instead of sitting
+there forever — the Archived section can only list root rows, so the archived
+filter is where it comes back. Nothing can create that state through the
 UI — DSH has no session delete — so a unit test covers the grouping and the
-browser journeys cover the listed-parent case.
+branch action, and the browser journeys cover the listed-parent case.
 
 Finished subagents (not running and not waiting on approval or input) fold
 into one “N finished” line by default so live ones stay on top; the
